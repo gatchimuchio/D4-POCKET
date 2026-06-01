@@ -1,6 +1,6 @@
 # Language Policy Gap Analysis
 
-Status: Phase 0 gap analysis
+Status: Phase 0 gap analysis updated after Phase 3 broker skeleton
 Date: 2026-06-01
 Scope: GUI-Shell language policy convergence
 
@@ -21,7 +21,7 @@ Scope: GUI-Shell language policy convergence
 | --- | --- | --- | --- |
 | Shell Core implementation language | `packages/shell_core/*.py` が registry、policy、approval、audit、recovery、content exposure、snapshot semantics を実装している | product authority path として使う場合は言語方針に抵触する | release_blocker |
 | owner-use state generation | `scripts/launch_owner_desktop.*` が Flutter launch 前に Python `tooling/shell_snapshot.py` を実行する | migration 中は許容できるが、final installed product runtime dependency としては不可 | release_blocker |
-| Rust security boundary | `native/rust_helper` は library helper で、broker process ではない | authority-sensitive production boundary として不足 | release_blocker |
+| Rust security boundary | `native/rust_helper` に broker skeleton、JSON envelope parsing、replay/stale/malformed rejection、broker-local audit skeleton がある | production IPC transport / Flutter cutover / authority migration が未完 | release_blocker |
 | Flutter authority ownership | Flutter は JSON を読み projection を表示するだけで、policy mutation / dispatch は見つからない | current scope では整合 | none |
 | FFI authority path | `dart:ffi`、`flutter_rust_bridge`、`MethodChannel`、Rust FFI authority path は見つからない | current scope では整合 | none |
 | TypeScript / Node core runtime | 見つからない | 整合 | none |
@@ -36,10 +36,10 @@ Scope: GUI-Shell language policy convergence
   required_action: 等価な Rust broker responsibilities を parity tests 付きで実装し、Python を active product invocation path から外して migration oracle / tooling に限定する。
   blocks_release: yes
 
-- item: Rust Security Broker process is absent
+- item: Rust Security Broker production path is incomplete
   classification: release_blocker
-  reason: `native/rust_helper` には independent process lifecycle、authenticated session、restricted IPC endpoint、replay rejection、broker-local audit acceptance/rejection path がない。
-  required_action: production cutover 前に envelope validation、structured errors、health、shutdown、fail-closed behavior、rejection audit を持つ最小 Rust broker skeleton を追加する。
+  reason: `native/rust_helper` に process skeleton と JSON envelope rejection tests はあるが、Windows-first restricted IPC transport、authenticated session lifecycle、Flutter client integration、approval/audit/recovery cutover、installed-path proof がない。
+  required_action: production cutover 前に IPC transport を選定し、Flutter authority operations を broker 経由にし、broker unavailable / crash / stale-session fail-closed behavior を検証する。
   blocks_release: yes
 
 - item: Flutter broker integration is absent
@@ -52,6 +52,18 @@ Scope: GUI-Shell language policy convergence
   classification: release_blocker
   reason: current `installer/setup_doctor.py` は Python diagnostics script であり、Windows installed-path Setup Doctor evidence がない。
   required_action: installed product diagnostics の authority evidence を Rust broker / product path へ移すか、Python diagnostics が release-only tooling で installed GUI-Shell runtime に必須ではないことを証明する。
+  blocks_release: yes
+
+- item: no-Python-runtime product assertion is incomplete
+  classification: release_blocker
+  reason: Python が tooling / CI / migration oracle に限定されるという product artifact assertion が strict release gate でまだ証明されていない。
+  required_action: installed/runtime artifact に Python interpreter または Python production dependency が不要であることを検証する no-Python-runtime check を strict release validation に追加する。
+  blocks_release: yes
+
+- item: no-FFI-authority release assertion is incomplete
+  classification: release_blocker
+  reason: current static scan では `dart:ffi` / `flutter_rust_bridge` authority path は見つからないが、authority path が restricted IPC だけであることを release gate として固定する検証がまだ十分ではない。
+  required_action: Flutter authority operations、Rust broker boundary、future bridge code を対象に no-FFI-authority assertion を strict release validation へ追加する。
   blocks_release: yes
 
 ## 4. Non-conflicts Observed
@@ -89,7 +101,7 @@ Completed product release claim 前に必要な条件:
 ## 6. Evidence Limitations
 
 - schema / conformance success は現時点で Python contract behavior を証明するが、Rust broker behavior は証明しない。
-- Rust helper cargo tests は helper library behavior を証明するが、standalone broker behavior は証明しない。
+- Rust helper cargo tests は broker skeleton の JSON envelope / rejection behavior を証明するが、production IPC transport、Flutter integration、installed product authority ownership は証明しない。
 - Flutter tests は display projection behavior を証明するが、authority ownership は証明しない。
 - Linux/WSLg smoke は development evidence であり、Windows product proof に昇格できない。
 - installed runtime artifact が Python を不要とする証拠はまだない。

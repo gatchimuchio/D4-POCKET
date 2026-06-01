@@ -16,7 +16,7 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: passed in development validation with 89 conformance checks; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress.
+  status: passed in development validation with 96 conformance checks; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts and static no-FFI/no-Python-spawn assertions are covered.
 
 - item: personal Windows trial operation
   classification: required_for_v1
@@ -48,7 +48,7 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: Rust helper boundary skeleton
   classification: required_for_v1
-  status: implementation present; `cd native/rust_helper && cargo test` passed on 2026-05-25
+  status: helper implementation and Rust Security Broker skeleton present; `cd native/rust_helper && cargo test` passed with broker JSON envelope/rejection tests on 2026-06-01
 
 - item: Desktop Flutter skeleton
   classification: required_for_v1
@@ -66,8 +66,8 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: language policy runtime convergence not passed
   classification: release_blocker
-  reason: Current Shell Core authority-sensitive behavior is implemented in Python under `packages/shell_core/*.py` and used by owner-use snapshot generation / validation, while the Rust side is still a bounded helper library without independent broker IPC ownership.
-  required_action: Migrate authority-sensitive active runtime responsibilities to a Rust Security Broker, keep Python only as dev/test/migration oracle, and prove Flutter authority operations are broker-mediated before completed product release.
+  reason: Rust Security Broker skeleton and JSON envelope tests exist, but current Shell Core authority-sensitive behavior is still implemented in Python under `packages/shell_core/*.py` and used by owner-use snapshot generation / validation. Production IPC transport, Flutter broker-mediated authority path, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  required_action: Migrate authority-sensitive active runtime responsibilities to the Rust Security Broker, keep Python only as dev/test/migration oracle, and prove Flutter authority operations are broker-mediated before completed product release.
   blocks_release: yes
 
 - item: Linux desktop build and launch smoke

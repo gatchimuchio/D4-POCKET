@@ -85,7 +85,7 @@ Phase B may improve owner usability without weakening strict release gates.
 
 - item: Rust Security Broker migration
   classification: release_blocker
-  status: not_passed
-  reason: current owner-use and validation Shell Core behavior is implemented in Python, and the Rust side is a helper library rather than an independent authority broker.
-  required_action: Complete broker IPC skeleton, parity migration, Flutter broker-mediated authority path, and no-Python-runtime assertion before Phase D evidence can support a completed product release claim.
+  status: partially_started_not_passed
+  reason: Rust broker skeleton and JSON envelope rejection tests exist, but current owner-use and validation Shell Core behavior is still implemented in Python, and the broker is not yet the production authority path.
+  required_action: Complete production IPC transport, parity migration, Flutter broker-mediated authority path, no-Python-runtime assertion, and no-FFI-authority assertion before Phase D evidence can support a completed product release claim.
   blocks_release: yes
