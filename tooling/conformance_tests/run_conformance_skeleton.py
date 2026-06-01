@@ -1292,6 +1292,49 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
     return errors
 
 
+def test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge() -> list[str]:
+    forbidden = [
+        "Process.run",
+        "Process.start",
+        "Process.killPid",
+        "dart:ffi",
+        "flutter_rust_bridge",
+        "MethodChannel(",
+    ]
+    errors = []
+    for path in sorted((DESKTOP_FLUTTER / "lib").rglob("*.dart")):
+        text = path.read_text(encoding="utf-8")
+        for token in forbidden:
+            if token in text:
+                errors.append(f"{path.relative_to(ROOT)} contains forbidden runtime bridge token: {token}")
+    return errors
+
+
+def test_release_docs_declare_language_policy_runtime_blockers() -> list[str]:
+    required_tokens = [
+        "rust security broker",
+        "release_blocker",
+        "production ipc",
+        "no-python-runtime",
+        "no-ffi-authority",
+    ]
+    required_docs = [
+        "ROADMAP.md",
+        "CLAIM.md",
+        "RELEASE_CHECKLIST.md",
+        "docs/PHASE_STRATEGY.md",
+        "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
+        "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
+    ]
+    errors = []
+    for relative in required_docs:
+        text = (ROOT / relative).read_text(encoding="utf-8").lower()
+        for token in required_tokens:
+            if token not in text:
+                errors.append(f"{relative} missing language-policy blocker token: {token}")
+    return errors
+
+
 def test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema() -> list[str]:
     adapter = BlueTanukiAdapter()
     runtime = adapter.runtime_snapshot()
@@ -1753,6 +1796,8 @@ def main() -> int:
         test_broker_boundary_docs_exist,
         test_rust_broker_skeleton_exists,
         test_rust_broker_rejection_audit_contract_shape,
+        test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
+        test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
         test_blue_tanuki_adapter_metadata_cannot_escalate_authority,
         test_blue_tanuki_adapter_cannot_expose_full_payload_unless_visibility_full,

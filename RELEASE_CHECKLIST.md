@@ -12,13 +12,13 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 - item: language policy runtime convergence gate
   classification: release_blocker
-  reason: The current authority-sensitive Shell Core behavior is Python-based and the Rust side is not yet an independent Rust Security Broker process with restricted IPC, rejection audit, approval/audit/recovery ownership, and no-Python-runtime product evidence.
-  required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only, and rerun strict release validation after broker-mediated Windows installed-path evidence exists.
+  reason: Rust Security Broker skeleton, JSON envelope parsing, replay/stale/malformed rejection, and broker-local rejection audit tests exist, but production IPC transport, Flutter broker integration, approval/audit/recovery ownership cutover, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only, prove authority paths use restricted IPC rather than FFI, and rerun strict release validation after broker-mediated Windows installed-path evidence exists.
   blocks_release: yes
 
 - item: cargo test gate for in-scope Rust helper
   classification: required_for_v1
-  reason: Rust helper validation is required for completed desktop-first v1.0 release. Current run on 2026-05-25 passed.
+  reason: Rust helper and Rust Security Broker skeleton validation are required for completed desktop-first v1.0 release. Current run on 2026-06-01 passed with broker JSON envelope and rejection tests.
   required_action: Pass `cd native/rust_helper && cargo test` on the release candidate.
   blocks_release: no
 

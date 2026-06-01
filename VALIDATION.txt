@@ -16,7 +16,7 @@ validation_update:
       classification: none
       blocks_release: no
       exit: 0
-      stdout: conformance skeleton passed: 94 checks
+      stdout: conformance skeleton passed: 96 checks
     - name: rust_helper_cargo_test
       command: cd native/rust_helper && cargo test
       status: passed
@@ -29,6 +29,8 @@ validation_update:
         - broker rejects malformed JSON and missing metadata
         - broker rejects malformed, stale-session, replayed, authority-metadata requests
         - command envelope remains suspended without dispatch
+        - static checks reject Flutter Python process spawning / FFI authority bridge tokens
+        - release-facing docs declare production IPC, no-Python-runtime, and no-FFI-authority blockers
     - name: rust_helper_cargo_fmt_check
       command: cd native/rust_helper && cargo fmt --check
       status: passed

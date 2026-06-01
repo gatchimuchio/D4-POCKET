@@ -3,7 +3,7 @@
 Status: Phase B owner-use complete; v1.0 desktop release roadmap  
 Project: GUI Shell / Runtime Operation Shell  
 Reference consumer/runtime: BLUE-TANUKI via adapter only  
-Primary implementation candidate: Flutter + Rust helper; Rust Security Broker required for authority-sensitive production convergence
+Primary implementation path: Flutter UI + Rust Security Broker for authority-sensitive production convergence; Rust helper remains bounded native diagnostics/operations where outside authority.
 
 ## Completion Audit Priority
 
@@ -23,9 +23,9 @@ Primary implementation candidate: Flutter + Rust helper; Rust Security Broker re
 
 - item: Language policy runtime convergence
   classification: release_blocker
-  status: not_passed
-  reason: `packages/shell_core/*.py` is the current authority-sensitive Shell Core implementation for owner-use snapshot generation and validation, while `native/rust_helper` is a bounded library helper rather than an independent Rust Security Broker process.
-  required_action: Complete Rust Security Broker IPC skeleton, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
+  status: partially_started_not_passed
+  reason: Rust broker skeleton and JSON envelope rejection tests exist under `native/rust_helper`, but production IPC transport, Flutter broker integration, authority-sensitive responsibility migration, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  required_action: Select restricted IPC transport, integrate Flutter through the broker for authority operations, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
   blocks_release: yes
 
 - item: Windows installer, first-run, and real Setup Doctor
@@ -119,7 +119,8 @@ The following decisions are locked for the current execution path:
 - Generic Runtime Operation Shell direction
 - BLUE-TANUKI as reference runtime only
 - BLUE-TANUKI connected through adapter boundary
-- Flutter + Rust helper as first implementation candidate
+- Flutter UI + Rust Security Broker as the authority-sensitive implementation path
+- Rust helper as bounded non-authority native diagnostics/operations
 - Compose Multiplatform as watchlist candidate
 - Tauri as desktop-heavy fallback
 - JSON Schema-first contract model
@@ -139,27 +140,27 @@ Runtime / Agent / Tool / Local Service
       -> content exposure policy
       -> capability declaration
       -> diagnostic normalization
-  -> Shell Core
-      -> runtime registry
-      -> permission ledger
-      -> approval queue
-      -> audit store
-      -> recovery catalog
-      -> update policy
-  -> UI Layer
+  -> Rust Security Broker
+      -> restricted IPC endpoint
+      -> schema-validated broker envelope
+      -> runtime registry authority path
+      -> capability / permission eligibility
+      -> approval validation and protected-field enforcement
+      -> audit append / verification authority
+      -> recovery classification
+      -> command-envelope eligibility
+      -> process / credential / update gated execution
+  -> Shell Core Contracts
+      -> runtime-neutral JSON Schema / protocol semantics
+      -> migration oracle parity fixtures until cutover
+  -> Flutter UI Layer
       -> Flutter rendering
       -> operator input
       -> navigation
       -> local UI state
   -> Rust Helper
-      -> bounded native diagnostics
-      -> bounded native operations
-      -> process checks
-      -> filesystem diagnostics
-      -> network diagnostics
-      -> audit hashing
-      -> update verification
-      -> secure IPC
+      -> bounded non-authority native diagnostics
+      -> bounded non-authority native operations
 ```
 
 ## 5. Phase Plan

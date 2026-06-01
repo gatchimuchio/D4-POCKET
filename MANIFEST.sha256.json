@@ -55,7 +55,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "ce6a8ae2c8662d7d6ec1b4ac8a3c1afa3cc0886e1bb23a88096f9d6c861ba3ff"
+      "sha256": "9ffeaa25eac0b9143bd1302848876161959f8246d0bb020f4b472996c15177e0"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -75,15 +75,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "a42c37e3452bae4e1ae8aa95c613a481623c4d2cdae3d511f7d828a77ee85c5d"
+      "sha256": "d9d86cf4b0d904fbfa4a31eba297e484318289652ca34e333248ad0376f432ef"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "e3452288493b8529ca7b4b44ad36940698e340dee1b1c22dd709e0f15ae5c8e2"
+      "sha256": "2773fd5be027d3a4b076c9e6117e694e195f804578d9b28e6914853a3b0d19f9"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9aeec5a516233ae562006c846b21c461f051d8df05f2de5b16c35ef8b6cbb405"
+      "sha256": "9da53db3776562bb606ec83a58f69dbbc2dbe68a769a00303dbbcb281956ec5b"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -91,7 +91,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "fbace0596c894568058c52b4c423caffb8ceedd03f3bd4dceb187b5c154fcde3"
+      "sha256": "c56f89b2f6fbcefa9aedeef03a1ef486a4f719794e185314febf0b6a3897078e"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -215,7 +215,7 @@
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
-      "sha256": "5edbf3577885e05275b444ca4978215281c011268cfde73a16f0c6f9933a276d"
+      "sha256": "e0c9fd26dcf25a51a34194ed7ca07425f377d61b20b04067a317fb7bae314306"
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
@@ -247,15 +247,15 @@
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
-      "sha256": "4e20cb311b3179874d954170e2e33a1e1bf004544e1eed30c2bc1a8ac4df1ab2"
+      "sha256": "d2fa855c15de885cfae291cb0de988c79c6c1f6aec4e9823aae79aefaedd569d"
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "ca6e1dff3cf8bc741b8343780ab10b360bcf21028cc6569bfcf8481880ee4de9"
+      "sha256": "d3fdbac29dcbe219d68c818b1ec88447be7f8798f24c0721d3e3b47f7d8ee690"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "546f884691d4b0e5576bed1b47d5f9d3ec281dfb3f9fb67bea422ebc8c383fef"
+      "sha256": "479e3b2d2ed91b473d96f1a3459f246ddab854d9f342963a33d6a8e3c377447d"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -763,7 +763,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8f6e619e49078433fa5c52b812f29e5c596be1f258a5bc212bda052048f501d9"
+      "sha256": "c2112865f87c8f1212a811c5e66ba788a9c20260d57a91ae2302c7de4878e227"
     },
     {
       "path": "tooling/evidence_bundle.py",

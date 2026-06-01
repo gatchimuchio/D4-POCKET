@@ -209,7 +209,7 @@ Rollback for a failed responsibility migration:
 Phase 3 hardening / Phase 4 preparation:
 
 - production IPC transport 候補を Windows named pipe / localhost authenticated loopback / cross-platform local socket で実測比較する。
-- broker request/response を JSON serialization + schema validation path に接続する。
+- broker request/response JSON path を schema-backed validation harness と negative fixture comparison に接続する。
 - Python Shell Core の authority key normalization / strip / quarantine fixture を Rust broker parity harness へ接続する。
 - Flutter client はまだ production authority owner にせず、broker unavailable / stale session / malformed response の fail-closed UI state を先に実装する。
 - Python Shell Core は migration oracle として残す。
