@@ -1282,6 +1282,12 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "broker_command_dispatch_disabled",
         "metadata_attempts_authority",
         "normalize_key",
+        "UnicodeNormalization",
+        "nfkc",
+        "boundary_role",
+        "authority_cutover_status",
+        "in_memory_skeleton",
+        "in_memory_session_only",
     ]
     for token in required_protocol_tokens:
         if token not in protocol_rs:

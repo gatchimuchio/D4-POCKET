@@ -83,10 +83,10 @@ GUI-Shell uses three separate completion definitions:
   evidence: `docs/GUI_OPERATION_SURFACES.md` records Trust Center, Authority Map, Audit Timeline, Recovery Playbook, Adapter Catalog, Permission Diff, Settings UX, Problems Panel, Evidence Center, Command Palette, and Status Bar surfaces.
   blocks_release: no
 
-- item: Shell snapshot generator
+- item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/shell_snapshot.py` produces the structured local snapshot consumed by Flutter local mode, including trust, authority, catalog, problems, evidence, settings, audit, recovery, and Setup Doctor fields.
+  evidence: `tooling/shell_snapshot.py` produces the structured local snapshot consumed by Flutter local mode for owner-use migration / development evidence, including trust, authority, catalog, problems, evidence, settings, audit, recovery, and Setup Doctor fields; it must not remain an installed product runtime dependency.
   blocks_release: no
 
 - item: Evidence bundle export

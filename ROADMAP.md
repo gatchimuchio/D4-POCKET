@@ -24,8 +24,8 @@ Primary implementation path: Flutter UI + Rust Security Broker for authority-sen
 - item: Language policy runtime convergence
   classification: release_blocker
   status: partially_started_not_passed
-  reason: Rust broker skeleton and JSON envelope rejection tests exist under `native/rust_helper`, but production IPC transport, Flutter broker integration, authority-sensitive responsibility migration, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
-  required_action: Select restricted IPC transport, integrate Flutter through the broker for authority operations, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
+  reason: Rust broker skeleton and JSON envelope rejection tests exist under `native/rust_helper`, including NFKC / case / zero-width / camelCase / separator / alias / value-only metadata hardening, but production IPC transport, Flutter broker integration, persistent audit/replay/session state, `issued_at` freshness enforcement, authority-sensitive responsibility migration, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  required_action: Select restricted IPC transport, add persistent audit/replay/session and freshness enforcement, integrate Flutter through the broker for authority operations, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
   blocks_release: yes
 
 - item: Windows installer, first-run, and real Setup Doctor
@@ -71,8 +71,8 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: Windows desktop release gates
   classification: release_blocker
-  reason: Windows is the primary product target, and Windows project support, Flutter toolchain verification, analyze, test, build, launch, Setup Doctor, installer, and first-run smoke have not passed.
-  required_action: Pass Windows project support, toolchain, `flutter analyze`, `flutter test`, `flutter build windows`, launch smoke, Setup Doctor smoke, and installer/first-run smoke.
+  reason: Windows is the primary product target. Windows project support, Flutter analyze, Flutter test, Windows build, and native launch smoke have passed as development evidence, but installed-path first-run evidence, installed-path Setup Doctor evidence, broker-mediated runtime evidence, language policy runtime convergence, strict Windows release validation, and owner GO have not passed.
+  required_action: Keep Windows development smoke current, then pass installed-path first-run, installed-path Setup Doctor, broker-mediated runtime evidence, strict Windows release validation, and owner GO.
   blocks_release: yes
 
 - item: macOS planned portability target

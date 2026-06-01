@@ -8,9 +8,12 @@
   "health": {
     "broker_id": "gui-shell-rust-broker",
     "status": "ready",
-    "authority_owner": "rust_security_broker",
+    "boundary_role": "rust_security_broker_candidate",
+    "authority_cutover_status": "not_active",
     "command_dispatch_enabled": false,
     "audit_append_enabled": true,
+    "audit_persistence": "in_memory_skeleton",
+    "replay_persistence": "in_memory_session_only",
     "evidence_source": "LIVE_RUNTIME"
   },
   "shutdown_requested": false

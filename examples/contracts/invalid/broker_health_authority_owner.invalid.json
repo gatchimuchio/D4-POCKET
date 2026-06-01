@@ -1,8 +1,7 @@
 {
   "broker_id": "gui-shell-rust-broker",
   "status": "ready",
-  "boundary_role": "rust_security_broker_candidate",
-  "authority_cutover_status": "not_active",
+  "authority_owner": "rust_security_broker",
   "command_dispatch_enabled": false,
   "audit_append_enabled": true,
   "audit_persistence": "in_memory_skeleton",

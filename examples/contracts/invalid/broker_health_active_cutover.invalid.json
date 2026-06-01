@@ -2,10 +2,10 @@
   "broker_id": "gui-shell-rust-broker",
   "status": "ready",
   "boundary_role": "rust_security_broker_candidate",
-  "authority_cutover_status": "not_active",
+  "authority_cutover_status": "active",
   "command_dispatch_enabled": false,
   "audit_append_enabled": true,
-  "audit_persistence": "in_memory_skeleton",
-  "replay_persistence": "in_memory_session_only",
+  "audit_persistence": "persistent_audit_store",
+  "replay_persistence": "persistent_session_store",
   "evidence_source": "LIVE_RUNTIME"
 }

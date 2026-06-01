@@ -55,7 +55,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "9ffeaa25eac0b9143bd1302848876161959f8246d0bb020f4b472996c15177e0"
+      "sha256": "1f8357fe3678b7b33a9bafeaa431d368f2ad328d7d713cfd2a73b5c62f185c48"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -79,11 +79,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "2773fd5be027d3a4b076c9e6117e694e195f804578d9b28e6914853a3b0d19f9"
+      "sha256": "c9c45b0dbb2b40edc7c24dba081817b1cfa8493e8b08ddcd767eff96d75e938a"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9da53db3776562bb606ec83a58f69dbbc2dbe68a769a00303dbbcb281956ec5b"
+      "sha256": "8fc674c904a62f7cc80679817a4722d3e155e7bf0df94617e6f8fbec4cb3e54f"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -175,7 +175,7 @@
     },
     {
       "path": "docs/COMPLETION_AUDIT_ROADMAP.md",
-      "sha256": "6db94a20298f87ede5f1cd49771812275434d0653af82b72653f27409cb8f3ff"
+      "sha256": "1e2591767562a40a576fce8c9b9b9a48f53d0e637473d9a97881a096f2fa9371"
     },
     {
       "path": "docs/COMPLETION_STRATEGY_INSTRUCTION.md",
@@ -195,7 +195,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "26da84d275f6506bf41cdf6f7927ac9dcc5b0cbfa4e6d249c94740580303baae"
+      "sha256": "6be15c40596b456c072fa720fcd44acd445448ad40bdc639737912c03cd1be98"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -243,7 +243,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "fd806c248e7653d6b1d1947de8d53abe2ad025ee9cb26daa147b6e8669331d4e"
+      "sha256": "83578601aac46d0ffc64ae43a4920f2b215081c1cb4d8e7a65cb1bc11742c934"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -255,7 +255,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "479e3b2d2ed91b473d96f1a3459f246ddab854d9f342963a33d6a8e3c377447d"
+      "sha256": "896998f8e908a9afdd44950e924a51b894c57091d9b3eda8d1fe5d498cf60aab"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -275,7 +275,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "b34272cce87b7733c13a6f72810008f147146d1a430b16d530298ea52110b60e"
+      "sha256": "9b903fc7ba7164cf8c743513e8ef0c1ec6c620cdb3e9f2244b16809fa01ac2f4"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -363,7 +363,7 @@
     },
     {
       "path": "examples/contracts/broker_health.valid.json",
-      "sha256": "b7887606f34b4ef55565150a3d6337d9e200070f56e1abdeb4bd0e2340024dff"
+      "sha256": "b1a64ede48b3ed8d072e4627fb7acab64b8166b9b4f855569baef6bda6a2591c"
     },
     {
       "path": "examples/contracts/broker_session.valid.json",
@@ -434,8 +434,16 @@
       "sha256": "22eafebcdc4f35a5d7426e8f868ea828e7e5d9c980d401bb6324c7b557e9416c"
     },
     {
+      "path": "examples/contracts/invalid/broker_health_active_cutover.invalid.json",
+      "sha256": "c31f9c75b899eab9b30d6e2505511b1ccc4c69cabdc170eea77a0b159b80e95d"
+    },
+    {
+      "path": "examples/contracts/invalid/broker_health_authority_owner.invalid.json",
+      "sha256": "a472f492af985f95e0d499055c51ef1d544ab89a3937f7c8fee918ac2c5a1006"
+    },
+    {
       "path": "examples/contracts/invalid/broker_health_dispatch_enabled.invalid.json",
-      "sha256": "105119c515edf613ba69061a5d146731e101b559beb2f817b2789d703a32d53e"
+      "sha256": "ac7ad8c279457edfc7d971e7948a5c7b3b5a2a8f3efe8755344f8cd84574c6bc"
     },
     {
       "path": "examples/contracts/invalid/broker_session_stale_state.invalid.json",
@@ -491,7 +499,7 @@
     },
     {
       "path": "examples/contracts/ipc_response.valid.json",
-      "sha256": "8900d64c65adbf510e4313042e383f20fd12d5deb870bc56f37845eb4908c9fa"
+      "sha256": "95b9924947ec5cbb5e768b0250c09a96dacfba8412b99b18a788d765745a47bc"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -519,11 +527,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "df6e6b0955e6f40c7bae3eab4e7f58e7c0a2dd987d9dda798d5f8738547368bf"
+      "sha256": "1b449f29fba42a553c17567aa06d79323d0ee86195cc6cbf2a934010bea0bdc2"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "84b8281038dd94aa5805481b59a87d0cddfd28b8339e1feb89f1e10114298a8f"
+      "sha256": "26fb68509661b3a93ab1fca843cd7ae4c5c3277526230af039cd0174ce4230d3"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -531,7 +539,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
-      "sha256": "9e8b54b429a4546641a4ec5bbf938d00dbcf4942ae7410a2fc9d945f3d9015c4"
+      "sha256": "4d7f8136c71a84b1d8e892ab58206fb2901a45a4cb255732404106eed36e6e77"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -539,7 +547,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "7f8a3c173e579b891742430cce8a87a313d3f9c167798231ffd1ba7df418b66b"
+      "sha256": "6d0d92661490dfb777833db0b9b7698869af9c997953e225b687d4b87a055cf5"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -707,7 +715,7 @@
     },
     {
       "path": "specs/broker_health.schema.json",
-      "sha256": "c41fce11f8549083a3836ebc2b0527d12e96ebefcc023ddb08d07e09c0d95dee"
+      "sha256": "b731bacf8f8c12484dc92aad9d602533ffe0d5aeaa489e553b98fb7786f2da21"
     },
     {
       "path": "specs/broker_session.schema.json",
@@ -763,7 +771,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c2112865f87c8f1212a811c5e66ba788a9c20260d57a91ae2302c7de4878e227"
+      "sha256": "fc5b5a8c585749fd893be9074ba5d42027d1282f05801e4ed6bda0bb9287e291"
     },
     {
       "path": "tooling/evidence_bundle.py",

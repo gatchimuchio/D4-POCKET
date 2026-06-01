@@ -63,6 +63,16 @@ Allowed status values:
 
 Every rejected or suspended response requires an audit event. Accepted health and shutdown responses are also audited to preserve broker-local append-only evidence.
 
+Health responses must not claim active Rust authority ownership before production cutover. During the skeleton stage the health object reports:
+
+- `boundary_role=rust_security_broker_candidate`
+- `authority_cutover_status=not_active`
+- `command_dispatch_enabled=false`
+- `audit_persistence=in_memory_skeleton`
+- `replay_persistence=in_memory_session_only`
+
+`authority_cutover_status=active`, persistent audit storage, persistent replay/session storage, and command dispatch require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, IPC, and Windows installed-path evidence.
+
 ## 5. Broker Error
 
 Broker errors are structured and fail closed.
@@ -92,7 +102,7 @@ The current Rust code provides:
 - shutdown response for test lifecycle;
 - stale session rejection;
 - nonce replay rejection;
-- authority metadata rejection;
+- authority metadata rejection with NFKC / case / zero-width / camelCase / separator / alias / value-only hardening;
 - command envelope suspension without dispatch.
 
 It does not yet provide:
@@ -101,6 +111,8 @@ It does not yet provide:
 - Flutter client integration;
 - approval finalization;
 - audit store persistence;
+- replay/session persistence across broker restart;
+- `issued_at` freshness enforcement;
 - credential/keychain access;
 - process or update gated execution.
 
@@ -123,7 +135,24 @@ Selection criteria:
 - auditable failure modes;
 - no hidden filesystem/process/network/credential expansion.
 
-## 8. Validation
+## 8. Session, Replay, And Freshness Policy
+
+Current skeleton behavior:
+
+- `session_id` is an in-process string checked for non-health operations.
+- `nonce` replay state is an in-memory `HashSet`.
+- `issued_at` is required but is not yet parsed for clock freshness.
+- audit events are chained in memory only.
+
+Production cutover requirements:
+
+- authenticate installed broker sessions through the selected restricted IPC transport;
+- persist or otherwise cryptographically bind replay protection across broker restart, crash recovery, and session reconnect;
+- reject stale `issued_at` values within a documented clock-skew window;
+- emit durable audit events before any approval, recovery, credential, update, process, or runtime command finalization;
+- fail closed with SUSPEND / rejected state when freshness, replay, session, or audit persistence cannot be verified.
+
+## 9. Validation
 
 Current validation path:
 

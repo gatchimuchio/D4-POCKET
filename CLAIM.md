@@ -32,7 +32,7 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: Shell snapshot and evidence bundle
   classification: required_for_v1
-  status: `tooling/shell_snapshot.py` provides structured local GUI state and `tooling/evidence_bundle.py --check` validates a development evidence bundle while preserving Windows installed-path blockers and `release_ready=false`.
+  status: `tooling/shell_snapshot.py` provides structured local GUI state for owner-use migration / development evidence and `tooling/evidence_bundle.py --check` validates a development evidence bundle while preserving Windows installed-path blockers and `release_ready=false`; the snapshot generator must not remain an installed product runtime dependency.
 
 - item: Shell Core hardening skeleton
   classification: required_for_v1

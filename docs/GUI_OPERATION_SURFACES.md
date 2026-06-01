@@ -54,11 +54,11 @@ GUI-Shell GUI hardening imports proven operation patterns without moving authori
   evidence: persistent status bar renders runtime status, trust status, pending approvals, audit chain status, network exposure, and release blocker count.
   authority_boundary: status bar is read-only.
 
-- item: Shell snapshot generator
+- item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
   evidence: `python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json` creates the local JSON consumed by `ShellCoreClient.local()`.
-  authority_boundary: snapshot generation records Shell Core and Setup Doctor state; it does not grant authority.
+  authority_boundary: snapshot generation records Shell Core and Setup Doctor state for owner-use migration / development evidence; it does not grant authority and must not remain an installed product runtime dependency.
 
 - item: Evidence bundle export
   classification: required_for_v1

@@ -18,6 +18,10 @@ pub struct BrokerAuditLog {
 }
 
 impl BrokerAuditLog {
+    pub fn persistence_scope(&self) -> &'static str {
+        "in_memory_skeleton"
+    }
+
     pub fn append(
         &mut self,
         request_id: &str,

@@ -125,11 +125,13 @@ Rust security constraints:
 2026-06-01 時点で、最小差分として既存 `native/rust_helper` crate 内に Rust Security Broker skeleton を追加した。
 
 - `native/rust_helper/src/main.rs`: stdin-based health / shutdown lifecycle smoke only.
-- `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、stale session rejection、nonce replay rejection、authority-like metadata rejection、JSON response serialization、command-envelope suspension。
-- `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の broker-local append-only audit hash chain。
+- `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、stale session rejection、nonce replay rejection、NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata rejection、JSON response serialization、command-envelope suspension。
+- `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の broker-local in-memory append-only audit hash chain。
 - `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
 
-現時点では production IPC transport、Flutter client integration、approval/audit/recovery cutover、process/credential/update gated execution は未実装である。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
+Broker health は現時点で `boundary_role=rust_security_broker_candidate`、`authority_cutover_status=not_active`、`audit_persistence=in_memory_skeleton`、`replay_persistence=in_memory_session_only` を返す。`authority_owner=rust_security_broker` のような active authority owner claim は production cutover 後にだけ許可する。
+
+現時点では production IPC transport、Flutter client integration、persistent audit store、restart-aware replay/session store、`issued_at` freshness enforcement、approval/audit/recovery cutover、process/credential/update gated execution は未実装である。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
 
 ## 6. Phase 4 / Responsibility Migration Order
 
@@ -150,6 +152,8 @@ Cutover rule:
 - Rust が少なくとも同じ negative cases を拒否する。
 - Rust-specific IPC/session/replay failures が audit される。
 - その responsibility の active product invocation から Python が外れている。
+
+For normalization cutover, the Rust broker must keep the current NFKC / case / zero-width / camelCase / separator / alias / value-only rejection tests and then connect them to a parity harness against Python `normalize_inbound_payload` fixtures before the product path is switched.
 
 ## 7. Phase 5 / Flutter Integration
 
@@ -211,6 +215,7 @@ Phase 3 hardening / Phase 4 preparation:
 - production IPC transport 候補を Windows named pipe / localhost authenticated loopback / cross-platform local socket で実測比較する。
 - broker request/response JSON path を schema-backed validation harness と negative fixture comparison に接続する。
 - Python Shell Core の authority key normalization / strip / quarantine fixture を Rust broker parity harness へ接続する。
+- persistent audit store、restart-aware replay/session store、`issued_at` freshness window を実装前仕様として固定する。
 - Flutter client はまだ production authority owner にせず、broker unavailable / stale session / malformed response の fail-closed UI state を先に実装する。
 - Python Shell Core は migration oracle として残す。
 - real command dispatch は有効化しない。

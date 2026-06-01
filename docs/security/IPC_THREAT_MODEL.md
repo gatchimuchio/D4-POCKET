@@ -27,8 +27,8 @@ Adapter / External Runtime
 | replayed approval request | nonce replay を拒否し、broker-local audit に記録する | implemented in Rust skeleton | release_blocker until integration proof |
 | forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner | release_blocker until parity migration |
 | malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust skeleton | none for skeleton; release_blocker for product cutover |
-| authority-like key/value alias | case / zero-width / camelCase aliases を拒否する | implemented for core aliases | release_blocker until full parity with Python normalization |
-| Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | zero-width/case/camelCase covered; full NFKC parity remains migration work | release_blocker |
+| authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner | release_blocker until active-path parity proof |
+| Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope | release_blocker until parity harness and cutover proof |
 | stale session | session mismatch を rejected / audited にする | implemented in Rust skeleton | release_blocker until real session lifecycle |
 | broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | documented only | release_blocker |
 | broken pipe / crash during approval | approval finalization must not complete; RecoveryAction required | documented only | release_blocker |
@@ -65,8 +65,8 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 
 - item: full Python normalization parity absent
   classification: release_blocker
-  reason: Rust skeleton covers case / zero-width / camelCase authority aliases, but full migration parity with Python normalization is not complete.
-  required_action: add parity harness for Python `normalize_inbound_payload` before active path cutover.
+  reason: Rust skeleton now rejects NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata in unit scope, but the active product path has not been connected to a Python fixture parity harness or cut over.
+  required_action: add parity harness for Python `normalize_inbound_payload` and prove active path cutover before release-ready claim.
   blocks_release: yes
 
 - item: Flutter broker unavailable behavior absent

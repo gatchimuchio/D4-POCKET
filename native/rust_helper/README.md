@@ -15,8 +15,8 @@ Current helper modules:
 Current broker skeleton modules:
 
 - `src/main.rs`: independent process lifecycle skeleton for health / shutdown smoke.
-- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, stale-session rejection, nonce replay rejection, authority-like metadata rejection, JSON response serialization, and command-envelope suspension.
-- `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests.
+- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, and command-envelope suspension.
+- `src/broker/audit.rs`: broker-local in-memory append-only audit hash chain for accepted, rejected, and suspended requests.
 
 Rust helper must remain callable through explicit IPC or FFI boundaries.
 
@@ -26,5 +26,7 @@ Authority-sensitive runtime ownership is not delegated to Flutter, Python, or FF
 - production IPC transport is not selected;
 - Flutter is not yet connected to the broker;
 - Python Shell Core remains a migration oracle until parity and cutover evidence exist.
+- health reports `boundary_role=rust_security_broker_candidate` and `authority_cutover_status=not_active`;
+- audit and replay state are in-memory skeleton state only.
 
 These incomplete items are `release_blocker` for completed product release, not release-ready evidence.

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 
@@ -135,9 +136,12 @@ struct JsonRequestEnvelope {
 pub struct BrokerHealth {
     pub broker_id: String,
     pub status: String,
-    pub authority_owner: String,
+    pub boundary_role: String,
+    pub authority_cutover_status: String,
     pub command_dispatch_enabled: bool,
     pub audit_append_enabled: bool,
+    pub audit_persistence: String,
+    pub replay_persistence: String,
     pub evidence_source: String,
 }
 
@@ -322,9 +326,12 @@ impl Broker {
             health: Some(BrokerHealth {
                 broker_id: BROKER_ID.to_string(),
                 status: "ready".to_string(),
-                authority_owner: "rust_security_broker".to_string(),
+                boundary_role: "rust_security_broker_candidate".to_string(),
+                authority_cutover_status: "not_active".to_string(),
                 command_dispatch_enabled: false,
                 audit_append_enabled: true,
+                audit_persistence: self.audit_log.persistence_scope().to_string(),
+                replay_persistence: "in_memory_session_only".to_string(),
                 evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
             }),
             shutdown_requested: false,
@@ -428,25 +435,47 @@ fn metadata_attempts_authority(metadata: &[BrokerMetadata]) -> bool {
     metadata.iter().any(|item| {
         let key = normalize_key(&item.key);
         let value = normalize_key(&item.value);
-        matches!(
-            key.as_str(),
-            "authority"
-                | "authority_context"
-                | "authority_trace"
-                | "approval_state"
-                | "approved_by"
-                | "permission"
-                | "permissions"
-                | "permission_grant"
-                | "permission_override"
-                | "role"
-                | "scope_escalation"
-                | "trust_level"
-        ) || matches!(
-            value.as_str(),
-            "admin" | "all" | "approved" | "elevated" | "root"
-        )
+        canonical_authority_key(&key).is_some()
+            || authority_value_present(&value)
+            || authority_token_present(&value)
     })
+}
+
+fn canonical_authority_key(normalized: &str) -> Option<&'static str> {
+    match normalized {
+        "authority" => Some("authority"),
+        "authority_context" | "admin_context" => Some("authority_context"),
+        "authority_trace" => Some("authority_trace"),
+        "approval_state" => Some("approval_state"),
+        "approved_by" => Some("approved_by"),
+        "permission"
+        | "permissions"
+        | "permissions_granted"
+        | "permissiongrant"
+        | "permission_grant"
+        | "grant"
+        | "grants"
+        | "privilege"
+        | "privileges" => Some("permission_grant"),
+        "permission_override" => Some("permission_override"),
+        "role" => Some("role"),
+        "scope_escalation" | "elevated" => Some("scope_escalation"),
+        "trust_level" => Some("trust_level"),
+        _ => None,
+    }
+}
+
+fn authority_value_present(normalized: &str) -> bool {
+    matches!(
+        normalized,
+        "admin" | "all" | "approved" | "elevated" | "root"
+    )
+}
+
+fn authority_token_present(normalized: &str) -> bool {
+    normalized
+        .split('_')
+        .any(|token| canonical_authority_key(token).is_some() || authority_value_present(token))
 }
 
 fn json_metadata_value(value: &Value) -> String {
@@ -464,7 +493,8 @@ fn normalize_key(value: &str) -> String {
     let mut result = String::new();
     let mut previous_was_underscore = false;
     let mut previous_was_lower_or_digit = false;
-    for character in value
+    let canonicalized: String = value.nfkc().collect();
+    for character in canonicalized
         .replace(['\u{200b}', '\u{200c}', '\u{200d}', '\u{feff}'], "")
         .trim()
         .chars()
@@ -496,10 +526,11 @@ mod tests {
         let mut broker = Broker::new("session-1");
         let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
         assert_eq!(response.status, BrokerStatus::Accepted);
-        assert_eq!(
-            response.health.unwrap().authority_owner,
-            "rust_security_broker"
-        );
+        let health = response.health.unwrap();
+        assert_eq!(health.boundary_role, "rust_security_broker_candidate");
+        assert_eq!(health.authority_cutover_status, "not_active");
+        assert_eq!(health.audit_persistence, "in_memory_skeleton");
+        assert_eq!(health.replay_persistence, "in_memory_session_only");
         assert_eq!(broker.audit_events().len(), 1);
         assert_eq!(broker.audit_events()[0].decision, "accepted");
     }
@@ -520,7 +551,8 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Accepted);
         let encoded = response.to_json_string().unwrap();
         assert!(encoded.contains(r#""status":"accepted""#));
-        assert!(encoded.contains(r#""authority_owner":"rust_security_broker""#));
+        assert!(encoded.contains(r#""boundary_role":"rust_security_broker_candidate""#));
+        assert!(encoded.contains(r#""authority_cutover_status":"not_active""#));
         assert!(encoded.contains(r#""shutdown_requested":false"#));
     }
 
@@ -635,6 +667,90 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(
             response.error.unwrap().code,
+            "broker_authority_metadata_rejected"
+        );
+    }
+
+    #[test]
+    fn unicode_nfkc_authority_metadata_is_rejected_and_audited() {
+        let mut broker = Broker::new("session-1");
+        let response = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"ｔｒｕｓｔ＿ｌｅｖｅｌ": "ｒｏｏｔ"}
+            }"#,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_authority_metadata_rejected"
+        );
+    }
+
+    #[test]
+    fn authority_alias_and_separator_variants_are_rejected() {
+        let mut broker = Broker::new("session-1");
+        for (index, key) in [
+            "Trust-Level",
+            "TRUST LEVEL",
+            "permissionGrant",
+            "permissiongrant",
+            "permissions_granted",
+            "privilege",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let mut request = BrokerRequestEnvelope::health(&format!("request-{}", index + 1), key);
+            request.metadata.push(BrokerMetadata {
+                key: (*key).to_string(),
+                value: "operator".to_string(),
+            });
+            let response = broker.handle(request);
+            assert_eq!(response.status, BrokerStatus::Rejected);
+            assert_eq!(
+                response.error.unwrap().code,
+                "broker_authority_metadata_rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn value_only_and_nested_authority_metadata_are_rejected() {
+        let mut broker = Broker::new("session-1");
+        let value_only = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"safe_label": "ｒｏｏｔ"}
+            }"#,
+        );
+        assert_eq!(value_only.status, BrokerStatus::Rejected);
+        assert_eq!(
+            value_only.error.unwrap().code,
+            "broker_authority_metadata_rejected"
+        );
+
+        let nested = broker.handle_json(
+            r#"{
+                "request_id": "json-request-2",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-2",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"safe_label": {"authority": "admin"}}
+            }"#,
+        );
+        assert_eq!(nested.status, BrokerStatus::Rejected);
+        assert_eq!(
+            nested.error.unwrap().code,
             "broker_authority_metadata_rejected"
         );
     }

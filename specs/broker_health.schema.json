@@ -6,9 +6,12 @@
   "required": [
     "broker_id",
     "status",
-    "authority_owner",
+    "boundary_role",
+    "authority_cutover_status",
     "command_dispatch_enabled",
     "audit_append_enabled",
+    "audit_persistence",
+    "replay_persistence",
     "evidence_source"
   ],
   "additionalProperties": false,
@@ -25,10 +28,16 @@
         "suspend"
       ]
     },
-    "authority_owner": {
+    "boundary_role": {
       "type": "string",
       "enum": [
-        "rust_security_broker"
+        "rust_security_broker_candidate"
+      ]
+    },
+    "authority_cutover_status": {
+      "type": "string",
+      "enum": [
+        "not_active"
       ]
     },
     "command_dispatch_enabled": {
@@ -38,6 +47,18 @@
     "audit_append_enabled": {
       "type": "boolean",
       "const": true
+    },
+    "audit_persistence": {
+      "type": "string",
+      "enum": [
+        "in_memory_skeleton"
+      ]
+    },
+    "replay_persistence": {
+      "type": "string",
+      "enum": [
+        "in_memory_session_only"
+      ]
     },
     "evidence_source": {
       "type": "string",
