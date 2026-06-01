@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -108,6 +110,23 @@ def macos_support_claim_errors(text: str) -> list[str]:
     return errors
 
 
+def manifest_check_errors() -> list[str]:
+    result = subprocess.run(
+        [sys.executable, "tooling/manifest.py", "--check"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    if result.returncode == 0:
+        return []
+    output = result.stdout.strip()
+    if not output:
+        return ["manifest check failed without output"]
+    return [f"manifest check failed: {line}" for line in output.splitlines()]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--strict-release", action="store_true")
@@ -126,6 +145,7 @@ def main() -> int:
     if release_claim_exists_without_classification(combined):
         errors.append("release claim appears while release_blocker exists")
     errors.extend(macos_support_claim_errors(combined))
+    errors.extend(manifest_check_errors())
 
     if errors:
         print("release gate check failed:")

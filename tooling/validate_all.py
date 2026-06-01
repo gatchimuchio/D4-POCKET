@@ -55,6 +55,7 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             ROOT,
             "python3",
         ),
+        ValidationStep("manifest_check", ["python3", "tooling/manifest.py", "--check"], ROOT, "python3"),
         ValidationStep("release_gate_check", ["python3", "tooling/release_gate_check.py"], ROOT, "python3"),
         ValidationStep("release_smoke", ["python3", "tooling/release_smoke.py"], ROOT, "python3"),
         ValidationStep("evidence_bundle", ["python3", "tooling/evidence_bundle.py", "--check"], ROOT, "python3"),
@@ -94,7 +95,7 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
     return steps
 
 
-def platform_evidence_checks(desktop_platform: str) -> list[EvidenceCheck]:
+def platform_evidence_checks(desktop_platform: str, strict_release: bool = False) -> list[EvidenceCheck]:
     current = current_desktop_platform()
     checks: list[EvidenceCheck] = []
 
@@ -241,6 +242,17 @@ def platform_evidence_checks(desktop_platform: str) -> list[EvidenceCheck]:
                 ),
             ]
         )
+    if strict_release:
+        checks.append(
+            EvidenceCheck(
+                "owner_go",
+                "failed",
+                "release_blocker",
+                "yes",
+                "Explicit owner GO has not been recorded.",
+                "Record explicit owner GO only after measured installed-path release evidence and strict validation pass.",
+            )
+        )
     return checks
 
 
@@ -384,7 +396,7 @@ def main() -> int:
         run_step(step, args.strict_release, args.desktop_platform)
         for step in build_steps(args.include_mobile_release, args.desktop_platform, args.python_only)
     ]
-    evidence = platform_evidence_checks(args.desktop_platform)
+    evidence = platform_evidence_checks(args.desktop_platform, args.strict_release)
     blockers = [
         result
         for result in results

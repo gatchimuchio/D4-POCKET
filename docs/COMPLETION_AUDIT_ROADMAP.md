@@ -18,6 +18,8 @@ The architecture remains valid:
 
 Release completion must not be claimed until strict Windows release validation passes and owner GO is explicit.
 
+MANIFEST covers Shell Core, tooling, schemas, desktop Flutter, Rust helper, root governance/release docs, and docs. MANIFEST does not claim completed product release readiness.
+
 ## Phase Completion Levels
 
 GUI-Shell uses three separate completion definitions:
@@ -93,6 +95,12 @@ GUI-Shell uses three separate completion definitions:
   evidence: `tooling/evidence_bundle.py --check` validates a development evidence bundle with release blockers preserved and `release_ready=false`.
   blocks_release: no
 
+- item: MANIFEST integrity artifact
+  classification: required_for_v1
+  status: implemented
+  evidence: `tooling/manifest.py --write` produces `MANIFEST.sha256.json`; `tooling/manifest.py --check` verifies hashes, missing listed files, required source coverage, forbidden generated files, and Shell Core presence. `MANIFEST.sha256.json` is excluded from its own file list.
+  blocks_release: no
+
 - item: conformance coverage
   classification: required_for_v1
   status: implemented
@@ -123,24 +131,30 @@ GUI-Shell uses three separate completion definitions:
   evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, installed-path first run, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, and non-synthetic Setup Doctor non-authority diagnostics.
   blocks_release: no
 
+- item: Native Windows build and launch smoke
+  classification: required_for_v1
+  status: development_evidence
+  evidence: Native Windows build and launch smoke have passed for the development build path. Native Windows launch smoke is development evidence, not measured installed-path release evidence.
+  blocks_release: no
+
 ## Remaining Release Blockers
 
 - item: Windows installer and first-run smoke
   classification: release_blocker
   reason: installed app path first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: run native Windows installed smoke collection and pass `python tooling\windows_release_evidence.py`.
+  required_action: run native Windows installed smoke collection and pass `python tooling\windows_release_evidence.py`. Strict release must still fail until measured windows_installed_smoke.json exists.
   blocks_release: yes
 
 - item: Windows Setup Doctor real diagnostics smoke
   classification: release_blocker
   reason: Setup Doctor has not passed from the installed Windows app path because evidence is missing.
-  required_action: record installed-path Setup Doctor diagnostics and pass `python tooling\windows_release_evidence.py`.
+  required_action: record installed-path Setup Doctor diagnostics and pass `python tooling\windows_release_evidence.py`. Strict release must still fail until non-synthetic installed-path Setup Doctor evidence exists.
   blocks_release: yes
 
 - item: Owner GO
   classification: release_blocker
   reason: completed product release requires explicit owner approval.
-  required_action: obtain owner GO only after all release blockers pass.
+  required_action: obtain owner GO only after all release blockers pass. Strict release must still fail until owner GO exists.
   blocks_release: yes
 
 ## Next Execution Order

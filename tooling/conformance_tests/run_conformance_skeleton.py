@@ -41,6 +41,7 @@ from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from tooling.schema_check.check_schemas import validate_instance
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
+from tooling.manifest import build_manifest, matches_forbidden
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.windows_release_evidence import validate_windows_release_evidence
 
@@ -1399,9 +1400,53 @@ def test_validation_reporter_exists() -> list[str]:
         return ["tooling/validate_all.py missing"]
     text = path.read_text(encoding="utf-8")
     errors = []
-    for token in ["schema_check", "conformance_skeleton", "release_gate_check", "rust_helper_cargo_test", "desktop_flutter_analyze", "desktop_flutter_test", "desktop_flutter_build_linux", "mobile_flutter_analyze", "strict-release", "desktop-platform", "windows", "linux", "macos"]:
+    for token in ["schema_check", "conformance_skeleton", "manifest_check", "release_gate_check", "rust_helper_cargo_test", "desktop_flutter_analyze", "desktop_flutter_test", "desktop_flutter_build_linux", "mobile_flutter_analyze", "strict-release", "desktop-platform", "windows", "linux", "macos"]:
         if token not in text:
             errors.append(f"validate_all.py missing validation token: {token}")
+    return errors
+
+
+def test_manifest_integrity_tooling_exists() -> list[str]:
+    errors = []
+    required_paths = {
+        "AGENTS.md",
+        "ROADMAP.md",
+        "CONFORMANCE_REPORT.md",
+        "COMPATIBILITY_MATRIX.md",
+        "docs/LANGUAGE_POLICY.md",
+        "tooling/manifest.py",
+        "tooling/conformance_tests/run_conformance_skeleton.py",
+    }
+    manifest, manifest_errors = build_manifest()
+    errors.extend(manifest_errors)
+    listed = {entry["path"] for entry in manifest["files"]}
+    for path in sorted(required_paths - listed):
+        errors.append(f"manifest expected source missing from generated file list: {path}")
+
+    forbidden_paths = [
+        "MANIFEST.sha256.json",
+        "build/out.txt",
+        "target/out.txt",
+        ".dart_tool/cache",
+        "__pycache__/x.pyc",
+        "apps/desktop_flutter/build/out.txt",
+        "native/rust_helper/target/out.txt",
+        "apps/mobile_flutter/pubspec.lock",
+        "../outside.txt",
+        "/tmp/out.txt",
+    ]
+    for path in forbidden_paths:
+        if not matches_forbidden(path):
+            errors.append(f"manifest forbidden path was accepted: {path}")
+
+    allowed_paths = [
+        "docs/LANGUAGE_POLICY.md",
+        "packages/shell_core/runtime_state.py",
+        "tooling/manifest.py",
+    ]
+    for path in allowed_paths:
+        if matches_forbidden(path):
+            errors.append(f"manifest source path was rejected: {path}")
     return errors
 
 
@@ -1620,6 +1665,7 @@ def main() -> int:
         test_release_hardening_files_exist,
         test_release_hardening_does_not_overclaim_readiness,
         test_validation_reporter_exists,
+        test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,
         test_adapter_manifest_authority_escalation_rejected,

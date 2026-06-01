@@ -26,6 +26,13 @@
   classification: required_for_v1
   status: `tooling/release_smoke.py` passes snapshot save/load, append-only audit chain verification, and tamper detection for the current implementation path.
 
+- item: MANIFEST integrity coverage
+  classification: required_for_v1
+  status: `python3 tooling/manifest.py --check` passes and is included in `tooling/release_gate_check.py`.
+  reason: MANIFEST covers Shell Core, tooling, schemas, desktop Flutter, Rust helper, root governance/release docs, and docs. MANIFEST does not claim completed product release readiness.
+  required_action: Keep `MANIFEST.sha256.json` current with `python3 tooling/manifest.py --write`; it excludes itself from its own file list.
+  blocks_release: no
+
 ## Phase B Internal Operation
 
 - item: operator-facing audit chain validation
@@ -46,4 +53,10 @@
   classification: release_blocker
   reason: completed product release still requires native Windows installed-path evidence to prove config/audit initialization from the installed app path.
   required_action: Generate measured `release_evidence/windows_installed_smoke.json` on native Windows and pass `python tooling/windows_release_evidence.py`.
+  blocks_release: yes
+
+- item: installed-path Setup Doctor release evidence
+  classification: release_blocker
+  reason: Native Windows launch smoke is development evidence, not measured installed-path release evidence. Non-synthetic installed-path Setup Doctor evidence is still required for strict release.
+  required_action: Record Setup Doctor diagnostics from the installed Windows app path. Strict release must still fail until measured windows_installed_smoke.json exists, non-synthetic installed-path Setup Doctor evidence exists, and owner GO exists.
   blocks_release: yes
