@@ -65,6 +65,12 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_task",
     "agent_tool_call",
     "agent_diff",
+    "ipc_request",
+    "ipc_response",
+    "broker_error",
+    "broker_session",
+    "broker_health",
+    "broker_command_envelope",
 }
 
 VISIBILITY_VALUES = ["none", "hash_only", "summary", "redacted", "full"]
@@ -78,6 +84,20 @@ RUST_HELPER_REQUIRED_SOURCES = {
     "update_verification.rs",
     "audit_hash.rs",
     "ipc.rs",
+    "main.rs",
+}
+BROKER_REQUIRED_SOURCES = {
+    "mod.rs",
+    "protocol.rs",
+    "audit.rs",
+}
+BROKER_REQUIRED_SCHEMAS = {
+    "ipc_request.schema.json",
+    "ipc_response.schema.json",
+    "broker_error.schema.json",
+    "broker_session.schema.json",
+    "broker_health.schema.json",
+    "broker_command_envelope.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -1185,11 +1205,86 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
         "ureq::",
     ]
     errors = []
-    for path in sorted((RUST_HELPER / "src").glob("*.rs")):
+    for path in sorted((RUST_HELPER / "src").rglob("*.rs")):
         text = path.read_text(encoding="utf-8")
         for pattern in forbidden:
             if pattern in text:
                 errors.append(f"{path} uses forbidden helper authority pattern: {pattern}")
+    return errors
+
+
+def test_broker_ipc_contract_schemas_exist() -> list[str]:
+    existing = {path.name for path in SPECS.glob("*.schema.json")}
+    errors = []
+    for missing in sorted(BROKER_REQUIRED_SCHEMAS - existing):
+        errors.append(f"broker IPC schema missing: {missing}")
+    for name in sorted(BROKER_REQUIRED_SCHEMAS & existing):
+        schema = load_schema(name)
+        if schema.get("type") != "object":
+            errors.append(f"{name} must define an object contract")
+        if "additionalProperties" not in schema:
+            errors.append(f"{name} must define additionalProperties policy")
+    return errors
+
+
+def test_broker_boundary_docs_exist() -> list[str]:
+    required = {
+        "docs/security/IPC_THREAT_MODEL.md",
+        "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
+        "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
+    }
+    errors = []
+    for relative in sorted(required):
+        path = ROOT / relative
+        if not path.exists():
+            errors.append(f"{relative} missing")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in ["Rust Security Broker", "release_blocker", "FFI"]:
+            if token not in text:
+                errors.append(f"{relative} missing broker governance token: {token}")
+    return errors
+
+
+def test_rust_broker_skeleton_exists() -> list[str]:
+    broker_src = RUST_HELPER / "src" / "broker"
+    existing = {path.name for path in broker_src.glob("*.rs")}
+    errors = []
+    for missing in sorted(BROKER_REQUIRED_SOURCES - existing):
+        errors.append(f"native/rust_helper/src/broker/{missing} missing")
+    main_rs = RUST_HELPER / "src" / "main.rs"
+    lib_rs = RUST_HELPER / "src" / "lib.rs"
+    for path in [main_rs, lib_rs]:
+        text = path.read_text(encoding="utf-8")
+        if "#![forbid(unsafe_code)]" not in text:
+            errors.append(f"{path.relative_to(ROOT)} must forbid unsafe code")
+    return errors
+
+
+def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
+    protocol_rs = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    audit_rs = (RUST_HELPER / "src" / "broker" / "audit.rs").read_text(encoding="utf-8")
+    errors = []
+    required_protocol_tokens = [
+        "BrokerRequestEnvelope",
+        "BrokerResponse",
+        "BrokerStatus::Rejected",
+        "BrokerStatus::Suspended",
+        "broker_request_malformed",
+        "broker_payload_hash_invalid",
+        "broker_stale_session",
+        "broker_replay_detected",
+        "broker_authority_metadata_rejected",
+        "broker_command_dispatch_disabled",
+        "metadata_attempts_authority",
+        "normalize_key",
+    ]
+    for token in required_protocol_tokens:
+        if token not in protocol_rs:
+            errors.append(f"broker protocol missing token: {token}")
+    for token in ["BrokerAuditLog", "append", "previous_event_hash", "event_hash"]:
+        if token not in audit_rs:
+            errors.append(f"broker audit missing token: {token}")
     return errors
 
 
@@ -1650,6 +1745,10 @@ def main() -> int:
         test_rust_helper_required_sources_exist,
         test_rust_helper_contract_shape_exists,
         test_rust_helper_does_not_expose_hidden_authority_paths,
+        test_broker_ipc_contract_schemas_exist,
+        test_broker_boundary_docs_exist,
+        test_rust_broker_skeleton_exists,
+        test_rust_broker_rejection_audit_contract_shape,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
         test_blue_tanuki_adapter_metadata_cannot_escalate_authority,
         test_blue_tanuki_adapter_cannot_expose_full_payload_unless_visibility_full,

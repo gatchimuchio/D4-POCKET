@@ -1,0 +1,13 @@
+{
+  "envelope_id": "broker-command-1",
+  "runtime_id": "blue_tanuki",
+  "operation": "runtime.read",
+  "capability_id": "runtime.read",
+  "permission_id": "permission.runtime.read",
+  "approval_id": "approval-runtime-read",
+  "audit_event_id": "audit-runtime-read",
+  "recovery_id": "recover-runtime-read",
+  "payload_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "dispatch_enabled": true,
+  "metadata": {}
+}

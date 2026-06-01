@@ -1,0 +1,8 @@
+{
+  "request_id": "ipc-request-1",
+  "operation": "health",
+  "status": "ok",
+  "evidence_source": "LIVE_RUNTIME",
+  "audit_event_id": "broker-audit-1",
+  "error": null
+}

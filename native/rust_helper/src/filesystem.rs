@@ -12,7 +12,9 @@ pub struct FilesystemDiagnosticResult {
     pub content_read: bool,
 }
 
-pub fn diagnose_filesystem(request: &FilesystemDiagnosticRequest) -> HelperResponse<FilesystemDiagnosticResult> {
+pub fn diagnose_filesystem(
+    request: &FilesystemDiagnosticRequest,
+) -> HelperResponse<FilesystemDiagnosticResult> {
     helper_ok(
         "filesystem.diagnose",
         FilesystemDiagnosticResult {

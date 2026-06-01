@@ -14,7 +14,9 @@ pub struct NetworkDiagnosticResult {
     pub external_fetch_performed: bool,
 }
 
-pub fn diagnose_network(request: &NetworkDiagnosticRequest) -> HelperResponse<NetworkDiagnosticResult> {
+pub fn diagnose_network(
+    request: &NetworkDiagnosticRequest,
+) -> HelperResponse<NetworkDiagnosticResult> {
     let mut diagnostics = Vec::new();
     if request.external_fetch_url.is_some() {
         diagnostics.push(Diagnostic {

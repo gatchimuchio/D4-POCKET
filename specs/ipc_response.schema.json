@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/ipc_response.schema.json",
+  "title": "IpcResponse",
+  "type": "object",
+  "required": [
+    "request_id",
+    "operation",
+    "status",
+    "evidence_source",
+    "audit_event_id",
+    "error"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "health",
+        "shutdown",
+        "command_envelope"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "suspended"
+      ]
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "LIVE_RUNTIME",
+        "INTERNAL_STATE"
+      ]
+    },
+    "audit_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "error": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

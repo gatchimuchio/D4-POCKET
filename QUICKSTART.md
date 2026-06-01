@@ -28,8 +28,8 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 Expected successful output:
 
 ```text
-schema check passed: 19 schemas, 19 examples, 19 negative fixtures
-conformance skeleton passed: 89 checks
+schema check passed: 25 schemas, 25 examples, 25 negative fixtures
+conformance skeleton passed: 94 checks
 ```
 
 ## Phase B owner launch
@@ -55,7 +55,7 @@ cd native/rust_helper
 cargo test
 ```
 
-The Rust helper is a bounded native helper surface. It must not become the hidden authority path for runtime permissions.
+The Rust helper contains the current Rust Security Broker skeleton for broker envelope validation and rejection audit. Real external command dispatch is disabled until authority migration and IPC integration evidence exists.
 
 ## Optional Flutter check
 

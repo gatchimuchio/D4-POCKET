@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/broker_error.schema.json",
+  "title": "BrokerError",
+  "type": "object",
+  "required": [
+    "code",
+    "message",
+    "recoverable",
+    "audit_event_required",
+    "fail_closed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": [
+        "broker_request_malformed",
+        "broker_payload_hash_invalid",
+        "broker_stale_session",
+        "broker_replay_detected",
+        "broker_authority_metadata_rejected",
+        "broker_command_dispatch_disabled"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recoverable": {
+      "type": "boolean"
+    },
+    "audit_event_required": {
+      "type": "boolean",
+      "const": true
+    },
+    "fail_closed": {
+      "type": "boolean",
+      "const": true
+    }
+  }
+}

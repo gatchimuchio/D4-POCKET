@@ -1,3 +1,63 @@
+validation_update:
+  validation_date: 2026-06-01
+  scope: Phase 2 / Phase 3 Rust Security Broker skeleton and IPC contract validation
+  commit: pre_commit_validation
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: schema check passed: 25 schemas, 25 examples, 25 negative fixtures
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: conformance skeleton passed: 94 checks
+    - name: rust_helper_cargo_test
+      command: cd native/rust_helper && cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - 12 Rust helper and broker unit tests passed
+        - broker rejects malformed, stale-session, replayed, authority-metadata requests
+        - command envelope remains suspended without dispatch
+    - name: rust_helper_cargo_fmt_check
+      command: cd native/rust_helper && cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - no rustfmt diff after formatting native/rust_helper crate
+    - name: rust_broker_process_smoke
+      command: cd native/rust_helper && printf 'health\nshutdown\n' | cargo run --quiet
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - request_id=stdin-request-1 operation=health status=accepted audit_event_id=broker-audit-1
+        - request_id=stdin-request-2 operation=shutdown status=accepted audit_event_id=broker-audit-2
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+  release_gate_classification:
+    - item: production IPC transport and Flutter broker integration
+      classification: release_blocker
+      reason: Rust broker skeleton is tested as INTERNAL_STATE / unit scope only; Windows installed-path LIVE_RUNTIME broker proof is not present.
+      required_action: Select IPC transport, integrate Flutter client, prove broker launch/connect/fail-closed behavior from installed Windows app path.
+      blocks_release: yes
+
 validation_mode: development
 validation_date: 2026-05-25
 repository: /home/mzcum/GUI-Shell

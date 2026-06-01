@@ -13,7 +13,9 @@ pub struct ProcessDiagnosticResult {
     pub command_ignored: bool,
 }
 
-pub fn diagnose_process(request: &ProcessDiagnosticRequest) -> HelperResponse<ProcessDiagnosticResult> {
+pub fn diagnose_process(
+    request: &ProcessDiagnosticRequest,
+) -> HelperResponse<ProcessDiagnosticResult> {
     let mut diagnostics = Vec::new();
     if request.command.is_some() {
         diagnostics.push(Diagnostic {

@@ -12,7 +12,9 @@ pub struct UpdateVerificationResult {
     pub signature_present: bool,
 }
 
-pub fn verify_update_signature(candidate: &UpdateCandidate) -> HelperResponse<UpdateVerificationResult> {
+pub fn verify_update_signature(
+    candidate: &UpdateCandidate,
+) -> HelperResponse<UpdateVerificationResult> {
     if candidate.signature.as_deref().unwrap_or("").is_empty() {
         return helper_error(
             "update.verify_signature",
