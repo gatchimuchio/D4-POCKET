@@ -223,10 +223,16 @@ BLUE-TANUKI is the first reference runtime and must connect through an adapter b
 - UI framework: Flutter
 - Native helper: Rust
 - Contracts: JSON Schema
+- Language policy: `docs/LANGUAGE_POLICY.md`
 - Reference runtime: BLUE-TANUKI via adapter only
 - Shell Core must remain framework-independent
 - Adapter contracts must remain runtime-neutral
 - Flutter must remain a replaceable UI layer
+- Flutter / Dart is the UI product layer and must not become the authority boundary
+- Rust is the native safety boundary for authority-sensitive helper, broker, IPC, audit, signature, and runtime command-envelope work
+- TypeScript / Node must not become GUI-Shell core runtime; keep it limited to external SDK, adapter sample, protocol client sample, or bridge example scope
+- Python must not become GUI-Shell runtime dependency; keep it limited to dev-only tooling, schema generation, migration helper, CI support, or temporary validation script scope
+- Authority-sensitive Flutter-Rust connection must prefer independent process IPC; FFI/direct bridge is allowed only outside authority, signature, approval-token, external command dispatch, and audit finalization boundaries
 - BLUE-TANUKI implementation must not be modified for GUI Shell convenience unless the owner explicitly requests it
 
 ### 14. Boundary Semantics
@@ -585,6 +591,8 @@ Do not optimize a local task in a way that makes later phases less safe, less in
 The canonical active roadmap is `ROADMAP.md`.
 
 The extended standard is `docs/standards/gui-shell-extended-standard.md`.
+
+The language and safety-boundary policy is `docs/LANGUAGE_POLICY.md`.
 
 Schemas under `specs/` define the contract gate for runtime, adapter, capability, permission, approval, audit, recovery, diagnostic, update, content exposure, framework risk, runtime manifest, adapter manifest, and agent runtime surfaces.
 
