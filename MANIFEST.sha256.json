@@ -47,7 +47,7 @@
   "files": [
     {
       "path": "AGENTS.md",
-      "sha256": "a7a8f2683c771257cbacf0379400fa1721a78423108c8bfaa6cce1e804794d15"
+      "sha256": "ededb59dd617ef40269d21b3ce2efc976ac55455c059200cf4fec00ea3d746f0"
     },
     {
       "path": "AUDIT_EVIDENCE.md",
@@ -211,7 +211,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "6b77e5b149105233d6b5ca8848492bda2d134e8aac5371d9768fd64e88be94e6"
+      "sha256": "c2878b750d0e6550e3a65d16b4786b7852323ba60ebe7714d99c5420d939397a"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",

@@ -445,14 +445,15 @@ Default workflow:
 
 1. Work on `main`
 2. Do not create feature branches or pull requests unless the owner explicitly asks
-3. Before committing a completed work block on `main`, rotate the two-generation backup pair:
+3. Before committing a completed work block on `main`, rotate the local two-generation backup pair:
    - If `codex/backup-main` exists, force-update `codex/backup-main-prev` to `codex/backup-main`
    - Force-update `codex/backup-main` to current pre-commit `main`
-4. Push backup branches when credentials allow
+4. Do not push backup branches during ordinary completed-work flow
 5. Commit the completed work block directly on `main`
 6. Push `main` immediately after the commit
-7. Verify `git status --short --branch` is clean and aligned with `origin/main`
-8. If backup, commit, or push fails, report the exact failed command and reason
+7. If remote `codex/backup-main` or `codex/backup-main-prev` branches exist without an explicit owner request to retain them, delete those remote backup branches after `main` is clean and aligned
+8. Verify `git status --short --branch` is clean and aligned with `origin/main`
+9. If backup, commit, push, or remote-backup cleanup fails, report the exact failed command and reason
 
 Backup branches:
 
@@ -460,6 +461,10 @@ Backup branches:
 codex/backup-main
 codex/backup-main-prev
 ```
+
+Backup branches are local recovery refs by default, not collaboration branches. Do not open, request, or merge pull requests from backup branches.
+
+Push backup branches only when the owner explicitly requests off-machine backup retention or emergency recovery handoff. If backup branches are pushed to GitHub for that exception, report that GitHub may show them as pull request candidates and clean them up once the owner no longer needs them.
 
 Do not create additional backup generations.
 

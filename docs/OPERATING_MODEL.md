@@ -66,7 +66,7 @@ Memory, cache, and previous state can inform UX. They cannot grant authority by 
 
 ## 4. Backup workflow
 
-GUI Shell uses the same two-generation direct-main backup flow as BLUE-TANUKI.
+GUI Shell uses a two-generation direct-main backup flow. The backup refs are local recovery refs by default, not collaboration branches.
 
 Before committing a completed work block on `main`:
 
@@ -78,14 +78,17 @@ git branch -f codex/backup-main-prev codex/backup-main
 git branch -f codex/backup-main main
 ```
 
-Push when credentials allow:
+Then validate, commit directly on `main`, and push `main` when credentials allow.
+
+Do not push `codex/backup-main` or `codex/backup-main-prev` during ordinary completed-work flow. GitHub treats pushed backup branches as normal branches and may present them as pull request candidates, which can create duplicate merge history when the backup branch is merged into `main`.
+
+If remote backup branches already exist and the owner has not explicitly requested remote backup retention, delete them after `main` is clean and aligned:
 
 ```bash
-git push -f origin codex/backup-main-prev
-git push -f origin codex/backup-main
+git push origin --delete codex/backup-main codex/backup-main-prev
 ```
 
-Then validate, commit directly on `main`, and push `main` when credentials allow.
+Push backup branches only when the owner explicitly requests off-machine backup retention or emergency recovery handoff. When this exception is used, report that GitHub may show those branches as pull request candidates, and do not open or merge pull requests from backup branches.
 
 The repository keeps exactly two backup branches:
 
