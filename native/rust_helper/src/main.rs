@@ -13,30 +13,32 @@ fn main() {
         let command = line.trim();
         let request_id = format!("stdin-request-{}", index + 1);
         let nonce = format!("stdin-nonce-{}", index + 1);
-        let response = match command {
-            "health" => broker.handle(BrokerRequestEnvelope::health(&request_id, &nonce)),
-            "shutdown" => broker.handle(BrokerRequestEnvelope::shutdown(
-                &request_id,
-                "local-dev-session",
-                &nonce,
-            )),
-            _ => broker.handle(BrokerRequestEnvelope {
-                request_id: Some("stdin-malformed".to_string()),
-                session_id: None,
-                operation: None,
-                payload_hash: None,
-                nonce: None,
-                issued_at: None,
-                metadata: vec![],
-            }),
+        let response = if command.starts_with('{') {
+            broker.handle_json(command)
+        } else {
+            match command {
+                "health" => broker.handle(BrokerRequestEnvelope::health(&request_id, &nonce)),
+                "shutdown" => broker.handle(BrokerRequestEnvelope::shutdown(
+                    &request_id,
+                    "local-dev-session",
+                    &nonce,
+                )),
+                _ => broker.handle(BrokerRequestEnvelope {
+                    request_id: Some("stdin-malformed".to_string()),
+                    session_id: None,
+                    operation: None,
+                    payload_hash: None,
+                    nonce: None,
+                    issued_at: None,
+                    metadata: vec![],
+                    metadata_present: false,
+                }),
+            }
         };
-        println!(
-            "request_id={} operation={} status={} audit_event_id={}",
-            response.request_id,
-            response.operation,
-            response.status.as_str(),
-            response.audit_event_id
-        );
+        let response_json = response
+            .to_json_string()
+            .unwrap_or_else(|_| "{\"status\":\"rejected\"}".to_string());
+        println!("{response_json}");
         if response.status == BrokerStatus::Accepted && response.shutdown_requested {
             break;
         }

@@ -85,6 +85,8 @@ The current Rust code provides:
 - `native/rust_helper/src/main.rs` process lifecycle skeleton;
 - `native/rust_helper/src/broker/protocol.rs` request/response decision skeleton;
 - `native/rust_helper/src/broker/audit.rs` broker-local audit hash chain;
+- JSON request parsing with unknown-field rejection;
+- JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
 - health response;
 - shutdown response for test lifecycle;

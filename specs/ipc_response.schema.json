@@ -9,7 +9,9 @@
     "status",
     "evidence_source",
     "audit_event_id",
-    "error"
+    "error",
+    "health",
+    "shutdown_requested"
   ],
   "additionalProperties": false,
   "properties": {
@@ -50,6 +52,16 @@
         "null"
       ],
       "additionalProperties": true
+    },
+    "health": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    },
+    "shutdown_requested": {
+      "type": "boolean"
     }
   }
 }

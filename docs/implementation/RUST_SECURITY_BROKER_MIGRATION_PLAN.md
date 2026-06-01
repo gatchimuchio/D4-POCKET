@@ -125,7 +125,7 @@ Rust security constraints:
 2026-06-01 時点で、最小差分として既存 `native/rust_helper` crate 内に Rust Security Broker skeleton を追加した。
 
 - `native/rust_helper/src/main.rs`: stdin-based health / shutdown lifecycle smoke only.
-- `native/rust_helper/src/broker/protocol.rs`: typed envelope validation、payload hash validation、stale session rejection、nonce replay rejection、authority-like metadata rejection、command-envelope suspension。
+- `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、stale session rejection、nonce replay rejection、authority-like metadata rejection、JSON response serialization、command-envelope suspension。
 - `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の broker-local append-only audit hash chain。
 - `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
 
