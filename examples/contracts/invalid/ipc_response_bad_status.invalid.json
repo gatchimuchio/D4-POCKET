@@ -4,5 +4,7 @@
   "status": "ok",
   "evidence_source": "LIVE_RUNTIME",
   "audit_event_id": "broker-audit-1",
-  "error": null
+  "error": null,
+  "health": null,
+  "shutdown_requested": false
 }

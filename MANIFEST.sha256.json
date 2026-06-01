@@ -11,6 +11,8 @@
       "examples/**/*.json",
       "apps/desktop_flutter/lib/**/*.dart",
       "apps/desktop_flutter/test/**/*.dart",
+      "native/rust_helper/Cargo.toml",
+      "native/rust_helper/Cargo.lock",
       "native/rust_helper/src/**/*.rs",
       "docs/**/*.md"
     ],
@@ -89,7 +91,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "c2b13f28416e65d3266738277085212a645e21ffcf1c9c319550ba39b45a1bc8"
+      "sha256": "fbace0596c894568058c52b4c423caffb8ceedd03f3bd4dceb187b5c154fcde3"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -241,7 +243,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "53e481d877e99e1e3ccc73d48314e3f62163113428063bb52fbc0304181c3b57"
+      "sha256": "fd806c248e7653d6b1d1947de8d53abe2ad025ee9cb26daa147b6e8669331d4e"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -253,7 +255,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "ad8d31c2aa745c48973bddbd8f40c8f0395702a886b661e67597a3ea7a8b4ddc"
+      "sha256": "546f884691d4b0e5576bed1b47d5f9d3ec281dfb3f9fb67bea422ebc8c383fef"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -461,7 +463,7 @@
     },
     {
       "path": "examples/contracts/invalid/ipc_response_bad_status.invalid.json",
-      "sha256": "6f854d47e1f6aaacaca5777f5778b3495de8c9d81b9e8d0823577f2b202f7e4a"
+      "sha256": "93754e3aa24f2a09c261578ffe2a91fe85485412bf79877d6fc29f23436137b1"
     },
     {
       "path": "examples/contracts/invalid/permission_bad_source.invalid.json",
@@ -489,7 +491,7 @@
     },
     {
       "path": "examples/contracts/ipc_response.valid.json",
-      "sha256": "53f7362d554842f56bb48eefae9235fae5345a64d5bf70279839e57ac89e1c15"
+      "sha256": "8900d64c65adbf510e4313042e383f20fd12d5deb870bc56f37845eb4908c9fa"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -516,6 +518,14 @@
       "sha256": "d38517d047fd41c2e674028fa1c66b66b4892eff6414e3244520cee5d2add9ec"
     },
     {
+      "path": "native/rust_helper/Cargo.lock",
+      "sha256": "df6e6b0955e6f40c7bae3eab4e7f58e7c0a2dd987d9dda798d5f8738547368bf"
+    },
+    {
+      "path": "native/rust_helper/Cargo.toml",
+      "sha256": "84b8281038dd94aa5805481b59a87d0cddfd28b8339e1feb89f1e10114298a8f"
+    },
+    {
       "path": "native/rust_helper/src/audit_hash.rs",
       "sha256": "c59d8511a9bc41826713fcc0234f5ae2075ab0e2da9e8ffa52901b22fcdb3680"
     },
@@ -529,7 +539,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "e473653650e75d23b3afc05b5f0a15095b0db378d385eeffcfeba753ec2b42ad"
+      "sha256": "7f8a3c173e579b891742430cce8a87a313d3f9c167798231ffd1ba7df418b66b"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -549,7 +559,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "bbdabb87fca854faad75537fb26f2c7b291655324b11e602a074686fce4c43e6"
+      "sha256": "6e111aaf7328ea72e4bbe5d09a8464cccb96416a6448d9c709610a1c504e85f3"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -725,7 +735,7 @@
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "019c3015a258c3b4cdc4422402c9fca40a325af6dcfba62357a845f951effe15"
+      "sha256": "46f4a245c6d7bbffa6212edf62f26438cb8562ca6808333903fdd6264cbe03f2"
     },
     {
       "path": "specs/permission.schema.json",
@@ -753,7 +763,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "452b4b1b8049f8b1e05da4bbd06c9c4a807a76dae6791359a6cca88139f26bf0"
+      "sha256": "8f6e619e49078433fa5c52b812f29e5c596be1f258a5bc212bda052048f501d9"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -761,7 +771,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "370eab2a892e47f42224409321625414d2157eb66acf54df907330b2370184c4"
+      "sha256": "a4848a62d17830cdea0c949c5b3b655b939cce080f31711e0d65fe63b3010736"
     },
     {
       "path": "tooling/release_gate_check.py",

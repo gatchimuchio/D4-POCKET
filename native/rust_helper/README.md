@@ -15,7 +15,7 @@ Current helper modules:
 Current broker skeleton modules:
 
 - `src/main.rs`: independent process lifecycle skeleton for health / shutdown smoke.
-- `src/broker/protocol.rs`: typed envelope validation, stale-session rejection, nonce replay rejection, authority-like metadata rejection, and command-envelope suspension.
+- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, stale-session rejection, nonce replay rejection, authority-like metadata rejection, JSON response serialization, and command-envelope suspension.
 - `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests.
 
 Rust helper must remain callable through explicit IPC or FFI boundaries.

@@ -1,6 +1,6 @@
 validation_update:
   validation_date: 2026-06-01
-  scope: Phase 2 / Phase 3 Rust Security Broker skeleton and IPC contract validation
+  scope: Phase 2 / Phase 3 Rust Security Broker skeleton, JSON IPC envelope, and IPC contract validation
   commit: pre_commit_validation
   checks:
     - name: schema_check
@@ -24,7 +24,9 @@ validation_update:
       blocks_release: no
       exit: 0
       stdout_summary:
-        - 12 Rust helper and broker unit tests passed
+        - 16 Rust helper and broker unit tests passed
+        - broker accepts schema-shaped JSON health request and serializes schema-aligned JSON response
+        - broker rejects malformed JSON and missing metadata
         - broker rejects malformed, stale-session, replayed, authority-metadata requests
         - command envelope remains suspended without dispatch
     - name: rust_helper_cargo_fmt_check
@@ -42,8 +44,16 @@ validation_update:
       blocks_release: no
       exit: 0
       stdout_summary:
-        - request_id=stdin-request-1 operation=health status=accepted audit_event_id=broker-audit-1
-        - request_id=stdin-request-2 operation=shutdown status=accepted audit_event_id=broker-audit-2
+        - JSON health response status accepted with command_dispatch_enabled=false
+        - JSON shutdown response status accepted with shutdown_requested=true
+    - name: rust_broker_json_request_smoke
+      command: cd native/rust_helper && printf '%s\n' '{"request_id":"json-smoke-1","operation":"health","payload_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","nonce":"json-smoke-nonce-1","issued_at":"2026-06-01T00:00:00Z","metadata":{"client":"desktop_flutter"}}' | cargo run --quiet
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - JSON request parsed by broker process and returned accepted health response
     - name: manifest_check
       command: python3 tooling/manifest.py --check
       status: passed

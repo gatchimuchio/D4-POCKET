@@ -18,6 +18,8 @@ GLOB_PATTERNS = [
     "examples/**/*.json",
     "apps/desktop_flutter/lib/**/*.dart",
     "apps/desktop_flutter/test/**/*.dart",
+    "native/rust_helper/Cargo.toml",
+    "native/rust_helper/Cargo.lock",
     "native/rust_helper/src/**/*.rs",
     "docs/**/*.md",
 ]

@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 
@@ -6,7 +9,8 @@ const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
     Health,
     Shutdown,
@@ -38,9 +42,34 @@ pub struct BrokerRequestEnvelope {
     pub nonce: Option<String>,
     pub issued_at: Option<String>,
     pub metadata: Vec<BrokerMetadata>,
+    pub metadata_present: bool,
 }
 
 impl BrokerRequestEnvelope {
+    pub fn from_json_str(input: &str) -> Result<Self, serde_json::Error> {
+        let raw: JsonRequestEnvelope = serde_json::from_str(input)?;
+        let metadata_present = raw.metadata.is_some();
+        let metadata = raw
+            .metadata
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(key, value)| BrokerMetadata {
+                key,
+                value: json_metadata_value(&value),
+            })
+            .collect();
+        Ok(Self {
+            request_id: raw.request_id,
+            session_id: raw.session_id,
+            operation: raw.operation,
+            payload_hash: raw.payload_hash,
+            nonce: raw.nonce,
+            issued_at: raw.issued_at,
+            metadata,
+            metadata_present,
+        })
+    }
+
     pub fn health(request_id: &str, nonce: &str) -> Self {
         Self {
             request_id: Some(request_id.to_string()),
@@ -53,6 +82,7 @@ impl BrokerRequestEnvelope {
             nonce: Some(nonce.to_string()),
             issued_at: Some("2026-06-01T00:00:00Z".to_string()),
             metadata: vec![],
+            metadata_present: true,
         }
     }
 
@@ -68,6 +98,7 @@ impl BrokerRequestEnvelope {
             nonce: Some(nonce.to_string()),
             issued_at: Some("2026-06-01T00:00:00Z".to_string()),
             metadata: vec![],
+            metadata_present: true,
         }
     }
 
@@ -83,11 +114,24 @@ impl BrokerRequestEnvelope {
             nonce: Some(nonce.to_string()),
             issued_at: Some("2026-06-01T00:00:00Z".to_string()),
             metadata: vec![],
+            metadata_present: true,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JsonRequestEnvelope {
+    request_id: Option<String>,
+    session_id: Option<String>,
+    operation: Option<BrokerOperation>,
+    payload_hash: Option<String>,
+    nonce: Option<String>,
+    issued_at: Option<String>,
+    metadata: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BrokerHealth {
     pub broker_id: String,
     pub status: String,
@@ -97,7 +141,7 @@ pub struct BrokerHealth {
     pub evidence_source: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BrokerError {
     pub code: String,
     pub message: String,
@@ -106,7 +150,8 @@ pub struct BrokerError {
     pub fail_closed: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BrokerStatus {
     Accepted,
     Rejected,
@@ -123,7 +168,7 @@ impl BrokerStatus {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BrokerResponse {
     pub request_id: String,
     pub operation: String,
@@ -133,6 +178,12 @@ pub struct BrokerResponse {
     pub error: Option<BrokerError>,
     pub health: Option<BrokerHealth>,
     pub shutdown_requested: bool,
+}
+
+impl BrokerResponse {
+    pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,6 +219,7 @@ impl Broker {
             || envelope.operation.is_none()
             || envelope.issued_at.as_deref().unwrap_or("").is_empty()
             || envelope.nonce.as_deref().unwrap_or("").is_empty()
+            || !envelope.metadata_present
         {
             return self.reject(
                 &request_id,
@@ -228,6 +280,19 @@ impl Broker {
             BrokerOperation::Health => self.accept_health(&request_id),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id),
             BrokerOperation::CommandEnvelope => self.suspend_command(&request_id),
+        }
+    }
+
+    pub fn handle_json(&mut self, input: &str) -> BrokerResponse {
+        match BrokerRequestEnvelope::from_json_str(input) {
+            Ok(envelope) => self.handle(envelope),
+            Err(_) => self.reject(
+                "malformed-request",
+                "unknown",
+                "broker_request_malformed",
+                "broker request JSON failed to parse or included unknown fields",
+                true,
+            ),
         }
     }
 
@@ -384,6 +449,17 @@ fn metadata_attempts_authority(metadata: &[BrokerMetadata]) -> bool {
     })
 }
 
+fn json_metadata_value(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        Value::Bool(value) => value.to_string(),
+        Value::Number(value) => value.to_string(),
+        Value::Null => "null".to_string(),
+        Value::Array(_) | Value::Object(_) => serde_json::to_string(value)
+            .unwrap_or_else(|_| "unserializable_metadata_value".to_string()),
+    }
+}
+
 fn normalize_key(value: &str) -> String {
     let mut result = String::new();
     let mut previous_was_underscore = false;
@@ -429,6 +505,77 @@ mod tests {
     }
 
     #[test]
+    fn json_health_request_is_accepted_and_serialized() {
+        let mut broker = Broker::new("session-1");
+        let response = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"client": "desktop_flutter"}
+            }"#,
+        );
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let encoded = response.to_json_string().unwrap();
+        assert!(encoded.contains(r#""status":"accepted""#));
+        assert!(encoded.contains(r#""authority_owner":"rust_security_broker""#));
+        assert!(encoded.contains(r#""shutdown_requested":false"#));
+    }
+
+    #[test]
+    fn invalid_json_is_rejected_and_audited() {
+        let mut broker = Broker::new("session-1");
+        let response = broker.handle_json("{not-json");
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_request_malformed".to_string()
+        );
+        assert_eq!(broker.audit_events().len(), 1);
+    }
+
+    #[test]
+    fn json_missing_metadata_is_rejected_and_audited() {
+        let mut broker = Broker::new("session-1");
+        let response = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z"
+            }"#,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_request_malformed".to_string()
+        );
+    }
+
+    #[test]
+    fn json_authority_metadata_is_rejected_and_audited() {
+        let mut broker = Broker::new("session-1");
+        let response = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "health",
+                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"trustLevel": "root"}
+            }"#,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_authority_metadata_rejected".to_string()
+        );
+    }
+
+    #[test]
     fn malformed_request_is_rejected_and_audited() {
         let mut broker = Broker::new("session-1");
         let response = broker.handle(BrokerRequestEnvelope {
@@ -442,6 +589,7 @@ mod tests {
             nonce: Some("nonce-1".to_string()),
             issued_at: Some("2026-06-01T00:00:00Z".to_string()),
             metadata: vec![],
+            metadata_present: true,
         });
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(
