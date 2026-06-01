@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/broker_session.schema.json",
+  "title": "BrokerSession",
+  "type": "object",
+  "required": [
+    "session_id",
+    "state",
+    "issued_at",
+    "expires_at",
+    "evidence_source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "active",
+        "stale",
+        "shutdown_requested"
+      ]
+    },
+    "issued_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expires_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "LIVE_RUNTIME",
+        "INTERNAL_STATE"
+      ]
+    }
+  }
+}

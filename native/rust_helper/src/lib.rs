@@ -1,4 +1,7 @@
+#![forbid(unsafe_code)]
+
 pub mod audit_hash;
+pub mod broker;
 pub mod diagnostics;
 pub mod filesystem;
 pub mod ipc;

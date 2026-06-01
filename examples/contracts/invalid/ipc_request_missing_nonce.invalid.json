@@ -1,0 +1,8 @@
+{
+  "request_id": "ipc-request-1",
+  "session_id": "broker-session-1",
+  "operation": "health",
+  "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "issued_at": "2026-06-01T00:00:00Z",
+  "metadata": {}
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/broker_health.schema.json",
+  "title": "BrokerHealth",
+  "type": "object",
+  "required": [
+    "broker_id",
+    "status",
+    "authority_owner",
+    "command_dispatch_enabled",
+    "audit_append_enabled",
+    "evidence_source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "broker_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "degraded",
+        "suspend"
+      ]
+    },
+    "authority_owner": {
+      "type": "string",
+      "enum": [
+        "rust_security_broker"
+      ]
+    },
+    "command_dispatch_enabled": {
+      "type": "boolean",
+      "const": false
+    },
+    "audit_append_enabled": {
+      "type": "boolean",
+      "const": true
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "LIVE_RUNTIME",
+        "INTERNAL_STATE"
+      ]
+    }
+  }
+}

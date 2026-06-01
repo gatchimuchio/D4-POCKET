@@ -27,6 +27,12 @@ REQUIRED = {
     "agent_task.schema.json",
     "agent_tool_call.schema.json",
     "agent_diff.schema.json",
+    "ipc_request.schema.json",
+    "ipc_response.schema.json",
+    "broker_error.schema.json",
+    "broker_session.schema.json",
+    "broker_health.schema.json",
+    "broker_command_envelope.schema.json",
 }
 
 TYPE_MAP = {

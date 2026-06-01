@@ -1,0 +1,8 @@
+{
+  "broker_id": "gui-shell-rust-broker",
+  "status": "ready",
+  "authority_owner": "rust_security_broker",
+  "command_dispatch_enabled": true,
+  "audit_append_enabled": true,
+  "evidence_source": "LIVE_RUNTIME"
+}

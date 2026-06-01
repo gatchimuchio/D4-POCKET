@@ -1,0 +1,7 @@
+{
+  "session_id": "broker-session-1",
+  "state": "active",
+  "issued_at": "2026-06-01T00:00:00Z",
+  "expires_at": "2026-06-01T01:00:00Z",
+  "evidence_source": "LIVE_RUNTIME"
+}

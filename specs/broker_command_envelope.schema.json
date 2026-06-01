@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/broker_command_envelope.schema.json",
+  "title": "BrokerCommandEnvelope",
+  "type": "object",
+  "required": [
+    "envelope_id",
+    "runtime_id",
+    "operation",
+    "capability_id",
+    "permission_id",
+    "approval_id",
+    "audit_event_id",
+    "recovery_id",
+    "payload_hash",
+    "dispatch_enabled",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "envelope_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capability_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "permission_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recovery_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "dispatch_enabled": {
+      "type": "boolean",
+      "const": false
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

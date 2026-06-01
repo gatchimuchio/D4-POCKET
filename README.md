@@ -49,6 +49,10 @@ Runtime / Agent / Tool / Local Service
       -> approval queue
       -> audit events
       -> recovery actions
+  -> Rust Security Broker
+      -> authority-sensitive IPC acceptance/rejection
+      -> broker-local audit for broker decisions
+      -> command-envelope validation before future dispatch
   -> UI Layer
       -> Flutter rendering
       -> operator input
@@ -78,8 +82,8 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 Expected successful output:
 
 ```text
-schema check passed: 19 schemas, 19 examples, 19 negative fixtures
-conformance skeleton passed: 89 checks
+schema check passed: 25 schemas, 25 examples, 25 negative fixtures
+conformance skeleton passed: 94 checks
 ```
 
 See [QUICKSTART.md](./QUICKSTART.md).

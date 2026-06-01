@@ -1,6 +1,6 @@
 # Rust Security Broker Migration Plan
 
-Status: Phase 0 migration plan
+Status: Phase 2 / Phase 3 minimal broker skeleton started
 Date: 2026-06-01
 Scope: minimal-diff plan after current-state audit
 
@@ -120,6 +120,17 @@ Rust security constraints:
 - `cargo audit`、`cargo deny`、`cargo geiger` または同等の unsafe/dependency visibility の導入可否を確認する。
 - skeleton では filesystem/process/network/credential access を拡張しない。
 
+### Current Skeleton Evidence
+
+2026-06-01 時点で、最小差分として既存 `native/rust_helper` crate 内に Rust Security Broker skeleton を追加した。
+
+- `native/rust_helper/src/main.rs`: stdin-based health / shutdown lifecycle smoke only.
+- `native/rust_helper/src/broker/protocol.rs`: typed envelope validation、payload hash validation、stale session rejection、nonce replay rejection、authority-like metadata rejection、command-envelope suspension。
+- `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の broker-local append-only audit hash chain。
+- `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
+
+現時点では production IPC transport、Flutter client integration、approval/audit/recovery cutover、process/credential/update gated execution は未実装である。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
+
 ## 6. Phase 4 / Responsibility Migration Order
 
 1 responsibility ずつ移管する。各 block では Python oracle enumeration、Rust implementation、parity harness、negative tests、active-path cutover evidence を必須にする。
@@ -195,12 +206,12 @@ Rollback for a failed responsibility migration:
 
 ## 10. Proposed Next Implementation Block
 
-Phase 2 / Phase 3 minimal start:
+Phase 3 hardening / Phase 4 preparation:
 
-- IPC threat model と broker protocol document を作成する。
-- 既存 schemas で不足する場合だけ broker schemas を追加する。
-- health、shutdown、envelope validation、structured errors、rejection audit を持つ independent Rust broker skeleton を実装する。
-- malformed envelope rejection と audit-on-rejection の Rust tests を追加する。
+- production IPC transport 候補を Windows named pipe / localhost authenticated loopback / cross-platform local socket で実測比較する。
+- broker request/response を JSON serialization + schema validation path に接続する。
+- Python Shell Core の authority key normalization / strip / quarantine fixture を Rust broker parity harness へ接続する。
+- Flutter client はまだ production authority owner にせず、broker unavailable / stale session / malformed response の fail-closed UI state を先に実装する。
 - Python Shell Core は migration oracle として残す。
 - real command dispatch は有効化しない。
 - Flutter-Rust FFI は導入しない。
