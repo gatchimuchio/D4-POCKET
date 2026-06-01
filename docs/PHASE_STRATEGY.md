@@ -58,7 +58,7 @@ GUI-Shell uses phase-based readiness language so owner-use progress is not confu
 - phase: C
   name: OSS claim hygiene
   status: next
-  goal: keep README, CLAIM, release checklist, audit, installer, security, and strategy docs aligned so external readers cannot mistake Phase B for release readiness.
+  goal: keep README, CLAIM, release checklist, audit, installer, security, strategy docs, and language-policy convergence blockers aligned so external readers cannot mistake Phase B for release readiness.
 
 - phase: D
   name: measured Windows release evidence
@@ -77,6 +77,15 @@ GUI-Shell uses phase-based readiness language so owner-use progress is not confu
 
 ## Release Rule
 
-Do not claim completed product release until strict Windows release validation passes and owner GO is explicit.
+Do not claim completed product release until language policy runtime convergence is proven, strict Windows release validation passes, and owner GO is explicit.
 
 Phase B may improve owner usability without weakening strict release gates.
+
+## Language Policy Gate
+
+- item: Rust Security Broker migration
+  classification: release_blocker
+  status: not_passed
+  reason: current owner-use and validation Shell Core behavior is implemented in Python, and the Rust side is a helper library rather than an independent authority broker.
+  required_action: Complete broker IPC skeleton, parity migration, Flutter broker-mediated authority path, and no-Python-runtime assertion before Phase D evidence can support a completed product release claim.
+  blocks_release: yes

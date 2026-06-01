@@ -10,6 +10,12 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 ## Release Blockers
 
+- item: language policy runtime convergence gate
+  classification: release_blocker
+  reason: The current authority-sensitive Shell Core behavior is Python-based and the Rust side is not yet an independent Rust Security Broker process with restricted IPC, rejection audit, approval/audit/recovery ownership, and no-Python-runtime product evidence.
+  required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only, and rerun strict release validation after broker-mediated Windows installed-path evidence exists.
+  blocks_release: yes
+
 - item: cargo test gate for in-scope Rust helper
   classification: required_for_v1
   reason: Rust helper validation is required for completed desktop-first v1.0 release. Current run on 2026-05-25 passed.

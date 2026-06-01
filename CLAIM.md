@@ -64,6 +64,12 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 ## Current Release Blockers
 
+- item: language policy runtime convergence not passed
+  classification: release_blocker
+  reason: Current Shell Core authority-sensitive behavior is implemented in Python under `packages/shell_core/*.py` and used by owner-use snapshot generation / validation, while the Rust side is still a bounded helper library without independent broker IPC ownership.
+  required_action: Migrate authority-sensitive active runtime responsibilities to a Rust Security Broker, keep Python only as dev/test/migration oracle, and prove Flutter authority operations are broker-mediated before completed product release.
+  blocks_release: yes
+
 - item: Linux desktop build and launch smoke
   classification: required_for_v1
   reason: Linux desktop build smoke and launch smoke passed on 2026-05-25 as development/verification proof.

@@ -53,7 +53,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "92c72195b8961816e42dcb981dc663619fd53ebb4bb2840647aeacd90bbcfe66"
+      "sha256": "ce6a8ae2c8662d7d6ec1b4ac8a3c1afa3cc0886e1bb23a88096f9d6c861ba3ff"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -77,11 +77,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "c0b54b1109ec440db32998ed58bf55477c4e691eeddf5c57e40936ff1aa015ad"
+      "sha256": "e3452288493b8529ca7b4b44ad36940698e340dee1b1c22dd709e0f15ae5c8e2"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0fee95aef7af56bf1c460e55c425e32d4c3118ae87d0da7f59dd47aaa913c3f5"
+      "sha256": "9aeec5a516233ae562006c846b21c461f051d8df05f2de5b16c35ef8b6cbb405"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -213,7 +213,7 @@
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
-      "sha256": "9c12f17cbe6804dbbff3f8a23c680f609aba610314576897733a97c74ba2fceb"
+      "sha256": "5edbf3577885e05275b444ca4978215281c011268cfde73a16f0c6f9933a276d"
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
@@ -238,6 +238,18 @@
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
       "sha256": "913f9e6f35acc62dea48a73aac83bf45900a2888ad500ae42a6e0217d04f4b36"
+    },
+    {
+      "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
+      "sha256": "4e20cb311b3179874d954170e2e33a1e1bf004544e1eed30c2bc1a8ac4df1ab2"
+    },
+    {
+      "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
+      "sha256": "ca6e1dff3cf8bc741b8343780ab10b360bcf21028cc6569bfcf8481880ee4de9"
+    },
+    {
+      "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
+      "sha256": "446f35a62b97626865366c5e9fe2176279838f3570b97f56999f339e501d121d"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",

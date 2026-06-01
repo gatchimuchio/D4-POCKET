@@ -3,7 +3,7 @@
 Status: Phase B owner-use complete; v1.0 desktop release roadmap  
 Project: GUI Shell / Runtime Operation Shell  
 Reference consumer/runtime: BLUE-TANUKI via adapter only  
-Primary implementation candidate: Flutter + Rust helper
+Primary implementation candidate: Flutter + Rust helper; Rust Security Broker required for authority-sensitive production convergence
 
 ## Completion Audit Priority
 
@@ -20,6 +20,13 @@ Primary implementation candidate: Flutter + Rust helper
   reason: Shell Core now preserves raw inbound payloads, normalizes keys, strips authority aliases, detects authority-like values, quarantines ambiguous payloads, and records normalization audit metadata.
   required_action: Keep Unicode/case/zero-width/camelCase/envelope/value-only escalation tests passing.
   blocks_release: no
+
+- item: Language policy runtime convergence
+  classification: release_blocker
+  status: not_passed
+  reason: `packages/shell_core/*.py` is the current authority-sensitive Shell Core implementation for owner-use snapshot generation and validation, while `native/rust_helper` is a bounded library helper rather than an independent Rust Security Broker process.
+  required_action: Complete Rust Security Broker IPC skeleton, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
+  blocks_release: yes
 
 - item: Windows installer, first-run, and real Setup Doctor
   classification: release_blocker
@@ -166,7 +173,7 @@ The canonical phase definitions live in [docs/PHASE_STRATEGY.md](./docs/PHASE_ST
 - Phase E: OSS v1.0 RC later
 - Phase F: paid/product QC later
 
-Completed product release is not claimed. Phase D measured Windows installed-path evidence and explicit owner GO remain `release_blocker` items before any release-ready claim.
+Completed product release is not claimed. Language policy runtime convergence, Phase D measured Windows installed-path evidence, and explicit owner GO remain `release_blocker` items before any release-ready claim.
 
 ### Phase 0: Standard / Selection Freeze
 
