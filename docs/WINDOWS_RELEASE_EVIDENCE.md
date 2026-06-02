@@ -22,6 +22,8 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smo
   -AuditDir "$env:ProgramData\GUI-Shell\audit" `
   -VisibleSurfacesJson .\release_evidence\visible_surfaces.json `
   -BrokerEvidenceJson .\release_evidence\windows_broker_smoke.json `
+  -BrokerHelperExe "$env:LOCALAPPDATA\GUI-Shell\installed\broker\gui_shell_rust_helper.exe" `
+  -NoPythonRuntime `
   -OutputPath release_evidence\windows_installed_smoke.json
 ```
 
@@ -37,6 +39,8 @@ The evidence must prove:
 
 - installed executable exists and has a tagged sha256 hash
 - first run launches from the installed app path, remains running, and exposes a non-zero `MainWindowHandle`
+- first run launches the installed Flutter `.exe` with `GUI_SHELL_BROKER_ENDPOINT_JSON` supplied by the installed Rust broker
+- first run records `-NoPythonRuntime` launch evidence with Python PATH entries scrubbed and no `python`, `python3`, or `py` command visible to the launch process
 - Dashboard, NavigationRail, Runtime Status, and Invariant Status are visible with recorded UIAutomation, screenshot, or accessibility-tree evidence
 - first-run config exists at the recorded path and parses as JSON
 - audit directory passes a write/read/delete probe

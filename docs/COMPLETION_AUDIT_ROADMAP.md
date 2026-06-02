@@ -128,7 +128,7 @@ GUI-Shell uses three separate completion definitions:
 - item: Windows installed-path evidence validator
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, installed-path first run, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, and non-synthetic Setup Doctor non-authority diagnostics.
+  evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, broker-mediated installed Flutter `.exe` first run, No-Python launch evidence, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor non-authority diagnostics, and broker authenticated IPC/restart/crash evidence.
   blocks_release: no
 
 - item: Native Windows build and launch smoke
@@ -142,7 +142,7 @@ GUI-Shell uses three separate completion definitions:
 - item: Windows installer and first-run smoke
   classification: release_blocker
   reason: installed app path first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: run native Windows installed smoke collection and pass `python tooling\windows_release_evidence.py`. Strict release must still fail until measured windows_installed_smoke.json exists.
+  required_action: run native Windows installed smoke collection with `-BrokerHelperExe` and `-NoPythonRuntime`, then pass `python tooling\windows_release_evidence.py`. Strict release must still fail until measured windows_installed_smoke.json exists.
   blocks_release: yes
 
 - item: Windows Setup Doctor real diagnostics smoke

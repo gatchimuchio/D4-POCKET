@@ -84,11 +84,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "b38d77977342ae5c39ffbb6580be2f4ab5f9ecf7755db7497b2cc8dbe2f81095"
+      "sha256": "997ba9e5e66303c0f659bc1098de593d9f13b7b05b4c4103219502947c1e1f1f"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "6e16a8f16bd7c18e53440d8678b446b765c7bd4c980e59dba723549dd200fbf1"
+      "sha256": "30ddda7f1663402007c4f99a6f95ca5cb627c11692ce53385a8882b4dea46576"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "385b99a4128156e80d74d9c6f195bce41f1ef4aadd04e0fd1f3606c2f67ee50a"
+      "sha256": "344ac52bc2350dd0b887cc91e27ea0aa72c1c482a67be914335208da93ac9343"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -184,7 +184,7 @@
     },
     {
       "path": "docs/COMPLETION_AUDIT_ROADMAP.md",
-      "sha256": "1e2591767562a40a576fce8c9b9b9a48f53d0e637473d9a97881a096f2fa9371"
+      "sha256": "375e57a3cd7d6b796f7b3d6057d509526d22abb99042d3f81879aef9b2426ffd"
     },
     {
       "path": "docs/COMPLETION_STRATEGY_INSTRUCTION.md",
@@ -228,11 +228,11 @@
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
-      "sha256": "987bb2945a79a17dae983397f9d71ed66eafda6a42a9c31c015e1f6ae08f40d4"
+      "sha256": "f0b52cd0e4e30cc920fc4762b434e7a32c10f3353d372318eee1543616ee098c"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
-      "sha256": "7c30ac0e92e4982d803cc82b7ff5cd733a22a920a8b3b761a235abcb1641bb82"
+      "sha256": "5aac935df976f16d552d745905baaa1a78a7f32ec7648afbe3d1fd276e207ec2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -240,15 +240,15 @@
     },
     {
       "path": "docs/STRATEGY.md",
-      "sha256": "26785f6c252923635b897efdedf5460ba3ae41bc3ede05fae5fc3cc4fd12a75c"
+      "sha256": "413dd1709bcb346ca163fca3209c4d1887df71da0c2e5474a3cf8fbf4da25b10"
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "ea3d0b016f0e63e152a3a5986931251499713c0dac323853d55c4eaed2e3bd78"
+      "sha256": "cb0465792345406f4a9092b06dcb8f48109228faeb7d340fea87fa433adfdf24"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
-      "sha256": "913f9e6f35acc62dea48a73aac83bf45900a2888ad500ae42a6e0217d04f4b36"
+      "sha256": "4be978d4dd0f9b6ca4bec24565031d46ff7361b0e4ca07a3f514aeb27c6f765d"
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
@@ -552,7 +552,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "1f5329445ac5ccab07178fff26d720741b9863a26104fbfe29a188004e7398eb"
+      "sha256": "ca51047fdc98d3ce71fdfc6844ca797399e90dcebde0b7478c546abe58d011eb"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -560,7 +560,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "0f239b684f5910fa6338a65a70ee74915d019d8a454f4997d1fd48db17e29c62"
+      "sha256": "b868f1a20ce82aea9c3ce0f157e181ddcdc9f79a133d7c31be48ea64981981fb"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
@@ -840,7 +840,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ca2057de7764d5cfd9fc9c2f6030c08017661e87a0fae8b6b1139e970ba79d85"
+      "sha256": "c229675ad2492a4f4584a4c6312a87e31359c043617c10975b8849aed3b89780"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -876,7 +876,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "94ebd8402487e33c1836fe874c54051745d51a0c28399a088668936064472b02"
+      "sha256": "c0fd8935a39a892c00377d5a06f08bee040413e8711185413c7172787284dceb"
     }
   ]
 }

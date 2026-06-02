@@ -145,7 +145,7 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 - item: Windows installer first-run smoke not passed
   classification: release_blocker
   reason: Windows installed-path first-run evidence has not been recorded in `release_evidence/windows_installed_smoke.json`.
-  required_action: Stage the Windows installed app, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` on native Windows with real Setup Doctor JSON, visible-surface evidence, broker evidence, config path, and audit dir probe inputs; pass `python tooling\windows_release_evidence.py`.
+  required_action: Stage the Windows installed app, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` on native Windows with `-BrokerHelperExe` and `-NoPythonRuntime` plus real Setup Doctor JSON, visible-surface evidence, broker evidence, config path, and audit dir probe inputs; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke not passed
@@ -162,7 +162,7 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 - item: Windows installed-path evidence validator
   classification: required_for_v1
-  reason: `tooling/windows_release_evidence.py` validates installed executable hash, installed-path launch evidence, non-zero window handle, visible-surface evidence source, first-run config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor diagnostics, broker authenticated IPC, durable store readiness, restart replay rejection, crash fail-closed connection behavior, no authority Python runtime requirement, and no Flutter/Rust FFI authority bridge before Windows release blockers can clear.
+  reason: `tooling/windows_release_evidence.py` validates installed executable hash, installed Flutter `.exe` launch evidence, broker-mediated first-run endpoint evidence, No-Python launch evidence, non-zero window handle, visible-surface evidence source, first-run config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor diagnostics, broker authenticated IPC, durable store readiness, restart replay rejection, crash fail-closed connection behavior, no authority Python runtime requirement, and no Flutter/Rust FFI authority bridge before Windows release blockers can clear.
   required_action: Keep evidence validation passing and reject copied, edited, synthetic, manually confirmed, shallow, or non-Windows evidence.
   blocks_release: no
 

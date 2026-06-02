@@ -100,6 +100,9 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("artifact.sha256 must be tagged sha256")
     if not _is_true(data, "artifact.installed_exe_exists"):
         errors.append("installed executable existence was not confirmed")
+    installed_exe_path = str(_get(data, "artifact.installed_exe_path") or "")
+    if not installed_exe_path.lower().endswith(".exe"):
+        errors.append("artifact.installed_exe_path must point to the installed Flutter executable")
     if _get(data, "first_run.status") != "passed":
         errors.append("first_run.status must be passed")
     if not _is_true(data, "first_run.launched_from_installed_path"):
@@ -112,6 +115,27 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("MainWindowHandle was not confirmed")
     if not _is_true(data, "first_run.first_window_visible"):
         errors.append("first window visibility was not confirmed")
+    if not _is_true(data, "first_run.broker_mediated_launch"):
+        errors.append("first run was not launched through the Rust broker")
+    if not _get(data, "first_run.broker_helper_path"):
+        errors.append("first_run.broker_helper_path missing")
+    if not _get(data, "first_run.broker_endpoint_file"):
+        errors.append("first_run.broker_endpoint_file missing")
+    if not _is_true(data, "first_run.broker_endpoint_created"):
+        errors.append("broker endpoint file creation was not confirmed for first run")
+    if _get(data, "first_run.broker_transport") != "authenticated_loopback_tcp":
+        errors.append("first_run.broker_transport must be authenticated_loopback_tcp")
+    if not _is_true(data, "first_run.no_python_runtime_requested"):
+        errors.append("first run did not request no-Python runtime evidence mode")
+    if not _is_true(data, "first_run.python_runtime_path_scrubbed"):
+        errors.append("Python runtime PATH scrub was not applied before first-run launch")
+    if _get(data, "first_run.python_path_entries_remaining_count") != 0:
+        errors.append("Python PATH entries remained visible before first-run launch")
+    python_commands = _get(data, "first_run.python_commands_visible_after_scrub")
+    if not isinstance(python_commands, list):
+        errors.append("first_run.python_commands_visible_after_scrub must be a list")
+    elif python_commands:
+        errors.append("Python commands remained visible before first-run launch")
     visible = set(_get(data, "first_run.visible_surfaces") or [])
     for label in sorted(REQUIRED_VISIBLE_SURFACES):
         if label not in visible:
@@ -147,7 +171,7 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_installer_first_run_smoke",
             "; ".join(errors),
-            "Run the Windows installed first-run smoke and record valid release_evidence/windows_installed_smoke.json.",
+            "Run the Windows installed first-run smoke with -BrokerHelperExe and -NoPythonRuntime and record valid release_evidence/windows_installed_smoke.json.",
         )
     return _passed(
         "windows_installer_first_run_smoke",
@@ -263,7 +287,7 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
             _failed(
                 "windows_installer_first_run_smoke",
                 error or "Windows installed smoke evidence missing",
-                "Create release_evidence/windows_installed_smoke.json from a native Windows installed-app smoke with measured window, visible-surface, config, and audit probe evidence.",
+                "Create release_evidence/windows_installed_smoke.json from a native Windows installed-app smoke with broker-mediated Flutter .exe launch, -NoPythonRuntime launch, measured window, visible-surface, config, and audit probe evidence.",
             ),
             _failed(
                 "windows_setup_doctor_smoke",

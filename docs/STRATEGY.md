@@ -34,7 +34,7 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 - item: Windows desktop release validation
   classification: release_blocker
   reason: Windows project support, toolchain verification, analyze, test, build smoke, and launch smoke have passed, but installed-path Setup Doctor, installer, and first-run evidence is missing.
-  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows and pass `python tooling\windows_release_evidence.py`.
+  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows with broker-mediated installed Flutter `.exe` first-run evidence, `-NoPythonRuntime` launch evidence, installed-path Setup Doctor evidence, and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target

@@ -1043,7 +1043,7 @@ def _valid_windows_installed_evidence() -> dict:
         "platform": "windows",
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "2",
+            "collector_version": "3",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1061,6 +1061,16 @@ def _valid_windows_installed_evidence() -> dict:
             "main_window_handle": 100,
             "window_title": "GUI-Shell",
             "first_window_visible": True,
+            "broker_mediated_launch": True,
+            "broker_helper_path": r"C:\Program Files\GUI-Shell\broker\gui_shell_rust_helper.exe",
+            "broker_endpoint_file": r"C:\ProgramData\GUI-Shell\broker\broker_session.json",
+            "broker_endpoint_created": True,
+            "broker_transport": "authenticated_loopback_tcp",
+            "no_python_runtime_requested": True,
+            "python_runtime_path_scrubbed": True,
+            "python_path_entries_removed_count": 2,
+            "python_path_entries_remaining_count": 0,
+            "python_commands_visible_after_scrub": [],
             "visible_surfaces": ["Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"],
             "visible_surfaces_evidence": {
                 "source": "uiautomation",
@@ -1160,6 +1170,8 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     bad["first_run"]["visible_surfaces_evidence"] = {"source": "manual", "path": ""}
     bad["first_run"]["config_json_valid"] = False
     bad["first_run"]["audit_write_probe"]["read"] = False
+    bad["first_run"]["broker_mediated_launch"] = False
+    bad["first_run"]["python_commands_visible_after_scrub"] = ["python"]
     bad["setup_doctor"]["evidence_source"]["synthetic"] = True
     bad["setup_doctor"]["checks"] = bad["setup_doctor"]["checks"][:1]
     bad["broker"]["evidence_source"]["synthetic"] = True

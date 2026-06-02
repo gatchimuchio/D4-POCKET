@@ -67,7 +67,7 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 - item: Windows installer and first-run smoke
   classification: release_blocker
   reason: native Windows installed-path installer and first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: Install through the Windows release path, launch from the installed app path, run `installer\windows\collect_installed_smoke.ps1` with measured visible-surface, config, audit, and Setup Doctor inputs, and pass `python tooling\windows_release_evidence.py`.
+  required_action: Install through the Windows release path, launch the installed Flutter `.exe` through the installed Rust broker, run `installer\windows\collect_installed_smoke.ps1` with `-BrokerHelperExe`, `-NoPythonRuntime`, measured visible-surface, config, audit, and Setup Doctor inputs, and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke
@@ -78,7 +78,7 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: Windows installed evidence validator
   classification: required_for_v1
-  reason: `tooling/windows_release_evidence.py` gates Windows installer/first-run and Setup Doctor release evidence on installed-path launch, artifact hash, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, and non-synthetic non-authoritative diagnostics.
+  reason: `tooling/windows_release_evidence.py` gates Windows installer/first-run and Setup Doctor release evidence on installed Flutter `.exe` launch, broker-mediated first-run endpoint evidence, No-Python launch evidence, artifact hash, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, broker authenticated IPC/restart/crash evidence, and non-synthetic non-authoritative diagnostics.
   required_action: Keep the validator strict enough to reject copied, edited, synthetic, manually confirmed, or non-Windows evidence before owner GO.
   blocks_release: no
 

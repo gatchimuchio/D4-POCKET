@@ -28,7 +28,7 @@ Platform priority:
 - item: Windows desktop project support, analyze, test, build, launch, Setup Doctor, installer, and first-run smoke
   classification: release_blocker
   reason: Windows is the primary product target. Windows project support, Flutter toolchain, analyze, test, build, and launch smoke have passed, but installed-path Setup Doctor, installer, and first-run evidence is missing.
-  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows and pass `python tooling\windows_release_evidence.py`.
+  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows with broker-mediated installed Flutter `.exe` first-run evidence, `-NoPythonRuntime` launch evidence, installed-path Setup Doctor evidence, and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target

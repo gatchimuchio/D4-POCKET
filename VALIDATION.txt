@@ -1,3 +1,141 @@
+validation_update_2026_06_03_block_e_installed_first_run_broker_gate:
+  scope: Windows installed first-run broker-mediated and no-Python launch evidence gate
+  commit: pre_commit_validation
+  implemented_behavior:
+    - collect_installed_smoke.ps1 can start the installed Rust broker and launch the installed Flutter .exe with GUI_SHELL_BROKER_ENDPOINT_JSON.
+    - collect_installed_smoke.ps1 records -NoPythonRuntime launch evidence by scrubbing Python and WindowsApps PATH entries and recording visible python/python3/py commands before app launch.
+    - tooling/windows_release_evidence.py now rejects first-run evidence unless it proves installed Flutter .exe launch, broker-mediated endpoint evidence, authenticated_loopback_tcp transport, and no-Python launch evidence.
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - python3 fallback passed: 25 schemas, 25 examples, 27 negative fixtures
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: conformance skeleton passed: 96 checks
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | INTERNAL_STATE
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | FIXTURE | LIVE_RUNTIME
+      exit: 0
+      stdout: release runtime assertions: 9 passed, 0 failed
+    - name: windows_release_evidence
+      command: python3 tooling/windows_release_evidence.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: EXTERNAL_EVIDENCE
+      exit: 1
+      reason: release_evidence/windows_installed_smoke.json missing; validator requires broker-mediated Flutter .exe launch, -NoPythonRuntime launch, first-run, Setup Doctor, and broker installed smoke evidence.
+      required_action: Collect native Windows installed-path first-run, Setup Doctor, visible-surface, broker, and no-Python-runtime evidence.
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - schema_check passed
+        - conformance_skeleton passed
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed with 3 blockers preserved
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: rust_helper_cargo_fmt_check
+      command: cd native/rust_helper && cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+    - name: rust_helper_cargo_test
+      command: cd native/rust_helper && cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: LIVE_RUNTIME
+      exit: 0
+      stdout_summary:
+        - 31 Rust helper and broker unit tests passed
+        - 3 broker IPC integration tests passed
+    - name: powershell_installer_script_parse
+      command: powershell.exe Parser.ParseFile for installer/windows/collect_broker_smoke.ps1, collect_installed_smoke.ps1, stage_installed_app.ps1
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG
+      exit: 0
+    - name: validate_all_full_current_host
+      command: python3 tooling/validate_all.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: LIVE_RUNTIME
+      exit: 1
+      reason: desktop Flutter analyze/test/build commands exit 127 in this WSL host because external Flutter shared.sh contains CRLF line endings.
+      required_action: Rerun desktop Flutter validation on a native Windows or corrected Flutter SDK host before release claim.
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: Windows installer first-run smoke
+      classification: release_blocker
+      reason: measured release_evidence/windows_installed_smoke.json is absent in this host, so installed Flutter .exe broker-mediated first-run and no-Python launch evidence is not recorded.
+      required_action: Run collect_installed_smoke.ps1 on native Windows with -BrokerHelperExe and -NoPythonRuntime plus measured Setup Doctor, visible-surface, config, audit, and broker evidence.
+      blocks_release: yes
+    - item: Windows Setup Doctor smoke
+      classification: release_blocker
+      reason: installed-path Setup Doctor evidence is absent from release_evidence/windows_installed_smoke.json.
+      required_action: Run Setup Doctor from the installed Windows app path and record non-synthetic diagnostics evidence.
+      blocks_release: yes
+    - item: Windows broker installed smoke
+      classification: release_blocker
+      reason: installed-path broker evidence is absent from release_evidence/windows_installed_smoke.json.
+      required_action: Run collect_broker_smoke.ps1 against the installed Rust broker helper and include the evidence in release_evidence/windows_installed_smoke.json.
+      blocks_release: yes
+    - item: current-host desktop Flutter validation
+      classification: release_blocker
+      reason: external Flutter SDK CRLF issue makes current-host desktop Flutter analyze/test/build fail with exit 127.
+      required_action: Rerun desktop Flutter validation on a native Windows or corrected Flutter SDK host.
+      blocks_release: yes
+
 validation_update_2026_06_03_block_e:
   scope: Windows staged installed path and broker evidence gate
   commit: pre_commit_validation

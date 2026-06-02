@@ -13,6 +13,6 @@ Use `stage_installed_app.ps1` to create a staged installed directory from an alr
 
 Use `collect_broker_smoke.ps1` before final installed evidence collection. It validates authenticated broker IPC, durable store readiness, replay rejection after broker restart, crash fail-closed connection behavior, and records that Python and FFI are not authority runtime requirements.
 
-`collect_installed_smoke.ps1` then combines app first-run evidence, Setup Doctor evidence, visible-surface evidence, and broker evidence into `release_evidence/windows_installed_smoke.json`.
+`collect_installed_smoke.ps1` then starts the installed Rust broker, launches the installed Flutter `.exe` with `GUI_SHELL_BROKER_ENDPOINT_JSON`, applies `-NoPythonRuntime` PATH scrubbing for launch evidence, and combines app first-run evidence, Setup Doctor evidence, visible-surface evidence, and broker evidence into `release_evidence/windows_installed_smoke.json`.
 
 Normal users must not be required to manually use terminal, WSL, npm, Git, port setup, or runtime root discovery. The staged `.cmd` launcher is a bounded packaging step until a signed installer/MSIX wrapper is added.
