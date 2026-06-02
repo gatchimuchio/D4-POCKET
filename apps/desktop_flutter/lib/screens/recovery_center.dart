@@ -24,7 +24,7 @@ class RecoveryCenter extends StatelessWidget {
                 'The current snapshot has no recovery playbook rows to display.',
             phaseBBlocked: false,
             nextAction:
-                'Continue owner-use operation or regenerate the snapshot after validation changes.',
+                'Continue owner-use operation or refresh diagnostics after validation changes.',
           )
         else
           SingleChildScrollView(

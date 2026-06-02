@@ -57,7 +57,7 @@ GUI-Shell GUI hardening imports proven operation patterns without moving authori
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
-  evidence: `python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json` creates the local JSON consumed by `ShellCoreClient.local()`.
+  evidence: `python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json` creates local diagnostic JSON consumed only by `ShellCoreClient.local()` in development / inspection mode. Product `main.dart` uses `ShellCoreClient.product()` and broker IPC.
   authority_boundary: snapshot generation records Shell Core and Setup Doctor state for owner-use migration / development evidence; it does not grant authority and must not remain an installed product runtime dependency.
 
 - item: Evidence bundle export

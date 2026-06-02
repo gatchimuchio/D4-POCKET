@@ -1,6 +1,6 @@
 # Rust Broker IPC Protocol
 
-Status: Phase 3 production broker process started
+Status: Phase 3 production broker process and Flutter broker client started
 Date: 2026-06-03
 Scope: Rust Security Broker envelope, authenticated loopback IPC, session, health, replay, and durable audit store
 
@@ -87,7 +87,7 @@ In production broker-server mode, a connected durable file store reports:
 - `persistence_required=true`
 - `persistence_ready=true`
 
-`authority_cutover_status=active` and command dispatch still require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, Flutter broker integration, and Windows installed-path evidence.
+`authority_cutover_status=active` and command dispatch still require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, runnable Flutter broker validation, and Windows installed-path evidence.
 
 When the broker is configured to require persistent audit/replay/session state but no persistent store is connected, health returns `status=suspend`, `audit_persistence=in_memory_skeleton`, `replay_persistence=in_memory_session_only`, `session_persistence=in_memory_session_only`, `persistence_required=true`, `persistence_ready=false`, and `broker_persistence_unavailable`. Non-health operations fail closed with the same error.
 
@@ -123,6 +123,8 @@ The current Rust code provides:
 - `native/rust_helper/src/broker/protocol.rs` request/response decision path;
 - `native/rust_helper/src/broker/audit.rs` broker audit hash chain;
 - `tooling/broker_parity/run_authority_parity.py` Python oracle to Rust broker IPC parity harness;
+- `apps/desktop_flutter/lib/services/broker_client.dart` Flutter-side authenticated loopback IPC client and broker endpoint discovery path. Flutter does not spawn processes on the authority path; broker process launch belongs to installer / launcher / supervisor code;
+- `apps/desktop_flutter/lib/services/shell_core_client.dart` product-mode broker snapshot projection and fail-closed broker unavailable/auth/stale/malformed handling;
 - JSON request parsing with unknown-field rejection;
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
@@ -141,11 +143,11 @@ The current Rust code provides:
 
 It does not yet provide:
 
-- Flutter client integration;
+- WSL direct Flutter validation, because the external Flutter shell scripts currently fail with CRLF line endings;
 - credential/keychain access;
 - process or update gated execution.
 
-Unimplemented Flutter cutover, no-Python-runtime product proof, execution gates, and Windows installed-path evidence remain `release_blocker` for completed product release.
+No-Python-runtime product proof, execution gates, and Windows installed-path evidence remain `release_blocker` for completed product release. Flutter analyze/test evidence exists through Windows `flutter.bat`; WSL direct `flutter` remains environment-blocked.
 
 ## 7. IPC Transport Decision
 

@@ -95,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'The current filter did not match any setting projection in the snapshot.',
             phaseBBlocked: false,
             nextAction:
-                'Clear filters or regenerate the local snapshot if settings changed.',
+                'Clear filters or refresh diagnostics if settings changed.',
           )
         else
           SingleChildScrollView(

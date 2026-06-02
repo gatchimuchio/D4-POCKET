@@ -1,6 +1,6 @@
 # IPC Threat Model
 
-Status: Phase 3 production broker process started
+Status: Phase 3 production broker process and Flutter broker product path started
 Date: 2026-06-03
 Scope: Flutter UI -> Rust Security Broker -> Adapter / Runtime IPC
 
@@ -17,22 +17,22 @@ Rust Security Broker Process
 Adapter / External Runtime
 ```
 
-この文書は broker skeleton の初期 threat model である。まだ production cutover は完了していないため、現時点の証拠は `INTERNAL_STATE` と Rust unit tests が中心であり、Windows installed-path `LIVE_RUNTIME` proof ではない。
+この文書は broker production path の threat model である。Flutter product entry は broker-mediated path に切り替わったが、まだ command dispatch は suspended、`authority_cutover_status=not_active`、Windows installed-path `LIVE_RUNTIME` proof は未取得である。
 
 ## 2. Threats And Required Handling
 
 | threat | required handling | current skeleton scope | release classification |
 | --- | --- | --- | --- |
-| spoofed UI request | session id、nonce、payload hash、operation、IPC auth secret を検証し、失敗時は rejected / audited | authenticated loopback IPC + typed envelope validation | release_blocker until Flutter product path uses broker |
-| replayed approval request | nonce replay を拒否し、broker audit に記録する | persisted nonce store rejects replay after broker restart | release_blocker until Flutter product path uses broker |
-| forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner and Python-oracle parity path | release_blocker until Flutter product path uses broker |
-| malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust skeleton | none for skeleton; release_blocker for product cutover |
-| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window covered in Rust IPC integration tests | release_blocker until Flutter product path uses broker |
-| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | durable file store implemented; unavailable mode remains fail-closed | release_blocker until Flutter product path uses broker |
-| authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner and parity harness | release_blocker until Flutter product path uses broker |
-| Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope and Python oracle parity | release_blocker until Flutter product path uses broker |
-| stale session | session mismatch を rejected / audited にする | production broker-server generates session per process | release_blocker until Flutter product path uses broker |
-| broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | documented only | release_blocker |
+| spoofed UI request | session id、nonce、payload hash、operation、IPC auth secret を検証し、失敗時は rejected / audited | authenticated loopback IPC + typed envelope validation; Flutter product client uses broker session file | release_blocker until Windows installed path proves it |
+| replayed approval request | nonce replay を拒否し、broker audit に記録する | persisted nonce store rejects replay after broker restart | release_blocker until Windows installed path proves it |
+| forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner and Python-oracle parity path | release_blocker until Windows installed path proves it |
+| malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust broker and exercised by Rust IPC tests | release_blocker until installed proof |
+| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window covered in Rust IPC integration tests | release_blocker until installed proof |
+| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | durable file store implemented; unavailable mode remains fail-closed | release_blocker until installed proof |
+| authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner and parity harness | release_blocker until installed proof |
+| Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope and Python oracle parity | release_blocker until installed proof |
+| stale session | session mismatch を rejected / audited にする | production broker-server generates session per process; Flutter product tests cover fail-closed stale session handling | release_blocker until installed proof |
+| broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | `ShellCoreClient.product()` returns `broker_unavailable` SUSPEND snapshot and does not read local JSON authority; Flutter product tests pass through Windows `flutter.bat` | release_blocker until installed proof |
 | broken pipe / crash during approval | approval finalization must not complete; RecoveryAction required | documented only | release_blocker |
 | audit append failure | broker must block finalization if audit append fails | documented only | release_blocker |
 | keychain unavailable | credential-gated operation must fail closed | documented only | release_blocker |
@@ -41,7 +41,7 @@ Adapter / External Runtime
 
 - CONFIG: JSON Schema files under `specs/`.
 - INTERNAL_STATE: Rust broker unit tests and typed envelope validation.
-- LIVE_RUNTIME: future broker process integration and Windows installed-path evidence.
+- LIVE_RUNTIME: Rust broker process integration and future Windows installed-path evidence.
 - EXTERNAL_EVIDENCE: future signed artifact / installed path evidence.
 - FIXTURE: examples and negative fixtures under `examples/contracts/`.
 
@@ -61,16 +61,16 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 
 ## 5. Current Limitations
 
-- item: Flutter broker unavailable behavior absent
+- item: Flutter broker unavailable installed proof absent
   classification: release_blocker
-  reason: Rust broker now has authenticated loopback IPC and durable store tests, but Flutter still reads local snapshot JSON and does not yet use broker IPC.
-  required_action: add broker launch/discovery, broker unavailable / crash / stale-session UI fail-closed tests, and authority surface cutover.
+  reason: Flutter product code now fail-closes broker unavailable / auth / stale / malformed response paths and Windows Flutter analyze/test passed. Windows installed-path proof is still absent.
+  required_action: run installed Windows broker unavailable / crash / stale-session UI fail-closed tests.
   blocks_release: yes
 
-- item: Flutter broker authority surface cutover absent
+- item: Flutter broker authority surface active proof incomplete
   classification: release_blocker
-  reason: Rust broker authority parity exists for Python oracle fixtures, but Flutter still reads local snapshot JSON and does not yet use broker authority operations.
-  required_action: connect Permission Center, Approval Center, Audit Viewer, Recovery Center, and authority status to broker IPC and prove fail-closed states.
+  reason: Product `main.dart` now uses broker IPC and renders broker-derived authority status/projection, but broker still reports `authority_cutover_status=not_active` and command dispatch is suspended.
+  required_action: complete active authority cutover only after command-envelope execution gates, no-Python/no-FFI proof, and Windows installed-path evidence exist.
   blocks_release: yes
 
 - item: Windows installed-path broker proof absent

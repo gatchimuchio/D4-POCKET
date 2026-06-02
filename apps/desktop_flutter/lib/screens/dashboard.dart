@@ -60,7 +60,7 @@ class Dashboard extends StatelessWidget {
                 'GUI-Shell is using the safe fallback projection instead of a local owner snapshot.',
             phaseBBlocked: false,
             nextAction:
-                'Run tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json before daily local inspection.',
+                'Refresh the development diagnostic snapshot before local inspection.',
           ),
         SectionList(
           title: 'Trust Status',
@@ -75,7 +75,7 @@ class Dashboard extends StatelessWidget {
               ? [
                   'No problems are present in the current snapshot.',
                   'Phase B owner-use is not blocked.',
-                  'Open Evidence Center or generate a fresh snapshot if local state changed.',
+                  'Open Evidence Center or refresh diagnostics if local state changed.',
                 ]
               : [
                   for (final problem in snapshot.problems)

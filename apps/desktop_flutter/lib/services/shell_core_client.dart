@@ -2,12 +2,87 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../models/generated_contracts.dart';
+import 'broker_client.dart';
 
 class ShellCoreClient {
   const ShellCoreClient._(this.snapshot, this.mode);
 
   final ShellSnapshot snapshot;
   final String mode;
+
+  static Future<ShellCoreClient> product({
+    BrokerTransport? transport,
+  }) async {
+    try {
+      final broker = transport ?? await BrokerClient.connect();
+      final healthResponse = await broker.request('health');
+      final health = _acceptedResponseBodyMap(
+        healthResponse,
+        'health',
+        bodyKey: 'health',
+      );
+
+      final normalizeResponse = await broker.request(
+        'normalize_payload',
+        payload: {'client_payload': 'desktop_flutter_authority_probe'},
+      );
+      _requireAccepted(normalizeResponse, 'normalize_payload');
+
+      final approval = _brokerProjectionProbeApproval();
+      final projectionResponse = await broker.request(
+        'content_projection',
+        payload: approval,
+      );
+      final projection = _acceptedResponseBodyMap(
+        projectionResponse,
+        'content_projection',
+      );
+
+      final protectedEditResponse = await broker.request(
+        'approval_edit',
+        payload: {
+          'approval': approval,
+          'field': 'payload_hash',
+          'value':
+              'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+        },
+      );
+      final protectedEdit = _acceptedResponseBodyMap(
+        protectedEditResponse,
+        'approval_edit',
+      );
+
+      final commandResponse = await broker.request(
+        'command_envelope',
+        payload: _brokerCommandProbePayload(),
+      );
+      if (commandResponse['status'] != 'suspended') {
+        throw BrokerClientException(
+          'command envelope was not suspended by broker: '
+          '${commandResponse['status']}',
+        );
+      }
+
+      return ShellCoreClient._(
+        _brokerSnapshot(
+          healthResponse: healthResponse,
+          health: health,
+          normalizeResponse: normalizeResponse,
+          projectionResponse: projectionResponse,
+          projection: projection,
+          protectedEditResponse: protectedEditResponse,
+          protectedEdit: protectedEdit,
+          commandResponse: commandResponse,
+        ),
+        'broker',
+      );
+    } on Object catch (error) {
+      return ShellCoreClient._(
+        _brokerUnavailableSnapshot(error.toString()),
+        'broker_unavailable',
+      );
+    }
+  }
 
   factory ShellCoreClient.local({String? snapshotPath}) {
     final paths = snapshotPath == null
@@ -42,7 +117,7 @@ class ShellCoreClient {
             message: 'Local owner-operation snapshot could not be parsed.',
             target: resolvedPath,
             requiredAction:
-                'Regenerate the snapshot with python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json.',
+                'Refresh the development diagnostic snapshot before using local inspection mode.',
             source: 'fallback',
             freshness: 'parse failed',
           ),
@@ -59,7 +134,7 @@ class ShellCoreClient {
         message: 'Local owner-operation snapshot file is missing.',
         target: paths.first,
         requiredAction:
-            'Generate .gui_shell/shell_snapshot.json for live local owner state.',
+            'Create a development diagnostic snapshot before using local inspection mode.',
         source: 'fallback',
         freshness: 'missing',
       ),
@@ -75,6 +150,622 @@ class ShellCoreClient {
   }
 
   ShellSnapshot getSnapshot() => snapshot;
+}
+
+Map<String, Object?> _acceptedResponseBodyMap(
+  Map<String, Object?> response,
+  String operation, {
+  String bodyKey = 'body',
+}) {
+  _requireAccepted(response, operation);
+  final body = response[bodyKey];
+  if (body is! Map) {
+    throw BrokerClientException('$operation response missing $bodyKey object');
+  }
+  return Map<String, Object?>.from(body);
+}
+
+void _requireAccepted(Map<String, Object?> response, String operation) {
+  if (response['status'] != 'accepted') {
+    final error = response['error'];
+    final message = error is Map
+        ? error['message']?.toString() ?? response.toString()
+        : response.toString();
+    throw BrokerClientException('$operation broker request rejected: $message');
+  }
+}
+
+ShellSnapshot _brokerSnapshot({
+  required Map<String, Object?> healthResponse,
+  required Map<String, Object?> health,
+  required Map<String, Object?> normalizeResponse,
+  required Map<String, Object?> projectionResponse,
+  required Map<String, Object?> projection,
+  required Map<String, Object?> protectedEditResponse,
+  required Map<String, Object?> protectedEdit,
+  required Map<String, Object?> commandResponse,
+}) {
+  final now = DateTime.now().toUtc().toIso8601String();
+  final healthStatus = health['status']?.toString() ?? 'unknown';
+  final cutoverStatus =
+      health['authority_cutover_status']?.toString() ?? 'unknown';
+  final persistenceReady = health['persistence_ready'] == true;
+  final commandDispatchEnabled =
+      health['command_dispatch_enabled'] == true &&
+          _boolInBody(commandResponse, 'dispatch_enabled');
+  final protectedEditRejected = protectedEdit['ok'] == false;
+  final brokerReady = healthStatus == 'ready' && persistenceReady;
+  final runtimeStatus =
+      brokerReady && cutoverStatus == 'active' ? 'ready' : 'suspend';
+  final problems = <Map<String, Object?>>[];
+  if (!brokerReady) {
+    problems.add(_releaseProblemJson(
+      problemId: 'broker-persistence-not-ready',
+      item: 'broker durable store not ready',
+      severity: 'error',
+      category: 'broker_ipc',
+      message:
+          'Rust broker did not report durable audit/replay/session readiness.',
+      target: 'rust_security_broker',
+      recoveryId: 'recover-broker-persistence',
+      requiredAction:
+          'Start the Rust broker with durable store access and reconnect the product UI.',
+      blocksOwnerUse: true,
+    ));
+  }
+  if (cutoverStatus != 'active') {
+    problems.add(_releaseProblemJson(
+      problemId: 'broker-authority-cutover-not-active',
+      item: 'broker authority cutover not active',
+      severity: 'warning',
+      category: 'authority_cutover',
+      message:
+          'Flutter is broker-mediated, but the broker has not claimed active authority cutover.',
+      target: 'authority_cutover_status',
+      recoveryId: 'recover-authority-cutover',
+      requiredAction:
+          'Complete broker authority cutover and only then allow active authority operations.',
+    ));
+  }
+  if (!commandDispatchEnabled) {
+    problems.add(_releaseProblemJson(
+      problemId: 'broker-command-dispatch-suspended',
+      item: 'broker command dispatch suspended',
+      severity: 'warning',
+      category: 'command_envelope',
+      message:
+          'External command dispatch remains suspended by the Rust broker.',
+      target: 'command_dispatch_enabled',
+      recoveryId: 'recover-command-dispatch',
+      requiredAction:
+          'Finish command-envelope authority mapping before enabling external dispatch.',
+    ));
+  }
+  if (!protectedEditRejected) {
+    problems.add(_releaseProblemJson(
+      problemId: 'approval-protected-field-edit-not-rejected',
+      item: 'approval protected field edit not rejected',
+      severity: 'error',
+      category: 'approval',
+      message:
+          'Broker did not reject a protected approval payload_hash edit probe.',
+      target: 'approval_edit',
+      recoveryId: 'recover-approval-protected-edit',
+      requiredAction:
+          'Keep authority actions suspended until protected field enforcement is restored.',
+      blocksOwnerUse: true,
+    ));
+  }
+
+  final projectedContent = projection.containsKey('redacted_payload')
+      ? Map<String, Object?>.from(projection['redacted_payload'] as Map? ?? {})
+      : projection;
+  final auditEvents = [
+    _auditJson(healthResponse, 'broker.health', 'accepted'),
+    _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
+    _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
+    _auditJson(
+      protectedEditResponse,
+      'broker.approval_protected_edit',
+      protectedEditRejected ? 'rejected' : 'accepted',
+    ),
+    _auditJson(commandResponse, 'broker.command_envelope', 'suspended'),
+  ];
+  final recoveryPlaybook =
+      problems.map(_problemToRecoveryPlaybookJson).toList(growable: false);
+
+  return ShellSnapshot.fromJson({
+    'phase_status': {
+      'phase_a_status': 'complete',
+      'phase_b_status': 'complete',
+      'phase_c_status': 'broker-mediated',
+      'phase_d_status': 'pending',
+      'phase_e_status': 'pending',
+      'phase_f_status': 'later',
+      'completed_product_release_claimed': false,
+    },
+    'operation_status': {
+      'runtime_status': runtimeStatus,
+      'invariant_status': protectedEditRejected ? 'ok' : 'blocked',
+      'trust_status': brokerReady ? 'restricted' : 'blocked',
+      'pending_approvals_count': 1,
+      'audit_chain_status':
+          persistenceReady ? 'durable_file_store' : 'not_ready',
+      'problems_count': problems.length,
+      'release_state': 'not claimed',
+    },
+    'runtimes': [
+      {
+        'runtime_id': 'gui_shell_rust_broker',
+        'name': 'Rust Security Broker',
+        'status': runtimeStatus,
+        'adapter_id': 'restricted_ipc',
+        'diagnostic_summary':
+            'status=$healthStatus persistence_ready=$persistenceReady cutover=$cutoverStatus',
+      }
+    ],
+    'agent_sessions': [],
+    'permissions': [
+      {
+        'permission_id': 'permission.broker.command_envelope',
+        'capability_id': 'command_envelope.dispatch',
+        'decision': commandDispatchEnabled ? 'allow' : 'deny',
+        'source': 'rust_security_broker',
+      }
+    ],
+    'pending_approvals': [
+      {
+        'approval_id': 'broker-projected-approval',
+        'operation': 'broker.projection_probe',
+        'status': 'blocked',
+        'content_visibility': 'redacted',
+        'projected_content': projectedContent,
+        'editable_fields': ['path'],
+        'protected_fields': [
+          'runtime_id',
+          'permission_id',
+          'payload_hash',
+          'authority_context'
+        ],
+      }
+    ],
+    'audit_events': auditEvents,
+    'recovery_actions': [
+      for (final problem in problems)
+        {
+          'recovery_id': problem['recovery_id'],
+          'severity': problem['severity'],
+          'message': problem['required_action'],
+          'safe_to_retry': true,
+        }
+    ],
+    'invariant_flags': {
+      'flutter_imported_by_shell_core': false,
+      'blue_tanuki_imported_by_shell_core': false,
+      'adapter_metadata_can_escalate_authority': false,
+      'memory_cache_previous_state_can_grant_authority': false,
+      'full_payload_projected_without_full_visibility': false,
+      'installer_setup_state_can_grant_authority': false,
+      'mobile_device_state_can_grant_authority': false,
+      'flutter_product_uses_local_snapshot_for_authority': false,
+      'authority_bridge_uses_ffi': false,
+      'approval_protected_field_edit_allowed': !protectedEditRejected,
+    },
+    'setup_doctor_status': brokerReady ? 'warning' : 'fail',
+    'installer_grants_authority': false,
+    'installer_silently_approves_permissions': false,
+    'setup_doctor_checks': [
+      {
+        'check_id': 'broker.ipc',
+        'status': brokerReady ? 'pass' : 'fail',
+        'message':
+            'Flutter product path used authenticated broker IPC for authority status.',
+        'recovery_instruction':
+            brokerReady ? null : 'Restart the Rust broker and reconnect.',
+        'grants_authority': false,
+      },
+      {
+        'check_id': 'broker.persistence',
+        'status': persistenceReady ? 'pass' : 'fail',
+        'message':
+            'persistence_ready=${persistenceReady.toString()} audit=${health['audit_persistence']} replay=${health['replay_persistence']} session=${health['session_persistence']}',
+        'recovery_instruction':
+            persistenceReady ? null : 'Repair durable broker store access.',
+        'grants_authority': false,
+      },
+      {
+        'check_id': 'broker.protected_field_edit',
+        'status': protectedEditRejected ? 'pass' : 'fail',
+        'message':
+            protectedEditRejected ? 'Protected payload_hash edit rejected.' : 'Protected edit probe was not rejected.',
+        'recovery_instruction': protectedEditRejected
+            ? null
+            : 'Keep authority actions suspended and restore approval edit enforcement.',
+        'grants_authority': false,
+      },
+      {
+        'check_id': 'broker.command_dispatch',
+        'status': commandDispatchEnabled ? 'pass' : 'warning',
+        'message':
+            'command_dispatch_enabled=${commandDispatchEnabled.toString()}',
+        'recovery_instruction': commandDispatchEnabled
+            ? null
+            : 'Complete command-envelope dispatch authority mapping.',
+        'grants_authority': false,
+      },
+    ],
+    'trust_records': [
+      {
+        'scope': 'broker_session',
+        'state': brokerReady ? 'restricted' : 'blocked',
+        'source': 'authenticated_loopback_tcp',
+        'expires_at': null,
+        'blocked_operations':
+            commandDispatchEnabled ? [] : ['external_command_dispatch'],
+      },
+      {
+        'scope': 'authority_cutover',
+        'state': cutoverStatus,
+        'source': 'rust_security_broker',
+        'expires_at': null,
+        'blocked_operations':
+            cutoverStatus == 'active' ? [] : ['authority_actions'],
+      },
+    ],
+    'authority_map': [
+      {
+        'runtime_id': 'gui_shell_rust_broker',
+        'capability_id': 'command_envelope.dispatch',
+        'permission_id': 'permission.broker.command_envelope',
+        'approval_id': 'broker-projected-approval',
+        'audit_event_id': commandResponse['audit_event_id']?.toString() ?? '',
+        'recovery_id': commandDispatchEnabled
+            ? ''
+            : 'recover-command-dispatch',
+        'dangerous': !commandDispatchEnabled,
+        'warning': commandDispatchEnabled
+            ? ''
+            : 'Command dispatch is suspended by broker response.',
+      }
+    ],
+    'adapter_catalog': [],
+    'permission_diffs': [],
+    'problems': problems,
+    'evidence': [
+      {
+        'evidence_id': 'broker-ipc-product-path',
+        'kind': 'LIVE_RUNTIME',
+        'status': brokerReady ? 'pass' : 'fail',
+        'path': 'broker://127.0.0.1/health',
+        'hash': '',
+        'exportable': false,
+      },
+      {
+        'evidence_id': 'broker-protected-edit-probe',
+        'kind': 'LIVE_RUNTIME',
+        'status': protectedEditRejected ? 'pass' : 'fail',
+        'path': 'broker://127.0.0.1/approval_edit',
+        'hash': '',
+        'exportable': false,
+      },
+    ],
+    'settings': [
+      {
+        'key': 'authority.product_path',
+        'group': 'broker',
+        'default': 'broker_ipc',
+        'current': 'broker_ipc',
+        'effective': 'broker_ipc',
+        'source': 'rust_security_broker',
+        'modified': false,
+        'dangerous': false,
+        'authority_related': true,
+      },
+      {
+        'key': 'authority.local_snapshot',
+        'group': 'broker',
+        'default': 'diagnostic_only',
+        'current': 'diagnostic_only',
+        'effective': 'diagnostic_only',
+        'source': 'flutter_product',
+        'modified': false,
+        'dangerous': false,
+        'authority_related': true,
+      },
+    ],
+    'audit_chain_status':
+        persistenceReady ? 'durable_file_store' : 'not_ready',
+    'network_exposure': '127.0.0.1 restricted broker IPC',
+    'release_blocker_count':
+        problems.where((problem) => problem['blocks_release'] == true).length,
+    'evidence_summary': {
+      'schema_check': 'not evaluated by product UI',
+      'conformance_check_count': 0,
+      'release_smoke': 'not evaluated by product UI',
+      'release_gate_check': 'not evaluated by product UI',
+      'evidence_bundle': 'not evaluated by product UI',
+      'validate_all': 'not evaluated by product UI',
+      'strict_windows_release': 'pending',
+      'missing_measured_windows_evidence': true,
+      'missing_setup_doctor_evidence': false,
+      'owner_go': 'missing',
+    },
+    'recovery_playbook': recoveryPlaybook,
+    'snapshot_source': 'broker',
+    'snapshot_path': 'broker://127.0.0.1/health',
+    'snapshot_generated_at': now,
+    'snapshot_freshness': now,
+  });
+}
+
+ShellSnapshot _brokerUnavailableSnapshot(String reason) {
+  final now = DateTime.now().toUtc().toIso8601String();
+  final problem = _releaseProblemJson(
+    problemId: 'broker-product-path-unavailable',
+    item: 'broker product path unavailable',
+    severity: 'error',
+    category: 'broker_ipc',
+    message:
+        'Flutter product authority path could not establish accepted broker IPC.',
+    target: 'rust_security_broker',
+    recoveryId: 'recover-broker-product-path',
+    requiredAction:
+        'Restart or repair the Rust broker; do not fall back to local JSON for authority.',
+    blocksOwnerUse: true,
+  );
+  return ShellSnapshot.fromJson({
+    'phase_status': {
+      'phase_a_status': 'complete',
+      'phase_b_status': 'complete',
+      'phase_c_status': 'blocked',
+      'phase_d_status': 'pending',
+      'phase_e_status': 'pending',
+      'phase_f_status': 'later',
+      'completed_product_release_claimed': false,
+    },
+    'operation_status': {
+      'runtime_status': 'suspend',
+      'invariant_status': 'blocked',
+      'trust_status': 'blocked',
+      'pending_approvals_count': 0,
+      'audit_chain_status': 'not_ready',
+      'problems_count': 1,
+      'release_state': 'not claimed',
+    },
+    'runtimes': [
+      {
+        'runtime_id': 'gui_shell_rust_broker',
+        'name': 'Rust Security Broker',
+        'status': 'unavailable',
+        'adapter_id': 'restricted_ipc',
+        'diagnostic_summary': reason,
+      }
+    ],
+    'agent_sessions': [],
+    'permissions': [],
+    'pending_approvals': [],
+    'audit_events': [
+      {
+        'event_id': 'broker-product-path-unavailable',
+        'action': 'broker.connect',
+        'result': 'rejected',
+        'payload_hash':
+            'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+      }
+    ],
+    'recovery_actions': [
+      {
+        'recovery_id': 'recover-broker-product-path',
+        'severity': 'error',
+        'message':
+            'Authority actions are disabled until broker IPC is restored.',
+        'safe_to_retry': true,
+      }
+    ],
+    'invariant_flags': {
+      'flutter_imported_by_shell_core': false,
+      'blue_tanuki_imported_by_shell_core': false,
+      'adapter_metadata_can_escalate_authority': false,
+      'memory_cache_previous_state_can_grant_authority': false,
+      'full_payload_projected_without_full_visibility': false,
+      'installer_setup_state_can_grant_authority': false,
+      'mobile_device_state_can_grant_authority': false,
+      'flutter_product_uses_local_snapshot_for_authority': false,
+      'authority_bridge_uses_ffi': false,
+      'broker_unavailable_fail_closed': true,
+    },
+    'setup_doctor_status': 'fail',
+    'installer_grants_authority': false,
+    'installer_silently_approves_permissions': false,
+    'setup_doctor_checks': [
+      {
+        'check_id': 'broker.ipc',
+        'status': 'fail',
+        'message': 'Broker IPC is unavailable or rejected authentication.',
+        'recovery_instruction':
+            'Restart the Rust broker and reconnect; local JSON is diagnostic-only.',
+        'grants_authority': false,
+      },
+      {
+        'check_id': 'broker.fail_closed',
+        'status': 'pass',
+        'message':
+            'Flutter product path returned SUSPEND instead of local snapshot authority.',
+        'recovery_instruction': null,
+        'grants_authority': false,
+      },
+    ],
+    'trust_records': [
+      {
+        'scope': 'broker_session',
+        'state': 'blocked',
+        'source': 'restricted_ipc',
+        'expires_at': null,
+        'blocked_operations': ['authority_actions', 'external_command_dispatch'],
+      }
+    ],
+    'authority_map': [],
+    'adapter_catalog': [],
+    'permission_diffs': [],
+    'problems': [problem],
+    'evidence': [
+      {
+        'evidence_id': 'broker-unavailable-fail-closed',
+        'kind': 'LIVE_RUNTIME',
+        'status': 'pass',
+        'path': 'broker://127.0.0.1/connect',
+        'hash': '',
+        'exportable': false,
+      }
+    ],
+    'settings': [],
+    'audit_chain_status': 'not_ready',
+    'network_exposure': '127.0.0.1 restricted broker IPC',
+    'release_blocker_count': 1,
+    'evidence_summary': {
+      'schema_check': 'not evaluated by product UI',
+      'conformance_check_count': 0,
+      'release_smoke': 'not evaluated by product UI',
+      'release_gate_check': 'not evaluated by product UI',
+      'evidence_bundle': 'not evaluated by product UI',
+      'validate_all': 'not evaluated by product UI',
+      'strict_windows_release': 'pending',
+      'missing_measured_windows_evidence': true,
+      'missing_setup_doctor_evidence': false,
+      'owner_go': 'missing',
+    },
+    'recovery_playbook': [_problemToRecoveryPlaybookJson(problem)],
+    'snapshot_source': 'broker_unavailable',
+    'snapshot_path': 'broker://127.0.0.1/connect',
+    'snapshot_generated_at': now,
+    'snapshot_freshness': 'unavailable',
+  });
+}
+
+Map<String, Object?> _brokerProjectionProbeApproval() {
+  return {
+    'approval_id': 'broker-projected-approval',
+    'runtime_id': 'gui_shell_rust_broker',
+    'permission_id': 'permission.broker.command_envelope',
+    'status': 'pending',
+    'content_visibility': 'redacted',
+    'payload_hash':
+        'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+    'summary': 'Broker-mediated approval projection probe',
+    'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
+    "full_payload": {'path': 'notes/today.md', 'content': 'hidden'},
+    'editable_fields': ['path', 'payload_hash'],
+    'authority_fields': ['permission_id'],
+  };
+}
+
+Map<String, Object?> _brokerCommandProbePayload() {
+  return {
+    'state': {
+      'runtimes': [
+        {'runtime_id': 'gui_shell_rust_broker'}
+      ],
+      'capabilities': [
+        {'capability_id': 'command_envelope.dispatch'}
+      ],
+      'permissions': [
+        {
+          'permission_id': 'permission.broker.command_envelope',
+          'capability_id': 'command_envelope.dispatch',
+          'decision': 'allow',
+        }
+      ],
+      'approvals': [
+        {'approval_id': 'broker-projected-approval', 'status': 'approved'}
+      ],
+      'recovery_actions': [
+        {'recovery_id': 'recover-command-dispatch'}
+      ],
+    },
+    'action': {
+      'operation': 'command_envelope.dispatch',
+      'runtime_id': 'gui_shell_rust_broker',
+      'capability_id': 'command_envelope.dispatch',
+      'permission_id': 'permission.broker.command_envelope',
+      'approval_id': 'broker-projected-approval',
+      'audit_event': {
+        'event_id': 'audit-command-probe',
+        'payload_hash':
+            'sha256:3333333333333333333333333333333333333333333333333333333333333333',
+      },
+      'recovery_action': {'recovery_id': 'recover-command-dispatch'},
+      'adapter_metadata': {'client': 'desktop_flutter'},
+    },
+  };
+}
+
+bool _boolInBody(Map<String, Object?> response, String key) {
+  final body = response['body'];
+  if (body is! Map) {
+    return false;
+  }
+  return body[key] == true;
+}
+
+Map<String, Object?> _auditJson(
+  Map<String, Object?> response,
+  String action,
+  String result,
+) {
+  return {
+    'event_id': response['audit_event_id']?.toString() ?? action,
+    'action': action,
+    'result': result,
+    'payload_hash':
+        'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+  };
+}
+
+Map<String, Object?> _releaseProblemJson({
+  required String problemId,
+  required String item,
+  required String severity,
+  required String category,
+  required String message,
+  required String target,
+  required String recoveryId,
+  required String requiredAction,
+  bool blocksOwnerUse = false,
+}) {
+  return {
+    'problem_id': problemId,
+    'severity': severity,
+    'category': category,
+    'message': message,
+    'target': target,
+    'recovery_id': recoveryId,
+    'item': item,
+    'classification': 'release_blocker',
+    'reason': message,
+    'required_action': requiredAction,
+    'blocks_release': true,
+    'safe_to_ignore_for_phase_b': !blocksOwnerUse,
+    'blocks_owner_use': blocksOwnerUse,
+    'blocks_completed_product_release': true,
+  };
+}
+
+Map<String, Object?> _problemToRecoveryPlaybookJson(
+  Map<String, Object?> problem,
+) {
+  return {
+    'recovery_id': problem['recovery_id']?.toString() ?? '',
+    'item': problem['item']?.toString() ?? '',
+    'severity': problem['severity']?.toString() ?? 'warning',
+    'classification': problem['classification']?.toString() ?? 'release_blocker',
+    'safe_to_ignore_for_phase_b': problem['safe_to_ignore_for_phase_b'] == true,
+    'required_action': problem['required_action']?.toString() ?? '',
+    'blocks_completed_product_release':
+        problem['blocks_completed_product_release'] == true,
+    'blocks_owner_use': problem['blocks_owner_use'] == true,
+    'command': '',
+    'path': problem['target']?.toString() ?? '',
+  };
 }
 
 List<String> _candidateSnapshotPaths() {
@@ -602,7 +1293,7 @@ const _localFallbackSnapshot = ShellSnapshot(
       status: 'warning',
       message: 'Local Shell Core snapshot file not found',
       recoveryInstruction:
-          'Generate .gui_shell/shell_snapshot.json or set GUI_SHELL_SNAPSHOT_JSON.',
+          'Refresh the development diagnostic snapshot or set GUI_SHELL_SNAPSHOT_JSON for local inspection.',
       grantsAuthority: false,
     ),
   ],
@@ -637,7 +1328,7 @@ const _localFallbackSnapshot = ShellSnapshot(
       classification: 'known_limitation',
       reason: 'Local snapshot was not available; safe fallback is active.',
       requiredAction:
-          'Generate .gui_shell/shell_snapshot.json for local owner state.',
+          'Refresh the development diagnostic snapshot for local inspection.',
       blocksRelease: false,
     ),
   ],
@@ -697,7 +1388,7 @@ const _localFallbackSnapshot = ShellSnapshot(
       classification: 'required_for_v1',
       safeToIgnoreForPhaseB: false,
       requiredAction:
-          'Generate .gui_shell/shell_snapshot.json or set GUI_SHELL_SNAPSHOT_JSON.',
+          'Refresh the development diagnostic snapshot or set GUI_SHELL_SNAPSHOT_JSON for local inspection.',
       blocksCompletedProductRelease: false,
     ),
     RecoveryPlaybookRecord(

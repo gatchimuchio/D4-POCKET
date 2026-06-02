@@ -1,7 +1,7 @@
 # Language Policy Gap Analysis
 
-Status: Phase 0 gap analysis updated after Phase 3 broker skeleton
-Date: 2026-06-01
+Status: Phase 0 gap analysis updated after Flutter broker product path start
+Date: 2026-06-03
 Scope: GUI-Shell language policy convergence
 
 ## 1. 判定基準
@@ -20,8 +20,8 @@ Scope: GUI-Shell language policy convergence
 | item | current fact | policy status | classification |
 | --- | --- | --- | --- |
 | Shell Core implementation language | `packages/shell_core/*.py` が registry、policy、approval、audit、recovery、content exposure、snapshot semantics を実装している | product authority path として使う場合は言語方針に抵触する | release_blocker |
-| owner-use state generation | `scripts/launch_owner_desktop.*` が Flutter launch 前に Python `tooling/shell_snapshot.py` を実行する | migration 中は許容できるが、final installed product runtime dependency としては不可 | release_blocker |
-| Rust security boundary | `native/rust_helper` に broker skeleton、JSON envelope parsing、replay/stale/malformed rejection、broker-local audit skeleton がある | production IPC transport / Flutter cutover / authority migration が未完 | release_blocker |
+| owner-use state generation | `scripts/launch_owner_desktop.*` は Rust broker を起動し `GUI_SHELL_BROKER_ENDPOINT_JSON` を Flutter に渡す。`tooling/shell_snapshot.py` は local diagnostic / parity tooling として残る。 | installed no-Python-runtime proof は未取得だが product launch path は broker-mediated に移行済み | release_blocker |
+| Rust security boundary | `native/rust_helper` に broker process、authenticated loopback IPC、durable store、authority parity operations がある | command dispatch / active cutover / installed proof が未完 | release_blocker |
 | Flutter authority ownership | Flutter は JSON を読み projection を表示するだけで、policy mutation / dispatch は見つからない | current scope では整合 | none |
 | FFI authority path | `dart:ffi`、`flutter_rust_bridge`、`MethodChannel`、Rust FFI authority path は見つからない | current scope では整合 | none |
 | TypeScript / Node core runtime | 見つからない | 整合 | none |
@@ -38,14 +38,14 @@ Scope: GUI-Shell language policy convergence
 
 - item: Rust Security Broker production path is incomplete
   classification: release_blocker
-  reason: `native/rust_helper` に process skeleton と JSON envelope rejection tests はあるが、Windows-first restricted IPC transport、authenticated session lifecycle、Flutter client integration、approval/audit/recovery cutover、installed-path proof がない。
-  required_action: production cutover 前に IPC transport を選定し、Flutter authority operations を broker 経由にし、broker unavailable / crash / stale-session fail-closed behavior を検証する。
+  reason: `native/rust_helper` に broker process、authenticated loopback IPC、durable store、authority parity operations があり、Flutter product client は endpoint file 経由で broker IPC を使う。ただし command dispatch は suspended、`authority_cutover_status=not_active`、Windows installed-path proof がない。
+  required_action: active authority cutover 前に command-envelope execution gates、no-Python/no-FFI assertions、broker unavailable / crash / stale-session fail-closed behavior、Windows installed proof を検証する。
   blocks_release: yes
 
-- item: Flutter broker integration is absent
+- item: Flutter broker integration runnable proof is incomplete
   classification: release_blocker
-  reason: Flutter は local snapshot JSON を読むだけであり、authority operations が broker-mediated である証拠がない。
-  required_action: restricted IPC client integration と broker unavailable / crash / stale-session fail-closed behavior を追加する。
+  reason: `main.dart` は `ShellCoreClient.product()` を使い、broker unavailable / auth / stale / malformed response は SUSPEND snapshot になる。Windows Flutter analyze/test は `flutter.bat` 経由で通過した。ただし Windows installed path の broker launch/connect/fail-closed evidence は未取得である。
+  required_action: Windows installed path で broker client launch/connect/fail-closed evidence を取得する。
   blocks_release: yes
 
 - item: Python Setup Doctor installed-path dependency is unresolved

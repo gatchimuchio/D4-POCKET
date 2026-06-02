@@ -131,11 +131,13 @@ Rust security constraints:
 - `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、`issued_at` RFC3339 freshness rejection、audit/replay/session store readiness reporting、persistent-state-required unavailable fail-closed gate、stale session rejection、nonce replay rejection、NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata rejection、JSON response serialization、authority operations、command-envelope eligibility with dispatch suspension。
 - `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の append-only audit hash chain。
 - `tooling/broker_parity/run_authority_parity.py`: Python oracle fixtures と Rust broker IPC result を比較し、accepted parity、rejected parity、Rust-specific broker IPC path を検証する。
+- `apps/desktop_flutter/lib/services/broker_client.dart`: Flutter product path から broker endpoint file を発見し、authenticated loopback IPC request を送る Dart client。Flutter は authority path で process spawn しない。broker process 起動は installer / launcher / supervisor 側の責務とする。session secret は endpoint file から読み込むだけで、UI snapshot / audit projection には出さない。
+- `apps/desktop_flutter/lib/services/shell_core_client.dart`: product mode は `ShellCoreClient.product()` で broker health、session-bound normalization probe、content projection、approval protected-field edit rejection、command-envelope suspend response を broker から取得し、broker unavailable / auth failure / stale session / malformed response を SUSPEND fail-closed snapshot にする。`ShellCoreClient.local()` は development / diagnostic-only path として残す。
 - `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
 
 Broker health は development stdin mode では `audit_persistence=in_memory_skeleton`、`replay_persistence=in_memory_session_only`、`session_persistence=in_memory_session_only` を返す。production `broker-server` mode で durable store に接続できた場合だけ `audit_persistence=durable_file_store`、`replay_persistence=durable_file_store`、`session_persistence=durable_file_store`、`persistence_ready=true` を返す。どちらの場合も `boundary_role=rust_security_broker_candidate`、`authority_cutover_status=not_active` のままであり、`authority_owner=rust_security_broker` のような active authority owner claim は production cutover 後にだけ許可する。
 
-現時点では Flutter client integration、Python active runtime retirement evidence、process/credential/update gated execution、Windows installed-path evidence は未実装である。Rust integration tests と broker parity harness は local broker process の `LIVE_RUNTIME` / `FIXTURE` 証拠だが、Windows installed-path product proof ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
+現時点では Flutter product entry は broker-mediated path に切り替わり、Windows Flutter `flutter.bat` で analyze/test は通過した。WSL direct `flutter` は外部 Flutter shell scripts の CRLF line endings により exit 127 のままで、`validate_all.py` の Flutter subchecks はこの環境では release_blocker として失敗する。broker health はまだ `authority_cutover_status=not_active` で、command dispatch は broker response として suspend のままにする。Python active runtime retirement evidence、no-FFI/no-Python release assertion、process/credential/update gated execution、Windows installed-path evidence は未実装である。Rust integration tests と broker parity harness は local broker process の `LIVE_RUNTIME` / `FIXTURE` 証拠だが、Windows installed-path product proof ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
 
 ## 6. Phase 4 / Responsibility Migration Order
 
@@ -159,15 +161,15 @@ Cutover rule:
 
 For normalization cutover, the Rust broker must keep the current NFKC / case / zero-width / camelCase / separator / alias / value-only rejection tests and then connect them to a parity harness against Python `normalize_inbound_payload` fixtures before the product path is switched.
 
-2026-06-03 update: `tooling/broker_parity/run_authority_parity.py` now runs this parity path against the authenticated broker process. Product UI cutover remains a separate Phase 5 / Block C requirement.
+2026-06-03 update: `tooling/broker_parity/run_authority_parity.py` now runs this parity path against the authenticated broker process. `apps/desktop_flutter/lib/main.dart` now calls `ShellCoreClient.product()` for the product path, while local JSON snapshots are retained only for development / diagnostic inspection. Active command dispatch, installed no-Python runtime proof, and Windows installed-path evidence remain separate release blockers.
 
 ## 7. Phase 5 / Flutter Integration
 
-Flutter は local JSON-only owner-use state から、authority-sensitive surfaces について broker-mediated state へ移る。
+Flutter product entry は local JSON-only owner-use state から broker-mediated state へ移り始めた。残りは runnable Flutter validation、installed-path broker supervisor proof、active command dispatch gate、no-Python/no-FFI proof である。
 
 Minimum UI integration checks:
 
-- broker discovery / launch / reconnect;
+- broker discovery / reconnect and external broker-supervisor launch evidence;
 - broker unavailable UI state;
 - stale session rejection;
 - schema-invalid response handling;

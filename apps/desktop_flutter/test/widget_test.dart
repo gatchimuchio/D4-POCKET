@@ -17,6 +17,7 @@ import 'package:gui_shell_desktop/screens/settings.dart';
 import 'package:gui_shell_desktop/screens/setup_doctor.dart';
 import 'package:gui_shell_desktop/screens/shared.dart';
 import 'package:gui_shell_desktop/screens/trust_center.dart';
+import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
 void main() {
@@ -228,6 +229,116 @@ void main() {
     );
   });
 
+  test('product client renders broker-mediated authority snapshot', () async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {
+        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'}
+      }),
+      _brokerAcceptedBody('approval_edit', {
+        'ok': false,
+        'error': 'field is not editable: payload_hash',
+      }),
+      _brokerCommandSuspendedResponse(),
+    ]);
+
+    final client = await ShellCoreClient.product(transport: transport);
+    final snapshot = client.getSnapshot();
+
+    expect(client.mode, 'broker');
+    expect(snapshot.snapshotSource, 'broker');
+    expect(snapshot.snapshotPath, 'broker://127.0.0.1/health');
+    expect(snapshot.operationStatus.runtimeStatus, 'suspend');
+    expect(snapshot.pendingApprovals.single.projectedContent['content'],
+        '[redacted]');
+    expect(snapshot.pendingApprovals.single.projectedContent.values,
+        isNot(contains('hidden')));
+    expect(
+      snapshot.setupDoctorChecks.any((check) =>
+          check.checkId == 'broker.protected_field_edit' &&
+          check.status == 'pass'),
+      isTrue,
+    );
+    expect(
+      snapshot.problems.any((problem) =>
+          problem.item == 'broker command dispatch suspended' &&
+          problem.classification == 'release_blocker'),
+      isTrue,
+    );
+    expect(
+      snapshot.problems.any((problem) =>
+          problem.requiredAction.toLowerCase().contains('python')),
+      isFalse,
+    );
+    expect(transport.operations, [
+      'health',
+      'normalize_payload',
+      'content_projection',
+      'approval_edit',
+      'command_envelope',
+    ]);
+  });
+
+  test('product client fails closed when broker is unavailable', () async {
+    final client = await ShellCoreClient.product(
+      transport: const _FailingBrokerTransport('broker unavailable'),
+    );
+    final snapshot = client.getSnapshot();
+
+    expect(client.mode, 'broker_unavailable');
+    expect(snapshot.snapshotSource, 'broker_unavailable');
+    expect(snapshot.operationStatus.runtimeStatus, 'suspend');
+    expect(snapshot.operationStatus.trustStatus, 'blocked');
+    expect(snapshot.pendingApprovals, isEmpty);
+    expect(snapshot.problems.single.classification, 'release_blocker');
+    expect(snapshot.problems.single.blocksRelease, isTrue);
+    expect(snapshot.setupDoctorChecks
+        .where((check) => check.checkId == 'broker.fail_closed'), isNotEmpty);
+  });
+
+  test('product client fails closed on authentication rejection', () async {
+    final client = await ShellCoreClient.product(
+      transport: _FakeBrokerTransport([
+        _brokerRejectedResponse(
+          'health',
+          'broker_authentication_failed',
+          'broker IPC authentication failed',
+        ),
+      ]),
+    );
+
+    expect(client.mode, 'broker_unavailable');
+    expect(client.getSnapshot().operationStatus.runtimeStatus, 'suspend');
+  });
+
+  test('product client fails closed on stale broker session', () async {
+    final client = await ShellCoreClient.product(
+      transport: _FakeBrokerTransport([
+        _brokerHealthResponse(),
+        _brokerRejectedResponse(
+          'normalize_payload',
+          'broker_stale_session',
+          'broker session is stale',
+        ),
+      ]),
+    );
+
+    expect(client.mode, 'broker_unavailable');
+    expect(client.getSnapshot().operationStatus.trustStatus, 'blocked');
+  });
+
+  test('product client fails closed on malformed broker response', () async {
+    final client = await ShellCoreClient.product(
+      transport: _FakeBrokerTransport([
+        {'status': 'accepted', 'operation': 'health'},
+      ]),
+    );
+
+    expect(client.mode, 'broker_unavailable');
+    expect(client.getSnapshot().snapshotSource, 'broker_unavailable');
+  });
+
   testWidgets('Setup Doctor shows lightweight environment snapshot',
       (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -383,4 +494,128 @@ void main() {
     expect(find.textContaining('[redacted]'), findsOneWidget);
     expect(find.textContaining('hello'), findsNothing);
   });
+}
+
+class _FakeBrokerTransport implements BrokerTransport {
+  _FakeBrokerTransport(this._responses);
+
+  final List<Map<String, Object?>> _responses;
+  final List<String> operations = [];
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) async {
+    operations.add(operation);
+    if (_responses.isEmpty) {
+      throw BrokerClientException('no fake broker response for $operation');
+    }
+    return _responses.removeAt(0);
+  }
+}
+
+class _FailingBrokerTransport implements BrokerTransport {
+  const _FailingBrokerTransport(this.message);
+
+  final String message;
+
+  @override
+  Future<Map<String, Object?>> request(
+    String operation, {
+    Map<String, Object?>? payload,
+  }) {
+    throw BrokerClientException(message);
+  }
+}
+
+Map<String, Object?> _brokerHealthResponse() {
+  return {
+    'request_id': 'test-health',
+    'operation': 'health',
+    'status': 'accepted',
+    'evidence_source': 'LIVE_RUNTIME',
+    'audit_event_id': 'audit-health',
+    'error': null,
+    'health': {
+      'broker_id': 'gui-shell-rust-broker',
+      'status': 'ready',
+      'boundary_role': 'rust_security_broker_candidate',
+      'authority_cutover_status': 'not_active',
+      'command_dispatch_enabled': false,
+      'audit_append_enabled': true,
+      'audit_persistence': 'durable_file_store',
+      'replay_persistence': 'durable_file_store',
+      'session_persistence': 'durable_file_store',
+      'persistence_required': true,
+      'persistence_ready': true,
+      'evidence_source': 'LIVE_RUNTIME',
+    },
+    'body': null,
+    'shutdown_requested': false,
+  };
+}
+
+Map<String, Object?> _brokerAcceptedBody(
+  String operation,
+  Map<String, Object?> body,
+) {
+  return {
+    'request_id': 'test-$operation',
+    'operation': operation,
+    'status': 'accepted',
+    'evidence_source': 'LIVE_RUNTIME',
+    'audit_event_id': 'audit-$operation',
+    'error': null,
+    'health': null,
+    'body': body,
+    'shutdown_requested': false,
+  };
+}
+
+Map<String, Object?> _brokerCommandSuspendedResponse() {
+  return {
+    'request_id': 'test-command-envelope',
+    'operation': 'command_envelope',
+    'status': 'suspended',
+    'evidence_source': 'INTERNAL_STATE',
+    'audit_event_id': 'audit-command-envelope',
+    'error': {
+      'code': 'broker_command_dispatch_disabled',
+      'message': 'external command dispatch is disabled',
+      'recoverable': true,
+      'audit_event_required': true,
+      'fail_closed': true,
+    },
+    'health': null,
+    'body': {
+      'dispatch_enabled': false,
+      'eligibility': {'allowed': true, 'errors': []},
+    },
+    'shutdown_requested': false,
+  };
+}
+
+Map<String, Object?> _brokerRejectedResponse(
+  String operation,
+  String code,
+  String message,
+) {
+  return {
+    'request_id': 'test-$operation-rejected',
+    'operation': operation,
+    'status': 'rejected',
+    'evidence_source': 'INTERNAL_STATE',
+    'audit_event_id': 'audit-$operation-rejected',
+    'error': {
+      'code': code,
+      'message': message,
+      'recoverable': true,
+      'audit_event_required': true,
+      'fail_closed': true,
+    },
+    'health': null,
+    'body': null,
+    'shutdown_requested': false,
+  };
 }

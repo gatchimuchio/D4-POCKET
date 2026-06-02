@@ -17,16 +17,20 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/shell_core_client.dart';
 
-void main() {
-  runApp(const GuiShellDesktopApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final client = await ShellCoreClient.product();
+  runApp(GuiShellDesktopApp(client: client));
 }
 
 class GuiShellDesktopApp extends StatelessWidget {
-  const GuiShellDesktopApp({super.key});
+  const GuiShellDesktopApp({super.key, this.client});
+
+  final ShellCoreClient? client;
 
   @override
   Widget build(BuildContext context) {
-    final client = ShellCoreClient.local();
+    final client = this.client ?? ShellCoreClient.mock();
     return MaterialApp(
       title: 'GUI Shell',
       debugShowCheckedModeBanner: false,

@@ -29,7 +29,7 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
             meaning: 'The current snapshot has no runtime records.',
             phaseBBlocked: false,
             nextAction:
-                'Generate a local snapshot after Shell Core runtime discovery completes.',
+                'Reconnect the broker product path or refresh diagnostics after runtime discovery completes.',
           )
         else
           LayoutBuilder(
@@ -102,7 +102,7 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
           title: 'Authority Boundary',
           rows: [
             'Runtime capability, permission, approval, audit, and recovery decisions remain Shell Core owned.',
-            'Flutter displays the local snapshot and does not grant, approve, or mutate authority.',
+            'Flutter displays broker-mediated authority state or diagnostic-only local data and does not grant, approve, or mutate authority.',
           ],
         ),
       ],

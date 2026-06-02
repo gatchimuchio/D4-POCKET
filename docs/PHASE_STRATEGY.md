@@ -26,13 +26,13 @@ GUI-Shell uses phase-based readiness language so owner-use progress is not confu
 - item: B-2 local snapshot / local runtime wiring
   classification: required_for_v1
   status: complete
-  evidence: `ShellCoreClient.local()` loads `GUI_SHELL_SNAPSHOT_JSON`, `%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json`, or `.gui_shell/shell_snapshot.json`; parse/missing failures fall back safely without release claim.
+  evidence: `ShellCoreClient.local()` remains available for development / diagnostic inspection and loads `GUI_SHELL_SNAPSHOT_JSON`, `%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json`, or `.gui_shell/shell_snapshot.json`; parse/missing failures fall back safely without release claim.
   blocks_release: no
 
 - item: B-3 owner launch flow
   classification: required_for_v1
   status: complete
-  evidence: `scripts/launch_owner_desktop.sh` and `scripts/launch_owner_desktop.ps1` generate `.gui_shell/shell_snapshot.json` and launch Flutter desktop without strict release validation or release evidence generation.
+  evidence: `scripts/launch_owner_desktop.sh` and `scripts/launch_owner_desktop.ps1` start the Rust broker, export `GUI_SHELL_BROKER_ENDPOINT_JSON`, and launch Flutter desktop without strict release validation or release evidence generation.
   blocks_release: no
 
 - item: B-4 Problems to Recovery loop

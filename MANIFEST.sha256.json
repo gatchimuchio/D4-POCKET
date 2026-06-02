@@ -80,11 +80,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "4cac4ddd716770da89c3a5fc30cfa288e71eb11d29fe26f7d9c0117f82d5266b"
+      "sha256": "929a9fb9fae8587d0938308c3b2f9507c6c5913ce1819bcb81357a252bf0dd2e"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "6237f758de2b15444265cea55bce9c0aed4480b72f55175fa5c86271e47bdbb4"
+      "sha256": "66b42e9a6bdbff962326adc2ed76472ed2e58232b5dad228513cc707bc6fa2c8"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "88d948e130c1d3b7a2af0d36c3651962edf93a09295ca8ba57762a3d4ec4b88c"
+      "sha256": "932b8594780229926e8195ba07b6a06636ddcc2f5ebc10885beca4001127b4a7"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -112,7 +112,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/audit_viewer.dart",
-      "sha256": "b932ed1b3e27edadd61d17b154a14512da301b81b2a17c30b836cc06cbf99c74"
+      "sha256": "f3491c8bb97b5f9b04635486037e0633cbb3c7a8114b6c87b161d9857df3bd7d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/authority_map.dart",
@@ -120,7 +120,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/dashboard.dart",
-      "sha256": "f3a3045cc580128b97982784ef2df596cd21b63348982e2643a48cae20ac81df"
+      "sha256": "ee4bd9b91bc849de8c11f4ea1363ff454f0d5f829ab57dfdab3b88c19988925c"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
@@ -132,19 +132,19 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/problems_panel.dart",
-      "sha256": "8eb0dbcc3863db1f378a7efbff345a88e194cbea8070af0e9a89b80e9f8dd215"
+      "sha256": "7b80906577e4a9aecc8b50abca1bb023ff5a15684199dce6bea7a0975d6ebfd7"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/recovery_center.dart",
-      "sha256": "7136a2d15b07ad92f32f9d1c2ced2532e26900082690bffdc91498fa4e0ff2b1"
+      "sha256": "0825d93dc760ebb090e772e316d6bdd103ea302b9499473a85a1892e1b4c8e33"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
-      "sha256": "124ff99ac8b8a9808d6543f6c2552281d28c8e3b133cf802e6e6ef7f3099f2c2"
+      "sha256": "c9c16ce8f743bfb4498a2db31ec9290018b68ccd02950202787a876867cba0fb"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "f58cbe22e95c2f3d547d79ed36235c2a8aed9063ff9ac86fd556b8ebd96af92f"
+      "sha256": "c1188a4d455b4d4ba3e0d925c2dd86d76b3200a50ac42ee4e5caf8a0cbb9149e"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -152,15 +152,19 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
-      "sha256": "c5a05aee5a4713af0408758dbd9af7820eb7218cc450740d0db3d56b32fdebff"
+      "sha256": "22aa72df237f0d8be0244366fa96eb00b34eee3756367c6b6ed015eb03af7057"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
       "sha256": "b9df2a8fe55ee91e0d6c43de7bffae860459b177de2f86c21252506965ac913e"
     },
     {
+      "path": "apps/desktop_flutter/lib/services/broker_client.dart",
+      "sha256": "3680de8a34bb115e83b2b0a80f596bac0bfab4363535459c7d0ef8943ac841f2"
+    },
+    {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "cb2355a3ab2075c1fa942c52b251630e8574981d759bae40cdce74177d6a694d"
+      "sha256": "8ef384b602049f7edfb35a13b64adafbf8bfadf9c7a7fc1c581d121970f92321"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
@@ -168,7 +172,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "c9b49c9afb1d91ec7fc5c2b9b844807901bff628e20280618414cc80ae3482ad"
+      "sha256": "f23c0f6e3710d05f4c049d46c578ace72f83b47bdf4f2dd489ed9e78746e188a"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -196,7 +200,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "6be15c40596b456c072fa720fcd44acd445448ad40bdc639737912c03cd1be98"
+      "sha256": "aa612983e468163bf7bb5bdf4764e83c8ef36c01e5a610b6a8b1e9e993a21220"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -216,7 +220,7 @@
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
-      "sha256": "e0c9fd26dcf25a51a34194ed7ca07425f377d61b20b04067a317fb7bae314306"
+      "sha256": "4cb194bdae5f45b0eceeec238cec33f7db252cd43cf8ffe3c6033cb14e8732d7"
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
@@ -244,19 +248,19 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "0206ba6e5be8193d447479a378219a879ca0d9148722337557fe8036b2bcf8e2"
+      "sha256": "f7d4baa716e9d79fe27a907b77e6c4084825e4cd7ad48e1f8a4fb8a6897aa642"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
-      "sha256": "d2fa855c15de885cfae291cb0de988c79c6c1f6aec4e9823aae79aefaedd569d"
+      "sha256": "9abdc8fa749feacf6529ea4db04fead75f117f4261d878499e63ec868b9683d2"
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "fc9194036411f5aad3483c3745a80fea6904bb3f9ac897cf8da066b110b04d91"
+      "sha256": "e83335aed26a202bb0680b62b928b16a0e88f1364ed92c0a4bb7641c894460cf"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "bf3dee2c9370622af6921d71260134ee32ef98c20ff11e32e3f40fcd4e893dc9"
+      "sha256": "9888fdcee8c8383521f1b685a9e79673e0f15db197e81a8c8566c0369362e0a3"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -276,7 +280,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "fef7d2fa205442e94a0231b536895837dd2a49046673efef24ef60a80c415d63"
+      "sha256": "c149e652d3a01b10c9c83558897bb78eb674ef25656c0cdcbc093dae909ecaff"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",

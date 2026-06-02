@@ -93,7 +93,7 @@ class _AuditViewerState extends State<AuditViewer> {
             title: 'No audit events match',
             meaning: 'The current filters hide all audit events.',
             phaseBBlocked: false,
-            nextAction: 'Clear filters or refresh the local snapshot.',
+            nextAction: 'Clear filters or refresh diagnostics.',
           )
         else
           SingleChildScrollView(

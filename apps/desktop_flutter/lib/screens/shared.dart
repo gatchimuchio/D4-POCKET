@@ -160,18 +160,28 @@ class PhaseBanner extends StatelessWidget {
         snapshot.evidenceSummary.missingMeasuredWindowsEvidence ||
             snapshot.evidenceSummary.missingSetupDoctorEvidence ||
             snapshot.evidenceSummary.ownerGo != 'recorded';
+    final brokerUnavailable = snapshotIsBrokerUnavailable(snapshot);
     final colorScheme = Theme.of(context).colorScheme;
-    final background = strictBlocked || stale
+    final background = brokerUnavailable || strictBlocked || stale
         ? colorScheme.tertiaryContainer
         : colorScheme.secondaryContainer;
-    final foreground = strictBlocked || stale
+    final foreground = brokerUnavailable || strictBlocked || stale
         ? colorScheme.onTertiaryContainer
         : colorScheme.onSecondaryContainer;
-    final text = stale
-        ? 'Fallback or stale snapshot is active. Phase B owner-use can continue; refresh local snapshot when current state matters.'
-        : strictBlocked
-            ? 'Owner-use is OK. Strict release remains blocked by Phase D evidence / owner GO.'
-            : 'Owner-use state is current. Completed product release is still not claimed.';
+    final String text;
+    if (brokerUnavailable) {
+      text =
+          'Rust broker IPC is unavailable or rejected. Authority actions are suspended and local snapshots are not authority.';
+    } else if (stale) {
+      text =
+          'Fallback or stale diagnostic snapshot is active. Phase B owner-use can continue; refresh diagnostics when current state matters.';
+    } else if (strictBlocked) {
+      text =
+          'Owner-use is OK. Strict release remains blocked by Phase D evidence / owner GO.';
+    } else {
+      text =
+          'Owner-use state is current. Completed product release is still not claimed.';
+    }
     return Material(
       color: background,
       child: Padding(
@@ -240,6 +250,7 @@ class SnapshotInfoPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stale = snapshotIsStale(snapshot);
+    final brokerUnavailable = snapshotIsBrokerUnavailable(snapshot);
     return BorderedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,7 +267,12 @@ class SnapshotInfoPanel extends StatelessWidget {
                   label: 'Generated', value: _shortSnapshotTime(snapshot)),
               StatusPill(label: 'Age', value: snapshotAgeLabel(snapshot)),
               StatusPill(
-                  label: 'Warning', value: stale ? 'stale/fallback' : 'none'),
+                  label: 'Warning',
+                  value: brokerUnavailable
+                      ? 'broker unavailable'
+                      : stale
+                          ? 'stale/fallback'
+                          : 'none'),
               StatusPill(
                   label: 'Release',
                   value: snapshot.operationStatus.releaseState),
@@ -265,11 +281,7 @@ class SnapshotInfoPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
               'Path: ${snapshot.snapshotPath.isEmpty ? '(not recorded)' : snapshot.snapshotPath}'),
-          Text(
-            stale
-                ? 'Owner-use can continue, but regenerate the local snapshot when current local state matters.'
-                : 'Snapshot is current enough for Phase B owner-use display.',
-          ),
+          Text(_snapshotInfoMessage(brokerUnavailable, stale)),
         ],
       ),
     );
@@ -324,8 +336,10 @@ bool snapshotIsStale(ShellSnapshot snapshot) {
   final source = snapshot.snapshotSource.toLowerCase();
   final freshness = snapshot.snapshotFreshness.toLowerCase();
   if (source == 'fallback' ||
+      source == 'broker_unavailable' ||
       freshness == 'missing' ||
       freshness == 'parse failed' ||
+      freshness == 'unavailable' ||
       freshness == 'static') {
     return true;
   }
@@ -334,6 +348,20 @@ bool snapshotIsStale(ShellSnapshot snapshot) {
     return true;
   }
   return DateTime.now().toUtc().difference(generatedAt.toUtc()).inHours >= 24;
+}
+
+bool snapshotIsBrokerUnavailable(ShellSnapshot snapshot) {
+  return snapshot.snapshotSource.toLowerCase() == 'broker_unavailable';
+}
+
+String _snapshotInfoMessage(bool brokerUnavailable, bool stale) {
+  if (brokerUnavailable) {
+    return 'Broker-mediated authority path is suspended; local snapshots are diagnostic-only.';
+  }
+  if (stale) {
+    return 'Owner-use can continue, but refresh the diagnostic snapshot when current local state matters.';
+  }
+  return 'Snapshot is current enough for Phase B owner-use display.';
 }
 
 DateTime? _snapshotDate(ShellSnapshot snapshot) {

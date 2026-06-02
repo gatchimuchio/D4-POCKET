@@ -41,7 +41,7 @@ class ProblemsPanel extends StatelessWidget {
                 'The current snapshot reports no owner-use or release problems.',
             phaseBBlocked: false,
             nextAction:
-                'Continue owner-use operation or refresh the snapshot after local changes.',
+                'Continue owner-use operation or refresh diagnostics after local changes.',
           )
         else
           SingleChildScrollView(
