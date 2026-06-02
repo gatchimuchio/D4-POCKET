@@ -79,11 +79,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "6869153cc7b8ee3614b51e7527c1fa408393846f920d6fbfc46c946c39b78312"
+      "sha256": "4cac4ddd716770da89c3a5fc30cfa288e71eb11d29fe26f7d9c0117f82d5266b"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a6843c6d3968b4f379737466448aac1f2d6b4ea0c7a6821fb51d71547adb73f2"
+      "sha256": "552be6c47df23a80e376feffb411d10a7320447ed2d9b7f786a6ace5c8664ac8"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -91,7 +91,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "c56f89b2f6fbcefa9aedeef03a1ef486a4f719794e185314febf0b6a3897078e"
+      "sha256": "f1fb127d4f2f696610652a92e853f0b4f250a375c5858de0e6b17fc8a32c1edf"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -243,7 +243,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "9be75cd91494578e1c3a6f10e9771e25612212e031b1f7f60b69ab1bf6a1957e"
+      "sha256": "7a3b2e0bfb1f3b5e502968ecc56b536a487add1dcf2aaec7fd66032b23f43896"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -255,7 +255,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "4f11009a48300b5ecfcc1d62dd6201a65327ad331420becbe6b79b4dcf428861"
+      "sha256": "154fab07ac60198190465fe50f3a13064281564ae9ad4717d36ce8f261da824f"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -275,7 +275,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "2878ad2f21b3f753c6b940629c2f8c289d731a38d2f05a3993845968c381976e"
+      "sha256": "7598356bf265687cd8e8d8d998f20023a42d98b220b6bd9f25cd07d7f0549db8"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -363,7 +363,7 @@
     },
     {
       "path": "examples/contracts/broker_health.valid.json",
-      "sha256": "e67198f496efaac9cbc71394720f3e02f172ea38cb4be549096dc430da0b0fee"
+      "sha256": "ef69e579c4e90b6f1392e753236539c6181321b7041268164d5b29b4f7400a51"
     },
     {
       "path": "examples/contracts/broker_session.valid.json",
@@ -435,15 +435,15 @@
     },
     {
       "path": "examples/contracts/invalid/broker_health_active_cutover.invalid.json",
-      "sha256": "6f8b9e7bb309631b66e8a75cd5e545e9a5956517a7f23c8297e83e73b3f1537b"
+      "sha256": "75902cf4add7026bb3bcf6f39b9e2f41e23104c7030110f4e05c790cf4be85ed"
     },
     {
       "path": "examples/contracts/invalid/broker_health_authority_owner.invalid.json",
-      "sha256": "eb95cca138b99b1cb5395095208034504bdd539f63f5bac8953f69b46af2b70f"
+      "sha256": "ffc99cf73ab671ab2c286a7eec46a160a0f168eab8227f4f9ad7b7d90ab55712"
     },
     {
       "path": "examples/contracts/invalid/broker_health_dispatch_enabled.invalid.json",
-      "sha256": "c40c69c06df9e6b9267159f56a2024265e4c7ce3f368193916c9adcd5d170146"
+      "sha256": "46f06502d52630c3bcfa875d5a0e370db1452427103e63fddd3ee54eb9015a65"
     },
     {
       "path": "examples/contracts/invalid/broker_session_stale_state.invalid.json",
@@ -499,7 +499,7 @@
     },
     {
       "path": "examples/contracts/ipc_response.valid.json",
-      "sha256": "fe99a1298ed966fc988ecb07e1c25e2559f40d7fb8181f312d8600db059d813b"
+      "sha256": "81419021e81c9704ad84120df8ba05692de380ea2d0ab7213dd72b65a667047a"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -543,11 +543,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "80184e7a1a45819d7b823e6bae92e33294a72f1be28a54d84f78af155324e9e1"
+      "sha256": "bbe0156d5703fef86c706381b72a4f5f60b54a926bdfb6abc47aa5b943de0a23"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "d5fd8478e6bd9f66ce11eee8cf705896842b0a720362a16bb0828914ec699b9e"
+      "sha256": "fcad4d302dfdcece398793fa8cfeb2002ec927ff2a51d566adf9e077a237995d"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -715,7 +715,7 @@
     },
     {
       "path": "specs/broker_health.schema.json",
-      "sha256": "4f1ad80c6c0b68f1d27ca25e9063485916c0f1e47bda7b0692e7e6f5c2132083"
+      "sha256": "9beaf7ab98713637947a4bc218357aaf701057ab3c43c8e060955e407764ab19"
     },
     {
       "path": "specs/broker_session.schema.json",
@@ -771,7 +771,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6e5325429f65a79dadcac65127841466c31403b647018febf566b96dbd57e108"
+      "sha256": "8a51b4418ab268f2a2695360426689419632d976832c73605429f5e841c66ca9"
     },
     {
       "path": "tooling/evidence_bundle.py",

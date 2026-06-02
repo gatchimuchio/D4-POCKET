@@ -1,3 +1,75 @@
+validation_update_2026_06_03:
+  scope: Rust Security Broker audit/replay/session store readiness health contract
+  commit: pre_commit_validation
+  checks:
+    - name: python_schema_check
+      command: python tooling/schema_check/check_schemas.py
+      status: not_run_python_unavailable
+      classification: known_limitation
+      blocks_release: no
+      exit: 127
+      stdout_summary: python command absent on this host; python3 fallback used
+      fallback: python3 tooling/schema_check/check_schemas.py
+    - name: python_conformance_skeleton
+      command: python tooling/conformance_tests/run_conformance_skeleton.py
+      status: not_run_python_unavailable
+      classification: known_limitation
+      blocks_release: no
+      exit: 127
+      stdout_summary: python command absent on this host; python3 fallback used
+      fallback: python3 tooling/conformance_tests/run_conformance_skeleton.py
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: schema check passed: 25 schemas, 25 examples, 27 negative fixtures
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: conformance skeleton passed: 96 checks
+    - name: rust_helper_cargo_test
+      command: cd native/rust_helper && cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - 26 Rust helper and broker unit tests passed
+        - BrokerStateStore reports audit/replay/session in-memory readiness fields
+        - persistent-state-required mode still suspends health and rejects non-health operations when no persistent store is connected
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: ""
+  release_gate_classification:
+    - item: persistent audit/replay/session store implementation
+      classification: release_blocker
+      reason: BrokerStateStore now fixes health reporting and fail-closed behavior, but no durable store, restart persistence, or production IPC integration exists.
+      required_action: Implement durable audit/replay/session stores and prove them through restricted IPC and Windows installed-path evidence.
+      blocks_release: yes
+
 validation_update:
   validation_date: 2026-06-01
   scope: Phase 2 / Phase 3 Rust Security Broker skeleton, JSON IPC envelope, and IPC contract validation

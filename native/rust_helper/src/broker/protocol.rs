@@ -18,21 +18,57 @@ pub enum BrokerPersistenceMode {
     PersistentRequiredUnavailable,
 }
 
-impl BrokerPersistenceMode {
-    fn persistence_required(self) -> bool {
-        matches!(self, Self::PersistentRequiredUnavailable)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BrokerStateStore {
+    mode: BrokerPersistenceMode,
+}
+
+impl BrokerStateStore {
+    pub fn in_memory_skeleton() -> Self {
+        Self {
+            mode: BrokerPersistenceMode::InMemorySkeleton,
+        }
     }
 
-    fn persistence_ready(self) -> bool {
+    pub fn persistent_required_unavailable() -> Self {
+        Self {
+            mode: BrokerPersistenceMode::PersistentRequiredUnavailable,
+        }
+    }
+
+    pub fn persistence_required(self) -> bool {
+        matches!(
+            self.mode,
+            BrokerPersistenceMode::PersistentRequiredUnavailable
+        )
+    }
+
+    pub fn persistence_ready(self) -> bool {
         false
     }
 
-    fn health_status(self) -> &'static str {
+    pub fn health_status(self) -> &'static str {
         if self.persistence_required() {
             "suspend"
         } else {
             "ready"
         }
+    }
+
+    pub fn audit_persistence(self) -> &'static str {
+        "in_memory_skeleton"
+    }
+
+    pub fn replay_persistence(self) -> &'static str {
+        "in_memory_session_only"
+    }
+
+    pub fn session_persistence(self) -> &'static str {
+        "in_memory_session_only"
+    }
+
+    pub fn unavailable_message(self) -> &'static str {
+        "persistent audit, replay, and session state are required but unavailable"
     }
 }
 
@@ -189,6 +225,7 @@ pub struct BrokerHealth {
     pub audit_append_enabled: bool,
     pub audit_persistence: String,
     pub replay_persistence: String,
+    pub session_persistence: String,
     pub persistence_required: bool,
     pub persistence_ready: bool,
     pub evidence_source: String,
@@ -246,7 +283,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
-    persistence_mode: BrokerPersistenceMode,
+    state_store: BrokerStateStore,
 }
 
 impl Broker {
@@ -257,7 +294,7 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
-            persistence_mode: BrokerPersistenceMode::InMemorySkeleton,
+            state_store: BrokerStateStore::in_memory_skeleton(),
         }
     }
 
@@ -269,7 +306,7 @@ impl Broker {
 
     pub fn new_requiring_persistence(session_id: &str) -> Self {
         let mut broker = Self::new(session_id);
-        broker.persistence_mode = BrokerPersistenceMode::PersistentRequiredUnavailable;
+        broker.state_store = BrokerStateStore::persistent_required_unavailable();
         broker
     }
 
@@ -322,9 +359,7 @@ impl Broker {
             );
         }
 
-        if self.persistence_mode.persistence_required()
-            && !self.persistence_mode.persistence_ready()
-        {
+        if self.state_store.persistence_required() && !self.state_store.persistence_ready() {
             if envelope.operation == Some(BrokerOperation::Health) {
                 return self.suspend_health(&request_id);
             }
@@ -332,7 +367,7 @@ impl Broker {
                 &request_id,
                 &operation,
                 "broker_persistence_unavailable",
-                "persistent audit and replay state are required but unavailable",
+                self.state_store.unavailable_message(),
                 true,
             );
         }
@@ -442,7 +477,7 @@ impl Broker {
             audit_event_id: audit_event.event_id,
             error: Some(error(
                 "broker_persistence_unavailable",
-                "persistent audit and replay state are required but unavailable",
+                self.state_store.unavailable_message(),
                 true,
             )),
             health: Some(self.health(EVIDENCE_SOURCE_INTERNAL_STATE)),
@@ -453,15 +488,16 @@ impl Broker {
     fn health(&self, evidence_source: &str) -> BrokerHealth {
         BrokerHealth {
             broker_id: BROKER_ID.to_string(),
-            status: self.persistence_mode.health_status().to_string(),
+            status: self.state_store.health_status().to_string(),
             boundary_role: "rust_security_broker_candidate".to_string(),
             authority_cutover_status: "not_active".to_string(),
             command_dispatch_enabled: false,
             audit_append_enabled: true,
-            audit_persistence: self.audit_log.persistence_scope().to_string(),
-            replay_persistence: "in_memory_session_only".to_string(),
-            persistence_required: self.persistence_mode.persistence_required(),
-            persistence_ready: self.persistence_mode.persistence_ready(),
+            audit_persistence: self.state_store.audit_persistence().to_string(),
+            replay_persistence: self.state_store.replay_persistence().to_string(),
+            session_persistence: self.state_store.session_persistence().to_string(),
+            persistence_required: self.state_store.persistence_required(),
+            persistence_ready: self.state_store.persistence_ready(),
             evidence_source: evidence_source.to_string(),
         }
     }
@@ -791,6 +827,17 @@ mod tests {
     }
 
     #[test]
+    fn broker_state_store_declares_all_in_memory_scopes() {
+        let store = BrokerStateStore::in_memory_skeleton();
+        assert_eq!(store.health_status(), "ready");
+        assert_eq!(store.audit_persistence(), "in_memory_skeleton");
+        assert_eq!(store.replay_persistence(), "in_memory_session_only");
+        assert_eq!(store.session_persistence(), "in_memory_session_only");
+        assert!(!store.persistence_required());
+        assert!(!store.persistence_ready());
+    }
+
+    #[test]
     fn broker_health_is_accepted_and_audited() {
         let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
@@ -800,6 +847,7 @@ mod tests {
         assert_eq!(health.authority_cutover_status, "not_active");
         assert_eq!(health.audit_persistence, "in_memory_skeleton");
         assert_eq!(health.replay_persistence, "in_memory_session_only");
+        assert_eq!(health.session_persistence, "in_memory_session_only");
         assert!(!health.persistence_required);
         assert!(!health.persistence_ready);
         assert_eq!(broker.audit_events().len(), 1);
@@ -817,6 +865,9 @@ mod tests {
         );
         let health = response.health.unwrap();
         assert_eq!(health.status, "suspend");
+        assert_eq!(health.audit_persistence, "in_memory_skeleton");
+        assert_eq!(health.replay_persistence, "in_memory_session_only");
+        assert_eq!(health.session_persistence, "in_memory_session_only");
         assert!(health.persistence_required);
         assert!(!health.persistence_ready);
         assert_eq!(broker.audit_events()[0].decision, "suspended");
@@ -859,6 +910,7 @@ mod tests {
         assert!(encoded.contains(r#""status":"accepted""#));
         assert!(encoded.contains(r#""boundary_role":"rust_security_broker_candidate""#));
         assert!(encoded.contains(r#""authority_cutover_status":"not_active""#));
+        assert!(encoded.contains(r#""session_persistence":"in_memory_session_only""#));
         assert!(encoded.contains(r#""shutdown_requested":false"#));
     }
 

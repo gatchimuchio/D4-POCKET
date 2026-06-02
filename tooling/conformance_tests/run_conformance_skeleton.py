@@ -1289,10 +1289,13 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "boundary_role",
         "authority_cutover_status",
         "BrokerPersistenceMode",
+        "BrokerStateStore",
         "in_memory_skeleton",
         "in_memory_session_only",
+        "session_persistence",
         "persistence_required",
         "persistence_ready",
+        "persistent audit, replay, and session state",
         "REQUEST_FRESHNESS_WINDOW_SECONDS",
         "parse_issued_at_epoch_seconds",
     ]

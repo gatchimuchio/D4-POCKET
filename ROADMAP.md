@@ -24,7 +24,7 @@ Primary implementation path: Flutter UI + Rust Security Broker for authority-sen
 - item: Language policy runtime convergence
   classification: release_blocker
   status: partially_started_not_passed
-  reason: Rust broker skeleton and JSON envelope rejection tests exist under `native/rust_helper`, including NFKC / case / zero-width / camelCase / separator / alias / value-only metadata hardening, unit-scope `issued_at` freshness rejection, and persistent-state-required unavailable fail-closed mode, but production IPC transport, Flutter broker integration, persistent audit/replay/session store implementation, authority-sensitive responsibility migration, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  reason: Rust broker skeleton and JSON envelope rejection tests exist under `native/rust_helper`, including NFKC / case / zero-width / camelCase / separator / alias / value-only metadata hardening, unit-scope `issued_at` freshness rejection, audit/replay/session store readiness reporting, and persistent-state-required unavailable fail-closed mode, but production IPC transport, Flutter broker integration, persistent audit/replay/session store implementation, authority-sensitive responsibility migration, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
   required_action: Select restricted IPC transport, implement persistent audit/replay/session stores, integrate freshness checks into IPC tests, integrate Flutter through the broker for authority operations, migrate authority-sensitive active runtime responsibilities from Python to Rust with parity evidence, and prove Python is dev/test/migration oracle only before completed product release.
   blocks_release: yes
 

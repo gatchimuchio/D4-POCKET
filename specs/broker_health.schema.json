@@ -12,6 +12,7 @@
     "audit_append_enabled",
     "audit_persistence",
     "replay_persistence",
+    "session_persistence",
     "persistence_required",
     "persistence_ready",
     "evidence_source"
@@ -57,6 +58,12 @@
       ]
     },
     "replay_persistence": {
+      "type": "string",
+      "enum": [
+        "in_memory_session_only"
+      ]
+    },
+    "session_persistence": {
       "type": "string",
       "enum": [
         "in_memory_session_only"

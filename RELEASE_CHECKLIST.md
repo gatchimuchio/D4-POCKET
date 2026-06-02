@@ -12,7 +12,7 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 - item: language policy runtime convergence gate
   classification: release_blocker
-  reason: Rust Security Broker skeleton, JSON envelope parsing, replay/stale/malformed rejection, unit-scope `issued_at` freshness rejection, persistent-state-required unavailable fail-closed mode, NFKC/case/zero-width/camelCase/separator/alias/value-only metadata hardening, and broker-local in-memory rejection audit tests exist, but production IPC transport, Flutter broker integration, persistent audit/replay/session store implementation, approval/audit/recovery ownership cutover, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
+  reason: Rust Security Broker skeleton, JSON envelope parsing, replay/stale/malformed rejection, unit-scope `issued_at` freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed mode, NFKC/case/zero-width/camelCase/separator/alias/value-only metadata hardening, and broker-local in-memory rejection audit tests exist, but production IPC transport, Flutter broker integration, persistent audit/replay/session store implementation, approval/audit/recovery ownership cutover, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
   required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only, prove authority paths use restricted IPC rather than FFI, and rerun strict release validation after broker-mediated Windows installed-path evidence exists.
   blocks_release: yes
 

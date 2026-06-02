@@ -70,12 +70,13 @@ Health responses must not claim active Rust authority ownership before productio
 - `command_dispatch_enabled=false`
 - `audit_persistence=in_memory_skeleton`
 - `replay_persistence=in_memory_session_only`
+- `session_persistence=in_memory_session_only`
 - `persistence_required=false` during default skeleton mode
 - `persistence_ready=false`
 
 `authority_cutover_status=active`, persistent audit storage, persistent replay/session storage, and command dispatch require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, IPC, and Windows installed-path evidence.
 
-When the broker is configured to require persistent audit/replay/session state but no persistent store is connected, health returns `status=suspend`, `persistence_required=true`, `persistence_ready=false`, and `broker_persistence_unavailable`. Non-health operations fail closed with the same error.
+When the broker is configured to require persistent audit/replay/session state but no persistent store is connected, health returns `status=suspend`, `audit_persistence=in_memory_skeleton`, `replay_persistence=in_memory_session_only`, `session_persistence=in_memory_session_only`, `persistence_required=true`, `persistence_ready=false`, and `broker_persistence_unavailable`. Non-health operations fail closed with the same error.
 
 ## 5. Broker Error
 
