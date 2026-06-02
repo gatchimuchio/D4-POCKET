@@ -1,7 +1,7 @@
 # Rust Security Broker Migration Plan
 
-Status: Phase 2 / Phase 3 minimal broker skeleton started
-Date: 2026-06-01
+Status: Phase 3 production broker process started
+Date: 2026-06-03
 Scope: minimal-diff plan after current-state audit
 
 ## 1. Migration Objective
@@ -122,16 +122,18 @@ Rust security constraints:
 
 ### Current Skeleton Evidence
 
-2026-06-01 時点で、最小差分として既存 `native/rust_helper` crate 内に Rust Security Broker skeleton を追加した。
+2026-06-03 時点で、既存 `native/rust_helper` crate 内の Rust Security Broker は production broker process の最初の実装を持つ。
 
-- `native/rust_helper/src/main.rs`: stdin-based health / shutdown lifecycle smoke only.
+- `native/rust_helper/src/main.rs`: `broker-server` subcommand で independent broker process を起動する。引数なしは development stdin smoke として残す。
+- `native/rust_helper/src/broker/ipc_server.rs`: `127.0.0.1` bound authenticated loopback IPC、per-process cryptographic session secret、request size limit、malformed/auth failure fail-closed response。
+- `native/rust_helper/src/broker/store.rs`: durable file store for audit hash-chain, replay nonces, and session state。restart 後 replay rejection、audit chain restart verification、malformed / tampered persisted state rejection を Rust tests で検証する。
 - `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、`issued_at` RFC3339 freshness rejection、audit/replay/session store readiness reporting、persistent-state-required unavailable fail-closed gate、stale session rejection、nonce replay rejection、NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata rejection、JSON response serialization、command-envelope suspension。
-- `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の broker-local in-memory append-only audit hash chain。
+- `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の append-only audit hash chain。
 - `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
 
-Broker health は現時点で `boundary_role=rust_security_broker_candidate`、`authority_cutover_status=not_active`、`audit_persistence=in_memory_skeleton`、`replay_persistence=in_memory_session_only`、`session_persistence=in_memory_session_only` を返す。`authority_owner=rust_security_broker` のような active authority owner claim は production cutover 後にだけ許可する。
+Broker health は development stdin mode では `audit_persistence=in_memory_skeleton`、`replay_persistence=in_memory_session_only`、`session_persistence=in_memory_session_only` を返す。production `broker-server` mode で durable store に接続できた場合だけ `audit_persistence=durable_file_store`、`replay_persistence=durable_file_store`、`session_persistence=durable_file_store`、`persistence_ready=true` を返す。どちらの場合も `boundary_role=rust_security_broker_candidate`、`authority_cutover_status=not_active` のままであり、`authority_owner=rust_security_broker` のような active authority owner claim は production cutover 後にだけ許可する。
 
-現時点では production IPC transport、Flutter client integration、persistent audit/replay/session store implementation、`issued_at` freshness integration evidence、approval/audit/recovery cutover、process/credential/update gated execution は未実装である。`BrokerStateStore` は health contract と fail-closed gate を固定するだけであり、永続化実装ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
+現時点では Flutter client integration、approval/audit/recovery cutover、Python active runtime retirement evidence、process/credential/update gated execution、Windows installed-path evidence は未実装である。Rust integration tests は local broker process の `LIVE_RUNTIME` 証拠だが、Windows installed-path product proof ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
 
 ## 6. Phase 4 / Responsibility Migration Order
 

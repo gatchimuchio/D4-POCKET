@@ -21,6 +21,7 @@ GLOB_PATTERNS = [
     "native/rust_helper/Cargo.toml",
     "native/rust_helper/Cargo.lock",
     "native/rust_helper/src/**/*.rs",
+    "native/rust_helper/tests/**/*.rs",
     "docs/**/*.md",
 ]
 

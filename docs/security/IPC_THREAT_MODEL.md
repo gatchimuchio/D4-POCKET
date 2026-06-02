@@ -1,7 +1,7 @@
 # IPC Threat Model
 
-Status: Phase 2 initial boundary freeze
-Date: 2026-06-01
+Status: Phase 3 production broker process started
+Date: 2026-06-03
 Scope: Flutter UI -> Rust Security Broker -> Adapter / Runtime IPC
 
 ## 1. Boundary
@@ -23,15 +23,15 @@ Adapter / External Runtime
 
 | threat | required handling | current skeleton scope | release classification |
 | --- | --- | --- | --- |
-| spoofed UI request | session id、nonce、payload hash、operation を検証し、失敗時は rejected / audited | typed envelope validation | release_blocker until transport auth exists |
-| replayed approval request | nonce replay を拒否し、broker-local audit に記録する | implemented in Rust skeleton | release_blocker until integration proof |
+| spoofed UI request | session id、nonce、payload hash、operation、IPC auth secret を検証し、失敗時は rejected / audited | authenticated loopback IPC + typed envelope validation | release_blocker until Flutter product path uses broker |
+| replayed approval request | nonce replay を拒否し、broker audit に記録する | persisted nonce store rejects replay after broker restart | release_blocker until approval migration |
 | forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner | release_blocker until parity migration |
 | malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust skeleton | none for skeleton; release_blocker for product cutover |
-| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window implemented in Rust unit scope | release_blocker until IPC integration proof |
-| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | implemented as fail-closed skeleton mode with explicit store readiness fields | release_blocker until persistent store exists |
+| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window covered in Rust IPC integration tests | release_blocker until Flutter product path uses broker |
+| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | durable file store implemented; unavailable mode remains fail-closed | release_blocker until Flutter product path uses broker |
 | authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner | release_blocker until active-path parity proof |
 | Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope | release_blocker until parity harness and cutover proof |
-| stale session | session mismatch を rejected / audited にする | implemented in Rust skeleton | release_blocker until real session lifecycle |
+| stale session | session mismatch を rejected / audited にする | production broker-server generates session per process | release_blocker until Flutter product path uses broker |
 | broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | documented only | release_blocker |
 | broken pipe / crash during approval | approval finalization must not complete; RecoveryAction required | documented only | release_blocker |
 | audit append failure | broker must block finalization if audit append fails | documented only | release_blocker |
@@ -61,10 +61,10 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 
 ## 5. Current Limitations
 
-- item: production IPC transport auth absent
+- item: Flutter broker unavailable behavior absent
   classification: release_blocker
-  reason: Windows named pipe / local socket / loopback authenticated session selection is not complete.
-  required_action: select and implement Windows-first IPC transport with authenticated session and reconnection behavior.
+  reason: Rust broker now has authenticated loopback IPC and durable store tests, but Flutter still reads local snapshot JSON and does not yet use broker IPC.
+  required_action: add broker launch/discovery, broker unavailable / crash / stale-session UI fail-closed tests, and authority surface cutover.
   blocks_release: yes
 
 - item: full Python normalization parity absent
@@ -73,8 +73,8 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
   required_action: add parity harness for Python `normalize_inbound_payload` and prove active path cutover before release-ready claim.
   blocks_release: yes
 
-- item: Flutter broker unavailable behavior absent
+- item: Windows installed-path broker proof absent
   classification: release_blocker
-  reason: Flutter still reads local snapshot JSON and does not yet use broker IPC.
-  required_action: add broker unavailable / crash / stale-session UI fail-closed tests.
+  reason: authenticated loopback IPC and durable store are proven by local Rust integration tests, not installed Windows app evidence.
+  required_action: run Windows installed-path broker launch, authenticated IPC, restart persistence, and crash fail-closed evidence collection.
   blocks_release: yes

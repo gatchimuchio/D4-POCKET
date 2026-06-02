@@ -1,7 +1,7 @@
 # Runtime Ownership Audit
 
-Status: Phase 0 current-state audit updated after Phase 3 broker skeleton
-Date: 2026-06-01
+Status: Phase 0 current-state audit updated after Phase 3 broker process start
+Date: 2026-06-03
 Scope: Language Policy Runtime Convergence / Rust Security Broker Migration v0.1
 
 この文書は、現行 GUI-Shell の実行経路、検証経路、release 判定経路で、どの言語・どのファイルが責任を持っているかを記録する。ここでの「active」は completed product release を意味しない。現時点で存在する owner-use、development validation、release evidence 経路において実際に呼ばれている、または責任実装として扱われていることを指す。
@@ -11,7 +11,7 @@ Scope: Language Policy Runtime Convergence / Rust Security Broker Migration v0.1
 - `packages/shell_core/*.py` は、現行の runtime registry、permission、approval、audit、recovery、content exposure、policy evaluation セマンティクスを実装している。
 - Flutter desktop app は Python を直接実行しない。`ShellCoreClient.local()` が `GUI_SHELL_SNAPSHOT_JSON`、`%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json`、`.gui_shell/shell_snapshot.json` を読む。
 - owner launch scripts は Flutter 起動前に Python `tooling/shell_snapshot.py` を実行し、その中で Python Shell Core を使う。
-- Rust helper crate 内に Rust Security Broker skeleton が追加され、`src/main.rs`、JSON envelope parsing、health/shutdown smoke、stale/replay/malformed/authority-metadata rejection、broker-local audit hash chain tests が存在する。ただし production IPC transport、Flutter client integration、authenticated installed-session lifecycle、approval / audit finalization endpoint は未完了である。
+- Rust helper crate 内に Rust Security Broker production process の初期実装が追加され、`broker-server`、authenticated `127.0.0.1` loopback IPC、durable audit/replay/session file store、health/shutdown process tests、stale/replay/malformed/authority-metadata rejection、restart replay rejection、tampered persisted-state rejection、audit hash-chain restart verification が存在する。ただし Flutter client integration、Windows installed-session evidence、approval / audit finalization endpoint は未完了である。
 - BLUE-TANUKI は adapter mock/reference の範囲に留まっており、BLUE-TANUKI core の変更経路は確認されなかった。
 - TypeScript / Node の GUI-Shell core runtime 導入は確認されなかった。
 - authority path への `flutter_rust_bridge`、`dart:ffi`、`MethodChannel`、Rust FFI 直結は確認されなかった。
@@ -20,8 +20,8 @@ Release-gate conclusion:
 
 - item: active Shell Core language policy convergence
   classification: release_blocker
-  reason: Rust Security Broker skeleton は存在するが、現行の owner-use Shell Core authority-sensitive 実装は Python で、broker は production authority path へ cutover されていない。
-  required_action: authority-sensitive active production path を Rust broker に移し、Python を dev/test/migration oracle に格下げした証拠、production IPC transport、Flutter fail-closed integration、no-Python-runtime evidence、no-FFI-authority assertion を追加する。
+  reason: Rust Security Broker process、production IPC としての authenticated loopback IPC、durable store は存在するが、現行の owner-use Shell Core authority-sensitive 実装は Python で、Flutter は broker production authority path へ cutover されていない。
+  required_action: authority-sensitive active production path を Rust broker に移し、Python を dev/test/migration oracle に格下げした証拠、Flutter fail-closed integration、no-Python-runtime evidence、no-FFI-authority assertion、Windows installed-path broker evidence を追加する。
   blocks_release: yes
 
 ## 2. 実行経路監査
@@ -36,7 +36,7 @@ Release-gate conclusion:
 | `packages/blue_tanuki_adapter` | reference adapter mock outputs | Python | test/reference adapter scaffold | `packages/blue_tanuki_adapter/*.py` | allowed only as adapter oracle; not release runtime owner |
 | `packages/runtime_catalog` | manifest registration and metadata authority checks | Python | validation / migration oracle | `packages/runtime_catalog/catalog.py`, `tooling/release_smoke.py` | Rust broker target needed for active release path |
 | `packages/agent_runtime` | workspace and tool-call contract helper | Python | validation / migration oracle | `packages/agent_runtime/contract.py`, `tooling/release_smoke.py` | Rust broker target needed for command eligibility |
-| `native/rust_helper` | bounded helper modules plus broker skeleton binary / JSON envelope / rejection audit tests | Rust | bounded helper + broker skeleton; not production cutover | `native/rust_helper/Cargo.toml`, `native/rust_helper/src/main.rs`, `native/rust_helper/src/broker/*.rs` | production IPC, Flutter integration, approval/audit/recovery ownership, no-Python-runtime proof absent |
+| `native/rust_helper` | bounded helper modules plus broker-server binary / authenticated loopback IPC / durable store / rejection audit tests | Rust | bounded helper + broker process started; not Flutter product cutover | `native/rust_helper/Cargo.toml`, `native/rust_helper/src/main.rs`, `native/rust_helper/src/broker/*.rs`, `native/rust_helper/tests/broker_ipc.rs` | Flutter integration, approval/audit/recovery ownership, no-Python-runtime proof, Windows installed-path proof absent |
 | `tooling/release_smoke.py` | integrated Shell Core, installer, runtime catalog, agent runtime smoke | Python | development validation | `tooling/release_smoke.py` | valid as CI/tooling, not product runtime proof |
 | `tooling/validate_all.py` | subprocess validation orchestrator | Python | CI / validation tooling | `tooling/validate_all.py` | allowed as CI support |
 | `.github/workflows/validation.yml` | split Python core, Rust helper, Flutter, Windows build jobs | YAML + Python/Rust/Dart | CI | `.github/workflows/validation.yml` | no no-Python-runtime assertion yet |
@@ -58,7 +58,7 @@ Release-gate conclusion:
 | update verification | `packages/shell_core/update_policy_store.py`, `native/rust_helper/src/update_verification.rs` | Python + Rust | partial helper / validation | Rust Security Broker | yes | Rust checks signature presence only; Shell Core policy is Python |
 | credential/keychain access | none | none | not implemented in current path | Rust Security Broker | yes before credential feature | no credential implementation found |
 | process supervision | `native/rust_helper/src/process.rs`; Windows smoke uses `Start-Process` | Rust + PowerShell | helper diagnostics / release-only collector | Rust Security Broker | yes | Rust helper refuses arbitrary command execution; collector is release evidence only |
-| IPC endpoint ownership | `native/rust_helper/src/ipc.rs`, `native/rust_helper/src/broker/protocol.rs`, `native/rust_helper/src/main.rs` | Rust | frame validation helper plus stdin JSON broker skeleton | Rust Security Broker | yes | JSON envelope / replay rejection exists; no production listener, authenticated installed session, Flutter client, or crash handling endpoint |
+| IPC endpoint ownership | `native/rust_helper/src/ipc.rs`, `native/rust_helper/src/broker/protocol.rs`, `native/rust_helper/src/broker/ipc_server.rs`, `native/rust_helper/src/main.rs` | Rust | frame validation helper plus authenticated loopback broker-server | Rust Security Broker | yes for Flutter product cutover | JSON envelope / replay rejection, production listener, authenticated local session, shutdown, and unavailable-after-shutdown tests exist; Flutter client and Windows installed-session evidence are absent |
 | adapter conformance enforcement | `packages/shell_core/adapter_loader.py`, conformance tests | Python | validation oracle | Rust Security Broker plus schema/conformance | yes | adapter metadata authority stripping is Python |
 | evidence reporting | `tooling/evidence_bundle.py`, `tooling/windows_release_evidence.py`, `tooling/validate_all.py` | Python | CI / release evidence tooling | Python allowed as tooling | no for tooling | no product runtime authority claim |
 
@@ -86,7 +86,7 @@ Release-gate conclusion:
 | conformance skeleton | CONFIG / INTERNAL_STATE / FIXTURE | Python implementation preserves current contract behavior | Rust broker behavior or installed product behavior |
 | Shell snapshot | INTERNAL_STATE / FIXTURE | generated local owner-operation projection | live runtime state from broker |
 | Flutter widget tests | INTERNAL_STATE / FIXTURE | UI renders projections and hides hidden payload in test/fallback data | authority decision correctness |
-| Rust helper cargo tests | INTERNAL_STATE | helper functions and broker skeleton reject malformed/stale/replayed/authority-like JSON envelopes and suspend command dispatch | production IPC transport, authenticated installed session, Flutter integration, approval/audit finalization |
+| Rust helper cargo tests | INTERNAL_STATE / LIVE_RUNTIME for local broker process tests | helper functions and broker-server reject malformed/stale/replayed/authority-like JSON envelopes, authenticate IPC, enforce request size, persist audit/replay/session state, reject restart replay, and suspend command dispatch | Windows installed-path broker proof, Flutter integration, approval/audit finalization |
 | Windows installed smoke validator | EXTERNAL_EVIDENCE when real JSON exists | installed-path Windows evidence if non-synthetic JSON exists | current repository has no such evidence file |
 
 No current evidence source proves installed-path `LIVE_RUNTIME` Rust Security Broker authority ownership.
@@ -103,7 +103,7 @@ C. Flutter desktop app は現在どの実行主体から状態を取得してい
 Dart の `ShellCoreClient.local()` が JSON file を読む。JSON は `tooling/shell_snapshot.py` で生成される場合があり、missing/parse failure 時は Dart fallback snapshot を使う。
 
 D. Rust helper は standalone process か、library/FFI 前提か、まだ未接続か。
-現状は Rust library crate に broker binary skeleton が追加されている。stdin JSON smoke はあるが、Flutter との production IPC endpoint は未接続であり、FFI も使っていない。
+現状は Rust library crate に broker-server binary が追加されている。authenticated loopback IPC と durable store は Rust integration tests で実行されるが、Flutter との product authority path は未接続であり、FFI も使っていない。
 
 E. approval / permission / audit / recovery の最終判定主体が現時点で何か。
 現行コード上は Python Shell Core が判定主体である。Flutter は表示のみ。Rust helper は最終判定主体ではない。

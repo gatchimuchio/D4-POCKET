@@ -8,6 +8,7 @@ name = "gui_shell_rust_helper"
 path = "src/lib.rs"
 
 [dependencies]
+getrandom = "0.2"
 sha2 = "0.10"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }

@@ -14,6 +14,7 @@
       "native/rust_helper/Cargo.toml",
       "native/rust_helper/Cargo.lock",
       "native/rust_helper/src/**/*.rs",
+      "native/rust_helper/tests/**/*.rs",
       "docs/**/*.md"
     ],
     "exact_files": [
@@ -83,7 +84,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "552be6c47df23a80e376feffb411d10a7320447ed2d9b7f786a6ace5c8664ac8"
+      "sha256": "3b77459eb9fad44912c8a16fed2f44aebf94abca5533f19e510fbbefc73df7d2"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -243,7 +244,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "7a3b2e0bfb1f3b5e502968ecc56b536a487add1dcf2aaec7fd66032b23f43896"
+      "sha256": "5d1d4594d7c3e23c13a0c66f23c14ed604a618d90a3ed70675cb0dec77c716b2"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -251,11 +252,11 @@
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "d3fdbac29dcbe219d68c818b1ec88447be7f8798f24c0721d3e3b47f7d8ee690"
+      "sha256": "522679bbb0208b096c62f49b0dc856f8281bbcb2d4975d7dfbc6bbc4551039f1"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "154fab07ac60198190465fe50f3a13064281564ae9ad4717d36ce8f261da824f"
+      "sha256": "f43b3d5a70981fbf054f97665dea51689cf77d9d582f86b30520382792d21bcd"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -275,7 +276,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "7598356bf265687cd8e8d8d998f20023a42d98b220b6bd9f25cd07d7f0549db8"
+      "sha256": "c8f5714eaee0c96951f743ad6e6fb507d73ddc88f763a27a9266a029efa3dc64"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -527,11 +528,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "1b449f29fba42a553c17567aa06d79323d0ee86195cc6cbf2a934010bea0bdc2"
+      "sha256": "b46d9f1e89eaaad6d5bf3e81c3d500bc7457268f9c66a0055425f67e718617f1"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "26fb68509661b3a93ab1fca843cd7ae4c5c3277526230af039cd0174ce4230d3"
+      "sha256": "41419f2bc3dc6e97651f5969351b64d68658332a9f3b89e449e2ff699d388b69"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -539,15 +540,23 @@
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
-      "sha256": "4d7f8136c71a84b1d8e892ab58206fb2901a45a4cb255732404106eed36e6e77"
+      "sha256": "bc92752650399b25833b9eb95f3c4bd1b20b10cd5b52ae6e95b015f024de8b8d"
+    },
+    {
+      "path": "native/rust_helper/src/broker/ipc_server.rs",
+      "sha256": "472b59593e416e9648474a7443ad9c8921df3aaedb5a3fa662118001a7fa2453"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "bbe0156d5703fef86c706381b72a4f5f60b54a926bdfb6abc47aa5b943de0a23"
+      "sha256": "eeb371eb506f828785ded026c85afcf08babff17283cd8f1775445467d05c703"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "fcad4d302dfdcece398793fa8cfeb2002ec927ff2a51d566adf9e077a237995d"
+      "sha256": "81c40f595ccd5cd8f6644d0830e1b077d723340f8c0412c1a0cc5175ba4df3b1"
+    },
+    {
+      "path": "native/rust_helper/src/broker/store.rs",
+      "sha256": "c7c21ea77093f11331b6729423f9eb550105a1bfa3c8b5ce5b6cee56ffcf25ef"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -567,7 +576,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "af1a97913162ab187d381c14f6be99ee611e2fd5da54d008b5a9762b277b8c0a"
+      "sha256": "d84fd49e497219b6ac74254294cdb81a4e2f6ed22f8acd2d1c2124fb242cd92d"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -580,6 +589,10 @@
     {
       "path": "native/rust_helper/src/update_verification.rs",
       "sha256": "5e85be1a70b29d84fed6233f084a0d16486f5cf77cf119f4e24d11f6ac448385"
+    },
+    {
+      "path": "native/rust_helper/tests/broker_ipc.rs",
+      "sha256": "51795e76ae5ad6c99963977e8050a44bab5702fe07e48549e33e4b59e5500f9c"
     },
     {
       "path": "packages/shell_core/__init__.py",
@@ -711,11 +724,11 @@
     },
     {
       "path": "specs/broker_error.schema.json",
-      "sha256": "cb86451cbdcac3aed5d863f38911a9fe68587e6b3ad40a4bcbbbcfe814e25758"
+      "sha256": "7d920121e331b0cc420f2015d4f831480ff32875969956ded9139e884e5c6711"
     },
     {
       "path": "specs/broker_health.schema.json",
-      "sha256": "9beaf7ab98713637947a4bc218357aaf701057ab3c43c8e060955e407764ab19"
+      "sha256": "80824b95549db5f22b820da533279cee451cd07a27cb41d9024a3894ef178807"
     },
     {
       "path": "specs/broker_session.schema.json",
@@ -779,7 +792,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "a4848a62d17830cdea0c949c5b3b655b939cce080f31711e0d65fe63b3010736"
+      "sha256": "ecc62d14c6a150dbe1a10ffcb63fcd5ac7efea00852213dfb02b30aba78fd383"
     },
     {
       "path": "tooling/release_gate_check.py",

@@ -54,27 +54,29 @@
     "audit_persistence": {
       "type": "string",
       "enum": [
-        "in_memory_skeleton"
+        "in_memory_skeleton",
+        "durable_file_store"
       ]
     },
     "replay_persistence": {
       "type": "string",
       "enum": [
-        "in_memory_session_only"
+        "in_memory_session_only",
+        "durable_file_store"
       ]
     },
     "session_persistence": {
       "type": "string",
       "enum": [
-        "in_memory_session_only"
+        "in_memory_session_only",
+        "durable_file_store"
       ]
     },
     "persistence_required": {
       "type": "boolean"
     },
     "persistence_ready": {
-      "type": "boolean",
-      "const": false
+      "type": "boolean"
     },
     "evidence_source": {
       "type": "string",

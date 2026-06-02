@@ -1,8 +1,8 @@
 # Rust Broker IPC Protocol
 
-Status: Phase 2 / Phase 3 initial protocol skeleton
-Date: 2026-06-01
-Scope: Rust Security Broker envelope, response, session, health, and audit skeleton
+Status: Phase 3 production broker process started
+Date: 2026-06-03
+Scope: Rust Security Broker envelope, authenticated loopback IPC, session, health, replay, and durable audit store
 
 ## 1. Protocol Owner
 
@@ -63,7 +63,7 @@ Allowed status values:
 
 Every rejected or suspended response requires an audit event. Accepted health and shutdown responses are also audited to preserve broker-local append-only evidence.
 
-Health responses must not claim active Rust authority ownership before production cutover. During the skeleton stage the health object reports:
+Health responses must not claim active Rust authority ownership before production cutover. In dev stdin mode the health object reports:
 
 - `boundary_role=rust_security_broker_candidate`
 - `authority_cutover_status=not_active`
@@ -74,7 +74,15 @@ Health responses must not claim active Rust authority ownership before productio
 - `persistence_required=false` during default skeleton mode
 - `persistence_ready=false`
 
-`authority_cutover_status=active`, persistent audit storage, persistent replay/session storage, and command dispatch require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, IPC, and Windows installed-path evidence.
+In production broker-server mode, a connected durable file store reports:
+
+- `audit_persistence=durable_file_store`
+- `replay_persistence=durable_file_store`
+- `session_persistence=durable_file_store`
+- `persistence_required=true`
+- `persistence_ready=true`
+
+`authority_cutover_status=active` and command dispatch still require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, Flutter broker integration, and Windows installed-path evidence.
 
 When the broker is configured to require persistent audit/replay/session state but no persistent store is connected, health returns `status=suspend`, `audit_persistence=in_memory_skeleton`, `replay_persistence=in_memory_session_only`, `session_persistence=in_memory_session_only`, `persistence_required=true`, `persistence_ready=false`, and `broker_persistence_unavailable`. Non-health operations fail closed with the same error.
 
@@ -88,6 +96,10 @@ Allowed error codes:
 - `broker_payload_hash_invalid`
 - `broker_issued_at_invalid`
 - `broker_persistence_unavailable`
+- `broker_authentication_failed`
+- `broker_ipc_malformed`
+- `broker_request_oversized`
+- `broker_audit_append_failed`
 - `broker_stale_session`
 - `broker_replay_detected`
 - `broker_authority_metadata_rejected`
@@ -100,13 +112,18 @@ Allowed error codes:
 The current Rust code provides:
 
 - `native/rust_helper/src/main.rs` process lifecycle skeleton;
+- `native/rust_helper/src/broker/ipc_server.rs` authenticated `127.0.0.1` loopback server for independent-process IPC;
+- `native/rust_helper/src/broker/store.rs` durable file store for audit hash-chain, replay nonces, and session state;
 - `native/rust_helper/src/broker/protocol.rs` request/response decision skeleton;
-- `native/rust_helper/src/broker/audit.rs` broker-local audit hash chain;
+- `native/rust_helper/src/broker/audit.rs` broker audit hash chain;
 - JSON request parsing with unknown-field rejection;
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
 - `issued_at` RFC3339 parsing and freshness rejection within a 300-second broker window;
 - persistence-required fail-closed behavior when persistent state is required but unavailable;
+- durable audit append and restart verification;
+- durable replay nonce rejection after broker restart;
+- malformed or tampered persisted state rejection;
 - health response;
 - shutdown response for test lifecycle;
 - stale session rejection;
@@ -116,23 +133,23 @@ The current Rust code provides:
 
 It does not yet provide:
 
-- production Windows named pipe / local socket / loopback transport;
 - Flutter client integration;
 - approval finalization;
-- audit store persistence;
-- replay/session persistence across broker restart;
 - credential/keychain access;
 - process or update gated execution.
 
-Unimplemented broker transport and migration items remain `release_blocker` for completed product release.
+Unimplemented Flutter cutover, responsibility migration, command eligibility, and Windows installed-path evidence remain `release_blocker` for completed product release.
 
 ## 7. IPC Transport Decision
 
-Transport decision remains open:
+The initial production transport is localhost loopback socket with authenticated session:
 
-- Windows named pipe;
-- localhost loopback socket with authenticated session;
-- cross-platform local socket abstraction.
+- bind address is restricted to `127.0.0.1`;
+- each broker process generates a cryptographically random session secret via `getrandom`;
+- the secret is written only to the broker session file for client discovery and is not logged, exposed through UI fields, or added to audit payloads;
+- each connection sends the secret on an auth line before the JSON envelope;
+- request size is bounded by the broker-server `--max-request-bytes` limit;
+- malformed IPC, authentication failure, stale `issued_at`, replayed nonce, and oversized request fail closed.
 
 Selection criteria:
 
@@ -145,12 +162,13 @@ Selection criteria:
 
 ## 8. Session, Replay, And Freshness Policy
 
-Current skeleton behavior:
+Current production broker-server behavior:
 
-- `session_id` is an in-process string checked for non-health operations.
-- `nonce` replay state is an in-memory `HashSet`.
+- `session_id` is generated per broker process and checked for non-health operations.
+- `nonce` replay state is persisted in `replay_nonces.jsonl`.
 - `issued_at` is parsed as RFC3339 and rejected when outside a 300-second broker freshness window.
-- audit events are chained in memory only.
+- audit events are chained and persisted in `audit.jsonl`.
+- `session.json` records active durable session state.
 
 Production cutover requirements:
 
@@ -171,3 +189,4 @@ cd native/rust_helper && cargo test
 ```
 
 This validation proves CONFIG / FIXTURE / INTERNAL_STATE scope. It does not prove Windows installed-path LIVE_RUNTIME broker ownership.
+Rust integration tests additionally exercise a local independent broker process on Linux. That is LIVE_RUNTIME for the local broker process, but not Windows installed-path product proof.

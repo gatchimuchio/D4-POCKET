@@ -5,70 +5,111 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use unicode_normalization::UnicodeNormalization;
 
+use std::path::Path;
+
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
+use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerPersistenceMode {
     InMemorySkeleton,
     PersistentRequiredUnavailable,
+    DurableFileStore,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrokerStateStore {
     mode: BrokerPersistenceMode,
+    persistent_store: Option<BrokerPersistentStore>,
 }
 
 impl BrokerStateStore {
     pub fn in_memory_skeleton() -> Self {
         Self {
             mode: BrokerPersistenceMode::InMemorySkeleton,
+            persistent_store: None,
         }
     }
 
     pub fn persistent_required_unavailable() -> Self {
         Self {
             mode: BrokerPersistenceMode::PersistentRequiredUnavailable,
+            persistent_store: None,
         }
     }
 
-    pub fn persistence_required(self) -> bool {
+    pub fn durable_file_store(store: BrokerPersistentStore) -> Self {
+        Self {
+            mode: BrokerPersistenceMode::DurableFileStore,
+            persistent_store: Some(store),
+        }
+    }
+
+    pub fn persistence_required(&self) -> bool {
         matches!(
             self.mode,
             BrokerPersistenceMode::PersistentRequiredUnavailable
+                | BrokerPersistenceMode::DurableFileStore
         )
     }
 
-    pub fn persistence_ready(self) -> bool {
-        false
+    pub fn persistence_ready(&self) -> bool {
+        matches!(self.mode, BrokerPersistenceMode::DurableFileStore)
     }
 
-    pub fn health_status(self) -> &'static str {
-        if self.persistence_required() {
+    pub fn health_status(&self) -> &'static str {
+        if self.persistence_required() && !self.persistence_ready() {
             "suspend"
         } else {
             "ready"
         }
     }
 
-    pub fn audit_persistence(self) -> &'static str {
-        "in_memory_skeleton"
+    pub fn audit_persistence(&self) -> &'static str {
+        if self.persistence_ready() {
+            "durable_file_store"
+        } else {
+            "in_memory_skeleton"
+        }
     }
 
-    pub fn replay_persistence(self) -> &'static str {
-        "in_memory_session_only"
+    pub fn replay_persistence(&self) -> &'static str {
+        if self.persistence_ready() {
+            "durable_file_store"
+        } else {
+            "in_memory_session_only"
+        }
     }
 
-    pub fn session_persistence(self) -> &'static str {
-        "in_memory_session_only"
+    pub fn session_persistence(&self) -> &'static str {
+        if self.persistence_ready() {
+            "durable_file_store"
+        } else {
+            "in_memory_session_only"
+        }
     }
 
-    pub fn unavailable_message(self) -> &'static str {
+    pub fn unavailable_message(&self) -> &'static str {
         "persistent audit, replay, and session state are required but unavailable"
+    }
+
+    pub fn append_audit_event(&self, event: &BrokerAuditEvent) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.append_audit_event(event)?;
+        }
+        Ok(())
+    }
+
+    pub fn append_replay_nonce(&self, nonce: &str) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.append_replay_nonce(nonce)?;
+        }
+        Ok(())
     }
 }
 
@@ -310,6 +351,22 @@ impl Broker {
         broker
     }
 
+    pub fn new_persistent(
+        session_id: &str,
+        store_root: impl AsRef<Path>,
+    ) -> Result<Self, BrokerStoreError> {
+        let (persistent_store, persistent_state) =
+            BrokerPersistentStore::open_or_create(store_root, session_id)?;
+        Ok(Self {
+            session_id: session_id.to_string(),
+            seen_nonces: persistent_state.seen_nonces,
+            audit_log: persistent_state.audit_log,
+            shutdown_requested: false,
+            current_epoch_seconds_override: None,
+            state_store: BrokerStateStore::durable_file_store(persistent_store),
+        })
+    }
+
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
         let request_id = envelope
             .request_id
@@ -396,7 +453,14 @@ impl Broker {
         }
 
         if metadata_attempts_authority(&envelope.metadata) {
-            self.seen_nonces.insert(nonce);
+            if let Err(error) = self.record_nonce(&nonce) {
+                return self.audit_store_failed_response(
+                    &request_id,
+                    &operation,
+                    "broker_persistence_unavailable",
+                    &error.message(),
+                );
+            }
             return self.reject(
                 &request_id,
                 &operation,
@@ -406,7 +470,15 @@ impl Broker {
             );
         }
 
-        self.seen_nonces.insert(nonce);
+        if let Err(error) = self.record_nonce(&nonce) {
+            return self.reject(
+                &request_id,
+                &operation,
+                "broker_persistence_unavailable",
+                &error.message(),
+                true,
+            );
+        }
 
         match envelope.operation.unwrap() {
             BrokerOperation::Health => self.accept_health(&request_id),
@@ -436,19 +508,33 @@ impl Broker {
         self.shutdown_requested
     }
 
+    pub fn reject_ipc(&mut self, code: &str, message: &str, recoverable: bool) -> BrokerResponse {
+        self.reject("ipc-request", "unknown", code, message, recoverable)
+    }
+
     fn current_epoch_seconds(&self) -> i64 {
         self.current_epoch_seconds_override
             .unwrap_or_else(current_epoch_seconds)
     }
 
     fn accept_health(&mut self, request_id: &str) -> BrokerResponse {
-        let audit_event = self.audit_log.append(
+        let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::Health.as_str(),
             "accepted",
             "health status returned",
             EVIDENCE_SOURCE_LIVE_RUNTIME,
-        );
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    BrokerOperation::Health.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
         BrokerResponse {
             request_id: request_id.to_string(),
             operation: BrokerOperation::Health.as_str().to_string(),
@@ -462,13 +548,23 @@ impl Broker {
     }
 
     fn suspend_health(&mut self, request_id: &str) -> BrokerResponse {
-        let audit_event = self.audit_log.append(
+        let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::Health.as_str(),
             "suspended",
             "broker_persistence_unavailable",
             EVIDENCE_SOURCE_INTERNAL_STATE,
-        );
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    BrokerOperation::Health.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
         BrokerResponse {
             request_id: request_id.to_string(),
             operation: BrokerOperation::Health.as_str().to_string(),
@@ -504,13 +600,23 @@ impl Broker {
 
     fn accept_shutdown(&mut self, request_id: &str) -> BrokerResponse {
         self.shutdown_requested = true;
-        let audit_event = self.audit_log.append(
+        let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::Shutdown.as_str(),
             "accepted",
             "shutdown requested",
             EVIDENCE_SOURCE_LIVE_RUNTIME,
-        );
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    BrokerOperation::Shutdown.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
         BrokerResponse {
             request_id: request_id.to_string(),
             operation: BrokerOperation::Shutdown.as_str().to_string(),
@@ -524,13 +630,23 @@ impl Broker {
     }
 
     fn suspend_command(&mut self, request_id: &str) -> BrokerResponse {
-        let audit_event = self.audit_log.append(
+        let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::CommandEnvelope.as_str(),
             "suspended",
             "external command dispatch disabled in broker skeleton",
             EVIDENCE_SOURCE_INTERNAL_STATE,
-        );
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    BrokerOperation::CommandEnvelope.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
         BrokerResponse {
             request_id: request_id.to_string(),
             operation: BrokerOperation::CommandEnvelope.as_str().to_string(),
@@ -555,13 +671,23 @@ impl Broker {
         message: &str,
         recoverable: bool,
     ) -> BrokerResponse {
-        let audit_event = self.audit_log.append(
+        let audit_event = match self.append_audit(
             request_id,
             operation,
             "rejected",
             code,
             EVIDENCE_SOURCE_INTERNAL_STATE,
-        );
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
         BrokerResponse {
             request_id: request_id.to_string(),
             operation: operation.to_string(),
@@ -569,6 +695,49 @@ impl Broker {
             evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
             audit_event_id: audit_event.event_id,
             error: Some(error(code, message, recoverable)),
+            health: None,
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
+    fn append_audit(
+        &mut self,
+        request_id: &str,
+        operation: &str,
+        decision: &str,
+        reason: &str,
+        evidence_source: &str,
+    ) -> Result<BrokerAuditEvent, BrokerStoreError> {
+        let event =
+            self.audit_log
+                .build_next(request_id, operation, decision, reason, evidence_source);
+        self.state_store.append_audit_event(&event)?;
+        self.audit_log
+            .push_verified(event.clone())
+            .map_err(BrokerStoreError::TamperedAuditState)?;
+        Ok(event)
+    }
+
+    fn record_nonce(&mut self, nonce: &str) -> Result<(), BrokerStoreError> {
+        self.state_store.append_replay_nonce(nonce)?;
+        self.seen_nonces.insert(nonce.to_string());
+        Ok(())
+    }
+
+    fn audit_store_failed_response(
+        &self,
+        request_id: &str,
+        operation: &str,
+        code: &str,
+        message: &str,
+    ) -> BrokerResponse {
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
+            status: BrokerStatus::Suspended,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: "broker-audit-unavailable".to_string(),
+            error: Some(error(code, message, true)),
             health: None,
             shutdown_requested: self.shutdown_requested,
         }
@@ -811,6 +980,9 @@ fn normalize_key(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_broker() -> Broker {
         Broker::new_with_current_epoch_seconds(
@@ -826,6 +998,26 @@ mod tests {
         broker
     }
 
+    fn temp_store_dir(test_name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "gui-shell-broker-{test_name}-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn persistent_test_broker(store_dir: &Path) -> Broker {
+        let mut broker = Broker::new_persistent("session-1", store_dir).unwrap();
+        broker.current_epoch_seconds_override =
+            Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
+        broker
+    }
+
     #[test]
     fn broker_state_store_declares_all_in_memory_scopes() {
         let store = BrokerStateStore::in_memory_skeleton();
@@ -835,6 +1027,96 @@ mod tests {
         assert_eq!(store.session_persistence(), "in_memory_session_only");
         assert!(!store.persistence_required());
         assert!(!store.persistence_ready());
+    }
+
+    #[test]
+    fn persistent_store_health_reports_durable_ready() {
+        let store_dir = temp_store_dir("persistent-health");
+        let mut broker = persistent_test_broker(&store_dir);
+        let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let health = response.health.unwrap();
+        assert_eq!(health.status, "ready");
+        assert_eq!(health.audit_persistence, "durable_file_store");
+        assert_eq!(health.replay_persistence, "durable_file_store");
+        assert_eq!(health.session_persistence, "durable_file_store");
+        assert!(health.persistence_required);
+        assert!(health.persistence_ready);
+        assert_eq!(health.authority_cutover_status, "not_active");
+        assert!(store_dir.join("audit.jsonl").exists());
+        assert!(store_dir.join("replay_nonces.jsonl").exists());
+        assert!(store_dir.join("session.json").exists());
+    }
+
+    #[test]
+    fn persistent_store_rejects_replayed_nonce_after_restart() {
+        let store_dir = temp_store_dir("persistent-replay");
+        {
+            let mut broker = persistent_test_broker(&store_dir);
+            let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+            assert_eq!(response.status, BrokerStatus::Accepted);
+        }
+
+        let mut restarted = persistent_test_broker(&store_dir);
+        let response = restarted.handle(BrokerRequestEnvelope::health("request-2", "nonce-1"));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "broker_replay_detected");
+    }
+
+    #[test]
+    fn persistent_store_verifies_audit_chain_after_restart() {
+        let store_dir = temp_store_dir("persistent-audit-chain");
+        {
+            let mut broker = persistent_test_broker(&store_dir);
+            let first = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+            let second = broker.handle(BrokerRequestEnvelope::command_envelope(
+                "request-2",
+                "session-1",
+                "nonce-2",
+            ));
+            assert_eq!(first.status, BrokerStatus::Accepted);
+            assert_eq!(second.status, BrokerStatus::Suspended);
+            assert_eq!(broker.audit_events().len(), 2);
+        }
+
+        let restarted = persistent_test_broker(&store_dir);
+        assert_eq!(restarted.audit_events().len(), 2);
+        assert_eq!(
+            restarted.audit_events()[1].previous_event_hash,
+            Some(restarted.audit_events()[0].event_hash.clone())
+        );
+    }
+
+    #[test]
+    fn persistent_store_rejects_tampered_audit_chain() {
+        let store_dir = temp_store_dir("persistent-audit-tamper");
+        {
+            let mut broker = persistent_test_broker(&store_dir);
+            let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+            assert_eq!(response.status, BrokerStatus::Accepted);
+        }
+        let audit_path = store_dir.join("audit.jsonl");
+        let tampered = fs::read_to_string(&audit_path)
+            .unwrap()
+            .replace("\"decision\":\"accepted\"", "\"decision\":\"rejected\"");
+        fs::write(&audit_path, tampered).unwrap();
+
+        let result = Broker::new_persistent("session-1", &store_dir);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn persistent_store_rejects_malformed_replay_state() {
+        let store_dir = temp_store_dir("persistent-replay-malformed");
+        {
+            let mut broker = persistent_test_broker(&store_dir);
+            let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+            assert_eq!(response.status, BrokerStatus::Accepted);
+        }
+        fs::write(store_dir.join("replay_nonces.jsonl"), "{not-json}\n").unwrap();
+
+        let result = Broker::new_persistent("session-1", &store_dir);
+        assert!(result.is_err());
     }
 
     #[test]
