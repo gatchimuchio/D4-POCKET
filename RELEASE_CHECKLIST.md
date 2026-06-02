@@ -12,8 +12,8 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 - item: language policy runtime convergence gate
   classification: release_blocker
-  reason: Rust Security Broker production IPC via authenticated loopback IPC, durable audit/replay/session store, Rust authority parity operations, and Flutter product broker client code exist. Product `main.dart` now uses `ShellCoreClient.product()` instead of `ShellCoreClient.local()`, and Windows Flutter analyze/test passed through `flutter.bat`. However command dispatch remains suspended, broker health still reports `authority_cutover_status=not_active`, WSL direct `flutter` still fails because the external Flutter SDK shell scripts have CRLF line endings, installed no-Python-runtime product evidence, no-FFI-authority release assertion, and Windows installed-path broker evidence are not complete.
-  required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only in installed product runtime, prove authority paths use restricted IPC rather than FFI, and rerun strict release validation after broker-mediated Windows installed-path evidence exists.
+  reason: Rust Security Broker production IPC via authenticated loopback IPC, durable audit/replay/session store, Rust authority parity operations, Flutter product broker client code, and release runtime static assertions exist. Product `main.dart` now uses `ShellCoreClient.product()` instead of `ShellCoreClient.local()`, `tooling/release_runtime_assertions.py --check` proves the current product authority surface uses broker IPC without Python process startup and satisfies the no-ffi-authority direct-bridge assertion, and Windows Flutter analyze/test passed through `flutter.bat`. However command dispatch remains suspended, broker health still reports `authority_cutover_status=not_active`, WSL direct `flutter` still fails because the external Flutter SDK shell scripts have CRLF line endings, installed no-Python-runtime product evidence, and Windows installed-path broker evidence are not complete.
+  required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only in installed product runtime, collect broker-mediated Windows installed-path evidence, and rerun strict release validation.
   blocks_release: yes
 
 - item: cargo test gate for in-scope Rust helper
@@ -96,8 +96,14 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
 
 - item: evidence bundle export
   classification: required_for_v1
-  reason: `tooling/evidence_bundle.py --check` validates a development evidence bundle that preserves Windows installed-path blockers and keeps `release_ready=false`.
+  reason: `tooling/evidence_bundle.py --check` validates a development evidence bundle that preserves Windows installed-path blockers, keeps `release_ready=false`, and embeds the release runtime assertions for broker-mediated Flutter authority, no Python authority process startup, and no FFI authority bridge.
   required_action: Keep evidence bundle export non-authoritative until Windows installed-path evidence and owner GO pass.
+  blocks_release: no
+
+- item: no-Python runtime / no-FFI authority assertion
+  classification: required_for_v1
+  reason: `tooling/release_runtime_assertions.py --check` is part of `tooling/validate_all.py` and verifies that product `main.dart` enters `ShellCoreClient.product()`, Flutter authority operations are broker-mediated, owner launch scripts start `broker-server` without Python snapshot generation, Flutter lib does not use Dart process-spawn APIs for authority, broker secrets are not projected to UI snapshots, and no Flutter/Rust FFI or direct bridge token appears in the authority surface scan.
+  required_action: Keep release runtime assertions passing and extend them whenever a new authority-sensitive product surface is added.
   blocks_release: no
 
 - item: duplicate authority key definitions

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from installer.setup_doctor import setup_doctor_report
+from tooling.release_runtime_assertions import build_report as build_release_runtime_assertions
 from tooling.release_smoke import run_release_smokes
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.windows_release_evidence import validate_windows_release_evidence
@@ -20,6 +21,7 @@ DEFAULT_BUNDLE_PATH = ROOT / "release_evidence" / "evidence_bundle.json"
 
 def build_evidence_bundle() -> dict:
     windows_evidence = validate_windows_release_evidence()
+    release_runtime_assertions = build_release_runtime_assertions()
     release_smoke = run_release_smokes()
     shell_snapshot = build_shell_snapshot()
     setup_doctor = setup_doctor_report()
@@ -39,12 +41,16 @@ def build_evidence_bundle() -> dict:
         "release_ready_reason": "Windows installed-path evidence is required before completed product release.",
         "classification": "development_evidence",
         "windows_release_evidence": [result.__dict__ for result in windows_evidence],
+        "release_runtime_assertions": release_runtime_assertions,
         "release_smoke": release_smoke,
         "setup_doctor": setup_doctor,
         "shell_snapshot": shell_snapshot,
         "blockers": blockers,
         "authority_boundary": {
             "flutter_owns_authority": False,
+            "flutter_authority_surface_broker_mediated": release_runtime_assertions["ok"],
+            "flutter_spawns_python_for_authority": False,
+            "flutter_rust_ffi_authority_bridge": False,
             "installer_grants_authority": setup_doctor["installer_grants_authority"],
             "installer_silently_approves_permissions": setup_doctor[
                 "installer_silently_approves_permissions"
@@ -60,6 +66,12 @@ def validate_evidence_bundle(bundle: dict) -> list[str]:
         errors.append("development evidence bundle must not claim release_ready")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
         errors.append("evidence bundle says Flutter owns authority")
+    if bundle.get("authority_boundary", {}).get("flutter_authority_surface_broker_mediated") is not True:
+        errors.append("evidence bundle missing broker-mediated Flutter authority assertion")
+    if bundle.get("authority_boundary", {}).get("flutter_spawns_python_for_authority") is not False:
+        errors.append("evidence bundle says Flutter spawns Python for authority")
+    if bundle.get("authority_boundary", {}).get("flutter_rust_ffi_authority_bridge") is not False:
+        errors.append("evidence bundle says Flutter uses FFI authority bridge")
     if bundle.get("authority_boundary", {}).get("installer_grants_authority") is not False:
         errors.append("evidence bundle says installer grants authority")
     if not bundle.get("shell_snapshot", {}).get("trust_records"):
@@ -70,6 +82,8 @@ def validate_evidence_bundle(bundle: dict) -> list[str]:
         errors.append("evidence bundle missing Setup Doctor checks")
     if not bundle.get("release_smoke", {}).get("ok"):
         errors.append("release smoke failed inside evidence bundle")
+    if not bundle.get("release_runtime_assertions", {}).get("ok"):
+        errors.append("release runtime assertions failed inside evidence bundle")
     return errors
 
 

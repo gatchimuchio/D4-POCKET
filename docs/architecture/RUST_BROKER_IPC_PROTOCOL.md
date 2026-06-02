@@ -194,8 +194,10 @@ Current validation path:
 ```bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
+python3 tooling/release_runtime_assertions.py --check
 cd native/rust_helper && cargo test
 ```
 
 This validation proves CONFIG / FIXTURE / INTERNAL_STATE scope. It does not prove Windows installed-path LIVE_RUNTIME broker ownership.
 Rust integration tests additionally exercise a local independent broker process on Linux. That is LIVE_RUNTIME for the local broker process, but not Windows installed-path product proof.
+`tooling/release_runtime_assertions.py --check` also proves CONFIG scope for product Flutter broker entry, no Python authority process startup, and no Flutter/Rust FFI/direct bridge tokens; its Rust broker restart/crash coverage is local test evidence only and still does not replace Windows installed-path proof.

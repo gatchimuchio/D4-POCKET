@@ -60,6 +60,12 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
         ValidationStep("release_smoke", ["python3", "tooling/release_smoke.py"], ROOT, "python3"),
         ValidationStep("evidence_bundle", ["python3", "tooling/evidence_bundle.py", "--check"], ROOT, "python3"),
         ValidationStep(
+            "release_runtime_assertions",
+            ["python3", "tooling/release_runtime_assertions.py", "--check"],
+            ROOT,
+            "python3",
+        ),
+        ValidationStep(
             "broker_authority_parity",
             ["python3", "tooling/broker_parity/run_authority_parity.py"],
             ROOT,

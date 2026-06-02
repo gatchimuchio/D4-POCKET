@@ -63,8 +63,14 @@ GUI-Shell GUI hardening imports proven operation patterns without moving authori
 - item: Evidence bundle export
   classification: required_for_v1
   status: implemented
-  evidence: `python3 tooling/evidence_bundle.py --check` verifies the bundle preserves Windows installed-path blockers and does not claim release readiness.
+  evidence: `python3 tooling/evidence_bundle.py --check` verifies the bundle preserves Windows installed-path blockers, embeds `tooling/release_runtime_assertions.py --check`, and does not claim release readiness.
   authority_boundary: evidence export is read-only and non-authoritative.
+
+- item: Release runtime assertions
+  classification: required_for_v1
+  status: implemented
+  evidence: `python3 tooling/release_runtime_assertions.py --check` verifies product Flutter entry uses broker IPC, product path does not start Python or invoke Python snapshot generation, no Flutter/Rust FFI or direct bridge token exists in the authority surface scan, broker secret tokens are not projected to UI snapshots, and fail-closed / restart persistence test coverage is present.
+  authority_boundary: assertion output is validation evidence only; Windows installed-path runtime proof remains required before completed product release.
 
 ## Remaining Release Blocker
 

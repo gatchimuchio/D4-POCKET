@@ -23,6 +23,7 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smo
 Then validate:
 
 ```powershell
+python tooling\release_runtime_assertions.py --check
 python tooling\windows_release_evidence.py
 python tooling\validate_all.py --strict-release --desktop-platform=windows
 ```
@@ -38,6 +39,7 @@ The evidence must prove:
 - installer/setup state silently approves no permissions
 - Setup Doctor runs from the installed app path
 - Setup Doctor checks are operator-readable, non-authoritative, non-synthetic, and include installed path, artifact hash, config, audit, runtime connection, authority boundary, network public bind, recovery instruction, and audit storage checks
+- the authority surface uses broker-mediated IPC without Python authority process startup or Flutter/Rust FFI/direct bridge tokens according to `tooling\release_runtime_assertions.py --check`
 
 The collector must not synthesize Setup Doctor evidence. Missing `-SetupDoctorJson`, missing visible-surface evidence, unmeasured config/audit probes, or manual confirmation evidence must remain release blockers.
 

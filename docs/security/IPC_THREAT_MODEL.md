@@ -32,7 +32,7 @@ Adapter / External Runtime
 | authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner and parity harness | release_blocker until installed proof |
 | Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope and Python oracle parity | release_blocker until installed proof |
 | stale session | session mismatch を rejected / audited にする | production broker-server generates session per process; Flutter product tests cover fail-closed stale session handling | release_blocker until installed proof |
-| broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | `ShellCoreClient.product()` returns `broker_unavailable` SUSPEND snapshot and does not read local JSON authority; Flutter product tests pass through Windows `flutter.bat` | release_blocker until installed proof |
+| broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | `ShellCoreClient.product()` returns `broker_unavailable` SUSPEND snapshot and does not read local JSON authority; Flutter product tests pass through Windows `flutter.bat`; `tooling/release_runtime_assertions.py --check` verifies fail-closed test coverage is present | release_blocker until installed proof |
 | broken pipe / crash during approval | approval finalization must not complete; RecoveryAction required | documented only | release_blocker |
 | audit append failure | broker must block finalization if audit append fails | documented only | release_blocker |
 | keychain unavailable | credential-gated operation must fail closed | documented only | release_blocker |
@@ -44,6 +44,7 @@ Adapter / External Runtime
 - LIVE_RUNTIME: Rust broker process integration and future Windows installed-path evidence.
 - EXTERNAL_EVIDENCE: future signed artifact / installed path evidence.
 - FIXTURE: examples and negative fixtures under `examples/contracts/`.
+- CONFIG / FIXTURE / LIVE_RUNTIME mixed assertion: `tooling/release_runtime_assertions.py --check` verifies current product entry, no Python authority process startup, no FFI/direct bridge token, broker fail-closed test coverage, and local broker restart/crash persistence test presence.
 
 CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof には昇格しない。
 
@@ -63,7 +64,7 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 
 - item: Flutter broker unavailable installed proof absent
   classification: release_blocker
-  reason: Flutter product code now fail-closes broker unavailable / auth / stale / malformed response paths and Windows Flutter analyze/test passed. Windows installed-path proof is still absent.
+  reason: Flutter product code now fail-closes broker unavailable / auth / stale / malformed response paths, release runtime assertions verify the fail-closed coverage tokens, and Windows Flutter analyze/test passed. Windows installed-path proof is still absent.
   required_action: run installed Windows broker unavailable / crash / stale-session UI fail-closed tests.
   blocks_release: yes
 

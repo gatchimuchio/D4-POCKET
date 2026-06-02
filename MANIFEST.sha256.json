@@ -80,11 +80,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "929a9fb9fae8587d0938308c3b2f9507c6c5913ce1819bcb81357a252bf0dd2e"
+      "sha256": "7113c3c57dfcc2cedd4471355c97d59718c58ccd38a6a3c96f5cc6e1188ec8bb"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "66b42e9a6bdbff962326adc2ed76472ed2e58232b5dad228513cc707bc6fa2c8"
+      "sha256": "4c4d541bf96e88d04bbc5ee644a39fe23987775b97ba06030e408dd97b6b5934"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -92,7 +92,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "f1fb127d4f2f696610652a92e853f0b4f250a375c5858de0e6b17fc8a32c1edf"
+      "sha256": "f1bb6d835c143ce6ccd1f4eb851515721d73e032d9b3c2e3320746108bf1a23b"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -200,7 +200,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "aa612983e468163bf7bb5bdf4764e83c8ef36c01e5a610b6a8b1e9e993a21220"
+      "sha256": "b3cee62325a47138263530bb4236a094f480f4256466647fb02cf1430c893b93"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -228,7 +228,7 @@
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
-      "sha256": "a1b4ead66c4b5e03f16c2571da00c93093dc0ab8185087a36645c8da1e264186"
+      "sha256": "f9882c12638c930e89ad373ee7f4b02391975b6f358a930c6cd67e6cec3f1d37"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -240,7 +240,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "f7f364c4d11a5a69e91ae4cd905cf6d0d8d278784d76884ed8354226b584fe69"
+      "sha256": "d098b7d495b278761070208b57068643efa6f7fd8a89077bc140b8047de72d84"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -248,19 +248,19 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "f7d4baa716e9d79fe27a907b77e6c4084825e4cd7ad48e1f8a4fb8a6897aa642"
+      "sha256": "92f95ab78680bfa2908a965fbb25831f3050f7114be3589d78a4f504ad3c363e"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
-      "sha256": "9abdc8fa749feacf6529ea4db04fead75f117f4261d878499e63ec868b9683d2"
+      "sha256": "1d28375f51343fcd83edd1ad4dad1473d846000dc6bb353d4e19be0640fd53d3"
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "e83335aed26a202bb0680b62b928b16a0e88f1364ed92c0a4bb7641c894460cf"
+      "sha256": "7d067d63063339743ffafb578788b23d3b10765e23efc15097dd1b07b4b21f60"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "9888fdcee8c8383521f1b685a9e79673e0f15db197e81a8c8566c0369362e0a3"
+      "sha256": "e3867d43a95064c97608aae1e68377ac10a5ef8032c980030cad7acfbe62991d"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -280,7 +280,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "c149e652d3a01b10c9c83558897bb78eb674ef25656c0cdcbc093dae909ecaff"
+      "sha256": "6000c52a20b826afc3dbd3de8138b8d0d72a74db422ea5a90f246ecba7e32ee2"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -800,7 +800,7 @@
     },
     {
       "path": "tooling/evidence_bundle.py",
-      "sha256": "ec6e26b95536cf252572cd406f42573c6cab5c3d81a0daedc991441f6679a7ee"
+      "sha256": "e822a5ecc4dd49051aed79a2c856b3ebd4a1df5bca294f53b721cacf632f6bec"
     },
     {
       "path": "tooling/manifest.py",
@@ -809,6 +809,10 @@
     {
       "path": "tooling/release_gate_check.py",
       "sha256": "3e5bcafd718a4980ed29c6c2074a2cc9bd8ce6d9aa64150bce3385805b1694f9"
+    },
+    {
+      "path": "tooling/release_runtime_assertions.py",
+      "sha256": "582b6f9b3950a9ada2fdd8db601b9bec118aedebd6dff8ca1d7f9ef3da9b7a88"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -824,7 +828,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "e974fd89daa4b314c5de2e4513383a46237ba9856d29af9a900b51e5c42c41b3"
+      "sha256": "4b680b3da331a941da33fb56518576dae1e183a3f8c1a4a557ed3d4987e1e76c"
     },
     {
       "path": "tooling/windows_release_evidence.py",

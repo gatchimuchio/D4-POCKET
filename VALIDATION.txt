@@ -1,3 +1,163 @@
+validation_update_2026_06_03_block_d:
+  scope: No-Python runtime / no-FFI authority release assertion and broker-mediated product path validation
+  commit: pre_commit_validation
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - python3 fallback passed: 25 schemas, 25 examples, 27 negative fixtures
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: conformance skeleton passed: 96 checks
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | FIXTURE | LIVE_RUNTIME
+      exit: 0
+      stdout: release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | INTERNAL_STATE
+      exit: 0
+      stdout: evidence bundle check passed: 2 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - schema_check passed
+        - conformance_skeleton passed
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: rust_helper_cargo_fmt_check
+      command: cd native/rust_helper && cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+    - name: rust_helper_cargo_test
+      command: cd native/rust_helper && cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: LIVE_RUNTIME
+      exit: 0
+      stdout_summary:
+        - 31 Rust helper and broker unit tests passed
+        - 3 broker IPC integration tests passed
+        - local broker process launch/connect/shutdown passed
+        - replay rejection after broker restart passed
+    - name: validate_all_full_current_host
+      command: python3 tooling/validate_all.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: CONFIG | INTERNAL_STATE
+      exit: 1
+      reason: WSL direct Flutter commands failed with external SDK CRLF line endings; Python/core/Rust/broker assertion subchecks passed.
+      required_action: Fix the external WSL Flutter SDK shell script line endings or run release validation through a supported native platform validation path.
+    - name: desktop_flutter_analyze_wsl_direct
+      command: cd apps/desktop_flutter && flutter analyze
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      exit: 127
+      reason: external Flutter SDK script `/mnt/c/Users/mzcum/dev/flutter/bin/internal/shared.sh` contains CRLF line endings in this WSL environment.
+      required_action: Fix the external WSL Flutter SDK line endings before using WSL direct Flutter as release evidence.
+    - name: desktop_flutter_test_wsl_direct
+      command: cd apps/desktop_flutter && flutter test
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      exit: 127
+      reason: external Flutter SDK script `/mnt/c/Users/mzcum/dev/flutter/bin/internal/shared.sh` contains CRLF line endings in this WSL environment.
+      required_action: Fix the external WSL Flutter SDK line endings before using WSL direct Flutter as release evidence.
+    - name: desktop_flutter_analyze_windows_temp_copy
+      command: cmd.exe /c "cd /d C:\Users\mzcum\AppData\Local\Temp\gui_shell_desktop_flutter_block_d && flutter analyze --no-pub"
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG
+      exit: 0
+      stdout: No issues found! (ran in 38.8s)
+      note: Validation temp copy was deleted after the run.
+    - name: desktop_flutter_test_windows_temp_copy
+      command: cmd.exe /c "cd /d C:\Users\mzcum\AppData\Local\Temp\gui_shell_desktop_flutter_block_d && flutter test --no-pub"
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: FIXTURE
+      exit: 0
+      stdout_summary:
+        - 23 Flutter tests passed
+        - broker-mediated product snapshot test passed
+        - broker-down / auth failure / stale session / malformed response fail-closed tests passed
+    - name: windows_release_evidence
+      command: python3 tooling/windows_release_evidence.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: EXTERNAL_EVIDENCE
+      exit: 1
+      reason: release_evidence/windows_installed_smoke.json missing.
+      required_action: Collect native Windows installed-path broker/Setup Doctor/no-Python-runtime smoke evidence and rerun.
+    - name: validate_all_strict_windows
+      command: python3 tooling/validate_all.py --strict-release --desktop-platform=windows
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: CONFIG | INTERNAL_STATE | EXTERNAL_EVIDENCE
+      exit: 1
+      reason: WSL direct Flutter commands failed, Windows installed-path evidence is missing, and owner GO is not recorded.
+      required_action: Fix host Flutter validation path, collect Windows installed-path evidence, and obtain owner GO before claiming completed product release.
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: no-Python runtime / no-FFI authority static assertion
+      classification: required_for_v1
+      reason: `tooling/release_runtime_assertions.py --check` is wired into validate_all and evidence_bundle, and passed for the current product Flutter broker path.
+      required_action: Keep the assertion passing and extend it for new authority-sensitive product surfaces.
+      blocks_release: no
+    - item: installed no-Python-runtime product proof
+      classification: release_blocker
+      reason: Python-not-installed Windows installed-path authority runtime smoke evidence has not been recorded.
+      required_action: Run Windows installed-path authority smoke in a Python-free runtime environment and record machine-readable evidence.
+      blocks_release: yes
+    - item: Windows installed-path broker evidence
+      classification: release_blocker
+      reason: `release_evidence/windows_installed_smoke.json` is missing, so broker launch/connect/restart/crash fail-closed product evidence is absent.
+      required_action: Collect native Windows installed-path evidence and pass `python3 tooling/windows_release_evidence.py`.
+      blocks_release: yes
+    - item: owner GO
+      classification: release_blocker
+      reason: Explicit owner GO has not been recorded.
+      required_action: Obtain owner GO only after strict Windows release validation passes.
+      blocks_release: yes
+
 validation_update_2026_06_03:
   scope: Rust Security Broker audit/replay/session store readiness health contract
   commit: pre_commit_validation
