@@ -64,23 +64,49 @@ Adapter metadata can describe. It cannot grant permissions.
 
 Memory, cache, and previous state can inform UX. They cannot grant authority by themselves.
 
-## 4. Backup workflow
+## 4. Repository-state completion workflow
 
-GUI Shell uses a two-generation direct-main backup flow. The backup refs are local recovery refs by default, not collaboration branches.
+GUI Shell uses a two-generation direct-main backup flow. A repository-state-modifying task is not complete until implementation, validation, commit, push, remote HEAD verification, and two-generation backup verification are all closed.
 
-Before committing a completed work block on `main`:
+Before changing files for a completed work block on `main`, verify the current pushed state:
+
+```bash
+git fetch --prune origin
+git status --short --branch
+```
+
+If `main` is not clean and aligned with `origin/main`, reconcile or report the blocker before editing.
+
+Then rotate local recovery branches to preserve the current pushed pre-change state:
 
 ```bash
 # If codex/backup-main already exists:
 git branch -f codex/backup-main-prev codex/backup-main
 
-# Always update the latest backup to the current pre-commit main:
+# Always update the latest backup to the current pushed main:
 git branch -f codex/backup-main main
 ```
 
-Then validate, commit directly on `main`, and push `main` when credentials allow.
+Push backup generations as remote tags, not remote branches:
 
-Do not push `codex/backup-main` or `codex/backup-main-prev` during ordinary completed-work flow. GitHub treats pushed backup branches as normal branches and may present them as pull request candidates, which can create duplicate merge history when the backup branch is merged into `main`.
+```bash
+git push -f origin \
+  codex/backup-main-prev:refs/tags/codex/backup-main-prev \
+  codex/backup-main:refs/tags/codex/backup-main
+```
+
+GitHub treats pushed backup branches as normal branches and may present them as pull request candidates. Remote tags provide off-machine recovery without creating pull request candidates.
+
+Then implement, validate, commit directly on `main`, and push `main` when credentials allow.
+
+After push, verify remote state:
+
+```bash
+git rev-parse HEAD
+git ls-remote origin refs/heads/main
+git ls-remote --tags origin codex/backup-main codex/backup-main-prev
+git status --short --branch
+```
 
 If remote backup branches already exist and the owner has not explicitly requested remote backup retention, delete them after `main` is clean and aligned:
 
@@ -88,13 +114,15 @@ If remote backup branches already exist and the owner has not explicitly request
 git push origin --delete codex/backup-main codex/backup-main-prev
 ```
 
-Push backup branches only when the owner explicitly requests off-machine backup retention or emergency recovery handoff. When this exception is used, report that GitHub may show those branches as pull request candidates, and do not open or merge pull requests from backup branches.
+Push backup branches as remote branches only when the owner explicitly requests that exact emergency handoff. When this exception is used, report that GitHub may show those branches as pull request candidates, and do not open or merge pull requests from backup branches.
 
-The repository keeps exactly two backup branches:
+The repository keeps exactly two local backup branches and two remote backup tags:
 
 ```text
 codex/backup-main
 codex/backup-main-prev
+refs/tags/codex/backup-main
+refs/tags/codex/backup-main-prev
 ```
 
 Do not create per-phase backup branches or extra backup generations.
@@ -132,8 +160,14 @@ Every completed change report must include:
 2. Changed files
 3. Risk classification
 4. Validation results
-5. Remaining risks
-6. Commit hash, or `not committed`
+5. Release-gate classification
+6. Remaining risks
+7. Working branch
+8. Commit hash, or `not committed`
+9. Push result, or `not pushed`
+10. Remote HEAD verification
+11. Backup generation refs and hashes
+12. Rollback point
 
 ## 7. Release claim rule
 

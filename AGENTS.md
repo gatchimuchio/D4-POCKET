@@ -71,6 +71,31 @@ Documentation, schema presence, mock success, fixture success, or unit-test succ
 
 For security-critical, authority-critical, audit-critical, recovery-critical, or release-critical changes, state what evidence demonstrates that the real governed path is exercised.
 
+For any implementation task that modifies repository state, completion also requires repository-state closure unless the owner explicitly limits the task to local-only, audit-only, review-only, or no-commit/no-push work.
+
+A repository-state-modifying task is not complete until:
+
+- the current pushed repository state is preserved before file edits using the repository two-generation backup convention;
+- intended changes are implemented and no task debris remains;
+- required validation has run and exact results are known;
+- all intended changes are committed with an accurate message;
+- the commit is pushed to the designated remote branch;
+- the pushed remote HEAD is verified to match the reported commit;
+- two recoverable backup generations are verified according to the repository backup convention;
+- working tree and branch alignment are verified after push.
+
+The completion report for repository-state-modifying work must include:
+
+- working branch;
+- commit hash;
+- push result;
+- remote HEAD verification;
+- backup generation refs and hashes;
+- rollback point;
+- validation results.
+
+If commit, push, remote verification, or backup confirmation cannot be completed, do not report the task as complete. Report the exact failed command, reason, current repository state, and the safest recovery point.
+
 ### 5. Evidence Source / No Ghost Invariants Rule
 
 Do not report runtime health, system integrity, security invariants, authority integrity, or release readiness based only on:
@@ -445,15 +470,22 @@ Default workflow:
 
 1. Work on `main`
 2. Do not create feature branches or pull requests unless the owner explicitly asks
-3. Before committing a completed work block on `main`, rotate the local two-generation backup pair:
+3. Before changing files for a repository-state-modifying task, fetch/prune `origin` and verify that `main` is clean and aligned with `origin/main`; if it is not aligned, reconcile or report the blocker before editing
+4. Rotate the local two-generation backup pair to preserve the current pushed pre-change state:
    - If `codex/backup-main` exists, force-update `codex/backup-main-prev` to `codex/backup-main`
-   - Force-update `codex/backup-main` to current pre-commit `main`
-4. Do not push backup branches during ordinary completed-work flow
-5. Commit the completed work block directly on `main`
-6. Push `main` immediately after the commit
-7. If remote `codex/backup-main` or `codex/backup-main-prev` branches exist without an explicit owner request to retain them, delete those remote backup branches after `main` is clean and aligned
-8. Verify `git status --short --branch` is clean and aligned with `origin/main`
-9. If backup, commit, push, or remote-backup cleanup fails, report the exact failed command and reason
+   - Force-update `codex/backup-main` to current pushed `main`
+5. Push the two backup generations as PR-neutral remote tags, not remote branches:
+   - `git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`
+6. Perform bounded implementation work and required validation
+7. Commit the completed work block directly on `main`
+8. Push `main` immediately after the commit
+9. Verify that `git ls-remote origin refs/heads/main` matches the local `HEAD`
+10. Verify that remote backup tags exist and record their hashes:
+    - `refs/tags/codex/backup-main`
+    - `refs/tags/codex/backup-main-prev`
+11. If remote `codex/backup-main` or `codex/backup-main-prev` branches exist, delete those remote backup branches after `main` is clean and aligned; backup branches on GitHub create pull-request candidates and must not be retained
+12. Verify `git status --short --branch` is clean and aligned with `origin/main`
+13. If backup, commit, push, remote HEAD verification, or remote-backup verification fails, report the exact failed command and reason
 
 Backup branches:
 
@@ -462,9 +494,16 @@ codex/backup-main
 codex/backup-main-prev
 ```
 
-Backup branches are local recovery refs by default, not collaboration branches. Do not open, request, or merge pull requests from backup branches.
+Remote backup refs:
 
-Push backup branches only when the owner explicitly requests off-machine backup retention or emergency recovery handoff. If backup branches are pushed to GitHub for that exception, report that GitHub may show them as pull request candidates and clean them up once the owner no longer needs them.
+```text
+refs/tags/codex/backup-main
+refs/tags/codex/backup-main-prev
+```
+
+Backup branches are local recovery refs only. Remote backup generations must be pushed as tags so GitHub does not present them as pull request candidates. Do not open, request, or merge pull requests from backup refs.
+
+Push backup branches as remote branches only when the owner explicitly requests that exact emergency handoff. If backup branches are pushed to GitHub for that exception, report that GitHub may show them as pull request candidates and clean them up once the owner no longer needs them.
 
 Do not create additional backup generations.
 
@@ -488,7 +527,12 @@ Every completed change report must include:
 4. Validation results
 5. Release-gate classification
 6. Remaining risks, classified
-7. Commit hash, or `not committed`
+7. Working branch
+8. Commit hash, or `not committed`
+9. Push result, or `not pushed`
+10. Remote HEAD verification
+11. Backup generation refs and hashes
+12. Rollback point
 
 Validation results must explicitly say which commands passed, failed, or were not run.
 
