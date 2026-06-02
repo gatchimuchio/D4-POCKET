@@ -17,6 +17,7 @@
       "enum": [
         "broker_request_malformed",
         "broker_payload_hash_invalid",
+        "broker_issued_at_invalid",
         "broker_stale_session",
         "broker_replay_detected",
         "broker_authority_metadata_rejected",

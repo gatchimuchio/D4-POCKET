@@ -1276,6 +1276,7 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "serde_json::from_str",
         "broker_request_malformed",
         "broker_payload_hash_invalid",
+        "broker_issued_at_invalid",
         "broker_stale_session",
         "broker_replay_detected",
         "broker_authority_metadata_rejected",
@@ -1288,6 +1289,8 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "authority_cutover_status",
         "in_memory_skeleton",
         "in_memory_session_only",
+        "REQUEST_FRESHNESS_WINDOW_SECONDS",
+        "parse_issued_at_epoch_seconds",
     ]
     for token in required_protocol_tokens:
         if token not in protocol_rs:

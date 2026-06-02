@@ -79,11 +79,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "c9c45b0dbb2b40edc7c24dba081817b1cfa8493e8b08ddcd767eff96d75e938a"
+      "sha256": "5fe6d51718a13b1f32d528427e73d8eb2ab0d9a8d36fff631c121b3cfdf5e6a2"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8fc674c904a62f7cc80679817a4722d3e155e7bf0df94617e6f8fbec4cb3e54f"
+      "sha256": "7429cf1a5d6c950dcde4cadc7e3f4faa226231d290487c05217ede9eb97ce94a"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -243,7 +243,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "83578601aac46d0ffc64ae43a4920f2b215081c1cb4d8e7a65cb1bc11742c934"
+      "sha256": "be07f436ed4352bf1dbc79812ede62650dc6c979688e390f41d4112346e010ec"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -255,7 +255,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "896998f8e908a9afdd44950e924a51b894c57091d9b3eda8d1fe5d498cf60aab"
+      "sha256": "717d044dff93a5b9faf2173c4c7f586c4dff062bcd02e9b3998c4df045eb7f1d"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -275,7 +275,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "9b903fc7ba7164cf8c743513e8ef0c1ec6c620cdb3e9f2244b16809fa01ac2f4"
+      "sha256": "6c67ff03a2fff7a212ee17de98dfd6e9bc10dfab22b2c83ca5dbc74780d28c1c"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -547,7 +547,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "6d0d92661490dfb777833db0b9b7698869af9c997953e225b687d4b87a055cf5"
+      "sha256": "e864ef7ee2a27109a16254c34559b927b4bc7557b4ab87733a59e51f31610187"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -567,7 +567,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "6e111aaf7328ea72e4bbe5d09a8464cccb96416a6448d9c709610a1c504e85f3"
+      "sha256": "af1a97913162ab187d381c14f6be99ee611e2fd5da54d008b5a9762b277b8c0a"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -711,7 +711,7 @@
     },
     {
       "path": "specs/broker_error.schema.json",
-      "sha256": "8d25c65d26b42bdce635f456361926d809f64973f4e8b4d76dc3792486f3c7b2"
+      "sha256": "e64d2d2c8b97fcd4fe00476f6c407b809883d650b111a07fb2972a2da791ea91"
     },
     {
       "path": "specs/broker_health.schema.json",
@@ -771,7 +771,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "fc5b5a8c585749fd893be9074ba5d42027d1282f05801e4ed6bda0bb9287e291"
+      "sha256": "3b5d47d63d8803e0956a45924fee0ff41af1ed12781963ecb680a63b6bfd1215"
     },
     {
       "path": "tooling/evidence_bundle.py",

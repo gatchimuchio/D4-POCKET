@@ -27,6 +27,7 @@ Adapter / External Runtime
 | replayed approval request | nonce replay を拒否し、broker-local audit に記録する | implemented in Rust skeleton | release_blocker until integration proof |
 | forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner | release_blocker until parity migration |
 | malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust skeleton | none for skeleton; release_blocker for product cutover |
+| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window implemented in Rust unit scope | release_blocker until IPC integration proof |
 | authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner | release_blocker until active-path parity proof |
 | Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope | release_blocker until parity harness and cutover proof |
 | stale session | session mismatch を rejected / audited にする | implemented in Rust skeleton | release_blocker until real session lifecycle |
@@ -48,6 +49,7 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 ## 4. Fail-Closed Requirements
 
 - malformed request: reject and audit;
+- malformed or stale `issued_at`: reject and audit;
 - stale session: reject and audit;
 - replayed nonce: reject and audit;
 - authority metadata: reject and audit;

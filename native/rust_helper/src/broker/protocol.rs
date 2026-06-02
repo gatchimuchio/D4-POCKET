@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,6 +10,7 @@ use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
+const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -72,6 +74,10 @@ impl BrokerRequestEnvelope {
     }
 
     pub fn health(request_id: &str, nonce: &str) -> Self {
+        Self::health_at(request_id, nonce, "2026-06-01T00:00:00Z")
+    }
+
+    pub fn health_at(request_id: &str, nonce: &str, issued_at: &str) -> Self {
         Self {
             request_id: Some(request_id.to_string()),
             session_id: None,
@@ -81,13 +87,17 @@ impl BrokerRequestEnvelope {
                     .to_string(),
             ),
             nonce: Some(nonce.to_string()),
-            issued_at: Some("2026-06-01T00:00:00Z".to_string()),
+            issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
         }
     }
 
     pub fn shutdown(request_id: &str, session_id: &str, nonce: &str) -> Self {
+        Self::shutdown_at(request_id, session_id, nonce, "2026-06-01T00:00:00Z")
+    }
+
+    pub fn shutdown_at(request_id: &str, session_id: &str, nonce: &str, issued_at: &str) -> Self {
         Self {
             request_id: Some(request_id.to_string()),
             session_id: Some(session_id.to_string()),
@@ -97,13 +107,22 @@ impl BrokerRequestEnvelope {
                     .to_string(),
             ),
             nonce: Some(nonce.to_string()),
-            issued_at: Some("2026-06-01T00:00:00Z".to_string()),
+            issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
         }
     }
 
     pub fn command_envelope(request_id: &str, session_id: &str, nonce: &str) -> Self {
+        Self::command_envelope_at(request_id, session_id, nonce, "2026-06-01T00:00:00Z")
+    }
+
+    pub fn command_envelope_at(
+        request_id: &str,
+        session_id: &str,
+        nonce: &str,
+        issued_at: &str,
+    ) -> Self {
         Self {
             request_id: Some(request_id.to_string()),
             session_id: Some(session_id.to_string()),
@@ -113,10 +132,14 @@ impl BrokerRequestEnvelope {
                     .to_string(),
             ),
             nonce: Some(nonce.to_string()),
-            issued_at: Some("2026-06-01T00:00:00Z".to_string()),
+            issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
         }
+    }
+
+    pub fn current_issued_at() -> String {
+        epoch_seconds_to_rfc3339(current_epoch_seconds())
     }
 }
 
@@ -196,6 +219,7 @@ pub struct Broker {
     seen_nonces: HashSet<String>,
     audit_log: BrokerAuditLog,
     shutdown_requested: bool,
+    current_epoch_seconds_override: Option<i64>,
 }
 
 impl Broker {
@@ -205,7 +229,14 @@ impl Broker {
             seen_nonces: HashSet::new(),
             audit_log: BrokerAuditLog::default(),
             shutdown_requested: false,
+            current_epoch_seconds_override: None,
         }
+    }
+
+    pub fn new_with_current_epoch_seconds(session_id: &str, current_epoch_seconds: i64) -> Self {
+        let mut broker = Self::new(session_id);
+        broker.current_epoch_seconds_override = Some(current_epoch_seconds);
+        broker
     }
 
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
@@ -240,6 +271,19 @@ impl Broker {
                 &operation,
                 "broker_payload_hash_invalid",
                 "payload_hash must be tagged sha256",
+                true,
+            );
+        }
+
+        if !issued_at_is_fresh(
+            envelope.issued_at.as_deref().unwrap_or(""),
+            self.current_epoch_seconds(),
+        ) {
+            return self.reject(
+                &request_id,
+                &operation,
+                "broker_issued_at_invalid",
+                "issued_at must be RFC3339 and within the broker freshness window",
                 true,
             );
         }
@@ -306,6 +350,11 @@ impl Broker {
 
     pub fn shutdown_requested(&self) -> bool {
         self.shutdown_requested
+    }
+
+    fn current_epoch_seconds(&self) -> i64 {
+        self.current_epoch_seconds_override
+            .unwrap_or_else(current_epoch_seconds)
     }
 
     fn accept_health(&mut self, request_id: &str) -> BrokerResponse {
@@ -431,6 +480,133 @@ fn is_tagged_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
+fn issued_at_is_fresh(value: &str, current_epoch_seconds: i64) -> bool {
+    let Some(issued_epoch_seconds) = parse_issued_at_epoch_seconds(value) else {
+        return false;
+    };
+    issued_epoch_seconds.abs_diff(current_epoch_seconds) <= REQUEST_FRESHNESS_WINDOW_SECONDS
+}
+
+fn parse_issued_at_epoch_seconds(value: &str) -> Option<i64> {
+    let date_time = value.as_bytes();
+    if date_time.len() != 20 && date_time.len() != 25 {
+        return None;
+    }
+    if date_time.get(4) != Some(&b'-')
+        || date_time.get(7) != Some(&b'-')
+        || !matches!(date_time.get(10), Some(b'T') | Some(b't'))
+        || date_time.get(13) != Some(&b':')
+        || date_time.get(16) != Some(&b':')
+    {
+        return None;
+    }
+
+    let year = parse_digits(value, 0, 4)? as i32;
+    let month = parse_digits(value, 5, 7)? as u32;
+    let day = parse_digits(value, 8, 10)? as u32;
+    let hour = parse_digits(value, 11, 13)? as u32;
+    let minute = parse_digits(value, 14, 16)? as u32;
+    let second = parse_digits(value, 17, 19)? as u32;
+    if !(1..=12).contains(&month)
+        || day == 0
+        || day > days_in_month(year, month)
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+
+    let offset_seconds = if date_time.len() == 20 {
+        if !matches!(date_time.get(19), Some(b'Z') | Some(b'z')) {
+            return None;
+        }
+        0
+    } else {
+        let sign = match date_time.get(19) {
+            Some(b'+') => 1,
+            Some(b'-') => -1,
+            _ => return None,
+        };
+        if date_time.get(22) != Some(&b':') {
+            return None;
+        }
+        let offset_hour = parse_digits(value, 20, 22)? as i64;
+        let offset_minute = parse_digits(value, 23, 25)? as i64;
+        if offset_hour > 23 || offset_minute > 59 {
+            return None;
+        }
+        sign * ((offset_hour * 3600) + (offset_minute * 60))
+    };
+
+    let local_epoch = days_from_civil(year, month, day)
+        .checked_mul(86_400)?
+        .checked_add((hour as i64) * 3600)?
+        .checked_add((minute as i64) * 60)?
+        .checked_add(second as i64)?;
+    local_epoch.checked_sub(offset_seconds)
+}
+
+fn current_epoch_seconds() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+fn epoch_seconds_to_rfc3339(epoch_seconds: i64) -> String {
+    let days = epoch_seconds.div_euclid(86_400);
+    let seconds_of_day = epoch_seconds.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    let hour = seconds_of_day / 3600;
+    let minute = (seconds_of_day % 3600) / 60;
+    let second = seconds_of_day % 60;
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+fn parse_digits(value: &str, start: usize, end: usize) -> Option<u32> {
+    value.get(start..end)?.parse().ok()
+}
+
+fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 0,
+    }
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let year = year - i32::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - (era * 400);
+    let month_prime = month as i32 + if month > 2 { -3 } else { 9 };
+    let day_of_year = ((153 * month_prime + 2) / 5) + day as i32 - 1;
+    let day_of_era = (year_of_era * 365) + (year_of_era / 4) - (year_of_era / 100) + day_of_year;
+    (era as i64 * 146_097) + day_of_era as i64 - 719_468
+}
+
+fn civil_from_days(days: i64) -> (i32, u32, u32) {
+    let days = days + 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 } / 146_097;
+    let day_of_era = days - (era * 146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era as i32 + era as i32 * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    let year = year + i32::from(month <= 2);
+    (year, month as u32, day as u32)
+}
+
 fn metadata_attempts_authority(metadata: &[BrokerMetadata]) -> bool {
     metadata.iter().any(|item| {
         let key = normalize_key(&item.key);
@@ -521,9 +697,16 @@ fn normalize_key(value: &str) -> String {
 mod tests {
     use super::*;
 
+    fn test_broker() -> Broker {
+        Broker::new_with_current_epoch_seconds(
+            "session-1",
+            parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
+        )
+    }
+
     #[test]
     fn broker_health_is_accepted_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
         assert_eq!(response.status, BrokerStatus::Accepted);
         let health = response.health.unwrap();
@@ -537,7 +720,7 @@ mod tests {
 
     #[test]
     fn json_health_request_is_accepted_and_serialized() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle_json(
             r#"{
                 "request_id": "json-request-1",
@@ -558,7 +741,7 @@ mod tests {
 
     #[test]
     fn invalid_json_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle_json("{not-json");
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(
@@ -570,7 +753,7 @@ mod tests {
 
     #[test]
     fn json_missing_metadata_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle_json(
             r#"{
                 "request_id": "json-request-1",
@@ -589,7 +772,7 @@ mod tests {
 
     #[test]
     fn json_authority_metadata_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle_json(
             r#"{
                 "request_id": "json-request-1",
@@ -609,7 +792,7 @@ mod tests {
 
     #[test]
     fn malformed_request_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope {
             request_id: None,
             session_id: None,
@@ -632,8 +815,55 @@ mod tests {
     }
 
     #[test]
+    fn stale_issued_at_is_rejected_and_audited() {
+        let mut broker = test_broker();
+        let mut request = BrokerRequestEnvelope::health("request-1", "nonce-1");
+        request.issued_at = Some("2026-06-01T00:10:00Z".to_string());
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "broker_issued_at_invalid");
+        assert_eq!(broker.audit_events().len(), 1);
+        assert_eq!(broker.audit_events()[0].reason, "broker_issued_at_invalid");
+    }
+
+    #[test]
+    fn malformed_issued_at_is_rejected_and_audited() {
+        let mut broker = test_broker();
+        let mut request = BrokerRequestEnvelope::health("request-1", "nonce-1");
+        request.issued_at = Some("not-a-timestamp".to_string());
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "broker_issued_at_invalid");
+        assert_eq!(broker.audit_events().len(), 1);
+    }
+
+    #[test]
+    fn issued_at_parser_handles_utc_offsets() {
+        assert_eq!(
+            parse_issued_at_epoch_seconds("2026-06-01T09:00:30+09:00"),
+            parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z")
+        );
+        assert_eq!(
+            parse_issued_at_epoch_seconds("2026-05-31T19:00:30-05:00"),
+            parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z")
+        );
+        assert!(parse_issued_at_epoch_seconds("2026-02-29T00:00:00Z").is_none());
+        assert!(parse_issued_at_epoch_seconds("2024-02-29T00:00:00Z").is_some());
+    }
+
+    #[test]
+    fn current_issued_at_formatter_uses_utc_rfc3339_seconds() {
+        assert_eq!(
+            epoch_seconds_to_rfc3339(
+                parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap()
+            ),
+            "2026-06-01T00:00:30Z"
+        );
+    }
+
+    #[test]
     fn replayed_nonce_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let first = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
         let second = broker.handle(BrokerRequestEnvelope::health("request-2", "nonce-1"));
         assert_eq!(first.status, BrokerStatus::Accepted);
@@ -644,7 +874,7 @@ mod tests {
 
     #[test]
     fn stale_session_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope::shutdown(
             "request-1",
             "stale-session",
@@ -657,7 +887,7 @@ mod tests {
 
     #[test]
     fn authority_metadata_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let mut request = BrokerRequestEnvelope::health("request-1", "nonce-1");
         request.metadata.push(BrokerMetadata {
             key: "trust\u{200b}Level".to_string(),
@@ -673,7 +903,7 @@ mod tests {
 
     #[test]
     fn unicode_nfkc_authority_metadata_is_rejected_and_audited() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle_json(
             r#"{
                 "request_id": "json-request-1",
@@ -693,7 +923,7 @@ mod tests {
 
     #[test]
     fn authority_alias_and_separator_variants_are_rejected() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         for (index, key) in [
             "Trust-Level",
             "TRUST LEVEL",
@@ -721,7 +951,7 @@ mod tests {
 
     #[test]
     fn value_only_and_nested_authority_metadata_are_rejected() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let value_only = broker.handle_json(
             r#"{
                 "request_id": "json-request-1",
@@ -757,7 +987,7 @@ mod tests {
 
     #[test]
     fn command_envelope_is_suspended_without_dispatch() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope::command_envelope(
             "request-1",
             "session-1",
@@ -773,7 +1003,7 @@ mod tests {
 
     #[test]
     fn shutdown_sets_lifecycle_flag() {
-        let mut broker = Broker::new("session-1");
+        let mut broker = test_broker();
         let response = broker.handle(BrokerRequestEnvelope::shutdown(
             "request-1",
             "session-1",

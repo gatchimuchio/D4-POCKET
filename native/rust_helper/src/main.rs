@@ -13,15 +13,21 @@ fn main() {
         let command = line.trim();
         let request_id = format!("stdin-request-{}", index + 1);
         let nonce = format!("stdin-nonce-{}", index + 1);
+        let issued_at = BrokerRequestEnvelope::current_issued_at();
         let response = if command.starts_with('{') {
             broker.handle_json(command)
         } else {
             match command {
-                "health" => broker.handle(BrokerRequestEnvelope::health(&request_id, &nonce)),
-                "shutdown" => broker.handle(BrokerRequestEnvelope::shutdown(
+                "health" => broker.handle(BrokerRequestEnvelope::health_at(
+                    &request_id,
+                    &nonce,
+                    &issued_at,
+                )),
+                "shutdown" => broker.handle(BrokerRequestEnvelope::shutdown_at(
                     &request_id,
                     "local-dev-session",
                     &nonce,
+                    &issued_at,
                 )),
                 _ => broker.handle(BrokerRequestEnvelope {
                     request_id: Some("stdin-malformed".to_string()),

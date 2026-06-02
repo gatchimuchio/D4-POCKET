@@ -81,6 +81,7 @@ Allowed error codes:
 
 - `broker_request_malformed`
 - `broker_payload_hash_invalid`
+- `broker_issued_at_invalid`
 - `broker_stale_session`
 - `broker_replay_detected`
 - `broker_authority_metadata_rejected`
@@ -98,6 +99,7 @@ The current Rust code provides:
 - JSON request parsing with unknown-field rejection;
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
+- `issued_at` RFC3339 parsing and freshness rejection within a 300-second broker window;
 - health response;
 - shutdown response for test lifecycle;
 - stale session rejection;
@@ -112,7 +114,6 @@ It does not yet provide:
 - approval finalization;
 - audit store persistence;
 - replay/session persistence across broker restart;
-- `issued_at` freshness enforcement;
 - credential/keychain access;
 - process or update gated execution.
 
@@ -141,14 +142,14 @@ Current skeleton behavior:
 
 - `session_id` is an in-process string checked for non-health operations.
 - `nonce` replay state is an in-memory `HashSet`.
-- `issued_at` is required but is not yet parsed for clock freshness.
+- `issued_at` is parsed as RFC3339 and rejected when outside a 300-second broker freshness window.
 - audit events are chained in memory only.
 
 Production cutover requirements:
 
 - authenticate installed broker sessions through the selected restricted IPC transport;
 - persist or otherwise cryptographically bind replay protection across broker restart, crash recovery, and session reconnect;
-- reject stale `issued_at` values within a documented clock-skew window;
+- keep the `issued_at` freshness window documented and covered by integration tests;
 - emit durable audit events before any approval, recovery, credential, update, process, or runtime command finalization;
 - fail closed with SUSPEND / rejected state when freshness, replay, session, or audit persistence cannot be verified.
 
