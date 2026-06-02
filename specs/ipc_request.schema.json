@@ -28,7 +28,12 @@
       "enum": [
         "health",
         "shutdown",
-        "command_envelope"
+        "command_envelope",
+        "authority_evaluate",
+        "approval_edit",
+        "content_projection",
+        "audit_verify",
+        "normalize_payload"
       ]
     },
     "payload_hash": {
@@ -45,6 +50,10 @@
     },
     "metadata": {
       "type": "object",
+      "additionalProperties": true
+    },
+    "payload": {
+      "description": "Schema-shaped operation payload. Broker validates operation-specific semantics and must not trust this as authority.",
       "additionalProperties": true
     }
   }

@@ -120,20 +120,22 @@ Rust security constraints:
 - `cargo audit`、`cargo deny`、`cargo geiger` または同等の unsafe/dependency visibility の導入可否を確認する。
 - skeleton では filesystem/process/network/credential access を拡張しない。
 
-### Current Skeleton Evidence
+### Current Broker Evidence
 
 2026-06-03 時点で、既存 `native/rust_helper` crate 内の Rust Security Broker は production broker process の最初の実装を持つ。
 
 - `native/rust_helper/src/main.rs`: `broker-server` subcommand で independent broker process を起動する。引数なしは development stdin smoke として残す。
 - `native/rust_helper/src/broker/ipc_server.rs`: `127.0.0.1` bound authenticated loopback IPC、per-process cryptographic session secret、request size limit、malformed/auth failure fail-closed response。
 - `native/rust_helper/src/broker/store.rs`: durable file store for audit hash-chain, replay nonces, and session state。restart 後 replay rejection、audit chain restart verification、malformed / tampered persisted state rejection を Rust tests で検証する。
-- `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、`issued_at` RFC3339 freshness rejection、audit/replay/session store readiness reporting、persistent-state-required unavailable fail-closed gate、stale session rejection、nonce replay rejection、NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata rejection、JSON response serialization、command-envelope suspension。
+- `native/rust_helper/src/broker/authority.rs`: Python Shell Core oracle と同じ authority key normalization / strip / quarantine、capability / permission / approval eligibility、protected-field edit rejection、approval payload rehash / requires_validation transition、content visibility projection、audit hash-chain verification / tamper rejection、recovery mapping verification、command-envelope eligibility body を実装する。
+- `native/rust_helper/src/broker/protocol.rs`: JSON request parsing、typed envelope validation、payload hash validation、`issued_at` RFC3339 freshness rejection、audit/replay/session store readiness reporting、persistent-state-required unavailable fail-closed gate、stale session rejection、nonce replay rejection、NFKC / case / zero-width / camelCase / separator / alias / value-only authority metadata rejection、JSON response serialization、authority operations、command-envelope eligibility with dispatch suspension。
 - `native/rust_helper/src/broker/audit.rs`: accepted / rejected / suspended request の append-only audit hash chain。
+- `tooling/broker_parity/run_authority_parity.py`: Python oracle fixtures と Rust broker IPC result を比較し、accepted parity、rejected parity、Rust-specific broker IPC path を検証する。
 - `specs/ipc_request.schema.json`、`specs/ipc_response.schema.json`、`specs/broker_error.schema.json`、`specs/broker_session.schema.json`、`specs/broker_health.schema.json`、`specs/broker_command_envelope.schema.json`: initial broker contract skeleton。
 
 Broker health は development stdin mode では `audit_persistence=in_memory_skeleton`、`replay_persistence=in_memory_session_only`、`session_persistence=in_memory_session_only` を返す。production `broker-server` mode で durable store に接続できた場合だけ `audit_persistence=durable_file_store`、`replay_persistence=durable_file_store`、`session_persistence=durable_file_store`、`persistence_ready=true` を返す。どちらの場合も `boundary_role=rust_security_broker_candidate`、`authority_cutover_status=not_active` のままであり、`authority_owner=rust_security_broker` のような active authority owner claim は production cutover 後にだけ許可する。
 
-現時点では Flutter client integration、approval/audit/recovery cutover、Python active runtime retirement evidence、process/credential/update gated execution、Windows installed-path evidence は未実装である。Rust integration tests は local broker process の `LIVE_RUNTIME` 証拠だが、Windows installed-path product proof ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
+現時点では Flutter client integration、Python active runtime retirement evidence、process/credential/update gated execution、Windows installed-path evidence は未実装である。Rust integration tests と broker parity harness は local broker process の `LIVE_RUNTIME` / `FIXTURE` 証拠だが、Windows installed-path product proof ではない。これは `release_blocker` であり、release-ready claim の根拠にしてはならない。
 
 ## 6. Phase 4 / Responsibility Migration Order
 
@@ -156,6 +158,8 @@ Cutover rule:
 - その responsibility の active product invocation から Python が外れている。
 
 For normalization cutover, the Rust broker must keep the current NFKC / case / zero-width / camelCase / separator / alias / value-only rejection tests and then connect them to a parity harness against Python `normalize_inbound_payload` fixtures before the product path is switched.
+
+2026-06-03 update: `tooling/broker_parity/run_authority_parity.py` now runs this parity path against the authenticated broker process. Product UI cutover remains a separate Phase 5 / Block C requirement.
 
 ## 7. Phase 5 / Flutter Integration
 

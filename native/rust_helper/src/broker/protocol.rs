@@ -8,6 +8,10 @@ use unicode_normalization::UnicodeNormalization;
 use std::path::Path;
 
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
+use crate::broker::authority::{
+    edit_approval, evaluate_authority, normalize_inbound_payload, project_approval_content,
+    verify_audit_chain,
+};
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
@@ -119,6 +123,11 @@ pub enum BrokerOperation {
     Health,
     Shutdown,
     CommandEnvelope,
+    AuthorityEvaluate,
+    ApprovalEdit,
+    ContentProjection,
+    AuditVerify,
+    NormalizePayload,
 }
 
 impl BrokerOperation {
@@ -127,6 +136,11 @@ impl BrokerOperation {
             BrokerOperation::Health => "health",
             BrokerOperation::Shutdown => "shutdown",
             BrokerOperation::CommandEnvelope => "command_envelope",
+            BrokerOperation::AuthorityEvaluate => "authority_evaluate",
+            BrokerOperation::ApprovalEdit => "approval_edit",
+            BrokerOperation::ContentProjection => "content_projection",
+            BrokerOperation::AuditVerify => "audit_verify",
+            BrokerOperation::NormalizePayload => "normalize_payload",
         }
     }
 }
@@ -147,6 +161,7 @@ pub struct BrokerRequestEnvelope {
     pub issued_at: Option<String>,
     pub metadata: Vec<BrokerMetadata>,
     pub metadata_present: bool,
+    pub payload: Option<Value>,
 }
 
 impl BrokerRequestEnvelope {
@@ -171,6 +186,7 @@ impl BrokerRequestEnvelope {
             issued_at: raw.issued_at,
             metadata,
             metadata_present,
+            payload: raw.payload,
         })
     }
 
@@ -191,6 +207,7 @@ impl BrokerRequestEnvelope {
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
+            payload: None,
         }
     }
 
@@ -211,6 +228,7 @@ impl BrokerRequestEnvelope {
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
+            payload: None,
         }
     }
 
@@ -236,6 +254,7 @@ impl BrokerRequestEnvelope {
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
             metadata_present: true,
+            payload: None,
         }
     }
 
@@ -254,6 +273,7 @@ struct JsonRequestEnvelope {
     nonce: Option<String>,
     issued_at: Option<String>,
     metadata: Option<BTreeMap<String, Value>>,
+    payload: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -308,6 +328,7 @@ pub struct BrokerResponse {
     pub audit_event_id: String,
     pub error: Option<BrokerError>,
     pub health: Option<BrokerHealth>,
+    pub body: Option<Value>,
     pub shutdown_requested: bool,
 }
 
@@ -483,7 +504,35 @@ impl Broker {
         match envelope.operation.unwrap() {
             BrokerOperation::Health => self.accept_health(&request_id),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id),
-            BrokerOperation::CommandEnvelope => self.suspend_command(&request_id),
+            BrokerOperation::CommandEnvelope => self.suspend_command(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+            ),
+            BrokerOperation::AuthorityEvaluate => self.accept_body(
+                &request_id,
+                BrokerOperation::AuthorityEvaluate,
+                evaluate_authority(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+            ),
+            BrokerOperation::ApprovalEdit => self.accept_body(
+                &request_id,
+                BrokerOperation::ApprovalEdit,
+                edit_approval(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+            ),
+            BrokerOperation::ContentProjection => self.accept_body(
+                &request_id,
+                BrokerOperation::ContentProjection,
+                project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+            ),
+            BrokerOperation::AuditVerify => self.accept_body(
+                &request_id,
+                BrokerOperation::AuditVerify,
+                verify_audit_chain(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+            ),
+            BrokerOperation::NormalizePayload => self.accept_body(
+                &request_id,
+                BrokerOperation::NormalizePayload,
+                normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+            ),
         }
     }
 
@@ -543,6 +592,7 @@ impl Broker {
             audit_event_id: audit_event.event_id,
             error: None,
             health: Some(self.health(EVIDENCE_SOURCE_LIVE_RUNTIME)),
+            body: None,
             shutdown_requested: false,
         }
     }
@@ -577,6 +627,7 @@ impl Broker {
                 true,
             )),
             health: Some(self.health(EVIDENCE_SOURCE_INTERNAL_STATE)),
+            body: None,
             shutdown_requested: false,
         }
     }
@@ -625,11 +676,12 @@ impl Broker {
             audit_event_id: audit_event.event_id,
             error: None,
             health: None,
+            body: None,
             shutdown_requested: true,
         }
     }
 
-    fn suspend_command(&mut self, request_id: &str) -> BrokerResponse {
+    fn suspend_command(&mut self, request_id: &str, payload: &Value) -> BrokerResponse {
         let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::CommandEnvelope.as_str(),
@@ -659,6 +711,44 @@ impl Broker {
                 true,
             )),
             health: None,
+            body: Some(json_command_eligibility(payload)),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
+    fn accept_body(
+        &mut self,
+        request_id: &str,
+        operation: BrokerOperation,
+        body: Value,
+    ) -> BrokerResponse {
+        let operation_name = operation.as_str();
+        let audit_event = match self.append_audit(
+            request_id,
+            operation_name,
+            "accepted",
+            "broker authority operation evaluated",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation_name,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation_name.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
             shutdown_requested: self.shutdown_requested,
         }
     }
@@ -696,6 +786,7 @@ impl Broker {
             audit_event_id: audit_event.event_id,
             error: Some(error(code, message, recoverable)),
             health: None,
+            body: None,
             shutdown_requested: self.shutdown_requested,
         }
     }
@@ -739,6 +830,7 @@ impl Broker {
             audit_event_id: "broker-audit-unavailable".to_string(),
             error: Some(error(code, message, true)),
             health: None,
+            body: None,
             shutdown_requested: self.shutdown_requested,
         }
     }
@@ -752,6 +844,13 @@ fn error(code: &str, message: &str, recoverable: bool) -> BrokerError {
         audit_event_required: true,
         fail_closed: true,
     }
+}
+
+fn json_command_eligibility(payload: &Value) -> Value {
+    serde_json::json!({
+        "dispatch_enabled": false,
+        "eligibility": evaluate_authority(payload)
+    })
 }
 
 fn is_tagged_sha256(value: &str) -> bool {
@@ -901,6 +1000,21 @@ fn metadata_attempts_authority(metadata: &[BrokerMetadata]) -> bool {
     })
 }
 
+pub(crate) fn metadata_attempts_authority_value(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => object.iter().any(|(key, value)| {
+            let key = normalize_authority_token(key);
+            canonical_authority_key(&key).is_some() || metadata_attempts_authority_value(value)
+        }),
+        Value::Array(items) => items.iter().any(metadata_attempts_authority_value),
+        Value::String(value) => {
+            let value = normalize_authority_token(value);
+            authority_value_present(&value) || authority_token_present(&value)
+        }
+        _ => false,
+    }
+}
+
 fn canonical_authority_key(normalized: &str) -> Option<&'static str> {
     match normalized {
         "authority" => Some("authority"),
@@ -949,7 +1063,7 @@ fn json_metadata_value(value: &Value) -> String {
     }
 }
 
-fn normalize_key(value: &str) -> String {
+pub(crate) fn normalize_authority_token(value: &str) -> String {
     let mut result = String::new();
     let mut previous_was_underscore = false;
     let mut previous_was_lower_or_digit = false;
@@ -975,6 +1089,10 @@ fn normalize_key(value: &str) -> String {
         }
     }
     result.trim_matches('_').to_string()
+}
+
+fn normalize_key(value: &str) -> String {
+    normalize_authority_token(value)
 }
 
 #[cfg(test)]
@@ -1262,6 +1380,7 @@ mod tests {
             issued_at: Some("2026-06-01T00:00:00Z".to_string()),
             metadata: vec![],
             metadata_present: true,
+            payload: None,
         });
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(

@@ -84,7 +84,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3b77459eb9fad44912c8a16fed2f44aebf94abca5533f19e510fbbefc73df7d2"
+      "sha256": "6237f758de2b15444265cea55bce9c0aed4480b72f55175fa5c86271e47bdbb4"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -244,7 +244,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "5d1d4594d7c3e23c13a0c66f23c14ed604a618d90a3ed70675cb0dec77c716b2"
+      "sha256": "0206ba6e5be8193d447479a378219a879ca0d9148722337557fe8036b2bcf8e2"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -252,11 +252,11 @@
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "522679bbb0208b096c62f49b0dc856f8281bbcb2d4975d7dfbc6bbc4551039f1"
+      "sha256": "fc9194036411f5aad3483c3745a80fea6904bb3f9ac897cf8da066b110b04d91"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "f43b3d5a70981fbf054f97665dea51689cf77d9d582f86b30520382792d21bcd"
+      "sha256": "bf3dee2c9370622af6921d71260134ee32ef98c20ff11e32e3f40fcd4e893dc9"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -276,7 +276,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "c8f5714eaee0c96951f743ad6e6fb507d73ddc88f763a27a9266a029efa3dc64"
+      "sha256": "fef7d2fa205442e94a0231b536895837dd2a49046673efef24ef60a80c415d63"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -543,16 +543,20 @@
       "sha256": "bc92752650399b25833b9eb95f3c4bd1b20b10cd5b52ae6e95b015f024de8b8d"
     },
     {
+      "path": "native/rust_helper/src/broker/authority.rs",
+      "sha256": "5c15f438088740aff0948916a347a7914d04958b669d7096a4658e29127fc8dd"
+    },
+    {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
       "sha256": "472b59593e416e9648474a7443ad9c8921df3aaedb5a3fa662118001a7fa2453"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "eeb371eb506f828785ded026c85afcf08babff17283cd8f1775445467d05c703"
+      "sha256": "eb0909c10fd7d1ef02b519a5a603c66bad4cea886ed958bc32b26f1f6ca4058f"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "81c40f595ccd5cd8f6644d0830e1b077d723340f8c0412c1a0cc5175ba4df3b1"
+      "sha256": "08e0a216ff84101c89658ff9064e9bf5a0ca2d8b0c73b64bfe1aea53cdfef9eb"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -576,7 +580,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "d84fd49e497219b6ac74254294cdb81a4e2f6ed22f8acd2d1c2124fb242cd92d"
+      "sha256": "5e477667a1b12c018f0120d2bf18462df09daccb4290ce57854898a66b3371f4"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -752,11 +756,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "d0c18ea29f9b05f3e90b813e68215c35f5f70fe186ecc871fad7979656a05622"
+      "sha256": "b47761221a0e7abf306b1ee21a71e37cff3913642d5584af5cc5c2bfbd8c045d"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "46f4a245c6d7bbffa6212edf62f26438cb8562ca6808333903fdd6264cbe03f2"
+      "sha256": "2b9d88c3c3ab90b9f955c03821609c0187737a5a660c46983d6f91174cc48c58"
     },
     {
       "path": "specs/permission.schema.json",
@@ -777,6 +781,10 @@
     {
       "path": "specs/update.schema.json",
       "sha256": "12f3d86b927809fb24a5164533e311572f2d237d7852683b4c35b2c39cd75524"
+    },
+    {
+      "path": "tooling/broker_parity/run_authority_parity.py",
+      "sha256": "62728663068865d089b80f75214af6aba50d7f62a032154a01ea091ab41dad64"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -812,7 +820,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "b42ebf83fea5f66a0fc88d71ca3e63a18bbd507289fca0819a33f7f15425fb4f"
+      "sha256": "e974fd89daa4b314c5de2e4513383a46237ba9856d29af9a900b51e5c42c41b3"
     },
     {
       "path": "tooling/windows_release_evidence.py",

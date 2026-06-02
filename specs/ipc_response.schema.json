@@ -60,6 +60,16 @@
       ],
       "additionalProperties": true
     },
+    "body": {
+      "type": [
+        "object",
+        "array",
+        "string",
+        "number",
+        "boolean",
+        "null"
+      ]
+    },
     "shutdown_requested": {
       "type": "boolean"
     }

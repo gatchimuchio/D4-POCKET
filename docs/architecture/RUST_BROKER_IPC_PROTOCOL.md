@@ -41,8 +41,13 @@ Allowed operations:
 - `health`
 - `shutdown`
 - `command_envelope`
+- `authority_evaluate`
+- `approval_edit`
+- `content_projection`
+- `audit_verify`
+- `normalize_payload`
 
-`command_envelope` is intentionally suspended in the skeleton. It must not dispatch real external commands until authority migration tests exist.
+`command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility in the response body, but it must not dispatch real external commands until product cutover and execution gates exist.
 
 ## 4. Response Envelope
 
@@ -114,8 +119,10 @@ The current Rust code provides:
 - `native/rust_helper/src/main.rs` process lifecycle skeleton;
 - `native/rust_helper/src/broker/ipc_server.rs` authenticated `127.0.0.1` loopback server for independent-process IPC;
 - `native/rust_helper/src/broker/store.rs` durable file store for audit hash-chain, replay nonces, and session state;
-- `native/rust_helper/src/broker/protocol.rs` request/response decision skeleton;
+- `native/rust_helper/src/broker/authority.rs` Rust ownership for normalization, policy eligibility, approval edit / rehash, content projection, audit verification, recovery mapping, and command-envelope eligibility;
+- `native/rust_helper/src/broker/protocol.rs` request/response decision path;
 - `native/rust_helper/src/broker/audit.rs` broker audit hash chain;
+- `tooling/broker_parity/run_authority_parity.py` Python oracle to Rust broker IPC parity harness;
 - JSON request parsing with unknown-field rejection;
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
@@ -129,16 +136,16 @@ The current Rust code provides:
 - stale session rejection;
 - nonce replay rejection;
 - authority metadata rejection with NFKC / case / zero-width / camelCase / separator / alias / value-only hardening;
-- command envelope suspension without dispatch.
+- authority operation response bodies for `authority_evaluate`, `approval_edit`, `content_projection`, `audit_verify`, and `normalize_payload`;
+- command envelope eligibility with dispatch suspension.
 
 It does not yet provide:
 
 - Flutter client integration;
-- approval finalization;
 - credential/keychain access;
 - process or update gated execution.
 
-Unimplemented Flutter cutover, responsibility migration, command eligibility, and Windows installed-path evidence remain `release_blocker` for completed product release.
+Unimplemented Flutter cutover, no-Python-runtime product proof, execution gates, and Windows installed-path evidence remain `release_blocker` for completed product release.
 
 ## 7. IPC Transport Decision
 

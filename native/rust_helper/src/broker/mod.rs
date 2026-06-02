@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod authority;
 pub mod ipc_server;
 pub mod protocol;
 pub mod store;

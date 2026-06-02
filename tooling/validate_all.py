@@ -59,6 +59,12 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
         ValidationStep("release_gate_check", ["python3", "tooling/release_gate_check.py"], ROOT, "python3"),
         ValidationStep("release_smoke", ["python3", "tooling/release_smoke.py"], ROOT, "python3"),
         ValidationStep("evidence_bundle", ["python3", "tooling/evidence_bundle.py", "--check"], ROOT, "python3"),
+        ValidationStep(
+            "broker_authority_parity",
+            ["python3", "tooling/broker_parity/run_authority_parity.py"],
+            ROOT,
+            "python3",
+        ),
     ]
     if python_only:
         return steps

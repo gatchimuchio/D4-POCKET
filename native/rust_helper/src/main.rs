@@ -133,6 +133,7 @@ fn run_dev_stdin_smoke() {
                     issued_at: None,
                     metadata: vec![],
                     metadata_present: false,
+                    payload: None,
                 }),
             }
         };
