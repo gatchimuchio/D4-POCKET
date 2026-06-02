@@ -79,11 +79,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "5fe6d51718a13b1f32d528427e73d8eb2ab0d9a8d36fff631c121b3cfdf5e6a2"
+      "sha256": "6869153cc7b8ee3614b51e7527c1fa408393846f920d6fbfc46c946c39b78312"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7429cf1a5d6c950dcde4cadc7e3f4faa226231d290487c05217ede9eb97ce94a"
+      "sha256": "a6843c6d3968b4f379737466448aac1f2d6b4ea0c7a6821fb51d71547adb73f2"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -243,7 +243,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "be07f436ed4352bf1dbc79812ede62650dc6c979688e390f41d4112346e010ec"
+      "sha256": "9be75cd91494578e1c3a6f10e9771e25612212e031b1f7f60b69ab1bf6a1957e"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -255,7 +255,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "717d044dff93a5b9faf2173c4c7f586c4dff062bcd02e9b3998c4df045eb7f1d"
+      "sha256": "4f11009a48300b5ecfcc1d62dd6201a65327ad331420becbe6b79b4dcf428861"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -275,7 +275,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "6c67ff03a2fff7a212ee17de98dfd6e9bc10dfab22b2c83ca5dbc74780d28c1c"
+      "sha256": "2878ad2f21b3f753c6b940629c2f8c289d731a38d2f05a3993845968c381976e"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -363,7 +363,7 @@
     },
     {
       "path": "examples/contracts/broker_health.valid.json",
-      "sha256": "b1a64ede48b3ed8d072e4627fb7acab64b8166b9b4f855569baef6bda6a2591c"
+      "sha256": "e67198f496efaac9cbc71394720f3e02f172ea38cb4be549096dc430da0b0fee"
     },
     {
       "path": "examples/contracts/broker_session.valid.json",
@@ -435,15 +435,15 @@
     },
     {
       "path": "examples/contracts/invalid/broker_health_active_cutover.invalid.json",
-      "sha256": "c31f9c75b899eab9b30d6e2505511b1ccc4c69cabdc170eea77a0b159b80e95d"
+      "sha256": "6f8b9e7bb309631b66e8a75cd5e545e9a5956517a7f23c8297e83e73b3f1537b"
     },
     {
       "path": "examples/contracts/invalid/broker_health_authority_owner.invalid.json",
-      "sha256": "a472f492af985f95e0d499055c51ef1d544ab89a3937f7c8fee918ac2c5a1006"
+      "sha256": "eb95cca138b99b1cb5395095208034504bdd539f63f5bac8953f69b46af2b70f"
     },
     {
       "path": "examples/contracts/invalid/broker_health_dispatch_enabled.invalid.json",
-      "sha256": "ac7ad8c279457edfc7d971e7948a5c7b3b5a2a8f3efe8755344f8cd84574c6bc"
+      "sha256": "c40c69c06df9e6b9267159f56a2024265e4c7ce3f368193916c9adcd5d170146"
     },
     {
       "path": "examples/contracts/invalid/broker_session_stale_state.invalid.json",
@@ -499,7 +499,7 @@
     },
     {
       "path": "examples/contracts/ipc_response.valid.json",
-      "sha256": "95b9924947ec5cbb5e768b0250c09a96dacfba8412b99b18a788d765745a47bc"
+      "sha256": "fe99a1298ed966fc988ecb07e1c25e2559f40d7fb8181f312d8600db059d813b"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -543,11 +543,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "ad0f6c6353cbe9e67a65405cb1a1faccecf73692f831449e2a3550f4a6b39aa1"
+      "sha256": "80184e7a1a45819d7b823e6bae92e33294a72f1be28a54d84f78af155324e9e1"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "e864ef7ee2a27109a16254c34559b927b4bc7557b4ab87733a59e51f31610187"
+      "sha256": "d5fd8478e6bd9f66ce11eee8cf705896842b0a720362a16bb0828914ec699b9e"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -711,11 +711,11 @@
     },
     {
       "path": "specs/broker_error.schema.json",
-      "sha256": "e64d2d2c8b97fcd4fe00476f6c407b809883d650b111a07fb2972a2da791ea91"
+      "sha256": "cb86451cbdcac3aed5d863f38911a9fe68587e6b3ad40a4bcbbbcfe814e25758"
     },
     {
       "path": "specs/broker_health.schema.json",
-      "sha256": "b731bacf8f8c12484dc92aad9d602533ffe0d5aeaa489e553b98fb7786f2da21"
+      "sha256": "4f1ad80c6c0b68f1d27ca25e9063485916c0f1e47bda7b0692e7e6f5c2132083"
     },
     {
       "path": "specs/broker_session.schema.json",
@@ -771,7 +771,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3b5d47d63d8803e0956a45924fee0ff41af1ed12781963ecb680a63b6bfd1215"
+      "sha256": "6e5325429f65a79dadcac65127841466c31403b647018febf566b96dbd57e108"
     },
     {
       "path": "tooling/evidence_bundle.py",

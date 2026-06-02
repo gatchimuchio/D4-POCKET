@@ -7,5 +7,7 @@
   "audit_append_enabled": true,
   "audit_persistence": "in_memory_skeleton",
   "replay_persistence": "in_memory_session_only",
+  "persistence_required": false,
+  "persistence_ready": false,
   "evidence_source": "LIVE_RUNTIME"
 }

@@ -28,6 +28,7 @@ Adapter / External Runtime
 | forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner | release_blocker until parity migration |
 | malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust skeleton | none for skeleton; release_blocker for product cutover |
 | stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window implemented in Rust unit scope | release_blocker until IPC integration proof |
+| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | implemented as fail-closed skeleton mode | release_blocker until persistent store exists |
 | authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner | release_blocker until active-path parity proof |
 | Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope | release_blocker until parity harness and cutover proof |
 | stale session | session mismatch を rejected / audited にする | implemented in Rust skeleton | release_blocker until real session lifecycle |
@@ -55,6 +56,7 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 - authority metadata: reject and audit;
 - command envelope dispatch before migration: suspend and audit;
 - broker audit append failure: block finalization;
+- persistent state required but unavailable: suspend health and reject operations;
 - broker unavailable: Flutter shows unavailable state and performs no authority decision.
 
 ## 5. Current Limitations

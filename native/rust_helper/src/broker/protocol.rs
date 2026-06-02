@@ -12,6 +12,30 @@ const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrokerPersistenceMode {
+    InMemorySkeleton,
+    PersistentRequiredUnavailable,
+}
+
+impl BrokerPersistenceMode {
+    fn persistence_required(self) -> bool {
+        matches!(self, Self::PersistentRequiredUnavailable)
+    }
+
+    fn persistence_ready(self) -> bool {
+        false
+    }
+
+    fn health_status(self) -> &'static str {
+        if self.persistence_required() {
+            "suspend"
+        } else {
+            "ready"
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
@@ -165,6 +189,8 @@ pub struct BrokerHealth {
     pub audit_append_enabled: bool,
     pub audit_persistence: String,
     pub replay_persistence: String,
+    pub persistence_required: bool,
+    pub persistence_ready: bool,
     pub evidence_source: String,
 }
 
@@ -220,6 +246,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
+    persistence_mode: BrokerPersistenceMode,
 }
 
 impl Broker {
@@ -230,12 +257,19 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
+            persistence_mode: BrokerPersistenceMode::InMemorySkeleton,
         }
     }
 
     pub fn new_with_current_epoch_seconds(session_id: &str, current_epoch_seconds: i64) -> Self {
         let mut broker = Self::new(session_id);
         broker.current_epoch_seconds_override = Some(current_epoch_seconds);
+        broker
+    }
+
+    pub fn new_requiring_persistence(session_id: &str) -> Self {
+        let mut broker = Self::new(session_id);
+        broker.persistence_mode = BrokerPersistenceMode::PersistentRequiredUnavailable;
         broker
     }
 
@@ -284,6 +318,21 @@ impl Broker {
                 &operation,
                 "broker_issued_at_invalid",
                 "issued_at must be RFC3339 and within the broker freshness window",
+                true,
+            );
+        }
+
+        if self.persistence_mode.persistence_required()
+            && !self.persistence_mode.persistence_ready()
+        {
+            if envelope.operation == Some(BrokerOperation::Health) {
+                return self.suspend_health(&request_id);
+            }
+            return self.reject(
+                &request_id,
+                &operation,
+                "broker_persistence_unavailable",
+                "persistent audit and replay state are required but unavailable",
                 true,
             );
         }
@@ -372,18 +421,48 @@ impl Broker {
             evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
             audit_event_id: audit_event.event_id,
             error: None,
-            health: Some(BrokerHealth {
-                broker_id: BROKER_ID.to_string(),
-                status: "ready".to_string(),
-                boundary_role: "rust_security_broker_candidate".to_string(),
-                authority_cutover_status: "not_active".to_string(),
-                command_dispatch_enabled: false,
-                audit_append_enabled: true,
-                audit_persistence: self.audit_log.persistence_scope().to_string(),
-                replay_persistence: "in_memory_session_only".to_string(),
-                evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
-            }),
+            health: Some(self.health(EVIDENCE_SOURCE_LIVE_RUNTIME)),
             shutdown_requested: false,
+        }
+    }
+
+    fn suspend_health(&mut self, request_id: &str) -> BrokerResponse {
+        let audit_event = self.audit_log.append(
+            request_id,
+            BrokerOperation::Health.as_str(),
+            "suspended",
+            "broker_persistence_unavailable",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+        );
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: BrokerOperation::Health.as_str().to_string(),
+            status: BrokerStatus::Suspended,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: Some(error(
+                "broker_persistence_unavailable",
+                "persistent audit and replay state are required but unavailable",
+                true,
+            )),
+            health: Some(self.health(EVIDENCE_SOURCE_INTERNAL_STATE)),
+            shutdown_requested: false,
+        }
+    }
+
+    fn health(&self, evidence_source: &str) -> BrokerHealth {
+        BrokerHealth {
+            broker_id: BROKER_ID.to_string(),
+            status: self.persistence_mode.health_status().to_string(),
+            boundary_role: "rust_security_broker_candidate".to_string(),
+            authority_cutover_status: "not_active".to_string(),
+            command_dispatch_enabled: false,
+            audit_append_enabled: true,
+            audit_persistence: self.audit_log.persistence_scope().to_string(),
+            replay_persistence: "in_memory_session_only".to_string(),
+            persistence_required: self.persistence_mode.persistence_required(),
+            persistence_ready: self.persistence_mode.persistence_ready(),
+            evidence_source: evidence_source.to_string(),
         }
     }
 
@@ -704,6 +783,13 @@ mod tests {
         )
     }
 
+    fn persistence_required_broker() -> Broker {
+        let mut broker = Broker::new_requiring_persistence("session-1");
+        broker.current_epoch_seconds_override =
+            Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
+        broker
+    }
+
     #[test]
     fn broker_health_is_accepted_and_audited() {
         let mut broker = test_broker();
@@ -714,8 +800,45 @@ mod tests {
         assert_eq!(health.authority_cutover_status, "not_active");
         assert_eq!(health.audit_persistence, "in_memory_skeleton");
         assert_eq!(health.replay_persistence, "in_memory_session_only");
+        assert!(!health.persistence_required);
+        assert!(!health.persistence_ready);
         assert_eq!(broker.audit_events().len(), 1);
         assert_eq!(broker.audit_events()[0].decision, "accepted");
+    }
+
+    #[test]
+    fn persistence_required_health_suspends_without_store() {
+        let mut broker = persistence_required_broker();
+        let response = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+        assert_eq!(response.status, BrokerStatus::Suspended);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_persistence_unavailable"
+        );
+        let health = response.health.unwrap();
+        assert_eq!(health.status, "suspend");
+        assert!(health.persistence_required);
+        assert!(!health.persistence_ready);
+        assert_eq!(broker.audit_events()[0].decision, "suspended");
+    }
+
+    #[test]
+    fn persistence_required_command_rejects_without_store() {
+        let mut broker = persistence_required_broker();
+        let response = broker.handle(BrokerRequestEnvelope::command_envelope(
+            "request-1",
+            "session-1",
+            "nonce-1",
+        ));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_persistence_unavailable"
+        );
+        assert_eq!(broker.audit_events()[0].decision, "rejected");
+        assert!(broker.audit_events()[0]
+            .reason
+            .contains("broker_persistence_unavailable"));
     }
 
     #[test]

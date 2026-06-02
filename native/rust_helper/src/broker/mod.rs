@@ -3,6 +3,6 @@ pub mod protocol;
 
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};
 pub use protocol::{
-    Broker, BrokerError, BrokerHealth, BrokerMetadata, BrokerOperation, BrokerRequestEnvelope,
-    BrokerResponse, BrokerStatus,
+    Broker, BrokerError, BrokerHealth, BrokerMetadata, BrokerOperation, BrokerPersistenceMode,
+    BrokerRequestEnvelope, BrokerResponse, BrokerStatus,
 };

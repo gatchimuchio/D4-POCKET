@@ -70,8 +70,12 @@ Health responses must not claim active Rust authority ownership before productio
 - `command_dispatch_enabled=false`
 - `audit_persistence=in_memory_skeleton`
 - `replay_persistence=in_memory_session_only`
+- `persistence_required=false` during default skeleton mode
+- `persistence_ready=false`
 
 `authority_cutover_status=active`, persistent audit storage, persistent replay/session storage, and command dispatch require a future contract revision after the governed production path has corresponding capability, permission, approval, AuditEvent, RecoveryAction, IPC, and Windows installed-path evidence.
+
+When the broker is configured to require persistent audit/replay/session state but no persistent store is connected, health returns `status=suspend`, `persistence_required=true`, `persistence_ready=false`, and `broker_persistence_unavailable`. Non-health operations fail closed with the same error.
 
 ## 5. Broker Error
 
@@ -82,6 +86,7 @@ Allowed error codes:
 - `broker_request_malformed`
 - `broker_payload_hash_invalid`
 - `broker_issued_at_invalid`
+- `broker_persistence_unavailable`
 - `broker_stale_session`
 - `broker_replay_detected`
 - `broker_authority_metadata_rejected`
@@ -100,6 +105,7 @@ The current Rust code provides:
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
 - `issued_at` RFC3339 parsing and freshness rejection within a 300-second broker window;
+- persistence-required fail-closed behavior when persistent state is required but unavailable;
 - health response;
 - shutdown response for test lifecycle;
 - stale session rejection;
