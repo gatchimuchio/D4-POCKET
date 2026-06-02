@@ -1094,6 +1094,30 @@ def _valid_windows_installed_evidence() -> dict:
             "installer_silently_approves_permissions": False,
             "checks": setup_checks,
         },
+        "broker": {
+            "status": "passed",
+            "evidence_source": {
+                "collector": "installer/windows/collect_broker_smoke.ps1",
+                "collector_version": "1",
+                "synthetic": False,
+                "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1",
+            },
+            "helper_exe_path": r"C:\Program Files\GUI-Shell\broker\gui_shell_rust_helper.exe",
+            "helper_exe_exists": True,
+            "session_file": r"C:\ProgramData\GUI-Shell\broker\broker_session.json",
+            "session_file_created": True,
+            "store_dir": r"C:\ProgramData\GUI-Shell\broker\store",
+            "authenticated_ipc_connection": True,
+            "durable_store_ready": True,
+            "replay_nonce": "windows-installed-replay-nonce",
+            "restart_replay_rejected": True,
+            "replay_error_code": "broker_replay_detected",
+            "fresh_health_after_restart": True,
+            "crash_fail_closed": True,
+            "python_runtime_required_for_authority": False,
+            "flutter_rust_ffi_authority_bridge": False,
+            "errors": [],
+        },
     }
 
 
@@ -1138,6 +1162,9 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     bad["first_run"]["audit_write_probe"]["read"] = False
     bad["setup_doctor"]["evidence_source"]["synthetic"] = True
     bad["setup_doctor"]["checks"] = bad["setup_doctor"]["checks"][:1]
+    bad["broker"]["evidence_source"]["synthetic"] = True
+    bad["broker"]["restart_replay_rejected"] = False
+    bad["broker"]["python_runtime_required_for_authority"] = True
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "windows_installed_smoke.json"
         path.write_text(json.dumps(bad), encoding="utf-8")
@@ -1148,6 +1175,8 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
         errors.append("Windows first-run evidence validator accepted unmeasured/manual evidence")
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
         errors.append("Windows Setup Doctor evidence validator accepted synthetic or shallow evidence")
+    if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
+        errors.append("Windows broker evidence validator accepted synthetic, replay-unsafe, or Python-required evidence")
     return errors
 
 

@@ -24,6 +24,15 @@ REQUIRED_SETUP_CHECKS = {
     "setup_doctor.recovery_instruction",
     "setup_doctor.audit_storage",
 }
+REQUIRED_BROKER_TRUE_FIELDS = {
+    "helper_exe_exists",
+    "session_file_created",
+    "authenticated_ipc_connection",
+    "durable_store_ready",
+    "restart_replay_rejected",
+    "fresh_health_after_restart",
+    "crash_fail_closed",
+}
 
 
 @dataclass(frozen=True)
@@ -202,6 +211,51 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
     )
 
 
+def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
+    errors: list[str] = []
+    broker = _get(data, "broker")
+    if not isinstance(broker, dict):
+        errors.append("broker evidence object missing")
+    else:
+        if broker.get("status") != "passed":
+            errors.append("broker.status must be passed")
+        source = broker.get("evidence_source")
+        if not isinstance(source, dict):
+            errors.append("broker evidence_source missing")
+        else:
+            if source.get("collector") != "installer/windows/collect_broker_smoke.ps1":
+                errors.append("broker evidence_source.collector must be installer/windows/collect_broker_smoke.ps1")
+            if not source.get("collector_version"):
+                errors.append("broker evidence_source.collector_version missing")
+            if source.get("synthetic") is not False:
+                errors.append("synthetic broker evidence is not accepted")
+            if not source.get("command"):
+                errors.append("broker evidence_source.command missing")
+        for field in sorted(REQUIRED_BROKER_TRUE_FIELDS):
+            if broker.get(field) is not True:
+                errors.append(f"broker.{field} must be true")
+        if broker.get("replay_error_code") != "broker_replay_detected":
+            errors.append("broker replay_error_code must be broker_replay_detected")
+        if broker.get("python_runtime_required_for_authority") is not False:
+            errors.append("broker python_runtime_required_for_authority must be false")
+        if broker.get("flutter_rust_ffi_authority_bridge") is not False:
+            errors.append("broker flutter_rust_ffi_authority_bridge must be false")
+        broker_errors = broker.get("errors")
+        if broker_errors not in (None, []) and not (isinstance(broker_errors, list) and len(broker_errors) == 0):
+            errors.append("broker errors must be empty")
+    if errors:
+        return _failed(
+            "windows_broker_installed_smoke",
+            "; ".join(errors),
+            "Run installer/windows/collect_broker_smoke.ps1 against the installed Rust broker helper and include the result in release_evidence/windows_installed_smoke.json.",
+        )
+    return _passed(
+        "windows_broker_installed_smoke",
+        "Windows installed-path broker launch/connect/restart/crash/no-Python/no-FFI evidence passed machine validation.",
+        "Keep broker installed-path smoke evidence current for release candidates.",
+    )
+
+
 def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> list[EvidenceResult]:
     data, error = load_evidence(path)
     if data is None:
@@ -216,8 +270,13 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
                 error or "Windows Setup Doctor evidence missing",
                 "Run Setup Doctor from the installed Windows app path and record non-synthetic required diagnostics evidence.",
             ),
+            _failed(
+                "windows_broker_installed_smoke",
+                error or "Windows broker installed smoke evidence missing",
+                "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json.",
+            ),
         ]
-    return [validate_installer_first_run(data), validate_setup_doctor(data)]
+    return [validate_installer_first_run(data), validate_setup_doctor(data), validate_broker_smoke(data)]
 
 
 def main() -> int:

@@ -1,3 +1,160 @@
+validation_update_2026_06_03_block_e:
+  scope: Windows staged installed path and broker evidence gate
+  commit: pre_commit_validation
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - python3 fallback passed: 25 schemas, 25 examples, 27 negative fixtures
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: conformance skeleton passed: 96 checks
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | INTERNAL_STATE
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: windows_release_evidence
+      command: python3 tooling/windows_release_evidence.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: EXTERNAL_EVIDENCE
+      exit: 1
+      reason: release_evidence/windows_installed_smoke.json missing; validator now requires first-run, Setup Doctor, and broker installed smoke evidence.
+      required_action: Collect native Windows installed-path first-run, Setup Doctor, visible-surface, broker, and no-Python-runtime evidence.
+    - name: powershell_installer_script_parse
+      command: powershell.exe Parser.ParseFile for installer/windows/collect_broker_smoke.ps1, collect_installed_smoke.ps1, stage_installed_app.ps1
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG
+      exit: 0
+    - name: windows_rust_helper_release_build_temp_copy
+      command: cmd.exe /c "cd /d C:\Users\mzcum\AppData\Local\Temp\gui_shell_rust_helper_block_e && cargo build --release"
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG
+      exit: 0
+      stdout: Finished `release` profile target(s) in 43.71s
+      note: Validation temp copy was deleted after the run.
+    - name: windows_broker_smoke_collector_temp_helper
+      command: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& installer/windows/collect_broker_smoke.ps1 -BrokerHelperExe <temp>\gui_shell_rust_helper.exe -OutputPath <temp>\windows_broker_smoke_block_e.json"
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: LIVE_RUNTIME
+      exit: 0
+      stdout_summary:
+        - authenticated_ipc_connection=true
+        - durable_store_ready=true
+        - restart_replay_rejected=true
+        - replay_error_code=broker_replay_detected
+        - fresh_health_after_restart=true
+        - crash_fail_closed=true
+        - python_runtime_required_for_authority=false
+        - flutter_rust_ffi_authority_bridge=false
+      note: Validation temp build and JSON output were deleted after the run.
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - schema_check passed
+        - conformance_skeleton passed
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed with 3 blockers preserved
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: rust_helper_cargo_fmt_check
+      command: cd native/rust_helper && cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+    - name: rust_helper_cargo_test
+      command: cd native/rust_helper && cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: LIVE_RUNTIME
+      exit: 0
+      stdout_summary:
+        - 31 Rust helper and broker unit tests passed
+        - 3 broker IPC integration tests passed
+    - name: validate_all_full_current_host
+      command: python3 tooling/validate_all.py
+      status: failed
+      classification: release_blocker
+      blocks_release: yes
+      evidence_scope: CONFIG | INTERNAL_STATE
+      exit: 1
+      reason: WSL direct Flutter commands failed with external SDK CRLF line endings; Python/core/Rust/broker assertion subchecks passed.
+      required_action: Fix the external WSL Flutter SDK shell script line endings or run release validation through a supported native platform validation path.
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: Windows staged installed app and broker smoke collector
+      classification: required_for_v1
+      reason: `installer/windows/stage_installed_app.ps1`, `collect_broker_smoke.ps1`, and the strengthened Windows evidence validator are implemented; broker smoke collector passed against a Windows Rust helper temp build.
+      required_action: Use these scripts on the release candidate installed path and include their machine-readable evidence.
+      blocks_release: no
+    - item: Windows installed-path first-run visible-surface evidence
+      classification: release_blocker
+      reason: release_evidence/windows_installed_smoke.json is missing, so installed app launch, MainWindowHandle, and visible-surface evidence are absent.
+      required_action: Collect UIAutomation, screenshot, or accessibility-tree evidence from the installed Windows app path.
+      blocks_release: yes
+    - item: Windows installed-path Setup Doctor evidence
+      classification: release_blocker
+      reason: non-synthetic installed-path Setup Doctor evidence is absent.
+      required_action: Run Setup Doctor from the installed path and record required checks in release_evidence/windows_installed_smoke.json.
+      blocks_release: yes
+    - item: Windows installed no-Python runtime proof
+      classification: release_blocker
+      reason: broker smoke proves Python is not required for broker authority, but a full installed app smoke in a Python-free runtime environment is absent.
+      required_action: Run the installed app authority path with Python removed from the runtime environment and record machine-readable evidence.
+      blocks_release: yes
+    - item: owner GO
+      classification: release_blocker
+      reason: Explicit owner GO has not been recorded.
+      required_action: Obtain owner GO only after strict Windows release validation passes.
+      blocks_release: yes
+
 validation_update_2026_06_03_block_d:
   scope: No-Python runtime / no-FFI authority release assertion and broker-mediated product path validation
   commit: pre_commit_validation

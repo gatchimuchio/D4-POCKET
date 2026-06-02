@@ -15,6 +15,10 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$VisibleSurfacesJson,
 
+  [string]$BrokerEvidenceJson = "",
+
+  [string]$RuntimeAssertionsJson = "",
+
   [string]$ScreenshotPath = ""
 )
 
@@ -31,6 +35,16 @@ $process.Refresh()
 
 $setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
 $visibleSurfaceEvidence = Get-Content -Raw -Path $visibleSurfacesPath | ConvertFrom-Json
+$brokerEvidence = $null
+if ($BrokerEvidenceJson -ne "") {
+  $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
+  $brokerEvidence = Get-Content -Raw -Path $brokerEvidencePath | ConvertFrom-Json
+}
+$runtimeAssertions = $null
+if ($RuntimeAssertionsJson -ne "") {
+  $runtimeAssertionsPath = Resolve-Path $RuntimeAssertionsJson
+  $runtimeAssertions = Get-Content -Raw -Path $runtimeAssertionsPath | ConvertFrom-Json
+}
 
 $mainWindowHandle = 0
 $windowTitle = ""
@@ -117,6 +131,26 @@ $evidence = [ordered]@{
     installer_silently_approves_permissions = $false
   }
   setup_doctor = $setupDoctor
+  broker = $(if ($null -ne $brokerEvidence) {
+      $brokerEvidence
+    } else {
+      [ordered]@{
+        status = "missing"
+        evidence_source = [ordered]@{
+          collector = "installer/windows/collect_broker_smoke.ps1"
+          collector_version = "missing"
+          synthetic = $true
+          command = $null
+        }
+        authenticated_ipc_connection = $false
+        durable_store_ready = $false
+        restart_replay_rejected = $false
+        crash_fail_closed = $false
+        python_runtime_required_for_authority = $true
+        flutter_rust_ffi_authority_bridge = $true
+      }
+    })
+  release_runtime_assertions = $runtimeAssertions
 }
 
 $output = New-Item -ItemType File -Force -Path $OutputPath

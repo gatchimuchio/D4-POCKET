@@ -34,6 +34,7 @@ Release validation:
 - `python3 tooling/evidence_bundle.py --check` must pass
 - `python3 tooling/release_runtime_assertions.py --check` must pass
 - `python3 tooling/windows_release_evidence.py` must pass for Windows completed product release
+- `installer\windows\collect_broker_smoke.ps1` evidence must be included in Windows installed smoke evidence
 - `cargo test` must pass if Rust helper is in release scope
 - desktop `flutter analyze` must pass if desktop app is in release scope
 - mobile `flutter analyze` is required only if mobile is in release scope

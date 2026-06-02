@@ -15,6 +15,10 @@
       "native/rust_helper/Cargo.lock",
       "native/rust_helper/src/**/*.rs",
       "native/rust_helper/tests/**/*.rs",
+      "installer/**/*.py",
+      "installer/**/*.ps1",
+      "installer/**/*.md",
+      "scripts/**/*",
       "docs/**/*.md"
     ],
     "exact_files": [
@@ -80,11 +84,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "7113c3c57dfcc2cedd4471355c97d59718c58ccd38a6a3c96f5cc6e1188ec8bb"
+      "sha256": "b38d77977342ae5c39ffbb6580be2f4ab5f9ecf7755db7497b2cc8dbe2f81095"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4c4d541bf96e88d04bbc5ee644a39fe23987775b97ba06030e408dd97b6b5934"
+      "sha256": "6e16a8f16bd7c18e53440d8678b446b765c7bd4c980e59dba723549dd200fbf1"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -92,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "f1bb6d835c143ce6ccd1f4eb851515721d73e032d9b3c2e3320746108bf1a23b"
+      "sha256": "385b99a4128156e80d74d9c6f195bce41f1ef4aadd04e0fd1f3606c2f67ee50a"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -228,7 +232,7 @@
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
-      "sha256": "f9882c12638c930e89ad373ee7f4b02391975b6f358a930c6cd67e6cec3f1d37"
+      "sha256": "7c30ac0e92e4982d803cc82b7ff5cd733a22a920a8b3b761a235abcb1641bb82"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -240,7 +244,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "d098b7d495b278761070208b57068643efa6f7fd8a89077bc140b8047de72d84"
+      "sha256": "ea3d0b016f0e63e152a3a5986931251499713c0dac323853d55c4eaed2e3bd78"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -531,6 +535,38 @@
       "sha256": "d38517d047fd41c2e674028fa1c66b66b4892eff6414e3244520cee5d2add9ec"
     },
     {
+      "path": "installer/first_run.py",
+      "sha256": "5ee6d2f9de93b9905564ff9848c9bb960c8411fdbc6ebfb631be15340d0cbf3e"
+    },
+    {
+      "path": "installer/linux/README.md",
+      "sha256": "7e7591efd15fbaf16e9a90bf69e3c10905f6bf81a29080678d35e003afc273da"
+    },
+    {
+      "path": "installer/macos/README.md",
+      "sha256": "4392029d1dfd487e47c40264b3ea49f23813a2934ccfbcb8f3bd4a7408b3450d"
+    },
+    {
+      "path": "installer/setup_doctor.py",
+      "sha256": "95cd75f7c19f9deeb7c5c5a0de540c31b4f49bb923ebf2b7e16478aef21e503f"
+    },
+    {
+      "path": "installer/windows/README.md",
+      "sha256": "1f5329445ac5ccab07178fff26d720741b9863a26104fbfe29a188004e7398eb"
+    },
+    {
+      "path": "installer/windows/collect_broker_smoke.ps1",
+      "sha256": "ab37b21024c0a92294374c9450aa48ad0b99b369190ba6fbedef3afc00d63956"
+    },
+    {
+      "path": "installer/windows/collect_installed_smoke.ps1",
+      "sha256": "0f239b684f5910fa6338a65a70ee74915d019d8a454f4997d1fd48db17e29c62"
+    },
+    {
+      "path": "installer/windows/stage_installed_app.ps1",
+      "sha256": "7c10beaae27bc0383a42c6329f7afd9d1ec8677bae23e04114a20dfb45e6dc99"
+    },
+    {
       "path": "native/rust_helper/Cargo.lock",
       "sha256": "b46d9f1e89eaaad6d5bf3e81c3d500bc7457268f9c66a0055425f67e718617f1"
     },
@@ -687,6 +723,14 @@
       "sha256": "9f7587cda11d0ef758dd826b6bf3e0df7785369951ddb5ce452c3f384ccc79e4"
     },
     {
+      "path": "scripts/launch_owner_desktop.ps1",
+      "sha256": "2179c7edc2a59003c550014cf131389c13cfb8d9da3d7a140ca9fb13e6791473"
+    },
+    {
+      "path": "scripts/launch_owner_desktop.sh",
+      "sha256": "8e63cea6aecd2e285ff49015431f46cde6b923323e9e90f42cdefa381ed28151"
+    },
+    {
       "path": "specs/adapter.schema.json",
       "sha256": "37882741099adb12c743439e2deef6bbb2549a33d95df185531b1b89d6caa6e3"
     },
@@ -796,7 +840,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8a51b4418ab268f2a2695360426689419632d976832c73605429f5e841c66ca9"
+      "sha256": "ca2057de7764d5cfd9fc9c2f6030c08017661e87a0fae8b6b1139e970ba79d85"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -804,7 +848,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "ecc62d14c6a150dbe1a10ffcb63fcd5ac7efea00852213dfb02b30aba78fd383"
+      "sha256": "4a9026440800ceb8f25d26036c19af92099e349b62d5b31ba2a35288e7253132"
     },
     {
       "path": "tooling/release_gate_check.py",
@@ -832,7 +876,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "04306e012c6801aed159b3c72ee4bc332e1735faa5274060c56dadf292350a25"
+      "sha256": "94ebd8402487e33c1836fe874c54051745d51a0c28399a088668936064472b02"
     }
   ]
 }

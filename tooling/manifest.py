@@ -22,6 +22,10 @@ GLOB_PATTERNS = [
     "native/rust_helper/Cargo.lock",
     "native/rust_helper/src/**/*.rs",
     "native/rust_helper/tests/**/*.rs",
+    "installer/**/*.py",
+    "installer/**/*.ps1",
+    "installer/**/*.md",
+    "scripts/**/*",
     "docs/**/*.md",
 ]
 
