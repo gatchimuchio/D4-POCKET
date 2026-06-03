@@ -1,4 +1,20 @@
-NON_AUTHORITY_SOURCES = {"memory", "cache", "previous_state", "local_ui_state"}
+NON_AUTHORITY_SOURCES = {
+    "adapter_metadata",
+    "cache",
+    "diagnostics",
+    "external_metadata",
+    "generated_config",
+    "generated_output",
+    "gui_state",
+    "history",
+    "local_ui_state",
+    "memory",
+    "metadata",
+    "previous_state",
+    "tool_output",
+    "tool_response",
+    "ui_state",
+}
 
 
 class PermissionLedger:

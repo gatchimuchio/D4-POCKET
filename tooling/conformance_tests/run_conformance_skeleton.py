@@ -26,7 +26,7 @@ from packages.shell_core.authority_keys import AUTHORITY_KEYS
 from packages.shell_core.content_exposure import project_approval_content
 from packages.shell_core.invariant_evaluator import InvariantEvaluator
 from packages.shell_core.normalization import normalize_inbound_payload, normalize_key
-from packages.shell_core.permission_ledger import PermissionLedger
+from packages.shell_core.permission_ledger import NON_AUTHORITY_SOURCES, PermissionLedger
 from packages.shell_core.policy_evaluator import PolicyEvaluator
 from packages.shell_core.runtime_state import RuntimeState
 from packages.shell_core.release_smoke import run_shell_core_release_smoke
@@ -75,7 +75,20 @@ REQUIRED_SCHEMA_NAMES = {
 }
 
 VISIBILITY_VALUES = ["none", "hash_only", "summary", "redacted", "full"]
-NON_AUTHORITY_SOURCES = {"memory", "cache", "previous_state", "local_ui_state"}
+BOUNDED_EXTENSION_FIXTURE = "llm_bounded_extension.valid.json"
+BOUNDED_EXTENSION_RECORD_SCHEMAS = {
+    "runtime": "runtime.schema.json",
+    "adapter": "adapter.schema.json",
+    "runtime_manifest": "runtime_manifest.schema.json",
+    "adapter_manifest": "adapter_manifest.schema.json",
+    "capability": "capability.schema.json",
+    "permission": "permission.schema.json",
+    "approval": "approval.schema.json",
+    "audit_event": "audit.schema.json",
+    "recovery_action": "recovery.schema.json",
+    "content_exposure_policy": "content_exposure.schema.json",
+    "update_policy": "update.schema.json",
+}
 RUST_HELPER_REQUIRED_SOURCES = {
     "lib.rs",
     "process.rs",
@@ -1867,6 +1880,239 @@ def test_agent_auto_permission_is_advisory_only() -> list[str]:
     return []
 
 
+def load_bounded_extension_fixture() -> dict:
+    return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
+
+
+def bounded_extension_validation_errors(extension: dict) -> list[str]:
+    errors = []
+    for key, schema_name in BOUNDED_EXTENSION_RECORD_SCHEMAS.items():
+        record = extension.get(key)
+        if not isinstance(record, dict):
+            errors.append(f"bounded extension missing object record: {key}")
+            continue
+        for failure in validate_instance(record, load_schema(schema_name)):
+            errors.append(f"bounded extension {key} failed {schema_name}: {failure}")
+
+    runtime = extension.get("runtime", {})
+    adapter = extension.get("adapter", {})
+    runtime_manifest = extension.get("runtime_manifest", {})
+    adapter_manifest = extension.get("adapter_manifest", {})
+    capability = extension.get("capability", {})
+    permission = extension.get("permission", {})
+    approval = extension.get("approval", {})
+    audit_event = extension.get("audit_event", {})
+    recovery_action = extension.get("recovery_action", {})
+    content_policy = extension.get("content_exposure_policy", {})
+
+    runtime_id = runtime.get("runtime_id")
+    adapter_id = adapter.get("adapter_id")
+    capability_id = capability.get("capability_id")
+    permission_id = permission.get("permission_id")
+
+    if extension.get("evidence_classification") != "contract_conformance":
+        errors.append("bounded extension must be classified as contract_conformance")
+    required_non_claims = {
+        "not_installed_product_evidence",
+        "not_windows_release_evidence",
+        "not_cross_agent_reproduction_evidence",
+        "not_public_standard_adoption_evidence",
+    }
+    missing_non_claims = required_non_claims - set(extension.get("non_claims", []))
+    if missing_non_claims:
+        errors.append(f"bounded extension missing non-claims: {', '.join(sorted(missing_non_claims))}")
+
+    if runtime_id != runtime_manifest.get("runtime_id"):
+        errors.append("bounded extension runtime_manifest runtime_id does not match runtime")
+    if runtime_id != adapter.get("runtime_id") or runtime_id != adapter_manifest.get("runtime_id"):
+        errors.append("bounded extension adapter runtime_id does not match runtime")
+    if runtime.get("adapter_id") != adapter_id or adapter_manifest.get("adapter_id") != adapter_id:
+        errors.append("bounded extension adapter_id linkage is inconsistent")
+    if runtime_manifest.get("runtime_type") != "tool_runtime" or runtime.get("kind") != "tool":
+        errors.append("bounded extension reference must remain a tool runtime")
+    if adapter.get("transport") != "mock" or adapter_manifest.get("transport") != "mock":
+        errors.append("bounded extension reference must not require privileged transport")
+    if adapter.get("authority_strip") is not True or adapter_manifest.get("authority_strip") is not True:
+        errors.append("bounded extension adapter must require authority_strip=true")
+    if runtime_manifest.get("signed_manifest") is not True or adapter_manifest.get("signed_manifest") is not True:
+        errors.append("bounded extension manifests must be signed")
+
+    for record_name, capabilities in {
+        "runtime": runtime.get("capabilities", []),
+        "runtime_manifest": runtime_manifest.get("capabilities", []),
+        "adapter": adapter.get("declared_capabilities", []),
+        "adapter_manifest": adapter_manifest.get("declared_capabilities", []),
+    }.items():
+        if capability_id not in capabilities:
+            errors.append(f"bounded extension {record_name} does not declare capability {capability_id}")
+    if permission_id not in runtime_manifest.get("permissions", []):
+        errors.append("bounded extension runtime_manifest does not declare permission")
+    if permission.get("capability_id") != capability_id:
+        errors.append("bounded extension permission does not map to capability")
+    if permission.get("source") != "policy":
+        errors.append("bounded extension permission source must be policy, not runtime or metadata")
+    if permission.get("decision") != "allow":
+        errors.append("bounded extension positive fixture permission must be allow")
+
+    if approval.get("runtime_id") != runtime_id or approval.get("operation") != capability_id:
+        errors.append("bounded extension approval does not map to runtime capability")
+    if approval.get("status") != "approved":
+        errors.append("bounded extension positive fixture approval must be approved")
+    if audit_event.get("payload_hash") != approval.get("payload_hash"):
+        errors.append("bounded extension audit payload_hash does not match approval payload_hash")
+    if audit_event.get("action") != capability_id or audit_event.get("target") != runtime_id:
+        errors.append("bounded extension audit target/action does not map to runtime capability")
+    if not recovery_action.get("recovery_id"):
+        errors.append("bounded extension recovery mapping is missing")
+
+    if content_policy.get("default_visibility") != "none":
+        errors.append("bounded extension content exposure default must be none")
+    if "full" in content_policy.get("allowed_visibility", []):
+        errors.append("bounded extension content exposure policy must not allow full payload")
+    if approval.get("content_visibility") not in content_policy.get("allowed_visibility", []):
+        errors.append("bounded extension approval visibility is outside content policy")
+
+    return errors
+
+
+def build_bounded_extension_state(extension: dict) -> RuntimeState:
+    state = RuntimeState()
+    state.register_runtime(extension["runtime"])
+    state.register_adapter(extension["adapter"])
+    state.register_capability(extension["capability"])
+    state.record_permission(extension["permission"])
+    state.enqueue_approval(extension["approval"])
+    state.append_audit_event(extension["audit_event"])
+    state.register_recovery_action(extension["recovery_action"])
+    state.register_update_policy(extension["update_policy"])
+    return state
+
+
+def build_bounded_extension_action(extension: dict) -> dict:
+    approval = extension["approval"]
+    return {
+        "runtime_id": extension["runtime"]["runtime_id"],
+        "operation": extension["capability"]["capability_id"],
+        "capability_id": extension["capability"]["capability_id"],
+        "permission_id": extension["permission"]["permission_id"],
+        "approval_id": approval["approval_id"],
+        "approval_state": "approved",
+        "payload": approval["redacted_payload"],
+        "audit_event": extension["audit_event"],
+        "recovery_action": extension["recovery_action"],
+        "adapter_metadata": extension["adapter"].get("metadata", {}),
+    }
+
+
+def test_l3_bounded_reference_extension_uses_existing_contracts() -> list[str]:
+    extension = load_bounded_extension_fixture()
+    errors = bounded_extension_validation_errors(extension)
+
+    catalog = RuntimeCatalog()
+    try:
+        catalog.register_runtime_manifest(extension["runtime_manifest"])
+        catalog.register_adapter_manifest(extension["adapter_manifest"])
+    except ValueError as exc:
+        errors.append(f"bounded extension manifest registration failed: {exc}")
+    if catalog.can_grant_authority(extension["runtime_manifest"]):
+        errors.append("bounded extension runtime manifest granted authority")
+    if catalog.metadata_attempts_authority(extension["adapter_manifest"].get("metadata", {})):
+        errors.append("bounded extension adapter manifest metadata attempted authority")
+
+    try:
+        adapter_record = load_adapter(extension["adapter"])
+    except ValueError as exc:
+        errors.append(f"bounded extension adapter load failed: {exc}")
+    else:
+        if adapter_record.effective_capabilities() != tuple(extension["adapter"]["declared_capabilities"]):
+            errors.append("bounded extension adapter metadata changed effective capabilities")
+
+    marker = extension["runtime"]["runtime_id"]
+    for path in sorted(SHELL_CORE.glob("*.py")):
+        if marker in path.read_text(encoding="utf-8"):
+            errors.append(f"bounded extension runtime-specific marker leaked into Shell Core: {path}")
+    return errors
+
+
+def test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping() -> list[str]:
+    extension = load_bounded_extension_fixture()
+    state = build_bounded_extension_state(extension)
+    result = PolicyEvaluator(state).evaluate(build_bounded_extension_action(extension))
+    errors = []
+    if not result["allowed"]:
+        errors.append(f"bounded extension declared mapping was rejected: {result['errors']}")
+    if result.get("audit_required") is not True:
+        errors.append("bounded extension policy result did not require audit")
+
+    projected = project_approval_content(extension["approval"])
+    if "full_payload" in projected:
+        errors.append("bounded extension projected full payload without full visibility")
+    if "redacted_payload" not in projected:
+        errors.append("bounded extension did not project the declared redacted payload")
+    return errors
+
+
+def test_l3_bounded_reference_extension_negative_cases_fail_closed() -> list[str]:
+    extension = load_bounded_extension_fixture()
+    errors = []
+
+    def assert_policy_error(label: str, mutate, expected_code: str) -> None:
+        state = build_bounded_extension_state(extension)
+        action = build_bounded_extension_action(extension)
+        mutate(state, action)
+        result = PolicyEvaluator(state).evaluate(action)
+        if result["allowed"] or expected_code not in error_codes(result):
+            errors.append(f"bounded extension negative case did not fail closed for {label}: {result}")
+
+    assert_policy_error(
+        "adapter metadata authority escalation",
+        lambda state, action: action.update({"adapter_metadata": {"generated_config": {"permissionGrant": "all"}}}),
+        "adapter_metadata_escalation_attempt",
+    )
+    assert_policy_error(
+        "undeclared capability",
+        lambda state, action: action.update({"capability_id": "diagnostic.write.undeclared"}),
+        "unknown_capability",
+    )
+    assert_policy_error(
+        "undeclared permission",
+        lambda state, action: action.update({"permission_id": "permission.diagnostic.write.undeclared"}),
+        "unknown_permission",
+    )
+    assert_policy_error(
+        "self-approved action without approval id",
+        lambda state, action: action.pop("approval_id"),
+        "approval_missing",
+    )
+    assert_policy_error(
+        "missing audit mapping",
+        lambda state, action: action.pop("audit_event"),
+        "audit_mapping_missing",
+    )
+    assert_policy_error(
+        "missing recovery mapping",
+        lambda state, action: action.pop("recovery_action"),
+        "recovery_mapping_missing",
+    )
+
+    for source in sorted(NON_AUTHORITY_SOURCES):
+        assert_policy_error(
+            f"{source} authority source",
+            lambda state, action, source=source: action.update({"authority_source": source}),
+            "non_authority_source_attempt",
+        )
+
+    approval = copy.deepcopy(extension["approval"])
+    approval["content_visibility"] = "full"
+    policy = extension["content_exposure_policy"]
+    projected = project_approval_content(approval)
+    if approval["content_visibility"] in policy["allowed_visibility"]:
+        errors.append("bounded extension content policy allowed full visibility")
+    if "full_payload" not in projected:
+        errors.append("bounded extension full visibility mutation did not expose why policy rejection is required")
+    return errors
+
+
 def test_audit_chain_verification_fails_on_tampered_event() -> list[str]:
     event = load_contract_fixture("audit.valid.json")
     first = chain_event(event, None)
@@ -2009,6 +2255,9 @@ def main() -> int:
         test_agent_git_push_requires_explicit_approval,
         test_agent_generated_diff_must_be_auditable,
         test_agent_auto_permission_is_advisory_only,
+        test_l3_bounded_reference_extension_uses_existing_contracts,
+        test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
+        test_l3_bounded_reference_extension_negative_cases_fail_closed,
         test_audit_chain_verification_fails_on_tampered_event,
         test_setup_doctor_public_bind_warning_exists,
         test_desktop_agent_center_required_surface_exists,

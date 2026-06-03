@@ -60,7 +60,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "596af6de3c180df95aad196e37e78827cbdace1aabb675e0ede7963475221c60"
+      "sha256": "f2a63f52337573bc14c3e4da1052711574cc12a4d2a0986a26f5a9d563355550"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -80,7 +80,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "895010276e53ec279df43130f27200722e2203ad0efd76bb9af1ee280d1c4b6b"
+      "sha256": "a43c4b0ed4d1187be91a0d869b7f29f405708a7dbe4b587d1ae1ea0cb0479a0d"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "6603aee7be8e2ed5ff4e7bafc29ae04445e25e8cd6c7850d0a6cbd758a11054e"
+      "sha256": "7e0e0c304debdd1ecb1a98fe1da2b44783c8899d6b87e42a84cd7d55cc34c3c0"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -527,6 +527,10 @@
       "sha256": "81419021e81c9704ad84120df8ba05692de380ea2d0ab7213dd72b65a667047a"
     },
     {
+      "path": "examples/contracts/llm_bounded_extension.valid.json",
+      "sha256": "b2fba8d4b66d692bd5b4525e83e8978e6961229870a7e0c8c31649b0da16c374"
+    },
+    {
       "path": "examples/contracts/permission.valid.json",
       "sha256": "4f16dd1929e55491cdbc254fe5f78452bbc0ce75ef658847b54d6de23a3c4755"
     },
@@ -700,7 +704,7 @@
     },
     {
       "path": "packages/shell_core/permission_ledger.py",
-      "sha256": "a15a1f665d11f5434fab23ca3b86c725ed924444696a86d88eaf94fe2bc56371"
+      "sha256": "be81c4a384c54f0c8cb9c482f5516067758c8a23f792db5db593cdbc4552e0b3"
     },
     {
       "path": "packages/shell_core/persistence.py",
@@ -860,7 +864,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8ffc639ad87324ae4a986cfcf2f610c84115f81ce1c32f570127feeb15d4b3a2"
+      "sha256": "e5a33bc8866cbabd2bf4ccb0a9df71952aedc2e4b111d53e5e6b1d9181ed501e"
     },
     {
       "path": "tooling/evidence_bundle.py",

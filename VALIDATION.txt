@@ -1,3 +1,91 @@
+validation_update_2026_06_04_l3_bounded_llm_extension_conformance:
+  scope: L3 bounded LLM-readable extension conformance harness
+  commit: pre_commit_validation_from_d0abc77c5a5354e51fb7cb3e39d8e345e996b5a9
+  implemented_behavior:
+    - examples/contracts/llm_bounded_extension.valid.json defines a bounded non-authoritative diagnostic extension using existing runtime, adapter, manifest, capability, permission, approval, audit, recovery, content exposure, and update contracts.
+    - tooling/conformance_tests/run_conformance_skeleton.py validates the bounded extension through existing contracts and proves positive governed-path behavior plus negative fail-closed cases for authority metadata, undeclared capability/permission, self-approval, missing audit, missing recovery, full-content exposure without policy, and non-authority sources.
+    - packages/shell_core/permission_ledger.py expands non-authority source names so generated_config, generated_output, tool_output, tool_response, metadata, external_metadata, adapter_metadata, diagnostics, history, gui_state, and ui_state cannot grant authority in the validation oracle.
+    - No schema, Flutter, Rust Broker, installer, Windows evidence, raw evidence, or build artifact changed.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    bounded_extension_fixture: FIXTURE
+    shell_core_permission_ledger: INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "conformance skeleton passed: 102 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | FIXTURE | LIVE_RUNTIME
+      exit: 0
+      stdout: release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: Rust Security Broker production convergence
+      classification: release_blocker
+      reason: authority_cutover_status remains not_active, real external command dispatch remains suspended, and process / credential / update gated execution remains incomplete.
+      required_action: Complete Track R Block R1 before Windows-first product release.
+      blocks_release: yes
+    - item: Windows installed-path product evidence
+      classification: release_blocker
+      reason: installed no-Python-runtime evidence, Windows installed-path broker proof, first-run proof, Setup Doctor proof, strict Windows validation, and owner GO remain incomplete.
+      required_action: Complete Track R Blocks R2/R3 and obtain owner GO before Windows-first product release.
+      blocks_release: yes
+    - item: cross-agent LLM-readable substrate reproduction
+      classification: known_limitation
+      reason: bounded reference extension conformance now exists, but independent cross-agent reproduction is not complete.
+      required_action: Complete Track L Blocks L4-L5 before cross-agent LLM-substrate claims.
+      blocks_release: no
+
 validation_update_2026_06_04_c0_unified_completion_roadmap:
   scope: Unified completion roadmap and current validation evidence alignment
   commit: pre_commit_validation_from_bdd28125c45d1c69686bfe8e271872b2dd260669

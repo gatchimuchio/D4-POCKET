@@ -1,0 +1,177 @@
+{
+  "evidence_classification": "contract_conformance",
+  "non_claims": [
+    "not_installed_product_evidence",
+    "not_windows_release_evidence",
+    "not_cross_agent_reproduction_evidence",
+    "not_public_standard_adoption_evidence"
+  ],
+  "runtime": {
+    "runtime_id": "llm_bounded_diagnostic",
+    "name": "LLM Bounded Diagnostic",
+    "kind": "tool",
+    "status": "ready",
+    "adapter_id": "llm_bounded_diagnostic_adapter",
+    "version": "0.1.0",
+    "endpoints": {
+      "status": "mock://llm_bounded_diagnostic/status"
+    },
+    "capabilities": [
+      "diagnostic.read.bounded"
+    ],
+    "diagnostic_summary": "Non-authoritative bounded diagnostic reference extension."
+  },
+  "adapter": {
+    "adapter_id": "llm_bounded_diagnostic_adapter",
+    "runtime_id": "llm_bounded_diagnostic",
+    "contract_version": "v1.0",
+    "transport": "mock",
+    "authority_strip": true,
+    "content_exposure_policy_id": "llm-bounded-default-safe",
+    "declared_capabilities": [
+      "diagnostic.read.bounded"
+    ],
+    "metadata": {
+      "note": "descriptive only",
+      "evidence_classification": "contract_conformance"
+    }
+  },
+  "runtime_manifest": {
+    "runtime_id": "llm_bounded_diagnostic",
+    "display_name": "LLM Bounded Diagnostic",
+    "runtime_type": "tool_runtime",
+    "supported_platforms": [
+      "linux",
+      "macos",
+      "windows"
+    ],
+    "required_tools": [],
+    "required_ports": [],
+    "storage_paths": [
+      "~/.gui-shell/runtimes/llm_bounded_diagnostic"
+    ],
+    "network_policy": "localhost_only",
+    "capabilities": [
+      "diagnostic.read.bounded"
+    ],
+    "permissions": [
+      "permission.diagnostic.read.bounded"
+    ],
+    "audit_profile": "bounded_extension_audit",
+    "recovery_profile": "bounded_extension_recovery",
+    "trust_profile": "signed_local",
+    "signed_manifest": true
+  },
+  "adapter_manifest": {
+    "adapter_id": "llm_bounded_diagnostic_adapter",
+    "runtime_id": "llm_bounded_diagnostic",
+    "contract_version": "v1.0",
+    "transport": "mock",
+    "authority_strip": true,
+    "content_exposure_policy_id": "llm-bounded-default-safe",
+    "declared_capabilities": [
+      "diagnostic.read.bounded"
+    ],
+    "metadata": {
+      "note": "manifest metadata is descriptive only"
+    },
+    "signed_manifest": true
+  },
+  "capability": {
+    "capability_id": "diagnostic.read.bounded",
+    "name": "Bounded Diagnostic Read",
+    "description": "Read a redacted diagnostic summary without privileged execution.",
+    "risk_level": "low",
+    "default_permission": "ask",
+    "requires_approval": true
+  },
+  "permission": {
+    "permission_id": "permission.diagnostic.read.bounded",
+    "capability_id": "diagnostic.read.bounded",
+    "scope": "operation",
+    "decision": "allow",
+    "source": "policy",
+    "expires_at": null,
+    "constraints": {
+      "visibility": "redacted",
+      "privileged_execution": false
+    }
+  },
+  "approval": {
+    "approval_id": "approval-llm-bounded-diagnostic",
+    "runtime_id": "llm_bounded_diagnostic",
+    "operation": "diagnostic.read.bounded",
+    "status": "approved",
+    "content_visibility": "redacted",
+    "payload_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "summary": "Read redacted diagnostics from the bounded reference extension.",
+    "redacted_payload": {
+      "diagnostic": "[redacted]",
+      "status": "ready"
+    },
+    "full_payload": {
+      "diagnostic": "internal diagnostic detail",
+      "credential": "must not project"
+    },
+    "editable_fields": [
+      "note"
+    ],
+    "sealed_fields": [
+      "runtime_id",
+      "operation"
+    ],
+    "hidden_fields": [
+      "credential"
+    ],
+    "sacred_fields": [
+      "authority_context"
+    ],
+    "authority_fields": [
+      "actor",
+      "permission_id"
+    ]
+  },
+  "audit_event": {
+    "event_id": "audit-llm-bounded-diagnostic",
+    "timestamp": "2026-06-04T00:00:00Z",
+    "actor": "adapter",
+    "action": "diagnostic.read.bounded",
+    "target": "llm_bounded_diagnostic",
+    "result": "success",
+    "payload_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "previous_event_hash": null,
+    "metadata": {
+      "evidence_classification": "contract_conformance"
+    }
+  },
+  "recovery_action": {
+    "recovery_id": "recover-llm-bounded-diagnostic",
+    "class": "permission_denied",
+    "severity": "warning",
+    "user_visible_message": "The bounded diagnostic extension cannot run until its declared permission and approval path is valid.",
+    "safe_to_retry": true,
+    "steps": [
+      "Review the declared capability and permission.",
+      "Retry only after approval and audit mapping are present."
+    ],
+    "requires_user_action": true
+  },
+  "content_exposure_policy": {
+    "policy_id": "llm-bounded-default-safe",
+    "default_visibility": "none",
+    "allowed_visibility": [
+      "none",
+      "hash_only",
+      "summary",
+      "redacted"
+    ],
+    "redaction_required": true
+  },
+  "update_policy": {
+    "policy_id": "updates-llm-bounded-diagnostic",
+    "channel": "pinned",
+    "auto_update": false,
+    "signature_required": true,
+    "rollback_enabled": true
+  }
+}

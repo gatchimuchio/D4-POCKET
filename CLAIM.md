@@ -16,13 +16,13 @@ GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a dev
 
 GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete without validation evidence from a macOS host.
 
-The LLM-readable substrate definition does not prove cross-agent reproduction, public standard adoption, third-party interoperability, or ecosystem readiness. It does not close any current release blocker.
+The LLM-readable substrate definition and bounded reference extension conformance do not prove cross-agent reproduction, public standard adoption, third-party interoperability, installed-product behavior, or ecosystem readiness. They do not close any current Windows-first product release blocker.
 
 ## Current Completed Areas
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: current C0 development validation passes with 99 conformance checks; historical 96-check entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts and static no-FFI/no-Python-spawn assertions are covered.
+  status: current development validation passes with 102 conformance checks; historical 99-check and 96-check entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, and bounded LLM-readable extension contract/conformance checks are covered.
 
 - item: personal Windows trial operation
   classification: required_for_v1
