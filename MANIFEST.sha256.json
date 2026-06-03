@@ -640,7 +640,7 @@
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "51795e76ae5ad6c99963977e8050a44bab5702fe07e48549e33e4b59e5500f9c"
+      "sha256": "6ef177e7b51abd792c4cbeabc3d15a655017c73207c7b70108d65b5751aacd34"
     },
     {
       "path": "packages/shell_core/__init__.py",

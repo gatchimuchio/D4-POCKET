@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -170,8 +170,15 @@ fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::
     stream.write_all(request.as_bytes())?;
     stream.write_all(b"\n")?;
     stream.shutdown(std::net::Shutdown::Write)?;
+    let mut reader = BufReader::new(stream);
     let mut response = String::new();
-    stream.read_to_string(&mut response)?;
+    reader.read_line(&mut response)?;
+    if response.trim().is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "broker IPC response was empty",
+        ));
+    }
     serde_json::from_str(response.trim())
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
 }
