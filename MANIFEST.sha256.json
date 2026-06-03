@@ -60,7 +60,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "55f83f79e4cea6f42ddfd628203b83b58eb884a67b1917b66999a36a46dd574b"
+      "sha256": "596af6de3c180df95aad196e37e78827cbdace1aabb675e0ede7963475221c60"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -80,15 +80,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "846975ea7b5121c5f6e4dcfb6d8f0083001bdc170085f26993406378745bb8d5"
+      "sha256": "895010276e53ec279df43130f27200722e2203ad0efd76bb9af1ee280d1c4b6b"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "71d628830f5a82ed1791ffe1c9a9ab71fd4e126fe751dc37ac0bfaf4500ce484"
+      "sha256": "13cf4f7d8c18108ad1e6f2a7f6044ae0cdb42af532ccd3ac8ec62f95fe03cf82"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3223b26f0c087746435c6a961f2816cfbb6a06e26a51aaee1a65c1a8bcc0d5dd"
+      "sha256": "3300074bd1fafb84f3b06b7459f8ba1b9e8698a5e3ca950c736e2a298beb53ce"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "344ac52bc2350dd0b887cc91e27ea0aa72c1c482a67be914335208da93ac9343"
+      "sha256": "6603aee7be8e2ed5ff4e7bafc29ae04445e25e8cd6c7850d0a6cbd758a11054e"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -224,7 +224,7 @@
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
-      "sha256": "4cb194bdae5f45b0eceeec238cec33f7db252cd43cf8ffe3c6033cb14e8732d7"
+      "sha256": "4c9cac450659a3178f55aa8a202c986216554346633d6c484e7c6ba24e45e0ca"
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
@@ -253,6 +253,10 @@
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
       "sha256": "92f95ab78680bfa2908a965fbb25831f3050f7114be3589d78a4f504ad3c363e"
+    },
+    {
+      "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
+      "sha256": "6fbe2151e6d352a24febbdd20938023641bd3387864db0efff66ba2adc6135ad"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",

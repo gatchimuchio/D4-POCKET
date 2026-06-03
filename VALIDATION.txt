@@ -1,3 +1,90 @@
+validation_update_2026_06_04_c0_unified_completion_roadmap:
+  scope: Unified completion roadmap and current validation evidence alignment
+  commit: pre_commit_validation_from_bdd28125c45d1c69686bfe8e271872b2dd260669
+  implemented_behavior:
+    - docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md establishes the canonical C/L/R/P/F completion roadmap.
+    - Current validation evidence is aligned with the current conformance count of 99 checks.
+    - Historical 96-check entries are preserved as prior evidence and are not rewritten.
+    - No production/runtime behavior, schema, Rust Broker, Flutter, installer, Windows evidence, or conformance harness implementation changed.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "conformance skeleton passed: 99 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  stale_count_handling:
+    decision: preserve_historical_96_check_entries
+    reason: Existing 96-check strings in VALIDATION.txt are historical validation evidence. Current README and this entry record 99 checks as the current output.
+    test_change_required: no
+    reason_test_change_not_required: tooling/conformance_tests/run_conformance_skeleton.py currently rejects older stale current-claim counts such as 23, 49, 51, 53, and 55, but does not globally reject 96 in historical evidence contexts.
+  release_gate_classification:
+    - item: Rust Security Broker production convergence
+      classification: release_blocker
+      reason: authority_cutover_status remains not_active, real external command dispatch remains suspended, and process / credential / update gated execution remains incomplete.
+      required_action: Complete Track R Block R1 before Windows-first product release.
+      blocks_release: yes
+    - item: Windows installed-path product evidence
+      classification: release_blocker
+      reason: installed no-Python-runtime evidence, Windows installed-path broker proof, first-run proof, Setup Doctor proof, and strict Windows validation remain incomplete.
+      required_action: Complete Track R Blocks R2/R3 before Windows-first product release.
+      blocks_release: yes
+    - item: owner GO
+      classification: release_blocker
+      reason: explicit owner release approval has not been recorded.
+      required_action: Obtain owner GO only after required evidence closes.
+      blocks_release: yes
+    - item: LLM-readable extension substrate demonstration
+      classification: known_limitation
+      reason: definition is locked, but bounded extension conformance and cross-agent reproduction are not yet complete.
+      required_action: Complete Track L Blocks L1-L5 before demonstrated central LLM-substrate public claims.
+      blocks_release: no
+
 validation_update_2026_06_03_block_e_installed_first_run_broker_gate:
   scope: Windows installed first-run broker-mediated and no-Python launch evidence gate
   commit: pre_commit_validation

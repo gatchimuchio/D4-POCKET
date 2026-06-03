@@ -176,6 +176,14 @@ The canonical phase definitions live in [docs/PHASE_STRATEGY.md](./docs/PHASE_ST
 
 Completed product release is not claimed. Language policy runtime convergence, Phase D measured Windows installed-path evidence, and explicit owner GO remain `release_blocker` items before any release-ready claim.
 
+The canonical execution roadmap from current state through Windows-first OSS v1.0 product release, demonstrated LLM-readable extension substrate capability, initial public release, and post-public product QC is:
+
+```text
+docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md
+```
+
+Use that roadmap for the unified C/L/R/P/F block model. This file preserves the phase roadmap and current release blockers.
+
 ## LLM-Readable Extension Surface Workstream
 
 This workstream adds the architectural direction that GUI Shell contracts are intended to be read and used by LLM development / integration agents as first-class implementation and integration surfaces.

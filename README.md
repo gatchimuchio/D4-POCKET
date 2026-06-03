@@ -190,6 +190,8 @@ The canonical phase source is [docs/PHASE_STRATEGY.md](./docs/PHASE_STRATEGY.md)
 - Phase E: OSS v1.0 RC later
 - Phase F: paid/product QC later
 
+The canonical completion roadmap for the combined Windows-first product path and LLM-readable substrate demonstration path is [docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md](./docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md).
+
 This repository does not claim completed product release readiness. Strict Windows installed-path evidence, measured Setup Doctor evidence, and explicit owner GO are classified as `release_blocker` before any release-ready claim.
 
 ## Release-Gate Classification
@@ -232,6 +234,7 @@ before product UI.
 
 - [AGENTS.md](./AGENTS.md): repository agent rules
 - [ROADMAP.md](./ROADMAP.md): phase roadmap and execution order
+- [docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md](./docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md): canonical completion roadmap for product responsibility and LLM-readable substrate proof
 - [docs/PHASE_STRATEGY.md](./docs/PHASE_STRATEGY.md): Phase A/B/C/D/E/F readiness boundaries
 - [docs/OPERATING_MODEL.md](./docs/OPERATING_MODEL.md): repository flow, backup model, and validation gates
 - [CLAIM.md](./CLAIM.md): current claim boundary

@@ -8,6 +8,8 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 Phase A personal Windows trial operation is complete. Phase B owner-use operational hardening is complete. This checklist remains the completed product release gate and must not be weakened for Phase B.
 
+The canonical completion roadmap for the combined Windows-first product path and LLM-readable substrate demonstration path is `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
+
 ## Release Blockers
 
 - item: language policy runtime convergence gate
@@ -230,6 +232,28 @@ Phase A personal Windows trial operation is complete. Phase B owner-use operatio
   classification: release_blocker
   required_action: Obtain explicit owner GO.
   blocks_release: yes
+
+## LLM-Readable Substrate Claim Gates
+
+- item: LLM extension contract sufficiency unresolved
+  classification: known_limitation
+  reason: GUI Shell is defined as an LLM-readable substrate, but the existing contract families have not yet been audited for bounded LLM-built extension onboarding.
+  required_action: Complete Block L1 in `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
+  blocks_release: no
+
+- item: bounded extension conformance not passed
+  classification: known_limitation
+  reason: No bounded reference extension / adapter conformance harness has yet proven that LLM-built integrations cannot escalate authority, bypass approval, bypass content exposure, omit audit, omit recovery, or break runtime neutrality.
+  required_action: Complete Blocks L2/L3 as required by the L1 gap decision.
+  blocks_release: no
+
+- item: cross-agent reproduction not passed
+  classification: known_limitation
+  reason: More than one independent LLM development agent has not yet reproduced the same bounded extension task from the repository contracts.
+  required_action: Complete Blocks L4/L5 before making cross-agent LLM-readable substrate claims.
+  blocks_release: no
+
+These items block a demonstrated LLM-readable substrate public claim. They do not automatically block a narrowly described Windows-first desktop product release unless the owner chooses the default combined public positioning in the canonical roadmap.
 
 ## Post-v1 Scope Defaults
 

@@ -8,6 +8,8 @@ Current claim: PC-first AI Runtime / Agent Operation Shell with Phase B owner-us
 
 Repository definition update: GUI-Shell is now also documented as an LLM-readable application responsibility substrate. This means LLM development / integration agents are intended to read GUI Shell contracts and use them as first-class implementation and integration surfaces. LLMs remain non-authoritative; human operators retain final approval, recovery, responsibility, and release-claim authority.
 
+The canonical completion roadmap for aligning Windows-first product responsibility and LLM-readable substrate demonstration is `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
+
 Phase A, personal Windows trial operation, is complete: the Windows desktop build and native launch smoke passed, and Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible. Phase B owner-use completion is complete: the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. External claim hygiene, measured Windows release evidence, OSS release candidate claims, and paid/product QC remain later phases.
 
 GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a development/verification slice, but it is not final product proof by itself. macOS is an unverified planned portability target, and BLUE-TANUKI remains a consumer/reference runtime rather than a GUI-Shell release dependency.
@@ -20,7 +22,7 @@ The LLM-readable substrate definition does not prove cross-agent reproduction, p
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: passed in development validation with 96 conformance checks; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts and static no-FFI/no-Python-spawn assertions are covered.
+  status: current C0 development validation passes with 99 conformance checks; historical 96-check entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts and static no-FFI/no-Python-spawn assertions are covered.
 
 - item: personal Windows trial operation
   classification: required_for_v1

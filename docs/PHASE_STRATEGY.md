@@ -75,6 +75,16 @@ GUI-Shell uses phase-based readiness language so owner-use progress is not confu
   status: later
   goal: complete support, rollback, long-run, legal, dependency, installer, and third-party-user quality gates.
 
+## Unified Completion Roadmap
+
+The canonical execution roadmap for moving from the current Phase B owner-use state through Windows-first product completion, LLM-readable substrate demonstration, initial public release, and post-public product QC is:
+
+```text
+docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md
+```
+
+This roadmap adds C/L/R/P/F execution blocks without changing the completed Phase A or Phase B status. Its LLM-readable substrate claim gates must not conceal the existing Rust Broker, Windows installed-path evidence, strict release validation, or owner GO release blockers.
+
 ## Release Rule
 
 Do not claim completed product release until language policy runtime convergence is proven, strict Windows release validation passes, and owner GO is explicit.
