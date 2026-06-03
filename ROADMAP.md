@@ -1,7 +1,7 @@
 # GUI Shell Roadmap
 
 Status: Phase B owner-use complete; v1.0 desktop release roadmap  
-Project: GUI Shell / Runtime Operation Shell  
+Project: GUI Shell / Runtime Operation Shell / LLM-readable application responsibility substrate
 Reference consumer/runtime: BLUE-TANUKI via adapter only  
 Primary implementation path: Flutter UI + Rust Security Broker for authority-sensitive production convergence; Rust helper remains bounded native diagnostics/operations where outside authority.
 
@@ -37,7 +37,7 @@ Primary implementation path: Flutter UI + Rust Security Broker for authority-sen
 
 ## 0. Product Definition
 
-GUI Shell is a PC-first AI Runtime / Agent Operation Shell for local runtimes, agents, tools, and services.
+GUI Shell is a PC-first AI Runtime / Agent Operation Shell and LLM-readable application responsibility substrate for local runtimes, agents, tools, and services.
 
 It is not a BLUE-TANUKI-specific GUI.
 
@@ -175,6 +175,47 @@ The canonical phase definitions live in [docs/PHASE_STRATEGY.md](./docs/PHASE_ST
 - Phase F: paid/product QC later
 
 Completed product release is not claimed. Language policy runtime convergence, Phase D measured Windows installed-path evidence, and explicit owner GO remain `release_blocker` items before any release-ready claim.
+
+## LLM-Readable Extension Surface Workstream
+
+This workstream adds the architectural direction that GUI Shell contracts are intended to be read and used by LLM development / integration agents as first-class implementation and integration surfaces.
+
+LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+
+This workstream coexists with the Windows-first release gates and Rust Security Broker convergence blockers. It must not conceal, rename, or close current `release_blocker` items.
+
+### Stage L0: Definition Lock
+
+- README / AGENTS / standards definition aligned.
+- Human-authority vs LLM-extension-agent boundary explicit.
+- Non-claims recorded.
+- Existing Phase A / Phase B status unchanged.
+
+### Stage L1: Contract Design
+
+- Determine whether an explicit machine-readable extension / module integration contract is required.
+- Map existing schemas against LLM-built module onboarding requirements.
+- Define required negative cases and failure behavior.
+- Report when existing contracts are sufficient instead of adding schema surface.
+
+### Stage L2: Conformance Harness
+
+- Add a bounded reference extension / adapter scenario.
+- Prove it cannot escalate authority.
+- Prove it cannot bypass approval.
+- Prove it emits audit evidence.
+- Prove failure maps to RecoveryAction or SUSPEND where required.
+
+### Stage L3: Cross-Agent Reproduction Evidence
+
+- Have more than one development agent independently read the repository and implement the same bounded extension task.
+- Compare whether both preserve contract boundaries and pass conformance.
+- Report differences and failure modes.
+
+### Stage L4: Public Standard / Ecosystem Claim Gate
+
+- Only after evidence exists, decide whether GUI Shell may claim to be an LLM-readable extension substrate demonstrated across development agents.
+- Do not claim public standard status, ecosystem adoption, or proven interoperability before measured reproduction evidence and owner approval.
 
 ### Phase 0: Standard / Selection Freeze
 

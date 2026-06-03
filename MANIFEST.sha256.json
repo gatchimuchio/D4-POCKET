@@ -52,7 +52,7 @@
   "files": [
     {
       "path": "AGENTS.md",
-      "sha256": "09c0ab2594ca4847ba1d5c136de8874b05510d41f11b9fbc0f244ed6b2b4f295"
+      "sha256": "3760ed4d077e6eff7719d16c5166c03c0aa4874fc6d6803dcdd1d2095c7414b6"
     },
     {
       "path": "AUDIT_EVIDENCE.md",
@@ -60,7 +60,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "1f8357fe3678b7b33a9bafeaa431d368f2ad328d7d713cfd2a73b5c62f185c48"
+      "sha256": "55f83f79e4cea6f42ddfd628203b83b58eb884a67b1917b66999a36a46dd574b"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -80,7 +80,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "d9d86cf4b0d904fbfa4a31eba297e484318289652ca34e333248ad0376f432ef"
+      "sha256": "846975ea7b5121c5f6e4dcfb6d8f0083001bdc170085f26993406378745bb8d5"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -88,7 +88,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9ee5ed2775946d160d98d8ef1fe6b2544a84a6711aacfe932cb3191aed11606d"
+      "sha256": "3223b26f0c087746435c6a961f2816cfbb6a06e26a51aaee1a65c1a8bcc0d5dd"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -320,7 +320,11 @@
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
-      "sha256": "d9379ac8b8973218e93621513f4857734a26eb59d502adad854310f8eff76dfb"
+      "sha256": "26f9348d7d2211c39d601a90fa7bc5155f74c6426db12c9e85ee4c38b9e008f0"
+    },
+    {
+      "path": "docs/standards/llm-readable-extension-surface.md",
+      "sha256": "abbd335fe6534fe70bc17a037f9910f337b75fff44e7e0ad2e9eb95a8f043342"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",

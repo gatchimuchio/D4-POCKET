@@ -10,6 +10,8 @@ Important note: BLUE-TANUKI is frozen as the Phase 0 reference runtime contract 
 
 GUI Shell is a generic runtime operation shell for multiple Runtime / Agent / Tool / Local Service targets.
 
+GUI Shell is also an LLM-readable application responsibility substrate: LLM development / integration agents may read and consume GUI Shell contracts as first-class implementation and integration surfaces, but LLMs are never authority sources.
+
 It provides:
 
 - installation-to-start experience
@@ -31,6 +33,7 @@ GUI Shell must not:
 - expose low-level CLI/WSL/npm/Git/runtime complexity to normal users
 - become a terminal wrapper
 - treat LLM/Agent output as authority
+- treat LLM implementation work as proof of release readiness or external standard adoption
 - store core assets in Flutter-only code
 
 ## 3. Core assets

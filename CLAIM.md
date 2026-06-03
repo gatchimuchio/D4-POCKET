@@ -6,11 +6,15 @@ GUI-Shell is not yet a completed product release.
 
 Current claim: PC-first AI Runtime / Agent Operation Shell with Phase B owner-use completion.
 
+Repository definition update: GUI-Shell is now also documented as an LLM-readable application responsibility substrate. This means LLM development / integration agents are intended to read GUI Shell contracts and use them as first-class implementation and integration surfaces. LLMs remain non-authoritative; human operators retain final approval, recovery, responsibility, and release-claim authority.
+
 Phase A, personal Windows trial operation, is complete: the Windows desktop build and native launch smoke passed, and Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible. Phase B owner-use completion is complete: the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. External claim hygiene, measured Windows release evidence, OSS release candidate claims, and paid/product QC remain later phases.
 
 GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a development/verification slice, but it is not final product proof by itself. macOS is an unverified planned portability target, and BLUE-TANUKI remains a consumer/reference runtime rather than a GUI-Shell release dependency.
 
 GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete without validation evidence from a macOS host.
+
+The LLM-readable substrate definition does not prove cross-agent reproduction, public standard adoption, third-party interoperability, or ecosystem readiness. It does not close any current release blocker.
 
 ## Current Completed Areas
 

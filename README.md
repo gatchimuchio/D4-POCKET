@@ -1,14 +1,17 @@
 # GUI Shell
 
-GUI Shell is a desktop-first AI Runtime / Agent Operation Shell for local runtimes, agents, tools, and services.
+GUI Shell is a desktop-first AI Runtime / Agent Operation Shell and LLM-readable application responsibility substrate for local runtimes, agents, tools, and services.
 
-It is **not** a BLUE-TANUKI-specific GUI. BLUE-TANUKI is a reference consumer/runtime and must connect through an adapter boundary; it is not a v1.0 release gate.
+It is a generic Runtime Operation Shell control plane whose contracts, safety boundaries, adapter model, approval model, audit model, recovery model, and extension rules are intended to be read by both human operators and LLM development/integration agents.
+
+It is **not** a BLUE-TANUKI-specific GUI. BLUE-TANUKI is the first reference consumer/runtime and must connect through an adapter boundary; it is not a v1.0 release gate.
 
 ## TL;DR
 
-1. **GUI Shell is a control plane.** Flutter renders operator surfaces; it does not own authority.
+1. **GUI Shell is a control plane and LLM-readable responsibility substrate.** Flutter renders operator surfaces; it does not own authority.
 2. **Schemas and conformance own the contract.** Runtime, adapter, permission, approval, audit, recovery, and content exposure semantics are JSON Schema-first.
-3. **Safety first, robustness second, product UI third.** Product screens never outrank authority strip, content exposure, approval, audit, and recovery boundaries.
+3. **LLMs may implement and integrate; they are not authority.** Human operators remain final approval, recovery, responsibility, and release-claim holders.
+4. **Safety first, robustness second, product UI third.** Product screens never outrank authority strip, content exposure, approval, audit, and recovery boundaries.
 
 ## Phase 0 locked surface
 
@@ -63,6 +66,29 @@ Runtime / Agent / Tool / Local Service
 
 The UI can display and request actions. It cannot create authority, bypass adapter conformance, or reinterpret runtime trust.
 
+## Human Operator and LLM Extension-Agent Model
+
+GUI Shell has two first-class interaction roles:
+
+- Human operator / owner: observes state, grants or denies approval, authorizes recovery, accepts release claims, and remains the final responsibility holder.
+- LLM development / integration agent: reads architecture and contract documents, implements bounded modules or adapters, connects runtimes/tools/services through declared contracts, runs validation, and reports evidence.
+
+LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+
+LLM output, generated configuration, memory, external metadata, GUI state, adapter metadata, previous state, and tool responses must not grant authority, approve sensitive operations, widen permissions, bypass conformance, or turn generated content into trusted truth. Sensitive work remains governed by capability, permission, approval, audit, recovery, content exposure, adapter, runtime, update/install, and broker boundaries.
+
+## Why LLM-Readable Contracts Matter
+
+GUI Shell is intended to make application/runtime extension work inspectable before implementation begins. A development agent should be able to read repository contracts and understand:
+
+- which contract surface a new module or adapter must consume;
+- which authority, approval, audit, recovery, and content exposure boundaries apply;
+- which failure case must reject, block, audit, or suspend behavior;
+- which validation path proves conformance;
+- when a proposed integration requires a new contract instead of an improvised shortcut.
+
+This definition is not an external ecosystem claim. Cross-agent reproduction, public standard status, and third-party interoperability remain unproven until measured evidence exists.
+
 ## Quickstart
 
 Validation checks the repository contracts and conformance skeleton. This skeleton does not assume Flutter or Rust is already installed.
@@ -82,8 +108,8 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 Expected successful output:
 
 ```text
-schema check passed: 25 schemas, 25 examples, 25 negative fixtures
-conformance skeleton passed: 96 checks
+schema check passed: 25 schemas, 25 examples, 27 negative fixtures
+conformance skeleton passed: 99 checks
 ```
 
 See [QUICKSTART.md](./QUICKSTART.md).

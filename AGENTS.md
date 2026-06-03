@@ -243,6 +243,24 @@ It is not a BLUE-TANUKI-specific GUI.
 
 BLUE-TANUKI is the first reference runtime and must connect through an adapter boundary.
 
+GUI Shell is also an LLM-readable application responsibility substrate. Its contracts, safety boundaries, adapter model, approval model, audit model, recovery model, and extension rules are intended to be read and used by LLM development / integration agents as first-class implementation and integration surfaces.
+
+LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+
+#### LLM Development / Integration Agent Rules
+
+Any AI or LLM implementation agent working in this repository must:
+
+- treat GUI Shell contracts as the mandatory connection surface for new functions, modules, adapters, tools, services, or runtime integrations;
+- identify whether each change belongs to runtime path, control path, diagnostic path, repair / recovery path, build / release path, or development-only path;
+- avoid adding adapters, tools, modules, external connections, or privileged behavior outside declared contract and conformance boundaries;
+- avoid granting authority through LLM output, memory, external metadata, generated configuration, GUI state, adapter metadata, tool responses, local cache, previous state, or diagnostics;
+- never approve its own sensitive action;
+- never weaken approval, audit, recovery, authority-strip, content exposure, or broker boundary behavior to make integration easier;
+- identify the consumed contract, required conformance test, required failure case, and governed runtime path before claiming an extension complete;
+- report when a proposed integration requires a new contract instead of silently improvising a shortcut;
+- keep human owner approval, recovery decisions, release claims, and final responsibility explicit.
+
 ### 13. Architecture Constraints
 
 - UI framework: Flutter
