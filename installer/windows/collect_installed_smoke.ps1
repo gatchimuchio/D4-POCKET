@@ -158,6 +158,91 @@ function Collect-VisibleSurfaces {
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
   $expected = @("Dashboard", "NavigationRail", "Runtime Status", "Invariant Status")
+  $aggregatePhrase = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
+
+  function Normalize-SurfaceText {
+    param([string]$Text)
+    return (($Text -replace "\s+", " ").Trim())
+  }
+
+  function Test-SurfaceTextContains {
+    param(
+      [string]$Text,
+      [string]$Label
+    )
+    if ($null -eq $Text -or $Text.Trim() -eq "") {
+      return $false
+    }
+    return ($Text -match [regex]::Escape($Label))
+  }
+
+  function Get-ElementString {
+    param(
+      $Element,
+      [string]$PropertyName
+    )
+    try {
+      $value = $Element.Current.$PropertyName
+      if ($null -eq $value) {
+        return ""
+      }
+      return $value.ToString().Trim()
+    } catch {
+      return ""
+    }
+  }
+
+  function Get-ControlTypeName {
+    param($Element)
+    try {
+      $value = $Element.Current.ControlType.ProgrammaticName
+      if ($null -eq $value) {
+        return ""
+      }
+      return $value.ToString().Trim()
+    } catch {
+      return ""
+    }
+  }
+
+  function New-ObservedElement {
+    param(
+      $Element,
+      [string]$ElementKey,
+      [bool]$IsRoot
+    )
+    $name = Get-ElementString -Element $Element -PropertyName "Name"
+    $automationId = Get-ElementString -Element $Element -PropertyName "AutomationId"
+    $className = Get-ElementString -Element $Element -PropertyName "ClassName"
+    $frameworkId = Get-ElementString -Element $Element -PropertyName "FrameworkId"
+    $controlType = Get-ControlTypeName -Element $Element
+    $searchText = Normalize-SurfaceText -Text "$name $automationId"
+    $surfacesPresent = @()
+    foreach ($label in $expected) {
+      if (Test-SurfaceTextContains -Text $searchText -Label $label) {
+        $surfacesPresent += $label
+      }
+    }
+    $isNativeContainer = (
+      $IsRoot -or
+      $controlType -in @("ControlType.Window", "ControlType.Pane") -or
+      $className -match "(?i)(Flutter|Window)"
+    )
+    return [pscustomobject][ordered]@{
+      element_key = $ElementKey
+      name = $name
+      automation_id = $automationId
+      control_type = $controlType
+      class_name = $className
+      framework_id = $frameworkId
+      is_root = $IsRoot
+      is_native_container = [bool]$isNativeContainer
+      surfaces_present = @($surfacesPresent)
+      surface_count = $surfacesPresent.Count
+      contains_all_required_surfaces = [bool]($surfacesPresent.Count -eq $expected.Count)
+    }
+  }
+
   $window = $null
   $deadline = (Get-Date).AddSeconds($WaitSeconds)
   $condition = New-Object System.Windows.Automation.PropertyCondition `
@@ -177,13 +262,18 @@ function Collect-VisibleSurfaces {
   }
 
   $names = New-Object System.Collections.Generic.List[string]
+  $observedElements = New-Object System.Collections.Generic.List[object]
   if ($null -ne $window) {
+    $observedElements.Add((New-ObservedElement -Element $window -ElementKey "root" -IsRoot $true))
     $elements = $window.FindAll(
       [System.Windows.Automation.TreeScope]::Descendants,
       [System.Windows.Automation.Condition]::TrueCondition
     )
     for ($index = 0; $index -lt $elements.Count; $index += 1) {
       $element = $elements.Item($index)
+      $observedElements.Add(
+        (New-ObservedElement -Element $element -ElementKey "descendant:$index" -IsRoot $false)
+      )
       foreach ($value in @(
           $element.Current.Name,
           $element.Current.AutomationId,
@@ -196,13 +286,87 @@ function Collect-VisibleSurfaces {
     }
   }
 
-  $surfaceText = ($names -join "`n")
-  $visible = @()
-  foreach ($label in $expected) {
-    if ($surfaceText -match [regex]::Escape($label)) {
-      $visible += $label
+  $aggregateSurfaceShortcutDetected = $false
+  foreach ($observed in $observedElements) {
+    $aggregateText = Normalize-SurfaceText -Text "$($observed.name) $($observed.automation_id)"
+    if ($observed.contains_all_required_surfaces) {
+      $aggregateSurfaceShortcutDetected = $true
+    }
+    if ($aggregateText -match [regex]::Escape($aggregatePhrase)) {
+      $aggregateSurfaceShortcutDetected = $true
     }
   }
+
+  $surfaceMatches = [ordered]@{}
+  $visible = @()
+  foreach ($label in $expected) {
+    $candidates = @($observedElements | Where-Object { $_.surfaces_present -contains $label })
+    $preferred = $null
+    if ($candidates.Count -gt 0) {
+      $preferred = @(
+        $candidates |
+          Where-Object { $_.surface_count -eq 1 -and !$_.is_root } |
+          Select-Object -First 1
+      )
+      if ($preferred.Count -eq 0) {
+        $preferred = @(
+          $candidates |
+            Where-Object { !$_.contains_all_required_surfaces -and !$_.is_root } |
+            Select-Object -First 1
+        )
+      }
+      if ($preferred.Count -eq 0) {
+        $preferred = @($candidates | Select-Object -First 1)
+      }
+      $preferred = $preferred[0]
+      $visible += $label
+      $surfaceMatches[$label] = [ordered]@{
+        matched = $true
+        name = $preferred.name
+        automation_id = $preferred.automation_id
+        control_type = $preferred.control_type
+        class_name = $preferred.class_name
+        framework_id = $preferred.framework_id
+        element_key = $preferred.element_key
+        is_root = $preferred.is_root
+        is_native_container = $preferred.is_native_container
+        surfaces_present = @($preferred.surfaces_present)
+      }
+    } else {
+      $surfaceMatches[$label] = [ordered]@{
+        matched = $false
+        name = ""
+        automation_id = ""
+        control_type = ""
+        class_name = ""
+        framework_id = ""
+        element_key = ""
+        is_root = $false
+        is_native_container = $false
+        surfaces_present = @()
+      }
+    }
+  }
+  $matchedElementKeys = @()
+  foreach ($label in $expected) {
+    $match = $surfaceMatches[$label]
+    if ($match["matched"] -eq $true) {
+      $matchedElementKeys += $match["element_key"]
+    }
+  }
+  $singleAggregateElement = $false
+  if ($matchedElementKeys.Count -eq $expected.Count) {
+    $uniqueMatchedElementKeys = @($matchedElementKeys | Select-Object -Unique)
+    $singleAggregateElement = ($uniqueMatchedElementKeys.Count -eq 1)
+  }
+  if ($singleAggregateElement) {
+    $aggregateSurfaceShortcutDetected = $true
+  }
+  $surfaceMatchRequirementsMet = (
+    $visible.Count -eq $expected.Count -and
+    !$aggregateSurfaceShortcutDetected -and
+    !$singleAggregateElement
+  )
   $capture = [ordered]@{
     source = "uiautomation"
     path = $OutputPath
@@ -211,7 +375,10 @@ function Collect-VisibleSurfaces {
     window_found = ($null -ne $window)
     window_title = $(if ($null -ne $window) { $window.Current.Name } else { "" })
     expected_surfaces = $expected
-    visible_surfaces = $visible
+    visible_surfaces = @($visible)
+    surface_matches = $surfaceMatches
+    aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
+    surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
     automation_names = @($names | Select-Object -Unique | Select-Object -First 200)
   }
   $output = New-Item -ItemType File -Force -Path $OutputPath
@@ -326,13 +493,53 @@ $auditDirWritable = (
   $auditWriteProbe.read -and
   $auditWriteProbe.delete
 )
+
+function Get-EvidenceValue {
+  param(
+    $Object,
+    [string]$Name
+  )
+  if ($null -eq $Object) {
+    return $null
+  }
+  if ($Object -is [System.Collections.IDictionary]) {
+    return $Object[$Name]
+  }
+  $property = $Object.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return $null
+  }
+  return $property.Value
+}
+
 $requiredVisibleSurfaces = @("Dashboard", "NavigationRail", "Runtime Status", "Invariant Status")
-$visibleSurfaceLabels = @($visibleSurfaceEvidence.visible_surfaces)
+$visibleSurfaceLabels = @(Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "visible_surfaces")
+$surfaceMatchesEvidence = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_matches"
+$aggregateSurfaceShortcutDetected = (
+  Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "aggregate_surface_shortcut_detected"
+) -eq $true
+$surfaceMatchRequirementsMet = (
+  Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_match_requirements_met"
+) -eq $true
 $visibleSurfacesComplete = $true
 foreach ($surface in $requiredVisibleSurfaces) {
   if ($visibleSurfaceLabels -notcontains $surface) {
     $visibleSurfacesComplete = $false
   }
+  $surfaceMatch = Get-EvidenceValue -Object $surfaceMatchesEvidence -Name $surface
+  if ($null -eq $surfaceMatch) {
+    $visibleSurfacesComplete = $false
+  } elseif ((Get-EvidenceValue -Object $surfaceMatch -Name "matched") -ne $true) {
+    $visibleSurfacesComplete = $false
+  } else {
+    $elementKey = Get-EvidenceValue -Object $surfaceMatch -Name "element_key"
+    if ($null -eq $elementKey -or $elementKey -eq "") {
+      $visibleSurfacesComplete = $false
+    }
+  }
+}
+if ($aggregateSurfaceShortcutDetected -or !$surfaceMatchRequirementsMet) {
+  $visibleSurfacesComplete = $false
 }
 
 $evidence = [ordered]@{
@@ -340,7 +547,7 @@ $evidence = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "3"
+    collector_version = "4"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -369,11 +576,14 @@ $evidence = [ordered]@{
     python_path_entries_remaining_count = $pythonPathEntriesRemainingCount
     python_commands_visible_after_scrub = @($pythonCommandsVisibleAfterScrub)
     visible_surfaces_complete = $visibleSurfacesComplete
-    visible_surfaces = @($visibleSurfaceEvidence.visible_surfaces)
+    visible_surfaces = @($visibleSurfaceLabels)
     visible_surfaces_evidence = [ordered]@{
-      source = $visibleSurfaceEvidence.source
-      path = $visibleSurfaceEvidence.path
-      captured_at = $visibleSurfaceEvidence.captured_at
+      source = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "source"
+      path = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path"
+      captured_at = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "captured_at"
+      surface_matches = $surfaceMatchesEvidence
+      aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
+      surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
     }
     config_path = $(if ($null -ne $resolvedConfigPath) { $resolvedConfigPath.Path } else { $ConfigPath })
     config_created = $configCreated

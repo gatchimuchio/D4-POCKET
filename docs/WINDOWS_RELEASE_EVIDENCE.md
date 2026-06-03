@@ -61,7 +61,9 @@ The evidence must prove:
 - first run launches from the installed app path, remains running, and exposes a non-zero `MainWindowHandle`
 - first run launches the installed Flutter `.exe` with `GUI_SHELL_BROKER_ENDPOINT_JSON` supplied by the installed Rust broker
 - first run records `-NoPythonRuntime` launch evidence with Python PATH entries scrubbed and no `python`, `python3`, or `py` command visible to the launch process
-- Dashboard, NavigationRail, Runtime Status, and Invariant Status are visible with recorded UIAutomation, screenshot, or accessibility-tree evidence
+- Dashboard, NavigationRail, Runtime Status, and Invariant Status are visible with recorded per-surface UIAutomation element evidence
+- `visible_surfaces_evidence.surface_matches` records matched automation element evidence for each required surface label
+- `visible_surfaces_evidence.aggregate_surface_shortcut_detected` is `false`
 - first-run config exists at the recorded path and parses as JSON
 - audit directory passes a write/read/delete probe
 - installer/setup state grants no authority
@@ -72,5 +74,13 @@ The evidence must prove:
 - broker installed-path smoke passes authenticated IPC, restricted `127.0.0.1` bind, durable store readiness, replay rejection after broker restart, crash fail-closed connection behavior, no authority Python runtime requirement, and no Flutter/Rust FFI authority bridge
 
 The collectors must not synthesize Setup Doctor, visible-surface, or broker evidence. Missing `-SetupDoctorJson`, missing UIAutomation visible-surface evidence, missing `-BrokerEvidenceJson`, unmeasured config/audit probes, or manual confirmation evidence must remain release blockers.
+
+Visible-surface evidence boundary:
+
+- Required surface names must come from the actual Flutter/Dart semantics or accessibility tree observed through Windows UIAutomation.
+- Native window titles, native container names, or root accessible names must not aggregate required labels such as `Dashboard`, `NavigationRail`, `Runtime Status`, and `Invariant Status`.
+- `GUI Shell` is acceptable as a product/window identity by itself; `GUI Shell Dashboard NavigationRail Runtime Status Invariant Status` is forbidden evidence.
+- Screenshot or manual confirmation alone must not produce automatic strict-release PASS.
+- Staged-install acceptance is final only after native Windows remeasurement of the exact implementation commit.
 
 Do not claim completed product release from copied, edited, or non-Windows evidence. Missing evidence remains a `release_blocker`.

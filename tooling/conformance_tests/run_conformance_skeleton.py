@@ -2,6 +2,7 @@ from pathlib import Path
 import copy
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -1043,7 +1044,7 @@ def _valid_windows_installed_evidence() -> dict:
         "platform": "windows",
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "3",
+            "collector_version": "4",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1077,6 +1078,58 @@ def _valid_windows_installed_evidence() -> dict:
                 "source": "uiautomation",
                 "path": r"C:\ProgramData\GUI-Shell\evidence\visible-surfaces.json",
                 "captured_at": "2026-05-26T00:00:00Z",
+                "surface_matches": {
+                    "Dashboard": {
+                        "matched": True,
+                        "name": "Dashboard",
+                        "automation_id": "",
+                        "control_type": "ControlType.Text",
+                        "class_name": "",
+                        "framework_id": "Flutter",
+                        "element_key": "descendant:1",
+                        "is_root": False,
+                        "is_native_container": False,
+                        "surfaces_present": ["Dashboard"],
+                    },
+                    "NavigationRail": {
+                        "matched": True,
+                        "name": "NavigationRail",
+                        "automation_id": "",
+                        "control_type": "ControlType.Group",
+                        "class_name": "",
+                        "framework_id": "Flutter",
+                        "element_key": "descendant:2",
+                        "is_root": False,
+                        "is_native_container": False,
+                        "surfaces_present": ["NavigationRail"],
+                    },
+                    "Runtime Status": {
+                        "matched": True,
+                        "name": "Runtime Status",
+                        "automation_id": "",
+                        "control_type": "ControlType.Text",
+                        "class_name": "",
+                        "framework_id": "Flutter",
+                        "element_key": "descendant:3",
+                        "is_root": False,
+                        "is_native_container": False,
+                        "surfaces_present": ["Runtime Status"],
+                    },
+                    "Invariant Status": {
+                        "matched": True,
+                        "name": "Invariant Status",
+                        "automation_id": "",
+                        "control_type": "ControlType.Text",
+                        "class_name": "",
+                        "framework_id": "Flutter",
+                        "element_key": "descendant:4",
+                        "is_root": False,
+                        "is_native_container": False,
+                        "surfaces_present": ["Invariant Status"],
+                    },
+                },
+                "aggregate_surface_shortcut_detected": False,
+                "surface_match_requirements_met": True,
             },
             "config_path": r"C:\ProgramData\GUI-Shell\config\gui_shell.json",
             "config_created": True,
@@ -1196,6 +1249,51 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
         errors.append("Windows broker evidence validator accepted synthetic, replay-unsafe, or Python-required evidence")
     return errors
+
+
+def test_windows_release_evidence_validator_rejects_missing_surface_matches() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad["first_run"]["visible_surfaces_evidence"].pop("surface_matches")
+    bad["first_run"]["visible_surfaces_evidence"].pop("aggregate_surface_shortcut_detected")
+    bad["first_run"]["visible_surfaces_evidence"].pop("surface_match_requirements_met")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+        return ["Windows first-run evidence validator accepted missing per-surface UIAutomation matches"]
+    return []
+
+
+def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    aggregate_match = {
+        "matched": True,
+        "name": "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status",
+        "automation_id": "",
+        "control_type": "ControlType.Window",
+        "class_name": "FlutterView",
+        "framework_id": "Win32",
+        "element_key": "root",
+        "is_root": True,
+        "is_native_container": True,
+        "surfaces_present": ["Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"],
+    }
+    bad["first_run"]["visible_surfaces_evidence"]["surface_matches"] = {
+        label: copy.deepcopy(aggregate_match)
+        for label in ["Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"]
+    }
+    bad["first_run"]["visible_surfaces_evidence"]["aggregate_surface_shortcut_detected"] = True
+    bad["first_run"]["visible_surfaces_evidence"]["surface_match_requirements_met"] = False
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+        return ["Windows first-run evidence validator accepted one aggregate root automation element"]
+    return []
 
 
 def test_invariant_evaluator_detects_intentional_import_violation() -> list[str]:
@@ -1491,6 +1589,27 @@ def test_desktop_flutter_keeps_authority_in_shell_core_client() -> list[str]:
         errors.append("desktop Flutter local client is still a direct mock alias")
     if "ShellSnapshot.fromJson" not in client:
         errors.append("desktop Flutter local client does not load structured snapshot JSON")
+    return errors
+
+
+def test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection() -> list[str]:
+    runner = DESKTOP_FLUTTER / "windows" / "runner" / "flutter_window.cpp"
+    if not runner.exists():
+        return ["Windows Flutter runner missing: apps/desktop_flutter/windows/runner/flutter_window.cpp"]
+    text = runner.read_text(encoding="utf-8")
+    required_labels = ["Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"]
+    aggregate = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
+    errors = []
+    if aggregate in text:
+        errors.append("Windows runner contains forbidden aggregate native surface title")
+    set_window_text_blocks = re.findall(r"SetWindowText\s*\([^;]*;", text, flags=re.DOTALL)
+    for block in set_window_text_blocks:
+        labels = [label for label in required_labels if label in block]
+        if labels:
+            errors.append(
+                "Windows runner SetWindowText contains required surface labels: "
+                + ", ".join(labels)
+            )
     return errors
 
 
@@ -1850,6 +1969,8 @@ def main() -> int:
         test_windows_release_evidence_validator_accepts_valid_installed_smoke,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
+        test_windows_release_evidence_validator_rejects_missing_surface_matches,
+        test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,
@@ -1860,6 +1981,7 @@ def main() -> int:
         test_rust_broker_skeleton_exists,
         test_rust_broker_rejection_audit_contract_shape,
         test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
+        test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection,
         test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
         test_blue_tanuki_adapter_metadata_cannot_escalate_authority,

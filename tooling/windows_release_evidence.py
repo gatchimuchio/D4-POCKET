@@ -34,6 +34,7 @@ REQUIRED_BROKER_TRUE_FIELDS = {
     "fresh_health_after_restart",
     "crash_fail_closed",
 }
+AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,66 @@ def _is_false(data: dict[str, Any], dotted: str) -> bool:
 
 def _is_true(data: dict[str, Any], dotted: str) -> bool:
     return _get(data, dotted) is True
+
+
+def _normalised_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _contains_surface_label(value: Any, label: str) -> bool:
+    return bool(re.search(re.escape(label), str(value or ""), flags=re.IGNORECASE))
+
+
+def _contains_all_required_surfaces(value: Any) -> bool:
+    return all(_contains_surface_label(value, label) for label in REQUIRED_VISIBLE_SURFACES)
+
+
+def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if surface_evidence.get("aggregate_surface_shortcut_detected") is not False:
+        errors.append("visible surfaces evidence detected or failed to rule out aggregate surface shortcut")
+    if surface_evidence.get("surface_match_requirements_met") is not True:
+        errors.append("visible surfaces evidence did not confirm individual surface match requirements")
+
+    surface_matches = surface_evidence.get("surface_matches")
+    if not isinstance(surface_matches, dict):
+        errors.append("visible surfaces evidence surface_matches missing")
+        return errors
+
+    matched_element_keys: list[str] = []
+    aggregate_text = _normalised_text(AGGREGATE_SURFACE_TEXT).casefold()
+    for label in sorted(REQUIRED_VISIBLE_SURFACES):
+        match = surface_matches.get(label)
+        if not isinstance(match, dict):
+            errors.append(f"{label} surface match evidence missing")
+            continue
+        if match.get("matched") is not True:
+            errors.append(f"{label} surface match must be true")
+        name = str(match.get("name") or "")
+        automation_id = str(match.get("automation_id") or "")
+        control_type = str(match.get("control_type") or "")
+        element_key = str(match.get("element_key") or "")
+        if not element_key:
+            errors.append(f"{label} surface match element_key missing")
+        else:
+            matched_element_keys.append(element_key)
+        if not control_type:
+            errors.append(f"{label} surface match control_type missing")
+        if not (_contains_surface_label(name, label) or _contains_surface_label(automation_id, label)):
+            errors.append(f"{label} surface match name or automation_id must contain the surface label")
+
+        element_text = _normalised_text(f"{name} {automation_id}")
+        if _contains_all_required_surfaces(element_text):
+            errors.append(f"{label} surface match uses one aggregate element containing all required labels")
+        if aggregate_text and aggregate_text in element_text.casefold():
+            errors.append(f"{label} surface match uses the forbidden aggregate native surface title")
+
+    if (
+        len(matched_element_keys) == len(REQUIRED_VISIBLE_SURFACES)
+        and len(set(matched_element_keys)) == 1
+    ):
+        errors.append("all required surfaces rely on a single automation element")
+    return errors
 
 
 def load_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> tuple[dict[str, Any] | None, str | None]:
@@ -151,6 +212,7 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
             errors.append("visible surfaces evidence source must be uiautomation, screenshot, or accessibility_tree")
         if not surface_evidence.get("path"):
             errors.append("visible surfaces evidence path missing")
+        errors.extend(_validate_surface_match_evidence(surface_evidence))
     if not _is_true(data, "first_run.config_created"):
         errors.append("first-run config creation was not confirmed")
     if not _is_true(data, "first_run.config_json_valid"):
