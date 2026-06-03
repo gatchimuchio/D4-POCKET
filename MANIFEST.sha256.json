@@ -263,6 +263,10 @@
       "sha256": "1d28375f51343fcd83edd1ad4dad1473d846000dc6bb353d4e19be0640fd53d3"
     },
     {
+      "path": "docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md",
+      "sha256": "fb72e83b649a10f61001b89680b2869790a94f07691676cf21b1d54e17fd7dc1"
+    },
+    {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
       "sha256": "7aae5e5a4851448d29e41418fcb979696b084733e467c7a876968b8003d5b3a0"
     },
