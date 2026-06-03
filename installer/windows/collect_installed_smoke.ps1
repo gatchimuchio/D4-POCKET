@@ -50,6 +50,20 @@ $pythonPathEntriesRemovedCount = 0
 $pythonPathEntriesRemainingCount = 0
 $pythonCommandsVisibleAfterScrub = @()
 
+function Write-JsonEvidence {
+  param(
+    [Parameter(Mandatory = $true)]
+    $Value,
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [int]$Depth = 10
+  )
+
+  $json = $Value | ConvertTo-Json -Depth $Depth
+  $encoding = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
+}
+
 function Start-SmokeBroker {
   param(
     [string]$HelperExe,
@@ -201,7 +215,7 @@ function Collect-VisibleSurfaces {
     automation_names = @($names | Select-Object -Unique | Select-Object -First 200)
   }
   $output = New-Item -ItemType File -Force -Path $OutputPath
-  $capture | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $output.FullName
+  Write-JsonEvidence -Value $capture -Path $output.FullName -Depth 8
   return $capture
 }
 
@@ -394,7 +408,7 @@ $evidence = [ordered]@{
 }
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
-$evidence | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 -Path $output.FullName
+Write-JsonEvidence -Value $evidence -Path $output.FullName -Depth 10
 
 if ($null -ne $process -and !$process.HasExited) {
   Stop-Process -Id $process.Id

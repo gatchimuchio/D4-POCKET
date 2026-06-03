@@ -27,6 +27,20 @@ if (Test-Path $SessionFile) {
   Remove-Item -Force -Path $SessionFile
 }
 
+function Write-JsonEvidence {
+  param(
+    [Parameter(Mandatory = $true)]
+    $Value,
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [int]$Depth = 10
+  )
+
+  $json = $Value | ConvertTo-Json -Depth $Depth
+  $encoding = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
+}
+
 function New-IssuedAt {
   return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
@@ -231,7 +245,7 @@ $result = [ordered]@{
 }
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
-$result | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 -Path $output.FullName
+Write-JsonEvidence -Value $result -Path $output.FullName -Depth 10
 Write-Host "wrote $($output.FullName)"
 if ($errors.Count -ne 0) {
   exit 1

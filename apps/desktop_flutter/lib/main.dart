@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import 'models/generated_contracts.dart';
@@ -17,10 +18,17 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/shell_core_client.dart';
 
+SemanticsHandle? _appSemanticsHandle;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _ensureAccessibilitySemantics();
   final client = await ShellCoreClient.product();
   runApp(GuiShellDesktopApp(client: client));
+}
+
+void _ensureAccessibilitySemantics() {
+  _appSemanticsHandle ??= SemanticsBinding.instance.ensureSemantics();
 }
 
 class GuiShellDesktopApp extends StatelessWidget {
@@ -108,62 +116,67 @@ class _ShellHomePageState extends State<ShellHomePage> {
                 Expanded(
                   child: Row(
                     children: [
-                      NavigationRail(
-                        selectedIndex: selectedIndex,
-                        onDestinationSelected: (index) =>
-                            setState(() => selectedIndex = index),
-                        labelType: NavigationRailLabelType.selected,
-                        scrollable: true,
-                        destinations: const [
-                          NavigationRailDestination(
-                              icon: Icon(Icons.dashboard_outlined),
-                              selectedIcon: Icon(Icons.dashboard),
-                              label: Text('Dashboard')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.build_circle_outlined),
-                              selectedIcon: Icon(Icons.build_circle),
-                              label: Text('Doctor')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.verified_user_outlined),
-                              selectedIcon: Icon(Icons.verified_user),
-                              label: Text('Trust')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.hub_outlined),
-                              selectedIcon: Icon(Icons.hub),
-                              label: Text('Runtime')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.account_tree_outlined),
-                              selectedIcon: Icon(Icons.account_tree),
-                              label: Text('Authority')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.smart_toy_outlined),
-                              selectedIcon: Icon(Icons.smart_toy),
-                              label: Text('Agent')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.fact_check_outlined),
-                              selectedIcon: Icon(Icons.fact_check),
-                              label: Text('Approval')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.receipt_long_outlined),
-                              selectedIcon: Icon(Icons.receipt_long),
-                              label: Text('Audit')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.health_and_safety_outlined),
-                              selectedIcon: Icon(Icons.health_and_safety),
-                              label: Text('Recovery')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.report_problem_outlined),
-                              selectedIcon: Icon(Icons.report_problem),
-                              label: Text('Problems')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.inventory_2_outlined),
-                              selectedIcon: Icon(Icons.inventory_2),
-                              label: Text('Evidence')),
-                          NavigationRailDestination(
-                              icon: Icon(Icons.settings_outlined),
-                              selectedIcon: Icon(Icons.settings),
-                              label: Text('Settings')),
-                        ],
+                      Semantics(
+                        label: 'NavigationRail',
+                        container: true,
+                        explicitChildNodes: true,
+                        child: NavigationRail(
+                          selectedIndex: selectedIndex,
+                          onDestinationSelected: (index) =>
+                              setState(() => selectedIndex = index),
+                          labelType: NavigationRailLabelType.selected,
+                          scrollable: true,
+                          destinations: const [
+                            NavigationRailDestination(
+                                icon: Icon(Icons.dashboard_outlined),
+                                selectedIcon: Icon(Icons.dashboard),
+                                label: Text('Dashboard')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.build_circle_outlined),
+                                selectedIcon: Icon(Icons.build_circle),
+                                label: Text('Doctor')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.verified_user_outlined),
+                                selectedIcon: Icon(Icons.verified_user),
+                                label: Text('Trust')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.hub_outlined),
+                                selectedIcon: Icon(Icons.hub),
+                                label: Text('Runtime')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.account_tree_outlined),
+                                selectedIcon: Icon(Icons.account_tree),
+                                label: Text('Authority')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.smart_toy_outlined),
+                                selectedIcon: Icon(Icons.smart_toy),
+                                label: Text('Agent')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.fact_check_outlined),
+                                selectedIcon: Icon(Icons.fact_check),
+                                label: Text('Approval')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.receipt_long_outlined),
+                                selectedIcon: Icon(Icons.receipt_long),
+                                label: Text('Audit')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.health_and_safety_outlined),
+                                selectedIcon: Icon(Icons.health_and_safety),
+                                label: Text('Recovery')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.report_problem_outlined),
+                                selectedIcon: Icon(Icons.report_problem),
+                                label: Text('Problems')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.inventory_2_outlined),
+                                selectedIcon: Icon(Icons.inventory_2),
+                                label: Text('Evidence')),
+                            NavigationRailDestination(
+                                icon: Icon(Icons.settings_outlined),
+                                selectedIcon: Icon(Icons.settings),
+                                label: Text('Settings')),
+                          ],
+                        ),
                       ),
                       const VerticalDivider(width: 1),
                       Expanded(child: pages[selectedIndex]),

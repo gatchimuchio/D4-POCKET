@@ -22,6 +22,19 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_setup_doctor.
   -BrokerEvidenceJson .\release_evidence\windows_broker_smoke.json `
   -OutputPath release_evidence\setup_doctor_installed.json
 
+$RuntimeAssertionsJson = python tooling\release_runtime_assertions.py --json
+$Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText(
+  (Resolve-Path release_evidence).Path + "\release_runtime_assertions.json",
+  ($RuntimeAssertionsJson + [Environment]::NewLine),
+  $Utf8NoBom
+)
+
+python tooling\release_runtime_assertions.py --check
+if ($LASTEXITCODE -ne 0) {
+  exit $LASTEXITCODE
+}
+
 powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smoke.ps1 `
   -InstalledExe "$env:LOCALAPPDATA\GUI-Shell\installed\app\gui_shell_desktop.exe" `
   -SetupDoctorJson .\release_evidence\setup_doctor_installed.json `
@@ -31,13 +44,13 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smo
   -BrokerEvidenceJson .\release_evidence\windows_broker_smoke.json `
   -BrokerHelperExe "$env:LOCALAPPDATA\GUI-Shell\installed\broker\gui_shell_rust_helper.exe" `
   -NoPythonRuntime `
+  -RuntimeAssertionsJson .\release_evidence\release_runtime_assertions.json `
   -OutputPath release_evidence\windows_installed_smoke.json
 ```
 
 Then validate:
 
 ```powershell
-python tooling\release_runtime_assertions.py --check
 python tooling\windows_release_evidence.py
 python tooling\validate_all.py --strict-release --desktop-platform=windows
 ```

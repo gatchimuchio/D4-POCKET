@@ -100,7 +100,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "932b8594780229926e8195ba07b6a06636ddcc2f5ebc10885beca4001127b4a7"
+      "sha256": "3c0f993e8ed17118f3f4d0f58fc4947285d09c6139baf9d711dd0e0fc5337563"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -156,7 +156,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
-      "sha256": "22aa72df237f0d8be0244366fa96eb00b34eee3756367c6b6ed015eb03af7057"
+      "sha256": "512298acf3cfdbf116b721e846e77ad52498a2d26205a433624a2fcb2e9105ec"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -176,7 +176,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "f23c0f6e3710d05f4c049d46c578ace72f83b47bdf4f2dd489ed9e78746e188a"
+      "sha256": "97502e3347937242b7de25f97d931dad429256154cc455859b138202dfe7fefe"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -244,7 +244,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "8b6bb7b62633baefd6fc07a24ae81cfc661be4fd76896759768221ededd55413"
+      "sha256": "fc55be74ec6a48cf2d40786ce1a31671ce7e97bfde499bb66ccef44404ea7a0b"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -265,6 +265,10 @@
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
       "sha256": "e3867d43a95064c97608aae1e68377ac10a5ef8032c980030cad7acfbe62991d"
+    },
+    {
+      "path": "docs/reports/WINDOWS_STAGED_INSTALL_ACCEPTANCE_REPORT.md",
+      "sha256": "399b09166d03f8fe2e4c28c820d4410d6b6e405971f304916e9f6e5188cf41c3"
     },
     {
       "path": "docs/research/compose-mp-watchlist.md",
@@ -556,15 +560,15 @@
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
-      "sha256": "5b0c035a9f5536db34a6ba89e2c6f8a2c93de9860fa399d823474bf3da538582"
+      "sha256": "ef383f7bb7d74890837d3a610f709a7726eaefe5d2a2cf18a1cf3dd280f3323b"
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "1431184327c8e4f6fa2ce873159d94623761723854ec9799a54004eacc0aa9bb"
+      "sha256": "053712dda293b281e47a998be9cf53b2180ea2b66897a6c2a82e1a809e0f6551"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
-      "sha256": "9530ddb87bdfabec88eaa2ce6f0525cdf8f3f103a320248d18d53e072b5a3ae4"
+      "sha256": "5c890f19af228abeb4cf451a625de97d1ef3a66d3abc001426c13a872cf0ac77"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",

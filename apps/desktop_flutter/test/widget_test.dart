@@ -31,6 +31,21 @@ void main() {
     expect(find.text('Authority'), findsOneWidget);
   });
 
+  testWidgets('Windows acceptance surfaces expose semantic labels',
+      (WidgetTester tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(const GuiShellDesktopApp());
+
+      expect(find.bySemanticsLabel(RegExp('Dashboard')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('NavigationRail')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('Runtime Status')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('Invariant Status')), findsWidgets);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('Dashboard shows Phase A complete and Phase B complete',
       (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -267,8 +282,8 @@ void main() {
       isTrue,
     );
     expect(
-      snapshot.problems.any((problem) =>
-          problem.requiredAction.toLowerCase().contains('python')),
+      snapshot.problems.any(
+          (problem) => problem.requiredAction.toLowerCase().contains('python')),
       isFalse,
     );
     expect(transport.operations, [
@@ -293,8 +308,10 @@ void main() {
     expect(snapshot.pendingApprovals, isEmpty);
     expect(snapshot.problems.single.classification, 'release_blocker');
     expect(snapshot.problems.single.blocksRelease, isTrue);
-    expect(snapshot.setupDoctorChecks
-        .where((check) => check.checkId == 'broker.fail_closed'), isNotEmpty);
+    expect(
+        snapshot.setupDoctorChecks
+            .where((check) => check.checkId == 'broker.fail_closed'),
+        isNotEmpty);
   });
 
   test('product client fails closed on authentication rejection', () async {

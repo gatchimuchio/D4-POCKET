@@ -26,6 +26,9 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  SetWindowText(flutter_controller_->view()->GetNativeWindow(),
+                L"GUI Shell Dashboard NavigationRail Runtime Status "
+                L"Invariant Status");
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();

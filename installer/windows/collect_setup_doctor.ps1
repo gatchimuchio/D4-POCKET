@@ -73,6 +73,20 @@ function Test-AuditWrite {
   }
 }
 
+function Write-JsonEvidence {
+  param(
+    [Parameter(Mandatory = $true)]
+    $Value,
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [int]$Depth = 8
+  )
+
+  $json = $Value | ConvertTo-Json -Depth $Depth
+  $encoding = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
+}
+
 $exe = Resolve-Path $InstalledExe
 $artifactHash = (Get-FileHash -Algorithm SHA256 -Path $exe.Path).Hash.ToLowerInvariant()
 $configProbe = Test-JsonFile -Path $ConfigPath
@@ -165,5 +179,5 @@ $report = [ordered]@{
 }
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
-$report | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $output.FullName
+Write-JsonEvidence -Value $report -Path $output.FullName -Depth 8
 Write-Host "wrote $($output.FullName)"

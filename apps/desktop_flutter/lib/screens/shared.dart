@@ -16,7 +16,12 @@ class ShellPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            Semantics(
+              label: title,
+              header: true,
+              child:
+                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            ),
             const SizedBox(height: 16),
             ...children.map((child) => Padding(
                 padding: const EdgeInsets.only(bottom: 16), child: child)),
@@ -46,16 +51,20 @@ class MetricRow extends StatelessWidget {
       runSpacing: 12,
       children: [
         for (final item in items)
-          SizedBox(
-            width: 150,
-            child: BorderedPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.value,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  Text(item.label),
-                ],
+          Semantics(
+            label: item.label,
+            container: true,
+            child: SizedBox(
+              width: 150,
+              child: BorderedPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.value,
+                        style: Theme.of(context).textTheme.headlineMedium),
+                    Text(item.label),
+                  ],
+                ),
               ),
             ),
           ),
@@ -300,7 +309,11 @@ class SectionList extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Semantics(
+            label: title,
+            header: true,
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ),
           const SizedBox(height: 8),
           for (final row in rows)
             Padding(
