@@ -12,8 +12,11 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$AuditDir,
 
-  [Parameter(Mandatory = $true)]
-  [string]$VisibleSurfacesJson,
+  [string]$VisibleSurfacesJson = "",
+
+  [string]$VisibleSurfacesOutputPath = "",
+
+  [int]$VisibleSurfaceWaitSeconds = 8,
 
   [string]$BrokerEvidenceJson = "",
 
@@ -35,7 +38,6 @@ $ErrorActionPreference = "Stop"
 $exe = Resolve-Path $InstalledExe
 $hash = (Get-FileHash -Algorithm SHA256 -Path $exe).Hash.ToLowerInvariant()
 $setupDoctorPath = Resolve-Path $SetupDoctorJson
-$visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
 $brokerProcess = $null
 $brokerEndpoint = $null
 $brokerEndpointFile = $null
@@ -132,6 +134,77 @@ function Enable-NoPythonLaunchPath {
   )
 }
 
+function Collect-VisibleSurfaces {
+  param(
+    [System.Diagnostics.Process]$Process,
+    [string]$OutputPath,
+    [int]$WaitSeconds
+  )
+
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $expected = @("Dashboard", "NavigationRail", "Runtime Status", "Invariant Status")
+  $window = $null
+  $deadline = (Get-Date).AddSeconds($WaitSeconds)
+  $condition = New-Object System.Windows.Automation.PropertyCondition `
+    -ArgumentList ([System.Windows.Automation.AutomationElement]::ProcessIdProperty), ([int]$Process.Id)
+  while ((Get-Date) -lt $deadline -and $null -eq $window) {
+    $Process.Refresh()
+    if ($Process.HasExited) {
+      break
+    }
+    $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+      [System.Windows.Automation.TreeScope]::Children,
+      $condition
+    )
+    if ($null -eq $window) {
+      Start-Sleep -Milliseconds 250
+    }
+  }
+
+  $names = New-Object System.Collections.Generic.List[string]
+  if ($null -ne $window) {
+    $elements = $window.FindAll(
+      [System.Windows.Automation.TreeScope]::Descendants,
+      [System.Windows.Automation.Condition]::TrueCondition
+    )
+    for ($index = 0; $index -lt $elements.Count; $index += 1) {
+      $element = $elements.Item($index)
+      foreach ($value in @(
+          $element.Current.Name,
+          $element.Current.AutomationId,
+          $element.Current.ControlType.ProgrammaticName
+        )) {
+        if ($null -ne $value -and $value.ToString().Trim() -ne "") {
+          $names.Add($value.ToString().Trim())
+        }
+      }
+    }
+  }
+
+  $surfaceText = ($names -join "`n")
+  $visible = @()
+  foreach ($label in $expected) {
+    if ($surfaceText -match [regex]::Escape($label)) {
+      $visible += $label
+    }
+  }
+  $capture = [ordered]@{
+    source = "uiautomation"
+    path = $OutputPath
+    captured_at = (Get-Date).ToUniversalTime().ToString("o")
+    process_id = $Process.Id
+    window_found = ($null -ne $window)
+    window_title = $(if ($null -ne $window) { $window.Current.Name } else { "" })
+    expected_surfaces = $expected
+    visible_surfaces = $visible
+    automation_names = @($names | Select-Object -Unique | Select-Object -First 200)
+  }
+  $output = New-Item -ItemType File -Force -Path $OutputPath
+  $capture | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $output.FullName
+  return $capture
+}
+
 trap {
   Restore-SmokeEnvironment
   if ($null -ne $process) {
@@ -167,7 +240,22 @@ try {
 }
 
 $setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
-$visibleSurfaceEvidence = Get-Content -Raw -Path $visibleSurfacesPath | ConvertFrom-Json
+if ($VisibleSurfacesJson -ne "") {
+  $visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
+  $visibleSurfaceEvidence = Get-Content -Raw -Path $visibleSurfacesPath.Path | ConvertFrom-Json
+} else {
+  if ($VisibleSurfacesOutputPath -eq "") {
+    $outputDirectory = Split-Path -Parent $OutputPath
+    if ($outputDirectory -eq "") {
+      $outputDirectory = "."
+    }
+    $VisibleSurfacesOutputPath = Join-Path $outputDirectory "visible_surfaces_collected.json"
+  }
+  $visibleSurfaceEvidence = Collect-VisibleSurfaces `
+    -Process $process `
+    -OutputPath $VisibleSurfacesOutputPath `
+    -WaitSeconds $VisibleSurfaceWaitSeconds
+}
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
@@ -211,7 +299,7 @@ if ($null -ne $resolvedAuditDir) {
   $auditWriteProbe.probe_path = $probePath
   Set-Content -Encoding UTF8 -Path $probePath -Value "ok"
   $auditWriteProbe.write = Test-Path $probePath
-  $auditWriteProbe.read = ((Get-Content -Raw -Path $probePath) -eq "ok")
+  $auditWriteProbe.read = ((Get-Content -Raw -Path $probePath).Trim() -eq "ok")
   Remove-Item -Force -Path $probePath
   $auditWriteProbe.delete = !(Test-Path $probePath)
 }
@@ -224,6 +312,14 @@ $auditDirWritable = (
   $auditWriteProbe.read -and
   $auditWriteProbe.delete
 )
+$requiredVisibleSurfaces = @("Dashboard", "NavigationRail", "Runtime Status", "Invariant Status")
+$visibleSurfaceLabels = @($visibleSurfaceEvidence.visible_surfaces)
+$visibleSurfacesComplete = $true
+foreach ($surface in $requiredVisibleSurfaces) {
+  if ($visibleSurfaceLabels -notcontains $surface) {
+    $visibleSurfacesComplete = $false
+  }
+}
 
 $evidence = [ordered]@{
   platform = "windows"
@@ -240,7 +336,7 @@ $evidence = [ordered]@{
     sha256 = "sha256:$hash"
   }
   first_run = [ordered]@{
-    status = $(if ($firstWindowVisible -and $configCreated -and $auditDirWritable) { "passed" } else { "failed" })
+    status = $(if ($firstWindowVisible -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete) { "passed" } else { "failed" })
     command = "& `"$($exe.Path)`""
     launched_from_installed_path = $true
     process_id = $process.Id
@@ -258,6 +354,7 @@ $evidence = [ordered]@{
     python_path_entries_removed_count = $pythonPathEntriesRemovedCount
     python_path_entries_remaining_count = $pythonPathEntriesRemainingCount
     python_commands_visible_after_scrub = @($pythonCommandsVisibleAfterScrub)
+    visible_surfaces_complete = $visibleSurfacesComplete
     visible_surfaces = @($visibleSurfaceEvidence.visible_surfaces)
     visible_surfaces_evidence = [ordered]@{
       source = $visibleSurfaceEvidence.source

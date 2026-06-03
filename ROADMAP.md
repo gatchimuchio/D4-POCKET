@@ -71,7 +71,7 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: Windows desktop release gates
   classification: release_blocker
-  reason: Windows is the primary product target. Windows project support, Flutter analyze, Flutter test, Windows build, and native launch smoke have passed as development evidence, and Block E now defines staged installed app plus broker installed smoke collectors. Installed-path first-run evidence, installed-path Setup Doctor evidence, broker-mediated installed Flutter `.exe` launch evidence, No-Python launch evidence, strict Windows release validation, and owner GO have not passed.
+  reason: Windows is the primary product target. Windows project support, Flutter analyze, Flutter test, Windows build, and native launch smoke have passed as development evidence, and Block E now defines staged installed app, broker smoke, Setup Doctor, and installed first-run collectors. Installed-path first-run evidence, installed-path Setup Doctor evidence, broker-mediated installed Flutter `.exe` launch evidence, No-Python launch evidence, strict Windows release validation, and owner GO have not passed.
   required_action: Keep Windows development smoke current, then pass staged installed app launch, installed-path first-run, installed-path Setup Doctor, broker authenticated IPC/restart/crash/no-Python/no-FFI evidence, No-Python installed Flutter `.exe` launch evidence, strict Windows release validation, and owner GO.
   blocks_release: yes
 

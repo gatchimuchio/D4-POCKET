@@ -27,6 +27,7 @@ REQUIRED_SETUP_CHECKS = {
 REQUIRED_BROKER_TRUE_FIELDS = {
     "helper_exe_exists",
     "session_file_created",
+    "restricted_loopback_bind",
     "authenticated_ipc_connection",
     "durable_store_ready",
     "restart_replay_rejected",
@@ -136,6 +137,8 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("first_run.python_commands_visible_after_scrub must be a list")
     elif python_commands:
         errors.append("Python commands remained visible before first-run launch")
+    if not _is_true(data, "first_run.visible_surfaces_complete"):
+        errors.append("first_run.visible_surfaces_complete must be true")
     visible = set(_get(data, "first_run.visible_surfaces") or [])
     for label in sorted(REQUIRED_VISIBLE_SURFACES):
         if label not in visible:
@@ -258,6 +261,8 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
         for field in sorted(REQUIRED_BROKER_TRUE_FIELDS):
             if broker.get(field) is not True:
                 errors.append(f"broker.{field} must be true")
+        if broker.get("endpoint_host") != "127.0.0.1":
+            errors.append("broker endpoint_host must be 127.0.0.1")
         if broker.get("replay_error_code") != "broker_replay_detected":
             errors.append("broker replay_error_code must be broker_replay_detected")
         if broker.get("python_runtime_required_for_authority") is not False:

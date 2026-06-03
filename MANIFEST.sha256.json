@@ -84,11 +84,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "997ba9e5e66303c0f659bc1098de593d9f13b7b05b4c4103219502947c1e1f1f"
+      "sha256": "71d628830f5a82ed1791ffe1c9a9ab71fd4e126fe751dc37ac0bfaf4500ce484"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "30ddda7f1663402007c4f99a6f95ca5cb627c11692ce53385a8882b4dea46576"
+      "sha256": "9ee5ed2775946d160d98d8ef1fe6b2544a84a6711aacfe932cb3191aed11606d"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -184,7 +184,7 @@
     },
     {
       "path": "docs/COMPLETION_AUDIT_ROADMAP.md",
-      "sha256": "375e57a3cd7d6b796f7b3d6057d509526d22abb99042d3f81879aef9b2426ffd"
+      "sha256": "6b3bfd54187c59e69fe16a7d40a79a14a94e451b7aaf24bc428056038b796b90"
     },
     {
       "path": "docs/COMPLETION_STRATEGY_INSTRUCTION.md",
@@ -232,7 +232,7 @@
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
-      "sha256": "5aac935df976f16d552d745905baaa1a78a7f32ec7648afbe3d1fd276e207ec2"
+      "sha256": "8d41c2073b28d566da70365236f1bfa8e2766ae43af1d7576d881e160ad40a84"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -244,11 +244,11 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "cb0465792345406f4a9092b06dcb8f48109228faeb7d340fea87fa433adfdf24"
+      "sha256": "8b6bb7b62633baefd6fc07a24ae81cfc661be4fd76896759768221ededd55413"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
-      "sha256": "4be978d4dd0f9b6ca4bec24565031d46ff7361b0e4ca07a3f514aeb27c6f765d"
+      "sha256": "3c21d06d1b823a169fcac7fc46fae8e6c875e16a3eb230ae32f4e1625a8d0c53"
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
@@ -260,7 +260,7 @@
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "7d067d63063339743ffafb578788b23d3b10765e23efc15097dd1b07b4b21f60"
+      "sha256": "7aae5e5a4851448d29e41418fcb979696b084733e467c7a876968b8003d5b3a0"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
@@ -552,15 +552,19 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "ca51047fdc98d3ce71fdfc6844ca797399e90dcebde0b7478c546abe58d011eb"
+      "sha256": "4cf35bd44370ec0bb92848a6b00f656a229189a90281112afe3408e4ae3d7547"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
-      "sha256": "ab37b21024c0a92294374c9450aa48ad0b99b369190ba6fbedef3afc00d63956"
+      "sha256": "5b0c035a9f5536db34a6ba89e2c6f8a2c93de9860fa399d823474bf3da538582"
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "b868f1a20ce82aea9c3ce0f157e181ddcdc9f79a133d7c31be48ea64981981fb"
+      "sha256": "1431184327c8e4f6fa2ce873159d94623761723854ec9799a54004eacc0aa9bb"
+    },
+    {
+      "path": "installer/windows/collect_setup_doctor.ps1",
+      "sha256": "9530ddb87bdfabec88eaa2ce6f0525cdf8f3f103a320248d18d53e072b5a3ae4"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
@@ -840,7 +844,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c229675ad2492a4f4584a4c6312a87e31359c043617c10975b8849aed3b89780"
+      "sha256": "385713a29282b17043b220abd0ab23b4fedf0cca730f231a7b20f77f15e08bfd"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -876,7 +880,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "c0fd8935a39a892c00377d5a06f08bee040413e8711185413c7172787284dceb"
+      "sha256": "0da1b5a00215f77cf61d0042b622235a716df01774e54e40e997aec167b914d8"
     }
   ]
 }
