@@ -62,7 +62,7 @@ Still incomplete / blockers that remain visible:
 - Rust Broker production authority cutover remains incomplete: `authority_cutover_status=not_active`, real external command dispatch remains suspended, and process / credential / update gated execution remains incomplete.
 - Installed product proof remains incomplete: installed no-Python-runtime evidence, Windows installed-path broker proof, installed first-run proof, installed Setup Doctor proof, and strict Windows release validation.
 - Owner GO is not recorded.
-- LLM-readable substrate is definition-locked, but not demonstrated through bounded extension conformance, cross-agent reproduction, or public external claim evidence.
+- LLM-readable substrate is definition-locked, and bounded reference extension conformance exists for the current contract/conformance layer. Cross-agent reproduction and public external claim evidence remain incomplete.
 
 ## 3. Completion Target Definitions
 

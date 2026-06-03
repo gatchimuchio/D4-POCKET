@@ -184,7 +184,7 @@ Preserved blockers:
 - Windows installed-path first-run / broker / Setup Doctor / UIAutomation evidence remains incomplete.
 - Strict Windows release validation remains incomplete.
 - Owner GO is not recorded.
-- LLM-readable substrate is definition-locked but not yet demonstrated by bounded extension conformance or cross-agent reproduction.
+- LLM-readable substrate is definition-locked. Bounded reference extension conformance has since been added at the contract/conformance layer; cross-agent reproduction remains incomplete.
 
 Claim impact:
 

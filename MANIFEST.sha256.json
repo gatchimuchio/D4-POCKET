@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "7e0e0c304debdd1ecb1a98fe1da2b44783c8899d6b87e42a84cd7d55cc34c3c0"
+      "sha256": "fde780cb1e5bd6ea42b7b664c9e9d549d30beebe25f1e98c9b0e6c6a8f0d6f03"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -256,7 +256,7 @@
     },
     {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "6fbe2151e6d352a24febbdd20938023641bd3387864db0efff66ba2adc6135ad"
+      "sha256": "c25d02c966bd4fa63280b5e27def941985f5ee5b53f681ac4f12ace940b72bf1"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -264,7 +264,15 @@
     },
     {
       "path": "docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md",
-      "sha256": "fb72e83b649a10f61001b89680b2869790a94f07691676cf21b1d54e17fd7dc1"
+      "sha256": "a0d50e417dc112e3bcb7ef833f260cb8997724bb3eae68adfb92019bb1b825ba"
+    },
+    {
+      "path": "docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md",
+      "sha256": "387cde1905becf3b8b7193b66c67984745a38f4260c88aa89092d3063778d3f1"
+    },
+    {
+      "path": "docs/implementation/LLM_EXTENSION_TASK_PACKET.md",
+      "sha256": "cfd4e16f1c7468543b5de0b590b53d2e097aea892e8ea766c6c78357af8da90d"
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",

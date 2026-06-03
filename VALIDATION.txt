@@ -1,3 +1,86 @@
+validation_update_2026_06_04_l4_llm_extension_task_packet:
+  scope: L4 LLM agent task packet and evidence template
+  commit: pre_commit_validation_from_b74ab0016c753f56e8a172ca83dcc58b1c38fd89
+  implemented_behavior:
+    - docs/implementation/LLM_EXTENSION_TASK_PACKET.md defines the bounded task input, allowed paths, forbidden changes, required contracts, negative cases, validation, stop conditions, and completion report format for independent LLM agents.
+    - docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md defines the evidence capture template needed for future L5 cross-agent comparison.
+    - docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md and docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md are aligned with the current L3 fact that bounded reference extension conformance exists while L5 cross-agent reproduction evidence is still open.
+    - No production/runtime behavior, schema, conformance harness, Rust Broker, Flutter, installer, Windows evidence, raw evidence, or build artifact changed.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    task_packet: CONFIG
+    evidence_template: CONFIG
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "conformance skeleton passed: 102 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | FIXTURE | LIVE_RUNTIME
+      exit: 0
+      stdout: release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: Windows installed-path product evidence
+      classification: release_blocker
+      reason: L4 documentation does not produce installed no-Python-runtime evidence, Windows installed-path broker proof, first-run proof, Setup Doctor proof, strict Windows validation, or owner GO.
+      required_action: Complete Track R Blocks R2/R3 and obtain owner GO before Windows-first product release.
+      blocks_release: yes
+    - item: cross-agent LLM-readable substrate reproduction
+      classification: known_limitation
+      reason: L4 creates the task packet and evidence template, but no second independent agent execution or comparison report has been completed.
+      required_action: Complete Track L Block L5 with at least two independent agent executions from the same baseline.
+      blocks_release: no
+
 validation_update_2026_06_04_l3_bounded_llm_extension_conformance:
   scope: L3 bounded LLM-readable extension conformance harness
   commit: pre_commit_validation_from_d0abc77c5a5354e51fb7cb3e39d8e345e996b5a9
