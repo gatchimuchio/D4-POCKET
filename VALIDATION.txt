@@ -1,3 +1,137 @@
+validation_update_2026_06_04_r1_broker_non_authority_source_parity:
+  scope: R1 Rust Security Broker responsibility convergence
+  commit: pre_commit_validation_from_6ecc6257a40b60bf110c4982e131b13b0a8919b7
+  implemented_behavior:
+    - Rust Broker authority_evaluate now rejects the same non-authority source family used by Python Shell Core, including model_output, generated_output, generated_config, tool_output, tool_response, external_metadata, metadata, adapter_metadata, diagnostics, gui_state, ui_state, history, memory, cache, previous_state, and local_ui_state.
+    - tooling/broker_parity/run_authority_parity.py now compares every Python NON_AUTHORITY_SOURCES entry against authenticated Rust broker IPC.
+    - native/rust_helper/src/broker/authority.rs includes a Rust unit regression test for the full non-authority source family.
+    - native/rust_helper/README.md and docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md align the current broker evidence wording.
+    - Command dispatch remains suspended and broker health remains authority_cutover_status=not_active.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+    broker_authority_parity: FIXTURE | LIVE_RUNTIME
+    cargo_test: FIXTURE | LIVE_RUNTIME
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "conformance skeleton passed: 102 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence"
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME"
+    - name: broker_authority_parity
+      command: python3 tooling/broker_parity/run_authority_parity.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "broker authority parity passed: accepted parity, rejected parity, rust-specific broker IPC path"
+    - name: cargo_fmt_check
+      command: cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+    - name: cargo_test
+      command: cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - "src/lib.rs: 32 passed; 0 failed"
+        - "src/main.rs: 0 passed; 0 failed"
+        - "tests/broker_ipc.rs: 3 passed; 0 failed"
+        - "doc-tests: 0 passed; 0 failed"
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - validation_mode=development
+        - schema_check passed
+        - conformance_skeleton passed with 102 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+  production_runtime_behavior_change_status:
+    rust_broker_authority_evaluation_changed: yes
+    command_dispatch_activation: no
+    authority_cutover_status_changed: no
+    schema_changed: no
+    flutter_changed: no
+    installer_changed: no
+    windows_raw_evidence_changed: no
+  release_gate_impact:
+    - item: Rust Broker production authority cutover
+      classification: release_blocker
+      reason: broker health remains authority_cutover_status=not_active and command dispatch remains suspended.
+      required_action: continue R1 responsibility migration through command, process, credential, and update gates with measured evidence.
+      blocks_release: yes
+    - item: Windows installed-path product proof
+      classification: release_blocker
+      reason: this Ubuntu R1 block supplies local broker parity evidence only.
+      required_action: execute native Windows installed-path evidence collection in R2 after source-side readiness.
+      blocks_release: yes
+    - item: Owner GO
+      classification: release_blocker
+      reason: explicit owner release approval is absent for completed product release.
+      required_action: request owner GO only after strict product evidence closes.
+      blocks_release: yes
+
 validation_update_2026_06_04_l5_cross_agent_reproduction:
   scope: L5 bounded cross-agent LLM-readable extension reproduction
   commit: pre_commit_validation_from_48082469089e9a63ef939b51f864dfc26e4ae2c9

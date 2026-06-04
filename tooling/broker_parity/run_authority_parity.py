@@ -17,6 +17,7 @@ from packages.shell_core.approval_queue import ApprovalQueue, canonical_hash
 from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from packages.shell_core.content_exposure import project_approval_content
 from packages.shell_core.normalization import normalize_inbound_payload
+from packages.shell_core.permission_ledger import NON_AUTHORITY_SOURCES
 from packages.shell_core.policy_evaluator import PolicyEvaluator
 from packages.shell_core.runtime_state import RuntimeState
 
@@ -186,7 +187,6 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
         "permission_denied": {**base_action(), "permission_id": "permission-deny"},
         "approval_pending": {**base_action(), "approval_id": "approval-pending"},
         "metadata_escalation": {**base_action(), "adapter_metadata": {"trustLevel": "root"}},
-        "non_authority_source": {**base_action(), "authority_source": "memory"},
     }
     for name, action in cases.items():
         python_result = PolicyEvaluator(state).evaluate(action)
@@ -195,6 +195,18 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
             errors.append(f"{name}: allowed mismatch")
         if error_codes(python_result) != error_codes(rust_result):
             errors.append(f"{name}: error code mismatch {error_codes(python_result)} != {error_codes(rust_result)}")
+    for source in sorted(NON_AUTHORITY_SOURCES):
+        action = {**base_action(), "authority_source": source}
+        python_result = PolicyEvaluator(state).evaluate(action)
+        rust_result = broker.call("authority_evaluate", {"state": state_json, "action": action})
+        if python_result["allowed"] != rust_result["allowed"]:
+            errors.append(f"non_authority_source {source}: allowed mismatch")
+        if error_codes(python_result) != error_codes(rust_result):
+            errors.append(
+                f"non_authority_source {source}: error code mismatch {error_codes(python_result)} != {error_codes(rust_result)}"
+            )
+        if "non_authority_source_attempt" not in error_codes(rust_result):
+            errors.append(f"non_authority_source {source}: rust did not reject source")
     command_response = broker.request("command_envelope", {"state": state_json, "action": cases["accepted"]})
     if command_response["status"] != "suspended":
         errors.append("command_envelope: dispatch was not suspended")

@@ -5,7 +5,24 @@ use serde_json::{json, Map, Value};
 use crate::audit_hash::sha256_tagged;
 use crate::broker::protocol::{metadata_attempts_authority_value, normalize_authority_token};
 
-const NON_AUTHORITY_SOURCES: [&str; 4] = ["cache", "local_ui_state", "memory", "previous_state"];
+const NON_AUTHORITY_SOURCES: [&str; 16] = [
+    "adapter_metadata",
+    "cache",
+    "diagnostics",
+    "external_metadata",
+    "generated_config",
+    "generated_output",
+    "gui_state",
+    "history",
+    "local_ui_state",
+    "memory",
+    "metadata",
+    "model_output",
+    "previous_state",
+    "tool_output",
+    "tool_response",
+    "ui_state",
+];
 
 pub fn evaluate_authority(payload: &Value) -> Value {
     let operation = payload
@@ -334,7 +351,7 @@ fn recovery_hint(code: &str) -> &'static str {
         "recovery_mapping_missing" => "Attach a RecoveryAction with a recovery_id.",
         "adapter_metadata_escalation_attempt" => "Remove authority claims from adapter metadata.",
         "non_authority_source_attempt" => {
-            "Use an authority source; memory, cache, previous_state, and local_ui_state cannot grant authority."
+            "Use an authority source; generated output, tool output, metadata, UI state, memory, cache, previous_state, and local_ui_state cannot grant authority."
         }
         _ => "",
     }
@@ -544,6 +561,65 @@ fn canonical_json(value: &Value) -> String {
                 })
                 .collect();
             format!("{{{}}}", encoded.join(","))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{evaluate_authority, NON_AUTHORITY_SOURCES};
+
+    fn authority_payload(source: &str) -> serde_json::Value {
+        json!({
+            "state": {
+                "runtimes": [{"runtime_id": "runtime-1"}],
+                "capabilities": [{"capability_id": "filesystem.write"}],
+                "permissions": [{
+                    "permission_id": "permission-allow",
+                    "capability_id": "filesystem.write",
+                    "decision": "allow"
+                }],
+                "approvals": [{
+                    "approval_id": "approval-approved",
+                    "status": "approved"
+                }],
+                "recovery_actions": [{"recovery_id": "recover-1"}]
+            },
+            "action": {
+                "operation": "filesystem.write",
+                "runtime_id": "runtime-1",
+                "capability_id": "filesystem.write",
+                "permission_id": "permission-allow",
+                "approval_id": "approval-approved",
+                "payload": {"path": "notes/today.md"},
+                "audit_event": {
+                    "event_id": "audit-1",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "recovery_action": {"recovery_id": "recover-1"},
+                "adapter_metadata": {"label": "safe"},
+                "authority_source": source
+            }
+        })
+    }
+
+    #[test]
+    fn non_authority_sources_cannot_grant_authority() {
+        for source in NON_AUTHORITY_SOURCES {
+            let result = evaluate_authority(&authority_payload(source));
+            assert_eq!(result["allowed"], false, "{source} was allowed");
+            let error_codes: Vec<&str> = result["errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|error| error.get("code").and_then(|code| code.as_str()))
+                .collect();
+            assert!(
+                error_codes.contains(&"non_authority_source_attempt"),
+                "{source} was not rejected as a non-authority source"
+            );
         }
     }
 }

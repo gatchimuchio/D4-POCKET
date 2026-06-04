@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "e8e1a86ce1031110ed6dd3e6fa687a8d5d551af819ff606ba10e0de4e7661d64"
+      "sha256": "8c5d5e9cf787eba671c55503bff1184bffe7c12ff4e467e0f601c4ac933aea29"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -284,7 +284,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "e3867d43a95064c97608aae1e68377ac10a5ef8032c980030cad7acfbe62991d"
+      "sha256": "a527a8496cf51c76badc135f53533bdeb943365f157c64a840959aa85fdc9e0d"
     },
     {
       "path": "docs/reports/WINDOWS_STAGED_INSTALL_ACCEPTANCE_REPORT.md",
@@ -620,7 +620,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
-      "sha256": "5c15f438088740aff0948916a347a7914d04958b669d7096a4658e29127fc8dd"
+      "sha256": "1218d4856f2eebd62a4360c951062b4c89beec20cea171fa9faf989b666e130b"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -868,7 +868,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "62728663068865d089b80f75214af6aba50d7f62a032154a01ea091ab41dad64"
+      "sha256": "bef880a7a239dfdff8872479e16fcc2083d1b4107cf7360ae98a23fa692e1fce"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",

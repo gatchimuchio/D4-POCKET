@@ -12,22 +12,23 @@ Current helper modules:
 - audit_hash
 - ipc
 
-Current broker skeleton modules:
+Current broker modules:
 
-- `src/main.rs`: independent process lifecycle skeleton for health / shutdown smoke.
-- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, `issued_at` RFC3339 freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed behavior, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, and command-envelope suspension.
-- `src/broker/audit.rs`: broker-local in-memory append-only audit hash chain for accepted, rejected, and suspended requests.
+- `src/main.rs`: independent process lifecycle for development stdin smoke and `broker-server`.
+- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, `issued_at` RFC3339 freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed behavior, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, authority operation routing, and command-envelope suspension.
+- `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests.
+- `src/broker/store.rs`: durable file store for audit hash-chain, replay nonce, and session state in `broker-server` mode.
+- `src/broker/authority.rs`: Rust authority evaluation, normalization/quarantine, approval edit, content projection, audit-chain verification, and command eligibility evaluation.
 
 Rust helper must remain callable through explicit IPC or FFI boundaries.
 
-Authority-sensitive runtime ownership is not delegated to Flutter, Python, or FFI. The broker skeleton is the Rust Security Broker migration start point, but it is not a completed production cutover:
+Authority-sensitive runtime ownership is not delegated to Flutter, Python, or FFI. The broker is the Rust Security Broker migration path, but it is not a completed production cutover:
 
 - real external command dispatch is disabled;
-- production IPC transport is not selected;
-- Flutter is not yet connected to the broker;
-- Python Shell Core remains a migration oracle until parity and cutover evidence exist.
+- Flutter product path uses broker IPC, but installed Windows product evidence is still a separate release blocker;
+- Python Shell Core remains a migration oracle, tooling path, and parity comparison source until cutover evidence exists.
 - health reports `boundary_role=rust_security_broker_candidate` and `authority_cutover_status=not_active`;
-- audit, replay, and session state are in-memory skeleton state only.
-- persistent-state-required mode suspends/rejects when no persistent store is connected; it is not persistent storage.
+- development stdin mode uses in-memory state; `broker-server` mode uses durable audit/replay/session state when `--store-dir` is available.
+- persistent-state-required mode suspends/rejects when no persistent store is connected.
 
 These incomplete items are `release_blocker` for completed product release, not release-ready evidence.
