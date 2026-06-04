@@ -87,7 +87,7 @@ GUI Shell is intended to make application/runtime extension work inspectable bef
 - which validation path proves conformance;
 - when a proposed integration requires a new contract instead of an improvised shortcut.
 
-This definition is not an external ecosystem claim. Cross-agent reproduction, public standard status, and third-party interoperability remain unproven until measured evidence exists.
+This definition is not an external ecosystem claim. A bounded cross-agent reproduction report exists for one controlled non-authoritative extension task; public standard status, broad ecosystem compatibility, and third-party interoperability remain unproven until separate measured evidence exists.
 
 ## Quickstart
 

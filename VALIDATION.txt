@@ -1,3 +1,145 @@
+validation_update_2026_06_04_l5_cross_agent_reproduction:
+  scope: L5 bounded cross-agent LLM-readable extension reproduction
+  commit: pre_commit_validation_from_48082469089e9a63ef939b51f864dfc26e4ae2c9
+  implemented_behavior:
+    - docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md records two independent agent executions from the same baseline and classifies the result as reproduced_successfully for one controlled non-authoritative task.
+    - packages/shell_core/permission_ledger.py now includes model_output in NON_AUTHORITY_SOURCES, matching both independent agent diffs.
+    - README.md, CLAIM.md, and docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md state the bounded claim scope without promoting public standard, ecosystem, installed-product, or Windows release claims.
+    - No schema, Rust Broker, Flutter, installer, Windows evidence, raw evidence, or build artifact changed.
+  agent_executions:
+    - agent: Agent A
+      execution_id: 019e907a-4455-77f2-8616-7b1ae0981b77
+      baseline: 48082469089e9a63ef939b51f864dfc26e4ae2c9
+      result: reproduced_successfully
+      changed_files:
+        - MANIFEST.sha256.json
+        - packages/shell_core/permission_ledger.py
+      validation_summary:
+        - schema check passed through python3 fallback
+        - conformance skeleton passed with 102 checks
+        - manifest check passed
+        - release gate check passed
+        - evidence bundle check passed with release_ready=False
+        - release runtime assertions passed
+      unauthorized_scope_expansion_attempted: no
+      manual_repair_required: no
+    - agent: Agent B
+      execution_id: 019e907a-9db9-7092-9d2a-0861a3277e6d
+      baseline: 48082469089e9a63ef939b51f864dfc26e4ae2c9
+      result: reproduced_successfully
+      changed_files:
+        - MANIFEST.sha256.json
+        - packages/shell_core/permission_ledger.py
+      targeted_probe:
+        - model_output_in_non_authority_sources=True
+        - ledger_model_output_can_grant_authority=False
+        - policy_allowed=False
+        - policy_error_codes=non_authority_source_attempt
+      validation_summary:
+        - schema check passed through python3 fallback
+        - conformance skeleton passed with 102 checks
+        - manifest check passed
+        - release gate check passed
+        - evidence bundle check passed with release_ready=False
+        - release runtime assertions passed
+        - git diff --check passed
+      unauthorized_scope_expansion_attempted: no
+      manual_repair_required: no
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    cross_agent_report: CONFIG | FIXTURE
+    permission_ledger_consensus_diff: INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+  checks:
+    - name: schema_check_with_python_fallback
+      command: python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton_with_python_fallback
+      command: python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed_via_python3_fallback
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - python command absent on this host
+        - "conformance skeleton passed: 102 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      evidence_scope: CONFIG | FIXTURE | LIVE_RUNTIME
+      exit: 0
+      stdout: release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - schema_check passed
+        - conformance_skeleton passed with 102 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+  release_gate_classification:
+    - item: bounded cross-agent LLM-readable extension behavior
+      classification: required_for_v1
+      reason: two independent agent executions from baseline 48082469089e9a63ef939b51f864dfc26e4ae2c9 produced the same bounded non-authority-source diff and passed validation.
+      required_action: Preserve docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md and repeat reproduction only when claim scope expands.
+      blocks_release: no
+    - item: Windows installed-path product evidence
+      classification: release_blocker
+      reason: L5 evidence does not provide installed no-Python-runtime evidence, Windows installed-path broker proof, first-run proof, Setup Doctor proof, strict Windows validation, or owner GO.
+      required_action: Complete Track R product evidence before Windows-first product release.
+      blocks_release: yes
+    - item: public standard or ecosystem claim
+      classification: known_limitation
+      reason: L5 evidence covers one controlled bounded extension task, not broad external adoption or ecosystem compatibility.
+      required_action: Collect broader external evidence only if the owner chooses to promote that claim.
+      blocks_release: no
+
 validation_update_2026_06_04_l4_llm_extension_task_packet:
   scope: L4 LLM agent task packet and evidence template
   commit: pre_commit_validation_from_b74ab0016c753f56e8a172ca83dcc58b1c38fd89

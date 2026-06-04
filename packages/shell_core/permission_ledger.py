@@ -10,6 +10,7 @@ NON_AUTHORITY_SOURCES = {
     "local_ui_state",
     "memory",
     "metadata",
+    "model_output",
     "previous_state",
     "tool_output",
     "tool_response",

@@ -60,7 +60,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "f2a63f52337573bc14c3e4da1052711574cc12a4d2a0986a26f5a9d563355550"
+      "sha256": "3af0121ec5f11546d4567c2006488cd3d0b075cbe263ae1fbba2ac808aee8133"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -80,7 +80,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "a43c4b0ed4d1187be91a0d869b7f29f405708a7dbe4b587d1ae1ea0cb0479a0d"
+      "sha256": "5036cdf6993cb3b3f4f1cc49fd82b701a139ec341b411221feb3af8f8be79752"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "fde780cb1e5bd6ea42b7b664c9e9d549d30beebe25f1e98c9b0e6c6a8f0d6f03"
+      "sha256": "e8e1a86ce1031110ed6dd3e6fa687a8d5d551af819ff606ba10e0de4e7661d64"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -255,8 +255,12 @@
       "sha256": "92f95ab78680bfa2908a965fbb25831f3050f7114be3589d78a4f504ad3c363e"
     },
     {
+      "path": "docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md",
+      "sha256": "2894d854d07ff746f15792a9208be79cae105ccd8eb9696c0a95f81411a4e9c9"
+    },
+    {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "c25d02c966bd4fa63280b5e27def941985f5ee5b53f681ac4f12ace940b72bf1"
+      "sha256": "b246f379c7b575d48d2cb8cabf14eb2fcbc936a2191f0a1d479a7dc722b178d8"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -712,7 +716,7 @@
     },
     {
       "path": "packages/shell_core/permission_ledger.py",
-      "sha256": "be81c4a384c54f0c8cb9c482f5516067758c8a23f792db5db593cdbc4552e0b3"
+      "sha256": "a54a37afc4e78bd12a569cd5678684842ff7b434299ff7c413cc4c90d3a2fd46"
     },
     {
       "path": "packages/shell_core/persistence.py",
