@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -13,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+DEFAULT_BROKER_START_TIMEOUT_SECONDS = 120.0
+
 from packages.shell_core.approval_queue import ApprovalQueue, canonical_hash
 from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from packages.shell_core.content_exposure import project_approval_content
@@ -20,6 +23,17 @@ from packages.shell_core.normalization import normalize_inbound_payload
 from packages.shell_core.permission_ledger import NON_AUTHORITY_SOURCES
 from packages.shell_core.policy_evaluator import PolicyEvaluator
 from packages.shell_core.runtime_state import RuntimeState
+
+
+def broker_start_timeout_seconds() -> float:
+    raw = os.environ.get("GUI_SHELL_BROKER_START_TIMEOUT_SECONDS")
+    if raw is None:
+        return DEFAULT_BROKER_START_TIMEOUT_SECONDS
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_BROKER_START_TIMEOUT_SECONDS
+    return max(1.0, value)
 
 
 def build_state() -> tuple[RuntimeState, dict]:
@@ -160,7 +174,8 @@ def start_broker(workspace: Path) -> BrokerClient:
         stdout=subprocess.DEVNULL,
         stderr=stderr,
     )
-    for _ in range(300):
+    deadline = time.monotonic() + broker_start_timeout_seconds()
+    while time.monotonic() < deadline:
         if session_file.exists():
             stderr.close()
             endpoint = json.loads(session_file.read_text(encoding="utf-8"))
@@ -173,7 +188,10 @@ def start_broker(workspace: Path) -> BrokerClient:
     stderr.close()
     process.kill()
     detail = stderr_path.read_text(encoding="utf-8", errors="replace")
-    raise AssertionError(f"broker session file was not created: {detail}")
+    raise AssertionError(
+        "broker session file was not created within "
+        f"{broker_start_timeout_seconds():.1f}s: {detail}"
+    )
 
 
 def error_codes(result: dict) -> list[str]:

@@ -1,3 +1,109 @@
+validation_update_2026_06_05_ci_broker_parity_startup_timeout:
+  scope: GitHub Actions core-validation broker parity startup reliability
+  commit: pre_commit_validation_from_40d6605540b850134e4ca56329e172bc0076f54b
+  observed_ci_failure:
+    - run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/26960969593
+    - job: core-validation
+    - failing_step: Development validation
+    - failing_check: broker_authority_parity
+    - failure: "AssertionError: broker session file was not created:"
+    - root_cause: tooling/broker_parity/run_authority_parity.py waited only about 15 seconds for cargo run to compile and start the Rust broker; GitHub Actions cold Rust compilation can exceed that window.
+  implemented_behavior:
+    - Broker parity startup timeout is now DEFAULT_BROKER_START_TIMEOUT_SECONDS=120.0.
+    - GUI_SHELL_BROKER_START_TIMEOUT_SECONDS can override the startup timeout for diagnostic or constrained validation environments.
+    - Timeout handling now reports the configured timeout value when the broker session file is not produced.
+    - Conformance now checks that broker parity startup timeout remains at least 60 seconds for CI cold Rust builds.
+  evidence_classification:
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    broker_authority_parity: FIXTURE | LIVE_RUNTIME
+    validate_all_python_only: CONFIG | FIXTURE | INTERNAL_STATE | LIVE_RUNTIME
+    ci_log: EXTERNAL_EVIDENCE
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "conformance skeleton passed: 106 checks"
+    - name: broker_authority_parity
+      command: python3 tooling/broker_parity/run_authority_parity.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "broker authority parity passed: accepted parity, rejected parity, rust-specific broker IPC path"
+    - name: validate_all_python_only_before_manifest_update
+      command: python3 tooling/validate_all.py --python-only
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - broker_authority_parity passed
+        - manifest_check failed only because tooling/broker_parity/run_authority_parity.py and tooling/conformance_tests/run_conformance_skeleton.py hashes changed before MANIFEST.sha256.json was regenerated
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - validation_mode=development
+        - schema_check passed
+        - conformance_skeleton passed with 106 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+  production_runtime_behavior_change_status:
+    product_runtime_changed: no
+    broker_runtime_protocol_changed: no
+    ci_validation_timeout_changed: yes
+    authority_cutover_status_changed: no
+    command_dispatch_activation: no
+  release_gate_impact:
+    - item: GitHub Actions core-validation broker parity cold-start timeout
+      classification: required_for_v1
+      reason: CI validation needs enough time for a cold Rust broker compile/start path without weakening broker authority behavior.
+      required_action: Keep conformance timeout guard passing and verify the next GitHub Actions run.
+      blocks_release: no
+    - item: Native Windows installed-path evidence
+      classification: release_blocker
+      reason: this CI fix does not produce Windows installed-path UIAutomation, Setup Doctor, broker, no-Python-runtime, config, or audit evidence.
+      required_action: collect native Windows installed-path evidence after source-side CI is green.
+      blocks_release: yes
+
 validation_update_2026_06_05_windows_uiautomation_interpreter_followup:
   scope: Windows UIAutomation individual surface evidence regression and strict validator interpreter follow-up
   commit: pre_commit_validation_from_7d46f952faed64c54c658cad553ab4505d876d7b

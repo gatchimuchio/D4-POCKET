@@ -46,6 +46,7 @@ from tooling.manifest import build_manifest, matches_forbidden
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import build_steps as build_validation_steps
 from tooling.windows_release_evidence import validate_windows_release_evidence
+from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
 REQUIRED_SCHEMA_NAMES = {
     "runtime",
@@ -2187,6 +2188,12 @@ def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     return []
 
 
+def test_broker_parity_startup_timeout_allows_ci_cold_build() -> list[str]:
+    if DEFAULT_BROKER_START_TIMEOUT_SECONDS < 60.0:
+        return ["broker parity startup timeout is too short for CI cold Rust builds"]
+    return []
+
+
 def test_desktop_agent_center_required_surface_exists() -> list[str]:
     path = DESKTOP_FLUTTER / "lib" / "screens" / "agent_center.dart"
     text = path.read_text(encoding="utf-8")
@@ -2311,6 +2318,7 @@ def main() -> int:
         test_l3_bounded_reference_extension_negative_cases_fail_closed,
         test_audit_chain_verification_fails_on_tampered_event,
         test_setup_doctor_public_bind_warning_exists,
+        test_broker_parity_startup_timeout_allows_ci_cold_build,
         test_desktop_agent_center_required_surface_exists,
     ]
     errors = []

@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "c0a71e81dfda761134ce269f12cde26263443207731df26232b10fd8c205a9f6"
+      "sha256": "5ec34e28ef94f1e812c12866fae672e1537fc824cfa505859e70c78453af06ed"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -868,7 +868,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "d84301cdbdc1d9050c5a5d41f8e673cea11e1ba1db90d21f7e6ade8c1b30f3dd"
+      "sha256": "2a6f0ab89e6a52f5b8e797ead680f2919c589806cd82b423d0c91669fc8ea15b"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -876,7 +876,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "04584e38cd3a889ffbf9bf9b5f6cc0fab792f03cffd315538bf25180c49aefe7"
+      "sha256": "b3fc65184d56a662336a119ed10847c3c1a6a37aa4760d789af7a4fa202e2c42"
     },
     {
       "path": "tooling/evidence_bundle.py",
