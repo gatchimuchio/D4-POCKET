@@ -2,6 +2,59 @@ import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
 
+const Map<String, String> _surfaceSemanticsIds = {
+  'Dashboard': 'gui_shell.surface.dashboard',
+  'NavigationRail': 'gui_shell.surface.navigation_rail',
+  'Runtime Status': 'gui_shell.surface.runtime_status',
+  'Invariant Status': 'gui_shell.surface.invariant_status',
+};
+
+String surfaceSemanticsIdentifier(String label) {
+  final mapped = _surfaceSemanticsIds[label];
+  if (mapped != null) {
+    return mapped;
+  }
+  final normalized = label
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  return 'gui_shell.surface.$normalized';
+}
+
+class SurfaceSemantics extends StatelessWidget {
+  const SurfaceSemantics({
+    super.key,
+    required this.label,
+    required this.child,
+    this.value,
+    this.header = false,
+    this.explicitChildNodes = false,
+    this.excludeSemantics = false,
+  });
+
+  final String label;
+  final String? value;
+  final bool header;
+  final bool explicitChildNodes;
+  final bool excludeSemantics;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      identifier: surfaceSemanticsIdentifier(label),
+      label: label,
+      value: value,
+      header: header,
+      container: true,
+      explicitChildNodes: explicitChildNodes,
+      excludeSemantics: excludeSemantics,
+      child: child,
+    );
+  }
+}
+
 class ShellPage extends StatelessWidget {
   const ShellPage({super.key, required this.title, required this.children});
 
@@ -16,9 +69,10 @@ class ShellPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Semantics(
+            SurfaceSemantics(
               label: title,
               header: true,
+              excludeSemantics: true,
               child:
                   Text(title, style: Theme.of(context).textTheme.headlineSmall),
             ),
@@ -51,9 +105,10 @@ class MetricRow extends StatelessWidget {
       runSpacing: 12,
       children: [
         for (final item in items)
-          Semantics(
+          SurfaceSemantics(
             label: item.label,
-            container: true,
+            value: item.value,
+            excludeSemantics: true,
             child: SizedBox(
               width: 150,
               child: BorderedPanel(

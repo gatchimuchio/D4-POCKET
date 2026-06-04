@@ -243,6 +243,39 @@ function Collect-VisibleSurfaces {
     }
   }
 
+  function Test-RequiredSurfaceLabelsReady {
+    param($RootElement)
+    if ($null -eq $RootElement) {
+      return $false
+    }
+    try {
+      $elements = $RootElement.FindAll(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition
+      )
+    } catch {
+      return $false
+    }
+    $seen = @{}
+    for ($index = 0; $index -lt $elements.Count; $index += 1) {
+      $element = $elements.Item($index)
+      $name = Get-ElementString -Element $element -PropertyName "Name"
+      $automationId = Get-ElementString -Element $element -PropertyName "AutomationId"
+      $searchText = Normalize-SurfaceText -Text "$name $automationId"
+      foreach ($label in $expected) {
+        if (Test-SurfaceTextContains -Text $searchText -Label $label) {
+          $seen[$label] = $true
+        }
+      }
+    }
+    foreach ($label in $expected) {
+      if (!$seen.ContainsKey($label)) {
+        return $false
+      }
+    }
+    return $true
+  }
+
   $window = $null
   $deadline = (Get-Date).AddSeconds($WaitSeconds)
   $condition = New-Object System.Windows.Automation.PropertyCondition `
@@ -259,6 +292,18 @@ function Collect-VisibleSurfaces {
     if ($null -eq $window) {
       Start-Sleep -Milliseconds 250
     }
+  }
+  $surfaceDeadline = (Get-Date).AddSeconds($WaitSeconds)
+  while (
+    (Get-Date) -lt $surfaceDeadline -and
+    $null -ne $window -and
+    !(Test-RequiredSurfaceLabelsReady -RootElement $window)
+  ) {
+    $Process.Refresh()
+    if ($Process.HasExited) {
+      break
+    }
+    Start-Sleep -Milliseconds 250
   }
 
   $names = New-Object System.Collections.Generic.List[string]
@@ -547,7 +592,7 @@ $evidence = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "4"
+    collector_version = "5"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }

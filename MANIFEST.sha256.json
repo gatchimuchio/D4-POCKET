@@ -100,7 +100,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "3c0f993e8ed17118f3f4d0f58fc4947285d09c6139baf9d711dd0e0fc5337563"
+      "sha256": "85d4303ee7512bd53549512ecd8e1f46b086f405ae4d28dd0d937986ca5c8f47"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -156,7 +156,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
-      "sha256": "512298acf3cfdbf116b721e846e77ad52498a2d26205a433624a2fcb2e9105ec"
+      "sha256": "f2319b65da407dca1ac1a440a5da7f07c7b3867388ff0673ac977979971efdc3"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -176,7 +176,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "97502e3347937242b7de25f97d931dad429256154cc455859b138202dfe7fefe"
+      "sha256": "3886750f45b8357fe51096759d2af296f511e30f8c0df1076a38c22b8759ea6a"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -592,7 +592,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "a5f358297045280d162c3704ad3380db68a332a77430660743774e6d2c2a627f"
+      "sha256": "c6cf3f3e7aa8689ae5303e229c25c11963de9d6723f44cc586c463a32d910ef8"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -876,7 +876,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e5a33bc8866cbabd2bf4ccb0a9df71952aedc2e4b111d53e5e6b1d9181ed501e"
+      "sha256": "d213778ca6fd3b192e457976b7008413e423ca1aef28ea094a342ebf52ccd8fb"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -908,7 +908,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "4b680b3da331a941da33fb56518576dae1e183a3f8c1a4a557ed3d4987e1e76c"
+      "sha256": "6a5fcadc98d12048e33dd6c352079cd18b43cada326b3d5ff4476d6a497507a8"
     },
     {
       "path": "tooling/windows_release_evidence.py",

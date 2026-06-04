@@ -44,6 +44,7 @@ from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden
 from tooling.shell_snapshot import build_shell_snapshot
+from tooling.validate_all import build_steps as build_validation_steps
 from tooling.windows_release_evidence import validate_windows_release_evidence
 
 REQUIRED_SCHEMA_NAMES = {
@@ -1057,7 +1058,7 @@ def _valid_windows_installed_evidence() -> dict:
         "platform": "windows",
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "4",
+            "collector_version": "5",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1623,6 +1624,40 @@ def test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injecti
                 "Windows runner SetWindowText contains required surface labels: "
                 + ", ".join(labels)
             )
+    return errors
+
+
+def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> list[str]:
+    shared = (DESKTOP_FLUTTER / "lib" / "screens" / "shared.dart").read_text(encoding="utf-8")
+    main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    widget_test = (DESKTOP_FLUTTER / "test" / "widget_test.dart").read_text(encoding="utf-8")
+    required = {
+        "Dashboard": "gui_shell.surface.dashboard",
+        "NavigationRail": "gui_shell.surface.navigation_rail",
+        "Runtime Status": "gui_shell.surface.runtime_status",
+        "Invariant Status": "gui_shell.surface.invariant_status",
+    }
+    errors = []
+    for label, identifier in required.items():
+        if identifier not in shared:
+            errors.append(f"desktop Flutter surface semantics identifier missing for {label}")
+        if label not in shared and label not in main:
+            errors.append(f"desktop Flutter surface label missing: {label}")
+    if "SurfaceSemantics(" not in main or "label: 'NavigationRail'" not in main:
+        errors.append("NavigationRail is not exposed through SurfaceSemantics")
+    if "bySemanticsIdentifier(surfaceSemanticsIdentifier(label))" not in widget_test:
+        errors.append("desktop Flutter widget test does not verify per-surface semantics identifiers")
+    return errors
+
+
+def test_validate_all_uses_running_python_interpreter_for_python_steps() -> list[str]:
+    errors = []
+    steps = build_validation_steps(False, "windows", python_only=True)
+    for step in steps:
+        if step.command[0] != sys.executable:
+            errors.append(f"{step.name} does not use sys.executable")
+        if step.required_tool is not None:
+            errors.append(f"{step.name} still declares a PATH Python tool requirement")
     return errors
 
 
@@ -2228,6 +2263,8 @@ def main() -> int:
         test_rust_broker_rejection_audit_contract_shape,
         test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
         test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection,
+        test_desktop_flutter_exposes_individual_surface_semantics_identifiers,
+        test_validate_all_uses_running_python_interpreter_for_python_steps,
         test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
         test_blue_tanuki_adapter_metadata_cannot_escalate_authority,

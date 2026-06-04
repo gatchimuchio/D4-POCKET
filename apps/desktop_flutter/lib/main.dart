@@ -116,9 +116,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
                 Expanded(
                   child: Row(
                     children: [
-                      Semantics(
+                      SurfaceSemantics(
                         label: 'NavigationRail',
-                        container: true,
                         explicitChildNodes: true,
                         child: NavigationRail(
                           selectedIndex: selectedIndex,

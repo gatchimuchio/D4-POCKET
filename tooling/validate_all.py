@@ -35,6 +35,10 @@ class EvidenceCheck:
     required_action: str
 
 
+def python_step(script: str, *args: str) -> list[str]:
+    return [sys.executable, script, *args]
+
+
 def current_desktop_platform() -> str:
     system = platform.system().lower()
     if system == "linux":
@@ -48,28 +52,25 @@ def current_desktop_platform() -> str:
 
 def build_steps(include_mobile_release: bool, desktop_platform: str, python_only: bool = False) -> list[ValidationStep]:
     steps = [
-        ValidationStep("schema_check", ["python3", "tooling/schema_check/check_schemas.py"], ROOT, "python3"),
+        ValidationStep("schema_check", python_step("tooling/schema_check/check_schemas.py"), ROOT),
         ValidationStep(
             "conformance_skeleton",
-            ["python3", "tooling/conformance_tests/run_conformance_skeleton.py"],
+            python_step("tooling/conformance_tests/run_conformance_skeleton.py"),
             ROOT,
-            "python3",
         ),
-        ValidationStep("manifest_check", ["python3", "tooling/manifest.py", "--check"], ROOT, "python3"),
-        ValidationStep("release_gate_check", ["python3", "tooling/release_gate_check.py"], ROOT, "python3"),
-        ValidationStep("release_smoke", ["python3", "tooling/release_smoke.py"], ROOT, "python3"),
-        ValidationStep("evidence_bundle", ["python3", "tooling/evidence_bundle.py", "--check"], ROOT, "python3"),
+        ValidationStep("manifest_check", python_step("tooling/manifest.py", "--check"), ROOT),
+        ValidationStep("release_gate_check", python_step("tooling/release_gate_check.py"), ROOT),
+        ValidationStep("release_smoke", python_step("tooling/release_smoke.py"), ROOT),
+        ValidationStep("evidence_bundle", python_step("tooling/evidence_bundle.py", "--check"), ROOT),
         ValidationStep(
             "release_runtime_assertions",
-            ["python3", "tooling/release_runtime_assertions.py", "--check"],
+            python_step("tooling/release_runtime_assertions.py", "--check"),
             ROOT,
-            "python3",
         ),
         ValidationStep(
             "broker_authority_parity",
-            ["python3", "tooling/broker_parity/run_authority_parity.py"],
+            python_step("tooling/broker_parity/run_authority_parity.py"),
             ROOT,
-            "python3",
         ),
     ]
     if python_only:

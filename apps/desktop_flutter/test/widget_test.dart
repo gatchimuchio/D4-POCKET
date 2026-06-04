@@ -37,6 +37,17 @@ void main() {
     try {
       await tester.pumpWidget(const GuiShellDesktopApp());
 
+      for (final label in [
+        'Dashboard',
+        'NavigationRail',
+        'Runtime Status',
+        'Invariant Status',
+      ]) {
+        expect(
+          find.bySemanticsIdentifier(surfaceSemanticsIdentifier(label)),
+          findsOneWidget,
+        );
+      }
       expect(find.bySemanticsLabel(RegExp('Dashboard')), findsWidgets);
       expect(find.bySemanticsLabel(RegExp('NavigationRail')), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('Runtime Status')), findsWidgets);
