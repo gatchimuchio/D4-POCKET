@@ -1,45 +1,113 @@
-# GUI Shell
+<div align="center">
 
-GUI Shell is a desktop-first AI Runtime / Agent Operation Shell and LLM-readable application responsibility substrate for local runtimes, agents, tools, and services.
+<!-- LOGO / TITLE -->
+<h1>
+  <br>
+  🐚 GUI&nbsp;Shell
+</h1>
 
-It is a generic Runtime Operation Shell control plane whose contracts, safety boundaries, adapter model, approval model, audit model, recovery model, and extension rules are intended to be read by both human operators and LLM development/integration agents.
+<h3>A desktop-first AI Runtime / Agent Operation Shell</h3>
+<p><em>ローカルランタイム・エージェント・ツール・サービスのための制御プレーン</em></p>
 
-It is **not** a BLUE-TANUKI-specific GUI. BLUE-TANUKI is the first reference consumer/runtime and must connect through an adapter boundary; it is not a v1.0 release gate.
+<!-- BADGES -->
+<p>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20skeleton-orange.svg">
+  <img alt="Phase" src="https://img.shields.io/badge/phase-0%20locked-blueviolet.svg">
+  <img alt="Schemas" src="https://img.shields.io/badge/schemas-19%20validated-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-67%20checks-success.svg">
+</p>
+<p>
+  <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
+  <img alt="Dart" src="https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white">
+  <img alt="Flutter" src="https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-00599C?logo=cplusplus&logoColor=white">
+</p>
 
-## TL;DR
+<p>
+  <a href="#-quickstart">Quickstart</a> •
+  <a href="#-architecture--アーキテクチャ">Architecture</a> •
+  <a href="#-explicit-boundaries--明示的境界">Boundaries</a> •
+  <a href="ROADMAP.md">Roadmap</a> •
+  <a href="SECURITY.md">Security</a>
+</p>
 
-1. **GUI Shell is a control plane and LLM-readable responsibility substrate.** Flutter renders operator surfaces; it does not own authority.
-2. **Schemas and conformance own the contract.** Runtime, adapter, permission, approval, audit, recovery, and content exposure semantics are JSON Schema-first.
-3. **LLMs may implement and integrate; they are not authority.** Human operators remain final approval, recovery, responsibility, and release-claim holders.
-4. **Safety first, robustness second, product UI third.** Product screens never outrank authority strip, content exposure, approval, audit, and recovery boundaries.
+</div>
 
-## Phase 0 locked surface
+---
 
-- Generic Runtime Operation Shell direction
-- BLUE-TANUKI is frozen as the Phase 0 reference runtime contract target through adapter only
-- Flutter + Rust helper as primary implementation candidate
-- Compose Multiplatform watchlist
-- Tauri desktop-heavy fallback
-- FrameworkRiskProfile for UI framework governance risk
-- Adapter Conformance requirements
-- Content Exposure Boundary
-- Authority Strip Conformance
+> **GUI Shell is _not_ a BLUE-TANUKI-specific GUI.**
+> BLUE-TANUKI is a reference consumer/runtime that must connect **through an adapter boundary** — it is not a v1.0 release gate.
+>
+> GUI Shell は BLUE-TANUKI 専用 GUI **ではありません**。BLUE-TANUKI はアダプタ境界を介して接続する参照ランタイムであり、v1.0 のリリースゲートではありません。
+
+<br>
+
+## 📌 TL;DR
+
+| | Principle | 原則 |
+|:---:|:---|:---|
+| **1** | **GUI Shell is a control plane.** Flutter renders operator surfaces; it does *not* own authority. | GUI Shell は制御プレーンである。Flutter は操作画面を描画するが、権限は保持しない。 |
+| **2** | **Schemas and conformance own the contract.** Runtime / adapter / permission / approval / audit / recovery / content-exposure semantics are **JSON Schema-first**. | スキーマと適合性が契約を所有する。各種セマンティクスは JSON Schema ファースト。 |
+| **3** | **Safety first, robustness second, product UI third.** Product screens never outrank authority strip, content exposure, approval, audit, and recovery boundaries. | 安全性が第一、堅牢性が第二、プロダクト UI は第三。 |
+
+<br>
+
+## 🔒 Phase 0 locked surface — フェーズ0 確定スコープ
+
+- Generic **Runtime Operation Shell** direction / 汎用ランタイム操作シェルの方向性
+- BLUE-TANUKI frozen as the Phase 0 reference runtime contract target **through adapter only**
+- **Flutter + Rust helper** as primary implementation candidate
+- **Compose Multiplatform** watchlist / 第三候補としてウォッチ
+- **Tauri** desktop-heavy fallback
+- `FrameworkRiskProfile` for UI framework governance risk
+- Adapter Conformance requirements / アダプタ適合要件
+- Content Exposure Boundary / コンテンツ露出境界
+- Authority Strip Conformance / 権限ストリップ適合
 - Schema-first / conformance-first work order
 
-## Explicit boundaries
+<br>
 
-- Shell Core must not contain BLUE-TANUKI-specific logic.
-- Flutter-specific code must not define core contracts or authority decisions.
-- Adapter metadata is untrusted and must never grant permissions.
-- Memory, local cache, and previous state must never grant authority by themselves.
-- Full content may be displayed only when `content_visibility=full`.
-- Approval payload fields marked authority, sealed, hidden, or sacred are not editable.
-- Sensitive actions must map to capability, permission, approval state, audit event, and recovery action.
-- Network, filesystem, process, credential, and IPC access must not be silently introduced or broadened.
+## 🧱 Architecture — アーキテクチャ
 
-## Architecture
+The UI can **display and request** actions. It **cannot** create authority, bypass adapter conformance, or reinterpret runtime trust.
+UI は表示と要求のみ可能。権限の生成・適合の迂回・信頼の再解釈はできません。
 
-```text
+```mermaid
+flowchart TD
+    A["Runtime / Agent / Tool / Local Service"]
+    subgraph ADAPTER["🔌 Adapter"]
+        direction TB
+        A1["authority strip"]
+        A2["content exposure policy"]
+        A3["schema validation"]
+        A4["capability declaration"]
+    end
+    subgraph CORE["🧠 Shell Core"]
+        direction TB
+        C1["runtime registry"]
+        C2["permission ledger"]
+        C3["approval queue"]
+        C4["audit events"]
+        C5["recovery actions"]
+    end
+    subgraph UI["🖥️ UI Layer"]
+        direction TB
+        U1["Flutter rendering"]
+        U2["operator input"]
+        U3["navigation / local UI state"]
+    end
+    R["🦀 Rust Helper<br/>bounded native diagnostics & operations"]
+
+    A --> ADAPTER --> CORE --> UI
+    CORE --> R
+```
+
+<details>
+<summary><strong>📄 Plain-text architecture (テキスト版)</strong></summary>
+
+```
 Runtime / Agent / Tool / Local Service
   -> Adapter
       -> authority strip
@@ -52,10 +120,6 @@ Runtime / Agent / Tool / Local Service
       -> approval queue
       -> audit events
       -> recovery actions
-  -> Rust Security Broker
-      -> authority-sensitive IPC acceptance/rejection
-      -> broker-local audit for broker decisions
-      -> command-envelope validation before future dispatch
   -> UI Layer
       -> Flutter rendering
       -> operator input
@@ -64,181 +128,157 @@ Runtime / Agent / Tool / Local Service
       -> bounded native diagnostics and operations
 ```
 
-The UI can display and request actions. It cannot create authority, bypass adapter conformance, or reinterpret runtime trust.
+</details>
 
-## Human Operator and LLM Extension-Agent Model
+<br>
 
-GUI Shell has two first-class interaction roles:
+## 🚧 Explicit boundaries — 明示的境界
 
-- Human operator / owner: observes state, grants or denies approval, authorizes recovery, accepts release claims, and remains the final responsibility holder.
-- LLM development / integration agent: reads architecture and contract documents, implements bounded modules or adapters, connects runtimes/tools/services through declared contracts, runs validation, and reports evidence.
+> These are hard invariants, not guidelines. これらはガイドラインではなく不変条件です。
 
-LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+- ❌ **Shell Core** must not contain BLUE-TANUKI-specific logic.
+- ❌ **Flutter-specific code** must not define core contracts or authority decisions.
+- ❌ **Adapter metadata** is untrusted and must never grant permissions.
+- ❌ **Memory / local cache / previous state** must never grant authority by themselves.
+- ✅ Full content may be displayed **only when** `content_visibility=full`.
+- ✅ Approval payload fields marked `authority` / `sealed` / `hidden` / `sacred` are **not editable**.
+- ✅ Sensitive actions must map to **capability → permission → approval state → audit event → recovery action**.
+- ❌ Network / filesystem / process / credential / IPC access must not be silently introduced or broadened.
 
-LLM output, generated configuration, memory, external metadata, GUI state, adapter metadata, previous state, and tool responses must not grant authority, approve sensitive operations, widen permissions, bypass conformance, or turn generated content into trusted truth. Sensitive work remains governed by capability, permission, approval, audit, recovery, content exposure, adapter, runtime, update/install, and broker boundaries.
+<br>
 
-## Why LLM-Readable Contracts Matter
+## ⚡ Quickstart
 
-GUI Shell is intended to make application/runtime extension work inspectable before implementation begins. A development agent should be able to read repository contracts and understand:
-
-- which contract surface a new module or adapter must consume;
-- which authority, approval, audit, recovery, and content exposure boundaries apply;
-- which failure case must reject, block, audit, or suspend behavior;
-- which validation path proves conformance;
-- when a proposed integration requires a new contract instead of an improvised shortcut.
-
-This definition is not an external ecosystem claim. A bounded cross-agent reproduction report exists for one controlled non-authoritative extension task; public standard status, broad ecosystem compatibility, and third-party interoperability remain unproven until separate measured evidence exists.
-
-## Quickstart
-
-Validation checks the repository contracts and conformance skeleton. This skeleton does not assume Flutter or Rust is already installed.
+Validation checks the repository contracts and conformance skeleton.
+This skeleton does **not** assume Flutter or Rust is already installed.
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-If the host only exposes Python as `python3`, use:
+<details>
+<summary>If the host only exposes <code>python3</code></summary>
 
 ```bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-Expected successful output:
+</details>
+
+Expected successful output / 期待される出力:
 
 ```text
-schema check passed: 25 schemas, 25 examples, 27 negative fixtures
-conformance skeleton passed: 102 checks
+schema check passed: 19 schemas, 19 examples, 19 negative fixtures
+conformance skeleton passed: 67 checks
 ```
 
-See [QUICKSTART.md](./QUICKSTART.md).
+➡️ See **[QUICKSTART.md](QUICKSTART.md)** for details.
 
-## Validation
+<br>
 
-Required before reporting implementation work:
+## ✅ Validation
+
+Required **before reporting implementation work** / 実装報告の前に必須:
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-Conditional toolchain checks:
+Conditional toolchain checks / 条件付きツールチェーン検証:
 
 ```bash
-cd native/rust_helper && cargo test
-cd apps/desktop_flutter && flutter analyze
-cd apps/mobile_flutter && flutter analyze
+cd native/rust_helper      && cargo test
+cd apps/desktop_flutter    && flutter analyze
+cd apps/mobile_flutter     && flutter analyze
 ```
 
-Or run the aggregate reporter:
+Or run the aggregate reporter / 一括レポーター:
 
 ```bash
 python3 tooling/validate_all.py
 ```
 
-See [VALIDATION.txt](./VALIDATION.txt) for the last recorded validation output.
+➡️ See **[VALIDATION.txt](VALIDATION.txt)** for the last recorded validation output.
 
-## Repository layout
+<br>
 
-```text
+## 📂 Repository layout — リポジトリ構成
+
+```
 docs/
-  standards/
-  research/
-  specs/
+  standards/        # 標準
+  research/         # 調査
+  specs/            # 仕様ドキュメント
 
 specs/
-  *.schema.json
+  *.schema.json     # JSON Schema (single source of contract)
 
 apps/
-  desktop_flutter/
-  mobile_flutter/
+  desktop_flutter/  # デスクトップ
+  mobile_flutter/   # モバイル
 
 packages/
-  shell_core/
-  shell_ui/
-  shell_contracts/
-  blue_tanuki_adapter/
+  shell_core/         # 権限を持つコア
+  shell_ui/           # UI 部品
+  shell_contracts/    # 契約定義
+  blue_tanuki_adapter/# 参照ランタイム用アダプタ
 
 native/
-  rust_helper/
+  rust_helper/      # 境界付きネイティブヘルパー
 
 installer/
-  windows/
-  macos/
-  linux/
+  windows/  macos/  linux/
 
 tooling/
-  codegen/
-  schema_check/
-  conformance_tests/
-  ui_snapshot_tests/
+  codegen/  schema_check/  conformance_tests/  ui_snapshot_tests/
 ```
 
-## Current status
+<br>
 
-GUI-Shell has completed Phase A: personal Windows trial operation and Phase B: owner-use operational hardening.
+## 📊 Current status — 現状
 
-Phase B owner-use complete means the owner can launch and use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. It does not mean OSS v1.0 RC or paid/product completion.
+This repository is a **v1.0 product-completion skeleton**, *not* a production runtime.
+本リポジトリは v1.0 プロダクト完成のスケルトンであり、プロダクション・ランタイムではありません。
 
-The canonical phase source is [docs/PHASE_STRATEGY.md](./docs/PHASE_STRATEGY.md):
+It intentionally prioritizes / 意図的に以下の順で優先します:
 
-- Phase A: complete
-- Phase B: owner-use complete
-- Phase C: OSS claim hygiene next
-- Phase D: measured Windows installed-path release evidence later
-- Phase E: OSS v1.0 RC later
-- Phase F: paid/product QC later
+```
+1. standards            標準
+2. specs                仕様
+3. conformance boundaries  適合境界
+4. runtime adapter contracts  ランタイムアダプタ契約
+5. helper boundaries    ヘルパー境界
+        ── before product UI ──  プロダクトUIより先に
+```
 
-The canonical completion roadmap for the combined Windows-first product path and LLM-readable substrate demonstration path is [docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md](./docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md).
+<br>
 
-This repository does not claim completed product release readiness. Strict Windows installed-path evidence, measured Setup Doctor evidence, and explicit owner GO are classified as `release_blocker` before any release-ready claim.
+## 📚 Top-level references — 主要ドキュメント
 
-## Release-Gate Classification
+| Document | Description | 説明 |
+|:---|:---|:---|
+| [AGENTS.md](AGENTS.md) | Repository agent rules | エージェント規則 |
+| [ROADMAP.md](ROADMAP.md) | Phase roadmap & execution order | フェーズ計画と実行順序 |
+| [docs/OPERATING_MODEL.md](docs/OPERATING_MODEL.md) | Repository flow, backup model, validation gates | 運用フロー・検証ゲート |
+| [CLAIM.md](CLAIM.md) | Current claim boundary | クレーム境界 |
+| [CONFIG.md](CONFIG.md) | Configuration reference | 設定リファレンス |
+| [AUDIT.md](AUDIT.md) | Audit & invariant expectations | 監査・不変条件 |
+| [SECURITY.md](SECURITY.md) | Security posture & reporting | セキュリティ方針 |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Validation & setup failure guide | 障害対応ガイド |
 
-- item: personal Windows trial operation
-  classification: required_for_v1
-  reason: Windows build and native launch smoke passed for owner trial use.
-  required_action: Keep the owner-use operation path usable while Phase C/D/E remain separate.
-  blocks_release: no
+<br>
 
-- item: completed product release
-  classification: release_blocker
-  reason: strict Windows installed-path release validation and owner GO have not passed.
-  required_action: Complete measured Windows installed-path evidence and all v1.0 release blockers in `RELEASE_CHECKLIST.md`.
-  blocks_release: yes
+## 📝 License — ライセンス
 
-- item: local single-user desktop scope
-  classification: known_limitation
-  reason: deliberate v1.0 product scope.
-  required_action: Keep README.md, CLAIM.md, and RELEASE_CHECKLIST.md aligned.
-  blocks_release: no
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
+本プロジェクトは **MIT ライセンス** で配布されています。
 
-- item: mobile full release
-  classification: post_v1_scope
-  reason: v1.0 is desktop-first unless owner changes scope.
-  required_action: Complete in mobile release phase.
-  blocks_release: no
+<br>
 
-It intentionally prioritizes:
-
-1. standards
-2. specs
-3. conformance boundaries
-4. runtime adapter contracts
-5. helper boundaries
-
-before product UI.
-
-## Top-level references
-
-- [AGENTS.md](./AGENTS.md): repository agent rules
-- [ROADMAP.md](./ROADMAP.md): phase roadmap and execution order
-- [docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md](./docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md): canonical completion roadmap for product responsibility and LLM-readable substrate proof
-- [docs/PHASE_STRATEGY.md](./docs/PHASE_STRATEGY.md): Phase A/B/C/D/E/F readiness boundaries
-- [docs/OPERATING_MODEL.md](./docs/OPERATING_MODEL.md): repository flow, backup model, and validation gates
-- [CLAIM.md](./CLAIM.md): current claim boundary
-- [CONFIG.md](./CONFIG.md): configuration reference
-- [AUDIT.md](./AUDIT.md): audit and invariant expectations
-- [SECURITY.md](./SECURITY.md): security posture and reporting
-- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md): validation and setup failure guide
+<div align="center">
+<sub>Built with a schema-first, conformance-first, safety-first philosophy.</sub><br>
+<sub>スキーマファースト・適合ファースト・安全性ファーストの思想で構築。</sub>
+</div>
