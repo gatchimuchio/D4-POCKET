@@ -247,6 +247,8 @@ python3 tooling/validate_all.py            # development slice
 python3 tooling/validate_all.py --strict-release --desktop-platform=windows
 ```
 
+Strict Windows release validation requires native Windows isolated installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. Historical Windows PASS records are owner-trial history only.
+
 > Never claim validation passed unless it actually passed. / 実際に通っていない検証を「通った」と報告しないこと。
 
 ➡️ See **[VALIDATION.txt](VALIDATION.txt)** for the full recorded evidence history.

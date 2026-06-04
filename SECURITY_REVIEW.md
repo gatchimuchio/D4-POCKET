@@ -28,7 +28,7 @@ Current phase: Phase B owner-use complete. This file records security posture fo
 
 - item: Windows installed-path evidence
   classification: release_blocker
-  reason: completed Windows-first product release requires measured installed-path evidence for launch, config, audit, visible surfaces, and non-synthetic Setup Doctor diagnostics.
+  reason: completed Windows-first product release requires measured installed-path evidence for launch, config, audit, visible surfaces, isolated provenance, artifact hash linkage, broker measured field provenance, and installed-app generated Setup Doctor product diagnostics.
   required_action: Generate and validate `release_evidence/windows_installed_smoke.json` on native Windows.
   blocks_release: yes
 

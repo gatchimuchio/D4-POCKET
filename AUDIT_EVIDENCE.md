@@ -55,8 +55,8 @@
   required_action: Generate measured `release_evidence/windows_installed_smoke.json` on native Windows and pass `python tooling/windows_release_evidence.py`.
   blocks_release: yes
 
-- item: installed-path Setup Doctor release evidence
+- item: installed-app Setup Doctor product evidence
   classification: release_blocker
-  reason: Native Windows launch smoke is development evidence, not measured installed-path release evidence. Non-synthetic installed-path Setup Doctor evidence is still required for strict release.
-  required_action: Record Setup Doctor diagnostics from the installed Windows app path. Strict release must still fail until measured windows_installed_smoke.json exists, non-synthetic installed-path Setup Doctor evidence exists, and owner GO exists.
+  reason: Native Windows launch smoke is development evidence. Strict R2 requires installed-app generated Setup Doctor product evidence; the current PowerShell collector is external probe evidence only.
+  required_action: Record installed-app generated Setup Doctor export evidence. Strict release must still fail until measured `windows_installed_smoke.json`, Setup Doctor product evidence, and owner GO exist.
   blocks_release: yes

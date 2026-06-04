@@ -5,6 +5,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -150,44 +151,12 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
                     "Keep Windows Flutter desktop project files under version control." if windows_project_exists else "Generate Windows desktop project support and commit the bounded Flutter desktop project files.",
                 ),
                 EvidenceCheck(
-                    "windows_flutter_toolchain",
-                    "passed",
+                    "windows_development_toolchain_historical_smoke",
+                    "historical_invalid_for_current_r2",
                     "none",
                     "no",
-                    "Native Windows Flutter desktop validation ran successfully for analyze, test, build, and launch smoke.",
-                    "Keep native Windows toolchain validation current for release candidates.",
-                ),
-                EvidenceCheck(
-                    "windows_flutter_analyze",
-                    "passed",
-                    "none",
-                    "no",
-                    "Windows Flutter analyze passed on a native Windows host.",
-                    "Keep `flutter analyze` passing on Windows release candidates.",
-                ),
-                EvidenceCheck(
-                    "windows_flutter_test",
-                    "passed",
-                    "none",
-                    "no",
-                    "Windows Flutter test passed on a native Windows host.",
-                    "Keep `flutter test` passing on Windows release candidates.",
-                ),
-                EvidenceCheck(
-                    "windows_desktop_build_smoke",
-                    "passed",
-                    "none",
-                    "no",
-                    r"`flutter build windows` passed on a native Windows host and produced `build\windows\x64\runner\Release\gui_shell_desktop.exe`.",
-                    "Keep Windows desktop build smoke passing on release candidates.",
-                ),
-                EvidenceCheck(
-                    "windows_desktop_launch_smoke",
-                    "passed",
-                    "none",
-                    "no",
-                    r"`.\build\windows\x64\runner\Release\gui_shell_desktop.exe` launched successfully on native Windows; Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible.",
-                    "Keep Windows desktop launch smoke passing on release candidates.",
+                    "Historical native Windows analyze/test/build/launch smoke is preserved as owner-trial history only. It is not current R2 formal evidence because it is not tied to the exact implementation commit and installed-path evidence bundle.",
+                    "Collect fresh native Windows release-candidate evidence through the isolated installed-path evidence flow.",
                 ),
             ]
         )
@@ -297,14 +266,30 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
             "exit": "",
         }
 
-    completed = subprocess.run(
-        step_command,
-        cwd=step.cwd,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        completed = subprocess.run(
+            step_command,
+            cwd=step.cwd,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        classification, blocks_release, _, _ = classify_not_run(step, strict_release)
+        return {
+            "name": step.name,
+            "command": command,
+            "command_array": step_command,
+            "status": "not_run",
+            "classification": classification,
+            "blocks_release": blocks_release,
+            "reason": f"validation command could not be started: {exc.__class__.__name__}: {exc}",
+            "required_action": "Fix the validation host toolchain or command resolution and rerun; validator failures must remain structured release blockers.",
+            "stdout": "",
+            "stderr": traceback.format_exc().rstrip(),
+            "exit": "",
+        }
     passed = completed.returncode == 0
     if not step.in_release_scope:
         classification = "post_v1_scope"

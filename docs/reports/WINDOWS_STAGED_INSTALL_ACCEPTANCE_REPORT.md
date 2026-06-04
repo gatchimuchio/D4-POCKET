@@ -1,7 +1,15 @@
 # Windows Staged-Install Acceptance Report
 
+## 0. Current R2 Evidence Classification
+
+- item: this historical report
+  classification: release_blocker
+  reason: This report is preserved as historical owner-trial evidence only. It is invalid for current strict R2 formal proof because the old run used aggregate native surface exposure, lacked isolated run provenance, lacked exact source/artifact/evidence bundle linkage, and treated external Setup Doctor probe output as formal evidence.
+  required_action: Recollect Windows evidence through the strict R2 isolated installed-path flow before any completed product release claim.
+  blocks_release: yes
+
 ## 1. 結論
-- Result: PASS
+- Result: historical PASS, invalid for current strict R2 formal proof
 - Tested implementation commit: `3e7d6079eaeb3af0dd1cd0fc38c84ba095dad9f7`
 - Branch: `main`
 - Date/time: `2026-06-03T14:24:01.8473316+09:00`
@@ -10,7 +18,7 @@
 - Validator command: `python tooling\windows_release_evidence.py`
 - Validator exit code: `0`
 
-This proves the staged Windows install evidence gate passed for the tested commit. It does not claim completed product release readiness.
+This proves only that the historical staged Windows install evidence gate passed under the older validator for the tested commit. It is no longer valid R2 formal release evidence.
 
 ## 2. 修正した原因分類
 | Cause | Classification | Fix |

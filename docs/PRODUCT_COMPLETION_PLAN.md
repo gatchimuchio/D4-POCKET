@@ -27,8 +27,8 @@ Platform priority:
 
 - item: Windows desktop project support, analyze, test, build, launch, Setup Doctor, installer, and first-run smoke
   classification: release_blocker
-  reason: Windows is the primary product target. Windows project support, Flutter toolchain, analyze, test, build, and launch smoke have passed, but installed-path Setup Doctor, installer, and first-run evidence is missing.
-  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows with broker-mediated installed Flutter `.exe` first-run evidence, `-NoPythonRuntime` launch evidence, installed-path Setup Doctor evidence, and pass `python tooling\windows_release_evidence.py`.
+  reason: Windows is the primary product target. Historical Windows project/toolchain/build/launch smoke is owner-trial history only; strict R2 evidence requires isolated installed-path provenance, artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product evidence.
+  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows from a unique staged run and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target
@@ -39,8 +39,8 @@ Platform priority:
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: real Setup Doctor diagnostics have not passed from the installed Windows app path.
-  required_action: Pass Windows Setup Doctor diagnostics smoke with machine-readable installed-path evidence.
+  reason: installed-app generated Setup Doctor product diagnostics are missing; the current PowerShell Setup Doctor collector is external probe evidence only.
+  required_action: Add installed-app generated machine-readable Setup Doctor export evidence.
   blocks_release: yes
 
 - item: Single-user local-first mode

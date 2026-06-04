@@ -293,14 +293,14 @@ def assert_broker_runtime_restart_and_crash_tests_exist() -> RuntimeAssertion:
     if missing:
         return _fail(
             "broker_runtime_restart_persistence_and_shutdown_coverage",
-            "LIVE_RUNTIME",
+            "FIXTURE",
             "Broker runtime persistence/shutdown test tokens missing: " + ", ".join(missing),
             "Cover broker launch/connect/shutdown, restart replay rejection, audit chain restart verification, and persisted-state tamper rejection.",
         )
     return _pass(
         "broker_runtime_restart_persistence_and_shutdown_coverage",
-        "LIVE_RUNTIME",
-        "Rust broker tests cover local broker process launch/connect/shutdown, unavailable-after-shutdown behavior, replay rejection after restart, audit chain verification after restart, and tampered/malformed persisted-state rejection.",
+        "FIXTURE",
+        "Rust broker test fixtures contain local broker process launch/connect/shutdown, unavailable-after-shutdown behavior, replay rejection after restart, audit chain verification after restart, and tampered/malformed persisted-state rejection coverage. This is not installed product runtime proof.",
         "Keep Rust broker IPC and persistence tests passing; Windows installed-path evidence remains a separate release gate.",
     )
 

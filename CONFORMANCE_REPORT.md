@@ -75,7 +75,7 @@
 - item: Windows installed-path evidence validator
   classification: required_for_v1
   status: implemented
-  evidence: conformance accepts valid `release_evidence/windows_installed_smoke.json` shape and rejects missing installed executable confirmation, installer authority grants, authority-granting Setup Doctor checks, unmeasured/manual GUI visibility evidence, missing config/audit probes, synthetic Setup Doctor evidence, and shallow one-check Setup Doctor payloads.
+  evidence: conformance accepts only the strict R2 `release_evidence/windows_installed_smoke.json` shape and rejects missing provenance/isolation, external Setup Doctor probe as product evidence, missing installed executable confirmation, installer authority grants, authority-granting Setup Doctor checks, unmeasured/manual GUI visibility evidence, missing UIAutomation diagnostic tree, missing config/audit probes, synthetic Setup Doctor evidence, shallow one-check Setup Doctor payloads, aggregate native surface evidence, and broker top-level unmeasured authority declarations.
 
 ## Not Sufficient For Release
 

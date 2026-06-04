@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_PATH = ROOT / "release_evidence" / "windows_installed_smoke.json"
 SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+SOURCE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUIRED_VISIBLE_SURFACES = {"Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"}
 REQUIRED_SETUP_CHECKS = {
     "windows.installed_app_path",
@@ -35,6 +37,23 @@ REQUIRED_BROKER_TRUE_FIELDS = {
     "crash_fail_closed",
 }
 AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
+REQUIRED_EVIDENCE_BUNDLE_KINDS = {
+    "setup_doctor",
+    "broker_smoke",
+    "visible_surfaces",
+    "runtime_assertions",
+}
+REQUIRED_FIELD_PROVENANCE = {
+    "artifact": ("directly_measured", {"EXTERNAL_EVIDENCE"}),
+    "first_run.process": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "first_run.visible_surfaces": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "first_run.config_audit": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "first_run.installer_authority_boundary": ("static_assertion", {"CONFIG"}),
+    "setup_doctor": ("product_export", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "broker.ipc_restart_crash": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "release_runtime_assertions": ("static_assertion", {"CONFIG", "FIXTURE"}),
+}
+LEGACY_FIXED_INSTALL_ROOT_SUFFIX = "\\gui-shell\\installed"
 
 
 @dataclass(frozen=True)
@@ -70,6 +89,18 @@ def _is_false(data: dict[str, Any], dotted: str) -> bool:
 
 def _is_true(data: dict[str, Any], dotted: str) -> bool:
     return _get(data, dotted) is True
+
+
+def _is_sha256_tag(value: Any) -> bool:
+    return bool(SHA256_RE.match(str(value or "")))
+
+
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
 
 
 def _normalised_text(value: Any) -> str:
@@ -129,7 +160,152 @@ def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[s
         and len(set(matched_element_keys)) == 1
     ):
         errors.append("all required surfaces rely on a single automation element")
+    diagnostic_tree = surface_evidence.get("diagnostic_tree")
+    if not isinstance(diagnostic_tree, dict):
+        errors.append("visible surfaces evidence diagnostic_tree missing")
+    else:
+        observed = diagnostic_tree.get("observed_elements")
+        if not isinstance(observed, list) or not observed:
+            errors.append("visible surfaces diagnostic_tree.observed_elements missing")
+        else:
+            required_keys = {"element_key", "runtime_id", "parent_runtime_id", "name", "automation_id", "control_type", "class_name", "framework_id", "supported_patterns"}
+            for index, element in enumerate(observed[: min(len(observed), 20)]):
+                if not isinstance(element, dict):
+                    errors.append(f"visible surfaces observed element {index} is not an object")
+                    continue
+                missing = sorted(required_keys - set(element))
+                if missing:
+                    errors.append(f"visible surfaces observed element {index} missing diagnostic keys: {', '.join(missing)}")
+                    break
+        tree_edges = diagnostic_tree.get("tree_edges")
+        if not isinstance(tree_edges, list):
+            errors.append("visible surfaces diagnostic_tree.tree_edges missing")
     return errors
+
+
+def _validate_field_provenance(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    provenance = data.get("field_provenance")
+    if not isinstance(provenance, dict):
+        return ["field_provenance object missing"]
+    for group, (source_type, evidence_classes) in REQUIRED_FIELD_PROVENANCE.items():
+        entry = provenance.get(group)
+        if not isinstance(entry, dict):
+            errors.append(f"field_provenance.{group} missing")
+            continue
+        if entry.get("source_type") != source_type:
+            errors.append(f"field_provenance.{group}.source_type must be {source_type}")
+        observed_classes = entry.get("evidence_class")
+        if isinstance(observed_classes, str):
+            observed = {observed_classes}
+        elif isinstance(observed_classes, list):
+            observed = {item for item in observed_classes if isinstance(item, str)}
+        else:
+            observed = set()
+        if not observed or observed.isdisjoint(evidence_classes):
+            errors.append(
+                f"field_provenance.{group}.evidence_class must include one of {', '.join(sorted(evidence_classes))}"
+            )
+        if entry.get("formal_release_input") is not True:
+            errors.append(f"field_provenance.{group}.formal_release_input must be true")
+    unsupported = provenance.get("unsupported_claims")
+    if unsupported not in (None, []):
+        errors.append("field_provenance.unsupported_claims must be empty for strict Windows evidence")
+    return errors
+
+
+def _path_contains_run_id(path_value: Any, run_id: str) -> bool:
+    path = str(path_value or "").replace("/", "\\").casefold()
+    return bool(run_id) and run_id.casefold() in path
+
+
+def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT_EVIDENCE_PATH) -> EvidenceResult:
+    errors: list[str] = []
+    provenance = data.get("provenance")
+    if not isinstance(provenance, dict):
+        errors.append("provenance object missing")
+    else:
+        run_id = str(provenance.get("run_id") or "")
+        if not run_id:
+            errors.append("provenance.run_id missing")
+        source_commit = str(provenance.get("source_commit") or "")
+        if not SOURCE_COMMIT_RE.match(source_commit):
+            errors.append("provenance.source_commit must be a 40-character commit SHA")
+        if provenance.get("source_worktree_clean") is not True:
+            errors.append("provenance.source_worktree_clean must be true")
+        if str(provenance.get("source_status_porcelain") or "") != "":
+            errors.append("provenance.source_status_porcelain must be empty")
+        for field in ("build_command", "build_timestamp", "staged_manifest_path"):
+            if not provenance.get(field):
+                errors.append(f"provenance.{field} missing")
+        for field in ("installed_manifest_sha256", "app_artifact_sha256", "broker_artifact_sha256", "evidence_bundle_sha256"):
+            if not _is_sha256_tag(provenance.get(field)):
+                errors.append(f"provenance.{field} must be tagged sha256")
+        artifact_hash = _get(data, "artifact.sha256")
+        if _is_sha256_tag(artifact_hash) and provenance.get("app_artifact_sha256") != artifact_hash:
+            errors.append("provenance.app_artifact_sha256 must match artifact.sha256")
+
+        isolation = provenance.get("isolation")
+        if not isinstance(isolation, dict):
+            errors.append("provenance.isolation object missing")
+        else:
+            if isolation.get("uses_shared_fixed_install_root") is not False:
+                errors.append("provenance.isolation.uses_shared_fixed_install_root must be false")
+            path_fields = [
+                "isolated_install_root",
+                "isolated_runtime_dir",
+                "isolated_store_dir",
+                "isolated_config_dir",
+                "isolated_audit_dir",
+            ]
+            for field in path_fields:
+                value = isolation.get(field)
+                if not value:
+                    errors.append(f"provenance.isolation.{field} missing")
+                elif not _path_contains_run_id(value, run_id):
+                    errors.append(f"provenance.isolation.{field} must contain run_id")
+            install_root = str(isolation.get("isolated_install_root") or "").replace("/", "\\").casefold()
+            if install_root.endswith(LEGACY_FIXED_INSTALL_ROOT_SUFFIX):
+                errors.append("provenance.isolation.isolated_install_root uses legacy shared fixed install root")
+
+        bundle_files = provenance.get("evidence_bundle_files")
+        if not isinstance(bundle_files, list) or not bundle_files:
+            errors.append("provenance.evidence_bundle_files missing")
+        else:
+            kinds = set()
+            for index, item in enumerate(bundle_files):
+                if not isinstance(item, dict):
+                    errors.append(f"provenance.evidence_bundle_files[{index}] must be an object")
+                    continue
+                kind = item.get("kind")
+                if isinstance(kind, str):
+                    kinds.add(kind)
+                if not item.get("path"):
+                    errors.append(f"provenance.evidence_bundle_files[{index}].path missing")
+                if not _is_sha256_tag(item.get("sha256")):
+                    errors.append(f"provenance.evidence_bundle_files[{index}].sha256 must be tagged sha256")
+            missing = REQUIRED_EVIDENCE_BUNDLE_KINDS - kinds
+            if missing:
+                errors.append(f"provenance.evidence_bundle_files missing kinds: {', '.join(sorted(missing))}")
+
+        errors.extend(_validate_field_provenance(data))
+
+        if path.exists():
+            actual_hash = _hash_file(path)
+            if _is_sha256_tag(provenance.get("final_evidence_sha256")) and provenance.get("final_evidence_sha256") != actual_hash:
+                errors.append("provenance.final_evidence_sha256 does not match this evidence file")
+
+    if errors:
+        return _failed(
+            "windows_evidence_provenance_isolation",
+            "; ".join(errors),
+            "Collect Windows evidence from a unique staged run with source commit, clean worktree, artifact hashes, isolated install/runtime/config/audit/store paths, field provenance, and evidence bundle hashes.",
+        )
+    return _passed(
+        "windows_evidence_provenance_isolation",
+        "Windows installed evidence is tied to a clean source commit, isolated run paths, artifact hashes, and field-level evidence provenance.",
+        "Keep every Windows formal evidence run isolated and commit-linked.",
+    )
 
 
 def load_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> tuple[dict[str, Any] | None, str | None]:
@@ -251,12 +427,20 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
     if not isinstance(setup, dict):
         errors.append("setup_doctor object missing")
     else:
+        if setup.get("formal_product_evidence") is not True:
+            errors.append("Setup Doctor must be installed-app product evidence, not an external probe")
         if setup.get("status") not in ("pass", "warning"):
             errors.append("setup_doctor.status must be pass or warning")
         evidence_source = setup.get("evidence_source")
         if not isinstance(evidence_source, dict):
             errors.append("Setup Doctor evidence_source missing")
         else:
+            if evidence_source.get("source_kind") != "installed_app_machine_readable_export":
+                errors.append("Setup Doctor evidence_source.source_kind must be installed_app_machine_readable_export")
+            if evidence_source.get("product_generated") is not True:
+                errors.append("Setup Doctor evidence must be generated by the installed app")
+            if evidence_source.get("collector_derives_checks") is not False:
+                errors.append("Setup Doctor collector must not derive product diagnostic checks")
             if evidence_source.get("synthetic") is not False:
                 errors.append("synthetic Setup Doctor evidence is not accepted")
             if not evidence_source.get("command"):
@@ -291,7 +475,7 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_setup_doctor_smoke",
             "; ".join(errors),
-            "Run Setup Doctor from the installed Windows app path and record valid diagnostics evidence.",
+            "Record installed-app generated machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
         )
     return _passed(
         "windows_setup_doctor_smoke",
@@ -320,17 +504,41 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
                 errors.append("synthetic broker evidence is not accepted")
             if not source.get("command"):
                 errors.append("broker evidence_source.command missing")
+        field_provenance = broker.get("field_provenance")
+        if not isinstance(field_provenance, dict):
+            errors.append("broker field_provenance missing")
         for field in sorted(REQUIRED_BROKER_TRUE_FIELDS):
             if broker.get(field) is not True:
                 errors.append(f"broker.{field} must be true")
+            if isinstance(field_provenance, dict):
+                entry = field_provenance.get(field)
+                if not isinstance(entry, dict):
+                    errors.append(f"broker field_provenance.{field} missing")
+                else:
+                    if entry.get("source_type") != "directly_measured":
+                        errors.append(f"broker field_provenance.{field}.source_type must be directly_measured")
+                    evidence_class = entry.get("evidence_class")
+                    if evidence_class not in ("LIVE_RUNTIME", "EXTERNAL_EVIDENCE"):
+                        errors.append(f"broker field_provenance.{field}.evidence_class must be LIVE_RUNTIME or EXTERNAL_EVIDENCE")
         if broker.get("endpoint_host") != "127.0.0.1":
             errors.append("broker endpoint_host must be 127.0.0.1")
         if broker.get("replay_error_code") != "broker_replay_detected":
             errors.append("broker replay_error_code must be broker_replay_detected")
-        if broker.get("python_runtime_required_for_authority") is not False:
-            errors.append("broker python_runtime_required_for_authority must be false")
-        if broker.get("flutter_rust_ffi_authority_bridge") is not False:
-            errors.append("broker flutter_rust_ffi_authority_bridge must be false")
+        if "python_runtime_required_for_authority" in broker:
+            errors.append("broker python_runtime_required_for_authority top-level declaration is not accepted as measured broker evidence")
+        if "flutter_rust_ffi_authority_bridge" in broker:
+            errors.append("broker flutter_rust_ffi_authority_bridge top-level declaration is not accepted as measured broker evidence")
+        declarations = broker.get("unmeasured_declarations")
+        if declarations not in (None, {}):
+            if not isinstance(declarations, dict):
+                errors.append("broker unmeasured_declarations must be an object when present")
+            else:
+                for key, value in declarations.items():
+                    if not isinstance(value, dict):
+                        errors.append(f"broker unmeasured_declarations.{key} must be an object")
+                        continue
+                    if value.get("formal_runtime_proof") is not False:
+                        errors.append(f"broker unmeasured_declarations.{key}.formal_runtime_proof must be false")
         broker_errors = broker.get("errors")
         if broker_errors not in (None, []) and not (isinstance(broker_errors, list) and len(broker_errors) == 0):
             errors.append("broker errors must be empty")
@@ -338,11 +546,11 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_broker_installed_smoke",
             "; ".join(errors),
-            "Run installer/windows/collect_broker_smoke.ps1 against the installed Rust broker helper and include the result in release_evidence/windows_installed_smoke.json.",
+            "Run installer/windows/collect_broker_smoke.ps1 against the installed Rust broker helper and include only measured IPC/restart/crash field provenance in release_evidence/windows_installed_smoke.json.",
         )
     return _passed(
         "windows_broker_installed_smoke",
-        "Windows installed-path broker launch/connect/restart/crash/no-Python/no-FFI evidence passed machine validation.",
+        "Windows installed-path broker launch/connect/restart/crash evidence passed machine validation; no-Python/no-FFI remain separately classified static or installed-launch evidence.",
         "Keep broker installed-path smoke evidence current for release candidates.",
     )
 
@@ -352,6 +560,11 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
     if data is None:
         return [
             _failed(
+                "windows_evidence_provenance_isolation",
+                error or "Windows installed smoke evidence missing",
+                "Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes.",
+            ),
+            _failed(
                 "windows_installer_first_run_smoke",
                 error or "Windows installed smoke evidence missing",
                 "Create release_evidence/windows_installed_smoke.json from a native Windows installed-app smoke with broker-mediated Flutter .exe launch, -NoPythonRuntime launch, measured window, visible-surface, config, and audit probe evidence.",
@@ -359,7 +572,7 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
             _failed(
                 "windows_setup_doctor_smoke",
                 error or "Windows Setup Doctor evidence missing",
-                "Run Setup Doctor from the installed Windows app path and record non-synthetic required diagnostics evidence.",
+                "Record installed-app generated machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
             ),
             _failed(
                 "windows_broker_installed_smoke",
@@ -367,7 +580,12 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
                 "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json.",
             ),
         ]
-    return [validate_installer_first_run(data), validate_setup_doctor(data), validate_broker_smoke(data)]
+    return [
+        validate_provenance_and_isolation(data, path),
+        validate_installer_first_run(data),
+        validate_setup_doctor(data),
+        validate_broker_smoke(data),
+    ]
 
 
 def main() -> int:

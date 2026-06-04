@@ -116,20 +116,20 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: Windows Flutter analyze gate
   classification: required_for_v1
-  reason: Windows Flutter analyze passed on a native Windows host.
-  required_action: Keep `cd apps/desktop_flutter && flutter analyze` passing on Windows release candidates.
+  reason: Historical Windows Flutter analyze passed on a native Windows host, but strict R2 release evidence requires current release-candidate validation tied to the exact implementation commit.
+  required_action: Keep `cd apps/desktop_flutter && flutter analyze` passing on Windows release candidates and record current-run provenance before release promotion.
   blocks_release: no
 
 - item: Windows Flutter test gate
   classification: required_for_v1
-  reason: Windows Flutter test passed on a native Windows host.
-  required_action: Keep `cd apps/desktop_flutter && flutter test` passing on Windows release candidates.
+  reason: Historical Windows Flutter test passed on a native Windows host, but strict R2 release evidence requires current release-candidate validation tied to the exact implementation commit.
+  required_action: Keep `cd apps/desktop_flutter && flutter test` passing on Windows release candidates and record current-run provenance before release promotion.
   blocks_release: no
 
 - item: Windows Flutter toolchain verified
   classification: required_for_v1
-  reason: Native Windows Flutter analyze, test, build, and launch smoke passed.
-  required_action: Keep Windows Flutter toolchain validation current on release candidates.
+  reason: Native Windows Flutter analyze, test, build, and launch smoke passed historically for owner-trial use. This is invalid for current strict R2 formal evidence until a fresh exact-commit Windows run is recorded.
+  required_action: Keep Windows Flutter toolchain validation current on release candidates and bind it to the isolated evidence run.
   blocks_release: no
 
 - item: Windows desktop build smoke
@@ -140,20 +140,26 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: Windows desktop launch smoke
   classification: required_for_v1
-  reason: `.\build\windows\x64\runner\Release\gui_shell_desktop.exe` launched successfully on native Windows; Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible in the first window.
-  required_action: Keep Windows desktop launch smoke passing on release candidates.
+  reason: `.\build\windows\x64\runner\Release\gui_shell_desktop.exe` launched successfully on native Windows as historical owner-trial evidence. The old launch smoke is invalid for current strict R2 proof because aggregate native surface exposure and missing exact-run provenance are forbidden.
+  required_action: Keep Windows desktop launch smoke passing on release candidates, then recollect per-surface UIAutomation/accessibility evidence from the isolated installed run.
   blocks_release: no
+
+- item: R2 Windows formal evidence path reset
+  classification: release_blocker
+  reason: Current strict Windows evidence now requires isolated run provenance, source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, field provenance, full UIAutomation diagnostic tree, measured broker IPC/restart/crash fields, and installed-app generated Setup Doctor product export. Historical PASS and external probe reports are invalid for this gate.
+  required_action: Complete the redesigned Windows evidence collection path and run strict Windows validation on native Windows.
+  blocks_release: yes
 
 - item: Windows installer first-run smoke not passed
   classification: release_blocker
-  reason: Windows installed-path first-run evidence has not been recorded in `release_evidence/windows_installed_smoke.json`.
-  required_action: Stage the Windows installed app, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_setup_doctor.ps1`, run `installer\windows\collect_installed_smoke.ps1` on native Windows with `-BrokerHelperExe`, `-NoPythonRuntime`, UIAutomation visible-surface evidence, broker evidence, config path, and audit dir probe inputs; pass `python tooling\windows_release_evidence.py`.
+  reason: Windows installed-path first-run evidence has not been recorded in `release_evidence/windows_installed_smoke.json` with the strict R2 provenance/isolation contract.
+  required_action: Stage the Windows installed app into a unique run root, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` on native Windows with `-BrokerHelperExe`, `-NoPythonRuntime`, UIAutomation diagnostic tree evidence, broker evidence, config path, audit dir probe inputs, and installed manifest; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
-  reason: Windows installed-path Setup Doctor diagnostics evidence has not been recorded in `release_evidence/windows_installed_smoke.json`.
-  required_action: Run Setup Doctor from the installed Windows app path, record non-synthetic required checks, and pass `python tooling\windows_release_evidence.py`.
+  reason: The current PowerShell Setup Doctor collector is an external installer/config/broker probe and is invalid as formal installed-app Setup Doctor product evidence.
+  required_action: Add installed-app generated machine-readable Setup Doctor export evidence, or keep this blocker open and exclude Setup Doctor from release evidence by explicit owner decision.
   blocks_release: yes
 
 - item: macOS planned portability target unverified
@@ -164,14 +170,14 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: Windows installed-path evidence validator
   classification: required_for_v1
-  reason: `tooling/windows_release_evidence.py` validates installed executable hash, installed Flutter `.exe` launch evidence, broker-mediated first-run endpoint evidence, No-Python launch evidence, non-zero window handle, visible-surface evidence source, first-run config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor diagnostics, broker authenticated IPC, restricted loopback bind, durable store readiness, restart replay rejection, crash fail-closed connection behavior, no authority Python runtime requirement, and no Flutter/Rust FFI authority bridge before Windows release blockers can clear.
-  required_action: Keep evidence validation passing and reject copied, edited, synthetic, manually confirmed, shallow, or non-Windows evidence.
+  reason: `tooling/windows_release_evidence.py` now validates installed executable hash, exact source commit provenance, clean worktree state, isolated run paths, app/broker artifact hash linkage, evidence bundle hashes, field provenance, installed Flutter `.exe` launch evidence, broker-mediated first-run endpoint evidence, No-Python launch evidence, non-zero window handle, visible-surface source plus diagnostic tree, first-run config JSON parsing, audit write/read/delete probe, installed-app generated Setup Doctor product evidence, and broker authenticated IPC/restart/crash measured field provenance.
+  required_action: Keep evidence validation fail-closed and reject copied, edited, synthetic, manually confirmed, shallow, aggregate-surface, non-Windows, external-probe-as-product, or unmeasured-declaration evidence.
   blocks_release: no
 
 - item: Windows Setup Doctor diagnostics evidence not passed
   classification: release_blocker
-  reason: Windows Setup Doctor real diagnostics have not passed for the Windows-first product target because installed-path evidence is missing.
-  required_action: Pass Windows Setup Doctor smoke with non-synthetic machine-verified evidence; macOS diagnostics remain planned portability validation.
+  reason: Installed-app generated Windows Setup Doctor product evidence has not passed for the Windows-first product target; external probe evidence is invalid for this gate.
+  required_action: Pass Windows Setup Doctor product export evidence; macOS diagnostics remain planned portability validation.
   blocks_release: yes
 
 - item: validate_all.py strict release mode not passed

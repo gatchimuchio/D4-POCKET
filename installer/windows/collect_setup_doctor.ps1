@@ -10,7 +10,9 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$AuditDir,
 
-  [string]$BrokerEvidenceJson = ""
+  [string]$BrokerEvidenceJson = "",
+
+  [string]$InstalledManifestJson = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +89,15 @@ function Write-JsonEvidence {
   [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
 }
 
+function Get-TaggedSha256 {
+  param([string]$Path)
+
+  if ($Path -eq "" -or !(Test-Path $Path)) {
+    return $null
+  }
+  return "sha256:$((Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant())"
+}
+
 $exe = Resolve-Path $InstalledExe
 $artifactHash = (Get-FileHash -Algorithm SHA256 -Path $exe.Path).Hash.ToLowerInvariant()
 $configProbe = Test-JsonFile -Path $ConfigPath
@@ -95,6 +106,18 @@ $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
   $brokerEvidence = Get-Content -Raw -Path $brokerEvidencePath.Path | ConvertFrom-Json
+}
+$installedManifest = $null
+$installedManifestPath = $null
+if ($InstalledManifestJson -ne "") {
+  $installedManifestPath = Resolve-Path $InstalledManifestJson
+  $installedManifest = Get-Content -Raw -Path $installedManifestPath.Path | ConvertFrom-Json
+} else {
+  $candidateManifest = Join-Path (Split-Path -Parent (Split-Path -Parent $exe.Path)) "installed_manifest.json"
+  if (Test-Path $candidateManifest) {
+    $installedManifestPath = Resolve-Path $candidateManifest
+    $installedManifest = Get-Content -Raw -Path $installedManifestPath.Path | ConvertFrom-Json
+  }
 }
 
 $brokerReady = (
@@ -165,13 +188,25 @@ $checks = @(
 $hasWarning = @($checks | Where-Object { $_.status -ne "pass" }).Count -ne 0
 $report = [ordered]@{
   status = $(if ($hasWarning) { "warning" } else { "pass" })
+  evidence_kind = "external_installer_config_broker_probe"
+  formal_product_evidence = $false
+  valid_for_current_strict_r2 = $false
+  reason_not_formal_product_evidence = "This collector probes installed files, config, audit storage, and broker evidence externally. It does not execute an installed-app Setup Doctor machine-readable export."
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_setup_doctor.ps1"
-    collector_version = "1"
-    synthetic = $false
+    collector_version = "2"
+    source_kind = "external_installer_config_broker_probe"
+    product_generated = $false
+    collector_derives_checks = $true
+    synthetic = $true
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_setup_doctor.ps1 -InstalledExe `"$($exe.Path)`""
   }
-  ran_from_installed_app_path = $true
+  installed_manifest_path = $(if ($null -ne $installedManifestPath) { $installedManifestPath.Path } else { $null })
+  installed_manifest_sha256 = $(if ($null -ne $installedManifestPath) { Get-TaggedSha256 -Path $installedManifestPath.Path } else { $null })
+  run_id = $(if ($null -ne $installedManifest) { $installedManifest.run_id } else { $null })
+  source_commit = $(if ($null -ne $installedManifest) { $installedManifest.source_commit } else { $null })
+  ran_from_installed_app_path = $false
+  probed_installed_app_path = $true
   operator_readable = $true
   installer_grants_authority = $false
   installer_silently_approves_permissions = $false

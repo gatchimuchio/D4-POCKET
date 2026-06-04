@@ -5,20 +5,96 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$BrokerHelperExe,
 
-  [string]$InstallRoot = "$env:LOCALAPPDATA\GUI-Shell\installed"
+  [string]$InstallRoot = "",
+
+  [string]$RunId = "",
+
+  [string]$GitRoot = "",
+
+  [string]$BuildCommand = "flutter build windows --release; cargo build --release",
+
+  [string]$BuildTimestamp = "",
+
+  [switch]$AllowExistingInstallRoot
 )
 
 $ErrorActionPreference = "Stop"
 
+function Get-TaggedSha256 {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  return "sha256:$((Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant())"
+}
+
+function Invoke-GitString {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Root,
+    [Parameter(Mandatory = $true)]
+    [string[]]$Arguments
+  )
+
+  try {
+    $output = & git -C $Root @Arguments 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      return $null
+    }
+    return (($output -join "`n").Trim())
+  } catch {
+    return $null
+  }
+}
+
+function Test-LegacyFixedInstallRoot {
+  param([string]$Path)
+  $normalized = $Path.Replace("/", "\").TrimEnd("\").ToLowerInvariant()
+  return $normalized.EndsWith("\gui-shell\installed")
+}
+
 $release = Resolve-Path $FlutterReleaseDir
 $helper = Resolve-Path $BrokerHelperExe
+
+if ($RunId -eq "") {
+  $RunId = "run-$((Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+}
+if ($InstallRoot -eq "") {
+  $InstallRoot = Join-Path $env:LOCALAPPDATA "GUI-Shell\installed-runs\$RunId"
+}
+if ($BuildTimestamp -eq "") {
+  $BuildTimestamp = (Get-Date).ToUniversalTime().ToString("o")
+}
+if ($GitRoot -eq "") {
+  $GitRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+}
+
+if (Test-Path $InstallRoot -and !$AllowExistingInstallRoot.IsPresent) {
+  throw "InstallRoot already exists; formal evidence requires a fresh isolated run root: $InstallRoot"
+}
+if ((Test-LegacyFixedInstallRoot -Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
+  throw "Legacy shared fixed InstallRoot is not valid for formal Windows evidence: $InstallRoot"
+}
+
+$sourceCommit = Invoke-GitString -Root $GitRoot -Arguments @("rev-parse", "HEAD")
+$sourceStatus = Invoke-GitString -Root $GitRoot -Arguments @("status", "--porcelain")
+$sourceWorktreeClean = ($null -ne $sourceCommit -and $null -ne $sourceStatus -and $sourceStatus -eq "")
+
 $installRootPath = New-Item -ItemType Directory -Force -Path $InstallRoot
 $appDir = New-Item -ItemType Directory -Force -Path (Join-Path $installRootPath.FullName "app")
 $brokerDir = New-Item -ItemType Directory -Force -Path (Join-Path $installRootPath.FullName "broker")
 $runtimeDir = New-Item -ItemType Directory -Force -Path (Join-Path $installRootPath.FullName "runtime")
+$storeDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.FullName "broker_store")
+$configDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.FullName "config")
+$auditDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.FullName "audit")
+$evidenceDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.FullName "evidence")
 
 Copy-Item -Recurse -Force -Path (Join-Path $release.Path "*") -Destination $appDir.FullName
 Copy-Item -Force -Path $helper.Path -Destination (Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe")
+
+$appExe = Join-Path $appDir.FullName "gui_shell_desktop.exe"
+$brokerExe = Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe"
+$configPath = Join-Path $configDir.FullName "gui_shell.json"
+$sessionFile = Join-Path $runtimeDir.FullName "broker_session.json"
+$appArtifactSha256 = Get-TaggedSha256 -Path $appExe
+$brokerArtifactSha256 = Get-TaggedSha256 -Path $brokerExe
 
 $launcher = Join-Path $installRootPath.FullName "GUI-Shell.brokered.ps1"
 $launcherText = @'
@@ -85,18 +161,54 @@ powershell -ExecutionPolicy Bypass -File "%~dp0GUI-Shell.brokered.ps1"
 Set-Content -Encoding ASCII -Path $cmdLauncher -Value $cmdText
 
 $manifest = [ordered]@{
+  manifest_version = 2
+  run_id = $RunId
+  staged_at = (Get-Date).ToUniversalTime().ToString("o")
+  source_commit = $sourceCommit
+  source_worktree_clean = $sourceWorktreeClean
+  source_status_porcelain = $(if ($null -ne $sourceStatus) { $sourceStatus } else { "" })
+  build_command = $BuildCommand
+  build_timestamp = $BuildTimestamp
   install_root = $installRootPath.FullName
-  app_exe = Join-Path $appDir.FullName "gui_shell_desktop.exe"
-  broker_exe = Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe"
+  app_exe = $appExe
+  broker_exe = $brokerExe
   runtime_dir = $runtimeDir.FullName
+  store_dir = $storeDir.FullName
+  config_dir = $configDir.FullName
+  config_path = $configPath
+  audit_dir = $auditDir.FullName
+  evidence_dir = $evidenceDir.FullName
+  broker_session_file = $sessionFile
   launcher_ps1 = $launcher
   launcher_cmd = $cmdLauncher
   broker_mediated = $true
-  python_runtime_required_for_authority = $false
-  flutter_rust_ffi_authority_bridge = $false
+  app_artifact_sha256 = $appArtifactSha256
+  broker_artifact_sha256 = $brokerArtifactSha256
+  isolation = [ordered]@{
+    uses_shared_fixed_install_root = $false
+    isolated_install_root = $installRootPath.FullName
+    isolated_runtime_dir = $runtimeDir.FullName
+    isolated_store_dir = $storeDir.FullName
+    isolated_config_dir = $configDir.FullName
+    isolated_audit_dir = $auditDir.FullName
+  }
+  declarations = [ordered]@{
+    python_runtime_required_for_authority = [ordered]@{
+      value = $false
+      source_type = "static_assertion"
+      evidence_class = "CONFIG"
+      formal_runtime_proof = $false
+    }
+    flutter_rust_ffi_authority_bridge = [ordered]@{
+      value = $false
+      source_type = "static_assertion"
+      evidence_class = "CONFIG"
+      formal_runtime_proof = $false
+    }
+  }
 }
 
 $manifestPath = Join-Path $installRootPath.FullName "installed_manifest.json"
-$manifest | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -Path $manifestPath
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $manifestPath
 Write-Host "staged GUI-Shell installed app at $($installRootPath.FullName)"
 Write-Host "manifest $manifestPath"

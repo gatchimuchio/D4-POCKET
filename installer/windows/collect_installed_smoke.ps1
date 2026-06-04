@@ -30,7 +30,11 @@ param(
 
   [string]$RuntimeAssertionsJson = "",
 
-  [string]$ScreenshotPath = ""
+  [string]$ScreenshotPath = "",
+
+  [string]$InstalledManifestJson = "",
+
+  [switch]$DiagnosticOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +66,85 @@ function Write-JsonEvidence {
   $json = $Value | ConvertTo-Json -Depth $Depth
   $encoding = New-Object System.Text.UTF8Encoding $false
   [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
+}
+
+function Get-TaggedSha256 {
+  param([string]$Path)
+
+  if ($Path -eq "" -or !(Test-Path $Path)) {
+    return $null
+  }
+  return "sha256:$((Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant())"
+}
+
+function Get-TaggedStringSha256 {
+  param([string]$Text)
+
+  $encoding = New-Object System.Text.UTF8Encoding $false
+  $bytes = $encoding.GetBytes($Text)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return "sha256:$(([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant())"
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function New-EvidenceFileRecord {
+  param(
+    [string]$Kind,
+    [string]$Path
+  )
+
+  if ($Path -eq "") {
+    return $null
+  }
+  $resolved = Resolve-Path $Path -ErrorAction SilentlyContinue
+  if ($null -eq $resolved) {
+    return [ordered]@{
+      kind = $Kind
+      path = $Path
+      exists = $false
+      sha256 = $null
+    }
+  }
+  return [ordered]@{
+    kind = $Kind
+    path = $resolved.Path
+    exists = $true
+    sha256 = Get-TaggedSha256 -Path $resolved.Path
+  }
+}
+
+function Find-InstalledManifestPath {
+  param([string]$ExePath)
+
+  if ($InstalledManifestJson -ne "") {
+    return (Resolve-Path $InstalledManifestJson).Path
+  }
+  $candidate = Join-Path (Split-Path -Parent (Split-Path -Parent $ExePath)) "installed_manifest.json"
+  if (Test-Path $candidate) {
+    return (Resolve-Path $candidate).Path
+  }
+  return $null
+}
+
+function Get-EvidenceValue {
+  param(
+    $Object,
+    [string]$Name
+  )
+  if ($null -eq $Object) {
+    return $null
+  }
+  if ($Object -is [System.Collections.IDictionary]) {
+    return $Object[$Name]
+  }
+  $property = $Object.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return $null
+  }
+  return $property.Value
 }
 
 function Start-SmokeBroker {
@@ -205,6 +288,77 @@ function Collect-VisibleSurfaces {
     }
   }
 
+  function Get-RuntimeIdString {
+    param($Element)
+    try {
+      $runtimeId = $Element.GetRuntimeId()
+      if ($null -eq $runtimeId) {
+        return ""
+      }
+      return (($runtimeId | ForEach-Object { $_.ToString() }) -join ".")
+    } catch {
+      return ""
+    }
+  }
+
+  function Get-ParentRuntimeIdString {
+    param($Element)
+    try {
+      $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($Element)
+      if ($null -eq $parent) {
+        return ""
+      }
+      return Get-RuntimeIdString -Element $parent
+    } catch {
+      return ""
+    }
+  }
+
+  function Get-SupportedPatternNames {
+    param($Element)
+    try {
+      return @(
+        $Element.GetSupportedPatterns() |
+          ForEach-Object { $_.ProgrammaticName.ToString() } |
+          Where-Object { $_ -ne "" }
+      )
+    } catch {
+      return @()
+    }
+  }
+
+  function Get-BoundingRectangleEvidence {
+    param($Element)
+    try {
+      $rect = $Element.Current.BoundingRectangle
+      return [ordered]@{
+        x = $rect.X
+        y = $rect.Y
+        width = $rect.Width
+        height = $rect.Height
+      }
+    } catch {
+      return [ordered]@{
+        x = 0
+        y = 0
+        width = 0
+        height = 0
+      }
+    }
+  }
+
+  function Get-ElementBool {
+    param(
+      $Element,
+      [string]$PropertyName
+    )
+    try {
+      return [bool]$Element.Current.$PropertyName
+    } catch {
+      return $false
+    }
+  }
+
   function New-ObservedElement {
     param(
       $Element,
@@ -216,6 +370,8 @@ function Collect-VisibleSurfaces {
     $className = Get-ElementString -Element $Element -PropertyName "ClassName"
     $frameworkId = Get-ElementString -Element $Element -PropertyName "FrameworkId"
     $controlType = Get-ControlTypeName -Element $Element
+    $runtimeId = Get-RuntimeIdString -Element $Element
+    $parentRuntimeId = $(if ($IsRoot) { "" } else { Get-ParentRuntimeIdString -Element $Element })
     $searchText = Normalize-SurfaceText -Text "$name $automationId"
     $surfacesPresent = @()
     foreach ($label in $expected) {
@@ -230,11 +386,18 @@ function Collect-VisibleSurfaces {
     )
     return [pscustomobject][ordered]@{
       element_key = $ElementKey
+      runtime_id = $runtimeId
+      parent_runtime_id = $parentRuntimeId
       name = $name
       automation_id = $automationId
       control_type = $controlType
       class_name = $className
       framework_id = $frameworkId
+      localized_control_type = Get-ElementString -Element $Element -PropertyName "LocalizedControlType"
+      help_text = Get-ElementString -Element $Element -PropertyName "HelpText"
+      is_offscreen = Get-ElementBool -Element $Element -PropertyName "IsOffscreen"
+      bounding_rectangle = Get-BoundingRectangleEvidence -Element $Element
+      supported_patterns = @(Get-SupportedPatternNames -Element $Element)
       is_root = $IsRoot
       is_native_container = [bool]$isNativeContainer
       surfaces_present = @($surfacesPresent)
@@ -412,6 +575,17 @@ function Collect-VisibleSurfaces {
     !$aggregateSurfaceShortcutDetected -and
     !$singleAggregateElement
   )
+  $treeEdges = @(
+    $observedElements |
+      Where-Object { $_.parent_runtime_id -ne "" } |
+      ForEach-Object {
+        [ordered]@{
+          child_runtime_id = $_.runtime_id
+          parent_runtime_id = $_.parent_runtime_id
+          child_element_key = $_.element_key
+        }
+      }
+  )
   $capture = [ordered]@{
     source = "uiautomation"
     path = $OutputPath
@@ -425,6 +599,14 @@ function Collect-VisibleSurfaces {
     aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
     surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
     automation_names = @($names | Select-Object -Unique | Select-Object -First 200)
+    diagnostic_tree = [ordered]@{
+      mode = "full_uiautomation_tree_projection"
+      observed_element_count = $observedElements.Count
+      observed_elements = @($observedElements)
+      tree_edges = @($treeEdges)
+      capture_limit = "none"
+      failure_diagnostic = !$surfaceMatchRequirementsMet
+    }
   }
   $output = New-Item -ItemType File -Force -Path $OutputPath
   Write-JsonEvidence -Value $capture -Path $output.FullName -Depth 8
@@ -466,6 +648,11 @@ try {
 }
 
 $setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
+$installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
+$installedManifest = $null
+if ($null -ne $installedManifestPath) {
+  $installedManifest = Get-Content -Raw -Path $installedManifestPath | ConvertFrom-Json
+}
 if ($VisibleSurfacesJson -ne "") {
   $visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
   $visibleSurfaceEvidence = Get-Content -Raw -Path $visibleSurfacesPath.Path | ConvertFrom-Json
@@ -492,6 +679,21 @@ if ($RuntimeAssertionsJson -ne "") {
   $runtimeAssertionsPath = Resolve-Path $RuntimeAssertionsJson
   $runtimeAssertions = Get-Content -Raw -Path $runtimeAssertionsPath | ConvertFrom-Json
 }
+$evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
+foreach ($record in @(
+    (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath.Path),
+    (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
+    (New-EvidenceFileRecord -Kind "visible_surfaces" -Path (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path")),
+    (New-EvidenceFileRecord -Kind "runtime_assertions" -Path $RuntimeAssertionsJson),
+    (New-EvidenceFileRecord -Kind "screenshot_supporting_material" -Path $ScreenshotPath),
+    (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath)
+  )) {
+  if ($null -ne $record) {
+    $evidenceBundleFiles.Add($record)
+  }
+}
+$bundleText = (@{ files = @($evidenceBundleFiles) } | ConvertTo-Json -Compress -Depth 10)
+$evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
 
 $mainWindowHandle = 0
 $windowTitle = ""
@@ -539,24 +741,6 @@ $auditDirWritable = (
   $auditWriteProbe.delete
 )
 
-function Get-EvidenceValue {
-  param(
-    $Object,
-    [string]$Name
-  )
-  if ($null -eq $Object) {
-    return $null
-  }
-  if ($Object -is [System.Collections.IDictionary]) {
-    return $Object[$Name]
-  }
-  $property = $Object.PSObject.Properties[$Name]
-  if ($null -eq $property) {
-    return $null
-  }
-  return $property.Value
-}
-
 $requiredVisibleSurfaces = @("Dashboard", "NavigationRail", "Runtime Status", "Invariant Status")
 $visibleSurfaceLabels = @(Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "visible_surfaces")
 $surfaceMatchesEvidence = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_matches"
@@ -590,9 +774,47 @@ if ($aggregateSurfaceShortcutDetected -or !$surfaceMatchRequirementsMet) {
 $evidence = [ordered]@{
   platform = "windows"
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
+  provenance = [ordered]@{
+    evidence_contract_version = 2
+    run_id = $(if ($null -ne $installedManifest) { $installedManifest.run_id } else { $null })
+    source_commit = $(if ($null -ne $installedManifest) { $installedManifest.source_commit } else { $null })
+    source_worktree_clean = $(if ($null -ne $installedManifest) { $installedManifest.source_worktree_clean } else { $false })
+    source_status_porcelain = $(if ($null -ne $installedManifest) { $installedManifest.source_status_porcelain } else { $null })
+    build_command = $(if ($null -ne $installedManifest) { $installedManifest.build_command } else { $null })
+    build_timestamp = $(if ($null -ne $installedManifest) { $installedManifest.build_timestamp } else { $null })
+    staged_manifest_path = $installedManifestPath
+    installed_manifest_sha256 = $(if ($null -ne $installedManifestPath) { Get-TaggedSha256 -Path $installedManifestPath } else { $null })
+    app_artifact_sha256 = "sha256:$hash"
+    broker_artifact_sha256 = $(if ($null -ne $installedManifest) { $installedManifest.broker_artifact_sha256 } elseif ($BrokerHelperExe -ne "") { Get-TaggedSha256 -Path (Resolve-Path $BrokerHelperExe).Path } else { $null })
+    isolation = [ordered]@{
+      uses_shared_fixed_install_root = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.uses_shared_fixed_install_root } else { $true })
+      isolated_install_root = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_install_root } else { $null })
+      isolated_runtime_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_runtime_dir } else { $null })
+      isolated_store_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_store_dir } else { $BrokerStoreDir })
+      isolated_config_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_config_dir } else { Split-Path -Parent $ConfigPath })
+      isolated_audit_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_audit_dir } else { $AuditDir })
+    }
+    evidence_bundle_files = @($evidenceBundleFiles)
+    evidence_bundle_sha256 = $evidenceBundleSha256
+  }
+  field_provenance = [ordered]@{
+    artifact = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $true }
+    "first_run.process" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.visible_surfaces" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.config_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.installer_authority_boundary" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
+    setup_doctor = [ordered]@{
+      source_type = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "product_export" } else { "external_probe" })
+      evidence_class = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "LIVE_RUNTIME" } else { "EXTERNAL_EVIDENCE" })
+      formal_release_input = $true
+    }
+    "broker.ipc_restart_crash" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    release_runtime_assertions = [ordered]@{ source_type = "static_assertion"; evidence_class = @("CONFIG", "FIXTURE"); formal_release_input = $true }
+    unsupported_claims = @()
+  }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "5"
+    collector_version = "6"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -602,7 +824,7 @@ $evidence = [ordered]@{
     sha256 = "sha256:$hash"
   }
   first_run = [ordered]@{
-    status = $(if ($firstWindowVisible -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete) { "passed" } else { "failed" })
+    status = $(if ($DiagnosticOnly.IsPresent) { "diagnostic_only" } elseif ($firstWindowVisible -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete) { "passed" } else { "failed" })
     command = "& `"$($exe.Path)`""
     launched_from_installed_path = $true
     process_id = $process.Id
@@ -629,6 +851,7 @@ $evidence = [ordered]@{
       surface_matches = $surfaceMatchesEvidence
       aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
       surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
+      diagnostic_tree = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "diagnostic_tree"
     }
     config_path = $(if ($null -ne $resolvedConfigPath) { $resolvedConfigPath.Path } else { $ConfigPath })
     config_created = $configCreated
@@ -655,8 +878,11 @@ $evidence = [ordered]@{
         durable_store_ready = $false
         restart_replay_rejected = $false
         crash_fail_closed = $false
-        python_runtime_required_for_authority = $true
-        flutter_rust_ffi_authority_bridge = $true
+        field_provenance = [ordered]@{}
+        unmeasured_declarations = [ordered]@{
+          python_runtime_required_for_authority = [ordered]@{ value = $true; source_type = "unsupported_claim"; evidence_class = "CONFIG"; formal_runtime_proof = $false }
+          flutter_rust_ffi_authority_bridge = [ordered]@{ value = $true; source_type = "unsupported_claim"; evidence_class = "CONFIG"; formal_runtime_proof = $false }
+        }
       }
     })
   release_runtime_assertions = $runtimeAssertions

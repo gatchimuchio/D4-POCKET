@@ -10,7 +10,7 @@ Repository definition update: GUI-Shell is now also documented as an LLM-readabl
 
 The canonical completion roadmap for aligning Windows-first product responsibility and LLM-readable substrate demonstration is `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
 
-Phase A, personal Windows trial operation, is complete: the Windows desktop build and native launch smoke passed, and Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible. Phase B owner-use completion is complete: the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. External claim hygiene, measured Windows release evidence, OSS release candidate claims, and paid/product QC remain later phases.
+Phase A, personal Windows trial operation, is complete: the Windows desktop build and native launch smoke passed for owner-trial history. That historical PASS is invalid for current strict R2 formal evidence because the old path predated the isolated provenance/evidence-bundle contract and aggregate native surface shortcut ban. Phase B owner-use completion is complete: the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. External claim hygiene, measured Windows release evidence, OSS release candidate claims, and paid/product QC remain later phases.
 
 GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a development/verification slice, but it is not final product proof by itself. macOS is an unverified planned portability target, and BLUE-TANUKI remains a consumer/reference runtime rather than a GUI-Shell release dependency.
 
@@ -88,8 +88,8 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows installer, first-run, and Setup Doctor release validation not passed
   classification: release_blocker
-  reason: Windows project support, Flutter toolchain verification, analyze, test, build, and native launch smoke have passed, but installed-path Windows Setup Doctor, installer, and first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: Run native Windows installed smoke collection with measured window, visible-surface, config JSON, audit write/read/delete, and non-synthetic Setup Doctor evidence; pass `python tooling\windows_release_evidence.py`.
+  reason: Windows project support and historical owner-trial launch smoke are preserved, but current strict R2 evidence requires a fresh native Windows isolated installed run with source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. `release_evidence/windows_installed_smoke.json` is missing.
+  required_action: Run native Windows installed smoke collection from an isolated staged run, collect measured window, visible-surface diagnostic tree, config JSON, audit write/read/delete, broker IPC/restart/crash field provenance, and installed-app generated Setup Doctor product evidence; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target unverified
@@ -100,8 +100,8 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows Setup Doctor diagnostics not passed
   classification: release_blocker
-  reason: Windows Setup Doctor installed-path diagnostics evidence is missing for the primary product target.
-  required_action: Pass Windows Setup Doctor diagnostics smoke through `release_evidence/windows_installed_smoke.json`.
+  reason: The current PowerShell Setup Doctor collector is classified as external installer/config/broker probe evidence, not installed-app product evidence.
+  required_action: Add installed-app generated machine-readable Setup Doctor export evidence or keep this release blocker open.
   blocks_release: yes
 
 - item: implementation first-run smoke

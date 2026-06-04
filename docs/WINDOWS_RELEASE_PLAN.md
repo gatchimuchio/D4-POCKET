@@ -32,28 +32,28 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: Windows Flutter analyze
   classification: required_for_v1
-  reason: Windows Flutter analyze passed on a native Windows host.
-  required_action: Keep `cd apps/desktop_flutter && flutter analyze` passing on Windows release candidates.
+  reason: Windows Flutter analyze passed historically on a native Windows host; strict R2 release promotion requires current release-candidate provenance.
+  required_action: Keep `cd apps/desktop_flutter && flutter analyze` passing on Windows release candidates and bind current validation to the exact source commit.
   blocks_release: no
 
 - item: Windows Flutter test
   classification: required_for_v1
-  reason: Windows Flutter test passed on a native Windows host.
-  required_action: Keep `cd apps/desktop_flutter && flutter test` passing on Windows release candidates.
+  reason: Windows Flutter test passed historically on a native Windows host; strict R2 release promotion requires current release-candidate provenance.
+  required_action: Keep `cd apps/desktop_flutter && flutter test` passing on Windows release candidates and bind current validation to the exact source commit.
   blocks_release: no
 
 - item: Windows build smoke
   classification: required_for_v1
-  reason: `cd apps/desktop_flutter && flutter build windows` passed on a native Windows host.
-  required_action: Keep Windows build smoke passing on release candidates.
+  reason: `cd apps/desktop_flutter && flutter build windows` passed historically on a native Windows host; strict R2 requires current app artifact hash linkage.
+  required_action: Keep Windows build smoke passing on release candidates and record the app artifact hash in the isolated staged manifest.
   blocks_release: no
 
 ## Launch Smoke Evidence Requirement
 
 - item: Windows launch smoke
   classification: required_for_v1
-  reason: `.\build\windows\x64\runner\Release\gui_shell_desktop.exe` launched successfully on native Windows; Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible in the first window.
-  required_action: Keep Windows launch smoke passing on release candidates.
+  reason: historical Windows launch smoke passed for owner-trial use. Strict R2 formal proof requires per-surface UIAutomation/accessibility evidence from the isolated installed run, not aggregate native surface exposure.
+  required_action: Keep Windows launch smoke passing on release candidates and recollect strict visible-surface evidence from the isolated installed path.
   blocks_release: no
 
 ## Installer And First-Run Requirement
@@ -66,20 +66,20 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: Windows installer and first-run smoke
   classification: release_blocker
-  reason: native Windows installed-path installer and first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: Install through the Windows release path, launch the installed Flutter `.exe` through the installed Rust broker, run `installer\windows\collect_broker_smoke.ps1`, `installer\windows\collect_setup_doctor.ps1`, and `installer\windows\collect_installed_smoke.ps1` with `-BrokerHelperExe`, `-NoPythonRuntime`, measured visible-surface, config, audit, and Setup Doctor inputs, and pass `python tooling\windows_release_evidence.py`.
+  reason: native Windows isolated installed-path installer and first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
+  required_action: Install through the unique staged Windows path, launch the installed Flutter `.exe` through the installed Rust broker, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` with `-BrokerHelperExe`, `-NoPythonRuntime`, installed manifest, measured UIAutomation diagnostic tree, config, audit, and broker field-provenance inputs, and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke
   classification: release_blocker
-  reason: native Windows Setup Doctor smoke has not passed from the installed Windows app path because machine-readable evidence is missing.
-  required_action: Run Setup Doctor from the installed Windows app path, record non-synthetic required diagnostics in `release_evidence/windows_installed_smoke.json`, and pass `python tooling\windows_release_evidence.py`.
+  reason: installed-app generated Setup Doctor product export evidence is missing. The current PowerShell Setup Doctor collector is external probe evidence and is rejected as product proof.
+  required_action: Add installed-app generated machine-readable Setup Doctor export evidence and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows installed evidence validator
   classification: required_for_v1
-  reason: `tooling/windows_release_evidence.py` gates Windows installer/first-run and Setup Doctor release evidence on installed Flutter `.exe` launch, broker-mediated first-run endpoint evidence, No-Python launch evidence, artifact hash, non-zero window handle, visible-surface evidence source, config JSON parsing, audit write/read/delete probe, broker restricted loopback bind, broker authenticated IPC/restart/crash evidence, and non-synthetic non-authoritative diagnostics.
-  required_action: Keep the validator strict enough to reject copied, edited, synthetic, manually confirmed, or non-Windows evidence before owner GO.
+  reason: `tooling/windows_release_evidence.py` gates Windows installer/first-run and Setup Doctor release evidence on exact source commit provenance, clean worktree state, isolated run paths, app/broker artifact hash linkage, evidence bundle hashes, field provenance, installed Flutter `.exe` launch, broker-mediated first-run endpoint evidence, No-Python launch evidence, non-zero window handle, visible-surface source plus diagnostic tree, config JSON parsing, audit write/read/delete probe, broker restricted loopback bind, broker authenticated IPC/restart/crash evidence, and installed-app generated Setup Doctor product export.
+  required_action: Keep the validator strict enough to reject copied, edited, synthetic, manually confirmed, aggregate-surface, external-probe-as-product, unmeasured-declaration, or non-Windows evidence before owner GO.
   blocks_release: no
 
 ## Windows-Specific Failure Modes

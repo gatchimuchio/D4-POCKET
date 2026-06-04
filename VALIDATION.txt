@@ -1907,3 +1907,147 @@ release_gate:
       reason: v1.0 is desktop-first unless owner explicitly includes mobile.
       required_action: No v1.0 action required.
       blocks_release: no
+
+validation_update_2026_06_05_r2_windows_evidence_trust_reset:
+  scope: R2 Windows formal evidence path trust/provenance/isolation/diagnostic reset
+  commit: pre_commit_validation_from_26dea584b1d8db5567b5cd57735a62cacc3eaa53
+  implemented_behavior:
+    - Historical native Windows analyze/test/build/launch PASS is reclassified as owner-trial history only and invalid for current strict R2 formal proof.
+    - `tooling/validate_all.py` no longer emits fixed Windows PASS rows for historical toolchain/build/launch smoke.
+    - `tooling/validate_all.py` now catches subprocess start `OSError` and reports structured `release_blocker` output instead of crashing.
+    - `tooling/windows_release_evidence.py` adds `windows_evidence_provenance_isolation` and requires run_id, source_commit, clean worktree state, isolated install/runtime/store/config/audit paths, app/broker artifact hashes, evidence bundle hashes, and field provenance.
+    - Windows visible-surface evidence now requires `diagnostic_tree` with UIAutomation element projection and parent/child edge data.
+    - `installer/windows/stage_installed_app.ps1` defaults to a unique `%LOCALAPPDATA%\GUI-Shell\installed-runs\<run_id>` root and writes a manifest with source and artifact provenance.
+    - `installer/windows/collect_setup_doctor.ps1` is explicitly reclassified as `external_installer_config_broker_probe`, `formal_product_evidence=false`.
+    - `installer/windows/collect_broker_smoke.ps1` separates measured IPC/restart/crash fields from no-Python/no-FFI static declarations.
+    - `tooling/release_runtime_assertions.py` reports evidence_scope `CONFIG,FIXTURE`; token/test coverage is not promoted to installed product runtime proof.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE
+    powershell_parser: CONFIG
+    windows_release_evidence_missing: EXTERNAL_EVIDENCE
+    validate_all_python_only: CONFIG | FIXTURE | INTERNAL_STATE | LIVE_RUNTIME
+    validate_all_strict_windows_python_only: CONFIG | FIXTURE | INTERNAL_STATE | EXTERNAL_EVIDENCE
+    validate_all_full_current_host: CONFIG | FIXTURE | INTERNAL_STATE | LIVE_RUNTIME
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "conformance skeleton passed: 110 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "evidence bundle check passed: 4 release blockers preserved, release_ready=False, classification=development_evidence"
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE"
+    - name: powershell_parser
+      command: Parser.ParseFile for installer/windows/stage_installed_app.ps1, collect_setup_doctor.ps1, collect_broker_smoke.ps1, collect_installed_smoke.ps1
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: powershell parser passed
+    - name: windows_release_evidence_missing
+      command: python3 tooling/windows_release_evidence.py
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - windows_evidence_provenance_isolation failed because release_evidence/windows_installed_smoke.json is missing
+        - windows_installer_first_run_smoke failed because release_evidence/windows_installed_smoke.json is missing
+        - windows_setup_doctor_smoke failed because installed-app generated Setup Doctor product evidence is missing
+        - windows_broker_installed_smoke failed because release_evidence/windows_installed_smoke.json is missing
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - schema_check passed
+        - conformance_skeleton passed with 110 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed with 4 preserved release blockers
+        - release_runtime_assertions passed with evidence_scope=CONFIG,FIXTURE
+        - broker_authority_parity passed
+    - name: validate_all_strict_windows_python_only
+      command: python3 tooling/validate_all.py --strict-release --desktop-platform=windows --python-only
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - Python/core checks passed
+        - historical Windows toolchain smoke reported as historical_invalid_for_current_r2
+        - windows_evidence_provenance_isolation remains release_blocker because Windows installed smoke evidence is missing
+        - windows_installer_first_run_smoke remains release_blocker because Windows installed smoke evidence is missing
+        - windows_setup_doctor_smoke remains release_blocker because installed-app generated Setup Doctor product evidence is missing
+        - windows_broker_installed_smoke remains release_blocker because Windows installed smoke evidence is missing
+        - owner_go remains release_blocker
+    - name: validate_all_full_current_host
+      command: python3 tooling/validate_all.py
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - Python/core checks passed
+        - cargo test passed with 33 unit tests and 3 broker_ipc tests
+        - desktop Flutter analyze/test/build_linux failed with exit 127 because the WSL-visible Flutter SDK shell script has CRLF line endings
+        - mobile Flutter analyze failed with exit 127 but remains post_v1_scope
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+  release_gate_impact:
+    - item: R2 Windows formal evidence path
+      classification: release_blocker
+      reason: Native Windows installed-path evidence must be recollected through the isolated provenance and diagnostic tree contract before completed product release.
+      required_action: Run the redesigned Windows evidence flow on a native Windows host with installed-app generated Setup Doctor product evidence.
+      blocks_release: yes
+    - item: Current-host Flutter validation
+      classification: release_blocker
+      reason: The WSL-visible Flutter SDK shell scripts currently fail with CRLF line endings in this host.
+      required_action: Validate Flutter through a usable Flutter toolchain host before using full current-host validation as release evidence.
+      blocks_release: yes

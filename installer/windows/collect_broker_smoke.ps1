@@ -220,7 +220,7 @@ $result = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_broker_smoke.ps1"
-    collector_version = "1"
+    collector_version = "2"
     synthetic = $false
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 -BrokerHelperExe `"$($helper.Path)`""
   }
@@ -239,8 +239,30 @@ $result = [ordered]@{
   replay_error_code = $replay.error.code
   fresh_health_after_restart = ($freshAfterRestart.status -eq "accepted")
   crash_fail_closed = $crashFailClosed
-  python_runtime_required_for_authority = $false
-  flutter_rust_ffi_authority_bridge = $false
+  field_provenance = [ordered]@{
+    helper_exe_exists = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE" }
+    session_file_created = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    restricted_loopback_bind = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    authenticated_ipc_connection = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    durable_store_ready = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    restart_replay_rejected = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    fresh_health_after_restart = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    crash_fail_closed = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+  }
+  unmeasured_declarations = [ordered]@{
+    python_runtime_required_for_authority = [ordered]@{
+      value = $false
+      source_type = "static_assertion"
+      evidence_class = "CONFIG"
+      formal_runtime_proof = $false
+    }
+    flutter_rust_ffi_authority_bridge = [ordered]@{
+      value = $false
+      source_type = "static_assertion"
+      evidence_class = "CONFIG"
+      formal_runtime_proof = $false
+    }
+  }
   errors = @($errors)
 }
 

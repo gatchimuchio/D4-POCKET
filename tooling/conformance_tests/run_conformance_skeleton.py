@@ -44,7 +44,7 @@ from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden
 from tooling.shell_snapshot import build_shell_snapshot
-from tooling.validate_all import build_steps as build_validation_steps
+from tooling.validate_all import ValidationStep, build_steps as build_validation_steps, run_step
 from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
@@ -1057,14 +1057,53 @@ def _valid_windows_installed_evidence() -> dict:
         )
     return {
         "platform": "windows",
+        "provenance": {
+            "evidence_contract_version": 2,
+            "run_id": "run-20260605T000000Z-a1b2c3d4",
+            "source_commit": "a" * 40,
+            "source_worktree_clean": True,
+            "source_status_porcelain": "",
+            "build_command": "flutter build windows --release; cargo build --release",
+            "build_timestamp": "2026-06-05T00:00:00Z",
+            "staged_manifest_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\installed_manifest.json",
+            "installed_manifest_sha256": "sha256:" + "2" * 64,
+            "app_artifact_sha256": "sha256:" + "1" * 64,
+            "broker_artifact_sha256": "sha256:" + "3" * 64,
+            "isolation": {
+                "uses_shared_fixed_install_root": False,
+                "isolated_install_root": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4",
+                "isolated_runtime_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime",
+                "isolated_store_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\broker_store",
+                "isolated_config_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\config",
+                "isolated_audit_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\audit",
+            },
+            "evidence_bundle_sha256": "sha256:" + "4" * 64,
+            "evidence_bundle_files": [
+                {"kind": "setup_doctor", "path": r"C:\evidence\setup_doctor.json", "sha256": "sha256:" + "5" * 64},
+                {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
+                {"kind": "visible_surfaces", "path": r"C:\evidence\visible_surfaces.json", "sha256": "sha256:" + "7" * 64},
+                {"kind": "runtime_assertions", "path": r"C:\evidence\runtime_assertions.json", "sha256": "sha256:" + "8" * 64},
+            ],
+        },
+        "field_provenance": {
+            "artifact": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE", "formal_release_input": True},
+            "first_run.process": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.visible_surfaces": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.config_audit": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.installer_authority_boundary": {"source_type": "static_assertion", "evidence_class": "CONFIG", "formal_release_input": True},
+            "setup_doctor": {"source_type": "product_export", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "broker.ipc_restart_crash": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "release_runtime_assertions": {"source_type": "static_assertion", "evidence_class": ["CONFIG", "FIXTURE"], "formal_release_input": True},
+            "unsupported_claims": [],
+        },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "5",
+            "collector_version": "6",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
         "artifact": {
-            "installed_exe_path": r"C:\Program Files\GUI-Shell\gui_shell_desktop.exe",
+            "installed_exe_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\app\gui_shell_desktop.exe",
             "installed_exe_exists": True,
             "sha256": "sha256:" + "1" * 64,
         },
@@ -1145,6 +1184,37 @@ def _valid_windows_installed_evidence() -> dict:
                 },
                 "aggregate_surface_shortcut_detected": False,
                 "surface_match_requirements_met": True,
+                "diagnostic_tree": {
+                    "mode": "full_uiautomation_tree_projection",
+                    "observed_element_count": 5,
+                    "observed_elements": [
+                        {
+                            "element_key": "root",
+                            "runtime_id": "1.2",
+                            "parent_runtime_id": "",
+                            "name": "GUI Shell",
+                            "automation_id": "",
+                            "control_type": "ControlType.Window",
+                            "class_name": "FlutterView",
+                            "framework_id": "Win32",
+                            "supported_patterns": ["WindowPatternIdentifiers.Pattern"],
+                        },
+                        {
+                            "element_key": "descendant:1",
+                            "runtime_id": "1.2.1",
+                            "parent_runtime_id": "1.2",
+                            "name": "Dashboard",
+                            "automation_id": "",
+                            "control_type": "ControlType.Text",
+                            "class_name": "",
+                            "framework_id": "Flutter",
+                            "supported_patterns": [],
+                        },
+                    ],
+                    "tree_edges": [
+                        {"child_runtime_id": "1.2.1", "parent_runtime_id": "1.2", "child_element_key": "descendant:1"}
+                    ],
+                },
             },
             "config_path": r"C:\ProgramData\GUI-Shell\config\gui_shell.json",
             "config_created": True,
@@ -1163,7 +1233,11 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "setup_doctor": {
             "status": "warning",
+            "formal_product_evidence": True,
             "evidence_source": {
+                "source_kind": "installed_app_machine_readable_export",
+                "product_generated": True,
+                "collector_derives_checks": False,
                 "synthetic": False,
                 "command": r".\gui_shell_desktop.exe --setup-doctor --json",
             },
@@ -1196,8 +1270,30 @@ def _valid_windows_installed_evidence() -> dict:
             "replay_error_code": "broker_replay_detected",
             "fresh_health_after_restart": True,
             "crash_fail_closed": True,
-            "python_runtime_required_for_authority": False,
-            "flutter_rust_ffi_authority_bridge": False,
+            "field_provenance": {
+                "helper_exe_exists": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE"},
+                "session_file_created": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "restricted_loopback_bind": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "authenticated_ipc_connection": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "durable_store_ready": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "restart_replay_rejected": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "fresh_health_after_restart": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "crash_fail_closed": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+            },
+            "unmeasured_declarations": {
+                "python_runtime_required_for_authority": {
+                    "value": False,
+                    "source_type": "static_assertion",
+                    "evidence_class": "CONFIG",
+                    "formal_runtime_proof": False,
+                },
+                "flutter_rust_ffi_authority_bridge": {
+                    "value": False,
+                    "source_type": "static_assertion",
+                    "evidence_class": "CONFIG",
+                    "formal_runtime_proof": False,
+                },
+            },
             "errors": [],
         },
     }
@@ -1217,6 +1313,19 @@ def test_windows_release_evidence_validator_accepts_valid_installed_smoke() -> l
     return errors
 
 
+def test_windows_release_evidence_validator_rejects_missing_provenance() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad.pop("provenance")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
+        return ["Windows evidence validator accepted missing provenance/isolation"]
+    return []
+
+
 def test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path() -> list[str]:
     bad = _valid_windows_installed_evidence()
     bad["artifact"]["installed_exe_exists"] = False
@@ -1232,6 +1341,26 @@ def test_windows_release_evidence_validator_rejects_authority_and_missing_instal
         errors.append("Windows first-run evidence validator accepted missing installed path or installer authority")
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
         errors.append("Windows Setup Doctor evidence validator accepted authority-granting check")
+    return errors
+
+
+def test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad["setup_doctor"]["formal_product_evidence"] = False
+    bad["setup_doctor"]["evidence_source"]["source_kind"] = "external_installer_config_broker_probe"
+    bad["setup_doctor"]["evidence_source"]["product_generated"] = False
+    bad["setup_doctor"]["evidence_source"]["collector_derives_checks"] = True
+    bad["field_provenance"]["setup_doctor"]["source_type"] = "external_probe"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    errors = []
+    if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
+        errors.append("Windows Setup Doctor validator accepted external probe as formal product evidence")
+    if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
+        errors.append("Windows provenance validator accepted external Setup Doctor provenance as product export")
     return errors
 
 
@@ -1264,6 +1393,20 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
         errors.append("Windows broker evidence validator accepted synthetic, replay-unsafe, or Python-required evidence")
     return errors
+
+
+def test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad["broker"]["python_runtime_required_for_authority"] = False
+    bad["broker"]["flutter_rust_ffi_authority_bridge"] = False
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
+        return ["Windows broker validator accepted top-level unmeasured authority declarations"]
+    return []
 
 
 def test_windows_release_evidence_validator_rejects_missing_surface_matches() -> list[str]:
@@ -1322,6 +1465,23 @@ def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
         return ["Windows first-run evidence validator accepted one aggregate root automation element"]
     return []
+
+
+def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
+    step = ValidationStep(
+        "missing_executable_probe",
+        ["gui-shell-definitely-missing-validator-command"],
+        ROOT,
+    )
+    result = run_step(step, strict_release=True, desktop_platform="windows")
+    errors = []
+    if result.get("status") != "not_run":
+        errors.append("validate_all run_step did not return not_run for subprocess start failure")
+    if result.get("classification") != "release_blocker":
+        errors.append("validate_all run_step did not classify subprocess start failure as release_blocker")
+    if "FileNotFoundError" not in result.get("stderr", ""):
+        errors.append("validate_all run_step did not preserve subprocess start failure stack trace")
+    return errors
 
 
 def test_invariant_evaluator_detects_intentional_import_violation() -> list[str]:
@@ -2268,8 +2428,11 @@ def main() -> int:
         test_shell_snapshot_generator_writes_phase_b_local_snapshot,
         test_evidence_bundle_is_development_classified_and_non_authoritative,
         test_windows_release_evidence_validator_accepts_valid_installed_smoke,
+        test_windows_release_evidence_validator_rejects_missing_provenance,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
+        test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
+        test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
@@ -2302,6 +2465,7 @@ def main() -> int:
         test_release_hardening_files_exist,
         test_release_hardening_does_not_overclaim_readiness,
         test_validation_reporter_exists,
+        test_validate_all_subprocess_start_failure_is_structured,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,

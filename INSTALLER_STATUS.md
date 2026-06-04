@@ -28,14 +28,14 @@ Current phase: Phase B owner-use complete. Installer work is not being treated a
 
 - item: Windows installed-path first-run evidence missing
   classification: release_blocker
-  reason: Windows-first completed product release requires measured installed-path first-run evidence.
-  required_action: Run the hardened Windows installed smoke collector with real Setup Doctor JSON, visible-surface evidence, config path, and audit dir probe inputs.
+  reason: Windows-first completed product release requires measured installed-path first-run evidence with isolated run provenance, source commit, artifact hashes, evidence bundle hashes, and UIAutomation diagnostic tree.
+  required_action: Run the hardened Windows installed smoke collector from a unique staged run with visible-surface diagnostic tree, broker measured field provenance, config path, audit dir probe inputs, and installed manifest.
   blocks_release: yes
 
 - item: Windows Setup Doctor installed-path evidence missing
   classification: release_blocker
-  reason: Setup Doctor must be proven from the installed Windows app path before completed product release.
-  required_action: Record non-synthetic installed-path Setup Doctor diagnostics and pass `python tooling/windows_release_evidence.py`.
+  reason: The current Setup Doctor PowerShell collector is external installer/config/broker probe evidence and is invalid as installed-app product evidence.
+  required_action: Add installed-app generated machine-readable Setup Doctor export evidence and pass `python tooling/windows_release_evidence.py`, or keep this blocker open.
   blocks_release: yes
 
 ## Known Limitations

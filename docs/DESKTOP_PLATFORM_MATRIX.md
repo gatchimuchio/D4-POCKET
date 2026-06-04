@@ -10,7 +10,7 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope. B
 
 | Platform | Priority | Project support | Required toolchain | Validation command | Build smoke | Launch smoke evidence | Installer / first-run status | Release classification |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Windows | Primary product target | generated | Flutter Windows desktop toolchain on Windows host, including Visual Studio Build Tools | `cd apps/desktop_flutter && flutter analyze && flutter test && flutter build windows` | passed on native Windows; produced `build\windows\x64\runner\Release\gui_shell_desktop.exe` | passed on native Windows; Dashboard, NavigationRail, Runtime Status, and Invariant Status visible | evidence_missing: release_blocker; requires `release_evidence/windows_installed_smoke.json` | release_blocker |
+| Windows | Primary product target | generated | Flutter Windows desktop toolchain on Windows host, including Visual Studio Build Tools | `cd apps/desktop_flutter && flutter analyze && flutter test && flutter build windows` | historical owner-trial pass; strict R2 requires current artifact hashes | historical owner-trial pass; strict R2 requires per-surface UIAutomation/accessibility evidence from isolated installed run | evidence_missing: release_blocker; requires strict R2 `release_evidence/windows_installed_smoke.json` | release_blocker |
 | macOS | Planned portability target | unverified_planned | Flutter macOS desktop toolchain on macOS host, including Xcode | `cd apps/desktop_flutter && flutter analyze && flutter build macos` before claiming support | unverified_planned: known_limitation | unverified_planned: known_limitation | unverified_planned: known_limitation | known_limitation; blocks_release: no |
 | Linux | Development/verification slice | generated | Flutter Linux desktop toolchain: clang, cmake, ninja, pkg-config | `cd apps/desktop_flutter && flutter analyze && flutter test && flutter build linux` | passed on 2026-05-25 | passed under WSLg; first window opened; Dashboard, NavigationRail, Runtime Status, and Invariant Status visible | not_primary_release_gate: known_limitation | required_for_v1 development slice; current build and launch smoke blocks_release: no |
 
@@ -30,8 +30,8 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope. B
 
 - item: Windows desktop validation
   classification: release_blocker
-  reason: Windows project support, analyze, test, build smoke, and native launch smoke have passed, but installed-path Setup Doctor, installer, and first-run evidence is missing.
-  required_action: Complete Windows installer/first-run and Setup Doctor validation on a native Windows host and pass `python tooling\windows_release_evidence.py`.
+  reason: Historical Windows project/analyze/test/build/launch smoke is owner-trial evidence only. Strict R2 installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product evidence is missing.
+  required_action: Complete isolated Windows installer/first-run validation on a native Windows host and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target
@@ -42,8 +42,8 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope. B
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: Setup Doctor installed-path diagnostics evidence is missing for the primary Windows product target.
-  required_action: Pass Windows Setup Doctor diagnostics smoke through `release_evidence/windows_installed_smoke.json`.
+  reason: installed-app generated Setup Doctor product evidence is missing for the primary Windows product target.
+  required_action: Pass Windows Setup Doctor product export evidence through `release_evidence/windows_installed_smoke.json`.
   blocks_release: yes
 
 - item: mobile full release
