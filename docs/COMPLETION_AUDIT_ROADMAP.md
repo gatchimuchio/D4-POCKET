@@ -128,7 +128,7 @@ GUI-Shell uses three separate completion definitions:
 - item: Windows installed-path evidence validator
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, broker-mediated installed Flutter `.exe` first run, No-Python launch evidence, non-zero window handle, UIAutomation or screenshot visible-surface evidence source, config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor non-authority diagnostics, broker restricted loopback bind, and broker authenticated IPC/restart/crash evidence.
+  evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, broker-mediated installed Flutter `.exe` first run, No-Python launch evidence, non-zero window handle, UIAutomation or accessibility-tree visible-surface evidence source, config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor non-authority diagnostics, broker restricted loopback bind, and broker authenticated IPC/restart/crash evidence.
   blocks_release: no
 
 - item: Native Windows build and launch smoke

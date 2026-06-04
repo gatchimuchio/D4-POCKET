@@ -80,7 +80,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "5036cdf6993cb3b3f4f1cc49fd82b701a139ec341b411221feb3af8f8be79752"
+      "sha256": "b5a6a1bf8e340d23ec2055b30318d83db4f71f15419b514d4181597cfe280518"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -96,7 +96,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "f40f3a32aaad786e3331193878dbd0767255bd97ffb05b534497f22f383094ae"
+      "sha256": "c0a71e81dfda761134ce269f12cde26263443207731df26232b10fd8c205a9f6"
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
@@ -184,7 +184,7 @@
     },
     {
       "path": "docs/COMPLETION_AUDIT_ROADMAP.md",
-      "sha256": "6b3bfd54187c59e69fe16a7d40a79a14a94e451b7aaf24bc428056038b796b90"
+      "sha256": "52b05d7c8a39186f126f522721354a98c0cec4b75b77a02fa45e972e263863c0"
     },
     {
       "path": "docs/COMPLETION_STRATEGY_INSTRUCTION.md",
@@ -244,7 +244,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "dad66e080db6f7a5bb731a6019d4ef63d9f25ef7196a3c9b35d77bf81e1d3df7"
+      "sha256": "4e384ad10c0436e6d906f6a9aba25eceee30b7360755932728ccdce8c0220bad"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -876,7 +876,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "d213778ca6fd3b192e457976b7008413e423ca1aef28ea094a342ebf52ccd8fb"
+      "sha256": "04584e38cd3a889ffbf9bf9b5f6cc0fab792f03cffd315538bf25180c49aefe7"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -912,7 +912,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "4742e5cfa2df0912ba70d2bc3c39becae76158cb5b5a75d68f7c6baf09812741"
+      "sha256": "bd4272c28ec6b4546db3a5711aef99685cfb5643b24b32aecc1492f5334ac897"
     }
   ]
 }

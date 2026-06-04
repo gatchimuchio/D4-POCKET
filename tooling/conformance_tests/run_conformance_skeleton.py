@@ -1280,6 +1280,19 @@ def test_windows_release_evidence_validator_rejects_missing_surface_matches() ->
     return []
 
 
+def test_windows_release_evidence_validator_rejects_screenshot_surface_source() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad["first_run"]["visible_surfaces_evidence"]["source"] = "screenshot"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+        return ["Windows first-run evidence validator accepted screenshot as strict visible-surface source"]
+    return []
+
+
 def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match() -> list[str]:
     bad = _valid_windows_installed_evidence()
     aggregate_match = {
@@ -2251,6 +2264,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
+        test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,

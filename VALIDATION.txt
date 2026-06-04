@@ -1,3 +1,169 @@
+validation_update_2026_06_05_windows_uiautomation_interpreter_followup:
+  scope: Windows UIAutomation individual surface evidence regression and strict validator interpreter follow-up
+  commit: pre_commit_validation_from_7d46f952faed64c54c658cad553ab4505d876d7b
+  reviewed_source_commit: e181ae34e883840aadf137375acdef944986add8
+  implemented_behavior:
+    - e181ae34 records the Ubuntu-side source fix for Dashboard, NavigationRail, Runtime Status, and Invariant Status as individual Flutter semantics nodes with stable semantics identifiers.
+    - e181ae34 records the Ubuntu-side source fix for tooling/validate_all.py Python subprocesses to use sys.executable instead of a python3 PATH lookup.
+    - This follow-up records the e181ae34 validation evidence in the canonical validation log before Windows remeasurement.
+    - tooling/windows_release_evidence.py now rejects screenshot as a strict visible-surface evidence source; strict visible-surface evidence must be uiautomation or accessibility_tree.
+    - Screenshot paths remain optional supporting visual material through collector metadata, but screenshots cannot satisfy strict visible-surface source validation.
+    - Conformance now includes a negative fixture proving screenshot visible-surface source remains a release_blocker.
+    - docs/WINDOWS_RELEASE_EVIDENCE.md and docs/COMPLETION_AUDIT_ROADMAP.md align the strict visible-surface source boundary with the validator.
+    - README wording changed "normal app scaffold" to "normal app template" to avoid a release_gate_check false positive without changing product stance.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+    windows_release_evidence_missing: EXTERNAL_EVIDENCE
+    validate_all_python_only: CONFIG | FIXTURE | INTERNAL_STATE | LIVE_RUNTIME
+    validate_all_strict_windows_current_host: CONFIG | FIXTURE | INTERNAL_STATE | LIVE_RUNTIME | EXTERNAL_EVIDENCE
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "conformance skeleton passed: 105 checks"
+    - name: windows_release_evidence
+      command: python3 tooling/windows_release_evidence.py
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - windows_installer_first_run_smoke failed because release_evidence/windows_installed_smoke.json is missing
+        - windows_setup_doctor_smoke failed because release_evidence/windows_installed_smoke.json is missing
+        - windows_broker_installed_smoke failed because release_evidence/windows_installed_smoke.json is missing
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence"
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME"
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - validation_mode=development
+        - Python subprocess commands used /usr/bin/python3 from sys.executable on this Ubuntu host
+        - schema_check passed
+        - conformance_skeleton passed with 105 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: validate_all_strict_windows_python_only
+      command: python3 tooling/validate_all.py --strict-release --desktop-platform=windows --python-only
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - Python subprocess commands used /usr/bin/python3 from sys.executable on this Ubuntu host
+        - schema_check passed
+        - conformance_skeleton passed with 105 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+        - windows_installer_first_run_smoke remains release_blocker because release_evidence/windows_installed_smoke.json is missing
+        - windows_setup_doctor_smoke remains release_blocker because release_evidence/windows_installed_smoke.json is missing
+        - windows_broker_installed_smoke remains release_blocker because release_evidence/windows_installed_smoke.json is missing
+        - owner_go remains release_blocker because explicit owner GO is absent
+    - name: validate_all_strict_windows_current_host
+      command: python3 tooling/validate_all.py --strict-release --desktop-platform=windows
+      status: failed_expected
+      classification: release_blocker
+      blocks_release: yes
+      exit: 1
+      stdout_summary:
+        - Python subprocess commands used /usr/bin/python3 from sys.executable on this Ubuntu host
+        - Rust cargo test passed, including 33 src/lib.rs tests and 3 tests/broker_ipc.rs tests
+        - desktop_flutter_analyze failed with exit 127 because the WSL-visible Flutter shell script has CRLF line ending failure
+        - desktop_flutter_test failed with exit 127 because the WSL-visible Flutter shell script has CRLF line ending failure
+        - Windows installed first-run, Setup Doctor, and broker installed smoke evidence remain release_blocker because release_evidence/windows_installed_smoke.json is missing
+        - owner_go remains release_blocker because explicit owner GO is absent
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+  production_runtime_behavior_change_status:
+    flutter_surface_semantics_changed: recorded_from_e181ae34
+    validator_python_interpreter_resolution_changed: recorded_from_e181ae34
+    strict_visible_surface_source_policy_changed: yes
+    release_gate_false_positive_wording_changed: yes
+    screenshot_supporting_metadata_removed: no
+    aggregate_root_accessible_name_shortcut_allowed: no
+    authority_cutover_status_changed: no
+    command_dispatch_activation: no
+    schema_changed: no
+    windows_raw_evidence_changed: no
+  release_gate_impact:
+    - item: Native Windows installed-path UIAutomation remeasurement
+      classification: release_blocker
+      reason: Ubuntu validation cannot produce native Windows UIAutomation or accessibility-tree evidence for the installed product path.
+      required_action: Rerun Windows installed smoke on the next main commit and collect fresh visible-surface JSON plus screenshots as supporting material.
+      blocks_release: yes
+    - item: Windows installed-path Setup Doctor and broker evidence
+      classification: release_blocker
+      reason: release_evidence/windows_installed_smoke.json is absent in this Ubuntu validation environment.
+      required_action: Collect native Windows installed-path first-run, Setup Doctor, broker, no-Python-runtime, config, and audit probe evidence.
+      blocks_release: yes
+    - item: Current-host Flutter validation
+      classification: release_blocker
+      reason: WSL direct Flutter exits 127 because the external Flutter shell script has CRLF line endings; Windows-side Flutter validation must be rerun natively.
+      required_action: Run flutter analyze and flutter test on native Windows for the next main commit.
+      blocks_release: yes
+    - item: Owner GO
+      classification: release_blocker
+      reason: explicit owner release approval is absent for completed product release.
+      required_action: request owner GO only after strict native Windows product evidence closes.
+      blocks_release: yes
+
 validation_update_2026_06_04_r1_command_execution_gate_reporting:
   scope: R1 Rust Security Broker command-envelope execution gate reporting
   commit: pre_commit_validation_from_fb3cf881740c695c6188e3660854200c34dee20a
@@ -946,7 +1112,7 @@ validation_update_2026_06_03_block_e:
     - item: Windows installed-path first-run visible-surface evidence
       classification: release_blocker
       reason: release_evidence/windows_installed_smoke.json is missing, so installed app launch, MainWindowHandle, and visible-surface evidence are absent.
-      required_action: Collect UIAutomation, screenshot, or accessibility-tree evidence from the installed Windows app path.
+      required_action: Collect UIAutomation or accessibility-tree evidence from the installed Windows app path; screenshots may be retained only as supporting visual material.
       blocks_release: yes
     - item: Windows installed-path Setup Doctor evidence
       classification: release_blocker

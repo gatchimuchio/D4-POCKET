@@ -80,7 +80,8 @@ Visible-surface evidence boundary:
 - Required surface names must come from the actual Flutter/Dart semantics or accessibility tree observed through Windows UIAutomation.
 - Native window titles, native container names, or root accessible names must not aggregate required labels such as `Dashboard`, `NavigationRail`, `Runtime Status`, and `Invariant Status`.
 - `GUI Shell` is acceptable as a product/window identity by itself; `GUI Shell Dashboard NavigationRail Runtime Status Invariant Status` is forbidden evidence.
-- Screenshot or manual confirmation alone must not produce automatic strict-release PASS.
+- Screenshot evidence is supporting visual material only; strict visible-surface source must be `uiautomation` or `accessibility_tree`.
+- Manual confirmation must not produce automatic strict-release PASS.
 - Staged-install acceptance is final only after native Windows remeasurement of the exact implementation commit.
 
 Do not claim completed product release from copied, edited, or non-Windows evidence. Missing evidence remains a `release_blocker`.

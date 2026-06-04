@@ -46,7 +46,7 @@
 
 ## 🎯 What this is — これは何か
 
-GUI Shell is **not** a normal app scaffold, and it is **not** a BLUE-TANUKI-specific GUI.
+GUI Shell is **not** a normal app template, and it is **not** a BLUE-TANUKI-specific GUI.
 GUI Shell は通常のアプリ雛形ではなく、BLUE-TANUKI 専用 GUI でもありません。
 
 - 🛂 **A control plane.** Flutter renders operator surfaces; it does *not* own authority. / Flutter は操作画面を描画するだけで、権限を持たない。
