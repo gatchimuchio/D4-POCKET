@@ -1,8 +1,8 @@
 # Rust Broker IPC Protocol
 
 Status: Phase 3 production broker process and Flutter broker client started
-Date: 2026-06-03
-Scope: Rust Security Broker envelope, authenticated loopback IPC, session, health, replay, and durable audit store
+Date: 2026-06-04
+Scope: Rust Security Broker envelope, authenticated loopback IPC, session, health, replay, durable audit store, and suspended command execution gate reporting
 
 ## 1. Protocol Owner
 
@@ -47,7 +47,7 @@ Allowed operations:
 - `audit_verify`
 - `normalize_payload`
 
-`command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility in the response body, but it must not dispatch real external commands until product cutover and execution gates exist.
+`command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility and an `execution_gate` body with process / credential / update gate status, but it must not dispatch real external commands until product cutover and installed-product execution evidence exist.
 
 ## 4. Response Envelope
 
@@ -139,15 +139,15 @@ The current Rust code provides:
 - nonce replay rejection;
 - authority metadata rejection with NFKC / case / zero-width / camelCase / separator / alias / value-only hardening;
 - authority operation response bodies for `authority_evaluate`, `approval_edit`, `content_projection`, `audit_verify`, and `normalize_payload`;
-- command envelope eligibility with dispatch suspension.
+- command envelope eligibility with dispatch suspension and structured process / credential / update gate reporting.
 
-It does not yet provide:
+Release-blocked items:
 
-- WSL direct Flutter validation, because the external Flutter shell scripts currently fail with CRLF line endings;
-- credential/keychain access;
-- process or update gated execution.
+- WSL direct Flutter validation is `release_blocker` because the external Flutter shell scripts currently fail with CRLF line endings;
+- credential/keychain access is `release_blocker` for credential-gated product behavior;
+- process execution and update execution remain `release_blocker` until explicit gate activation, installed-product evidence, and owner GO exist.
 
-No-Python-runtime product proof, execution gates, and Windows installed-path evidence remain `release_blocker` for completed product release. Flutter analyze/test evidence exists through Windows `flutter.bat`; WSL direct `flutter` remains environment-blocked.
+No-Python-runtime product proof, execution gate activation, and Windows installed-path evidence remain `release_blocker` for completed product release. Flutter analyze/test evidence exists through Windows `flutter.bat`; WSL direct `flutter` remains environment-blocked.
 
 ## 7. IPC Transport Decision
 

@@ -215,6 +215,26 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
         errors.append("command_envelope: eligible accepted fixture was not allowed")
     if command_response["body"]["dispatch_enabled"] is not False:
         errors.append("command_envelope: dispatch_enabled was not false")
+    gate = command_response["body"]["execution_gate"]
+    if gate["dispatch"] != "suspended" or gate["status"] != "suspended":
+        errors.append("command_envelope: dispatch gate was not suspended")
+    gated_operations = {
+        "process": "process.spawn",
+        "credential": "credential.read",
+        "update": "update.apply",
+    }
+    for target, operation in gated_operations.items():
+        gated_action = {**base_action(), "operation": operation, "capability_id": operation}
+        response = broker.request("command_envelope", {"state": state_json, "action": gated_action})
+        if response["status"] != "suspended":
+            errors.append(f"command_envelope {target}: response was not suspended")
+        gated = response["body"]["execution_gate"]
+        if gated["target_kind"] != target:
+            errors.append(f"command_envelope {target}: target_kind mismatch {gated['target_kind']} != {target}")
+        if gated[target] != "suspended":
+            errors.append(f"command_envelope {target}: target gate was not suspended")
+        if response["body"]["dispatch_enabled"] is not False:
+            errors.append(f"command_envelope {target}: dispatch_enabled was not false")
     return errors
 
 

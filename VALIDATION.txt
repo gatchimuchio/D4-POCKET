@@ -1,3 +1,140 @@
+validation_update_2026_06_04_r1_command_execution_gate_reporting:
+  scope: R1 Rust Security Broker command-envelope execution gate reporting
+  commit: pre_commit_validation_from_fb3cf881740c695c6188e3660854200c34dee20a
+  implemented_behavior:
+    - Rust Broker command_envelope responses now include dispatch_decision=suspended, dispatch_reason=broker_command_dispatch_disabled, and an execution_gate object.
+    - execution_gate classifies process, credential, and update command targets while preserving dispatch_enabled=false.
+    - Rust unit coverage now verifies process.spawn, credential.read, and update.apply command envelopes are suspended at their matching execution gate.
+    - tooling/broker_parity/run_authority_parity.py now verifies the same process / credential / update gate behavior through authenticated Rust broker IPC.
+    - docs/architecture/RUST_BROKER_IPC_PROTOCOL.md, native/rust_helper/README.md, and docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md align the gate-reporting evidence scope.
+  evidence_classification:
+    schema_check: CONFIG
+    conformance_skeleton: FIXTURE | INTERNAL_STATE
+    manifest_check: CONFIG
+    release_gate_check: CONFIG | INTERNAL_STATE
+    evidence_bundle: CONFIG | INTERNAL_STATE
+    release_runtime_assertions: CONFIG | FIXTURE | LIVE_RUNTIME
+    broker_authority_parity: FIXTURE | LIVE_RUNTIME
+    cargo_test: FIXTURE | LIVE_RUNTIME
+  checks:
+    - name: schema_check
+      command: python3 tooling/schema_check/check_schemas.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "schema check passed: 25 schemas, 25 examples, 27 negative fixtures"
+    - name: conformance_skeleton
+      command: python3 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "conformance skeleton passed: 102 checks"
+    - name: manifest_check
+      command: python3 tooling/manifest.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: manifest check passed
+    - name: release_gate_check
+      command: python3 tooling/release_gate_check.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: release gate check passed
+    - name: evidence_bundle
+      command: python3 tooling/evidence_bundle.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence"
+    - name: release_runtime_assertions
+      command: python3 tooling/release_runtime_assertions.py --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "release runtime assertions: 9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME"
+    - name: broker_authority_parity
+      command: python3 tooling/broker_parity/run_authority_parity.py
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: "broker authority parity passed: accepted parity, rejected parity, rust-specific broker IPC path"
+    - name: cargo_fmt_check
+      command: cargo fmt --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+    - name: cargo_test
+      command: cargo test
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - "src/lib.rs: 33 passed; 0 failed"
+        - "src/main.rs: 0 passed; 0 failed"
+        - "tests/broker_ipc.rs: 3 passed; 0 failed"
+        - "doc-tests: 0 passed; 0 failed"
+    - name: validate_all_python_only
+      command: python3 tooling/validate_all.py --python-only
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout_summary:
+        - validation_mode=development
+        - schema_check passed
+        - conformance_skeleton passed with 102 checks
+        - manifest_check passed
+        - release_gate_check passed
+        - release_smoke passed
+        - evidence_bundle passed
+        - release_runtime_assertions passed
+        - broker_authority_parity passed
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      classification: none
+      blocks_release: no
+      exit: 0
+      stdout: empty
+  production_runtime_behavior_change_status:
+    rust_broker_command_envelope_body_changed: yes
+    command_dispatch_activation: no
+    process_execution_activation: no
+    credential_access_activation: no
+    update_execution_activation: no
+    authority_cutover_status_changed: no
+    schema_changed: no
+    flutter_changed: no
+    installer_changed: no
+    windows_raw_evidence_changed: no
+  release_gate_impact:
+    - item: Rust Broker production authority cutover
+      classification: release_blocker
+      reason: broker health remains authority_cutover_status=not_active and command dispatch remains suspended.
+      required_action: continue R1 through explicit activation criteria for process, credential, and update gates with installed-product evidence.
+      blocks_release: yes
+    - item: Windows installed-path product proof
+      classification: release_blocker
+      reason: this Ubuntu R1 block supplies local broker gate-reporting evidence only.
+      required_action: execute native Windows installed-path evidence collection in R2 after source-side readiness.
+      blocks_release: yes
+    - item: Owner GO
+      classification: release_blocker
+      reason: explicit owner release approval is absent for completed product release.
+      required_action: request owner GO only after strict product evidence closes.
+      blocks_release: yes
+
 validation_update_2026_06_04_r1_broker_non_authority_source_parity:
   scope: R1 Rust Security Broker responsibility convergence
   commit: pre_commit_validation_from_6ecc6257a40b60bf110c4982e131b13b0a8919b7

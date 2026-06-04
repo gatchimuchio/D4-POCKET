@@ -166,6 +166,8 @@ For normalization cutover, the Rust broker must keep the current NFKC / case / z
 
 2026-06-04 R1 update: Rust Broker authority evaluation now rejects the same non-authority source family used by Python Shell Core, including generated output, model output, tool output/tool response, external metadata, generated config, GUI/UI state, diagnostics, history, memory, cache, and previous state. `tooling/broker_parity/run_authority_parity.py` now compares every Python `NON_AUTHORITY_SOURCES` entry against authenticated Rust broker IPC, and Rust unit coverage fixes the same rejection inside `native/rust_helper`. This is local Rust Broker parity evidence only. It does not activate command dispatch, does not change `authority_cutover_status=not_active`, and does not create Windows installed-path product proof.
 
+2026-06-04 R1 command gate update: `command_envelope` response bodies now include `dispatch_decision=suspended`, `dispatch_reason=broker_command_dispatch_disabled`, and an `execution_gate` object that classifies process, credential, and update targets while keeping `dispatch_enabled=false`. Rust unit coverage and the broker parity harness verify process / credential / update requests are suspended through authenticated broker IPC. This is gate-reporting evidence only; process execution, credential access, update execution, Windows installed-path proof, and owner GO remain `release_blocker`.
+
 ## 7. Phase 5 / Flutter Integration
 
 Flutter product entry は local JSON-only owner-use state から broker-mediated state へ移り始めた。残りは installed-path broker supervisor proof、active command dispatch gate、installed no-Python runtime proof である。no-Python product-path startup / no-FFI static assertion は release validation に接続済みである。

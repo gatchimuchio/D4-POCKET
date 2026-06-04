@@ -847,10 +847,100 @@ fn error(code: &str, message: &str, recoverable: bool) -> BrokerError {
 }
 
 fn json_command_eligibility(payload: &Value) -> Value {
+    let target_kind = command_target_kind(payload);
     serde_json::json!({
         "dispatch_enabled": false,
+        "dispatch_decision": "suspended",
+        "dispatch_reason": "broker_command_dispatch_disabled",
+        "execution_gate": {
+            "status": "suspended",
+            "target_kind": target_kind,
+            "dispatch": "suspended",
+            "process": execution_gate_state(target_kind, "process"),
+            "credential": execution_gate_state(target_kind, "credential"),
+            "update": execution_gate_state(target_kind, "update"),
+            "required_before_dispatch": [
+                "capability_permission_approval_audit_recovery_eligibility",
+                "process_execution_gate",
+                "credential_access_gate",
+                "update_signature_gate",
+                "installed_product_evidence"
+            ]
+        },
         "eligibility": evaluate_authority(payload)
     })
+}
+
+fn execution_gate_state(target_kind: &str, gate: &str) -> &'static str {
+    if target_kind == gate {
+        "suspended"
+    } else {
+        "not_requested"
+    }
+}
+
+fn command_target_kind(payload: &Value) -> &'static str {
+    let action = payload.get("action").unwrap_or(payload);
+    let mut text = String::new();
+    for key in [
+        "operation",
+        "capability_id",
+        "permission_id",
+        "runtime_id",
+        "command",
+        "target",
+    ] {
+        if let Some(value) = action.get(key).and_then(Value::as_str) {
+            text.push(' ');
+            text.push_str(value);
+        }
+    }
+    if let Some(action_payload) = action.get("payload") {
+        collect_target_text(action_payload, &mut text);
+    }
+    let lowered = text.to_ascii_lowercase();
+    if lowered.contains("credential") || lowered.contains("keychain") || lowered.contains("secret")
+    {
+        "credential"
+    } else if lowered.contains("update") || lowered.contains("installer") {
+        "update"
+    } else if lowered.contains("process")
+        || lowered.contains("spawn")
+        || lowered.contains("execute")
+        || lowered.contains("command")
+    {
+        "process"
+    } else if lowered.contains("filesystem") {
+        "filesystem"
+    } else if lowered.contains("network") {
+        "network"
+    } else if lowered.contains("runtime") {
+        "runtime"
+    } else {
+        "unknown"
+    }
+}
+
+fn collect_target_text(value: &Value, text: &mut String) {
+    match value {
+        Value::Object(object) => {
+            for (key, value) in object {
+                text.push(' ');
+                text.push_str(key);
+                collect_target_text(value, text);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_target_text(item, text);
+            }
+        }
+        Value::String(value) => {
+            text.push(' ');
+            text.push_str(value);
+        }
+        _ => {}
+    }
 }
 
 fn is_tagged_sha256(value: &str) -> bool {
@@ -1134,6 +1224,25 @@ mod tests {
         broker.current_epoch_seconds_override =
             Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
         broker
+    }
+
+    fn command_request_with_operation(
+        request_id: &str,
+        nonce: &str,
+        operation: &str,
+    ) -> BrokerRequestEnvelope {
+        let mut envelope = BrokerRequestEnvelope::command_envelope(request_id, "session-1", nonce);
+        envelope.payload = Some(serde_json::json!({
+            "action": {
+                "operation": operation,
+                "capability_id": operation,
+                "permission_id": format!("permission.{operation}"),
+                "payload": {
+                    "target": operation
+                }
+            }
+        }));
+        envelope
     }
 
     #[test]
@@ -1574,7 +1683,37 @@ mod tests {
             response.error.unwrap().code,
             "broker_command_dispatch_disabled"
         );
+        let body = response.body.unwrap();
+        assert_eq!(body["dispatch_enabled"], false);
+        assert_eq!(body["dispatch_decision"], "suspended");
+        assert_eq!(body["execution_gate"]["dispatch"], "suspended");
         assert_eq!(broker.audit_events()[0].decision, "suspended");
+    }
+
+    #[test]
+    fn command_envelope_reports_process_credential_and_update_gates() {
+        for (index, (operation, target_kind)) in [
+            ("process.spawn", "process"),
+            ("credential.read", "credential"),
+            ("update.apply", "update"),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let mut broker = test_broker();
+            let response = broker.handle(command_request_with_operation(
+                &format!("request-{index}"),
+                &format!("nonce-{index}"),
+                operation,
+            ));
+            assert_eq!(response.status, BrokerStatus::Suspended);
+            let body = response.body.unwrap();
+            assert_eq!(body["dispatch_enabled"], false);
+            assert_eq!(body["execution_gate"]["status"], "suspended");
+            assert_eq!(body["execution_gate"]["target_kind"], *target_kind);
+            assert_eq!(body["execution_gate"]["dispatch"], "suspended");
+            assert_eq!(body["execution_gate"][*target_kind], "suspended");
+        }
     }
 
     #[test]
