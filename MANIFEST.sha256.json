@@ -618,7 +618,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "60f2c9d8f2fc5723ff63010f163dc56b1d46acb053febbd5ad35b2b39de3ed04"
+      "sha256": "10b0436c02c3477ce92d03762f03711911848c735fe01adebb6d48051d7b6cad"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -914,7 +914,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "7eb8d5adf454fc5d10ac7b90154594de41f16fa435ed66ec64e1e7429aa1f93b"
+      "sha256": "69275fe1974aca86811cc64ad3fa2c8023dfb3a7db34a235613bde6c9c3f798e"
     },
     {
       "path": "tooling/evidence_bundle.py",

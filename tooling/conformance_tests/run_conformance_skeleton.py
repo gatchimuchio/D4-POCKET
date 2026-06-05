@@ -1658,6 +1658,18 @@ def test_windows_installed_smoke_preserves_trap_failure() -> list[str]:
     return errors
 
 
+def test_windows_installed_smoke_automation_names_are_materialized() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "automation_names = @($names | Select-Object" in text:
+        errors.append("collect_installed_smoke.ps1 pipelines UIAutomation names directly into JSON evidence")
+    if "$automationNames = New-Object System.Collections.Generic.List[string]" not in text:
+        errors.append("collect_installed_smoke.ps1 does not materialize automation names before JSON evidence")
+    if "automation_names = @($automationNames)" not in text:
+        errors.append("collect_installed_smoke.ps1 does not serialize the materialized automation names list")
+    return errors
+
+
 def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     step = ValidationStep(
         "missing_executable_probe",

@@ -645,6 +645,18 @@ function Collect-VisibleSurfaces {
         }
       }
   )
+  $automationNames = New-Object System.Collections.Generic.List[string]
+  foreach ($candidateName in $names) {
+    if ($candidateName -eq "") {
+      continue
+    }
+    if (!$automationNames.Contains($candidateName)) {
+      $automationNames.Add($candidateName)
+    }
+    if ($automationNames.Count -ge 200) {
+      break
+    }
+  }
   $capture = [ordered]@{
     source = "uiautomation"
     path = $OutputPath
@@ -657,7 +669,7 @@ function Collect-VisibleSurfaces {
     surface_matches = $surfaceMatches
     aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
     surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
-    automation_names = @($names | Select-Object -Unique | Select-Object -First 200)
+    automation_names = @($automationNames)
     diagnostic_tree = [ordered]@{
       mode = "full_uiautomation_tree_projection"
       observed_element_count = $observedElements.Count
