@@ -41,13 +41,14 @@ $ErrorActionPreference = "Stop"
 
 $exe = Resolve-Path $InstalledExe
 $hash = (Get-FileHash -Algorithm SHA256 -Path $exe).Hash.ToLowerInvariant()
-$setupDoctorPath = Resolve-Path $SetupDoctorJson
 $brokerProcess = $null
 $brokerEndpoint = $null
 $brokerEndpointFile = $null
 $brokerMediatedLaunch = $false
 $previousBrokerEndpointEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_ENDPOINT_JSON", "Process")
 $previousBrokerRuntimeDirEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_RUNTIME_DIR", "Process")
+$previousSetupDoctorExportEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON", "Process")
+$previousSetupDoctorContextEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON", "Process")
 $previousPathEnv = [Environment]::GetEnvironmentVariable("Path", "Process")
 $pythonRuntimePathScrubbed = $false
 $pythonPathEntriesRemovedCount = 0
@@ -88,6 +89,54 @@ function Get-TaggedStringSha256 {
   } finally {
     $sha.Dispose()
   }
+}
+
+function Resolve-InputOrOutputPath {
+  param([string]$Path)
+
+  if (Test-Path $Path) {
+    return (Resolve-Path $Path).Path
+  }
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  $directory = Split-Path -Parent $fullPath
+  if ($directory -ne "") {
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+  }
+  return $fullPath
+}
+
+function Write-SetupDoctorProductContext {
+  param(
+    [string]$Path,
+    [string]$InstalledAppPath,
+    [string]$AppArtifactSha256,
+    [string]$ConfigPathValue,
+    [string]$AuditDirValue,
+    [bool]$BrokerMediated,
+    [string]$BrokerEndpointFileValue,
+    $BrokerEndpointValue
+  )
+
+  $endpointHost = $null
+  if ($null -ne $BrokerEndpointValue) {
+    $endpointHost = Get-EvidenceValue -Object $BrokerEndpointValue -Name "host"
+    if ($null -eq $endpointHost) {
+      $endpointHost = Get-EvidenceValue -Object $BrokerEndpointValue -Name "endpoint_host"
+    }
+  }
+  $context = [ordered]@{
+    context_kind = "installed_app_setup_doctor_context"
+    context_version = 1
+    installed_app_path = $InstalledAppPath
+    installed_app_path_confirmed = $true
+    app_artifact_sha256 = $AppArtifactSha256
+    config_path = [System.IO.Path]::GetFullPath($ConfigPathValue)
+    audit_dir = [System.IO.Path]::GetFullPath($AuditDirValue)
+    broker_mediated_launch = $BrokerMediated
+    broker_endpoint_file = $BrokerEndpointFileValue
+    restricted_loopback_bind = ($endpointHost -eq "127.0.0.1")
+  }
+  Write-JsonEvidence -Value $context -Path $Path -Depth 8
 }
 
 function New-EvidenceFileRecord {
@@ -210,6 +259,16 @@ function Restore-SmokeEnvironment {
     Remove-Item Env:\GUI_SHELL_BROKER_RUNTIME_DIR -ErrorAction SilentlyContinue
   } else {
     $env:GUI_SHELL_BROKER_RUNTIME_DIR = $previousBrokerRuntimeDirEnv
+  }
+  if ($null -eq $previousSetupDoctorExportEnv) {
+    Remove-Item Env:\GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON -ErrorAction SilentlyContinue
+  } else {
+    $env:GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON = $previousSetupDoctorExportEnv
+  }
+  if ($null -eq $previousSetupDoctorContextEnv) {
+    Remove-Item Env:\GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON -ErrorAction SilentlyContinue
+  } else {
+    $env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $previousSetupDoctorContextEnv
   }
   if ($null -eq $previousPathEnv) {
     Remove-Item Env:\Path -ErrorAction SilentlyContinue
@@ -635,6 +694,20 @@ if ($BrokerHelperExe -ne "") {
   $env:GUI_SHELL_BROKER_RUNTIME_DIR = Split-Path -Parent $brokerEndpointFile
 }
 
+$setupDoctorPath = Resolve-InputOrOutputPath -Path $SetupDoctorJson
+$setupDoctorContextPath = Join-Path (Split-Path -Parent $setupDoctorPath) "setup_doctor_context.json"
+Write-SetupDoctorProductContext `
+  -Path $setupDoctorContextPath `
+  -InstalledAppPath $exe.Path `
+  -AppArtifactSha256 "sha256:$hash" `
+  -ConfigPathValue $ConfigPath `
+  -AuditDirValue $AuditDir `
+  -BrokerMediated $brokerMediatedLaunch `
+  -BrokerEndpointFileValue $brokerEndpointFile `
+  -BrokerEndpointValue $brokerEndpoint
+$env:GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON = $setupDoctorPath
+$env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $setupDoctorContextPath
+
 $process = $null
 try {
   if ($NoPythonRuntime.IsPresent) {
@@ -647,6 +720,9 @@ try {
   Restore-SmokeEnvironment
 }
 
+if (!(Test-Path $setupDoctorPath)) {
+  throw "Installed app did not write Setup Doctor product export: $setupDoctorPath"
+}
 $setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
 $installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
 $installedManifest = $null
@@ -681,12 +757,13 @@ if ($RuntimeAssertionsJson -ne "") {
 }
 $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
-    (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath.Path),
+    (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath),
     (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
     (New-EvidenceFileRecord -Kind "visible_surfaces" -Path (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path")),
     (New-EvidenceFileRecord -Kind "runtime_assertions" -Path $RuntimeAssertionsJson),
     (New-EvidenceFileRecord -Kind "screenshot_supporting_material" -Path $ScreenshotPath),
-    (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath)
+    (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath),
+    (New-EvidenceFileRecord -Kind "setup_doctor_context" -Path $setupDoctorContextPath)
   )) {
   if ($null -ne $record) {
     $evidenceBundleFiles.Add($record)

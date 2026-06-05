@@ -32,10 +32,10 @@ Current phase: Phase B owner-use complete. Installer work is not being treated a
   required_action: Run the hardened Windows installed smoke collector from a unique staged run with visible-surface diagnostic tree, broker measured field provenance, config path, audit dir probe inputs, and installed manifest.
   blocks_release: yes
 
-- item: Windows Setup Doctor installed-path evidence missing
+- item: Windows Setup Doctor installed-path evidence not collected
   classification: release_blocker
-  reason: The current Setup Doctor PowerShell collector is external installer/config/broker probe evidence and is invalid as installed-app product evidence.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence and pass `python tooling/windows_release_evidence.py`, or keep this blocker open.
+  reason: The PowerShell Setup Doctor collector remains external installer/config/broker probe evidence. The installed Flutter app can now generate machine-readable Setup Doctor product export, but native Windows evidence has not been collected and validated.
+  required_action: Run isolated Windows installed smoke so the installed app writes Setup Doctor product export evidence and pass `python tooling/windows_release_evidence.py`.
   blocks_release: yes
 
 ## Known Limitations

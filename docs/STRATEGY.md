@@ -45,8 +45,8 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: The current PowerShell Setup Doctor collector is external probe evidence and is invalid as formal product evidence.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence.
+  reason: The installed app supports machine-readable Setup Doctor product export, but native Windows product evidence has not been collected. The PowerShell Setup Doctor collector is external probe evidence and is invalid as formal product evidence.
+  required_action: Collect installed-app generated machine-readable Setup Doctor export evidence through isolated Windows installed smoke.
   blocks_release: yes
 
 - item: installer and first-run Setup Doctor

@@ -158,8 +158,8 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
-  reason: The current PowerShell Setup Doctor collector is an external installer/config/broker probe and is invalid as formal installed-app Setup Doctor product evidence.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence, or keep this blocker open and exclude Setup Doctor from release evidence by explicit owner decision.
+  reason: The installed app supports machine-readable Setup Doctor product export, but native Windows isolated-run evidence has not been collected and validated. The PowerShell Setup Doctor collector remains external probe evidence only.
+  required_action: Run isolated Windows installed smoke so the installed app writes Setup Doctor product export evidence, then pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: macOS planned portability target unverified
@@ -177,7 +177,7 @@ The canonical completion roadmap for the combined Windows-first product path and
 - item: Windows Setup Doctor diagnostics evidence not passed
   classification: release_blocker
   reason: Installed-app generated Windows Setup Doctor product evidence has not passed for the Windows-first product target; external probe evidence is invalid for this gate.
-  required_action: Pass Windows Setup Doctor product export evidence; macOS diagnostics remain planned portability validation.
+  required_action: Pass Windows Setup Doctor product export evidence from `collect_installed_smoke.ps1`; macOS diagnostics remain planned portability validation.
   blocks_release: yes
 
 - item: validate_all.py strict release mode not passed

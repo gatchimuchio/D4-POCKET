@@ -1575,6 +1575,67 @@ def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match
     return []
 
 
+def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str]:
+    export = DESKTOP_FLUTTER / "lib" / "services" / "setup_doctor_export.dart"
+    main = DESKTOP_FLUTTER / "lib" / "main.dart"
+    collector = INSTALLER / "windows" / "collect_installed_smoke.ps1"
+    if not export.exists():
+        return ["installed app Setup Doctor product export helper is missing"]
+    export_text = export.read_text(encoding="utf-8")
+    main_text = main.read_text(encoding="utf-8")
+    collector_text = collector.read_text(encoding="utf-8")
+    required_export_tokens = [
+        "GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON",
+        "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON",
+        "installed_app_machine_readable_export",
+        "'formal_product_evidence': true",
+        "'product_generated': true",
+        "'collector_derives_checks': false",
+        "'synthetic': false",
+        "'installer_grants_authority': false",
+        "'installer_silently_approves_permissions': false",
+    ]
+    required_checks = [
+        "windows.installed_app_path",
+        "windows.artifact_hash",
+        "first_run.config_created",
+        "first_run.audit_dir_writable",
+        "setup_doctor.ran_from_installed_app_path",
+        "setup_doctor.runtime_connection",
+        "setup_doctor.authority_boundary",
+        "setup_doctor.network_public_bind",
+        "setup_doctor.recovery_instruction",
+        "setup_doctor.audit_storage",
+    ]
+    errors = [
+        f"Setup Doctor product export missing token: {token}"
+        for token in required_export_tokens
+        if token not in export_text
+    ]
+    errors.extend(
+        f"Setup Doctor product export missing required check id: {check_id}"
+        for check_id in required_checks
+        if check_id not in export_text
+    )
+    if "writeSetupDoctorProductExportIfRequested(client.getSnapshot())" not in main_text:
+        errors.append("desktop main does not call installed-app Setup Doctor product export helper")
+    for token in [
+        "GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON",
+        "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON",
+        "Installed app did not write Setup Doctor product export",
+        "setup_doctor_context",
+    ]:
+        if token not in collector_text:
+            errors.append(f"installed smoke collector missing product export token: {token}")
+    external_probe_text = (INSTALLER / "windows" / "collect_setup_doctor.ps1").read_text(encoding="utf-8")
+    if (
+        "formal_product_evidence" in external_probe_text
+        and "formal_product_evidence = $false" not in external_probe_text
+    ):
+        errors.append("external Setup Doctor probe is no longer clearly non-formal")
+    return errors
+
+
 def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     step = ValidationStep(
         "missing_executable_probe",
@@ -2704,6 +2765,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
+        test_installed_app_setup_doctor_product_export_contract_exists,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,

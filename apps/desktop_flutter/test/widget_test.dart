@@ -19,6 +19,7 @@ import 'package:gui_shell_desktop/screens/shared.dart';
 import 'package:gui_shell_desktop/screens/trust_center.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
+import 'package:gui_shell_desktop/services/setup_doctor_export.dart';
 
 void main() {
   testWidgets('GUI Shell desktop app smoke test', (WidgetTester tester) async {
@@ -444,6 +445,48 @@ void main() {
     expect(snapshot.invariantFlags['flutter_imported_by_shell_core'], isTrue);
     expect(snapshot.snapshotSource, 'local');
     expect(snapshot.operationStatus.releaseState, 'not claimed');
+  });
+
+  test('Setup Doctor product export is formal app-generated evidence', () {
+    final tempDir = Directory.systemTemp.createTempSync('gui-shell-export-');
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final configFile = File('${tempDir.path}/gui_shell.json')
+      ..writeAsStringSync('{}');
+    final auditDir = Directory('${tempDir.path}/audit')..createSync();
+    const exePath =
+        r'C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-1\app\gui_shell_desktop.exe';
+    final export = buildSetupDoctorProductExport(
+      ShellCoreClient.mock().getSnapshot(),
+      command: exePath,
+      context: {
+        'installed_app_path': exePath,
+        'installed_app_path_confirmed': true,
+        'app_artifact_sha256': 'sha256:${List.filled(64, '1').join()}',
+        'config_path': configFile.path,
+        'audit_dir': auditDir.path,
+        'restricted_loopback_bind': true,
+      },
+    );
+
+    expect(export['formal_product_evidence'], isTrue);
+    final source = export['evidence_source'] as Map<String, Object?>;
+    expect(source['source_kind'], 'installed_app_machine_readable_export');
+    expect(source['product_generated'], isTrue);
+    expect(source['collector_derives_checks'], isFalse);
+    expect(source['synthetic'], isFalse);
+    expect(export['ran_from_installed_app_path'], isTrue);
+    final checks = export['checks'] as List<Map<String, Object?>>;
+    expect(
+      kRequiredSetupDoctorCheckIds.every(
+        (checkId) => checks.any((check) => check['check_id'] == checkId),
+      ),
+      isTrue,
+    );
+    expect(checks.any((check) => check['grants_authority'] != false), isFalse);
+    expect(
+      checks.any((check) => (check['recovery_instruction'] as String).isEmpty),
+      isFalse,
+    );
   });
 
   test('local snapshot fallback does not claim release-ready', () {

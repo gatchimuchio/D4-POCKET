@@ -72,8 +72,8 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: Windows Setup Doctor smoke
   classification: release_blocker
-  reason: installed-app generated Setup Doctor product export evidence is missing. The current PowerShell Setup Doctor collector is external probe evidence and is rejected as product proof.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence and pass `python tooling\windows_release_evidence.py`.
+  reason: installed-app generated Setup Doctor product export support exists, but native Windows isolated-run evidence is missing. The PowerShell Setup Doctor collector is external probe evidence and is rejected as product proof.
+  required_action: Run `collect_installed_smoke.ps1` so the installed app writes machine-readable Setup Doctor product export evidence and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows installed evidence validator

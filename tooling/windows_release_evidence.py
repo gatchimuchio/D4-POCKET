@@ -475,7 +475,7 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_setup_doctor_smoke",
             "; ".join(errors),
-            "Record installed-app generated machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
+            "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
         )
     return _passed(
         "windows_setup_doctor_smoke",
@@ -572,7 +572,7 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
             _failed(
                 "windows_setup_doctor_smoke",
                 error or "Windows Setup Doctor evidence missing",
-                "Record installed-app generated machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
+                "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.",
             ),
             _failed(
                 "windows_broker_installed_smoke",

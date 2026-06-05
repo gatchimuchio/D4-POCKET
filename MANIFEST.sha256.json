@@ -62,15 +62,15 @@
     },
     {
       "path": "AUDIT_EVIDENCE.md",
-      "sha256": "1f74c1df0346331522b9c3d29d48c9cab7c3ee96992440a6ac89c1852d051da6"
+      "sha256": "97be3e8dd54b98ae346418c2888c5d7902acf51f36f22c177ecd1105bba4cd8b"
     },
     {
       "path": "CLAIM.md",
-      "sha256": "991fc31f3390cd356d180a760844ae63f9182aee4a569053ba1821101a1ddf69"
+      "sha256": "60ac992c2dcdde5c6b36801d8b3bff34890d20e79edf43ca986a4234e0b1eaeb"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "5567f4484744eee42c8e3406349f8ecb05267c7a44c7dc173f49e08920dc56b3"
+      "sha256": "3a4a6a59eb11e3e293988dd24d38dc0806b6021fe73bf5033a086cdbed809ba2"
     },
     {
       "path": "CONFORMANCE_REPORT.md",
@@ -82,7 +82,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "a29edd0f06f2f4c78a0ec839f133860923de9bd6c1afae3b8982e5b7043aa7dd"
+      "sha256": "922e74218d6984bdd2a6af167235d3c6583fba1387369815c758bd7bd13e9cf9"
     },
     {
       "path": "MOBILE_STATUS.md",
@@ -94,7 +94,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "f385779dff18c42a2c7453afade20e9d9ffc91c05ea9fd916dee35ba2bc6a367"
+      "sha256": "46bc260359f73da0478c1289137793a45509ae8c85b28d43aa57f5ba5385a185"
     },
     {
       "path": "ROADMAP.md",
@@ -110,7 +110,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "45682fe54227a5d379cf4fd56f6f66c6a4bd338ebf2dff3cd95edf019008a8ed"
+      "sha256": "9ee82e74dd99c67ba3bdb5f1e8e0261f5cbb6ee475fa924a4700aff296fdb380"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -177,6 +177,10 @@
       "sha256": "3680de8a34bb115e83b2b0a80f596bac0bfab4363535459c7d0ef8943ac841f2"
     },
     {
+      "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
+      "sha256": "732c68b745ff08610ba57d29b897a4b02d40c6d7feece9f79930a3a12b2930d0"
+    },
+    {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
       "sha256": "055cb375c94fd20e2f5612fa9ba4db2c7575502e5ea0841a7853c9a022a10bbb"
     },
@@ -186,7 +190,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "0c70a37fa2e6d4c2f8b8f0e49047b946ee40ff780da4a0045477bc566875e92e"
+      "sha256": "9f222f1b8a11b530f98a86adf5e458968beae49a482a97f199c7490e86836a82"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -206,7 +210,7 @@
     },
     {
       "path": "docs/DESKTOP_PLATFORM_MATRIX.md",
-      "sha256": "ca6ddd0ef88302b6fb4835b5fb27aa1122410807facd759bebbc4bc1740fadbb"
+      "sha256": "632e116abf7956d8f56caa95edd6a1608432a667bb84deb150aafd28fdb6d84a"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -238,7 +242,7 @@
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
-      "sha256": "a6d12eb57ad8bc3938c003b76a08946a2612cb3aca42bf2b2ea6d0e6f8e7164d"
+      "sha256": "514fca769651acb61547e9abca6282b562a12dee18d39155bd18b289344c3809"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
@@ -250,15 +254,15 @@
     },
     {
       "path": "docs/STRATEGY.md",
-      "sha256": "39a74e99b982018095b95bbee5f5bf8ea32a921f1e0997a286eccdce5cf6bed4"
+      "sha256": "23a9441f1efec9c7d60d9e3b434df9f50bc3d400ac659b18bf09a3891db0912d"
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "fe71746f31b203da571b0d8d827be63e60208516d138b4e8839c6a3ef9dad667"
+      "sha256": "8db20695b6c5637093d1352551ebe8e29a19cb80f98f4b5320c4ce6b0ae9f7c0"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
-      "sha256": "a3e3519306835a6bf40f662b4e416902336b160996a8837693545c4a0195b471"
+      "sha256": "27a805919856b746df9cc5a6e4b61a82863550e5413dbf5d93815d4ba6947e93"
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
@@ -606,7 +610,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "b55a449deae30efc6173f0bae675f49b086120aa89b77be9a1bad812c3204b1c"
+      "sha256": "18a833d7d0482e81b2962f22335b46cc217a5af8fced54ecb93f3cfc4c5c947a"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -614,7 +618,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "c7b42751e5f5ce8b348605e239f42753cad3a3ca23c0e269a8dc83fbd1ff5063"
+      "sha256": "db29b183a8c83e2ace517f5efbb98d93aea1267e716a2346683faaf0bcf0c68c"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -910,7 +914,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "cf9d364eb8dfdcf8ed3dbeff7a2b11581738866b384116a9549a29fecbd6472f"
+      "sha256": "cb6b4ec4a06a4d0fb6bc3601cf2ee8aa9a6dcf008f42ddfcb0020070d21dcbad"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -946,7 +950,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "a0e7bf4818b4902eb5356d7fb162ce798d4c2beb70f3d98db34ce80d78c66b95"
+      "sha256": "a3b9176d476ace73aabc73951b4aad9d48a8f757cd47a5a81742c771a30a4c92"
     }
   ]
 }

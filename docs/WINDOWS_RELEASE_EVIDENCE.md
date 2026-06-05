@@ -10,10 +10,10 @@ Windows-first release validation uses isolated, machine-readable installed-path 
   required_action: Recollect native Windows evidence with the current isolated evidence contract before any completed product release claim.
   blocks_release: yes
 
-- item: external Setup Doctor probe
+- item: native Windows Setup Doctor product export not recollected
   classification: release_blocker
-  reason: `installer/windows/collect_setup_doctor.ps1` is now explicitly classified as `external_installer_config_broker_probe`. It does not execute an installed-app Setup Doctor machine-readable export and must not satisfy formal Setup Doctor product evidence.
-  required_action: Add an installed-app generated Setup Doctor export, or keep Setup Doctor outside formal product evidence and preserve the release blocker.
+  reason: `installer/windows/collect_setup_doctor.ps1` remains classified as `external_installer_config_broker_probe` and must not satisfy formal Setup Doctor product evidence. The installed Flutter app now supports `GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON`, but native Windows evidence has not been recollected and validated from an isolated staged run.
+  required_action: Run `collect_installed_smoke.ps1` on native Windows so the installed app writes the Setup Doctor product export, then pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 ## Required Evidence File
@@ -73,21 +73,12 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.
   -SessionFile $Manifest.broker_session_file `
   -OutputPath (Join-Path $Manifest.evidence_dir "windows_broker_smoke.json")
 
-# External-only diagnostic/probe evidence.
-powershell -ExecutionPolicy Bypass -File installer\windows\collect_setup_doctor.ps1 `
-  -InstalledExe $Manifest.app_exe `
-  -ConfigPath $Manifest.config_path `
-  -AuditDir $Manifest.audit_dir `
-  -BrokerEvidenceJson (Join-Path $Manifest.evidence_dir "windows_broker_smoke.json") `
-  -InstalledManifestJson (Join-Path $Manifest.install_root "installed_manifest.json") `
-  -OutputPath (Join-Path $Manifest.evidence_dir "setup_doctor_external_probe.json")
-
 python tooling\release_runtime_assertions.py --json > release_evidence\release_runtime_assertions.json
 
 powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smoke.ps1 `
   -InstalledExe $Manifest.app_exe `
   -InstalledManifestJson (Join-Path $Manifest.install_root "installed_manifest.json") `
-  -SetupDoctorJson (Join-Path $Manifest.evidence_dir "setup_doctor_external_probe.json") `
+  -SetupDoctorJson (Join-Path $Manifest.evidence_dir "setup_doctor_product_export.json") `
   -ConfigPath $Manifest.config_path `
   -AuditDir $Manifest.audit_dir `
   -VisibleSurfacesOutputPath (Join-Path $Manifest.evidence_dir "visible_surfaces.json") `

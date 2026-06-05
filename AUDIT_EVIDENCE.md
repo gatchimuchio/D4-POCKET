@@ -57,6 +57,6 @@
 
 - item: installed-app Setup Doctor product evidence
   classification: release_blocker
-  reason: Native Windows launch smoke is development evidence. Strict R2 requires installed-app generated Setup Doctor product evidence; the current PowerShell collector is external probe evidence only.
-  required_action: Record installed-app generated Setup Doctor export evidence. Strict release must still fail until measured `windows_installed_smoke.json`, Setup Doctor product evidence, and owner GO exist.
+  reason: Native Windows launch smoke is development evidence. Strict R2 requires installed-app generated Setup Doctor product evidence from an isolated native Windows run; the current PowerShell Setup Doctor collector is external probe evidence only.
+  required_action: Record installed-app generated Setup Doctor export evidence through isolated Windows installed smoke. Strict release must still fail until measured `windows_installed_smoke.json`, Setup Doctor product evidence, and owner GO exist.
   blocks_release: yes

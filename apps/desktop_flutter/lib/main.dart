@@ -19,6 +19,7 @@ import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
+import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 
 const String kGuiShellProductTitle = 'GUI Shell';
@@ -32,6 +33,7 @@ Future<void> main() async {
       _installFatalErrorHandlers();
       _ensureAccessibilitySemantics();
       final client = await ShellCoreClient.product();
+      await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
       runApp(GuiShellDesktopApp(client: client));
     },
     (error, stack) {

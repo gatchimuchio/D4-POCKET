@@ -30,7 +30,7 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope. B
 
 - item: Windows desktop validation
   classification: release_blocker
-  reason: Historical Windows project/analyze/test/build/launch smoke is owner-trial evidence only. Strict R2 installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product evidence is missing.
+  reason: Historical Windows project/analyze/test/build/launch smoke is owner-trial evidence only. Strict R2 installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export has not been recollected on native Windows.
   required_action: Complete isolated Windows installer/first-run validation on a native Windows host and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
@@ -42,7 +42,7 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope. B
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: installed-app generated Setup Doctor product evidence is missing for the primary Windows product target.
+  reason: installed-app generated Setup Doctor product export support exists, but Windows product evidence has not been collected for the primary Windows product target.
   required_action: Pass Windows Setup Doctor product export evidence through `release_evidence/windows_installed_smoke.json`.
   blocks_release: yes
 

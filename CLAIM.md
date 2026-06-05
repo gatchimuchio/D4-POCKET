@@ -88,7 +88,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows installer, first-run, and Setup Doctor release validation not passed
   classification: release_blocker
-  reason: Windows project support and historical owner-trial launch smoke are preserved, but current strict R2 evidence requires a fresh native Windows isolated installed run with source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. `release_evidence/windows_installed_smoke.json` is missing.
+  reason: Windows project support and historical owner-trial launch smoke are preserved, but current strict R2 evidence requires a fresh native Windows isolated installed run with source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. The product export path exists, but `release_evidence/windows_installed_smoke.json` is missing.
   required_action: Run native Windows installed smoke collection from an isolated staged run, collect measured window, visible-surface diagnostic tree, config JSON, audit write/read/delete, broker IPC/restart/crash field provenance, and installed-app generated Setup Doctor product evidence; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
@@ -100,8 +100,8 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows Setup Doctor diagnostics not passed
   classification: release_blocker
-  reason: The current PowerShell Setup Doctor collector is classified as external installer/config/broker probe evidence, not installed-app product evidence.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence or keep this release blocker open.
+  reason: The installed app supports machine-readable Setup Doctor product export, but that evidence has not been collected on native Windows and passed through the strict validator. The PowerShell Setup Doctor collector remains external probe evidence only.
+  required_action: Collect app-generated Setup Doctor product export through isolated Windows installed smoke and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: implementation first-run smoke

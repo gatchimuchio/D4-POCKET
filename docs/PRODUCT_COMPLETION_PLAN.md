@@ -39,8 +39,8 @@ Platform priority:
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: installed-app generated Setup Doctor product diagnostics are missing; the current PowerShell Setup Doctor collector is external probe evidence only.
-  required_action: Add installed-app generated machine-readable Setup Doctor export evidence.
+  reason: installed-app generated Setup Doctor product export support exists, but native Windows product diagnostics evidence has not been collected; the current PowerShell Setup Doctor collector is external probe evidence only.
+  required_action: Collect installed-app generated machine-readable Setup Doctor export evidence through isolated Windows installed smoke.
   blocks_release: yes
 
 - item: Single-user local-first mode
