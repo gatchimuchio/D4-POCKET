@@ -20,6 +20,7 @@ import 'package:gui_shell_desktop/screens/trust_center.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_desktop/services/setup_doctor_export.dart';
+import 'package:gui_shell_desktop/services/surface_semantics_export.dart';
 
 void main() {
   testWidgets('GUI Shell desktop app smoke test', (WidgetTester tester) async {
@@ -47,6 +48,7 @@ void main() {
   testWidgets('Windows acceptance surfaces expose semantic labels',
       (WidgetTester tester) async {
     final semantics = tester.ensureSemantics();
+    SurfaceSemanticsRegistry.resetForTest();
     try {
       await tester.pumpWidget(const GuiShellDesktopApp());
 
@@ -65,7 +67,16 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('NavigationRail')), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('Runtime Status')), findsWidgets);
       expect(find.bySemanticsLabel(RegExp('Invariant Status')), findsWidgets);
+      final export = buildSurfaceSemanticsExport(path: 'surface.json');
+      expect(export['source'], 'flutter_semantics_runtime_export');
+      expect(export['path'], 'surface.json');
+      expect(
+        export['visible_surfaces'],
+        containsAll(kRequiredSurfaceSemanticsLabels),
+      );
+      expect(export['surface_match_requirements_met'], isTrue);
     } finally {
+      SurfaceSemanticsRegistry.resetForTest();
       semantics.dispose();
     }
   });
@@ -518,8 +529,8 @@ void main() {
     );
 
     expect(configFile.existsSync(), isTrue);
-    final config = jsonDecode(configFile.readAsStringSync())
-        as Map<String, Object?>;
+    final config =
+        jsonDecode(configFile.readAsStringSync()) as Map<String, Object?>;
     expect(config['created_by'], 'gui_shell_desktop_installed_first_run');
     expect(config['installer_grants_authority'], isFalse);
     expect(config['installer_silently_approves_permissions'], isFalse);

@@ -49,6 +49,7 @@ $previousBrokerEndpointEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BR
 $previousBrokerRuntimeDirEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_RUNTIME_DIR", "Process")
 $previousSetupDoctorExportEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON", "Process")
 $previousSetupDoctorContextEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON", "Process")
+$previousSurfaceSemanticsExportEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON", "Process")
 $previousPathEnv = [Environment]::GetEnvironmentVariable("Path", "Process")
 $pythonRuntimePathScrubbed = $false
 $pythonPathEntriesRemovedCount = 0
@@ -269,6 +270,11 @@ function Restore-SmokeEnvironment {
     Remove-Item Env:\GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON -ErrorAction SilentlyContinue
   } else {
     $env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $previousSetupDoctorContextEnv
+  }
+  if ($null -eq $previousSurfaceSemanticsExportEnv) {
+    Remove-Item Env:\GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON -ErrorAction SilentlyContinue
+  } else {
+    $env:GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON = $previousSurfaceSemanticsExportEnv
   }
   if ($null -eq $previousPathEnv) {
     Remove-Item Env:\Path -ErrorAction SilentlyContinue
@@ -721,6 +727,7 @@ if ($BrokerHelperExe -ne "") {
 }
 
 $setupDoctorPath = Resolve-InputOrOutputPath -Path $SetupDoctorJson
+$surfaceSemanticsPath = Join-Path (Split-Path -Parent $setupDoctorPath) "surface_semantics_export.json"
 $setupDoctorContextPath = Join-Path (Split-Path -Parent $setupDoctorPath) "setup_doctor_context.json"
 Write-SetupDoctorProductContext `
   -Path $setupDoctorContextPath `
@@ -733,6 +740,7 @@ Write-SetupDoctorProductContext `
   -BrokerEndpointValue $brokerEndpoint
 $env:GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON = $setupDoctorPath
 $env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $setupDoctorContextPath
+$env:GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON = $surfaceSemanticsPath
 
 $process = $null
 try {
@@ -770,6 +778,12 @@ if ($VisibleSurfacesJson -ne "") {
     -Process $process `
     -OutputPath $VisibleSurfacesOutputPath `
     -WaitSeconds $VisibleSurfaceWaitSeconds
+  if (
+    (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_match_requirements_met") -ne $true -and
+    (Test-Path $surfaceSemanticsPath)
+  ) {
+    $visibleSurfaceEvidence = Get-Content -Raw -Path $surfaceSemanticsPath | ConvertFrom-Json
+  }
 }
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {

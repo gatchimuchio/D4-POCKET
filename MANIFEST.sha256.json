@@ -110,7 +110,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "9ee82e74dd99c67ba3bdb5f1e8e0261f5cbb6ee475fa924a4700aff296fdb380"
+      "sha256": "4bebc5c19862043182193aaf3e70554f24c410ef71674123378dbee7848d4147"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -166,7 +166,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
-      "sha256": "f2319b65da407dca1ac1a440a5da7f07c7b3867388ff0673ac977979971efdc3"
+      "sha256": "32f10b8ac318eb8fbda37ab881b7606a33b8d30a2501f592c8e61b94a1b94aaa"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/trust_center.dart",
@@ -185,12 +185,16 @@
       "sha256": "055cb375c94fd20e2f5612fa9ba4db2c7575502e5ea0841a7853c9a022a10bbb"
     },
     {
+      "path": "apps/desktop_flutter/lib/services/surface_semantics_export.dart",
+      "sha256": "7bb753be890b681cafad7022366acc1ba68a56aa5f4e5e149d1bcb3914c75a17"
+    },
+    {
       "path": "apps/desktop_flutter/pubspec.yaml",
       "sha256": "90b0add1a3f7891b345316a7c3b0fa601fdcb3286efc94ff740ab7fbfa377610"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "a2c6b495bf4c33ab34d7e7e84cea95d81fd6bcaa9690822fb475d65ccb917b13"
+      "sha256": "0bd5d546963c31e1f14e8393d16f05afd6fc8f478089ffcc9b7dea6515d4336b"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -618,7 +622,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "2afc6ebd093e83b3bd8533b0c6663bed5b59640fac4a9636cf5561f04dc1207c"
+      "sha256": "5e072846ac42b401a98c4ce076bdd74c7707694a75f29a254855221ebb8ff536"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -914,7 +918,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "d81a637abea28e090503288fd9a493ce439ce9b14df3897cdb012e21d5043527"
+      "sha256": "852f9719292b2d07819f1697b689e06842bdbbedccc18cb0549a3a9c13b862fb"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -950,7 +954,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "a3b9176d476ace73aabc73951b4aad9d48a8f757cd47a5a81742c771a30a4c92"
+      "sha256": "d52925fad30e960ffb297efcf848a952d4cdf6563cb81f016bc4e8517b6606a0"
     }
   ]
 }

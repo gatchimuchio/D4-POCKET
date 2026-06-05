@@ -21,6 +21,7 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
+import 'services/surface_semantics_export.dart';
 
 const String kGuiShellProductTitle = 'GUI Shell';
 
@@ -35,6 +36,9 @@ Future<void> main() async {
       final client = await ShellCoreClient.product();
       await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
       runApp(GuiShellDesktopApp(client: client));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(writeSurfaceSemanticsExportIfRequested());
+      });
     },
     (error, stack) {
       FlutterError.reportError(

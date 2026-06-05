@@ -130,6 +130,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_center.dart",
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
+    "lib/services/surface_semantics_export.dart",
     "lib/models/generated_contracts.dart",
 }
 MOBILE_FLUTTER_REQUIRED_FILES = {
@@ -1545,6 +1546,19 @@ def test_windows_release_evidence_validator_rejects_screenshot_surface_source() 
     return []
 
 
+def test_windows_release_evidence_validator_accepts_flutter_semantics_surface_source() -> list[str]:
+    valid = _valid_windows_installed_evidence()
+    valid["first_run"]["visible_surfaces_evidence"]["source"] = "flutter_semantics_runtime_export"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(valid), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_installer_first_run_smoke"].status != "passed":
+        return ["Windows first-run evidence validator rejected Flutter semantics runtime surface evidence"]
+    return []
+
+
 def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match() -> list[str]:
     bad = _valid_windows_installed_evidence()
     aggregate_match = {
@@ -1696,6 +1710,8 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
         "window_found = $windowFound",
         "observed_elements = @($observedElementValues)",
         "evidence_bundle_files = @($evidenceBundleFileValues)",
+        "GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON",
+        "surface_semantics_export.json",
     ]:
         if token not in text:
             errors.append(f"collect_installed_smoke.ps1 missing materialized UIAutomation evidence token: {token}")
@@ -2861,6 +2877,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
+        test_windows_release_evidence_validator_accepts_flutter_semantics_surface_source,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,

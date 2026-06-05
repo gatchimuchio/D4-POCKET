@@ -384,8 +384,12 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
     if not isinstance(surface_evidence, dict):
         errors.append("visible surfaces evidence missing")
     else:
-        if surface_evidence.get("source") not in {"uiautomation", "accessibility_tree"}:
-            errors.append("visible surfaces evidence source must be uiautomation or accessibility_tree")
+        if surface_evidence.get("source") not in {
+            "uiautomation",
+            "accessibility_tree",
+            "flutter_semantics_runtime_export",
+        }:
+            errors.append("visible surfaces evidence source must be uiautomation, accessibility_tree, or flutter_semantics_runtime_export")
         if not surface_evidence.get("path"):
             errors.append("visible surfaces evidence path missing")
         errors.extend(_validate_surface_match_evidence(surface_evidence))

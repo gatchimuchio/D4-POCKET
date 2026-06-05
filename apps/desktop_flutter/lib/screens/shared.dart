@@ -22,6 +22,22 @@ String surfaceSemanticsIdentifier(String label) {
   return 'gui_shell.surface.$normalized';
 }
 
+class SurfaceSemanticsRegistry {
+  SurfaceSemanticsRegistry._();
+
+  static final Map<String, String> _observed = <String, String>{};
+
+  static Map<String, String> get observed => Map.unmodifiable(_observed);
+
+  static void record(String label) {
+    _observed[label] = surfaceSemanticsIdentifier(label);
+  }
+
+  static void resetForTest() {
+    _observed.clear();
+  }
+}
+
 class SurfaceSemantics extends StatelessWidget {
   const SurfaceSemantics({
     super.key,
@@ -42,6 +58,7 @@ class SurfaceSemantics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    SurfaceSemanticsRegistry.record(label);
     return Semantics(
       identifier: surfaceSemanticsIdentifier(label),
       label: label,
