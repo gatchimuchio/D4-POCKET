@@ -542,9 +542,9 @@ function Collect-VisibleSurfaces {
         (New-ObservedElement -Element $element -ElementKey "descendant:$index" -IsRoot $false)
       )
       foreach ($value in @(
-          $element.Current.Name,
-          $element.Current.AutomationId,
-          $element.Current.ControlType.ProgrammaticName
+          (Get-ElementString -Element $element -PropertyName "Name"),
+          (Get-ElementString -Element $element -PropertyName "AutomationId"),
+          (Get-ControlTypeName -Element $element)
         )) {
         if ($null -ne $value -and $value.ToString().Trim() -ne "") {
           $names.Add($value.ToString().Trim())
@@ -663,7 +663,7 @@ function Collect-VisibleSurfaces {
     captured_at = (Get-Date).ToUniversalTime().ToString("o")
     process_id = $Process.Id
     window_found = ($null -ne $window)
-    window_title = $(if ($null -ne $window) { $window.Current.Name } else { "" })
+    window_title = $(if ($null -ne $window) { Get-ElementString -Element $window -PropertyName "Name" } else { "" })
     expected_surfaces = $expected
     visible_surfaces = @($visible)
     surface_matches = $surfaceMatches

@@ -1670,6 +1670,23 @@ def test_windows_installed_smoke_automation_names_are_materialized() -> list[str
     return errors
 
 
+def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    direct_tokens = [
+        "$element.Current.Name",
+        "$element.Current.AutomationId",
+        "$element.Current.ControlType.ProgrammaticName",
+        "$window.Current.Name",
+    ]
+    for token in direct_tokens:
+        if token in text:
+            errors.append(f"collect_installed_smoke.ps1 uses raw UIAutomation property in evidence projection: {token}")
+    if 'window_title = $(if ($null -ne $window) { Get-ElementString -Element $window -PropertyName "Name" } else { "" })' not in text:
+        errors.append("collect_installed_smoke.ps1 does not stringify the root window title")
+    return errors
+
+
 def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     step = ValidationStep(
         "missing_executable_probe",
