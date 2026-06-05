@@ -1690,8 +1690,10 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
         "$windowFound = [bool]($observedElements.Count -gt 0)",
         "$automationNameValues = @($automationNames.ToArray())",
         "$observedElementValues = @($observedElements.ToArray())",
+        "$evidenceBundleFileValues = @($evidenceBundleFiles.ToArray())",
         "window_found = $windowFound",
         "observed_elements = @($observedElementValues)",
+        "evidence_bundle_files = @($evidenceBundleFileValues)",
     ]:
         if token not in text:
             errors.append(f"collect_installed_smoke.ps1 missing materialized UIAutomation evidence token: {token}")

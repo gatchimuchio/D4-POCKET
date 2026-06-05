@@ -795,7 +795,8 @@ foreach ($record in @(
     $evidenceBundleFiles.Add($record)
   }
 }
-$bundleText = (@{ files = @($evidenceBundleFiles) } | ConvertTo-Json -Compress -Depth 10)
+$evidenceBundleFileValues = @($evidenceBundleFiles.ToArray())
+$bundleText = (@{ files = @($evidenceBundleFileValues) } | ConvertTo-Json -Compress -Depth 10)
 $evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
 
 $mainWindowHandle = 0
@@ -897,7 +898,7 @@ $evidence = [ordered]@{
       isolated_config_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_config_dir } else { Split-Path -Parent $ConfigPath })
       isolated_audit_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_audit_dir } else { $AuditDir })
     }
-    evidence_bundle_files = @($evidenceBundleFiles)
+    evidence_bundle_files = @($evidenceBundleFileValues)
     evidence_bundle_sha256 = $evidenceBundleSha256
   }
   field_provenance = [ordered]@{
