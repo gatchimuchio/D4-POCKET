@@ -626,7 +626,7 @@
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
-      "sha256": "baa7bbb8f488252d840d734ee55a7f5711a05d22dace13184c2a64a0fa5c83fa"
+      "sha256": "00a85a7421dacdf289eaee4a0b58da381ef695eb73f6ab79cd2ee5be82aee626"
     },
     {
       "path": "native/rust_helper/Cargo.lock",
@@ -914,7 +914,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "cb6b4ec4a06a4d0fb6bc3601cf2ee8aa9a6dcf008f42ddfcb0020070d21dcbad"
+      "sha256": "8249df9b4538916df3a41966988eedb1bc3350b495fd252fb32469e4b05adb9d"
     },
     {
       "path": "tooling/evidence_bundle.py",

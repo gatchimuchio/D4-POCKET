@@ -66,7 +66,7 @@ if ($GitRoot -eq "") {
   $GitRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 
-if (Test-Path $InstallRoot -and !$AllowExistingInstallRoot.IsPresent) {
+if ((Test-Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
   throw "InstallRoot already exists; formal evidence requires a fresh isolated run root: $InstallRoot"
 }
 if ((Test-LegacyFixedInstallRoot -Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {

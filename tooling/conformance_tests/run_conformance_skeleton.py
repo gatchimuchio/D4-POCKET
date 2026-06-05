@@ -1636,6 +1636,16 @@ def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str
     return errors
 
 
+def test_windows_stage_installer_powershell_boolean_grouping() -> list[str]:
+    text = (INSTALLER / "windows" / "stage_installed_app.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "Test-Path $InstallRoot -and" in text:
+        errors.append("stage_installed_app.ps1 passes -and as a Test-Path argument")
+    if "if ((Test-Path $InstallRoot) -and" not in text:
+        errors.append("stage_installed_app.ps1 missing grouped Test-Path boolean condition")
+    return errors
+
+
 def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     step = ValidationStep(
         "missing_executable_probe",
@@ -2766,6 +2776,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_installed_app_setup_doctor_product_export_contract_exists,
+        test_windows_stage_installer_powershell_boolean_grouping,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,
