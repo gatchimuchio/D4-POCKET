@@ -1594,6 +1594,8 @@ def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str
         "'synthetic': false",
         "'installer_grants_authority': false",
         "'installer_silently_approves_permissions': false",
+        "gui_shell_desktop_installed_first_run",
+        "_ensureInstalledFirstRunConfig",
     ]
     required_checks = [
         "windows.installed_app_path",

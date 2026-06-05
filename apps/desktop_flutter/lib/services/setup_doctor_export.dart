@@ -31,6 +31,7 @@ Future<void> writeSetupDoctorProductExportIfRequested(
   }
 
   final context = _loadContext(env[kSetupDoctorContextPathEnv]);
+  await _ensureInstalledFirstRunConfig(context);
   final report = buildSetupDoctorProductExport(
     snapshot,
     command: resolvedExecutable ?? Platform.resolvedExecutable,
@@ -40,6 +41,28 @@ Future<void> writeSetupDoctorProductExportIfRequested(
   await output.parent.create(recursive: true);
   await output.writeAsString(
     const JsonEncoder.withIndent('  ').convert(report),
+  );
+}
+
+Future<void> _ensureInstalledFirstRunConfig(Map<String, Object?> context) async {
+  final configPath = _stringValue(context['config_path']);
+  if (configPath.isEmpty) {
+    return;
+  }
+  final configFile = File(configPath);
+  if (await configFile.exists()) {
+    return;
+  }
+  await configFile.parent.create(recursive: true);
+  final config = <String, Object?>{
+    'schema_version': 1,
+    'created_by': 'gui_shell_desktop_installed_first_run',
+    'created_at': DateTime.now().toUtc().toIso8601String(),
+    'installer_grants_authority': false,
+    'installer_silently_approves_permissions': false,
+  };
+  await configFile.writeAsString(
+    const JsonEncoder.withIndent('  ').convert(config),
   );
 }
 

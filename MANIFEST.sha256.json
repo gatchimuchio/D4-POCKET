@@ -178,7 +178,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
-      "sha256": "732c68b745ff08610ba57d29b897a4b02d40c6d7feece9f79930a3a12b2930d0"
+      "sha256": "28f2052c23e3ac129a1721b7c3a5b27105c45b565be92c458bc602aedb97309b"
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
@@ -190,7 +190,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "9f222f1b8a11b530f98a86adf5e458968beae49a482a97f199c7490e86836a82"
+      "sha256": "a2c6b495bf4c33ab34d7e7e84cea95d81fd6bcaa9690822fb475d65ccb917b13"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -914,7 +914,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "60c984e860978905ecc79388e39ae2a0070b9424eaf40d98575a05c69a170bf0"
+      "sha256": "d81a637abea28e090503288fd9a493ce439ce9b14df3897cdb012e21d5043527"
     },
     {
       "path": "tooling/evidence_bundle.py",

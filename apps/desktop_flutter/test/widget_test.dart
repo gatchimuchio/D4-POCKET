@@ -489,6 +489,49 @@ void main() {
     );
   });
 
+  test('Setup Doctor product export creates installed first-run config',
+      () async {
+    final tempDir = Directory.systemTemp.createTempSync('gui-shell-export-');
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final exportFile = File('${tempDir.path}/setup_doctor.json');
+    final contextFile = File('${tempDir.path}/setup_doctor_context.json');
+    final configFile = File('${tempDir.path}/config/gui_shell.json');
+    final auditDir = Directory('${tempDir.path}/audit')..createSync();
+    const exePath =
+        r'C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-1\app\gui_shell_desktop.exe';
+    await contextFile.writeAsString(jsonEncode({
+      'installed_app_path': exePath,
+      'installed_app_path_confirmed': true,
+      'app_artifact_sha256': 'sha256:${List.filled(64, '1').join()}',
+      'config_path': configFile.path,
+      'audit_dir': auditDir.path,
+      'restricted_loopback_bind': true,
+    }));
+
+    await writeSetupDoctorProductExportIfRequested(
+      ShellCoreClient.mock().getSnapshot(),
+      environment: {
+        kSetupDoctorExportPathEnv: exportFile.path,
+        kSetupDoctorContextPathEnv: contextFile.path,
+      },
+      resolvedExecutable: exePath,
+    );
+
+    expect(configFile.existsSync(), isTrue);
+    final config = jsonDecode(configFile.readAsStringSync())
+        as Map<String, Object?>;
+    expect(config['created_by'], 'gui_shell_desktop_installed_first_run');
+    expect(config['installer_grants_authority'], isFalse);
+    expect(config['installer_silently_approves_permissions'], isFalse);
+    final export =
+        jsonDecode(exportFile.readAsStringSync()) as Map<String, Object?>;
+    final checks = export['checks'] as List<Object?>;
+    final configCheck = checks.cast<Map<String, Object?>>().singleWhere(
+          (check) => check['check_id'] == 'first_run.config_created',
+        );
+    expect(configCheck['status'], 'pass');
+  });
+
   test('local snapshot fallback does not claim release-ready', () {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-missing-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
