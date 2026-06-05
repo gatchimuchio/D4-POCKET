@@ -31,6 +31,7 @@ GLOB_PATTERNS = [
 
 EXACT_FILES = [
     "AGENTS.md",
+    "GUI_Shell_製品品質統合是正実装台帳_v4_2026-06-05.md",
     "ROADMAP.md",
     "CONFORMANCE_REPORT.md",
     "COMPATIBILITY_MATRIX.md",

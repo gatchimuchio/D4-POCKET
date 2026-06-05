@@ -42,12 +42,15 @@ Allowed operations:
 - `shutdown`
 - `command_envelope`
 - `authority_evaluate`
+- `authority_fixture_evaluate`
 - `approval_edit`
 - `content_projection`
 - `audit_verify`
 - `normalize_payload`
 
-`command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility and an `execution_gate` body with process / credential / update gate status, but it must not dispatch real external commands until product cutover and installed-product execution evidence exist.
+`authority_evaluate` is the production authority decision operation. It accepts an action request only and rejects caller-supplied `payload.state`; runtime, capability, permission, approval, audit, and recovery state must be broker-owned. `authority_fixture_evaluate` is development/parity-only and may consume fixture `state` for Python oracle comparison.
+
+`command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility from broker-owned state and an `execution_gate` body with process / credential / update gate status, but it must not dispatch real external commands until product cutover and installed-product execution evidence exist.
 
 ## 4. Response Envelope
 
@@ -108,6 +111,7 @@ Allowed error codes:
 - `broker_stale_session`
 - `broker_replay_detected`
 - `broker_authority_metadata_rejected`
+- `broker_authority_state_rejected`
 - `broker_command_dispatch_disabled`
 
 `audit_event_required=true` and `fail_closed=true` are required by schema.
@@ -138,7 +142,8 @@ The current Rust code provides:
 - stale session rejection;
 - nonce replay rejection;
 - authority metadata rejection with NFKC / case / zero-width / camelCase / separator / alias / value-only hardening;
-- authority operation response bodies for `authority_evaluate`, `approval_edit`, `content_projection`, `audit_verify`, and `normalize_payload`;
+- authority operation response bodies for production `authority_evaluate`, fixture-only `authority_fixture_evaluate`, `approval_edit`, `content_projection`, `audit_verify`, and `normalize_payload`;
+- production `authority_evaluate` rejects caller-supplied state and caller audit mappings, and records broker-owned authority decisions as authorized / denied / suspended audit decisions while command dispatch remains disabled;
 - command envelope eligibility with dispatch suspension and structured process / credential / update gate reporting.
 
 Release-blocked items:

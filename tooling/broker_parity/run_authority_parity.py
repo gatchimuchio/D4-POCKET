@@ -208,7 +208,7 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
     }
     for name, action in cases.items():
         python_result = PolicyEvaluator(state).evaluate(action)
-        rust_result = broker.call("authority_evaluate", {"state": state_json, "action": action})
+        rust_result = broker.call("authority_fixture_evaluate", {"state": state_json, "action": action})
         if python_result["allowed"] != rust_result["allowed"]:
             errors.append(f"{name}: allowed mismatch")
         if error_codes(python_result) != error_codes(rust_result):
@@ -216,7 +216,7 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
     for source in sorted(NON_AUTHORITY_SOURCES):
         action = {**base_action(), "authority_source": source}
         python_result = PolicyEvaluator(state).evaluate(action)
-        rust_result = broker.call("authority_evaluate", {"state": state_json, "action": action})
+        rust_result = broker.call("authority_fixture_evaluate", {"state": state_json, "action": action})
         if python_result["allowed"] != rust_result["allowed"]:
             errors.append(f"non_authority_source {source}: allowed mismatch")
         if error_codes(python_result) != error_codes(rust_result):
@@ -229,8 +229,10 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
     if command_response["status"] != "suspended":
         errors.append("command_envelope: dispatch was not suspended")
     command_eligibility = command_response["body"]["eligibility"]
-    if command_eligibility["allowed"] is not True:
-        errors.append("command_envelope: eligible accepted fixture was not allowed")
+    if command_eligibility["allowed"] is not False:
+        errors.append("command_envelope: caller fixture state authorized command eligibility")
+    if "caller_state_rejected" not in error_codes(command_eligibility):
+        errors.append("command_envelope: caller fixture state was not rejected by production eligibility")
     if command_response["body"]["dispatch_enabled"] is not False:
         errors.append("command_envelope: dispatch_enabled was not false")
     gate = command_response["body"]["execution_gate"]

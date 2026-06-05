@@ -23,6 +23,7 @@
     ],
     "exact_files": [
       "AGENTS.md",
+      "GUI_Shell_\u88fd\u54c1\u54c1\u8cea\u7d71\u5408\u662f\u6b63\u5b9f\u88c5\u53f0\u5e33_v4_2026-06-05.md",
       "ROADMAP.md",
       "CONFORMANCE_REPORT.md",
       "COMPATIBILITY_MATRIX.md",
@@ -69,6 +70,10 @@
     {
       "path": "CONFORMANCE_REPORT.md",
       "sha256": "24ee0bac3abd3d14265fb4c9aa98f14dedcd2d9d2595cf19091d82e68980e302"
+    },
+    {
+      "path": "GUI_Shell_\u88fd\u54c1\u54c1\u8cea\u7d71\u5408\u662f\u6b63\u5b9f\u88c5\u53f0\u5e33_v4_2026-06-05.md",
+      "sha256": "4b22a92df9d020dc5768bf704b5d3aa67e1153de85a4351ffe2cecadc8cbbddd"
     },
     {
       "path": "INSTALLER_STATUS.md",
@@ -168,7 +173,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "8ef384b602049f7edfb35a13b64adafbf8bfadf9c7a7fc1c581d121970f92321"
+      "sha256": "54552368130daa479c86e6f571ea772627c0cca8731c1be648fd111a46cf7de7"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
@@ -252,7 +257,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "60bf5ddc02c0ff68329e4a534408531aa5e56bdfcf443fc1cc8b7f7c15f93d74"
+      "sha256": "803349d2177fbd7d590f0836a96eccbe6f342e84d48f95a6bce9c2815aa22713"
     },
     {
       "path": "docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md",
@@ -284,7 +289,11 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "4523887e5fd42dfc28313be8b5c1f89490e2efa7dd8e745f237e79b750acac8c"
+      "sha256": "4ea9e9ce0b362693a1f5110984bac0d18873e91c1cfedc3a59a318a071deda82"
+    },
+    {
+      "path": "docs/implementation/WP00_AUTHORITY_SOURCE_OF_TRUTH_DESIGN.md",
+      "sha256": "aa2d737c119d3f49d971fcc472226b69abe36f7a27464458073d842b2bd700b9"
     },
     {
       "path": "docs/reports/WINDOWS_STAGED_INSTALL_ACCEPTANCE_REPORT.md",
@@ -620,7 +629,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
-      "sha256": "1218d4856f2eebd62a4360c951062b4c89beec20cea171fa9faf989b666e130b"
+      "sha256": "c7f98e3c44909dd236573c180e0bec5a939edbdf695fd9b146c20d8d32d1ac30"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -632,7 +641,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "9645bd3bf5e459fadc48ce4c0305afc03ca1346c59ba0d805d848ff96489ef57"
+      "sha256": "3153cd80c8e4d50b981cacb38f68603579d0d6d8538afb931470127ea2dc1ef6"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -812,7 +821,7 @@
     },
     {
       "path": "specs/broker_error.schema.json",
-      "sha256": "7d920121e331b0cc420f2015d4f831480ff32875969956ded9139e884e5c6711"
+      "sha256": "a08942be537d9b3de9880676fc0641e9818686168bba30dab65384f06c4aadd5"
     },
     {
       "path": "specs/broker_health.schema.json",
@@ -840,11 +849,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "b47761221a0e7abf306b1ee21a71e37cff3913642d5584af5cc5c2bfbd8c045d"
+      "sha256": "887c54f8aaba30dee9ff4b0ef760a3aa97eab4ef54f994e5caad4f83ebe76a5b"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "2b9d88c3c3ab90b9f955c03821609c0187737a5a660c46983d6f91174cc48c58"
+      "sha256": "2394842a8a4099ba9d57003ce89231f1271fb39b11d68067cf114c64609e04f5"
     },
     {
       "path": "specs/permission.schema.json",
@@ -868,7 +877,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "2a6f0ab89e6a52f5b8e797ead680f2919c589806cd82b423d0c91669fc8ea15b"
+      "sha256": "40ea1c9a0f8662e8f7053ad05129a519c08f8be0b232121ecbe88d6d85097b71"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -884,7 +893,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "4a9026440800ceb8f25d26036c19af92099e349b62d5b31ba2a35288e7253132"
+      "sha256": "d2e4a30225740525d755dabdb53b125ae364c569db429d74f8f0d68e2f4f0044"
     },
     {
       "path": "tooling/release_gate_check.py",

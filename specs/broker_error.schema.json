@@ -26,6 +26,7 @@
         "broker_stale_session",
         "broker_replay_detected",
         "broker_authority_metadata_rejected",
+        "broker_authority_state_rejected",
         "broker_command_dispatch_disabled"
       ]
     },

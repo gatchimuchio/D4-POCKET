@@ -30,6 +30,7 @@
         "shutdown",
         "command_envelope",
         "authority_evaluate",
+        "authority_fixture_evaluate",
         "approval_edit",
         "content_projection",
         "audit_verify",

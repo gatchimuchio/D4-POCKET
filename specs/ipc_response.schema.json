@@ -24,7 +24,13 @@
       "enum": [
         "health",
         "shutdown",
-        "command_envelope"
+        "command_envelope",
+        "authority_evaluate",
+        "authority_fixture_evaluate",
+        "approval_edit",
+        "content_projection",
+        "audit_verify",
+        "normalize_payload"
       ]
     },
     "status": {

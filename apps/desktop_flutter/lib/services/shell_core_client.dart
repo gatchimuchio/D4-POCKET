@@ -661,38 +661,12 @@ Map<String, Object?> _brokerProjectionProbeApproval() {
 
 Map<String, Object?> _brokerCommandProbePayload() {
   return {
-    'state': {
-      'runtimes': [
-        {'runtime_id': 'gui_shell_rust_broker'}
-      ],
-      'capabilities': [
-        {'capability_id': 'command_envelope.dispatch'}
-      ],
-      'permissions': [
-        {
-          'permission_id': 'permission.broker.command_envelope',
-          'capability_id': 'command_envelope.dispatch',
-          'decision': 'allow',
-        }
-      ],
-      'approvals': [
-        {'approval_id': 'broker-projected-approval', 'status': 'approved'}
-      ],
-      'recovery_actions': [
-        {'recovery_id': 'recover-command-dispatch'}
-      ],
-    },
     'action': {
       'operation': 'command_envelope.dispatch',
       'runtime_id': 'gui_shell_rust_broker',
       'capability_id': 'command_envelope.dispatch',
       'permission_id': 'permission.broker.command_envelope',
       'approval_id': 'broker-projected-approval',
-      'audit_event': {
-        'event_id': 'audit-command-probe',
-        'payload_hash':
-            'sha256:3333333333333333333333333333333333333333333333333333333333333333',
-      },
       'recovery_action': {'recovery_id': 'recover-command-dispatch'},
       'adapter_metadata': {'client': 'desktop_flutter'},
     },

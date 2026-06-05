@@ -204,6 +204,15 @@ Phase 7 前に必要な assertions:
 - broker stop/crash fails closed;
 - malformed IPC / forged authority / replayed approval are rejected and audited.
 
+2026-06-05 WP00 update:
+
+- production `authority_evaluate` no longer accepts caller-supplied `payload.state`;
+- production authority eligibility is evaluated against broker-owned internal registry state;
+- caller-declared authority source and caller audit mappings deny the decision;
+- Python oracle state/action parity moved to fixture-only `authority_fixture_evaluate`;
+- `command_envelope` remains suspended and `authority_cutover_status=not_active`;
+- this does not activate command dispatch or Windows formal acceptance.
+
 ## 9. Rollback and Preservation
 
 production cutover までは以下を維持する。

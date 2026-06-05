@@ -24,14 +24,131 @@ const NON_AUTHORITY_SOURCES: [&str; 16] = [
     "ui_state",
 ];
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrokerAuthorityRegistry {
+    state: Value,
+}
+
+impl BrokerAuthorityRegistry {
+    pub fn production_default() -> Self {
+        Self {
+            state: json!({
+                "runtimes": [{
+                    "runtime_id": "gui_shell_rust_broker",
+                    "issuer": "gui-shell-rust-broker",
+                    "authority_source": "rust_security_broker"
+                }],
+                "capabilities": [{
+                    "capability_id": "command_envelope.dispatch",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operations": ["command_envelope.dispatch"]
+                }],
+                "permissions": [{
+                    "permission_id": "permission.broker.command_envelope",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "capability_id": "command_envelope.dispatch",
+                    "operation": "command_envelope.dispatch",
+                    "decision": "deny",
+                    "source": "broker_internal_policy"
+                }],
+                "approvals": [],
+                "recovery_actions": [{
+                    "recovery_id": "recover-command-dispatch",
+                    "runtime_id": "gui_shell_rust_broker"
+                }]
+            }),
+        }
+    }
+
+    fn state(&self) -> &Value {
+        &self.state
+    }
+}
+
 pub fn evaluate_authority(payload: &Value) -> Value {
-    let operation = payload
-        .get("action")
-        .and_then(|action| action.get("operation"))
+    let action = payload.get("action").unwrap_or(&Value::Null);
+    let operation = action
+        .get("operation")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
-    let state = payload.get("state").unwrap_or(&Value::Null);
-    let action = payload.get("action").unwrap_or(&Value::Null);
+    evaluate_authority_from_state(
+        payload.get("state").unwrap_or(&Value::Null),
+        action,
+        operation,
+        EvaluationMode::Fixture,
+    )
+}
+
+pub fn evaluate_broker_authority(registry: &BrokerAuthorityRegistry, payload: &Value) -> Value {
+    let action = payload.get("action").unwrap_or(payload);
+    let operation = action
+        .get("operation")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let mut caller_errors = Vec::new();
+    if payload.get("state").is_some() {
+        caller_errors.push(shell_error(
+            "caller_state_rejected",
+            "production authority evaluation does not accept caller-supplied state",
+            operation,
+        ));
+    }
+    if action.get("audit_event").is_some() {
+        caller_errors.push(shell_error(
+            "caller_audit_mapping_rejected",
+            "production authority evaluation emits broker audit and does not accept caller audit mappings",
+            operation,
+        ));
+    }
+    if let Some(source) = action.get("authority_source").and_then(Value::as_str) {
+        caller_errors.push(shell_error(
+            "caller_authority_source_rejected",
+            &format!("{source} cannot grant authority from a caller request"),
+            operation,
+        ));
+    }
+    for source in NON_AUTHORITY_SOURCES {
+        let source_flag = format!("{source}_grants_authority");
+        if action.get(&source_flag).and_then(Value::as_bool) == Some(true) {
+            caller_errors.push(shell_error(
+                "caller_authority_source_rejected",
+                &format!("{source} cannot grant authority"),
+                operation,
+            ));
+        }
+    }
+
+    let mut result = evaluate_authority_from_state(
+        registry.state(),
+        action,
+        operation,
+        EvaluationMode::Production,
+    );
+    let result_errors = result
+        .get_mut("errors")
+        .and_then(Value::as_array_mut)
+        .expect("authority result errors must be an array");
+    result_errors.splice(0..0, caller_errors);
+    let allowed = result_errors.is_empty();
+    result["allowed"] = Value::Bool(allowed);
+    result["decision"] = Value::String(if allowed { "authorized" } else { "denied" }.to_string());
+    result["authority_source"] = Value::String("rust_security_broker".to_string());
+    result["issuer"] = Value::String("gui-shell-rust-broker".to_string());
+    result
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EvaluationMode {
+    Fixture,
+    Production,
+}
+
+fn evaluate_authority_from_state(
+    state: &Value,
+    action: &Value,
+    operation: &str,
+    mode: EvaluationMode,
+) -> Value {
     let mut errors = Vec::new();
 
     if let Some(runtime_id) = action.get("runtime_id").and_then(Value::as_str) {
@@ -119,37 +236,39 @@ pub fn evaluate_authority(payload: &Value) -> Value {
         },
     }
 
-    match action.get("audit_event") {
-        Some(Value::Object(audit_event)) => {
-            if !audit_event
-                .get("event_id")
-                .and_then(Value::as_str)
-                .is_some_and(|id| !id.is_empty())
-            {
-                errors.push(shell_error(
-                    "audit_mapping_missing",
-                    "audit_event.event_id is required",
-                    operation,
-                ));
-            }
-            if action_has_payload(action)
-                && !audit_event
-                    .get("payload_hash")
+    if mode == EvaluationMode::Fixture {
+        match action.get("audit_event") {
+            Some(Value::Object(audit_event)) => {
+                if !audit_event
+                    .get("event_id")
                     .and_then(Value::as_str)
-                    .is_some_and(|hash| !hash.is_empty())
-            {
-                errors.push(shell_error(
-                    "audit_mapping_missing",
-                    "audit_event.payload_hash is required when payload exists",
-                    operation,
-                ));
+                    .is_some_and(|id| !id.is_empty())
+                {
+                    errors.push(shell_error(
+                        "audit_mapping_missing",
+                        "audit_event.event_id is required",
+                        operation,
+                    ));
+                }
+                if action_has_payload(action)
+                    && !audit_event
+                        .get("payload_hash")
+                        .and_then(Value::as_str)
+                        .is_some_and(|hash| !hash.is_empty())
+                {
+                    errors.push(shell_error(
+                        "audit_mapping_missing",
+                        "audit_event.payload_hash is required when payload exists",
+                        operation,
+                    ));
+                }
             }
+            _ => errors.push(shell_error(
+                "audit_mapping_missing",
+                "audit_event is required",
+                operation,
+            )),
         }
-        _ => errors.push(shell_error(
-            "audit_mapping_missing",
-            "audit_event is required",
-            operation,
-        )),
     }
 
     let recovery_action = action.get("recovery_action");
@@ -184,16 +303,18 @@ pub fn evaluate_authority(payload: &Value) -> Value {
         ));
     }
 
-    for source in NON_AUTHORITY_SOURCES {
-        let source_flag = format!("{source}_grants_authority");
-        if action.get("authority_source").and_then(Value::as_str) == Some(source)
-            || action.get(&source_flag).and_then(Value::as_bool) == Some(true)
-        {
-            errors.push(shell_error(
-                "non_authority_source_attempt",
-                &format!("{source} cannot grant authority"),
-                operation,
-            ));
+    if mode == EvaluationMode::Fixture {
+        for source in NON_AUTHORITY_SOURCES {
+            let source_flag = format!("{source}_grants_authority");
+            if action.get("authority_source").and_then(Value::as_str) == Some(source)
+                || action.get(&source_flag).and_then(Value::as_bool) == Some(true)
+            {
+                errors.push(shell_error(
+                    "non_authority_source_attempt",
+                    &format!("{source} cannot grant authority"),
+                    operation,
+                ));
+            }
         }
     }
 

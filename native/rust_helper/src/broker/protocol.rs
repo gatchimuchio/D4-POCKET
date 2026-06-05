@@ -9,8 +9,8 @@ use std::path::Path;
 
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 use crate::broker::authority::{
-    edit_approval, evaluate_authority, normalize_inbound_payload, project_approval_content,
-    verify_audit_chain,
+    edit_approval, evaluate_authority, evaluate_broker_authority, normalize_inbound_payload,
+    project_approval_content, verify_audit_chain, BrokerAuthorityRegistry,
 };
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 
@@ -124,6 +124,7 @@ pub enum BrokerOperation {
     Shutdown,
     CommandEnvelope,
     AuthorityEvaluate,
+    AuthorityFixtureEvaluate,
     ApprovalEdit,
     ContentProjection,
     AuditVerify,
@@ -137,6 +138,7 @@ impl BrokerOperation {
             BrokerOperation::Shutdown => "shutdown",
             BrokerOperation::CommandEnvelope => "command_envelope",
             BrokerOperation::AuthorityEvaluate => "authority_evaluate",
+            BrokerOperation::AuthorityFixtureEvaluate => "authority_fixture_evaluate",
             BrokerOperation::ApprovalEdit => "approval_edit",
             BrokerOperation::ContentProjection => "content_projection",
             BrokerOperation::AuditVerify => "audit_verify",
@@ -343,6 +345,7 @@ pub struct Broker {
     session_id: String,
     seen_nonces: HashSet<String>,
     audit_log: BrokerAuditLog,
+    authority_registry: BrokerAuthorityRegistry,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
     state_store: BrokerStateStore,
@@ -354,6 +357,7 @@ impl Broker {
             session_id: session_id.to_string(),
             seen_nonces: HashSet::new(),
             audit_log: BrokerAuditLog::default(),
+            authority_registry: BrokerAuthorityRegistry::production_default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
@@ -382,6 +386,7 @@ impl Broker {
             session_id: session_id.to_string(),
             seen_nonces: persistent_state.seen_nonces,
             audit_log: persistent_state.audit_log,
+            authority_registry: BrokerAuthorityRegistry::production_default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
@@ -508,10 +513,26 @@ impl Broker {
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
             ),
-            BrokerOperation::AuthorityEvaluate => self.accept_body(
+            BrokerOperation::AuthorityEvaluate => {
+                let payload = envelope.payload.as_ref().unwrap_or(&Value::Null);
+                if payload.get("state").is_some() {
+                    self.reject(
+                        &request_id,
+                        BrokerOperation::AuthorityEvaluate.as_str(),
+                        "broker_authority_state_rejected",
+                        "production authority evaluation does not accept caller-supplied state",
+                        true,
+                    )
+                } else {
+                    let body = evaluate_broker_authority(&self.authority_registry, payload);
+                    self.accept_authority_decision(&request_id, body)
+                }
+            }
+            BrokerOperation::AuthorityFixtureEvaluate => self.accept_body_with_evidence(
                 &request_id,
-                BrokerOperation::AuthorityEvaluate,
+                BrokerOperation::AuthorityFixtureEvaluate,
                 evaluate_authority(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
             ),
             BrokerOperation::ApprovalEdit => self.accept_body(
                 &request_id,
@@ -711,7 +732,42 @@ impl Broker {
                 true,
             )),
             health: None,
-            body: Some(json_command_eligibility(payload)),
+            body: Some(json_command_eligibility(payload, &self.authority_registry)),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
+    fn accept_authority_decision(&mut self, request_id: &str, body: Value) -> BrokerResponse {
+        let decision = body
+            .get("decision")
+            .and_then(Value::as_str)
+            .unwrap_or("denied");
+        let audit_event = match self.append_audit(
+            request_id,
+            BrokerOperation::AuthorityEvaluate.as_str(),
+            decision,
+            "broker-owned authority decision evaluated",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    BrokerOperation::AuthorityEvaluate.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: BrokerOperation::AuthorityEvaluate.as_str().to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
             shutdown_requested: self.shutdown_requested,
         }
     }
@@ -722,13 +778,23 @@ impl Broker {
         operation: BrokerOperation,
         body: Value,
     ) -> BrokerResponse {
+        self.accept_body_with_evidence(request_id, operation, body, EVIDENCE_SOURCE_LIVE_RUNTIME)
+    }
+
+    fn accept_body_with_evidence(
+        &mut self,
+        request_id: &str,
+        operation: BrokerOperation,
+        body: Value,
+        evidence_source: &str,
+    ) -> BrokerResponse {
         let operation_name = operation.as_str();
         let audit_event = match self.append_audit(
             request_id,
             operation_name,
             "accepted",
             "broker authority operation evaluated",
-            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            evidence_source,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -744,7 +810,7 @@ impl Broker {
             request_id: request_id.to_string(),
             operation: operation_name.to_string(),
             status: BrokerStatus::Accepted,
-            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            evidence_source: evidence_source.to_string(),
             audit_event_id: audit_event.event_id,
             error: None,
             health: None,
@@ -846,7 +912,7 @@ fn error(code: &str, message: &str, recoverable: bool) -> BrokerError {
     }
 }
 
-fn json_command_eligibility(payload: &Value) -> Value {
+fn json_command_eligibility(payload: &Value, registry: &BrokerAuthorityRegistry) -> Value {
     let target_kind = command_target_kind(payload);
     serde_json::json!({
         "dispatch_enabled": false,
@@ -867,7 +933,7 @@ fn json_command_eligibility(payload: &Value) -> Value {
                 "installed_product_evidence"
             ]
         },
-        "eligibility": evaluate_authority(payload)
+        "eligibility": evaluate_broker_authority(registry, payload)
     })
 }
 
@@ -1243,6 +1309,38 @@ mod tests {
             }
         }));
         envelope
+    }
+
+    fn production_authority_request(
+        request_id: &str,
+        nonce: &str,
+        action: serde_json::Value,
+    ) -> BrokerRequestEnvelope {
+        let mut envelope = BrokerRequestEnvelope::command_envelope(request_id, "session-1", nonce);
+        envelope.operation = Some(BrokerOperation::AuthorityEvaluate);
+        envelope.payload = Some(serde_json::json!({"action": action}));
+        envelope
+    }
+
+    fn broker_command_action() -> serde_json::Value {
+        serde_json::json!({
+            "operation": "command_envelope.dispatch",
+            "runtime_id": "gui_shell_rust_broker",
+            "capability_id": "command_envelope.dispatch",
+            "permission_id": "permission.broker.command_envelope",
+            "approval_id": "broker-projected-approval",
+            "recovery_action": {"recovery_id": "recover-command-dispatch"},
+            "adapter_metadata": {"client": "test"}
+        })
+    }
+
+    fn authority_error_codes(body: &serde_json::Value) -> Vec<&str> {
+        body.get("errors")
+            .and_then(serde_json::Value::as_array)
+            .unwrap()
+            .iter()
+            .filter_map(|error| error.get("code").and_then(serde_json::Value::as_str))
+            .collect()
     }
 
     #[test]
@@ -1668,6 +1766,114 @@ mod tests {
             nested.error.unwrap().code,
             "broker_authority_metadata_rejected"
         );
+    }
+
+    #[test]
+    fn production_authority_rejects_caller_supplied_fixture_state() {
+        let mut broker = test_broker();
+        let mut request =
+            production_authority_request("request-1", "nonce-1", broker_command_action());
+        request.payload = Some(serde_json::json!({
+            "state": {
+                "runtimes": [{"runtime_id": "gui_shell_rust_broker"}],
+                "capabilities": [{"capability_id": "command_envelope.dispatch"}],
+                "permissions": [{
+                    "permission_id": "permission.broker.command_envelope",
+                    "capability_id": "command_envelope.dispatch",
+                    "decision": "allow"
+                }],
+                "approvals": [{"approval_id": "broker-projected-approval", "status": "approved"}],
+                "recovery_actions": [{"recovery_id": "recover-command-dispatch"}]
+            },
+            "action": broker_command_action()
+        }));
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "broker_authority_state_rejected"
+        );
+    }
+
+    #[test]
+    fn production_authority_uses_broker_owned_registry_and_denies_missing_records() {
+        let mut broker = test_broker();
+        let mut action = broker_command_action();
+        action["runtime_id"] = serde_json::Value::String("caller-runtime".to_string());
+        let response = broker.handle(production_authority_request("request-1", "nonce-1", action));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.unwrap();
+        assert_eq!(body["allowed"], false);
+        assert_eq!(body["decision"], "denied");
+        assert!(authority_error_codes(&body).contains(&"unknown_runtime"));
+        assert_eq!(broker.audit_events()[0].decision, "denied");
+    }
+
+    #[test]
+    fn production_authority_rejects_caller_forged_authority_source() {
+        let mut broker = test_broker();
+        let mut action = broker_command_action();
+        action["authority_source"] = serde_json::Value::String("rust_security_broker".to_string());
+        let response = broker.handle(production_authority_request("request-1", "nonce-1", action));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.unwrap();
+        assert_eq!(body["allowed"], false);
+        assert!(authority_error_codes(&body).contains(&"caller_authority_source_rejected"));
+        assert_eq!(broker.audit_events()[0].decision, "denied");
+    }
+
+    #[test]
+    fn production_authority_rejects_caller_audit_mapping() {
+        let mut broker = test_broker();
+        let mut action = broker_command_action();
+        action["audit_event"] = serde_json::json!({
+            "event_id": "caller-audit",
+            "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        });
+        let response = broker.handle(production_authority_request("request-1", "nonce-1", action));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let body = response.body.unwrap();
+        assert_eq!(body["allowed"], false);
+        assert!(authority_error_codes(&body).contains(&"caller_audit_mapping_rejected"));
+        assert_eq!(broker.audit_events()[0].decision, "denied");
+    }
+
+    #[test]
+    fn fixture_authority_operation_is_isolated_from_production_operation() {
+        let mut broker = test_broker();
+        let mut request =
+            production_authority_request("request-1", "nonce-1", broker_command_action());
+        request.operation = Some(BrokerOperation::AuthorityFixtureEvaluate);
+        request.payload = Some(serde_json::json!({
+            "state": {
+                "runtimes": [{"runtime_id": "gui_shell_rust_broker"}],
+                "capabilities": [{"capability_id": "command_envelope.dispatch"}],
+                "permissions": [{
+                    "permission_id": "permission.broker.command_envelope",
+                    "capability_id": "command_envelope.dispatch",
+                    "decision": "allow"
+                }],
+                "approvals": [{"approval_id": "broker-projected-approval", "status": "approved"}],
+                "recovery_actions": [{"recovery_id": "recover-command-dispatch"}]
+            },
+            "action": {
+                "operation": "command_envelope.dispatch",
+                "runtime_id": "gui_shell_rust_broker",
+                "capability_id": "command_envelope.dispatch",
+                "permission_id": "permission.broker.command_envelope",
+                "approval_id": "broker-projected-approval",
+                "audit_event": {
+                    "event_id": "fixture-audit",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "recovery_action": {"recovery_id": "recover-command-dispatch"}
+            }
+        }));
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(response.operation, "authority_fixture_evaluate");
+        assert_eq!(response.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        assert_eq!(response.body.unwrap()["allowed"], true);
     }
 
     #[test]
