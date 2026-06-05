@@ -657,13 +657,20 @@ function Collect-VisibleSurfaces {
       break
     }
   }
+  $rootWindowTitle = ""
+  if ($observedElements.Count -gt 0) {
+    $rootObservedElement = $observedElements.Item(0)
+    if ($null -ne $rootObservedElement.name) {
+      $rootWindowTitle = $rootObservedElement.name.ToString()
+    }
+  }
   $capture = [ordered]@{
     source = "uiautomation"
     path = $OutputPath
     captured_at = (Get-Date).ToUniversalTime().ToString("o")
     process_id = $Process.Id
     window_found = ($null -ne $window)
-    window_title = $(if ($null -ne $window) { Get-ElementString -Element $window -PropertyName "Name" } else { "" })
+    window_title = $rootWindowTitle
     expected_surfaces = $expected
     visible_surfaces = @($visible)
     surface_matches = $surfaceMatches

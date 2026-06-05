@@ -1682,8 +1682,10 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
     for token in direct_tokens:
         if token in text:
             errors.append(f"collect_installed_smoke.ps1 uses raw UIAutomation property in evidence projection: {token}")
-    if 'window_title = $(if ($null -ne $window) { Get-ElementString -Element $window -PropertyName "Name" } else { "" })' not in text:
-        errors.append("collect_installed_smoke.ps1 does not stringify the root window title")
+    if "$rootWindowTitle = \"\"" not in text:
+        errors.append("collect_installed_smoke.ps1 does not materialize the root window title")
+    if "window_title = $rootWindowTitle" not in text:
+        errors.append("collect_installed_smoke.ps1 does not serialize the materialized root window title")
     return errors
 
 
