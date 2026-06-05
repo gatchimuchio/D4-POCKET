@@ -40,6 +40,33 @@ def python_step(script: str, *args: str) -> list[str]:
     return [sys.executable, script, *args]
 
 
+def find_tool(tool: str) -> str | None:
+    resolved = shutil.which(tool)
+    if resolved is not None:
+        return resolved
+    if platform.system() == "Windows" and Path(tool).suffix == "":
+        for suffix in (".exe", ".bat", ".cmd"):
+            resolved = shutil.which(f"{tool}{suffix}")
+            if resolved is not None:
+                return resolved
+    return None
+
+
+def resolve_step_command(command: list[str]) -> list[str]:
+    resolved = list(command)
+    if platform.system() != "Windows" or not resolved:
+        return resolved
+    executable = resolved[0]
+    if Path(executable).suffix != "" or "\\" in executable or "/" in executable:
+        return resolved
+    for suffix in (".exe", ".bat", ".cmd"):
+        candidate = shutil.which(f"{executable}{suffix}")
+        if candidate is not None:
+            resolved[0] = candidate
+            break
+    return resolved
+
+
 def current_desktop_platform() -> str:
     system = platform.system().lower()
     if system == "linux":
@@ -247,11 +274,11 @@ def classify_not_run(step: ValidationStep, strict_release: bool) -> tuple[str, s
 
 
 def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) -> dict:
-    step_command = list(step.command)
+    step_command = resolve_step_command(step.command)
     if strict_release and desktop_platform == "all" and step.name == "release_gate_check":
         step_command.append("--strict-release")
     command = " ".join(step_command)
-    if step.required_tool and shutil.which(step.required_tool) is None:
+    if step.required_tool and find_tool(step.required_tool) is None:
         classification, blocks_release, reason, required_action = classify_not_run(step, strict_release)
         return {
             "name": step.name,

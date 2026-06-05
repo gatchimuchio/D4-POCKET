@@ -1665,7 +1665,7 @@ def test_windows_installed_smoke_automation_names_are_materialized() -> list[str
         errors.append("collect_installed_smoke.ps1 pipelines UIAutomation names directly into JSON evidence")
     if "$automationNames = New-Object System.Collections.Generic.List[string]" not in text:
         errors.append("collect_installed_smoke.ps1 does not materialize automation names before JSON evidence")
-    if "automation_names = @($automationNames)" not in text:
+    if "automation_names = @($automationNameValues)" not in text:
         errors.append("collect_installed_smoke.ps1 does not serialize the materialized automation names list")
     return errors
 
@@ -2224,6 +2224,23 @@ def test_validation_reporter_exists() -> list[str]:
     return errors
 
 
+def test_validate_all_resolves_windows_batch_commands() -> list[str]:
+    text = (ROOT / "tooling" / "validate_all.py").read_text(encoding="utf-8")
+    errors = []
+    for token in [
+        "def find_tool(",
+        "def resolve_step_command(",
+        '".exe"',
+        '".bat"',
+        '".cmd"',
+        "step_command = resolve_step_command(step.command)",
+        "find_tool(step.required_tool)",
+    ]:
+        if token not in text:
+            errors.append(f"validate_all.py missing Windows command resolution token: {token}")
+    return errors
+
+
 def test_manifest_integrity_tooling_exists() -> list[str]:
     errors = []
     required_paths = {
@@ -2708,7 +2725,7 @@ def test_platform_hardening_configuration_exists() -> list[str]:
         errors.append(".gitattributes missing")
     else:
         text = gitattributes.read_text(encoding="utf-8")
-        for token in ["* text=auto eol=lf", "*.ps1 text eol=crlf", "*.exe binary"]:
+        for token in ["* text=auto eol=lf", "*.ps1 text eol=lf", "*.exe binary"]:
             if token not in text:
                 errors.append(f".gitattributes missing token: {token}")
 
@@ -2740,6 +2757,20 @@ def test_broker_parity_startup_timeout_allows_ci_cold_build() -> list[str]:
     if DEFAULT_BROKER_START_TIMEOUT_SECONDS < 60.0:
         return ["broker parity startup timeout is too short for CI cold Rust builds"]
     return []
+
+
+def test_broker_parity_waits_after_process_kill() -> list[str]:
+    text = (ROOT / "tooling" / "broker_parity" / "run_authority_parity.py").read_text(encoding="utf-8")
+    errors = []
+    for token in [
+        "def wait_for_process_exit(",
+        "process.kill()",
+        "process.wait(timeout=timeout)",
+        "finally:\n                wait_for_process_exit(broker.process)",
+    ]:
+        if token not in text:
+            errors.append(f"broker parity cleanup missing token: {token}")
+    return errors
 
 
 def test_desktop_agent_center_required_surface_exists() -> list[str]:
@@ -2832,6 +2863,8 @@ def main() -> int:
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,
         test_windows_installed_smoke_preserves_trap_failure,
+        test_windows_installed_smoke_automation_names_are_materialized,
+        test_windows_installed_smoke_uia_properties_are_stringified,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,
@@ -2862,6 +2895,7 @@ def main() -> int:
         test_release_hardening_files_exist,
         test_release_hardening_does_not_overclaim_readiness,
         test_validation_reporter_exists,
+        test_validate_all_resolves_windows_batch_commands,
         test_validate_all_subprocess_start_failure_is_structured,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
@@ -2884,6 +2918,7 @@ def main() -> int:
         test_platform_hardening_configuration_exists,
         test_setup_doctor_public_bind_warning_exists,
         test_broker_parity_startup_timeout_allows_ci_cold_build,
+        test_broker_parity_waits_after_process_kill,
         test_desktop_agent_center_required_surface_exists,
     ]
     errors = []

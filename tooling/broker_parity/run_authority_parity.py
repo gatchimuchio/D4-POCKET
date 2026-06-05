@@ -36,6 +36,14 @@ def broker_start_timeout_seconds() -> float:
     return max(1.0, value)
 
 
+def wait_for_process_exit(process: subprocess.Popen, timeout: float = 5.0) -> None:
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=timeout)
+
+
 def build_state() -> tuple[RuntimeState, dict]:
     state = RuntimeState()
     state.register_runtime(
@@ -230,7 +238,7 @@ def start_broker(workspace: Path) -> BrokerClient:
             raise AssertionError(f"broker process exited early: {process.returncode}: {detail}")
         time.sleep(0.05)
     stderr.close()
-    process.kill()
+    wait_for_process_exit(process)
     detail = stderr_path.read_text(encoding="utf-8", errors="replace")
     raise AssertionError(
         "broker session file was not created within "
@@ -400,11 +408,10 @@ def main() -> int:
             errors.extend(compare_approval_edit_and_projection(broker))
             errors.extend(compare_audit_chain(broker))
         finally:
-            broker.shutdown()
             try:
-                broker.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                broker.process.kill()
+                broker.shutdown()
+            finally:
+                wait_for_process_exit(broker.process)
         if errors:
             print("broker authority parity failed:")
             for error in errors:
