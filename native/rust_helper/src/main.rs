@@ -12,7 +12,12 @@ fn main() {
     if let Some(exit_code) = maybe_run_broker_server() {
         std::process::exit(exit_code);
     }
-    run_dev_stdin_smoke();
+    if let Some(exit_code) = maybe_run_dev_stdin_smoke() {
+        std::process::exit(exit_code);
+    }
+    eprintln!("usage: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
+    eprintln!("dev-only: gui_shell_rust_helper dev-stdin-smoke");
+    std::process::exit(2);
 }
 
 fn maybe_run_broker_server() -> Option<i32> {
@@ -97,6 +102,22 @@ fn maybe_run_broker_server() -> Option<i32> {
             Some(1)
         }
     }
+}
+
+fn maybe_run_dev_stdin_smoke() -> Option<i32> {
+    let mut args = env::args().skip(1);
+    let Some(mode) = args.next() else {
+        return None;
+    };
+    if mode != "dev-stdin-smoke" {
+        return None;
+    }
+    if args.next().is_some() {
+        eprintln!("dev-stdin-smoke accepts no arguments");
+        return Some(2);
+    }
+    run_dev_stdin_smoke();
+    Some(0)
 }
 
 fn run_dev_stdin_smoke() {

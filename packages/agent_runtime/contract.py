@@ -9,18 +9,31 @@ class AgentRuntimeContract:
         self.workspace = dict(workspace)
         self.root_path = Path(workspace["root_path"]).resolve()
         self.secret_paths = tuple(workspace.get("secret_paths", []))
+        self.resolved_secret_paths = tuple(self._resolve_candidate(secret) for secret in self.secret_paths)
 
     def path_allowed(self, candidate: str) -> bool:
-        path = Path(candidate).resolve()
+        path = self._resolve_candidate(candidate)
         try:
             path.relative_to(self.root_path)
         except ValueError:
             return False
-        return not self.is_secret_path(candidate)
+        return not self.is_secret_path(path)
 
-    def is_secret_path(self, candidate: str) -> bool:
-        parts = set(Path(candidate).parts)
-        return bool(parts & SECRET_PATH_PARTS) or any(secret in candidate for secret in self.secret_paths)
+    def is_secret_path(self, candidate: str | Path) -> bool:
+        path = self._resolve_candidate(candidate)
+        parts = set(path.parts)
+        if parts & SECRET_PATH_PARTS:
+            return True
+        for secret in self.resolved_secret_paths:
+            if path == secret or secret in path.parents:
+                return True
+        return False
+
+    def _resolve_candidate(self, candidate: str | Path) -> Path:
+        path = Path(candidate)
+        if not path.is_absolute():
+            path = self.root_path / path
+        return path.resolve()
 
     def shell_command_requires_permission(self, tool_call: dict) -> bool:
         return tool_call.get("tool_name") == "shell.command" and bool(tool_call.get("permission_id"))

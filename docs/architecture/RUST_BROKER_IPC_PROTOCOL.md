@@ -71,7 +71,7 @@ Allowed status values:
 
 Every rejected or suspended response requires an audit event. Accepted health and shutdown responses are also audited to preserve broker-local append-only evidence.
 
-Health responses must not claim active Rust authority ownership before production cutover. In dev stdin mode the health object reports:
+Health responses must not claim active Rust authority ownership before production cutover. In explicit `dev-stdin-smoke` mode the health object reports:
 
 - `boundary_role=rust_security_broker_candidate`
 - `authority_cutover_status=not_active`

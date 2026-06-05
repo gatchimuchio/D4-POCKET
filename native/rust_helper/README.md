@@ -14,7 +14,7 @@ Current helper modules:
 
 Current broker modules:
 
-- `src/main.rs`: independent process lifecycle for development stdin smoke and `broker-server`.
+- `src/main.rs`: independent process lifecycle for explicit `dev-stdin-smoke` diagnostics and `broker-server`.
 - `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, `issued_at` RFC3339 freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed behavior, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, authority operation routing, and command-envelope suspension with process / credential / update gate reporting.
 - `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests.
 - `src/broker/store.rs`: durable file store for audit hash-chain, replay nonce, and session state in `broker-server` mode.
@@ -28,7 +28,7 @@ Authority-sensitive runtime ownership is not delegated to Flutter, Python, or FF
 - Flutter product path uses broker IPC, but installed Windows product evidence is still a separate release blocker;
 - Python Shell Core remains a migration oracle, tooling path, and parity comparison source until cutover evidence exists.
 - health reports `boundary_role=rust_security_broker_candidate` and `authority_cutover_status=not_active`;
-- development stdin mode uses in-memory state; `broker-server` mode uses durable audit/replay/session state when `--store-dir` is available.
+- explicit `dev-stdin-smoke` mode uses in-memory state; `broker-server` mode uses durable audit/replay/session state when `--store-dir` is available.
 - persistent-state-required mode suspends/rejects when no persistent store is connected.
 
 These incomplete items are `release_blocker` for completed product release, not release-ready evidence.

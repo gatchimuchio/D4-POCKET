@@ -93,6 +93,24 @@ fn broker_ipc_rejects_unauthenticated_malformed_oversized_and_stale_requests() {
     assert_eq!(oversized["status"], "rejected");
     assert_eq!(oversized["error"]["code"], "broker_request_oversized");
 
+    let oversized_without_newline = send_raw_without_request_newline(
+        &process.endpoint,
+        &process.endpoint.session_secret,
+        &oversized_payload,
+    );
+    assert_eq!(oversized_without_newline["status"], "rejected");
+    assert_eq!(
+        oversized_without_newline["error"]["code"],
+        "broker_request_oversized"
+    );
+
+    abandon_connection_before_auth(&process.endpoint);
+    let after_abandoned_connection = send_request(
+        &process.endpoint,
+        &health_request("request-after-abandoned", "nonce-after-abandoned"),
+    );
+    assert_eq!(after_abandoned_connection["status"], "accepted");
+
     let stale = send_request(
         &process.endpoint,
         &health_request_at("request-stale", "nonce-stale", "2000-01-01T00:00:00Z"),
@@ -161,6 +179,26 @@ fn send_request(endpoint: &BrokerEndpoint, request: &str) -> Value {
 
 fn send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> Value {
     try_send_raw(endpoint, secret, request).unwrap()
+}
+
+fn send_raw_without_request_newline(
+    endpoint: &BrokerEndpoint,
+    secret: &str,
+    request: &str,
+) -> Value {
+    let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port)).unwrap();
+    stream.write_all(secret.as_bytes()).unwrap();
+    stream.write_all(b"\n").unwrap();
+    stream.write_all(request.as_bytes()).unwrap();
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut reader = BufReader::new(stream);
+    let mut response = String::new();
+    reader.read_line(&mut response).unwrap();
+    serde_json::from_str(response.trim()).unwrap()
+}
+
+fn abandon_connection_before_auth(endpoint: &BrokerEndpoint) {
+    let _stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port)).unwrap();
 }
 
 fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::io::Result<Value> {

@@ -22,6 +22,7 @@
       "docs/**/*.md"
     ],
     "exact_files": [
+      ".gitattributes",
       "AGENTS.md",
       "GUI_Shell_\u88fd\u54c1\u54c1\u8cea\u7d71\u5408\u662f\u6b63\u5b9f\u88c5\u53f0\u5e33_v4_2026-06-05.md",
       "ROADMAP.md",
@@ -51,6 +52,10 @@
     ]
   },
   "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "58eb705713c18c1f5fae29cb502d025fd09a06662a11d5bebc6a1b795c992ade"
+    },
     {
       "path": "AGENTS.md",
       "sha256": "3760ed4d077e6eff7719d16c5166c03c0aa4874fc6d6803dcdd1d2095c7414b6"
@@ -257,7 +262,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "803349d2177fbd7d590f0836a96eccbe6f342e84d48f95a6bce9c2815aa22713"
+      "sha256": "964d75bd26c01e45d64a9ed26cd0b2cdafbd5981a05dbe4500fea2126ee55f15"
     },
     {
       "path": "docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md",
@@ -289,7 +294,7 @@
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "4ea9e9ce0b362693a1f5110984bac0d18873e91c1cfedc3a59a318a071deda82"
+      "sha256": "5343d7725795a29b2bfd97f18a77cc58c95a454ef7133c19942e10dcc177c07e"
     },
     {
       "path": "docs/implementation/WP00_AUTHORITY_SOURCE_OF_TRUTH_DESIGN.md",
@@ -641,7 +646,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "472b59593e416e9648474a7443ad9c8921df3aaedb5a3fa662118001a7fa2453"
+      "sha256": "3913d848f5727337ab8d2b99b28cc5909fbc4fa22b9a15c994b1ace243331c1a"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -673,7 +678,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "5e477667a1b12c018f0120d2bf18462df09daccb4290ce57854898a66b3371f4"
+      "sha256": "41e5fbd64e62b601b14d8e4963a8fd28ba50370118bd0e28aea6b9586a535dbe"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -689,7 +694,7 @@
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "6ef177e7b51abd792c4cbeabc3d15a655017c73207c7b70108d65b5751aacd34"
+      "sha256": "f477e81b87aaa61b5f3cdfb7ab174e58e5a9be8f2a415463c142c49ba25230ae"
     },
     {
       "path": "packages/shell_core/__init__.py",
@@ -721,7 +726,7 @@
     },
     {
       "path": "packages/shell_core/content_exposure.py",
-      "sha256": "877704e842bd9ea8a7b65e505b1484d2aca6c714fe856fdbcdf1ba8cab7a81ed"
+      "sha256": "d08128449fab4b081abfefdd5650848a4ee3819bdc80ade77c05e0a5ad57463d"
     },
     {
       "path": "packages/shell_core/error_taxonomy.py",
@@ -729,7 +734,7 @@
     },
     {
       "path": "packages/shell_core/invariant_evaluator.py",
-      "sha256": "dea43728fd074769cef63a504ae7eca62de442827e9fe08e4df9dd4425441e68"
+      "sha256": "d953efc0a2d089f71926117644407c4be9bf1bacaaf63ed41337f5b14efea175"
     },
     {
       "path": "packages/shell_core/normalization.py",
@@ -741,7 +746,7 @@
     },
     {
       "path": "packages/shell_core/persistence.py",
-      "sha256": "486d7027e6e76e846524d025678f982a5c4811454ace404e8c759f607cbf0f3e"
+      "sha256": "037e0009d879f31fa1b138ee0008b1b35a1c9ac432fc7845e332044f0107bbd8"
     },
     {
       "path": "packages/shell_core/policy_evaluator.py",
@@ -905,7 +910,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6636a0278214e7b82cbe3bfc7725e99504a011e0e5219326fec7831f2bca3edc"
+      "sha256": "1c650a5d5bd7cc81dd409e17a10f0926f23e72d3add845b671769cc6c4dcd279"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -913,7 +918,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "d2e4a30225740525d755dabdb53b125ae364c569db429d74f8f0d68e2f4f0044"
+      "sha256": "6349df63516cc637fd6d2ea51ec78e271d6f98c2bb7373a472435bea4ec17559"
     },
     {
       "path": "tooling/release_gate_check.py",

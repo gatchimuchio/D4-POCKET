@@ -34,12 +34,37 @@ class JsonPersistence:
         return copy.deepcopy(chained)
 
     def audit_events(self) -> list[dict]:
+        report = self.audit_events_report()
+        if report["errors"]:
+            raise ValueError("; ".join(report["errors"]))
+        return copy.deepcopy(report["events"])
+
+    def audit_events_report(self) -> dict:
         if not self.audit_path.exists():
-            return []
-        return [json.loads(line) for line in self.audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            return {"events": [], "errors": []}
+        events = []
+        errors = []
+        for index, line in enumerate(self.audit_path.read_text(encoding="utf-8").splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError as exc:
+                errors.append(f"corrupt audit JSONL line {index}: {exc.msg}")
+                continue
+            if not isinstance(parsed, dict):
+                errors.append(f"corrupt audit JSONL line {index}: event is not an object")
+                continue
+            events.append(parsed)
+        return {"events": events, "errors": errors}
 
     def verify_audit_chain(self) -> dict:
-        return verify_audit_chain(self.audit_events())
+        report = self.audit_events_report()
+        result = verify_audit_chain(report["events"])
+        if report["errors"]:
+            result["ok"] = False
+            result["errors"] = report["errors"] + result["errors"]
+        return result
 
     def export_audit(self) -> list[dict]:
         return copy.deepcopy(self.audit_events())

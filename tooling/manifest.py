@@ -30,6 +30,7 @@ GLOB_PATTERNS = [
 ]
 
 EXACT_FILES = [
+    ".gitattributes",
     "AGENTS.md",
     "GUI_Shell_製品品質統合是正実装台帳_v4_2026-06-05.md",
     "ROADMAP.md",

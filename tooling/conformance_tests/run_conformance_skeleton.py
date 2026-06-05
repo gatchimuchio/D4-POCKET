@@ -677,9 +677,23 @@ def test_shell_core_content_projection_hides_full_payload_until_full() -> list[s
     return errors
 
 
+def test_content_projection_missing_visibility_fails_closed() -> list[str]:
+    approval = load_contract_fixture("approval.valid.json")
+    approval.pop("content_visibility")
+    projected = project_approval_content(approval)
+    error = projected.get("error", {})
+    if error.get("code") != "content_visibility_violation":
+        return ["missing content_visibility did not return structured fail-closed projection error"]
+    if "full_payload" in projected:
+        return ["missing content_visibility exposed full_payload"]
+    return []
+
+
 def test_shell_core_has_no_flutter_imports() -> list[str]:
     errors = []
-    for path in sorted(SHELL_CORE.glob("*.py")):
+    for path in sorted(SHELL_CORE.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
         text = path.read_text(encoding="utf-8")
         for line_number, line in enumerate(text.splitlines(), start=1):
             normalized = line.strip().lower()
@@ -690,7 +704,9 @@ def test_shell_core_has_no_flutter_imports() -> list[str]:
 
 def test_shell_core_has_no_blue_tanuki_internal_imports() -> list[str]:
     errors = []
-    for path in sorted(SHELL_CORE.glob("*.py")):
+    for path in sorted(SHELL_CORE.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
         text = path.read_text(encoding="utf-8")
         for line_number, line in enumerate(text.splitlines(), start=1):
             normalized = line.strip().lower()
@@ -1009,6 +1025,17 @@ def test_state_snapshot_reports_invariant_flags() -> list[str]:
         if flags.get(flag) is not False:
             errors.append(f"state snapshot invariant flag missing or not false: {flag}")
     return errors
+
+
+def test_invariant_evaluator_scans_nested_shell_core_python() -> list[str]:
+    with tempfile.TemporaryDirectory(prefix="gui-shell-invariant-recursive-") as directory:
+        root = Path(directory)
+        nested = root / "packages" / "shell_core" / "nested"
+        nested.mkdir(parents=True)
+        (nested / "bad.py").write_text("import flutter\n", encoding="utf-8")
+        if not InvariantEvaluator(root).shell_core_imports_forbidden("flutter"):
+            return ["InvariantEvaluator did not scan nested Shell Core Python files"]
+    return []
 
 
 def test_shell_core_integrated_release_smoke() -> list[str]:
@@ -2133,6 +2160,34 @@ def test_agent_secret_path_read_default_deny() -> list[str]:
     return []
 
 
+def test_agent_secret_path_symlink_default_deny() -> list[str]:
+    with tempfile.TemporaryDirectory(prefix="gui-shell-agent-runtime-") as directory:
+        root = Path(directory)
+        workspace_root = root / "workspace"
+        workspace_root.mkdir()
+        secret = workspace_root / ".env"
+        secret.write_text("TOKEN=secret\n", encoding="utf-8")
+        public = workspace_root / "public"
+        public.mkdir()
+        symlink = public / "linked-config"
+        try:
+            symlink.symlink_to(secret)
+        except OSError:
+            return []
+        contract = AgentRuntimeContract(
+            {
+                "workspace_id": "workspace-symlink",
+                "root_path": str(workspace_root),
+                "boundary_policy": "deny_outside_workspace",
+                "secret_paths": [".env", "secrets/"],
+                "outside_access_default": "deny",
+            }
+        )
+        if contract.path_allowed(str(symlink)):
+            return ["agent runtime allowed symlink path resolving to secret file"]
+    return []
+
+
 def test_agent_shell_command_requires_permission_mapping() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -2459,6 +2514,54 @@ def test_audit_chain_rejects_duplicate_event_ids() -> list[str]:
     return errors
 
 
+def test_json_persistence_reports_corrupt_audit_jsonl() -> list[str]:
+    from packages.shell_core.persistence import JsonPersistence
+
+    event = load_contract_fixture("audit.valid.json")
+    with tempfile.TemporaryDirectory(prefix="gui-shell-audit-corrupt-") as directory:
+        persistence = JsonPersistence(Path(directory))
+        persistence.append_audit_event(event)
+        with persistence.audit_path.open("a", encoding="utf-8") as handle:
+            handle.write("{not-json}\n")
+        report = persistence.audit_events_report()
+        errors = []
+        if not report["errors"]:
+            errors.append("JsonPersistence did not report corrupt audit JSONL line")
+        if persistence.verify_audit_chain()["ok"] is not False:
+            errors.append("JsonPersistence verified corrupt audit JSONL")
+        try:
+            persistence.audit_events()
+            errors.append("JsonPersistence audit_events did not fail closed on corrupt JSONL")
+        except ValueError:
+            pass
+        return errors
+
+
+def test_platform_hardening_configuration_exists() -> list[str]:
+    errors = []
+    gitattributes = ROOT / ".gitattributes"
+    if not gitattributes.exists():
+        errors.append(".gitattributes missing")
+    else:
+        text = gitattributes.read_text(encoding="utf-8")
+        for token in ["* text=auto eol=lf", "*.ps1 text eol=crlf", "*.exe binary"]:
+            if token not in text:
+                errors.append(f".gitattributes missing token: {token}")
+
+    workflow = (ROOT / ".github" / "workflows" / "validation.yml").read_text(encoding="utf-8")
+    if workflow.count('flutter-version: "3.22.3"') < 2:
+        errors.append("validation workflow does not pin the same Flutter SDK version for Linux and Windows")
+    if "cache: true" not in workflow:
+        errors.append("validation workflow does not enable Flutter SDK cache")
+
+    main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
+    if "dev-stdin-smoke" not in main_rs:
+        errors.append("Rust helper dev stdin smoke is not isolated behind an explicit subcommand")
+    if "usage: gui_shell_rust_helper broker-server" not in main_rs:
+        errors.append("Rust helper does not fail closed to usage for unknown/no-arg invocation")
+    return errors
+
+
 def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     from installer.setup_doctor import setup_doctor_report
 
@@ -2523,6 +2626,7 @@ def main() -> int:
         test_shell_core_non_authority_sources_do_not_grant_authority,
         test_shell_core_routes_sensitive_actions_through_required_mapping,
         test_shell_core_content_projection_hides_full_payload_until_full,
+        test_content_projection_missing_visibility_fails_closed,
         test_shell_core_has_no_flutter_imports,
         test_shell_core_has_no_blue_tanuki_internal_imports,
         test_policy_evaluator_rejects_unknown_capability,
@@ -2546,6 +2650,7 @@ def main() -> int:
         test_sensitive_action_router_blocks_policy_denied_action,
         test_state_snapshot_is_deterministic,
         test_state_snapshot_reports_invariant_flags,
+        test_invariant_evaluator_scans_nested_shell_core_python,
         test_shell_core_integrated_release_smoke,
         test_release_smoke_runs_first_run_and_setup_doctor,
         test_shell_snapshot_contains_gui_operation_state,
@@ -2597,6 +2702,7 @@ def main() -> int:
         test_runtime_catalog_cannot_grant_authority,
         test_agent_workspace_outside_access_default_deny,
         test_agent_secret_path_read_default_deny,
+        test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,
         test_agent_git_push_requires_explicit_approval,
         test_agent_generated_diff_must_be_auditable,
@@ -2606,6 +2712,8 @@ def main() -> int:
         test_l3_bounded_reference_extension_negative_cases_fail_closed,
         test_audit_chain_verification_fails_on_tampered_event,
         test_audit_chain_rejects_duplicate_event_ids,
+        test_json_persistence_reports_corrupt_audit_jsonl,
+        test_platform_hardening_configuration_exists,
         test_setup_doctor_public_bind_warning_exists,
         test_broker_parity_startup_timeout_allows_ci_cold_build,
         test_desktop_agent_center_required_surface_exists,

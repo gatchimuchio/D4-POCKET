@@ -26,7 +26,9 @@ class InvariantEvaluator:
         shell_core = self.root / "packages" / "shell_core"
         if not shell_core.exists():
             return True
-        for path in sorted(shell_core.glob("*.py")):
+        for path in sorted(shell_core.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
             text = path.read_text(encoding="utf-8")
             for line in text.splitlines():
                 normalized = line.strip().lower()

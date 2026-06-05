@@ -82,10 +82,14 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     write_endpoint_file(&config.session_file, &endpoint)?;
 
     for incoming in listener.incoming() {
-        let stream = incoming.map_err(|error| {
-            BrokerServerError::new(format!("failed to accept broker IPC stream: {error}"))
-        })?;
-        let shutdown = handle_stream(stream, &endpoint.session_secret, &mut broker, &config)?;
+        let stream = match incoming {
+            Ok(stream) => stream,
+            Err(_) => continue,
+        };
+        let shutdown = match handle_stream(stream, &endpoint.session_secret, &mut broker, &config) {
+            Ok(shutdown) => shutdown,
+            Err(_) => continue,
+        };
         if shutdown {
             break;
         }
@@ -182,14 +186,30 @@ fn read_limited_line(
     max_bytes: usize,
 ) -> Result<Option<String>, IpcLineError> {
     let mut buffer = Vec::new();
-    let bytes_read = reader
-        .read_until(b'\n', &mut buffer)
-        .map_err(|error| IpcLineError::Io(format!("failed to read broker IPC line: {error}")))?;
-    if bytes_read == 0 {
-        return Ok(None);
-    }
-    if buffer.len() > max_bytes {
-        return Err(IpcLineError::Oversized);
+    loop {
+        let available = reader.fill_buf().map_err(|error| {
+            IpcLineError::Io(format!("failed to read broker IPC line: {error}"))
+        })?;
+        if available.is_empty() {
+            if buffer.is_empty() {
+                return Ok(None);
+            }
+            break;
+        }
+
+        let take = available
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map(|position| position + 1)
+            .unwrap_or(available.len());
+        if buffer.len() + take > max_bytes {
+            return Err(IpcLineError::Oversized);
+        }
+        buffer.extend_from_slice(&available[..take]);
+        reader.consume(take);
+        if buffer.last() == Some(&b'\n') {
+            break;
+        }
     }
     while matches!(buffer.last(), Some(b'\n' | b'\r')) {
         buffer.pop();
