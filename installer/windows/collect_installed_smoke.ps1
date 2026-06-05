@@ -664,24 +664,30 @@ function Collect-VisibleSurfaces {
       $rootWindowTitle = $rootObservedElement.name.ToString()
     }
   }
+  $windowFound = [bool]($observedElements.Count -gt 0)
+  $expectedSurfaceLabels = @($expected | ForEach-Object { $_.ToString() })
+  $visibleSurfaceLabels = @($visible | ForEach-Object { $_.ToString() })
+  $automationNameValues = @($automationNames.ToArray())
+  $observedElementValues = @($observedElements.ToArray())
+  $treeEdgeValues = @($treeEdges)
   $capture = [ordered]@{
     source = "uiautomation"
     path = $OutputPath
     captured_at = (Get-Date).ToUniversalTime().ToString("o")
     process_id = $Process.Id
-    window_found = ($null -ne $window)
+    window_found = $windowFound
     window_title = $rootWindowTitle
-    expected_surfaces = $expected
-    visible_surfaces = @($visible)
+    expected_surfaces = @($expectedSurfaceLabels)
+    visible_surfaces = @($visibleSurfaceLabels)
     surface_matches = $surfaceMatches
     aggregate_surface_shortcut_detected = [bool]$aggregateSurfaceShortcutDetected
     surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
-    automation_names = @($automationNames)
+    automation_names = @($automationNameValues)
     diagnostic_tree = [ordered]@{
       mode = "full_uiautomation_tree_projection"
-      observed_element_count = $observedElements.Count
-      observed_elements = @($observedElements)
-      tree_edges = @($treeEdges)
+      observed_element_count = $observedElementValues.Count
+      observed_elements = @($observedElementValues)
+      tree_edges = @($treeEdgeValues)
       capture_limit = "none"
       failure_diagnostic = !$surfaceMatchRequirementsMet
     }
