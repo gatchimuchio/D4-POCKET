@@ -2761,6 +2761,8 @@ def test_platform_hardening_configuration_exists() -> list[str]:
         errors.append("validation workflow does not pin the same Flutter SDK version for Linux and Windows")
     if "cache: true" not in workflow:
         errors.append("validation workflow does not enable Flutter SDK cache")
+    if "runs-on: windows-2022" not in workflow:
+        errors.append("validation workflow does not pin Windows Flutter build to windows-2022")
 
     main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     if "dev-stdin-smoke" not in main_rs:
