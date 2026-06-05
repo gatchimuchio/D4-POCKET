@@ -1646,6 +1646,18 @@ def test_windows_stage_installer_powershell_boolean_grouping() -> list[str]:
     return errors
 
 
+def test_windows_installed_smoke_preserves_trap_failure() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "trap {\n  $failure = $_" not in text:
+        errors.append("collect_installed_smoke.ps1 trap does not preserve the original failure")
+    if "\n  throw\n" in text:
+        errors.append("collect_installed_smoke.ps1 uses bare throw and loses diagnostic cause")
+    if "throw $failure" not in text:
+        errors.append("collect_installed_smoke.ps1 does not rethrow the captured failure")
+    return errors
+
+
 def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     step = ValidationStep(
         "missing_executable_probe",
@@ -2777,6 +2789,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,
+        test_windows_installed_smoke_preserves_trap_failure,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,

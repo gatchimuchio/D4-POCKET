@@ -673,6 +673,7 @@ function Collect-VisibleSurfaces {
 }
 
 trap {
+  $failure = $_
   Restore-SmokeEnvironment
   if ($null -ne $process) {
     $process.Refresh()
@@ -681,7 +682,7 @@ trap {
     }
   }
   Stop-SmokeBroker -Process $brokerProcess
-  throw
+  throw $failure
 }
 
 if ($BrokerHelperExe -ne "") {
