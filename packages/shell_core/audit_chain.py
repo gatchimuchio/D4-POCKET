@@ -19,7 +19,15 @@ def chain_event(event: dict, previous_event_hash: str | None) -> dict:
 def verify_audit_chain(events: list[dict]) -> dict:
     previous = None
     errors = []
+    seen_event_ids = set()
     for index, event in enumerate(events):
+        event_id = event.get("event_id")
+        if not event_id:
+            errors.append(f"event {index} missing event_id")
+        elif event_id in seen_event_ids:
+            errors.append(f"event {index} duplicate event_id {event_id}")
+        else:
+            seen_event_ids.add(event_id)
         expected = chain_event({key: value for key, value in event.items() if key != "event_hash"}, previous)
         if event.get("previous_event_hash") != previous:
             errors.append(f"event {index} previous hash mismatch")

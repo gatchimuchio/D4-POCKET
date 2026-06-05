@@ -380,6 +380,12 @@ def compare_audit_chain(broker: BrokerClient) -> list[str]:
     tampered = [{**first, "result": "failed"}, second]
     if broker.call("audit_verify", tampered)["ok"] is not False:
         errors.append("audit_verify: tampered event was not rejected")
+    duplicate = chain_event({**event, "target": "runtime"}, first["event_hash"])
+    duplicate_events = [first, duplicate]
+    python_duplicate = verify_audit_chain(duplicate_events)
+    rust_duplicate = broker.call("audit_verify", duplicate_events)
+    if python_duplicate != rust_duplicate:
+        errors.append("audit_verify: duplicate event_id mismatch")
     return errors
 
 

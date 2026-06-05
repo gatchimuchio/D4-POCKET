@@ -15,7 +15,19 @@ class JsonPersistence:
 
     def append_audit_event(self, event: dict) -> dict:
         self.root.mkdir(parents=True, exist_ok=True)
-        previous = self._latest_event_hash()
+        event_id = event.get("event_id")
+        if not event_id:
+            raise ValueError("audit event_id is required")
+        events = self.audit_events()
+        verification = verify_audit_chain(events)
+        if verification["ok"] is not True:
+            raise ValueError(
+                "cannot append to invalid audit chain: "
+                + "; ".join(verification.get("errors", []))
+            )
+        if any(stored.get("event_id") == event_id for stored in events):
+            raise ValueError(f"duplicate audit event_id: {event_id}")
+        previous = events[-1].get("event_hash") if events else None
         chained = chain_event(event, previous)
         with self.audit_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(chained, sort_keys=True, separators=(",", ":")) + "\n")

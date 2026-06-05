@@ -42,6 +42,26 @@ def _product_body() -> str:
     return text[start:end]
 
 
+def _broker_snapshot_body() -> str:
+    text = _read("apps/desktop_flutter/lib/services/shell_core_client.dart")
+    start = text.find("ShellSnapshot _brokerSnapshot")
+    end = text.find("ShellSnapshot _brokerUnavailableSnapshot", start)
+    if start == -1 or end == -1:
+        return ""
+    return text[start:end]
+
+
+def _function_body(function_name: str) -> str:
+    text = _read("apps/desktop_flutter/lib/services/shell_core_client.dart")
+    start = text.find(f"Map<String, Object?> {function_name}")
+    if start == -1:
+        return ""
+    end = text.find("\n}\n", start)
+    if end == -1:
+        return text[start:]
+    return text[start : end + 3]
+
+
 def _scan_files(paths: list[Path], tokens: list[str]) -> list[str]:
     findings: list[str] = []
     for path in sorted(paths):
@@ -115,6 +135,66 @@ def assert_flutter_authority_operations_are_broker_mediated() -> RuntimeAssertio
         "CONFIG",
         "ShellCoreClient.product() requests health, normalization, content projection, protected-field edit rejection, and command-envelope state from the broker and fail-closes through a broker_unavailable snapshot.",
         "Keep new authority surfaces broker-mediated and fail-closed.",
+    )
+
+
+def assert_flutter_product_snapshot_does_not_promote_probe_state() -> RuntimeAssertion:
+    broker_snapshot = _broker_snapshot_body()
+    command_probe = _function_body("_brokerCommandProbePayload")
+    forbidden_snapshot_tokens = [
+        "'pending_approvals_count': 1",
+        "'permission_id': 'permission.broker.command_envelope'",
+        "'approval_id': 'broker-projected-approval'",
+        "'authority_map': [\n      {",
+    ]
+    findings = [token for token in forbidden_snapshot_tokens if token in broker_snapshot]
+    forbidden_probe_tokens = ["'state':", "'audit_event':"]
+    findings.extend(
+        f"_brokerCommandProbePayload contains {token}"
+        for token in forbidden_probe_tokens
+        if token in command_probe
+    )
+    if findings:
+        return _fail(
+            "flutter_product_snapshot_does_not_promote_probe_state",
+            "CONFIG",
+            "ShellCoreClient.product() promotes diagnostic probe state into product records: "
+            + "; ".join(findings),
+            "Keep broker probes as LIVE_RUNTIME evidence/setup checks only; do not emit synthetic permissions, approvals, authority maps, caller state, or caller audit mappings from the product snapshot.",
+        )
+    return _pass(
+        "flutter_product_snapshot_does_not_promote_probe_state",
+        "CONFIG",
+        "ShellCoreClient.product() keeps broker projection/command probes out of product permissions, approvals, authority_map, caller state, and caller audit mappings.",
+        "Keep future product records sourced from broker-owned state exports, not Flutter-created probes.",
+    )
+
+
+def assert_flutter_models_do_not_default_evidence_to_passed() -> RuntimeAssertion:
+    text = _read("apps/desktop_flutter/lib/models/generated_contracts.dart")
+    forbidden = [
+        "json['schema_check'] as String? ?? 'passed'",
+        "json['release_smoke'] as String? ?? 'passed'",
+        "json['release_gate_check'] as String? ?? 'passed'",
+        "json['evidence_bundle'] as String? ?? 'passed'",
+        "json['validate_all'] as String? ?? 'passed'",
+        "json['strict_windows_release'] as String? ?? 'expected fail'",
+        "json['conformance_check_count'] as int? ?? 89",
+    ]
+    findings = [token for token in forbidden if token in text]
+    if findings:
+        return _fail(
+            "flutter_models_do_not_default_evidence_to_passed",
+            "CONFIG",
+            "Dart evidence summary defaults can synthesize PASS values: "
+            + "; ".join(findings),
+            "Default missing evidence summary fields to not reported/0 and keep release PASS values sourced from explicit evidence.",
+        )
+    return _pass(
+        "flutter_models_do_not_default_evidence_to_passed",
+        "CONFIG",
+        "Dart evidence summary defaults do not synthesize PASS or fixed check counts when source JSON omits evidence fields.",
+        "Keep missing evidence visibly missing until an explicit validator/export supplies it.",
     )
 
 
@@ -309,6 +389,8 @@ def run_release_runtime_assertions() -> list[RuntimeAssertion]:
     return [
         assert_flutter_product_entry_uses_broker(),
         assert_flutter_authority_operations_are_broker_mediated(),
+        assert_flutter_product_snapshot_does_not_promote_probe_state(),
+        assert_flutter_models_do_not_default_evidence_to_passed(),
         assert_flutter_does_not_spawn_python_product_path(),
         assert_launch_scripts_start_broker_without_python_snapshot(),
         assert_no_ffi_or_direct_bridge_authority_path(),

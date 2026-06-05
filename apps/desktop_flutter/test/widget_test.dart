@@ -276,10 +276,16 @@ void main() {
     expect(snapshot.snapshotSource, 'broker');
     expect(snapshot.snapshotPath, 'broker://127.0.0.1/health');
     expect(snapshot.operationStatus.runtimeStatus, 'suspend');
-    expect(snapshot.pendingApprovals.single.projectedContent['content'],
-        '[redacted]');
-    expect(snapshot.pendingApprovals.single.projectedContent.values,
-        isNot(contains('hidden')));
+    expect(snapshot.operationStatus.pendingApprovalsCount, 0);
+    expect(snapshot.permissions, isEmpty);
+    expect(snapshot.pendingApprovals, isEmpty);
+    expect(snapshot.authorityMap, isEmpty);
+    expect(
+      snapshot.evidence.any((record) =>
+          record.evidenceId == 'broker-redacted-projection-probe' &&
+          record.status == 'pass'),
+      isTrue,
+    );
     expect(
       snapshot.setupDoctorChecks.any((check) =>
           check.checkId == 'broker.protected_field_edit' &&

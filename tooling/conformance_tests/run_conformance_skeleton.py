@@ -2420,6 +2420,45 @@ def test_audit_chain_verification_fails_on_tampered_event() -> list[str]:
     return errors
 
 
+def test_audit_chain_rejects_duplicate_event_ids() -> list[str]:
+    event = load_contract_fixture("audit.valid.json")
+    first = chain_event(event, None)
+    duplicate = chain_event({**event, "target": "runtime"}, first["event_hash"])
+    invalid = verify_audit_chain([first, duplicate])
+    errors = []
+    if invalid["ok"] is not False:
+        errors.append("duplicate audit event_id chain verified")
+
+    state = RuntimeState()
+    state.append_audit_event(event)
+    try:
+        state.append_audit_event(copy.deepcopy(event))
+        errors.append("RuntimeState allowed duplicate audit event_id overwrite")
+    except ValueError:
+        pass
+
+    from packages.shell_core.audit_store import AuditStore
+    from packages.shell_core.persistence import JsonPersistence
+
+    store = AuditStore()
+    store.append({"event_id": "audit-1", "action": "test", "result": "success"})
+    try:
+        store.append({"event_id": "audit-1", "action": "test", "result": "success"})
+        errors.append("AuditStore allowed duplicate audit event_id append")
+    except ValueError:
+        pass
+
+    with tempfile.TemporaryDirectory(prefix="gui-shell-audit-duplicate-") as directory:
+        persistence = JsonPersistence(Path(directory))
+        persistence.append_audit_event(event)
+        try:
+            persistence.append_audit_event(copy.deepcopy(event))
+            errors.append("JsonPersistence allowed duplicate audit event_id append")
+        except ValueError:
+            pass
+    return errors
+
+
 def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     from installer.setup_doctor import setup_doctor_report
 
@@ -2566,6 +2605,7 @@ def main() -> int:
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,
         test_audit_chain_verification_fails_on_tampered_event,
+        test_audit_chain_rejects_duplicate_event_ids,
         test_setup_doctor_public_bind_warning_exists,
         test_broker_parity_startup_timeout_allows_ci_cold_build,
         test_desktop_agent_center_required_surface_exists,

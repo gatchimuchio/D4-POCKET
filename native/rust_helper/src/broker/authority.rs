@@ -515,11 +515,19 @@ pub fn verify_audit_chain(events: &Value) -> Value {
     let mut previous = Value::Null;
     let mut latest = Value::Null;
     let mut errors = Vec::new();
+    let mut seen_event_ids = BTreeSet::new();
     for (index, event) in events.iter().enumerate() {
         let Some(object) = event.as_object() else {
             errors.push(format!("event {index} is not an object"));
             continue;
         };
+        if let Some(event_id) = object.get("event_id").and_then(Value::as_str) {
+            if !seen_event_ids.insert(event_id.to_string()) {
+                errors.push(format!("event {index} duplicate event_id {event_id}"));
+            }
+        } else {
+            errors.push(format!("event {index} missing event_id"));
+        }
         if object
             .get("previous_event_hash")
             .cloned()

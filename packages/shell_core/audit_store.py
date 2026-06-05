@@ -8,6 +8,11 @@ class AuditStore:
         self._events: list[dict] = []
 
     def append(self, event: dict) -> dict:
+        event_id = event.get("event_id")
+        if not event_id:
+            raise ValueError("audit event_id is required")
+        if any(stored.get("event_id") == event_id for stored in self._events):
+            raise ValueError(f"duplicate audit event_id: {event_id}")
         previous_hash = self._events[-1]["event_hash"] if self._events else None
         stored = copy.deepcopy(event)
         stored["previous_event_hash"] = previous_hash

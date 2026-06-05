@@ -109,7 +109,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
-      "sha256": "3e2c512c7d2efcab493cc84e127cd28ac90546f6e7b1ceb70fc0dde33aa82dc9"
+      "sha256": "38b8c6e0422f8c5cf7de34c5bd2ca18785eac2301d2f828ea7d7281397b05724"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -173,7 +173,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "ee4fea012e8103582a32cfed7c4466ba914e9166773af3e23b2eb2f341b6bb25"
+      "sha256": "055cb375c94fd20e2f5612fa9ba4db2c7575502e5ea0841a7853c9a022a10bbb"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
@@ -181,7 +181,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "3886750f45b8357fe51096759d2af296f511e30f8c0df1076a38c22b8759ea6a"
+      "sha256": "ef5a0947ccf59f5e2e6fa4f706b91d2bebda314b1aba35e54435cda9b8ddceb2"
     },
     {
       "path": "docs/COMPETITOR_ANALYSIS.md",
@@ -637,7 +637,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
-      "sha256": "7ce4dfa876ea888f5b310adf4cabde92cdc3dda1aa32e2266ea37c2cceb44da2"
+      "sha256": "f1c7d2087751ff823520c22b00f8a8e79637c1b4aa0b1b2afc495013d1fe5edc"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -709,11 +709,11 @@
     },
     {
       "path": "packages/shell_core/audit_chain.py",
-      "sha256": "1060f0025f3e0022db98da5ca3b77386c792576a377b793867a90b8b12730cb4"
+      "sha256": "6921e3955361097675ba2da6b3cffb3705b442b804ffd012bf35f6eb03767a05"
     },
     {
       "path": "packages/shell_core/audit_store.py",
-      "sha256": "4457b0fef0a31595bb6d1d5f2576fc4d9886325a6b374b35c31caf74f70a2c2e"
+      "sha256": "3753c12319889f0b67414f9734610535b2e63ab0739594bfd991e47202d378d1"
     },
     {
       "path": "packages/shell_core/authority_keys.py",
@@ -741,7 +741,7 @@
     },
     {
       "path": "packages/shell_core/persistence.py",
-      "sha256": "079b185426225ecfc73344176c4268fa390b65e313658fbc6a62dc29ea8be8a0"
+      "sha256": "486d7027e6e76e846524d025678f982a5c4811454ace404e8c759f607cbf0f3e"
     },
     {
       "path": "packages/shell_core/policy_evaluator.py",
@@ -761,7 +761,7 @@
     },
     {
       "path": "packages/shell_core/runtime_state.py",
-      "sha256": "e71f67f4cfae8b38fa95c323c7bac3e30b5574ffa9367352ba2fcc7b7ff57e9d"
+      "sha256": "18baaaa0770d0f18bc825019f317ce989def8ed4616f9fa5835cc8150640e2f2"
     },
     {
       "path": "packages/shell_core/schema_validation.py",
@@ -897,7 +897,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "acd9452d447dc0427fe6688b69db8f2320303706cd46142d8c04b3963cbd9596"
+      "sha256": "c4d0fb5d45383a921affb2bd6c6beb185c6b871524d95a2673d5a3f06e3f4f37"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -905,7 +905,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "fa162000f48d54075278c857d15e96ce458e0aae843920d3c3d60e8a9121d0f6"
+      "sha256": "6636a0278214e7b82cbe3bfc7725e99504a011e0e5219326fec7831f2bca3edc"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -921,7 +921,7 @@
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "9c4c32d68c2be24239a10f65f7b833989eac3a5212087ffcfe40ff0df466a3a9"
+      "sha256": "38f49617244a63461d992033350b3012724b87ac92108efeed00e5663cec1d4f"
     },
     {
       "path": "tooling/release_smoke.py",

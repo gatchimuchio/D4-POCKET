@@ -260,6 +260,22 @@ ShellSnapshot _brokerSnapshot({
   final projectedContent = projection.containsKey('redacted_payload')
       ? Map<String, Object?>.from(projection['redacted_payload'] as Map? ?? {})
       : projection;
+  final projectionRedacted = !jsonEncode(projectedContent).contains('hidden');
+  if (!projectionRedacted) {
+    problems.add(_releaseProblemJson(
+      problemId: 'broker-content-projection-leaked-full-payload',
+      item: 'broker content projection leaked full payload',
+      severity: 'error',
+      category: 'content_projection',
+      message:
+          'Broker content projection returned data from the hidden full payload probe.',
+      target: 'content_projection',
+      recoveryId: 'recover-content-projection',
+      requiredAction:
+          'Keep authority actions suspended and restore content visibility enforcement.',
+      blocksOwnerUse: true,
+    ));
+  }
   final auditEvents = [
     _auditJson(healthResponse, 'broker.health', 'accepted'),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
@@ -288,7 +304,7 @@ ShellSnapshot _brokerSnapshot({
       'runtime_status': runtimeStatus,
       'invariant_status': protectedEditRejected ? 'ok' : 'blocked',
       'trust_status': brokerReady ? 'restricted' : 'blocked',
-      'pending_approvals_count': 1,
+      'pending_approvals_count': 0,
       'audit_chain_status':
           persistenceReady ? 'durable_file_store' : 'not_ready',
       'problems_count': problems.length,
@@ -305,30 +321,8 @@ ShellSnapshot _brokerSnapshot({
       }
     ],
     'agent_sessions': [],
-    'permissions': [
-      {
-        'permission_id': 'permission.broker.command_envelope',
-        'capability_id': 'command_envelope.dispatch',
-        'decision': commandDispatchEnabled ? 'allow' : 'deny',
-        'source': 'rust_security_broker',
-      }
-    ],
-    'pending_approvals': [
-      {
-        'approval_id': 'broker-projected-approval',
-        'operation': 'broker.projection_probe',
-        'status': 'blocked',
-        'content_visibility': 'redacted',
-        'projected_content': projectedContent,
-        'editable_fields': ['path'],
-        'protected_fields': [
-          'runtime_id',
-          'permission_id',
-          'payload_hash',
-          'authority_context'
-        ],
-      }
-    ],
+    'permissions': [],
+    'pending_approvals': [],
     'audit_events': auditEvents,
     'recovery_actions': [
       for (final problem in problems)
@@ -412,22 +406,7 @@ ShellSnapshot _brokerSnapshot({
             cutoverStatus == 'active' ? [] : ['authority_actions'],
       },
     ],
-    'authority_map': [
-      {
-        'runtime_id': 'gui_shell_rust_broker',
-        'capability_id': 'command_envelope.dispatch',
-        'permission_id': 'permission.broker.command_envelope',
-        'approval_id': 'broker-projected-approval',
-        'audit_event_id': commandResponse['audit_event_id']?.toString() ?? '',
-        'recovery_id': commandDispatchEnabled
-            ? ''
-            : 'recover-command-dispatch',
-        'dangerous': !commandDispatchEnabled,
-        'warning': commandDispatchEnabled
-            ? ''
-            : 'Command dispatch is suspended by broker response.',
-      }
-    ],
+    'authority_map': [],
     'adapter_catalog': [],
     'permission_diffs': [],
     'problems': problems,
@@ -445,6 +424,22 @@ ShellSnapshot _brokerSnapshot({
         'kind': 'LIVE_RUNTIME',
         'status': protectedEditRejected ? 'pass' : 'fail',
         'path': 'broker://127.0.0.1/approval_edit',
+        'hash': '',
+        'exportable': false,
+      },
+      {
+        'evidence_id': 'broker-redacted-projection-probe',
+        'kind': 'LIVE_RUNTIME',
+        'status': projectionRedacted ? 'pass' : 'fail',
+        'path': 'broker://127.0.0.1/content_projection',
+        'hash': '',
+        'exportable': false,
+      },
+      {
+        'evidence_id': 'broker-command-dispatch-suspended',
+        'kind': 'LIVE_RUNTIME',
+        'status': commandDispatchEnabled ? 'fail' : 'pass',
+        'path': 'broker://127.0.0.1/command_envelope',
         'hash': '',
         'exportable': false,
       },

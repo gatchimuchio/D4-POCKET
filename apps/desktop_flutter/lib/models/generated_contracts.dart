@@ -573,14 +573,14 @@ class EvidenceSummaryRecord {
 
   factory EvidenceSummaryRecord.fromJson(Map<String, Object?> json) {
     return EvidenceSummaryRecord(
-      schemaCheck: json['schema_check'] as String? ?? 'passed',
-      conformanceCheckCount: json['conformance_check_count'] as int? ?? 89,
-      releaseSmoke: json['release_smoke'] as String? ?? 'passed',
-      releaseGateCheck: json['release_gate_check'] as String? ?? 'passed',
-      evidenceBundle: json['evidence_bundle'] as String? ?? 'passed',
-      validateAll: json['validate_all'] as String? ?? 'passed',
+      schemaCheck: json['schema_check'] as String? ?? 'not reported',
+      conformanceCheckCount: json['conformance_check_count'] as int? ?? 0,
+      releaseSmoke: json['release_smoke'] as String? ?? 'not reported',
+      releaseGateCheck: json['release_gate_check'] as String? ?? 'not reported',
+      evidenceBundle: json['evidence_bundle'] as String? ?? 'not reported',
+      validateAll: json['validate_all'] as String? ?? 'not reported',
       strictWindowsRelease:
-          json['strict_windows_release'] as String? ?? 'expected fail',
+          json['strict_windows_release'] as String? ?? 'not reported',
       missingMeasuredWindowsEvidence:
           json['missing_measured_windows_evidence'] as bool? ?? true,
       missingSetupDoctorEvidence:

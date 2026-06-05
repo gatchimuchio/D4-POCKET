@@ -46,7 +46,10 @@ class RuntimeState:
 
     def append_audit_event(self, audit_event: dict) -> None:
         validate_contract(audit_event, "audit.schema.json")
-        self.audit_events[audit_event["event_id"]] = copy.deepcopy(audit_event)
+        event_id = audit_event["event_id"]
+        if event_id in self.audit_events:
+            raise ValueError(f"duplicate audit event_id: {event_id}")
+        self.audit_events[event_id] = copy.deepcopy(audit_event)
 
     def register_recovery_action(self, recovery_action: dict) -> None:
         validate_contract(recovery_action, "recovery.schema.json")
