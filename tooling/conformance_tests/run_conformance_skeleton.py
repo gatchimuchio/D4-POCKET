@@ -1135,7 +1135,13 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
     if bundle.get("classification") != "development_evidence":
         errors.append("evidence bundle is not classified as development_evidence")
     if not bundle.get("blockers"):
-        errors.append("evidence bundle did not preserve Windows installed-path blockers")
+        evidence_path = ROOT / "release_evidence" / "windows_installed_smoke.json"
+        if not evidence_path.exists():
+            errors.append("evidence bundle did not preserve missing Windows installed-path blockers")
+        else:
+            windows_results = validate_windows_release_evidence(evidence_path)
+            if any(result.classification == "release_blocker" for result in windows_results):
+                errors.append("evidence bundle dropped failing Windows installed-path blockers")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
         errors.append("evidence bundle made Flutter authoritative")
     return errors
