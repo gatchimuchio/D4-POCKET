@@ -1,5 +1,7 @@
 {
   "recovery_id": "recover-1",
+  "runtime_id": "blue_tanuki",
+  "operation": "filesystem.write",
   "class": "permission_denied",
   "severity": "warning",
   "user_visible_message": "Permission is required before this action can run.",

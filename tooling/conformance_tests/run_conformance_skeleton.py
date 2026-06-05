@@ -49,6 +49,7 @@ from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
 REQUIRED_SCHEMA_NAMES = {
+    "action_envelope",
     "runtime",
     "adapter",
     "capability",
@@ -344,6 +345,20 @@ def test_adapter_loader_rejects_value_only_authority_metadata() -> list[str]:
     return ["adapter loader accepted value-only authority metadata"]
 
 
+def test_runtime_state_adapter_registration_uses_loader_boundary() -> list[str]:
+    state = RuntimeState()
+    adapter = load_contract_fixture("adapter.valid.json")
+    adapter["metadata"] = {"permissionGrant": "all", "safe_label": "reference"}
+    state.register_adapter(adapter)
+    stored = state.adapters.get(adapter["adapter_id"], {})
+    errors = []
+    if "permission_grant" in json.dumps(stored.get("metadata", {}), sort_keys=True):
+        errors.append("RuntimeState.register_adapter stored stripped authority metadata")
+    if stored.get("metadata") != {"safe_label": "reference"}:
+        errors.append("RuntimeState.register_adapter did not preserve safe stripped metadata")
+    return errors
+
+
 def test_normalization_firewall_rejects_authority_aliases() -> list[str]:
     payload = {
         "Trust_Level": "root",
@@ -380,6 +395,18 @@ def test_normalization_firewall_detects_value_only_escalation() -> list[str]:
         errors.append("normalization firewall did not record authority value finding")
     if normalized["stripped_payload"].get("metadata", {}).get("safe_note") != "operator visible":
         errors.append("normalization firewall removed safe metadata while detecting value-only escalation")
+    return errors
+
+
+def test_normalization_firewall_detects_key_collisions() -> list[str]:
+    normalized = normalize_inbound_payload({"safeLabel": "first", "safe_label": "second"})
+    errors = []
+    if normalized["quarantined"] is not True:
+        errors.append("normalization firewall did not quarantine normalized key collision")
+    if not normalized.get("normalization_collision_findings"):
+        errors.append("normalization firewall did not record normalized key collision")
+    if normalized["audit_event"].get("normalization_collision_count") != 1:
+        errors.append("normalization firewall did not count normalized key collision")
     return errors
 
 
@@ -607,22 +634,30 @@ def test_shell_core_routes_sensitive_actions_through_required_mapping() -> list[
     recovery_action = load_contract_fixture("recovery.valid.json")
     routed = router.route(
         {
+            "runtime_id": "blue_tanuki",
+            "operation": capability["capability_id"],
             "capability_id": capability["capability_id"],
             "permission_id": permission["permission_id"],
-            "approval_state": "approved",
+            "approval_id": load_contract_fixture("approval.valid.json")["approval_id"],
+            "target_scope": permission["target_scope"],
             "audit_event": audit_event,
             "recovery_action": recovery_action,
         }
     )
     errors = []
-    if routed.get("routed") is not True:
-        errors.append("Shell Core did not mark sensitive action as routed")
+    if routed.get("routed") is not False:
+        errors.append("Shell Core routed sensitive action without evaluator state")
+    if "schema_contract_missing" not in error_codes(routed.get("policy_result", {})):
+        errors.append("Shell Core did not expose fail-closed missing evaluator result")
     try:
         router.route(
             {
+                "runtime_id": "blue_tanuki",
+                "operation": capability["capability_id"],
                 "capability_id": capability["capability_id"],
                 "permission_id": permission["permission_id"],
-                "approval_state": "approved",
+                "approval_id": load_contract_fixture("approval.valid.json")["approval_id"],
+                "target_scope": permission["target_scope"],
                 "audit_event": audit_event,
             }
         )
@@ -692,6 +727,7 @@ def build_sensitive_action() -> dict:
         "permission_id": permission["permission_id"],
         "approval_id": approval["approval_id"],
         "approval_state": "approved",
+        "target_scope": permission.get("target_scope", "workspace"),
         "payload": approval["full_payload"],
         "audit_event": load_contract_fixture("audit.valid.json"),
         "recovery_action": load_contract_fixture("recovery.valid.json"),
@@ -877,6 +913,51 @@ def test_policy_evaluator_rejects_non_authority_source() -> list[str]:
         result = PolicyEvaluator(state).evaluate(action)
         if result["allowed"] or "non_authority_source_attempt" not in error_codes(result):
             errors.append(f"PolicyEvaluator allowed non-authority source: {source}")
+    return errors
+
+
+def test_policy_evaluator_enforces_action_envelope_relations() -> list[str]:
+    errors = []
+
+    def assert_error(label: str, mutate, expected_code: str) -> None:
+        state = build_policy_state(approval_status="approved")
+        action = build_sensitive_action()
+        mutate(state, action)
+        result = PolicyEvaluator(state).evaluate(action)
+        if result["allowed"] or expected_code not in error_codes(result):
+            errors.append(f"PolicyEvaluator did not reject {label}: {result}")
+
+    assert_error(
+        "runtime capability mismatch",
+        lambda state, action: state.capabilities[action["capability_id"]].update({"runtime_id": "other-runtime"}),
+        "relation_mismatch",
+    )
+    assert_error(
+        "operation capability mismatch",
+        lambda state, action: state.capabilities[action["capability_id"]].update({"operations": ["filesystem.read"]}),
+        "relation_mismatch",
+    )
+    assert_error(
+        "permission runtime mismatch",
+        lambda state, action: state.permissions[action["permission_id"]].update({"runtime_id": "other-runtime"}),
+        "relation_mismatch",
+    )
+    assert_error(
+        "approval payload hash mismatch",
+        lambda state, action: action.update({"payload": {"path": "notes/today.md", "content": "tampered"}}),
+        "payload_hash_mismatch",
+    )
+    assert_error(
+        "fabricated audit mapping",
+        lambda state, action: action.update({"audit_event": {**action["audit_event"], "event_id": "fabricated-audit"}}),
+        "audit_mapping_missing",
+    )
+
+    allowed = PolicyEvaluator(build_policy_state(approval_status="approved")).evaluate(build_sensitive_action())
+    if allowed["allowed"] is not True:
+        errors.append(f"PolicyEvaluator rejected valid ActionEnvelope relation: {allowed}")
+    if not allowed.get("action_envelope"):
+        errors.append("PolicyEvaluator did not return validated action_envelope")
     return errors
 
 
@@ -2206,6 +2287,7 @@ def build_bounded_extension_action(extension: dict) -> dict:
         "permission_id": extension["permission"]["permission_id"],
         "approval_id": approval["approval_id"],
         "approval_state": "approved",
+        "target_scope": extension["permission"].get("target_scope", "diagnostic_summary"),
         "payload": approval["redacted_payload"],
         "audit_event": extension["audit_event"],
         "recovery_action": extension["recovery_action"],
@@ -2381,8 +2463,10 @@ def main() -> int:
         test_inbound_authority_keys_are_stripped,
         test_adapter_loader_strips_authority_metadata_from_effective_payload,
         test_adapter_loader_rejects_value_only_authority_metadata,
+        test_runtime_state_adapter_registration_uses_loader_boundary,
         test_normalization_firewall_rejects_authority_aliases,
         test_normalization_firewall_detects_value_only_escalation,
+        test_normalization_firewall_detects_key_collisions,
         test_external_metadata_cannot_escalate_authority,
         test_gui_input_cannot_create_runtime_disallowed_authority_context,
         test_memory_cache_previous_state_cannot_grant_authority,
@@ -2418,6 +2502,7 @@ def main() -> int:
         test_policy_evaluator_ignores_adapter_metadata_authority,
         test_policy_evaluator_normalizes_adapter_metadata_authority,
         test_policy_evaluator_rejects_non_authority_source,
+        test_policy_evaluator_enforces_action_envelope_relations,
         test_sensitive_action_router_uses_policy_evaluator_when_state_is_provided,
         test_sensitive_action_router_blocks_policy_denied_action,
         test_state_snapshot_is_deterministic,

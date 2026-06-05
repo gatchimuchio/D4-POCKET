@@ -48,6 +48,7 @@ impl BrokerAuthorityRegistry {
                     "runtime_id": "gui_shell_rust_broker",
                     "capability_id": "command_envelope.dispatch",
                     "operation": "command_envelope.dispatch",
+                    "target_scope": "broker_command",
                     "decision": "deny",
                     "source": "broker_internal_policy"
                 }],
@@ -151,7 +152,8 @@ fn evaluate_authority_from_state(
 ) -> Value {
     let mut errors = Vec::new();
 
-    if let Some(runtime_id) = action.get("runtime_id").and_then(Value::as_str) {
+    let runtime_id = action.get("runtime_id").and_then(Value::as_str);
+    if let Some(runtime_id) = runtime_id {
         if !contains_id(state, "runtimes", "runtime_id", runtime_id) {
             errors.push(shell_error(
                 "unknown_runtime",
@@ -159,11 +161,43 @@ fn evaluate_authority_from_state(
                 operation,
             ));
         }
+    } else {
+        errors.push(shell_error(
+            "unknown_runtime",
+            "runtime_id is required",
+            operation,
+        ));
     }
 
     let capability_id = action.get("capability_id").and_then(Value::as_str);
     if let Some(capability_id) = capability_id {
-        if !contains_id(state, "capabilities", "capability_id", capability_id) {
+        if let Some(capability) = find_record(state, "capabilities", "capability_id", capability_id)
+        {
+            if runtime_id.is_some()
+                && capability.get("runtime_id").and_then(Value::as_str) != runtime_id
+            {
+                errors.push(shell_error(
+                    "relation_mismatch",
+                    "capability does not belong to requested runtime",
+                    operation,
+                ));
+            }
+            if capability
+                .get("operations")
+                .and_then(Value::as_array)
+                .is_some_and(|operations| {
+                    !operations
+                        .iter()
+                        .any(|candidate| candidate.as_str() == Some(operation))
+                })
+            {
+                errors.push(shell_error(
+                    "relation_mismatch",
+                    "capability does not authorize requested operation",
+                    operation,
+                ));
+            }
+        } else {
             errors.push(shell_error(
                 "unknown_capability",
                 &format!("unknown capability: {capability_id}"),
@@ -208,6 +242,17 @@ fn evaluate_authority_from_state(
                     ));
                 }
             }
+            for field in ["runtime_id", "operation", "target_scope"] {
+                if action.get(field).and_then(Value::as_str)
+                    != permission.get(field).and_then(Value::as_str)
+                {
+                    errors.push(shell_error(
+                        "relation_mismatch",
+                        &format!("permission {field} does not match requested action"),
+                        operation,
+                    ));
+                }
+            }
         }
     }
 
@@ -232,7 +277,32 @@ fn evaluate_authority_from_state(
                     operation,
                 ));
             }
-            Some(_) => {}
+            Some(approval) => {
+                for field in ["runtime_id", "operation", "target_scope"] {
+                    if action.get(field).and_then(Value::as_str)
+                        != approval.get(field).and_then(Value::as_str)
+                    {
+                        errors.push(shell_error(
+                            "relation_mismatch",
+                            &format!("approval {field} does not match requested action"),
+                            operation,
+                        ));
+                    }
+                }
+                if action_has_payload(action) {
+                    let expected_hash =
+                        canonical_hash(action.get("payload").unwrap_or(&Value::Null));
+                    if approval.get("payload_hash").and_then(Value::as_str)
+                        != Some(expected_hash.as_str())
+                    {
+                        errors.push(shell_error(
+                            "payload_hash_mismatch",
+                            "approval payload_hash does not match canonical action payload",
+                            operation,
+                        ));
+                    }
+                }
+            }
         },
     }
 
@@ -262,6 +332,43 @@ fn evaluate_authority_from_state(
                         operation,
                     ));
                 }
+                let stored_audit = audit_event
+                    .get("event_id")
+                    .and_then(Value::as_str)
+                    .and_then(|id| find_record(state, "audit_events", "event_id", id));
+                if stored_audit.is_none() {
+                    errors.push(shell_error(
+                        "audit_mapping_missing",
+                        "audit_event is not present in broker-owned audit store",
+                        operation,
+                    ));
+                }
+                if action_has_payload(action) {
+                    let expected_hash =
+                        canonical_hash(action.get("payload").unwrap_or(&Value::Null));
+                    if audit_event.get("payload_hash").and_then(Value::as_str)
+                        != Some(expected_hash.as_str())
+                        || stored_audit
+                            .and_then(|audit| audit.get("payload_hash").and_then(Value::as_str))
+                            != Some(expected_hash.as_str())
+                    {
+                        errors.push(shell_error(
+                            "payload_hash_mismatch",
+                            "audit payload_hash does not match canonical action payload",
+                            operation,
+                        ));
+                    }
+                }
+                if stored_audit
+                    .and_then(|audit| audit.get("action").and_then(Value::as_str))
+                    .is_some_and(|action_name| action_name != operation)
+                {
+                    errors.push(shell_error(
+                        "relation_mismatch",
+                        "audit action does not match requested operation",
+                        operation,
+                    ));
+                }
             }
             _ => errors.push(shell_error(
                 "audit_mapping_missing",
@@ -280,7 +387,21 @@ fn evaluate_authority_from_state(
                 .is_some() =>
         {
             let recovery_id = recovery.get("recovery_id").and_then(Value::as_str).unwrap();
-            if !contains_id(state, "recovery_actions", "recovery_id", recovery_id) {
+            if let Some(stored_recovery) =
+                find_record(state, "recovery_actions", "recovery_id", recovery_id)
+            {
+                for field in ["runtime_id", "operation"] {
+                    if action.get(field).and_then(Value::as_str)
+                        != stored_recovery.get(field).and_then(Value::as_str)
+                    {
+                        errors.push(shell_error(
+                            "relation_mismatch",
+                            &format!("recovery {field} does not match requested action"),
+                            operation,
+                        ));
+                    }
+                }
+            } else {
                 errors.push(shell_error(
                     "recovery_mapping_missing",
                     &format!("unknown recovery action: {recovery_id}"),
@@ -430,17 +551,20 @@ pub fn normalize_inbound_payload(payload: &Value) -> Value {
     let stripped_payload = strip_authority_keys(payload);
     let key_findings = authority_keys_in(payload, "");
     let value_findings = authority_values_in(&stripped_payload, "");
+    let collision_findings = normalization_collisions_in(payload, "");
     json!({
         "raw_payload": payload,
         "normalized_payload": normalized_payload,
         "stripped_payload": stripped_payload,
-        "quarantined": !key_findings.is_empty() || !value_findings.is_empty(),
+        "quarantined": !key_findings.is_empty() || !value_findings.is_empty() || !collision_findings.is_empty(),
         "authority_key_findings": key_findings,
         "authority_value_findings": value_findings,
+        "normalization_collision_findings": collision_findings,
         "audit_event": {
-            "event_type": if key_findings.is_empty() && value_findings.is_empty() { "normalization.pass" } else { "normalization.quarantine" },
+            "event_type": if key_findings.is_empty() && value_findings.is_empty() && collision_findings.is_empty() { "normalization.pass" } else { "normalization.quarantine" },
             "authority_key_count": key_findings.len(),
             "authority_value_count": value_findings.len(),
+            "normalization_collision_count": collision_findings.len(),
             "raw_payload_preserved": true
         }
     })
@@ -574,6 +698,46 @@ fn strip_authority_keys(value: &Value) -> Value {
     }
 }
 
+fn normalization_collisions_in(value: &Value, path: &str) -> Vec<Value> {
+    let mut findings = Vec::new();
+    match value {
+        Value::Object(object) => {
+            let mut seen: BTreeMap<String, String> = BTreeMap::new();
+            for (key, item) in object {
+                let normalized = normalize_authority_token(key);
+                let child_path = if path.is_empty() {
+                    normalized.clone()
+                } else {
+                    format!("{path}.{normalized}")
+                };
+                if let Some(first_key) = seen.get(&normalized) {
+                    if first_key != key {
+                        findings.push(json!({
+                            "path": child_path,
+                            "normalized_key": normalized,
+                            "first_key": first_key,
+                            "colliding_key": key
+                        }));
+                    }
+                } else {
+                    seen.insert(normalized, key.clone());
+                }
+                findings.extend(normalization_collisions_in(item, &child_path));
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                findings.extend(normalization_collisions_in(
+                    item,
+                    &format!("{path}[{index}]"),
+                ));
+            }
+        }
+        _ => {}
+    }
+    findings
+}
+
 fn authority_keys_in(value: &Value, path: &str) -> Vec<Value> {
     let mut findings = Vec::new();
     match value {
@@ -696,17 +860,37 @@ mod tests {
         json!({
             "state": {
                 "runtimes": [{"runtime_id": "runtime-1"}],
-                "capabilities": [{"capability_id": "filesystem.write"}],
+                "capabilities": [{
+                    "capability_id": "filesystem.write",
+                    "runtime_id": "runtime-1",
+                    "operations": ["filesystem.write"]
+                }],
                 "permissions": [{
                     "permission_id": "permission-allow",
+                    "runtime_id": "runtime-1",
                     "capability_id": "filesystem.write",
+                    "operation": "filesystem.write",
+                    "target_scope": "workspace",
                     "decision": "allow"
                 }],
                 "approvals": [{
                     "approval_id": "approval-approved",
+                    "runtime_id": "runtime-1",
+                    "operation": "filesystem.write",
+                    "target_scope": "workspace",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                     "status": "approved"
                 }],
-                "recovery_actions": [{"recovery_id": "recover-1"}]
+                "audit_events": [{
+                    "event_id": "audit-1",
+                    "action": "filesystem.write",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }],
+                "recovery_actions": [{
+                    "recovery_id": "recover-1",
+                    "runtime_id": "runtime-1",
+                    "operation": "filesystem.write"
+                }]
             },
             "action": {
                 "operation": "filesystem.write",
@@ -714,6 +898,7 @@ mod tests {
                 "capability_id": "filesystem.write",
                 "permission_id": "permission-allow",
                 "approval_id": "approval-approved",
+                "target_scope": "workspace",
                 "payload": {"path": "notes/today.md"},
                 "audit_event": {
                     "event_id": "audit-1",

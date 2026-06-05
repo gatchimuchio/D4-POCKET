@@ -5,6 +5,8 @@ UNKNOWN_RUNTIME = "unknown_runtime"
 UNKNOWN_CAPABILITY = "unknown_capability"
 UNKNOWN_PERMISSION = "unknown_permission"
 PERMISSION_DENIED = "permission_denied"
+RELATION_MISMATCH = "relation_mismatch"
+PAYLOAD_HASH_MISMATCH = "payload_hash_mismatch"
 APPROVAL_MISSING = "approval_missing"
 APPROVAL_NOT_VALID = "approval_not_valid"
 AUDIT_MAPPING_MISSING = "audit_mapping_missing"
@@ -21,6 +23,8 @@ RECOVERY_HINTS = {
     UNKNOWN_CAPABILITY: "Register the capability in Shell Core before use.",
     UNKNOWN_PERMISSION: "Record an explicit permission decision before use.",
     PERMISSION_DENIED: "Request or grant permission through an authority source.",
+    RELATION_MISMATCH: "Resolve runtime, capability, permission, approval, recovery, and target scope from one broker-owned action relation.",
+    PAYLOAD_HASH_MISMATCH: "Recompute the canonical payload hash and bind approval/audit to the submitted payload.",
     APPROVAL_MISSING: "Create an approval and wait for an approved state.",
     APPROVAL_NOT_VALID: "Revalidate or approve the current approval request.",
     AUDIT_MAPPING_MISSING: "Attach an AuditEvent with an event_id and required payload_hash.",

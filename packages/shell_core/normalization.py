@@ -59,6 +59,31 @@ def normalize_payload(value):
     return copy.deepcopy(value)
 
 
+def normalization_collisions_in(value, *, path: str = "") -> list[dict]:
+    findings: list[dict] = []
+    if isinstance(value, dict):
+        seen: dict[str, str] = {}
+        for key, item in value.items():
+            normalized = normalize_key(key)
+            child_path = f"{path}.{normalized}" if path else normalized
+            if normalized in seen and seen[normalized] != str(key):
+                findings.append(
+                    {
+                        "path": child_path,
+                        "normalized_key": normalized,
+                        "first_key": seen[normalized],
+                        "colliding_key": str(key),
+                    }
+                )
+            else:
+                seen[normalized] = str(key)
+            findings.extend(normalization_collisions_in(item, path=child_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            findings.extend(normalization_collisions_in(item, path=f"{path}[{index}]"))
+    return findings
+
+
 def authority_keys_in(value, *, path: str = "") -> list[dict]:
     findings: list[dict] = []
     if isinstance(value, dict):
@@ -108,7 +133,8 @@ def normalize_inbound_payload(payload: dict) -> dict:
     stripped_payload = strip_authority_keys(payload)
     key_findings = authority_keys_in(payload)
     value_findings = authority_values_in(stripped_payload)
-    quarantined = bool(key_findings or value_findings)
+    collision_findings = normalization_collisions_in(payload)
+    quarantined = bool(key_findings or value_findings or collision_findings)
     return {
         "raw_payload": raw_payload,
         "normalized_payload": normalized_payload,
@@ -116,10 +142,12 @@ def normalize_inbound_payload(payload: dict) -> dict:
         "quarantined": quarantined,
         "authority_key_findings": key_findings,
         "authority_value_findings": value_findings,
+        "normalization_collision_findings": collision_findings,
         "audit_event": {
             "event_type": "normalization.quarantine" if quarantined else "normalization.pass",
             "authority_key_count": len(key_findings),
             "authority_value_count": len(value_findings),
+            "normalization_collision_count": len(collision_findings),
             "raw_payload_preserved": True,
         },
     }

@@ -5,13 +5,19 @@
   "type": "object",
   "required": [
     "capability_id",
+    "runtime_id",
     "name",
     "risk_level",
-    "default_permission"
+    "default_permission",
+    "operations"
   ],
   "additionalProperties": false,
   "properties": {
     "capability_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_id": {
       "type": "string",
       "minLength": 1
     },
@@ -42,6 +48,14 @@
     "requires_approval": {
       "type": "boolean",
       "default": true
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
     }
   }
 }

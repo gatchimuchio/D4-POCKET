@@ -79,15 +79,22 @@
   },
   "capability": {
     "capability_id": "diagnostic.read.bounded",
+    "runtime_id": "llm_bounded_diagnostic",
     "name": "Bounded Diagnostic Read",
     "description": "Read a redacted diagnostic summary without privileged execution.",
     "risk_level": "low",
     "default_permission": "ask",
-    "requires_approval": true
+    "requires_approval": true,
+    "operations": [
+      "diagnostic.read.bounded"
+    ]
   },
   "permission": {
     "permission_id": "permission.diagnostic.read.bounded",
+    "runtime_id": "llm_bounded_diagnostic",
     "capability_id": "diagnostic.read.bounded",
+    "operation": "diagnostic.read.bounded",
+    "target_scope": "diagnostic_summary",
     "scope": "operation",
     "decision": "allow",
     "source": "policy",
@@ -101,9 +108,10 @@
     "approval_id": "approval-llm-bounded-diagnostic",
     "runtime_id": "llm_bounded_diagnostic",
     "operation": "diagnostic.read.bounded",
+    "target_scope": "diagnostic_summary",
     "status": "approved",
     "content_visibility": "redacted",
-    "payload_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "payload_hash": "sha256:23d8ce200562dad1091d3c7bc8062c686f957cb91bbd7083a13ec82fbc43d138",
     "summary": "Read redacted diagnostics from the bounded reference extension.",
     "redacted_payload": {
       "diagnostic": "[redacted]",
@@ -138,7 +146,7 @@
     "action": "diagnostic.read.bounded",
     "target": "llm_bounded_diagnostic",
     "result": "success",
-    "payload_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "payload_hash": "sha256:23d8ce200562dad1091d3c7bc8062c686f957cb91bbd7083a13ec82fbc43d138",
     "previous_event_hash": null,
     "metadata": {
       "evidence_classification": "contract_conformance"
@@ -146,6 +154,8 @@
   },
   "recovery_action": {
     "recovery_id": "recover-llm-bounded-diagnostic",
+    "runtime_id": "llm_bounded_diagnostic",
+    "operation": "diagnostic.read.bounded",
     "class": "permission_denied",
     "severity": "warning",
     "user_visible_message": "The bounded diagnostic extension cannot run until its declared permission and approval path is valid.",

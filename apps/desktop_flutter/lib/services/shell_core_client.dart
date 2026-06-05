@@ -667,6 +667,7 @@ Map<String, Object?> _brokerCommandProbePayload() {
       'capability_id': 'command_envelope.dispatch',
       'permission_id': 'permission.broker.command_envelope',
       'approval_id': 'broker-projected-approval',
+      'target_scope': 'broker_command',
       'recovery_action': {'recovery_id': 'recover-command-dispatch'},
       'adapter_metadata': {'client': 'desktop_flutter'},
     },

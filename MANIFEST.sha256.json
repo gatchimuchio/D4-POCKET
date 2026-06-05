@@ -173,7 +173,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "54552368130daa479c86e6f571ea772627c0cca8731c1be648fd111a46cf7de7"
+      "sha256": "ee4fea012e8103582a32cfed7c4466ba914e9166773af3e23b2eb2f341b6bb25"
     },
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
@@ -360,6 +360,10 @@
       "sha256": "d774db92702345300ac9383ef4a4db21d9f8780d83f2b3a29673c22cabbe7cc4"
     },
     {
+      "path": "examples/contracts/action_envelope.valid.json",
+      "sha256": "2408235370cd8038a9206ec21f64a210464ae4375436a0f4ee2e281d7593a198"
+    },
+    {
       "path": "examples/contracts/adapter.valid.json",
       "sha256": "6fccc82a12d2e9b50235f0e23c2e05a5d32bad771a5df6c23a7b6b280f4420a9"
     },
@@ -393,11 +397,11 @@
     },
     {
       "path": "examples/contracts/approval.valid.json",
-      "sha256": "ec56282e677ea28643603a2e25d8bf95b7d2bcdc7f3bba9f1d1255d4fcd82c0d"
+      "sha256": "2104e800363ce9cf6cba972220bdf5fef8f6b975be56d715986a06dc4c9237e8"
     },
     {
       "path": "examples/contracts/audit.valid.json",
-      "sha256": "ebaaf6f61cf06158e0c017479f4c8aefb810f513020df81d91297db28e7082f9"
+      "sha256": "b2811180e64ed94fe4c32c77691687a4c33f85d51c577e9900b0f2b4118ab3eb"
     },
     {
       "path": "examples/contracts/broker_command_envelope.valid.json",
@@ -417,7 +421,7 @@
     },
     {
       "path": "examples/contracts/capability.valid.json",
-      "sha256": "aedca5303234ebd7e71caf0c044e85f05f987ff1f1eec5043f8ea10e1345d37a"
+      "sha256": "f714d0e83663b89a2b9cbd4b69572b9cb33cadd6815faca32da3d8464c318ffd"
     },
     {
       "path": "examples/contracts/content_exposure.valid.json",
@@ -430,6 +434,10 @@
     {
       "path": "examples/contracts/framework_risk_profile.valid.json",
       "sha256": "d38517d047fd41c2e674028fa1c66b66b4892eff6414e3244520cee5d2add9ec"
+    },
+    {
+      "path": "examples/contracts/invalid/action_envelope_missing_relation.invalid.json",
+      "sha256": "6db469cbdf0db8bb089476d73f6a578d2a1e22b9ccd0dae674d98383ab0c3652"
     },
     {
       "path": "examples/contracts/invalid/adapter_authority_escalation.invalid.json",
@@ -549,15 +557,15 @@
     },
     {
       "path": "examples/contracts/llm_bounded_extension.valid.json",
-      "sha256": "b2fba8d4b66d692bd5b4525e83e8978e6961229870a7e0c8c31649b0da16c374"
+      "sha256": "e4fbbf0c728427d2eb8ae8cf737622024fa3def6e872eb8332cd1d6dd2e18bf1"
     },
     {
       "path": "examples/contracts/permission.valid.json",
-      "sha256": "4f16dd1929e55491cdbc254fe5f78452bbc0ce75ef658847b54d6de23a3c4755"
+      "sha256": "b70738365fa11799ae514cd876fbc06cc8f3c24da8d54d549d895724b6ca4bed"
     },
     {
       "path": "examples/contracts/recovery.valid.json",
-      "sha256": "a7b89df94c5b81abfbf6c396fe76cf9e40e75de9cfafdfe866ea4104df85d43e"
+      "sha256": "f9240ac4b4cc1ba449cc8ecacf6525f5e19807a3e0969a4ef0aa0a71faa4a792"
     },
     {
       "path": "examples/contracts/runtime.valid.json",
@@ -629,7 +637,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
-      "sha256": "c7f98e3c44909dd236573c180e0bec5a939edbdf695fd9b146c20d8d32d1ac30"
+      "sha256": "7ce4dfa876ea888f5b310adf4cabde92cdc3dda1aa32e2266ea37c2cceb44da2"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -641,7 +649,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3153cd80c8e4d50b981cacb38f68603579d0d6d8538afb931470127ea2dc1ef6"
+      "sha256": "8aa3bde4c307b3bd9f1469266f2edfbb4779c3d68760427ade1224ae7b17bd3a"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -685,7 +693,11 @@
     },
     {
       "path": "packages/shell_core/__init__.py",
-      "sha256": "77f85063bfae3b0f72b41d660fffdeda084dd664367eb2710cb409ce3f9893b2"
+      "sha256": "03e22f348fc383ba1b68df382df7b571e7a9b209a3b7f05feb9ed27ae9c5936f"
+    },
+    {
+      "path": "packages/shell_core/action_envelope.py",
+      "sha256": "e083b5641e5933238d5fa4a8978e598205518b2565aac95bd508544d4bd1753d"
     },
     {
       "path": "packages/shell_core/adapter_loader.py",
@@ -713,7 +725,7 @@
     },
     {
       "path": "packages/shell_core/error_taxonomy.py",
-      "sha256": "3e41ad394edf06236e450408c85c0eff4dd2a3f175641c6f60d2b0f3deef148c"
+      "sha256": "ed11d6875b4096395e1d15b2e92c831dbaf6aac76b93c0cb41fe2a59e0a1edbc"
     },
     {
       "path": "packages/shell_core/invariant_evaluator.py",
@@ -721,7 +733,7 @@
     },
     {
       "path": "packages/shell_core/normalization.py",
-      "sha256": "bbfb4356b2f5a6da05351c36a70c98910808d08286476516f171b279f8595859"
+      "sha256": "e9d137e8aa04f1c94365419ce9148e34d5ea5bbaee0e2a3b7b2b6d464cb9b004"
     },
     {
       "path": "packages/shell_core/permission_ledger.py",
@@ -733,7 +745,7 @@
     },
     {
       "path": "packages/shell_core/policy_evaluator.py",
-      "sha256": "a422b594dc831b777ea56a2ef02c15668819ba62abddb86ec59343ae3cd658ee"
+      "sha256": "9f2da382ad1a118587925ae7024e2c6570663e065939a32af89280fcf74074fe"
     },
     {
       "path": "packages/shell_core/recovery_catalog.py",
@@ -741,7 +753,7 @@
     },
     {
       "path": "packages/shell_core/release_smoke.py",
-      "sha256": "855686c36e5b69fd49a0ffba059f8ab02cac93cc092252583157aa9628ff01ca"
+      "sha256": "a8baa5970d8b8310c4252623ffd14ae997d827ccf71077eac4bdfccaae3a2463"
     },
     {
       "path": "packages/shell_core/runtime_registry.py",
@@ -749,11 +761,15 @@
     },
     {
       "path": "packages/shell_core/runtime_state.py",
-      "sha256": "466ed8f3bce36c3ea659a52c65c06f688492bd65cbea7653cb9b470505b71ff3"
+      "sha256": "e71f67f4cfae8b38fa95c323c7bac3e30b5574ffa9367352ba2fcc7b7ff57e9d"
+    },
+    {
+      "path": "packages/shell_core/schema_validation.py",
+      "sha256": "524e6bb3503a981bc2eb60d88a8ab819df42a911a5ac7ec59c45321da2b9fab8"
     },
     {
       "path": "packages/shell_core/sensitive_action_router.py",
-      "sha256": "6fb562aae5d25e7fe2b3a68d9c326ee0e0dbc6946f8b50042e11d1a8a60745b5"
+      "sha256": "e9504114ee9c482cc9751a8120677f05b5835a44221f48f96e9fb3ac6eeac185"
     },
     {
       "path": "packages/shell_core/state_snapshot.py",
@@ -774,6 +790,10 @@
     {
       "path": "scripts/launch_owner_desktop.sh",
       "sha256": "8e63cea6aecd2e285ff49015431f46cde6b923323e9e90f42cdefa381ed28151"
+    },
+    {
+      "path": "specs/action_envelope.schema.json",
+      "sha256": "737d5584ef2bf3905f784e7707071b9001691490251ef09123a0f5e20b66b25b"
     },
     {
       "path": "specs/adapter.schema.json",
@@ -809,7 +829,7 @@
     },
     {
       "path": "specs/approval.schema.json",
-      "sha256": "b12f290e813504d92ebeb0934554b7f8f2608971e1cfaea40812a8faaa9cdd0d"
+      "sha256": "06ef5fee1733bd3ee5b51bf85e4fe6cd81898036001e7e912f09238b1cc1c9b2"
     },
     {
       "path": "specs/audit.schema.json",
@@ -833,7 +853,7 @@
     },
     {
       "path": "specs/capability.schema.json",
-      "sha256": "4deef4c58fc4a1a164f1d2830a6497f65a73839e0dce8664cacc8049a8075614"
+      "sha256": "934c3aa35f019adbd7c5d7dfb4dab95b2f3b375719f2d0ce30317d3ff971923f"
     },
     {
       "path": "specs/content_exposure.schema.json",
@@ -857,11 +877,11 @@
     },
     {
       "path": "specs/permission.schema.json",
-      "sha256": "ae50cd0d0ea4efeca139588fbe5708ccd66e5223a033200fcd03b7732feab951"
+      "sha256": "467f214d9c2fd23076f4a4eae721ed90eb5e2cae6e4b25b31bbed34792bb658a"
     },
     {
       "path": "specs/recovery.schema.json",
-      "sha256": "e224473a6e682ea384390f2b2ab1eed005dd677cad768225042d44984f1c9d06"
+      "sha256": "ca4cbbbcf53cb654ae4d51c8f741f91b0a8f787c7b47f5ced7c4f6d1cd9697d9"
     },
     {
       "path": "specs/runtime.schema.json",
@@ -877,7 +897,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "40ea1c9a0f8662e8f7053ad05129a519c08f8be0b232121ecbe88d6d85097b71"
+      "sha256": "acd9452d447dc0427fe6688b69db8f2320303706cd46142d8c04b3963cbd9596"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -885,7 +905,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e2923e7479f01af443e2f2343dd7c69f8d27880daa0a1d83c675e22fcb3e43b7"
+      "sha256": "fa162000f48d54075278c857d15e96ce458e0aae843920d3c3d60e8a9121d0f6"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -909,7 +929,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "5dca66f6c26ddf333b93f936ed02171db9f22f45a963e067e29eecc2d6bfb485"
+      "sha256": "3a663989050dced9aee5d8fa5d9d340aa42f5e2960c885c6c9db5f71500113e4"
     },
     {
       "path": "tooling/shell_snapshot.py",

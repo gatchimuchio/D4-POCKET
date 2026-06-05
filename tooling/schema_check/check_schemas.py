@@ -8,6 +8,7 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "action_envelope.schema.json",
     "runtime.schema.json",
     "adapter.schema.json",
     "capability.schema.json",

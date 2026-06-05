@@ -5,6 +5,8 @@
   "type": "object",
   "required": [
     "recovery_id",
+    "runtime_id",
+    "operation",
     "class",
     "severity",
     "user_visible_message",
@@ -13,6 +15,14 @@
   "additionalProperties": false,
   "properties": {
     "recovery_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
       "type": "string",
       "minLength": 1
     },

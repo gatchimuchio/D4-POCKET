@@ -1,6 +1,7 @@
 """Framework-independent Shell Core skeleton."""
 
 from .adapter_loader import AdapterRecord, load_adapter
+from .action_envelope import build_action_envelope
 from .approval_queue import ApprovalQueue
 from .audit_chain import chain_event, verify_audit_chain
 from .audit_store import AuditStore
@@ -34,6 +35,7 @@ __all__ = [
     "ShellCoreError",
     "UpdatePolicyStore",
     "create_state_snapshot",
+    "build_action_envelope",
     "chain_event",
     "deterministic_snapshot_json",
     "load_adapter",

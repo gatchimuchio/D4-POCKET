@@ -1,6 +1,9 @@
 {
   "permission_id": "permission.fs.write.workspace",
+  "runtime_id": "blue_tanuki",
   "capability_id": "filesystem.write",
+  "operation": "filesystem.write",
+  "target_scope": "workspace",
   "scope": "target",
   "decision": "ask",
   "source": "policy",

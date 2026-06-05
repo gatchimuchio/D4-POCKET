@@ -3,6 +3,8 @@ def recovery_candidates(reason: str) -> list[dict]:
     return [
         {
             "recovery_id": f"blue-tanuki-{recovery_class}",
+            "runtime_id": "blue_tanuki",
+            "operation": "runtime.read",
             "class": recovery_class,
             "severity": "warning",
             "user_visible_message": "Check BLUE-TANUKI runtime connectivity and retry after it is ready.",

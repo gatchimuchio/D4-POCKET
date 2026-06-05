@@ -12,22 +12,48 @@ from .runtime_state import RuntimeState
 
 def build_reference_state() -> RuntimeState:
     state = RuntimeState()
-    state.register_runtime({"runtime_id": "blue_tanuki", "name": "BLUE-TANUKI", "status": "ready"})
+    state.register_runtime(
+        {
+            "runtime_id": "blue_tanuki",
+            "name": "BLUE-TANUKI",
+            "kind": "reference_runtime",
+            "status": "ready",
+            "adapter_id": "blue_tanuki_reference",
+        }
+    )
     state.register_adapter(
         {
             "adapter_id": "blue_tanuki_reference",
             "runtime_id": "blue_tanuki",
             "contract_version": "v1.0",
+            "transport": "mock",
             "authority_strip": True,
+            "declared_capabilities": ["filesystem.write"],
         }
     )
-    state.register_capability({"capability_id": "filesystem.write", "runtime_id": "blue_tanuki"})
+    state.register_capability(
+        {
+            "capability_id": "filesystem.write",
+            "runtime_id": "blue_tanuki",
+            "name": "Filesystem Write",
+            "risk_level": "high",
+            "default_permission": "ask",
+            "requires_approval": True,
+            "operations": ["filesystem.write"],
+        }
+    )
     state.record_permission(
         {
             "permission_id": "permission.fs.write.workspace",
+            "runtime_id": "blue_tanuki",
             "capability_id": "filesystem.write",
+            "operation": "filesystem.write",
+            "target_scope": "workspace",
+            "scope": "target",
             "decision": "allow",
             "source": "policy",
+            "expires_at": None,
+            "constraints": {"root": "workspace"},
         }
     )
     state.enqueue_approval(
@@ -35,10 +61,12 @@ def build_reference_state() -> RuntimeState:
             "approval_id": "approval-1",
             "runtime_id": "blue_tanuki",
             "operation": "filesystem.write",
+            "target_scope": "workspace",
             "status": "approved",
             "content_visibility": "redacted",
             "payload_hash": canonical_hash({"path": "notes/today.md", "content": "hello"}),
             "full_payload": {"path": "notes/today.md", "content": "hello"},
+            "redacted_payload": {"path": "notes/today.md", "content": "[redacted]"},
             "editable_fields": ["path"],
             "authority_fields": ["permission_id"],
             "sealed_fields": ["runtime_id"],
@@ -49,10 +77,23 @@ def build_reference_state() -> RuntimeState:
     state.register_recovery_action(
         {
             "recovery_id": "recover-1",
+            "runtime_id": "blue_tanuki",
+            "operation": "filesystem.write",
             "class": "permission_denied",
             "severity": "warning",
             "safe_to_retry": True,
             "user_visible_message": "Permission is required before this action can run.",
+        }
+    )
+    state.append_audit_event(
+        {
+            "event_id": "audit-1",
+            "timestamp": "2026-06-05T00:00:00Z",
+            "actor": "shell",
+            "action": "filesystem.write",
+            "target": "blue_tanuki",
+            "result": "success",
+            "payload_hash": canonical_hash({"path": "notes/today.md", "content": "hello"}),
         }
     )
     return state
@@ -65,6 +106,7 @@ def build_sensitive_action() -> dict:
         "capability_id": "filesystem.write",
         "permission_id": "permission.fs.write.workspace",
         "approval_id": "approval-1",
+        "target_scope": "workspace",
         "payload": {"path": "notes/today.md", "content": "hello"},
         "audit_event": {
             "event_id": "audit-1",

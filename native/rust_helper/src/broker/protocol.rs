@@ -1329,6 +1329,7 @@ mod tests {
             "capability_id": "command_envelope.dispatch",
             "permission_id": "permission.broker.command_envelope",
             "approval_id": "broker-projected-approval",
+            "target_scope": "broker_command",
             "recovery_action": {"recovery_id": "recover-command-dispatch"},
             "adapter_metadata": {"client": "test"}
         })
@@ -1776,14 +1777,37 @@ mod tests {
         request.payload = Some(serde_json::json!({
             "state": {
                 "runtimes": [{"runtime_id": "gui_shell_rust_broker"}],
-                "capabilities": [{"capability_id": "command_envelope.dispatch"}],
+                "capabilities": [{
+                    "capability_id": "command_envelope.dispatch",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operations": ["command_envelope.dispatch"]
+                }],
                 "permissions": [{
                     "permission_id": "permission.broker.command_envelope",
+                    "runtime_id": "gui_shell_rust_broker",
                     "capability_id": "command_envelope.dispatch",
+                    "operation": "command_envelope.dispatch",
+                    "target_scope": "broker_command",
                     "decision": "allow"
                 }],
-                "approvals": [{"approval_id": "broker-projected-approval", "status": "approved"}],
-                "recovery_actions": [{"recovery_id": "recover-command-dispatch"}]
+                "approvals": [{
+                    "approval_id": "broker-projected-approval",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operation": "command_envelope.dispatch",
+                    "target_scope": "broker_command",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "status": "approved"
+                }],
+                "audit_events": [{
+                    "event_id": "fixture-audit",
+                    "action": "command_envelope.dispatch",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }],
+                "recovery_actions": [{
+                    "recovery_id": "recover-command-dispatch",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operation": "command_envelope.dispatch"
+                }]
             },
             "action": broker_command_action()
         }));
@@ -1847,14 +1871,37 @@ mod tests {
         request.payload = Some(serde_json::json!({
             "state": {
                 "runtimes": [{"runtime_id": "gui_shell_rust_broker"}],
-                "capabilities": [{"capability_id": "command_envelope.dispatch"}],
+                "capabilities": [{
+                    "capability_id": "command_envelope.dispatch",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operations": ["command_envelope.dispatch"]
+                }],
                 "permissions": [{
                     "permission_id": "permission.broker.command_envelope",
+                    "runtime_id": "gui_shell_rust_broker",
                     "capability_id": "command_envelope.dispatch",
+                    "operation": "command_envelope.dispatch",
+                    "target_scope": "broker_command",
                     "decision": "allow"
                 }],
-                "approvals": [{"approval_id": "broker-projected-approval", "status": "approved"}],
-                "recovery_actions": [{"recovery_id": "recover-command-dispatch"}]
+                "approvals": [{
+                    "approval_id": "broker-projected-approval",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operation": "command_envelope.dispatch",
+                    "target_scope": "broker_command",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "status": "approved"
+                }],
+                "audit_events": [{
+                    "event_id": "fixture-audit",
+                    "action": "command_envelope.dispatch",
+                    "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }],
+                "recovery_actions": [{
+                    "recovery_id": "recover-command-dispatch",
+                    "runtime_id": "gui_shell_rust_broker",
+                    "operation": "command_envelope.dispatch"
+                }]
             },
             "action": {
                 "operation": "command_envelope.dispatch",
@@ -1862,6 +1909,7 @@ mod tests {
                 "capability_id": "command_envelope.dispatch",
                 "permission_id": "permission.broker.command_envelope",
                 "approval_id": "broker-projected-approval",
+                "target_scope": "broker_command",
                 "audit_event": {
                     "event_id": "fixture-audit",
                     "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

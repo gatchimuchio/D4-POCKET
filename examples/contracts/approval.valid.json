@@ -2,9 +2,10 @@
   "approval_id": "approval-1",
   "runtime_id": "blue_tanuki",
   "operation": "filesystem.write",
+  "target_scope": "workspace",
   "status": "pending",
   "content_visibility": "redacted",
-  "payload_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "payload_hash": "sha256:5c5b691c760a352b7eb430f981091e8afa14d833eb74a654c12231146dc9d315",
   "summary": "Write one file in the workspace.",
   "redacted_payload": {
     "path": "notes/today.md",

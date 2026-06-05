@@ -38,12 +38,34 @@ def broker_start_timeout_seconds() -> float:
 
 def build_state() -> tuple[RuntimeState, dict]:
     state = RuntimeState()
-    state.register_runtime({"runtime_id": "runtime-1", "name": "Runtime 1"})
-    state.register_capability({"capability_id": "filesystem.write", "name": "Filesystem write"})
+    state.register_runtime(
+        {
+            "runtime_id": "runtime-1",
+            "name": "Runtime 1",
+            "kind": "local_service",
+            "status": "ready",
+            "adapter_id": "broker-parity-adapter",
+        }
+    )
+    state.register_capability(
+        {
+            "capability_id": "filesystem.write",
+            "runtime_id": "runtime-1",
+            "name": "Filesystem write",
+            "risk_level": "high",
+            "default_permission": "ask",
+            "requires_approval": True,
+            "operations": ["filesystem.write"],
+        }
+    )
     state.record_permission(
         {
             "permission_id": "permission-allow",
+            "runtime_id": "runtime-1",
             "capability_id": "filesystem.write",
+            "operation": "filesystem.write",
+            "target_scope": "workspace",
+            "scope": "target",
             "decision": "allow",
             "source": "policy",
         }
@@ -51,14 +73,21 @@ def build_state() -> tuple[RuntimeState, dict]:
     state.record_permission(
         {
             "permission_id": "permission-deny",
+            "runtime_id": "runtime-1",
             "capability_id": "filesystem.write",
+            "operation": "filesystem.write",
+            "target_scope": "workspace",
+            "scope": "target",
             "decision": "deny",
             "source": "policy",
         }
     )
     approved = {
         "approval_id": "approval-approved",
+        "runtime_id": "runtime-1",
         "status": "approved",
+        "operation": "filesystem.write",
+        "target_scope": "workspace",
         "content_visibility": "redacted",
         "payload_hash": canonical_hash({"path": "notes/today.md", "content": "hello"}),
         "full_payload": {"path": "notes/today.md", "content": "hello"},
@@ -69,9 +98,22 @@ def build_state() -> tuple[RuntimeState, dict]:
     pending = {**approved, "approval_id": "approval-pending", "status": "pending"}
     state.enqueue_approval(approved)
     state.enqueue_approval(pending)
+    state.append_audit_event(
+        {
+            "event_id": "audit-1",
+            "timestamp": "2026-06-05T00:00:00Z",
+            "actor": "shell",
+            "action": "filesystem.write",
+            "target": "runtime-1",
+            "result": "success",
+            "payload_hash": canonical_hash({"path": "notes/today.md", "content": "hello"}),
+        }
+    )
     state.register_recovery_action(
         {
             "recovery_id": "recover-1",
+            "runtime_id": "runtime-1",
+            "operation": "filesystem.write",
             "class": "permission_denied",
             "severity": "warning",
             "user_visible_message": "Permission required.",
@@ -83,6 +125,7 @@ def build_state() -> tuple[RuntimeState, dict]:
         "capabilities": list(state.capabilities.values()),
         "permissions": list(state.permissions.values()),
         "approvals": list(state.approvals.values()),
+        "audit_events": list(state.audit_events.values()),
         "recovery_actions": list(state.recovery_actions.values()),
     }
     return state, state_json
@@ -95,6 +138,7 @@ def base_action() -> dict:
         "capability_id": "filesystem.write",
         "permission_id": "permission-allow",
         "approval_id": "approval-approved",
+        "target_scope": "workspace",
         "payload": {"path": "notes/today.md", "content": "hello"},
         "audit_event": {
             "event_id": "audit-1",
@@ -263,6 +307,7 @@ def compare_normalization(broker: BrokerClient) -> list[str]:
     cases = [
         {"safeLabel": "operator", "nested": {"path": "notes/today.md"}},
         {"trust\u200bLevel": "root", "nested": {"permissionGrant": "all"}},
+        {"safeLabel": "first", "safe_label": "second"},
     ]
     for index, payload in enumerate(cases):
         python_result = normalize_inbound_payload(payload)
@@ -274,6 +319,8 @@ def compare_normalization(broker: BrokerClient) -> list[str]:
             errors.append(f"normalization {index}: authority key count mismatch")
         if len(python_result["authority_value_findings"]) != len(rust_result["authority_value_findings"]):
             errors.append(f"normalization {index}: authority value count mismatch")
+        if len(python_result["normalization_collision_findings"]) != len(rust_result["normalization_collision_findings"]):
+            errors.append(f"normalization {index}: collision count mismatch")
     return errors
 
 

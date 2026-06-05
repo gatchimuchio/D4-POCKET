@@ -2,10 +2,10 @@
   "event_id": "audit-1",
   "timestamp": "2026-05-25T00:00:00Z",
   "actor": "shell",
-  "action": "approval.requested",
-  "target": "approval-1",
+  "action": "filesystem.write",
+  "target": "blue_tanuki",
   "result": "success",
-  "payload_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "payload_hash": "sha256:5c5b691c760a352b7eb430f981091e8afa14d833eb74a654c12231146dc9d315",
   "previous_event_hash": null,
   "metadata": {
     "content_visibility": "redacted"

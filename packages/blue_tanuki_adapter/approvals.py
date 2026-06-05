@@ -10,6 +10,7 @@ def normalize_approval(source: dict) -> dict:
         "approval_id": source.get("approval_id", "blue-tanuki-approval-1"),
         "runtime_id": "blue_tanuki",
         "operation": source.get("operation", "runtime.read"),
+        "target_scope": source.get("target_scope", "runtime_status"),
         "status": status,
         "content_visibility": source.get("content_visibility", "redacted"),
         "payload_hash": source.get(

@@ -1,0 +1,16 @@
+{
+  "envelope_id": "action-envelope-1",
+  "runtime_id": "blue_tanuki",
+  "operation": "filesystem.write",
+  "capability_id": "filesystem.write",
+  "permission_id": "permission.fs.write.workspace",
+  "approval_id": "approval-1",
+  "recovery_id": "recover-1",
+  "target_scope": "workspace",
+  "payload_hash": "sha256:5c5b691c760a352b7eb430f981091e8afa14d833eb74a654c12231146dc9d315",
+  "authority_source": "broker_internal",
+  "audit_event_required": true,
+  "metadata": {
+    "evidence_class": "CONFIG"
+  }
+}
