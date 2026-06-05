@@ -31,6 +31,18 @@ void main() {
     expect(find.text('Authority'), findsOneWidget);
   });
 
+  testWidgets('GUI Shell desktop app has product baseline shell chrome',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.title, kGuiShellProductTitle);
+    expect(app.themeMode, ThemeMode.system);
+    expect(app.theme, isNotNull);
+    expect(app.darkTheme, isNotNull);
+    expect(find.byType(GuiShellFatalErrorScreen), findsNothing);
+  });
+
   testWidgets('Windows acceptance surfaces expose semantic labels',
       (WidgetTester tester) async {
     final semantics = tester.ensureSemantics();

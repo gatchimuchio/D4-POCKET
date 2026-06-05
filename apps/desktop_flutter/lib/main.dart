@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -18,17 +21,53 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/shell_core_client.dart';
 
+const String kGuiShellProductTitle = 'GUI Shell';
+
 SemanticsHandle? _appSemanticsHandle;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  _ensureAccessibilitySemantics();
-  final client = await ShellCoreClient.product();
-  runApp(GuiShellDesktopApp(client: client));
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      _installFatalErrorHandlers();
+      _ensureAccessibilitySemantics();
+      final client = await ShellCoreClient.product();
+      runApp(GuiShellDesktopApp(client: client));
+    },
+    (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'gui_shell_desktop',
+          context: ErrorDescription('uncaught app zone error'),
+        ),
+      );
+    },
+  );
 }
 
 void _ensureAccessibilitySemantics() {
   _appSemanticsHandle ??= SemanticsBinding.instance.ensureSemantics();
+}
+
+void _installFatalErrorHandlers() {
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'gui_shell_desktop',
+        context: ErrorDescription('uncaught platform dispatcher error'),
+      ),
+    );
+    return true;
+  };
+  ErrorWidget.builder = (details) =>
+      GuiShellFatalErrorScreen(message: details.exceptionAsString());
 }
 
 class GuiShellDesktopApp extends StatelessWidget {
@@ -40,14 +79,74 @@ class GuiShellDesktopApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final client = this.client ?? ShellCoreClient.mock();
     return MaterialApp(
-      title: 'GUI Shell',
+      title: kGuiShellProductTitle,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xff2f6f5e),
-        useMaterial3: true,
-        visualDensity: VisualDensity.compact,
-      ),
+      themeMode: ThemeMode.system,
+      theme: _buildShellTheme(Brightness.light),
+      darkTheme: _buildShellTheme(Brightness.dark),
       home: ShellHomePage(client: client),
+    );
+  }
+}
+
+ThemeData _buildShellTheme(Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: const Color(0xff2f6f5e),
+    brightness: brightness,
+  );
+  return ThemeData(
+    colorScheme: scheme,
+    useMaterial3: true,
+    visualDensity: VisualDensity.compact,
+    scaffoldBackgroundColor: scheme.surface,
+  );
+}
+
+class GuiShellFatalErrorScreen extends StatelessWidget {
+  const GuiShellFatalErrorScreen({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xff2f6f5e),
+      brightness: Brightness.light,
+    );
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        color: scheme.errorContainer,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline, color: scheme.onErrorContainer),
+                  const SizedBox(height: 12),
+                  Text(
+                    'GUI Shell encountered a fatal UI error.',
+                    style: TextStyle(
+                      color: scheme.onErrorContainer,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    style: TextStyle(color: scheme.onErrorContainer),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

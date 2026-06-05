@@ -1932,6 +1932,45 @@ def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> l
     return errors
 
 
+def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
+    main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    windows_main = (DESKTOP_FLUTTER / "windows" / "runner" / "main.cpp").read_text(encoding="utf-8")
+    win32 = (DESKTOP_FLUTTER / "windows" / "runner" / "win32_window.cpp").read_text(encoding="utf-8")
+    linux = (DESKTOP_FLUTTER / "linux" / "runner" / "my_application.cc").read_text(encoding="utf-8")
+    widget_test = (DESKTOP_FLUTTER / "test" / "widget_test.dart").read_text(encoding="utf-8")
+    errors = []
+    for token in [
+        "runZonedGuarded",
+        "PlatformDispatcher.instance.onError",
+        "ErrorWidget.builder",
+        "GuiShellFatalErrorScreen",
+        "themeMode: ThemeMode.system",
+        "darkTheme: _buildShellTheme(Brightness.dark)",
+        "kGuiShellProductTitle",
+    ]:
+        if token not in main:
+            errors.append(f"desktop Flutter product baseline missing token: {token}")
+    if 'window.Create(L"GUI Shell", origin, size)' not in windows_main:
+        errors.append("Windows runner product window title is not GUI Shell")
+    if "Win32Window::Size size(1280, 800)" not in windows_main:
+        errors.append("Windows runner default product window size is not fixed at 1280x800")
+    for token in ["WM_GETMINMAXINFO", "kMinWindowWidth = 1024", "kMinWindowHeight = 640"]:
+        if token not in win32:
+            errors.append(f"Windows runner minimum-size guard missing token: {token}")
+    for token in [
+        'gtk_header_bar_set_title(header_bar, "GUI Shell")',
+        'gtk_window_set_title(window, "GUI Shell")',
+        "gtk_window_set_default_size(window, 1280, 800)",
+        "gtk_widget_set_size_request(GTK_WIDGET(window), 1024, 640)",
+    ]:
+        if token not in linux:
+            errors.append(f"Linux runner product window baseline missing token: {token}")
+    for token in ["GUI Shell desktop app has product baseline shell chrome", "ThemeMode.system"]:
+        if token not in widget_test:
+            errors.append(f"desktop Flutter widget baseline test missing token: {token}")
+    return errors
+
+
 def test_validate_all_uses_running_python_interpreter_for_python_steps() -> list[str]:
     errors = []
     steps = build_validation_steps(False, "windows", python_only=True)
@@ -2677,6 +2716,7 @@ def main() -> int:
         test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
         test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection,
         test_desktop_flutter_exposes_individual_surface_semantics_identifiers,
+        test_desktop_flutter_product_baseline_chrome_exists,
         test_validate_all_uses_running_python_interpreter_for_python_steps,
         test_release_docs_declare_language_policy_runtime_blockers,
         test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema,
