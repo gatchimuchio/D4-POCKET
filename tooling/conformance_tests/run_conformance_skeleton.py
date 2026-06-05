@@ -2076,7 +2076,10 @@ def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> l
             errors.append(f"desktop Flutter surface label missing: {label}")
     if "SurfaceSemantics(" not in main or "label: 'NavigationRail'" not in main:
         errors.append("NavigationRail is not exposed through SurfaceSemantics")
-    if "bySemanticsIdentifier(surfaceSemanticsIdentifier(label))" not in widget_test:
+    if "bySemanticsIdentifier(surfaceSemanticsIdentifier(label))" not in widget_test and (
+        "surfaceSemanticsIdentifier(label)" not in widget_test
+        or "properties.identifier == identifier" not in widget_test
+    ):
         errors.append("desktop Flutter widget test does not verify per-surface semantics identifiers")
     return errors
 

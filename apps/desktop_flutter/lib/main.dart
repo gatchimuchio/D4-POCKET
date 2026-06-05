@@ -24,6 +24,7 @@ import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
 
 const String kGuiShellProductTitle = 'GUI Shell';
+const double _navigationRailMinScrollableExtent = 760;
 
 SemanticsHandle? _appSemanticsHandle;
 
@@ -224,62 +225,80 @@ class _ShellHomePageState extends State<ShellHomePage> {
                       SurfaceSemantics(
                         label: 'NavigationRail',
                         explicitChildNodes: true,
-                        child: NavigationRail(
-                          selectedIndex: selectedIndex,
-                          onDestinationSelected: (index) =>
-                              setState(() => selectedIndex = index),
-                          labelType: NavigationRailLabelType.selected,
-                          scrollable: true,
-                          destinations: const [
-                            NavigationRailDestination(
-                                icon: Icon(Icons.dashboard_outlined),
-                                selectedIcon: Icon(Icons.dashboard),
-                                label: Text('Dashboard')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.build_circle_outlined),
-                                selectedIcon: Icon(Icons.build_circle),
-                                label: Text('Doctor')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.verified_user_outlined),
-                                selectedIcon: Icon(Icons.verified_user),
-                                label: Text('Trust')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.hub_outlined),
-                                selectedIcon: Icon(Icons.hub),
-                                label: Text('Runtime')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.account_tree_outlined),
-                                selectedIcon: Icon(Icons.account_tree),
-                                label: Text('Authority')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.smart_toy_outlined),
-                                selectedIcon: Icon(Icons.smart_toy),
-                                label: Text('Agent')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.fact_check_outlined),
-                                selectedIcon: Icon(Icons.fact_check),
-                                label: Text('Approval')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.receipt_long_outlined),
-                                selectedIcon: Icon(Icons.receipt_long),
-                                label: Text('Audit')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.health_and_safety_outlined),
-                                selectedIcon: Icon(Icons.health_and_safety),
-                                label: Text('Recovery')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.report_problem_outlined),
-                                selectedIcon: Icon(Icons.report_problem),
-                                label: Text('Problems')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.inventory_2_outlined),
-                                selectedIcon: Icon(Icons.inventory_2),
-                                label: Text('Evidence')),
-                            NavigationRailDestination(
-                                icon: Icon(Icons.settings_outlined),
-                                selectedIcon: Icon(Icons.settings),
-                                label: Text('Settings')),
-                          ],
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final railHeight = constraints.hasBoundedHeight &&
+                                    constraints.maxHeight >
+                                        _navigationRailMinScrollableExtent
+                                ? constraints.maxHeight
+                                : _navigationRailMinScrollableExtent;
+                            return SingleChildScrollView(
+                              child: SizedBox(
+                                height: railHeight,
+                                child: NavigationRail(
+                                  selectedIndex: selectedIndex,
+                                  onDestinationSelected: (index) =>
+                                      setState(() => selectedIndex = index),
+                                  labelType: NavigationRailLabelType.selected,
+                                  destinations: const [
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.dashboard_outlined),
+                                        selectedIcon: Icon(Icons.dashboard),
+                                        label: Text('Dashboard')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.build_circle_outlined),
+                                        selectedIcon: Icon(Icons.build_circle),
+                                        label: Text('Doctor')),
+                                    NavigationRailDestination(
+                                        icon:
+                                            Icon(Icons.verified_user_outlined),
+                                        selectedIcon: Icon(Icons.verified_user),
+                                        label: Text('Trust')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.hub_outlined),
+                                        selectedIcon: Icon(Icons.hub),
+                                        label: Text('Runtime')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.account_tree_outlined),
+                                        selectedIcon: Icon(Icons.account_tree),
+                                        label: Text('Authority')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.smart_toy_outlined),
+                                        selectedIcon: Icon(Icons.smart_toy),
+                                        label: Text('Agent')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.fact_check_outlined),
+                                        selectedIcon: Icon(Icons.fact_check),
+                                        label: Text('Approval')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.receipt_long_outlined),
+                                        selectedIcon: Icon(Icons.receipt_long),
+                                        label: Text('Audit')),
+                                    NavigationRailDestination(
+                                        icon: Icon(
+                                            Icons.health_and_safety_outlined),
+                                        selectedIcon:
+                                            Icon(Icons.health_and_safety),
+                                        label: Text('Recovery')),
+                                    NavigationRailDestination(
+                                        icon:
+                                            Icon(Icons.report_problem_outlined),
+                                        selectedIcon:
+                                            Icon(Icons.report_problem),
+                                        label: Text('Problems')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.inventory_2_outlined),
+                                        selectedIcon: Icon(Icons.inventory_2),
+                                        label: Text('Evidence')),
+                                    NavigationRailDestination(
+                                        icon: Icon(Icons.settings_outlined),
+                                        selectedIcon: Icon(Icons.settings),
+                                        label: Text('Settings')),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       const VerticalDivider(width: 1),

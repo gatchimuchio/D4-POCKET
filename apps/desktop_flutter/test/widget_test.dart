@@ -23,6 +23,15 @@ import 'package:gui_shell_desktop/services/setup_doctor_export.dart';
 import 'package:gui_shell_desktop/services/surface_semantics_export.dart';
 
 void main() {
+  Finder findSurfaceSemanticsIdentifier(String label) {
+    final identifier = surfaceSemanticsIdentifier(label);
+    return find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics && widget.properties.identifier == identifier,
+      description: 'Semantics(identifier: $identifier)',
+    );
+  }
+
   testWidgets('GUI Shell desktop app smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
@@ -58,10 +67,7 @@ void main() {
         'Runtime Status',
         'Invariant Status',
       ]) {
-        expect(
-          find.bySemanticsIdentifier(surfaceSemanticsIdentifier(label)),
-          findsOneWidget,
-        );
+        expect(findSurfaceSemanticsIdentifier(label), findsOneWidget);
       }
       expect(find.bySemanticsLabel(RegExp('Dashboard')), findsWidgets);
       expect(find.bySemanticsLabel(RegExp('NavigationRail')), findsOneWidget);
