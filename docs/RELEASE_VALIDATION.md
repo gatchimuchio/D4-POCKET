@@ -4,6 +4,7 @@ In this repository, "release" means completed product release.
 
 - item: skeleton, preview, alpha, beta, and scaffold states
   classification: release_blocker
+  example: true
   reason: these states are not completed product release states.
   blocks_release: yes
 

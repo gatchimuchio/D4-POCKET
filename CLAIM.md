@@ -22,7 +22,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: current development validation passes with 137 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
+  status: current development validation passes with 138 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, release-facing blocker/doc synchronization, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
 
 - item: bounded cross-agent LLM-readable extension reproduction
   classification: required_for_v1
@@ -76,6 +76,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: language policy runtime convergence not passed
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_broker_installed_smoke
   reason: Rust Security Broker skeleton and JSON envelope tests exist, but current Shell Core authority-sensitive behavior is still implemented in Python under `packages/shell_core/*.py` and used by owner-use snapshot generation / validation. Production IPC transport, Flutter broker-mediated authority path, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
   required_action: Migrate authority-sensitive active runtime responsibilities to the Rust Security Broker, keep Python only as dev/test/migration oracle, and prove Flutter authority operations are broker-mediated before completed product release.
   blocks_release: yes
@@ -88,6 +89,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows installer, first-run, and Setup Doctor release validation not passed
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
   reason: Windows project support and historical owner-trial launch smoke are preserved, but current strict R2 evidence requires a fresh native Windows isolated installed run with source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. The product export path exists, but `release_evidence/windows_installed_smoke.json` is missing.
   required_action: Run native Windows installed smoke collection from an isolated staged run, collect measured window, visible-surface diagnostic tree, config JSON, audit write/read/delete, broker IPC/restart/crash field provenance, and installed-app generated Setup Doctor product evidence; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
@@ -100,12 +102,14 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Windows Setup Doctor diagnostics not passed
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: The installed app supports machine-readable Setup Doctor product export, but that evidence has not been collected on native Windows and passed through the strict validator. The PowerShell Setup Doctor collector remains external probe evidence only.
   required_action: Collect app-generated Setup Doctor product export through isolated Windows installed smoke and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: audit anchor external tamper-evidence proof missing
   classification: release_blocker
+  registry_id: audit_anchor_external_tamper_evidence_proof
   reason: Local HMAC audit anchors detect local corruption and partial tamper, but same-user or administrator/root rewrite resistance is not proven without Windows ACL/DPAPI, an external anchor, or signed evidence.
   required_action: Collect Windows installed-path audit anchor key-protection or external-anchor proof and pass strict Windows release validation.
   blocks_release: yes
@@ -142,12 +146,14 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Strict release validation not passed
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke, audit_anchor_external_tamper_evidence_proof, owner_go
   reason: completed Windows-first product release requires Windows strict validation.
   required_action: Pass `python3 tooling/validate_all.py --strict-release --desktop-platform=windows`; `--desktop-platform=all` may still fail because macOS is unverified, but that does not block Windows-first v1.0.
   blocks_release: yes
 
 - item: Owner GO missing
   classification: release_blocker
+  registry_id: owner_go
   reason: release claim promotion requires owner approval.
   required_action: Obtain explicit owner GO.
   blocks_release: yes

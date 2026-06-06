@@ -78,7 +78,7 @@
     },
     {
       "path": "AUDIT_EVIDENCE.md",
-      "sha256": "f8ffcb63bcedd76d313d635b93a8e074f30752d39c0c6b43521dd9242e9197b5"
+      "sha256": "7e680036ea864cfbf296481faa756d26aca80ab5aeec472e0e1929c0aa4d924d"
     },
     {
       "path": "CHANGELOG.md",
@@ -86,11 +86,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "5f0a8e8d8995b642e08dbb53b627d8b6af0520704804cb91e98b5260444050e5"
+      "sha256": "56531acbcb7ceee1e01a27e447528d30c3bd8787abae01f0094783eaf78a51ac"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "3a4a6a59eb11e3e293988dd24d38dc0806b6021fe73bf5033a086cdbed809ba2"
+      "sha256": "e2cc5c79b0afd7dc59bd33ab341d9f66e971ffa65e9cc29ba851041ff8a2bd3f"
     },
     {
       "path": "CONFIG.md",
@@ -98,7 +98,7 @@
     },
     {
       "path": "CONFORMANCE_REPORT.md",
-      "sha256": "346d201b781fcac297e29d58b894f67fc39168352c47ed843fea1b192d74ce5b"
+      "sha256": "dbec4d2c0147a614f9432ff978216e56481ff78da4f12928c095e5128bafecba"
     },
     {
       "path": "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
@@ -106,7 +106,7 @@
     },
     {
       "path": "INSTALLER_STATUS.md",
-      "sha256": "922e74218d6984bdd2a6af167235d3c6583fba1387369815c758bd7bd13e9cf9"
+      "sha256": "4c2cc7075a032000e4ec07f45b60a9e0ae170ac01886ca1b54207d5c928c9ccc"
     },
     {
       "path": "LICENSE",
@@ -118,15 +118,15 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "5938bb77c00031c15b7c09bc271b4829888517883e88b4375d882025bfd7c512"
+      "sha256": "9b660ee40f1b0e1080f722a3f2658c52c40c1e7d14fb5158295ab9cc47ced4ba"
     },
     {
       "path": "README.md",
-      "sha256": "23fe559882ae4698a503be8a84daee3e089a1ebed1f51b6ce111b421421ec3a1"
+      "sha256": "6aaa626810f645db9f7fa2ec969ff4efde7787ce0c79ffffd59a490ba2754296"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "206a8bc3a173810aa9c8c0b6f902dea81ee71fd5b7aa270c54de6a798123c4cf"
+      "sha256": "e6c99b291e09063dd77ff018338f902d188343a8cb642adf40944fa31e44c851"
     },
     {
       "path": "ROADMAP.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "SECURITY_REVIEW.md",
-      "sha256": "08b27894d5bbffa85ec96c07744ab598178cb13ed4866a125713f1d4584d99bd"
+      "sha256": "667b428f2bc66432b2627f9b7e8082c3e92b3bbdbbc28a7f6caa3cc84c0740c5"
     },
     {
       "path": "TROUBLESHOOTING.md",
@@ -238,7 +238,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "e769c0be7a46609bdcf03ad334f645df1570f06d0de0f97511a3725bccb4221c"
+      "sha256": "05c75dddb9ba7fb929757f3a712f0d973b5fa689b8b60e7311627bebd10bc086"
     },
     {
       "path": "apps/desktop_flutter/lib/services/surface_semantics_export.dart",
@@ -462,11 +462,11 @@
     },
     {
       "path": "docs/PRODUCT_COMPLETION_PLAN.md",
-      "sha256": "514fca769651acb61547e9abca6282b562a12dee18d39155bd18b289344c3809"
+      "sha256": "e8d3e59efa346dbb679c8c392b5d270f2cffd498f37b8bdb2e6b4c72cdab5649"
     },
     {
       "path": "docs/RELEASE_VALIDATION.md",
-      "sha256": "5551f8ffa24c5c123c279fe66a53bda4a3171ad4501f277a02852316452dc3bf"
+      "sha256": "8ceb8e9ca3bc51a5f7119f6c8d526e5414a15ff88f32bacc6c46967adbf4ec1b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -478,11 +478,11 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "8db20695b6c5637093d1352551ebe8e29a19cb80f98f4b5320c4ce6b0ae9f7c0"
+      "sha256": "9315e10c9105833674aa5a075dddaa4226b62e9e90779df42beccfac4ff112cd"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
-      "sha256": "27a805919856b746df9cc5a6e4b61a82863550e5413dbf5d93815d4ba6947e93"
+      "sha256": "b803583886a30e8bb1cd216f19fb7ac50a874ad49b8467499461246eca05ce40"
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
@@ -494,7 +494,7 @@
     },
     {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "bebb7d15437e21e9b515ce0e97482c951e25296b1b3f68f956e8c88d54859f1a"
+      "sha256": "abfc28519bae2a2315b0dfd978346850467f88512f412d6be2e7b121b983afa0"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -546,7 +546,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "8f744c079f0525a1bd651552cb488bb40f5b0ac14dc57454f6f54e872b0fef39"
+      "sha256": "cd0cac3f426626d090b3058f220dcad66a66ea6c9cf1e1cc427f0f50555c75d9"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -1266,7 +1266,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0f3e789354cddb506ce25665a82934e7d1306738505b82a2a6fd2599a0eddf75"
+      "sha256": "5dd3934476af1e0752eb38051affb75be707ed59feb50d3534f97d658ed834ad"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1282,11 +1282,11 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "b29e4f75362104930cc59d3394eeb5e918883f8a52c62c1dcaad551bd6e7d854"
+      "sha256": "4ddc9660b128b588347b16e45e6a87fd3fc9a6d5cf1bb7df8a10970d8f577d2c"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "f18b48b210294a687cd8170a5b937f991d3f9b4d2ff0032970612fedef9f878b"
+      "sha256": "aafffb1ccb87436fdc984e63e09927ee1988b16f0afb68dfa45351f4df1b04f2"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -1298,7 +1298,7 @@
     },
     {
       "path": "tooling/shell_snapshot.py",
-      "sha256": "1ad76459e07de44312687c49999788d561b5a4de46d1d54c9398331bcc77f6e7"
+      "sha256": "1b406e9b5d8f5789c50d1f63a7eaa29037776561a1d14aaec4d8196968d1a473"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",

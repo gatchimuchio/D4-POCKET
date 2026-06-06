@@ -51,18 +51,21 @@
 
 - item: measured Windows installed-path audit evidence
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke
   reason: completed product release still requires native Windows installed-path evidence to prove config/audit initialization from the installed app path.
   required_action: Generate measured `release_evidence/windows_installed_smoke.json` on native Windows and pass `python tooling/windows_release_evidence.py`.
   blocks_release: yes
 
 - item: installed-app Setup Doctor product evidence
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: Native Windows launch smoke is development evidence. Strict R2 requires installed-app generated Setup Doctor product evidence from an isolated native Windows run; the current PowerShell Setup Doctor collector is external probe evidence only.
   required_action: Record installed-app generated Setup Doctor export evidence through isolated Windows installed smoke. Strict release must still fail until measured `windows_installed_smoke.json`, Setup Doctor product evidence, and owner GO exist.
   blocks_release: yes
 
 - item: audit anchor external tamper-evidence proof
   classification: release_blocker
+  registry_id: audit_anchor_external_tamper_evidence_proof
   reason: Local HMAC audit anchor verification does not prove same-user or administrator/root rewrite resistance by itself.
   required_action: Record Windows ACL/DPAPI, external anchor, or signed-evidence proof for audit anchor files and pass strict Windows release validation.
   blocks_release: yes

@@ -30,7 +30,7 @@ Expected successful output:
 
 ```text
 schema check passed: 26 schemas, 26 examples, 28 negative fixtures
-conformance skeleton passed: 137 checks
+conformance skeleton passed: 138 checks
 ```
 
 ## Phase B owner launch

@@ -66,12 +66,14 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: Windows installer and first-run smoke
   classification: release_blocker
+  registry_id: windows_installer_first_run_smoke
   reason: native Windows isolated installed-path installer and first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
   required_action: Install through the unique staged Windows path, launch the installed Flutter `.exe` through the installed Rust broker, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` with `-BrokerHelperExe`, `-NoPythonRuntime`, installed manifest, measured UIAutomation diagnostic tree, config, audit, and broker field-provenance inputs, and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: installed-app generated Setup Doctor product export support exists, but native Windows isolated-run evidence is missing. The PowerShell Setup Doctor collector is external probe evidence and is rejected as product proof.
   required_action: Run `collect_installed_smoke.ps1` so the installed app writes machine-readable Setup Doctor product export evidence and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
@@ -86,42 +88,49 @@ Mobile remains `post_v1_scope` unless the owner explicitly changes v1.0 scope.
 
 - item: PATH resolution
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke
   reason: Flutter, Git, runtime, or helper commands may resolve differently across PowerShell, CMD, installer environment, and user shell.
   required_action: Validate PATH from the installed app path and Setup Doctor.
   blocks_release: yes
 
 - item: PowerShell policy
   classification: release_blocker
+  aggregate_of: windows_installer_first_run_smoke, windows_setup_doctor_smoke
   reason: execution policy can block scripts or helper launch paths.
   required_action: Detect and report policy issues without silently broadening authority.
   blocks_release: yes
 
 - item: Visual Studio Build Tools
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation
   reason: missing C++ workload or Windows SDK blocks `flutter build windows`.
   required_action: Detect missing build tools and provide operator-visible recovery guidance.
   blocks_release: yes
 
 - item: Windows Defender
   classification: release_blocker
+  aggregate_of: windows_installer_first_run_smoke, windows_broker_installed_smoke
   reason: quarantine or controlled-folder access can block helper, installer, cache, or runtime files.
   required_action: Detect likely Defender interference and classify recovery steps.
   blocks_release: yes
 
 - item: WSL boundary confusion
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation
   reason: WSL paths and Windows paths can cross authority and filesystem expectations.
   required_action: Keep Windows release validation on native Windows app paths and classify WSL use separately.
   blocks_release: yes
 
 - item: filesystem permission
   classification: release_blocker
+  aggregate_of: windows_installer_first_run_smoke, windows_broker_installed_smoke, audit_anchor_external_tamper_evidence_proof
   reason: Program Files, user profile, temp, and workspace permissions can differ.
   required_action: Validate filesystem diagnostics through Shell Core permission, approval, audit, and recovery mapping.
   blocks_release: yes
 
 - item: Git credential / SSH credential confusion
   classification: release_blocker
+  aggregate_of: windows_setup_doctor_smoke
   reason: Windows Credential Manager, SSH agent, Git config, and WSL credentials can diverge.
   required_action: Detect credential-surface ambiguity without exposing secrets or treating credentials as authority.
   blocks_release: yes

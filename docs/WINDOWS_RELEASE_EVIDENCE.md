@@ -6,12 +6,15 @@ Windows-first release validation uses isolated, machine-readable installed-path 
 
 - item: historical Windows staged-install PASS
   classification: release_blocker
+  historical: true
+  superseded_by: windows_evidence_provenance_isolation
   reason: The historical Windows PASS is retained only as owner-trial history. It is invalid for current strict R2 proof because the old run depended on aggregate native surface exposure and was not bound to the exact source commit, isolated install root, and evidence bundle hash required now.
   required_action: Recollect native Windows evidence with the current isolated evidence contract before any completed product release claim.
   blocks_release: yes
 
 - item: native Windows Setup Doctor product export not recollected
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: `installer/windows/collect_setup_doctor.ps1` remains classified as `external_installer_config_broker_probe` and must not satisfy formal Setup Doctor product evidence. The installed Flutter app now supports `GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON`, but native Windows evidence has not been recollected and validated from an isolated staged run.
   required_action: Run `collect_installed_smoke.ps1` on native Windows so the installed app writes the Setup Doctor product export, then pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes

@@ -28,12 +28,14 @@ Current phase: Phase B owner-use complete. Installer work is not being treated a
 
 - item: Windows installed-path first-run evidence missing
   classification: release_blocker
+  registry_id: windows_installer_first_run_smoke
   reason: Windows-first completed product release requires measured installed-path first-run evidence with isolated run provenance, source commit, artifact hashes, evidence bundle hashes, and UIAutomation diagnostic tree.
   required_action: Run the hardened Windows installed smoke collector from a unique staged run with visible-surface diagnostic tree, broker measured field provenance, config path, audit dir probe inputs, and installed manifest.
   blocks_release: yes
 
 - item: Windows Setup Doctor installed-path evidence not collected
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: The PowerShell Setup Doctor collector remains external installer/config/broker probe evidence. The installed Flutter app can now generate machine-readable Setup Doctor product export, but native Windows evidence has not been collected and validated.
   required_action: Run isolated Windows installed smoke so the installed app writes Setup Doctor product export evidence and pass `python tooling/windows_release_evidence.py`.
   blocks_release: yes

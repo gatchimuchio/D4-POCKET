@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -179,9 +180,14 @@ def assert_flutter_models_do_not_default_evidence_to_passed() -> RuntimeAssertio
         "json['evidence_bundle'] as String? ?? 'passed'",
         "json['validate_all'] as String? ?? 'passed'",
         "json['strict_windows_release'] as String? ?? 'expected fail'",
-        "json['conformance_check_count'] as int? ?? 135",
     ]
     findings = [token for token in forbidden if token in text]
+    conformance_default = re.search(
+        r"json\[['\"]conformance_check_count['\"]\]\s+as\s+int\?\s+\?\?\s+(?!0\b)\d+",
+        text,
+    )
+    if conformance_default:
+        findings.append(f"nonzero conformance_check_count default: {conformance_default.group(0)}")
     if findings:
         return _fail(
             "flutter_models_do_not_default_evidence_to_passed",

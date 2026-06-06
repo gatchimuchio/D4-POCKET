@@ -1137,7 +1137,7 @@ const _mockSnapshot = ShellSnapshot(
   releaseBlockerCount: 4,
   evidenceSummary: EvidenceSummaryRecord(
     schemaCheck: 'passed',
-    conformanceCheckCount: 137,
+    conformanceCheckCount: 138,
     releaseSmoke: 'passed',
     releaseGateCheck: 'passed',
     evidenceBundle: 'passed',
@@ -1345,7 +1345,7 @@ const _localFallbackSnapshot = ShellSnapshot(
   releaseBlockerCount: 1,
   evidenceSummary: EvidenceSummaryRecord(
     schemaCheck: 'passed',
-    conformanceCheckCount: 137,
+    conformanceCheckCount: 138,
     releaseSmoke: 'passed',
     releaseGateCheck: 'passed',
     evidenceBundle: 'passed',

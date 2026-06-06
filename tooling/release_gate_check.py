@@ -32,6 +32,22 @@ SCAN_FILES = [
     "docs/STRATEGY.md",
 ]
 
+CURRENT_FACING_RELEASE_DOCS = [
+    "README.md",
+    "CLAIM.md",
+    "RELEASE_CHECKLIST.md",
+    "AUDIT_EVIDENCE.md",
+    "SECURITY_REVIEW.md",
+    "INSTALLER_STATUS.md",
+    "MOBILE_STATUS.md",
+    "COMPATIBILITY_MATRIX.md",
+    "docs/security/IPC_THREAT_MODEL.md",
+    "docs/WINDOWS_RELEASE_PLAN.md",
+    "docs/WINDOWS_RELEASE_EVIDENCE.md",
+    "docs/PRODUCT_COMPLETION_PLAN.md",
+    "docs/RELEASE_VALIDATION.md",
+]
+
 PATTERNS = [
     "not run",
     "not verified",
@@ -55,6 +71,7 @@ PATTERNS = [
 ]
 
 CLASSIFICATIONS = ["release_blocker", "post_v1_scope", "known_limitation", "required_for_v1"]
+DOC_SYNC_MARKERS = ["registry_id", "aggregate_of", "superseded_by", "historical", "example"]
 
 MACOS_CLAIM_PATTERNS = [
     r"\bmacos\b.{0,80}\b(verified|supported|ready|complete|release-ready)\b",
@@ -182,8 +199,22 @@ def registry_errors() -> list[str]:
     return errors
 
 
+def load_release_blocker_registry() -> dict:
+    return json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
+
+
+def registry_blocker_names() -> set[str]:
+    registry = load_release_blocker_registry()
+    blockers = registry.get("blockers", [])
+    return {
+        blocker["name"]
+        for blocker in blockers
+        if isinstance(blocker, dict) and isinstance(blocker.get("name"), str)
+    }
+
+
 def unresolved_active_blockers() -> list[dict]:
-    registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
+    registry = load_release_blocker_registry()
     blockers = registry.get("blockers", [])
     return [
         blocker
@@ -194,6 +225,101 @@ def unresolved_active_blockers() -> list[dict]:
         and blocker.get("classification") == "release_blocker"
         and blocker.get("blocks_release") is True
     ]
+
+
+def _metadata_values(block: str, key: str) -> list[str]:
+    values: list[str] = []
+    for match in re.finditer(rf"(?im)^\s*{re.escape(key)}\s*:\s*(.+?)\s*$", block):
+        values.extend(_split_metadata_values(match.group(1)))
+    for match in re.finditer(rf"\b{re.escape(key)}=([A-Za-z0-9_,.-]+)", block):
+        values.extend(_split_metadata_values(match.group(1)))
+    return values
+
+
+def _split_metadata_values(raw: str) -> list[str]:
+    cleaned = raw.strip().strip("[]`")
+    cleaned = cleaned.replace("[", "").replace("]", "")
+    parts = re.split(r"[\s,]+", cleaned)
+    return [part.strip().strip("`'\"") for part in parts if part.strip().strip("`'\"")]
+
+
+def _has_doc_sync_marker(block: str) -> bool:
+    lowered = block.lower()
+    return any(f"{marker}:" in lowered or f"{marker}=" in lowered for marker in DOC_SYNC_MARKERS)
+
+
+def _has_truthy_marker(block: str, key: str) -> bool:
+    return any(value.lower() in {"true", "yes"} for value in _metadata_values(block, key))
+
+
+def _unknown_registry_refs(block: str, names: set[str]) -> list[str]:
+    refs: list[str] = []
+    for key in ("registry_id", "aggregate_of", "superseded_by"):
+        refs.extend(_metadata_values(block, key))
+    ignored = {"", "none", "true", "false", "yes", "no"}
+    return sorted({ref for ref in refs if ref.lower() not in ignored and ref not in names})
+
+
+def _release_blocker_doc_blocks(lines: list[str]) -> list[tuple[int, str]]:
+    blocks: list[tuple[int, str]] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        item_match = re.match(r"^\s*-\s+item:\s+", line)
+        classification_rule_match = re.match(r"^\s*-\s+classification:\s*`?release_blocker`?\s*$", line)
+        if item_match or classification_rule_match:
+            start = index
+            index += 1
+            while index < len(lines):
+                next_line = lines[index]
+                if re.match(r"^\s*-\s+item:\s+", next_line):
+                    break
+                if classification_rule_match and re.match(r"^\s*-\s+classification:\s+", next_line):
+                    break
+                if next_line.startswith("#"):
+                    break
+                index += 1
+            block = "\n".join(lines[start:index])
+            if re.search(r"(?im)^\s*classification:\s*`?release_blocker`?\s*$", block):
+                blocks.append((start + 1, block))
+            continue
+        if "|" in line and "release_blocker" in line:
+            blocks.append((index + 1, line))
+        index += 1
+    return blocks
+
+
+def release_blocker_doc_sync_errors() -> list[str]:
+    names = registry_blocker_names()
+    errors: list[str] = []
+    for relative in CURRENT_FACING_RELEASE_DOCS:
+        path = ROOT / relative
+        if not path.exists():
+            errors.append(f"{relative} missing from release blocker doc sync scan")
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_number, block in _release_blocker_doc_blocks(lines):
+            if not _has_doc_sync_marker(block):
+                errors.append(
+                    f"{relative}:{line_number}: release_blocker block missing registry_id, aggregate_of, superseded_by, historical, or example marker"
+                )
+                continue
+            unknown = _unknown_registry_refs(block, names)
+            if unknown:
+                errors.append(
+                    f"{relative}:{line_number}: release_blocker block references unknown registry blocker: {', '.join(unknown)}"
+                )
+            if (
+                not _metadata_values(block, "registry_id")
+                and not _metadata_values(block, "aggregate_of")
+                and not _metadata_values(block, "superseded_by")
+                and not _has_truthy_marker(block, "historical")
+                and not _has_truthy_marker(block, "example")
+            ):
+                errors.append(
+                    f"{relative}:{line_number}: release_blocker marker exists but does not bind to registry, aggregate, superseded, historical=true, or example=true"
+                )
+    return errors
 
 
 def main() -> int:
@@ -210,6 +336,8 @@ def main() -> int:
         errors.extend(scan_file(path))
 
     errors.extend(registry_errors())
+    if not errors:
+        errors.extend(release_blocker_doc_sync_errors())
     if args.strict_release and not errors:
         for blocker in unresolved_active_blockers():
             errors.append(

@@ -4,6 +4,7 @@ GUI-Shell v1.0 means completed Windows-first PC desktop product release.
 
 - item: skeleton, preview, alpha, beta, and scaffold states
   classification: release_blocker
+  example: true
   reason: these states are not completed product release states.
   blocks_release: yes
 
@@ -27,6 +28,7 @@ Platform priority:
 
 - item: Windows desktop project support, analyze, test, build, launch, Setup Doctor, installer, and first-run smoke
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
   reason: Windows is the primary product target. Historical Windows project/toolchain/build/launch smoke is owner-trial history only; strict R2 evidence requires isolated installed-path provenance, artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product evidence.
   required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows from a unique staged run and pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
@@ -39,6 +41,7 @@ Platform priority:
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: installed-app generated Setup Doctor product export support exists, but native Windows product diagnostics evidence has not been collected; the current PowerShell Setup Doctor collector is external probe evidence only.
   required_action: Collect installed-app generated machine-readable Setup Doctor export evidence through isolated Windows installed smoke.
   blocks_release: yes

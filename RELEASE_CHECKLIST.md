@@ -14,6 +14,7 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: language policy runtime convergence gate
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_broker_installed_smoke
   reason: Rust Security Broker production IPC via authenticated loopback IPC, durable audit/replay/session store, Rust authority parity operations, Flutter product broker client code, and release runtime static assertions exist. Product `main.dart` now uses `ShellCoreClient.product()` instead of `ShellCoreClient.local()`, `tooling/release_runtime_assertions.py --check` proves the current product authority surface uses broker IPC without Python process startup and satisfies the no-ffi-authority direct-bridge assertion, and Windows Flutter analyze/test passed through `flutter.bat`. However command dispatch remains suspended, broker health still reports `authority_cutover_status=not_active`, WSL direct `flutter` still fails because the external Flutter SDK shell scripts have CRLF line endings, installed no-Python-runtime product evidence, and Windows installed-path broker evidence are not complete.
   required_action: Complete the migration plan in `docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md`, prove Python is dev/test/migration oracle only in installed product runtime, collect broker-mediated Windows installed-path evidence, and rerun strict release validation.
   blocks_release: yes
@@ -146,18 +147,21 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: R2 Windows formal evidence path reset
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
   reason: Current strict Windows evidence now requires isolated run provenance, source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, field provenance, full UIAutomation diagnostic tree, measured broker IPC/restart/crash fields, and installed-app generated Setup Doctor product export. Historical PASS and external probe reports are invalid for this gate.
   required_action: Complete the redesigned Windows evidence collection path and run strict Windows validation on native Windows.
   blocks_release: yes
 
 - item: Windows installer first-run smoke not passed
   classification: release_blocker
+  registry_id: windows_installer_first_run_smoke
   reason: Windows installed-path first-run evidence has not been recorded in `release_evidence/windows_installed_smoke.json` with the strict R2 provenance/isolation contract.
   required_action: Stage the Windows installed app into a unique run root, run `installer\windows\collect_broker_smoke.ps1`, run `installer\windows\collect_installed_smoke.ps1` on native Windows with `-BrokerHelperExe`, `-NoPythonRuntime`, UIAutomation diagnostic tree evidence, broker evidence, config path, audit dir probe inputs, and installed manifest; pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: The installed app supports machine-readable Setup Doctor product export, but native Windows isolated-run evidence has not been collected and validated. The PowerShell Setup Doctor collector remains external probe evidence only.
   required_action: Run isolated Windows installed smoke so the installed app writes Setup Doctor product export evidence, then pass `python tooling\windows_release_evidence.py`.
   blocks_release: yes
@@ -176,12 +180,14 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: Windows Setup Doctor diagnostics evidence not passed
   classification: release_blocker
+  registry_id: windows_setup_doctor_smoke
   reason: Installed-app generated Windows Setup Doctor product evidence has not passed for the Windows-first product target; external probe evidence is invalid for this gate.
   required_action: Pass Windows Setup Doctor product export evidence from `collect_installed_smoke.ps1`; macOS diagnostics remain planned portability validation.
   blocks_release: yes
 
 - item: validate_all.py strict release mode not passed
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke, audit_anchor_external_tamper_evidence_proof, owner_go
   reason: Current-host Linux validation may pass, but Windows-first strict release mode must not report release blockers before completed product release.
   required_action: Pass `python3 tooling/validate_all.py --strict-release --desktop-platform=windows`; `--desktop-platform=all` may still fail because macOS is unverified, but that does not block Windows-first v1.0.
   blocks_release: yes
@@ -212,6 +218,7 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: audit anchor external tamper-evidence proof
   classification: release_blocker
+  registry_id: audit_anchor_external_tamper_evidence_proof
   reason: Local HMAC audit anchors detect corruption and partial tamper, but completed product release requires measured Windows ACL/DPAPI, external anchor, or signed-evidence proof before claiming same-user tamper evidence beyond the local file authority boundary.
   required_action: Record installed-path audit anchor key-protection or external-anchor evidence and pass strict Windows release validation.
   blocks_release: yes
@@ -242,6 +249,7 @@ The canonical completion roadmap for the combined Windows-first product path and
 
 - item: owner GO missing
   classification: release_blocker
+  registry_id: owner_go
   required_action: Obtain explicit owner GO.
   blocks_release: yes
 

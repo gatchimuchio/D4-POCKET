@@ -28,12 +28,14 @@ Current phase: Phase B owner-use complete. This file records security posture fo
 
 - item: Windows installed-path evidence
   classification: release_blocker
+  aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
   reason: completed Windows-first product release requires measured installed-path evidence for launch, config, audit, visible surfaces, isolated provenance, artifact hash linkage, broker measured field provenance, and installed-app generated Setup Doctor product diagnostics.
   required_action: Generate and validate `release_evidence/windows_installed_smoke.json` on native Windows.
   blocks_release: yes
 
 - item: owner GO
   classification: release_blocker
+  registry_id: owner_go
   reason: release claim promotion requires explicit owner approval after blockers are cleared.
   required_action: Obtain explicit owner GO before claiming completed product release.
   blocks_release: yes

@@ -46,6 +46,11 @@ from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden
 from tooling.packaging_portability_check import portable_path_errors
+from tooling.release_gate_check import (
+    CURRENT_FACING_RELEASE_DOCS,
+    release_blocker_doc_sync_errors,
+    registry_blocker_names,
+)
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
     ValidationStep,
@@ -1914,6 +1919,25 @@ def test_release_blocker_registry_controls_strict_release() -> list[str]:
     return errors
 
 
+def test_release_facing_docs_sync_release_blockers_to_registry() -> list[str]:
+    errors = release_blocker_doc_sync_errors()
+    registry_names = registry_blocker_names()
+    for expected in [
+        "windows_evidence_provenance_isolation",
+        "windows_installer_first_run_smoke",
+        "windows_setup_doctor_smoke",
+        "windows_broker_installed_smoke",
+        "audit_anchor_external_tamper_evidence_proof",
+        "owner_go",
+    ]:
+        if expected not in registry_names:
+            errors.append(f"release blocker registry missing canonical blocker: {expected}")
+    for relative in CURRENT_FACING_RELEASE_DOCS:
+        if not (ROOT / relative).exists():
+            errors.append(f"release-facing doc missing from sync scan: {relative}")
+    return errors
+
+
 def test_release_gate_scans_ipc_threat_model() -> list[str]:
     text = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
     if "docs/security/IPC_THREAT_MODEL.md" not in text:
@@ -3208,6 +3232,7 @@ def main() -> int:
         test_validate_all_subprocess_start_failure_is_structured,
         test_validate_all_strict_release_runs_release_gate_strict_scan,
         test_release_blocker_registry_controls_strict_release,
+        test_release_facing_docs_sync_release_blockers_to_registry,
         test_release_gate_scans_ipc_threat_model,
         test_packaging_portability_checker_exists,
         test_manifest_integrity_tooling_exists,
