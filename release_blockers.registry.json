@@ -6,42 +6,52 @@
     {
       "name": "windows_evidence_provenance_isolation",
       "status": "unresolved",
+      "status_source": "windows_release_evidence",
+      "evidence_result": "windows_evidence_provenance_isolation",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "release_evidence/windows_installed_smoke.json is missing, so isolated Windows source/artifact/evidence provenance is not proven.",
-      "required_action": "Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes."
+      "reason": "Isolated Windows source/artifact/evidence provenance must pass machine validation before release.",
+      "required_action": "Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes, then pass tooling/windows_release_evidence.py."
     },
     {
       "name": "windows_installer_first_run_smoke",
       "status": "unresolved",
+      "status_source": "windows_release_evidence",
+      "evidence_result": "windows_installer_first_run_smoke",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Windows installed first-run evidence is missing.",
-      "required_action": "Collect native Windows installed-app first-run smoke with broker-mediated Flutter .exe launch, no-Python-runtime launch, visible surfaces, config, and audit probe evidence."
+      "reason": "Windows installed first-run evidence must pass machine validation before release.",
+      "required_action": "Collect native Windows installed-app first-run smoke with broker-mediated Flutter .exe launch, no-Python-runtime launch, visible surfaces, config, and audit probe evidence, then pass tooling/windows_release_evidence.py."
     },
     {
       "name": "windows_setup_doctor_smoke",
       "status": "unresolved",
+      "status_source": "windows_release_evidence",
+      "evidence_result": "windows_setup_doctor_smoke",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Installed-app generated Setup Doctor product evidence is missing.",
-      "required_action": "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence."
+      "reason": "Installed-app generated Setup Doctor product evidence must pass machine validation before release.",
+      "required_action": "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence, then pass tooling/windows_release_evidence.py."
     },
     {
       "name": "windows_broker_installed_smoke",
       "status": "unresolved",
+      "status_source": "windows_release_evidence",
+      "evidence_result": "windows_broker_installed_smoke",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Installed Rust broker launch/connect/restart/crash evidence is missing.",
-      "required_action": "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json."
+      "reason": "Installed Rust broker launch/connect/restart/crash evidence must pass machine validation before release.",
+      "required_action": "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json, then pass tooling/windows_release_evidence.py."
     },
     {
       "name": "audit_anchor_external_tamper_evidence_proof",
       "status": "unresolved",
+      "status_source": "windows_release_evidence",
+      "evidence_result": "audit_anchor_external_tamper_evidence_proof",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
@@ -51,6 +61,7 @@
     {
       "name": "owner_go",
       "status": "unresolved",
+      "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,

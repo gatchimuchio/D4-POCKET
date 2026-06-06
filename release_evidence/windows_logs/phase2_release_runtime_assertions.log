@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:36:28.9893326Z
-timestamp_end: 2026-06-06T17:36:30.0575336Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python tooling\release_runtime_assertions.py --check
-exit_code: 0
---- output ---
-release runtime assertions: 12 passed, 0 failed, evidence_scope=CONFIG,FIXTURE

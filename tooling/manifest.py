@@ -51,7 +51,6 @@ EXACT_FILES = [
 
 EXCLUDED_PATHS = {
     "MANIFEST.sha256.json",
-    "release_evidence/windows_installed_smoke.json",
     "apps/mobile_flutter/pubspec.lock",
     "apps/desktop_flutter/flutter_01.log",
 }
@@ -64,6 +63,7 @@ EXCLUDED_PARTS = {
     "ephemeral",
     "target",
     "__pycache__",
+    "release_evidence",
 }
 
 

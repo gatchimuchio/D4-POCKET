@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:35:40.8063896Z
-timestamp_end: 2026-06-06T17:35:41.5671512Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: cargo --version
-exit_code: 0
---- output ---
-cargo 1.95.0 (f2d3ce0bd 2026-03-21)

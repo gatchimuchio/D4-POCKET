@@ -50,6 +50,20 @@ function Test-LegacyFixedInstallRoot {
   return $normalized.EndsWith("\gui-shell\installed")
 }
 
+function Write-JsonEvidence {
+  param(
+    [Parameter(Mandatory = $true)]
+    $Value,
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [int]$Depth = 8
+  )
+
+  $json = $Value | ConvertTo-Json -Depth $Depth
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+  [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
+}
+
 $release = Resolve-Path $FlutterReleaseDir
 $helper = Resolve-Path $BrokerHelperExe
 
@@ -209,6 +223,6 @@ $manifest = [ordered]@{
 }
 
 $manifestPath = Join-Path $installRootPath.FullName "installed_manifest.json"
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -Path $manifestPath
+Write-JsonEvidence -Value $manifest -Path $manifestPath -Depth 8
 Write-Host "staged GUI-Shell installed app at $($installRootPath.FullName)"
 Write-Host "manifest $manifestPath"

@@ -1,8 +1,0 @@
-timestamp_start: 2026-06-06T17:43:23.6713611Z
-timestamp_end: 2026-06-06T17:43:26.9813451Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: powershell -ExecutionPolicy Bypass -File installer\windows\stage_installed_app.ps1 -FlutterReleaseDir .\apps\desktop_flutter\build\windows\x64\runner\Release -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe -RunId run-qa-20260606T173431Z
-exit_code: 0
---- output ---
-staged GUI-Shell installed app at C:\Users\mzcum\AppData\Local\GUI-Shell\installed-runs\run-qa-20260606T173431Z
-manifest C:\Users\mzcum\AppData\Local\GUI-Shell\installed-runs\run-qa-20260606T173431Z\installed_manifest.json

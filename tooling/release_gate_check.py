@@ -9,7 +9,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
+WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"
 
 SCAN_FILES = [
     "README.md",
@@ -163,6 +165,7 @@ def registry_errors() -> list[str]:
     required_fields = {
         "name",
         "status",
+        "status_source",
         "active",
         "classification",
         "blocks_release",
@@ -192,6 +195,13 @@ def registry_errors() -> list[str]:
             errors.append(f"release blocker {name or index} active must be boolean")
         if blocker.get("status") not in {"unresolved", "resolved"}:
             errors.append(f"release blocker {name or index} status must be unresolved or resolved")
+        status_source = blocker.get("status_source")
+        if status_source not in {"manual", WINDOWS_EVIDENCE_STATUS_SOURCE}:
+            errors.append(f"release blocker {name or index} status_source must be manual or {WINDOWS_EVIDENCE_STATUS_SOURCE}")
+        if status_source == WINDOWS_EVIDENCE_STATUS_SOURCE:
+            evidence_result = blocker.get("evidence_result")
+            if not isinstance(evidence_result, str) or not evidence_result:
+                errors.append(f"release blocker {name or index} evidence_result missing for {WINDOWS_EVIDENCE_STATUS_SOURCE}")
         if not isinstance(blocker.get("reason"), str) or not blocker.get("reason"):
             errors.append(f"release blocker {name or index} reason missing")
         if not isinstance(blocker.get("required_action"), str) or not blocker.get("required_action"):
@@ -216,15 +226,59 @@ def registry_blocker_names() -> set[str]:
 def unresolved_active_blockers() -> list[dict]:
     registry = load_release_blocker_registry()
     blockers = registry.get("blockers", [])
-    return [
-        blocker
+    windows_results = _windows_evidence_results_by_name(blockers)
+    unresolved: list[dict] = []
+    for blocker in blockers:
+        if not isinstance(blocker, dict):
+            continue
+        effective = effective_release_blocker(blocker, windows_results)
+        if (
+            effective.get("active") is True
+            and effective.get("status") == "unresolved"
+            and effective.get("classification") == "release_blocker"
+            and effective.get("blocks_release") is True
+        ):
+            unresolved.append(effective)
+    return unresolved
+
+
+def _windows_evidence_results_by_name(blockers: list) -> dict[str, object]:
+    if not any(
+        isinstance(blocker, dict)
+        and blocker.get("status_source") == WINDOWS_EVIDENCE_STATUS_SOURCE
         for blocker in blockers
-        if isinstance(blocker, dict)
-        and blocker.get("active") is True
-        and blocker.get("status") == "unresolved"
-        and blocker.get("classification") == "release_blocker"
-        and blocker.get("blocks_release") is True
-    ]
+    ):
+        return {}
+    from tooling.windows_release_evidence import validate_windows_release_evidence
+
+    return {result.name: result for result in validate_windows_release_evidence()}
+
+
+def effective_release_blocker(blocker: dict, windows_results: dict[str, object]) -> dict:
+    effective = dict(blocker)
+    if blocker.get("status_source") != WINDOWS_EVIDENCE_STATUS_SOURCE:
+        effective["effective_status_source"] = blocker.get("status_source", "manual")
+        return effective
+
+    evidence_result_name = str(blocker.get("evidence_result") or blocker.get("name") or "")
+    result = windows_results.get(evidence_result_name)
+    effective["effective_status_source"] = WINDOWS_EVIDENCE_STATUS_SOURCE
+    if result is None:
+        effective["status"] = "unresolved"
+        effective["reason"] = f"Windows evidence result missing: {evidence_result_name}"
+        effective["required_action"] = "Run tooling/windows_release_evidence.py and keep the registry evidence_result names synchronized."
+        return effective
+
+    if getattr(result, "status", "") == "passed" and getattr(result, "classification", "") != "release_blocker":
+        effective["status"] = "resolved"
+        effective["reason"] = f"resolved by Windows evidence: {getattr(result, 'reason', '')}"
+        effective["required_action"] = getattr(result, "required_action", "")
+        return effective
+
+    effective["status"] = "unresolved"
+    effective["reason"] = getattr(result, "reason", "")
+    effective["required_action"] = getattr(result, "required_action", "")
+    return effective
 
 
 def _metadata_values(block: str, key: str) -> list[str]:

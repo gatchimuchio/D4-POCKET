@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:37:32.6706480Z
-timestamp_end: 2026-06-06T17:37:57.5850248Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python tooling\packaging_portability_check.py
-exit_code: 0
---- output ---
-packaging portability check passed

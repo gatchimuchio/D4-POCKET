@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:36:26.1989995Z
-timestamp_end: 2026-06-06T17:36:28.9854615Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python tooling\evidence_bundle.py --check
-exit_code: 0
---- output ---
-evidence bundle check passed: 5 release blockers preserved, release_ready=False, classification=development_evidence

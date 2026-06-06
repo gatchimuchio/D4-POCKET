@@ -1,6 +1,0 @@
-timestamp_start: 2026-06-06T17:35:23.8211762Z
-timestamp_end: 2026-06-06T17:35:24.7987008Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: git status --short
-exit_code: 0
---- output ---

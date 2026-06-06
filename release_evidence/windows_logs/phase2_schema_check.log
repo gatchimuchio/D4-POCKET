@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:36:02.5458514Z
-timestamp_end: 2026-06-06T17:36:03.4568015Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python tooling\schema_check\check_schemas.py
-exit_code: 0
---- output ---
-schema check passed: 26 schemas, 26 examples, 28 negative fixtures

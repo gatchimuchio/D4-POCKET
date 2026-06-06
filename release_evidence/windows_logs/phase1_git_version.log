@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:35:39.0562799Z
-timestamp_end: 2026-06-06T17:35:39.7880433Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: git --version
-exit_code: 0
---- output ---
-git version 2.51.0.windows.1

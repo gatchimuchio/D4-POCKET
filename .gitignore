@@ -7,3 +7,5 @@ apps/desktop_flutter/build/
 apps/mobile_flutter/.dart_tool/
 apps/mobile_flutter/build/
 apps/mobile_flutter/pubspec.lock
+/release_evidence/*
+!/release_evidence/.gitkeep

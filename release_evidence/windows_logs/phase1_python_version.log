@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:35:37.5519331Z
-timestamp_end: 2026-06-06T17:35:38.2694617Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python --version
-exit_code: 0
---- output ---
-Python 3.11.9

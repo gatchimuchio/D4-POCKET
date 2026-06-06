@@ -30,6 +30,8 @@ param(
 
   [string]$RuntimeAssertionsJson = "",
 
+  [string]$AuditAnchorEvidenceJson = "",
+
   [string]$ScreenshotPath = "",
 
   [string]$InstalledManifestJson = "",
@@ -795,12 +797,18 @@ if ($RuntimeAssertionsJson -ne "") {
   $runtimeAssertionsPath = Resolve-Path $RuntimeAssertionsJson
   $runtimeAssertions = Get-Content -Raw -Path $runtimeAssertionsPath | ConvertFrom-Json
 }
+$auditAnchorEvidence = $null
+if ($AuditAnchorEvidenceJson -ne "") {
+  $auditAnchorEvidencePath = Resolve-Path $AuditAnchorEvidenceJson
+  $auditAnchorEvidence = Get-Content -Raw -Path $auditAnchorEvidencePath | ConvertFrom-Json
+}
 $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
     (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath),
     (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
     (New-EvidenceFileRecord -Kind "visible_surfaces" -Path (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path")),
     (New-EvidenceFileRecord -Kind "runtime_assertions" -Path $RuntimeAssertionsJson),
+    (New-EvidenceFileRecord -Kind "audit_anchor_external_tamper_evidence" -Path $AuditAnchorEvidenceJson),
     (New-EvidenceFileRecord -Kind "screenshot_supporting_material" -Path $ScreenshotPath),
     (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath),
     (New-EvidenceFileRecord -Kind "setup_doctor_context" -Path $setupDoctorContextPath)
@@ -932,7 +940,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "6"
+    collector_version = "7"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -1004,6 +1012,15 @@ $evidence = [ordered]@{
       }
     })
   release_runtime_assertions = $runtimeAssertions
+}
+
+if ($null -ne $auditAnchorEvidence) {
+  $evidence["field_provenance"]["audit_anchor.external_tamper_evidence"] = [ordered]@{
+    source_type = "directly_measured"
+    evidence_class = $(if ((Get-EvidenceValue -Object (Get-EvidenceValue -Object $auditAnchorEvidence -Name "evidence_source") -Name "evidence_class") -eq "EXTERNAL_EVIDENCE") { "EXTERNAL_EVIDENCE" } else { "LIVE_RUNTIME" })
+    formal_release_input = $true
+  }
+  $evidence["audit_anchor_external_tamper_evidence"] = $auditAnchorEvidence
 }
 
 $output = New-Item -ItemType File -Force -Path $OutputPath

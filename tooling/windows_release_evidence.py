@@ -37,14 +37,16 @@ REQUIRED_BROKER_TRUE_FIELDS = {
     "crash_fail_closed",
 }
 AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
-REQUIRED_EVIDENCE_BUNDLE_KINDS = {
-    "audit_anchor_external_tamper_evidence",
+BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS = {
     "setup_doctor",
     "broker_smoke",
     "visible_surfaces",
     "runtime_assertions",
 }
-REQUIRED_FIELD_PROVENANCE = {
+AUDIT_REQUIRED_EVIDENCE_BUNDLE_KINDS = {
+    "audit_anchor_external_tamper_evidence",
+}
+BASE_REQUIRED_FIELD_PROVENANCE = {
     "artifact": ("directly_measured", {"EXTERNAL_EVIDENCE"}),
     "first_run.process": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
     "first_run.visible_surfaces": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
@@ -52,11 +54,13 @@ REQUIRED_FIELD_PROVENANCE = {
     "first_run.installer_authority_boundary": ("static_assertion", {"CONFIG"}),
     "setup_doctor": ("product_export", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
     "broker.ipc_restart_crash": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "release_runtime_assertions": ("static_assertion", {"CONFIG", "FIXTURE"}),
+}
+AUDIT_REQUIRED_FIELD_PROVENANCE = {
     "audit_anchor.external_tamper_evidence": (
         "directly_measured",
         {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"},
     ),
-    "release_runtime_assertions": ("static_assertion", {"CONFIG", "FIXTURE"}),
 }
 LEGACY_FIXED_INSTALL_ROOT_SUFFIX = "\\gui-shell\\installed"
 
@@ -188,12 +192,17 @@ def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[s
     return errors
 
 
-def _validate_field_provenance(data: dict[str, Any]) -> list[str]:
+def _validate_field_provenance(
+    data: dict[str, Any],
+    required_field_provenance: dict[str, tuple[str, set[str]]] = BASE_REQUIRED_FIELD_PROVENANCE,
+    *,
+    check_unsupported_claims: bool = True,
+) -> list[str]:
     errors: list[str] = []
     provenance = data.get("field_provenance")
     if not isinstance(provenance, dict):
         return ["field_provenance object missing"]
-    for group, (source_type, evidence_classes) in REQUIRED_FIELD_PROVENANCE.items():
+    for group, (source_type, evidence_classes) in required_field_provenance.items():
         entry = provenance.get(group)
         if not isinstance(entry, dict):
             errors.append(f"field_provenance.{group} missing")
@@ -213,9 +222,10 @@ def _validate_field_provenance(data: dict[str, Any]) -> list[str]:
             )
         if entry.get("formal_release_input") is not True:
             errors.append(f"field_provenance.{group}.formal_release_input must be true")
-    unsupported = provenance.get("unsupported_claims")
-    if unsupported not in (None, []):
-        errors.append("field_provenance.unsupported_claims must be empty for strict Windows evidence")
+    if check_unsupported_claims:
+        unsupported = provenance.get("unsupported_claims")
+        if unsupported not in (None, []):
+            errors.append("field_provenance.unsupported_claims must be empty for strict Windows evidence")
     return errors
 
 
@@ -289,7 +299,7 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
                     errors.append(f"provenance.evidence_bundle_files[{index}].path missing")
                 if not _is_sha256_tag(item.get("sha256")):
                     errors.append(f"provenance.evidence_bundle_files[{index}].sha256 must be tagged sha256")
-            missing = REQUIRED_EVIDENCE_BUNDLE_KINDS - kinds
+            missing = BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS - kinds
             if missing:
                 errors.append(f"provenance.evidence_bundle_files missing kinds: {', '.join(sorted(missing))}")
 
@@ -317,7 +327,7 @@ def load_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> tuple[dict[str, Any] | 
     if not path.exists():
         return None, f"{path.relative_to(ROOT)} missing"
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         return None, f"{path.relative_to(ROOT)} is invalid JSON: {exc}"
     if not isinstance(payload, dict):
@@ -566,6 +576,25 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
 
 def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> EvidenceResult:
     errors: list[str] = []
+    provenance = data.get("provenance")
+    if not isinstance(provenance, dict):
+        errors.append("provenance object missing for audit anchor evidence")
+    else:
+        bundle_files = provenance.get("evidence_bundle_files")
+        if not isinstance(bundle_files, list) or not bundle_files:
+            errors.append("provenance.evidence_bundle_files missing audit anchor evidence")
+        else:
+            kinds = {item.get("kind") for item in bundle_files if isinstance(item, dict)}
+            missing = AUDIT_REQUIRED_EVIDENCE_BUNDLE_KINDS - {kind for kind in kinds if isinstance(kind, str)}
+            if missing:
+                errors.append(f"provenance.evidence_bundle_files missing kinds: {', '.join(sorted(missing))}")
+    errors.extend(
+        _validate_field_provenance(
+            data,
+            AUDIT_REQUIRED_FIELD_PROVENANCE,
+            check_unsupported_claims=False,
+        )
+    )
     evidence = data.get("audit_anchor_external_tamper_evidence")
     if not isinstance(evidence, dict):
         errors.append("audit_anchor_external_tamper_evidence object missing")

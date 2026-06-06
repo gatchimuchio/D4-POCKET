@@ -1,7 +1,0 @@
-timestamp_start: 2026-06-06T17:46:01.6068697Z
-timestamp_end: 2026-06-06T17:46:04.1271371Z
-working_directory: C:\Users\mzcum\Documents\GUI-Shell
-command: python tooling\manifest.py --check
-exit_code: 0
---- output ---
-manifest check passed

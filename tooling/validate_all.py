@@ -339,7 +339,7 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         blocks_release = "yes"
         if strict_release and step.name == "release_gate_check":
             reason = "strict release gate found unresolved active structured release blockers"
-            required_action = "Resolve every active Windows-first release_blocker in release_blockers.registry.json, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
+            required_action = "Resolve every active or evidence-effective Windows-first release_blocker, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
         else:
             reason = "validation command failed"
             required_action = "Fix the failing validation command and rerun."
@@ -433,17 +433,18 @@ def main() -> int:
         for result in results
         if result["classification"] == "release_blocker"
     ]
-    blockers.extend(
-        {
-            "name": check.name,
-            "classification": check.classification,
-            "blocks_release": check.blocks_release,
-            "reason": check.reason,
-            "required_action": check.required_action,
-        }
-        for check in evidence
-        if check.classification == "release_blocker"
-    )
+    if args.strict_release:
+        blockers.extend(
+            {
+                "name": check.name,
+                "classification": check.classification,
+                "blocks_release": check.blocks_release,
+                "reason": check.reason,
+                "required_action": check.required_action,
+            }
+            for check in evidence
+            if check.classification == "release_blocker"
+        )
     print_report(mode, args.desktop_platform, results, evidence, blockers)
     return 1 if blockers else 0
 

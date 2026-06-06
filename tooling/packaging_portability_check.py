@@ -16,6 +16,10 @@ from tooling.manifest import expected_files, relative
 
 
 DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120
+WINDOWS_GIT_UNZIP_CANDIDATES = [
+    Path(r"C:\Program Files\Git\usr\bin\unzip.exe"),
+    Path(r"C:\Program Files (x86)\Git\usr\bin\unzip.exe"),
+]
 
 
 def portable_path_errors(paths: list[Path]) -> list[str]:
@@ -41,6 +45,17 @@ def timeout_output(exc: subprocess.TimeoutExpired) -> str:
         output = output.decode("utf-8", errors="replace")
     output = str(output).strip()
     return output or "no partial output"
+
+
+def find_unzip() -> str | None:
+    resolved = shutil.which("unzip")
+    if resolved is not None:
+        return resolved
+    if sys.platform == "win32":
+        for candidate in WINDOWS_GIT_UNZIP_CANDIDATES:
+            if candidate.is_file():
+                return str(candidate)
+    return None
 
 
 def run_check(
@@ -77,9 +92,15 @@ def run_check(
 def main() -> int:
     source_files, errors = expected_files()
     errors.extend(portable_path_errors(source_files))
-    unzip = shutil.which("unzip")
+    unzip = find_unzip()
     if unzip is None:
-        errors.append("unzip not found on PATH")
+        if sys.platform == "win32":
+            errors.append(
+                "unzip not found on PATH or in Git for Windows at "
+                + ", ".join(str(path) for path in WINDOWS_GIT_UNZIP_CANDIDATES)
+            )
+        else:
+            errors.append("unzip not found on PATH")
     if errors:
         print("packaging portability check failed:")
         for error in errors:

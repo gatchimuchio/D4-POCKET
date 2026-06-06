@@ -1515,7 +1515,7 @@ def _valid_windows_installed_evidence() -> dict:
                 "source_kind": "windows_acl_dpapi_probe",
                 "evidence_class": "EXTERNAL_EVIDENCE",
                 "synthetic": False,
-                "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_audit_anchor_evidence.ps1",
+                "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_audit_anchor_proof.ps1",
                 "path": r"C:\evidence\audit_anchor_external.json",
                 "sha256": "sha256:" + "9" * 64,
             },
@@ -1567,8 +1567,8 @@ def test_windows_release_evidence_validator_preserves_audit_anchor_external_bloc
     errors = []
     if result_by_name["audit_anchor_external_tamper_evidence_proof"].classification != "release_blocker":
         errors.append("Windows evidence validator dropped audit anchor external tamper-evidence release blocker")
-    if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
-        errors.append("Windows provenance validator accepted missing audit anchor evidence bundle/provenance")
+    if result_by_name["windows_evidence_provenance_isolation"].classification == "release_blocker":
+        errors.append("Windows provenance validator still owns missing audit anchor evidence bundle/provenance")
     return errors
 
 
@@ -1852,6 +1852,39 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
     ]:
         if token not in text:
             errors.append(f"collect_installed_smoke.ps1 missing materialized UIAutomation evidence token: {token}")
+    return errors
+
+
+def test_windows_audit_anchor_proof_collector_is_connected() -> list[str]:
+    collector = INSTALLER / "windows" / "collect_audit_anchor_proof.ps1"
+    installed_smoke = INSTALLER / "windows" / "collect_installed_smoke.ps1"
+    errors: list[str] = []
+    if not collector.exists():
+        return ["collect_audit_anchor_proof.ps1 is missing"]
+    collector_text = collector.read_text(encoding="utf-8")
+    installed_text = installed_smoke.read_text(encoding="utf-8")
+    for token in [
+        "audit_anchor_external_tamper_evidence.json",
+        "key_anchor_log_same_user_rewrite_mitigated",
+        "windows_acl_verified",
+        "dpapi_verified",
+        "external_anchor_verified",
+        "signed_evidence_verified",
+        "administrator_root_resistance_claimed = $false",
+        "source_kind = $sourceKind",
+        "sha256_scope = \"probe_material_without_self_reference\"",
+        "[System.Text.UTF8Encoding]::new($false)",
+    ]:
+        if token not in collector_text:
+            errors.append(f"audit anchor proof collector missing token: {token}")
+    for token in [
+        "[string]$AuditAnchorEvidenceJson",
+        "audit_anchor_external_tamper_evidence",
+        "field_provenance\"][\"audit_anchor.external_tamper_evidence",
+        "New-EvidenceFileRecord -Kind \"audit_anchor_external_tamper_evidence\"",
+    ]:
+        if token not in installed_text:
+            errors.append(f"installed smoke collector missing audit anchor integration token: {token}")
     return errors
 
 
@@ -3206,6 +3239,7 @@ def main() -> int:
         test_windows_installed_smoke_preserves_trap_failure,
         test_windows_installed_smoke_automation_names_are_materialized,
         test_windows_installed_smoke_uia_properties_are_stringified,
+        test_windows_audit_anchor_proof_collector_is_connected,
         test_invariant_evaluator_detects_intentional_import_violation,
         test_invariant_evaluator_detects_live_authority_invariants,
         test_rust_helper_required_sources_exist,
