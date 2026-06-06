@@ -139,6 +139,35 @@ fn broker_ipc_rejects_replay_after_process_restart() {
     assert_eq!(replay["error"]["code"], "broker_replay_detected");
 }
 
+#[test]
+fn broker_ipc_rejects_payload_hash_mismatch() {
+    let workspace = temp_workspace("payload-hash-mismatch");
+    let process = spawn_broker(&workspace, 64 * 1024);
+
+    let accepted = send_request(
+        &process.endpoint,
+        &normalize_payload_request(
+            &process.endpoint.session_id,
+            "request-normalize-accepted",
+            "nonce-normalize-accepted",
+            "sha256:787a213a62a6dd88756a81d1b68234f88759d36308adc933625aa48a4507a93b",
+        ),
+    );
+    assert_eq!(accepted["status"], "accepted");
+
+    let mismatched = send_request(
+        &process.endpoint,
+        &normalize_payload_request(
+            &process.endpoint.session_id,
+            "request-normalize-mismatch",
+            "nonce-normalize-mismatch",
+            "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        ),
+    );
+    assert_eq!(mismatched["status"], "rejected");
+    assert_eq!(mismatched["error"]["code"], "broker_payload_hash_mismatch");
+}
+
 fn spawn_broker(workspace: &Workspace, max_request_bytes: usize) -> BrokerProcess {
     let binary = env!("CARGO_BIN_EXE_gui_shell_rust_helper");
     let _ = fs::remove_file(&workspace.session_file);
@@ -245,6 +274,22 @@ fn shutdown_request(session_id: &str) -> String {
         session_id,
         null_payload_hash_hex(),
         session_id,
+        BrokerRequestEnvelope::current_issued_at()
+    )
+}
+
+fn normalize_payload_request(
+    session_id: &str,
+    request_id: &str,
+    nonce: &str,
+    payload_hash: &str,
+) -> String {
+    format!(
+        "{{\"request_id\":\"{}\",\"session_id\":\"{}\",\"operation\":\"normalize_payload\",\"payload_hash\":\"{}\",\"nonce\":\"{}\",\"issued_at\":\"{}\",\"metadata\":{{\"client\":\"desktop_flutter\"}},\"payload\":{{\"client_payload\":\"desktop_flutter_authority_probe\"}}}}",
+        request_id,
+        session_id,
+        payload_hash,
+        nonce,
         BrokerRequestEnvelope::current_issued_at()
     )
 }

@@ -1,3 +1,13 @@
+validation_log_notice_2026_06_06:
+  scope: historical validation log
+  classification: known_limitation
+  blocks_release: no
+  reason: Entries below are preserved audit history and may contain older schema, fixture, negative-fixture, or conformance-check counts from the commit where each entry was recorded.
+  current_values_source:
+    - run PYTHONDONTWRITEBYTECODE=1 python3 tooling/validate_all.py --python-only on the target commit
+    - use the latest completion report for exact commands and results
+  required_action: Treat earlier counts as historical evidence for their recorded commits, not as current validation totals.
+
 validation_update_2026_06_05_ci_broker_parity_startup_timeout:
   scope: GitHub Actions core-validation broker parity startup reliability
   commit: pre_commit_validation_from_40d6605540b850134e4ca56329e172bc0076f54b

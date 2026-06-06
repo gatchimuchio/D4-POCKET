@@ -187,7 +187,7 @@ Current production broker-server behavior:
 - `nonce` replay state is persisted in `replay_nonces.jsonl` with `recorded_at_epoch_seconds` and bounded compaction.
 - `issued_at` is parsed as RFC3339 and rejected when outside a 300-second broker freshness window.
 - audit events are chained, include `payload_hash`, and are persisted in `audit.jsonl`.
-- audit chain head/count are HMAC-bound in `audit_anchor.json` using the broker-local `audit_anchor.key`; this is local authenticity evidence and does not replace external release notarization.
+- audit chain head/count are HMAC-bound in `audit_anchor.json` using the broker-local `audit_anchor.key`; this is local corruption / partial tamper evidence and does not replace external release notarization, Windows key-protection evidence, or same-user key+anchor+log rewrite resistance.
 - `session.json` records active durable session state.
 
 Production cutover requirements:

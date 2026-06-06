@@ -1345,6 +1345,7 @@ fn normalize_key(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1661,6 +1662,31 @@ mod tests {
         assert_eq!(
             broker.audit_events()[0].payload_hash,
             "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        );
+    }
+
+    #[test]
+    fn payload_hash_matches_dart_known_vectors() {
+        assert_eq!(
+            canonical_payload_hash(None),
+            "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        );
+        assert_eq!(
+            canonical_payload_hash(Some(&json!({"b": 1, "a": 2}))),
+            "sha256:d3626ac30a87e6f7a6428233b3c68299976865fa5508e4267c5415c76af7a772"
+        );
+        assert_eq!(
+            canonical_payload_hash(Some(&json!({
+                "z": [{"b": 1, "a": 2}, null, true],
+                "a": {"d": "text", "c": [3, 2, 1]}
+            }))),
+            "sha256:8895d6e5b558a29b870d1156bfb1e95fcbab9933f2360c35edaa78d734c8c87a"
+        );
+        assert_eq!(
+            canonical_payload_hash(Some(&json!({
+                "client_payload": "desktop_flutter_authority_probe"
+            }))),
+            "sha256:787a213a62a6dd88756a81d1b68234f88759d36308adc933625aa48a4507a93b"
         );
     }
 

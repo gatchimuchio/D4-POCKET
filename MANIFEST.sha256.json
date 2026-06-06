@@ -145,7 +145,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "55442c5b858f6535245da85cb5edab093c65a1425e5c5b43e0c1fc55b99736e8"
+      "sha256": "bc6e0d1d600b75acff44d1d925f51ed6e7cf1d76dba8e6d499ca5337214e72df"
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
@@ -229,7 +229,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "3edbbdf2b6f7d8519c9172b5e0571f488d6d206fdd42fbe4afe5245af0fe3739"
+      "sha256": "9359bdf71812a20c79c787dddffad9fc461c47cd283482ac0c109149743fc9b8"
     },
     {
       "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
@@ -290,6 +290,10 @@
     {
       "path": "apps/desktop_flutter/pubspec.yaml",
       "sha256": "90b0add1a3f7891b345316a7c3b0fa601fdcb3286efc94ff740ab7fbfa377610"
+    },
+    {
+      "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
+      "sha256": "6aed4cc35164d973770e91581fdb43956bf707c1aba7768ec28eab38f69434c9"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -481,7 +485,7 @@
     },
     {
       "path": "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
-      "sha256": "99397e0373a90bec77ed2fd4cd096113395ea6a018e2f7fc31fb3d0e57923d53"
+      "sha256": "454de51eced0914a923d330a68f0e799af4aa274d305d3c17792070aa18187cb"
     },
     {
       "path": "docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md",
@@ -541,7 +545,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "6000c52a20b826afc3dbd3de8138b8d0d72a74db422ea5a90f246ecba7e32ee2"
+      "sha256": "fa38ebf8bb9dd39ba89029e4addd1ceb346cb7935d642153146bf78c7407c5f5"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -905,11 +909,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "fc8fbd47a8a935f92104e291214a236dc5d58ef633448cd477f51acea1730568"
+      "sha256": "368f76ab7b7ea0db589fe5bd4bb32848ca7f6ccd709fbf0e6d423dcb7ec1c3c5"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "9bf6d3fc064e41aaba1dd7510933f5a8762e8859e4257b4750c038515a464427"
+      "sha256": "7156bdfa1f18098dce93bebbe46c88224283eb12ab36e7a12b06bbe21a22ccc7"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -945,7 +949,7 @@
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "be5b4a8a4d220bb51e3e10014679edb97f29e96e53ce67470698bec303f7c501"
+      "sha256": "fd9352fd3d65dea6a2c9797e04cc5f1ae6c45c07381581d8b7336ff3400fc286"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",

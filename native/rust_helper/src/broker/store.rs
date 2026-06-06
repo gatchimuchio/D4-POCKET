@@ -93,9 +93,6 @@ impl BrokerPersistentStore {
         store.ensure_file_exists(&store.replay_path)?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
-        if !audit_log.events().is_empty() && !store.audit_anchor_path.exists() {
-            store.write_audit_anchor(&audit_log)?;
-        }
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
         store.compact_replay_nonces(&seen_nonces)?;
         store.load_existing_session_if_present()?;

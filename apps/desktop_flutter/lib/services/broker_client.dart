@@ -178,6 +178,9 @@ String _rfc3339Seconds(DateTime value) {
   return '$year-$month-${day}T$hour:$minute:${second}Z';
 }
 
+String brokerPayloadHashForTest(Map<String, Object?>? payload) =>
+    _payloadHash(payload);
+
 String _payloadHash(Map<String, Object?>? payload) {
   final canonicalJson = jsonEncode(_canonicalizeJsonValue(payload));
   return _sha256Tagged(utf8.encode(canonicalJson));
