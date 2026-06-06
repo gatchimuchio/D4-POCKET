@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:35:39.7951892Z
+timestamp_end: 2026-06-06T17:35:40.7983649Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: rustc --version
+exit_code: 0
+--- output ---
+rustc 1.95.0 (59807616e 2026-04-14)

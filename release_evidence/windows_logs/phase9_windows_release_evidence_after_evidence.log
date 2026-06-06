@@ -1,0 +1,48 @@
+timestamp_start: 2026-06-06T17:49:58.4172142Z
+timestamp_end: 2026-06-06T17:49:59.7440103Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: python tooling\windows_release_evidence.py
+exit_code: 1
+--- output ---
+[
+  {
+    "blocks_release": "yes",
+    "classification": "release_blocker",
+    "name": "windows_evidence_provenance_isolation",
+    "reason": "provenance.evidence_bundle_files missing kinds: audit_anchor_external_tamper_evidence; field_provenance.audit_anchor.external_tamper_evidence missing",
+    "required_action": "Collect Windows evidence from a unique staged run with source commit, clean worktree, artifact hashes, isolated install/runtime/config/audit/store paths, field provenance, and evidence bundle hashes.",
+    "status": "failed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_installer_first_run_smoke",
+    "reason": "Windows installed executable first-run smoke evidence passed machine validation.",
+    "required_action": "Keep Windows installed first-run evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_setup_doctor_smoke",
+    "reason": "Windows installed-path Setup Doctor evidence passed machine validation.",
+    "required_action": "Keep Windows Setup Doctor evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_broker_installed_smoke",
+    "reason": "Windows installed-path broker launch/connect/restart/crash evidence passed machine validation; no-Python/no-FFI remain separately classified static or installed-launch evidence.",
+    "required_action": "Keep broker installed-path smoke evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "yes",
+    "classification": "release_blocker",
+    "name": "audit_anchor_external_tamper_evidence_proof",
+    "reason": "audit_anchor_external_tamper_evidence object missing",
+    "required_action": "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl before product release claim.",
+    "status": "failed"
+  }
+]

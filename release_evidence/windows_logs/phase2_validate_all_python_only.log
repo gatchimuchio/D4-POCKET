@@ -1,0 +1,196 @@
+timestamp_start: 2026-06-06T17:36:30.0693845Z
+timestamp_end: 2026-06-06T17:36:53.7437555Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: python tooling\validate_all.py --python-only
+exit_code: 1
+--- output ---
+validation_mode: development
+desktop_platform: current
+
+checks:
+  - name: schema_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/schema_check/check_schemas.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      schema check passed: 26 schemas, 26 examples, 28 negative fixtures
+  - name: conformance_skeleton
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/conformance_tests/run_conformance_skeleton.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      conformance skeleton passed: 138 checks
+  - name: manifest_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/manifest.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      manifest check passed
+  - name: release_gate_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_gate_check.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      release gate check passed
+  - name: packaging_portability_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/packaging_portability_check.py
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: validation command failed
+    exit: 1
+    stdout: |
+      packaging portability check failed:
+        - unzip not found on PATH
+  - name: release_smoke
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_smoke.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      {
+        "agent_runtime": {
+          "errors": [],
+          "ok": true
+        },
+        "errors": [],
+        "first_run": {
+          "audit_dir": "C:\\Users\\mzcum\\AppData\\Local\\Temp\\tmpbdahohy7\\first_run\\audit",
+          "audit_dir_writable": true,
+          "config_created": true,
+          "config_path": "C:\\Users\\mzcum\\AppData\\Local\\Temp\\tmpbdahohy7\\first_run\\config\\gui_shell.json",
+          "errors": [],
+          "installer_grants_authority": false,
+          "installer_silently_approves_permissions": false,
+          "ok": true,
+          "setup_doctor_status": "warning"
+        },
+        "ok": true,
+        "runtime_catalog": {
+          "adapter_count": 1,
+          "errors": [],
+          "ok": true,
+          "runtime_count": 1
+        },
+        "shell_core": {
+          "approval_revalidation_required": true,
+          "audit_anchor_verified": true,
+          "audit_chain_verified": true,
+          "audit_event_count": 2,
+          "errors": [],
+          "ok": true,
+          "recovery_id_verified": true,
+          "snapshot_saved": true,
+          "tamper_detected": true
+        }
+      }
+  - name: evidence_bundle
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/evidence_bundle.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      evidence bundle check passed: 5 release blockers preserved, release_ready=False, classification=development_evidence
+  - name: release_runtime_assertions
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_runtime_assertions.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      release runtime assertions: 12 passed, 0 failed, evidence_scope=CONFIG,FIXTURE
+
+desktop_platform_evidence:
+  - name: windows_desktop_project_support_exists
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: `apps/desktop_flutter/windows` exists.
+    required_action: Keep Windows Flutter desktop project files under version control.
+  - name: windows_development_toolchain_historical_smoke
+    status: historical_invalid_for_current_r2
+    classification: none
+    blocks_release: no
+    reason: Historical native Windows analyze/test/build/launch smoke is preserved as owner-trial history only. It is not current R2 formal evidence because it is not tied to the exact implementation commit and installed-path evidence bundle.
+    required_action: Collect fresh native Windows release-candidate evidence through the isolated installed-path evidence flow.
+  - name: windows_evidence_provenance_isolation
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: release_evidence\windows_installed_smoke.json missing
+    required_action: Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes.
+  - name: windows_installer_first_run_smoke
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: release_evidence\windows_installed_smoke.json missing
+    required_action: Create release_evidence/windows_installed_smoke.json from a native Windows installed-app smoke with broker-mediated Flutter .exe launch, -NoPythonRuntime launch, measured window, visible-surface, config, and audit probe evidence.
+  - name: windows_setup_doctor_smoke
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: release_evidence\windows_installed_smoke.json missing
+    required_action: Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.
+  - name: windows_broker_installed_smoke
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: release_evidence\windows_installed_smoke.json missing
+    required_action: Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json.
+  - name: audit_anchor_external_tamper_evidence_proof
+    status: failed
+    classification: release_blocker
+    blocks_release: yes
+    reason: release_evidence\windows_installed_smoke.json missing
+    required_action: Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl before product release claim.
+
+release_gate:
+  status: fail
+  blockers:
+    - item: packaging_portability_check
+      classification: release_blocker
+      blocks_release: yes
+      reason: validation command failed
+      required_action: Fix the failing validation command and rerun.
+    - item: windows_evidence_provenance_isolation
+      classification: release_blocker
+      blocks_release: yes
+      reason: release_evidence\windows_installed_smoke.json missing
+      required_action: Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes.
+    - item: windows_installer_first_run_smoke
+      classification: release_blocker
+      blocks_release: yes
+      reason: release_evidence\windows_installed_smoke.json missing
+      required_action: Create release_evidence/windows_installed_smoke.json from a native Windows installed-app smoke with broker-mediated Flutter .exe launch, -NoPythonRuntime launch, measured window, visible-surface, config, and audit probe evidence.
+    - item: windows_setup_doctor_smoke
+      classification: release_blocker
+      blocks_release: yes
+      reason: release_evidence\windows_installed_smoke.json missing
+      required_action: Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence; external collector probe output is not accepted as product evidence.
+    - item: windows_broker_installed_smoke
+      classification: release_blocker
+      blocks_release: yes
+      reason: release_evidence\windows_installed_smoke.json missing
+      required_action: Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json.
+    - item: audit_anchor_external_tamper_evidence_proof
+      classification: release_blocker
+      blocks_release: yes
+      reason: release_evidence\windows_installed_smoke.json missing
+      required_action: Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl before product release claim.

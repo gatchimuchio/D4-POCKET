@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:37:31.6745802Z
+timestamp_end: 2026-06-06T17:37:32.5795409Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: where.exe unzip
+exit_code: 0
+--- output ---
+C:\Program Files\Git\usr\bin\unzip.exe

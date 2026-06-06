@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:44:30.7635436Z
+timestamp_end: 2026-06-06T17:44:46.2915762Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: $Manifest=Get-Content -Raw 'C:\Users\mzcum\AppData\Local\GUI-Shell\installed-runs\run-qa-20260606T173431Z\installed_manifest.json' | ConvertFrom-Json; powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smoke.ps1 -InstalledExe $Manifest.app_exe -InstalledManifestJson (Join-Path $Manifest.install_root 'installed_manifest.json') -SetupDoctorJson (Join-Path $Manifest.evidence_dir 'setup_doctor_product_export.json') -ConfigPath $Manifest.config_path -AuditDir $Manifest.audit_dir -VisibleSurfacesOutputPath (Join-Path $Manifest.evidence_dir 'visible_surfaces.json') -BrokerEvidenceJson (Join-Path $Manifest.evidence_dir 'windows_broker_smoke.json') -BrokerHelperExe $Manifest.broker_exe -BrokerStoreDir $Manifest.store_dir -BrokerSessionFile $Manifest.broker_session_file -NoPythonRuntime -RuntimeAssertionsJson release_evidence\release_runtime_assertions.json -OutputPath release_evidence\windows_installed_smoke.json
+exit_code: 0
+--- output ---
+wrote C:\Users\mzcum\Documents\GUI-Shell\release_evidence\windows_installed_smoke.json

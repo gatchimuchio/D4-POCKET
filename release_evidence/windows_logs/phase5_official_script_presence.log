@@ -1,0 +1,14 @@
+timestamp_start: 2026-06-06T17:41:41.5117884Z
+timestamp_end: 2026-06-06T17:41:42.3661523Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: @("installer\windows\collect_installed_smoke.ps1","installer\windows\collect_setup_doctor.ps1","installer\windows\collect_broker_smoke.ps1","installer\windows\collect_windows_release_evidence.ps1","installer\windows\stage_installed_app.ps1") | ForEach-Object { [pscustomobject]@{path=$_; present=(Test-Path $_)} } | Format-Table -AutoSize
+exit_code: 0
+--- output ---
+
+path                                                   present
+----                                                   -------
+installer\windows\collect_installed_smoke.ps1             True
+installer\windows\collect_setup_doctor.ps1                True
+installer\windows\collect_broker_smoke.ps1                True
+installer\windows\collect_windows_release_evidence.ps1   False
+installer\windows\stage_installed_app.ps1                 True

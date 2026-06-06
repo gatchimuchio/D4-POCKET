@@ -1,0 +1,26 @@
+timestamp_start: 2026-06-06T17:44:46.3071175Z
+timestamp_end: 2026-06-06T17:44:48.7641605Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: $Manifest=Get-Content -Raw 'C:\Users\mzcum\AppData\Local\GUI-Shell\installed-runs\run-qa-20260606T173431Z\installed_manifest.json' | ConvertFrom-Json; $paths=@((Join-Path $Manifest.store_dir 'audit_anchor.key'),(Join-Path $Manifest.store_dir 'audit_anchor.json'),(Join-Path $Manifest.store_dir 'audit.jsonl')); $paths | ForEach-Object { [pscustomobject]@{path=$_; exists=(Test-Path $_); hash=if(Test-Path $_){(Get-FileHash $_ -Algorithm SHA256).Hash}else{$null}; acl=if(Test-Path $_){(Get-Acl $_ | Format-List | Out-String)}else{$null}} } | ConvertTo-Json -Depth 5
+exit_code: 0
+--- output ---
+[
+    {
+        "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T173431Z\\runtime\\broker_store\\audit_anchor.key",
+        "exists":  true,
+        "hash":  "7D38F95C76C662FB9D9770F45265729875358E5205AA0CA5C80004FF6A97C801",
+        "acl":  "\r\n\r\nPath   : Microsoft.PowerShell.Core\\FileSystem::C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T17\r\n         3431Z\\runtime\\broker_store\\audit_anchor.key\r\nOwner  : LAPTOP-89BTKF4N\\mzcum\r\nGroup  : LAPTOP-89BTKF4N\\mzcum\r\nAccess : NT AUTHORITY\\SYSTEM Allow  FullControl\r\n         BUILTIN\\Administrators Allow  FullControl\r\n         LAPTOP-89BTKF4N\\mzcum Allow  FullControl\r\nAudit  : \r\nSddl   : O:S-1-5-21-3524596986-3033032914-776417026-1002G:S-1-5-21-3524596986-3033032914-776417026-1002D:(A;ID;FA;;;SY)\r\n         (A;ID;FA;;;BA)(A;ID;FA;;;S-1-5-21-3524596986-3033032914-776417026-1002)\r\n\r\n\r\n\r\n"
+    },
+    {
+        "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T173431Z\\runtime\\broker_store\\audit_anchor.json",
+        "exists":  true,
+        "hash":  "9C1C1E6D1D2C8D9D37429C57643CB8A11129806CB2C6BDB1104354E735433F02",
+        "acl":  "\r\n\r\nPath   : Microsoft.PowerShell.Core\\FileSystem::C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T17\r\n         3431Z\\runtime\\broker_store\\audit_anchor.json\r\nOwner  : LAPTOP-89BTKF4N\\mzcum\r\nGroup  : LAPTOP-89BTKF4N\\mzcum\r\nAccess : NT AUTHORITY\\SYSTEM Allow  FullControl\r\n         BUILTIN\\Administrators Allow  FullControl\r\n         LAPTOP-89BTKF4N\\mzcum Allow  FullControl\r\nAudit  : \r\nSddl   : O:S-1-5-21-3524596986-3033032914-776417026-1002G:S-1-5-21-3524596986-3033032914-776417026-1002D:(A;ID;FA;;;SY)\r\n         (A;ID;FA;;;BA)(A;ID;FA;;;S-1-5-21-3524596986-3033032914-776417026-1002)\r\n\r\n\r\n\r\n"
+    },
+    {
+        "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T173431Z\\runtime\\broker_store\\audit.jsonl",
+        "exists":  true,
+        "hash":  "7CE4AFA5EB21E7A60FC0EDB2BB361826B4906D0F431A6CF21A9B1A67AAC70893",
+        "acl":  "\r\n\r\nPath   : Microsoft.PowerShell.Core\\FileSystem::C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-qa-20260606T17\r\n         3431Z\\runtime\\broker_store\\audit.jsonl\r\nOwner  : LAPTOP-89BTKF4N\\mzcum\r\nGroup  : LAPTOP-89BTKF4N\\mzcum\r\nAccess : NT AUTHORITY\\SYSTEM Allow  FullControl\r\n         BUILTIN\\Administrators Allow  FullControl\r\n         LAPTOP-89BTKF4N\\mzcum Allow  FullControl\r\nAudit  : \r\nSddl   : O:S-1-5-21-3524596986-3033032914-776417026-1002G:S-1-5-21-3524596986-3033032914-776417026-1002D:(A;ID;FA;;;SY)\r\n         (A;ID;FA;;;BA)(A;ID;FA;;;S-1-5-21-3524596986-3033032914-776417026-1002)\r\n\r\n\r\n\r\n"
+    }
+]

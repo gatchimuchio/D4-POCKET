@@ -1,0 +1,6 @@
+timestamp_start: 2026-06-06T17:42:16.3732528Z
+timestamp_end: 2026-06-06T17:42:17.2186958Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: Get-ChildItem -Recurse -File -Include *.msix,*.msi,*.exe installer,build,dist,release_evidence -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime | Format-Table -AutoSize
+exit_code: 0
+--- output ---

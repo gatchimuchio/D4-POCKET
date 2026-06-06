@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:35:24.8902023Z
+timestamp_end: 2026-06-06T17:35:25.6279787Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: git rev-parse --abbrev-ref HEAD
+exit_code: 0
+--- output ---
+main

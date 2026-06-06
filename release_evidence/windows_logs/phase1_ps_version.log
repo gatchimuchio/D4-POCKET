@@ -1,0 +1,17 @@
+timestamp_start: 2026-06-06T17:35:36.8797603Z
+timestamp_end: 2026-06-06T17:35:37.5462804Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: $PSVersionTable
+exit_code: 0
+--- output ---
+
+Name                           Value
+----                           -----
+PSVersion                      5.1.26100.8521
+PSEdition                      Desktop
+PSCompatibleVersions           {1.0, 2.0, 3.0, 4.0...}
+BuildVersion                   10.0.26100.8521
+CLRVersion                     4.0.30319.42000
+WSManStackVersion              3.0
+PSRemotingProtocolVersion      2.3
+SerializationVersion           1.1.0.1

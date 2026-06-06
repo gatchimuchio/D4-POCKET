@@ -1,0 +1,8 @@
+timestamp_start: 2026-06-06T17:36:25.0360920Z
+timestamp_end: 2026-06-06T17:36:26.1943417Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: python tooling\packaging_portability_check.py
+exit_code: 1
+--- output ---
+packaging portability check failed:
+  - unzip not found on PATH

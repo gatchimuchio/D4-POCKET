@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:40:36.1086598Z
+timestamp_end: 2026-06-06T17:40:39.7219740Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell\apps\desktop_flutter
+command: dart format --output=none --set-exit-if-changed .
+exit_code: 0
+--- output ---
+Formatted 22 files (0 changed) in 0.18 seconds.

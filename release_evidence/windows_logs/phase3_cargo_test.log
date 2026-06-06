@@ -1,0 +1,76 @@
+timestamp_start: 2026-06-06T17:39:16.9208440Z
+timestamp_end: 2026-06-06T17:39:22.2021591Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell\native\rust_helper
+command: cargo test
+exit_code: 0
+--- output ---
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src\lib.rs (target\debug\deps\gui_shell_rust_helper-4ea4ca33dc28eb0d.exe)
+
+running 42 tests
+test audit_hash::tests::hmac_sha256_matches_rfc_4231_case_1 ... ok
+test audit_hash::tests::audit_hash_is_deterministic ... ok
+test broker::protocol::tests::broker_state_store_declares_all_in_memory_scopes ... ok
+test broker::protocol::tests::authority_metadata_is_rejected_and_audited ... ok
+test broker::protocol::tests::broker_health_is_accepted_and_audited ... ok
+test broker::protocol::tests::command_envelope_is_suspended_without_dispatch ... ok
+test broker::protocol::tests::current_issued_at_formatter_uses_utc_rfc3339_seconds ... ok
+test broker::protocol::tests::authority_alias_and_separator_variants_are_rejected ... ok
+test broker::protocol::tests::invalid_json_is_rejected_and_audited ... ok
+test broker::protocol::tests::issued_at_parser_handles_utc_offsets ... ok
+test broker::protocol::tests::json_authority_metadata_is_rejected_and_audited ... ok
+test broker::protocol::tests::json_missing_metadata_is_rejected_and_audited ... ok
+test broker::protocol::tests::command_envelope_reports_process_credential_and_update_gates ... ok
+test broker::protocol::tests::json_health_request_is_accepted_and_serialized ... ok
+test broker::protocol::tests::fixture_authority_operation_is_isolated_from_production_operation ... ok
+test broker::protocol::tests::malformed_request_is_rejected_and_audited ... ok
+test broker::protocol::tests::malformed_issued_at_is_rejected_and_audited ... ok
+test broker::protocol::tests::payload_hash_matches_dart_known_vectors ... ok
+test broker::protocol::tests::payload_hash_mismatch_is_rejected_and_audited ... ok
+test broker::protocol::tests::persistence_required_health_suspends_without_store ... ok
+test broker::protocol::tests::persistence_required_command_rejects_without_store ... ok
+test broker::authority::tests::non_authority_sources_cannot_grant_authority ... ok
+test broker::protocol::tests::production_authority_rejects_caller_audit_mapping ... ok
+test broker::protocol::tests::production_authority_rejects_caller_forged_authority_source ... ok
+test broker::protocol::tests::production_authority_uses_broker_owned_registry_and_denies_missing_records ... ok
+test broker::protocol::tests::production_authority_rejects_caller_supplied_fixture_state ... ok
+test broker::protocol::tests::shutdown_sets_lifecycle_flag ... ok
+test broker::protocol::tests::replayed_nonce_is_rejected_and_audited ... ok
+test broker::protocol::tests::stale_session_is_rejected_and_audited ... ok
+test broker::protocol::tests::stale_issued_at_is_rejected_and_audited ... ok
+test broker::protocol::tests::unicode_nfkc_authority_metadata_is_rejected_and_audited ... ok
+test broker::protocol::tests::value_only_and_nested_authority_metadata_are_rejected ... ok
+test network::tests::network_diagnostic_does_not_fetch_external_url_by_default ... ok
+test filesystem::tests::filesystem_diagnostic_does_not_read_content_by_default ... ok
+test process::tests::process_diagnostic_does_not_execute_arbitrary_commands ... ok
+test update_verification::tests::update_verification_rejects_unsigned_update ... ok
+test broker::protocol::tests::persistent_store_rejects_tampered_audit_chain ... ok
+test broker::protocol::tests::persistent_store_health_reports_durable_ready ... ok
+test broker::protocol::tests::persistent_store_rejects_malformed_replay_state ... ok
+test broker::protocol::tests::persistent_store_rejects_replayed_nonce_after_restart ... ok
+test broker::protocol::tests::persistent_store_rejects_truncated_audit_anchor ... ok
+test broker::protocol::tests::persistent_store_verifies_audit_chain_after_restart ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running unittests src\main.rs (target\debug\deps\gui_shell_rust_helper-fee503b2d77d015d.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\broker_ipc.rs (target\debug\deps\broker_ipc-aec2c0852b2de18d.exe)
+
+running 4 tests
+test broker_ipc_rejects_payload_hash_mismatch ... ok
+test broker_ipc_rejects_unauthenticated_malformed_oversized_and_stale_requests ... ok
+test broker_process_launch_connect_and_shutdown ... ok
+test broker_ipc_rejects_replay_after_process_restart ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.92s
+
+   Doc-tests gui_shell_rust_helper
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

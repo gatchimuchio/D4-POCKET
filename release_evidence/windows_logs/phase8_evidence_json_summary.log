@@ -1,0 +1,75 @@
+timestamp_start: 2026-06-06T17:45:29.6788611Z
+timestamp_end: 2026-06-06T17:45:31.1444357Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: Get-ChildItem release_evidence -Recurse -Filter *.json | ForEach-Object {
+  $json = Get-Content -Raw $_.FullName | ConvertFrom-Json
+  [pscustomobject]@{
+    path = $_.FullName
+    sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+    status = $json.status
+    classification = $json.classification
+    evidence_source = $json.evidence_source
+    blocks_release = $json.blocks_release
+    reason = $json.reason
+    required_action = $json.required_action
+    commit_sha = if ($json.provenance) { $json.provenance.source_commit } elseif ($json.source_commit) { $json.source_commit } else { $null }
+    app_artifact_hash = if ($json.provenance) { $json.provenance.app_artifact_sha256 } else { $null }
+    broker_artifact_hash = if ($json.provenance) { $json.provenance.broker_artifact_sha256 } else { $null }
+    installed_path = if ($json.provenance) { $json.provenance.isolated_install_root } elseif ($json.installed_path) { $json.installed_path } else { $null }
+    native_windows_installed_path = $json.native_windows_installed_path
+    has_owner_go = ($json.PSObject.Properties.Name -contains 'owner_go')
+    owner_go_value = $json.owner_go
+    has_release_ready = ($json.PSObject.Properties.Name -contains 'release_ready')
+    release_ready_value = $json.release_ready
+    fixture_marker = ($json | ConvertTo-Json -Depth 30) -match 'FIXTURE|fixture|development_evidence|CONFIG'
+  }
+} | ConvertTo-Json -Depth 6
+exit_code: 0
+--- output ---
+[
+    {
+        "path":  "C:\\Users\\mzcum\\Documents\\GUI-Shell\\release_evidence\\release_runtime_assertions.json",
+        "sha256":  "BAA37D343EFFD871E6DB595DFD5364F14E9A2D8EC5BA8CBD6F81AC09C283D891",
+        "status":  null,
+        "classification":  null,
+        "evidence_source":  null,
+        "blocks_release":  null,
+        "reason":  null,
+        "required_action":  null,
+        "commit_sha":  null,
+        "app_artifact_hash":  null,
+        "broker_artifact_hash":  null,
+        "installed_path":  null,
+        "native_windows_installed_path":  null,
+        "has_owner_go":  false,
+        "owner_go_value":  null,
+        "has_release_ready":  false,
+        "release_ready_value":  null,
+        "fixture_marker":  true
+    },
+    {
+        "path":  "C:\\Users\\mzcum\\Documents\\GUI-Shell\\release_evidence\\windows_installed_smoke.json",
+        "sha256":  "6D701699FB8EEF63EC6F7AEF193FB1A2167875D4C46631A902F4C210A8A6AD78",
+        "status":  null,
+        "classification":  null,
+        "evidence_source":  {
+                                "collector":  "installer/windows/collect_installed_smoke.ps1",
+                                "collector_version":  "6",
+                                "manual_confirmation":  false,
+                                "screenshot_path":  null
+                            },
+        "blocks_release":  null,
+        "reason":  null,
+        "required_action":  null,
+        "commit_sha":  "2bffe61b4804c4f4f2e1566571798aad9a06e4bf",
+        "app_artifact_hash":  "sha256:785b464bc04091169657c041f51314da8c2961bfbd1e022369ba0f2d59b67468",
+        "broker_artifact_hash":  "sha256:515b2d09839bb629670b76a94ce6dc522cdde626424d1bb7675fb035d7606c59",
+        "installed_path":  null,
+        "native_windows_installed_path":  null,
+        "has_owner_go":  false,
+        "owner_go_value":  null,
+        "has_release_ready":  false,
+        "release_ready_value":  null,
+        "fixture_marker":  true
+    }
+]

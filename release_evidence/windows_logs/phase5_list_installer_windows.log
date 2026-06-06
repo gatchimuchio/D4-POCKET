@@ -1,0 +1,6 @@
+timestamp_start: 2026-06-06T17:41:37.1382381Z
+timestamp_end: 2026-06-06T17:41:37.9835105Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: Get-ChildItem installer\windows -Recurse | Select-Object FullName,Length,LastWriteTime
+exit_code: 0
+--- output ---

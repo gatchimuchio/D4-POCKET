@@ -1,0 +1,10 @@
+timestamp_start: 2026-06-06T17:42:15.1269675Z
+timestamp_end: 2026-06-06T17:42:16.3649373Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: Get-FileHash native\rust_helper\target\release\gui_shell_rust_helper.exe -Algorithm SHA256
+exit_code: 0
+--- output ---
+
+Algorithm       Hash                                                                   Path
+---------       ----                                                                   ----
+SHA256          515B2D09839BB629670B76A94CE6DC522CDDE626424D1BB7675FB035D7606C59       C:\Users\mzcum\Documents\GUI-...

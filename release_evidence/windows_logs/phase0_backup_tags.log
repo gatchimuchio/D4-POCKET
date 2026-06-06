@@ -1,0 +1,8 @@
+timestamp_start: 2026-06-06T17:35:27.3691106Z
+timestamp_end: 2026-06-06T17:35:28.2342207Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: git tag --list "codex/backup-main*"
+exit_code: 0
+--- output ---
+codex/backup-main
+codex/backup-main-prev

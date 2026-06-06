@@ -1,0 +1,13 @@
+timestamp_start: 2026-06-06T17:46:57.3055954Z
+timestamp_end: 2026-06-06T17:46:59.7495268Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: python tooling\release_gate_check.py --strict-release
+exit_code: 1
+--- output ---
+release gate check failed:
+  - strict release active blocker unresolved: windows_evidence_provenance_isolation - release_evidence/windows_installed_smoke.json is missing, so isolated Windows source/artifact/evidence provenance is not proven.
+  - strict release active blocker unresolved: windows_installer_first_run_smoke - Windows installed first-run evidence is missing.
+  - strict release active blocker unresolved: windows_setup_doctor_smoke - Installed-app generated Setup Doctor product evidence is missing.
+  - strict release active blocker unresolved: windows_broker_installed_smoke - Installed Rust broker launch/connect/restart/crash evidence is missing.
+  - strict release active blocker unresolved: audit_anchor_external_tamper_evidence_proof - Local HMAC audit anchor evidence does not prove same-user or administrator/root rewrite resistance.
+  - strict release active blocker unresolved: owner_go - Explicit owner GO has not been recorded.

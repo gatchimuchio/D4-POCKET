@@ -1,0 +1,6 @@
+timestamp_start: 2026-06-06T17:43:28.2098359Z
+timestamp_end: 2026-06-06T17:43:29.4182829Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: python tooling\release_runtime_assertions.py --json | Set-Content -Encoding utf8 release_evidence\release_runtime_assertions.json
+exit_code: 0
+--- output ---

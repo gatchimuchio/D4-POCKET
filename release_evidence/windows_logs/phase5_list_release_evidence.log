@@ -1,0 +1,6 @@
+timestamp_start: 2026-06-06T17:41:38.0719458Z
+timestamp_end: 2026-06-06T17:41:38.8410363Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: Get-ChildItem release_evidence -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length,LastWriteTime
+exit_code: 0
+--- output ---

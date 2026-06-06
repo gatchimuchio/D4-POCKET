@@ -1,0 +1,7 @@
+timestamp_start: 2026-06-06T17:35:46.4109910Z
+timestamp_end: 2026-06-06T17:35:49.3722685Z
+working_directory: C:\Users\mzcum\Documents\GUI-Shell
+command: dart --version
+exit_code: 0
+--- output ---
+Dart SDK version: 3.12.0 (stable) (Fri May 8 01:51:14 2026 -0700) on "windows_x64"
