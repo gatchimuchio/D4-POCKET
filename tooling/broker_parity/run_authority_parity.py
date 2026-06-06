@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -48,6 +49,20 @@ def wait_for_process_exit(process: subprocess.Popen, timeout: float = 5.0) -> No
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=timeout)
+
+
+def cleanup_temp_directory(path: Path, attempts: int = 25, delay_seconds: float = 0.2) -> None:
+    last_error: OSError | None = None
+    for _ in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            last_error = exc
+            time.sleep(delay_seconds)
+    raise AssertionError(f"temporary broker parity directory cleanup failed: {path}: {last_error}")
 
 
 def build_state() -> tuple[RuntimeState, dict]:
@@ -405,7 +420,8 @@ def compare_audit_chain(broker: BrokerClient) -> list[str]:
 
 def main() -> int:
     state, state_json = build_state()
-    with tempfile.TemporaryDirectory(prefix="gui-shell-broker-parity-") as directory:
+    directory = Path(tempfile.mkdtemp(prefix="gui-shell-broker-parity-"))
+    try:
         broker = start_broker(Path(directory))
         try:
             errors = []
@@ -423,6 +439,8 @@ def main() -> int:
             for error in errors:
                 print(f"  - {error}")
             return 1
+    finally:
+        cleanup_temp_directory(directory)
     print("broker authority parity passed: accepted parity, rejected parity, rust-specific broker IPC path")
     return 0
 

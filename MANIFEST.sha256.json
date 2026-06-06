@@ -1254,7 +1254,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "a889db94dbb73574142799149c007307f172e6f0e231c265171f7ebcac064e60"
+      "sha256": "8281971621e063b2d0db24ce6e0b271dc94063653a1a02c8dfc80c5ffaf4d68b"
     },
     {
       "path": "tooling/codegen/README.md",
