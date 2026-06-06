@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -8,6 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
 
 SCAN_FILES = [
     "README.md",
@@ -128,6 +130,72 @@ def manifest_check_errors() -> list[str]:
     return [f"manifest check failed: {line}" for line in output.splitlines()]
 
 
+def registry_errors() -> list[str]:
+    try:
+        registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return ["release blockers registry missing"]
+    except json.JSONDecodeError as exc:
+        return [f"release blockers registry invalid JSON: {exc}"]
+    if not isinstance(registry, dict):
+        return ["release blockers registry must be an object"]
+    blockers = registry.get("blockers")
+    if not isinstance(blockers, list):
+        return ["release blockers registry must contain a blockers list"]
+    errors: list[str] = []
+    required_fields = {
+        "name",
+        "status",
+        "active",
+        "classification",
+        "blocks_release",
+        "reason",
+        "required_action",
+    }
+    names: set[str] = set()
+    for index, blocker in enumerate(blockers):
+        if not isinstance(blocker, dict):
+            errors.append(f"release blockers registry entry {index} is not an object")
+            continue
+        missing = sorted(required_fields - set(blocker))
+        if missing:
+            errors.append(f"release blockers registry entry {index} missing fields: {', '.join(missing)}")
+        name = blocker.get("name")
+        if not isinstance(name, str) or not name:
+            errors.append(f"release blockers registry entry {index} has invalid name")
+        elif name in names:
+            errors.append(f"duplicate release blocker name: {name}")
+        else:
+            names.add(name)
+        if blocker.get("classification") != "release_blocker":
+            errors.append(f"release blocker {name or index} must be classified release_blocker")
+        if blocker.get("blocks_release") is not True:
+            errors.append(f"release blocker {name or index} must set blocks_release=true")
+        if blocker.get("active") not in (True, False):
+            errors.append(f"release blocker {name or index} active must be boolean")
+        if blocker.get("status") not in {"unresolved", "resolved"}:
+            errors.append(f"release blocker {name or index} status must be unresolved or resolved")
+        if not isinstance(blocker.get("reason"), str) or not blocker.get("reason"):
+            errors.append(f"release blocker {name or index} reason missing")
+        if not isinstance(blocker.get("required_action"), str) or not blocker.get("required_action"):
+            errors.append(f"release blocker {name or index} required_action missing")
+    return errors
+
+
+def unresolved_active_blockers() -> list[dict]:
+    registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
+    blockers = registry.get("blockers", [])
+    return [
+        blocker
+        for blocker in blockers
+        if isinstance(blocker, dict)
+        and blocker.get("active") is True
+        and blocker.get("status") == "unresolved"
+        and blocker.get("classification") == "release_blocker"
+        and blocker.get("blocks_release") is True
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--strict-release", action="store_true")
@@ -141,8 +209,13 @@ def main() -> int:
             combined += "\n" + path.read_text(encoding="utf-8")
         errors.extend(scan_file(path))
 
-    if args.strict_release and "release_blocker" in combined:
-        errors.append("strict release mode found release_blocker classifications")
+    errors.extend(registry_errors())
+    if args.strict_release and not errors:
+        for blocker in unresolved_active_blockers():
+            errors.append(
+                "strict release active blocker unresolved: "
+                f"{blocker['name']} - {blocker['reason']}"
+            )
     if release_claim_exists_without_classification(combined):
         errors.append("release claim appears while release_blocker exists")
     errors.extend(macos_support_claim_errors(combined))

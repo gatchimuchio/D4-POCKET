@@ -210,6 +210,12 @@ The canonical completion roadmap for the combined Windows-first product path and
   required_action: Keep integrated audit chain and local anchor smoke passing.
   blocks_release: no
 
+- item: audit anchor external tamper-evidence proof
+  classification: release_blocker
+  reason: Local HMAC audit anchors detect corruption and partial tamper, but completed product release requires measured Windows ACL/DPAPI, external anchor, or signed-evidence proof before claiming same-user tamper evidence beyond the local file authority boundary.
+  required_action: Record installed-path audit anchor key-protection or external-anchor evidence and pass strict Windows release validation.
+  blocks_release: yes
+
 - item: approval edit to rehash to revalidation smoke
   classification: required_for_v1
   reason: integrated Shell Core release smoke edits an allowed approval field, recalculates payload hash, and marks the approval `requires_validation`.

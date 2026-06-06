@@ -190,9 +190,8 @@ ShellSnapshot _brokerSnapshot({
   final cutoverStatus =
       health['authority_cutover_status']?.toString() ?? 'unknown';
   final persistenceReady = health['persistence_ready'] == true;
-  final commandDispatchEnabled =
-      health['command_dispatch_enabled'] == true &&
-          _boolInBody(commandResponse, 'dispatch_enabled');
+  final commandDispatchEnabled = health['command_dispatch_enabled'] == true &&
+      _boolInBody(commandResponse, 'dispatch_enabled');
   final protectedEditRejected = protectedEdit['ok'] == false;
   final brokerReady = healthStatus == 'ready' && persistenceReady;
   final runtimeStatus =
@@ -370,8 +369,9 @@ ShellSnapshot _brokerSnapshot({
       {
         'check_id': 'broker.protected_field_edit',
         'status': protectedEditRejected ? 'pass' : 'fail',
-        'message':
-            protectedEditRejected ? 'Protected payload_hash edit rejected.' : 'Protected edit probe was not rejected.',
+        'message': protectedEditRejected
+            ? 'Protected payload_hash edit rejected.'
+            : 'Protected edit probe was not rejected.',
         'recovery_instruction': protectedEditRejected
             ? null
             : 'Keep authority actions suspended and restore approval edit enforcement.',
@@ -468,8 +468,7 @@ ShellSnapshot _brokerSnapshot({
         'authority_related': true,
       },
     ],
-    'audit_chain_status':
-        persistenceReady ? 'durable_file_store' : 'not_ready',
+    'audit_chain_status': persistenceReady ? 'durable_file_store' : 'not_ready',
     'network_exposure': '127.0.0.1 restricted broker IPC',
     'release_blocker_count':
         problems.where((problem) => problem['blocks_release'] == true).length,
@@ -596,7 +595,10 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'state': 'blocked',
         'source': 'restricted_ipc',
         'expires_at': null,
-        'blocked_operations': ['authority_actions', 'external_command_dispatch'],
+        'blocked_operations': [
+          'authority_actions',
+          'external_command_dispatch'
+        ],
       }
     ],
     'authority_map': [],
@@ -727,7 +729,8 @@ Map<String, Object?> _problemToRecoveryPlaybookJson(
     'recovery_id': problem['recovery_id']?.toString() ?? '',
     'item': problem['item']?.toString() ?? '',
     'severity': problem['severity']?.toString() ?? 'warning',
-    'classification': problem['classification']?.toString() ?? 'release_blocker',
+    'classification':
+        problem['classification']?.toString() ?? 'release_blocker',
     'safe_to_ignore_for_phase_b': problem['safe_to_ignore_for_phase_b'] == true,
     'required_action': problem['required_action']?.toString() ?? '',
     'blocks_completed_product_release':
@@ -1131,10 +1134,10 @@ const _mockSnapshot = ShellSnapshot(
   ],
   auditChainStatus: 'verified',
   networkExposure: 'localhost only',
-  releaseBlockerCount: 3,
+  releaseBlockerCount: 4,
   evidenceSummary: EvidenceSummaryRecord(
     schemaCheck: 'passed',
-    conformanceCheckCount: 89,
+    conformanceCheckCount: 137,
     releaseSmoke: 'passed',
     releaseGateCheck: 'passed',
     evidenceBundle: 'passed',
@@ -1142,6 +1145,7 @@ const _mockSnapshot = ShellSnapshot(
     strictWindowsRelease: 'expected fail',
     missingMeasuredWindowsEvidence: true,
     missingSetupDoctorEvidence: true,
+    missingAuditAnchorExternalTamperEvidence: true,
     ownerGo: 'missing',
   ),
   recoveryPlaybook: [
@@ -1341,7 +1345,7 @@ const _localFallbackSnapshot = ShellSnapshot(
   releaseBlockerCount: 1,
   evidenceSummary: EvidenceSummaryRecord(
     schemaCheck: 'passed',
-    conformanceCheckCount: 89,
+    conformanceCheckCount: 137,
     releaseSmoke: 'passed',
     releaseGateCheck: 'passed',
     evidenceBundle: 'passed',
@@ -1349,6 +1353,7 @@ const _localFallbackSnapshot = ShellSnapshot(
     strictWindowsRelease: 'expected fail',
     missingMeasuredWindowsEvidence: true,
     missingSetupDoctorEvidence: true,
+    missingAuditAnchorExternalTamperEvidence: true,
     ownerGo: 'missing',
   ),
   recoveryPlaybook: [

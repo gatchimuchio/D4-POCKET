@@ -33,7 +33,7 @@ GLOB_PATTERNS = [
 EXACT_FILES = [
     ".gitattributes",
     "AGENTS.md",
-    "GUI_Shell_製品品質統合是正実装台帳_v4_2026-06-05.md",
+    "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
     "ROADMAP.md",
     "CONFORMANCE_REPORT.md",
     "COMPATIBILITY_MATRIX.md",
@@ -41,6 +41,7 @@ EXACT_FILES = [
     "README.md",
     "CLAIM.md",
     "RELEASE_CHECKLIST.md",
+    "release_blockers.registry.json",
     "VALIDATION.txt",
     "AUDIT_EVIDENCE.md",
     "INSTALLER_STATUS.md",

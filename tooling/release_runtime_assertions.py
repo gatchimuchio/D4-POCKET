@@ -179,7 +179,7 @@ def assert_flutter_models_do_not_default_evidence_to_passed() -> RuntimeAssertio
         "json['evidence_bundle'] as String? ?? 'passed'",
         "json['validate_all'] as String? ?? 'passed'",
         "json['strict_windows_release'] as String? ?? 'expected fail'",
-        "json['conformance_check_count'] as int? ?? 89",
+        "json['conformance_check_count'] as int? ?? 135",
     ]
     findings = [token for token in forbidden if token in text]
     if findings:

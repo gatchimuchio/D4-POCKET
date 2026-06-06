@@ -60,3 +60,9 @@
   reason: Native Windows launch smoke is development evidence. Strict R2 requires installed-app generated Setup Doctor product evidence from an isolated native Windows run; the current PowerShell Setup Doctor collector is external probe evidence only.
   required_action: Record installed-app generated Setup Doctor export evidence through isolated Windows installed smoke. Strict release must still fail until measured `windows_installed_smoke.json`, Setup Doctor product evidence, and owner GO exist.
   blocks_release: yes
+
+- item: audit anchor external tamper-evidence proof
+  classification: release_blocker
+  reason: Local HMAC audit anchor verification does not prove same-user or administrator/root rewrite resistance by itself.
+  required_action: Record Windows ACL/DPAPI, external anchor, or signed-evidence proof for audit anchor files and pass strict Windows release validation.
+  blocks_release: yes

@@ -45,6 +45,7 @@ from tooling.schema_check.check_schemas import validate_instance
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden
+from tooling.packaging_portability_check import portable_path_errors
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
     ValidationStep,
@@ -1214,6 +1215,17 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
     evidence_path = ROOT / "release_evidence" / "windows_installed_smoke.json"
     if not evidence_path.exists() and "audit_anchor_external_tamper_evidence_proof" not in blocker_names:
         errors.append("evidence bundle did not preserve audit anchor external tamper-evidence blocker")
+    for index, blocker in enumerate(bundle.get("blockers", [])):
+        if not isinstance(blocker, dict):
+            errors.append(f"evidence bundle blocker {index} is not structured metadata")
+            continue
+        for key in ["name", "status", "classification", "blocks_release", "reason", "required_action"]:
+            if key not in blocker:
+                errors.append(f"evidence bundle blocker {index} missing {key}")
+        if blocker.get("classification") != "release_blocker":
+            errors.append(f"evidence bundle blocker {index} is not classified release_blocker")
+        if blocker.get("blocks_release") is not True:
+            errors.append(f"evidence bundle blocker {index} does not block release")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
         errors.append("evidence bundle made Flutter authoritative")
     return errors
@@ -1862,11 +1874,43 @@ def test_validate_all_strict_release_runs_release_gate_strict_scan() -> list[str
     if "--strict-release" not in result.get("command", ""):
         errors.append("validate_all strict Windows release did not pass --strict-release to release_gate_check")
     if result.get("status") != "failed":
-        errors.append("validate_all strict release gate scan should fail while documented release_blockers remain")
+        errors.append("validate_all strict release gate scan should fail while active release blockers remain")
     if result.get("classification") != "release_blocker":
         errors.append("validate_all strict release gate scan was not classified as release_blocker")
-    if "strict release gate found documented release_blocker classifications" not in result.get("reason", ""):
-        errors.append("validate_all strict release gate scan did not report documented release_blocker reason")
+    if "strict release gate found unresolved active structured release blockers" not in result.get("reason", ""):
+        errors.append("validate_all strict release gate scan did not report structured release_blocker reason")
+    return errors
+
+
+def test_release_blocker_registry_controls_strict_release() -> list[str]:
+    registry = ROOT / "release_blockers.registry.json"
+    if not registry.exists():
+        return ["release_blockers.registry.json missing"]
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    blockers = data.get("blockers")
+    if not isinstance(blockers, list):
+        return ["release blocker registry lacks blockers list"]
+    errors = []
+    active = [
+        blocker
+        for blocker in blockers
+        if isinstance(blocker, dict)
+        and blocker.get("active") is True
+        and blocker.get("status") == "unresolved"
+    ]
+    if not active:
+        errors.append("release blocker registry has no active unresolved blockers")
+    for blocker in active:
+        if blocker.get("classification") != "release_blocker":
+            errors.append(f"active blocker {blocker.get('name')} not classified release_blocker")
+        if blocker.get("blocks_release") is not True:
+            errors.append(f"active blocker {blocker.get('name')} does not block release")
+    release_gate = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
+    for token in ["RELEASE_BLOCKERS_REGISTRY", "unresolved_active_blockers", "strict release active blocker unresolved"]:
+        if token not in release_gate:
+            errors.append(f"release_gate_check.py missing structured registry token: {token}")
+    if '"release_blocker" in combined' in release_gate:
+        errors.append("release_gate_check.py still uses raw release_blocker text as strict release blocker")
     return errors
 
 
@@ -1875,6 +1919,34 @@ def test_release_gate_scans_ipc_threat_model() -> list[str]:
     if "docs/security/IPC_THREAT_MODEL.md" not in text:
         return ["release_gate_check.py does not scan IPC threat model release blockers"]
     return []
+
+
+def test_packaging_portability_checker_exists() -> list[str]:
+    checker = ROOT / "tooling" / "packaging_portability_check.py"
+    workflow = ROOT / ".github" / "workflows" / "validation.yml"
+    validate_all = ROOT / "tooling" / "validate_all.py"
+    errors = []
+    if not checker.exists():
+        errors.append("tooling/packaging_portability_check.py missing")
+    else:
+        text = checker.read_text(encoding="utf-8")
+        for token in ["unzip", "LC_ALL", "tooling/manifest.py", "run_conformance_skeleton.py", "release_gate_check.py"]:
+            if token not in text:
+                errors.append(f"packaging portability checker missing token: {token}")
+    tracked_paths = [ROOT / path for path in subprocess.run(
+        ["git", "ls-files"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=False,
+    ).stdout.splitlines()]
+    errors.extend(portable_path_errors([path for path in tracked_paths if path.exists()]))
+    workflow_text = workflow.read_text(encoding="utf-8")
+    if "tooling/packaging_portability_check.py" not in workflow_text:
+        errors.append("CI does not run packaging portability check")
+    if "packaging_portability_check" not in validate_all.read_text(encoding="utf-8"):
+        errors.append("validate_all.py does not run packaging portability check")
+    return errors
 
 
 def test_invariant_evaluator_detects_intentional_import_violation() -> list[str]:
@@ -3135,7 +3207,9 @@ def main() -> int:
         test_validate_all_resolves_windows_batch_commands,
         test_validate_all_subprocess_start_failure_is_structured,
         test_validate_all_strict_release_runs_release_gate_strict_scan,
+        test_release_blocker_registry_controls_strict_release,
         test_release_gate_scans_ipc_threat_model,
+        test_packaging_portability_checker_exists,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,

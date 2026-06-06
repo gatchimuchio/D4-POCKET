@@ -454,7 +454,7 @@ def _settings_records() -> list[dict]:
 def _evidence_summary() -> dict:
     return {
         "schema_check": "passed",
-        "conformance_check_count": 89,
+        "conformance_check_count": 137,
         "release_smoke": "passed",
         "release_gate_check": "passed",
         "evidence_bundle": "passed",

@@ -1,5 +1,13 @@
 $ErrorActionPreference = "Stop"
 
+# Boundary record:
+# - purpose: local owner desktop launch with the Rust broker-server active.
+# - standard mechanism: native Rust helper broker-server plus Flutter desktop run.
+# - wrapper reason: keep the broker endpoint/session wiring reproducible for owner-use.
+# - deletion condition: remove when the installed product launcher owns this wiring.
+# - release evidence: this is not Windows installed-path release evidence.
+# - authority: this wrapper grants no capability, permission, approval, or audit authority.
+
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $BrokerRoot = Join-Path $Root ".gui_shell\broker"
 $BrokerStore = Join-Path $BrokerRoot "store"

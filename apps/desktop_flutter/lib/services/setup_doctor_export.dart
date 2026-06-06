@@ -44,7 +44,8 @@ Future<void> writeSetupDoctorProductExportIfRequested(
   );
 }
 
-Future<void> _ensureInstalledFirstRunConfig(Map<String, Object?> context) async {
+Future<void> _ensureInstalledFirstRunConfig(
+    Map<String, Object?> context) async {
   final configPath = _stringValue(context['config_path']);
   if (configPath.isEmpty) {
     return;
@@ -163,9 +164,8 @@ Map<String, Object?> buildSetupDoctorProductExport(
   ];
 
   return {
-    'status': checks.every((check) => check['status'] == 'pass')
-        ? 'pass'
-        : 'warning',
+    'status':
+        checks.every((check) => check['status'] == 'pass') ? 'pass' : 'warning',
     'formal_product_evidence': true,
     'evidence_source': {
       'source_kind': 'installed_app_machine_readable_export',

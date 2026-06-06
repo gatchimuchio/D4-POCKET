@@ -50,10 +50,10 @@ Completed / already established:
 Current C0 validation evidence:
 
 - `python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py`: passed through `python3` fallback with `schema check passed: 26 schemas, 26 examples, 28 negative fixtures`.
-- `python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py`: passed through `python3` fallback with `conformance skeleton passed: 132 checks`.
+- `python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py`: passed through `python3` fallback with `conformance skeleton passed: 137 checks`.
 - `python3 tooling/manifest.py --check`: passed with `manifest check passed`.
 - `python3 tooling/release_gate_check.py`: passed with `release gate check passed`.
-- `python3 tooling/evidence_bundle.py --check`: passed with `evidence bundle check passed: 3 release blockers preserved, release_ready=False, classification=development_evidence`.
+- `python3 tooling/evidence_bundle.py --check`: passed with structured release blocker metadata preserved, `release_ready=False`, and `classification=development_evidence`.
 
 Historical validation entries that record `96 checks` remain preserved as earlier evidence. They must not be rewritten as current evidence.
 

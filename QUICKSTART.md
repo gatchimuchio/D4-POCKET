@@ -7,7 +7,8 @@ GUI Shell is currently a release-hardening skeleton, not a production runtime. T
 - A POSIX-like shell
 - Python available as `python` or `python3`
 - Optional: Rust for `native/rust_helper`
-- Optional: Flutter for `apps/desktop_flutter` and `apps/mobile_flutter`
+- Optional: Flutter for `apps/desktop_flutter`
+- Optional post-v1: Flutter for `apps/mobile_flutter`
 
 ## Contract validation
 
@@ -29,7 +30,7 @@ Expected successful output:
 
 ```text
 schema check passed: 26 schemas, 26 examples, 28 negative fixtures
-conformance skeleton passed: 132 checks
+conformance skeleton passed: 137 checks
 ```
 
 ## Phase B owner launch
@@ -57,19 +58,16 @@ cargo test
 
 The Rust helper contains the current Rust Security Broker skeleton for broker envelope validation and rejection audit. Real external command dispatch is disabled until authority migration and IPC integration evidence exists.
 
-## Optional Flutter check
+## Optional desktop Flutter check
 
 ```bash
 cd apps/desktop_flutter
 flutter analyze
 ```
 
-```bash
-cd apps/mobile_flutter
-flutter analyze
-```
-
 Flutter is the replaceable UI layer. UI widgets may collect operator input and render status, but they must not define authority, permission, approval, audit, or recovery semantics.
+
+Mobile Flutter is `post_v1_scope` and is excluded from the v1.0 release gate and CI product claim unless the owner explicitly changes scope.
 
 ## Next implementation order
 

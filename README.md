@@ -13,8 +13,8 @@
   <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20in%20progress-orange.svg">
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
-  <img alt="Schemas" src="https://img.shields.io/badge/schemas-25%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-102%20checks-success.svg">
+  <img alt="Schemas" src="https://img.shields.io/badge/schemas-26%20validated-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-137%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -216,7 +216,7 @@ Expected successful output / 期待される出力:
 
 ```text
 schema check passed: 26 schemas, 26 examples, 28 negative fixtures
-conformance skeleton passed: 132 checks
+conformance skeleton passed: 137 checks
 ```
 
 ➡️ See **[QUICKSTART.md](QUICKSTART.md)**.
@@ -237,8 +237,9 @@ Conditional toolchain checks / 条件付きツールチェーン検証:
 ```bash
 cd native/rust_helper      && cargo test
 cd apps/desktop_flutter    && flutter analyze
-cd apps/mobile_flutter     && flutter analyze
 ```
+
+Mobile Flutter is `post_v1_scope` and is excluded from the v1.0 product release gate unless the owner explicitly opts it in.
 
 Or run the aggregate reporter / 一括レポーター:
 
@@ -270,7 +271,7 @@ Strict Windows release validation requires native Windows isolated installed-pat
 ## 📂 Repository layout — リポジトリ構成
 
 ```
-specs/                       # 25 contract schemas (the gate)
+specs/                       # 26 contract schemas (the gate)
   runtime · runtime_manifest · adapter · adapter_manifest
   capability · permission · approval · audit · recovery
   content_exposure · diagnostic · update · framework_risk_profile
@@ -326,9 +327,9 @@ It intentionally prioritizes / 意図的に以下の順で優先します:
 What is true today, stated without inflation — 誇張なしの現状:
 
 - ✅ **Phase A/B owner-use complete.** The owner can run the desktop shell for daily local operation with status, problems, evidence, recovery, trust, runtime, and authority surfaces visible.
-- ✅ **Schema + conformance pass** as a development slice (26 schemas, 132 checks).
+- ✅ **Schema + conformance pass** as a development slice (26 schemas, 137 checks).
 - ✅ **LLM-readable substrate is definition-locked**, with one bounded reference extension and one cross-agent reproduction report.
-- ⛔ **v1.0 product release is NOT yet claimed.** Open `release_blocker` items: Rust Broker production authority cutover, Windows installed-path product evidence, and explicit owner GO.
+- ⛔ **v1.0 product release is NOT yet claimed.** Open `release_blocker` items include Rust Broker production authority cutover, Windows installed-path product evidence, audit anchor external tamper-evidence proof, and explicit owner GO.
 - ⚠️ **Windows-first.** Linux validation is a development slice, not final product proof. **macOS is unverified** and must not be advertised as supported.
 - ⚠️ The substrate work demonstrates controlled LLM-readable extension behavior for a non-authoritative task. It does **not** prove public-standard adoption, broad third-party interoperability, or installed-product behavior.
 

@@ -88,6 +88,11 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
         ),
         ValidationStep("manifest_check", python_step("tooling/manifest.py", "--check"), ROOT),
         ValidationStep("release_gate_check", python_step("tooling/release_gate_check.py"), ROOT),
+        ValidationStep(
+            "packaging_portability_check",
+            python_step("tooling/packaging_portability_check.py"),
+            ROOT,
+        ),
         ValidationStep("release_smoke", python_step("tooling/release_smoke.py"), ROOT),
         ValidationStep("evidence_bundle", python_step("tooling/evidence_bundle.py", "--check"), ROOT),
         ValidationStep(
@@ -333,8 +338,8 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         classification = "release_blocker"
         blocks_release = "yes"
         if strict_release and step.name == "release_gate_check":
-            reason = "strict release gate found documented release_blocker classifications"
-            required_action = "Resolve every classified Windows-first release_blocker, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
+            reason = "strict release gate found unresolved active structured release blockers"
+            required_action = "Resolve every active Windows-first release_blocker in release_blockers.registry.json, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
         else:
             reason = "validation command failed"
             required_action = "Fix the failing validation command and rerun."

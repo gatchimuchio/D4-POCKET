@@ -1,6 +1,10 @@
 # Codegen
 
-Placeholder for schema-driven code generation.
+Reserved schema-driven code generation boundary.
+
+classification: post_v1_scope
+reason: current v1.0 gate keeps generated contract artifacts checked in; broader codegen automation is deferred.
+blocks_release: no
 
 Targets:
 

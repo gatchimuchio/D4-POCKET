@@ -348,6 +348,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
     }
     if (selected.copyText != null) {
       await Clipboard.setData(ClipboardData(text: selected.copyText!));
+      if (!mounted) {
+        return;
+      }
     }
     setState(() {
       selectedIndex = selected.pageIndex;

@@ -57,7 +57,7 @@ Schemas and protocol documents:
   - add production authority contract rejection code.
 - `docs/architecture/RUST_BROKER_IPC_PROTOCOL.md`
   - distinguish production authority evaluation from fixture parity evaluation.
-- `GUI_Shell_製品品質統合是正実装台帳_v4_2026-06-05.md`
+- `GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md`
   - canonical ledger already added for this work package.
 
 ## Reused Components

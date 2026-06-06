@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Boundary record:
+# - purpose: local owner desktop launch with the Rust broker-server active.
+# - standard mechanism: native Rust helper broker-server plus Flutter desktop run.
+# - wrapper reason: keep the broker endpoint/session wiring reproducible for owner-use.
+# - deletion condition: remove when the installed product launcher owns this wiring.
+# - release evidence: this is not Windows installed-path release evidence.
+# - authority: this wrapper grants no capability, permission, approval, or audit authority.
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BROKER_ROOT="$ROOT/.gui_shell/broker"
 BROKER_STORE="$BROKER_ROOT/store"

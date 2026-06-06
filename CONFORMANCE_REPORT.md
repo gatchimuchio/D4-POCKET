@@ -10,7 +10,7 @@
 - item: conformance checks
   classification: required_for_v1
   status: passed
-  evidence: `conformance skeleton passed: 132 checks`
+  evidence: `conformance skeleton passed: 137 checks`
 
 - item: conformance tautology fix
   classification: required_for_v1
@@ -60,7 +60,17 @@
 - item: Evidence bundle export
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/evidence_bundle.py --check` validates a development evidence bundle that preserves Windows installed-path blockers, keeps `release_ready=false`, and records Flutter/installer non-authority boundaries.
+  evidence: `tooling/evidence_bundle.py --check` validates a development evidence bundle that preserves release blocker metadata, keeps `release_ready=false`, and records Flutter/installer non-authority boundaries.
+
+- item: structured release blocker registry
+  classification: required_for_v1
+  status: implemented
+  evidence: strict release mode reads `release_blockers.registry.json` and fails on unresolved active blockers instead of raw `release_blocker` text in policy or historical logs.
+
+- item: artifact portability check
+  classification: required_for_v1
+  status: implemented
+  evidence: conformance verifies `tooling/packaging_portability_check.py` exists, rejects non-portable tracked paths, and runs manifest, conformance, and release gate after POSIX-locale `unzip` extraction.
 
 - item: integrated Shell Core release smoke
   classification: required_for_v1

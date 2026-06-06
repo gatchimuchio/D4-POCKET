@@ -4,6 +4,8 @@ Mobile is not part of v1.0 completed product release unless owner explicitly cha
 
 Mobile is `post_v1_scope`. The mobile Flutter app may remain as a bounded companion surface, but this cleanup does not improve mobile and does not track `apps/mobile_flutter/pubspec.lock`; local Flutter tooling may regenerate it during mobile-only work.
 
+Mobile is excluded from the v1.0 release gate, CI product claim, and advertised support surface unless the owner explicitly opts mobile into the release scope.
+
 ## Implemented Areas
 
 - item: mobile dashboard

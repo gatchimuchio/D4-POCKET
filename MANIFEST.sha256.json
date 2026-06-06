@@ -24,7 +24,7 @@
     "exact_files": [
       ".gitattributes",
       "AGENTS.md",
-      "GUI_Shell_\u88fd\u54c1\u54c1\u8cea\u7d71\u5408\u662f\u6b63\u5b9f\u88c5\u53f0\u5e33_v4_2026-06-05.md",
+      "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
       "ROADMAP.md",
       "CONFORMANCE_REPORT.md",
       "COMPATIBILITY_MATRIX.md",
@@ -32,6 +32,7 @@
       "README.md",
       "CLAIM.md",
       "RELEASE_CHECKLIST.md",
+      "release_blockers.registry.json",
       "VALIDATION.txt",
       "AUDIT_EVIDENCE.md",
       "INSTALLER_STATUS.md",
@@ -61,7 +62,7 @@
     },
     {
       "path": ".github/workflows/validation.yml",
-      "sha256": "f6c0b4474e03c5333694bc5177e63129db82dac489ef5fc563ff52609a842d06"
+      "sha256": "86571595bdd39cd25cf1c040f35824e4f79fc45f9108c55a40521dfa4296c294"
     },
     {
       "path": ".gitignore",
@@ -77,15 +78,15 @@
     },
     {
       "path": "AUDIT_EVIDENCE.md",
-      "sha256": "aabec49116e1ec3449487b3e8a7d186a19ecf53ef603a406d0613006cd661b77"
+      "sha256": "f8ffcb63bcedd76d313d635b93a8e074f30752d39c0c6b43521dd9242e9197b5"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2c2f9e1d3984aef38761ee8ce03bad662ede976717d8b8b588213e4a00a8c850"
+      "sha256": "8a38a33e9899bcd757574ec83754080fe414af58fb69104efcffad276aae5cc6"
     },
     {
       "path": "CLAIM.md",
-      "sha256": "d64571c2e834ff4cbc0233aa1e6469ace54291f4beffeb7b33293b8ab8f45a5d"
+      "sha256": "5f0a8e8d8995b642e08dbb53b627d8b6af0520704804cb91e98b5260444050e5"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -97,10 +98,10 @@
     },
     {
       "path": "CONFORMANCE_REPORT.md",
-      "sha256": "50c36e1ab0ffe88acf105d7397f2f40ee9928172eed662cf9cd0500e8a362a9e"
+      "sha256": "346d201b781fcac297e29d58b894f67fc39168352c47ed843fea1b192d74ce5b"
     },
     {
-      "path": "GUI_Shell_\u88fd\u54c1\u54c1\u8cea\u7d71\u5408\u662f\u6b63\u5b9f\u88c5\u53f0\u5e33_v4_2026-06-05.md",
+      "path": "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
       "sha256": "4b22a92df9d020dc5768bf704b5d3aa67e1153de85a4351ffe2cecadc8cbbddd"
     },
     {
@@ -113,19 +114,19 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "047c8733245bbcf16132857d8036dea0515c2442e4ff6ac4707872ef61fb7fd6"
+      "sha256": "67c6e56d440155005ea0480d17c363769227639cd2a15f48877c9a36ff8f1b95"
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "73d999532d937412edba2efa9fa556065e20ead4d89c2dd838dc1685f375f00d"
+      "sha256": "5938bb77c00031c15b7c09bc271b4829888517883e88b4375d882025bfd7c512"
     },
     {
       "path": "README.md",
-      "sha256": "977a90fb067f6253cfa12bb33bbab88b21be37e939642218920c257671675619"
+      "sha256": "23fe559882ae4698a503be8a84daee3e089a1ebed1f51b6ce111b421421ec3a1"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "4d91447efa30f6e45eefed3c79bc33952b1be20f2d14cf55ba4a76ba6c07cfb2"
+      "sha256": "206a8bc3a173810aa9c8c0b6f902dea81ee71fd5b7aa270c54de6a798123c4cf"
     },
     {
       "path": "ROADMAP.md",
@@ -157,7 +158,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "8faf72d51e9a074d73849df6da5cd3e0f4cc1214f55b9c9ceca51b65eefcc48a"
+      "sha256": "0f332b4afda22881afb135c9a7f7d4a3e5f04f5fc1be13942bc9fbbe52090609"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -165,15 +166,15 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "2f781cf6bd01a57a38b42235269d64b202c981db89a8aa32bc0da4f709aa2ab0"
+      "sha256": "c50eb82f2a3885b9d1042a31bc3f8c18b9dfe008316e5e7327c976d94dce3127"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
-      "sha256": "38b8c6e0422f8c5cf7de34c5bd2ca18785eac2301d2f828ea7d7281397b05724"
+      "sha256": "b086c52e6f208a3ec6d14b2de85ae0b0c476c5d3ed9b825ae8c796fbcdf2026b"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "bbe5776e6851896aff13e6797db5c848407489f60b887319ea4daa1bc64f9ecf"
+      "sha256": "923f7606cf7e9b1f71ee145cd0814c3441803c72111e07acfde7fdec7810ace9"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -233,11 +234,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
-      "sha256": "28f2052c23e3ac129a1721b7c3a5b27105c45b565be92c458bc602aedb97309b"
+      "sha256": "9834d606d4c12d743a1a51eba2c6ef7dfd174c5bd62350e2591593cf358da694"
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "055cb375c94fd20e2f5612fa9ba4db2c7575502e5ea0841a7853c9a022a10bbb"
+      "sha256": "e769c0be7a46609bdcf03ad334f645df1570f06d0de0f97511a3725bccb4221c"
     },
     {
       "path": "apps/desktop_flutter/lib/services/surface_semantics_export.dart",
@@ -373,7 +374,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "4ea97fb7e44114501d9ed869cb7df7a9c7183788b359594d2ec3741839ab0020"
+      "sha256": "14561a4a2578ae393c5ca470accfde74d3fadd511bd4bc942ec81a96d8ccd81e"
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
@@ -493,7 +494,7 @@
     },
     {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "47b026b290e71605aa3aa557e2e01d761021fbc483b12a8f89fc0b355d6bfa11"
+      "sha256": "bebb7d15437e21e9b515ce0e97482c951e25296b1b3f68f956e8c88d54859f1a"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -521,7 +522,7 @@
     },
     {
       "path": "docs/implementation/WP00_AUTHORITY_SOURCE_OF_TRUTH_DESIGN.md",
-      "sha256": "aa2d737c119d3f49d971fcc472226b69abe36f7a27464458073d842b2bd700b9"
+      "sha256": "8924da8054f27924f9c98b709d403d474abc46b9544fa2585e3424b7facf147c"
     },
     {
       "path": "docs/reports/WINDOWS_STAGED_INSTALL_ACCEPTANCE_REPORT.md",
@@ -821,11 +822,11 @@
     },
     {
       "path": "installer/linux/README.md",
-      "sha256": "7e7591efd15fbaf16e9a90bf69e3c10905f6bf81a29080678d35e003afc273da"
+      "sha256": "e89ce2d8942489fb6b5dfd25e463d06ec656c02afefdf9a1f69ba46adc37fe88"
     },
     {
       "path": "installer/macos/README.md",
-      "sha256": "4392029d1dfd487e47c40264b3ea49f23813a2934ccfbcb8f3bd4a7408b3450d"
+      "sha256": "a6492622764241e8080e36f5865275f7155d9cc08615e9fe17f1149609fcbf42"
     },
     {
       "path": "installer/setup_doctor.py",
@@ -865,27 +866,27 @@
     },
     {
       "path": "native/rust_helper/audit_hash/README.md",
-      "sha256": "b321643aae236349e7e4c3b096bc5a375a0b97074f0aa45b5142ad10d55221ea"
+      "sha256": "e0c8a0b9ade7ee06522a9e9474e8c1199bfc86b992d7c4fdc774c343c2dbfd1d"
     },
     {
       "path": "native/rust_helper/diagnostics/README.md",
-      "sha256": "90a75f32da61b80790af6a6d0e32db2a8c25380134e9b882c8a363579b9cf848"
+      "sha256": "0b826c72d0901693b9e3f384ae89ca45f5ee703111c2892d9d36465c57a19bd9"
     },
     {
       "path": "native/rust_helper/filesystem/README.md",
-      "sha256": "8d76fa9f919a93daa9090c80c7677d399aedc9b32fdaee143df6a423b522e9c0"
+      "sha256": "a011d9536f87dc8deab25e6fa1a0f6b80e8dede2c3db1d438c5b2abec763ff48"
     },
     {
       "path": "native/rust_helper/network/README.md",
-      "sha256": "ac875a50d12a25d776961440a592c5d454e8a1a1fbf9c7c5b1b4ad8a1497fa1a"
+      "sha256": "303837b4f2d31b701f80e1cc16d8d186a6854993ada4ae61b43e7f3b1c278f4a"
     },
     {
       "path": "native/rust_helper/process/README.md",
-      "sha256": "fdc02024c5bd344ada178a24dc22f78f3fe6494e7b2eb9880a45a25290ef6cf4"
+      "sha256": "f7d902d65e05c59a80ad220eb5e0286a646bc99040a31c7bd8421839a7c7fcb6"
     },
     {
       "path": "native/rust_helper/secure_ipc/README.md",
-      "sha256": "63ef8b8f91830c684c65ca78f472cce7224f02a7db830aa66cb2363e20697959"
+      "sha256": "1686d6419b12205aa7d55d4339875b038d546845850623d2fca72216f4033ab6"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -953,7 +954,7 @@
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
-      "sha256": "6cbc034eb8f7e19d01061b894b23de5390bb521597b714caa20023ce3eb8471d"
+      "sha256": "7df726b2cecca5df5c7635f4123b0ed30968e592c50444d6aa2f6503d6d7b189"
     },
     {
       "path": "packages/__init__.py",
@@ -1136,12 +1137,16 @@
       "sha256": "3521f358a65aae47e993dd1dc5e0657507047ac913fcce7a03594049bcc39242"
     },
     {
+      "path": "release_blockers.registry.json",
+      "sha256": "95c990b470ed8a03d1ee9e0a348eeea0a760beb7e45e019fc0891d26d3b90140"
+    },
+    {
       "path": "scripts/launch_owner_desktop.ps1",
-      "sha256": "2179c7edc2a59003c550014cf131389c13cfb8d9da3d7a140ca9fb13e6791473"
+      "sha256": "21ac7c1589ac804070aed3b1167b9b6ee2a883e130820d6ee3a04b294fd3fddf"
     },
     {
       "path": "scripts/launch_owner_desktop.sh",
-      "sha256": "8e63cea6aecd2e285ff49015431f46cde6b923323e9e90f42cdefa381ed28151"
+      "sha256": "b0568d093fd1cc01cecc0d47ef0319e9d2a5468e41b545c905c8383d038a140c"
     },
     {
       "path": "specs/action_envelope.schema.json",
@@ -1253,7 +1258,7 @@
     },
     {
       "path": "tooling/codegen/README.md",
-      "sha256": "8495c5085079b338f441ffd3e2ed2ceccda42eab2598ff914c60c0e58f43000e"
+      "sha256": "61aa0b84ae5c2185a0fa05ff95f5dd2fe7611f1ed0a13be3390278000383a424"
     },
     {
       "path": "tooling/codegen/generate_contracts.py",
@@ -1261,23 +1266,27 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "915a6571ea4ac695772e7f183a5824aaaf056a5cef3885c07298301796693a86"
+      "sha256": "0f3e789354cddb506ce25665a82934e7d1306738505b82a2a6fd2599a0eddf75"
     },
     {
       "path": "tooling/evidence_bundle.py",
-      "sha256": "a5b0675434c1e3cef79e79eecf65d2e3f3d269ce3af2a2107a3ac09705a57008"
+      "sha256": "6b2547b940d4690a0667b04918f1cf2fee2baa85576942a55771022045758da9"
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "1878085c95c875b69290a8553ba00b833f69c7ce5fd591174a2460f0015c8103"
+      "sha256": "17b84e3fe6223b6917c478e409820f503b053323c7298e4cd9da068a58830535"
+    },
+    {
+      "path": "tooling/packaging_portability_check.py",
+      "sha256": "20377b88ab78038f6b64553da1c7708759bc2f58da86acfe77ea6648a7f01a35"
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "5aed32b58221b4a7a3d7d4c1a83d68cca1904cc34c06845efbd398238a8f7a9c"
+      "sha256": "b29e4f75362104930cc59d3394eeb5e918883f8a52c62c1dcaad551bd6e7d854"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "eff435efb47dda31c655ac4dd249aace09a37df706a4ec58f55945ce0df96660"
+      "sha256": "f18b48b210294a687cd8170a5b937f991d3f9b4d2ff0032970612fedef9f878b"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -1289,15 +1298,15 @@
     },
     {
       "path": "tooling/shell_snapshot.py",
-      "sha256": "312a7f1c02351cc179e066a9d99cfcb80aa75733194717043c9ee875bdd41802"
+      "sha256": "1ad76459e07de44312687c49999788d561b5a4de46d1d54c9398331bcc77f6e7"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
-      "sha256": "39443cf8205f06c103275f27981a3aa5d7fcca3ccd90317175a72a5528530256"
+      "sha256": "84e9d9171374aa1123e3d9bb135364bbfcd6ebc43fa920aed8c49da15345d249"
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "bcaa60f9aa29d8e90b0a3653ba17334a79ca54f4bf3ab4afb40adfc44f0716e4"
+      "sha256": "724804d5418c8e49a9b9505851ee180c4fc57638cc281e5f67b954eefa798d9d"
     },
     {
       "path": "tooling/windows_release_evidence.py",

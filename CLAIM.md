@@ -22,7 +22,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: current development validation passes with 102 conformance checks; historical 99-check and 96-check entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, and bounded LLM-readable extension contract/conformance checks are covered.
+  status: current development validation passes with 137 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
 
 - item: bounded cross-agent LLM-readable extension reproduction
   classification: required_for_v1
@@ -42,7 +42,7 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Shell snapshot and evidence bundle
   classification: required_for_v1
-  status: `tooling/shell_snapshot.py` provides structured local GUI state for owner-use migration / development evidence and `tooling/evidence_bundle.py --check` validates a development evidence bundle while preserving Windows installed-path blockers and `release_ready=false`; the snapshot generator must not remain an installed product runtime dependency.
+  status: `tooling/shell_snapshot.py` provides structured local GUI state for owner-use migration / development evidence and `tooling/evidence_bundle.py --check` validates a development evidence bundle while preserving Windows installed-path and audit anchor external tamper-evidence blockers with `release_ready=false`; the snapshot generator must not remain an installed product runtime dependency.
 
 - item: Shell Core hardening skeleton
   classification: required_for_v1
@@ -102,6 +102,12 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
   classification: release_blocker
   reason: The installed app supports machine-readable Setup Doctor product export, but that evidence has not been collected on native Windows and passed through the strict validator. The PowerShell Setup Doctor collector remains external probe evidence only.
   required_action: Collect app-generated Setup Doctor product export through isolated Windows installed smoke and pass `python tooling\windows_release_evidence.py`.
+  blocks_release: yes
+
+- item: audit anchor external tamper-evidence proof missing
+  classification: release_blocker
+  reason: Local HMAC audit anchors detect local corruption and partial tamper, but same-user or administrator/root rewrite resistance is not proven without Windows ACL/DPAPI, an external anchor, or signed evidence.
+  required_action: Collect Windows installed-path audit anchor key-protection or external-anchor proof and pass strict Windows release validation.
   blocks_release: yes
 
 - item: implementation first-run smoke

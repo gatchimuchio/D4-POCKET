@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "release_ready": false,
+  "release_ready_reason": "Windows installed-path evidence, audit anchor external tamper-evidence proof, and owner GO are required before completed product release.",
+  "blockers": [
+    {
+      "name": "windows_evidence_provenance_isolation",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "release_evidence/windows_installed_smoke.json is missing, so isolated Windows source/artifact/evidence provenance is not proven.",
+      "required_action": "Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes."
+    },
+    {
+      "name": "windows_installer_first_run_smoke",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Windows installed first-run evidence is missing.",
+      "required_action": "Collect native Windows installed-app first-run smoke with broker-mediated Flutter .exe launch, no-Python-runtime launch, visible surfaces, config, and audit probe evidence."
+    },
+    {
+      "name": "windows_setup_doctor_smoke",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Installed-app generated Setup Doctor product evidence is missing.",
+      "required_action": "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence."
+    },
+    {
+      "name": "windows_broker_installed_smoke",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Installed Rust broker launch/connect/restart/crash evidence is missing.",
+      "required_action": "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json."
+    },
+    {
+      "name": "audit_anchor_external_tamper_evidence_proof",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Local HMAC audit anchor evidence does not prove same-user or administrator/root rewrite resistance.",
+      "required_action": "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl."
+    },
+    {
+      "name": "owner_go",
+      "status": "unresolved",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Explicit owner GO has not been recorded.",
+      "required_action": "Record explicit owner GO only after measured installed-path release evidence and strict validation pass."
+    }
+  ]
+}

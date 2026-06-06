@@ -28,6 +28,9 @@ def build_evidence_bundle() -> dict:
     blockers = [
         {
             "name": result.name,
+            "status": result.status,
+            "classification": result.classification,
+            "blocks_release": result.blocks_release == "yes",
             "reason": result.reason,
             "required_action": result.required_action,
         }
@@ -84,6 +87,17 @@ def validate_evidence_bundle(bundle: dict) -> list[str]:
         errors.append("release smoke failed inside evidence bundle")
     if not bundle.get("release_runtime_assertions", {}).get("ok"):
         errors.append("release runtime assertions failed inside evidence bundle")
+    for index, blocker in enumerate(bundle.get("blockers", [])):
+        if not isinstance(blocker, dict):
+            errors.append(f"evidence bundle blocker {index} is not an object")
+            continue
+        for key in ["name", "status", "classification", "blocks_release", "reason", "required_action"]:
+            if key not in blocker:
+                errors.append(f"evidence bundle blocker {index} missing {key}")
+        if blocker.get("classification") != "release_blocker":
+            errors.append(f"evidence bundle blocker {index} is not release_blocker")
+        if blocker.get("blocks_release") is not True:
+            errors.append(f"evidence bundle blocker {index} must block release")
     return errors
 
 

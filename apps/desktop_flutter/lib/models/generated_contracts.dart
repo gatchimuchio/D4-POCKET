@@ -557,6 +557,7 @@ class EvidenceSummaryRecord {
     required this.strictWindowsRelease,
     required this.missingMeasuredWindowsEvidence,
     required this.missingSetupDoctorEvidence,
+    required this.missingAuditAnchorExternalTamperEvidence,
     required this.ownerGo,
   });
 
@@ -569,6 +570,7 @@ class EvidenceSummaryRecord {
   final String strictWindowsRelease;
   final bool missingMeasuredWindowsEvidence;
   final bool missingSetupDoctorEvidence;
+  final bool missingAuditAnchorExternalTamperEvidence;
   final String ownerGo;
 
   factory EvidenceSummaryRecord.fromJson(Map<String, Object?> json) {
@@ -585,6 +587,9 @@ class EvidenceSummaryRecord {
           json['missing_measured_windows_evidence'] as bool? ?? true,
       missingSetupDoctorEvidence:
           json['missing_setup_doctor_evidence'] as bool? ?? true,
+      missingAuditAnchorExternalTamperEvidence:
+          json['missing_audit_anchor_external_tamper_evidence'] as bool? ??
+              true,
       ownerGo: json['owner_go'] as String? ?? 'missing',
     );
   }

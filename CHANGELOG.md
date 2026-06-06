@@ -28,6 +28,6 @@
 - Added framework risk register documents.
 - Added JSON Schema contracts.
 - Added conformance test skeleton.
-- Added Flutter desktop/mobile placeholders.
-- Added Rust helper placeholder.
-- Added BLUE-TANUKI adapter placeholder.
+- Added Flutter desktop/mobile reserved boundaries.
+- Added Rust helper reserved boundary.
+- Added BLUE-TANUKI adapter reserved boundary.
