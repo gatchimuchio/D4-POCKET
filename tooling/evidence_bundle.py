@@ -38,7 +38,7 @@ def build_evidence_bundle() -> dict:
         "bundle_version": 1,
         "product": "GUI-Shell",
         "release_ready": False,
-        "release_ready_reason": "Windows installed-path evidence is required before completed product release.",
+        "release_ready_reason": "Windows installed-path evidence and audit anchor external tamper-evidence proof are required before completed product release.",
         "classification": "development_evidence",
         "windows_release_evidence": [result.__dict__ for result in windows_evidence],
         "release_runtime_assertions": release_runtime_assertions,

@@ -545,7 +545,7 @@
     },
     {
       "path": "docs/security/IPC_THREAT_MODEL.md",
-      "sha256": "fa38ebf8bb9dd39ba89029e4addd1ceb346cb7935d642153146bf78c7407c5f5"
+      "sha256": "8f744c079f0525a1bd651552cb488bb40f5b0ac14dc57454f6f54e872b0fef39"
     },
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
@@ -1261,11 +1261,11 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "72de68f2235ad3fec55356db5754a0e616e75363505d3bcf20a3eac0c5aa7d1a"
+      "sha256": "915a6571ea4ac695772e7f183a5824aaaf056a5cef3885c07298301796693a86"
     },
     {
       "path": "tooling/evidence_bundle.py",
-      "sha256": "e822a5ecc4dd49051aed79a2c856b3ebd4a1df5bca294f53b721cacf632f6bec"
+      "sha256": "a5b0675434c1e3cef79e79eecf65d2e3f3d269ce3af2a2107a3ac09705a57008"
     },
     {
       "path": "tooling/manifest.py",
@@ -1273,7 +1273,7 @@
     },
     {
       "path": "tooling/release_gate_check.py",
-      "sha256": "3e5bcafd718a4980ed29c6c2074a2cc9bd8ce6d9aa64150bce3385805b1694f9"
+      "sha256": "5aed32b58221b4a7a3d7d4c1a83d68cca1904cc34c06845efbd398238a8f7a9c"
     },
     {
       "path": "tooling/release_runtime_assertions.py",
@@ -1289,7 +1289,7 @@
     },
     {
       "path": "tooling/shell_snapshot.py",
-      "sha256": "6bd6fa9577dd5879ae08e30ff7564c5d17078894c51056a8ec036e827a95ce2d"
+      "sha256": "312a7f1c02351cc179e066a9d99cfcb80aa75733194717043c9ee875bdd41802"
     },
     {
       "path": "tooling/ui_snapshot_tests/README.md",
@@ -1297,11 +1297,11 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "9942833ff4b51e47d67bde6233d6a0608f89ba9a08325affedf0fb326cffdd1d"
+      "sha256": "bcaa60f9aa29d8e90b0a3653ba17334a79ca54f4bf3ab4afb40adfc44f0716e4"
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "d52925fad30e960ffb297efcf848a952d4cdf6563cb81f016bc4e8517b6606a0"
+      "sha256": "6a47344737a7996fba56d05fb3ad1abf08eaa3dc6705946f0c04f42f4f8e5e23"
     }
   ]
 }

@@ -46,7 +46,12 @@ from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden
 from tooling.shell_snapshot import build_shell_snapshot
-from tooling.validate_all import ValidationStep, build_steps as build_validation_steps, run_step
+from tooling.validate_all import (
+    ValidationStep,
+    build_steps as build_validation_steps,
+    python_step,
+    run_step,
+)
 from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
@@ -1172,6 +1177,19 @@ def test_shell_snapshot_generator_writes_phase_b_local_snapshot() -> list[str]:
         errors.append("generated snapshot claimed release readiness")
     if not any(problem.get("classification") == "release_blocker" for problem in snapshot.get("problems", [])):
         errors.append("generated snapshot lacks expected release blockers")
+    problem_ids = {problem.get("problem_id") for problem in snapshot.get("problems", []) if isinstance(problem, dict)}
+    if "audit-anchor-external-tamper-evidence-missing" not in problem_ids:
+        errors.append("generated snapshot lacks audit anchor external tamper-evidence blocker")
+    computed_blockers = sum(
+        1
+        for problem in snapshot.get("problems", [])
+        if isinstance(problem, dict) and problem.get("classification") == "release_blocker"
+    )
+    if snapshot.get("release_blocker_count") != computed_blockers:
+        errors.append("generated snapshot release_blocker_count is not computed from problems")
+    playbook_ids = {item.get("recovery_id") for item in snapshot.get("recovery_playbook", []) if isinstance(item, dict)}
+    if "recover-audit-anchor-external-proof" not in playbook_ids:
+        errors.append("generated snapshot lacks audit anchor external recovery playbook item")
     if release_evidence.exists() != existed_before:
         errors.append("shell snapshot generator created or removed Windows release evidence")
     return errors
@@ -1192,6 +1210,10 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
             windows_results = validate_windows_release_evidence(evidence_path)
             if any(result.classification == "release_blocker" for result in windows_results):
                 errors.append("evidence bundle dropped failing Windows installed-path blockers")
+    blocker_names = {blocker.get("name") for blocker in bundle.get("blockers", []) if isinstance(blocker, dict)}
+    evidence_path = ROOT / "release_evidence" / "windows_installed_smoke.json"
+    if not evidence_path.exists() and "audit_anchor_external_tamper_evidence_proof" not in blocker_names:
+        errors.append("evidence bundle did not preserve audit anchor external tamper-evidence blocker")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
         errors.append("evidence bundle made Flutter authoritative")
     return errors
@@ -1248,6 +1270,7 @@ def _valid_windows_installed_evidence() -> dict:
                 {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
                 {"kind": "visible_surfaces", "path": r"C:\evidence\visible_surfaces.json", "sha256": "sha256:" + "7" * 64},
                 {"kind": "runtime_assertions", "path": r"C:\evidence\runtime_assertions.json", "sha256": "sha256:" + "8" * 64},
+                {"kind": "audit_anchor_external_tamper_evidence", "path": r"C:\evidence\audit_anchor_external.json", "sha256": "sha256:" + "9" * 64},
             ],
         },
         "field_provenance": {
@@ -1258,6 +1281,7 @@ def _valid_windows_installed_evidence() -> dict:
             "first_run.installer_authority_boundary": {"source_type": "static_assertion", "evidence_class": "CONFIG", "formal_release_input": True},
             "setup_doctor": {"source_type": "product_export", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "broker.ipc_restart_crash": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "audit_anchor.external_tamper_evidence": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE", "formal_release_input": True},
             "release_runtime_assertions": {"source_type": "static_assertion", "evidence_class": ["CONFIG", "FIXTURE"], "formal_release_input": True},
             "unsupported_claims": [],
         },
@@ -1461,6 +1485,24 @@ def _valid_windows_installed_evidence() -> dict:
             },
             "errors": [],
         },
+        "audit_anchor_external_tamper_evidence": {
+            "status": "passed",
+            "installed_path_verified": True,
+            "key_anchor_log_same_user_rewrite_mitigated": True,
+            "windows_acl_verified": True,
+            "dpapi_verified": True,
+            "external_anchor_verified": False,
+            "signed_evidence_verified": False,
+            "administrator_root_resistance_claimed": False,
+            "evidence_source": {
+                "source_kind": "windows_acl_dpapi_probe",
+                "evidence_class": "EXTERNAL_EVIDENCE",
+                "synthetic": False,
+                "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_audit_anchor_evidence.ps1",
+                "path": r"C:\evidence\audit_anchor_external.json",
+                "sha256": "sha256:" + "9" * 64,
+            },
+        },
     }
 
 
@@ -1489,6 +1531,28 @@ def test_windows_release_evidence_validator_rejects_missing_provenance() -> list
     if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
         return ["Windows evidence validator accepted missing provenance/isolation"]
     return []
+
+
+def test_windows_release_evidence_validator_preserves_audit_anchor_external_blocker() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad.pop("audit_anchor_external_tamper_evidence")
+    bad["field_provenance"].pop("audit_anchor.external_tamper_evidence")
+    bad["provenance"]["evidence_bundle_files"] = [
+        item
+        for item in bad["provenance"]["evidence_bundle_files"]
+        if item.get("kind") != "audit_anchor_external_tamper_evidence"
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    errors = []
+    if result_by_name["audit_anchor_external_tamper_evidence_proof"].classification != "release_blocker":
+        errors.append("Windows evidence validator dropped audit anchor external tamper-evidence release blocker")
+    if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
+        errors.append("Windows provenance validator accepted missing audit anchor evidence bundle/provenance")
+    return errors
 
 
 def test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path() -> list[str]:
@@ -1789,6 +1853,28 @@ def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     if "FileNotFoundError" not in result.get("stderr", ""):
         errors.append("validate_all run_step did not preserve subprocess start failure stack trace")
     return errors
+
+
+def test_validate_all_strict_release_runs_release_gate_strict_scan() -> list[str]:
+    step = ValidationStep("release_gate_check", python_step("tooling/release_gate_check.py"), ROOT)
+    result = run_step(step, strict_release=True, desktop_platform="windows")
+    errors = []
+    if "--strict-release" not in result.get("command", ""):
+        errors.append("validate_all strict Windows release did not pass --strict-release to release_gate_check")
+    if result.get("status") != "failed":
+        errors.append("validate_all strict release gate scan should fail while documented release_blockers remain")
+    if result.get("classification") != "release_blocker":
+        errors.append("validate_all strict release gate scan was not classified as release_blocker")
+    if "strict release gate found documented release_blocker classifications" not in result.get("reason", ""):
+        errors.append("validate_all strict release gate scan did not report documented release_blocker reason")
+    return errors
+
+
+def test_release_gate_scans_ipc_threat_model() -> list[str]:
+    text = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
+    if "docs/security/IPC_THREAT_MODEL.md" not in text:
+        return ["release_gate_check.py does not scan IPC threat model release blockers"]
+    return []
 
 
 def test_invariant_evaluator_detects_intentional_import_violation() -> list[str]:
@@ -3000,6 +3086,7 @@ def main() -> int:
         test_evidence_bundle_is_development_classified_and_non_authoritative,
         test_windows_release_evidence_validator_accepts_valid_installed_smoke,
         test_windows_release_evidence_validator_rejects_missing_provenance,
+        test_windows_release_evidence_validator_preserves_audit_anchor_external_blocker,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
@@ -3047,6 +3134,8 @@ def main() -> int:
         test_validation_reporter_exists,
         test_validate_all_resolves_windows_batch_commands,
         test_validate_all_subprocess_start_failure_is_structured,
+        test_validate_all_strict_release_runs_release_gate_strict_scan,
+        test_release_gate_scans_ipc_threat_model,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,

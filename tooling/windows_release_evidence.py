@@ -38,6 +38,7 @@ REQUIRED_BROKER_TRUE_FIELDS = {
 }
 AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
 REQUIRED_EVIDENCE_BUNDLE_KINDS = {
+    "audit_anchor_external_tamper_evidence",
     "setup_doctor",
     "broker_smoke",
     "visible_surfaces",
@@ -51,6 +52,10 @@ REQUIRED_FIELD_PROVENANCE = {
     "first_run.installer_authority_boundary": ("static_assertion", {"CONFIG"}),
     "setup_doctor": ("product_export", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
     "broker.ipc_restart_crash": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "audit_anchor.external_tamper_evidence": (
+        "directly_measured",
+        {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"},
+    ),
     "release_runtime_assertions": ("static_assertion", {"CONFIG", "FIXTURE"}),
 }
 LEGACY_FIXED_INSTALL_ROOT_SUFFIX = "\\gui-shell\\installed"
@@ -559,6 +564,66 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
     )
 
 
+def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> EvidenceResult:
+    errors: list[str] = []
+    evidence = data.get("audit_anchor_external_tamper_evidence")
+    if not isinstance(evidence, dict):
+        errors.append("audit_anchor_external_tamper_evidence object missing")
+    else:
+        if evidence.get("status") != "passed":
+            errors.append("audit_anchor_external_tamper_evidence.status must be passed")
+        if evidence.get("installed_path_verified") is not True:
+            errors.append("audit anchor evidence must be measured from the installed app path")
+        if evidence.get("key_anchor_log_same_user_rewrite_mitigated") is not True:
+            errors.append("same-user key+anchor+log rewrite mitigation must be verified")
+        protection_checks = [
+            "windows_acl_verified",
+            "dpapi_verified",
+            "external_anchor_verified",
+            "signed_evidence_verified",
+        ]
+        if not any(evidence.get(field) is True for field in protection_checks):
+            errors.append("audit anchor evidence must verify Windows ACL, DPAPI, external anchor, or signed evidence")
+        if evidence.get("administrator_root_resistance_claimed") is True and not (
+            evidence.get("external_anchor_verified") is True
+            or evidence.get("signed_evidence_verified") is True
+        ):
+            errors.append("administrator/root resistance requires external anchor or signed evidence")
+
+        source = evidence.get("evidence_source")
+        if not isinstance(source, dict):
+            errors.append("audit anchor evidence_source missing")
+        else:
+            if source.get("source_kind") not in {
+                "windows_acl_dpapi_probe",
+                "external_anchor",
+                "signed_evidence",
+            }:
+                errors.append("audit anchor evidence_source.source_kind must be windows_acl_dpapi_probe, external_anchor, or signed_evidence")
+            evidence_class = source.get("evidence_class")
+            if evidence_class not in ("LIVE_RUNTIME", "EXTERNAL_EVIDENCE"):
+                errors.append("audit anchor evidence_source.evidence_class must be LIVE_RUNTIME or EXTERNAL_EVIDENCE")
+            if source.get("synthetic") is not False:
+                errors.append("synthetic audit anchor evidence is not accepted")
+            if not source.get("command"):
+                errors.append("audit anchor evidence_source.command missing")
+            if not source.get("path"):
+                errors.append("audit anchor evidence_source.path missing")
+            if not _is_sha256_tag(source.get("sha256")):
+                errors.append("audit anchor evidence_source.sha256 must be tagged sha256")
+    if errors:
+        return _failed(
+            "audit_anchor_external_tamper_evidence_proof",
+            "; ".join(errors),
+            "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl before product release claim.",
+        )
+    return _passed(
+        "audit_anchor_external_tamper_evidence_proof",
+        "Windows installed-path audit anchor external tamper-evidence proof passed machine validation.",
+        "Keep audit anchor key-protection or external-anchor evidence current for release candidates.",
+    )
+
+
 def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> list[EvidenceResult]:
     data, error = load_evidence(path)
     if data is None:
@@ -583,12 +648,18 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
                 error or "Windows broker installed smoke evidence missing",
                 "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json.",
             ),
+            _failed(
+                "audit_anchor_external_tamper_evidence_proof",
+                error or "Audit anchor external tamper-evidence proof missing",
+                "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl before product release claim.",
+            ),
         ]
     return [
         validate_provenance_and_isolation(data, path),
         validate_installer_first_run(data),
         validate_setup_doctor(data),
         validate_broker_smoke(data),
+        validate_audit_anchor_external_tamper_evidence(data),
     ]
 
 

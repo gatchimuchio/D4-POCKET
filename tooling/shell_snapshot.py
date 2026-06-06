@@ -79,13 +79,17 @@ def build_shell_snapshot() -> dict:
         }
         for recovery_id, recovery in sorted(state.recovery_actions.items())
     ]
+    problems = _problems()
+    release_blocker_count = sum(
+        1 for problem in problems if problem.get("classification") == "release_blocker"
+    )
     return {
         "snapshot_source": "generated",
         "snapshot_path": str(DEFAULT_SNAPSHOT_PATH.relative_to(ROOT)),
         "snapshot_generated_at": generated_at,
         "snapshot_freshness": generated_at,
         "phase_status": _phase_status(),
-        "operation_status": _operation_status(runtimes, approvals, invariant_flags),
+        "operation_status": _operation_status(runtimes, approvals, invariant_flags, problems),
         "runtimes": runtimes,
         "agent_sessions": [
             {
@@ -115,12 +119,12 @@ def build_shell_snapshot() -> dict:
         "authority_map": _authority_map(state, approvals, audit_events, recovery_actions),
         "adapter_catalog": _adapter_catalog(state),
         "permission_diffs": _permission_diffs(),
-        "problems": _problems(),
+        "problems": problems,
         "evidence": _evidence_records(),
         "settings": _settings_records(),
         "audit_chain_status": "verified",
         "network_exposure": "localhost only",
-        "release_blocker_count": 3,
+        "release_blocker_count": release_blocker_count,
         "evidence_summary": _evidence_summary(),
         "recovery_playbook": _recovery_playbook(),
     }
@@ -138,14 +142,19 @@ def _phase_status() -> dict:
     }
 
 
-def _operation_status(runtimes: list[dict], approvals: list[dict], invariant_flags: dict) -> dict:
+def _operation_status(
+    runtimes: list[dict],
+    approvals: list[dict],
+    invariant_flags: dict,
+    problems: list[dict],
+) -> dict:
     return {
         "runtime_status": runtimes[0]["status"] if runtimes else "unknown",
         "invariant_status": "blocked" if any(invariant_flags.values()) else "ok",
         "trust_status": "restricted",
         "pending_approvals_count": len(approvals),
         "audit_chain_status": "verified",
-        "problems_count": 6,
+        "problems_count": len(problems),
         "release_state": "not claimed",
     }
 
@@ -306,6 +315,22 @@ def _problems() -> list[dict]:
             "blocks_completed_product_release": True,
         },
         {
+            "problem_id": "audit-anchor-external-tamper-evidence-missing",
+            "severity": "blocked",
+            "category": "missing_evidence",
+            "message": "Audit anchor external tamper-evidence proof is missing.",
+            "target": "release_evidence/windows_installed_smoke.json",
+            "recovery_id": "recover-audit-anchor-external-proof",
+            "item": "audit anchor external tamper-evidence proof missing",
+            "classification": "release_blocker",
+            "reason": "Local HMAC anchor evidence does not prove same-user or administrator/root rewrite resistance without Windows ACL/DPAPI, external anchor, or signed evidence proof.",
+            "required_action": "Collect Windows installed-path audit anchor key-protection or external-anchor evidence.",
+            "blocks_release": True,
+            "safe_to_ignore_for_phase_b": True,
+            "blocks_owner_use": False,
+            "blocks_completed_product_release": True,
+        },
+        {
             "problem_id": "macos-unverified",
             "severity": "info",
             "category": "scope",
@@ -437,6 +462,7 @@ def _evidence_summary() -> dict:
         "strict_windows_release": "expected fail",
         "missing_measured_windows_evidence": True,
         "missing_setup_doctor_evidence": True,
+        "missing_audit_anchor_external_tamper_evidence": True,
         "owner_go": "missing",
     }
 
@@ -478,6 +504,18 @@ def _recovery_playbook() -> list[dict]:
             "blocks_completed_product_release": True,
             "command": "",
             "path": "RELEASE_CHECKLIST.md",
+        },
+        {
+            "recovery_id": "recover-audit-anchor-external-proof",
+            "item": "audit anchor external tamper-evidence proof missing",
+            "severity": "release",
+            "classification": "release_blocker",
+            "safe_to_ignore_for_phase_b": True,
+            "blocks_owner_use": False,
+            "required_action": "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit anchor files.",
+            "blocks_completed_product_release": True,
+            "command": "python tooling/windows_release_evidence.py",
+            "path": "release_evidence/windows_installed_smoke.json",
         },
         {
             "recovery_id": "recover-macos-validation",

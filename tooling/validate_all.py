@@ -276,7 +276,7 @@ def classify_not_run(step: ValidationStep, strict_release: bool) -> tuple[str, s
 
 def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) -> dict:
     step_command = resolve_step_command(step.command)
-    if strict_release and desktop_platform == "all" and step.name == "release_gate_check":
+    if strict_release and step.name == "release_gate_check":
         step_command.append("--strict-release")
     command = " ".join(step_command)
     if step.required_tool and find_tool(step.required_tool) is None:
@@ -332,9 +332,9 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
     if not passed and step.in_release_scope:
         classification = "release_blocker"
         blocks_release = "yes"
-        if strict_release and desktop_platform == "all" and step.name == "release_gate_check":
-            reason = "all-desktop strict release gate found documented release_blocker classifications"
-            required_action = "Resolve every classified Windows-first release_blocker, then rerun all-desktop strict validation. macOS remains an unverified known limitation unless owner changes scope."
+        if strict_release and step.name == "release_gate_check":
+            reason = "strict release gate found documented release_blocker classifications"
+            required_action = "Resolve every classified Windows-first release_blocker, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
         else:
             reason = "validation command failed"
             required_action = "Fix the failing validation command and rerun."

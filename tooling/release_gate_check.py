@@ -22,6 +22,7 @@ SCAN_FILES = [
     "VALIDATION.txt",
     "docs/DESKTOP_PLATFORM_MATRIX.md",
     "docs/GUI_OPERATION_SURFACES.md",
+    "docs/security/IPC_THREAT_MODEL.md",
     "docs/WINDOWS_RELEASE_PLAN.md",
     "docs/PRODUCT_COMPLETION_PLAN.md",
     "docs/RELEASE_VALIDATION.md",

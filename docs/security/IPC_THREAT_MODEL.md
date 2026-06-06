@@ -56,10 +56,11 @@ CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof に�
 - stale session: reject and audit;
 - replayed nonce: reject and audit;
 - authority metadata: reject and audit;
+- release classification: `release_blocker` until Windows installed proof exists for unavailable persistence / broker cases;
 - command envelope dispatch before migration: suspend and audit;
 - broker audit append failure: block finalization;
-- persistent state required but unavailable: suspend health and reject operations;
-- broker unavailable: Flutter shows unavailable state and performs no authority decision.
+- persistent state required but unavailable (`release_blocker` until installed proof): suspend health and reject operations;
+- broker unavailable (`release_blocker` until installed proof): Flutter shows unavailable state and performs no authority decision.
 
 ## 5. Audit Anchor Threat Model
 
