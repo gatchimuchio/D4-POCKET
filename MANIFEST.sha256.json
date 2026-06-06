@@ -1266,7 +1266,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5dd3934476af1e0752eb38051affb75be707ed59feb50d3534f97d658ed834ad"
+      "sha256": "ef5048831aff7d5a8991148a1f143efa5003f7196676b46fad35d2af1b3e5c42"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1278,7 +1278,7 @@
     },
     {
       "path": "tooling/packaging_portability_check.py",
-      "sha256": "20377b88ab78038f6b64553da1c7708759bc2f58da86acfe77ea6648a7f01a35"
+      "sha256": "d215a04b9caf583d4a551c12b0016a668c37a167668c9caff4f1991e6dcb78f8"
     },
     {
       "path": "tooling/release_gate_check.py",

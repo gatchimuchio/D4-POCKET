@@ -15,6 +15,9 @@ sys.path.insert(0, str(ROOT))
 from tooling.manifest import expected_files, relative
 
 
+DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120
+
+
 def portable_path_errors(paths: list[Path]) -> list[str]:
     errors: list[str] = []
     for path in paths:
@@ -28,24 +31,47 @@ def portable_path_errors(paths: list[Path]) -> list[str]:
     return errors
 
 
-def run_check(cwd: Path, command: list[str]) -> list[str]:
+def command_label(command: list[str]) -> str:
+    return " ".join(str(part) for part in command)
+
+
+def timeout_output(exc: subprocess.TimeoutExpired) -> str:
+    output = exc.output or ""
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", errors="replace")
+    output = str(output).strip()
+    return output or "no partial output"
+
+
+def run_check(
+    cwd: Path,
+    command: list[str],
+    timeout_seconds: int = DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
+) -> list[str]:
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-        env=env,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            env=env,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return [
+            f"{command_label(command)} timed out after {timeout_seconds}s: "
+            f"{timeout_output(exc)}"
+        ]
     if completed.returncode == 0:
         return []
     output = completed.stdout.strip()
     if not output:
         output = "no output"
-    return [f"{' '.join(command)} failed: {output}"]
+    return [f"{command_label(command)} failed: {output}"]
 
 
 def main() -> int:
@@ -73,14 +99,25 @@ def main() -> int:
         env = os.environ.copy()
         env["LC_ALL"] = "C"
         env["LANG"] = "C"
-        completed = subprocess.run(
-            [unzip, "-qq", str(archive), "-d", str(extract_root)],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-            env=env,
-        )
+        unzip_command = [unzip, "-qq", str(archive), "-d", str(extract_root)]
+        try:
+            completed = subprocess.run(
+                unzip_command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+                env=env,
+                timeout=DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            print("packaging portability check failed:")
+            print(
+                "  - "
+                f"{command_label(unzip_command)} timed out after "
+                f"{DEFAULT_SUBPROCESS_TIMEOUT_SECONDS}s: {timeout_output(exc)}"
+            )
+            return 1
         if completed.returncode != 0:
             print("packaging portability check failed:")
             print(f"  - unzip extraction failed: {completed.stdout.strip()}")

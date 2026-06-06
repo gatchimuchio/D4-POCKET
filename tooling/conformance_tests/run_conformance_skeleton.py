@@ -1954,7 +1954,17 @@ def test_packaging_portability_checker_exists() -> list[str]:
         errors.append("tooling/packaging_portability_check.py missing")
     else:
         text = checker.read_text(encoding="utf-8")
-        for token in ["unzip", "LC_ALL", "tooling/manifest.py", "run_conformance_skeleton.py", "release_gate_check.py"]:
+        for token in [
+            "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120",
+            "timeout=timeout_seconds",
+            "subprocess.TimeoutExpired",
+            "timed out after",
+            "unzip",
+            "LC_ALL",
+            "tooling/manifest.py",
+            "run_conformance_skeleton.py",
+            "release_gate_check.py",
+        ]:
             if token not in text:
                 errors.append(f"packaging portability checker missing token: {token}")
     tracked_paths = [ROOT / path for path in subprocess.run(
