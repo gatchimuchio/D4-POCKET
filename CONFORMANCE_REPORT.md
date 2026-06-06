@@ -5,12 +5,12 @@
 - item: schema check
   classification: required_for_v1
   status: passed
-  evidence: `schema check passed: 19 schemas, 19 examples, 19 negative fixtures`
+  evidence: `schema check passed: 26 schemas, 26 examples, 28 negative fixtures`
 
 - item: conformance checks
   classification: required_for_v1
   status: passed
-  evidence: `conformance skeleton passed: 89 checks`
+  evidence: `conformance skeleton passed: 132 checks`
 
 - item: conformance tautology fix
   classification: required_for_v1
@@ -65,7 +65,7 @@
 - item: integrated Shell Core release smoke
   classification: required_for_v1
   status: passed
-  evidence: production smoke covers save/load snapshot, append-only audit chain verification, tamper detection, approval edit rehash/revalidation, and recovery_id policy verification.
+  evidence: production smoke covers save/load snapshot, append-only audit chain verification, HMAC audit anchor verification, tamper detection, approval edit rehash/revalidation, and recovery_id policy verification.
 
 - item: first-run and Setup Doctor implementation smoke
   classification: required_for_v1

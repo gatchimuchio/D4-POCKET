@@ -28,8 +28,8 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 Expected successful output:
 
 ```text
-schema check passed: 25 schemas, 25 examples, 27 negative fixtures
-conformance skeleton passed: 99 checks
+schema check passed: 26 schemas, 26 examples, 28 negative fixtures
+conformance skeleton passed: 132 checks
 ```
 
 ## Phase B owner launch

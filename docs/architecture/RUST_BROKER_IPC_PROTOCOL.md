@@ -52,6 +52,8 @@ Allowed operations:
 
 `command_envelope` is intentionally suspended for dispatch. It returns broker-evaluated eligibility from broker-owned state and an `execution_gate` body with process / credential / update gate status, but it must not dispatch real external commands until product cutover and installed-product execution evidence exist.
 
+`payload_hash` is the tagged SHA-256 hash of the canonical JSON request payload. Requests without a payload bind to the canonical JSON value `null`. The broker rejects a syntactically valid but mismatched hash with `broker_payload_hash_mismatch`, and audit events include the request `payload_hash`.
+
 ## 4. Response Envelope
 
 Required fields:
@@ -102,6 +104,7 @@ Allowed error codes:
 
 - `broker_request_malformed`
 - `broker_payload_hash_invalid`
+- `broker_payload_hash_mismatch`
 - `broker_issued_at_invalid`
 - `broker_persistence_unavailable`
 - `broker_authentication_failed`
@@ -122,7 +125,7 @@ The current Rust code provides:
 
 - `native/rust_helper/src/main.rs` process lifecycle skeleton;
 - `native/rust_helper/src/broker/ipc_server.rs` authenticated `127.0.0.1` loopback server for independent-process IPC;
-- `native/rust_helper/src/broker/store.rs` durable file store for audit hash-chain, replay nonces, and session state;
+- `native/rust_helper/src/broker/store.rs` durable file store for audit hash-chain, HMAC audit anchor, replay nonces, and session state;
 - `native/rust_helper/src/broker/authority.rs` Rust ownership for normalization, policy eligibility, approval edit / rehash, content projection, audit verification, recovery mapping, and command-envelope eligibility;
 - `native/rust_helper/src/broker/protocol.rs` request/response decision path;
 - `native/rust_helper/src/broker/audit.rs` broker audit hash chain;
@@ -133,9 +136,11 @@ The current Rust code provides:
 - JSON response serialization aligned with `ipc_response.schema.json`;
 - typed request envelope validation;
 - `issued_at` RFC3339 parsing and freshness rejection within a 300-second broker window;
+- payload hash binding between `payload_hash` and canonical request `payload`;
 - persistence-required fail-closed behavior when persistent state is required but unavailable;
-- durable audit append and restart verification;
+- durable audit append, HMAC anchor, and restart verification;
 - durable replay nonce rejection after broker restart;
+- replay nonce timestamping and compaction;
 - malformed or tampered persisted state rejection;
 - health response;
 - shutdown response for test lifecycle;
@@ -179,9 +184,10 @@ Selection criteria:
 Current production broker-server behavior:
 
 - `session_id` is generated per broker process and checked for non-health operations.
-- `nonce` replay state is persisted in `replay_nonces.jsonl`.
+- `nonce` replay state is persisted in `replay_nonces.jsonl` with `recorded_at_epoch_seconds` and bounded compaction.
 - `issued_at` is parsed as RFC3339 and rejected when outside a 300-second broker freshness window.
-- audit events are chained and persisted in `audit.jsonl`.
+- audit events are chained, include `payload_hash`, and are persisted in `audit.jsonl`.
+- audit chain head/count are HMAC-bound in `audit_anchor.json` using the broker-local `audit_anchor.key`; this is local authenticity evidence and does not replace external release notarization.
 - `session.json` records active durable session state.
 
 Production cutover requirements:

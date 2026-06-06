@@ -118,8 +118,8 @@ The LLM-readable substrate definition, bounded reference extension conformance, 
 
 - item: Audit chain verification smoke
   classification: required_for_v1
-  reason: integrated Shell Core release smoke verifies audit chain linkage and detects tampering.
-  required_action: Keep audit chain smoke passing on release candidates.
+  reason: integrated Shell Core release smoke verifies audit chain linkage, HMAC audit anchor verification, and tamper detection.
+  required_action: Keep audit chain and local anchor smoke passing on release candidates.
   blocks_release: no
 
 - item: Runtime Catalog live/use smoke

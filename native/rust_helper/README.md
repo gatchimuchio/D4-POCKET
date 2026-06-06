@@ -15,9 +15,9 @@ Current helper modules:
 Current broker modules:
 
 - `src/main.rs`: independent process lifecycle for explicit `dev-stdin-smoke` diagnostics and `broker-server`.
-- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, `issued_at` RFC3339 freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed behavior, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, authority operation routing, and command-envelope suspension with process / credential / update gate reporting.
-- `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests.
-- `src/broker/store.rs`: durable file store for audit hash-chain, replay nonce, and session state in `broker-server` mode.
+- `src/broker/protocol.rs`: JSON request parsing, typed envelope validation, canonical payload-hash binding, `issued_at` RFC3339 freshness rejection, audit/replay/session store readiness reporting, persistent-state-required unavailable fail-closed behavior, stale-session rejection, nonce replay rejection, NFKC/case/zero-width/camelCase/separator/alias/value-only authority-like metadata rejection, JSON response serialization, health cutover status, authority operation routing, and command-envelope suspension with process / credential / update gate reporting.
+- `src/broker/audit.rs`: broker-local append-only audit hash chain for accepted, rejected, and suspended requests, with request `payload_hash` included in each event hash.
+- `src/broker/store.rs`: durable file store for audit hash-chain, HMAC audit anchor, compacted replay nonce state, and session state in `broker-server` mode.
 - `src/broker/authority.rs`: Rust authority evaluation, normalization/quarantine, approval edit, content projection, audit-chain verification, and command eligibility evaluation.
 
 Rust helper must remain callable through explicit IPC or FFI boundaries.

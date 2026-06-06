@@ -26,12 +26,14 @@ from packages.shell_core.authority_keys import AUTHORITY_KEYS
 from packages.shell_core.content_exposure import project_approval_content
 from packages.shell_core.invariant_evaluator import InvariantEvaluator
 from packages.shell_core.normalization import normalize_inbound_payload, normalize_key
-from packages.shell_core.permission_ledger import NON_AUTHORITY_SOURCES, PermissionLedger
+from packages.shell_core.permission_ledger import AUTHORITY_SOURCES, NON_AUTHORITY_SOURCES, PermissionLedger
 from packages.shell_core.policy_evaluator import PolicyEvaluator
+from packages.shell_core.persistence import JsonPersistence
 from packages.shell_core.runtime_state import RuntimeState
 from packages.shell_core.release_smoke import run_shell_core_release_smoke
 from packages.shell_core.sensitive_action_router import SensitiveActionRouter
 from packages.shell_core.state_snapshot import create_state_snapshot, deterministic_snapshot_json
+from packages.shell_core.update_policy_store import UpdatePolicyStore
 from packages.blue_tanuki_adapter.adapter import BlueTanukiAdapter
 from packages.blue_tanuki_adapter.approvals import normalize_approval, projected_approval
 from packages.blue_tanuki_adapter.authority_trace import metadata_attempts_authority
@@ -185,7 +187,7 @@ def can_create_authority_context(source: str, runtime_allowed: bool) -> bool:
 
 
 def source_can_grant_authority(source: str) -> bool:
-    return source not in NON_AUTHORITY_SOURCES
+    return source in AUTHORITY_SOURCES
 
 
 def render_approval_content(approval: dict) -> dict:
@@ -442,6 +444,8 @@ def test_memory_cache_previous_state_cannot_grant_authority() -> list[str]:
     for source in sorted(NON_AUTHORITY_SOURCES):
         if source_can_grant_authority(source):
             errors.append(f"{source} granted authority")
+    if source_can_grant_authority("unknown_future_source"):
+        errors.append("unknown source granted authority")
     return errors
 
 
@@ -592,6 +596,17 @@ def test_update_fixture_requires_signature() -> list[str]:
     return []
 
 
+def test_update_policy_unsigned_rejection_uses_taxonomy() -> list[str]:
+    store = UpdatePolicyStore()
+    try:
+        store.register({"policy_id": "unsigned-policy", "signature_required": False})
+    except ValueError as exc:
+        if "update_signature_required" not in str(exc):
+            return ["UpdatePolicyStore unsigned rejection did not use update_signature_required taxonomy"]
+        return []
+    return ["UpdatePolicyStore accepted unsigned update policy"]
+
+
 def test_shell_contracts_load_required_schemas() -> list[str]:
     catalog = load_default_catalog()
     expected = {f"{name}.schema.json" for name in REQUIRED_SCHEMA_NAMES}
@@ -624,6 +639,8 @@ def test_shell_core_non_authority_sources_do_not_grant_authority() -> list[str]:
     for source in sorted(NON_AUTHORITY_SOURCES):
         if ledger.can_grant_authority_from_source(source):
             errors.append(f"Shell Core treated {source} as authority")
+    if ledger.can_grant_authority_from_source("unknown_future_source"):
+        errors.append("Shell Core treated unknown source as authority")
     return errors
 
 
@@ -1049,6 +1066,8 @@ def test_shell_core_integrated_release_smoke() -> list[str]:
         errors.append("Shell Core release smoke did not save snapshot")
     if result["audit_chain_verified"] is not True:
         errors.append("Shell Core release smoke did not verify audit chain")
+    if result.get("audit_anchor_verified") is not True:
+        errors.append("Shell Core release smoke did not verify audit HMAC anchor")
     if result["tamper_detected"] is not True:
         errors.append("Shell Core release smoke did not detect tamper")
     if result["approval_revalidation_required"] is not True:
@@ -1056,6 +1075,37 @@ def test_shell_core_integrated_release_smoke() -> list[str]:
     if result["recovery_id_verified"] is not True:
         errors.append("Shell Core release smoke did not verify recovery mapping")
     return errors
+
+
+def test_json_persistence_rejects_truncated_audit_anchor() -> list[str]:
+    with tempfile.TemporaryDirectory(prefix="gui-shell-audit-anchor-") as directory:
+        persistence = JsonPersistence(Path(directory))
+        first = persistence.append_audit_event(
+            {
+                "event_id": "audit-1",
+                "action": "approval.requested",
+                "result": "success",
+                "payload_hash": canonical_hash({"approval_id": "approval-1"}),
+            }
+        )
+        persistence.append_audit_event(
+            {
+                "event_id": "audit-2",
+                "action": "approval.validated",
+                "result": "success",
+                "payload_hash": canonical_hash({"approval_id": "approval-1", "status": "approved"}),
+            }
+        )
+        persistence.audit_path.write_text(
+            json.dumps(first, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        verification = persistence.verify_audit_chain()
+        if verification["ok"] is not False:
+            return ["JsonPersistence accepted truncated audit log with stale HMAC anchor"]
+        if "audit anchor HMAC" not in " ".join(verification.get("errors", [])):
+            return ["JsonPersistence truncate failure did not cite audit anchor HMAC"]
+    return []
 
 
 def test_release_smoke_runs_first_run_and_setup_doctor() -> list[str]:
@@ -1866,6 +1916,8 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "serde_json::from_str",
         "broker_request_malformed",
         "broker_payload_hash_invalid",
+        "broker_payload_hash_mismatch",
+        "canonical_payload_hash",
         "broker_issued_at_invalid",
         "broker_persistence_unavailable",
         "broker_stale_session",
@@ -1892,9 +1944,47 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
     for token in required_protocol_tokens:
         if token not in protocol_rs:
             errors.append(f"broker protocol missing token: {token}")
-    for token in ["BrokerAuditLog", "append", "previous_event_hash", "event_hash"]:
+    for token in ["BrokerAuditLog", "append", "previous_event_hash", "event_hash", "payload_hash"]:
         if token not in audit_rs:
             errors.append(f"broker audit missing token: {token}")
+    return errors
+
+
+def test_rust_broker_audit_anchor_and_nonce_compaction_present() -> list[str]:
+    store_rs = (RUST_HELPER / "src" / "broker" / "store.rs").read_text(encoding="utf-8")
+    audit_hash_rs = (RUST_HELPER / "src" / "audit_hash.rs").read_text(encoding="utf-8")
+    errors = []
+    for token in [
+        "audit_anchor.json",
+        "audit_anchor.key",
+        "AuditAnchorRecord",
+        "anchor_hmac",
+        "verify_audit_anchor",
+        "write_audit_anchor",
+        "recorded_at_epoch_seconds",
+        "REPLAY_NONCE_RETENTION_SECONDS",
+        "MAX_REPLAY_NONCE_RECORDS",
+        "compact_replay_nonces",
+    ]:
+        if token not in store_rs:
+            errors.append(f"broker store missing audit anchor/nonce token: {token}")
+    if "hmac_sha256_tagged" not in audit_hash_rs:
+        errors.append("audit_hash.rs missing HMAC helper")
+    return errors
+
+
+def test_rust_filesystem_diagnostic_detects_secret_symlink() -> list[str]:
+    filesystem_rs = (RUST_HELPER / "src" / "filesystem.rs").read_text(encoding="utf-8")
+    errors = []
+    for token in [
+        "symlink_metadata",
+        "canonicalize",
+        "secret_path_detected",
+        "filesystem_secret_path_diagnostic_blocked",
+        "filesystem_diagnostic_detects_symlink_to_secret",
+    ]:
+        if token not in filesystem_rs:
+            errors.append(f"filesystem diagnostic missing symlink secret token: {token}")
     return errors
 
 
@@ -2126,11 +2216,14 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
 def test_validate_all_uses_running_python_interpreter_for_python_steps() -> list[str]:
     errors = []
     steps = build_validation_steps(False, "windows", python_only=True)
+    names = {step.name for step in steps}
     for step in steps:
         if step.command[0] != sys.executable:
             errors.append(f"{step.name} does not use sys.executable")
         if step.required_tool is not None:
             errors.append(f"{step.name} still declares a PATH Python tool requirement")
+    if "broker_authority_parity" in names:
+        errors.append("validate_all --python-only still includes cargo-backed broker_authority_parity")
     return errors
 
 
@@ -2271,11 +2364,18 @@ def test_validate_all_resolves_windows_batch_commands() -> list[str]:
 def test_manifest_integrity_tooling_exists() -> list[str]:
     errors = []
     required_paths = {
+        ".github/workflows/validation.yml",
         "AGENTS.md",
         "ROADMAP.md",
         "CONFORMANCE_REPORT.md",
         "COMPATIBILITY_MATRIX.md",
+        "apps/mobile_flutter/lib/main.dart",
+        "apps/desktop_flutter/windows/runner/main.cpp",
         "docs/LANGUAGE_POLICY.md",
+        "packages/agent_runtime/contract.py",
+        "packages/runtime_catalog/catalog.py",
+        "packages/shell_contracts/schema_loader.py",
+        "packages/blue_tanuki_adapter/adapter.py",
         "tooling/manifest.py",
         "tooling/conformance_tests/run_conformance_skeleton.py",
     }
@@ -2763,6 +2863,22 @@ def test_platform_hardening_configuration_exists() -> list[str]:
         errors.append("validation workflow does not enable Flutter SDK cache")
     if "runs-on: windows-2022" not in workflow:
         errors.append("validation workflow does not pin Windows Flutter build to windows-2022")
+    for mutable_ref in [
+        "actions/checkout@v4",
+        "actions/setup-python@v5",
+        "subosito/flutter-action@v2",
+        "dtolnay/rust-toolchain@stable",
+    ]:
+        if mutable_ref in workflow:
+            errors.append(f"validation workflow still uses mutable action ref: {mutable_ref}")
+    for pinned_sha in [
+        "34e114876b0b11c390a56381ad16ebd13914f8d5",
+        "a26af69be951a213d495a4c3e4e4022e16d87065",
+        "1a449444c387b1966244ae4d4f8c696479add0b2",
+        "29eef336d9b2848a0b548edc03f92a220660cdb8",
+    ]:
+        if pinned_sha not in workflow:
+            errors.append(f"validation workflow missing pinned action SHA: {pinned_sha}")
 
     main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     if "dev-stdin-smoke" not in main_rs:
@@ -2845,6 +2961,7 @@ def main() -> int:
         test_hash_patterns_are_tagged_sha256,
         test_framework_risk_profile_exists,
         test_update_fixture_requires_signature,
+        test_update_policy_unsigned_rejection_uses_taxonomy,
         test_shell_contracts_load_required_schemas,
         test_shell_core_ignores_adapter_metadata_permissions,
         test_shell_core_non_authority_sources_do_not_grant_authority,
@@ -2876,6 +2993,7 @@ def main() -> int:
         test_state_snapshot_reports_invariant_flags,
         test_invariant_evaluator_scans_nested_shell_core_python,
         test_shell_core_integrated_release_smoke,
+        test_json_persistence_rejects_truncated_audit_anchor,
         test_release_smoke_runs_first_run_and_setup_doctor,
         test_shell_snapshot_contains_gui_operation_state,
         test_shell_snapshot_generator_writes_phase_b_local_snapshot,
@@ -2904,6 +3022,8 @@ def main() -> int:
         test_broker_boundary_docs_exist,
         test_rust_broker_skeleton_exists,
         test_rust_broker_rejection_audit_contract_shape,
+        test_rust_broker_audit_anchor_and_nonce_compaction_present,
+        test_rust_filesystem_diagnostic_detects_secret_symlink,
         test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
         test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection,
         test_desktop_flutter_exposes_individual_surface_semantics_identifiers,

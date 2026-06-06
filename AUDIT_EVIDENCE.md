@@ -20,11 +20,11 @@
 
 - item: audit chain tamper detection
   classification: required_for_v1
-  status: conformance and release smoke present
+  status: conformance and release smoke present, including local HMAC audit anchor verification
 
 - item: Shell Core persistence and audit smoke
   classification: required_for_v1
-  status: `tooling/release_smoke.py` passes snapshot save/load, append-only audit chain verification, and tamper detection for the current implementation path.
+  status: `tooling/release_smoke.py` passes snapshot save/load, append-only audit chain verification, HMAC audit anchor verification, and tamper detection for the current implementation path.
 
 - item: MANIFEST integrity coverage
   classification: required_for_v1

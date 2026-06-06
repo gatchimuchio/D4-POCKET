@@ -1,5 +1,7 @@
 import copy
 
+from .error_taxonomy import UPDATE_SIGNATURE_REQUIRED, shell_error
+
 
 class UpdatePolicyStore:
     def __init__(self):
@@ -7,7 +9,13 @@ class UpdatePolicyStore:
 
     def register(self, policy: dict) -> None:
         if policy.get("signature_required") is not True:
-            raise ValueError("update policy must require signatures")
+            raise ValueError(
+                shell_error(
+                    UPDATE_SIGNATURE_REQUIRED,
+                    "update policy must require signatures",
+                    "update.policy.register",
+                )["code"]
+            )
         self._policies[policy["policy_id"]] = copy.deepcopy(policy)
 
     def get(self, policy_id: str) -> dict:

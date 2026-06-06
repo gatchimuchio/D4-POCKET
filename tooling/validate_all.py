@@ -95,15 +95,16 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             python_step("tooling/release_runtime_assertions.py", "--check"),
             ROOT,
         ),
-        ValidationStep(
-            "broker_authority_parity",
-            python_step("tooling/broker_parity/run_authority_parity.py"),
-            ROOT,
-        ),
     ]
     if python_only:
         return steps
     steps.extend([
+        ValidationStep(
+            "broker_authority_parity",
+            python_step("tooling/broker_parity/run_authority_parity.py"),
+            ROOT,
+            "cargo",
+        ),
         ValidationStep("rust_helper_cargo_test", ["cargo", "test"], ROOT / "native" / "rust_helper", "cargo"),
         ValidationStep("desktop_flutter_analyze", ["flutter", "analyze"], ROOT / "apps" / "desktop_flutter", "flutter"),
         ValidationStep("desktop_flutter_test", ["flutter", "test"], ROOT / "apps" / "desktop_flutter", "flutter"),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import socket
 import subprocess
@@ -23,6 +24,11 @@ from packages.shell_core.normalization import normalize_inbound_payload
 from packages.shell_core.permission_ledger import NON_AUTHORITY_SOURCES
 from packages.shell_core.policy_evaluator import PolicyEvaluator
 from packages.shell_core.runtime_state import RuntimeState
+
+
+def ipc_payload_hash(payload) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def broker_start_timeout_seconds() -> float:
@@ -175,7 +181,7 @@ class BrokerClient:
             "request_id": f"parity-{self.counter}",
             "session_id": self.endpoint["session_id"],
             "operation": operation,
-            "payload_hash": "sha256:" + "a" * 64,
+            "payload_hash": ipc_payload_hash(payload),
             "nonce": f"parity-nonce-{self.counter}",
             "issued_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "metadata": {"client": "broker_parity"},
@@ -195,7 +201,7 @@ class BrokerClient:
             "request_id": f"parity-shutdown-{self.counter}",
             "session_id": self.endpoint["session_id"],
             "operation": "shutdown",
-            "payload_hash": "sha256:" + "a" * 64,
+            "payload_hash": ipc_payload_hash(None),
             "nonce": f"parity-shutdown-nonce-{self.counter}",
             "issued_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "metadata": {"client": "broker_parity"},

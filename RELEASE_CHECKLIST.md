@@ -204,10 +204,10 @@ The canonical completion roadmap for the combined Windows-first product path and
   required_action: Keep integrated persistence smoke passing.
   blocks_release: no
 
-- item: audit chain verification smoke
+- item: audit chain and local anchor verification smoke
   classification: required_for_v1
-  reason: integrated Shell Core release smoke appends JSONL audit events, verifies hash chain linkage, and detects tampering.
-  required_action: Keep integrated audit chain smoke passing.
+  reason: integrated Shell Core release smoke appends JSONL audit events, verifies hash chain linkage, verifies the HMAC audit anchor, and detects tampering.
+  required_action: Keep integrated audit chain and local anchor smoke passing.
   blocks_release: no
 
 - item: approval edit to rehash to revalidation smoke

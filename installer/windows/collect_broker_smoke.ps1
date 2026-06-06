@@ -56,7 +56,7 @@ function New-BrokerRequest {
   $request = [ordered]@{
     request_id = $RequestId
     operation = $Operation
-    payload_hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    payload_hash = "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
     nonce = $Nonce
     issued_at = New-IssuedAt
     metadata = [ordered]@{

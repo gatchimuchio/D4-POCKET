@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -51,12 +52,15 @@ EXCLUDED_PATHS = {
     "MANIFEST.sha256.json",
     "release_evidence/windows_installed_smoke.json",
     "apps/mobile_flutter/pubspec.lock",
+    "apps/desktop_flutter/flutter_01.log",
 }
 
 EXCLUDED_PARTS = {
     ".git",
+    ".idea",
     ".dart_tool",
     "build",
+    "ephemeral",
     "target",
     "__pycache__",
 }
@@ -104,23 +108,49 @@ def expected_files() -> tuple[list[Path], list[str]]:
     files: set[Path] = set()
     errors: list[str] = []
 
-    for pattern in GLOB_PATTERNS:
-        for path in ROOT.glob(pattern):
+    tracked = git_tracked_files()
+    if tracked is not None:
+        for relative_path in tracked:
+            path = ROOT / relative_path
             if path.is_file() and not is_excluded(path):
                 files.add(path)
+        if not files:
+            errors.append("git-tracked source file list is empty")
+        return sorted(files, key=relative), errors
+
+    for path in ROOT.rglob("*"):
+        if path.is_file() and not is_excluded(path):
+            files.add(path)
 
     for name in EXACT_FILES:
         path = ROOT / name
         if not path.exists():
             errors.append(f"required file missing from workspace: {name}")
-        elif path.is_file() and not is_excluded(path):
-            files.add(path)
 
     shell_core_files = sorted((ROOT / "packages" / "shell_core").glob("**/*.py"))
     if not shell_core_files:
         errors.append("core Shell Core files are absent")
 
     return sorted(files, key=relative), errors
+
+
+def git_tracked_files() -> list[str] | None:
+    if not (ROOT / ".git").exists():
+        return None
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    raw = completed.stdout.decode("utf-8", errors="strict")
+    return [item for item in raw.split("\0") if item]
 
 
 def build_manifest() -> tuple[dict, list[str]]:

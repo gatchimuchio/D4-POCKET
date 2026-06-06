@@ -148,6 +148,8 @@ def run_shell_core_release_smoke(root: Path) -> dict:
     verification = persistence.verify_audit_chain()
     if verification["ok"] is not True:
         errors.append("append-only audit chain did not verify")
+    if verification.get("anchor_verified") is not True:
+        errors.append("audit anchor HMAC did not verify")
     if second_event.get("previous_event_hash") != first_event.get("event_hash"):
         errors.append("audit chain did not link second event to first event")
 
@@ -187,6 +189,7 @@ def run_shell_core_release_smoke(root: Path) -> dict:
         "snapshot_saved": True,
         "audit_event_count": len(events),
         "audit_chain_verified": verification["ok"],
+        "audit_anchor_verified": verification.get("anchor_verified") is True,
         "tamper_detected": True,
         "approval_revalidation_required": edited["status"] == "requires_validation",
         "recovery_id_verified": policy_result["allowed"] is True,

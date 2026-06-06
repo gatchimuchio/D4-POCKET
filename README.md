@@ -50,7 +50,7 @@ GUI Shell is **not** a normal app template, and it is **not** a BLUE-TANUKI-spec
 GUI Shell は通常のアプリ雛形ではなく、BLUE-TANUKI 専用 GUI でもありません。
 
 - 🛂 **A control plane.** Flutter renders operator surfaces; it does *not* own authority. / Flutter は操作画面を描画するだけで、権限を持たない。
-- 📐 **A contract.** Runtime / adapter / permission / approval / audit / recovery / content-exposure semantics are **JSON Schema-first** — 25 schemas, each with a valid example and negative fixtures. / 各セマンティクスは JSON Schema ファースト。25スキーマ、各々に正例と負例。
+- 📐 **A contract.** Runtime / adapter / permission / approval / audit / recovery / content-exposure semantics are **JSON Schema-first** — 26 schemas, each with a valid example and negative fixtures. / 各セマンティクスは JSON Schema ファースト。26スキーマ、各々に正例と負例。
 - 🤖 **A substrate LLMs build on.** New functions, adapters, tools, and integrations connect through declared contracts — not improvised shortcuts. / 新機能・アダプタ・ツールは宣言済み契約を介して接続する。
 - 🔒 **Safety first, robustness second, operator clarity third, product UI after that.** / 安全性が第一、堅牢性が第二、操作明瞭性が第三、プロダクト UI はその後。
 
@@ -215,8 +215,8 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 Expected successful output / 期待される出力:
 
 ```text
-schema check passed: 25 schemas, 25 examples, 27 negative fixtures
-conformance skeleton passed: 102 checks
+schema check passed: 26 schemas, 26 examples, 28 negative fixtures
+conformance skeleton passed: 132 checks
 ```
 
 ➡️ See **[QUICKSTART.md](QUICKSTART.md)**.
@@ -326,7 +326,7 @@ It intentionally prioritizes / 意図的に以下の順で優先します:
 What is true today, stated without inflation — 誇張なしの現状:
 
 - ✅ **Phase A/B owner-use complete.** The owner can run the desktop shell for daily local operation with status, problems, evidence, recovery, trust, runtime, and authority surfaces visible.
-- ✅ **Schema + conformance pass** as a development slice (25 schemas, 102 checks).
+- ✅ **Schema + conformance pass** as a development slice (26 schemas, 132 checks).
 - ✅ **LLM-readable substrate is definition-locked**, with one bounded reference extension and one cross-agent reproduction report.
 - ⛔ **v1.0 product release is NOT yet claimed.** Open `release_blocker` items: Rust Broker production authority cutover, Windows installed-path product evidence, and explicit owner GO.
 - ⚠️ **Windows-first.** Linux validation is a development slice, not final product proof. **macOS is unverified** and must not be advertised as supported.

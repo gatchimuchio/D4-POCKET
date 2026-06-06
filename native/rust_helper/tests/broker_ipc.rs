@@ -84,7 +84,7 @@ fn broker_ipc_rejects_unauthenticated_malformed_oversized_and_stale_requests() {
 
     let oversized_payload = format!(
         "{{\"request_id\":\"oversized\",\"operation\":\"health\",\"payload_hash\":\"sha256:{}\",\"nonce\":\"{}\",\"issued_at\":\"{}\",\"metadata\":{{\"padding\":\"{}\"}}}}",
-        "a".repeat(64),
+        null_payload_hash_hex(),
         "nonce-oversized",
         BrokerRequestEnvelope::current_issued_at(),
         "x".repeat(2048)
@@ -233,7 +233,7 @@ fn health_request_at(request_id: &str, nonce: &str, issued_at: &str) -> String {
     format!(
         "{{\"request_id\":\"{}\",\"operation\":\"health\",\"payload_hash\":\"sha256:{}\",\"nonce\":\"{}\",\"issued_at\":\"{}\",\"metadata\":{{\"client\":\"desktop_flutter\"}}}}",
         request_id,
-        "a".repeat(64),
+        null_payload_hash_hex(),
         nonce,
         issued_at
     )
@@ -243,10 +243,14 @@ fn shutdown_request(session_id: &str) -> String {
     format!(
         "{{\"request_id\":\"shutdown-request\",\"session_id\":\"{}\",\"operation\":\"shutdown\",\"payload_hash\":\"sha256:{}\",\"nonce\":\"shutdown-nonce-{}\",\"issued_at\":\"{}\",\"metadata\":{{\"client\":\"desktop_flutter\"}}}}",
         session_id,
-        "a".repeat(64),
+        null_payload_hash_hex(),
         session_id,
         BrokerRequestEnvelope::current_issued_at()
     )
+}
+
+fn null_payload_hash_hex() -> &'static str {
+    "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
 }
 
 struct Workspace {

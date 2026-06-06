@@ -17,6 +17,13 @@ NON_AUTHORITY_SOURCES = {
     "ui_state",
 }
 
+AUTHORITY_SOURCES = {
+    "broker_internal_policy",
+    "policy",
+    "runtime",
+    "rust_security_broker",
+}
+
 
 class PermissionLedger:
     def __init__(self):
@@ -32,4 +39,4 @@ class PermissionLedger:
         return permission.get("decision", "deny")
 
     def can_grant_authority_from_source(self, source: str) -> bool:
-        return source not in NON_AUTHORITY_SOURCES
+        return source in AUTHORITY_SOURCES

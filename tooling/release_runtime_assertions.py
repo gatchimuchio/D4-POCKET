@@ -308,6 +308,31 @@ def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
     )
 
 
+def assert_broker_client_binds_payload_hash_to_payload() -> RuntimeAssertion:
+    text = _read("apps/desktop_flutter/lib/services/broker_client.dart")
+    required = ["_payloadHash(payload)", "_canonicalizeJsonValue", "_sha256Tagged"]
+    missing = [token for token in required if token not in text]
+    fixed_hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    if missing or fixed_hash in text:
+        pieces = []
+        if missing:
+            pieces.append("missing " + ", ".join(missing))
+        if fixed_hash in text:
+            pieces.append("fixed dummy payload_hash remains")
+        return _fail(
+            "broker_client_binds_payload_hash_to_payload",
+            "CONFIG",
+            "; ".join(pieces),
+            "Compute request payload_hash from canonical JSON payload and let Rust broker reject mismatches.",
+        )
+    return _pass(
+        "broker_client_binds_payload_hash_to_payload",
+        "CONFIG",
+        "BrokerClient computes payload_hash from canonical JSON payload instead of sending a fixed dummy hash.",
+        "Keep Rust broker payload hash mismatch tests passing.",
+    )
+
+
 def assert_broker_secret_not_projected_to_ui() -> RuntimeAssertion:
     files = [
         path
@@ -395,6 +420,7 @@ def run_release_runtime_assertions() -> list[RuntimeAssertion]:
         assert_launch_scripts_start_broker_without_python_snapshot(),
         assert_no_ffi_or_direct_bridge_authority_path(),
         assert_broker_client_uses_authenticated_loopback_ipc(),
+        assert_broker_client_binds_payload_hash_to_payload(),
         assert_broker_secret_not_projected_to_ui(),
         assert_flutter_fail_closed_tests_exist(),
         assert_broker_runtime_restart_and_crash_tests_exist(),

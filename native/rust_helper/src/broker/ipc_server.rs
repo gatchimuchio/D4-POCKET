@@ -203,6 +203,7 @@ fn read_limited_line(
             .map(|position| position + 1)
             .unwrap_or(available.len());
         if buffer.len() + take > max_bytes {
+            reader.consume(take);
             return Err(IpcLineError::Oversized);
         }
         buffer.extend_from_slice(&available[..take]);

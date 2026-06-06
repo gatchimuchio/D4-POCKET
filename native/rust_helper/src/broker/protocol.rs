@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -7,6 +7,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use std::path::Path;
 
+use crate::audit_hash::sha256_tagged;
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 use crate::broker::authority::{
     edit_approval, evaluate_authority, evaluate_broker_authority, normalize_inbound_payload,
@@ -18,6 +19,8 @@ const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
+const ZERO_PAYLOAD_HASH: &str =
+    "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerPersistenceMode {
@@ -109,11 +112,17 @@ impl BrokerStateStore {
         Ok(())
     }
 
-    pub fn append_replay_nonce(&self, nonce: &str) -> Result<(), BrokerStoreError> {
+    pub fn append_replay_nonce(
+        &self,
+        nonce: &str,
+        recorded_at_epoch_seconds: i64,
+    ) -> Result<Option<HashMap<String, i64>>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
-            store.append_replay_nonce(nonce)?;
+            return store
+                .append_replay_nonce(nonce, recorded_at_epoch_seconds)
+                .map(Some);
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -201,10 +210,7 @@ impl BrokerRequestEnvelope {
             request_id: Some(request_id.to_string()),
             session_id: None,
             operation: Some(BrokerOperation::Health),
-            payload_hash: Some(
-                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                    .to_string(),
-            ),
+            payload_hash: Some(canonical_payload_hash(None)),
             nonce: Some(nonce.to_string()),
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
@@ -222,10 +228,7 @@ impl BrokerRequestEnvelope {
             request_id: Some(request_id.to_string()),
             session_id: Some(session_id.to_string()),
             operation: Some(BrokerOperation::Shutdown),
-            payload_hash: Some(
-                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                    .to_string(),
-            ),
+            payload_hash: Some(canonical_payload_hash(None)),
             nonce: Some(nonce.to_string()),
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
@@ -248,10 +251,7 @@ impl BrokerRequestEnvelope {
             request_id: Some(request_id.to_string()),
             session_id: Some(session_id.to_string()),
             operation: Some(BrokerOperation::CommandEnvelope),
-            payload_hash: Some(
-                "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                    .to_string(),
-            ),
+            payload_hash: Some(canonical_payload_hash(None)),
             nonce: Some(nonce.to_string()),
             issued_at: Some(issued_at.to_string()),
             metadata: vec![],
@@ -262,6 +262,10 @@ impl BrokerRequestEnvelope {
 
     pub fn current_issued_at() -> String {
         epoch_seconds_to_rfc3339(current_epoch_seconds())
+    }
+
+    pub fn refresh_payload_hash(&mut self) {
+        self.payload_hash = Some(canonical_payload_hash(self.payload.as_ref()));
     }
 }
 
@@ -343,7 +347,7 @@ impl BrokerResponse {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Broker {
     session_id: String,
-    seen_nonces: HashSet<String>,
+    seen_nonces: HashMap<String, i64>,
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     shutdown_requested: bool,
@@ -355,7 +359,7 @@ impl Broker {
     pub fn new(session_id: &str) -> Self {
         Self {
             session_id: session_id.to_string(),
-            seen_nonces: HashSet::new(),
+            seen_nonces: HashMap::new(),
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
             shutdown_requested: false,
@@ -406,6 +410,7 @@ impl Broker {
 
         if envelope.request_id.as_deref().unwrap_or("").is_empty()
             || envelope.operation.is_none()
+            || envelope.payload_hash.as_deref().unwrap_or("").is_empty()
             || envelope.issued_at.as_deref().unwrap_or("").is_empty()
             || envelope.nonce.as_deref().unwrap_or("").is_empty()
             || !envelope.metadata_present
@@ -419,7 +424,8 @@ impl Broker {
             );
         }
 
-        if !is_tagged_sha256(envelope.payload_hash.as_deref().unwrap_or("")) {
+        let payload_hash = envelope.payload_hash.clone().unwrap_or_default();
+        if !is_tagged_sha256(&payload_hash) {
             return self.reject(
                 &request_id,
                 &operation,
@@ -429,52 +435,68 @@ impl Broker {
             );
         }
 
+        let expected_payload_hash = canonical_payload_hash(envelope.payload.as_ref());
+        if payload_hash != expected_payload_hash {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "broker_payload_hash_mismatch",
+                "payload_hash must match the canonical request payload",
+                true,
+                &payload_hash,
+            );
+        }
+
         if !issued_at_is_fresh(
             envelope.issued_at.as_deref().unwrap_or(""),
             self.current_epoch_seconds(),
         ) {
-            return self.reject(
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_issued_at_invalid",
                 "issued_at must be RFC3339 and within the broker freshness window",
                 true,
+                &payload_hash,
             );
         }
 
         if self.state_store.persistence_required() && !self.state_store.persistence_ready() {
             if envelope.operation == Some(BrokerOperation::Health) {
-                return self.suspend_health(&request_id);
+                return self.suspend_health(&request_id, &payload_hash);
             }
-            return self.reject(
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_persistence_unavailable",
                 self.state_store.unavailable_message(),
                 true,
+                &payload_hash,
             );
         }
 
         if envelope.operation != Some(BrokerOperation::Health)
             && envelope.session_id.as_deref() != Some(self.session_id.as_str())
         {
-            return self.reject(
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_stale_session",
                 "broker session is missing or stale",
                 true,
+                &payload_hash,
             );
         }
 
         let nonce = envelope.nonce.clone().unwrap_or_default();
-        if self.seen_nonces.contains(&nonce) {
-            return self.reject(
+        if self.seen_nonces.contains_key(&nonce) {
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_replay_detected",
                 "broker request nonce was replayed",
                 true,
+                &payload_hash,
             );
         }
 
@@ -487,45 +509,49 @@ impl Broker {
                     &error.message(),
                 );
             }
-            return self.reject(
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_authority_metadata_rejected",
                 "broker metadata attempted to carry authority",
                 true,
+                &payload_hash,
             );
         }
 
         if let Err(error) = self.record_nonce(&nonce) {
-            return self.reject(
+            return self.reject_with_payload_hash(
                 &request_id,
                 &operation,
                 "broker_persistence_unavailable",
                 &error.message(),
                 true,
+                &payload_hash,
             );
         }
 
         match envelope.operation.unwrap() {
-            BrokerOperation::Health => self.accept_health(&request_id),
-            BrokerOperation::Shutdown => self.accept_shutdown(&request_id),
+            BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
+            BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
             BrokerOperation::CommandEnvelope => self.suspend_command(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
             ),
             BrokerOperation::AuthorityEvaluate => {
                 let payload = envelope.payload.as_ref().unwrap_or(&Value::Null);
                 if payload.get("state").is_some() {
-                    self.reject(
+                    self.reject_with_payload_hash(
                         &request_id,
                         BrokerOperation::AuthorityEvaluate.as_str(),
                         "broker_authority_state_rejected",
                         "production authority evaluation does not accept caller-supplied state",
                         true,
+                        &payload_hash,
                     )
                 } else {
                     let body = evaluate_broker_authority(&self.authority_registry, payload);
-                    self.accept_authority_decision(&request_id, body)
+                    self.accept_authority_decision(&request_id, body, &payload_hash)
                 }
             }
             BrokerOperation::AuthorityFixtureEvaluate => self.accept_body_with_evidence(
@@ -533,26 +559,31 @@ impl Broker {
                 BrokerOperation::AuthorityFixtureEvaluate,
                 evaluate_authority(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 EVIDENCE_SOURCE_INTERNAL_STATE,
+                &payload_hash,
             ),
             BrokerOperation::ApprovalEdit => self.accept_body(
                 &request_id,
                 BrokerOperation::ApprovalEdit,
                 edit_approval(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+                &payload_hash,
             ),
             BrokerOperation::ContentProjection => self.accept_body(
                 &request_id,
                 BrokerOperation::ContentProjection,
                 project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+                &payload_hash,
             ),
             BrokerOperation::AuditVerify => self.accept_body(
                 &request_id,
                 BrokerOperation::AuditVerify,
                 verify_audit_chain(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+                &payload_hash,
             ),
             BrokerOperation::NormalizePayload => self.accept_body(
                 &request_id,
                 BrokerOperation::NormalizePayload,
                 normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
+                &payload_hash,
             ),
         }
     }
@@ -587,13 +618,14 @@ impl Broker {
             .unwrap_or_else(current_epoch_seconds)
     }
 
-    fn accept_health(&mut self, request_id: &str) -> BrokerResponse {
+    fn accept_health(&mut self, request_id: &str, payload_hash: &str) -> BrokerResponse {
         let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::Health.as_str(),
             "accepted",
             "health status returned",
             EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -618,13 +650,14 @@ impl Broker {
         }
     }
 
-    fn suspend_health(&mut self, request_id: &str) -> BrokerResponse {
+    fn suspend_health(&mut self, request_id: &str, payload_hash: &str) -> BrokerResponse {
         let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::Health.as_str(),
             "suspended",
             "broker_persistence_unavailable",
             EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -670,7 +703,7 @@ impl Broker {
         }
     }
 
-    fn accept_shutdown(&mut self, request_id: &str) -> BrokerResponse {
+    fn accept_shutdown(&mut self, request_id: &str, payload_hash: &str) -> BrokerResponse {
         self.shutdown_requested = true;
         let audit_event = match self.append_audit(
             request_id,
@@ -678,6 +711,7 @@ impl Broker {
             "accepted",
             "shutdown requested",
             EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -702,13 +736,19 @@ impl Broker {
         }
     }
 
-    fn suspend_command(&mut self, request_id: &str, payload: &Value) -> BrokerResponse {
+    fn suspend_command(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
         let audit_event = match self.append_audit(
             request_id,
             BrokerOperation::CommandEnvelope.as_str(),
             "suspended",
             "external command dispatch disabled in broker skeleton",
             EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -737,7 +777,12 @@ impl Broker {
         }
     }
 
-    fn accept_authority_decision(&mut self, request_id: &str, body: Value) -> BrokerResponse {
+    fn accept_authority_decision(
+        &mut self,
+        request_id: &str,
+        body: Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
         let decision = body
             .get("decision")
             .and_then(Value::as_str)
@@ -748,6 +793,7 @@ impl Broker {
             decision,
             "broker-owned authority decision evaluated",
             EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -777,8 +823,15 @@ impl Broker {
         request_id: &str,
         operation: BrokerOperation,
         body: Value,
+        payload_hash: &str,
     ) -> BrokerResponse {
-        self.accept_body_with_evidence(request_id, operation, body, EVIDENCE_SOURCE_LIVE_RUNTIME)
+        self.accept_body_with_evidence(
+            request_id,
+            operation,
+            body,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        )
     }
 
     fn accept_body_with_evidence(
@@ -787,6 +840,7 @@ impl Broker {
         operation: BrokerOperation,
         body: Value,
         evidence_source: &str,
+        payload_hash: &str,
     ) -> BrokerResponse {
         let operation_name = operation.as_str();
         let audit_event = match self.append_audit(
@@ -795,6 +849,7 @@ impl Broker {
             "accepted",
             "broker authority operation evaluated",
             evidence_source,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -827,12 +882,32 @@ impl Broker {
         message: &str,
         recoverable: bool,
     ) -> BrokerResponse {
+        self.reject_with_payload_hash(
+            request_id,
+            operation,
+            code,
+            message,
+            recoverable,
+            ZERO_PAYLOAD_HASH,
+        )
+    }
+
+    fn reject_with_payload_hash(
+        &mut self,
+        request_id: &str,
+        operation: &str,
+        code: &str,
+        message: &str,
+        recoverable: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
         let audit_event = match self.append_audit(
             request_id,
             operation,
             "rejected",
             code,
             EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
         ) {
             Ok(event) => event,
             Err(error) => {
@@ -864,10 +939,16 @@ impl Broker {
         decision: &str,
         reason: &str,
         evidence_source: &str,
+        payload_hash: &str,
     ) -> Result<BrokerAuditEvent, BrokerStoreError> {
-        let event =
-            self.audit_log
-                .build_next(request_id, operation, decision, reason, evidence_source);
+        let event = self.audit_log.build_next(
+            request_id,
+            operation,
+            decision,
+            reason,
+            evidence_source,
+            payload_hash,
+        );
         self.state_store.append_audit_event(&event)?;
         self.audit_log
             .push_verified(event.clone())
@@ -876,8 +957,12 @@ impl Broker {
     }
 
     fn record_nonce(&mut self, nonce: &str) -> Result<(), BrokerStoreError> {
-        self.state_store.append_replay_nonce(nonce)?;
-        self.seen_nonces.insert(nonce.to_string());
+        let recorded_at = current_epoch_seconds();
+        if let Some(nonces) = self.state_store.append_replay_nonce(nonce, recorded_at)? {
+            self.seen_nonces = nonces;
+        } else {
+            self.seen_nonces.insert(nonce.to_string(), recorded_at);
+        }
         Ok(())
     }
 
@@ -1017,6 +1102,12 @@ fn is_tagged_sha256(value: &str) -> bool {
             .iter()
             .skip(7)
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn canonical_payload_hash(payload: Option<&Value>) -> String {
+    let encoded =
+        serde_json::to_vec(payload.unwrap_or(&Value::Null)).unwrap_or_else(|_| b"null".to_vec());
+    sha256_tagged(&encoded)
 }
 
 fn issued_at_is_fresh(value: &str, current_epoch_seconds: i64) -> bool {
@@ -1308,6 +1399,7 @@ mod tests {
                 }
             }
         }));
+        envelope.refresh_payload_hash();
         envelope
     }
 
@@ -1319,6 +1411,7 @@ mod tests {
         let mut envelope = BrokerRequestEnvelope::command_envelope(request_id, "session-1", nonce);
         envelope.operation = Some(BrokerOperation::AuthorityEvaluate);
         envelope.payload = Some(serde_json::json!({"action": action}));
+        envelope.refresh_payload_hash();
         envelope
     }
 
@@ -1432,6 +1525,29 @@ mod tests {
     }
 
     #[test]
+    fn persistent_store_rejects_truncated_audit_anchor() {
+        let store_dir = temp_store_dir("persistent-audit-anchor-truncate");
+        {
+            let mut broker = persistent_test_broker(&store_dir);
+            let first = broker.handle(BrokerRequestEnvelope::health("request-1", "nonce-1"));
+            let second = broker.handle(BrokerRequestEnvelope::health("request-2", "nonce-2"));
+            assert_eq!(first.status, BrokerStatus::Accepted);
+            assert_eq!(second.status, BrokerStatus::Accepted);
+        }
+        let audit_path = store_dir.join("audit.jsonl");
+        let first_line = fs::read_to_string(&audit_path)
+            .unwrap()
+            .lines()
+            .next()
+            .unwrap()
+            .to_string();
+        fs::write(&audit_path, format!("{first_line}\n")).unwrap();
+
+        let result = Broker::new_persistent("session-1", &store_dir);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn persistent_store_rejects_malformed_replay_state() {
         let store_dir = temp_store_dir("persistent-replay-malformed");
         {
@@ -1460,6 +1576,10 @@ mod tests {
         assert!(!health.persistence_ready);
         assert_eq!(broker.audit_events().len(), 1);
         assert_eq!(broker.audit_events()[0].decision, "accepted");
+        assert_eq!(
+            broker.audit_events()[0].payload_hash,
+            canonical_payload_hash(None)
+        );
     }
 
     #[test]
@@ -1507,7 +1627,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-1",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-1",
                 "issued_at": "2026-06-01T00:00:00Z",
                 "metadata": {"client": "desktop_flutter"}
@@ -1520,6 +1640,28 @@ mod tests {
         assert!(encoded.contains(r#""authority_cutover_status":"not_active""#));
         assert!(encoded.contains(r#""session_persistence":"in_memory_session_only""#));
         assert!(encoded.contains(r#""shutdown_requested":false"#));
+    }
+
+    #[test]
+    fn payload_hash_mismatch_is_rejected_and_audited() {
+        let mut broker = test_broker();
+        let response = broker.handle_json(
+            r#"{
+                "request_id": "json-request-1",
+                "operation": "normalize_payload",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+                "nonce": "json-nonce-1",
+                "issued_at": "2026-06-01T00:00:00Z",
+                "metadata": {"client": "desktop_flutter"},
+                "payload": {"client_payload": "desktop_flutter_authority_probe"}
+            }"#,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "broker_payload_hash_mismatch");
+        assert_eq!(
+            broker.audit_events()[0].payload_hash,
+            "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        );
     }
 
     #[test]
@@ -1541,7 +1683,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-1",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-1",
                 "issued_at": "2026-06-01T00:00:00Z"
             }"#,
@@ -1560,7 +1702,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-1",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-1",
                 "issued_at": "2026-06-01T00:00:00Z",
                 "metadata": {"trustLevel": "root"}
@@ -1581,7 +1723,7 @@ mod tests {
             session_id: None,
             operation: Some(BrokerOperation::Health),
             payload_hash: Some(
-                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
                     .to_string(),
             ),
             nonce: Some("nonce-1".to_string()),
@@ -1692,7 +1834,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-1",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-1",
                 "issued_at": "2026-06-01T00:00:00Z",
                 "metadata": {"ｔｒｕｓｔ＿ｌｅｖｅｌ": "ｒｏｏｔ"}
@@ -1740,7 +1882,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-1",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-1",
                 "issued_at": "2026-06-01T00:00:00Z",
                 "metadata": {"safe_label": "ｒｏｏｔ"}
@@ -1756,7 +1898,7 @@ mod tests {
             r#"{
                 "request_id": "json-request-2",
                 "operation": "health",
-                "payload_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
                 "nonce": "json-nonce-2",
                 "issued_at": "2026-06-01T00:00:00Z",
                 "metadata": {"safe_label": {"authority": "admin"}}
@@ -1811,6 +1953,7 @@ mod tests {
             },
             "action": broker_command_action()
         }));
+        request.refresh_payload_hash();
         let response = broker.handle(request);
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(
@@ -1917,6 +2060,7 @@ mod tests {
                 "recovery_action": {"recovery_id": "recover-command-dispatch"}
             }
         }));
+        request.refresh_payload_hash();
         let response = broker.handle(request);
         assert_eq!(response.status, BrokerStatus::Accepted);
         assert_eq!(response.operation, "authority_fixture_evaluate");
