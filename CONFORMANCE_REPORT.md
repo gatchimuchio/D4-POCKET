@@ -10,7 +10,7 @@
 - item: conformance checks
   classification: required_for_v1
   status: passed
-  evidence: `conformance skeleton passed: 138 checks`
+  evidence: `conformance skeleton passed: 139 checks`
 
 - item: conformance tautology fix
   classification: required_for_v1

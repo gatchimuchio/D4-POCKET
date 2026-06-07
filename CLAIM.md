@@ -6,7 +6,15 @@ GUI-Shell is not yet a completed product release.
 
 Current claim: PC-first AI Runtime / Agent Operation Shell with Phase B owner-use completion.
 
+A GitHub Release tagged as a public review snapshot is not a completed product release. In this repository, completed product release readiness remains gated by `release_blockers.registry.json` and explicit owner GO.
+
+GitHub Release として固定する public review snapshot は、完成製品リリースではありません。本リポジトリにおける完成製品リリース可否は、`release_blockers.registry.json` と明示的な owner GO によって別途判定されます。
+
 Repository definition update: GUI-Shell is now also documented as an LLM-readable application responsibility substrate. This means LLM development / integration agents are intended to read GUI Shell contracts and use them as first-class implementation and integration surfaces. LLMs remain non-authoritative; human operators retain final approval, recovery, responsibility, and release-claim authority.
+
+Process note: this project was built by a non-programmer / non-software developer through LLM direction in less than one month of part-time work. That construction is a bounded demonstration of the LLM-readable responsibility-substrate design goal, not proof of release readiness, broad interoperability, or external endorsement.
+
+プロセス注記: 本プロジェクトは、プログラマーではない個人が、1か月未満の兼業作業で LLM に指示しながら構築したものです。構築できたことは LLM-readable responsibility substrate という設計目標の限定的な実証であり、リリース準備完了、広範な相互運用性、または外部 endorsement の証明ではありません。
 
 The canonical completion roadmap for aligning Windows-first product responsibility and LLM-readable substrate demonstration is `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
 
@@ -16,13 +24,17 @@ GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a dev
 
 GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete without validation evidence from a macOS host.
 
-The LLM-readable substrate definition, bounded reference extension conformance, and one bounded cross-agent reproduction report demonstrate controlled LLM-readable extension behavior for a non-authoritative task. They do not prove public standard adoption, broad third-party interoperability, installed-product behavior, or ecosystem readiness. They do not close any current Windows-first product release blocker.
+The LLM-readable substrate definition, bounded reference extension conformance, and one bounded cross-agent reproduction report provide a bounded demonstration of controlled LLM-readable extension behavior for a non-authoritative task. They do not prove public standard adoption, broad third-party interoperability, installed-product behavior, or ecosystem readiness. They do not close any current Windows-first product release blocker.
+
+The public Windows proof pack contains redacted review copies derived from measured Windows installed-path evidence. These copies are not canonical release evidence and do not close completed product release blockers in this public repository.
+
+公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copies が含まれます。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
 
 ## Current Completed Areas
 
 - item: schema and conformance skeleton
   classification: required_for_v1
-  status: current development validation passes with 138 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, release-facing blocker/doc synchronization, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
+  status: current development validation passes with 139 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, release-facing blocker/doc synchronization, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
 
 - item: bounded cross-agent LLM-readable extension reproduction
   classification: required_for_v1

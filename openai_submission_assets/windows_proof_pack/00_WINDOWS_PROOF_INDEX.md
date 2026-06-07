@@ -2,6 +2,10 @@
 
 This index is factual raw material only. It is not an OpenAI application draft, pitch text, essay, marketing story, or final submission answer.
 
+This public proof pack contains redacted review copies derived from measured Windows installed-path evidence. These copies are not canonical release evidence and do not close completed product release blockers in this public repository.
+
+この public proof pack には、実測 Windows installed-path evidence に由来する redacted review copies が含まれます。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
+
 ## Repository State
 - repo: C:\Users\mzcum\Documents\GUI-Shell
 - branch: main

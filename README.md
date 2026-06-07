@@ -14,7 +14,7 @@
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
   <img alt="Schemas" src="https://img.shields.io/badge/schemas-26%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-138%20checks-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-139%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -41,6 +41,10 @@
 > Agents are **first-class implementation and integration consumers** of its contracts. They are **never an authority source**: the human owner keeps final approval, recovery, and release authority.
 >
 > GUI Shell は二重の存在です。①汎用ランタイム操作シェルの制御プレーン、②**LLM が読む「アプリケーション責任基盤」**。LLM 開発/統合エージェントが契約を読み、その上に実装・接続するための、機械可読な責任構造です。エージェントは契約の第一級コンシューマですが、**決して権限源にはなりません**。最終承認・復旧・リリース権限は人間のオーナーが保持します。
+
+> **Process note.** This project was built by a non-programmer / non-software developer through LLM direction in less than one month of part-time work. The construction is a bounded demonstration of the design goal: an LLM-readable responsibility substrate can guide implementation without making the LLM an authority source.
+>
+> **プロセス注記。** 本プロジェクトは、プログラマーではない個人が、1か月未満の兼業作業で LLM に指示しながら構築しました。構築できたことは、その設計目標の限定的な実証です。つまり、LLM が権限源にならず、LLM が読む責任基盤によって実装を導けることを示しています。
 
 <br>
 
@@ -85,7 +89,7 @@ Non-negotiable rules for agents — 譲れない規則:
 > A completion claim is not evidence. Schema presence, mock success, or unit-test success alone never proves a production path is complete.
 > 完了の主張は証拠ではない。スキーマの存在・モック成功・単体テスト成功だけでは本番経路の完成を証明しない。
 
-A bounded reference extension ([`examples/contracts/llm_bounded_extension.valid.json`](examples/contracts/llm_bounded_extension.valid.json)) and a cross-agent reproduction report ([`docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md`](docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md)) demonstrate this in practice — two independent agents produced the same bounded, non-authoritative diff from the same baseline.
+A bounded reference extension ([`examples/contracts/llm_bounded_extension.valid.json`](examples/contracts/llm_bounded_extension.valid.json)) and a cross-agent reproduction report ([`docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md`](docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md)) provide a bounded demonstration in practice — two independent agents produced the same bounded, non-authoritative diff from the same baseline.
 
 <br>
 
@@ -216,7 +220,7 @@ Expected successful output / 期待される出力:
 
 ```text
 schema check passed: 26 schemas, 26 examples, 28 negative fixtures
-conformance skeleton passed: 138 checks
+conformance skeleton passed: 139 checks
 ```
 
 ➡️ See **[QUICKSTART.md](QUICKSTART.md)**.
@@ -309,6 +313,9 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 This repository is a **v1.0 product-completion effort, not yet a claimed product release.**
 本リポジトリは v1.0 完成に向けた作業中であり、まだ製品リリースを宣言していません。
 
+A GitHub Release tagged as a public review snapshot is not a completed product release. In this repository, completed product release readiness remains gated by `release_blockers.registry.json` and explicit owner GO.
+GitHub Release として固定する public review snapshot は、完成製品リリースではありません。本リポジトリにおける完成製品リリース可否は、`release_blockers.registry.json` と明示的な owner GO によって別途判定されます。
+
 It intentionally prioritizes / 意図的に以下の順で優先します:
 
 ```
@@ -327,11 +334,13 @@ It intentionally prioritizes / 意図的に以下の順で優先します:
 What is true today, stated without inflation — 誇張なしの現状:
 
 - ✅ **Phase A/B owner-use complete.** The owner can run the desktop shell for daily local operation with status, problems, evidence, recovery, trust, runtime, and authority surfaces visible.
-- ✅ **Schema + conformance pass** as a development slice (26 schemas, 138 checks).
+- ✅ **Schema + conformance pass** as a development slice (26 schemas, 139 checks).
 - ✅ **LLM-readable substrate is definition-locked**, with one bounded reference extension and one cross-agent reproduction report.
 - ⛔ **v1.0 product release is NOT yet claimed.** Active `release_blocker` items are canonicalized in `release_blockers.registry.json`: Windows installed-path provenance, first-run, Setup Doctor, broker evidence, audit anchor external tamper-evidence proof, and explicit owner GO. Rust Broker production authority cutover wording is represented through the Windows installed-path broker/runtime evidence blocker, not as an independent registry blocker.
+- 🧪 **Public proof pack boundary.** The public Windows proof pack contains redacted review copies derived from measured Windows installed-path evidence. These copies are not canonical release evidence and do not close completed product release blockers in this public repository.
+- 🧪 **公開 proof pack 境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copies が含まれます。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
 - ⚠️ **Windows-first.** Linux validation is a development slice, not final product proof. **macOS is unverified** and must not be advertised as supported.
-- ⚠️ The substrate work demonstrates controlled LLM-readable extension behavior for a non-authoritative task. It does **not** prove public-standard adoption, broad third-party interoperability, or installed-product behavior.
+- ⚠️ The substrate work provides a bounded demonstration of controlled LLM-readable extension behavior for a non-authoritative task. It does **not** prove public-standard adoption, broad third-party interoperability, or installed-product behavior.
 
 Every unfinished item in repository docs is classified `release_blocker` / `post_v1_scope` / `known_limitation`. See [CLAIM.md](CLAIM.md) and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 

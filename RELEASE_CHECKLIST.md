@@ -2,7 +2,15 @@
 
 In this repository, "release" means completed product release. Skeleton, preview, alpha, beta, scaffold, and contract-preview states are not release states.
 
+A GitHub Release tagged as a public review snapshot is not a completed product release. In this repository, completed product release readiness remains gated by `release_blockers.registry.json` and explicit owner GO.
+
+GitHub Release として固定する public review snapshot は、完成製品リリースではありません。本リポジトリにおける完成製品リリース可否は、`release_blockers.registry.json` と明示的な owner GO によって別途判定されます。
+
 No completed product release may be claimed if any Windows-first v1.0 `release_blocker` remains. GUI-Shell v1.0 is Windows-first: Windows is primary, Linux is the validated development/verification slice, and macOS is an unverified planned portability target.
+
+Public Windows proof pack assets are redacted review copies derived from measured Windows installed-path evidence. They are not canonical release evidence and do not close completed product release blockers in this public repository.
+
+公開 Windows proof pack assets は、実測 Windows installed-path evidence に由来する redacted review copies です。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
 
 GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete until validated on a macOS host.
 

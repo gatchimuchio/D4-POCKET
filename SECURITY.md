@@ -32,4 +32,6 @@ The following surfaces require explicit capability, permission, approval, audit,
 
 Do not place secrets, tokens, private keys, raw approval payloads, or full hidden content in issue text, logs, screenshots, or audit examples.
 
+Preferred route: use GitHub Security Advisories for this repository for private vulnerability reports. If GitHub does not expose a private advisory path and a public issue is necessary, include only a redacted reproduction and do not attach private evidence, secrets, tokens, raw approval payloads, or full hidden content.
+
 Report the affected boundary, expected invariant, observed behavior, reproduction steps with redacted data, and validation commands run.

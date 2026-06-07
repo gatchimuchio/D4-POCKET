@@ -70,7 +70,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "3760ed4d077e6eff7719d16c5166c03c0aa4874fc6d6803dcdd1d2095c7414b6"
+      "sha256": "b35690315b7116c7ae6dd87967e53efa09191d5b85bb433fb4aba64c20b680f5"
     },
     {
       "path": "AUDIT.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "56531acbcb7ceee1e01a27e447528d30c3bd8787abae01f0094783eaf78a51ac"
+      "sha256": "fbf22880cacdcf5d957b6c5be7543581557f10d9f570663e90adec52dff63d3c"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -98,7 +98,7 @@
     },
     {
       "path": "CONFORMANCE_REPORT.md",
-      "sha256": "dbec4d2c0147a614f9432ff978216e56481ff78da4f12928c095e5128bafecba"
+      "sha256": "502458877af564234564a122be5006037fd0bd9025b9557a29656b757702eb34"
     },
     {
       "path": "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
@@ -118,15 +118,15 @@
     },
     {
       "path": "QUICKSTART.md",
-      "sha256": "9b660ee40f1b0e1080f722a3f2658c52c40c1e7d14fb5158295ab9cc47ced4ba"
+      "sha256": "62a3e768b4a308b6b1b1903a965f7b5de78cce49b355f031e19dba1f1bca383a"
     },
     {
       "path": "README.md",
-      "sha256": "6aaa626810f645db9f7fa2ec969ff4efde7787ce0c79ffffd59a490ba2754296"
+      "sha256": "cb536d57184429abae06495881159221437df14e03407acc21db484805dd1015"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "e6c99b291e09063dd77ff018338f902d188343a8cb642adf40944fa31e44c851"
+      "sha256": "cdeb4ac82059948dbc75700dad1a7e6ebb207c5a1ff1c92f23f85acd766219e6"
     },
     {
       "path": "ROADMAP.md",
@@ -134,7 +134,7 @@
     },
     {
       "path": "SECURITY.md",
-      "sha256": "fac8299c8ca01ccec59c37e50918f07bcc9ef289a904ecfb3d285006e8dfa0a4"
+      "sha256": "3b8fd8323c75f0fd399fcebbff31b5314c207cc2928681e08d9fbcc68982f5c1"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -494,7 +494,7 @@
     },
     {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "abfc28519bae2a2315b0dfd978346850467f88512f412d6be2e7b121b983afa0"
+      "sha256": "fa5443e2caaa528139b980fb3ad40bdee0430886a4620233d6e836c0169dd545"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
@@ -962,23 +962,23 @@
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/00_WINDOWS_PROOF_INDEX.md",
-      "sha256": "a79105c028e36a6f6960062d42fb0fe38817d5ea0ff4d032678f7c61ab9d82dc"
+      "sha256": "13d2f8743c314b51bc5f2b253940fd4f5cdca9bd42ae164ec454a256163aee5c"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/EVIDENCE_HASHES.txt",
-      "sha256": "f6f9774b07ceec79c7b57d9ee0ae5899f883e041f03d27fe6fadcb77d3900b19"
+      "sha256": "4d6a34f0538462a022be894e854bfef0f390b9594251e83de157d844f937ce8e"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/audit_anchor_external_tamper_evidence.json",
-      "sha256": "40d29b8a2cb81d27f7ed55a44728493472668ce6c8b4055ab8b42f00600b6e27"
+      "sha256": "21b0a4ebe9d11cec0d89a9604a7b4b2bbc3582e63bdb908a6b5953d4f48151fb"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/release_runtime_assertions.json",
-      "sha256": "78cf9aa06f8f79fbf41bdef42693e45cce0f7359db4d2623accc476e26a218a7"
+      "sha256": "587659d05ddc3d416f85f744b4850481dfdbc26ab0023d9b2537670cb47bb511"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_context.json",
-      "sha256": "0e68629ee683cd1024c9003bfbd0cc74378ad1224e275a0fd345f7c8789125d3"
+      "sha256": "6cf76c0044263bbbf3f452920b94dfd3418ae75694da3c0d02638b627c223039"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_installed.json",
@@ -990,35 +990,35 @@
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/visible_surfaces_collected.json",
-      "sha256": "b46ca54b714ebccb8a1d5661e4ca5625eb89dcbb47f6b62adf6aaab630bd1dd7"
+      "sha256": "639078d5f16d7bd25ecb50bc3f57c4ee38049076f7163c04579b7bac23bf2e6e"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_broker_smoke.json",
-      "sha256": "cdbb1fd6bc1b382802067c31cfe09819e839c13d8ea4a226e5eb8ce0c99ae63c"
+      "sha256": "c4950fa9fa16d57fd423798a287931e762b36a9e84b37c43a20040c4512d8ae6"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_installed_smoke.json",
-      "sha256": "6ce96ca2461662e21f374cc55eb80ea4da43f8e108ba19cc18d12189bbfea817"
+      "sha256": "dd34bb8a50481350255dae4b5ea401c3df7b4cb900be2ee464a6901378b284d5"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/hashes/artifact_hashes.txt",
-      "sha256": "64bcd456552eb23bc607da8134fe46f857664082f3db2e2bfc9dd07afeac18d0"
+      "sha256": "25faa52e2cb5a85a4c8a418bb7c422834fb3a4dcf163175873892bee96c4a93d"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/logs/build_validation.log",
-      "sha256": "6e6b41ef549ecf168dbc18cbe4630518d36063fee4d49b71103551d17c71467b"
+      "sha256": "cbc83c86483c1fbb817659e37682259ead97a0a2e44dbf328639fa33453e871a"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/logs/validation.log",
-      "sha256": "bd06b24d39130ca1040d1d70d2cb37ca85a2d23ff068a052541314f51d00b41c"
+      "sha256": "ec2b77d928a46df007f1953aed4fe1138074a0a2409ff785717468ca4af44a0d"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/logs/windows_environment.log",
-      "sha256": "0caf37498441e6005bc53f897ef9252cecf15a284a999d5707de683d54a35222"
+      "sha256": "90047fe22a5b3eaa6b32bfaf9c2b65ecc6ef3454ff18c3cf31095a3bbdcd59fe"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/notes/repo_state.txt",
-      "sha256": "d27b0af5008d038f09a22172f1b959906cd5e907dd2f8500cdd1aae4f5727d45"
+      "sha256": "03787c755b21b764d73671741de78ebe5238ec1ea36564a8adfee10cb42e3742"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/screenshots/01_main_window.png",

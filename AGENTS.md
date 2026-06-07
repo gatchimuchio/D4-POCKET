@@ -12,7 +12,7 @@ The common base discipline in this section applies to all work in this repositor
 
 Rule precedence:
 
-1. Explicit owner instruction for the current task
+1. Explicit owner/user instruction for the current task, unless it weakens safety, authority, evidence, release-gate, owner GO, `release_ready`, audit, recovery, or content-exposure boundaries
 2. Common Base Discipline in this `AGENTS.md`
 3. Repository Extension rules in this `AGENTS.md`
 4. Active implementation instruction / roadmap / phase document
