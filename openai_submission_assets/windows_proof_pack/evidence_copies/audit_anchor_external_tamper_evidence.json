@@ -1,0 +1,76 @@
+{
+    "status":  "passed",
+    "collected_at":  "2026-06-07T00:58:25.5466322Z",
+    "installed_root":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607",
+    "audit_dir":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store",
+    "installed_path_verified":  true,
+    "key_anchor_log_same_user_rewrite_mitigated":  true,
+    "windows_acl_verified":  true,
+    "dpapi_verified":  true,
+    "external_anchor_verified":  false,
+    "signed_evidence_verified":  false,
+    "administrator_root_resistance_claimed":  false,
+    "checked_paths":  [
+                          "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607",
+                          "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store",
+                          "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit_anchor.key",
+                          "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit_anchor.json",
+                          "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit.jsonl"
+                      ],
+    "acl_report":  [
+                       {
+                           "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607",
+                           "owner":  "LAPTOP-89BTKF4N\\mzcum",
+                           "protected":  false,
+                           "broad_write_rules":  [
+
+                                                 ]
+                       },
+                       {
+                           "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store",
+                           "owner":  "LAPTOP-89BTKF4N\\mzcum",
+                           "protected":  false,
+                           "broad_write_rules":  [
+
+                                                 ]
+                       },
+                       {
+                           "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit_anchor.key",
+                           "owner":  "LAPTOP-89BTKF4N\\mzcum",
+                           "protected":  false,
+                           "broad_write_rules":  [
+
+                                                 ]
+                       },
+                       {
+                           "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit_anchor.json",
+                           "owner":  "LAPTOP-89BTKF4N\\mzcum",
+                           "protected":  false,
+                           "broad_write_rules":  [
+
+                                                 ]
+                       },
+                       {
+                           "path":  "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store\\audit.jsonl",
+                           "owner":  "LAPTOP-89BTKF4N\\mzcum",
+                           "protected":  false,
+                           "broad_write_rules":  [
+
+                                                 ]
+                       }
+                   ],
+    "external_anchor_sha256":  null,
+    "signed_evidence_sha256":  null,
+    "errors":  [
+
+               ],
+    "evidence_source":  {
+                            "source_kind":  "windows_acl_dpapi_probe",
+                            "evidence_class":  "LIVE_RUNTIME",
+                            "synthetic":  false,
+                            "command":  "powershell -ExecutionPolicy Bypass -File installer\\windows\\collect_audit_anchor_proof.ps1 -InstalledRoot \"C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\"",
+                            "path":  "release_evidence\\audit_anchor_external_tamper_evidence.json",
+                            "sha256":  "sha256:4302437a6f262421d5e2c32ddb93921a05494752d9b71ed7ec7f8cc101adc81b",
+                            "sha256_scope":  "probe_material_without_self_reference"
+                        }
+}

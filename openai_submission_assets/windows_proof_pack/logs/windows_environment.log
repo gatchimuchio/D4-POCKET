@@ -1,0 +1,207 @@
+# Windows environment evidence
+captured_at=2026-06-07T01:19:19.2485472Z
+
+===== systeminfo =====
+started_at=2026-06-07T01:19:19.2733739Z
+exit=0
+
+Host Name:                     LAPTOP-89BTKF4N
+OS Name:                       Microsoft Windows 11 Home
+OS Version:                    10.0.26200 N/A Build 26200
+OS Manufacturer:               Microsoft Corporation
+OS Configuration:              Standalone Workstation
+OS Build Type:                 Multiprocessor Free
+Registered Owner:              mzcum@outlook.jp
+Registered Organization:       HP
+Product ID:                    00325-81455-74833-AAOEM
+Original Install Date:         2025/01/19, 8:00:18
+System Boot Time:              2026/06/06, 12:19:43
+System Manufacturer:           HP
+System Model:                  HP Laptop 14s-dk0xxx
+System Type:                   x64-based PC
+Processor(s):                  1 Processor(s) Installed.
+                               [01]: AMD64 Family 23 Model 24 Stepping 1 AuthenticAMD ~2100 Mhz
+BIOS Version:                  AMI F.42, 2019/07/03
+Windows Directory:             C:\WINDOWS
+System Directory:              C:\WINDOWS\system32
+Boot Device:                   \Device\HarddiskVolume1
+System Locale:                 ja;Japanese
+Input Locale:                  ja;Japanese
+Time Zone:                     (UTC+09:00) Osaka, Sapporo, Tokyo
+Total Physical Memory:         6,058 MB
+Available Physical Memory:     1,019 MB
+Virtual Memory: Max Size:      15,654 MB
+Virtual Memory: Available:     2,849 MB
+Virtual Memory: In Use:        12,805 MB
+Page File Location(s):         C:\pagefile.sys
+Domain:                        WORKGROUP
+Logon Server:                  \\LAPTOP-89BTKF4N
+Hotfix(s):                     4 Hotfix(s) Installed.
+                               [01]: KB5092427
+                               [02]: KB5054156
+                               [03]: KB5089573
+                               [04]: KB5092734
+Network Card(s):               4 NIC(s) Installed.
+                               [01]: TunnelBear Adapter V9
+                                     Connection Name: イーサネット 2
+                                     Status:          Media disconnected
+                               [02]: Realtek PCIe GbE Family Controller
+                                     Connection Name: イーサネット
+                                     DHCP Enabled:    Yes
+                                     DHCP Server:     192.168.179.1
+                                     IP address(es)
+                                     [01]: 192.168.179.50
+                                     [02]: fe80::ab2d:5cba:3111:dcff
+                                     [03]: 240b:c010:663:a748:19f:2433:8dd6:fb5b
+                                     [04]: 240b:c010:663:a748:9955:78d9:f78e:a912
+                               [03]: Bluetooth Device (Personal Area Network)
+                                     Connection Name: Bluetooth ネットワーク接続
+                                     Status:          Media disconnected
+                               [04]: Realtek RTL8821CE 802.11ac PCIe Adapter
+                                     Connection Name: Wi-Fi
+                                     Status:          Media disconnected
+Virtualization-based security: Status: Running
+                               Required Security Properties:
+                               Available Security Properties:
+                                     Base Virtualization Support
+                                     Secure Boot
+                                     DMA Protection
+                                     UEFI Code Readonly
+                                     SMM Security Mitigations 1.0
+                               Services Configured:
+                                     Hypervisor enforced Code Integrity
+                               Services Running:
+                                     Hypervisor enforced Code Integrity
+                               App Control for Business policy: Enforced
+                               App Control for Business user mode policy: Off
+                               Security Features Enabled:
+Hyper-V Requirements:          A hypervisor has been detected. Features required for Hyper-V will not be displayed.
+finished_at=2026-06-07T01:19:25.9230905Z
+
+===== $PSVersionTable =====
+started_at=2026-06-07T01:19:25.9243884Z
+exit=0
+
+Name  : PSVersion
+Key   : PSVersion
+Value : 7.6.1
+
+Name  : PSEdition
+Key   : PSEdition
+Value : Core
+
+Name  : GitCommitId
+Key   : GitCommitId
+Value : 7.6.1
+
+Name  : OS
+Key   : OS
+Value : Microsoft Windows 10.0.26200
+
+Name  : Platform
+Key   : Platform
+Value : Win32NT
+
+Name  : PSCompatibleVersions
+Key   : PSCompatibleVersions
+Value : {1.0, 2.0, 3.0, 4.0…}
+
+Name  : PSRemotingProtocolVersion
+Key   : PSRemotingProtocolVersion
+Value : 2.4
+
+Name  : SerializationVersion
+Key   : SerializationVersion
+Value : 1.1.0.1
+
+Name  : WSManStackVersion
+Key   : WSManStackVersion
+Value : 3.0
+finished_at=2026-06-07T01:19:26.0367871Z
+
+===== python --version =====
+started_at=2026-06-07T01:19:26.0376926Z
+exit=0
+Python 3.11.9
+finished_at=2026-06-07T01:19:26.1353590Z
+
+===== py --version =====
+started_at=2026-06-07T01:19:26.1362071Z
+exit=0
+Python 3.13.7
+finished_at=2026-06-07T01:19:26.3005726Z
+
+===== git --version =====
+started_at=2026-06-07T01:19:26.3015610Z
+exit=0
+git version 2.51.0.windows.1
+finished_at=2026-06-07T01:19:26.4585346Z
+
+===== rustc --version =====
+started_at=2026-06-07T01:19:26.4595646Z
+exit=0
+rustc 1.95.0 (59807616e 2026-04-14)
+finished_at=2026-06-07T01:19:26.7990101Z
+
+===== cargo --version =====
+started_at=2026-06-07T01:19:26.8000115Z
+exit=0
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+finished_at=2026-06-07T01:19:27.0013827Z
+
+===== flutter --version =====
+started_at=2026-06-07T01:19:27.0022035Z
+exit=0
+Flutter 3.44.0 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 559ffa3f75 (3 weeks ago) • 2026-05-15 14:13:13 -0700
+Engine • hash fcf463a2242790d1fdcd9d044f533080f5022e18 (revision 4c525dac5e) (22 days ago) • 2026-05-15 19:00:04.000Z
+Tools • Dart 3.12.0 • DevTools 2.57.0
+finished_at=2026-06-07T01:19:32.1179601Z
+
+===== dart --version =====
+started_at=2026-06-07T01:19:32.1186004Z
+exit=0
+Dart SDK version: 3.12.0 (stable) (Fri May 8 01:51:14 2026 -0700) on "windows_x64"
+finished_at=2026-06-07T01:19:34.3295085Z
+
+===== flutter doctor -v =====
+started_at=2026-06-07T01:19:34.3301493Z
+exit=0
+[√] Flutter (Channel stable, 3.44.0, on Microsoft Windows [Version 10.0.26200.8524], locale ja-JP) [1,074ms]
+    • Flutter version 3.44.0 on channel stable at C:\Users\mzcum\dev\flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision 559ffa3f75 (3 weeks ago), 2026-05-15 14:13:13 -0700
+    • Engine revision 4c525dac5e
+    • Dart version 3.12.0
+    • DevTools version 2.57.0
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-native-assets, enable-swift-package-manager, omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+
+[√] Windows Version (11 Home 64-bit, 25H2, 2009) [3.3s]
+
+[X] Android toolchain - develop for Android devices [445ms]
+    X Unable to locate Android SDK.
+      Install Android Studio from: https://developer.android.com/studio/index.html
+      On first launch it will assist you in installing the Android SDK components.
+      (or visit https://flutter.dev/to/windows-android-setup for detailed instructions).
+      If the Android SDK has been installed to a custom location, please use
+      `flutter config --android-sdk` to update to that location.
+
+
+[√] Chrome - develop for the web [389ms]
+    • Chrome at C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+
+[√] Visual Studio - develop Windows apps (Visual Studio Build Tools 2022 17.14.33 (May 2026)) [384ms]
+    • Visual Studio at C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools
+    • Visual Studio Build Tools 2022 version 17.14.37314.3
+    • Windows 10 SDK version 10.0.26100.0
+
+[√] Connected device (3 available) [428ms]
+    • Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.26200.8524]
+    • Chrome (web)      • chrome  • web-javascript • Google Chrome 148.0.7778.218
+    • Edge (web)        • edge    • web-javascript • Microsoft Edge 149.0.4022.52
+
+[√] Network resources [581ms]
+    • All expected network resources are available.
+
+! Doctor found issues in 1 category.
+finished_at=2026-06-07T01:19:42.5412205Z

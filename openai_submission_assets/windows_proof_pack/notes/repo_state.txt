@@ -1,0 +1,23 @@
+# Repo state
+captured_at=2026-06-07T01:18:52.6115809Z
+repo=C:\Users\mzcum\Documents\GUI-Shell
+
+> git status --short
+exit=0
+
+> git rev-parse --abbrev-ref HEAD
+exit=0
+main
+
+> git rev-parse HEAD
+exit=0
+4e92339259c584460671c5adce33b7f86a724167
+
+> git rev-parse origin/main
+exit=0
+4e92339259c584460671c5adce33b7f86a724167
+
+> git tag --list "codex/backup-main*"
+exit=0
+codex/backup-main
+codex/backup-main-prev

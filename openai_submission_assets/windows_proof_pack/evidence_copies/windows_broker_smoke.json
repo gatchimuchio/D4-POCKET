@@ -1,0 +1,74 @@
+{
+  "status": "passed",
+  "collected_at": "2026-06-07T00:54:39.2612330Z",
+  "evidence_source": {
+    "collector": "installer/windows/collect_broker_smoke.ps1",
+    "collector_version": "2",
+    "synthetic": false,
+    "command": "powershell -ExecutionPolicy Bypass -File installer\\windows\\collect_broker_smoke.ps1 -BrokerHelperExe \"C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\broker\\gui_shell_rust_helper.exe\""
+  },
+  "helper_exe_path": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\broker\\gui_shell_rust_helper.exe",
+  "helper_exe_exists": true,
+  "session_file": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_session.json",
+  "session_file_created": true,
+  "store_dir": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_store",
+  "endpoint_host": "127.0.0.1",
+  "endpoint_port": 52930,
+  "restricted_loopback_bind": true,
+  "authenticated_ipc_connection": true,
+  "durable_store_ready": true,
+  "replay_nonce": "windows-installed-replay-nonce-b080ba17088b483695c2340422f9ac15",
+  "restart_replay_rejected": true,
+  "replay_error_code": "broker_replay_detected",
+  "fresh_health_after_restart": true,
+  "crash_fail_closed": true,
+  "field_provenance": {
+    "helper_exe_exists": {
+      "source_type": "directly_measured",
+      "evidence_class": "EXTERNAL_EVIDENCE"
+    },
+    "session_file_created": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "restricted_loopback_bind": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "authenticated_ipc_connection": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "durable_store_ready": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "restart_replay_rejected": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "fresh_health_after_restart": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    },
+    "crash_fail_closed": {
+      "source_type": "directly_measured",
+      "evidence_class": "LIVE_RUNTIME"
+    }
+  },
+  "unmeasured_declarations": {
+    "python_runtime_required_for_authority": {
+      "value": false,
+      "source_type": "static_assertion",
+      "evidence_class": "CONFIG",
+      "formal_runtime_proof": false
+    },
+    "flutter_rust_ffi_authority_bridge": {
+      "value": false,
+      "source_type": "static_assertion",
+      "evidence_class": "CONFIG",
+      "formal_runtime_proof": false
+    }
+  },
+  "errors": []
+}

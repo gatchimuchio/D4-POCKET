@@ -1,0 +1,12 @@
+{
+  "context_kind": "installed_app_setup_doctor_context",
+  "context_version": 1,
+  "installed_app_path": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\app\\gui_shell_desktop.exe",
+  "installed_app_path_confirmed": true,
+  "app_artifact_sha256": "sha256:785b464bc04091169657c041f51314da8c2961bfbd1e022369ba0f2d59b67468",
+  "config_path": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\config\\gui_shell.json",
+  "audit_dir": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\audit",
+  "broker_mediated_launch": true,
+  "broker_endpoint_file": "C:\\Users\\mzcum\\AppData\\Local\\GUI-Shell\\installed-runs\\run-audit-anchor-28a700f-20260607\\runtime\\broker_session.json",
+  "restricted_loopback_bind": true
+}

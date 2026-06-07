@@ -1,0 +1,343 @@
+{
+  "source": "uiautomation",
+  "path": "release_evidence\\visible_surfaces_collected.json",
+  "captured_at": "2026-06-07T01:01:05.2131028Z",
+  "process_id": 15976,
+  "window_found": true,
+  "window_title": "GUI Shell",
+  "expected_surfaces": [
+    "Dashboard",
+    "NavigationRail",
+    "Runtime Status",
+    "Invariant Status"
+  ],
+  "visible_surfaces": [],
+  "surface_matches": {
+    "Dashboard": {
+      "matched": false,
+      "name": "",
+      "automation_id": "",
+      "control_type": "",
+      "class_name": "",
+      "framework_id": "",
+      "element_key": "",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": []
+    },
+    "NavigationRail": {
+      "matched": false,
+      "name": "",
+      "automation_id": "",
+      "control_type": "",
+      "class_name": "",
+      "framework_id": "",
+      "element_key": "",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": []
+    },
+    "Runtime Status": {
+      "matched": false,
+      "name": "",
+      "automation_id": "",
+      "control_type": "",
+      "class_name": "",
+      "framework_id": "",
+      "element_key": "",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": []
+    },
+    "Invariant Status": {
+      "matched": false,
+      "name": "",
+      "automation_id": "",
+      "control_type": "",
+      "class_name": "",
+      "framework_id": "",
+      "element_key": "",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": []
+    }
+  },
+  "aggregate_surface_shortcut_detected": false,
+  "surface_match_requirements_met": false,
+  "automation_names": [
+    "FLUTTERVIEW",
+    "ControlType.Pane",
+    "GUI Shell",
+    "TitleBar",
+    "ControlType.TitleBar",
+    "システム メニュー バー",
+    "SystemMenuBar",
+    "ControlType.MenuBar",
+    "System",
+    "Item 1",
+    "ControlType.MenuItem",
+    "最小化",
+    "Minimize",
+    "ControlType.Button",
+    "最大化",
+    "Maximize",
+    "閉じる",
+    "Close"
+  ],
+  "diagnostic_tree": {
+    "mode": "full_uiautomation_tree_projection",
+    "observed_element_count": 8,
+    "observed_elements": [
+      {
+        "element_key": "root",
+        "runtime_id": "42.3017032",
+        "parent_runtime_id": "",
+        "name": "GUI Shell",
+        "automation_id": "",
+        "control_type": "ControlType.Window",
+        "class_name": "FLUTTER_RUNNER_WIN32_WINDOW",
+        "framework_id": "Win32",
+        "localized_control_type": "ウィンドウ",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 15.0,
+          "y": 15.0,
+          "width": 1920.0,
+          "height": 1106.0
+        },
+        "supported_patterns": [
+          "WindowPatternIdentifiers.Pattern",
+          "TransformPatternIdentifiers.Pattern"
+        ],
+        "is_root": true,
+        "is_native_container": true,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:0",
+        "runtime_id": "42.7930976",
+        "parent_runtime_id": "42.3017032",
+        "name": "FLUTTERVIEW",
+        "automation_id": "",
+        "control_type": "ControlType.Pane",
+        "class_name": "FLUTTERVIEW",
+        "framework_id": "Win32",
+        "localized_control_type": "ウィンドウ",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 26.0,
+          "y": 60.0,
+          "width": 1898.0,
+          "height": 1050.0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": true,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:1",
+        "runtime_id": "4.3017032.0",
+        "parent_runtime_id": "42.3017032",
+        "name": "GUI Shell",
+        "automation_id": "TitleBar",
+        "control_type": "ControlType.TitleBar",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "タイトル バー",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 26.0,
+          "y": 26.0,
+          "width": 1898.0,
+          "height": 34.0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:2",
+        "runtime_id": "1.3017032.65973",
+        "parent_runtime_id": "4.3017032.0",
+        "name": "システム メニュー バー",
+        "automation_id": "SystemMenuBar",
+        "control_type": "ControlType.MenuBar",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "メニュー バー",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 26.0,
+          "y": 26.0,
+          "width": 33.0,
+          "height": 33.0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:3",
+        "runtime_id": "1.3017032.65973.0",
+        "parent_runtime_id": "1.3017032.65973",
+        "name": "System",
+        "automation_id": "Item 1",
+        "control_type": "ControlType.MenuItem",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "メニュー項目",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 26.0,
+          "y": 26.0,
+          "width": 33.0,
+          "height": 33.0
+        },
+        "supported_patterns": [
+          "ExpandCollapsePatternIdentifiers.Pattern"
+        ],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:4",
+        "runtime_id": "4.3017032.0.2",
+        "parent_runtime_id": "4.3017032.0",
+        "name": "最小化",
+        "automation_id": "Minimize",
+        "control_type": "ControlType.Button",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "ボタン",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 1713.0,
+          "y": 16.0,
+          "width": 71.0,
+          "height": 44.0
+        },
+        "supported_patterns": [
+          "InvokePatternIdentifiers.Pattern"
+        ],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:5",
+        "runtime_id": "4.3017032.0.3",
+        "parent_runtime_id": "4.3017032.0",
+        "name": "最大化",
+        "automation_id": "Maximize",
+        "control_type": "ControlType.Button",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "ボタン",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 1784.0,
+          "y": 16.0,
+          "width": 70.0,
+          "height": 44.0
+        },
+        "supported_patterns": [
+          "InvokePatternIdentifiers.Pattern"
+        ],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "descendant:6",
+        "runtime_id": "4.3017032.0.5",
+        "parent_runtime_id": "4.3017032.0",
+        "name": "閉じる",
+        "automation_id": "Close",
+        "control_type": "ControlType.Button",
+        "class_name": "",
+        "framework_id": "Win32",
+        "localized_control_type": "ボタン",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 1854.0,
+          "y": 16.0,
+          "width": 71.0,
+          "height": 44.0
+        },
+        "supported_patterns": [
+          "InvokePatternIdentifiers.Pattern"
+        ],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [],
+        "surface_count": 0,
+        "contains_all_required_surfaces": false
+      }
+    ],
+    "tree_edges": [
+      {
+        "child_runtime_id": "42.7930976",
+        "parent_runtime_id": "42.3017032",
+        "child_element_key": "descendant:0"
+      },
+      {
+        "child_runtime_id": "4.3017032.0",
+        "parent_runtime_id": "42.3017032",
+        "child_element_key": "descendant:1"
+      },
+      {
+        "child_runtime_id": "1.3017032.65973",
+        "parent_runtime_id": "4.3017032.0",
+        "child_element_key": "descendant:2"
+      },
+      {
+        "child_runtime_id": "1.3017032.65973.0",
+        "parent_runtime_id": "1.3017032.65973",
+        "child_element_key": "descendant:3"
+      },
+      {
+        "child_runtime_id": "4.3017032.0.2",
+        "parent_runtime_id": "4.3017032.0",
+        "child_element_key": "descendant:4"
+      },
+      {
+        "child_runtime_id": "4.3017032.0.3",
+        "parent_runtime_id": "4.3017032.0",
+        "child_element_key": "descendant:5"
+      },
+      {
+        "child_runtime_id": "4.3017032.0.5",
+        "parent_runtime_id": "4.3017032.0",
+        "child_element_key": "descendant:6"
+      }
+    ],
+    "capture_limit": "none",
+    "failure_diagnostic": true
+  }
+}

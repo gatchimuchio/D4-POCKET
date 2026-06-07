@@ -1,0 +1,250 @@
+# Validation evidence
+captured_at=2026-06-07T01:20:23.7860848Z
+
+===== python tooling\schema_check\check_schemas.py =====
+started_at=2026-06-07T01:20:23.8091184Z
+exit=0
+schema check passed: 26 schemas, 26 examples, 28 negative fixtures
+finished_at=2026-06-07T01:20:24.1490288Z
+
+===== python tooling\conformance_tests\run_conformance_skeleton.py =====
+started_at=2026-06-07T01:20:24.1507513Z
+exit=0
+conformance skeleton passed: 139 checks
+finished_at=2026-06-07T01:20:39.9201201Z
+
+===== python tooling\manifest.py --check =====
+started_at=2026-06-07T01:20:39.9213244Z
+exit=0
+manifest check passed
+finished_at=2026-06-07T01:20:41.4091255Z
+
+===== python tooling\release_gate_check.py =====
+started_at=2026-06-07T01:20:41.4100787Z
+exit=0
+release gate check passed
+finished_at=2026-06-07T01:20:43.2345333Z
+
+===== python tooling\windows_release_evidence.py =====
+started_at=2026-06-07T01:20:43.2491265Z
+exit=0
+[
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_evidence_provenance_isolation",
+    "reason": "Windows installed evidence is tied to a clean source commit, isolated run paths, artifact hashes, and field-level evidence provenance.",
+    "required_action": "Keep every Windows formal evidence run isolated and commit-linked.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_installer_first_run_smoke",
+    "reason": "Windows installed executable first-run smoke evidence passed machine validation.",
+    "required_action": "Keep Windows installed first-run evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_setup_doctor_smoke",
+    "reason": "Windows installed-path Setup Doctor evidence passed machine validation.",
+    "required_action": "Keep Windows Setup Doctor evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "windows_broker_installed_smoke",
+    "reason": "Windows installed-path broker launch/connect/restart/crash evidence passed machine validation; no-Python/no-FFI remain separately classified static or installed-launch evidence.",
+    "required_action": "Keep broker installed-path smoke evidence current for release candidates.",
+    "status": "passed"
+  },
+  {
+    "blocks_release": "no",
+    "classification": "none",
+    "name": "audit_anchor_external_tamper_evidence_proof",
+    "reason": "Windows installed-path audit anchor external tamper-evidence proof passed machine validation.",
+    "required_action": "Keep audit anchor key-protection or external-anchor evidence current for release candidates.",
+    "status": "passed"
+  }
+]
+finished_at=2026-06-07T01:20:43.5598968Z
+
+===== python tooling\evidence_bundle.py --check =====
+started_at=2026-06-07T01:20:43.5610547Z
+exit=0
+evidence bundle check passed: 0 release blockers preserved, release_ready=False, classification=development_evidence
+finished_at=2026-06-07T01:20:45.8635618Z
+
+===== python tooling\validate_all.py --python-only =====
+started_at=2026-06-07T01:20:45.8642217Z
+exit=0
+validation_mode: development
+desktop_platform: current
+
+checks:
+  - name: schema_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/schema_check/check_schemas.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      schema check passed: 26 schemas, 26 examples, 28 negative fixtures
+  - name: conformance_skeleton
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/conformance_tests/run_conformance_skeleton.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      conformance skeleton passed: 139 checks
+  - name: manifest_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/manifest.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      manifest check passed
+  - name: release_gate_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_gate_check.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      release gate check passed
+  - name: packaging_portability_check
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/packaging_portability_check.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      packaging portability check passed
+  - name: release_smoke
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_smoke.py
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      {
+        "agent_runtime": {
+          "errors": [],
+          "ok": true
+        },
+        "errors": [],
+        "first_run": {
+          "audit_dir": "C:\\Users\\mzcum\\AppData\\Local\\Temp\\tmpfkcfekuq\\first_run\\audit",
+          "audit_dir_writable": true,
+          "config_created": true,
+          "config_path": "C:\\Users\\mzcum\\AppData\\Local\\Temp\\tmpfkcfekuq\\first_run\\config\\gui_shell.json",
+          "errors": [],
+          "installer_grants_authority": false,
+          "installer_silently_approves_permissions": false,
+          "ok": true,
+          "setup_doctor_status": "warning"
+        },
+        "ok": true,
+        "runtime_catalog": {
+          "adapter_count": 1,
+          "errors": [],
+          "ok": true,
+          "runtime_count": 1
+        },
+        "shell_core": {
+          "approval_revalidation_required": true,
+          "audit_anchor_verified": true,
+          "audit_chain_verified": true,
+          "audit_event_count": 2,
+          "errors": [],
+          "ok": true,
+          "recovery_id_verified": true,
+          "snapshot_saved": true,
+          "tamper_detected": true
+        }
+      }
+  - name: evidence_bundle
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/evidence_bundle.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      evidence bundle check passed: 0 release blockers preserved, release_ready=False, classification=development_evidence
+  - name: release_runtime_assertions
+    command: C:\Users\mzcum\AppData\Local\Programs\Python\Python311\python.exe tooling/release_runtime_assertions.py --check
+    status: passed
+    classification: none
+    blocks_release: no
+    reason:
+    exit: 0
+    stdout: |
+      release runtime assertions: 12 passed, 0 failed, evidence_scope=CONFIG,FIXTURE
+
+desktop_platform_evidence:
+  - name: windows_desktop_project_support_exists
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: `apps/desktop_flutter/windows` exists.
+    required_action: Keep Windows Flutter desktop project files under version control.
+  - name: windows_development_toolchain_historical_smoke
+    status: historical_invalid_for_current_r2
+    classification: none
+    blocks_release: no
+    reason: Historical native Windows analyze/test/build/launch smoke is preserved as owner-trial history only. It is not current R2 formal evidence because it is not tied to the exact implementation commit and installed-path evidence bundle.
+    required_action: Collect fresh native Windows release-candidate evidence through the isolated installed-path evidence flow.
+  - name: windows_evidence_provenance_isolation
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: Windows installed evidence is tied to a clean source commit, isolated run paths, artifact hashes, and field-level evidence provenance.
+    required_action: Keep every Windows formal evidence run isolated and commit-linked.
+  - name: windows_installer_first_run_smoke
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: Windows installed executable first-run smoke evidence passed machine validation.
+    required_action: Keep Windows installed first-run evidence current for release candidates.
+  - name: windows_setup_doctor_smoke
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: Windows installed-path Setup Doctor evidence passed machine validation.
+    required_action: Keep Windows Setup Doctor evidence current for release candidates.
+  - name: windows_broker_installed_smoke
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: Windows installed-path broker launch/connect/restart/crash evidence passed machine validation; no-Python/no-FFI remain separately classified static or installed-launch evidence.
+    required_action: Keep broker installed-path smoke evidence current for release candidates.
+  - name: audit_anchor_external_tamper_evidence_proof
+    status: passed
+    classification: none
+    blocks_release: no
+    reason: Windows installed-path audit anchor external tamper-evidence proof passed machine validation.
+    required_action: Keep audit anchor key-protection or external-anchor evidence current for release candidates.
+
+release_gate:
+  status: pass
+  blockers:
+finished_at=2026-06-07T01:21:31.8381016Z
+
+===== python tooling\release_gate_check.py --strict-release =====
+started_at=2026-06-07T01:21:31.8384451Z
+exit=1
+release gate check failed:
+  - strict release active blocker unresolved: owner_go - Explicit owner GO has not been recorded.
+finished_at=2026-06-07T01:21:33.7320283Z

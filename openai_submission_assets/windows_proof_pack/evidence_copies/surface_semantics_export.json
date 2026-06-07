@@ -1,0 +1,326 @@
+{
+  "source": "flutter_semantics_runtime_export",
+  "path": "C:\\Users\\mzcum\\Documents\\GUI-Shell\\release_evidence\\surface_semantics_export.json",
+  "captured_at": "2026-06-07T01:00:54.516161Z",
+  "expected_surfaces": [
+    "Dashboard",
+    "NavigationRail",
+    "Runtime Status",
+    "Invariant Status"
+  ],
+  "visible_surfaces": [
+    "Dashboard",
+    "NavigationRail",
+    "Runtime Status",
+    "Invariant Status"
+  ],
+  "surface_matches": {
+    "Dashboard": {
+      "matched": true,
+      "name": "Dashboard",
+      "automation_id": "gui_shell.surface.dashboard",
+      "control_type": "FlutterSemanticsNode",
+      "class_name": "SurfaceSemantics",
+      "framework_id": "Flutter",
+      "element_key": "flutter_semantics:gui_shell.surface.dashboard",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": [
+        "Dashboard"
+      ]
+    },
+    "NavigationRail": {
+      "matched": true,
+      "name": "NavigationRail",
+      "automation_id": "gui_shell.surface.navigation_rail",
+      "control_type": "FlutterSemanticsNode",
+      "class_name": "SurfaceSemantics",
+      "framework_id": "Flutter",
+      "element_key": "flutter_semantics:gui_shell.surface.navigation_rail",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": [
+        "NavigationRail"
+      ]
+    },
+    "Runtime Status": {
+      "matched": true,
+      "name": "Runtime Status",
+      "automation_id": "gui_shell.surface.runtime_status",
+      "control_type": "FlutterSemanticsNode",
+      "class_name": "SurfaceSemantics",
+      "framework_id": "Flutter",
+      "element_key": "flutter_semantics:gui_shell.surface.runtime_status",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": [
+        "Runtime Status"
+      ]
+    },
+    "Invariant Status": {
+      "matched": true,
+      "name": "Invariant Status",
+      "automation_id": "gui_shell.surface.invariant_status",
+      "control_type": "FlutterSemanticsNode",
+      "class_name": "SurfaceSemantics",
+      "framework_id": "Flutter",
+      "element_key": "flutter_semantics:gui_shell.surface.invariant_status",
+      "is_root": false,
+      "is_native_container": false,
+      "surfaces_present": [
+        "Invariant Status"
+      ]
+    }
+  },
+  "aggregate_surface_shortcut_detected": false,
+  "surface_match_requirements_met": true,
+  "automation_names": [
+    "NavigationRail",
+    "gui_shell.surface.navigation_rail",
+    "Dashboard",
+    "gui_shell.surface.dashboard",
+    "Runtime Status",
+    "gui_shell.surface.runtime_status",
+    "Invariant Status",
+    "gui_shell.surface.invariant_status",
+    "Pending Approvals",
+    "gui_shell.surface.pending_approvals",
+    "Problems",
+    "gui_shell.surface.problems",
+    "Evidence",
+    "gui_shell.surface.evidence",
+    "Recovery",
+    "gui_shell.surface.recovery"
+  ],
+  "diagnostic_tree": {
+    "mode": "flutter_dart_surface_semantics_runtime_export",
+    "observed_element_count": 8,
+    "observed_elements": [
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.navigation_rail",
+        "runtime_id": "flutter_semantics.0",
+        "parent_runtime_id": "",
+        "name": "NavigationRail",
+        "automation_id": "gui_shell.surface.navigation_rail",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "NavigationRail"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.dashboard",
+        "runtime_id": "flutter_semantics.1",
+        "parent_runtime_id": "",
+        "name": "Dashboard",
+        "automation_id": "gui_shell.surface.dashboard",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Dashboard"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.runtime_status",
+        "runtime_id": "flutter_semantics.2",
+        "parent_runtime_id": "",
+        "name": "Runtime Status",
+        "automation_id": "gui_shell.surface.runtime_status",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Runtime Status"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.invariant_status",
+        "runtime_id": "flutter_semantics.3",
+        "parent_runtime_id": "",
+        "name": "Invariant Status",
+        "automation_id": "gui_shell.surface.invariant_status",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Invariant Status"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.pending_approvals",
+        "runtime_id": "flutter_semantics.4",
+        "parent_runtime_id": "",
+        "name": "Pending Approvals",
+        "automation_id": "gui_shell.surface.pending_approvals",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Pending Approvals"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.problems",
+        "runtime_id": "flutter_semantics.5",
+        "parent_runtime_id": "",
+        "name": "Problems",
+        "automation_id": "gui_shell.surface.problems",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Problems"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.evidence",
+        "runtime_id": "flutter_semantics.6",
+        "parent_runtime_id": "",
+        "name": "Evidence",
+        "automation_id": "gui_shell.surface.evidence",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Evidence"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      },
+      {
+        "element_key": "flutter_semantics:gui_shell.surface.recovery",
+        "runtime_id": "flutter_semantics.7",
+        "parent_runtime_id": "",
+        "name": "Recovery",
+        "automation_id": "gui_shell.surface.recovery",
+        "control_type": "FlutterSemanticsNode",
+        "class_name": "SurfaceSemantics",
+        "framework_id": "Flutter",
+        "localized_control_type": "semantics",
+        "help_text": "",
+        "is_offscreen": false,
+        "bounding_rectangle": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "supported_patterns": [],
+        "is_root": false,
+        "is_native_container": false,
+        "surfaces_present": [
+          "Recovery"
+        ],
+        "surface_count": 1,
+        "contains_all_required_surfaces": false
+      }
+    ],
+    "tree_edges": [],
+    "capture_limit": "none",
+    "failure_diagnostic": false
+  },
+  "evidence_source": {
+    "source_kind": "installed_app_flutter_semantics_export",
+    "product_generated": true,
+    "synthetic": false,
+    "collector_derives_surfaces": false
+  }
+}

@@ -961,6 +961,98 @@
       "sha256": "7df726b2cecca5df5c7635f4123b0ed30968e592c50444d6aa2f6503d6d7b189"
     },
     {
+      "path": "openai_submission_assets/windows_proof_pack/00_WINDOWS_PROOF_INDEX.md",
+      "sha256": "a79105c028e36a6f6960062d42fb0fe38817d5ea0ff4d032678f7c61ab9d82dc"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/EVIDENCE_HASHES.txt",
+      "sha256": "f6f9774b07ceec79c7b57d9ee0ae5899f883e041f03d27fe6fadcb77d3900b19"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/audit_anchor_external_tamper_evidence.json",
+      "sha256": "40d29b8a2cb81d27f7ed55a44728493472668ce6c8b4055ab8b42f00600b6e27"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/release_runtime_assertions.json",
+      "sha256": "78cf9aa06f8f79fbf41bdef42693e45cce0f7359db4d2623accc476e26a218a7"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_context.json",
+      "sha256": "0e68629ee683cd1024c9003bfbd0cc74378ad1224e275a0fd345f7c8789125d3"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_installed.json",
+      "sha256": "2b610ff480e54a2fdb93d348d1b40abe7b57b64973cfe54300df7fde95ec2b74"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/surface_semantics_export.json",
+      "sha256": "1e63388f2eb5d991e7127717874e60be7317d0d696a87e473d8070d34d52c8c3"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/visible_surfaces_collected.json",
+      "sha256": "b46ca54b714ebccb8a1d5661e4ca5625eb89dcbb47f6b62adf6aaab630bd1dd7"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_broker_smoke.json",
+      "sha256": "cdbb1fd6bc1b382802067c31cfe09819e839c13d8ea4a226e5eb8ce0c99ae63c"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_installed_smoke.json",
+      "sha256": "6ce96ca2461662e21f374cc55eb80ea4da43f8e108ba19cc18d12189bbfea817"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/hashes/artifact_hashes.txt",
+      "sha256": "64bcd456552eb23bc607da8134fe46f857664082f3db2e2bfc9dd07afeac18d0"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/build_validation.log",
+      "sha256": "6e6b41ef549ecf168dbc18cbe4630518d36063fee4d49b71103551d17c71467b"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/validation.log",
+      "sha256": "bd06b24d39130ca1040d1d70d2cb37ca85a2d23ff068a052541314f51d00b41c"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/windows_environment.log",
+      "sha256": "0caf37498441e6005bc53f897ef9252cecf15a284a999d5707de683d54a35222"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/notes/repo_state.txt",
+      "sha256": "d27b0af5008d038f09a22172f1b959906cd5e907dd2f8500cdd1aae4f5727d45"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/01_main_window.png",
+      "sha256": "7f6170c3a4d0be003b7692ae0e866f56e402e98837d8976f8d19405cd9c7f1ce"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/02_setup_doctor_or_status.png",
+      "sha256": "7f6170c3a4d0be003b7692ae0e866f56e402e98837d8976f8d19405cd9c7f1ce"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/03_validation_pass.png",
+      "sha256": "00b6219a3a4343377557605e39f922c48abb44661abc957590ca07b275381a9d"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/04_strict_release_owner_go_only.png",
+      "sha256": "b0939af74eff8bdcc7fa9eb25a7c6561a9f633d6ad7330620a878c6105220c43"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/05_windows_build_artifact.png",
+      "sha256": "df10c10ab47356294c03e78c328d752639f05b5535af8b8d8306d45b559834d8"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/06_release_evidence_files.png",
+      "sha256": "b53b4f00db4ffbdfe92484402501e3b44eb0a7fa6e11d87311c13aed8bdef5c4"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/07_flutter_build_success.png",
+      "sha256": "91e0187a21bebd6d52cf69d75b51600fe40665821f46751b4d22a2d6ac8b9221"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/08_cargo_test_success.png",
+      "sha256": "14a54d853dc03aaa1e992b072d484de01c38117144b35e4d415cfbca73acd40d"
+    },
+    {
       "path": "packages/__init__.py",
       "sha256": "bd8c996fdcb319ac9ba57e9ba62842810450212a449125cb7e4f0b56856fb23c"
     },

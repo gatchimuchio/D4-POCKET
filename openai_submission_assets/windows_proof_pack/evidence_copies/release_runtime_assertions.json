@@ -1,0 +1,124 @@
+{
+  "assertions": [
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "flutter_product_entry_uses_broker",
+      "reason": "Product main.dart initializes ShellCoreClient.product() and does not reference ShellCoreClient.local().",
+      "required_action": "Keep product startup on the broker-mediated client.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "flutter_authority_operations_broker_mediated",
+      "reason": "ShellCoreClient.product() requests health, normalization, content projection, protected-field edit rejection, and command-envelope state from the broker and fail-closes through a broker_unavailable snapshot.",
+      "required_action": "Keep new authority surfaces broker-mediated and fail-closed.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "flutter_product_snapshot_does_not_promote_probe_state",
+      "reason": "ShellCoreClient.product() keeps broker projection/command probes out of product permissions, approvals, authority_map, caller state, and caller audit mappings.",
+      "required_action": "Keep future product records sourced from broker-owned state exports, not Flutter-created probes.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "flutter_models_do_not_default_evidence_to_passed",
+      "reason": "Dart evidence summary defaults do not synthesize PASS or fixed check counts when source JSON omits evidence fields.",
+      "required_action": "Keep missing evidence visibly missing until an explicit validator/export supplies it.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "flutter_product_path_does_not_spawn_python",
+      "reason": "Desktop Flutter lib and owner launch scripts contain no Python snapshot generator invocation or Dart process-spawn API.",
+      "required_action": "Keep Python limited to tooling, CI, schema validation, and migration parity.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "owner_launch_path_starts_broker_without_python_snapshot",
+      "reason": "Owner desktop launch scripts start gui_shell_rust_helper broker-server and pass GUI_SHELL_BROKER_ENDPOINT_JSON without running Python snapshot generation.",
+      "required_action": "Keep broker launch in launcher/supervisor code and out of Flutter authority logic.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "no_ffi_authority_path",
+      "reason": "No Dart FFI, flutter_rust_bridge, MethodChannel, or Rust FFI export token was found in the Flutter/Rust authority surface scan.",
+      "required_action": "Keep authority-sensitive Flutter-Rust communication on independent-process IPC.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "broker_client_uses_authenticated_loopback_ipc",
+      "reason": "BrokerClient uses Socket.connect with broker endpoint/session fields and has no direct bridge or process-start token.",
+      "required_action": "Keep request authentication and endpoint discovery covered by broker tests.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "broker_client_binds_payload_hash_to_payload",
+      "reason": "BrokerClient computes payload_hash from canonical JSON payload instead of sending a fixed dummy hash.",
+      "required_action": "Keep Rust broker payload hash mismatch tests passing.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "CONFIG",
+      "name": "broker_secret_not_projected_to_ui",
+      "reason": "Broker session secret tokens are confined to BrokerClient and are not projected through UI/snapshot files.",
+      "required_action": "Keep secrets out of display and audit payloads.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "FIXTURE",
+      "name": "flutter_broker_fail_closed_test_coverage",
+      "reason": "Flutter tests cover broker unavailable, authentication rejection, stale session, malformed response, and broker.fail_closed setup diagnostics.",
+      "required_action": "Keep fail-closed UI tests passing on release candidates.",
+      "status": "passed"
+    },
+    {
+      "blocks_release": "no",
+      "classification": "none",
+      "evidence_scope": "FIXTURE",
+      "name": "broker_runtime_restart_persistence_and_shutdown_coverage",
+      "reason": "Rust broker test fixtures contain local broker process launch/connect/shutdown, unavailable-after-shutdown behavior, replay rejection after restart, audit chain verification after restart, and tampered/malformed persisted-state rejection coverage. This is not installed product runtime proof.",
+      "required_action": "Keep Rust broker IPC and persistence tests passing; Windows installed-path evidence remains a separate release gate.",
+      "status": "passed"
+    }
+  ],
+  "evidence_scope": [
+    "CONFIG",
+    "FIXTURE"
+  ],
+  "failure_count": 0,
+  "ok": true,
+  "release_gate_note": {
+    "blocks_release": "yes",
+    "classification": "release_blocker",
+    "reason": "Windows installed-path no-Python-runtime and broker-mediated LIVE_RUNTIME evidence is still required before completed product release.",
+    "required_action": "Run Windows installed-path broker launch/connect/restart/crash/no-Python-runtime smoke and pass strict Windows release validation."
+  }
+}

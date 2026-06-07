@@ -1,0 +1,15 @@
+# Artifact hashes
+captured_at=2026-06-07T01:24:38.6164171Z
+git_head=4e92339259c584460671c5adce33b7f86a724167
+
+path=apps\desktop_flutter\build\windows\x64\runner\Release\gui_shell_desktop.exe
+sha256=785B464BC04091169657C041F51314DA8C2961BFBD1E022369BA0F2D59B67468
+size_bytes=91136
+last_write_time=2026-06-07T02:03:07.0297695+09:00
+full_path=C:\Users\mzcum\Documents\GUI-Shell\apps\desktop_flutter\build\windows\x64\runner\Release\gui_shell_desktop.exe
+
+path=native\rust_helper\target\release\gui_shell_rust_helper.exe
+sha256=515B2D09839BB629670B76A94CE6DC522CDDE626424D1BB7675FB035D7606C59
+size_bytes=869888
+last_write_time=2026-06-07T02:04:29.6364610+09:00
+full_path=C:\Users\mzcum\Documents\GUI-Shell\native\rust_helper\target\release\gui_shell_rust_helper.exe
