@@ -838,7 +838,7 @@
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
-      "sha256": "e6221b6971d0606311e7202dc87271ac376f468b39e6ad646e435cf434986515"
+      "sha256": "5803eb15812369a7f734fc3f97af76e0dac88f30a307346e081e5677e1d6f116"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -846,7 +846,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "03a908c65b74e5e05f620a1c269a2c6e55a48b1ad04215113a21c5267dd573c7"
+      "sha256": "e97d8bd1dd23767244697fa9e21c771c7ac99241a758c7fef7eaa10c7773c48c"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",

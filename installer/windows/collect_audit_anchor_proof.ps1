@@ -167,9 +167,9 @@ if ($null -eq $auditDirPath) {
 $requiredAuditFiles = @()
 if ($null -ne $auditDirPath) {
   $requiredAuditFiles = @(
-    Join-Path $auditDirPath.Path "audit_anchor.key",
-    Join-Path $auditDirPath.Path "audit_anchor.json",
-    Join-Path $auditDirPath.Path "audit.jsonl"
+    (Join-Path $auditDirPath.Path "audit_anchor.key")
+    (Join-Path $auditDirPath.Path "audit_anchor.json")
+    (Join-Path $auditDirPath.Path "audit.jsonl")
   )
   foreach ($path in $requiredAuditFiles) {
     if (!(Test-Path $path)) {

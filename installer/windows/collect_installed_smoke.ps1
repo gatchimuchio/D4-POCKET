@@ -824,7 +824,7 @@ $evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
 $mainWindowHandle = 0
 $windowTitle = ""
 if (!$process.HasExited) {
-  $mainWindowHandle = $process.MainWindowHandle
+  $mainWindowHandle = $process.MainWindowHandle.ToInt64()
   $windowTitle = $process.MainWindowTitle
 }
 
