@@ -66,7 +66,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "74ffa78e56ea83db980d71310a1329c74dc4f5aeb340427479317bf9a5860958"
+      "sha256": "34156f99476354a41760fb0913b06281faa2631ea24eaeeb06b24d964762871c"
     },
     {
       "path": "AUDIT.md",
@@ -118,7 +118,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "cb536d57184429abae06495881159221437df14e03407acc21db484805dd1015"
+      "sha256": "106d66f65bc24b4efa74a6b441b384683d98c100f1ece1170e775c96d6c7f00e"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -126,7 +126,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3300074bd1fafb84f3b06b7459f8ba1b9e8698a5e3ca950c736e2a298beb53ce"
+      "sha256": "2a86fa1167a7825c76e9c3f805862b30e1d94dea32264ebeb4f5aa80fff1509a"
     },
     {
       "path": "SECURITY.md",
@@ -569,12 +569,16 @@
       "sha256": "710e766fa4f7db2370fd3bdaeb54622faa48245edd3594263fc14dac2916d3f1"
     },
     {
+      "path": "docs/specs/gui-shell-spec-v1.md",
+      "sha256": "d3de205bdbca4e12a19e063ffd0112aa16d0561c1c3069f877944a5e3909404b"
+    },
+    {
       "path": "docs/specs/runtime-catalog.md",
       "sha256": "81a33761e65875012202eba15ed6843ef2c3d18905aba3b8e594e9aafd70cc66"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
-      "sha256": "26f9348d7d2211c39d601a90fa7bc5155f74c6426db12c9e85ee4c38b9e008f0"
+      "sha256": "48e463af570b57db63c8c5818f5e93c918d65745145ae9abd8c2387a4f2742e4"
     },
     {
       "path": "docs/standards/llm-readable-extension-surface.md",
@@ -1358,7 +1362,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "be2b72e05c7a66116053ec3224f6aaf384a89e782b027a058a5b765ab98e1960"
+      "sha256": "acb449c2927fd8d8e1140dff49526157c413bb602bc00454dc58ead5d9a024e9"
     },
     {
       "path": "tooling/evidence_bundle.py",

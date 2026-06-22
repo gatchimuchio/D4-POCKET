@@ -634,11 +634,12 @@ Do not treat product UI completion as contract completion.
 
 Within the precedence model in Part I, use this repository-specific active guidance order:
 
-1. `ROADMAP.md`
-2. `docs/standards/gui-shell-extended-standard.md`
+1. `docs/specs/gui-shell-spec-v1.md`
+2. `docs/specs/adapter-conformance.md`, `docs/specs/content-exposure-policy.md`, `docs/specs/approval-visibility-boundary.md`, and related `docs/specs/` contract documents
 3. `specs/*.schema.json`
-4. Existing tests and validation scripts
-5. Existing implementation patterns
+4. `tooling/conformance_tests/`
+5. `ROADMAP.md` and `docs/standards/gui-shell-extended-standard.md` for phase and technology-selection context
+6. Existing implementation patterns
 
 If conflict exists, choose the stricter rule that preserves Shell Core authority boundaries, schema integrity, conformance coverage, and operator safety.
 
@@ -646,20 +647,24 @@ If conflict exists, choose the stricter rule that preserves Shell Core authority
 
 Unless the owner explicitly instructs otherwise, work in this order:
 
-1. Read `docs/standards/gui-shell-extended-standard.md`
-2. Read relevant schemas under `specs/`
-3. Preserve Shell Core / UI / Adapter / Rust helper boundaries
-4. Add or update schemas before implementation when contracts change
-5. Add or update conformance tests before product UI
-6. Implement minimal bounded code
-7. Run validation
-8. Report exact results
+1. Read `docs/specs/gui-shell-spec-v1.md`
+2. Read relevant `docs/specs/` contract documents
+3. Read `docs/standards/gui-shell-extended-standard.md`
+4. Read relevant schemas under `specs/`
+5. Preserve Shell Core / UI / Adapter / Rust helper boundaries
+6. Add or update schemas before implementation when contracts change
+7. Add or update conformance tests before product UI
+8. Implement minimal bounded code
+9. Run validation
+10. Report exact results
 
 Do not optimize a local task in a way that makes later phases less safe, less inspectable, or harder to validate.
 
 ### 26. Active Instruction / Roadmap References
 
 The canonical active roadmap is `ROADMAP.md`.
+
+The formal implementation specification is `docs/specs/gui-shell-spec-v1.md`.
 
 The extended standard is `docs/standards/gui-shell-extended-standard.md`.
 

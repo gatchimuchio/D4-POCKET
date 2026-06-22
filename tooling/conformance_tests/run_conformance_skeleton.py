@@ -234,6 +234,7 @@ def sensitive_action_mapping_is_complete(action: dict) -> bool:
 def test_required_docs_exist() -> list[str]:
     errors = []
     required_docs = {
+        "gui-shell-spec-v1.md",
         "adapter-conformance.md",
         "agent-runtime.md",
         "authority-strip-conformance.md",
@@ -245,6 +246,35 @@ def test_required_docs_exist() -> list[str]:
     for missing in sorted(required_docs - existing):
         errors.append(f"docs/specs/{missing} missing")
     return errors
+
+
+def test_gui_shell_spec_v1_declares_core_boundaries() -> list[str]:
+    path = DOC_SPECS / "gui-shell-spec-v1.md"
+    if not path.exists():
+        return ["docs/specs/gui-shell-spec-v1.md missing"]
+    text = path.read_text(encoding="utf-8")
+    required_tokens = [
+        "Runtime Operation Shell",
+        "not a BLUE-TANUKI-specific GUI",
+        "BLUE-TANUKI is the first reference runtime",
+        "Flutter UI layer",
+        "Shell Core",
+        "Adapter",
+        "Permission Ledger",
+        "Approval Queue",
+        "Audit Store",
+        "Recovery Center",
+        "Rust Native Helper",
+        "Content Exposure Boundary",
+        "Authority Strip",
+        "Windows installed smoke tests",
+        "explicit owner GO",
+    ]
+    return [
+        f"docs/specs/gui-shell-spec-v1.md missing required token: {token}"
+        for token in required_tokens
+        if token not in text
+    ]
 
 
 def test_contract_fixtures_are_available() -> list[str]:
@@ -2591,6 +2621,7 @@ def test_manifest_integrity_tooling_exists() -> list[str]:
         "COMPATIBILITY_MATRIX.md",
         "apps/mobile_flutter/lib/main.dart",
         "apps/desktop_flutter/windows/runner/main.cpp",
+        "docs/specs/gui-shell-spec-v1.md",
         "docs/LANGUAGE_POLICY.md",
         "packages/agent_runtime/contract.py",
         "packages/runtime_catalog/catalog.py",
@@ -3145,6 +3176,7 @@ def test_desktop_agent_center_required_surface_exists() -> list[str]:
 def main() -> int:
     tests = [
         test_required_docs_exist,
+        test_gui_shell_spec_v1_declares_core_boundaries,
         test_contract_fixtures_are_available,
         test_negative_contract_fixtures_cover_all_schemas,
         test_adapter_authority_strip_schema,

@@ -351,6 +351,7 @@ Every unfinished item in repository docs is classified `release_blocker` / `post
 | Document | Description | 説明 |
 |:---|:---|:---|
 | [AGENTS.md](AGENTS.md) | Repository agent rules & work discipline | エージェント規則・作業規律 |
+| [docs/specs/gui-shell-spec-v1.md](docs/specs/gui-shell-spec-v1.md) | GUI-Shell v1 implementation specification | v1 実装仕様 |
 | [docs/standards/llm-readable-extension-surface.md](docs/standards/llm-readable-extension-surface.md) | LLM-readable substrate standard | LLM 責任基盤の標準 |
 | [docs/standards/gui-shell-extended-standard.md](docs/standards/gui-shell-extended-standard.md) | Extended standard | 拡張標準 |
 | [ROADMAP.md](ROADMAP.md) | Phase roadmap & execution order | フェーズ計画と実行順序 |

@@ -231,6 +231,7 @@ Goal: Freeze the conceptual and technical selection boundary.
 
 Deliverables:
 
+- `docs/specs/gui-shell-spec-v1.md`
 - `docs/standards/gui-shell-extended-standard.md`
 - `docs/research/flutter-governance-risk.md`
 - `docs/research/compose-mp-watchlist.md`
@@ -291,6 +292,7 @@ Goal: Prevent product UI from outrunning safety contracts.
 Deliverables:
 
 - `tooling/conformance_tests/run_conformance_skeleton.py`
+- `docs/specs/gui-shell-spec-v1.md`
 - `docs/specs/adapter-conformance.md`
 - `docs/specs/content-exposure-policy.md`
 - `docs/specs/approval-visibility-boundary.md`

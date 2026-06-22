@@ -6,6 +6,8 @@ Primary decision: Flutter + Rust helper
 Reference runtime: BLUE-TANUKI  
 Important note: BLUE-TANUKI is frozen as the Phase 0 reference runtime contract target.
 
+Formal implementation constraints for GUI-Shell v1.0 live in `docs/specs/gui-shell-spec-v1.md`. This Phase 0 extended standard remains the technology-selection and design-posture record.
+
 ## 1. Definition
 
 GUI Shell is a generic runtime operation shell for multiple Runtime / Agent / Tool / Local Service targets.
