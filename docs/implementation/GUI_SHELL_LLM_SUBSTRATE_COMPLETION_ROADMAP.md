@@ -33,7 +33,7 @@ Critical invariant:
 LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
 ```
 
-GUI Shell remains generic and is not BLUE-TANUKI-specific. BLUE-TANUKI remains the first reference consumer/runtime through adapter boundaries only. Shell Core must remain runtime-neutral. Flutter remains the operator-facing UI layer and must not own authority. Rust Security Broker remains the authority-sensitive production boundary. Python may remain for tooling, validation, CI, migration oracle, parity comparison, and evidence validation, but must not remain required for the installed active authority runtime.
+GUI Shell remains generic and is not BLUE-TANUKI-specific. BLUE-TANUKI remains the first reference consumer/runtime through adapter boundaries only. Shell Core must remain runtime-neutral. Flutter remains the operator-facing UI layer and must not own authority. Rust Security Broker remains the authority-sensitive production boundary. Python may remain for tooling, local validation, migration oracle, parity comparison, and evidence validation, but must not remain required for the installed active authority runtime.
 
 ## 2. Current Verified Starting Point
 

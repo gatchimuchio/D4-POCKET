@@ -1980,7 +1980,6 @@ def test_release_gate_scans_ipc_threat_model() -> list[str]:
 
 def test_packaging_portability_checker_exists() -> list[str]:
     checker = ROOT / "tooling" / "packaging_portability_check.py"
-    workflow = ROOT / ".github" / "workflows" / "validation.yml"
     validate_all = ROOT / "tooling" / "validate_all.py"
     errors = []
     if not checker.exists():
@@ -2008,9 +2007,6 @@ def test_packaging_portability_checker_exists() -> list[str]:
         check=False,
     ).stdout.splitlines()]
     errors.extend(portable_path_errors([path for path in tracked_paths if path.exists()]))
-    workflow_text = workflow.read_text(encoding="utf-8")
-    if "tooling/packaging_portability_check.py" not in workflow_text:
-        errors.append("CI does not run packaging portability check")
     if "packaging_portability_check" not in validate_all.read_text(encoding="utf-8"):
         errors.append("validate_all.py does not run packaging portability check")
     return errors
@@ -2589,7 +2585,6 @@ def test_validate_all_resolves_windows_batch_commands() -> list[str]:
 def test_manifest_integrity_tooling_exists() -> list[str]:
     errors = []
     required_paths = {
-        ".github/workflows/validation.yml",
         "AGENTS.md",
         "ROADMAP.md",
         "CONFORMANCE_REPORT.md",
@@ -3081,29 +3076,15 @@ def test_platform_hardening_configuration_exists() -> list[str]:
             if token not in text:
                 errors.append(f".gitattributes missing token: {token}")
 
-    workflow = (ROOT / ".github" / "workflows" / "validation.yml").read_text(encoding="utf-8")
-    if workflow.count('flutter-version: "3.22.3"') < 2:
-        errors.append("validation workflow does not pin the same Flutter SDK version for Linux and Windows")
-    if "cache: true" not in workflow:
-        errors.append("validation workflow does not enable Flutter SDK cache")
-    if "runs-on: windows-2022" not in workflow:
-        errors.append("validation workflow does not pin Windows Flutter build to windows-2022")
-    for mutable_ref in [
-        "actions/checkout@v4",
-        "actions/setup-python@v5",
-        "subosito/flutter-action@v2",
-        "dtolnay/rust-toolchain@stable",
-    ]:
-        if mutable_ref in workflow:
-            errors.append(f"validation workflow still uses mutable action ref: {mutable_ref}")
-    for pinned_sha in [
-        "34e114876b0b11c390a56381ad16ebd13914f8d5",
-        "a26af69be951a213d495a4c3e4e4022e16d87065",
-        "1a449444c387b1966244ae4d4f8c696479add0b2",
-        "29eef336d9b2848a0b548edc03f92a220660cdb8",
-    ]:
-        if pinned_sha not in workflow:
-            errors.append(f"validation workflow missing pinned action SHA: {pinned_sha}")
+    workflow_dir = ROOT / ".github" / "workflows"
+    if workflow_dir.exists():
+        workflow_files = sorted(
+            path.relative_to(ROOT).as_posix()
+            for pattern in ("*.yml", "*.yaml")
+            for path in workflow_dir.glob(pattern)
+        )
+        for workflow_file in workflow_files:
+            errors.append(f"GitHub Actions workflow must remain absent: {workflow_file}")
 
     main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     if "dev-stdin-smoke" not in main_rs:
@@ -3123,9 +3104,9 @@ def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     return []
 
 
-def test_broker_parity_startup_timeout_allows_ci_cold_build() -> list[str]:
+def test_broker_parity_startup_timeout_allows_local_cold_build() -> list[str]:
     if DEFAULT_BROKER_START_TIMEOUT_SECONDS < 60.0:
-        return ["broker parity startup timeout is too short for CI cold Rust builds"]
+        return ["broker parity startup timeout is too short for local cold Rust builds"]
     return []
 
 
@@ -3299,7 +3280,7 @@ def main() -> int:
         test_json_persistence_reports_corrupt_audit_jsonl,
         test_platform_hardening_configuration_exists,
         test_setup_doctor_public_bind_warning_exists,
-        test_broker_parity_startup_timeout_allows_ci_cold_build,
+        test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
         test_desktop_agent_center_required_surface_exists,
     ]

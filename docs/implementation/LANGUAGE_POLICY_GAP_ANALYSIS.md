@@ -11,7 +11,7 @@ Scope: GUI-Shell language policy convergence
 - UI product layer: Flutter / Dart
 - authority-sensitive safety boundary: Rust
 - contracts: JSON Schema / protocol contracts
-- Python: dev-only tooling / CI support / migration oracle / temporary validation only
+- Python: dev-only tooling / local validation / migration oracle / temporary validation only
 - TypeScript / Node: external SDK / adapter sample / protocol client sample only
 - authority-sensitive Flutter-Rust connection: independent process + restricted IPC
 

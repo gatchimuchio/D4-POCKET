@@ -54,6 +54,10 @@ For every task:
 
 A large amount of generated structure is not evidence of completeness.
 
+### 3.1 P-Series Baseline Freeze
+
+GitHub Actions / CI workflow は GUI-Shell の品質判定基準面から廃止済み。`.github/workflows` 配下に workflow YAML を置かない。品質判定の基準面は owner / Codex が明示的に実行する local validation、smoke、release verification、Windows 実機 evidence とする。基準面の変更（追加を含む）は active roadmap / phase instruction 経由のみ。検査の削除・弱体化は owner 承認必須。
+
 ### 4. Completion Evidence Rule
 
 A completion claim is not evidence.
@@ -185,7 +189,7 @@ An unexplained, unbounded, or symptom-hiding workaround is not acceptable.
 
 ### 9. Environment and Product-Proof Separation Rule
 
-Keep development environment, CI environment, validation environment, release-proof environment, and target product environment conceptually separate.
+Keep development environment, local validation environment, release-proof environment, external runner environment, and target product environment conceptually separate.
 
 Do not report success in one environment as proof of success in another environment unless the repository explicitly defines that equivalence and evidence supports it.
 
@@ -274,7 +278,7 @@ Any AI or LLM implementation agent working in this repository must:
 - Flutter / Dart is the UI product layer and must not become the authority boundary
 - Rust is the native safety boundary for authority-sensitive helper, broker, IPC, audit, signature, and runtime command-envelope work
 - TypeScript / Node must not become GUI-Shell core runtime; keep it limited to external SDK, adapter sample, protocol client sample, or bridge example scope
-- Python must not become GUI-Shell runtime dependency; keep it limited to dev-only tooling, schema generation, migration helper, CI support, or temporary validation script scope
+- Python must not become GUI-Shell runtime dependency; keep it limited to dev-only tooling, schema generation, migration helper, local validation, release evidence validation, or temporary validation script scope
 - Authority-sensitive Flutter-Rust connection must prefer independent process IPC; FFI/direct bridge is allowed only outside authority, signature, approval-token, external command dispatch, and audit finalization boundaries
 - BLUE-TANUKI implementation must not be modified for GUI Shell convenience unless the owner explicitly requests it
 

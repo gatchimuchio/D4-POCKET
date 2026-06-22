@@ -1,7 +1,7 @@
 # GUI-Shell 言語方針 監査レポート v0.1
 
 Status: 暫定採用方針  
-Scope: GUI-Shell language, runtime, safety-boundary, and CI responsibility policy
+Scope: GUI-Shell language, runtime, safety-boundary, and validation responsibility policy
 
 ## 1. 結論
 
@@ -36,7 +36,7 @@ GUI-Shell は BLUE-TANUKI の内包物ではなく、汎用の操作・承認・
 3. 安定性
 
    - インストール、起動、常駐、更新、通知、OS別動作、GUI表示が安定すること。
-   - CI・release gate・開発環境の複雑性が、ユーザー向け品質保証を壊さないこと。
+   - local validation・release gate・開発環境の複雑性が、ユーザー向け品質保証を壊さないこと。
 
 補助評価軸として保守性・開発速度は考慮するが、最上位ではない。
 
@@ -45,7 +45,7 @@ GUI-Shell は BLUE-TANUKI の内包物ではなく、汎用の操作・承認・
 ケビンの主張の核は以下である。
 
 - 現状の GUI-Shell / BLUE-TANUKI には、Flutter/Dart、TypeScript/Node、Rust、Python が混在しており、toolchain 負荷が重い。
-- CI・ローカル環境・WSLg・Flutter SDK PATH など、環境依存の問題が release gate に漏れている。
+- ローカル環境・WSLg・Flutter SDK PATH など、環境依存の問題が release gate に漏れている。
 - 単一リポ・単一スタック・restricted IPC によって、同等の安全境界を維持しつつ運用負荷を下げられる可能性がある。
 - static schema 検証へ寄りすぎると、非構造化リアルタイム信号や運用異常に対して brittle になるリスクがある。
 
@@ -53,9 +53,9 @@ GUI-Shell は BLUE-TANUKI の内包物ではなく、汎用の操作・承認・
 
 ```text
 採用:
-- CIからWSLg前提を除去する
+- validation 基準面から WSLg 前提を除去する
 - Flutter SDK不在で全体release gateが死ぬ構造を修正する
-- ローカルWindows/WSL前提をGitHub CIへ漏らさない
+- ローカルWindows/WSL前提を品質判定基準面へ漏らさない
 - schema検証とruntime検証を分ける
 - 不要なtoolchainを削る
 - release責任境界を明確化する
@@ -130,14 +130,14 @@ Claudeの一度目の案は、Rust中心収束を提案した。
 懸念:
 
 - Googleプロダクト寿命リスク。
-- Flutter SDK 依存が CI / release gate に漏れると重くなる。
+- Flutter SDK 依存が local validation / release gate に漏れると重くなる。
 - native security boundary までDartに背負わせると弱い。
 
 対応:
 
 - FlutterはUI層に限定する。
 - 安全境界はRustへ分離する。
-- CIではUI build / GUI smoke / security boundary testを分離する。
+- local validation では UI build / GUI smoke / security boundary test を分離する。
 
 ### 5.2 Rust
 
@@ -270,42 +270,44 @@ FFI直結は便利だが、信頼境界用途では弱い。
 - audit finalization
 ```
 
-## 7. CI / Release Gate 方針
+## 7. Local Validation / Release Gate 方針
 
-ケビン指摘を踏まえ、CIは以下の責任分離を行う。
+GitHub Actions / CI workflow は GUI-Shell の品質判定経路ではない。`.github/workflows` 配下に YAML workflow を置かず、品質判定は owner / Codex が明示実行する local validation、smoke、release verification、Windows 実機 evidence を正とする。
+
+ケビン指摘を踏まえ、local validation / release gate は以下の責任分離を行う。
 
 ```text
-1. Contract CI
+1. Contract validation
    - JSON Schema / protocol / fixtures
    - OS非依存
    - 軽量・高速
 
-2. Rust Security Boundary CI
+2. Rust Security Boundary validation
    - cargo test
    - cargo audit
    - cargo deny
    - unsafe policy check
    - IPC protocol tests
 
-3. Flutter UI CI
+3. Flutter UI validation
    - dart analyze
    - flutter test
    - platform build smoke
    - GUI smoke はOS別に分離
 
-4. Integration CI
+4. Integration validation
    - Flutter process ↔ Rust broker IPC
    - signed envelope roundtrip
    - authority rejection tests
    - audit replay tests
 
-5. OS-specific Release CI
+5. OS-specific release evidence
    - Windows / macOS / Linux に分離
-   - WSLg前提をGitHub CIへ漏らさない
+   - WSLg前提を品質判定基準面へ漏らさない
    - Flutter SDK不在で全体release gateが死なないよう分離
 ```
 
-重要なのは、全CIを一枚岩にしないこと。Flutter SDKやGUI smokeの失敗が、contract/security CIの結果を無効化しない構成にする。
+重要なのは、全 validation を一枚岩にしないこと。Flutter SDKやGUI smokeの失敗が、contract/security validation の結果を無効化しない構成にする。
 
 ## 8. 最終採用方針
 
@@ -331,7 +333,7 @@ Reject:
 
 ## 9. 監査結論
 
-ケビンの「多言語が重い」という指摘は、CI・検証・環境漏出の改善材料として採用する。
+ケビンの「多言語が重い」という指摘は、validation・検証・環境漏出の改善材料として採用する。
 Claudeの「Rust中心」は、安全境界層に限定して採用する。
 チャッピー案の「Flutter/Dart UI + Rust安全境界」は、GUI-Shellの安全・堅牢・安定という判断軸に最も整合する。
 

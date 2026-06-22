@@ -23,7 +23,7 @@ Rust Security Broker Process
 Adapter / External Runtime
 ```
 
-Python は tooling、CI、schema validation、conformance、migration parity oracle、release evidence validation として残せる。installed GUI-Shell の active authority runtime に Python が必須であってはならない。
+Python は tooling、local validation、schema validation、conformance、migration parity oracle、release evidence validation として残せる。installed GUI-Shell の active authority runtime に Python が必須であってはならない。
 
 ## 2. Constraints
 
@@ -186,14 +186,14 @@ Minimum UI integration checks:
 
 Flutter は rendering、navigation、operator input、local non-authority UI state のみを所有する。
 
-## 8. CI / Validation Additions
+## 8. Local Validation Additions
 
 責任別に validation を分ける。
 
-- Contract CI: schemas, fixtures, negative fixtures, protocol compatibility;
-- Rust Security Boundary CI: cargo test, broker IPC rejection tests, approval/audit/recovery tests;
-- Flutter UI CI: analyze/test and broker unavailable state tests;
-- Integration CI: Flutter process to Rust broker roundtrip and fail-closed behavior;
+- Contract validation: schemas, fixtures, negative fixtures, protocol compatibility;
+- Rust Security Boundary validation: cargo test, broker IPC rejection tests, approval/audit/recovery tests;
+- Flutter UI validation: analyze/test and broker unavailable state tests;
+- Integration validation: Flutter process to Rust broker roundtrip and fail-closed behavior;
 - Release evidence: Windows installed-path broker launch, crash/recovery, audit evidence, Setup Doctor, artifact hash.
 
 Phase 7 前に必要な assertions:

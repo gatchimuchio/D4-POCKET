@@ -61,16 +61,12 @@
       "sha256": "a96f7ee8d0feacee47f68cbfc27d1e0a2c64eb26a49df9eda3e9dabe3be09197"
     },
     {
-      "path": ".github/workflows/validation.yml",
-      "sha256": "86571595bdd39cd25cf1c040f35824e4f79fc45f9108c55a40521dfa4296c294"
-    },
-    {
       "path": ".gitignore",
       "sha256": "cccef2fc2fe9c71073567e17a8b9587bf52105092ba6c7421c2f015f394bfae1"
     },
     {
       "path": "AGENTS.md",
-      "sha256": "b35690315b7116c7ae6dd87967e53efa09191d5b85bb433fb4aba64c20b680f5"
+      "sha256": "74ffa78e56ea83db980d71310a1329c74dc4f5aeb340427479317bf9a5860958"
     },
     {
       "path": "AUDIT.md",
@@ -446,7 +442,7 @@
     },
     {
       "path": "docs/LANGUAGE_POLICY.md",
-      "sha256": "f70350454e7455b5c8d581e9451397b3f85d9384c393e95fdb118a18db442e1d"
+      "sha256": "5b55393f43a12a387f21d1a8248a414301f4753691712c82c08df3b34cdd6fdb"
     },
     {
       "path": "docs/MUTATION_VERIFICATION.md",
@@ -454,7 +450,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "f43b9806b627c6d43ac185a8dbfb640ce5f4f1fc85dab2618431ca4db1536dc7"
+      "sha256": "a3c2282af873386cdbee3837c8cc4e6d541fea8aed897070484f187a0a76c690"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
@@ -494,11 +490,11 @@
     },
     {
       "path": "docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md",
-      "sha256": "fa5443e2caaa528139b980fb3ad40bdee0430886a4620233d6e836c0169dd545"
+      "sha256": "18cde71384a9fc92891455543dd948517abc5d618eb0c60e80599328c2b3be28"
     },
     {
       "path": "docs/implementation/LANGUAGE_POLICY_GAP_ANALYSIS.md",
-      "sha256": "1d28375f51343fcd83edd1ad4dad1473d846000dc6bb353d4e19be0640fd53d3"
+      "sha256": "c7c5b1f55c5fbcbabc6e6e61a57297887329b3f6600708b726f0474c7fc2deac"
     },
     {
       "path": "docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md",
@@ -514,11 +510,11 @@
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "7aae5e5a4851448d29e41418fcb979696b084733e467c7a876968b8003d5b3a0"
+      "sha256": "19c570a491a1f493af23ee68acad35f953778e86a3df52ba57e887a25434d9ea"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
-      "sha256": "5343d7725795a29b2bfd97f18a77cc58c95a454ef7133c19942e10dcc177c07e"
+      "sha256": "52df3117782cdd8ab2ca2fc66b0c3b26701287cf0c09f286b73aeb5b1c89ccdd"
     },
     {
       "path": "docs/implementation/WP00_AUTHORITY_SOURCE_OF_TRUTH_DESIGN.md",
@@ -1362,7 +1358,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "25a28a93b3a6bd0d87b8e5c6397c8abc3ec61e1daca855925df096b5dc0eaf09"
+      "sha256": "be2b72e05c7a66116053ec3224f6aaf384a89e782b027a058a5b765ab98e1960"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1382,7 +1378,7 @@
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "aafffb1ccb87436fdc984e63e09927ee1988b16f0afb68dfa45351f4df1b04f2"
+      "sha256": "d206c28bd5df16df2802424dd83afa18576ab152205658b0f24ba1cced6884c7"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -1402,7 +1398,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "0b76dd2137e9aa5ce5e5765f5f8ffc39657a9d7c06c857c054fbf045736a5c75"
+      "sha256": "80ebdb73fc561398bc19d8f79ab574d5b0b31fdf7aec5b29c5352138ad741dfa"
     },
     {
       "path": "tooling/windows_release_evidence.py",

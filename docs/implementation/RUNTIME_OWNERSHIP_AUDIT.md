@@ -39,9 +39,9 @@ Release-gate conclusion:
 | `packages/runtime_catalog` | manifest registration and metadata authority checks | Python | validation / migration oracle | `packages/runtime_catalog/catalog.py`, `tooling/release_smoke.py` | Rust broker target needed for active release path |
 | `packages/agent_runtime` | workspace and tool-call contract helper | Python | validation / migration oracle | `packages/agent_runtime/contract.py`, `tooling/release_smoke.py` | Rust broker target needed for command eligibility |
 | `native/rust_helper` | bounded helper modules plus broker-server binary / authenticated loopback IPC / durable store / authority parity operations | Rust | broker authority path started and product UI client target | `native/rust_helper/Cargo.toml`, `native/rust_helper/src/main.rs`, `native/rust_helper/src/broker/*.rs`, `native/rust_helper/tests/broker_ipc.rs`, `tooling/broker_parity/run_authority_parity.py`, `tooling/release_runtime_assertions.py` | command dispatch suspended; installed no-Python-runtime proof and Windows installed-path proof absent |
-| `tooling/release_smoke.py` | integrated Shell Core, installer, runtime catalog, agent runtime smoke | Python | development validation | `tooling/release_smoke.py` | valid as CI/tooling, not product runtime proof |
-| `tooling/validate_all.py` | subprocess validation orchestrator, including release runtime assertions | Python | CI / validation tooling | `tooling/validate_all.py`, `tooling/release_runtime_assertions.py` | allowed as CI support |
-| `.github/workflows/validation.yml` | split Python core, Rust helper, Flutter, Windows build jobs | YAML + Python/Rust/Dart | CI | `.github/workflows/validation.yml` | release runtime assertion is in `validate_all.py`; installed no-Python-runtime smoke remains Windows evidence scope |
+| `tooling/release_smoke.py` | integrated Shell Core, installer, runtime catalog, agent runtime smoke | Python | development validation | `tooling/release_smoke.py` | valid as tooling, not product runtime proof |
+| `tooling/validate_all.py` | subprocess validation orchestrator, including release runtime assertions | Python | local validation tooling | `tooling/validate_all.py`, `tooling/release_runtime_assertions.py` | allowed as explicit validation tooling |
+| `.github/workflows/*.yml` | intentionally absent; GitHub Actions / CI workflow is not a quality gate | none | absent CI path | conformance rejects workflow YAML under `.github/workflows` | local validation and installed Windows evidence remain the quality basis |
 
 ## 3. Responsibility Ownership Table
 
@@ -62,7 +62,7 @@ Release-gate conclusion:
 | process supervision | `native/rust_helper/src/process.rs`; Windows smoke uses `Start-Process` | Rust + PowerShell | helper diagnostics / release-only collector | Rust Security Broker | yes | Rust helper refuses arbitrary command execution; collector is release evidence only |
 | IPC endpoint ownership | `native/rust_helper/src/ipc.rs`, `native/rust_helper/src/broker/protocol.rs`, `native/rust_helper/src/broker/ipc_server.rs`, `native/rust_helper/src/main.rs`, `apps/desktop_flutter/lib/services/broker_client.dart` | Rust + Dart IPC client | authenticated loopback broker-server with Flutter product client | Rust Security Broker | yes for installed proof | JSON envelope / replay rejection, production listener, authenticated local session, shutdown, and unavailable-after-shutdown tests exist; Flutter client code and fail-closed tests exist; Windows installed-session evidence is absent |
 | adapter conformance enforcement | `packages/shell_core/adapter_loader.py`, conformance tests | Python | validation oracle | Rust Security Broker plus schema/conformance | yes | adapter metadata authority stripping is Python |
-| evidence reporting | `tooling/evidence_bundle.py`, `tooling/windows_release_evidence.py`, `tooling/validate_all.py` | Python | CI / release evidence tooling | Python allowed as tooling | no for tooling | no product runtime authority claim |
+| evidence reporting | `tooling/evidence_bundle.py`, `tooling/windows_release_evidence.py`, `tooling/validate_all.py` | Python | local validation / release evidence tooling | Python allowed as tooling | no for tooling | no product runtime authority claim |
 
 ## 4. Python Classification
 
@@ -70,10 +70,10 @@ Release-gate conclusion:
 | --- | --- | --- | --- | --- |
 | `tooling/schema_check/check_schemas.py` | A. dev-only allowed | yes | schema validation only | none |
 | `tooling/conformance_tests/run_conformance_skeleton.py` | A. dev-only allowed | yes | imports production Python code as conformance target | none as tooling; must not be product runtime proof |
-| `tooling/validate_all.py` | A. CI support allowed | yes | subprocess validation orchestrator including release runtime assertions | none as tooling |
-| `tooling/release_runtime_assertions.py` | A. CI/release validation support allowed | yes | static product authority path assertions for no Python authority process startup, no Python snapshot generator invocation, no FFI/direct bridge, broker-mediated authority operations, fail-closed tests, and broker restart/crash coverage | none as tooling |
+| `tooling/validate_all.py` | A. local validation allowed | yes | subprocess validation orchestrator including release runtime assertions | none as tooling |
+| `tooling/release_runtime_assertions.py` | A. local/release validation support allowed | yes | static product authority path assertions for no Python authority process startup, no Python snapshot generator invocation, no FFI/direct bridge, broker-mediated authority operations, fail-closed tests, and broker restart/crash coverage | none as tooling |
 | `tooling/windows_release_evidence.py` | A. release evidence validator allowed | yes | validates installed smoke JSON | none as tooling |
-| `tooling/manifest.py` | A. CI support allowed | yes | source hash manifest | none |
+| `tooling/manifest.py` | A. local validation allowed | yes | source hash manifest | none |
 | `tooling/shell_snapshot.py` | B. temporary migration oracle / development diagnostic generator | yes temporarily | local diagnostic client and tooling may call it; product `main.dart` no longer reads it for authority | release_blocker until installed no-Python-runtime proof shows it is not required |
 | `packages/shell_core/*.py` | B/C. migration parity oracle and development tooling | yes temporarily | implements policy, approval, audit, recovery, snapshot, content visibility; Rust broker parity compares against it | release_blocker until installed product proof excludes Python authority runtime |
 | `packages/runtime_catalog/*.py` | B. migration oracle | yes temporarily | release smoke and conformance import it | must move governed active path to Rust broker |

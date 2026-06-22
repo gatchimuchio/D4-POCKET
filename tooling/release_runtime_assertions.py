@@ -229,7 +229,7 @@ def assert_flutter_does_not_spawn_python_product_path() -> RuntimeAssertion:
         "flutter_product_path_does_not_spawn_python",
         "CONFIG",
         "Desktop Flutter lib and owner launch scripts contain no Python snapshot generator invocation or Dart process-spawn API.",
-        "Keep Python limited to tooling, CI, schema validation, and migration parity.",
+        "Keep Python limited to tooling, local validation, schema validation, and migration parity.",
     )
 
 

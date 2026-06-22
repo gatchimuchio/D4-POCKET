@@ -129,6 +129,8 @@ Do not create per-phase backup branches or extra backup generations.
 
 ## 5. Validation gates
 
+GitHub Actions / CI workflow is not a GUI Shell quality gate. Do not place workflow YAML under `.github/workflows`; the validation basis is explicit owner / Codex local validation, smoke, release verification, and Windows device evidence.
+
 Minimum validation:
 
 ```bash

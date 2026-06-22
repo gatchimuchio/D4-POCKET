@@ -418,7 +418,7 @@ def main() -> int:
     parser.add_argument(
         "--python-only",
         action="store_true",
-        help="Run only Python/core validation steps for CI jobs that split Rust and Flutter into separate jobs.",
+        help="Run only Python/core validation steps when Rust and Flutter are validated separately.",
     )
     args = parser.parse_args()
 
