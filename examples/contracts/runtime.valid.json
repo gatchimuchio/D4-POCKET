@@ -11,5 +11,5 @@
   "capabilities": [
     "runtime.read"
   ],
-  "diagnostic_summary": "reference runtime reachable"
+  "diagnostic_summary": "参照実行系へ到達可能"
 }

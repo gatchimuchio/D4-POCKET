@@ -1,81 +1,85 @@
-# GUI Operation Surfaces
+# GUI操作面
 
-Status date: 2026-05-26
+状態基準日: 2026-05-26
 
-GUI-Shell GUI hardening imports proven operation patterns without moving authority into Flutter. Flutter renders state and operator intent surfaces; Shell Core remains the authority boundary.
+GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの操作パターンを取り込む。Flutterは状態と操作者の意図を表す操作面を描画し、Shell Coreは引き続き権限境界を担う。
 
-## Implemented Surfaces
+## 実装済み操作面
 
+~~~yaml
 - item: Trust Center
   classification: required_for_v1
   status: implemented
-  evidence: desktop app exposes workspace/runtime/adapter/installer trust records with trusted/restricted/inherited/unknown states and blocked operations.
-  authority_boundary: display-only unless a future Shell Core trust mutation operation grants capability, permission, approval, audit, and recovery mapping.
+  evidence: デスクトップアプリは、workspace、runtime、adapter、installerのtrust recordを、trusted、restricted、inherited、unknownの状態および遮断済み操作とともに公開する。
+  authority_boundary: 将来のShell Core trust mutation操作がcapability、permission、approval、audit、recovery mappingを付与しない限り、表示専用である。
 
 - item: Authority Map
   classification: required_for_v1
   status: implemented
-  evidence: desktop app exposes Runtime -> Capability -> Permission -> Approval -> AuditEvent -> RecoveryAction mapping with warning/danger fields.
-  authority_boundary: visual map only; it does not grant permissions.
+  evidence: デスクトップアプリはRuntimeからCapability、Permission、Approval、AuditEvent、RecoveryActionへ至る対応関係を、warningおよびdangerフィールドとともに公開する。
+  authority_boundary: 視覚的な対応図に限り、権限を付与しない。
 
 - item: Audit Timeline
   classification: required_for_v1
   status: implemented
-  evidence: Audit Viewer includes filters for runtime, adapter, approval, permission, setup_doctor, normalization, installer, and error/warning/blocked plus copy/export/verify/jump action vocabulary.
-  authority_boundary: verify/export operations must be backed by Shell Core audit verification.
+  evidence: Audit Viewerはruntime、adapter、approval、permission、setup_doctor、normalization、installer、およびerror、warning、blockedのフィルターと、copy、export、verify、jumpの操作語彙を含む。
+  authority_boundary: verifyおよびexport操作はShell Coreの監査検証を根拠にしなければならない。
 
 - item: Recovery Playbook
   classification: required_for_v1
   status: implemented
-  evidence: Recovery Center includes severity, retry state, pre_check, action_steps, post_check, rollback, and audit/recovery mapping vocabulary.
-  authority_boundary: no recovery action executes without Shell Core authorization.
+  evidence: Recovery Centerはseverity、retry state、pre_check、action_steps、post_check、rollback、およびaudit/recovery mappingの語彙を含む。
+  authority_boundary: Shell Coreの認可なしには、いかなる復旧操作も実行しない。
 
 - item: Adapter Catalog and Permission Diff
   classification: required_for_v1
   status: implemented
-  evidence: Runtime Center renders adapter publisher/source/version/signature/hash, requested/granted/denied capabilities, trust status, risks, and permission diffs.
-  authority_boundary: install/disable/quarantine/remove remain Shell Core operations.
+  evidence: Runtime Centerはadapterのpublisher、source、version、signature、hash、要求・付与・拒否されたcapability、trust status、risk、およびpermission diffを描画する。
+  authority_boundary: install、disable、quarantine、removeは引き続きShell Coreの操作である。
 
 - item: Settings UX
   classification: required_for_v1
   status: implemented
-  evidence: Settings screen includes search filters, source/default/current/effective values, modified/dangerous/authority flags, reset/export vocabulary, and command palette vocabulary.
-  authority_boundary: setting mutation is represented as Shell Core controlled operation.
+  evidence: Settings画面は検索filter、source/default/current/effective value、modified/dangerous/authority flag、reset/export語彙、およびcommand palette語彙を含む。
+  authority_boundary: setting mutationはShell Coreが制御する操作として表現する。
 
 - item: Problems Panel and Evidence Center
   classification: required_for_v1
   status: implemented
-  evidence: Dashboard renders release blockers, problems, and evidence status; Setup Doctor renders installed-path evidence.
-  authority_boundary: evidence display does not satisfy release readiness without machine-validated Windows installed-path evidence.
+  evidence: Dashboardはrelease blocker、problem、evidence statusを描画し、Setup Doctorはinstalled-path evidenceを描画する。
+  authority_boundary: 機械検証済みのWindows installed-path evidenceがなければ、evidence表示はrelease readinessを満たさない。
 
 - item: Status Bar
   classification: required_for_v1
   status: implemented
-  evidence: persistent status bar renders runtime status, trust status, pending approvals, audit chain status, network exposure, and release blocker count.
-  authority_boundary: status bar is read-only.
+  evidence: 常時表示のstatus barはruntime status、trust status、pending approval、audit chain status、network exposure、およびrelease blocker countを描画する。
+  authority_boundary: status barは読み取り専用である。
 
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
-  evidence: `python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.json` creates local diagnostic JSON consumed only by `ShellCoreClient.local()` in development / inspection mode. Product `main.dart` uses `ShellCoreClient.product()` and broker IPC.
-  authority_boundary: snapshot generation records Shell Core and Setup Doctor state for owner-use migration / development evidence; it does not grant authority and must not remain an installed product runtime dependency.
+  evidence: python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.jsonは、development / inspection modeだけでShellCoreClient.local()が利用するlocal diagnostic JSONを生成する。製品のmain.dartはShellCoreClient.product()とbroker IPCを使用する。
+  authority_boundary: snapshot生成は所有者用のmigration / development evidenceとしてShell CoreおよびSetup Doctorの状態を記録する。権限を付与せず、installed product runtimeの依存関係として残してはならない。
 
 - item: Evidence bundle export
   classification: required_for_v1
   status: implemented
-  evidence: `python3 tooling/evidence_bundle.py --check` verifies the bundle preserves Windows installed-path blockers, embeds `tooling/release_runtime_assertions.py --check`, and does not claim release readiness.
-  authority_boundary: evidence export is read-only and non-authoritative.
+  evidence: python3 tooling/evidence_bundle.py --checkは、bundleがWindows installed-path blockerを保持し、tooling/release_runtime_assertions.py --checkを埋め込み、release readinessを主張しないことを検証する。
+  authority_boundary: evidence exportは読み取り専用かつ非権限的である。
 
 - item: Release runtime assertions
   classification: required_for_v1
   status: implemented
-  evidence: `python3 tooling/release_runtime_assertions.py --check` verifies product Flutter entry uses broker IPC, product path does not start Python or invoke Python snapshot generation, no Flutter/Rust FFI or direct bridge token exists in the authority surface scan, broker secret tokens are not projected to UI snapshots, and fail-closed / restart persistence test coverage is present.
-  authority_boundary: assertion output is validation evidence only; Windows installed-path runtime proof remains required before completed product release.
+  evidence: python3 tooling/release_runtime_assertions.py --checkは、製品Flutter entryがbroker IPCを使用し、製品pathがPythonを起動せずPython snapshot生成も呼び出さないこと、authority surface scanにFlutter/Rust FFIまたはdirect bridge tokenがないこと、broker secret tokenがUI snapshotへ投影されないこと、およびfail-closed / restart persistence test coverageが存在することを検証する。
+  authority_boundary: assertion出力はvalidation evidenceに限る。完成製品リリースの前にはWindows installed-path runtime proofが引き続き必要である。
+~~~
 
-## Remaining Release Blocker
+## 残存リリースブロッカー
 
+~~~yaml
 - item: Windows installed-path evidence
   classification: release_blocker
-  reason: `release_evidence/windows_installed_smoke.json` is still missing in this environment.
-  required_action: collect native Windows installed-path evidence and pass `python tooling/windows_release_evidence.py`.
+  reason: この環境にはrelease_evidence/windows_installed_smoke.jsonがまだ存在しない。
+  required_action: native Windows installed-path evidenceを収集し、python tooling/windows_release_evidence.pyを通す。
   blocks_release: yes
+~~~

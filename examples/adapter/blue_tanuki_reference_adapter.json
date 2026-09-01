@@ -17,6 +17,6 @@
     "recovery"
   ],
   "metadata": {
-    "note": "untrusted; must not grant authority"
+    "note": "信頼しない。権限を付与してはならない"
   }
 }

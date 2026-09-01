@@ -80,7 +80,7 @@ impl BrokerAuditLog {
             &event.payload_hash,
         );
         if expected != event {
-            return Err("broker audit event does not extend the current hash chain".to_string());
+            return Err("broker audit eventが現在のhash chainを延長していない".to_string());
         }
         self.events.push(event);
         Ok(())

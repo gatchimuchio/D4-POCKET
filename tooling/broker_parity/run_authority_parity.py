@@ -62,7 +62,7 @@ def cleanup_temp_directory(path: Path, attempts: int = 25, delay_seconds: float 
         except OSError as exc:
             last_error = exc
             time.sleep(delay_seconds)
-    raise AssertionError(f"temporary broker parity directory cleanup failed: {path}: {last_error}")
+    raise AssertionError(f"一時broker parity directoryのcleanupに失敗: {path}: {last_error}")
 
 
 def build_state() -> tuple[RuntimeState, dict]:
@@ -187,7 +187,7 @@ class BrokerClient:
     def call(self, operation: str, payload) -> dict:
         response = self.request(operation, payload)
         if response["status"] != "accepted":
-            raise AssertionError(f"broker rejected {operation}: {response}")
+            raise AssertionError(f"brokerが{operation}を拒否: {response}")
         return response["body"]
 
     def request(self, operation: str, payload=None) -> dict:
@@ -256,13 +256,13 @@ def start_broker(workspace: Path) -> BrokerClient:
         if process.poll() is not None:
             stderr.close()
             detail = stderr_path.read_text(encoding="utf-8", errors="replace")
-            raise AssertionError(f"broker process exited early: {process.returncode}: {detail}")
+            raise AssertionError(f"broker processが早期終了: {process.returncode}: {detail}")
         time.sleep(0.05)
     stderr.close()
     wait_for_process_exit(process)
     detail = stderr_path.read_text(encoding="utf-8", errors="replace")
     raise AssertionError(
-        "broker session file was not created within "
+        "broker session fileが制限時間内に作成されなかった: "
         f"{broker_start_timeout_seconds():.1f}s: {detail}"
     )
 
@@ -283,34 +283,34 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
         python_result = PolicyEvaluator(state).evaluate(action)
         rust_result = broker.call("authority_fixture_evaluate", {"state": state_json, "action": action})
         if python_result["allowed"] != rust_result["allowed"]:
-            errors.append(f"{name}: allowed mismatch")
+            errors.append(f"{name}: allowedが不一致")
         if error_codes(python_result) != error_codes(rust_result):
-            errors.append(f"{name}: error code mismatch {error_codes(python_result)} != {error_codes(rust_result)}")
+            errors.append(f"{name}: error codeが不一致 {error_codes(python_result)} != {error_codes(rust_result)}")
     for source in sorted(NON_AUTHORITY_SOURCES):
         action = {**base_action(), "authority_source": source}
         python_result = PolicyEvaluator(state).evaluate(action)
         rust_result = broker.call("authority_fixture_evaluate", {"state": state_json, "action": action})
         if python_result["allowed"] != rust_result["allowed"]:
-            errors.append(f"non_authority_source {source}: allowed mismatch")
+            errors.append(f"non_authority_source {source}: allowedが不一致")
         if error_codes(python_result) != error_codes(rust_result):
             errors.append(
-                f"non_authority_source {source}: error code mismatch {error_codes(python_result)} != {error_codes(rust_result)}"
+                f"non_authority_source {source}: error codeが不一致 {error_codes(python_result)} != {error_codes(rust_result)}"
             )
         if "non_authority_source_attempt" not in error_codes(rust_result):
-            errors.append(f"non_authority_source {source}: rust did not reject source")
+            errors.append(f"non_authority_source {source}: Rustがsourceを拒否しなかった")
     command_response = broker.request("command_envelope", {"state": state_json, "action": cases["accepted"]})
     if command_response["status"] != "suspended":
-        errors.append("command_envelope: dispatch was not suspended")
+        errors.append("command_envelope: dispatchがsuspendedではなかった")
     command_eligibility = command_response["body"]["eligibility"]
     if command_eligibility["allowed"] is not False:
-        errors.append("command_envelope: caller fixture state authorized command eligibility")
+        errors.append("command_envelope: 呼出し側fixture stateがcommand eligibilityをauthorizedにした")
     if "caller_state_rejected" not in error_codes(command_eligibility):
-        errors.append("command_envelope: caller fixture state was not rejected by production eligibility")
+        errors.append("command_envelope: 製品eligibilityが呼出し側fixture stateを拒否しなかった")
     if command_response["body"]["dispatch_enabled"] is not False:
-        errors.append("command_envelope: dispatch_enabled was not false")
+        errors.append("command_envelope: dispatch_enabledがfalseではなかった")
     gate = command_response["body"]["execution_gate"]
     if gate["dispatch"] != "suspended" or gate["status"] != "suspended":
-        errors.append("command_envelope: dispatch gate was not suspended")
+        errors.append("command_envelope: dispatch gateがsuspendedではなかった")
     gated_operations = {
         "process": "process.spawn",
         "credential": "credential.read",
@@ -320,14 +320,14 @@ def compare_policy(state: RuntimeState, state_json: dict, broker: BrokerClient) 
         gated_action = {**base_action(), "operation": operation, "capability_id": operation}
         response = broker.request("command_envelope", {"state": state_json, "action": gated_action})
         if response["status"] != "suspended":
-            errors.append(f"command_envelope {target}: response was not suspended")
+            errors.append(f"command_envelope {target}: responseがsuspendedではなかった")
         gated = response["body"]["execution_gate"]
         if gated["target_kind"] != target:
-            errors.append(f"command_envelope {target}: target_kind mismatch {gated['target_kind']} != {target}")
+            errors.append(f"command_envelope {target}: target_kindが不一致 {gated['target_kind']} != {target}")
         if gated[target] != "suspended":
-            errors.append(f"command_envelope {target}: target gate was not suspended")
+            errors.append(f"command_envelope {target}: target gateがsuspendedではなかった")
         if response["body"]["dispatch_enabled"] is not False:
-            errors.append(f"command_envelope {target}: dispatch_enabled was not false")
+            errors.append(f"command_envelope {target}: dispatch_enabledがfalseではなかった")
     return errors
 
 
@@ -343,13 +343,13 @@ def compare_normalization(broker: BrokerClient) -> list[str]:
         rust_result = broker.call("normalize_payload", payload)
         for key in ["quarantined", "stripped_payload"]:
             if python_result[key] != rust_result[key]:
-                errors.append(f"normalization {index}: {key} mismatch")
+                errors.append(f"normalization {index}: {key}が不一致")
         if len(python_result["authority_key_findings"]) != len(rust_result["authority_key_findings"]):
-            errors.append(f"normalization {index}: authority key count mismatch")
+            errors.append(f"normalization {index}: authority key countが不一致")
         if len(python_result["authority_value_findings"]) != len(rust_result["authority_value_findings"]):
-            errors.append(f"normalization {index}: authority value count mismatch")
+            errors.append(f"normalization {index}: authority value countが不一致")
         if len(python_result["normalization_collision_findings"]) != len(rust_result["normalization_collision_findings"]):
-            errors.append(f"normalization {index}: collision count mismatch")
+            errors.append(f"normalization {index}: collision countが不一致")
     return errors
 
 
@@ -373,17 +373,17 @@ def compare_approval_edit_and_projection(broker: BrokerClient) -> list[str]:
     python_edit = queue.edit("approval-1", "path", "notes/tomorrow.md")
     rust_edit = broker.call("approval_edit", {"approval": approval, "field": "path", "value": "notes/tomorrow.md"})
     if rust_edit.get("ok") is not True or rust_edit["approval"]["payload_hash"] != python_edit["payload_hash"]:
-        errors.append("approval_edit: allowed edit hash mismatch")
+        errors.append("approval_edit: 許可済みeditのhashが不一致")
     protected = broker.call("approval_edit", {"approval": approval, "field": "payload_hash", "value": "sha256:" + "0" * 64})
     if protected.get("ok") is not False:
-        errors.append("approval_edit: protected payload_hash edit was not rejected")
+        errors.append("approval_edit: 保護されたpayload_hashのeditが拒否されなかった")
 
     for visibility in ["none", "hash_only", "summary", "redacted", "full"]:
         projected_approval = {**approval, "content_visibility": visibility}
         python_projection = project_approval_content(projected_approval)
         rust_projection = broker.call("content_projection", projected_approval)
         if python_projection != rust_projection:
-            errors.append(f"content_projection {visibility}: mismatch")
+            errors.append(f"content_projection {visibility}: 不一致")
     return errors
 
 
@@ -405,16 +405,16 @@ def compare_audit_chain(broker: BrokerClient) -> list[str]:
     errors = []
     for key in ["ok", "event_count", "latest_event_hash", "errors"]:
         if python_result[key] != rust_result[key]:
-            errors.append(f"audit_verify: {key} mismatch")
+            errors.append(f"audit_verify: {key}が不一致")
     tampered = [{**first, "result": "failed"}, second]
     if broker.call("audit_verify", tampered)["ok"] is not False:
-        errors.append("audit_verify: tampered event was not rejected")
+        errors.append("audit_verify: 改ざんeventが拒否されなかった")
     duplicate = chain_event({**event, "target": "runtime"}, first["event_hash"])
     duplicate_events = [first, duplicate]
     python_duplicate = verify_audit_chain(duplicate_events)
     rust_duplicate = broker.call("audit_verify", duplicate_events)
     if python_duplicate != rust_duplicate:
-        errors.append("audit_verify: duplicate event_id mismatch")
+        errors.append("audit_verify: 重複event_idの結果が不一致")
     return errors
 
 
@@ -435,13 +435,13 @@ def main() -> int:
             finally:
                 wait_for_process_exit(broker.process)
         if errors:
-            print("broker authority parity failed:")
+            print("broker authority parityが失敗:")
             for error in errors:
                 print(f"  - {error}")
             return 1
     finally:
         cleanup_temp_directory(directory)
-    print("broker authority parity passed: accepted parity, rejected parity, rust-specific broker IPC path")
+    print("broker authority parityが合格: accepted parity、rejected parity、Rust固有broker IPC path")
     return 0
 
 

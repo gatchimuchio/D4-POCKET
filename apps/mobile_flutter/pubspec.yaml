@@ -1,5 +1,5 @@
 name: gui_shell_mobile
-description: Mobile Flutter companion for GUI Shell.
+description: GUI ShellのFlutter製モバイル補助アプリ。
 publish_to: "none"
 version: 0.1.0
 

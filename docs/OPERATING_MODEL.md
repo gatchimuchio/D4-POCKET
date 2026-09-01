@@ -1,16 +1,16 @@
-# GUI Shell Operating Model
+# GUI Shell の運用モデル
 
-Status: Phase B owner-use complete operating model; completed product release not claimed  
-Reference style: BLUE-TANUKI direct-main owner workflow  
-Scope: repository flow, safety posture, validation, backup, and reporting
+状態: Phase B の owner-use は完了。completed product release は未主張
+参照様式: BLUE-TANUKI の direct-main owner workflow
+適用範囲: repository の作業流、安全姿勢、validation、backup、報告
 
-## 1. Core posture
+## 1. 中核姿勢
 
-GUI Shell is a control plane, not a visual wrapper.
+GUI Shell は control plane であり、visual wrapper ではない。
 
-The repository must move in this order:
+repository は次の順序で進めなければならない。
 
-```text
+~~~text
 standard
   -> schema
   -> conformance
@@ -24,23 +24,23 @@ standard
   -> installer / update
   -> v1.0 release gate
   -> post-v1.0 mobile companion
-```
+~~~
 
-Later phases must not weaken earlier guarantees.
+後続 Phase は、先行する保証を弱めてはならない。
 
-## 2. Priority order
+## 2. 優先順位
 
-1. Safety
-2. Robustness
-3. Operator clarity / UX
-4. Product features
-5. Convenience
+1. 安全性
+2. 堅牢性
+3. operator にとっての明瞭さ／UX
+4. 製品機能
+5. 利便性
 
-Feature coverage and convenience are not valid reasons to weaken authority strip, content exposure, approval, audit, recovery, or schema validation.
+feature coverage と利便性は、authority strip、content exposure、approval、audit、recovery、schema validation を弱める正当な理由にならない。
 
-## 3. Boundary model
+## 3. 境界モデル
 
-```text
+~~~text
 Runtime
   -> Adapter
       -> schema validation
@@ -56,127 +56,127 @@ Runtime
       -> operator input
   -> Rust helper
       -> bounded native operation
-```
+~~~
 
-The UI can request and display. It cannot grant authority.
+UI は action を要求し、state を表示できる。authority を付与することはできない。
 
-Adapter metadata can describe. It cannot grant permissions.
+Adapter metadata は説明できる。permission を付与することはできない。
 
-Memory, cache, and previous state can inform UX. They cannot grant authority by themselves.
+memory、cache、previous state は UX の参考にできる。それ自体で authority を付与することはできない。
 
-## 4. Repository-state completion workflow
+## 4. repository state を完了させる作業流
 
-GUI Shell uses a two-generation direct-main backup flow. A repository-state-modifying task is not complete until implementation, validation, commit, push, remote HEAD verification, and two-generation backup verification are all closed.
+GUI Shell は、2世代の direct-main backup flow を使用する。repository state を変更する task は、implementation、validation、commit、push、remote HEAD verification、2世代 backup verification のすべてを閉じるまで完了ではない。
 
-Before changing files for a completed work block on `main`, verify the current pushed state:
+<code>main</code> 上で完了対象の work block に関する file を変更する前に、現在 push 済みの state を確認する。
 
-```bash
+~~~bash
 git fetch --prune origin
 git status --short --branch
-```
+~~~
 
-If `main` is not clean and aligned with `origin/main`, reconcile or report the blocker before editing.
+<code>main</code> が clean でなく、<code>origin/main</code> とも整合していない場合は、編集前に不整合を解消するか blocker を報告する。
 
-Then rotate local recovery branches to preserve the current pushed pre-change state:
+次に local recovery branch を rotate し、現在 push 済みの変更前 state を保存する。
 
-```bash
+~~~bash
 # If codex/backup-main already exists:
 git branch -f codex/backup-main-prev codex/backup-main
 
 # Always update the latest backup to the current pushed main:
 git branch -f codex/backup-main main
-```
+~~~
 
-Push backup generations as remote tags, not remote branches:
+backup generation は remote branch ではなく remote tag として push する。
 
-```bash
+~~~bash
 git push -f origin \
   codex/backup-main-prev:refs/tags/codex/backup-main-prev \
   codex/backup-main:refs/tags/codex/backup-main
-```
+~~~
 
-GitHub treats pushed backup branches as normal branches and may present them as pull request candidates. Remote tags provide off-machine recovery without creating pull request candidates.
+GitHub は push された backup branch を通常 branch として扱い、pull request candidate として表示し得る。remote tag なら、pull request candidate を作らずに off-machine recovery を提供できる。
 
-Then implement, validate, commit directly on `main`, and push `main` when credentials allow.
+その後 implementation と validation を行い、<code>main</code> へ直接 commit し、credential を利用できる場合は <code>main</code> を push する。
 
-After push, verify remote state:
+push 後は remote state を検証する。
 
-```bash
+~~~bash
 git rev-parse HEAD
 git ls-remote origin refs/heads/main
 git ls-remote --tags origin codex/backup-main codex/backup-main-prev
 git status --short --branch
-```
+~~~
 
-If remote backup branches already exist and the owner has not explicitly requested remote backup retention, delete them after `main` is clean and aligned:
+remote backup branch が既に存在し、owner が remote backup の保持を明示的に要求していない場合は、<code>main</code> が clean かつ整合した後に削除する。
 
-```bash
+~~~bash
 git push origin --delete codex/backup-main codex/backup-main-prev
-```
+~~~
 
-Push backup branches as remote branches only when the owner explicitly requests that exact emergency handoff. When this exception is used, report that GitHub may show those branches as pull request candidates, and do not open or merge pull requests from backup branches.
+owner がその exact emergency handoff を明示的に要求した場合に限り、backup branch を remote branch として push する。この例外を使った場合、GitHub がそれらを pull request candidate として表示し得ることを報告し、backup branch から pull request を open／merge しない。
 
-The repository keeps exactly two local backup branches and two remote backup tags:
+repository が保持するのは、正確に2本の local backup branch と2本の remote backup tag である。
 
-```text
+~~~text
 codex/backup-main
 codex/backup-main-prev
 refs/tags/codex/backup-main
 refs/tags/codex/backup-main-prev
-```
+~~~
 
-Do not create per-phase backup branches or extra backup generations.
+Phase ごとの backup branch または追加の backup generation を作成しない。
 
-## 5. Validation gates
+## 5. validation の gate
 
-GitHub Actions / CI workflow is not a GUI Shell quality gate. Do not place workflow YAML under `.github/workflows`; the validation basis is explicit owner / Codex local validation, smoke, release verification, and Windows device evidence.
+GitHub Actions／CI workflow は GUI Shell の quality gate ではない。<code>.github/workflows</code> 配下に workflow YAML を置かない。validation の基準は、owner／Codex が明示的に実行する local validation、smoke、release verification、Windows device evidence である。
 
-Minimum validation:
+最低限の validation:
 
-```bash
+~~~bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
-Fallback when `python` is unavailable:
+<code>python</code> が利用できない場合の代替:
 
-```bash
+~~~bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
-Conditional checks:
+条件付き check:
 
-```bash
+~~~bash
 cd native/rust_helper && cargo test
 cd apps/desktop_flutter && flutter analyze
-```
+~~~
 
-Report every command as passed, failed, or not run.
+各 command を passed、failed、not run のいずれかとして報告する。
 
-## 6. Change report format
+## 6. 変更報告の形式
 
-Every completed change report must include:
+完了した各変更報告には、次を含めなければならない。
 
-1. Summary
-2. Changed files
-3. Risk classification
-4. Validation results
-5. Release-gate classification
-6. Remaining risks
-7. Working branch
-8. Commit hash, or `not committed`
-9. Push result, or `not pushed`
-10. Remote HEAD verification
-11. Backup generation refs and hashes
-12. Rollback point
+1. 概要
+2. 変更 file
+3. risk 分類
+4. validation 結果
+5. release gate 分類
+6. 残存 risk
+7. 作業 branch
+8. commit hash、または <code>not committed</code>
+9. push 結果、または <code>not pushed</code>
+10. remote HEAD の確認
+11. backup generation の ref と hash
+12. rollback の point
 
-## 7. Release claim rule
+## 7. release claim の規則
 
-Do not claim release readiness until all applicable validation gates pass and the owner explicitly approves the release claim.
+適用されるすべての validation gate が通過し、owner が release claim を明示的に承認するまでは、release readiness を主張しない。
 
-Current claim boundary lives in:
+現在の claim boundary は次に置く。
 
-```text
+~~~text
 CLAIM.md
-```
+~~~

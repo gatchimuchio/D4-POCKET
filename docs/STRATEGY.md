@@ -1,52 +1,55 @@
-# GUI-Shell Strategy
+# GUI-Shell の戦略
 
-GUI-Shell v1.0 release is Windows-first PC desktop product release.
+GUI-Shell v1.0 の release は、Windows-first の PC desktop 向け product release とする。
 
-- item: skeleton, preview, alpha, beta, and scaffold states
+~~~yaml
+- item: skeleton、preview、alpha、beta、scaffold の各状態
   classification: release_blocker
-  reason: these states are not completed product release states.
+  reason: これらの状態は completed product release の状態ではない。
   blocks_release: yes
+~~~
 
-BLUE-TANUKI is a consumer/reference runtime and not a GUI-Shell release gate.
+BLUE-TANUKI は consumer／reference Runtime であり、GUI-Shell の release gate ではない。
 
-Agent Runtime support is part of the generic Shell strategy, but live third-party agent integrations may be `post_v1_scope` unless explicitly included by owner instruction.
+Agent Runtime support は汎用 Shell 戦略の一部である。ただし live third-party agent の integration は、owner instruction で明示的に含めない限り <code>post_v1_scope</code> としてよい。
 
-Platform priority:
+platform の優先順位:
 
-- Primary: Windows
-- Planned portability target: macOS
-- Development/verification slice: Linux
+- 第一対象: Windows
+- portability の計画対象: macOS
+- development／verification 用 slice: Linux
 
-GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete until validated on a macOS host.
+GUI-Shell v1.0 は検証済みの macOS support を主張しない。macOS は未検証（<code>unverified</code>）であり、macOS host で検証するまでは macOS support を supported、ready、complete と宣伝してはならない。
 
-## Product Definition
+## 製品定義
 
+~~~yaml
 - item: desktop operator app
   classification: required_for_v1
-  reason: Windows is the primary product target, macOS is planned unverified portability, and Linux is development verification.
+  reason: Windows が主要 product target、macOS が未検証の portability 計画対象、Linux が development verification である。
   blocks_release: yes
 
 - item: Linux desktop build and launch smoke
   classification: required_for_v1
-  reason: Linux desktop build and launch smoke passed on 2026-05-25 as development/verification proof, not final product proof by itself.
+  reason: Linux desktop build／launch smoke は 2026-05-25 に development／verification proof として通過したが、それだけでは最終 product proof ではない。
   blocks_release: no
 
 - item: Windows desktop release validation
   classification: release_blocker
-  reason: Historical Windows project/toolchain/build/launch smoke is owner-trial history only. Strict R2 release validation requires isolated installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product evidence.
-  required_action: Generate `release_evidence/windows_installed_smoke.json` on native Windows from a unique staged run and pass `python tooling\windows_release_evidence.py`.
+  reason: 過去の Windows project／toolchain／build／launch smoke は owner-trial の履歴にすぎない。strict R2 release validation には、source commit、clean worktree state、artifact hash、UIAutomation diagnostic tree、broker の measured field provenance、installed-app generated Setup Doctor product evidence を伴う isolated installed-path evidence が必要である。
+  required_action: native Windows の一意な staged run から release_evidence/windows_installed_smoke.json を生成し、python tooling/windows_release_evidence.py を通過させる。
   blocks_release: yes
 
 - item: macOS planned portability target
   classification: known_limitation
-  reason: no macOS validation environment is currently available, so GUI-Shell v1.0 does not claim verified macOS support.
-  required_action: Validate on a macOS host before claiming macOS support.
+  reason: 現在利用できる macOS validation environment がないため、GUI-Shell v1.0 は検証済み macOS support を主張しない。
+  required_action: macOS support を主張する前に macOS host で検証する。
   blocks_release: no
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: The installed app supports machine-readable Setup Doctor product export, but native Windows product evidence has not been collected. The PowerShell Setup Doctor collector is external probe evidence and is invalid as formal product evidence.
-  required_action: Collect installed-app generated machine-readable Setup Doctor export evidence through isolated Windows installed smoke.
+  reason: installed app は machine-readable Setup Doctor product export を扱うが、native Windows product evidence は未収集である。PowerShell Setup Doctor collector は external probe evidence であり、formal product evidence としては無効である。
+  required_action: isolated Windows installed smoke を介して、installed-app generated machine-readable Setup Doctor export evidence を収集する。
   blocks_release: yes
 
 - item: installer and first-run Setup Doctor
@@ -76,25 +79,28 @@ GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be 
 - item: adapter contract for arbitrary runtimes and agents
   classification: required_for_v1
   blocks_release: yes
+~~~
 
-## Scope Classification
+## 範囲の分類
 
+~~~yaml
 - item: Windows-first PC desktop single-user local-first release
   classification: known_limitation
-  reason: deliberate v1.0 scope.
+  reason: 意図的な v1.0 scope である。
   blocks_release: no
 
 - item: mobile full release
   classification: post_v1_scope
-  reason: outside v1.0 unless owner changes scope.
+  reason: owner が scope を変更しない限り v1.0 の対象外である。
   blocks_release: no
 
 - item: multi-user, cloud service, marketplace, enterprise admin
   classification: post_v1_scope
-  reason: outside v1.0 desktop product scope.
+  reason: v1.0 desktop product scope の対象外である。
   blocks_release: no
 
 - item: BLUE-TANUKI product completion
   classification: post_v1_scope
-  reason: BLUE-TANUKI consumes GUI-Shell through adapter contracts.
+  reason: BLUE-TANUKI は adapter contract を介して GUI-Shell を消費する。
   blocks_release: no
+~~~

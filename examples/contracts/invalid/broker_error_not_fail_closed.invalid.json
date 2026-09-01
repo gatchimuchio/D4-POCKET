@@ -1,6 +1,6 @@
 {
   "code": "broker_stale_session",
-  "message": "stale broker session rejected",
+  "message": "期限切れブローカーセッションを拒否",
   "recoverable": true,
   "audit_event_required": true,
   "fail_closed": false

@@ -1,110 +1,110 @@
-# Conformance Report
+# Conformance 報告
 
-## Current Conformance
+## 現行 conformance
 
-- item: schema check
+- item: schema 検査
   classification: required_for_v1
-  status: passed
-  evidence: `schema check passed: 26 schemas, 26 examples, 28 negative fixtures`
+  status: 通過
+  evidence: `schema checkが合格: schema 26件、example 26件、negative fixture 28件`
 
-- item: conformance checks
+- item: conformance 検査
   classification: required_for_v1
-  status: passed
-  evidence: `conformance skeleton passed: 139 checks`
+  status: 通過
+  evidence: `conformance skeletonが合格: 141 件のcheck`
 
-- item: conformance tautology fix
+- item: conformance の同義反復検査を修正
   classification: required_for_v1
-  status: resolved
-  evidence: authority stripping and approval edit guard checks now import and exercise production Shell Core implementations; see `docs/MUTATION_VERIFICATION.md`.
+  status: 解決済み
+  evidence: 権限除去と approval 編集 guard check は、製品 Shell Core 実装を import して実行する。`docs/MUTATION_VERIFICATION.md` を参照。
 
-- item: production authority strip mutation coverage
+- item: 製品権限除去の mutation coverage
   classification: required_for_v1
-  status: passed
-  evidence: mutating `adapter_loader.strip_authority_keys` to return input unchanged caused conformance failure; mutation was reverted and final conformance passed.
+  status: 通過
+  evidence: `adapter_loader.strip_authority_keys` が入力を未変更で返す mutation により conformance は失敗した。mutation を戻し、最終 conformance は通過した。
 
-- item: production approval guard mutation coverage
+- item: 製品 approval guard の mutation coverage
   classification: required_for_v1
-  status: passed
-  evidence: mutating `ApprovalQueue.can_edit` to always return `True` and mutating `ApprovalQueue.edit` to bypass protected-field guards both caused conformance failure; mutations were reverted and final conformance passed.
+  status: 通過
+  evidence: `ApprovalQueue.can_edit` が常に `True` を返す mutation と、`ApprovalQueue.edit` が保護 field guard を迂回する mutation はどちらも conformance を失敗させた。mutation を戻し、最終 conformance は通過した。
 
-- item: duplicate authority key definitions
+- item: 重複した権限 key 定義
   classification: required_for_v1
-  status: resolved
-  evidence: `packages/shell_core/authority_keys.py` is the single production source for `AUTHORITY_KEYS`; remaining duplicate definitions are classified as `release_blocker`.
+  status: 解決済み
+  evidence: `packages/shell_core/authority_keys.py` を `AUTHORITY_KEYS` の唯一の製品 source とする。残る重複定義は `release_blocker` と分類する。
 
-- item: ghost invariant measurement
+- item: ghost invariant 測定
   classification: required_for_v1
-  status: resolved
-  evidence: `packages/shell_core/state_snapshot.py` uses `InvariantEvaluator().evaluate()` instead of static invariant flags, and conformance checks intentional invariant violations.
+  status: 解決済み
+  evidence: `packages/shell_core/state_snapshot.py` は静的 invariant flag ではなく `InvariantEvaluator().evaluate()` を使い、conformance が意図的な invariant 違反を検査する。
 
-- item: normalization firewall
+- item: 正規化 firewall
   classification: required_for_v1
-  status: implemented
-  evidence: conformance covers `Trust_Level`, fullwidth `ｔｒｕｓｔ＿ｌｅｖｅｌ`, zero-width `trust\u200b_level`, `permissionGrant`, `admin_context`, nested frame metadata authority, value-only authority attempts, PolicyEvaluator adapter metadata normalization, and adapter metadata value-only rejection.
+  status: 実装済み
+  evidence: conformance は `Trust_Level`、全角 `ｔｒｕｓｔ＿ｌｅｖｅｌ`、zero-width `trust\u200b_level`、`permissionGrant`、`admin_context`、入れ子 frame metadata 権限、値のみの権限試行、PolicyEvaluator のadapter metadata正規化、adapter metadataの値のみの試行拒否を対象とする。
 
-- item: Flutter local Shell Core client
+- item: Flutter 局所 Shell Core client
   classification: required_for_v1
-  status: implemented
-  evidence: `ShellCoreClient.local()` reads structured local snapshot JSON instead of aliasing `mock()`, and Flutter tests verify local mode, Setup Doctor local diagnostics rendering, redacted content projection, and snapshot-sourced invariant flags.
+  status: 実装済み
+  evidence: `ShellCoreClient.local()` は `mock()` へ alias せず構造化した局所 snapshot JSON を読む。Flutter test は局所 mode、環境診断の局所診断描画、墨消し内容射影、snapshot 由来 invariant flag を検証する。
 
-- item: GUI operation surfaces
+- item: GUI 操作表層
   classification: required_for_v1
-  status: implemented
-  evidence: conformance verifies Trust Center, Authority Map, Adapter Catalog, Permission Diff, Problems Panel, Evidence Center, Command Palette, Audit Timeline actions, Recovery Playbook vocabulary, and Status Bar are present in the desktop Flutter surface.
+  status: 実装済み
+  evidence: conformance は、信頼センター、権限 map、Adapter catalog、Permission diff、問題 panel、証拠センター、Command palette、Audit timeline action、Recovery playbook 語彙、Status bar が desktop Flutter 表層にあることを検証する。
 
-- item: Shell snapshot generator
+- item: Shell snapshot 生成器
   classification: required_for_v1
-  status: implemented
-  evidence: `tooling/shell_snapshot.py` generates structured local snapshot JSON for Flutter local mode, including trust records, authority map, adapter catalog, permission diffs, problems, evidence, settings, Setup Doctor checks, and non-authoritative installer flags.
+  status: 実装済み
+  evidence: `tooling/shell_snapshot.py` は Flutter 局所 mode 用の構造化局所 snapshot JSON を生成する。これには trust record、権限 map、adapter catalog、permission diff、問題、証拠、設定、環境診断 check、非権限的 installer flag を含む。
 
-- item: Evidence bundle export
+- item: Evidence bundle 出力
   classification: required_for_v1
-  status: implemented
-  evidence: `tooling/evidence_bundle.py --check` validates a development evidence bundle that preserves release blocker metadata, keeps `release_ready=false`, and records Flutter/installer non-authority boundaries.
+  status: 実装済み
+  evidence: `tooling/evidence_bundle.py --check` は、release blocker metadata を保存し、`release_ready=false` を保ち、Flutter/installer 非権限境界を記録する開発 evidence bundle を検証する。
 
-- item: structured release blocker registry
+- item: 構造化 release blocker registry
   classification: required_for_v1
-  status: implemented
-  evidence: strict release mode reads `release_blockers.registry.json` and fails on unresolved active blockers instead of raw `release_blocker` text in policy or historical logs.
+  status: 実装済み
+  evidence: strict release mode は policy または履歴 log の生の `release_blocker` 文字列ではなく `release_blockers.registry.json` を読み、未解決の有効 blocker で失敗する。
 
-- item: artifact portability check
+- item: artifact portability 検査
   classification: required_for_v1
-  status: implemented
-  evidence: conformance verifies `tooling/packaging_portability_check.py` exists, rejects non-portable tracked paths, and runs manifest, conformance, and release gate after POSIX-locale `unzip` extraction.
+  status: 実装済み
+  evidence: conformance は `tooling/packaging_portability_check.py` の存在、portability のない追跡 path の拒否、POSIX locale で `unzip` 展開後の manifest、conformance、release gate 実行を検証する。
 
-- item: integrated Shell Core release smoke
+- item: 統合 Shell Core release smoke
   classification: required_for_v1
-  status: passed
-  evidence: production smoke covers save/load snapshot, append-only audit chain verification, HMAC audit anchor verification, tamper detection, approval edit rehash/revalidation, and recovery_id policy verification.
+  status: 通過
+  evidence: 製品 smoke は snapshot 保存/読込み、追記専用 audit chain 検証、HMAC audit anchor 検証、改変検知、approval 編集の再 hash/再検証、recovery_id policy 検証を対象とする。
 
-- item: first-run and Setup Doctor implementation smoke
+- item: 初回起動と環境診断の実装 smoke
   classification: required_for_v1
-  status: passed
-  evidence: `tooling/release_smoke.py` creates first-run config/audit paths, verifies audit writability, runs Setup Doctor, and confirms installer/setup state grants no authority and silently approves no permissions.
+  status: 通過
+  evidence: `tooling/release_smoke.py` は初回起動の config/audit path を作成し、audit 書込み可否を検証し、環境診断を実行し、installer/setup state が権限を与えず permission を暗黙承認しないことを確認する。
 
-- item: Windows installed-path evidence validator
+- item: Windows インストール先証拠検証器
   classification: required_for_v1
-  status: implemented
-  evidence: conformance accepts only the strict R2 `release_evidence/windows_installed_smoke.json` shape and rejects missing provenance/isolation, external Setup Doctor probe as product evidence, missing installed executable confirmation, installer authority grants, authority-granting Setup Doctor checks, unmeasured/manual GUI visibility evidence, missing UIAutomation diagnostic tree, missing config/audit probes, synthetic Setup Doctor evidence, shallow one-check Setup Doctor payloads, aggregate native surface evidence, and broker top-level unmeasured authority declarations.
+  status: 実装済み
+  evidence: conformance は厳格 R2 の `release_evidence/windows_installed_smoke.json` 形式だけを受理する。由来/分離の欠落、外部環境診断確認を製品証拠とすること、インストール済み実行ファイル確認の欠落、installer による権限付与、権限を与える環境診断 check、未実測/手動 GUI 可視性証拠、UIAutomation 診断 tree の欠落、config/audit 確認の欠落、合成環境診断証拠、単一 check だけの浅い環境診断 payload、集約 native 表層証拠、broker 最上位の未実測権限宣言を拒否する。
 
-## Not Sufficient For Release
+## Release に不十分な項目
 
-- item: cargo test gate
+- item: cargo test 用 gate
   classification: required_for_v1
-  reason: Rust helper is in v1.0 scope and current validation passes.
-  required_action: Keep `cd native/rust_helper && cargo test` passing.
+  reason: Rust helper はv1.0範囲にあり、現行検証は通過する。
+  required_action: `cd native/rust_helper && cargo test` を通過する状態に保つ。
   blocks_release: no
 
-- item: desktop flutter analyze gate
+- item: desktop Flutter analyze 用 gate
   classification: required_for_v1
-  reason: desktop app is in v1.0 scope and current validation passes.
-  required_action: Keep `cd apps/desktop_flutter && flutter analyze` passing.
+  reason: desktop app はv1.0範囲にあり、現行検証は通過する。
+  required_action: `cd apps/desktop_flutter && flutter analyze` を通過する状態に保つ。
   blocks_release: no
 
-- item: strict release validation not pass
+- item: 厳格 release 検証は未通過
   classification: release_blocker
-  reason: completed product release requires strict release validation.
-  required_action: Pass `python3 tooling/validate_all.py --strict-release`.
+  reason: 完成製品 release には厳格 release 検証が必要である。
+  required_action: `python3 tooling/validate_all.py --strict-release` を通過する。
   blocks_release: yes
 
-Conformance report must not imply production readiness.
+Conformance 報告は製品 readiness を示唆してはならない。

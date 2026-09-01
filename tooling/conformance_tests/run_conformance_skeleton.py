@@ -189,7 +189,7 @@ def sha256_tagged(payload: bytes) -> str:
 
 
 def metadata_permissions(adapter: dict) -> list[str]:
-    # Adapter metadata is descriptive only. Permission-like metadata must be ignored.
+    # Adapterのmetadataは説明用に限り、permissionのようなmetadataは無視しなければならない。
     return list(adapter.get("declared_capabilities", []))
 
 
@@ -213,7 +213,7 @@ def render_approval_content(approval: dict) -> dict:
         return {"redacted_payload": approval.get("redacted_payload", {})}
     if visibility == "full":
         return {"full_payload": approval.get("full_payload", {})}
-    raise ValueError(f"unknown content visibility: {visibility}")
+    raise ValueError(f"未知のcontent visibility: {visibility}")
 
 
 def sensitive_action_mapping_is_complete(action: dict) -> bool:
@@ -244,14 +244,14 @@ def test_required_docs_exist() -> list[str]:
     }
     existing = {path.name for path in DOC_SPECS.glob("*.md")}
     for missing in sorted(required_docs - existing):
-        errors.append(f"docs/specs/{missing} missing")
+        errors.append(f"docs/specs/{missing} が存在しない")
     return errors
 
 
 def test_gui_shell_spec_v1_declares_core_boundaries() -> list[str]:
     path = DOC_SPECS / "gui-shell-spec-v1.md"
     if not path.exists():
-        return ["docs/specs/gui-shell-spec-v1.md missing"]
+        return ["docs/specs/gui-shell-spec-v1.md が存在しない"]
     text = path.read_text(encoding="utf-8")
     required_tokens = [
         "Runtime Operation Shell",
@@ -271,7 +271,7 @@ def test_gui_shell_spec_v1_declares_core_boundaries() -> list[str]:
         "explicit owner GO",
     ]
     return [
-        f"docs/specs/gui-shell-spec-v1.md missing required token: {token}"
+        f"docs/specs/gui-shell-spec-v1.md に必須tokenがない: {token}"
         for token in required_tokens
         if token not in text
     ]
@@ -282,15 +282,15 @@ def test_contract_fixtures_are_available() -> list[str]:
     expected = {f"{name}.valid.json" for name in REQUIRED_SCHEMA_NAMES}
     existing = {path.name for path in CONTRACT_EXAMPLES.glob("*.valid.json")}
     for missing in sorted(expected - existing):
-        errors.append(f"examples/contracts/{missing} missing")
+        errors.append(f"examples/contracts/{missing} が存在しない")
     for name in sorted(expected & existing):
         try:
             fixture = load_contract_fixture(name)
         except Exception as exc:
-            errors.append(f"examples/contracts/{name} did not parse: {exc}")
+            errors.append(f"examples/contracts/{name} を解析できない: {exc}")
             continue
         if not isinstance(fixture, dict):
-            errors.append(f"examples/contracts/{name} must be a JSON object")
+            errors.append(f"examples/contracts/{name} はJSON objectでなければならない")
     return errors
 
 
@@ -308,9 +308,9 @@ def test_negative_contract_fixtures_cover_all_schemas() -> list[str]:
     covered = {schema_name_from_invalid_fixture(path) for path in invalid_paths}
     errors = []
     for missing in sorted(REQUIRED_SCHEMA_NAMES - covered):
-        errors.append(f"examples/contracts/invalid missing negative fixture for {missing}")
+        errors.append(f"examples/contracts/invalid に{missing}用のnegative fixtureがない")
     if len(invalid_paths) < len(REQUIRED_SCHEMA_NAMES):
-        errors.append("negative contract fixtures must cover every schema")
+        errors.append("negative contract fixtureはすべてのschemaを対象にしなければならない")
     return errors
 
 
@@ -320,9 +320,9 @@ def test_adapter_authority_strip_schema() -> list[str]:
     required = set(schema.get("required", []))
     authority_strip = schema["properties"].get("authority_strip", {})
     if "authority_strip" not in required:
-        errors.append("adapter.schema.json must require authority_strip")
+        errors.append("adapter.schema.jsonはauthority_stripを必須にしなければならない")
     if authority_strip.get("const") is not True:
-        errors.append("adapter.schema.json must require authority_strip=true")
+        errors.append("adapter.schema.jsonはauthority_strip=trueを必須にしなければならない")
     return errors
 
 
@@ -342,9 +342,9 @@ def test_inbound_authority_keys_are_stripped() -> list[str]:
     errors = []
     for key in AUTHORITY_KEYS:
         if f'"{key}"' in encoded:
-            errors.append(f"inbound authority key was not stripped: {key}")
+            errors.append(f"入力側のauthority keyが除去されていない: {key}")
     if stripped["payload"]["nested"].get("value") != 1:
-        errors.append("authority strip removed safe nested payload")
+        errors.append("authority除去が安全なnested payloadまで除去した")
     return errors
 
 
@@ -368,14 +368,14 @@ def test_adapter_loader_strips_authority_metadata_from_effective_payload() -> li
     errors = []
     for forbidden in ["admin", "all", "approved", "root"]:
         if forbidden in encoded:
-            errors.append(f"authority value survived adapter metadata strip: {forbidden}")
+            errors.append(f"authority valueがadapter metadata除去後も残った: {forbidden}")
     for key in AUTHORITY_KEYS:
         if f'"{key}"' in encoded:
-            errors.append(f"authority key survived adapter metadata strip: {key}")
+            errors.append(f"authority keyがadapter metadata除去後も残った: {key}")
     if record.metadata != {"safe_label": "reference"}:
-        errors.append("adapter metadata strip removed safe metadata or left authority metadata")
+        errors.append("adapter metadata除去が安全なmetadataを除去したか、authority metadataを残した")
     if record.effective_capabilities() != ("filesystem.read",):
-        errors.append("adapter metadata changed effective capabilities")
+        errors.append("adapter metadataがeffective capabilitiesを変更した")
     return errors
 
 
@@ -386,7 +386,7 @@ def test_adapter_loader_rejects_value_only_authority_metadata() -> list[str]:
         load_adapter(adapter)
     except ValueError:
         return []
-    return ["adapter loader accepted value-only authority metadata"]
+    return ["adapter loaderがvalue-only authority metadataを受け入れた"]
 
 
 def test_runtime_state_adapter_registration_uses_loader_boundary() -> list[str]:
@@ -397,9 +397,9 @@ def test_runtime_state_adapter_registration_uses_loader_boundary() -> list[str]:
     stored = state.adapters.get(adapter["adapter_id"], {})
     errors = []
     if "permission_grant" in json.dumps(stored.get("metadata", {}), sort_keys=True):
-        errors.append("RuntimeState.register_adapter stored stripped authority metadata")
+        errors.append("RuntimeState.register_adapterが除去対象のauthority metadataを保存した")
     if stored.get("metadata") != {"safe_label": "reference"}:
-        errors.append("RuntimeState.register_adapter did not preserve safe stripped metadata")
+        errors.append("RuntimeState.register_adapterが除去処理後の安全なmetadataを保持しなかった")
     return errors
 
 
@@ -417,15 +417,15 @@ def test_normalization_firewall_rejects_authority_aliases() -> list[str]:
     errors = []
     for key in ["Trust_Level", "ｔｒｕｓｔ＿ｌｅｖｅｌ", "trust\u200b_level"]:
         if normalize_key(key) != "trust_level":
-            errors.append(f"normalization did not canonicalize key: {key}")
+            errors.append(f"normalizationがkeyを正規化しなかった: {key}")
     if normalized["quarantined"] is not True:
-        errors.append("normalization firewall did not quarantine authority-bearing payload")
+        errors.append("normalization firewallがauthorityを含むpayloadを隔離しなかった")
     if not normalized["audit_event"].get("raw_payload_preserved"):
-        errors.append("normalization firewall did not preserve raw payload for audit")
+        errors.append("normalization firewallがaudit用のraw payloadを保持しなかった")
     stripped = json.dumps(normalized["stripped_payload"], sort_keys=True)
     for forbidden in ["trust_level", "permission_grant", "admin_context", "authority"]:
         if forbidden in stripped:
-            errors.append(f"authority key survived normalization strip: {forbidden}")
+            errors.append(f"authority keyがnormalization除去後も残った: {forbidden}")
     return errors
 
 
@@ -434,11 +434,11 @@ def test_normalization_firewall_detects_value_only_escalation() -> list[str]:
     normalized = normalize_inbound_payload(payload)
     errors = []
     if normalized["quarantined"] is not True:
-        errors.append("normalization firewall did not quarantine value-only authority attempt")
+        errors.append("normalization firewallがvalue-only authority試行を隔離しなかった")
     if not normalized["authority_value_findings"]:
-        errors.append("normalization firewall did not record authority value finding")
+        errors.append("normalization firewallがauthority valueの検出を記録しなかった")
     if normalized["stripped_payload"].get("metadata", {}).get("safe_note") != "operator visible":
-        errors.append("normalization firewall removed safe metadata while detecting value-only escalation")
+        errors.append("normalization firewallがvalue-only escalation検出時に安全なmetadataまで除去した")
     return errors
 
 
@@ -446,11 +446,11 @@ def test_normalization_firewall_detects_key_collisions() -> list[str]:
     normalized = normalize_inbound_payload({"safeLabel": "first", "safe_label": "second"})
     errors = []
     if normalized["quarantined"] is not True:
-        errors.append("normalization firewall did not quarantine normalized key collision")
+        errors.append("normalization firewallがnormalized keyの衝突を隔離しなかった")
     if not normalized.get("normalization_collision_findings"):
-        errors.append("normalization firewall did not record normalized key collision")
+        errors.append("normalization firewallがnormalized keyの衝突を記録しなかった")
     if normalized["audit_event"].get("normalization_collision_count") != 1:
-        errors.append("normalization firewall did not count normalized key collision")
+        errors.append("normalization firewallがnormalized keyの衝突を計数しなかった")
     return errors
 
 
@@ -463,20 +463,20 @@ def test_external_metadata_cannot_escalate_authority() -> list[str]:
     }
     effective = metadata_permissions(adapter)
     if effective != adapter["declared_capabilities"]:
-        return ["adapter metadata escalated effective permissions"]
+        return ["adapter metadataがeffective permissionsを昇格させた"]
     return []
 
 
 def test_gui_input_cannot_create_runtime_disallowed_authority_context() -> list[str]:
     errors = []
     if can_create_authority_context("gui", runtime_allowed=True):
-        errors.append("GUI input created authority context")
+        errors.append("GUI inputがauthority contextを作成した")
     if can_create_authority_context("adapter", runtime_allowed=True):
-        errors.append("adapter input created authority context directly")
+        errors.append("adapter inputがauthority contextを直接作成した")
     if can_create_authority_context("runtime", runtime_allowed=False):
-        errors.append("runtime-disallowed authority context was created")
+        errors.append("runtimeで禁止されたauthority contextが作成された")
     if not can_create_authority_context("runtime", runtime_allowed=True):
-        errors.append("runtime-allowed authority context was denied")
+        errors.append("runtimeで許可されたauthority contextが拒否された")
     return errors
 
 
@@ -484,9 +484,9 @@ def test_memory_cache_previous_state_cannot_grant_authority() -> list[str]:
     errors = []
     for source in sorted(NON_AUTHORITY_SOURCES):
         if source_can_grant_authority(source):
-            errors.append(f"{source} granted authority")
+            errors.append(f"{source} がauthorityを付与した")
     if source_can_grant_authority("unknown_future_source"):
-        errors.append("unknown source granted authority")
+        errors.append("未知のsourceがauthorityを付与した")
     return errors
 
 
@@ -496,12 +496,12 @@ def test_content_exposure_contract() -> list[str]:
     errors = []
     default_visibility = schema["properties"]["default_visibility"]
     if default_visibility.get("const") != "none":
-        errors.append("content exposure default_visibility must be const none")
+        errors.append("content exposureのdefault_visibilityはconst noneでなければならない")
     if fixture.get("default_visibility") != "none":
-        errors.append("content exposure valid fixture default_visibility must be none")
+        errors.append("content exposureのvalid fixtureではdefault_visibilityがnoneでなければならない")
     enum = schema["properties"]["allowed_visibility"]["items"]["enum"]
     if enum != VISIBILITY_VALUES:
-        errors.append("content exposure allowed_visibility enum must match locked order")
+        errors.append("content exposureのallowed_visibility enumは固定順序と一致しなければならない")
     return errors
 
 
@@ -511,11 +511,11 @@ def test_full_content_only_visible_when_full() -> list[str]:
     for visibility in VISIBILITY_VALUES:
         rendered = render_approval_content({**base, "content_visibility": visibility})
         if visibility != "full" and "full_payload" in rendered:
-            errors.append(f"full payload rendered for content_visibility={visibility}")
+            errors.append(f"content_visibility={visibility}でfull payloadが描画された")
         if visibility == "hash_only" and set(rendered) != {"payload_hash"}:
-            errors.append("hash_only rendered more than payload_hash")
+            errors.append("hash_onlyがpayload_hashを超える内容を描画した")
         if visibility == "none" and rendered:
-            errors.append("none visibility rendered content")
+            errors.append("none visibilityでcontentが描画された")
     return errors
 
 
@@ -525,7 +525,7 @@ def test_approval_schema_has_protected_field_sets() -> list[str]:
     errors = []
     for field in ["authority_fields", "sealed_fields", "hidden_fields", "sacred_fields"]:
         if field not in properties:
-            errors.append(f"approval.schema.json missing {field}")
+            errors.append(f"approval.schema.jsonに{field}がない")
     return errors
 
 
@@ -544,19 +544,19 @@ def test_protected_approval_fields_cannot_be_edited() -> list[str]:
     errors = []
     for field in ["authority_context", "runtime_id", "credential", "permission_id", "payload_hash"]:
         if queue.can_edit(approval["approval_id"], field):
-            errors.append(f"protected approval field was editable: {field}")
+            errors.append(f"保護されたapproval fieldが編集可能だった: {field}")
         before = queue.get(approval["approval_id"])
         try:
             queue.edit(approval["approval_id"], field, "mutated")
         except ValueError:
             pass
         else:
-            errors.append(f"protected approval field was written: {field}")
+            errors.append(f"保護されたapproval fieldが書き込まれた: {field}")
         after = queue.get(approval["approval_id"])
         if after != before:
-            errors.append(f"protected approval mutation changed queued approval: {field}")
+            errors.append(f"保護されたapprovalの変更がqueued approvalを変更した: {field}")
     if not queue.can_edit(approval["approval_id"], "path"):
-        errors.append("allowed non-protected approval field was not editable")
+        errors.append("許可された非保護のapproval fieldが編集できなかった")
     return errors
 
 
@@ -576,11 +576,11 @@ def test_approval_edits_are_rehashed_and_revalidated() -> list[str]:
     edited = queue.edit("approval-edit-1", "allowed_note", "after")
     errors = []
     if edited["payload_hash"] == approval["payload_hash"]:
-        errors.append("approval edit did not change payload_hash")
+        errors.append("approval編集がpayload_hashを変更しなかった")
     if edited["payload_hash"] != canonical_hash({"allowed_note": "after"}):
-        errors.append("approval edit payload_hash was not canonical")
+        errors.append("approval編集後のpayload_hashがcanonicalではなかった")
     if edited["status"] != "requires_validation":
-        errors.append("approval edit did not require revalidation")
+        errors.append("approval編集が再検証を必須にしなかった")
     return errors
 
 
@@ -604,9 +604,9 @@ def test_sensitive_actions_map_to_audit_and_recovery() -> list[str]:
     }
     errors = []
     if not sensitive_action_mapping_is_complete(complete):
-        errors.append("complete sensitive action mapping was rejected")
+        errors.append("完全なsensitive action mappingが拒否された")
     if sensitive_action_mapping_is_complete(incomplete):
-        errors.append("sensitive action mapping passed without RecoveryAction")
+        errors.append("sensitive action mappingがRecoveryActionなしで通過した")
     return errors
 
 
@@ -614,26 +614,26 @@ def test_hash_patterns_are_tagged_sha256() -> list[str]:
     errors = []
     sample = sha256_tagged(b"approval")
     if not sample.startswith("sha256:") or len(sample) != 71:
-        errors.append("sha256_tagged helper invariant failed")
+        errors.append("sha256_tagged helperのinvariantが失敗した")
     for schema_name in ["approval.schema.json", "audit.schema.json"]:
         schema = load_schema(schema_name)
         pattern = schema["properties"]["payload_hash"].get("pattern", "")
         if "sha256:" not in pattern:
-            errors.append(f"{schema_name} payload_hash must use tagged sha256 pattern")
+            errors.append(f"{schema_name} のpayload_hashはtagged sha256 patternを使わなければならない")
     return errors
 
 
 def test_framework_risk_profile_exists() -> list[str]:
     path = SPECS / "framework_risk_profile.schema.json"
     if not path.exists():
-        return ["framework_risk_profile.schema.json missing"]
+        return ["framework_risk_profile.schema.jsonが存在しない"]
     return []
 
 
 def test_update_fixture_requires_signature() -> list[str]:
     update = load_contract_fixture("update.valid.json")
     if update.get("signature_required") is not True:
-        return ["update valid fixture does not require signatures"]
+        return ["updateのvalid fixtureがsignatureを必須にしていない"]
     return []
 
 
@@ -643,9 +643,9 @@ def test_update_policy_unsigned_rejection_uses_taxonomy() -> list[str]:
         store.register({"policy_id": "unsigned-policy", "signature_required": False})
     except ValueError as exc:
         if "update_signature_required" not in str(exc):
-            return ["UpdatePolicyStore unsigned rejection did not use update_signature_required taxonomy"]
+            return ["UpdatePolicyStoreのunsigned拒否がupdate_signature_required taxonomyを使っていない"]
         return []
-    return ["UpdatePolicyStore accepted unsigned update policy"]
+    return ["UpdatePolicyStoreがunsigned update policyを受け入れた"]
 
 
 def test_shell_contracts_load_required_schemas() -> list[str]:
@@ -654,7 +654,7 @@ def test_shell_contracts_load_required_schemas() -> list[str]:
     loaded = set(catalog.names())
     missing = sorted(expected - loaded)
     if missing:
-        return [f"shell_contracts catalog missing schema: {name}" for name in missing]
+        return [f"shell_contracts catalogにschemaがない: {name}" for name in missing]
     return []
 
 
@@ -670,7 +670,7 @@ def test_shell_core_ignores_adapter_metadata_permissions() -> list[str]:
     except ValueError:
         return []
     if record.effective_capabilities() != tuple(adapter["declared_capabilities"]):
-        return ["Shell Core trusted adapter metadata for permissions"]
+        return ["Shell Coreがpermissionのadapter metadataを信頼した"]
     return []
 
 
@@ -679,9 +679,9 @@ def test_shell_core_non_authority_sources_do_not_grant_authority() -> list[str]:
     errors = []
     for source in sorted(NON_AUTHORITY_SOURCES):
         if ledger.can_grant_authority_from_source(source):
-            errors.append(f"Shell Core treated {source} as authority")
+            errors.append(f"Shell Coreが{source}をauthorityとして扱った")
     if ledger.can_grant_authority_from_source("unknown_future_source"):
-        errors.append("Shell Core treated unknown source as authority")
+        errors.append("Shell Coreが未知のsourceをauthorityとして扱った")
     return errors
 
 
@@ -705,9 +705,9 @@ def test_shell_core_routes_sensitive_actions_through_required_mapping() -> list[
     )
     errors = []
     if routed.get("routed") is not False:
-        errors.append("Shell Core routed sensitive action without evaluator state")
+        errors.append("Shell Coreがevaluator stateなしでsensitive actionをroutedした")
     if "schema_contract_missing" not in error_codes(routed.get("policy_result", {})):
-        errors.append("Shell Core did not expose fail-closed missing evaluator result")
+        errors.append("Shell Coreがevaluator result欠落時のfail-closedを公開しなかった")
     try:
         router.route(
             {
@@ -722,7 +722,7 @@ def test_shell_core_routes_sensitive_actions_through_required_mapping() -> list[
         )
     except ValueError:
         return errors
-    errors.append("Shell Core routed sensitive action without RecoveryAction")
+    errors.append("Shell CoreがRecoveryActionなしでsensitive actionをroutedした")
     return errors
 
 
@@ -732,7 +732,7 @@ def test_shell_core_content_projection_hides_full_payload_until_full() -> list[s
     for visibility in VISIBILITY_VALUES:
         projected = project_approval_content({**approval, "content_visibility": visibility})
         if visibility != "full" and "full_payload" in projected:
-            errors.append(f"Shell Core projected full_payload for {visibility}")
+            errors.append(f"Shell Coreが{visibility}でfull_payloadを射影した")
     return errors
 
 
@@ -742,9 +742,9 @@ def test_content_projection_missing_visibility_fails_closed() -> list[str]:
     projected = project_approval_content(approval)
     error = projected.get("error", {})
     if error.get("code") != "content_visibility_violation":
-        return ["missing content_visibility did not return structured fail-closed projection error"]
+        return ["content_visibility欠落が構造化されたfail-closedのprojection errorを返さなかった"]
     if "full_payload" in projected:
-        return ["missing content_visibility exposed full_payload"]
+        return ["content_visibility欠落時にfull_payloadが公開された"]
     return []
 
 
@@ -757,7 +757,7 @@ def test_shell_core_has_no_flutter_imports() -> list[str]:
         for line_number, line in enumerate(text.splitlines(), start=1):
             normalized = line.strip().lower()
             if normalized.startswith("import flutter") or normalized.startswith("from flutter"):
-                errors.append(f"{path}:{line_number} imports Flutter")
+                errors.append(f"{path}:{line_number} がFlutterをimportしている")
     return errors
 
 
@@ -770,7 +770,7 @@ def test_shell_core_has_no_blue_tanuki_internal_imports() -> list[str]:
         for line_number, line in enumerate(text.splitlines(), start=1):
             normalized = line.strip().lower()
             if normalized.startswith("import blue_tanuki") or normalized.startswith("from blue_tanuki"):
-                errors.append(f"{path}:{line_number} imports BLUE-TANUKI internals")
+                errors.append(f"{path}:{line_number} がBLUE-TANUKI内部をimportしている")
     return errors
 
 
@@ -819,7 +819,7 @@ def test_policy_evaluator_rejects_unknown_capability() -> list[str]:
     action["capability_id"] = "unknown.capability"
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "unknown_capability" not in error_codes(result):
-        return ["PolicyEvaluator did not reject unknown capability"]
+        return ["PolicyEvaluatorが未知のcapabilityを拒否しなかった"]
     return []
 
 
@@ -831,13 +831,13 @@ def test_policy_evaluator_returns_structured_errors() -> list[str]:
     errors = []
     required = {"code", "message", "operation", "recoverable"}
     if not result["errors"]:
-        return ["PolicyEvaluator returned no error for invalid action"]
+        return ["PolicyEvaluatorが無効なactionでerrorを返さなかった"]
     for error in result["errors"]:
         missing = sorted(required - set(error))
         if missing:
-            errors.append(f"PolicyEvaluator error missing fields: {', '.join(missing)}")
+            errors.append(f"PolicyEvaluatorのerrorにfieldがない: {', '.join(missing)}")
         if error.get("code") == "unknown_capability" and "recovery_hint" not in error:
-            errors.append("PolicyEvaluator recoverable error missing recovery_hint")
+            errors.append("PolicyEvaluatorのrecoverable errorにrecovery_hintがない")
     return errors
 
 
@@ -847,7 +847,7 @@ def test_policy_evaluator_rejects_unknown_permission() -> list[str]:
     action["permission_id"] = "unknown.permission"
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "unknown_permission" not in error_codes(result):
-        return ["PolicyEvaluator did not reject unknown permission"]
+        return ["PolicyEvaluatorが未知のpermissionを拒否しなかった"]
     return []
 
 
@@ -855,7 +855,7 @@ def test_policy_evaluator_rejects_denied_permission() -> list[str]:
     state = build_policy_state(permission_decision="deny")
     result = PolicyEvaluator(state).evaluate(build_sensitive_action())
     if result["allowed"] or "permission_denied" not in error_codes(result):
-        return ["PolicyEvaluator did not reject denied permission"]
+        return ["PolicyEvaluatorが拒否されたpermissionを拒否しなかった"]
     return []
 
 
@@ -866,7 +866,7 @@ def test_policy_evaluator_rejects_missing_approval() -> list[str]:
     action.pop("approval_id")
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "approval_missing" not in error_codes(result):
-        return ["PolicyEvaluator did not reject missing approval"]
+        return ["PolicyEvaluatorが欠落したapprovalを拒否しなかった"]
     return []
 
 
@@ -877,7 +877,7 @@ def test_policy_evaluator_rejects_self_reported_approval_without_approval_id() -
     action["approval_state"] = "approved"
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "approval_missing" not in error_codes(result):
-        return ["PolicyEvaluator trusted self-reported approval_state without approval_id"]
+        return ["PolicyEvaluatorがapproval_idなしの自己申告approval_stateを信頼した"]
     return []
 
 
@@ -888,7 +888,7 @@ def test_policy_evaluator_rejects_unknown_approval_id() -> list[str]:
     action["approval_state"] = "approved"
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "approval_missing" not in error_codes(result):
-        return ["PolicyEvaluator accepted unknown approval_id"]
+        return ["PolicyEvaluatorが未知のapproval_idを受け入れた"]
     return []
 
 
@@ -898,7 +898,7 @@ def test_policy_evaluator_uses_runtime_state_approval_status() -> list[str]:
     action["approval_state"] = "pending"
     result = PolicyEvaluator(state).evaluate(action)
     if not result["allowed"]:
-        return ["PolicyEvaluator rejected approved RuntimeState approval because action self-report differed"]
+        return ["PolicyEvaluatorがactionの自己申告差だけを理由に、RuntimeStateでapprovedのapprovalを拒否した"]
     return []
 
 
@@ -908,7 +908,7 @@ def test_policy_evaluator_rejects_unapproved_runtime_state_approval() -> list[st
     action["approval_state"] = "approved"
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "approval_not_valid" not in error_codes(result):
-        return ["PolicyEvaluator trusted action approval_state over RuntimeState approval status"]
+        return ["PolicyEvaluatorがRuntimeStateのapproval statusよりactionのapproval_stateを信頼した"]
     return []
 
 
@@ -918,7 +918,7 @@ def test_policy_evaluator_rejects_missing_audit_event() -> list[str]:
     action.pop("audit_event")
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "audit_mapping_missing" not in error_codes(result):
-        return ["PolicyEvaluator did not reject missing audit event"]
+        return ["PolicyEvaluatorが欠落したaudit eventを拒否しなかった"]
     return []
 
 
@@ -928,7 +928,7 @@ def test_policy_evaluator_rejects_missing_recovery_action() -> list[str]:
     action.pop("recovery_action")
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "recovery_mapping_missing" not in error_codes(result):
-        return ["PolicyEvaluator did not reject missing recovery action"]
+        return ["PolicyEvaluatorが欠落したrecovery actionを拒否しなかった"]
     return []
 
 
@@ -938,7 +938,7 @@ def test_policy_evaluator_rejects_unknown_recovery_id() -> list[str]:
     action["recovery_action"] = {"recovery_id": "recover-does-not-exist"}
     result = PolicyEvaluator(state).evaluate(action)
     if result["allowed"] or "recovery_mapping_missing" not in error_codes(result):
-        return ["PolicyEvaluator accepted unknown recovery_id"]
+        return ["PolicyEvaluatorが未知のrecovery_idを受け入れた"]
     return []
 
 
@@ -946,7 +946,7 @@ def test_policy_evaluator_accepts_known_recovery_id() -> list[str]:
     state = build_policy_state()
     result = PolicyEvaluator(state).evaluate(build_sensitive_action())
     if not result["allowed"]:
-        return ["PolicyEvaluator rejected known recovery_id with otherwise valid action"]
+        return ["PolicyEvaluatorがその他は有効なactionで既知のrecovery_idを拒否した"]
     return []
 
 
@@ -956,7 +956,7 @@ def test_policy_evaluator_ignores_adapter_metadata_authority() -> list[str]:
     action["adapter_metadata"] = {"permissions": ["filesystem.write"], "trust_level": "root"}
     result = PolicyEvaluator(state).evaluate(action)
     if "adapter_metadata_escalation_attempt" not in error_codes(result):
-        return ["PolicyEvaluator did not flag adapter metadata authority claims"]
+        return ["PolicyEvaluatorがadapter metadataのauthority claimを検出しなかった"]
     return []
 
 
@@ -975,7 +975,7 @@ def test_policy_evaluator_normalizes_adapter_metadata_authority() -> list[str]:
         action["adapter_metadata"] = metadata
         result = PolicyEvaluator(state).evaluate(action)
         if result["allowed"] or "adapter_metadata_escalation_attempt" not in error_codes(result):
-            errors.append(f"PolicyEvaluator did not normalize and reject adapter metadata: {metadata}")
+            errors.append(f"PolicyEvaluatorがadapter metadataをnormalizeして拒否しなかった: {metadata}")
     return errors
 
 
@@ -987,7 +987,7 @@ def test_policy_evaluator_rejects_non_authority_source() -> list[str]:
         action["authority_source"] = source
         result = PolicyEvaluator(state).evaluate(action)
         if result["allowed"] or "non_authority_source_attempt" not in error_codes(result):
-            errors.append(f"PolicyEvaluator allowed non-authority source: {source}")
+            errors.append(f"PolicyEvaluatorが非authorityのsourceを許可した: {source}")
     return errors
 
 
@@ -1000,7 +1000,7 @@ def test_policy_evaluator_enforces_action_envelope_relations() -> list[str]:
         mutate(state, action)
         result = PolicyEvaluator(state).evaluate(action)
         if result["allowed"] or expected_code not in error_codes(result):
-            errors.append(f"PolicyEvaluator did not reject {label}: {result}")
+            errors.append(f"PolicyEvaluatorが{label}を拒否しなかった: {result}")
 
     assert_error(
         "runtime capability mismatch",
@@ -1030,9 +1030,9 @@ def test_policy_evaluator_enforces_action_envelope_relations() -> list[str]:
 
     allowed = PolicyEvaluator(build_policy_state(approval_status="approved")).evaluate(build_sensitive_action())
     if allowed["allowed"] is not True:
-        errors.append(f"PolicyEvaluator rejected valid ActionEnvelope relation: {allowed}")
+        errors.append(f"PolicyEvaluatorが有効なActionEnvelope relationを拒否した: {allowed}")
     if not allowed.get("action_envelope"):
-        errors.append("PolicyEvaluator did not return validated action_envelope")
+        errors.append("PolicyEvaluatorが検証済みaction_envelopeを返さなかった")
     return errors
 
 
@@ -1041,9 +1041,9 @@ def test_sensitive_action_router_uses_policy_evaluator_when_state_is_provided() 
     routed = SensitiveActionRouter(state).route(build_sensitive_action())
     errors = []
     if routed.get("routed") is not True:
-        errors.append("policy-backed SensitiveActionRouter did not route allowed action")
+        errors.append("policy-backed SensitiveActionRouterが許可済みactionをrouteしなかった")
     if routed.get("policy_result", {}).get("allowed") is not True:
-        errors.append("policy-backed SensitiveActionRouter missing allowed policy result")
+        errors.append("policy-backed SensitiveActionRouterに許可済みpolicy resultがない")
     return errors
 
 
@@ -1052,9 +1052,9 @@ def test_sensitive_action_router_blocks_policy_denied_action() -> list[str]:
     routed = SensitiveActionRouter(state).route(build_sensitive_action())
     errors = []
     if routed.get("routed") is not False:
-        errors.append("policy-backed SensitiveActionRouter routed denied action")
+        errors.append("policy-backed SensitiveActionRouterが拒否済みactionをrouteした")
     if "permission_denied" not in error_codes(routed.get("policy_result", {})):
-        errors.append("policy-backed SensitiveActionRouter did not expose permission_denied")
+        errors.append("policy-backed SensitiveActionRouterがpermission_deniedを公開しなかった")
     return errors
 
 
@@ -1063,7 +1063,7 @@ def test_state_snapshot_is_deterministic() -> list[str]:
     first = deterministic_snapshot_json(state)
     second = deterministic_snapshot_json(state.clone())
     if first != second:
-        return ["state snapshot was not deterministic"]
+        return ["state snapshotがdeterministicではなかった"]
     return []
 
 
@@ -1082,7 +1082,7 @@ def test_state_snapshot_reports_invariant_flags() -> list[str]:
     errors = []
     for flag in sorted(required):
         if flags.get(flag) is not False:
-            errors.append(f"state snapshot invariant flag missing or not false: {flag}")
+            errors.append(f"state snapshotのinvariant flagがないかfalseではない: {flag}")
     return errors
 
 
@@ -1093,7 +1093,7 @@ def test_invariant_evaluator_scans_nested_shell_core_python() -> list[str]:
         nested.mkdir(parents=True)
         (nested / "bad.py").write_text("import flutter\n", encoding="utf-8")
         if not InvariantEvaluator(root).shell_core_imports_forbidden("flutter"):
-            return ["InvariantEvaluator did not scan nested Shell Core Python files"]
+            return ["InvariantEvaluatorがnested Shell CoreのPython fileをscanしなかった"]
     return []
 
 
@@ -1101,20 +1101,20 @@ def test_shell_core_integrated_release_smoke() -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
         result = run_shell_core_release_smoke(Path(tmp))
     if not result["ok"]:
-        return [f"Shell Core release smoke failed: {error}" for error in result["errors"]]
+        return [f"Shell Coreのrelease smokeが失敗: {error}" for error in result["errors"]]
     errors = []
     if result["snapshot_saved"] is not True:
-        errors.append("Shell Core release smoke did not save snapshot")
+        errors.append("Shell Coreのrelease smokeがsnapshotを保存しなかった")
     if result["audit_chain_verified"] is not True:
-        errors.append("Shell Core release smoke did not verify audit chain")
+        errors.append("Shell Coreのrelease smokeがaudit chainを検証しなかった")
     if result.get("audit_anchor_verified") is not True:
-        errors.append("Shell Core release smoke did not verify audit HMAC anchor")
+        errors.append("Shell Coreのrelease smokeがaudit HMAC anchorを検証しなかった")
     if result["tamper_detected"] is not True:
-        errors.append("Shell Core release smoke did not detect tamper")
+        errors.append("Shell Coreのrelease smokeがtamperを検出しなかった")
     if result["approval_revalidation_required"] is not True:
-        errors.append("Shell Core release smoke did not require approval revalidation")
+        errors.append("Shell Coreのrelease smokeがapprovalの再検証を必須にしなかった")
     if result["recovery_id_verified"] is not True:
-        errors.append("Shell Core release smoke did not verify recovery mapping")
+        errors.append("Shell Coreのrelease smokeがrecovery mappingを検証しなかった")
     return errors
 
 
@@ -1143,26 +1143,26 @@ def test_json_persistence_rejects_truncated_audit_anchor() -> list[str]:
         )
         verification = persistence.verify_audit_chain()
         if verification["ok"] is not False:
-            return ["JsonPersistence accepted truncated audit log with stale HMAC anchor"]
+            return ["JsonPersistenceがstale HMAC anchorを伴うtruncated audit logを受け入れた"]
         if "audit anchor HMAC" not in " ".join(verification.get("errors", [])):
-            return ["JsonPersistence truncate failure did not cite audit anchor HMAC"]
+            return ["JsonPersistenceのtruncate失敗がaudit anchor HMACを示さなかった"]
     return []
 
 
 def test_release_smoke_runs_first_run_and_setup_doctor() -> list[str]:
     result = run_release_smokes()
     if not result["ok"]:
-        return [f"release smoke failed: {error}" for error in result["errors"]]
+        return [f"release smokeが失敗: {error}" for error in result["errors"]]
     first_run = result["first_run"]
     errors = []
     if first_run["config_created"] is not True:
-        errors.append("first-run smoke did not create config")
+        errors.append("first-run smokeがconfigを作成しなかった")
     if first_run["audit_dir_writable"] is not True:
-        errors.append("first-run smoke did not verify audit dir writability")
+        errors.append("first-run smokeがaudit dirの書き込み可能性を検証しなかった")
     if first_run["installer_grants_authority"] is not False:
-        errors.append("first-run smoke grants authority")
+        errors.append("first-run smokeがauthorityを付与する")
     if first_run["installer_silently_approves_permissions"] is not False:
-        errors.append("first-run smoke silently approves permissions")
+        errors.append("first-run smokeがpermissionを黙示承認する")
     return errors
 
 
@@ -1179,11 +1179,11 @@ def test_shell_snapshot_contains_gui_operation_state() -> list[str]:
         "settings",
     ]:
         if not snapshot.get(key):
-            errors.append(f"shell snapshot missing GUI operation state: {key}")
+            errors.append(f"shell snapshotにGUI operation stateがない: {key}")
     if snapshot.get("installer_grants_authority") is not False:
-        errors.append("shell snapshot grants installer authority")
+        errors.append("shell snapshotがinstaller authorityを付与する")
     if snapshot.get("installer_silently_approves_permissions") is not False:
-        errors.append("shell snapshot silently approves installer permissions")
+        errors.append("shell snapshotがinstaller permissionを黙示承認する")
     return errors
 
 
@@ -1200,34 +1200,34 @@ def test_shell_snapshot_generator_writes_phase_b_local_snapshot() -> list[str]:
             check=False,
         )
         if result.returncode != 0:
-            return [f"shell snapshot generator failed: {result.stderr or result.stdout}"]
+            return [f"shell snapshot generatorが失敗: {result.stderr or result.stdout}"]
         if not output.exists():
-            return ["shell snapshot generator did not write output"]
+            return ["shell snapshot generatorがoutputを書き込まなかった"]
         snapshot = json.loads(output.read_text(encoding="utf-8"))
     errors = []
     if snapshot.get("phase_status", {}).get("phase_a_status") != "complete":
-        errors.append("generated snapshot does not mark Phase A complete")
+        errors.append("生成されたsnapshotがPhase A完了を示していない")
     if snapshot.get("phase_status", {}).get("phase_b_status") != "complete":
-        errors.append("generated snapshot does not mark Phase B complete")
+        errors.append("生成されたsnapshotがPhase B完了を示していない")
     if snapshot.get("operation_status", {}).get("release_state") != "not claimed":
-        errors.append("generated snapshot claimed release readiness")
+        errors.append("生成されたsnapshotがrelease readinessを主張した")
     if not any(problem.get("classification") == "release_blocker" for problem in snapshot.get("problems", [])):
-        errors.append("generated snapshot lacks expected release blockers")
+        errors.append("生成されたsnapshotに想定されるrelease blockerがない")
     problem_ids = {problem.get("problem_id") for problem in snapshot.get("problems", []) if isinstance(problem, dict)}
     if "audit-anchor-external-tamper-evidence-missing" not in problem_ids:
-        errors.append("generated snapshot lacks audit anchor external tamper-evidence blocker")
+        errors.append("生成されたsnapshotにaudit anchorの外部tamper-evidence blockerがない")
     computed_blockers = sum(
         1
         for problem in snapshot.get("problems", [])
         if isinstance(problem, dict) and problem.get("classification") == "release_blocker"
     )
     if snapshot.get("release_blocker_count") != computed_blockers:
-        errors.append("generated snapshot release_blocker_count is not computed from problems")
+        errors.append("生成されたsnapshotのrelease_blocker_countがproblemsから計算されていない")
     playbook_ids = {item.get("recovery_id") for item in snapshot.get("recovery_playbook", []) if isinstance(item, dict)}
     if "recover-audit-anchor-external-proof" not in playbook_ids:
-        errors.append("generated snapshot lacks audit anchor external recovery playbook item")
+        errors.append("生成されたsnapshotにaudit anchor外部recovery playbookの項目がない")
     if release_evidence.exists() != existed_before:
-        errors.append("shell snapshot generator created or removed Windows release evidence")
+        errors.append("shell snapshot generatorがWindows release evidenceを作成または削除した")
     return errors
 
 
@@ -1235,34 +1235,34 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
     bundle = build_evidence_bundle()
     errors = validate_evidence_bundle(bundle)
     if bundle.get("release_ready") is not False:
-        errors.append("evidence bundle claimed release readiness")
+        errors.append("evidence bundleがrelease readinessを主張した")
     if bundle.get("classification") != "development_evidence":
-        errors.append("evidence bundle is not classified as development_evidence")
+        errors.append("evidence bundleがdevelopment_evidenceに分類されていない")
     if not bundle.get("blockers"):
         evidence_path = ROOT / "release_evidence" / "windows_installed_smoke.json"
         if not evidence_path.exists():
-            errors.append("evidence bundle did not preserve missing Windows installed-path blockers")
+            errors.append("evidence bundleがWindows installed-path欠落のblockerを保持しなかった")
         else:
             windows_results = validate_windows_release_evidence(evidence_path)
             if any(result.classification == "release_blocker" for result in windows_results):
-                errors.append("evidence bundle dropped failing Windows installed-path blockers")
+                errors.append("evidence bundleが失敗中のWindows installed-path blockerを落とした")
     blocker_names = {blocker.get("name") for blocker in bundle.get("blockers", []) if isinstance(blocker, dict)}
     evidence_path = ROOT / "release_evidence" / "windows_installed_smoke.json"
     if not evidence_path.exists() and "audit_anchor_external_tamper_evidence_proof" not in blocker_names:
-        errors.append("evidence bundle did not preserve audit anchor external tamper-evidence blocker")
+        errors.append("evidence bundleがaudit anchorの外部tamper-evidence blockerを保持しなかった")
     for index, blocker in enumerate(bundle.get("blockers", [])):
         if not isinstance(blocker, dict):
-            errors.append(f"evidence bundle blocker {index} is not structured metadata")
+            errors.append(f"evidence bundleのblocker {index} が構造化metadataではない")
             continue
         for key in ["name", "status", "classification", "blocks_release", "reason", "required_action"]:
             if key not in blocker:
-                errors.append(f"evidence bundle blocker {index} missing {key}")
+                errors.append(f"evidence bundleのblocker {index} に{key}がない")
         if blocker.get("classification") != "release_blocker":
-            errors.append(f"evidence bundle blocker {index} is not classified release_blocker")
+            errors.append(f"evidence bundleのblocker {index} がrelease_blockerに分類されていない")
         if blocker.get("blocks_release") is not True:
-            errors.append(f"evidence bundle blocker {index} does not block release")
+            errors.append(f"evidence bundleのblocker {index} がreleaseを阻止していない")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
-        errors.append("evidence bundle made Flutter authoritative")
+        errors.append("evidence bundleがFlutterを権威化した")
     return errors
 
 
@@ -1561,9 +1561,9 @@ def test_windows_release_evidence_validator_accepts_valid_installed_smoke() -> l
     errors = []
     for result in results:
         if result.status != "passed":
-            errors.append(f"{result.name} rejected valid Windows evidence: {result.reason}")
+            errors.append(f"{result.name} が有効なWindows evidenceを拒否した: {result.reason}")
         if result.classification == "release_blocker":
-            errors.append(f"{result.name} classified valid Windows evidence as release_blocker")
+            errors.append(f"{result.name} が有効なWindows evidenceをrelease_blockerに分類した")
     return errors
 
 
@@ -1576,7 +1576,7 @@ def test_windows_release_evidence_validator_rejects_missing_provenance() -> list
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
-        return ["Windows evidence validator accepted missing provenance/isolation"]
+        return ["Windows evidence validatorがprovenance/isolation欠落を受け入れた"]
     return []
 
 
@@ -1596,9 +1596,9 @@ def test_windows_release_evidence_validator_preserves_audit_anchor_external_bloc
     result_by_name = {result.name: result for result in results}
     errors = []
     if result_by_name["audit_anchor_external_tamper_evidence_proof"].classification != "release_blocker":
-        errors.append("Windows evidence validator dropped audit anchor external tamper-evidence release blocker")
+        errors.append("Windows evidence validatorがaudit anchorの外部tamper-evidence release blockerを落とした")
     if result_by_name["windows_evidence_provenance_isolation"].classification == "release_blocker":
-        errors.append("Windows provenance validator still owns missing audit anchor evidence bundle/provenance")
+        errors.append("Windows provenance validatorがaudit anchor evidence bundle/provenance欠落の責任を依然として持っている")
     return errors
 
 
@@ -1614,9 +1614,9 @@ def test_windows_release_evidence_validator_rejects_authority_and_missing_instal
     result_by_name = {result.name: result for result in results}
     errors = []
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
-        errors.append("Windows first-run evidence validator accepted missing installed path or installer authority")
+        errors.append("Windows first-run evidence validatorがinstalled pathまたはinstaller authorityの欠落を受け入れた")
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
-        errors.append("Windows Setup Doctor evidence validator accepted authority-granting check")
+        errors.append("Windows Setup Doctorのevidence validatorがauthorityを付与するcheckを受け入れた")
     return errors
 
 
@@ -1634,9 +1634,9 @@ def test_windows_release_evidence_validator_rejects_external_setup_probe_as_prod
     result_by_name = {result.name: result for result in results}
     errors = []
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
-        errors.append("Windows Setup Doctor validator accepted external probe as formal product evidence")
+        errors.append("Windows Setup Doctor validatorがexternal probeをformal product evidenceとして受け入れた")
     if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
-        errors.append("Windows provenance validator accepted external Setup Doctor provenance as product export")
+        errors.append("Windows provenance validatorがexternal Setup Doctor provenanceをproduct exportとして受け入れた")
     return errors
 
 
@@ -1663,11 +1663,11 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     result_by_name = {result.name: result for result in results}
     errors = []
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
-        errors.append("Windows first-run evidence validator accepted unmeasured/manual evidence")
+        errors.append("Windows first-run evidence validatorがunmeasured/manual evidenceを受け入れた")
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
-        errors.append("Windows Setup Doctor evidence validator accepted synthetic or shallow evidence")
+        errors.append("Windows Setup Doctorのevidence validatorがsyntheticまたはshallowのevidenceを受け入れた")
     if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
-        errors.append("Windows broker evidence validator accepted synthetic, replay-unsafe, or Python-required evidence")
+        errors.append("Windows brokerのevidence validatorがsynthetic、replay-unsafe、またはPython-requiredのevidenceを受け入れた")
     return errors
 
 
@@ -1681,7 +1681,7 @@ def test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
-        return ["Windows broker validator accepted top-level unmeasured authority declarations"]
+        return ["Windows broker validatorがtop-levelのunmeasured authority declarationを受け入れた"]
     return []
 
 
@@ -1696,7 +1696,7 @@ def test_windows_release_evidence_validator_rejects_missing_surface_matches() ->
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
-        return ["Windows first-run evidence validator accepted missing per-surface UIAutomation matches"]
+        return ["Windows first-run evidence validatorがper-surface UIAutomation matchの欠落を受け入れた"]
     return []
 
 
@@ -1709,7 +1709,7 @@ def test_windows_release_evidence_validator_rejects_screenshot_surface_source() 
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
-        return ["Windows first-run evidence validator accepted screenshot as strict visible-surface source"]
+        return ["Windows first-run evidence validatorがscreenshotを厳密なvisible-surface sourceとして受け入れた"]
     return []
 
 
@@ -1722,7 +1722,7 @@ def test_windows_release_evidence_validator_accepts_flutter_semantics_surface_so
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_installer_first_run_smoke"].status != "passed":
-        return ["Windows first-run evidence validator rejected Flutter semantics runtime surface evidence"]
+        return ["Windows first-run evidence validatorがFlutter semanticsのruntime surface evidenceを拒否した"]
     return []
 
 
@@ -1752,7 +1752,7 @@ def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match
         results = validate_windows_release_evidence(path)
     result_by_name = {result.name: result for result in results}
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
-        return ["Windows first-run evidence validator accepted one aggregate root automation element"]
+        return ["Windows first-run evidence validatorが1つのaggregate root automation elementを受け入れた"]
     return []
 
 
@@ -1761,7 +1761,7 @@ def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str
     main = DESKTOP_FLUTTER / "lib" / "main.dart"
     collector = INSTALLER / "windows" / "collect_installed_smoke.ps1"
     if not export.exists():
-        return ["installed app Setup Doctor product export helper is missing"]
+        return ["installed appのSetup Doctor product export helperが存在しない"]
     export_text = export.read_text(encoding="utf-8")
     main_text = main.read_text(encoding="utf-8")
     collector_text = collector.read_text(encoding="utf-8")
@@ -1791,31 +1791,31 @@ def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str
         "setup_doctor.audit_storage",
     ]
     errors = [
-        f"Setup Doctor product export missing token: {token}"
+        f"Setup Doctorのproduct exportにtokenがない: {token}"
         for token in required_export_tokens
         if token not in export_text
     ]
     errors.extend(
-        f"Setup Doctor product export missing required check id: {check_id}"
+        f"Setup Doctorのproduct exportに必須check idがない: {check_id}"
         for check_id in required_checks
         if check_id not in export_text
     )
     if "writeSetupDoctorProductExportIfRequested(client.getSnapshot())" not in main_text:
-        errors.append("desktop main does not call installed-app Setup Doctor product export helper")
+        errors.append("desktop mainがinstalled-appのSetup Doctor product export helperを呼び出していない")
     for token in [
         "GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON",
         "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON",
-        "Installed app did not write Setup Doctor product export",
+        "インストール済み app が環境診断の製品出力を書き出しませんでした",
         "setup_doctor_context",
     ]:
         if token not in collector_text:
-            errors.append(f"installed smoke collector missing product export token: {token}")
+            errors.append(f"installed smoke collectorにproduct export tokenがない: {token}")
     external_probe_text = (INSTALLER / "windows" / "collect_setup_doctor.ps1").read_text(encoding="utf-8")
     if (
         "formal_product_evidence" in external_probe_text
         and "formal_product_evidence = $false" not in external_probe_text
     ):
-        errors.append("external Setup Doctor probe is no longer clearly non-formal")
+        errors.append("外部Setup Doctor probeが明確に非正式ではなくなった")
     return errors
 
 
@@ -1823,9 +1823,9 @@ def test_windows_stage_installer_powershell_boolean_grouping() -> list[str]:
     text = (INSTALLER / "windows" / "stage_installed_app.ps1").read_text(encoding="utf-8")
     errors = []
     if "Test-Path $InstallRoot -and" in text:
-        errors.append("stage_installed_app.ps1 passes -and as a Test-Path argument")
+        errors.append("stage_installed_app.ps1が-andをTest-Pathのargumentとして渡している")
     if "if ((Test-Path $InstallRoot) -and" not in text:
-        errors.append("stage_installed_app.ps1 missing grouped Test-Path boolean condition")
+        errors.append("stage_installed_app.ps1にgroup化されたTest-Path boolean conditionがない")
     return errors
 
 
@@ -1833,11 +1833,11 @@ def test_windows_installed_smoke_preserves_trap_failure() -> list[str]:
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
     if "trap {\n  $failure = $_" not in text:
-        errors.append("collect_installed_smoke.ps1 trap does not preserve the original failure")
+        errors.append("collect_installed_smoke.ps1のtrapが元の失敗を保持していない")
     if "\n  throw\n" in text:
-        errors.append("collect_installed_smoke.ps1 uses bare throw and loses diagnostic cause")
+        errors.append("collect_installed_smoke.ps1がbare throwを使いdiagnostic causeを失う")
     if "throw $failure" not in text:
-        errors.append("collect_installed_smoke.ps1 does not rethrow the captured failure")
+        errors.append("collect_installed_smoke.ps1がcaptureした失敗をrethrowしない")
     return errors
 
 
@@ -1845,11 +1845,11 @@ def test_windows_installed_smoke_automation_names_are_materialized() -> list[str
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
     if "automation_names = @($names | Select-Object" in text:
-        errors.append("collect_installed_smoke.ps1 pipelines UIAutomation names directly into JSON evidence")
+        errors.append("collect_installed_smoke.ps1がUIAutomation nameをJSON evidenceへ直接pipeline処理する")
     if "$automationNames = New-Object System.Collections.Generic.List[string]" not in text:
-        errors.append("collect_installed_smoke.ps1 does not materialize automation names before JSON evidence")
+        errors.append("collect_installed_smoke.ps1がJSON evidence化の前にautomation nameをmaterializeしない")
     if "automation_names = @($automationNameValues)" not in text:
-        errors.append("collect_installed_smoke.ps1 does not serialize the materialized automation names list")
+        errors.append("collect_installed_smoke.ps1がmaterialize済みのautomation name一覧をserializeしない")
     return errors
 
 
@@ -1864,11 +1864,11 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
     ]
     for token in direct_tokens:
         if token in text:
-            errors.append(f"collect_installed_smoke.ps1 uses raw UIAutomation property in evidence projection: {token}")
+            errors.append(f"collect_installed_smoke.ps1がevidence projectionでraw UIAutomation propertyを使う: {token}")
     if "$rootWindowTitle = \"\"" not in text:
-        errors.append("collect_installed_smoke.ps1 does not materialize the root window title")
+        errors.append("collect_installed_smoke.ps1がroot window titleをmaterializeしない")
     if "window_title = $rootWindowTitle" not in text:
-        errors.append("collect_installed_smoke.ps1 does not serialize the materialized root window title")
+        errors.append("collect_installed_smoke.ps1がmaterialize済みのroot window titleをserializeしない")
     for token in [
         "$windowFound = [bool]($observedElements.Count -gt 0)",
         "$automationNameValues = @($automationNames.ToArray())",
@@ -1881,7 +1881,7 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
         "surface_semantics_export.json",
     ]:
         if token not in text:
-            errors.append(f"collect_installed_smoke.ps1 missing materialized UIAutomation evidence token: {token}")
+            errors.append(f"collect_installed_smoke.ps1にmaterialize済みUIAutomation evidence tokenがない: {token}")
     return errors
 
 
@@ -1890,7 +1890,7 @@ def test_windows_audit_anchor_proof_collector_is_connected() -> list[str]:
     installed_smoke = INSTALLER / "windows" / "collect_installed_smoke.ps1"
     errors: list[str] = []
     if not collector.exists():
-        return ["collect_audit_anchor_proof.ps1 is missing"]
+        return ["collect_audit_anchor_proof.ps1が存在しない"]
     collector_text = collector.read_text(encoding="utf-8")
     installed_text = installed_smoke.read_text(encoding="utf-8")
     for token in [
@@ -1906,7 +1906,7 @@ def test_windows_audit_anchor_proof_collector_is_connected() -> list[str]:
         "[System.Text.UTF8Encoding]::new($false)",
     ]:
         if token not in collector_text:
-            errors.append(f"audit anchor proof collector missing token: {token}")
+            errors.append(f"audit anchor proof collectorにtokenがない: {token}")
     for token in [
         "[string]$AuditAnchorEvidenceJson",
         "audit_anchor_external_tamper_evidence",
@@ -1914,7 +1914,7 @@ def test_windows_audit_anchor_proof_collector_is_connected() -> list[str]:
         "New-EvidenceFileRecord -Kind \"audit_anchor_external_tamper_evidence\"",
     ]:
         if token not in installed_text:
-            errors.append(f"installed smoke collector missing audit anchor integration token: {token}")
+            errors.append(f"installed smoke collectorにaudit anchor integration tokenがない: {token}")
     return errors
 
 
@@ -1927,11 +1927,11 @@ def test_validate_all_subprocess_start_failure_is_structured() -> list[str]:
     result = run_step(step, strict_release=True, desktop_platform="windows")
     errors = []
     if result.get("status") != "not_run":
-        errors.append("validate_all run_step did not return not_run for subprocess start failure")
+        errors.append("validate_allのrun_stepがsubprocess起動失敗でnot_runを返さなかった")
     if result.get("classification") != "release_blocker":
-        errors.append("validate_all run_step did not classify subprocess start failure as release_blocker")
+        errors.append("validate_allのrun_stepがsubprocess起動失敗をrelease_blockerに分類しなかった")
     if "FileNotFoundError" not in result.get("stderr", ""):
-        errors.append("validate_all run_step did not preserve subprocess start failure stack trace")
+        errors.append("validate_allのrun_stepがsubprocess起動失敗のstack traceを保持しなかった")
     return errors
 
 
@@ -1940,24 +1940,24 @@ def test_validate_all_strict_release_runs_release_gate_strict_scan() -> list[str
     result = run_step(step, strict_release=True, desktop_platform="windows")
     errors = []
     if "--strict-release" not in result.get("command", ""):
-        errors.append("validate_all strict Windows release did not pass --strict-release to release_gate_check")
+        errors.append("validate_allのstrict Windows releaseが--strict-releaseをrelease_gate_checkへ渡さなかった")
     if result.get("status") != "failed":
-        errors.append("validate_all strict release gate scan should fail while active release blockers remain")
+        errors.append("activeなrelease blockerが残る間、validate_allのstrict release gate scanは失敗しなければならない")
     if result.get("classification") != "release_blocker":
-        errors.append("validate_all strict release gate scan was not classified as release_blocker")
-    if "strict release gate found unresolved active structured release blockers" not in result.get("reason", ""):
-        errors.append("validate_all strict release gate scan did not report structured release_blocker reason")
+        errors.append("validate_allのstrict release gate scanがrelease_blockerに分類されていない")
+    if "strict release gate が未解決の有効な structured release blocker を検出した" not in result.get("reason", ""):
+        errors.append("validate_allのstrict release gate scanが構造化されたrelease_blocker reasonを報告しなかった")
     return errors
 
 
 def test_release_blocker_registry_controls_strict_release() -> list[str]:
     registry = ROOT / "release_blockers.registry.json"
     if not registry.exists():
-        return ["release_blockers.registry.json missing"]
+        return ["release_blockers.registry.jsonが存在しない"]
     data = json.loads(registry.read_text(encoding="utf-8"))
     blockers = data.get("blockers")
     if not isinstance(blockers, list):
-        return ["release blocker registry lacks blockers list"]
+        return ["release blocker registryにblocker一覧がない"]
     errors = []
     active = [
         blocker
@@ -1967,18 +1967,18 @@ def test_release_blocker_registry_controls_strict_release() -> list[str]:
         and blocker.get("status") == "unresolved"
     ]
     if not active:
-        errors.append("release blocker registry has no active unresolved blockers")
+        errors.append("release blocker registryにactiveかunresolvedのblockerがない")
     for blocker in active:
         if blocker.get("classification") != "release_blocker":
-            errors.append(f"active blocker {blocker.get('name')} not classified release_blocker")
+            errors.append(f"active blocker {blocker.get('name')} がrelease_blockerに分類されていない")
         if blocker.get("blocks_release") is not True:
-            errors.append(f"active blocker {blocker.get('name')} does not block release")
+            errors.append(f"active blocker {blocker.get('name')} がreleaseを阻止していない")
     release_gate = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
-    for token in ["RELEASE_BLOCKERS_REGISTRY", "unresolved_active_blockers", "strict release active blocker unresolved"]:
+    for token in ["RELEASE_BLOCKERS_REGISTRY", "unresolved_active_blockers", "strict releaseのactive blockerが未解決"]:
         if token not in release_gate:
-            errors.append(f"release_gate_check.py missing structured registry token: {token}")
+            errors.append(f"release_gate_check.pyに構造化registry tokenがない: {token}")
     if '"release_blocker" in combined' in release_gate:
-        errors.append("release_gate_check.py still uses raw release_blocker text as strict release blocker")
+        errors.append("release_gate_check.pyがraw release_blocker textをstrict release blockerとしてまだ使っている")
     return errors
 
 
@@ -1994,17 +1994,17 @@ def test_release_facing_docs_sync_release_blockers_to_registry() -> list[str]:
         "owner_go",
     ]:
         if expected not in registry_names:
-            errors.append(f"release blocker registry missing canonical blocker: {expected}")
+            errors.append(f"release blocker registryにcanonical blockerがない: {expected}")
     for relative in CURRENT_FACING_RELEASE_DOCS:
         if not (ROOT / relative).exists():
-            errors.append(f"release-facing doc missing from sync scan: {relative}")
+            errors.append(f"release-facing docがsync scanの対象にない: {relative}")
     return errors
 
 
 def test_release_gate_scans_ipc_threat_model() -> list[str]:
     text = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
     if "docs/security/IPC_THREAT_MODEL.md" not in text:
-        return ["release_gate_check.py does not scan IPC threat model release blockers"]
+        return ["release_gate_check.pyがIPC threat modelのrelease blockerをscanしていない"]
     return []
 
 
@@ -2013,14 +2013,15 @@ def test_packaging_portability_checker_exists() -> list[str]:
     validate_all = ROOT / "tooling" / "validate_all.py"
     errors = []
     if not checker.exists():
-        errors.append("tooling/packaging_portability_check.py missing")
+        errors.append("tooling/packaging_portability_check.pyが存在しない")
     else:
         text = checker.read_text(encoding="utf-8")
         for token in [
             "DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120",
+            "UTF8_GOVERNANCE_PATH_ALLOWLIST",
             "timeout=timeout_seconds",
             "subprocess.TimeoutExpired",
-            "timed out after",
+            "が次の秒数後にタイムアウト",
             "unzip",
             "LC_ALL",
             "tooling/manifest.py",
@@ -2028,7 +2029,7 @@ def test_packaging_portability_checker_exists() -> list[str]:
             "release_gate_check.py",
         ]:
             if token not in text:
-                errors.append(f"packaging portability checker missing token: {token}")
+                errors.append(f"packaging portability checkerにtokenがない: {token}")
     tracked_paths = [ROOT / path for path in subprocess.run(
         ["git", "ls-files"],
         cwd=ROOT,
@@ -2038,7 +2039,32 @@ def test_packaging_portability_checker_exists() -> list[str]:
     ).stdout.splitlines()]
     errors.extend(portable_path_errors([path for path in tracked_paths if path.exists()]))
     if "packaging_portability_check" not in validate_all.read_text(encoding="utf-8"):
-        errors.append("validate_all.py does not run packaging portability check")
+        errors.append("validate_all.pyがpackaging portability checkを実行していない")
+    return errors
+
+
+def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]:
+    errors = []
+    allowlisted_paths = [
+        ROOT / "規定" / "00_日本語基底規定.md",
+        ROOT / "規定" / "正本索引.json",
+        ROOT / "規定" / "日本語基底例外.json",
+        ROOT / "tooling" / "日本語基底監査.py",
+    ]
+    allowlisted_errors = portable_path_errors(allowlisted_paths)
+    if allowlisted_errors:
+        errors.append(
+            "exact UTF-8 governance allowlistのpathが拒否された: "
+            + "; ".join(allowlisted_errors)
+        )
+
+    unregistered_errors = portable_path_errors([ROOT / "規定" / "未登録規定.md"])
+    if not unregistered_errors:
+        errors.append("未登録の非ASCII pathが許可された")
+
+    control_errors = portable_path_errors([ROOT / "docs" / "control\npath.md"])
+    if not control_errors:
+        errors.append("control characterを含むpathが許可された")
     return errors
 
 
@@ -2049,7 +2075,7 @@ def test_invariant_evaluator_detects_intentional_import_violation() -> list[str]
         shell_core.mkdir(parents=True)
         (shell_core / "bad.py").write_text("import flutter\n", encoding="utf-8")
         if not InvariantEvaluator(root).shell_core_imports_forbidden("flutter"):
-            return ["InvariantEvaluator did not detect forbidden Flutter import"]
+            return ["InvariantEvaluatorが禁止されたFlutter importを検出しなかった"]
     return []
 
 
@@ -2057,15 +2083,15 @@ def test_invariant_evaluator_detects_live_authority_invariants() -> list[str]:
     flags = InvariantEvaluator().evaluate()
     errors = []
     if flags["adapter_metadata_can_escalate_authority"]:
-        errors.append("InvariantEvaluator measured adapter metadata authority escalation")
+        errors.append("InvariantEvaluatorがadapter metadataのauthority escalationを計測した")
     if flags["memory_cache_previous_state_can_grant_authority"]:
-        errors.append("InvariantEvaluator measured non-authority source authority grant")
+        errors.append("InvariantEvaluatorが非authority sourceからのauthority付与を計測した")
     if flags["full_payload_projected_without_full_visibility"]:
-        errors.append("InvariantEvaluator measured full payload projection without full visibility")
+        errors.append("InvariantEvaluatorがfull visibilityなしのfull payload projectionを計測した")
     if flags["installer_setup_state_can_grant_authority"]:
-        errors.append("InvariantEvaluator measured installer/setup authority grant")
+        errors.append("InvariantEvaluatorがinstaller/setupのauthority付与を計測した")
     if flags["mobile_device_state_can_grant_authority"]:
-        errors.append("InvariantEvaluator measured mobile/device authority grant")
+        errors.append("InvariantEvaluatorがmobile/deviceのauthority付与を計測した")
     return errors
 
 
@@ -2073,7 +2099,7 @@ def test_rust_helper_required_sources_exist() -> list[str]:
     existing = {path.name for path in (RUST_HELPER / "src").glob("*.rs")}
     errors = []
     for missing in sorted(RUST_HELPER_REQUIRED_SOURCES - existing):
-        errors.append(f"native/rust_helper/src/{missing} missing")
+        errors.append(f"native/rust_helper/src/{missing} が存在しない")
     return errors
 
 
@@ -2082,7 +2108,7 @@ def test_rust_helper_contract_shape_exists() -> list[str]:
     errors = []
     for token in ["HelperResponse", "HelperError", "ok", "operation", "result", "diagnostics", "error"]:
         if token not in lib_rs:
-            errors.append(f"Rust helper contract missing token: {token}")
+            errors.append(f"Rust helper contractにtokenがない: {token}")
     return errors
 
 
@@ -2100,7 +2126,7 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
         text = path.read_text(encoding="utf-8")
         for pattern in forbidden:
             if pattern in text:
-                errors.append(f"{path} uses forbidden helper authority pattern: {pattern}")
+                errors.append(f"{path} が禁止されたhelper authority patternを使う: {pattern}")
     return errors
 
 
@@ -2108,13 +2134,13 @@ def test_broker_ipc_contract_schemas_exist() -> list[str]:
     existing = {path.name for path in SPECS.glob("*.schema.json")}
     errors = []
     for missing in sorted(BROKER_REQUIRED_SCHEMAS - existing):
-        errors.append(f"broker IPC schema missing: {missing}")
+        errors.append(f"broker IPC schemaがない: {missing}")
     for name in sorted(BROKER_REQUIRED_SCHEMAS & existing):
         schema = load_schema(name)
         if schema.get("type") != "object":
-            errors.append(f"{name} must define an object contract")
+            errors.append(f"{name} はobject contractを定義しなければならない")
         if "additionalProperties" not in schema:
-            errors.append(f"{name} must define additionalProperties policy")
+            errors.append(f"{name} はadditionalProperties policyを定義しなければならない")
     return errors
 
 
@@ -2128,12 +2154,12 @@ def test_broker_boundary_docs_exist() -> list[str]:
     for relative in sorted(required):
         path = ROOT / relative
         if not path.exists():
-            errors.append(f"{relative} missing")
+            errors.append(f"{relative} が存在しない")
             continue
         text = path.read_text(encoding="utf-8")
         for token in ["Rust Security Broker", "release_blocker", "FFI"]:
             if token not in text:
-                errors.append(f"{relative} missing broker governance token: {token}")
+                errors.append(f"{relative} にbroker governance tokenがない: {token}")
     return errors
 
 
@@ -2142,13 +2168,13 @@ def test_rust_broker_skeleton_exists() -> list[str]:
     existing = {path.name for path in broker_src.glob("*.rs")}
     errors = []
     for missing in sorted(BROKER_REQUIRED_SOURCES - existing):
-        errors.append(f"native/rust_helper/src/broker/{missing} missing")
+        errors.append(f"native/rust_helper/src/broker/{missing} が存在しない")
     main_rs = RUST_HELPER / "src" / "main.rs"
     lib_rs = RUST_HELPER / "src" / "lib.rs"
     for path in [main_rs, lib_rs]:
         text = path.read_text(encoding="utf-8")
         if "#![forbid(unsafe_code)]" not in text:
-            errors.append(f"{path.relative_to(ROOT)} must forbid unsafe code")
+            errors.append(f"{path.relative_to(ROOT)} はunsafe codeを禁止しなければならない")
     return errors
 
 
@@ -2194,10 +2220,10 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
     ]
     for token in required_protocol_tokens:
         if token not in protocol_rs:
-            errors.append(f"broker protocol missing token: {token}")
+            errors.append(f"broker protocolにtokenがない: {token}")
     for token in ["BrokerAuditLog", "append", "previous_event_hash", "event_hash", "payload_hash"]:
         if token not in audit_rs:
-            errors.append(f"broker audit missing token: {token}")
+            errors.append(f"broker auditにtokenがない: {token}")
     return errors
 
 
@@ -2218,9 +2244,9 @@ def test_rust_broker_audit_anchor_and_nonce_compaction_present() -> list[str]:
         "compact_replay_nonces",
     ]:
         if token not in store_rs:
-            errors.append(f"broker store missing audit anchor/nonce token: {token}")
+            errors.append(f"broker storeにaudit anchor/nonce tokenがない: {token}")
     if "hmac_sha256_tagged" not in audit_hash_rs:
-        errors.append("audit_hash.rs missing HMAC helper")
+        errors.append("audit_hash.rsにHMAC helperがない")
     return errors
 
 
@@ -2235,7 +2261,7 @@ def test_rust_filesystem_diagnostic_detects_secret_symlink() -> list[str]:
         "filesystem_diagnostic_detects_symlink_to_secret",
     ]:
         if token not in filesystem_rs:
-            errors.append(f"filesystem diagnostic missing symlink secret token: {token}")
+            errors.append(f"filesystem diagnosticにsymlink secret tokenがない: {token}")
     return errors
 
 
@@ -2253,17 +2279,17 @@ def test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge() -> 
         text = path.read_text(encoding="utf-8")
         for token in forbidden:
             if token in text:
-                errors.append(f"{path.relative_to(ROOT)} contains forbidden runtime bridge token: {token}")
+                errors.append(f"{path.relative_to(ROOT)} が禁止されたruntime bridge tokenを含む: {token}")
     return errors
 
 
 def test_release_docs_declare_language_policy_runtime_blockers() -> list[str]:
-    required_tokens = [
-        "rust security broker",
-        "release_blocker",
-        "production ipc",
-        "no-python-runtime",
-        "no-ffi-authority",
+    required_token_groups = [
+        ("rust security broker",),
+        ("release_blocker",),
+        ("production ipc", "製品 ipc"),
+        ("no-python-runtime",),
+        ("no-ffi-authority",),
     ]
     required_docs = [
         "ROADMAP.md",
@@ -2276,9 +2302,12 @@ def test_release_docs_declare_language_policy_runtime_blockers() -> list[str]:
     errors = []
     for relative in required_docs:
         text = (ROOT / relative).read_text(encoding="utf-8").lower()
-        for token in required_tokens:
-            if token not in text:
-                errors.append(f"{relative} missing language-policy blocker token: {token}")
+        for token_group in required_token_groups:
+            if not any(token in text for token in token_group):
+                errors.append(
+                    f"{relative} にlanguage-policy blocker tokenがない: "
+                    + " / ".join(token_group)
+                )
     return errors
 
 
@@ -2300,7 +2329,7 @@ def test_blue_tanuki_adapter_runtime_output_validates_against_generic_schema() -
     for schema_name, value in schema_pairs:
         schema = load_schema(schema_name)
         for failure in validate_instance(value, schema):
-            errors.append(f"BLUE-TANUKI adapter {schema_name} validation failed: {failure}")
+            errors.append(f"BLUE-TANUKI adapter {schema_name} のvalidationが失敗: {failure}")
     return errors
 
 
@@ -2309,11 +2338,11 @@ def test_blue_tanuki_adapter_metadata_cannot_escalate_authority() -> list[str]:
     trace = BlueTanukiAdapter().authority_trace()
     errors = []
     if not metadata_attempts_authority(metadata):
-        errors.append("BLUE-TANUKI adapter did not detect authority-like metadata")
+        errors.append("BLUE-TANUKI adapterがauthority-like metadataを検出しなかった")
     if trace.get("metadata_trusted") is not False:
-        errors.append("BLUE-TANUKI adapter trusted metadata")
+        errors.append("BLUE-TANUKI adapterがmetadataを信頼した")
     if trace.get("adapter_can_grant_permission") is not False:
-        errors.append("BLUE-TANUKI adapter can grant permission")
+        errors.append("BLUE-TANUKI adapterがpermissionを付与できる")
     return errors
 
 
@@ -2322,35 +2351,35 @@ def test_blue_tanuki_adapter_cannot_expose_full_payload_unless_visibility_full()
     for visibility in ["none", "hash_only", "summary", "redacted"]:
         projected = projected_approval({"content_visibility": visibility})
         if "full_payload" in projected:
-            errors.append(f"BLUE-TANUKI adapter exposed full payload for {visibility}")
+            errors.append(f"BLUE-TANUKI adapterが{visibility}でfull payloadを公開した")
     if "full_payload" not in projected_approval({"content_visibility": "full"}):
-        errors.append("BLUE-TANUKI adapter did not expose full payload when visibility was full")
+        errors.append("BLUE-TANUKI adapterがvisibilityがfullのときfull payloadを公開しなかった")
     return errors
 
 
 def test_blue_tanuki_adapter_cannot_mark_approvals_approved_by_itself() -> list[str]:
     approval = normalize_approval({"status": "approved", "approved_by": "adapter", "adapter_approved": True})
     if approval["status"] == "approved":
-        return ["BLUE-TANUKI adapter self-approved an approval"]
+        return ["BLUE-TANUKI adapterがapprovalを自己承認した"]
     return []
 
 
 def test_blue_tanuki_adapter_failures_map_to_recovery_actions() -> list[str]:
     candidates = recovery_candidates("runtime_down")
     if not candidates:
-        return ["BLUE-TANUKI adapter failure did not produce RecoveryAction candidates"]
+        return ["BLUE-TANUKI adapterの失敗がRecoveryAction candidateを生成しなかった"]
     schema = load_schema("recovery.schema.json")
     errors = []
     for candidate in candidates:
         errors.extend(validate_instance(candidate, schema))
-    return [f"BLUE-TANUKI adapter recovery validation failed: {error}" for error in errors]
+    return [f"BLUE-TANUKI adapterのrecovery validationが失敗: {error}" for error in errors]
 
 
 def test_desktop_flutter_required_files_exist() -> list[str]:
     errors = []
     for relative in sorted(DESKTOP_FLUTTER_REQUIRED_FILES):
         if not (DESKTOP_FLUTTER / relative).exists():
-            errors.append(f"apps/desktop_flutter/{relative} missing")
+            errors.append(f"apps/desktop_flutter/{relative} が存在しない")
     return errors
 
 
@@ -2367,33 +2396,33 @@ def test_desktop_flutter_keeps_authority_in_shell_core_client() -> list[str]:
         text = path.read_text(encoding="utf-8")
         for pattern in forbidden_assignments:
             if pattern in text:
-                errors.append(f"{path} contains forbidden UI authority pattern: {pattern}")
+                errors.append(f"{path} が禁止されたUI authority patternを含む: {pattern}")
     client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
     if "full_payload_projected_without_full_visibility': false" not in client:
-        errors.append("desktop Flutter mock client does not expose Shell Core invariant status")
+        errors.append("desktop Flutterのmock clientがShell Coreのinvariant statusを公開していない")
     if "factory ShellCoreClient.local() => ShellCoreClient.mock()" in client:
-        errors.append("desktop Flutter local client is still a direct mock alias")
+        errors.append("desktop Flutterのlocal clientが依然としてdirect mock aliasである")
     if "ShellSnapshot.fromJson" not in client:
-        errors.append("desktop Flutter local client does not load structured snapshot JSON")
+        errors.append("desktop Flutterのlocal clientが構造化snapshot JSONをloadしない")
     return errors
 
 
 def test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection() -> list[str]:
     runner = DESKTOP_FLUTTER / "windows" / "runner" / "flutter_window.cpp"
     if not runner.exists():
-        return ["Windows Flutter runner missing: apps/desktop_flutter/windows/runner/flutter_window.cpp"]
+        return ["Windows Flutter runnerがない: apps/desktop_flutter/windows/runner/flutter_window.cpp"]
     text = runner.read_text(encoding="utf-8")
     required_labels = ["Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"]
     aggregate = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
     errors = []
     if aggregate in text:
-        errors.append("Windows runner contains forbidden aggregate native surface title")
+        errors.append("Windows runnerが禁止されたaggregate native surface titleを含む")
     set_window_text_blocks = re.findall(r"SetWindowText\s*\([^;]*;", text, flags=re.DOTALL)
     for block in set_window_text_blocks:
         labels = [label for label in required_labels if label in block]
         if labels:
             errors.append(
-                "Windows runner SetWindowText contains required surface labels: "
+                "Windows runnerのSetWindowTextが必須のsurface labelを含む: "
                 + ", ".join(labels)
             )
     return errors
@@ -2412,16 +2441,16 @@ def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> l
     errors = []
     for label, identifier in required.items():
         if identifier not in shared:
-            errors.append(f"desktop Flutter surface semantics identifier missing for {label}")
+            errors.append(f"desktop Flutterのsurface semantics identifierが{label}にない")
         if label not in shared and label not in main:
-            errors.append(f"desktop Flutter surface label missing: {label}")
-    if "SurfaceSemantics(" not in main or "label: 'NavigationRail'" not in main:
-        errors.append("NavigationRail is not exposed through SurfaceSemantics")
+            errors.append(f"desktop Flutterのsurface labelがない: {label}")
+    if "SurfaceSemantics(" not in main or "evidenceLabel: 'NavigationRail'" not in main:
+        errors.append("NavigationRailの安定証拠IDがSurfaceSemanticsから公開されていない")
     if "bySemanticsIdentifier(surfaceSemanticsIdentifier(label))" not in widget_test and (
         "surfaceSemanticsIdentifier(label)" not in widget_test
         or "properties.identifier == identifier" not in widget_test
     ):
-        errors.append("desktop Flutter widget test does not verify per-surface semantics identifiers")
+        errors.append("desktop Flutterのwidget testがper-surface semantics identifierを検証しない")
     return errors
 
 
@@ -2442,14 +2471,14 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
         "kGuiShellProductTitle",
     ]:
         if token not in main:
-            errors.append(f"desktop Flutter product baseline missing token: {token}")
+            errors.append(f"desktop Flutterのproduct baselineにtokenがない: {token}")
     if 'window.Create(L"GUI Shell", origin, size)' not in windows_main:
-        errors.append("Windows runner product window title is not GUI Shell")
+        errors.append("Windows runnerのproduct window titleがGUI Shellではない")
     if "Win32Window::Size size(1280, 800)" not in windows_main:
-        errors.append("Windows runner default product window size is not fixed at 1280x800")
+        errors.append("Windows runnerのdefault product window sizeが1280x800に固定されていない")
     for token in ["WM_GETMINMAXINFO", "kMinWindowWidth = 1024", "kMinWindowHeight = 640"]:
         if token not in win32:
-            errors.append(f"Windows runner minimum-size guard missing token: {token}")
+            errors.append(f"Windows runnerのminimum-size guardにtokenがない: {token}")
     for token in [
         'gtk_header_bar_set_title(header_bar, "GUI Shell")',
         'gtk_window_set_title(window, "GUI Shell")',
@@ -2457,10 +2486,10 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
         "gtk_widget_set_size_request(GTK_WIDGET(window), 1024, 640)",
     ]:
         if token not in linux:
-            errors.append(f"Linux runner product window baseline missing token: {token}")
-    for token in ["GUI Shell desktop app has product baseline shell chrome", "ThemeMode.system"]:
+            errors.append(f"Linux runnerのproduct window baselineにtokenがない: {token}")
+    for token in ["GUI Shellデスクトップアプリが製品基準の外枠を持つ", "ThemeMode.system"]:
         if token not in widget_test:
-            errors.append(f"desktop Flutter widget baseline test missing token: {token}")
+            errors.append(f"desktop Flutterのwidget baseline testにtokenがない: {token}")
     return errors
 
 
@@ -2470,11 +2499,11 @@ def test_validate_all_uses_running_python_interpreter_for_python_steps() -> list
     names = {step.name for step in steps}
     for step in steps:
         if step.command[0] != sys.executable:
-            errors.append(f"{step.name} does not use sys.executable")
+            errors.append(f"{step.name} がsys.executableを使っていない")
         if step.required_tool is not None:
-            errors.append(f"{step.name} still declares a PATH Python tool requirement")
+            errors.append(f"{step.name} がPATH上のPython tool必須をまだ宣言している")
     if "broker_authority_parity" in names:
-        errors.append("validate_all --python-only still includes cargo-backed broker_authority_parity")
+        errors.append("validate_all --python-onlyがcargo-backed broker_authority_parityをまだ含む")
     return errors
 
 
@@ -2493,16 +2522,16 @@ def test_desktop_flutter_exposes_operation_surfaces() -> list[str]:
     required = [
         "TrustCenter",
         "AuthorityMap",
-        "Adapter Catalog",
-        "Permission Diff",
-        "Problems Panel",
-        "Evidence Center",
-        "Command Palette",
-        "copy event / export JSONL / verify chain",
-        "pre_check",
+        "アダプター台帳",
+        "許可差分",
+        "問題一覧",
+        "証拠センター",
+        "コマンドパレット",
+        "事象をコピー／JSONLを書き出し／鎖を検証",
+        "事前確認",
         "ShellStatusBar",
     ]
-    return [f"desktop Flutter operation surface missing: {token}" for token in required if token not in combined]
+    return [f"desktop Flutterのoperation surfaceがない: {token}" for token in required if token not in combined]
 
 
 def test_installer_setup_doctor_reports_structured_status_without_authority() -> list[str]:
@@ -2512,16 +2541,16 @@ def test_installer_setup_doctor_reports_structured_status_without_authority() ->
     errors = []
     for key in ["status", "checks", "installer_grants_authority", "installer_silently_approves_permissions"]:
         if key not in report:
-            errors.append(f"Setup Doctor report missing {key}")
+            errors.append(f"Setup Doctor reportに{key}がない")
     if report.get("installer_grants_authority") is not False:
-        errors.append("installer grants authority")
+        errors.append("installerがauthorityを付与する")
     if report.get("installer_silently_approves_permissions") is not False:
-        errors.append("installer silently approves permissions")
+        errors.append("installerがpermissionを黙示承認する")
     for check in report.get("checks", []):
         if check.get("grants_authority") is not False:
-            errors.append(f"Setup Doctor check grants authority: {check.get('check_id')}")
+            errors.append(f"Setup Doctorのcheckがauthorityを付与する: {check.get('check_id')}")
         if check.get("status") in {"fail", "warning"} and not check.get("recovery_instruction"):
-            errors.append(f"Setup Doctor check lacks recovery instruction: {check.get('check_id')}")
+            errors.append(f"Setup Doctorのcheckにrecovery instructionがない: {check.get('check_id')}")
     return errors
 
 
@@ -2530,9 +2559,9 @@ def test_installer_boundary_docs_exist() -> list[str]:
     errors = []
     for name in required:
         if not (ROOT / "docs" / name).exists():
-            errors.append(f"docs/{name} missing")
+            errors.append(f"docs/{name} が存在しない")
     if not (INSTALLER / "setup_doctor.py").exists():
-        errors.append("installer/setup_doctor.py missing")
+        errors.append("installer/setup_doctor.pyが存在しない")
     return errors
 
 
@@ -2540,21 +2569,21 @@ def test_mobile_flutter_required_files_exist() -> list[str]:
     errors = []
     for relative in sorted(MOBILE_FLUTTER_REQUIRED_FILES):
         if not (MOBILE_FLUTTER / relative).exists():
-            errors.append(f"apps/mobile_flutter/{relative} missing")
+            errors.append(f"apps/mobile_flutter/{relative} が存在しない")
     return errors
 
 
 def test_mobile_flutter_cannot_create_hidden_authority() -> list[str]:
-    required_terms = ["device_id", "pairing_id", "operator confirmation", "audit event", "revocation", "recovery path"]
+    required_terms = ["device_id", "pairing_id", "操作者確認", "監査事象", "取消し", "復旧経路"]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in sorted((MOBILE_FLUTTER / "lib").glob("**/*.dart")))
     errors = []
     for term in required_terms:
         if term not in combined:
-            errors.append(f"mobile pairing contract term missing: {term}")
+            errors.append(f"mobile pairing contractのtermがない: {term}")
     forbidden = ["independent authority: true", "silently pair", "'full_payload'", "hidden payload available"]
     for pattern in forbidden:
         if pattern in combined:
-            errors.append(f"mobile Flutter contains forbidden authority pattern: {pattern}")
+            errors.append(f"mobile Flutterが禁止されたauthority patternを含む: {pattern}")
     return errors
 
 
@@ -2562,7 +2591,7 @@ def test_release_hardening_files_exist() -> list[str]:
     errors = []
     for relative in sorted(RELEASE_HARDENING_FILES):
         if not (ROOT / relative).exists():
-            errors.append(f"{relative} missing")
+            errors.append(f"{relative} が存在しない")
     return errors
 
 
@@ -2586,12 +2615,12 @@ def test_release_hardening_does_not_overclaim_readiness() -> list[str]:
 def test_validation_reporter_exists() -> list[str]:
     path = ROOT / "tooling" / "validate_all.py"
     if not path.exists():
-        return ["tooling/validate_all.py missing"]
+        return ["tooling/validate_all.pyが存在しない"]
     text = path.read_text(encoding="utf-8")
     errors = []
     for token in ["schema_check", "conformance_skeleton", "manifest_check", "release_gate_check", "rust_helper_cargo_test", "desktop_flutter_analyze", "desktop_flutter_test", "desktop_flutter_build_linux", "mobile_flutter_analyze", "strict-release", "desktop-platform", "windows", "linux", "macos"]:
         if token not in text:
-            errors.append(f"validate_all.py missing validation token: {token}")
+            errors.append(f"validate_all.pyにvalidation tokenがない: {token}")
     return errors
 
 
@@ -2608,7 +2637,7 @@ def test_validate_all_resolves_windows_batch_commands() -> list[str]:
         "find_tool(step.required_tool)",
     ]:
         if token not in text:
-            errors.append(f"validate_all.py missing Windows command resolution token: {token}")
+            errors.append(f"validate_all.pyにWindows command resolution tokenがない: {token}")
     return errors
 
 
@@ -2634,7 +2663,7 @@ def test_manifest_integrity_tooling_exists() -> list[str]:
     errors.extend(manifest_errors)
     listed = {entry["path"] for entry in manifest["files"]}
     for path in sorted(required_paths - listed):
-        errors.append(f"manifest expected source missing from generated file list: {path}")
+        errors.append(f"manifestが期待するsourceが生成file一覧にない: {path}")
 
     forbidden_paths = [
         "MANIFEST.sha256.json",
@@ -2650,7 +2679,7 @@ def test_manifest_integrity_tooling_exists() -> list[str]:
     ]
     for path in forbidden_paths:
         if not matches_forbidden(path):
-            errors.append(f"manifest forbidden path was accepted: {path}")
+            errors.append(f"manifestで禁止されたpathが受け入れられた: {path}")
 
     allowed_paths = [
         "docs/LANGUAGE_POLICY.md",
@@ -2659,7 +2688,7 @@ def test_manifest_integrity_tooling_exists() -> list[str]:
     ]
     for path in allowed_paths:
         if matches_forbidden(path):
-            errors.append(f"manifest source path was rejected: {path}")
+            errors.append(f"manifestのsource pathが拒否された: {path}")
     return errors
 
 
@@ -2670,7 +2699,7 @@ def test_claim_documents_do_not_contain_stale_phase_or_check_counts() -> list[st
         text = (ROOT / relative).read_text(encoding="utf-8")
         for pattern in stale_patterns:
             if pattern in text:
-                errors.append(f"{relative} contains stale claim text: {pattern}")
+                errors.append(f"{relative} がstaleのclaim textを含む: {pattern}")
     return errors
 
 
@@ -2678,7 +2707,7 @@ def test_runtime_manifest_invalid_fixture_rejected() -> list[str]:
     schema = load_schema("runtime_manifest.schema.json")
     invalid = json.loads((INVALID_CONTRACT_EXAMPLES / "runtime_manifest_unsigned.invalid.json").read_text(encoding="utf-8"))
     if not validate_instance(invalid, schema):
-        return ["runtime manifest invalid fixture was accepted"]
+        return ["runtime manifestのinvalid fixtureが受け入れられた"]
     return []
 
 
@@ -2687,10 +2716,10 @@ def test_adapter_manifest_authority_escalation_rejected() -> list[str]:
     invalid = json.loads((INVALID_CONTRACT_EXAMPLES / "adapter_manifest_authority_escalation.invalid.json").read_text(encoding="utf-8"))
     errors = []
     if not validate_instance(invalid, schema):
-        errors.append("adapter manifest authority escalation fixture was accepted")
+        errors.append("adapter manifestのauthority escalation fixtureが受け入れられた")
     catalog = RuntimeCatalog()
     if not catalog.metadata_attempts_authority(invalid.get("metadata", {})):
-        errors.append("RuntimeCatalog did not detect adapter manifest metadata authority attempt")
+        errors.append("RuntimeCatalogがadapter manifest metadataのauthority試行を検出しなかった")
     return errors
 
 
@@ -2699,7 +2728,7 @@ def test_runtime_catalog_cannot_grant_authority() -> list[str]:
     manifest = load_contract_fixture("runtime_manifest.valid.json")
     catalog.register_runtime_manifest(manifest)
     if catalog.can_grant_authority(manifest):
-        return ["RuntimeCatalog granted authority from manifest"]
+        return ["RuntimeCatalogがmanifestからauthorityを付与した"]
     return []
 
 
@@ -2707,7 +2736,7 @@ def test_agent_workspace_outside_access_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
     if contract.path_allowed("/outside/project/file.txt"):
-        return ["agent runtime allowed access outside workspace by default"]
+        return ["agent runtimeがworkspace外へのaccessをdefaultで許可した"]
     return []
 
 
@@ -2715,7 +2744,7 @@ def test_agent_secret_path_read_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
     if contract.path_allowed("/workspace/project/.env"):
-        return ["agent runtime allowed secret path read by default"]
+        return ["agent runtimeがsecret pathのreadをdefaultで許可した"]
     return []
 
 
@@ -2743,7 +2772,7 @@ def test_agent_secret_path_symlink_default_deny() -> list[str]:
             }
         )
         if contract.path_allowed(str(symlink)):
-            return ["agent runtime allowed symlink path resolving to secret file"]
+            return ["agent runtimeがsecret fileへresolveするsymlink pathを許可した"]
     return []
 
 
@@ -2753,34 +2782,34 @@ def test_agent_shell_command_requires_permission_mapping() -> list[str]:
     allowed = contract.shell_command_requires_permission(load_contract_fixture("agent_tool_call.valid.json"))
     denied = contract.shell_command_requires_permission({"tool_name": "shell.command"})
     if not allowed or denied:
-        return ["agent shell command permission mapping check failed"]
+        return ["agent shell commandのpermission mapping checkが失敗した"]
     return []
 
 
 def test_agent_git_push_requires_explicit_approval() -> list[str]:
     contract = AgentRuntimeContract(load_contract_fixture("agent_workspace.valid.json"))
     if not contract.git_push_requires_explicit_approval({"tool_name": "git.push", "permission_id": "permission.git.push", "approval_required": True}):
-        return ["agent git push explicit approval was rejected"]
+        return ["agentのgit pushに対するexplicit approvalが拒否された"]
     if contract.git_push_requires_explicit_approval({"tool_name": "git.push", "permission_id": "permission.git.push", "approval_required": False}):
-        return ["agent git push did not require explicit approval"]
+        return ["agentのgit pushがexplicit approvalを必須にしなかった"]
     return []
 
 
 def test_agent_generated_diff_must_be_auditable() -> list[str]:
     contract = AgentRuntimeContract(load_contract_fixture("agent_workspace.valid.json"))
     if not contract.diff_is_auditable(load_contract_fixture("agent_diff.valid.json")):
-        return ["agent generated diff with audit evidence was rejected"]
+        return ["agentがaudit evidence付きで生成したdiffが拒否された"]
     if contract.diff_is_auditable({"diff_id": "diff-1", "payload_hash": "sha256:" + "5" * 64}):
-        return ["agent generated diff without audit was accepted"]
+        return ["agentがauditなしで生成したdiffが受け入れられた"]
     return []
 
 
 def test_agent_auto_permission_is_advisory_only() -> list[str]:
     contract = AgentRuntimeContract(load_contract_fixture("agent_workspace.valid.json"))
     if not contract.auto_permission_is_advisory_only(load_contract_fixture("agent_runtime.valid.json")):
-        return ["agent advisory auto-permission mode was rejected"]
+        return ["agentのadvisory auto-permission modeが拒否された"]
     if contract.auto_permission_is_advisory_only({"auto_permission_mode": "authority"}):
-        return ["agent auto-permission authority mode was accepted"]
+        return ["agentのauto-permission authority modeが受け入れられた"]
     return []
 
 
@@ -2793,10 +2822,10 @@ def bounded_extension_validation_errors(extension: dict) -> list[str]:
     for key, schema_name in BOUNDED_EXTENSION_RECORD_SCHEMAS.items():
         record = extension.get(key)
         if not isinstance(record, dict):
-            errors.append(f"bounded extension missing object record: {key}")
+            errors.append(f"bounded extensionにobject recordがない: {key}")
             continue
         for failure in validate_instance(record, load_schema(schema_name)):
-            errors.append(f"bounded extension {key} failed {schema_name}: {failure}")
+            errors.append(f"bounded extension {key} が{schema_name}で失敗: {failure}")
 
     runtime = extension.get("runtime", {})
     adapter = extension.get("adapter", {})
@@ -2815,7 +2844,7 @@ def bounded_extension_validation_errors(extension: dict) -> list[str]:
     permission_id = permission.get("permission_id")
 
     if extension.get("evidence_classification") != "contract_conformance":
-        errors.append("bounded extension must be classified as contract_conformance")
+        errors.append("bounded extensionはcontract_conformanceに分類されなければならない")
     required_non_claims = {
         "not_installed_product_evidence",
         "not_windows_release_evidence",
@@ -2824,22 +2853,22 @@ def bounded_extension_validation_errors(extension: dict) -> list[str]:
     }
     missing_non_claims = required_non_claims - set(extension.get("non_claims", []))
     if missing_non_claims:
-        errors.append(f"bounded extension missing non-claims: {', '.join(sorted(missing_non_claims))}")
+        errors.append(f"bounded extensionにnon-claimがない: {', '.join(sorted(missing_non_claims))}")
 
     if runtime_id != runtime_manifest.get("runtime_id"):
-        errors.append("bounded extension runtime_manifest runtime_id does not match runtime")
+        errors.append("bounded extensionのruntime_manifest runtime_idがruntimeと一致しない")
     if runtime_id != adapter.get("runtime_id") or runtime_id != adapter_manifest.get("runtime_id"):
-        errors.append("bounded extension adapter runtime_id does not match runtime")
+        errors.append("bounded extensionのadapter runtime_idがruntimeと一致しない")
     if runtime.get("adapter_id") != adapter_id or adapter_manifest.get("adapter_id") != adapter_id:
-        errors.append("bounded extension adapter_id linkage is inconsistent")
+        errors.append("bounded extensionのadapter_id linkageが不整合である")
     if runtime_manifest.get("runtime_type") != "tool_runtime" or runtime.get("kind") != "tool":
-        errors.append("bounded extension reference must remain a tool runtime")
+        errors.append("bounded extensionのreferenceはtool runtimeのままでなければならない")
     if adapter.get("transport") != "mock" or adapter_manifest.get("transport") != "mock":
-        errors.append("bounded extension reference must not require privileged transport")
+        errors.append("bounded extensionのreferenceはprivileged transportを必須にしてはならない")
     if adapter.get("authority_strip") is not True or adapter_manifest.get("authority_strip") is not True:
-        errors.append("bounded extension adapter must require authority_strip=true")
+        errors.append("bounded extensionのadapterはauthority_strip=trueを必須にしなければならない")
     if runtime_manifest.get("signed_manifest") is not True or adapter_manifest.get("signed_manifest") is not True:
-        errors.append("bounded extension manifests must be signed")
+        errors.append("bounded extensionのmanifestはsignedでなければならない")
 
     for record_name, capabilities in {
         "runtime": runtime.get("capabilities", []),
@@ -2848,33 +2877,33 @@ def bounded_extension_validation_errors(extension: dict) -> list[str]:
         "adapter_manifest": adapter_manifest.get("declared_capabilities", []),
     }.items():
         if capability_id not in capabilities:
-            errors.append(f"bounded extension {record_name} does not declare capability {capability_id}")
+            errors.append(f"bounded extension {record_name} がcapability {capability_id}を宣言していない")
     if permission_id not in runtime_manifest.get("permissions", []):
-        errors.append("bounded extension runtime_manifest does not declare permission")
+        errors.append("bounded extensionのruntime_manifestがpermissionを宣言していない")
     if permission.get("capability_id") != capability_id:
-        errors.append("bounded extension permission does not map to capability")
+        errors.append("bounded extensionのpermissionがcapabilityへ対応付けられていない")
     if permission.get("source") != "policy":
-        errors.append("bounded extension permission source must be policy, not runtime or metadata")
+        errors.append("bounded extensionのpermission sourceはruntimeまたはmetadataではなくpolicyでなければならない")
     if permission.get("decision") != "allow":
-        errors.append("bounded extension positive fixture permission must be allow")
+        errors.append("bounded extensionのpositive fixtureのpermissionはallowでなければならない")
 
     if approval.get("runtime_id") != runtime_id or approval.get("operation") != capability_id:
-        errors.append("bounded extension approval does not map to runtime capability")
+        errors.append("bounded extensionのapprovalがruntime capabilityへ対応付けられていない")
     if approval.get("status") != "approved":
-        errors.append("bounded extension positive fixture approval must be approved")
+        errors.append("bounded extensionのpositive fixtureのapprovalはapprovedでなければならない")
     if audit_event.get("payload_hash") != approval.get("payload_hash"):
-        errors.append("bounded extension audit payload_hash does not match approval payload_hash")
+        errors.append("bounded extensionのaudit payload_hashがapproval payload_hashと一致しない")
     if audit_event.get("action") != capability_id or audit_event.get("target") != runtime_id:
-        errors.append("bounded extension audit target/action does not map to runtime capability")
+        errors.append("bounded extensionのaudit target/actionがruntime capabilityへ対応付けられていない")
     if not recovery_action.get("recovery_id"):
-        errors.append("bounded extension recovery mapping is missing")
+        errors.append("bounded extensionのrecovery mappingがない")
 
     if content_policy.get("default_visibility") != "none":
-        errors.append("bounded extension content exposure default must be none")
+        errors.append("bounded extensionのcontent exposure defaultはnoneでなければならない")
     if "full" in content_policy.get("allowed_visibility", []):
-        errors.append("bounded extension content exposure policy must not allow full payload")
+        errors.append("bounded extensionのcontent exposure policyはfull payloadを許可してはならない")
     if approval.get("content_visibility") not in content_policy.get("allowed_visibility", []):
-        errors.append("bounded extension approval visibility is outside content policy")
+        errors.append("bounded extensionのapproval visibilityがcontent policyの範囲外である")
 
     return errors
 
@@ -2918,24 +2947,24 @@ def test_l3_bounded_reference_extension_uses_existing_contracts() -> list[str]:
         catalog.register_runtime_manifest(extension["runtime_manifest"])
         catalog.register_adapter_manifest(extension["adapter_manifest"])
     except ValueError as exc:
-        errors.append(f"bounded extension manifest registration failed: {exc}")
+        errors.append(f"bounded extensionのmanifest registrationが失敗: {exc}")
     if catalog.can_grant_authority(extension["runtime_manifest"]):
-        errors.append("bounded extension runtime manifest granted authority")
+        errors.append("bounded extensionのruntime manifestがauthorityを付与した")
     if catalog.metadata_attempts_authority(extension["adapter_manifest"].get("metadata", {})):
-        errors.append("bounded extension adapter manifest metadata attempted authority")
+        errors.append("bounded extensionのadapter manifest metadataがauthorityを試行した")
 
     try:
         adapter_record = load_adapter(extension["adapter"])
     except ValueError as exc:
-        errors.append(f"bounded extension adapter load failed: {exc}")
+        errors.append(f"bounded extensionのadapter loadが失敗: {exc}")
     else:
         if adapter_record.effective_capabilities() != tuple(extension["adapter"]["declared_capabilities"]):
-            errors.append("bounded extension adapter metadata changed effective capabilities")
+            errors.append("bounded extensionのadapter metadataがeffective capabilitiesを変更した")
 
     marker = extension["runtime"]["runtime_id"]
     for path in sorted(SHELL_CORE.glob("*.py")):
         if marker in path.read_text(encoding="utf-8"):
-            errors.append(f"bounded extension runtime-specific marker leaked into Shell Core: {path}")
+            errors.append(f"bounded extensionのruntime固有markerがShell Coreへ漏れた: {path}")
     return errors
 
 
@@ -2945,15 +2974,15 @@ def test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping()
     result = PolicyEvaluator(state).evaluate(build_bounded_extension_action(extension))
     errors = []
     if not result["allowed"]:
-        errors.append(f"bounded extension declared mapping was rejected: {result['errors']}")
+        errors.append(f"bounded extensionの宣言済みmappingが拒否された: {result['errors']}")
     if result.get("audit_required") is not True:
-        errors.append("bounded extension policy result did not require audit")
+        errors.append("bounded extensionのpolicy resultがauditを必須にしなかった")
 
     projected = project_approval_content(extension["approval"])
     if "full_payload" in projected:
-        errors.append("bounded extension projected full payload without full visibility")
+        errors.append("bounded extensionがfull visibilityなしでfull payloadを射影した")
     if "redacted_payload" not in projected:
-        errors.append("bounded extension did not project the declared redacted payload")
+        errors.append("bounded extensionが宣言済みのredacted payloadを射影しなかった")
     return errors
 
 
@@ -2967,7 +2996,7 @@ def test_l3_bounded_reference_extension_negative_cases_fail_closed() -> list[str
         mutate(state, action)
         result = PolicyEvaluator(state).evaluate(action)
         if result["allowed"] or expected_code not in error_codes(result):
-            errors.append(f"bounded extension negative case did not fail closed for {label}: {result}")
+            errors.append(f"bounded extensionのnegative caseが{label}でfail closedにならなかった: {result}")
 
     assert_policy_error(
         "adapter metadata authority escalation",
@@ -3012,9 +3041,9 @@ def test_l3_bounded_reference_extension_negative_cases_fail_closed() -> list[str
     policy = extension["content_exposure_policy"]
     projected = project_approval_content(approval)
     if approval["content_visibility"] in policy["allowed_visibility"]:
-        errors.append("bounded extension content policy allowed full visibility")
+        errors.append("bounded extensionのcontent policyがfull visibilityを許可した")
     if "full_payload" not in projected:
-        errors.append("bounded extension full visibility mutation did not expose why policy rejection is required")
+        errors.append("bounded extensionのfull visibility変更がpolicyの拒否が必要な理由を示さなかった")
     return errors
 
 
@@ -3028,9 +3057,9 @@ def test_audit_chain_verification_fails_on_tampered_event() -> list[str]:
     invalid = verify_audit_chain([first, tampered])
     errors = []
     if valid["ok"] is not True:
-        errors.append("valid audit chain did not verify")
+        errors.append("有効なaudit chainを検証できなかった")
     if invalid["ok"] is not False:
-        errors.append("tampered audit chain verified")
+        errors.append("改ざんされたaudit chainの検証に成功した")
     return errors
 
 
@@ -3041,13 +3070,13 @@ def test_audit_chain_rejects_duplicate_event_ids() -> list[str]:
     invalid = verify_audit_chain([first, duplicate])
     errors = []
     if invalid["ok"] is not False:
-        errors.append("duplicate audit event_id chain verified")
+        errors.append("重複したaudit event_idのchainの検証に成功した")
 
     state = RuntimeState()
     state.append_audit_event(event)
     try:
         state.append_audit_event(copy.deepcopy(event))
-        errors.append("RuntimeState allowed duplicate audit event_id overwrite")
+        errors.append("RuntimeStateが重複したaudit event_idのoverwriteを許可した")
     except ValueError:
         pass
 
@@ -3058,7 +3087,7 @@ def test_audit_chain_rejects_duplicate_event_ids() -> list[str]:
     store.append({"event_id": "audit-1", "action": "test", "result": "success"})
     try:
         store.append({"event_id": "audit-1", "action": "test", "result": "success"})
-        errors.append("AuditStore allowed duplicate audit event_id append")
+        errors.append("AuditStoreが重複したaudit event_idのappendを許可した")
     except ValueError:
         pass
 
@@ -3067,7 +3096,7 @@ def test_audit_chain_rejects_duplicate_event_ids() -> list[str]:
         persistence.append_audit_event(event)
         try:
             persistence.append_audit_event(copy.deepcopy(event))
-            errors.append("JsonPersistence allowed duplicate audit event_id append")
+            errors.append("JsonPersistenceが重複したaudit event_idのappendを許可した")
         except ValueError:
             pass
     return errors
@@ -3085,12 +3114,12 @@ def test_json_persistence_reports_corrupt_audit_jsonl() -> list[str]:
         report = persistence.audit_events_report()
         errors = []
         if not report["errors"]:
-            errors.append("JsonPersistence did not report corrupt audit JSONL line")
+            errors.append("JsonPersistenceがcorrupt audit JSONLのlineを報告しなかった")
         if persistence.verify_audit_chain()["ok"] is not False:
-            errors.append("JsonPersistence verified corrupt audit JSONL")
+            errors.append("JsonPersistenceがcorrupt audit JSONLの検証に成功した")
         try:
             persistence.audit_events()
-            errors.append("JsonPersistence audit_events did not fail closed on corrupt JSONL")
+            errors.append("JsonPersistenceのaudit_eventsがcorrupt JSONLでfail closedにならなかった")
         except ValueError:
             pass
         return errors
@@ -3100,12 +3129,12 @@ def test_platform_hardening_configuration_exists() -> list[str]:
     errors = []
     gitattributes = ROOT / ".gitattributes"
     if not gitattributes.exists():
-        errors.append(".gitattributes missing")
+        errors.append(".gitattributesが存在しない")
     else:
         text = gitattributes.read_text(encoding="utf-8")
         for token in ["* text=auto eol=lf", "*.ps1 text eol=lf", "*.exe binary"]:
             if token not in text:
-                errors.append(f".gitattributes missing token: {token}")
+                errors.append(f".gitattributesにtokenがない: {token}")
 
     workflow_dir = ROOT / ".github" / "workflows"
     if workflow_dir.exists():
@@ -3115,13 +3144,13 @@ def test_platform_hardening_configuration_exists() -> list[str]:
             for path in workflow_dir.glob(pattern)
         )
         for workflow_file in workflow_files:
-            errors.append(f"GitHub Actions workflow must remain absent: {workflow_file}")
+            errors.append(f"GitHub Actions workflowは存在しないままでなければならない: {workflow_file}")
 
     main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     if "dev-stdin-smoke" not in main_rs:
-        errors.append("Rust helper dev stdin smoke is not isolated behind an explicit subcommand")
-    if "usage: gui_shell_rust_helper broker-server" not in main_rs:
-        errors.append("Rust helper does not fail closed to usage for unknown/no-arg invocation")
+        errors.append("Rust helperのdev stdin smokeがexplicit subcommandの後方に隔離されていない")
+    if "使用法: gui_shell_rust_helper broker-server" not in main_rs:
+        errors.append("Rust helperが未知/引数なしの呼び出しでusageへfail closedにならない")
     return errors
 
 
@@ -3131,13 +3160,13 @@ def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     report = setup_doctor_report()
     matches = [check for check in report["checks"] if check["check_id"] == "network.public_bind"]
     if not matches or matches[0].get("status") != "warning" or not matches[0].get("recovery_action"):
-        return ["Setup Doctor public bind warning missing"]
+        return ["Setup Doctorのpublic bind warningがない"]
     return []
 
 
 def test_broker_parity_startup_timeout_allows_local_cold_build() -> list[str]:
     if DEFAULT_BROKER_START_TIMEOUT_SECONDS < 60.0:
-        return ["broker parity startup timeout is too short for local cold Rust builds"]
+        return ["broker parityのstartup timeoutがlocal cold Rust buildに対して短すぎる"]
     return []
 
 
@@ -3151,7 +3180,7 @@ def test_broker_parity_waits_after_process_kill() -> list[str]:
         "finally:\n                wait_for_process_exit(broker.process)",
     ]:
         if token not in text:
-            errors.append(f"broker parity cleanup missing token: {token}")
+            errors.append(f"broker parityのcleanupにtokenがない: {token}")
     return errors
 
 
@@ -3159,18 +3188,18 @@ def test_desktop_agent_center_required_surface_exists() -> list[str]:
     path = DESKTOP_FLUTTER / "lib" / "screens" / "agent_center.dart"
     text = path.read_text(encoding="utf-8")
     required = [
-        "Workspace",
-        "Task",
-        "Changed Files",
-        "Tool Calls",
-        "Shell Commands",
-        "Test Status",
-        "Diff Summary",
-        "Pending Approvals",
-        "Rollback Candidate",
-        "Audit Link",
+        "作業領域",
+        "タスク",
+        "変更ファイル",
+        "道具呼出し",
+        "シェルコマンド",
+        "試験状態",
+        "差分概要",
+        "保留中の承認",
+        "巻戻し候補",
+        "監査リンク",
     ]
-    return [f"Agent Center missing surface: {item}" for item in required if item not in text]
+    return [f"エージェントセンターにsurfaceがない: {item}" for item in required if item not in text]
 
 
 def main() -> int:
@@ -3292,6 +3321,7 @@ def main() -> int:
         test_release_facing_docs_sync_release_blockers_to_registry,
         test_release_gate_scans_ipc_threat_model,
         test_packaging_portability_checker_exists,
+        test_packaging_portability_utf8_governance_allowlist_is_exact,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,
@@ -3321,12 +3351,12 @@ def main() -> int:
         errors.extend(test())
 
     if errors:
-        print("conformance skeleton failed:")
+        print("conformance skeletonが失敗:")
         for err in errors:
             print(f"  - {err}")
         return 1
 
-    print(f"conformance skeleton passed: {len(tests)} checks")
+    print(f"conformance skeletonが合格: {len(tests)} 件のcheck")
     return 0
 
 

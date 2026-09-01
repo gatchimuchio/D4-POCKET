@@ -41,7 +41,7 @@ def build_evidence_bundle() -> dict:
         "bundle_version": 1,
         "product": "GUI-Shell",
         "release_ready": False,
-        "release_ready_reason": "Windows installed-path evidence and audit anchor external tamper-evidence proof are required before completed product release.",
+        "release_ready_reason": "完成製品releaseの前にWindows installed-path evidenceとaudit anchorの外部tamper-evidence proofが必要である。",
         "classification": "development_evidence",
         "windows_release_evidence": [result.__dict__ for result in windows_evidence],
         "release_runtime_assertions": release_runtime_assertions,
@@ -66,38 +66,38 @@ def build_evidence_bundle() -> dict:
 def validate_evidence_bundle(bundle: dict) -> list[str]:
     errors: list[str] = []
     if bundle.get("release_ready") is not False:
-        errors.append("development evidence bundle must not claim release_ready")
+        errors.append("development evidence bundleはrelease_readyを主張してはならない")
     if bundle.get("authority_boundary", {}).get("flutter_owns_authority") is not False:
-        errors.append("evidence bundle says Flutter owns authority")
+        errors.append("evidence bundleがFlutterによるauthority所有を示している")
     if bundle.get("authority_boundary", {}).get("flutter_authority_surface_broker_mediated") is not True:
-        errors.append("evidence bundle missing broker-mediated Flutter authority assertion")
+        errors.append("evidence bundleにFlutter authority surfaceがbroker-mediatedであるというassertionがない")
     if bundle.get("authority_boundary", {}).get("flutter_spawns_python_for_authority") is not False:
-        errors.append("evidence bundle says Flutter spawns Python for authority")
+        errors.append("evidence bundleがFlutterによるauthority用Python spawnを示している")
     if bundle.get("authority_boundary", {}).get("flutter_rust_ffi_authority_bridge") is not False:
-        errors.append("evidence bundle says Flutter uses FFI authority bridge")
+        errors.append("evidence bundleがFlutterによるFFI authority bridge使用を示している")
     if bundle.get("authority_boundary", {}).get("installer_grants_authority") is not False:
-        errors.append("evidence bundle says installer grants authority")
+        errors.append("evidence bundleがinstallerによるauthority付与を示している")
     if not bundle.get("shell_snapshot", {}).get("trust_records"):
-        errors.append("evidence bundle missing trust records")
+        errors.append("evidence bundleにtrust recordがない")
     if not bundle.get("shell_snapshot", {}).get("authority_map"):
-        errors.append("evidence bundle missing authority map")
+        errors.append("evidence bundleにauthority mapがない")
     if not bundle.get("setup_doctor", {}).get("checks"):
-        errors.append("evidence bundle missing Setup Doctor checks")
+        errors.append("evidence bundleにSetup Doctor checkがない")
     if not bundle.get("release_smoke", {}).get("ok"):
-        errors.append("release smoke failed inside evidence bundle")
+        errors.append("evidence bundle内のrelease smokeが失敗")
     if not bundle.get("release_runtime_assertions", {}).get("ok"):
-        errors.append("release runtime assertions failed inside evidence bundle")
+        errors.append("evidence bundle内のrelease runtime assertionが失敗")
     for index, blocker in enumerate(bundle.get("blockers", [])):
         if not isinstance(blocker, dict):
-            errors.append(f"evidence bundle blocker {index} is not an object")
+            errors.append(f"evidence bundle blocker {index}がobjectではない")
             continue
         for key in ["name", "status", "classification", "blocks_release", "reason", "required_action"]:
             if key not in blocker:
-                errors.append(f"evidence bundle blocker {index} missing {key}")
+                errors.append(f"evidence bundle blocker {index}に{key}がない")
         if blocker.get("classification") != "release_blocker":
-            errors.append(f"evidence bundle blocker {index} is not release_blocker")
+            errors.append(f"evidence bundle blocker {index}がrelease_blockerではない")
         if blocker.get("blocks_release") is not True:
-            errors.append(f"evidence bundle blocker {index} must block release")
+            errors.append(f"evidence bundle blocker {index}はreleaseを阻止しなければならない")
     return errors
 
 
@@ -109,14 +109,14 @@ def main() -> int:
     bundle = build_evidence_bundle()
     errors = validate_evidence_bundle(bundle)
     if errors:
-        print("evidence bundle validation failed:")
+        print("evidence bundle validationが失敗:")
         for error in errors:
             print(f"  - {error}")
         return 1
     if args.check:
         print(
-            "evidence bundle check passed: "
-            f"{len(bundle['blockers'])} release blockers preserved, "
+            "evidence bundle checkが合格: "
+            f"release blockerを{len(bundle['blockers'])} 件保持、"
             f"release_ready={bundle['release_ready']}, "
             f"classification={bundle['classification']}"
         )

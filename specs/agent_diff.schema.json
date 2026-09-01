@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_diff.schema.json",
-  "title": "AgentDiff",
+  "title": "エージェント差分（AgentDiff）",
   "type": "object",
   "required": ["diff_id", "session_id", "changed_files", "payload_hash", "audit_event_id", "rollback_candidate_id"],
   "additionalProperties": false,

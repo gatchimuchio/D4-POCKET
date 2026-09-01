@@ -31,21 +31,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = widget.client.getSnapshot().settings;
     final filtered = settings.where(_matchesFilters).toList();
     return ShellPage(
-      title: 'Settings',
+      title: '設定',
       children: [
         BorderedPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Search / Filter',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text('検索／絞込み', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.search),
-                  labelText: 'Search settings',
+                  labelText: '設定を検索',
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -55,25 +54,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 runSpacing: 8,
                 children: [
                   FilterChip(
-                    label: const Text('modified'),
+                    label: const Text('変更済み'),
                     selected: _modifiedOnly,
                     onSelected: (value) =>
                         setState(() => _modifiedOnly = value),
                   ),
                   FilterChip(
-                    label: const Text('authority'),
+                    label: const Text('権限関連'),
                     selected: _authorityOnly,
                     onSelected: (value) =>
                         setState(() => _authorityOnly = value),
                   ),
                   FilterChip(
-                    label: const Text('dangerous'),
+                    label: const Text('危険'),
                     selected: _dangerousOnly,
                     onSelected: (value) =>
                         setState(() => _dangerousOnly = value),
                   ),
                   FilterChip(
-                    label: const Text('phase/release'),
+                    label: const Text('段階／リリース'),
                     selected: _phaseReleaseOnly,
                     onSelected: (value) =>
                         setState(() => _phaseReleaseOnly = value),
@@ -83,34 +82,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-        const SectionList(title: 'Authority Boundary', rows: [
-          'Settings are display-only in Phase B polish.',
-          'Reset, export, and mutating changes must go through Shell Core approval paths.',
-          'Dangerous or authority-related settings are flagged for operator review.',
-        ]),
+        const SectionList(
+          title: '権限境界',
+          rows: [
+            '段階Bの仕上げでは設定を表示専用とします。',
+            '初期化、書き出し、変更操作はShell Coreの承認経路を通す必要があります。',
+            '危険または権限関連の設定には、操作者確認用の印を付けます。',
+          ],
+        ),
         if (filtered.isEmpty)
           const EmptyStatePanel(
-            title: 'No matching settings',
-            meaning:
-                'The current filter did not match any setting projection in the snapshot.',
+            title: '一致する設定なし',
+            meaning: '現在の絞込み条件に一致する設定射影がスナップショット内にありません。',
             phaseBBlocked: false,
-            nextAction:
-                'Clear filters or refresh diagnostics if settings changed.',
+            nextAction: '絞込みを解除するか、設定が変わった場合は診断を更新してください。',
           )
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('Setting')),
-                DataColumn(label: Text('Current')),
-                DataColumn(label: Text('Source')),
-                DataColumn(label: Text('Effect / Notes')),
-                DataColumn(label: Text('Flags')),
+                DataColumn(label: Text('設定')),
+                DataColumn(label: Text('現在値')),
+                DataColumn(label: Text('出所')),
+                DataColumn(label: Text('有効値／注記')),
+                DataColumn(label: Text('印')),
               ],
-              rows: [
-                for (final setting in filtered) _settingRow(setting),
-              ],
+              rows: [for (final setting in filtered) _settingRow(setting)],
             ),
           ),
       ],
@@ -149,23 +147,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   DataRow _settingRow(SettingRecord setting) {
-    return DataRow(cells: [
-      DataCell(Text('${setting.key}\n${setting.group}')),
-      DataCell(Text(setting.currentValue)),
-      DataCell(Text(setting.source)),
-      DataCell(Text(
-        'default: ${setting.defaultValue}\neffective: ${setting.effectiveValue}',
-      )),
-      DataCell(Text(_flags(setting))),
-    ]);
+    return DataRow(
+      cells: [
+        DataCell(Text('${setting.key}\n${setting.group}')),
+        DataCell(Text(setting.currentValue)),
+        DataCell(Text(setting.source)),
+        DataCell(
+          Text('既定値: ${setting.defaultValue}\n有効値: ${setting.effectiveValue}'),
+        ),
+        DataCell(Text(_flags(setting))),
+      ],
+    );
   }
 
   String _flags(SettingRecord setting) {
     final flags = [
-      if (setting.modified) 'modified',
-      if (setting.dangerous) 'dangerous',
-      if (setting.authorityRelated) 'authority',
+      if (setting.modified) '変更済み',
+      if (setting.dangerous) '危険',
+      if (setting.authorityRelated) '権限関連',
     ];
-    return flags.isEmpty ? 'none' : flags.join(', ');
+    return flags.isEmpty ? 'なし' : flags.join(', ');
   }
 }

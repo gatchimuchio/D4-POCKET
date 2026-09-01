@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_workspace.schema.json",
-  "title": "AgentWorkspace",
+  "title": "エージェント作業領域（AgentWorkspace）",
   "type": "object",
   "required": ["workspace_id", "root_path", "boundary_policy", "secret_paths", "outside_access_default"],
   "additionalProperties": false,

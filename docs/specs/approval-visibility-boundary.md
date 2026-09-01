@@ -1,27 +1,27 @@
-# Approval Visibility Boundary
+# Approval の表示境界（Approval Visibility Boundary）
 
-Approval UI must not imply that the user can approve what the runtime has not exposed.
+Approval UI は、Runtime が露出していない内容をユーザーが承認できるかのように示してはならない。
 
-## Full payload storage boundary
+## Full payload の保存境界
 
-`full_payload` may exist in approval storage for hashing, revalidation, audit correlation, or later full-review use.
+`full_payload` は、hashing、revalidation、Audit correlation、または後の full review のため、Approval の保存領域に存在し得る。
 
-UI projection must never expose `full_payload` unless the effective approval contract has `content_visibility=full`.
+有効な Approval Contract が `content_visibility=full` でない限り、UI projection は決して `full_payload` を露出してはならない。
 
-If `content_visibility` is `none`, `hash_only`, `summary`, or `redacted`, the UI must render only the allowed projection and must not leak full payload values through labels, tooltips, logs, previews, search indexes, accessibility text, or debug views.
+`content_visibility` が `none`、`hash_only`、`summary`、または `redacted` の場合、UI は許可された projection だけを描画し、label、tooltip、log、preview、search index、accessibility text、debug view を通じて full payload の値を漏出してはならない。
 
-## Editable field constraints
+## 編集可能 field の制約
 
-- Editable fields must be explicitly declared by runtime.
-- Authority fields are never editable.
-- Hidden fields are never editable.
-- Sealed fields are never editable.
-- Sacred-domain fields are never editable.
-- Runtime identity, permission identity, audit identity, and payload hash are never directly editable.
+- 編集可能な field は Runtime が明示的に宣言しなければならない。
+- authority field は決して編集できない。
+- hidden field は決して編集できない。
+- sealed field は決して編集できない。
+- sacred-domain field は決して編集できない。
+- Runtime identity、Permission identity、Audit identity、および payload hash は、決して直接編集できない。
 
-After edits:
+編集後は、次を行う。
 
-- payload must be rehashed
-- approval must be revalidated
-- approval status must require validation when needed
-- edit event must be audited
+- payload を再 hash 化する。
+- Approval を再検証する。
+- 必要な場合、Approval status を validation required にする。
+- 編集 event を Audit に記録する。

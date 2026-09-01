@@ -1,7 +1,9 @@
 # GUI-Shell 言語方針 監査レポート v0.1
 
 Status: 暫定採用方針  
-Scope: GUI-Shell language, runtime, safety-boundary, and validation responsibility policy
+Scope: GUI-Shell の実装言語、Runtime、安全境界、および validation 責任の方針
+
+自然言語の日本語基底は `規定/00_日本語基底規定.md` が扱う。本書は Flutter / Dart、Rust、TypeScript / Node、Python の実装責任を扱い、自然言語の基底規定とは責任を分ける。
 
 ## 1. 結論
 
@@ -170,7 +172,7 @@ Claudeの一度目の案は、Rust中心収束を提案した。
 - Rustだから安全、とは扱わない。
 - Rust UI全面化は現時点では採用しない。
 
-### 5.3 TypeScript / Node
+### 5.3 TypeScript / Node の用途
 
 GUI-Shell本体には採用しない。
 

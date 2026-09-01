@@ -9,12 +9,12 @@ const Map<String, String> _surfaceSemanticsIds = {
   'Invariant Status': 'gui_shell.surface.invariant_status',
 };
 
-String surfaceSemanticsIdentifier(String label) {
-  final mapped = _surfaceSemanticsIds[label];
+String surfaceSemanticsIdentifier(String evidenceLabel) {
+  final mapped = _surfaceSemanticsIds[evidenceLabel];
   if (mapped != null) {
     return mapped;
   }
-  final normalized = label
+  final normalized = evidenceLabel
       .trim()
       .toLowerCase()
       .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
@@ -29,8 +29,8 @@ class SurfaceSemanticsRegistry {
 
   static Map<String, String> get observed => Map.unmodifiable(_observed);
 
-  static void record(String label) {
-    _observed[label] = surfaceSemanticsIdentifier(label);
+  static void record(String evidenceLabel) {
+    _observed[evidenceLabel] = surfaceSemanticsIdentifier(evidenceLabel);
   }
 
   static void resetForTest() {
@@ -43,6 +43,7 @@ class SurfaceSemantics extends StatelessWidget {
     super.key,
     required this.label,
     required this.child,
+    this.evidenceLabel,
     this.value,
     this.header = false,
     this.explicitChildNodes = false,
@@ -50,6 +51,7 @@ class SurfaceSemantics extends StatelessWidget {
   });
 
   final String label;
+  final String? evidenceLabel;
   final String? value;
   final bool header;
   final bool explicitChildNodes;
@@ -58,9 +60,10 @@ class SurfaceSemantics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    SurfaceSemanticsRegistry.record(label);
+    final stableEvidenceLabel = evidenceLabel ?? label;
+    SurfaceSemanticsRegistry.record(stableEvidenceLabel);
     return Semantics(
-      identifier: surfaceSemanticsIdentifier(label),
+      identifier: surfaceSemanticsIdentifier(stableEvidenceLabel),
       label: label,
       value: value,
       header: header,
@@ -73,9 +76,15 @@ class SurfaceSemantics extends StatelessWidget {
 }
 
 class ShellPage extends StatelessWidget {
-  const ShellPage({super.key, required this.title, required this.children});
+  const ShellPage({
+    super.key,
+    required this.title,
+    required this.children,
+    this.evidenceTitle,
+  });
 
   final String title;
+  final String? evidenceTitle;
   final List<Widget> children;
 
   @override
@@ -88,14 +97,21 @@ class ShellPage extends StatelessWidget {
           children: [
             SurfaceSemantics(
               label: title,
+              evidenceLabel: evidenceTitle,
               header: true,
               excludeSemantics: true,
-              child:
-                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
             const SizedBox(height: 16),
-            ...children.map((child) => Padding(
-                padding: const EdgeInsets.only(bottom: 16), child: child)),
+            ...children.map(
+              (child) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: child,
+              ),
+            ),
           ],
         ),
       ),
@@ -104,10 +120,15 @@ class ShellPage extends StatelessWidget {
 }
 
 class MetricItem {
-  const MetricItem({required this.label, required this.value});
+  const MetricItem({
+    required this.label,
+    required this.value,
+    this.evidenceLabel,
+  });
 
   final String label;
   final String value;
+  final String? evidenceLabel;
 }
 
 class MetricRow extends StatelessWidget {
@@ -124,6 +145,7 @@ class MetricRow extends StatelessWidget {
         for (final item in items)
           SurfaceSemantics(
             label: item.label,
+            evidenceLabel: item.evidenceLabel,
             value: item.value,
             excludeSemantics: true,
             child: SizedBox(
@@ -132,8 +154,10 @@ class MetricRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.value,
-                        style: Theme.of(context).textTheme.headlineMedium),
+                    Text(
+                      item.value,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                     Text(item.label),
                   ],
                 ),
@@ -186,7 +210,7 @@ class ShellStatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final operation = snapshot.operationStatus;
     final ageLabel = snapshotAgeLabel(snapshot);
-    final staleLabel = snapshotIsStale(snapshot) ? 'stale' : 'fresh';
+    final staleLabel = snapshotIsStale(snapshot) ? '期限切れ' : '最新';
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: SizedBox(
@@ -196,31 +220,31 @@ class ShellStatusBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
             children: [
-              const StatusPill(label: 'Phase', value: 'B owner-use'),
+              const StatusPill(label: '段階', value: 'B 所有者利用'),
               const SizedBox(width: 8),
-              StatusPill(label: 'Runtime', value: operation.runtimeStatus),
-              const SizedBox(width: 8),
-              StatusPill(
-                  label: 'Trust/Invariants',
-                  value:
-                      '${operation.trustStatus}/${operation.invariantStatus}'),
+              StatusPill(label: '実行系', value: operation.runtimeStatus),
               const SizedBox(width: 8),
               StatusPill(
-                  label: 'Approvals',
-                  value: '${operation.pendingApprovalsCount} pending'),
-              const SizedBox(width: 8),
-              StatusPill(label: 'Audit', value: operation.auditChainStatus),
+                label: '信頼／不変条件',
+                value: '${operation.trustStatus}/${operation.invariantStatus}',
+              ),
               const SizedBox(width: 8),
               StatusPill(
-                  label: 'Problems', value: '${operation.problemsCount}'),
+                label: '承認',
+                value: '${operation.pendingApprovalsCount}件保留',
+              ),
               const SizedBox(width: 8),
-              StatusPill(label: 'Release', value: operation.releaseState),
+              StatusPill(label: '監査', value: operation.auditChainStatus),
               const SizedBox(width: 8),
-              StatusPill(label: 'Snapshot', value: snapshot.snapshotSource),
+              StatusPill(label: '問題', value: '${operation.problemsCount}'),
               const SizedBox(width: 8),
-              StatusPill(label: 'Age', value: ageLabel),
+              StatusPill(label: 'リリース', value: operation.releaseState),
               const SizedBox(width: 8),
-              StatusPill(label: 'Freshness', value: staleLabel),
+              StatusPill(label: 'スナップショット', value: snapshot.snapshotSource),
+              const SizedBox(width: 8),
+              StatusPill(label: '経過時間', value: ageLabel),
+              const SizedBox(width: 8),
+              StatusPill(label: '鮮度', value: staleLabel),
             ],
           ),
         ),
@@ -252,16 +276,14 @@ class PhaseBanner extends StatelessWidget {
     final String text;
     if (brokerUnavailable) {
       text =
-          'Rust broker IPC is unavailable or rejected. Authority actions are suspended and local snapshots are not authority.';
+          'RustブローカーIPCを利用できないか、接続が拒否されました。権限作用は停止され、ローカルスナップショットは権限根拠になりません。';
     } else if (stale) {
       text =
-          'Fallback or stale diagnostic snapshot is active. Phase B owner-use can continue; refresh diagnostics when current state matters.';
+          '代替または期限切れの診断スナップショットを表示しています。段階Bの所有者利用は継続できますが、現在状態が必要なときは診断を更新してください。';
     } else if (strictBlocked) {
-      text =
-          'Owner-use is OK. Strict release remains blocked by Phase D evidence / owner GO.';
+      text = '所有者利用は可能です。厳格リリースは段階Dの証拠または所有者GOがないため、引き続き遮断されています。';
     } else {
-      text =
-          'Owner-use state is current. Completed product release is still not claimed.';
+      text = '所有者利用状態は最新です。完成製品としてのリリースはまだ主張しません。';
     }
     return Material(
       color: background,
@@ -314,9 +336,9 @@ class EmptyStatePanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Meaning: $meaning'),
-          Text('Phase B owner-use blocked: ${phaseBBlocked ? 'yes' : 'no'}'),
-          Text('Next: $nextAction'),
+          Text('意味: $meaning'),
+          Text('段階Bの所有者利用を遮断: ${phaseBBlocked ? 'はい' : 'いいえ'}'),
+          Text('次の対応: $nextAction'),
         ],
       ),
     );
@@ -336,32 +358,33 @@ class SnapshotInfoPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Snapshot Freshness',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('スナップショットの鮮度', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              StatusPill(label: 'Source', value: snapshot.snapshotSource),
+              StatusPill(label: '出所', value: snapshot.snapshotSource),
+              StatusPill(label: '生成日時', value: _shortSnapshotTime(snapshot)),
+              StatusPill(label: '経過時間', value: snapshotAgeLabel(snapshot)),
               StatusPill(
-                  label: 'Generated', value: _shortSnapshotTime(snapshot)),
-              StatusPill(label: 'Age', value: snapshotAgeLabel(snapshot)),
+                label: '警告',
+                value: brokerUnavailable
+                    ? 'ブローカー利用不可'
+                    : stale
+                        ? '期限切れ／代替'
+                        : 'なし',
+              ),
               StatusPill(
-                  label: 'Warning',
-                  value: brokerUnavailable
-                      ? 'broker unavailable'
-                      : stale
-                          ? 'stale/fallback'
-                          : 'none'),
-              StatusPill(
-                  label: 'Release',
-                  value: snapshot.operationStatus.releaseState),
+                label: 'リリース',
+                value: snapshot.operationStatus.releaseState,
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-              'Path: ${snapshot.snapshotPath.isEmpty ? '(not recorded)' : snapshot.snapshotPath}'),
+            'パス: ${snapshot.snapshotPath.isEmpty ? '(記録なし)' : snapshot.snapshotPath}',
+          ),
           Text(_snapshotInfoMessage(brokerUnavailable, stale)),
         ],
       ),
@@ -389,8 +412,9 @@ class SectionList extends StatelessWidget {
           const SizedBox(height: 8),
           for (final row in rows)
             Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(row)),
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(row),
+            ),
         ],
       ),
     );
@@ -401,20 +425,20 @@ String snapshotAgeLabel(ShellSnapshot snapshot) {
   final generatedAt = _snapshotDate(snapshot);
   if (generatedAt == null) {
     return snapshot.snapshotFreshness.isEmpty
-        ? 'unknown'
-        : snapshot.snapshotFreshness;
+        ? '不明'
+        : _localizedSnapshotMarker(snapshot.snapshotFreshness);
   }
   final age = DateTime.now().toUtc().difference(generatedAt.toUtc());
   if (age.inMinutes < 1) {
-    return 'just now';
+    return 'たった今';
   }
   if (age.inHours < 1) {
-    return '${age.inMinutes}m';
+    return '${age.inMinutes}分';
   }
   if (age.inDays < 1) {
-    return '${age.inHours}h';
+    return '${age.inHours}時間';
   }
-  return '${age.inDays}d';
+  return '${age.inDays}日';
 }
 
 bool snapshotIsStale(ShellSnapshot snapshot) {
@@ -441,12 +465,12 @@ bool snapshotIsBrokerUnavailable(ShellSnapshot snapshot) {
 
 String _snapshotInfoMessage(bool brokerUnavailable, bool stale) {
   if (brokerUnavailable) {
-    return 'Broker-mediated authority path is suspended; local snapshots are diagnostic-only.';
+    return 'ブローカーを介する権限経路は停止中です。ローカルスナップショットは診断用途に限られます。';
   }
   if (stale) {
-    return 'Owner-use can continue, but refresh the diagnostic snapshot when current local state matters.';
+    return '所有者利用は継続できますが、現在のローカル状態が必要なときは診断スナップショットを更新してください。';
   }
-  return 'Snapshot is current enough for Phase B owner-use display.';
+  return '段階Bの所有者利用表示に必要な鮮度を満たしています。';
 }
 
 DateTime? _snapshotDate(ShellSnapshot snapshot) {
@@ -467,11 +491,30 @@ String _shortSnapshotTime(ShellSnapshot snapshot) {
       ? snapshot.snapshotGeneratedAt
       : snapshot.snapshotFreshness;
   if (value.isEmpty) {
-    return 'unknown';
+    return '不明';
   }
   final parsed = DateTime.tryParse(value);
   if (parsed == null) {
-    return value;
+    return _localizedSnapshotMarker(value);
   }
   return parsed.toLocal().toIso8601String();
+}
+
+String _localizedSnapshotMarker(String value) {
+  switch (value.toLowerCase()) {
+    case 'missing':
+      return '未取得';
+    case 'parse failed':
+      return '解析失敗';
+    case 'unavailable':
+      return '利用不可';
+    case 'static':
+      return '固定値';
+    case 'generated':
+      return '生成済み';
+    case 'unknown':
+      return '不明';
+    default:
+      return value;
+  }
 }

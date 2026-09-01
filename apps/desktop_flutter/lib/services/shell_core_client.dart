@@ -4,15 +4,15 @@ import 'dart:io';
 import '../models/generated_contracts.dart';
 import 'broker_client.dart';
 
+const String _snapshotFreshnessParseFailed = 'parse failed';
+
 class ShellCoreClient {
   const ShellCoreClient._(this.snapshot, this.mode);
 
   final ShellSnapshot snapshot;
   final String mode;
 
-  static Future<ShellCoreClient> product({
-    BrokerTransport? transport,
-  }) async {
+  static Future<ShellCoreClient> product({BrokerTransport? transport}) async {
     try {
       final broker = transport ?? await BrokerClient.connect();
       final healthResponse = await broker.request('health');
@@ -58,7 +58,7 @@ class ShellCoreClient {
       );
       if (commandResponse['status'] != 'suspended') {
         throw BrokerClientException(
-          'command envelope was not suspended by broker: '
+          'ブローカーがコマンド封筒を停止しなかった: '
           '${commandResponse['status']}',
         );
       }
@@ -111,15 +111,14 @@ class ShellCoreClient {
         return ShellCoreClient._(
           _snapshotWithLocalIssue(
             problemId: 'local-snapshot-parse-failed',
-            item: 'local snapshot parse failed',
+            item: 'ローカルスナップショットの解析失敗',
             classification: 'required_for_v1',
             severity: 'warning',
-            message: 'Local owner-operation snapshot could not be parsed.',
+            message: '所有者操作用ローカルスナップショットを解析できませんでした。',
             target: resolvedPath,
-            requiredAction:
-                'Refresh the development diagnostic snapshot before using local inspection mode.',
+            requiredAction: 'ローカル確認モードを使う前に、開発診断スナップショットを更新してください。',
             source: 'fallback',
-            freshness: 'parse failed',
+            freshness: _snapshotFreshnessParseFailed,
           ),
           'local',
         );
@@ -128,13 +127,12 @@ class ShellCoreClient {
     return ShellCoreClient._(
       _snapshotWithLocalIssue(
         problemId: 'local-snapshot-missing',
-        item: 'local snapshot missing',
+        item: 'ローカルスナップショットなし',
         classification: 'known_limitation',
         severity: 'info',
-        message: 'Local owner-operation snapshot file is missing.',
+        message: '所有者操作用ローカルスナップショットファイルがありません。',
         target: paths.first,
-        requiredAction:
-            'Create a development diagnostic snapshot before using local inspection mode.',
+        requiredAction: 'ローカル確認モードを使う前に、開発診断スナップショットを作成してください。',
         source: 'fallback',
         freshness: 'missing',
       ),
@@ -143,10 +141,7 @@ class ShellCoreClient {
   }
 
   factory ShellCoreClient.mock() {
-    return const ShellCoreClient._(
-      _mockSnapshot,
-      'mock',
-    );
+    return const ShellCoreClient._(_mockSnapshot, 'mock');
   }
 
   ShellSnapshot getSnapshot() => snapshot;
@@ -160,7 +155,7 @@ Map<String, Object?> _acceptedResponseBodyMap(
   _requireAccepted(response, operation);
   final body = response[bodyKey];
   if (body is! Map) {
-    throw BrokerClientException('$operation response missing $bodyKey object');
+    throw BrokerClientException('$operation 応答に $bodyKey object がありません');
   }
   return Map<String, Object?>.from(body);
 }
@@ -171,7 +166,9 @@ void _requireAccepted(Map<String, Object?> response, String operation) {
     final message = error is Map
         ? error['message']?.toString() ?? response.toString()
         : response.toString();
-    throw BrokerClientException('$operation broker request rejected: $message');
+    throw BrokerClientException(
+      '$operation の broker request が拒否されました: $message',
+    );
   }
 }
 
@@ -198,62 +195,62 @@ ShellSnapshot _brokerSnapshot({
       brokerReady && cutoverStatus == 'active' ? 'ready' : 'suspend';
   final problems = <Map<String, Object?>>[];
   if (!brokerReady) {
-    problems.add(_releaseProblemJson(
-      problemId: 'broker-persistence-not-ready',
-      item: 'broker durable store not ready',
-      severity: 'error',
-      category: 'broker_ipc',
-      message:
-          'Rust broker did not report durable audit/replay/session readiness.',
-      target: 'rust_security_broker',
-      recoveryId: 'recover-broker-persistence',
-      requiredAction:
-          'Start the Rust broker with durable store access and reconnect the product UI.',
-      blocksOwnerUse: true,
-    ));
+    problems.add(
+      _releaseProblemJson(
+        problemId: 'broker-persistence-not-ready',
+        item: 'ブローカー永続保管庫の準備未完了',
+        severity: 'error',
+        category: 'broker_ipc',
+        message: 'Rustブローカーが監査／再生／セッションの永続化準備完了を報告していません。',
+        target: 'rust_security_broker',
+        recoveryId: 'recover-broker-persistence',
+        requiredAction: '永続保管庫へアクセスできる状態でRustブローカーを起動し、製品UIを再接続してください。',
+        blocksOwnerUse: true,
+      ),
+    );
   }
   if (cutoverStatus != 'active') {
-    problems.add(_releaseProblemJson(
-      problemId: 'broker-authority-cutover-not-active',
-      item: 'broker authority cutover not active',
-      severity: 'warning',
-      category: 'authority_cutover',
-      message:
-          'Flutter is broker-mediated, but the broker has not claimed active authority cutover.',
-      target: 'authority_cutover_status',
-      recoveryId: 'recover-authority-cutover',
-      requiredAction:
-          'Complete broker authority cutover and only then allow active authority operations.',
-    ));
+    problems.add(
+      _releaseProblemJson(
+        problemId: 'broker-authority-cutover-not-active',
+        item: 'ブローカー権限切替えが未稼働',
+        severity: 'warning',
+        category: 'authority_cutover',
+        message: 'Flutterはブローカーを介していますが、ブローカーは権限切替えの稼働を主張していません。',
+        target: 'authority_cutover_status',
+        recoveryId: 'recover-authority-cutover',
+        requiredAction: 'ブローカー権限切替えを完了した後に限り、能動的な権限操作を許可してください。',
+      ),
+    );
   }
   if (!commandDispatchEnabled) {
-    problems.add(_releaseProblemJson(
-      problemId: 'broker-command-dispatch-suspended',
-      item: 'broker command dispatch suspended',
-      severity: 'warning',
-      category: 'command_envelope',
-      message:
-          'External command dispatch remains suspended by the Rust broker.',
-      target: 'command_dispatch_enabled',
-      recoveryId: 'recover-command-dispatch',
-      requiredAction:
-          'Finish command-envelope authority mapping before enabling external dispatch.',
-    ));
+    problems.add(
+      _releaseProblemJson(
+        problemId: 'broker-command-dispatch-suspended',
+        item: 'ブローカーのコマンド配送は停止中',
+        severity: 'warning',
+        category: 'command_envelope',
+        message: '外部コマンド配送はRustブローカーによって引き続き停止されています。',
+        target: 'command_dispatch_enabled',
+        recoveryId: 'recover-command-dispatch',
+        requiredAction: '外部配送を有効にする前に、コマンド封筒の権限対応を完了してください。',
+      ),
+    );
   }
   if (!protectedEditRejected) {
-    problems.add(_releaseProblemJson(
-      problemId: 'approval-protected-field-edit-not-rejected',
-      item: 'approval protected field edit not rejected',
-      severity: 'error',
-      category: 'approval',
-      message:
-          'Broker did not reject a protected approval payload_hash edit probe.',
-      target: 'approval_edit',
-      recoveryId: 'recover-approval-protected-edit',
-      requiredAction:
-          'Keep authority actions suspended until protected field enforcement is restored.',
-      blocksOwnerUse: true,
-    ));
+    problems.add(
+      _releaseProblemJson(
+        problemId: 'approval-protected-field-edit-not-rejected',
+        item: '承認の保護項目編集が拒否されなかった',
+        severity: 'error',
+        category: 'approval',
+        message: 'ブローカーが承認の保護項目payload_hashに対する編集試行を拒否しませんでした。',
+        target: 'approval_edit',
+        recoveryId: 'recover-approval-protected-edit',
+        requiredAction: '保護項目の強制を復旧するまで権限作用を停止してください。',
+        blocksOwnerUse: true,
+      ),
+    );
   }
 
   final projectedContent = projection.containsKey('redacted_payload')
@@ -261,19 +258,19 @@ ShellSnapshot _brokerSnapshot({
       : projection;
   final projectionRedacted = !jsonEncode(projectedContent).contains('hidden');
   if (!projectionRedacted) {
-    problems.add(_releaseProblemJson(
-      problemId: 'broker-content-projection-leaked-full-payload',
-      item: 'broker content projection leaked full payload',
-      severity: 'error',
-      category: 'content_projection',
-      message:
-          'Broker content projection returned data from the hidden full payload probe.',
-      target: 'content_projection',
-      recoveryId: 'recover-content-projection',
-      requiredAction:
-          'Keep authority actions suspended and restore content visibility enforcement.',
-      blocksOwnerUse: true,
-    ));
+    problems.add(
+      _releaseProblemJson(
+        problemId: 'broker-content-projection-leaked-full-payload',
+        item: 'ブローカー内容射影から完全内容が漏えい',
+        severity: 'error',
+        category: 'content_projection',
+        message: 'ブローカー内容射影が、非表示の完全内容に対する試行からデータを返しました。',
+        target: 'content_projection',
+        recoveryId: 'recover-content-projection',
+        requiredAction: '権限作用を停止し、内容可視性の強制を復旧してください。',
+        blocksOwnerUse: true,
+      ),
+    );
   }
   final auditEvents = [
     _auditJson(healthResponse, 'broker.health', 'accepted'),
@@ -316,8 +313,8 @@ ShellSnapshot _brokerSnapshot({
         'status': runtimeStatus,
         'adapter_id': 'restricted_ipc',
         'diagnostic_summary':
-            'status=$healthStatus persistence_ready=$persistenceReady cutover=$cutoverStatus',
-      }
+            '状態=$healthStatus 永続化準備=$persistenceReady 切替え=$cutoverStatus',
+      },
     ],
     'agent_sessions': [],
     'permissions': [],
@@ -330,7 +327,7 @@ ShellSnapshot _brokerSnapshot({
           'severity': problem['severity'],
           'message': problem['required_action'],
           'safe_to_retry': true,
-        }
+        },
     ],
     'invariant_flags': {
       'flutter_imported_by_shell_core': false,
@@ -351,30 +348,28 @@ ShellSnapshot _brokerSnapshot({
       {
         'check_id': 'broker.ipc',
         'status': brokerReady ? 'pass' : 'fail',
-        'message':
-            'Flutter product path used authenticated broker IPC for authority status.',
+        'message': 'Flutter製品経路は、権限状態の取得に認証済みブローカーIPCを使用しました。',
         'recovery_instruction':
-            brokerReady ? null : 'Restart the Rust broker and reconnect.',
+            brokerReady ? null : 'Rustブローカーを再起動して再接続してください。',
         'grants_authority': false,
       },
       {
         'check_id': 'broker.persistence',
         'status': persistenceReady ? 'pass' : 'fail',
         'message':
-            'persistence_ready=${persistenceReady.toString()} audit=${health['audit_persistence']} replay=${health['replay_persistence']} session=${health['session_persistence']}',
+            '永続化準備=${persistenceReady.toString()} 監査=${health['audit_persistence']} 再生=${health['replay_persistence']} セッション=${health['session_persistence']}',
         'recovery_instruction':
-            persistenceReady ? null : 'Repair durable broker store access.',
+            persistenceReady ? null : 'ブローカー永続保管庫へのアクセスを修復してください。',
         'grants_authority': false,
       },
       {
         'check_id': 'broker.protected_field_edit',
         'status': protectedEditRejected ? 'pass' : 'fail',
         'message': protectedEditRejected
-            ? 'Protected payload_hash edit rejected.'
-            : 'Protected edit probe was not rejected.',
-        'recovery_instruction': protectedEditRejected
-            ? null
-            : 'Keep authority actions suspended and restore approval edit enforcement.',
+            ? '保護項目payload_hashの編集を拒否しました。'
+            : '保護項目の編集試行が拒否されませんでした。',
+        'recovery_instruction':
+            protectedEditRejected ? null : '権限作用を停止し、承認編集の強制を復旧してください。',
         'grants_authority': false,
       },
       {
@@ -382,9 +377,8 @@ ShellSnapshot _brokerSnapshot({
         'status': commandDispatchEnabled ? 'pass' : 'warning',
         'message':
             'command_dispatch_enabled=${commandDispatchEnabled.toString()}',
-        'recovery_instruction': commandDispatchEnabled
-            ? null
-            : 'Complete command-envelope dispatch authority mapping.',
+        'recovery_instruction':
+            commandDispatchEnabled ? null : 'コマンド封筒配送の権限対応を完了してください。',
         'grants_authority': false,
       },
     ],
@@ -473,12 +467,12 @@ ShellSnapshot _brokerSnapshot({
     'release_blocker_count':
         problems.where((problem) => problem['blocks_release'] == true).length,
     'evidence_summary': {
-      'schema_check': 'not evaluated by product UI',
+      'schema_check': '製品UIでは未評価',
       'conformance_check_count': 0,
-      'release_smoke': 'not evaluated by product UI',
-      'release_gate_check': 'not evaluated by product UI',
-      'evidence_bundle': 'not evaluated by product UI',
-      'validate_all': 'not evaluated by product UI',
+      'release_smoke': '製品UIでは未評価',
+      'release_gate_check': '製品UIでは未評価',
+      'evidence_bundle': '製品UIでは未評価',
+      'validate_all': '製品UIでは未評価',
       'strict_windows_release': 'pending',
       'missing_measured_windows_evidence': true,
       'missing_setup_doctor_evidence': false,
@@ -496,15 +490,13 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
   final now = DateTime.now().toUtc().toIso8601String();
   final problem = _releaseProblemJson(
     problemId: 'broker-product-path-unavailable',
-    item: 'broker product path unavailable',
+    item: 'ブローカー製品経路を利用不可',
     severity: 'error',
     category: 'broker_ipc',
-    message:
-        'Flutter product authority path could not establish accepted broker IPC.',
+    message: 'Flutter製品の権限経路は、受理されたブローカーIPCを確立できませんでした。',
     target: 'rust_security_broker',
     recoveryId: 'recover-broker-product-path',
-    requiredAction:
-        'Restart or repair the Rust broker; do not fall back to local JSON for authority.',
+    requiredAction: 'Rustブローカーを再起動または修復してください。権限根拠をローカルJSONへ代替しないでください。',
     blocksOwnerUse: true,
   );
   return ShellSnapshot.fromJson({
@@ -533,7 +525,7 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'status': 'unavailable',
         'adapter_id': 'restricted_ipc',
         'diagnostic_summary': reason,
-      }
+      },
     ],
     'agent_sessions': [],
     'permissions': [],
@@ -545,16 +537,15 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'result': 'rejected',
         'payload_hash':
             'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-      }
+      },
     ],
     'recovery_actions': [
       {
         'recovery_id': 'recover-broker-product-path',
         'severity': 'error',
-        'message':
-            'Authority actions are disabled until broker IPC is restored.',
+        'message': 'ブローカーIPCを復旧するまで権限作用は無効です。',
         'safe_to_retry': true,
-      }
+      },
     ],
     'invariant_flags': {
       'flutter_imported_by_shell_core': false,
@@ -575,16 +566,14 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
       {
         'check_id': 'broker.ipc',
         'status': 'fail',
-        'message': 'Broker IPC is unavailable or rejected authentication.',
-        'recovery_instruction':
-            'Restart the Rust broker and reconnect; local JSON is diagnostic-only.',
+        'message': 'ブローカーIPCを利用できないか、認証が拒否されました。',
+        'recovery_instruction': 'Rustブローカーを再起動して再接続してください。ローカルJSONは診断専用です。',
         'grants_authority': false,
       },
       {
         'check_id': 'broker.fail_closed',
         'status': 'pass',
-        'message':
-            'Flutter product path returned SUSPEND instead of local snapshot authority.',
+        'message': 'Flutter製品経路はローカルスナップショットを権限化せず、SUSPENDを返しました。',
         'recovery_instruction': null,
         'grants_authority': false,
       },
@@ -597,9 +586,9 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'expires_at': null,
         'blocked_operations': [
           'authority_actions',
-          'external_command_dispatch'
+          'external_command_dispatch',
         ],
-      }
+      },
     ],
     'authority_map': [],
     'adapter_catalog': [],
@@ -613,19 +602,19 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
         'path': 'broker://127.0.0.1/connect',
         'hash': '',
         'exportable': false,
-      }
+      },
     ],
     'settings': [],
     'audit_chain_status': 'not_ready',
     'network_exposure': '127.0.0.1 restricted broker IPC',
     'release_blocker_count': 1,
     'evidence_summary': {
-      'schema_check': 'not evaluated by product UI',
+      'schema_check': '製品UIでは未評価',
       'conformance_check_count': 0,
-      'release_smoke': 'not evaluated by product UI',
-      'release_gate_check': 'not evaluated by product UI',
-      'evidence_bundle': 'not evaluated by product UI',
-      'validate_all': 'not evaluated by product UI',
+      'release_smoke': '製品UIでは未評価',
+      'release_gate_check': '製品UIでは未評価',
+      'evidence_bundle': '製品UIでは未評価',
+      'validate_all': '製品UIでは未評価',
       'strict_windows_release': 'pending',
       'missing_measured_windows_evidence': true,
       'missing_setup_doctor_evidence': false,
@@ -648,7 +637,7 @@ Map<String, Object?> _brokerProjectionProbeApproval() {
     'content_visibility': 'redacted',
     'payload_hash':
         'sha256:2222222222222222222222222222222222222222222222222222222222222222',
-    'summary': 'Broker-mediated approval projection probe',
+    'summary': 'ブローカー経由の承認射影試行',
     'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
     "full_payload": {'path': 'notes/today.md', 'content': 'hidden'},
     'editable_fields': ['path', 'payload_hash'],
@@ -821,20 +810,20 @@ const _mockSnapshot = ShellSnapshot(
       name: 'BLUE-TANUKI',
       status: 'ready',
       adapterId: 'blue_tanuki_reference',
-      diagnosticSummary: 'mock adapter contract available',
+      diagnosticSummary: '模擬アダプター契約を利用可能',
     ),
   ],
   agentSessions: [
     AgentSessionRecord(
       sessionId: 'agent-session-1',
       workspace: '/workspace/project',
-      task: 'Update documentation',
+      task: '文書を更新する',
       changedFiles: ['README.md', 'docs/STRATEGY.md'],
       toolCalls: ['shell.command', 'git.diff'],
       shellCommands: [
-        'python3 tooling/conformance_tests/run_conformance_skeleton.py'
+        'python3 tooling/conformance_tests/run_conformance_skeleton.py',
       ],
-      testStatus: 'conformance passed',
+      testStatus: '適合検査に合格',
       diffSummary: '2 files changed',
       pendingApprovalCount: 1,
       rollbackCandidate: 'rollback-1',
@@ -861,7 +850,7 @@ const _mockSnapshot = ShellSnapshot(
         'runtime_id',
         'permission_id',
         'payload_hash',
-        'authority_context'
+        'authority_context',
       ],
     ),
   ],
@@ -878,7 +867,7 @@ const _mockSnapshot = ShellSnapshot(
     RecoveryRecord(
       recoveryId: 'recover-1',
       severity: 'warning',
-      message: 'Permission is required before this action can run.',
+      message: 'この作用を実行する前に許可が必要です。',
       safeToRetry: true,
     ),
   ],
@@ -898,23 +887,22 @@ const _mockSnapshot = ShellSnapshot(
     SetupDoctorCheckRecord(
       checkId: 'host.os',
       status: 'pass',
-      message: 'Host OS detected',
+      message: 'ホストOSを検出しました',
       recoveryInstruction: null,
       grantsAuthority: false,
     ),
     SetupDoctorCheckRecord(
       checkId: 'filesystem.permission',
       status: 'pass',
-      message: 'Audit storage path writable',
+      message: '監査保管先へ書込み可能です',
       recoveryInstruction: null,
       grantsAuthority: false,
     ),
     SetupDoctorCheckRecord(
       checkId: 'network.public_bind',
       status: 'warning',
-      message: 'Public bind requires explicit operator review',
-      recoveryInstruction:
-          'Keep runtimes on localhost unless permission and approval explicitly allow public bind.',
+      message: '公開bindには操作者の明示確認が必要です',
+      recoveryInstruction: '許可と承認が公開bindを明示的に認めない限り、実行系はlocalhostに限定してください。',
       grantsAuthority: false,
     ),
   ],
@@ -922,14 +910,14 @@ const _mockSnapshot = ShellSnapshot(
     TrustRecord(
       scope: 'workspace_trust',
       state: 'restricted',
-      source: 'local policy',
+      source: 'ローカル方針',
       expiresAt: null,
       blockedOperations: ['process.spawn', 'network.public_bind'],
     ),
     TrustRecord(
       scope: 'runtime_trust',
       state: 'trusted',
-      source: 'signed manifest',
+      source: '署名済みマニフェスト',
       expiresAt: null,
       blockedOperations: [],
     ),
@@ -943,7 +931,7 @@ const _mockSnapshot = ShellSnapshot(
     TrustRecord(
       scope: 'installer_trust',
       state: 'unknown',
-      source: 'installed-path evidence missing',
+      source: 'インストール先証拠なし',
       expiresAt: null,
       blockedOperations: ['release_ready_claim'],
     ),
@@ -957,14 +945,14 @@ const _mockSnapshot = ShellSnapshot(
       auditEventId: 'audit-1',
       recoveryId: 'recover-1',
       dangerous: false,
-      warning: 'approval pending',
+      warning: '承認保留中',
     ),
   ],
   adapterCatalog: [
     AdapterCatalogRecord(
       adapterId: 'blue_tanuki_reference',
       runtimeId: 'blue_tanuki',
-      publisher: 'GUI-Shell reference',
+      publisher: 'GUI-Shell参照実装',
       version: '0.1.0',
       signature: 'development',
       hash: 'sha256:pending',
@@ -972,9 +960,9 @@ const _mockSnapshot = ShellSnapshot(
       grantedCapabilities: [],
       deniedCapabilities: ['network.public_bind'],
       trustStatus: 'inherited',
-      lastVerified: 'development smoke',
+      lastVerified: '開発簡易検査',
       updateAvailable: false,
-      knownRisks: ['reference adapter only'],
+      knownRisks: ['参照アダプター専用'],
     ),
   ],
   permissionDiffs: [
@@ -982,7 +970,7 @@ const _mockSnapshot = ShellSnapshot(
       subject: 'blue_tanuki_reference',
       added: ['filesystem.write'],
       removed: [],
-      changed: ['content_visibility: full -> redacted'],
+      changed: ['content_visibility: full → redacted（完全表示から墨消し表示）'],
       dangerous: [],
     ),
   ],
@@ -991,80 +979,78 @@ const _mockSnapshot = ShellSnapshot(
       problemId: 'windows-installed-evidence-missing',
       severity: 'blocked',
       category: 'missing_evidence',
-      message: 'Windows installed-path evidence is missing.',
+      message: 'Windowsインストール先の証拠がありません。',
       target: 'release_evidence/windows_installed_smoke.json',
       recoveryId: 'recover-windows-evidence',
-      item: 'measured Windows installed-path first-run evidence missing',
+      item: 'Windowsインストール先の初回起動実測証拠なし',
       classification: 'release_blocker',
-      reason: 'Measured installed-path first-run evidence is not recorded.',
-      requiredAction:
-          'Run hardened Windows installed smoke collection on native Windows.',
+      reason: 'インストール先の初回起動を実測した証拠が記録されていません。',
+      requiredAction: 'ネイティブWindowsで強化済みインストール簡易検査を実行してください。',
       blocksRelease: true,
     ),
     ProblemRecord(
       problemId: 'setup-doctor-installed-evidence-missing',
       severity: 'blocked',
       category: 'missing_evidence',
-      message: 'Non-synthetic installed-path Setup Doctor evidence is missing.',
+      message: 'インストール先で生成した非合成の環境診断証拠がありません。',
       target: 'release_evidence/windows_installed_smoke.json',
       recoveryId: 'recover-setup-doctor-evidence',
-      item: 'non-synthetic installed-path Setup Doctor evidence missing',
+      item: 'インストール先の非合成環境診断証拠なし',
       classification: 'release_blocker',
-      reason: 'Setup Doctor has not been proven from the installed app path.',
-      requiredAction:
-          'Run Setup Doctor from the installed Windows app path and record required checks.',
+      reason: 'インストール済みアプリのパスから環境診断を実行した証明がありません。',
+      requiredAction: 'インストール済みWindowsアプリのパスから環境診断を実行し、必須検査を記録してください。',
       blocksRelease: true,
     ),
     ProblemRecord(
       problemId: 'owner-go-missing',
       severity: 'blocked',
       category: 'release_gate',
-      message: 'Owner GO missing.',
-      target: 'release checklist',
+      message: '所有者GOがありません。',
+      target: 'リリース確認表',
       recoveryId: 'recover-owner-go',
-      item: 'owner GO missing',
+      item: '所有者GOなし',
       classification: 'release_blocker',
-      reason: 'Completed product release requires explicit owner approval.',
-      requiredAction: 'Record owner GO after release blockers are cleared.',
+      reason: '完成製品のリリースには所有者の明示承認が必要です。',
+      requiredAction: 'リリース遮断要因を解消した後に所有者GOを記録してください。',
       blocksRelease: true,
     ),
     ProblemRecord(
       problemId: 'macos-unverified',
       severity: 'info',
       category: 'scope',
-      message: 'macOS remains unverified.',
-      target: 'desktop platform matrix',
+      message: 'macOSは未検証です。',
+      target: 'デスクトップ対応表',
       recoveryId: 'recover-macos-validation',
-      item: 'macOS unverified',
+      item: 'macOS未検証',
       classification: 'known_limitation',
-      reason: 'No macOS validation environment is available.',
-      requiredAction: 'Validate on macOS before claiming macOS support.',
+      reason: 'macOS検証環境を利用できません。',
+      requiredAction: 'macOS対応を主張する前にmacOS上で検証してください。',
       blocksRelease: false,
     ),
     ProblemRecord(
       problemId: 'mobile-post-v1',
       severity: 'info',
       category: 'scope',
-      message: 'Mobile full release is post-v1 scope.',
-      target: 'mobile status',
+      message: 'モバイル完全リリースはv1後の範囲です。',
+      target: 'モバイル状態',
       recoveryId: 'recover-mobile-scope',
-      item: 'mobile post-v1 scope',
+      item: 'モバイルはv1後の範囲',
       classification: 'post_v1_scope',
-      reason: 'v1.0 is Windows-first desktop unless owner changes scope.',
-      requiredAction: 'Defer mobile release work.',
+      reason: '所有者が範囲を変更しない限り、v1.0はWindows優先のデスクトップ版です。',
+      requiredAction: 'モバイルのリリース作業を保留してください。',
       blocksRelease: false,
     ),
     ProblemRecord(
       problemId: 'paid-qc-later',
       severity: 'info',
       category: 'scope',
-      message: 'Paid/product QC is a later phase.',
-      target: 'phase strategy',
+      message: '有償製品の品質管理は後続段階です。',
+      target: '段階戦略',
       recoveryId: 'recover-paid-qc',
-      item: 'paid/product QC later',
+      item: '有償製品の品質管理は後続',
       classification: 'post_v1_scope',
-      reason: 'Phase B is owner-use hardening, not paid/product QC.',
-      requiredAction: 'Defer paid/product QC until Phase F.',
+      reason: '段階Bは所有者利用の堅牢化であり、有償製品の品質管理ではありません。',
+      requiredAction: '有償製品の品質管理は段階Fまで保留してください。',
       blocksRelease: false,
     ),
   ],
@@ -1093,7 +1079,7 @@ const _mockSnapshot = ShellSnapshot(
       defaultValue: 'redacted',
       currentValue: 'redacted',
       effectiveValue: 'redacted',
-      source: 'Shell Core policy',
+      source: 'Shell Core方針',
       modified: false,
       dangerous: false,
       authorityRelated: true,
@@ -1104,7 +1090,7 @@ const _mockSnapshot = ShellSnapshot(
       defaultValue: 'blocked',
       currentValue: 'blocked',
       effectiveValue: 'blocked',
-      source: 'permission ledger',
+      source: '許可台帳',
       modified: false,
       dangerous: true,
       authorityRelated: true,
@@ -1126,7 +1112,7 @@ const _mockSnapshot = ShellSnapshot(
       defaultValue: 'not claimed',
       currentValue: 'not claimed',
       effectiveValue: 'not claimed',
-      source: 'strict release gate',
+      source: '厳格リリース関門',
       modified: false,
       dangerous: true,
       authorityRelated: true,
@@ -1150,58 +1136,56 @@ const _mockSnapshot = ShellSnapshot(
   ),
   recoveryPlaybook: [
     RecoveryPlaybookRecord(
-      item: 'measured Windows installed-path evidence missing',
+      item: 'Windowsインストール先の実測証拠なし',
       severity: 'release',
       classification: 'release_blocker',
       safeToIgnoreForPhaseB: true,
-      requiredAction: 'Run hardened Windows installed smoke on native Windows.',
+      requiredAction: 'ネイティブWindowsで強化済みインストール簡易検査を実行してください。',
       blocksCompletedProductRelease: true,
     ),
     RecoveryPlaybookRecord(
-      item: 'non-synthetic installed-path Setup Doctor evidence missing',
+      item: 'インストール先の非合成環境診断証拠なし',
       severity: 'release',
       classification: 'release_blocker',
       safeToIgnoreForPhaseB: true,
-      requiredAction:
-          'Run installed-path Setup Doctor and record non-synthetic checks.',
+      requiredAction: 'インストール先から環境診断を実行し、非合成の検査結果を記録してください。',
       blocksCompletedProductRelease: true,
     ),
     RecoveryPlaybookRecord(
-      item: 'owner GO missing',
+      item: '所有者GOなし',
       severity: 'release',
       classification: 'release_blocker',
       safeToIgnoreForPhaseB: true,
-      requiredAction: 'Record owner GO after release blockers pass.',
+      requiredAction: 'リリース遮断要因の検査合格後に所有者GOを記録してください。',
       blocksCompletedProductRelease: true,
     ),
     RecoveryPlaybookRecord(
-      item: 'macOS unverified',
+      item: 'macOS未検証',
       severity: 'scope',
       classification: 'known_limitation',
       safeToIgnoreForPhaseB: true,
-      requiredAction: 'Validate on macOS before claiming macOS support.',
+      requiredAction: 'macOS対応を主張する前にmacOS上で検証してください。',
       blocksCompletedProductRelease: false,
     ),
     RecoveryPlaybookRecord(
-      item: 'mobile full release',
+      item: 'モバイル完全リリース',
       severity: 'scope',
       classification: 'post_v1_scope',
       safeToIgnoreForPhaseB: true,
-      requiredAction: 'Defer mobile full release until post-v1.',
+      requiredAction: 'モバイル完全リリースはv1後まで保留してください。',
       blocksCompletedProductRelease: false,
     ),
     RecoveryPlaybookRecord(
-      item: 'Phase B owner-use usability issue',
+      item: '段階Bの所有者利用上の問題',
       severity: 'owner-use',
       classification: 'required_for_v1',
       safeToIgnoreForPhaseB: false,
-      requiredAction:
-          'Keep dashboard, status, problems, evidence, and recovery surfaces usable.',
+      requiredAction: '概要、状態、問題、証拠、復旧の各画面を利用可能に保ってください。',
       blocksCompletedProductRelease: false,
     ),
   ],
   snapshotSource: 'mock',
-  snapshotPath: 'embedded mock',
+  snapshotPath: '組込み模擬値',
   snapshotGeneratedAt: 'static',
   snapshotFreshness: 'static',
 );
@@ -1228,10 +1212,10 @@ const _localFallbackSnapshot = ShellSnapshot(
   runtimes: [
     RuntimeRecord(
       runtimeId: 'local_shell_core',
-      name: 'Local Shell Core',
+      name: 'ローカルShell Core',
       status: 'diagnostic',
       adapterId: 'local_setup_doctor',
-      diagnosticSummary: 'local diagnostic snapshot fallback',
+      diagnosticSummary: 'ローカル診断スナップショットの代替値',
     ),
   ],
   agentSessions: [],
@@ -1265,9 +1249,9 @@ const _localFallbackSnapshot = ShellSnapshot(
     SetupDoctorCheckRecord(
       checkId: 'local.snapshot',
       status: 'warning',
-      message: 'Local Shell Core snapshot file not found',
+      message: 'ローカルShell Coreスナップショットファイルが見つかりません',
       recoveryInstruction:
-          'Refresh the development diagnostic snapshot or set GUI_SHELL_SNAPSHOT_JSON for local inspection.',
+          '開発診断スナップショットを更新するか、ローカル確認用にGUI_SHELL_SNAPSHOT_JSONを設定してください。',
       grantsAuthority: false,
     ),
   ],
@@ -1275,14 +1259,14 @@ const _localFallbackSnapshot = ShellSnapshot(
     TrustRecord(
       scope: 'workspace_trust',
       state: 'unknown',
-      source: 'local snapshot missing',
+      source: 'ローカルスナップショットなし',
       expiresAt: null,
       blockedOperations: ['agent.execute'],
     ),
     TrustRecord(
       scope: 'installer_trust',
       state: 'unknown',
-      source: 'installed-path evidence missing',
+      source: 'インストール先証拠なし',
       expiresAt: null,
       blockedOperations: ['release_ready_claim'],
     ),
@@ -1295,14 +1279,13 @@ const _localFallbackSnapshot = ShellSnapshot(
       problemId: 'local-snapshot-missing',
       severity: 'warning',
       category: 'missing_evidence',
-      message: 'Local Shell Core snapshot file is missing.',
+      message: 'ローカルShell Coreスナップショットファイルがありません。',
       target: '.gui_shell/shell_snapshot.json',
       recoveryId: 'recover-local-snapshot',
-      item: 'fallback snapshot active',
+      item: '代替スナップショット使用中',
       classification: 'known_limitation',
-      reason: 'Local snapshot was not available; safe fallback is active.',
-      requiredAction:
-          'Refresh the development diagnostic snapshot for local inspection.',
+      reason: 'ローカルスナップショットを利用できないため、安全な代替値を使用しています。',
+      requiredAction: 'ローカル確認用の開発診断スナップショットを更新してください。',
       blocksRelease: false,
     ),
   ],
@@ -1334,7 +1317,7 @@ const _localFallbackSnapshot = ShellSnapshot(
       defaultValue: 'not claimed',
       currentValue: 'not claimed',
       effectiveValue: 'not claimed',
-      source: 'fallback invariant',
+      source: '代替不変条件',
       modified: false,
       dangerous: true,
       authorityRelated: true,
@@ -1358,20 +1341,20 @@ const _localFallbackSnapshot = ShellSnapshot(
   ),
   recoveryPlaybook: [
     RecoveryPlaybookRecord(
-      item: 'local Shell Core snapshot missing',
+      item: 'ローカルShell Coreスナップショットなし',
       severity: 'owner-use',
       classification: 'required_for_v1',
       safeToIgnoreForPhaseB: false,
       requiredAction:
-          'Refresh the development diagnostic snapshot or set GUI_SHELL_SNAPSHOT_JSON for local inspection.',
+          '開発診断スナップショットを更新するか、ローカル確認用にGUI_SHELL_SNAPSHOT_JSONを設定してください。',
       blocksCompletedProductRelease: false,
     ),
     RecoveryPlaybookRecord(
-      item: 'measured Windows installed-path evidence missing',
+      item: 'Windowsインストール先の実測証拠なし',
       severity: 'release',
       classification: 'release_blocker',
       safeToIgnoreForPhaseB: true,
-      requiredAction: 'Run hardened Windows installed smoke on native Windows.',
+      requiredAction: 'ネイティブWindowsで強化済みインストール簡易検査を実行してください。',
       blocksCompletedProductRelease: true,
     ),
   ],

@@ -80,6 +80,11 @@ def current_desktop_platform() -> str:
 
 def build_steps(include_mobile_release: bool, desktop_platform: str, python_only: bool = False) -> list[ValidationStep]:
     steps = [
+        ValidationStep(
+            "japanese_base_audit",
+            python_step("tooling/日本語基底監査.py", "--strict"),
+            ROOT,
+        ),
         ValidationStep("schema_check", python_step("tooling/schema_check/check_schemas.py"), ROOT),
         ValidationStep(
             "conformance_skeleton",
@@ -136,7 +141,7 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             in_release_scope=include_mobile_release,
             post_v1_reason=None
             if include_mobile_release
-            else "mobile full release is outside v1.0 desktop scope unless owner explicitly includes mobile",
+            else "owner が mobile を明示的に含めない限り、mobile 完全 release は v1.0 desktop scope 外である",
         )
     )
     return steps
@@ -158,16 +163,16 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
                     "passed",
                     "none",
                     "no",
-                    "Linux desktop build smoke passed on 2026-05-25.",
-                    "Keep Linux build smoke passing as the development/verification slice.",
+                    "Linux desktop build smoke は 2026-05-25 に合格した。",
+                    "開発・検証範囲の証拠として Linux build smoke の合格を維持する。",
                 ),
                 EvidenceCheck(
                     "linux_desktop_launch_smoke",
                     "passed",
                     "none",
                     "no",
-                    "Linux desktop launch smoke passed under WSLg with first-window evidence recorded; this is useful proof but not final Windows-first product proof by itself.",
-                    "Keep Linux launch smoke passing while completing Windows-first release evidence.",
+                    "Linux desktop launch smoke は WSLg 上で合格し、最初の window 証拠を記録済みである。これは有用な証拠だが、単独で最終的な Windows-first 製品証拠にはならない。",
+                    "Windows-first release 証拠を完成させる間も Linux launch smoke の合格を維持する。",
                 ),
             ]
         )
@@ -180,16 +185,16 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
                     "passed" if windows_project_exists else "failed",
                     "none" if windows_project_exists else "release_blocker",
                     "no" if windows_project_exists else "yes",
-                    "`apps/desktop_flutter/windows` exists." if windows_project_exists else "`apps/desktop_flutter/windows` is not present, so Windows desktop project support is not generated.",
-                    "Keep Windows Flutter desktop project files under version control." if windows_project_exists else "Generate Windows desktop project support and commit the bounded Flutter desktop project files.",
+                    "`apps/desktop_flutter/windows` が存在する。" if windows_project_exists else "`apps/desktop_flutter/windows` が存在しないため、Windows desktop project support は未生成である。",
+                    "Windows Flutter desktop project files を version control 下に維持する。" if windows_project_exists else "Windows desktop project support を生成し、限定した Flutter desktop project files を commit する。",
                 ),
                 EvidenceCheck(
                     "windows_development_toolchain_historical_smoke",
                     "historical_invalid_for_current_r2",
                     "none",
                     "no",
-                    "Historical native Windows analyze/test/build/launch smoke is preserved as owner-trial history only. It is not current R2 formal evidence because it is not tied to the exact implementation commit and installed-path evidence bundle.",
-                    "Collect fresh native Windows release-candidate evidence through the isolated installed-path evidence flow.",
+                    "過去の native Windows analyze/test/build/launch smoke は owner 試用履歴としてのみ保存している。正確な実装 commit と installed-path evidence bundle に紐付いていないため、現行 R2 の正式証拠ではない。",
+                    "隔離した installed-path evidence flow で新しい native Windows release-candidate 証拠を収集する。",
                 ),
             ]
         )
@@ -212,48 +217,48 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "No macOS validation environment is currently available; GUI-Shell v1.0 does not claim verified macOS support.",
-                    "Validate on a macOS host before claiming macOS support.",
+                    "現在利用できる macOS 検証環境はなく、GUI-Shell v1.0 は検証済み macOS support を主張しない。",
+                    "macOS support を主張する前に macOS host で検証する。",
                 ),
                 EvidenceCheck(
                     "macos_flutter_toolchain",
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "No macOS validation environment is currently available.",
-                    "Validate macOS Flutter toolchain on macOS before claiming support.",
+                    "現在利用できる macOS 検証環境はない。",
+                    "support を主張する前に macOS 上で macOS Flutter toolchain を検証する。",
                 ),
                 EvidenceCheck(
                     "macos_desktop_build_smoke",
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "macOS build smoke has not run because no macOS validation environment is currently available.",
-                    "Pass `flutter build macos` on a macOS host before claiming support.",
+                    "macOS 検証環境を利用できないため、macOS build smoke は未実行である。",
+                    "support を主張する前に macOS host で `flutter build macos` を合格させる。",
                 ),
                 EvidenceCheck(
                     "macos_desktop_launch_smoke",
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "macOS launch smoke evidence is not recorded because no macOS validation environment is currently available.",
-                    "Launch macOS artifact and record evidence before claiming support.",
+                    "macOS 検証環境を利用できないため、macOS launch smoke 証拠は未記録である。",
+                    "support を主張する前に macOS artifact を起動して証拠を記録する。",
                 ),
                 EvidenceCheck(
                     "macos_packaging_notarization_plan",
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "macOS packaging/notarization remains planned portability validation.",
-                    "Document and validate on macOS before claiming support.",
+                    "macOS packaging/notarization は計画段階の portability 検証のままである。",
+                    "support を主張する前に macOS 上で文書化し、検証する。",
                 ),
                 EvidenceCheck(
                     "macos_installer_first_run_smoke",
                     "unverified_planned",
                     "known_limitation",
                     "no",
-                    "macOS installer/first-run smoke is not in the Windows-first v1.0 release gate.",
-                    "Validate on macOS host before claiming support.",
+                    "macOS installer/first-run smoke は Windows-first v1.0 release gate の対象外である。",
+                    "support を主張する前に macOS host で検証する。",
                 ),
             ]
         )
@@ -264,8 +269,8 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
                 "failed",
                 "release_blocker",
                 "yes",
-                "Explicit owner GO has not been recorded.",
-                "Record explicit owner GO only after measured installed-path release evidence and strict validation pass.",
+                "明示的な owner GO は記録されていない。",
+                "計測済み installed-path release 証拠と strict validation 合格の後に限り、明示的な owner GO を記録する。",
             )
         )
     return checks
@@ -273,10 +278,10 @@ def platform_evidence_checks(desktop_platform: str, strict_release: bool = False
 
 def classify_not_run(step: ValidationStep, strict_release: bool) -> tuple[str, str, str, str]:
     if step.in_release_scope and strict_release:
-        return ("release_blocker", "yes", f"{step.required_tool} not found on PATH", f"Install {step.required_tool} and rerun release validation.")
+        return ("release_blocker", "yes", f"{step.required_tool} が PATH 上に存在しない", f"{step.required_tool} を導入して release validation を再実行する。")
     if not step.in_release_scope:
-        return ("post_v1_scope", "no", step.post_v1_reason or "outside v1.0 scope", "No v1.0 action required.")
-    return ("release_blocker", "yes", f"{step.required_tool} not found on PATH", f"Install {step.required_tool} before release validation.")
+        return ("post_v1_scope", "no", step.post_v1_reason or "v1.0 scope 外", "v1.0 で必要な対応はない。")
+    return ("release_blocker", "yes", f"{step.required_tool} が PATH 上に存在しない", f"release validation の前に {step.required_tool} を導入する。")
 
 
 def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) -> dict:
@@ -317,8 +322,8 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
             "status": "not_run",
             "classification": classification,
             "blocks_release": blocks_release,
-            "reason": f"validation command could not be started: {exc.__class__.__name__}: {exc}",
-            "required_action": "Fix the validation host toolchain or command resolution and rerun; validator failures must remain structured release blockers.",
+            "reason": f"validation command を起動できない: {exc.__class__.__name__}: {exc}",
+            "required_action": "validation host toolchain または command 解決を修正して再実行する。validator failure は構造化された release blocker のまま保持する。",
             "stdout": "",
             "stderr": traceback.format_exc().rstrip(),
             "exit": "",
@@ -327,8 +332,8 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
     if not step.in_release_scope:
         classification = "post_v1_scope"
         blocks_release = "no"
-        reason = step.post_v1_reason or "outside v1.0 scope"
-        required_action = "No v1.0 action required unless owner includes this scope."
+        reason = step.post_v1_reason or "v1.0 scope 外"
+        required_action = "owner がこの scope を含めない限り、v1.0 で必要な対応はない。"
     else:
         classification = "none"
         blocks_release = "no"
@@ -338,11 +343,11 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
         classification = "release_blocker"
         blocks_release = "yes"
         if strict_release and step.name == "release_gate_check":
-            reason = "strict release gate found unresolved active structured release blockers"
-            required_action = "Resolve every active or evidence-effective Windows-first release_blocker, then rerun strict validation. macOS remains an unverified known limitation unless owner changes scope."
+            reason = "strict release gate が未解決の有効な structured release blocker を検出した"
+            required_action = "有効または証拠上有効な Windows-first release_blocker をすべて解消し、strict validation を再実行する。owner が scope を変更しない限り、macOS は未検証の既知制限のままである。"
         else:
-            reason = "validation command failed"
-            required_action = "Fix the failing validation command and rerun."
+            reason = "validation command が失敗した"
+            required_action = "失敗した validation command を修正して再実行する。"
     return {
         "name": step.name,
         "command": command,
@@ -407,18 +412,18 @@ def main() -> int:
     parser.add_argument(
         "--include-mobile-release",
         action="store_true",
-        help="Treat mobile Flutter validation as in-scope for the release gate.",
+        help="mobile Flutter validation を release gate の scope 内として扱う。",
     )
     parser.add_argument(
         "--desktop-platform",
         choices=["current", "windows", "linux", "macos", "all"],
         default="current",
-        help="Validate current host, a named desktop target, or the full Windows/macOS/Linux desktop scope.",
+        help="現在の host、指定した desktop target、または Windows/macOS/Linux desktop 全 scope を検証する。",
     )
     parser.add_argument(
         "--python-only",
         action="store_true",
-        help="Run only Python/core validation steps when Rust and Flutter are validated separately.",
+        help="Rust と Flutter を別途検証する場合に、Python/core validation step だけを実行する。",
     )
     args = parser.parse_args()
 

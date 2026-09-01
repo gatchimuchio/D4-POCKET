@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/adapter.schema.json",
-  "title": "Adapter",
+  "title": "アダプター（Adapter）",
   "type": "object",
   "required": [
     "adapter_id",
@@ -47,7 +47,7 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Untrusted metadata. Must never grant authority.",
+      "description": "信頼しないメタデータです。権限を付与してはなりません。",
       "additionalProperties": true
     }
   }

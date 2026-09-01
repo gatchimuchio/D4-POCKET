@@ -1,16 +1,16 @@
-# Codegen
+# Codegen 境界
 
-Reserved schema-driven code generation boundary.
+schema 駆動の予約済み code generation 境界。
 
 classification: post_v1_scope
-reason: current v1.0 gate keeps generated contract artifacts checked in; broader codegen automation is deferred.
+reason: 現行 v1.0 gate は生成済み contract artifact を登録済みで保ち、より広い codegen 自動化は延期する。
 blocks_release: no
 
-Targets:
+対象:
 
-- Dart contracts
-- Rust structs
-- TypeScript clients if needed
-- OpenAPI bridge if needed
+- Dart contract
+- Rust struct
+- 必要な場合の TypeScript client
+- 必要な場合の OpenAPI bridge
 
-Schemas under `specs/` are canonical.
+`specs/` 下の schema を機械契約の正本とする。

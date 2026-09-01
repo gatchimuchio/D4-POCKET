@@ -1,125 +1,127 @@
-# LLM-Readable Extension Surface Standard
+# LLM が読む拡張面の標準
 
-Status: definition lock workstream
-Scope: GUI Shell / Runtime Operation Shell / LLM-readable application responsibility substrate
-Reference runtime: BLUE-TANUKI through adapter only
+状態: definition lock workstream
+適用範囲: GUI Shell / Runtime Operation Shell / `LLM-readable application responsibility substrate`（LLM が読むアプリケーション責任基盤）
+参照 Runtime: BLUE-TANUKI（Adapter 経由のみ）
 
-## 1. Purpose
+## 1. 目的
 
-GUI Shell is a generic Runtime Operation Shell and LLM-readable application responsibility substrate.
+GUI Shell は、汎用 Runtime Operation Shell であり、LLM が読む「アプリケーション責任基盤」である。
 
-It provides a stable, machine-readable responsibility structure into which LLM development / integration agents can implement or connect applications, runtimes, tools, services, and adapters without reinventing or bypassing:
+LLM 開発/統合エージェントが次の要素を再発明または迂回することなく application、Runtime、Tool、Service、Adapter を実装・接続できるように、安定した machine-readable な責任構造を提供する。
 
-- capability boundaries;
-- permission boundaries;
-- approval boundaries;
-- authority stripping;
-- content exposure controls;
-- audit evidence;
-- recovery behavior;
-- update and install responsibility;
-- runtime trust boundaries;
-- validation and conformance requirements.
+- Capability の境界
+- Permission の境界
+- Approval の境界
+- 権限の除去（Authority Strip）
+- Content Exposure の制御
+- Audit の evidence
+- Recovery の挙動
+- update / install の責任
+- Runtime の trust boundary
+- validation / conformance の要件
 
-This document does not activate new runtime authority, add a module loader, add an SDK, or claim external standard adoption.
+この文書は、新しい Runtime authority を有効化せず、module loader や SDK を追加せず、外部標準への採用を主張しない。
 
-## 2. Role Model
+## 2. 役割モデル
 
-Human operator / owner:
+人間の operator／owner:
 
-- observes runtime and shell state;
-- grants or denies approval;
-- authorizes or performs recovery;
-- accepts or rejects release claims;
-- remains the final responsibility holder.
+- Runtime と Shell の state を観測する。
+- Approval を grant または deny する。
+- Recovery を承認または実行する。
+- release claim を受理または拒否する。
+- 最終責任者であり続ける。
 
-LLM development / integration agent:
+LLM 開発/統合エージェント:
 
-- reads architecture, standards, schemas, conformance rules, and operating documents;
-- proposes or produces bounded code and documentation changes;
-- connects new runtimes, tools, services, or adapters through declared contracts;
-- runs validation and reports evidence;
-- must not create authority, approve its own sensitive operations, widen permissions silently, bypass conformance, or convert generated output into trusted truth.
+- architecture、standard、schema、conformance rule、operating document を読む。
+- 範囲を限定した code / documentation の変更を提案または作成する。
+- 宣言済み contract を介して新しい Runtime、Tool、Service、Adapter を接続する。
+- validation を実行し、evidence を報告する。
+- 権限を作成せず、自らの sensitive operation を自己承認せず、Permission を暗黙に拡大せず、conformance を迂回せず、生成した output を信頼済みの事実へ変換しない。
 
-Runtime / tool / service target:
+Runtime / Tool / Service の対象:
 
-- exposes behavior only through declared runtime or adapter contracts;
-- must not use metadata, diagnostics, or self-reporting to create authority.
+- 宣言済み Runtime Contract または Adapter Contract だけを介して挙動を露出する。
+- `metadata`、diagnostics、または self-reporting によって権限を作成してはならない。
 
-Adapter:
+接続層（Adapter）:
 
-- normalizes target state into GUI Shell schemas;
-- strips authority;
-- applies content exposure boundaries;
-- maps diagnostics and failures without granting permission.
+- 対象の state を GUI Shell の schema へ正規化する。
+- Authority Strip を適用する。
+- Content Exposure Boundary を適用する。
+- Permission を付与せずに diagnostics と failure を対応付ける。
 
-Rust Security Broker:
+権限境界（Rust Security Broker）:
 
-- remains the intended authority-sensitive production boundary for IPC, approval eligibility, audit, recovery classification, command-envelope gating, and sensitive native operations.
+- IPC、Approval eligibility、Audit、Recovery classification、command-envelope gating、および機密性の高い native operation に関する、意図された authority-sensitive production boundary であり続ける。
 
-UI layer:
+画面層（UI layer）:
 
-- renders operator surfaces and collects operator input;
-- must not own authority, approval semantics, audit semantics, recovery classification, content visibility rules, or runtime trust rules.
+- operator surface を描画し、operator input を収集する。
+- Authority、Approval semantics、Audit semantics、Recovery classification、Content Visibility Rule、Runtime Trust Rule を所有してはならない。
 
-## 3. Authority Model
+## 3. Authority のモデル
 
-LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+LLM は GUI Shell Contract の第一級の実装・統合コンシューマだが、決して権限源ではない。
 
-LLM agents may implement, propose, explain, and validate. They may not grant permission, approve sensitive actions, replace human responsibility, or convert generated state into trusted runtime truth.
+LLM エージェントは、実装、提案、説明、検証を行ってよい。Permission の付与、sensitive action の承認、人間の責任の代替、または生成した state の trusted runtime truth への変換を行ってはならない。
 
-Human operators retain final approval, recovery, responsibility, and release-claim authority.
+Human operator は、最終的な Approval、Recovery、責任、および release claim の権限を保持する。
 
-Broker, contract, and conformance paths govern sensitive execution. Any sensitive action must remain mapped to capability, permission, approval state, AuditEvent, and RecoveryAction on failure.
+Broker、Contract、Conformance の各経路が sensitive execution を統制する。すべての sensitive action は、Capability、Permission、Approval state、AuditEvent、および失敗時の RecoveryAction への mapping を維持しなければならない。
 
-## 4. Connection Model
+## 4. 接続モデル
 
-New functions must connect through existing contracts or through an explicitly introduced contract reviewed under the schema-first and conformance-first order.
+新しい機能は、既存 contract を介して接続する。既存 contract で表現できない場合は、schema-first / conformance-first の順序で review する contract を明示的に導入する。
 
-New authority-relevant behavior must not be introduced as an undocumented shortcut, generated configuration side effect, UI-only decision, adapter metadata claim, memory/cache inference, diagnostic observation, or tool-response assertion.
+権限に関係する新しい挙動を、文書化されていない shortcut、generated configuration の副作用、UI だけの判断、Adapter metadata の claim、memory / cache からの推論、diagnostic observation、または tool-response assertion として導入してはならない。
 
-Runtime-specific behavior must remain behind the adapter boundary. BLUE-TANUKI remains the first reference runtime and must not be pulled into Shell Core for GUI Shell convenience.
+Runtime 固有の挙動は Adapter 境界の内側に維持する。BLUE-TANUKI は最初の Reference Runtime であり続け、GUI Shell の都合で Shell Core へ取り込んではならない。
 
-If a proposed integration cannot be represented by existing contracts, the correct result is a contract-design task, not an improvised production path.
+提案された integration を既存 contract で表現できない場合、正しい帰結は contract-design task であり、即興の production path ではない。
 
-## 5. Required Contract Families
+## 5. 必須の Contract family
 
-LLM-built modules and integrations must account for these contract families before completion can be claimed:
+LLM が構築する module / integration は、完了を主張する前に次の Contract family を扱わなければならない。
 
-- capability;
-- permission;
-- approval;
-- audit;
-- recovery;
-- content exposure;
-- adapter;
-- runtime;
-- update / install.
+- 能力宣言（Capability）
+- 許可（Permission）
+- 承認（Approval）
+- 監査（Audit）
+- 修復（Recovery）
+- 内容露出（Content Exposure）
+- 接続層（Adapter）
+- 実行対象（Runtime）
+- 更新／導入（update／install）
 
-An explicit LLM extension submission or module integration contract may be introduced later only if contract design proves that existing schemas cannot represent bounded module onboarding safely.
+明示的な LLM extension submission または module integration の contract は、既存 schema では範囲を限定した module onboarding を安全に表現できないと contract design が証明した場合に限り、後で導入してよい。
 
-## 6. Conformance Target Model
+## 6. Conformance の証明対象モデル
 
-Future proof target:
+将来の証明対象:
 
 ```text
-A third-party LLM development agent can read GUI Shell repository contracts and add a bounded reference module or adapter without breaking authority, approval, audit, recovery, content exposure, or runtime neutrality constraints.
+第三者の LLM 開発エージェントが GUI Shell リポジトリの contract を読み、
+Authority、Approval、Audit、Recovery、Content Exposure、Runtime neutrality の制約を
+破らずに、範囲を限定した Reference Module または Adapter を追加できる。
 ```
 
-The proof target requires negative cases, not only successful fixture examples. A valid harness must prove that the extension cannot escalate authority, cannot bypass approval, cannot expose disallowed content, emits required audit evidence, and maps failure to RecoveryAction or SUSPEND where required.
+証明対象には、成功する fixture example だけでなく negative case が必要である。有効な harness は、extension が Authority を昇格できず、Approval を迂回できず、許可されていない content を露出できないこと、必要な Audit evidence を発行すること、および必要な場合に failure を RecoveryAction または SUSPEND へ対応付けることを証明しなければならない。
 
-## 7. Non-Claims and Deferred Evidence
+## 7. 非主張事項と延期した evidence
 
-This definition update does not prove cross-agent implementation success.
+この definition update は、cross-agent implementation の成功を証明しない。
 
-It does not prove external standard adoption.
+外部標準への採用を証明しない。
 
-It does not activate new runtime authority.
+新しい Runtime authority を有効化しない。
 
-It does not close current Windows-first release blockers.
+現在の Windows-first release blocker を解消しない。
 
-It does not complete Rust Security Broker production convergence.
+Rust Security Broker の production convergence を完了しない。
 
-It does not authorize a plugin registry, module loader, SDK, marketplace, or broad runtime implementation.
+plugin registry、module loader、SDK、marketplace、または広範な Runtime implementation を承認しない。
 
-Cross-agent reproduction and ecosystem claims remain deferred until measured evidence exists and the owner approves claim promotion.
+Cross-agent reproduction と ecosystem に関する claim は、measured evidence が存在し、owner が claim promotion を承認するまで延期する。

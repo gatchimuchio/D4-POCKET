@@ -1,6 +1,6 @@
 {
   "task_id": "agent-task-1",
   "session_id": "agent-session-1",
-  "description": "Update documentation",
+  "description": "文書を更新する",
   "status": "running"
 }

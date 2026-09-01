@@ -1,6 +1,6 @@
 {
   "runtime_id": "bad-runtime",
-  "name": "Bad Runtime",
+  "name": "不正な実行系",
   "kind": "reference_runtime",
   "status": "running",
   "adapter_id": "adapter"

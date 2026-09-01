@@ -6,7 +6,7 @@
     {
       "check_id": "runtime.snapshot",
       "status": "pass",
-      "message": "Runtime snapshot endpoint responded."
+      "message": "実行系スナップショット終端点が応答しました。"
     }
   ]
 }

@@ -1,14 +1,14 @@
-# Installer Boundary
+# Installer 境界
 
-The installer may prepare files, dependencies, launchers, and first-run status.
+Installer はファイル、依存関係、launcher、初回起動状態を準備できる。
 
-The installer must not:
+Installer は次を行ってはならない。
 
-- grant permissions
-- approve actions
-- hide dependency failures
-- bypass Shell Core policy evaluation
-- bypass audit
-- bypass recovery mapping
+- permission を与える
+- action を承認する
+- 依存関係の失敗を隠す
+- Shell Core policy 評価を迂回する
+- audit を迂回する
+- recovery 対応を迂回する
 
-Authority remains in Shell Core. Runtime-specific readiness remains behind adapter contracts.
+権限は Shell Core に留める。runtime 固有の準備状態は adapter 契約の背後に閉じる。

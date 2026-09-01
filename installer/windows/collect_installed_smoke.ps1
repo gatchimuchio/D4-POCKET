@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$InstalledExe,
 
@@ -234,11 +234,11 @@ function Start-SmokeBroker {
     }
     $process.Refresh()
     if ($process.HasExited) {
-      throw "Rust broker exited before endpoint was ready: $($process.ExitCode)"
+      throw "Rust broker が endpoint 準備前に終了しました: $($process.ExitCode)"
     }
     Start-Sleep -Milliseconds 50
   }
-  throw "Rust broker endpoint file was not created: $SessionFile"
+  throw "Rust broker endpoint ファイルが作成されませんでした: $SessionFile"
 }
 
 function Stop-SmokeBroker {
@@ -757,7 +757,7 @@ try {
 }
 
 if (!(Test-Path $setupDoctorPath)) {
-  throw "Installed app did not write Setup Doctor product export: $setupDoctorPath"
+  throw "インストール済み app が環境診断の製品出力を書き出しませんでした: $setupDoctorPath"
 }
 $setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
 $installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
@@ -1031,4 +1031,4 @@ if ($null -ne $process -and !$process.HasExited) {
 }
 Stop-SmokeBroker -Process $brokerProcess
 
-Write-Host "wrote $($output.FullName)"
+Write-Host "書き出しました: $($output.FullName)"

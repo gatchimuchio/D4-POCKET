@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/runtime_manifest.schema.json",
-  "title": "RuntimeManifest",
+  "title": "実行系マニフェスト（RuntimeManifest）",
   "type": "object",
   "required": [
     "runtime_id",

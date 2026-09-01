@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_session.schema.json",
-  "title": "AgentSession",
+  "title": "エージェントセッション（AgentSession）",
   "type": "object",
   "required": ["session_id", "agent_runtime_id", "workspace_id", "status", "audit_event_id"],
   "additionalProperties": false,

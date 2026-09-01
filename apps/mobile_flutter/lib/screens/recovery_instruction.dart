@@ -8,10 +8,18 @@ class RecoveryInstruction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MobilePage(
-      title: 'Recovery Instruction',
+      title: '復旧手順',
       children: [
-        StatusTile(icon: Icons.health_and_safety_outlined, title: 'Permission Recovery', subtitle: 'review pending approval and retry after Shell Core approval'),
-        StatusTile(icon: Icons.link_off_outlined, title: 'Revocation Path', subtitle: 'pairing includes device_id, pairing_id, audit event, revocation, and recovery path'),
+        StatusTile(
+          icon: Icons.health_and_safety_outlined,
+          title: '許可の復旧',
+          subtitle: '保留中の承認を確認し、Shell Coreの承認後に再試行してください',
+        ),
+        StatusTile(
+          icon: Icons.link_off_outlined,
+          title: '取消し経路',
+          subtitle: 'ペアリングにはdevice_id、pairing_id、監査事象、取消し、復旧経路が含まれます',
+        ),
       ],
     );
   }

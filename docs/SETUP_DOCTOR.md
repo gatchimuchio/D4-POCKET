@@ -1,8 +1,8 @@
-# Setup Doctor
+# 環境診断
 
-Setup Doctor is a read-only environment and contract status surface.
+環境診断は、読取り専用の環境・契約状態表層である。
 
-Each check reports:
+各 check は次を報告する。
 
 - `check_id`
 - `status`
@@ -10,4 +10,4 @@ Each check reports:
 - `recovery_instruction`
 - `grants_authority=false`
 
-Missing dependencies must be visible to the operator. CLI fallback is allowed for developers, but the normal user path remains the desktop Setup Doctor screen.
+欠落した依存関係は操作者から見えなければならない。開発者向けに CLI fallback を許可するが、通常利用者の経路は desktop 環境診断画面とする。

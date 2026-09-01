@@ -24,5 +24,5 @@ def runtime_snapshot() -> dict:
             "diagnostics.read",
             "recovery.read",
         ],
-        "diagnostic_summary": "mock adapter contract available",
+        "diagnostic_summary": "mock adapter 契約を利用できます",
     }

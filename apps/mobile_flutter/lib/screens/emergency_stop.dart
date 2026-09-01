@@ -8,10 +8,18 @@ class EmergencyStop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MobilePage(
-      title: 'Emergency Stop',
+      title: '緊急停止',
       children: [
-        StatusTile(icon: Icons.stop_circle_outlined, title: 'Request Only', subtitle: 'mobile requests stop through Shell Core; it is not independent authority'),
-        StatusTile(icon: Icons.receipt_long_outlined, title: 'Audit Required', subtitle: 'stop request must create AuditEvent and RecoveryAction mapping'),
+        StatusTile(
+          icon: Icons.stop_circle_outlined,
+          title: '要求のみ',
+          subtitle: 'モバイルはShell Coreを通じて停止を要求します。独立した権限主体ではありません',
+        ),
+        StatusTile(
+          icon: Icons.receipt_long_outlined,
+          title: '監査必須',
+          subtitle: '停止要求にはAuditEventとRecoveryActionの対応が必要です',
+        ),
       ],
     );
   }

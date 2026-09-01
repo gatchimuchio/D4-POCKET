@@ -1,7 +1,7 @@
-# shell_contracts
+# shell_contracts 契約境界
 
-Generated or hand-written contract bindings derived from `specs/*.schema.json`.
+`specs/*.schema.json` から導出する生成または手書きの contract binding。
 
-Contracts are source-of-truth compatible, but the schemas remain canonical.
+Contract は正本との互換性を保つが、schema を引き続き機械契約の正本とする。
 
-Current Phase 3 skeleton provides deterministic schema loading only. It does not replace JSON Schema as the source of truth.
+現行の段階3骨格が提供するのは決定的な schema 読込みだけである。JSON Schema を正本とする責任は置き換えない。

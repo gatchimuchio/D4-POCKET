@@ -47,7 +47,7 @@ Future<void> main() async {
           exception: error,
           stack: stack,
           library: 'gui_shell_desktop',
-          context: ErrorDescription('uncaught app zone error'),
+          context: ErrorDescription('アプリ領域で捕捉されなかったエラー'),
         ),
       );
     },
@@ -68,7 +68,7 @@ void _installFatalErrorHandlers() {
         exception: error,
         stack: stack,
         library: 'gui_shell_desktop',
-        context: ErrorDescription('uncaught platform dispatcher error'),
+        context: ErrorDescription('プラットフォーム配送処理で捕捉されなかったエラー'),
       ),
     );
     return true;
@@ -136,7 +136,7 @@ class GuiShellFatalErrorScreen extends StatelessWidget {
                   Icon(Icons.error_outline, color: scheme.onErrorContainer),
                   const SizedBox(height: 12),
                   Text(
-                    'GUI Shell encountered a fatal UI error.',
+                    'GUI Shellで回復不能な画面エラーが発生しました。',
                     style: TextStyle(
                       color: scheme.onErrorContainer,
                       fontSize: 18,
@@ -223,7 +223,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
                   child: Row(
                     children: [
                       SurfaceSemantics(
-                        label: 'NavigationRail',
+                        label: 'ナビゲーション',
+                        evidenceLabel: 'NavigationRail',
                         explicitChildNodes: true,
                         child: LayoutBuilder(
                           builder: (context, constraints) {
@@ -242,58 +243,69 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                   labelType: NavigationRailLabelType.selected,
                                   destinations: const [
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.dashboard_outlined),
-                                        selectedIcon: Icon(Icons.dashboard),
-                                        label: Text('Dashboard')),
+                                      icon: Icon(Icons.dashboard_outlined),
+                                      selectedIcon: Icon(Icons.dashboard),
+                                      label: Text('概要'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.build_circle_outlined),
-                                        selectedIcon: Icon(Icons.build_circle),
-                                        label: Text('Doctor')),
+                                      icon: Icon(Icons.build_circle_outlined),
+                                      selectedIcon: Icon(Icons.build_circle),
+                                      label: Text('診断'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon:
-                                            Icon(Icons.verified_user_outlined),
-                                        selectedIcon: Icon(Icons.verified_user),
-                                        label: Text('Trust')),
+                                      icon: Icon(Icons.verified_user_outlined),
+                                      selectedIcon: Icon(Icons.verified_user),
+                                      label: Text('信頼'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.hub_outlined),
-                                        selectedIcon: Icon(Icons.hub),
-                                        label: Text('Runtime')),
+                                      icon: Icon(Icons.hub_outlined),
+                                      selectedIcon: Icon(Icons.hub),
+                                      label: Text('実行系'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.account_tree_outlined),
-                                        selectedIcon: Icon(Icons.account_tree),
-                                        label: Text('Authority')),
+                                      icon: Icon(Icons.account_tree_outlined),
+                                      selectedIcon: Icon(Icons.account_tree),
+                                      label: Text('権限'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.smart_toy_outlined),
-                                        selectedIcon: Icon(Icons.smart_toy),
-                                        label: Text('Agent')),
+                                      icon: Icon(Icons.smart_toy_outlined),
+                                      selectedIcon: Icon(Icons.smart_toy),
+                                      label: Text('エージェント'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.fact_check_outlined),
-                                        selectedIcon: Icon(Icons.fact_check),
-                                        label: Text('Approval')),
+                                      icon: Icon(Icons.fact_check_outlined),
+                                      selectedIcon: Icon(Icons.fact_check),
+                                      label: Text('承認'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.receipt_long_outlined),
-                                        selectedIcon: Icon(Icons.receipt_long),
-                                        label: Text('Audit')),
+                                      icon: Icon(Icons.receipt_long_outlined),
+                                      selectedIcon: Icon(Icons.receipt_long),
+                                      label: Text('監査'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(
-                                            Icons.health_and_safety_outlined),
-                                        selectedIcon:
-                                            Icon(Icons.health_and_safety),
-                                        label: Text('Recovery')),
+                                      icon: Icon(
+                                        Icons.health_and_safety_outlined,
+                                      ),
+                                      selectedIcon: Icon(
+                                        Icons.health_and_safety,
+                                      ),
+                                      label: Text('復旧'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon:
-                                            Icon(Icons.report_problem_outlined),
-                                        selectedIcon:
-                                            Icon(Icons.report_problem),
-                                        label: Text('Problems')),
+                                      icon: Icon(Icons.report_problem_outlined),
+                                      selectedIcon: Icon(Icons.report_problem),
+                                      label: Text('問題'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.inventory_2_outlined),
-                                        selectedIcon: Icon(Icons.inventory_2),
-                                        label: Text('Evidence')),
+                                      icon: Icon(Icons.inventory_2_outlined),
+                                      selectedIcon: Icon(Icons.inventory_2),
+                                      label: Text('証拠'),
+                                    ),
                                     NavigationRailDestination(
-                                        icon: Icon(Icons.settings_outlined),
-                                        selectedIcon: Icon(Icons.settings),
-                                        label: Text('Settings')),
+                                      icon: Icon(Icons.settings_outlined),
+                                      selectedIcon: Icon(Icons.settings),
+                                      label: Text('設定'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -317,18 +329,18 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
   List<_ShellPageEntry> _pageEntries() {
     return const [
-      _ShellPageEntry(0, 'Dashboard', Icons.dashboard_outlined),
-      _ShellPageEntry(1, 'Setup Doctor', Icons.build_circle_outlined),
-      _ShellPageEntry(2, 'Trust Center', Icons.verified_user_outlined),
-      _ShellPageEntry(3, 'Runtime Center', Icons.hub_outlined),
-      _ShellPageEntry(4, 'Authority Map', Icons.account_tree_outlined),
-      _ShellPageEntry(5, 'Agent Center', Icons.smart_toy_outlined),
-      _ShellPageEntry(6, 'Approval Center', Icons.fact_check_outlined),
-      _ShellPageEntry(7, 'Audit Viewer', Icons.receipt_long_outlined),
-      _ShellPageEntry(8, 'Recovery Playbook', Icons.health_and_safety_outlined),
-      _ShellPageEntry(9, 'Problems Panel', Icons.report_problem_outlined),
-      _ShellPageEntry(10, 'Evidence Center', Icons.inventory_2_outlined),
-      _ShellPageEntry(11, 'Settings', Icons.settings_outlined),
+      _ShellPageEntry(0, '概要', Icons.dashboard_outlined),
+      _ShellPageEntry(1, '環境診断', Icons.build_circle_outlined),
+      _ShellPageEntry(2, '信頼センター', Icons.verified_user_outlined),
+      _ShellPageEntry(3, '実行系センター', Icons.hub_outlined),
+      _ShellPageEntry(4, '権限対応図', Icons.account_tree_outlined),
+      _ShellPageEntry(5, 'エージェントセンター', Icons.smart_toy_outlined),
+      _ShellPageEntry(6, '承認センター', Icons.fact_check_outlined),
+      _ShellPageEntry(7, '監査ビューアー', Icons.receipt_long_outlined),
+      _ShellPageEntry(8, '復旧手順', Icons.health_and_safety_outlined),
+      _ShellPageEntry(9, '問題一覧', Icons.report_problem_outlined),
+      _ShellPageEntry(10, '証拠センター', Icons.inventory_2_outlined),
+      _ShellPageEntry(11, '設定', Icons.settings_outlined),
     ];
   }
 
@@ -367,25 +379,25 @@ class _ShellHomePageState extends State<ShellHomePage> {
     return [
       for (final page in pageEntries)
         _CommandEntry(
-          title: 'Open ${page.label}',
-          subtitle: 'Navigate to ${page.label}',
+          title: '${page.label}を開く',
+          subtitle: '${page.label}へ移動',
           pageIndex: page.index,
           icon: page.icon,
           keywords: page.label,
         ),
       for (final mode in _ShellViewMode.values)
         _CommandEntry(
-          title: 'Switch view mode: ${mode.label}',
+          title: '表示モードを切り替え: ${mode.label}',
           subtitle: mode.description,
           pageIndex: selectedIndex,
           icon: mode.icon,
-          keywords: 'mode profile ${mode.label} ${mode.description}',
+          keywords: '表示 モード mode profile ${mode.label} ${mode.description}',
           viewMode: mode,
         ),
       for (final problem in snapshot.problems)
         _CommandEntry(
           title: problem.item.isEmpty ? problem.message : problem.item,
-          subtitle: 'Problem -> ${problem.recoveryId}',
+          subtitle: '問題 → ${problem.recoveryId}',
           pageIndex: 9,
           icon: Icons.report_problem_outlined,
           keywords:
@@ -410,7 +422,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       for (final runtime in snapshot.runtimes)
         _CommandEntry(
           title: runtime.runtimeId,
-          subtitle: '${runtime.status} via ${runtime.adapterId}',
+          subtitle: '${runtime.status}（${runtime.adapterId}経由）',
           pageIndex: 3,
           icon: Icons.hub_outlined,
           keywords: '${runtime.name} ${runtime.diagnosticSummary}',
@@ -428,7 +440,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       for (final setting in snapshot.settings)
         _CommandEntry(
           title: setting.key,
-          subtitle: '${setting.currentValue} from ${setting.source}',
+          subtitle: '${setting.currentValue}（出所: ${setting.source}）',
           pageIndex: 11,
           icon: Icons.settings_outlined,
           keywords:
@@ -513,7 +525,7 @@ class _TopCommandBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Tooltip(
-                    message: 'Open command palette (Ctrl+K or Ctrl+P)',
+                    message: 'コマンドパレットを開く（Ctrl+KまたはCtrl+P）',
                     child: compact
                         ? IconButton.filled(
                             onPressed: onOpenCommandPalette,
@@ -522,13 +534,13 @@ class _TopCommandBar extends StatelessWidget {
                         : FilledButton.icon(
                             onPressed: onOpenCommandPalette,
                             icon: const Icon(Icons.search),
-                            label: const Text('Command Palette'),
+                            label: const Text('コマンドパレット'),
                           ),
                   ),
                   const SizedBox(width: 8),
                   if (compact)
                     PopupMenuButton<_ShellViewMode>(
-                      tooltip: 'View mode',
+                      tooltip: '表示モード',
                       icon: Icon(viewMode.icon),
                       onSelected: onViewModeChanged,
                       itemBuilder: (context) => [
@@ -572,29 +584,29 @@ enum _ShellViewMode {
 
   String get label {
     return switch (this) {
-      _ShellViewMode.ownerUse => 'Owner-use mode',
-      _ShellViewMode.audit => 'Audit mode',
-      _ShellViewMode.releaseCandidate => 'Release candidate mode',
-      _ShellViewMode.demo => 'Demo mode',
+      _ShellViewMode.ownerUse => '所有者利用モード',
+      _ShellViewMode.audit => '監査モード',
+      _ShellViewMode.releaseCandidate => 'リリース候補モード',
+      _ShellViewMode.demo => 'デモモード',
     };
   }
 
   String get shortLabel {
     return switch (this) {
-      _ShellViewMode.ownerUse => 'Owner',
-      _ShellViewMode.audit => 'Audit',
+      _ShellViewMode.ownerUse => '所有者',
+      _ShellViewMode.audit => '監査',
       _ShellViewMode.releaseCandidate => 'RC',
-      _ShellViewMode.demo => 'Demo',
+      _ShellViewMode.demo => 'デモ',
     };
   }
 
   String get description {
     return switch (this) {
-      _ShellViewMode.ownerUse => 'Daily local owner operation view.',
-      _ShellViewMode.audit => 'Evidence, audit, and blocker review view.',
+      _ShellViewMode.ownerUse => '日常のローカル所有者操作用表示です。',
+      _ShellViewMode.audit => '証拠、監査、遮断要因を確認する表示です。',
       _ShellViewMode.releaseCandidate =>
-        'RC review view; completed product release remains not claimed.',
-      _ShellViewMode.demo => 'Read-only demonstration view.',
+        'リリース候補の確認用表示です。完成製品としてのリリースはまだ主張しません。',
+      _ShellViewMode.demo => '読み取り専用の実演表示です。',
     };
   }
 
@@ -646,9 +658,8 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.search),
-                  labelText: 'Command Palette',
-                  helperText:
-                      'Search pages, problems, recovery, runtime, authority, and settings',
+                  labelText: 'コマンドパレット',
+                  helperText: '画面、問題、復旧、実行系、権限、設定を検索します',
                 ),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) {
@@ -660,7 +671,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
               const SizedBox(height: 12),
               Expanded(
                 child: entries.isEmpty
-                    ? const Center(child: Text('No matching command'))
+                    ? const Center(child: Text('一致するコマンドはありません'))
                     : ListView.builder(
                         itemCount: entries.length,
                         itemBuilder: (context, index) {

@@ -17,59 +17,63 @@ class EvidenceCenter extends StatelessWidget {
     final snapshot = client.getSnapshot();
     final summary = snapshot.evidenceSummary;
     return ShellPage(
-      title: 'Evidence Center',
+      title: '証拠センター',
       children: [
-        const SectionList(title: 'Release Boundary', rows: [
-          'Evidence Center is display-only in Phase B.',
-          'Missing release evidence blocks completed product release, not Phase B owner-use operation.',
-          'This screen does not generate release evidence.',
-        ]),
+        const SectionList(
+          title: 'リリース境界',
+          rows: [
+            '段階Bの証拠センターは表示専用です。',
+            'リリース証拠の不足は完成製品リリースを遮断しますが、段階Bの所有者利用は遮断しません。',
+            'この画面はリリース証拠を生成しません。',
+          ],
+        ),
         SnapshotInfoPanel(snapshot: snapshot),
         _EvidenceBundleExportPanel(snapshot: snapshot),
         _SnapshotExchangePanel(snapshot: snapshot),
         SectionList(
-          title: 'Validation Summary',
+          title: '検証概要',
           rows: [
             'schema_check: ${summary.schemaCheck}',
-            'conformance_skeleton: passed, ${summary.conformanceCheckCount} checks',
+            'conformance_skeleton: 通過、${summary.conformanceCheckCount}件の check',
             'release_smoke: ${summary.releaseSmoke}',
             'release_gate_check: ${summary.releaseGateCheck}',
             'evidence_bundle: ${summary.evidenceBundle}',
             'validate_all: ${summary.validateAll}',
             'strict_windows_release: ${summary.strictWindowsRelease}',
-            'missing measured Windows evidence: ${summary.missingMeasuredWindowsEvidence ? 'release_blocker' : 'none'}',
-            'missing non-synthetic Setup Doctor evidence: ${summary.missingSetupDoctorEvidence ? 'release_blocker' : 'none'}',
-            'owner GO: ${summary.ownerGo}',
+            'Windows実測証拠の不足: ${summary.missingMeasuredWindowsEvidence ? 'release_blocker' : 'なし'}',
+            '非合成の環境診断証拠の不足: ${summary.missingSetupDoctorEvidence ? 'release_blocker' : 'なし'}',
+            '所有者GO: ${summary.ownerGo}',
           ],
         ),
         if (snapshot.evidence.isEmpty)
           const EmptyStatePanel(
-            title: 'No evidence yet',
-            meaning: 'The current snapshot has no evidence records to display.',
+            title: '証拠なし',
+            meaning: '現在のスナップショットに表示対象の証拠記録がありません。',
             phaseBBlocked: false,
-            nextAction:
-                'Run the standard validation commands when evidence state matters.',
+            nextAction: '証拠状態が必要なときは標準検証コマンドを実行してください。',
           )
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('Evidence')),
-                DataColumn(label: Text('Kind')),
-                DataColumn(label: Text('Status')),
-                DataColumn(label: Text('Path')),
-                DataColumn(label: Text('Exportable')),
+                DataColumn(label: Text('証拠')),
+                DataColumn(label: Text('種別')),
+                DataColumn(label: Text('状態')),
+                DataColumn(label: Text('パス')),
+                DataColumn(label: Text('書出し可能')),
               ],
               rows: [
                 for (final evidence in snapshot.evidence)
-                  DataRow(cells: [
-                    DataCell(Text(evidence.evidenceId)),
-                    DataCell(Text(evidence.kind)),
-                    DataCell(Text(evidence.status)),
-                    DataCell(Text(evidence.path)),
-                    DataCell(Text(evidence.exportable ? 'yes' : 'no')),
-                  ]),
+                  DataRow(
+                    cells: [
+                      DataCell(Text(evidence.evidenceId)),
+                      DataCell(Text(evidence.kind)),
+                      DataCell(Text(evidence.status)),
+                      DataCell(Text(evidence.path)),
+                      DataCell(Text(evidence.exportable ? 'はい' : 'いいえ')),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -90,12 +94,9 @@ class _EvidenceBundleExportPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Evidence Bundle Export',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('証拠束の書き出し', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          const Text(
-            'Display-only export helpers. These copy existing paths, summaries, or commands; they do not collect release evidence.',
-          ),
+          const Text('表示専用の書出し補助です。既存のパス、概要、コマンドをコピーするだけで、リリース証拠は収集しません。'),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -108,20 +109,20 @@ class _EvidenceBundleExportPanel extends StatelessWidget {
                   ),
                 ),
                 icon: const Icon(Icons.copy),
-                label: const Text('Copy Check Command'),
+                label: const Text('検査コマンドをコピー'),
               ),
               OutlinedButton.icon(
                 onPressed: () =>
                     Clipboard.setData(ClipboardData(text: summaryText)),
                 icon: const Icon(Icons.summarize_outlined),
-                label: const Text('Copy Validation Summary'),
+                label: const Text('検証概要をコピー'),
               ),
               OutlinedButton.icon(
                 onPressed: () => Clipboard.setData(
                   const ClipboardData(text: 'release_evidence'),
                 ),
                 icon: const Icon(Icons.folder_copy_outlined),
-                label: const Text('Copy Evidence Folder'),
+                label: const Text('証拠フォルダーをコピー'),
               ),
             ],
           ),
@@ -144,11 +145,13 @@ class _SnapshotExchangePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Snapshot Import / Export',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'スナップショットの読込み／書出し',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           const Text(
-            'Snapshot import is preview-only in Flutter. Applying imported state remains a Shell Core responsibility.',
+            'Flutterでのスナップショット読込みは事前確認専用です。読み込んだ状態の適用はShell Coreの責任です。',
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -160,14 +163,14 @@ class _SnapshotExchangePanel extends StatelessWidget {
                   ClipboardData(text: _snapshotExportJson(snapshot)),
                 ),
                 icon: const Icon(Icons.ios_share_outlined),
-                label: const Text('Copy Snapshot JSON'),
+                label: const Text('スナップショットJSONをコピー'),
               ),
               OutlinedButton.icon(
                 onPressed: () => Clipboard.setData(
                   ClipboardData(text: snapshot.snapshotPath),
                 ),
                 icon: const Icon(Icons.folder_copy_outlined),
-                label: const Text('Copy Snapshot Path'),
+                label: const Text('スナップショットのパスをコピー'),
               ),
               OutlinedButton.icon(
                 onPressed: () => showDialog<void>(
@@ -176,7 +179,7 @@ class _SnapshotExchangePanel extends StatelessWidget {
                       _SnapshotImportPreviewDialog(current: snapshot),
                 ),
                 icon: const Icon(Icons.compare_arrows_outlined),
-                label: const Text('Preview Import / Compare'),
+                label: const Text('読込み前確認／比較'),
               ),
             ],
           ),
@@ -199,8 +202,7 @@ class _SnapshotImportPreviewDialog extends StatefulWidget {
 class _SnapshotImportPreviewDialogState
     extends State<_SnapshotImportPreviewDialog> {
   final TextEditingController _controller = TextEditingController();
-  String _preview =
-      'Paste snapshot JSON to preview source, release state, and counts.';
+  String _preview = 'スナップショットJSONを貼り付けると、出所、リリース状態、件数を事前確認できます。';
 
   @override
   void dispose() {
@@ -217,15 +219,17 @@ class _SnapshotImportPreviewDialogState
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Text('Preview Snapshot Import',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'スナップショット読込みの事前確認',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _controller,
                 maxLines: 8,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: 'Snapshot JSON',
+                  labelText: 'スナップショットJSON',
                 ),
                 onChanged: _updatePreview,
               ),
@@ -244,7 +248,7 @@ class _SnapshotImportPreviewDialogState
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Close'),
+                    child: const Text('閉じる'),
                   ),
                 ],
               ),
@@ -258,8 +262,7 @@ class _SnapshotImportPreviewDialogState
   void _updatePreview(String value) {
     if (value.trim().isEmpty) {
       setState(() {
-        _preview =
-            'Paste snapshot JSON to preview source, release state, and counts.';
+        _preview = 'スナップショットJSONを貼り付けると、出所、リリース状態、件数を事前確認できます。';
       });
       return;
     }
@@ -268,23 +271,23 @@ class _SnapshotImportPreviewDialogState
       final imported = ShellSnapshot.fromJson(json);
       setState(() {
         _preview = [
-          'Preview only: no imported data is applied.',
-          'current source: ${widget.current.snapshotSource}',
-          'import source: ${imported.snapshotSource}',
-          'current release: ${widget.current.operationStatus.releaseState}',
-          'import release: ${imported.operationStatus.releaseState}',
-          'current problems: ${widget.current.problems.length}',
-          'import problems: ${imported.problems.length}',
-          'current recovery rows: ${widget.current.recoveryPlaybook.length}',
-          'import recovery rows: ${imported.recoveryPlaybook.length}',
-          'current evidence rows: ${widget.current.evidence.length}',
-          'import evidence rows: ${imported.evidence.length}',
-          'Phase B blocked by import preview: ${imported.problems.any((problem) => problem.blocksOwnerUse) ? 'yes' : 'no'}',
+          '事前確認専用です。読み込んだデータは適用しません。',
+          '現在の出所: ${widget.current.snapshotSource}',
+          '読込み側の出所: ${imported.snapshotSource}',
+          '現在のリリース状態: ${widget.current.operationStatus.releaseState}',
+          '読込み側のリリース状態: ${imported.operationStatus.releaseState}',
+          '現在の問題数: ${widget.current.problems.length}',
+          '読込み側の問題数: ${imported.problems.length}',
+          '現在の復旧行数: ${widget.current.recoveryPlaybook.length}',
+          '読込み側の復旧行数: ${imported.recoveryPlaybook.length}',
+          '現在の証拠行数: ${widget.current.evidence.length}',
+          '読込み側の証拠行数: ${imported.evidence.length}',
+          '読込み前確認で段階Bを遮断: ${imported.problems.any((problem) => problem.blocksOwnerUse) ? 'はい' : 'いいえ'}',
         ].join('\n');
       });
     } on Object catch (error) {
       setState(() {
-        _preview = 'Invalid snapshot JSON: $error';
+        _preview = 'スナップショットJSONが不正です: $error';
       });
     }
   }
@@ -293,14 +296,14 @@ class _SnapshotImportPreviewDialogState
 String _validationSummaryText(ShellSnapshot snapshot) {
   final summary = snapshot.evidenceSummary;
   return [
-    'schema_check=${summary.schemaCheck}',
-    'conformance_checks=${summary.conformanceCheckCount}',
-    'release_smoke=${summary.releaseSmoke}',
-    'release_gate_check=${summary.releaseGateCheck}',
-    'evidence_bundle=${summary.evidenceBundle}',
-    'validate_all=${summary.validateAll}',
-    'strict_windows_release=${summary.strictWindowsRelease}',
-    'release_state=${snapshot.operationStatus.releaseState}',
+    'スキーマ検査(schema_check)=${summary.schemaCheck}',
+    '適合検査数(conformance_checks)=${summary.conformanceCheckCount}',
+    'リリース簡易検査(release_smoke)=${summary.releaseSmoke}',
+    'リリース関門検査(release_gate_check)=${summary.releaseGateCheck}',
+    '証拠束(evidence_bundle)=${summary.evidenceBundle}',
+    '全検証(validate_all)=${summary.validateAll}',
+    'Windows厳格リリース(strict_windows_release)=${summary.strictWindowsRelease}',
+    'リリース状態(release_state)=${snapshot.operationStatus.releaseState}',
   ].join('\n');
 }
 

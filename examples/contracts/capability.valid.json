@@ -1,8 +1,8 @@
 {
   "capability_id": "filesystem.write",
   "runtime_id": "blue_tanuki",
-  "name": "Filesystem Write",
-  "description": "Write files within an approved scope.",
+  "name": "ファイルシステム書込み",
+  "description": "承認済み範囲内のファイルを書き込みます。",
   "risk_level": "high",
   "default_permission": "ask",
   "requires_approval": true,

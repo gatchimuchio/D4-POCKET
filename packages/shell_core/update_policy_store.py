@@ -12,7 +12,7 @@ class UpdatePolicyStore:
             raise ValueError(
                 shell_error(
                     UPDATE_SIGNATURE_REQUIRED,
-                    "update policy must require signatures",
+                    "update policy は署名を必須としなければなりません",
                     "update.policy.register",
                 )["code"]
             )
@@ -20,5 +20,5 @@ class UpdatePolicyStore:
 
     def get(self, policy_id: str) -> dict:
         if policy_id not in self._policies:
-            raise KeyError(f"update policy not registered: {policy_id}")
+            raise KeyError(f"未登録の update policy です: {policy_id}")
         return copy.deepcopy(self._policies[policy_id])

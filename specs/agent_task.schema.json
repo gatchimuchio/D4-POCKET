@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_task.schema.json",
-  "title": "AgentTask",
+  "title": "エージェントタスク（AgentTask）",
   "type": "object",
   "required": ["task_id", "session_id", "description", "status", "audit_event_id"],
   "additionalProperties": false,

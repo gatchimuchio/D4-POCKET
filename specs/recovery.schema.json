@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/recovery.schema.json",
-  "title": "RecoveryAction",
+  "title": "復旧対応（RecoveryAction）",
   "type": "object",
   "required": [
     "recovery_id",

@@ -1,35 +1,35 @@
-# GUI Shell Audit
+# GUI Shell 監査
 
-GUI Shell audit expectations are schema-first and conformance-first.
+GUI Shell の監査要件は schema-first かつ conformance-first である。
 
-## Required audit mapping
+## 必須の Audit mapping
 
-Every sensitive action must map to:
+すべての sensitive action は、次へ対応付けなければならない。
 
-- capability;
-- permission;
-- approval state;
-- `AuditEvent`;
-- `RecoveryAction` on failure.
+- 能力宣言（Capability）
+- 許可（Permission）
+- 承認状態（Approval state）
+- 監査事象（`AuditEvent`）
+- 失敗時の `RecoveryAction`
 
-## Core invariant checks
+## Core invariant の検査
 
-The repository must preserve these invariants:
+このリポジトリは、次の invariant を維持しなければならない。
 
-- inbound authority keys are stripped;
-- external metadata cannot escalate authority;
-- runtime-disallowed authority context cannot be created by GUI input;
-- GUI input is not authority;
-- memory, cache, and previous state are not authority by themselves;
-- content visibility is respected;
-- `full_payload` storage does not imply UI exposure unless `content_visibility=full`;
-- approval edits are field-scoped;
-- edited payloads are rehashed and revalidated;
-- all sensitive actions create audit events.
+- inbound authority key を除去する。
+- external metadata は権限を昇格できない。
+- Runtime が許可していない `authority_context` を GUI input から作成できない。
+- GUI input は権限ではない。
+- memory、cache、previous state は、それ自体では権限ではない。
+- `content_visibility` を遵守する。
+- `full_payload` を保存していても、`content_visibility=full` でない限り UI への露出を意味しない。
+- Approval の編集範囲は field 単位に限定する。
+- 編集後の payload を再 hash 化し、再検証する。
+- すべての sensitive action について AuditEvent を作成する。
 
-## Contract surfaces
+## Contract の所在
 
-Audit-related contracts live in:
+Audit に関係する contract は、次に置く。
 
 ```text
 specs/audit.schema.json
@@ -42,11 +42,11 @@ docs/specs/approval-visibility-boundary.md
 docs/specs/content-exposure-policy.md
 ```
 
-## Validation
+## 検証
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-The conformance skeleton is not a complete audit implementation. It is the first gate that prevents product UI from outrunning authority, visibility, approval, and recovery contracts.
+conformance skeleton は、完成した Audit 実装ではない。これは、product UI が Authority、Visibility、Approval、Recovery の contract を追い越すことを防ぐ最初の gate である。

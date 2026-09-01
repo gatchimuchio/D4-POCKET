@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/audit.schema.json",
-  "title": "AuditEvent",
+  "title": "監査事象（AuditEvent）",
   "type": "object",
   "required": [
     "event_id",

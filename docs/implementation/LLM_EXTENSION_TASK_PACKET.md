@@ -1,47 +1,47 @@
-# LLM Extension Task Packet
+# LLM 拡張 task packet
 
-Status: Block L4 task packet for independent agent reproduction
-Date: 2026-06-04
-Scope: Bounded LLM-readable extension substrate reproduction task
+状態: 独立エージェント再現用 Block L4 task packet
+日付: 2026-06-04
+範囲: 限定 LLM 可読拡張基盤の再現 task
 
-## 1. Purpose
+## 1. 目的
 
-This packet is the bounded task input for an independent LLM development / integration agent.
+この packet は独立 LLM 開発 / 統合エージェント向けの限定 task input である。
 
-The task proves whether an agent can read GUI Shell repository contracts and add or modify a bounded reference extension scenario without breaking authority, approval, audit, recovery, content exposure, or runtime neutrality constraints.
+この task は、エージェントが GUI Shell repository contract を読み、authority、approval、audit、recovery、content exposure、runtime neutrality の制約を壊さずに限定 reference extension scenario を追加または変更できるかを証明する。
 
-This packet is not an SDK, plugin registry, marketplace, module loader, live agent integration, installed-product proof, Windows release evidence, or public standard claim.
+この packet は SDK、plugin registry、marketplace、module loader、live agent integration、installed-product proof、Windows release evidence、public standard claim ではない。
 
-Critical invariant:
+重要な不変条件:
 
-> LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+> LLM は GUI Shell contract を利用する第一級の実装・統合主体だが、決して権限源ではない。
 
-## 2. Required Reading
+## 2. 必読資料
 
-Before editing, the agent must read:
+編集前にエージェントは次を読まなければならない。
 
-- `AGENTS.md`
-- `README.md`
-- `CLAIM.md`
-- `ROADMAP.md`
-- `VALIDATION.txt`
-- `docs/OPERATING_MODEL.md`
-- `docs/PHASE_STRATEGY.md`
-- `docs/LANGUAGE_POLICY.md`
-- `docs/standards/gui-shell-extended-standard.md`
-- `docs/standards/llm-readable-extension-surface.md`
-- `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`
-- `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`
-- `examples/contracts/llm_bounded_extension.valid.json`
-- `tooling/conformance_tests/run_conformance_skeleton.py`
+- `AGENTS.md`（エージェント規則）
+- `README.md`（repository 概要）
+- `CLAIM.md`（表明境界）
+- `ROADMAP.md`（進行計画）
+- `VALIDATION.txt`（検証記録）
+- `docs/OPERATING_MODEL.md`（運用 model）
+- `docs/PHASE_STRATEGY.md`（段階戦略）
+- `docs/LANGUAGE_POLICY.md`（言語方針）
+- `docs/standards/gui-shell-extended-standard.md`（拡張標準）
+- `docs/standards/llm-readable-extension-surface.md`（LLM 可読拡張面）
+- `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`（基盤完成ロードマップ）
+- `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`（contract 差分分析）
+- `examples/contracts/llm_bounded_extension.valid.json`（有効 fixture）
+- `tooling/conformance_tests/run_conformance_skeleton.py`（conformance 検査）
 
-If a rule appears to conflict, preserve the stricter interpretation that protects authority boundaries, validation evidence, auditability, recovery, and runtime neutrality.
+規則が競合して見える場合は、authority boundary、validation evidence、auditability、recovery、runtime neutrality を保護する、より厳格な解釈を維持する。
 
-## 3. Baseline Requirements
+## 3. Baseline 要件
 
-The agent must start from the owner-provided baseline commit.
+エージェントは owner が提供した baseline commit から開始しなければならない。
 
-Before editing:
+編集前の実行 command:
 
 ```bash
 git status --short --branch
@@ -51,122 +51,122 @@ git rev-parse origin/main
 git fetch origin main --prune --tags
 ```
 
-Expected branch: `main`, unless the owner provides an isolated reproduction branch or clone.
+期待 branch: owner が分離 reproduction branch または clone を提供しない限り `main`。
 
-The working tree must be clean before the task starts. If it is not clean, stop and report the uncommitted state.
+task 開始前に working tree は clean でなければならない。clean でない場合は停止し、未 commit 状態を報告する。
 
-## 4. Task Objective
+## 4. Task の目的
 
-Implement one bounded contract/conformance improvement for the existing LLM-readable reference extension surface.
+既存の LLM 可読参照拡張面に対する限定 contract/conformance 改善を一つ実装する。
 
-Allowed task shapes:
+許可する task 形式:
 
-- add a negative conformance case for `examples/contracts/llm_bounded_extension.valid.json`;
-- add a positive conformance check that ties an existing record in that fixture to an existing schema or governed path;
-- add a small fixture-only mutation inside `tooling/conformance_tests/run_conformance_skeleton.py`;
-- add documentation that clarifies the bounded extension reproduction evidence format;
-- tighten non-authority source handling where the repository already defines the source as non-authoritative.
+- `examples/contracts/llm_bounded_extension.valid.json` に対する negative conformance case を追加する。
+- その fixture の既存 record を既存 schema または governed path に結び付ける positive conformance check を追加する。
+- `tooling/conformance_tests/run_conformance_skeleton.py` 内に小規模な fixture-only mutation を追加する。
+- 限定拡張の再現証拠形式を明確にする文書を追加する。
+- repository が既に non-authoritative と定義した source の non-authority source handling を強化する。
 
-The task must preserve the existing reference extension as:
+task は既存 reference extension の次の性質を維持しなければならない。
 
-- non-authoritative;
-- mock or fixture-based;
-- contract/conformance evidence only;
-- runtime-neutral;
-- not BLUE-TANUKI-specific;
-- not installed-product proof;
-- not cross-agent reproduction proof by itself.
+- non-authoritative（非権限）。
+- mock または fixture-based（fixture 基底）。
+- contract/conformance evidence に限る。
+- runtime-neutral（runtime 中立）。
+- BLUE-TANUKI 固有ではない。
+- installed-product proof ではない。
+- 単独では cross-agent reproduction proof ではない。
 
-## 5. Allowed Paths
+## 5. 許可する path
 
-The agent may change only the smallest necessary subset of:
+エージェントは次のうち必要最小限の subset だけを変更してよい。
 
-- `examples/contracts/llm_bounded_extension.valid.json`
-- `tooling/conformance_tests/run_conformance_skeleton.py`
-- `packages/shell_core/permission_ledger.py`
-- `docs/implementation/LLM_EXTENSION_TASK_PACKET.md`
-- `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md`
-- `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`
-- `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`
-- `README.md`
-- `CLAIM.md`
-- `VALIDATION.txt`
-- `MANIFEST.sha256.json`
+- `examples/contracts/llm_bounded_extension.valid.json`（限定 extension fixture）
+- `tooling/conformance_tests/run_conformance_skeleton.py`（conformance 検査）
+- `packages/shell_core/permission_ledger.py`（許可 ledger）
+- `docs/implementation/LLM_EXTENSION_TASK_PACKET.md`（作業指示 packet）
+- `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md`（証拠 template）
+- `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`（完成ロードマップ）
+- `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`（contract 差分分析）
+- `README.md`（repository 概要）
+- `CLAIM.md`（表明境界）
+- `VALIDATION.txt`（検証記録）
+- `MANIFEST.sha256.json`（収録 manifest）
 
-If another file appears necessary, stop before editing it and report why the existing allowed surface is insufficient.
+別ファイルが必要に見える場合は、編集前に停止し、既存の許可範囲が不十分である理由を報告する。
 
-## 6. Forbidden Changes
+## 6. 禁止する変更
 
-Do not change:
+次を変更してはならない。
 
-- production runtime execution paths;
-- Rust broker implementation;
-- Flutter UI;
-- installer scripts;
-- Windows evidence collectors;
-- release evidence JSON;
-- schema files under `specs/`;
-- generic schema checker behavior;
-- BLUE-TANUKI runtime code;
-- authority boundary design;
-- approval semantics;
-- audit semantics;
-- recovery semantics;
-- content exposure policy semantics;
-- repository backup discipline.
+- 製品 runtime の実行経路。
+- Rust broker implementation（broker 実装）。
+- Flutter UI（利用者 UI）。
+- installer script（導入 script）。
+- Windows evidence collector（証拠収集器）。
+- release evidence JSON（リリース証拠）。
+- `specs/` 配下の schema file。
+- 汎用 schema checker の挙動。
+- BLUE-TANUKI runtime code（runtime 実装）。
+- authority boundary design（権限境界設計）。
+- approval semantics（承認意味論）。
+- audit semantics（監査意味論）。
+- recovery semantics（回復意味論）。
+- 内容露出方針の意味論。
+- repository backup discipline（backup 規律）。
 
-Do not add:
+次を追加してはならない。
 
-- a plugin registry;
-- a module loader;
-- an SDK;
-- marketplace behavior;
-- live third-party agent integration;
-- new dependencies;
-- runtime command dispatch;
-- privileged filesystem, process, network, credential, IPC, or update behavior.
+- plugin registry（登録機構）。
+- module loader（module 読込み機構）。
+- SDK（開発 kit）。
+- marketplace behavior（市場機構の挙動）。
+- 実動する第三者 agent 統合。
+- new dependency（新規依存）。
+- runtime command dispatch（runtime command 配送）。
+- privileged filesystem、process、network、credential、IPC、または update behavior（特権挙動）。
 
-## 7. Required Contract Surface
+## 7. 必須 contract 面
 
-Any accepted change must account for the existing contract families:
+採用する変更は既存の次の contract family を考慮しなければならない。
 
-- runtime;
-- adapter;
-- runtime manifest;
-- adapter manifest;
-- capability;
-- permission;
-- approval;
-- audit;
-- recovery;
-- content exposure;
-- update/install;
-- agent runtime when the change concerns agent-operated development behavior.
+- runtime（実行主体）。
+- adapter（接続境界）。
+- runtime manifest（runtime 宣言）。
+- adapter manifest（adapter 宣言）。
+- capability（能力）。
+- permission（権限許可）。
+- approval（承認）。
+- audit（監査）。
+- recovery（回復）。
+- content exposure（内容露出）。
+- update/install（更新・導入）。
+- 変更が agent-operated development behavior に関係する場合の agent runtime。
 
-If the proposed change cannot be represented by existing contracts, the correct output is a contract gap report, not an improvised implementation.
+提案する変更を既存 contract で表現できない場合、正しい出力は contract gap report であり、即興 implementation ではない。
 
-## 8. Required Negative Cases
+## 8. 必須 negative case
 
-At least one governed negative case must remain or be added for the changed surface.
+変更面について、少なくとも一つの governed negative case を維持または追加しなければならない。
 
-Valid negative case categories:
+有効な negative case category:
 
-- authority escalation metadata;
-- self-approved sensitive behavior;
-- undeclared capability;
-- undeclared permission;
-- missing audit evidence;
-- missing recovery mapping;
-- full content exposure without policy;
-- memory, generated output, generated config, metadata, tool response, GUI state, or previous state attempting to become authority;
-- runtime-specific logic entering Shell Core;
-- BLUE-TANUKI-specific logic entering Shell Core.
+- authority escalation metadata（権限昇格 metadata）。
+- self-approved sensitive behavior（自己承認した機微挙動）。
+- undeclared capability（未宣言能力）。
+- undeclared permission（未宣言許可）。
+- missing audit evidence（監査証拠欠落）。
+- missing recovery mapping（回復対応欠落）。
+- 方針のない full content exposure。
+- memory、generated output、generated config、metadata、tool response、GUI state、または previous state による authority 化の試行。
+- Shell Core に入る runtime-specific logic。
+- Shell Core に入る BLUE-TANUKI-specific logic。
 
-The negative case must fail closed through schema validation, conformance, policy evaluation, catalog rejection, normalization quarantine, or equivalent existing validation path.
+negative case は schema validation、conformance、policy evaluation、catalog rejection、normalization quarantine、または同等の既存 validation path を通じて fail closed しなければならない。
 
-## 9. Required Validation
+## 9. 必須検証
 
-Run at minimum:
+最低限、次を実行する。
 
 ```bash
 python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
@@ -176,89 +176,89 @@ python3 tooling/release_gate_check.py
 python3 tooling/evidence_bundle.py --check
 ```
 
-If runtime-boundary code is touched, also run:
+runtime-boundary code に触れた場合は次も実行する。
 
 ```bash
 python3 tooling/release_runtime_assertions.py --check
 ```
 
-If Rust helper or Flutter files are touched, the task has exceeded this packet unless the owner explicitly allowed that scope. Stop and report before continuing.
+Rust helper または Flutter file に触れた場合、owner がその範囲を明示的に許可していない限り task はこの packet を逸脱している。続行前に停止して報告する。
 
-## 10. Expected Output
+## 10. 期待出力
 
-The agent must produce:
+エージェントは次を生成しなければならない。
 
-- a bounded diff;
-- validation command outputs;
-- evidence classification;
-- remaining blocker classification;
-- a statement that no installed-product proof or cross-agent reproduction claim is made;
-- a completed `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md`-compatible report.
+- bounded diff（限定差分）。
+- validation command output（検証 command 出力）。
+- evidence classification（証拠分類）。
+- remaining blocker classification（残存 blocker 分類）。
+- installed-product proof または cross-agent reproduction claim を行わないとの明記。
+- 完成した `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md` 互換 report。
 
-## 11. Completion Report Format
+## 11. 完了報告形式
 
-The completion report must include:
+完了報告は次を含まなければならない。
 
-1. Summary
-2. Baseline commit
-3. Task packet path and version/date
-4. Changed files
-5. Contract path exercised
-6. Negative case added or preserved
-7. Validation commands and exact outputs
-8. Evidence classification
-9. Production/runtime behavior change status
-10. Release-gate impact
-11. LLM-substrate claim impact
-12. Unauthorized scope expansion attempts, if any
-13. Manual repair required, if any
-14. Remaining risks with repository classifications
-15. Working branch
-16. Commit hash, or `not committed`
-17. Push result, or `not pushed`
-18. Remote HEAD verification, if pushed
-19. Backup refs, if repository-state modifying direct-main work was performed
-20. Rollback point
+1. 要約（Summary）
+2. Baseline commit（基準 commit）
+3. Task packet の path と version/date
+4. 変更ファイル（Changed files）
+5. 実行した contract path
+6. 追加または維持した negative case
+7. Validation command と正確な output
+8. Evidence classification（証拠分類）
+9. Production/runtime behavior の変更状態
+10. Release-gate への影響
+11. LLM-substrate claim への影響
+12. 存在する場合、無許可の範囲拡大試行
+13. 存在する場合、必要な manual repair
+14. Repository classification を伴う remaining risk
+15. Working branch（作業 branch）
+16. Commit hash、または `not committed`
+17. Push result、または `not pushed`
+18. push した場合の Remote HEAD verification
+19. repository state を変更する main 直接作業を行った場合の backup ref
+20. Rollback point（ロールバック地点）
 
-## 12. Evidence Classification Rules
+## 12. 証拠分類規則
 
-Allowed classifications for this packet:
+この packet で許可する分類:
 
-- CONFIG
-- INTERNAL_STATE
-- FIXTURE
+- CONFIG（設定証拠）
+- INTERNAL_STATE（内部状態証拠）
+- FIXTURE（fixture 証拠）
 
-Do not classify this task as:
+この task を次に分類してはならない。
 
-- installed-product evidence;
-- Windows release evidence;
-- external evidence;
-- cross-agent reproduction evidence by itself;
-- public standard adoption evidence.
+- installed-product evidence（インストール済み製品証拠）。
+- Windows release evidence（Windows リリース証拠）。
+- external evidence（外部証拠）。
+- 単独での cross-agent reproduction evidence。
+- 公開標準採用の証拠。
 
-Cross-agent reproduction evidence exists only after the owner runs at least two independent agent executions from the same baseline and compares the resulting diffs and validation results.
+Cross-agent reproduction evidence は、owner が同じ baseline から少なくとも二つの独立 agent execution を実行し、生成 diff と validation result を比較した後に限り成立する。
 
-## 13. Stop Conditions
+## 13. 停止条件
 
-Stop and report before editing further if:
+次の場合は追加編集前に停止して報告する。
 
-- a new schema appears necessary;
-- production runtime behavior appears necessary;
-- authority semantics need to change;
-- approval, audit, recovery, or content exposure rules appear insufficient;
-- Rust, Flutter, installer, Windows evidence, or release evidence files appear necessary;
-- validation fails and the fix would exceed allowed paths;
-- the working tree is dirty with unrelated changes;
-- remote push or backup verification fails.
+- 新規 schema が必要に見える。
+- production runtime behavior が必要に見える。
+- authority semantics の変更が必要である。
+- approval、audit、recovery、または content exposure rule が不十分に見える。
+- Rust、Flutter、installer、Windows evidence、または release evidence file が必要に見える。
+- validation が失敗し、修正が allowed path を越える。
+- working tree に無関係な dirty change がある。
+- remote push または backup verification が失敗する。
 
-## 14. Success Criteria
+## 14. 成功条件
 
-The task succeeds only if:
+task は次をすべて満たす場合に限り成功する。
 
-- the diff stays inside allowed scope;
-- existing contracts are used instead of bypassed;
-- at least one relevant negative path is validated;
-- validation passes;
-- no release blockers are incorrectly closed;
-- no installed-product or cross-agent claim is promoted;
-- evidence is recorded in the template-compatible format.
+- diff が allowed scope 内に留まる。
+- 既存 contract を迂回せず使用する。
+- 少なくとも一つの関連 negative path を検証する。
+- validation が合格する。
+- release blocker を誤って閉じない。
+- installed-product または cross-agent claim を昇格させない。
+- evidence を template 互換形式で記録する。

@@ -16,48 +16,52 @@ class ProblemsPanel extends StatelessWidget {
     final problems = snapshot.problems;
     final recoveryById = {
       for (final recovery in snapshot.recoveryPlaybook)
-        if (recovery.recoveryId.isNotEmpty) recovery.recoveryId: recovery
+        if (recovery.recoveryId.isNotEmpty) recovery.recoveryId: recovery,
     };
     final authorityByRecoveryId = {
       for (final authority in snapshot.authorityMap)
-        if (authority.recoveryId.isNotEmpty) authority.recoveryId: authority
+        if (authority.recoveryId.isNotEmpty) authority.recoveryId: authority,
     };
     return ShellPage(
-      title: 'Problems Panel',
+      title: '問題一覧',
       children: [
-        const SectionList(title: 'Phase B Boundary', rows: [
-          'Release blockers are visible here without making Phase B owner-use fail.',
-          'Rows are display-only; authority and recovery execution remain Shell Core responsibilities.',
-        ]),
-        const SectionList(title: 'Problem to Recovery Map', rows: [
-          'safe_to_ignore_for_phase_b=true means the owner can continue Phase B daily operation.',
-          'blocks_owner_use=true means the owner-use loop needs attention before Phase B can stay complete.',
-          'blocks_completed_product_release=true remains a later strict release blocker.',
-        ]),
+        const SectionList(
+          title: '段階Bの境界',
+          rows: [
+            'リリース遮断要因は、段階Bの所有者利用を失敗扱いにせず、ここに表示します。',
+            '各行は表示専用です。権限判断と復旧実行は引き続きShell Coreの責任です。',
+          ],
+        ),
+        const SectionList(
+          title: '問題と復旧の対応',
+          rows: [
+            '`safe_to_ignore_for_phase_b=true`は、所有者が段階Bの日常操作を継続できることを示します。',
+            '`blocks_owner_use=true`は、段階Bの完了状態を維持する前に所有者利用循環への対応が必要であることを示します。',
+            '`blocks_completed_product_release=true`は、後続の厳格リリースを遮断します。',
+          ],
+        ),
         if (problems.isEmpty)
           const EmptyStatePanel(
-            title: 'No problems',
-            meaning:
-                'The current snapshot reports no owner-use or release problems.',
+            title: '問題なし',
+            meaning: '現在のスナップショットには、所有者利用またはリリースの問題がありません。',
             phaseBBlocked: false,
-            nextAction:
-                'Continue owner-use operation or refresh diagnostics after local changes.',
+            nextAction: '所有者利用を継続するか、ローカル変更後に診断を更新してください。',
           )
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('Item')),
-                DataColumn(label: Text('Classification')),
-                DataColumn(label: Text('Recovery')),
-                DataColumn(label: Text('Safe for Phase B')),
-                DataColumn(label: Text('Blocks Owner Use')),
-                DataColumn(label: Text('Blocks Product Release')),
-                DataColumn(label: Text('Reason')),
-                DataColumn(label: Text('Required Action')),
-                DataColumn(label: Text('Related')),
-                DataColumn(label: Text('Copy')),
+                DataColumn(label: Text('項目')),
+                DataColumn(label: Text('分類')),
+                DataColumn(label: Text('復旧')),
+                DataColumn(label: Text('段階Bで継続可能')),
+                DataColumn(label: Text('所有者利用を遮断')),
+                DataColumn(label: Text('製品リリースを遮断')),
+                DataColumn(label: Text('理由')),
+                DataColumn(label: Text('必要な対応')),
+                DataColumn(label: Text('関連')),
+                DataColumn(label: Text('コピー')),
               ],
               rows: [
                 for (final problem in problems)
@@ -89,24 +93,27 @@ class ProblemsPanel extends StatelessWidget {
       if (recovery == null) problem.target,
     ].join(' | ');
     final related = [
-      'recovery_id: ${problem.recoveryId}',
-      if (problem.target.isNotEmpty) 'evidence/path: ${problem.target}',
-      if (authority != null) 'runtime_id: ${authority.runtimeId}',
-      if (authority != null) 'authority: ${authority.capabilityId}',
+      '復旧ID: ${problem.recoveryId}',
+      if (problem.target.isNotEmpty) '証拠／パス: ${problem.target}',
+      if (authority != null) '実行系ID: ${authority.runtimeId}',
+      if (authority != null) '権限: ${authority.capabilityId}',
     ].join('\n');
-    return DataRow(cells: [
-      DataCell(Text(problem.item.isEmpty ? problem.message : problem.item)),
-      DataCell(Text(problem.classification)),
-      DataCell(Text(problem.recoveryId)),
-      DataCell(Text(safeForPhaseB ? 'true' : 'false')),
-      DataCell(Text(blocksOwnerUse ? 'yes' : 'no')),
-      DataCell(Text(blocksProductRelease ? 'yes' : 'no')),
-      DataCell(Text(problem.reason)),
-      DataCell(Text(problem.requiredAction)),
-      DataCell(Text(related)),
-      DataCell(
-          _CopyActions(commandOrPath: commandOrPath, path: problem.target)),
-    ]);
+    return DataRow(
+      cells: [
+        DataCell(Text(problem.item.isEmpty ? problem.message : problem.item)),
+        DataCell(Text(problem.classification)),
+        DataCell(Text(problem.recoveryId)),
+        DataCell(Text(safeForPhaseB ? 'はい' : 'いいえ')),
+        DataCell(Text(blocksOwnerUse ? 'はい' : 'いいえ')),
+        DataCell(Text(blocksProductRelease ? 'はい' : 'いいえ')),
+        DataCell(Text(problem.reason)),
+        DataCell(Text(problem.requiredAction)),
+        DataCell(Text(related)),
+        DataCell(
+          _CopyActions(commandOrPath: commandOrPath, path: problem.target),
+        ),
+      ],
+    );
   }
 }
 
@@ -123,15 +130,14 @@ class _CopyActions extends StatelessWidget {
       children: [
         if (commandOrPath.isNotEmpty)
           IconButton(
-            tooltip: 'Copy command or path',
+            tooltip: 'コマンドまたはパスをコピー',
             icon: const Icon(Icons.copy, size: 18),
-            onPressed: () => Clipboard.setData(
-              ClipboardData(text: commandOrPath),
-            ),
+            onPressed: () =>
+                Clipboard.setData(ClipboardData(text: commandOrPath)),
           ),
         if (path.isNotEmpty)
           IconButton(
-            tooltip: 'Copy related path',
+            tooltip: '関連パスをコピー',
             icon: const Icon(Icons.folder_copy_outlined, size: 18),
             onPressed: () => Clipboard.setData(ClipboardData(text: path)),
           ),

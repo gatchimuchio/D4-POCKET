@@ -1,15 +1,15 @@
-# BLUE-TANUKI Adapter Contract Draft
+# BLUE-TANUKI Adapter 契約草案
 
-Expected endpoints:
+想定 endpoint:
 
-- health
-- ready
-- runtime snapshot
-- authority trace
-- notifications
-- approvals
-- audit events
-- diagnostics export
+- health 状態
+- ready 状態
+- runtime snapshot 取得
+- 権限 trace
+- 通知
+- approval
+- audit event 取得
+- 診断出力
 - recovery
 
-All payloads must conform to JSON Schemas under `specs/`.
+すべての payload は `specs/` 下の JSON Schema に適合しなければならない。

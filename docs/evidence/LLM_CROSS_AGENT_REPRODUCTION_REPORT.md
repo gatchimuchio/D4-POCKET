@@ -1,20 +1,20 @@
-# LLM Cross-Agent Reproduction Report
+# LLM エージェント間再現報告
 
-Status: Block L5 bounded reproduction evidence
-Date: 2026-06-04
-Scope: Controlled LLM-readable extension substrate reproduction
+状態: Block L5 の限定再現証拠
+日付: 2026-06-04
+範囲: 管理された LLM 可読拡張基盤の再現
 
-## 1. Summary
+## 1. 要約
 
-Two independent LLM development-agent executions were run from the same baseline commit using the same task packet and bounded task.
+同じ task packet と限定 task を使い、同一の baseline commit から独立した二つの LLM 開発エージェント実行を行った。
 
-Both agents produced the same bounded diff:
+両エージェントは同一の限定差分を生成した。
 
-- add `model_output` to `NON_AUTHORITY_SOURCES` in `packages/shell_core/permission_ledger.py`;
-- update `MANIFEST.sha256.json`;
-- rely on the existing bounded extension conformance negative-case loop to prove `model_output` cannot become an authority source.
+- `packages/shell_core/permission_ledger.py` の `NON_AUTHORITY_SOURCES` に `model_output` を追加する。
+- `MANIFEST.sha256.json` を更新する。
+- 既存の限定拡張 conformance negative-case loop により、`model_output` が権限源になれないことを証明する。
 
-Outcome:
+結果:
 
 ```yaml
 outcome: reproduced_successfully
@@ -22,9 +22,9 @@ evidence_scope: CONFIG | INTERNAL_STATE | FIXTURE
 claim_scope: bounded_cross_agent_llm_readable_extension_behavior
 ```
 
-This report does not prove installed-product behavior, Windows release readiness, public standard adoption, broad ecosystem compatibility, or third-party interoperability.
+本報告は、インストール済み製品の挙動、Windows リリース準備完了、公開標準への採用、広範な ecosystem 互換性、または第三者相互運用性を証明しない。
 
-## 2. Baseline and Task Packet
+## 2. Baseline と task packet
 
 ```yaml
 baseline_commit: 48082469089e9a63ef939b51f864dfc26e4ae2c9
@@ -45,32 +45,32 @@ forbidden_scope:
   - raw evidence
 ```
 
-## 3. Agent Executions
+## 3. エージェント実行
 
-| agent | execution id | baseline | commit | push | outcome |
+| エージェント | execution id（実行識別子） | baseline | commit | push | 結果 |
 | --- | --- | --- | --- | --- | --- |
-| Agent A | `019e907a-4455-77f2-8616-7b1ae0981b77` | `48082469089e9a63ef939b51f864dfc26e4ae2c9` | not committed | not pushed | reproduced successfully |
-| Agent B | `019e907a-9db9-7092-9d2a-0861a3277e6d` | `48082469089e9a63ef939b51f864dfc26e4ae2c9` | not committed | not pushed | reproduced successfully |
+| エージェント A | `019e907a-4455-77f2-8616-7b1ae0981b77` | `48082469089e9a63ef939b51f864dfc26e4ae2c9` | not committed（未 commit） | not pushed（未 push） | reproduced successfully（再現成功） |
+| エージェント B | `019e907a-9db9-7092-9d2a-0861a3277e6d` | `48082469089e9a63ef939b51f864dfc26e4ae2c9` | not committed（未 commit） | not pushed（未 push） | reproduced successfully（再現成功） |
 
-Both executions stayed inside the allowed write surface:
+両実行は許可された書込み範囲内に留まった。
 
 ```text
 M	MANIFEST.sha256.json
 M	packages/shell_core/permission_ledger.py
 ```
 
-Both executions reported:
+両実行から次が報告された。
 
-- no unauthorized scope expansion attempt;
-- no manual repair requirement;
-- no schema change;
-- no production runtime path addition;
-- no Rust, Flutter, installer, Windows evidence, or raw evidence change;
-- no release blocker closure.
+- 無許可の範囲拡大を試みていない。
+- 手動修復を必要としない。
+- schema を変更していない。
+- 製品 runtime 経路を追加していない。
+- Rust、Flutter、installer、Windows evidence、raw evidence を変更していない。
+- release blocker を解消していない。
 
-## 4. Resulting Diff
+## 4. 生成された差分
 
-Both agents independently produced the same substantive source change:
+両エージェントは独立に同じ実質的な source 変更を生成した。
 
 ```diff
  NON_AUTHORITY_SOURCES = {
@@ -80,9 +80,9 @@ Both agents independently produced the same substantive source change:
  }
 ```
 
-Both agents also updated the manifest hash for `packages/shell_core/permission_ledger.py`.
+両エージェントは `packages/shell_core/permission_ledger.py` の manifest hash も更新した。
 
-Consensus diff summary:
+合意差分の要約:
 
 ```text
  MANIFEST.sha256.json                     | 2 +-
@@ -90,19 +90,19 @@ Consensus diff summary:
  2 files changed, 2 insertions(+), 1 deletion(-)
 ```
 
-## 5. Validation Comparison
+## 5. 検証比較
 
-| check | Agent A | Agent B |
+| 検査 | エージェント A | エージェント B |
 | --- | --- | --- |
-| schema check | passed via `python3` fallback: `25 schemas, 25 examples, 27 negative fixtures` | passed via `python3` fallback: `25 schemas, 25 examples, 27 negative fixtures` |
-| conformance skeleton | passed via `python3` fallback: `102 checks` | passed via `python3` fallback: `102 checks` |
-| manifest check | passed | passed |
-| release gate check | passed | passed |
-| evidence bundle | passed: `3 release blockers preserved, release_ready=False, classification=development_evidence` | passed: `3 release blockers preserved, release_ready=False, classification=development_evidence` |
-| release runtime assertions | passed: `9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME` | passed: `9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME` |
-| diff whitespace check | not reported | passed with no output |
+| schema check（schema 検査） | `python3` fallback により合格: `25 schemas, 25 examples, 27 negative fixtures` | `python3` fallback により合格: `25 schemas, 25 examples, 27 negative fixtures` |
+| conformance skeleton（適合検査） | `python3` fallback により合格: `102 checks` | `python3` fallback により合格: `102 checks` |
+| manifest check（manifest 検査） | passed（合格） | passed（合格） |
+| release gate check（関門検査） | passed（合格） | passed（合格） |
+| evidence bundle（証拠 bundle） | passed（合格）: `3 release blockers preserved, release_ready=False, classification=development_evidence` | passed（合格）: `3 release blockers preserved, release_ready=False, classification=development_evidence` |
+| release runtime assertion（runtime 表明検査） | passed（合格）: `9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME` | passed（合格）: `9 passed, 0 failed, evidence_scope=CONFIG,FIXTURE,LIVE_RUNTIME` |
+| diff whitespace check（空白検査） | not reported（未報告） | 出力なしで passed（合格） |
 
-Agent B also ran a targeted probe:
+Agent B は対象を絞った probe も実行した。
 
 ```text
 model_output_in_non_authority_sources=True
@@ -111,21 +111,21 @@ policy_allowed=False
 policy_error_codes=non_authority_source_attempt
 ```
 
-## 6. Boundary Comparison
+## 6. 境界比較
 
-| boundary | Agent A | Agent B | result |
+| 境界 | エージェント A | エージェント B | 結果 |
 | --- | --- | --- | --- |
-| LLM output as authority | rejected through `NON_AUTHORITY_SOURCES` | rejected through `NON_AUTHORITY_SOURCES` plus targeted probe | reproduced |
-| self-approval | no weakening | no weakening | preserved |
-| permission widening | no widening | no widening | preserved |
-| audit mapping | no weakening | no weakening | preserved |
-| recovery mapping | no weakening | no weakening | preserved |
-| content exposure | no weakening | no weakening | preserved |
-| runtime neutrality | no runtime-specific logic added | no runtime-specific logic added | preserved |
-| Shell Core BLUE-TANUKI coupling | no coupling added | no coupling added | preserved |
-| hidden runtime path | no path added | no path added | preserved |
+| LLM output の authority 化 | `NON_AUTHORITY_SOURCES` を通じて拒否 | `NON_AUTHORITY_SOURCES` と対象 probe を通じて拒否 | reproduced（再現） |
+| self-approval（自己承認） | no weakening（弱化なし） | no weakening（弱化なし） | preserved（維持） |
+| permission widening（許可拡大） | no widening（拡大なし） | no widening（拡大なし） | preserved（維持） |
+| audit mapping（監査対応） | no weakening（弱化なし） | no weakening（弱化なし） | preserved（維持） |
+| recovery mapping（回復対応） | no weakening（弱化なし） | no weakening（弱化なし） | preserved（維持） |
+| content exposure（内容露出） | no weakening（弱化なし） | no weakening（弱化なし） | preserved（維持） |
+| runtime neutrality（runtime 中立性） | runtime 固有 logic の追加なし | runtime 固有 logic の追加なし | preserved（維持） |
+| Shell Core と BLUE-TANUKI の coupling | coupling の追加なし | coupling の追加なし | preserved（維持） |
+| hidden runtime path（隠れた経路） | path の追加なし | path の追加なし | preserved（維持） |
 
-## 7. Classification
+## 7. 分類
 
 ```yaml
 classification:
@@ -136,7 +136,7 @@ classification:
   inconclusive: false
 ```
 
-Evidence classification:
+証拠分類:
 
 ```yaml
 primary: CONFIG | INTERNAL_STATE | FIXTURE
@@ -146,43 +146,43 @@ not_public_standard_adoption_evidence: true
 not_broad_ecosystem_compatibility_evidence: true
 ```
 
-Claim enabled by this report:
+本報告により可能となる表明:
 
 ```text
 GUI Shell has demonstrated bounded cross-agent LLM-readable extension behavior for one controlled non-authoritative extension task under its declared responsibility contracts.
 ```
 
-Claims not enabled by this report:
+本報告では可能とならない表明:
 
-- public standard status;
-- broad ecosystem compatibility;
-- third-party runtime interoperability;
-- installed Windows product readiness;
-- Rust Broker production authority cutover;
-- owner GO.
+- 公開標準としての状態。
+- 広範な ecosystem 互換性。
+- 第三者 runtime の相互運用性。
+- インストール済み Windows 製品の準備完了。
+- Rust Broker の製品権限 cutover。
+- 所有者の GO。
 
-## 8. Release Impact
+## 8. リリースへの影響
 
-- item: bounded cross-agent LLM-readable extension behavior
-  classification: required_for_v1
-  reason: two independent agent executions from the same baseline produced the same bounded diff and passed the required validation set.
-  required_action: preserve this report and repeat or broaden reproduction only when claim scope expands.
-  blocks_release: no
+- item: 限定されたエージェント間 LLM 可読拡張挙動
+  classification: required_for_v1（分類）
+  reason: 同じ baseline からの二つの独立 agent execution が、同一の限定 diff を生成し、必須 validation set に合格した。
+  required_action: 本報告を維持し、claim scope が拡大する場合に限り reproduction を反復または拡張する。
+  blocks_release: no（リリース阻止）
 
-- item: Windows installed-path product evidence
-  classification: release_blocker
-  reason: this L5 report does not provide installed no-Python-runtime evidence, Windows installed-path broker proof, first-run proof, Setup Doctor proof, strict Windows validation, or owner GO.
-  required_action: complete Track R product evidence before Windows-first product release.
-  blocks_release: yes
+- item: Windows インストール済み経路の製品証拠
+  classification: release_blocker（分類）
+  reason: この L5 report は installed no-Python-runtime evidence、Windows installed-path broker proof、first-run proof、Setup Doctor proof、strict Windows validation、owner GO を提供しない。
+  required_action: Windows-first product release 前に Track R の製品証拠を完成させる。
+  blocks_release: yes（リリース阻止）
 
-- item: public standard or ecosystem claim
-  classification: known_limitation
-  reason: this report covers one controlled bounded extension task, not broad external adoption or ecosystem compatibility.
-  required_action: collect broader external evidence only if the owner chooses to promote that claim.
-  blocks_release: no
+- item: 公開標準または ecosystem に関する表明
+  classification: known_limitation（分類）
+  reason: この report が扱うのは一つの管理された限定 extension task であり、広範な外部採用または ecosystem compatibility ではない。
+  required_action: owner がその claim の昇格を選ぶ場合に限り、より広範な external evidence を収集する。
+  blocks_release: no（リリース阻止）
 
-## 9. Final Decision
+## 9. 最終判断
 
-Block L5 passes for the bounded task defined in this report.
+本報告で定義した限定 task について Block L5 は合格する。
 
-The result should be used only as bounded cross-agent LLM-readable extension evidence. It must not be promoted into product release proof, installed Windows evidence, public standard status, or broad ecosystem compatibility.
+この結果は、限定されたエージェント間 LLM 可読拡張の証拠としてのみ使う。製品リリース証拠、インストール済み Windows 証拠、公開標準としての状態、または広範な ecosystem 互換性へ昇格させてはならない。

@@ -1,223 +1,225 @@
-# GUI Shell Claim Boundary
+# GUI Shell の主張境界
 
-## Current Status
+## 現在の状態
 
-GUI-Shell is not yet a completed product release.
+GUI-Shell は、まだ完成製品の release ではない。
 
-Current claim: PC-first AI Runtime / Agent Operation Shell with Phase B owner-use completion.
+現在の claim は、Phase B の owner-use が完了した PC-first AI Runtime / Agent Operation Shell である。
 
-A GitHub Release tagged as a public review snapshot is not a completed product release. In this repository, completed product release readiness remains gated by `release_blockers.registry.json` and explicit owner GO.
+Public review snapshot として tag を付けた GitHub Release は、完成製品の release ではない。この repository における完成製品の release readiness は、<code>release_blockers.registry.json</code> と明示的な owner GO によって引き続き gate される。
 
-GitHub Release として固定する public review snapshot は、完成製品リリースではありません。本リポジトリにおける完成製品リリース可否は、`release_blockers.registry.json` と明示的な owner GO によって別途判定されます。
+Repository definition の更新により、GUI-Shell は LLM が読む「アプリケーション責任基盤」としても文書化されている。これは、LLM 開発/統合エージェントが GUI Shell Contract を読み、第一級の実装・統合面として使うことを意図する。LLM は引き続き権限を持たず、Human operator が最終的な Approval、Recovery、責任、release claim の権限を保持する。
 
-Repository definition update: GUI-Shell is now also documented as an LLM-readable application responsibility substrate. This means LLM development / integration agents are intended to read GUI Shell contracts and use them as first-class implementation and integration surfaces. LLMs remain non-authoritative; human operators retain final approval, recovery, responsibility, and release-claim authority.
+構築過程の注記: 本プロジェクトは、プログラマーでもソフトウェア開発者でもない個人が、1か月未満の兼業作業で LLM に指示しながら構築した。この構築は、LLM が読む責任基盤という設計目標の限定的な実証であり、release readiness、広範な interoperability、または外部 endorsement の証明ではない。
 
-Process note: this project was built by a non-programmer / non-software developer through LLM direction in less than one month of part-time work. That construction is a bounded demonstration of the LLM-readable responsibility-substrate design goal, not proof of release readiness, broad interoperability, or external endorsement.
+Windows-first の product responsibility と LLM-readable substrate の実証を整合させる canonical completion roadmap は、<code>docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md</code> である。
 
-プロセス注記: 本プロジェクトは、プログラマーではない個人が、1か月未満の兼業作業で LLM に指示しながら構築したものです。構築できたことは LLM-readable responsibility substrate という設計目標の限定的な実証であり、リリース準備完了、広範な相互運用性、または外部 endorsement の証明ではありません。
+個人向け Windows trial operation である Phase A は完了している。Windows desktop build と native launch smoke は owner-trial の履歴として通過した。ただし、この過去の PASS は、隔離された provenance／evidence-bundle contract と aggregate な native surface shortcut の禁止より前の経路であるため、現在の厳格な R2 formal evidence としては無効である。Phase B の owner-use completion も完了しており、owner は desktop shell を日常の local operation に使い、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。External claim hygiene、実測した Windows release evidence、OSS の release candidate claim、paid／product QC は後の Phase に残る。
 
-The canonical completion roadmap for aligning Windows-first product responsibility and LLM-readable substrate demonstration is `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`.
+GUI-Shell v1.0 は Windows-first である。現在の host 上の Linux validation は development / verification slice として通過し得るが、それだけでは最終的な product proof ではない。macOS は未検証（<code>unverified</code>）の planned portability target であり、BLUE-TANUKI は GUI-Shell の release dependency ではなく consumer / Reference Runtime であり続ける。
 
-Phase A, personal Windows trial operation, is complete: the Windows desktop build and native launch smoke passed for owner-trial history. That historical PASS is invalid for current strict R2 formal evidence because the old path predated the isolated provenance/evidence-bundle contract and aggregate native surface shortcut ban. Phase B owner-use completion is complete: the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. External claim hygiene, measured Windows release evidence, OSS release candidate claims, and paid/product QC remain later phases.
+GUI-Shell v1.0 は、検証済みの macOS support を主張しない。macOS は未検証（<code>unverified</code>）であり、macOS host の validation evidence がない状態で、macOS support を supported、ready、complete として宣伝してはならない。
 
-GUI-Shell v1.0 is Windows-first. Current-host Linux validation can pass as a development/verification slice, but it is not final product proof by itself. macOS is an unverified planned portability target, and BLUE-TANUKI remains a consumer/reference runtime rather than a GUI-Shell release dependency.
+LLM-readable substrate の定義、範囲を限定した Reference Extension の Conformance、および一件の限定的な cross-agent reproduction report は、権限を持たない task に対する統制された LLM-readable extension の behavior を限定的に実証する。public standard への採用、広範な第三者 interoperability、installed-product behavior、ecosystem readiness は証明しない。現在の Windows-first product の release blocker は一つも解消しない。
 
-GUI-Shell v1.0 does not claim verified macOS support. macOS support must not be advertised as supported, ready, or complete without validation evidence from a macOS host.
+公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。
 
-The LLM-readable substrate definition, bounded reference extension conformance, and one bounded cross-agent reproduction report provide a bounded demonstration of controlled LLM-readable extension behavior for a non-authoritative task. They do not prove public standard adoption, broad third-party interoperability, installed-product behavior, or ecosystem readiness. They do not close any current Windows-first product release blocker.
+## 現在完了している領域
 
-The public Windows proof pack contains redacted review copies derived from measured Windows installed-path evidence. These copies are not canonical release evidence and do not close completed product release blockers in this public repository.
-
-公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copies が含まれます。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
-
-## Current Completed Areas
-
-- item: schema and conformance skeleton
+~~~yaml
+- item: schema と conformance skeleton
   classification: required_for_v1
-  status: current development validation passes with 139 conformance checks; historical check-count entries remain preserved in `VALIDATION.txt`; conformance tautology fix resolved by testing production authority stripping and ApprovalQueue behavior; ghost invariants are measured by production InvariantEvaluator; normalization firewall conformance now covers PolicyEvaluator and adapter metadata ingress; broker IPC contracts, static no-FFI/no-Python-spawn assertions, structured release blocker registry, release-facing blocker/doc synchronization, packaging portability, and bounded LLM-readable extension contract/conformance checks are covered.
+  status: 現在の development validation は 139 の conformance check とともに通過している。過去の check count は <code>VALIDATION.txt</code> に履歴として保持する。Conformance の tautology は production の Authority Strip と ApprovalQueue の挙動を検査することで解消した。ghost invariant は production の InvariantEvaluator が測定する。Normalization Firewall の Conformance は PolicyEvaluator と Adapter metadata ingress を対象に含む。Broker IPC Contract、static な no-FFI / no-Python-spawn assertion、構造化された release blocker registry、release-facing blocker と文書の同期、packaging portability、および範囲を限定した LLM-readable extension の Contract / Conformance check を対象に含む。
 
-- item: bounded cross-agent LLM-readable extension reproduction
+- item: 範囲を限定した cross-agent LLM-readable extension reproduction
   classification: required_for_v1
-  status: `docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md` records two independent agent executions from baseline `48082469089e9a63ef939b51f864dfc26e4ae2c9` producing the same bounded `model_output` non-authority-source diff with validation passing; this is limited to the controlled task and does not prove public standard adoption, broad interoperability, or installed-product behavior.
+  status: <code>docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md</code> は、baseline <code>48082469089e9a63ef939b51f864dfc26e4ae2c9</code> から二つの独立した Agent execution が同じ bounded な <code>model_output</code> non-authority-source diff を生成し、validation が通過したことを記録する。これは統制された task に限定され、public standard への採用、広範な interoperability、installed-product behavior を証明しない。
 
-- item: personal Windows trial operation
+- item: 個人向け Windows trial operation
   classification: required_for_v1
-  status: Windows build and native launch smoke passed for owner trial use; this does not satisfy completed product release readiness.
+  status: Windows build と native launch smoke は owner trial use として通過したが、完成製品の release readiness を満たさない。
 
 - item: Flutter local Shell Core client
   classification: required_for_v1
-  status: `ShellCoreClient.local()` reads structured local snapshot JSON and is no longer a direct mock alias; mock mode remains available for tests/demo.
+  status: <code>ShellCoreClient.local()</code> は構造化された local snapshot JSON を読み、direct mock alias ではなくなった。test / demo 用には mock mode を残す。
 
-- item: GUI operation surfaces
+- item: GUI operation surface
   classification: required_for_v1
-  status: Trust Center, Authority Map, Audit Timeline, Recovery Playbook, Adapter Catalog, Permission Diff, Problems Panel, Evidence Center, Settings UX, Command Palette, and Status Bar vocabulary are present as Shell Core-bound operator surfaces.
+  status: Trust Center、Authority Map、Audit Timeline、Recovery Playbook、Adapter Catalog、Permission Diff、Problems Panel、Evidence Center、Settings UX、Command Palette、Status Bar の語彙が、Shell Core に接続された operator surface として存在する。
 
-- item: Shell snapshot and evidence bundle
+- item: Shell snapshot と evidence bundle
   classification: required_for_v1
-  status: `tooling/shell_snapshot.py` provides structured local GUI state for owner-use migration / development evidence and `tooling/evidence_bundle.py --check` validates a development evidence bundle while preserving Windows installed-path and audit anchor external tamper-evidence blockers with `release_ready=false`; the snapshot generator must not remain an installed product runtime dependency.
+  status: <code>tooling/shell_snapshot.py</code> は owner-use migration / development evidence 用の構造化された local GUI state を提供する。<code>tooling/evidence_bundle.py --check</code> は development evidence bundle を検証し、Windows installed-path と Audit anchor external tamper-evidence の blocker、および <code>release_ready=false</code> を維持する。snapshot generator を installed product runtime dependency として残してはならない。
 
 - item: Shell Core hardening skeleton
   classification: required_for_v1
-  status: contract-level implementation present
+  status: Contract level の実装が存在する。
 
 - item: Runtime Catalog skeleton
   classification: required_for_v1
-  status: schema, fixtures, package, and conformance present
+  status: schema、fixture、package、Conformance が存在する。
 
 - item: Agent Runtime skeleton
   classification: required_for_v1
-  status: schema, fixtures, package, and conformance present
+  status: schema、fixture、package、Conformance が存在する。
 
 - item: Rust helper boundary skeleton
   classification: required_for_v1
-  status: helper implementation and Rust Security Broker skeleton present; `cd native/rust_helper && cargo test` passed with broker JSON envelope/rejection tests on 2026-06-01
+  status: Helper 実装と Rust Security Broker skeleton が存在する。2026-06-01 に <code>cd native/rust_helper && cargo test</code> が Broker JSON envelope / rejection test とともに通過した。
 
 - item: Desktop Flutter skeleton
   classification: required_for_v1
-  status: implementation present; `cd apps/desktop_flutter && flutter analyze`, `flutter test`, `flutter build linux`, and Linux launch smoke passed on 2026-05-25
+  status: 実装が存在する。2026-05-25 に <code>cd apps/desktop_flutter && flutter analyze</code>、<code>flutter test</code>、<code>flutter build linux</code>、Linux launch smoke が通過した。
 
 - item: Setup Doctor skeleton
   classification: required_for_v1
-  status: implementation present
+  status: 実装が存在する。
 
-- item: release-hardening documents
+- item: release-hardening document
   classification: required_for_v1
-  status: implementation present
+  status: 実装が存在する。
+~~~
 
-## Current Release Blockers
+## 現在の release blocker
 
-- item: language policy runtime convergence not passed
+~~~yaml
+- item: 実装言語方針の Runtime convergence が未通過
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_broker_installed_smoke
-  reason: Rust Security Broker skeleton and JSON envelope tests exist, but current Shell Core authority-sensitive behavior is still implemented in Python under `packages/shell_core/*.py` and used by owner-use snapshot generation / validation. Production IPC transport, Flutter broker-mediated authority path, no-Python-runtime product evidence, and no-FFI-authority release assertion are not complete.
-  required_action: Migrate authority-sensitive active runtime responsibilities to the Rust Security Broker, keep Python only as dev/test/migration oracle, and prove Flutter authority operations are broker-mediated before completed product release.
+  reason: Rust Security Broker skeleton と JSON envelope test は存在するが、現在の Shell Core の authority-sensitive behavior は <code>packages/shell_core/*.py</code> の Python 実装であり、owner-use snapshot generation / validation に使われている。production IPC transport、Flutter の Broker-mediated authority path、no-Python-runtime product evidence、no-FFI-authority release assertion は完了していない。
+  required_action: authority-sensitive な active Runtime responsibility を Rust Security Broker へ移し、Python は dev / test / migration oracle だけに保つ。完成製品の release より前に、Flutter の Authority operation が Broker-mediated であることを証明する。
   blocks_release: yes
 
-- item: Linux desktop build and launch smoke
+- item: Linux desktop build / launch smoke
   classification: required_for_v1
-  reason: Linux desktop build smoke and launch smoke passed on 2026-05-25 as development/verification proof.
-  required_action: Keep Linux build and launch smoke passing, but do not treat them as Windows-first product proof.
+  reason: Linux desktop build smoke と launch smoke は 2026-05-25 に development / verification proof として通過した。
+  required_action: Linux build / launch smoke を通過状態に保つが、Windows-first product proof として扱わない。
   blocks_release: no
 
-- item: Windows installer, first-run, and Setup Doctor release validation not passed
+- item: Windows Installer、first-run、Setup Doctor の release validation が未通過
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
-  reason: Windows project support and historical owner-trial launch smoke are preserved, but current strict R2 evidence requires a fresh native Windows isolated installed run with source commit, clean worktree state, app/broker artifact hashes, evidence bundle hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. The product export path exists, but `release_evidence/windows_installed_smoke.json` is missing.
-  required_action: Run native Windows installed smoke collection from an isolated staged run, collect measured window, visible-surface diagnostic tree, config JSON, audit write/read/delete, broker IPC/restart/crash field provenance, and installed-app generated Setup Doctor product evidence; pass `python tooling\windows_release_evidence.py`.
+  reason: Windows project support と過去の owner-trial launch smoke は保持されているが、現在の strict R2 evidence には、native Windows の新しい隔離 installed run が必要である。その run は source commit、clean worktree state、app / Broker artifact hash、evidence bundle hash、UIAutomation diagnostic tree、Broker の measured field provenance、installed app が生成した Setup Doctor product export を含まなければならない。product export path は存在するが、<code>release_evidence/windows_installed_smoke.json</code> がない。
+  required_action: 隔離された staged run から native Windows installed smoke collection を実行し、measured window、visible-surface diagnostic tree、config JSON、Audit の write / read / delete、Broker IPC / restart / crash の field provenance、installed app が生成した Setup Doctor product evidence を収集する。その後 <code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
-- item: macOS planned portability target unverified
+- item: macOS planned portability target が未検証
   classification: known_limitation
-  reason: no macOS validation environment is currently available, so GUI-Shell v1.0 does not claim verified macOS support.
-  required_action: Validate on a macOS host before claiming macOS support.
+  reason: 現在利用できる macOS validation environment がないため、GUI-Shell v1.0 は検証済みの macOS support を主張しない。
+  required_action: macOS support を主張する前に macOS host で検証する。
   blocks_release: no
 
-- item: Windows Setup Doctor diagnostics not passed
+- item: Windows Setup Doctor diagnostics が未通過
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: The installed app supports machine-readable Setup Doctor product export, but that evidence has not been collected on native Windows and passed through the strict validator. The PowerShell Setup Doctor collector remains external probe evidence only.
-  required_action: Collect app-generated Setup Doctor product export through isolated Windows installed smoke and pass `python tooling\windows_release_evidence.py`.
+  reason: installed app は machine-readable な Setup Doctor product export を提供するが、その evidence は native Windows で収集されておらず、strict validator も通過していない。PowerShell の Setup Doctor collector は external probe evidence にすぎない。
+  required_action: 隔離された Windows installed smoke を通じて app-generated Setup Doctor product export を収集し、<code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
-- item: audit anchor external tamper-evidence proof missing
+- item: Audit anchor の external tamper-evidence proof がない
   classification: release_blocker
   registry_id: audit_anchor_external_tamper_evidence_proof
-  reason: Local HMAC audit anchors detect local corruption and partial tamper, but same-user or administrator/root rewrite resistance is not proven without Windows ACL/DPAPI, an external anchor, or signed evidence.
-  required_action: Collect Windows installed-path audit anchor key-protection or external-anchor proof and pass strict Windows release validation.
+  reason: local HMAC Audit anchor は local corruption と partial tamper を検出するが、Windows ACL / DPAPI、external anchor、または signed evidence がなければ、same-user または administrator / root による rewrite への耐性を証明できない。
+  required_action: Windows installed-path の Audit anchor key-protection または external-anchor proof を収集し、strict Windows release validation を通過させる。
   blocks_release: yes
 
 - item: implementation first-run smoke
   classification: required_for_v1
-  reason: implementation first-run smoke creates config/audit paths and verifies installer/setup state is non-authoritative.
-  required_action: Keep implementation first-run smoke passing; native Windows installed-path first-run remains a release blocker.
+  reason: implementation first-run smoke は config / Audit path を作成し、Installer / setup state が権限を持たないことを検証する。
+  required_action: implementation first-run smoke を通過状態に保つ。native Windows installed-path first-run は引き続き release blocker である。
   blocks_release: no
 
 - item: Shell Core persistence smoke
   classification: required_for_v1
-  reason: integrated Shell Core release smoke saves and loads state snapshots.
-  required_action: Keep persistence smoke passing on release candidates.
+  reason: 統合された Shell Core release smoke は state snapshot を保存・読込する。
+  required_action: release candidate で persistence smoke を通過状態に保つ。
   blocks_release: no
 
 - item: Audit chain verification smoke
   classification: required_for_v1
-  reason: integrated Shell Core release smoke verifies audit chain linkage, HMAC audit anchor verification, and tamper detection.
-  required_action: Keep audit chain and local anchor smoke passing on release candidates.
+  reason: 統合された Shell Core release smoke は Audit chain linkage、HMAC Audit anchor verification、tamper detection を検証する。
+  required_action: release candidate で Audit chain / local anchor smoke を通過状態に保つ。
   blocks_release: no
 
 - item: Runtime Catalog live/use smoke
   classification: required_for_v1
-  reason: release smoke registers runtime and adapter manifests through RuntimeCatalog and confirms catalog authority remains false.
-  required_action: Keep Runtime Catalog smoke passing.
+  reason: release smoke は RuntimeCatalog を介して Runtime / Adapter manifest を登録し、Catalog の authority が false のままであることを確認する。
+  required_action: Runtime Catalog smoke を通過状態に保つ。
   blocks_release: no
 
 - item: Agent Runtime mock/reference smoke
   classification: required_for_v1
-  reason: release smoke validates workspace boundary, secret path denial, shell command permission mapping, and auditable diff behavior.
-  required_action: Keep Agent Runtime reference smoke passing.
+  reason: release smoke は workspace boundary、secret path denial、shell command の Permission mapping、auditable diff behavior を検証する。
+  required_action: Agent Runtime reference smoke を通過状態に保つ。
   blocks_release: no
 
-- item: Strict release validation not passed
+- item: Strict release validation が未通過
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke, audit_anchor_external_tamper_evidence_proof, owner_go
-  reason: completed Windows-first product release requires Windows strict validation.
-  required_action: Pass `python3 tooling/validate_all.py --strict-release --desktop-platform=windows`; `--desktop-platform=all` may still fail because macOS is unverified, but that does not block Windows-first v1.0.
+  reason: 完成した Windows-first product release には Windows strict validation が必要である。
+  required_action: <code>python3 tooling/validate_all.py --strict-release --desktop-platform=windows</code> を通過させる。<code>--desktop-platform=all</code> は macOS が未検証であるため失敗し得るが、そのことは Windows-first v1.0 を block しない。
   blocks_release: yes
 
-- item: Owner GO missing
+- item: Owner GO がない
   classification: release_blocker
   registry_id: owner_go
-  reason: release claim promotion requires owner approval.
-  required_action: Obtain explicit owner GO.
+  reason: release claim の promotion には owner approval が必要である。
+  required_action: 明示的な owner GO を取得する。
   blocks_release: yes
+~~~
 
-## Post-v1 Scope
+## v1 後の範囲
 
-- item: Mobile full release
+~~~yaml
+- item: Mobile の full release
   classification: post_v1_scope
-  reason: v1.0 scope is Windows-first PC desktop unless owner explicitly includes mobile.
-  required_action: Complete after v1.0 or update scope by owner instruction.
+  reason: owner が明示的に mobile を含めない限り、v1.0 の scope は Windows-first PC desktop である。
+  required_action: v1.0 後に完了するか、owner instruction によって scope を更新する。
   blocks_release: no
 
-- item: Multi-user mode
+- item: multi-user mode
   classification: post_v1_scope
-  reason: v1.0 is single-user.
-  required_action: Defer until post-v1 planning.
+  reason: v1.0 は single-user である。
+  required_action: post-v1 planning まで延期する。
   blocks_release: no
 
-- item: Cloud service
+- item: Cloud Service
   classification: post_v1_scope
-  reason: v1.0 is local-first.
-  required_action: Defer until post-v1 planning.
+  reason: v1.0 は local-first である。
+  required_action: post-v1 planning まで延期する。
   blocks_release: no
 
 - item: Marketplace
   classification: post_v1_scope
-  reason: v1.0 does not include runtime marketplace distribution.
-  required_action: Defer until post-v1 planning.
+  reason: v1.0 は Runtime marketplace distribution を含まない。
+  required_action: post-v1 planning まで延期する。
   blocks_release: no
 
-- item: Enterprise admin
+- item: Enterprise administration
   classification: post_v1_scope
-  reason: v1.0 is single-user desktop.
-  required_action: Defer until post-v1 planning.
+  reason: v1.0 は single-user desktop である。
+  required_action: post-v1 planning まで延期する。
   blocks_release: no
 
-- item: Full live third-party agent integrations
+- item: 完全な live third-party Agent integration
   classification: post_v1_scope
-  reason: v1.0 requires generic Agent Runtime contract and mock/reference agent, not all live adapters.
-  required_action: Add after v1.0 as adapter work.
+  reason: v1.0 に必要なのは汎用 Agent Runtime Contract と mock / Reference Agent であり、すべての live Adapter ではない。
+  required_action: v1.0 後に Adapter work として追加する。
   blocks_release: no
 
-- item: BLUE-TANUKI product completion
+- item: BLUE-TANUKI の product completion
   classification: post_v1_scope
-  reason: BLUE-TANUKI is a consumer/reference runtime, not a GUI-Shell release gate.
-  required_action: Complete as consumer integration after GUI-Shell v1.0 gate.
+  reason: BLUE-TANUKI は consumer / Reference Runtime であり、GUI-Shell の release gate ではない。
+  required_action: GUI-Shell v1.0 gate の後に consumer integration として完了する。
   blocks_release: no
+~~~
 
-## Known Limitations
+## 既知制約
 
-- item: local single-user only
+~~~yaml
+- item: local single-user のみ
   classification: known_limitation
-  reason: v1.0 product scope is Windows-first PC desktop, single-user, local-first.
-  required_action: Keep README, CLAIM, and RELEASE_CHECKLIST aligned.
+  reason: v1.0 product scope は Windows-first PC desktop、single-user、local-first である。
+  required_action: README、CLAIM、RELEASE_CHECKLIST の整合を維持する。
   blocks_release: no
+~~~

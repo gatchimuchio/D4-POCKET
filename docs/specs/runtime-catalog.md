@@ -1,20 +1,20 @@
-# Runtime Catalog
+# Runtime の目録（Runtime Catalog）
 
-The Runtime Catalog is manifest-controlled. GUI-Shell must not hard-code runtime behavior into Shell Core.
+Runtime Catalog は manifest によって制御する。GUI-Shell は Runtime の挙動を Shell Core に hard-code してはならない。
 
-Catalog entries are composed from:
+Catalog entry は、次から構成する。
 
-- RuntimeManifest
-- AdapterManifest
-- PlatformProfile
-- TrustProfile
-- CapabilityProfile
-- PermissionProfile
-- RecoveryProfile
+- `RuntimeManifest`
+- `AdapterManifest`
+- `PlatformProfile`
+- `TrustProfile`
+- `CapabilityProfile`
+- `PermissionProfile`
+- `RecoveryProfile`
 
-Manifests are descriptive inputs. They cannot grant authority by themselves.
+Manifest は説明用の input である。それ自体では権限を付与できない。
 
-Minimum RuntimeManifest fields:
+`RuntimeManifest` の最小 field:
 
 - `runtime_id`
 - `display_name`

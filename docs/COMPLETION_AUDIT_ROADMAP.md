@@ -1,176 +1,182 @@
-# Completion Audit Roadmap
+# 完了監査ロードマップ
 
-Status date: 2026-05-26
+状態日: 2026-05-26
 
-## Audit Conclusion
+## 監査結論
 
-GUI-Shell is a strong Windows-first v1.0 skeleton for a control-plane Runtime Operation Shell. It is not a completed product release.
+GUI-Shell は、control-plane Runtime Operation Shell に向けた強力な Windows-first v1.0 skeleton である。completed product release ではない。
 
-Phase B owner-use completion is now complete. This means the owner can use the desktop shell for daily local operation with visible status, problems, evidence, recovery, trust, runtime, and authority surfaces. It does not mean OSS v1.0 RC or paid/product completion.
+Phase B の owner-use completion は現在 complete である。これは owner が desktop Shell を日常の local operation に使い、status、problem、evidence、recovery、trust、Runtime、authority の各 surface を確認できることを意味する。OSS v1.0 RC または paid／product completion を意味しない。
 
-The architecture remains valid:
+architecture は引き続き有効である。
 
-- Shell Core owns authority.
-- Flutter renders operator surfaces and must not own authority.
-- Runtime and adapter boundaries remain separate.
-- BLUE-TANUKI remains a consumer/reference runtime through adapter boundaries, not a GUI-Shell release dependency.
-- Schema and conformance own the contract.
+- authority の責任主体は Shell Core である。
+- Flutter は operator surface を描画し、authority を所有してはならない。
+- Runtime と adapter の boundary は分離したままにする。
+- BLUE-TANUKI は adapter boundary を介した consumer／reference Runtime のままであり、GUI-Shell の release dependency ではない。
+- contract の責任主体は schema と conformance である。
 
-Release completion must not be claimed until strict Windows release validation passes and owner GO is explicit.
+strict Windows release validation が通過し owner GO が明示されるまでは、release completion を主張してはならない。
 
-MANIFEST covers Shell Core, tooling, schemas, desktop Flutter, Rust helper, root governance/release docs, and docs. MANIFEST does not claim completed product release readiness.
+MANIFEST は Shell Core、tooling、schema、desktop Flutter、Rust helper、root governance／release document、docs を対象に含む。MANIFEST は completed product の release readiness を主張しない。
 
-## Phase Completion Levels
+## Phase の完了 level
 
-GUI-Shell uses three separate completion definitions:
+GUI-Shell は、三つの完了定義を分離して使用する。
 
+~~~yaml
 - item: owner-use completion
   classification: required_for_v1
   status: complete
-  reason: Phase B completion means the owner can use GUI-Shell for daily local operation with visible status, problems, evidence, and recovery guidance.
-  required_action: keep Phase B owner-use complete while preserving release-not-claimed language until Phases C, D, and E are complete.
+  reason: Phase B completion は、owner が GUI-Shell を日常の local operation に使用し、status、problem、evidence、recovery guidance を確認できることを意味する。
+  required_action: Phase C、D、E が complete になるまで release-not-claimed language を保持しながら、Phase B owner-use を complete に保つ。
   blocks_release: no
 
 - item: OSS v1.0 RC completion
   classification: release_blocker
   status: later
-  reason: OSS release candidate requires claim hygiene, measured Windows installed-path evidence, strict Windows release validation, and owner GO.
-  required_action: complete Phases C, D, and E before claiming OSS v1.0 RC.
+  reason: OSS release candidate には claim hygiene、measured Windows installed-path evidence、strict Windows release validation、owner GO が必要である。
+  required_action: OSS v1.0 RC を主張する前に Phase C、D、E を complete にする。
   blocks_release: yes
 
 - item: paid/product completion
   classification: post_v1_scope
   status: later
-  reason: paid/product QC requires support, rollback, long-run, legal, installer, and third-party-user quality gates beyond owner-use and OSS RC.
-  required_action: defer to Phase F.
+  reason: paid／product QC には owner-use および OSS RC を越える support、rollback、long-run、legal、installer、third-party-user の quality gate が必要である。
+  required_action: Phase F まで延期する。
   blocks_release: no
+~~~
 
-## Implemented From Audit
+## 監査から実装済みの事項
 
+~~~yaml
 - item: measured invariant evaluator
   classification: required_for_v1
   status: implemented
-  evidence: `packages/shell_core/invariant_evaluator.py` measures import boundaries, adapter metadata escalation, non-authority source grants, content projection, installer/setup authority, and mobile/device authority.
+  evidence: packages/shell_core/invariant_evaluator.py は import boundary、adapter metadata escalation、non-authority source grant、content projection、installer／setup authority、mobile／device authority を計測する。
   blocks_release: no
 
 - item: state snapshot invariant measurement
   classification: required_for_v1
   status: implemented
-  evidence: `packages/shell_core/state_snapshot.py` now calls `InvariantEvaluator().evaluate()` instead of returning static invariant flags.
+  evidence: packages/shell_core/state_snapshot.py は static invariant flag を返す代わりに InvariantEvaluator().evaluate() を呼び出す。
   blocks_release: no
 
 - item: normalization firewall
   classification: required_for_v1
   status: implemented
-  evidence: `packages/shell_core/normalization.py` preserves raw payloads, normalizes keys, strips authority aliases, detects authority-like values, quarantines ambiguous authority-bearing payloads, and emits normalization audit event metadata. PolicyEvaluator, AdapterLoader, RuntimeCatalog, and BLUE-TANUKI authority trace now use the shared normalization authority scanners instead of exact raw key matching.
+  evidence: packages/shell_core/normalization.py は raw payload を保持し、key を正規化し、authority alias を除去し、authority に類する値を検出し、曖昧な authority-bearing payload を隔離し、normalization audit event metadata を出力する。PolicyEvaluator、AdapterLoader、RuntimeCatalog、BLUE-TANUKI authority trace は、exact raw key matching ではなく共有 normalization authority scanner を使用する。
   blocks_release: no
 
 - item: metadata value-only authority policy
   classification: required_for_v1
   status: implemented
-  evidence: adapter metadata with authority-like values after key stripping is rejected; PolicyEvaluator flags value-only adapter metadata authority attempts.
+  evidence: key stripping 後に authority に類する値を持つ adapter metadata は拒否され、PolicyEvaluator は value-only adapter metadata authority attempt を flag する。
   blocks_release: no
 
 - item: Flutter local Shell Core client
   classification: required_for_v1
   status: implemented
-  evidence: `ShellCoreClient.local()` loads structured local snapshot JSON from `GUI_SHELL_SNAPSHOT_JSON`, `%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json` on Windows, or `.gui_shell/shell_snapshot.json` for local development; `ShellCoreClient.mock()` remains separate for tests/demo.
+  evidence: ShellCoreClient.local() は GUI_SHELL_SNAPSHOT_JSON、Windows の %LOCALAPPDATA%\GUI-Shell\shell_snapshot.json、または local development 用 .gui_shell/shell_snapshot.json から structured local snapshot JSON を読み込む。ShellCoreClient.mock() は test／demo 用として分離したままである。
   blocks_release: no
 
 - item: GUI operation surfaces
   classification: required_for_v1
   status: implemented
-  evidence: `docs/GUI_OPERATION_SURFACES.md` records Trust Center, Authority Map, Audit Timeline, Recovery Playbook, Adapter Catalog, Permission Diff, Settings UX, Problems Panel, Evidence Center, Command Palette, and Status Bar surfaces.
+  evidence: docs/GUI_OPERATION_SURFACES.md は Trust Center、Authority Map、Audit Timeline、Recovery Playbook、Adapter Catalog、Permission Diff、Settings UX、Problems Panel、Evidence Center、Command Palette、Status Bar の surface を記録する。
   blocks_release: no
 
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/shell_snapshot.py` produces the structured local snapshot consumed by Flutter local mode for owner-use migration / development evidence, including trust, authority, catalog, problems, evidence, settings, audit, recovery, and Setup Doctor fields; it must not remain an installed product runtime dependency.
+  evidence: tooling/shell_snapshot.py は owner-use migration／development evidence のため、Flutter local mode が消費する structured local snapshot を生成する。そこには trust、authority、catalog、problem、evidence、settings、audit、recovery、Setup Doctor の field が含まれる。installed product runtime dependency として残してはならない。
   blocks_release: no
 
 - item: Evidence bundle export
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/evidence_bundle.py --check` validates a development evidence bundle with release blockers preserved and `release_ready=false`.
+  evidence: tooling/evidence_bundle.py --check は release blocker を保持し release_ready=false とした development evidence bundle を検証する。
   blocks_release: no
 
 - item: MANIFEST integrity artifact
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/manifest.py --write` produces `MANIFEST.sha256.json`; `tooling/manifest.py --check` verifies hashes, missing listed files, required source coverage, forbidden generated files, and Shell Core presence. `MANIFEST.sha256.json` is excluded from its own file list.
+  evidence: tooling/manifest.py --write は MANIFEST.sha256.json を生成する。tooling/manifest.py --check は hash、listed file の missing、required source coverage、forbidden generated file、Shell Core の存在を検証する。MANIFEST.sha256.json は自身の file list から除外される。
   blocks_release: no
 
 - item: conformance coverage
   classification: required_for_v1
   status: implemented
-  evidence: conformance covers Unicode/case/zero-width/camelCase/alias/value-only authority attempts and intentional invariant import violation detection.
+  evidence: conformance は Unicode／case／zero-width／camelCase／alias／value-only authority attempt と、意図的な invariant import violation detection を対象にする。
   blocks_release: no
 
 - item: Shell Core persistence, audit, approval, and recovery smoke
   classification: required_for_v1
   status: implemented
-  evidence: `packages/shell_core/release_smoke.py` covers state snapshot save/load, append-only audit verification, audit tamper detection, approval edit rehash/revalidation, and recovery_id policy verification.
+  evidence: packages/shell_core/release_smoke.py は state snapshot save／load、append-only audit verification、audit tamper detection、approval edit rehash／revalidation、recovery_id policy verification を対象にする。
   blocks_release: no
 
 - item: implementation first-run and Setup Doctor smoke
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/release_smoke.py` runs first-run config/audit initialization and structured Setup Doctor non-authority checks.
+  evidence: tooling/release_smoke.py は first-run config／audit initialization と structured Setup Doctor non-authority check を実行する。
   blocks_release: no
 
 - item: Runtime Catalog and Agent Runtime reference smoke
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/release_smoke.py` registers reference manifests through RuntimeCatalog and validates Agent Runtime workspace, secret path, permission mapping, and auditable diff behavior.
+  evidence: tooling/release_smoke.py は RuntimeCatalog を介して reference manifest を登録し、Agent Runtime workspace、secret path、permission mapping、auditable diff behavior を検証する。
   blocks_release: no
 
 - item: Windows installed-path evidence validator
   classification: required_for_v1
   status: implemented
-  evidence: `tooling/windows_release_evidence.py` validates `release_evidence/windows_installed_smoke.json` for installed executable hash, broker-mediated installed Flutter `.exe` first run, No-Python launch evidence, non-zero window handle, UIAutomation or accessibility-tree visible-surface evidence source, config JSON parsing, audit write/read/delete probe, non-synthetic Setup Doctor non-authority diagnostics, broker restricted loopback bind, and broker authenticated IPC/restart/crash evidence.
+  evidence: tooling/windows_release_evidence.py は release_evidence/windows_installed_smoke.json に対し、installed executable hash、broker-mediated installed Flutter .exe first run、No-Python launch evidence、non-zero window handle、UIAutomation または accessibility-tree の visible-surface evidence source、config JSON parsing、audit write／read／delete probe、non-synthetic Setup Doctor non-authority diagnostics、broker restricted loopback bind、broker authenticated IPC／restart／crash evidence を検証する。
   blocks_release: no
 
 - item: Native Windows build and launch smoke
   classification: required_for_v1
   status: development_evidence
-  evidence: Native Windows build and launch smoke have passed for the development build path. Native Windows launch smoke is development evidence, not measured installed-path release evidence.
+  evidence: native Windows build／launch smoke は development build path で通過済みである。native Windows launch smoke は development evidence であり、measured installed-path release evidence ではない。
   blocks_release: no
+~~~
 
-## Remaining Release Blockers
+## 残る release blocker
 
+~~~yaml
 - item: Windows installer and first-run smoke
   classification: release_blocker
-  reason: installed app path first-run evidence is missing from `release_evidence/windows_installed_smoke.json`.
-  required_action: run native Windows installed smoke collection with `collect_broker_smoke.ps1`, `collect_setup_doctor.ps1`, `collect_installed_smoke.ps1 -BrokerHelperExe -NoPythonRuntime`, then pass `python tooling\windows_release_evidence.py`. Strict release must still fail until measured windows_installed_smoke.json exists.
+  reason: installed app path の first-run evidence が release_evidence/windows_installed_smoke.json に存在しない。
+  required_action: collect_broker_smoke.ps1、collect_setup_doctor.ps1、collect_installed_smoke.ps1 -BrokerHelperExe -NoPythonRuntime を使って native Windows installed smoke collection を実行し、python tooling/windows_release_evidence.py を通過させる。計測済み windows_installed_smoke.json が存在するまでは strict release を引き続き失敗させる。
   blocks_release: yes
 
 - item: Windows Setup Doctor real diagnostics smoke
   classification: release_blocker
-  reason: Setup Doctor has not passed from the installed Windows app path because evidence is missing.
-  required_action: record installed-path Setup Doctor diagnostics and pass `python tooling\windows_release_evidence.py`. Strict release must still fail until non-synthetic installed-path Setup Doctor evidence exists.
+  reason: evidence が存在しないため、Setup Doctor は installed Windows app path から未通過である。
+  required_action: installed-path Setup Doctor diagnostics を記録し、python tooling/windows_release_evidence.py を通過させる。non-synthetic installed-path Setup Doctor evidence が存在するまでは strict release を引き続き失敗させる。
   blocks_release: yes
 
 - item: Owner GO
   classification: release_blocker
-  reason: completed product release requires explicit owner approval.
-  required_action: obtain owner GO only after all release blockers pass. Strict release must still fail until owner GO exists.
+  reason: completed product release には明示的な owner approval が必要である。
+  required_action: すべての release blocker が通過した後に限り owner GO を得る。owner GO が存在するまでは strict release を引き続き失敗させる。
   blocks_release: yes
+~~~
 
-## Next Execution Order
+## 次の実行順序
 
-1. Phase C: keep README, CLAIM, release checklist, audit, installer, security, and strategy docs aligned for OSS claim hygiene.
-2. Phase D: collect measured Windows installed-path evidence and pass `python3 tooling/validate_all.py --strict-release --desktop-platform=windows`.
-3. Phase E: prepare OSS v1.0 RC only after Phase C/D pass and owner GO is explicit.
-4. Phase F: defer paid/product QC until money or third-party support enters scope.
+1. Phase C: OSS claim hygiene のため、README、CLAIM、release checklist、audit、installer、security、strategy document の整合を保つ。
+2. Phase D: measured Windows installed-path evidence を収集し、<code>python3 tooling/validate_all.py --strict-release --desktop-platform=windows</code> を通過させる。
+3. Phase E: Phase C／D が通過し owner GO が明示された後に限り、OSS v1.0 RC を準備する。
+4. Phase F: money または third-party support が scope に入るまで paid／product QC を延期する。
 
-## Release Rule
+## release 規則
 
-Do not say release-ready until:
+次を満たすまでは、release-ready と述べない。
 
-- strict Windows release gate passes,
-- installer/first-run smoke passes,
-- Setup Doctor real diagnostics smoke passes,
-- persistence/audit/approval/content visibility/runtime/agent smokes pass,
-- README/CLAIM/release docs match evidence,
-- owner GO is explicit.
+- strict Windows release gate が通過する。
+- installer／first-run smoke が通過する。
+- Setup Doctor の real diagnostics smoke が通過する。
+- persistence／audit／approval／content visibility／Runtime／agent の smoke が通過する。
+- README／CLAIM／release document が evidence と一致する。
+- owner GO が明示される。

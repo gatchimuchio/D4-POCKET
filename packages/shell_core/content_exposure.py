@@ -18,7 +18,7 @@ def project_approval_content(approval: dict) -> dict:
     return {
         "error": shell_error(
             CONTENT_VISIBILITY_VIOLATION,
-            f"unknown or missing content_visibility: {visibility}",
+            f"未知または欠落した content_visibility です: {visibility}",
             "content_projection",
             recoverable=True,
         )

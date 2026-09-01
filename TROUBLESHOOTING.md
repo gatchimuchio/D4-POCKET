@@ -1,77 +1,77 @@
-# GUI Shell Troubleshooting
+# GUI Shell トラブルシューティング
 
 ## `python: command not found`
 
-Some hosts expose Python as `python3`.
+一部の host は Python を `python3` として公開する。
 
-Use:
+次を使う。
 
 ```bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-## Schema validation fails
+## Schema 検証が失敗する
 
-Check:
+次を確認する。
 
-- JSON syntax in `specs/*.schema.json`;
-- required draft declaration;
-- duplicate or malformed `$id`;
-- accidental Flutter-specific or BLUE-TANUKI-specific fields in core contracts.
+- `specs/*.schema.json` の JSON 構文
+- 必須の draft 宣言
+- 重複または不正な `$id`
+- core contract に誤って入った Flutter 固有または BLUE-TANUKI 固有 field
 
-Then rerun:
+その後、次を再実行する。
 
 ```bash
 python tooling/schema_check/check_schemas.py
 ```
 
-## Conformance skeleton fails
+## Conformance 骨格が失敗する
 
-Check that conformance still covers:
+conformance が引き続き次を検査することを確認する。
 
-- adapter authority strip;
-- content exposure boundary;
-- approval edit restrictions;
-- sensitive action audit/recovery mapping.
-- policy evaluator failure cases;
-- Rust helper boundary structure;
-- BLUE-TANUKI adapter contract mapping;
-- desktop/mobile authority boundaries;
-- installer non-authority status;
-- release claim boundary.
+- adapter 権限除去
+- content exposure 境界
+- approval 編集制限
+- 機密 action の audit/recovery 対応
+- policy evaluator の失敗事例
+- Rust helper 境界構造
+- BLUE-TANUKI adapter contract 対応
+- desktop/mobile 権限境界
+- installer の非権限状態
+- release 主張境界
 
-Then rerun:
+その後、次を再実行する。
 
 ```bash
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-## Rust is not installed
+## Rust がインストールされていない
 
-Skip the conditional Rust command and report it as not run:
+条件付き Rust command を実行せず、未実行と報告する。
 
 ```bash
 cd native/rust_helper && cargo test
 ```
 
-## Flutter is not installed
+## Flutter がインストールされていない
 
-Skip the conditional Flutter commands and report them as not run:
+条件付き Flutter command を実行せず、未実行と報告する。
 
 ```bash
 cd apps/desktop_flutter && flutter analyze
 cd apps/mobile_flutter && flutter analyze
 ```
 
-## Run all available validation
+## 利用可能なすべての検証を実行する
 
-Use the aggregate reporter to collect passed, failed, and not-run results:
+集約報告器を使い、成功、失敗、未実行の結果を収集する。
 
 ```bash
 python3 tooling/validate_all.py
 ```
 
-## Product UI work seems blocked
+## 製品 UI 作業が停滞しているように見える
 
-This is expected when schemas or conformance tests are incomplete. GUI Shell is schema-first and conformance-first, so the next task should usually be the smallest missing schema or conformance check, not a UI screen.
+schema または conformance test が未完了な場合は想定される状態である。GUI Shell は schema と conformance を先行させるため、次の task は通常、UI 画面ではなく最小の欠落 schema または conformance check とする。

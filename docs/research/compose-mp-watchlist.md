@@ -1,30 +1,30 @@
-# Compose Multiplatform Watchlist
+# Compose Multiplatform 監視表
 
-Status: Counter-candidate
+状態: 対案候補
 
-## Position
+## 位置づけ
 
-Compose Multiplatform + Kotlin + Rust helper is the first migration candidate if Flutter becomes unsuitable.
+Flutter が不適合になった場合、Compose Multiplatform + Kotlin + Rust helper を第一の移行候補とする。
 
-## Strengths
+## 強み
 
-- JetBrains governance
-- Kotlin ecosystem
-- Android foundation
-- desktop continuity
-- long-term language/tooling stability
+- JetBrains による governance
+- Kotlin の ecosystem
+- Android 基盤
+- desktop 連続性
+- 長期的な言語/tooling 安定性
 
-## Current blocker
+## 現行の遮断要因
 
-- iOS stable maturity is newer than Flutter
-- fewer production references for GUI Shell scale
-- API adjustment risk remains higher than Flutter
+- iOS stable の成熟期間が Flutter より短い
+- GUI Shell の規模に対する製品参照事例が少ない
+- API 調整 risk が Flutter より高い
 
-## Watch conditions
+## 監視条件
 
-Re-evaluate when:
+次の場合に再評価する。
 
-- Compose MP accumulates 1-2 years of additional production evidence
-- iOS stability improves materially
-- Flutter desktop priority declines
-- Flutter governance risk increases
+- Compose MP が追加の製品証拠を1〜2年蓄積する
+- iOS の安定性が実質的に向上する
+- Flutter desktop の優先度が低下する
+- Flutter governance risk が増加する

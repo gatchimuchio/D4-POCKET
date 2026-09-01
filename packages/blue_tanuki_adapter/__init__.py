@@ -1,6 +1,6 @@
-"""BLUE-TANUKI reference adapter package.
+"""BLUE-TANUKI 参照 adapter package。
 
-Runtime-specific mapping lives here and must not leak into Shell Core.
+runtime 固有の対応はここに閉じ、Shell Core へ漏らさない。
 """
 
 from .adapter import BlueTanukiAdapter

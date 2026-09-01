@@ -21,15 +21,14 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
     final snapshot = widget.client.getSnapshot();
     final selectedRuntime = _selectedRuntime(snapshot);
     return ShellPage(
-      title: 'Runtime Center',
+      title: '実行系センター',
       children: [
         if (snapshot.runtimes.isEmpty)
           const EmptyStatePanel(
-            title: 'No runtime connected',
-            meaning: 'The current snapshot has no runtime records.',
+            title: '接続中の実行系なし',
+            meaning: '現在のスナップショットに実行系の記録がありません。',
             phaseBBlocked: false,
-            nextAction:
-                'Reconnect the broker product path or refresh diagnostics after runtime discovery completes.',
+            nextAction: '実行系の検出完了後に、ブローカーの製品経路へ再接続するか診断を更新してください。',
           )
         else
           LayoutBuilder(
@@ -48,11 +47,7 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
               if (constraints.maxWidth < 980) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    table,
-                    const SizedBox(height: 12),
-                    detail,
-                  ],
+                  children: [table, const SizedBox(height: 12), detail],
                 );
               }
               return Row(
@@ -67,23 +62,23 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
           ),
         for (final adapter in snapshot.adapterCatalog)
           SectionList(
-            title: 'Adapter Catalog: ${adapter.adapterId}',
+            title: 'アダプター台帳: ${adapter.adapterId}',
             rows: [
-              'runtime: ${adapter.runtimeId}',
-              'publisher: ${adapter.publisher}',
-              'version: ${adapter.version}',
-              'signature: ${adapter.signature}',
-              'hash: ${adapter.hash}',
-              'trust: ${adapter.trustStatus}',
-              'requested: ${adapter.requestedCapabilities.join(', ')}',
-              'granted: ${adapter.grantedCapabilities.join(', ')}',
-              'denied: ${adapter.deniedCapabilities.join(', ')}',
-              'risks: ${adapter.knownRisks.join(', ')}',
+              '実行系: ${adapter.runtimeId}',
+              '発行者: ${adapter.publisher}',
+              '版: ${adapter.version}',
+              '署名: ${adapter.signature}',
+              'ハッシュ: ${adapter.hash}',
+              '信頼: ${adapter.trustStatus}',
+              '要求能力: ${adapter.requestedCapabilities.join(', ')}',
+              '付与能力: ${adapter.grantedCapabilities.join(', ')}',
+              '拒否能力: ${adapter.deniedCapabilities.join(', ')}',
+              '既知の危険: ${adapter.knownRisks.join(', ')}',
             ],
           ),
         for (final diff in snapshot.permissionDiffs)
           SectionList(
-            title: 'Permission Diff: ${diff.subject}',
+            title: '許可差分: ${diff.subject}',
             rows: [
               for (final item in diff.added) '+ $item',
               for (final item in diff.removed) '- $item',
@@ -92,17 +87,17 @@ class _RuntimeCenterState extends State<RuntimeCenter> {
             ],
           ),
         SectionList(
-          title: 'Runtime Authority Flow',
+          title: '実行系の権限経路',
           rows: [
             for (final item in snapshot.authorityMap)
               '${item.runtimeId} -> ${item.capabilityId} -> ${item.permissionId} -> ${item.approvalId} -> ${item.auditEventId} -> ${item.recoveryId}',
           ],
         ),
         const SectionList(
-          title: 'Authority Boundary',
+          title: '権限境界',
           rows: [
-            'Runtime capability, permission, approval, audit, and recovery decisions remain Shell Core owned.',
-            'Flutter displays broker-mediated authority state or diagnostic-only local data and does not grant, approve, or mutate authority.',
+            '実行系の能力、許可、承認、監査、復旧の判断はShell Coreが保持します。',
+            'Flutterはブローカー経由の権限状態または診断専用のローカルデータを表示するだけで、権限の付与、承認、変更を行いません。',
           ],
         ),
       ],
@@ -137,10 +132,10 @@ class _RuntimeTable extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: const [
-          DataColumn(label: Text('Runtime')),
-          DataColumn(label: Text('Status')),
-          DataColumn(label: Text('Adapter')),
-          DataColumn(label: Text('Diagnostics')),
+          DataColumn(label: Text('実行系')),
+          DataColumn(label: Text('状態')),
+          DataColumn(label: Text('アダプター')),
+          DataColumn(label: Text('診断')),
         ],
         rows: [
           for (final runtime in snapshot.runtimes)
@@ -173,46 +168,44 @@ class _RuntimeDetailPanel extends StatelessWidget {
         .where((item) => item.runtimeId == runtime.runtimeId)
         .toList();
     final relatedProblems = snapshot.problems
-        .where((problem) =>
-            problem.target.contains(runtime.runtimeId) ||
-            authority.any((item) => item.recoveryId == problem.recoveryId))
+        .where(
+          (problem) =>
+              problem.target.contains(runtime.runtimeId) ||
+              authority.any((item) => item.recoveryId == problem.recoveryId),
+        )
         .toList();
     return BorderedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Runtime Detail',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('実行系の詳細', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text('runtime_id: ${runtime.runtimeId}'),
-          Text('status: ${runtime.status}'),
-          Text('adapter: ${runtime.adapterId}'),
-          Text('snapshot_source: ${snapshot.snapshotSource}'),
-          Text('network_exposure: ${snapshot.networkExposure}'),
+          Text('実行系ID: ${runtime.runtimeId}'),
+          Text('状態: ${runtime.status}'),
+          Text('アダプター: ${runtime.adapterId}'),
+          Text('スナップショット出所: ${snapshot.snapshotSource}'),
+          Text('ネットワーク公開範囲: ${snapshot.networkExposure}'),
           const Divider(),
+          Text('能力: ${authority.map((item) => item.capabilityId).join(', ')}'),
+          Text('許可: ${authority.map((item) => item.permissionId).join(', ')}'),
+          Text('承認: ${authority.map((item) => item.approvalId).join(', ')}'),
           Text(
-              'capabilities: ${authority.map((item) => item.capabilityId).join(', ')}'),
-          Text(
-              'permissions: ${authority.map((item) => item.permissionId).join(', ')}'),
-          Text(
-              'approvals: ${authority.map((item) => item.approvalId).join(', ')}'),
-          Text(
-              'last_audit: ${authority.map((item) => item.auditEventId).join(', ')}'),
-          Text(
-              'related_recovery: ${authority.map((item) => item.recoveryId).join(', ')}'),
+            '直近監査: ${authority.map((item) => item.auditEventId).join(', ')}',
+          ),
+          Text('関連復旧: ${authority.map((item) => item.recoveryId).join(', ')}'),
           if (adapter != null) ...[
             const Divider(),
-            Text('adapter_trust: ${adapter.trustStatus}'),
-            Text('requested: ${adapter.requestedCapabilities.join(', ')}'),
-            Text('granted: ${adapter.grantedCapabilities.join(', ')}'),
-            Text('denied: ${adapter.deniedCapabilities.join(', ')}'),
+            Text('アダプター信頼: ${adapter.trustStatus}'),
+            Text('要求能力: ${adapter.requestedCapabilities.join(', ')}'),
+            Text('付与能力: ${adapter.grantedCapabilities.join(', ')}'),
+            Text('拒否能力: ${adapter.deniedCapabilities.join(', ')}'),
           ],
           const Divider(),
           if (relatedProblems.isEmpty)
-            const Text('related_problems: none')
+            const Text('関連問題: なし')
           else
             for (final problem in relatedProblems)
-              Text('related_problem: ${problem.item} -> ${problem.recoveryId}'),
+              Text('関連問題: ${problem.item} → ${problem.recoveryId}'),
         ],
       ),
     );

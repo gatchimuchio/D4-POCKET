@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/ipc_request.schema.json",
-  "title": "IpcRequest",
+  "title": "IPC要求（IpcRequest）",
   "type": "object",
   "required": [
     "request_id",
@@ -54,7 +54,7 @@
       "additionalProperties": true
     },
     "payload": {
-      "description": "Schema-shaped operation payload. Broker validates operation-specific semantics and must not trust this as authority.",
+      "description": "スキーマ形状を持つ操作内容です。ブローカーは操作固有の意味を検証し、これを権限として信頼してはなりません。",
       "additionalProperties": true
     }
   }

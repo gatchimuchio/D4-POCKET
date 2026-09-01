@@ -17,7 +17,7 @@ def normalize_approval(source: dict) -> dict:
             "payload_hash",
             "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         ),
-        "summary": source.get("summary", "Review BLUE-TANUKI runtime operation."),
+        "summary": source.get("summary", "BLUE-TANUKI runtime 操作を確認してください。"),
         "redacted_payload": source.get("redacted_payload", {"target": "runtime", "details": "[redacted]"}),
         "full_payload": source.get("full_payload", {"target": "runtime", "details": "mock"}),
         "editable_fields": source.get("editable_fields", ["target"]),

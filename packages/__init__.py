@@ -1,1 +1,1 @@
-"""GUI Shell package namespace."""
+"""GUI Shell の package namespace。"""

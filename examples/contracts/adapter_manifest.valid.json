@@ -7,7 +7,7 @@
   "content_exposure_policy_id": "default_safe",
   "declared_capabilities": ["runtime.read", "model.chat"],
   "metadata": {
-    "note": "untrusted"
+    "note": "信頼しない"
   },
   "signed_manifest": true
 }

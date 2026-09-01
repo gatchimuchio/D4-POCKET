@@ -1,5 +1,5 @@
 name: gui_shell_desktop
-description: Desktop Flutter shell for GUI Shell.
+description: GUI ShellのFlutter製デスクトップ操作面。
 publish_to: "none"
 version: 0.1.0
 

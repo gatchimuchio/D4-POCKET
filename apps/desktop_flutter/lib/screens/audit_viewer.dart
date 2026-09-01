@@ -32,21 +32,20 @@ class _AuditViewerState extends State<AuditViewer> {
     final snapshot = widget.client.getSnapshot();
     final auditEvents = snapshot.auditEvents.where(_matchesFilters).toList();
     return ShellPage(
-      title: 'Audit Viewer',
+      title: '監査ビューアー',
       children: [
         BorderedPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Audit Timeline Filters',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text('監査時系列の絞込み', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.search),
-                  labelText: 'Search audit events',
+                  labelText: '監査事象を検索',
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -64,14 +63,14 @@ class _AuditViewerState extends State<AuditViewer> {
                     'setup_doctor',
                   ])
                     ChoiceChip(
-                      label: Text(category),
+                      label: Text(_categoryLabel(category)),
                       selected: _category == category,
                       onSelected: (_) => setState(() => _category = category),
                     ),
                   const SizedBox(width: 8),
                   for (final result in ['all', 'success', 'warning', 'blocked'])
                     FilterChip(
-                      label: Text(result),
+                      label: Text(_resultLabel(result)),
                       selected: _result == result,
                       onSelected: (_) => setState(() => _result = result),
                     ),
@@ -81,52 +80,54 @@ class _AuditViewerState extends State<AuditViewer> {
           ),
         ),
         SectionList(
-          title: 'Chain Status',
+          title: '監査鎖状態',
           rows: [
-            'audit_chain_status: ${snapshot.auditChainStatus}',
-            'hash_chain_status: ${snapshot.auditChainStatus}',
-            'actions: copy event / export JSONL / verify chain / jump conceptually to related approval-runtime-adapter',
+            '監査鎖状態: ${snapshot.auditChainStatus}',
+            'ハッシュ鎖状態: ${snapshot.auditChainStatus}',
+            '操作: 事象をコピー／JSONLを書き出し／鎖を検証／関連する承認・実行系・アダプターを確認',
           ],
         ),
         if (auditEvents.isEmpty)
           const EmptyStatePanel(
-            title: 'No audit events match',
-            meaning: 'The current filters hide all audit events.',
+            title: '一致する監査事象なし',
+            meaning: '現在の絞込み条件では全監査事象が非表示です。',
             phaseBBlocked: false,
-            nextAction: 'Clear filters or refresh diagnostics.',
+            nextAction: '絞込みを解除するか診断を更新してください。',
           )
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('Event')),
-                DataColumn(label: Text('Action')),
-                DataColumn(label: Text('Result')),
-                DataColumn(label: Text('Payload Hash')),
-                DataColumn(label: Text('Previous')),
-                DataColumn(label: Text('Related')),
-                DataColumn(label: Text('Copy')),
+                DataColumn(label: Text('事象')),
+                DataColumn(label: Text('作用')),
+                DataColumn(label: Text('結果')),
+                DataColumn(label: Text('内容ハッシュ')),
+                DataColumn(label: Text('直前')),
+                DataColumn(label: Text('関連')),
+                DataColumn(label: Text('コピー')),
               ],
               rows: [
                 for (final event in auditEvents)
-                  DataRow(cells: [
-                    DataCell(Text(event.eventId)),
-                    DataCell(Text(event.action)),
-                    DataCell(Text(event.result)),
-                    DataCell(Text(event.payloadHash)),
-                    DataCell(Text(event.previousEventHash ?? 'root')),
-                    DataCell(Text(_relatedText(snapshot, event))),
-                    DataCell(
-                      IconButton(
-                        tooltip: 'Copy audit event JSON',
-                        icon: const Icon(Icons.copy, size: 18),
-                        onPressed: () => Clipboard.setData(
-                          ClipboardData(text: _eventJson(event)),
+                  DataRow(
+                    cells: [
+                      DataCell(Text(event.eventId)),
+                      DataCell(Text(event.action)),
+                      DataCell(Text(event.result)),
+                      DataCell(Text(event.payloadHash)),
+                      DataCell(Text(event.previousEventHash ?? 'root')),
+                      DataCell(Text(_relatedText(snapshot, event))),
+                      DataCell(
+                        IconButton(
+                          tooltip: '監査事象JSONをコピー',
+                          icon: const Icon(Icons.copy, size: 18),
+                          onPressed: () => Clipboard.setData(
+                            ClipboardData(text: _eventJson(event)),
+                          ),
                         ),
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -152,16 +153,39 @@ class _AuditViewerState extends State<AuditViewer> {
   }
 }
 
+String _categoryLabel(String value) {
+  return switch (value) {
+    'all' => 'すべて',
+    'runtime' => '実行系',
+    'approval' => '承認',
+    'recovery' => '復旧',
+    'evidence' => '証拠',
+    'setup_doctor' => '環境診断',
+    _ => value,
+  };
+}
+
+String _resultLabel(String value) {
+  return switch (value) {
+    'all' => 'すべて',
+    'success' => '成功',
+    'warning' => '警告',
+    'blocked' => '遮断',
+    _ => value,
+  };
+}
+
 String _relatedText(ShellSnapshot snapshot, AuditRecord event) {
   final relatedAuthority = snapshot.authorityMap
       .where((item) => item.auditEventId == event.eventId)
       .toList();
   if (relatedAuthority.isEmpty) {
-    return 'none';
+    return 'なし';
   }
   return relatedAuthority
       .map(
-          (item) => '${item.runtimeId}/${item.capabilityId}/${item.recoveryId}')
+        (item) => '${item.runtimeId}/${item.capabilityId}/${item.recoveryId}',
+      )
       .join('\n');
 }
 

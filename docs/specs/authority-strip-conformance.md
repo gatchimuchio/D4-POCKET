@@ -1,26 +1,26 @@
-# Authority Strip Conformance
+# Authority Strip の適合規則（Authority Strip Conformance）
 
-Authority Strip Conformance prevents inbound runtime, adapter, UI, memory, cache, or metadata values from creating authority inside GUI Shell.
+Authority Strip Conformance は、inbound Runtime、Adapter、UI、memory、cache、または `metadata` の値が GUI Shell 内部に権限を作ることを防ぐ。
 
-## MUST
+## 必須（MUST）
 
-- Strip inbound authority keys before Shell Core evaluates a request.
-- Treat adapter metadata as untrusted descriptive data.
-- Reject or ignore external attempts to set permission, approval, grant, actor, or authority context.
-- Preserve runtime-declared boundaries without broadening them.
-- Record audit evidence for stripped sensitive authority material when safe to do so.
+- Shell Core が request を評価する前に、inbound authority key を除去する。
+- Adapter の `metadata` を、信頼できない説明用データとして扱う。
+- Permission、Approval、grant、actor、または `authority_context` を外部から設定しようとする試みを拒否または無視する。
+- Runtime が宣言した境界を拡大せずに維持する。
+- 安全に実施できる場合は、除去した機密性の高い authority material の Audit evidence を記録する。
 
-## MUST NOT
+## 禁止（MUST NOT）
 
-- Let GUI input create runtime-disallowed authority context.
-- Let adapter metadata grant permissions.
-- Let memory, local cache, complete history, previous state, or remembered UI state grant authority by itself.
-- Infer approval from previous display, previous selection, or local UI state.
-- Convert runtime-specific authority concepts into Shell Core authority without explicit schema and conformance coverage.
+- GUI input に、Runtime が許可していない `authority_context` を作らせる。
+- Adapter の `metadata` に Permission を付与させる。
+- memory、local cache、complete history、previous state、または記憶された UI state に、それ自体で権限を与えさせる。
+- 過去の表示、選択、または local UI state から Approval を推論する。
+- 明示的な schema と conformance coverage なしに、Runtime 固有の authority concept を Shell Core の権限へ変換する。
 
-## Authority-like inbound keys
+## Authority-like な inbound key
 
-The conformance baseline treats these inbound keys as authority-like and strips them unless explicitly owned by a validated Shell Core contract:
+Conformance baseline では、次の inbound key を authority-like として扱い、検証済みの Shell Core Contract が明示的に所有していない限り除去する。
 
 ```text
 authority
@@ -35,8 +35,8 @@ scope_escalation
 trust_level
 ```
 
-Nested authority-like keys must also be stripped.
+入れ子の authority-like key も除去しなければならない。
 
-## Pass condition
+## 合格条件
 
-After strip, the request may retain payload, runtime identity, operation identity, safe metadata, and hashes. It must not retain inbound authority-like keys that can grant permission, approval, privilege, or trust.
+除去後の request は、payload、Runtime identity、operation identity、安全な `metadata`、および hash を保持してよい。Permission、Approval、privilege、または trust を付与できる inbound authority-like key を保持してはならない。

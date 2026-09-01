@@ -48,7 +48,7 @@ class RuntimeState:
         validate_contract(audit_event, "audit.schema.json")
         event_id = audit_event["event_id"]
         if event_id in self.audit_events:
-            raise ValueError(f"duplicate audit event_id: {event_id}")
+            raise ValueError(f"重複した audit event_id です: {event_id}")
         self.audit_events[event_id] = copy.deepcopy(audit_event)
 
     def register_recovery_action(self, recovery_action: dict) -> None:

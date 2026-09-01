@@ -1,14 +1,14 @@
-# Contract Examples
+# 契約例
 
-These files are valid example instances for `specs/*.schema.json`.
+これらのファイルは `specs/*.schema.json` に対する有効な例である。
 
-`tooling/schema_check/check_schemas.py` validates every `*.valid.json` file against the matching schema using the repository's built-in schema subset checker.
+`tooling/schema_check/check_schemas.py` は、repository 内蔵の schema subset 検査器を使い、すべての `*.valid.json` を対応する schema に対して検証する。
 
-The `invalid/` directory contains negative fixtures that must fail schema validation. There must be at least one negative fixture per schema.
+`invalid/` directory には、schema 検証に失敗しなければならない negative fixture を置く。各 schema に少なくとも1つ必要である。
 
-The examples are not runtime state and do not grant authority. They exist to keep Phase 1 contracts executable before product UI exists.
+これらの例は runtime state ではなく、権限を与えない。製品 UI の成立前に段階1の契約を実行可能に保つために置く。
 
-Mapping:
+対応:
 
 ```text
 runtime.valid.json -> specs/runtime.schema.json
@@ -24,7 +24,7 @@ content_exposure.valid.json -> specs/content_exposure.schema.json
 framework_risk_profile.valid.json -> specs/framework_risk_profile.schema.json
 ```
 
-Negative fixture naming uses the schema basename as a prefix:
+Negative fixture の名称は schema の basename を接頭辞に使う。
 
 ```text
 runtime_*.invalid.json -> specs/runtime.schema.json

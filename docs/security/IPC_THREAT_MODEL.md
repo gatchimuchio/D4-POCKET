@@ -1,101 +1,103 @@
-# IPC Threat Model
+# IPC脅威モデル
 
-Status: Phase 3 production broker process and Flutter broker product path started
-Date: 2026-06-03
-Scope: Flutter UI -> Rust Security Broker -> Adapter / Runtime IPC
+状態: Phase 3の本番ブローカープロセスおよびFlutterブローカー製品経路を開始済み
+日付: 2026-06-03
+範囲: Flutter UIからRust Security Brokerを経てAdapter / Runtime IPCへ至る経路
 
-## 1. Boundary
+## 1. 境界
 
-GUI-Shell の authority-sensitive 経路は、Flutter UI process ではなく Rust Security Broker process を境界にする。
-Authority-sensitive Flutter-Rust 接続は restricted IPC を使い、FFI/direct bridge は approval-token、authority decision、external command dispatch、audit finalization、credential、recovery authorization に使わない。
+GUI-Shellのauthority-sensitive経路は、Flutter UI processではなくRust Security Broker processを境界にする。
+Authority-sensitiveなFlutterとRustの接続にはrestricted IPCを使用する。approval-token、authority decision、external command dispatch、audit finalization、credential、およびrecovery authorizationにはFFI/direct bridgeを使用しない。
 
-```text
-Flutter GUI Process
-  -> restricted IPC request
-Rust Security Broker Process
-  -> broker-validated envelope
+~~~text
+Flutter GUIプロセス
+  -> 制限済みIPC要求
+Rust Security Brokerプロセス
+  -> ブローカーが検証したenvelope
 Adapter / External Runtime
-```
+~~~
 
-この文書は broker production path の threat model である。Flutter product entry は broker-mediated path に切り替わったが、まだ command dispatch は suspended、`authority_cutover_status=not_active`、Windows installed-path `LIVE_RUNTIME` proof は未取得である。
+この文書はbroker production pathのthreat modelである。Flutter product entryはbroker-mediated pathへ切り替わったが、command dispatchはまだsuspendedであり、`authority_cutover_status=not_active`で、Windows installed-pathの`LIVE_RUNTIME` proofは未取得である。
 
-## 2. Threats And Required Handling
+## 2. 脅威と必須対処
 
-| threat | required handling | current skeleton scope | release classification |
+| 脅威 | 必須対処 | 現在のskeleton範囲 | リリース分類 |
 | --- | --- | --- | --- |
-| spoofed UI request | session id、nonce、payload hash、operation、IPC auth secret を検証し、失敗時は rejected / audited | authenticated loopback IPC + typed envelope validation; Flutter product client uses broker session file | release_blocker aggregate_of=windows_broker_installed_smoke until Windows installed path proves it |
-| replayed approval request | nonce replay を拒否し、broker audit に記録する | persisted nonce store rejects replay after broker restart | release_blocker aggregate_of=windows_broker_installed_smoke until Windows installed path proves it |
-| forged runtime metadata | authority-like key/value を検出し、adapter metadata を authority として扱わない | implemented for broker metadata scanner and Python-oracle parity path | release_blocker aggregate_of=windows_broker_installed_smoke until Windows installed path proves it |
-| malformed envelope | request_id / operation / payload_hash / nonce を必須にし、fail closed | implemented in Rust broker and exercised by Rust IPC tests | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| stale or malformed `issued_at` | RFC3339 と freshness window を検証し、失敗時は rejected / audited | 300-second freshness window covered in Rust IPC integration tests | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| persistent state unavailable | audit/replay/session persistence required 時に store がなければ health suspend / operation reject | durable file store implemented; unavailable mode remains fail-closed | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| audit anchor key / log co-residency | HMAC anchor を local corruption / partial tamper detection として扱い、同一権限で key / anchor / log を同時更新できる相手への外部完全性証明として扱わない | `audit_anchor.json` + `audit_anchor.key` implemented; external anchor / Windows key-protection proof is not complete | release_blocker registry_id=audit_anchor_external_tamper_evidence_proof until product release proof defines Windows ACL / DPAPI / external-anchor handling |
-| authority-like key/value alias | case / zero-width / camelCase / separator / alias を拒否する | implemented for broker metadata scanner and parity harness | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| Unicode / case / zero-width normalization bypass | Unicode/case/zero-width を negative tests に含める | NFKC / zero-width / case / camelCase covered in Rust unit scope and Python oracle parity | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| stale session | session mismatch を rejected / audited にする | production broker-server generates session per process; Flutter product tests cover fail-closed stale session handling | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| broker unavailable | Flutter must not infer authority; UI must enter fail-closed / SUSPEND state | `ShellCoreClient.product()` returns `broker_unavailable` SUSPEND snapshot and does not read local JSON authority; Flutter product tests pass through Windows `flutter.bat`; `tooling/release_runtime_assertions.py --check` verifies fail-closed test coverage is present | release_blocker aggregate_of=windows_broker_installed_smoke until installed proof |
-| broken pipe / crash during approval | approval finalization must not complete; RecoveryAction required | documented only | release_blocker aggregate_of=windows_broker_installed_smoke |
-| audit append failure | broker must block finalization if audit append fails | documented only | release_blocker aggregate_of=windows_broker_installed_smoke |
-| keychain unavailable | credential-gated operation must fail closed | documented only | post_v1_scope until credential-gated operation is included in v1.0 |
+| 偽装UI要求 | session id、nonce、payload hash、operation、IPC auth secretを検証し、失敗時はrejected / auditedとする。 | authenticated loopback IPCとtyped envelope validationを実装済み。Flutter product clientはbroker session fileを使用する。 | Windows installed pathで証明するまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 再送された承認要求 | nonce replayを拒否し、broker auditへ記録する。 | persisted nonce storeはbroker restart後のreplayも拒否する。 | Windows installed pathで証明するまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 偽造されたランタイムmetadata | authority-like key/valueを検出し、adapter metadataをauthorityとして扱わない。 | broker metadata scannerおよびPython-oracle parity pathで実装済み。 | Windows installed pathで証明するまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 不正形式のenvelope | request_id、operation、payload_hash、nonceを必須とし、fail closedにする。 | Rust brokerで実装し、Rust IPC testで検証済み。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 古い、または不正形式の`issued_at` | RFC3339およびfreshness windowを検証し、失敗時はrejected / auditedとする。 | 300秒のfreshness windowをRust IPC integration testで網羅。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 永続状態を利用できない場合 | audit/replay/session persistenceが必要なときにstoreがなければhealth suspend / operation rejectとする。 | durable file storeを実装済み。unavailable modeはfail-closedのままである。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| audit anchor keyとlogの同居 | HMAC anchorはlocal corruption / partial tamper detectionとして扱う。同一権限でkey / anchor / logを同時更新できる相手に対する外部完全性証明としては扱わない。 | `audit_anchor.json`と`audit_anchor.key`を実装済み。external anchor / Windows key-protection proofは未完了。 | product release proofがWindows ACL / DPAPI / external-anchor handlingを定義するまで`release_blocker registry_id=audit_anchor_external_tamper_evidence_proof` |
+| authority-like key/valueの別名 | case、zero-width、camelCase、separator、およびaliasを拒否する。 | broker metadata scannerとparity harnessで実装済み。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| Unicode、case、zero-widthによるnormalization迂回 | Unicode、case、zero-widthをnegative testへ含める。 | NFKC、zero-width、case、camelCaseをRust unit scopeおよびPython oracle parityで網羅。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 古いsession | session mismatchをrejected / auditedとする。 | production broker-serverはprocessごとにsessionを生成し、Flutter product testはfail-closed stale session handlingを網羅する。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| brokerを利用できない場合 | Flutterはauthorityを推論してはならず、UIはfail-closed / SUSPEND状態へ入らなければならない。 | `ShellCoreClient.product()`は`broker_unavailable` SUSPEND snapshotを返し、local JSON authorityを読まない。Flutter product testはWindowsの`flutter.bat`を通して合格し、`tooling/release_runtime_assertions.py --check`はfail-closed test coverageの存在を検証する。 | installed proofまで`release_blocker aggregate_of=windows_broker_installed_smoke` |
+| 承認中のbroken pipeまたはcrash | approval finalizationを完了してはならず、RecoveryActionを必須とする。 | 文書化だけ。 | `release_blocker aggregate_of=windows_broker_installed_smoke` |
+| `audit append failure`（監査追記の失敗） | audit appendが失敗した場合、brokerはfinalizationを遮断しなければならない。 | 文書化だけ。 | `release_blocker aggregate_of=windows_broker_installed_smoke` |
+| keychainを利用できない場合 | credential-gated operationはfail closedにしなければならない。 | 文書化だけ。 | credential-gated operationをv1.0へ含めるまでは`post_v1_scope` |
 
-## 3. Evidence Source Rules
+## 3. 証拠源の規則
 
-- CONFIG: JSON Schema files under `specs/`.
-- INTERNAL_STATE: Rust broker unit tests and typed envelope validation.
-- LIVE_RUNTIME: Rust broker process integration and future Windows installed-path evidence.
-- EXTERNAL_EVIDENCE: future signed artifact / installed path evidence.
-- FIXTURE: examples and negative fixtures under `examples/contracts/`.
-- CONFIG / FIXTURE / LIVE_RUNTIME mixed assertion: `tooling/release_runtime_assertions.py --check` verifies current product entry, no Python authority process startup, no FFI/direct bridge token, broker fail-closed test coverage, and local broker restart/crash persistence test presence.
+- `CONFIG`: `specs/`配下のJSON Schemaファイル。
+- `INTERNAL_STATE`: Rust broker unit testおよびtyped envelope validation。
+- `LIVE_RUNTIME`: Rust broker process integrationと、将来のWindows installed-path evidence。
+- `EXTERNAL_EVIDENCE`: 将来のsigned artifact / installed path evidence。
+- `FIXTURE`: `examples/contracts/`配下のexampleおよびnegative fixture。
+- `CONFIG / FIXTURE / LIVE_RUNTIME`の混合表明: `tooling/release_runtime_assertions.py --check`は、現行product entry、Python authority process startupがないこと、FFI/direct bridge tokenがないこと、`broker fail-closed test coverage`、およびlocal broker restart/crash persistence testの存在を検証する。
 
-CONFIG、INTERNAL_STATE、FIXTURE の結果は、LIVE_RUNTIME broker proof には昇格しない。
+`CONFIG`、`INTERNAL_STATE`、`FIXTURE`の結果は、`LIVE_RUNTIME` broker proofへ昇格しない。
 
-## 4. Fail-Closed Requirements
+## 4. Fail-Closed要求
 
-- malformed request: reject and audit;
-- malformed or stale `issued_at`: reject and audit;
-- stale session: reject and audit;
-- replayed nonce: reject and audit;
-- authority metadata: reject and audit;
-- release classification: `release_blocker` until Windows installed proof exists for unavailable persistence / broker cases;
-- command envelope dispatch before migration: suspend and audit;
-- broker audit append failure: block finalization;
-- persistent state required but unavailable (`release_blocker` until installed proof): suspend health and reject operations;
-- broker unavailable (`release_blocker` until installed proof): Flutter shows unavailable state and performs no authority decision.
+- 不正形式の要求: 拒否して監査する。
+- 不正形式または古い`issued_at`: 拒否して監査する。
+- 古いsession: 拒否して監査する。
+- 再送nonce: 拒否して監査する。
+- authority metadata: 拒否して監査する。
+- リリース分類: unavailable persistence / broker caseについてWindows installed proofが存在するまでは`release_blocker`とする。
+- migration前のcommand envelope dispatch: suspendして監査する。
+- `broker audit append failure`（ブローカー監査追記の失敗）: finalizationを遮断する。
+- 必須のpersistent stateを利用できない場合（installed proofまでは`release_blocker`）: healthをsuspendし、operationを拒否する。
+- brokerを利用できない場合（installed proofまでは`release_blocker`）: Flutterはunavailable stateを表示し、authority decisionを行わない。
 
-## 5. Audit Anchor Threat Model
+## 5. 監査アンカー脅威モデル
 
-`audit_anchor.json` は audit event count と head event hash を `audit_anchor.key` で HMAC 化する。これは broker store 内の audit log truncate、partial rewrite、anchor mismatch、local corruption を検出するための INTERNAL_STATE / LIVE_RUNTIME local evidence である。
+`audit_anchor.json`はaudit event countとhead event hashを`audit_anchor.key`でHMAC化する。これはbroker store内のaudit log truncate、partial rewrite、anchor mismatch、およびlocal corruptionを検出するための`INTERNAL_STATE / LIVE_RUNTIME` local evidenceである。
 
-この anchor は external notarization、signed release artifact、remote transparency log、または OS key-protection proof の代替ではない。`audit_anchor.key`、`audit_anchor.json`、`audit.jsonl` を同一権限で同時に書き換えられる same-user attacker は、整合した HMAC anchor を再生成できる。administrator / root adversary に対する改ざん耐性も、この local file-store anchor だけでは主張しない。
+このanchorはexternal notarization、signed release artifact、remote transparency log、またはOS key-protection proofの代替ではない。`audit_anchor.key`、`audit_anchor.json`、`audit.jsonl`を同一権限で同時に書き換えられるsame-user attackerは、整合するHMAC anchorを再生成できる。administrator / root adversaryに対する改ざん耐性も、このlocal file-store anchorだけでは主張しない。
 
-Windows product release claim では、installed app path 上で key / anchor / audit log の配置、ACL、DPAPI などの OS key protection、または external anchor / signed evidence のどれを採用するかを明示し、その evidence source を EXTERNAL_EVIDENCE または Windows installed-path LIVE_RUNTIME として検証する必要がある。
+Windows product release claimでは、installed app path上でkey / anchor / audit logの配置、ACL、DPAPIなどのOS key protection、またはexternal anchor / signed evidenceのどれを採用するかを明示する必要がある。そのevidence sourceを`EXTERNAL_EVIDENCE`またはWindows installed-path `LIVE_RUNTIME`として検証しなければならない。
 
-## 6. Current Limitations
+## 6. 現在の制限
 
+~~~yaml
 - item: Flutter broker unavailable installed proof absent
   classification: release_blocker
   registry_id: windows_broker_installed_smoke
-  reason: Flutter product code now fail-closes broker unavailable / auth / stale / malformed response paths, release runtime assertions verify the fail-closed coverage tokens, and Windows Flutter analyze/test passed. Windows installed-path proof is still absent.
-  required_action: run installed Windows broker-down / crash / stale-session UI fail-closed tests.
+  reason: Flutter product codeはbroker unavailable / auth / stale / malformed response pathをfail closeするようになり、release runtime assertionはfail-closed coverage tokenを検証し、Windows Flutter analyze/testは合格した。Windows installed-path proofはまだ存在しない。
+  required_action: installed Windowsのbroker-down / crash / stale-session UI fail-closed testを実行する。
   blocks_release: yes
 
 - item: Flutter broker authority surface active proof incomplete
   classification: release_blocker
   aggregate_of: windows_broker_installed_smoke
-  reason: Product `main.dart` now uses broker IPC and renders broker-derived authority status/projection. This is not an independent registry blocker; it is represented by installed-path broker/runtime evidence until v1.0 explicitly changes command dispatch scope.
-  required_action: collect Windows installed-path broker evidence for the v1.0 authority surface; keep command dispatch suspended unless owner changes v1.0 scope.
+  reason: 製品main.dartはbroker IPCを使用し、broker由来のauthority status/projectionを描画する。これは独立したregistry blockerではない。v1.0がcommand dispatch scopeを明示的に変更するまでは、installed-path broker/runtime evidenceによって表す。
+  required_action: v1.0 authority surfaceについてWindows installed-path broker evidenceを収集する。所有者がv1.0 scopeを変更しない限りcommand dispatchをsuspendedに保つ。
   blocks_release: yes
 
 - item: Windows installed-path broker proof absent
   classification: release_blocker
   registry_id: windows_broker_installed_smoke
-  reason: authenticated loopback IPC and durable store are proven by local Rust integration tests, not installed Windows app evidence.
-  required_action: run Windows installed-path broker launch, authenticated IPC, restart persistence, and crash fail-closed evidence collection.
+  reason: authenticated loopback IPCとdurable storeはlocal Rust integration testで証明されており、installed Windows app evidenceでは証明されていない。
+  required_action: Windows installed-pathのbroker launch、authenticated IPC、restart persistence、およびcrash fail-closed evidence collectionを実行する。
   blocks_release: yes
 
 - item: Audit anchor external tamper-evidence proof absent
   classification: release_blocker
   registry_id: audit_anchor_external_tamper_evidence_proof
-  reason: broker-local HMAC anchor detects local corruption and partial tamper, but the key, anchor, and audit log currently live in the same product store trust region. Same-user or administrator/root rewrite resistance requires Windows ACL/DPAPI evidence, external anchoring, signed evidence, or an explicitly accepted narrower threat model.
-  required_action: define and validate the Windows installed-path key-protection or external-anchor model before product release claim.
+  reason: broker-local HMAC anchorはlocal corruptionとpartial tamperを検出するが、key、anchor、audit logは現在同じproduct store trust region内にある。same-userまたはadministrator/rootによる書き換えへの耐性には、Windows ACL/DPAPI evidence、external anchoring、signed evidence、または明示的に受容したより狭いthreat modelが必要である。
+  required_action: product release claimの前に、Windows installed-path key-protection modelまたはexternal-anchor modelを定義して検証する。
   blocks_release: yes
+~~~

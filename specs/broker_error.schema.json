@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/broker_error.schema.json",
-  "title": "BrokerError",
+  "title": "ブローカーエラー（BrokerError）",
   "type": "object",
   "required": [
     "code",

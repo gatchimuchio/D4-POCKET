@@ -6,7 +6,7 @@
   "status": "pending",
   "content_visibility": "redacted",
   "payload_hash": "sha256:5c5b691c760a352b7eb430f981091e8afa14d833eb74a654c12231146dc9d315",
-  "summary": "Write one file in the workspace.",
+  "summary": "作業領域内のファイルを1つ書き込みます。",
   "redacted_payload": {
     "path": "notes/today.md",
     "content": "[redacted]"

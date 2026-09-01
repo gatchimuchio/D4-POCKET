@@ -67,32 +67,32 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
 
     if isinstance(expected_type, list):
         if not any(type_matches(value, item) for item in expected_type):
-            errors.append(f"{path}: expected one of {expected_type}")
+            errors.append(f"{path}: 次のいずれかを期待: {expected_type}")
             return errors
     elif isinstance(expected_type, str):
         if not type_matches(value, expected_type):
-            errors.append(f"{path}: expected {expected_type}")
+            errors.append(f"{path}: 期待値: {expected_type}")
             return errors
 
     if "const" in schema and value != schema["const"]:
-        errors.append(f"{path}: expected const {schema['const']!r}")
+            errors.append(f"{path}: const {schema['const']!r}を期待")
 
     if "enum" in schema and value not in schema["enum"]:
-        errors.append(f"{path}: value {value!r} not in enum")
+            errors.append(f"{path}: value {value!r}がenumにない")
 
     if isinstance(value, str):
         if "minLength" in schema and len(value) < schema["minLength"]:
-            errors.append(f"{path}: shorter than minLength {schema['minLength']}")
+            errors.append(f"{path}: minLength {schema['minLength']}より短い")
         if "pattern" in schema and re.match(schema["pattern"], value) is None:
-            errors.append(f"{path}: does not match pattern {schema['pattern']}")
+            errors.append(f"{path}: pattern {schema['pattern']}と一致しない")
 
     if isinstance(value, int) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:
-            errors.append(f"{path}: below minimum {schema['minimum']}")
+            errors.append(f"{path}: minimum {schema['minimum']}未満")
 
     if isinstance(value, list):
         if "minItems" in schema and len(value) < schema["minItems"]:
-            errors.append(f"{path}: fewer than minItems {schema['minItems']}")
+            errors.append(f"{path}: minItems {schema['minItems']}より少ない")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
@@ -102,7 +102,7 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
         required = schema.get("required", [])
         for key in required:
             if key not in value:
-                errors.append(f"{path}: missing required key {key}")
+                errors.append(f"{path}: 必須key {key}がない")
 
         properties = schema.get("properties", {})
         additional = schema.get("additionalProperties", True)
@@ -110,7 +110,7 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
         if additional is False:
             for key in value:
                 if key not in properties:
-                    errors.append(f"{path}: additional property {key} not allowed")
+                    errors.append(f"{path}: 追加property {key}は許可されない")
 
         for key, item in value.items():
             if key in properties:
@@ -144,21 +144,21 @@ def main() -> int:
     errors: list[str] = []
     if missing:
         for name in missing:
-            errors.append(f"missing schema: {name}")
+            errors.append(f"schemaがない: {name}")
 
     schemas: dict[str, dict] = {}
     for path in sorted(SPECS.glob("*.schema.json")):
         data, err = load_json(path)
         if err:
-            errors.append(f"{path}: invalid json: {err}")
+            errors.append(f"{path}: 無効なJSON: {err}")
             continue
         if not isinstance(data, dict):
-            errors.append(f"{path}: schema root must be object")
+            errors.append(f"{path}: schema rootはobjectでなければならない")
             continue
         schemas[path.name] = data
         for key in ["$schema", "$id", "title", "type"]:
             if key not in data:
-                errors.append(f"{path}: missing {key}")
+                errors.append(f"{path}: {key}がない")
 
     for schema_name in sorted(REQUIRED):
         schema = schemas.get(schema_name)
@@ -167,7 +167,7 @@ def main() -> int:
         example_path = valid_example_path(schema_name)
         example, err = load_json(example_path)
         if err:
-            errors.append(f"{example_path}: invalid or missing valid example: {err}")
+            errors.append(f"{example_path}: 有効exampleが無効または欠落: {err}")
             continue
         for failure in validate_instance(example, schema):
             errors.append(f"{example_path}: {failure}")
@@ -180,27 +180,27 @@ def main() -> int:
         invalid_schema_names.add(schema_name)
         schema = schemas.get(schema_name)
         if not schema:
-            errors.append(f"{invalid_path}: cannot resolve schema {schema_name}")
+            errors.append(f"{invalid_path}: schema {schema_name}を解決できない")
             continue
         instance, err = load_json(invalid_path)
         if err:
-            errors.append(f"{invalid_path}: invalid json: {err}")
+            errors.append(f"{invalid_path}: 無効なJSON: {err}")
             continue
         failures = validate_instance(instance, schema)
         if not failures:
-            errors.append(f"{invalid_path}: invalid fixture unexpectedly passed {schema_name}")
+            errors.append(f"{invalid_path}: 無効fixtureが予期せず{schema_name}に合格")
 
     missing_invalid = sorted(REQUIRED - invalid_schema_names)
     for schema_name in missing_invalid:
-        errors.append(f"missing negative fixture for {schema_name}")
+        errors.append(f"{schema_name}のnegative fixtureがない")
 
     if errors:
-        print("schema check failed:")
+        print("schema checkが失敗:")
         for err in errors:
             print(f"  - {err}")
         return 1
 
-    print(f"schema check passed: {len(schemas)} schemas, {len(REQUIRED)} examples, {invalid_count} negative fixtures")
+    print(f"schema checkが合格: schema {len(schemas)}件、example {len(REQUIRED)}件、negative fixture {invalid_count}件")
     return 0
 
 

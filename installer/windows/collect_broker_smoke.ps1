@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$BrokerHelperExe,
 
@@ -92,11 +92,11 @@ function Wait-BrokerEndpoint {
     }
     $Process.Refresh()
     if ($Process.HasExited) {
-      throw "Rust broker exited before endpoint was ready: $($Process.ExitCode)"
+      throw "Rust broker が endpoint 準備前に終了しました: $($Process.ExitCode)"
     }
     Start-Sleep -Milliseconds 50
   }
-  throw "Rust broker endpoint file was not created: $Path"
+  throw "Rust broker endpoint ファイルが作成されませんでした: $Path"
 }
 
 function Invoke-BrokerRequest {
@@ -168,10 +168,10 @@ try {
     -Nonce $replayNonce
   $health = Invoke-BrokerRequest -Endpoint $endpoint -Request $healthRequest
   if ($health.status -ne "accepted") {
-    $errors.Add("initial broker health was not accepted")
+    $errors.Add("最初の broker health が受理されませんでした")
   }
   if ($health.health.persistence_ready -ne $true) {
-    $errors.Add("broker durable store was not ready")
+    $errors.Add("broker の durable store が準備できていませんでした")
   }
 
   Stop-Broker -Process $broker -Endpoint $endpoint
@@ -184,7 +184,7 @@ try {
   $restartEndpoint = Wait-BrokerEndpoint -Path $SessionFile -Process $restartBroker
   $replay = Invoke-BrokerRequest -Endpoint $restartEndpoint -Request $healthRequest
   if ($replay.status -ne "rejected" -or $replay.error.code -ne "broker_replay_detected") {
-    $errors.Add("replayed nonce was not rejected after broker restart")
+    $errors.Add("broker restart 後に再使用した nonce が拒否されませんでした")
   }
   $freshRequest = New-BrokerRequest `
     -RequestId "windows-installed-health-2" `
@@ -192,7 +192,7 @@ try {
     -Nonce $freshNonce
   $freshAfterRestart = Invoke-BrokerRequest -Endpoint $restartEndpoint -Request $freshRequest
   if ($freshAfterRestart.status -ne "accepted") {
-    $errors.Add("fresh broker health after restart was not accepted")
+    $errors.Add("restart 後の新規 broker health が受理されませんでした")
   }
 
   Stop-Process -Id $restartBroker.Id -Force
@@ -206,7 +206,7 @@ try {
     $crashFailClosed = $true
   }
   if (!$crashFailClosed) {
-    $errors.Add("broker accepted IPC after forced stop")
+    $errors.Add("強制停止後も broker が IPC を受理しました")
   }
 } catch {
   $errors.Add($_.Exception.Message)
@@ -268,7 +268,7 @@ $result = [ordered]@{
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
 Write-JsonEvidence -Value $result -Path $output.FullName -Depth 10
-Write-Host "wrote $($output.FullName)"
+Write-Host "書き出しました: $($output.FullName)"
 if ($errors.Count -ne 0) {
   exit 1
 }

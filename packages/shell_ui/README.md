@@ -1,5 +1,5 @@
-# shell_ui
+# shell_ui 責任境界
 
-Reusable UI composition layer.
+再利用可能な UI 構成層。
 
-May depend on Flutter in later implementation, but must not define authority semantics.
+後続実装で Flutter に依存する場合でも、権限の意味を定義してはならない。

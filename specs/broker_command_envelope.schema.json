@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/broker_command_envelope.schema.json",
-  "title": "BrokerCommandEnvelope",
+  "title": "ブローカーコマンド封筒（BrokerCommandEnvelope）",
   "type": "object",
   "required": [
     "envelope_id",

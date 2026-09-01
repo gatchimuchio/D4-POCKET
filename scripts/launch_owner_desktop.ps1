@@ -1,12 +1,12 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
-# Boundary record:
-# - purpose: local owner desktop launch with the Rust broker-server active.
-# - standard mechanism: native Rust helper broker-server plus Flutter desktop run.
-# - wrapper reason: keep the broker endpoint/session wiring reproducible for owner-use.
-# - deletion condition: remove when the installed product launcher owns this wiring.
-# - release evidence: this is not Windows installed-path release evidence.
-# - authority: this wrapper grants no capability, permission, approval, or audit authority.
+# 境界記録:
+# - 目的: Rust broker-server を稼働させた状態で、所有者のローカルデスクトップを起動する。
+# - 標準機構: native Rust helper broker-server と Flutter desktop run。
+# - wrapper の理由: 所有者利用時の broker endpoint/session 接続を再現可能に保つ。
+# - 削除条件: インストール済み製品の launcher がこの接続を所有したときに削除する。
+# - release 証拠: これは Windows インストール先の release 証拠ではない。
+# - 権限: この wrapper はcapability、permission、approval、audit 権限を与えない。
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $BrokerRoot = Join-Path $Root ".gui_shell\broker"
@@ -38,13 +38,13 @@ try {
             break
         }
         if ($Broker.HasExited) {
-            throw "Rust broker exited before endpoint was ready: $($Broker.ExitCode)"
+      throw "Rust broker が endpoint 準備前に終了しました: $($Broker.ExitCode)"
         }
         Start-Sleep -Milliseconds 50
     }
 
     if (-not (Test-Path $BrokerSession)) {
-        throw "Rust broker endpoint file was not created: $BrokerSession"
+    throw "Rust broker endpoint ファイルが作成されませんでした: $BrokerSession"
     }
 
     $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $BrokerSession

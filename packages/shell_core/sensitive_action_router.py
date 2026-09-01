@@ -22,7 +22,7 @@ class SensitiveActionRouter:
         }
         missing = sorted(required - set(action))
         if missing:
-            raise ValueError(f"sensitive action missing required mapping: {', '.join(missing)}")
+            raise ValueError(f"機密 action に必須の対応がありません: {', '.join(missing)}")
         routed = copy.deepcopy(action)
         if self._evaluator is None:
             routed["routed"] = False
@@ -31,7 +31,7 @@ class SensitiveActionRouter:
                 "errors": [
                     shell_error(
                         SCHEMA_CONTRACT_MISSING,
-                        "production sensitive action router requires an evaluator and broker-owned state",
+                        "製品用の機密 action router には evaluator と broker 所有 state が必要です",
                         routed.get("operation", "unknown"),
                     )
                 ],

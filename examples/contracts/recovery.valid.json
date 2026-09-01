@@ -4,11 +4,11 @@
   "operation": "filesystem.write",
   "class": "permission_denied",
   "severity": "warning",
-  "user_visible_message": "Permission is required before this action can run.",
+  "user_visible_message": "この作用を実行する前に許可が必要です。",
   "safe_to_retry": true,
   "steps": [
-    "Review the pending approval.",
-    "Retry after approval is granted."
+    "保留中の承認を確認してください。",
+    "承認が付与された後に再試行してください。"
   ],
   "requires_user_action": true
 }

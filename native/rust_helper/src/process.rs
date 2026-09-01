@@ -20,7 +20,7 @@ pub fn diagnose_process(
     if request.command.is_some() {
         diagnostics.push(Diagnostic {
             code: "command_ignored".to_string(),
-            message: "process diagnostics do not execute arbitrary commands".to_string(),
+            message: "process diagnosticsは任意のcommandを実行しない".to_string(),
         });
     }
 

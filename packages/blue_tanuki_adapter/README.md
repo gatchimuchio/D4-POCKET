@@ -1,10 +1,10 @@
-# blue_tanuki_adapter
+# blue_tanuki_adapter 参照境界
 
-Reference adapter for BLUE-TANUKI.
+BLUE-TANUKI 用の参照 adapter。
 
-Rules:
+規則:
 
-- BLUE-TANUKI is frozen as the Phase 0 reference runtime contract target.
-- Adapter translates GUI Shell contracts to BLUE-TANUKI runtime endpoints.
-- No BLUE-TANUKI-specific behavior may leak into Shell Core.
-- Adapter metadata is untrusted and must not escalate authority.
+- BLUE-TANUKI は段階0の参照 runtime 契約対象として固定する。
+- Adapter は GUI Shell 契約を BLUE-TANUKI runtime endpoint へ変換する。
+- BLUE-TANUKI 固有の挙動を Shell Core へ漏らしてはならない。
+- Adapter metadata は非信頼であり、権限を昇格させてはならない。

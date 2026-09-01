@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$InstalledExe,
 
@@ -136,53 +136,53 @@ $checks = @(
   New-DoctorCheck `
     -CheckId "windows.installed_app_path" `
     -Status "pass" `
-    -Message "Installed GUI-Shell executable exists at $($exe.Path)." `
-    -RecoveryInstruction "Stage or install the Windows GUI-Shell artifact before collecting release evidence."
+    -Message "installed GUI-Shell executable が存在します: $($exe.Path)" `
+    -RecoveryInstruction "release evidence の収集前に Windows GUI-Shell artifact を stage または install してください。"
   New-DoctorCheck `
     -CheckId "windows.artifact_hash" `
     -Status "pass" `
-    -Message "Installed executable sha256 is sha256:$artifactHash." `
-    -RecoveryInstruction "Rebuild and restage the Windows artifact if the recorded hash is not the intended release candidate."
+    -Message "installed executable の sha256 は sha256:$artifactHash です。" `
+    -RecoveryInstruction "記録された hash が意図した release candidate と異なる場合は、Windows artifact を rebuild して再び stage してください。"
   New-DoctorCheck `
     -CheckId "first_run.config_created" `
     -Status $(if ($configProbe.ok) { "pass" } else { "warning" }) `
-    -Message $(if ($configProbe.ok) { "Config JSON parsed at $($configProbe.path)." } else { "Config JSON was not valid at $ConfigPath." }) `
-    -RecoveryInstruction "Launch the installed app once and verify the recorded config path parses as JSON."
+    -Message $(if ($configProbe.ok) { "Config JSON を解析できました: $($configProbe.path)" } else { "Config JSON が無効です: $ConfigPath" }) `
+    -RecoveryInstruction "installed app を一度起動し、記録された config path を JSON として解析できることを検証してください。"
   New-DoctorCheck `
     -CheckId "first_run.audit_dir_writable" `
     -Status $(if ($auditProbe.ok) { "pass" } else { "warning" }) `
-    -Message $(if ($auditProbe.ok) { "Audit directory write/read/delete probe passed at $($auditProbe.path)." } else { "Audit directory write/read/delete probe did not pass at $AuditDir." }) `
-    -RecoveryInstruction "Grant the installed app a writable local audit directory and rerun installed smoke."
+    -Message $(if ($auditProbe.ok) { "Audit directory の write/read/delete probe が合格しました: $($auditProbe.path)" } else { "Audit directory の write/read/delete probe が合格しませんでした: $AuditDir" }) `
+    -RecoveryInstruction "installed app に書込み可能な local audit directory を付与し、installed smoke を再実行してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.ran_from_installed_app_path" `
     -Status "pass" `
-    -Message "Setup Doctor evidence was collected against the installed executable path." `
-    -RecoveryInstruction "Run this collector against the installed GUI-Shell executable, not a development build path."
+    -Message "Setup Doctor evidence を installed executable path に対して収集しました。" `
+    -RecoveryInstruction "development build path ではなく installed GUI-Shell executable に対してこの collector を実行してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.runtime_connection" `
     -Status $(if ($brokerReady) { "pass" } else { "warning" }) `
-    -Message $(if ($brokerReady) { "Installed Rust broker evidence reports authenticated IPC and durable store readiness." } else { "Installed Rust broker evidence was absent or did not report ready IPC and persistence." }) `
-    -RecoveryInstruction "Run collect_broker_smoke.ps1 against the installed Rust broker helper and include the JSON here."
+    -Message $(if ($brokerReady) { "installed Rust broker evidence は認証済み IPC と durable store の準備完了を報告しています。" } else { "installed Rust broker evidence がないか、IPC と永続化の準備完了を報告していません。" }) `
+    -RecoveryInstruction "installed Rust broker helper に対して collect_broker_smoke.ps1 を実行し、その JSON をここに含めてください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.authority_boundary" `
     -Status "pass" `
-    -Message "Installer and Setup Doctor evidence do not grant authority or silently approve permissions." `
-    -RecoveryInstruction "Keep installer diagnostics non-authoritative and broker-mediated."
+    -Message "Installer と Setup Doctor evidence は権限を付与せず、permission を無言で承認しません。" `
+    -RecoveryInstruction "installer diagnostics の非権限性と broker 仲介を維持してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.network_public_bind" `
     -Status $(if ($restrictedBind) { "pass" } else { "warning" }) `
-    -Message $(if ($restrictedBind) { "Broker evidence reports restricted 127.0.0.1 loopback bind." } else { "Broker restricted loopback bind evidence was absent." }) `
-    -RecoveryInstruction "Run broker smoke and confirm the broker endpoint host is 127.0.0.1."
+    -Message $(if ($restrictedBind) { "Broker evidence は 127.0.0.1 に制限した loopback bind を報告しています。" } else { "Broker の制限済み loopback bind evidence がありません。" }) `
+    -RecoveryInstruction "broker smoke を実行し、broker endpoint host が 127.0.0.1 であることを確認してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.recovery_instruction" `
     -Status "pass" `
-    -Message "Each Setup Doctor check includes an operator recovery instruction." `
-    -RecoveryInstruction "Keep every diagnostic check paired with an operator-readable recovery instruction."
+    -Message "各 Setup Doctor check に operator recovery instruction が含まれています。" `
+    -RecoveryInstruction "すべての diagnostic check に operator が読める recovery instruction を対応付けてください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.audit_storage" `
     -Status $(if ($auditProbe.ok) { "pass" } else { "warning" }) `
-    -Message $(if ($auditProbe.ok) { "Audit storage probe passed at $($auditProbe.path)." } else { "Audit storage probe did not pass at $AuditDir." }) `
-    -RecoveryInstruction "Repair audit storage permissions before release evidence collection."
+    -Message $(if ($auditProbe.ok) { "Audit storage probe が合格しました: $($auditProbe.path)" } else { "Audit storage probe が合格しませんでした: $AuditDir" }) `
+    -RecoveryInstruction "release evidence の収集前に audit storage permission を修復してください。"
 )
 
 $hasWarning = @($checks | Where-Object { $_.status -ne "pass" }).Count -ne 0
@@ -191,7 +191,7 @@ $report = [ordered]@{
   evidence_kind = "external_installer_config_broker_probe"
   formal_product_evidence = $false
   valid_for_current_strict_r2 = $false
-  reason_not_formal_product_evidence = "This collector probes installed files, config, audit storage, and broker evidence externally. It does not execute an installed-app Setup Doctor machine-readable export."
+  reason_not_formal_product_evidence = "この collector は installed file、config、audit storage、broker evidence を外部から probe します。installed-app の Setup Doctor による machine-readable export は実行しません。"
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_setup_doctor.ps1"
     collector_version = "2"
@@ -215,4 +215,4 @@ $report = [ordered]@{
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
 Write-JsonEvidence -Value $report -Path $output.FullName -Depth 8
-Write-Host "wrote $($output.FullName)"
+Write-Host "書き出しました: $($output.FullName)"

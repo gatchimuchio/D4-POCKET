@@ -14,7 +14,12 @@ class MobilePage extends StatelessWidget {
         children: [
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
-          ...children.map((child) => Padding(padding: const EdgeInsets.only(bottom: 12), child: child)),
+          ...children.map(
+            (child) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: child,
+            ),
+          ),
         ],
       ),
     );
@@ -22,7 +27,12 @@ class MobilePage extends StatelessWidget {
 }
 
 class StatusTile extends StatelessWidget {
-  const StatusTile({super.key, required this.icon, required this.title, required this.subtitle});
+  const StatusTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   final IconData icon;
   final String title;
@@ -35,7 +45,11 @@ class StatusTile extends StatelessWidget {
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: ListTile(leading: Icon(icon), title: Text(title), subtitle: Text(subtitle)),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+      ),
     );
   }
 }

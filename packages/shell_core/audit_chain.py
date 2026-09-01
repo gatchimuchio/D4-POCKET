@@ -23,16 +23,16 @@ def verify_audit_chain(events: list[dict]) -> dict:
     for index, event in enumerate(events):
         event_id = event.get("event_id")
         if not event_id:
-            errors.append(f"event {index} missing event_id")
+            errors.append(f"event {index} に event_id がありません")
         elif event_id in seen_event_ids:
-            errors.append(f"event {index} duplicate event_id {event_id}")
+            errors.append(f"event {index} の event_id {event_id} が重複しています")
         else:
             seen_event_ids.add(event_id)
         expected = chain_event({key: value for key, value in event.items() if key != "event_hash"}, previous)
         if event.get("previous_event_hash") != previous:
-            errors.append(f"event {index} previous hash mismatch")
+            errors.append(f"event {index} の previous hash が一致しません")
         if event.get("event_hash") != expected["event_hash"]:
-            errors.append(f"event {index} hash mismatch")
+            errors.append(f"event {index} の hash が一致しません")
         previous = event.get("event_hash")
     return {
         "ok": not errors,

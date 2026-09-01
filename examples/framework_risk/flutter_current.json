@@ -10,8 +10,8 @@
   "migration_target": "ComposeMP",
   "review_interval_months": 6,
   "exit_conditions": [
-    "desktop support materially degrades",
-    "critical Flutter-originated bug becomes unavoidable",
-    "official roadmap deprioritizes desktop"
+    "デスクトップ対応が実質的に低下する",
+    "Flutter由来の重大不具合を回避できなくなる",
+    "公式ロードマップでデスクトップの優先度が下がる"
   ]
 }

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Boundary record:
-# - purpose: local owner desktop launch with the Rust broker-server active.
-# - standard mechanism: native Rust helper broker-server plus Flutter desktop run.
-# - wrapper reason: keep the broker endpoint/session wiring reproducible for owner-use.
-# - deletion condition: remove when the installed product launcher owns this wiring.
-# - release evidence: this is not Windows installed-path release evidence.
-# - authority: this wrapper grants no capability, permission, approval, or audit authority.
+# 境界記録:
+# - 目的: Rust broker-server を稼働させた状態で、所有者のローカルデスクトップを起動する。
+# - 標準機構: native Rust helper broker-server と Flutter desktop run。
+# - wrapper の理由: 所有者利用時の broker endpoint/session 接続を再現可能に保つ。
+# - 削除条件: インストール済み製品の launcher がこの接続を所有したときに削除する。
+# - release 証拠: これは Windows インストール先の release 証拠ではない。
+# - 権限: この wrapper はcapability、permission、approval、audit 権限を与えない。
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BROKER_ROOT="$ROOT/.gui_shell/broker"
@@ -34,14 +34,14 @@ for _ in {1..100}; do
     break
   fi
   if ! kill -0 "$BROKER_PID" 2>/dev/null; then
-    echo "Rust broker exited before endpoint was ready" >&2
+    echo "Rust broker が endpoint 準備前に終了しました" >&2
     exit 1
   fi
   sleep 0.05
 done
 
 if [[ ! -f "$BROKER_SESSION" ]]; then
-  echo "Rust broker endpoint file was not created: $BROKER_SESSION" >&2
+  echo "Rust broker endpoint ファイルが作成されませんでした: $BROKER_SESSION" >&2
   exit 1
 fi
 

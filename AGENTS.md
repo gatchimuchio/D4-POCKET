@@ -1,413 +1,417 @@
-# GUI Shell Agent Instructions
+# GUI Shell エージェント規約
 
-This file defines repository-wide work discipline for AI agents working in GUI Shell.
+本書は、GUI Shellで作業するAIエージェントに対する、リポジトリ全体の作業規律を定める。
 
-## Part I. Common Base Discipline
+## 第I部 共通基底規律
 
-### 1. Purpose and Rule Precedence
+### 1. 目的と規則優先順位
 
-This repository is operated by AI implementation agents under explicit safety, auditability, and completion-evidence requirements.
+本リポジトリは、安全性、監査可能性、完成証拠について明示的な要求を受けるAI実装エージェントによって運用される。
 
-The common base discipline in this section applies to all work in this repository.
+本部の共通基底規律は、本リポジトリ内の全作業に適用する。
 
-Rule precedence:
+規則優先順位:
 
-1. Explicit owner/user instruction for the current task, unless it weakens safety, authority, evidence, release-gate, owner GO, `release_ready`, audit, recovery, or content-exposure boundaries
-2. Common Base Discipline in this `AGENTS.md`
-3. Repository Extension rules in this `AGENTS.md`
-4. Active implementation instruction / roadmap / phase document
-5. Repository contracts, schemas, tests, and validation scripts
-6. Existing implementation patterns
+1. 現在taskに対するオーナーまたはユーザーの明示指示。ただし、安全、権限、証拠、release gate、owner GO、`release_ready`、監査、復旧、Content Exposure Boundaryを弱める指示は、この順位によって許可されない
+2. 本`AGENTS.md`の共通基底規律
+3. 本`AGENTS.md`のリポジトリ拡張規則
+4. `規定/00_日本語基底規定.md`。ただし、言語・意味正本の責任範囲に限り、上位の安全規則を変更しない
+5. 現行の実装指示、ROADMAP、phase文書
+6. リポジトリのcontract、Schema、test、validation script
+7. 既存実装pattern
 
-Repository Extension rules may narrow, strengthen, or specialize the Common Base Discipline for this repository. They must not silently weaken safety, authority boundaries, auditability, validation evidence, or recovery requirements.
+`規定/正本索引.json`は、現行正本、責任地図、外部参照固定点を機械可読に示す索引である。各正本の実質要求を置き換えず、索引と実ファイルが矛盾する場合は不整合としてSUSPENDし、責任正本を確認する。
 
-When rules appear to conflict, preserve the stricter interpretation unless the owner explicitly instructs a controlled change to the governing rule.
+リポジトリ拡張規則は、本リポジトリのために共通基底規律を限定、強化、具体化できる。安全、権限境界、監査可能性、検証証拠、復旧要件を無言で弱めてはならない。
 
-### 2. Non-Negotiable Priorities
+規則が衝突して見える場合は、オーナーが統治規則の制御された変更を明示指示しない限り、より厳格な解釈を保持する。
 
-Apply this priority order unless a repository extension defines a stricter specialization:
+### 2. 譲れない優先事項
 
-1. Safety
-2. Robustness
-3. Operator clarity / auditability
-4. Contract and runtime integrity
-5. Product features
-6. Convenience
+リポジトリ拡張規則がさらに厳しい具体化を定めない限り、次の優先順位を適用する。
 
-Feature completion never outranks safety, authority boundaries, auditability, recovery, or validation evidence.
+1. 安全性
+2. 堅牢性
+3. 操作者の明瞭性・監査可能性
+4. contractとruntimeの完全性
+5. 製品機能
+6. 利便性
 
-Convenience never justifies hidden authority, false completion claims, unverified runtime guarantees, unexplained workarounds, or weakened failure handling.
+機能完成は、安全、権限境界、監査可能性、復旧、検証証拠より上位にならない。
 
-### 3. Bounded Implementation Discipline
+利便性を、隠れた権限、虚偽の完成主張、未検証のruntime保証、説明のない回避策、失敗処理の弱体化の理由にしてはならない。
 
-Do not treat a complex specification as permission for broad generation.
+### 3. 境界付き実装規律
 
-For every task:
+複雑な仕様を、広範な生成の許可として扱わない。
 
-- inspect existing files, contracts, tests, validation commands, and relevant documentation before editing;
-- implement the smallest maintainable change that satisfies the task;
-- preserve repository-specific boundaries;
-- do not perform opportunistic refactors;
-- do not add speculative features;
-- do not broaden permissions, authority, runtime reachability, dependencies, toolchains, or environment assumptions without explicit requirement;
-- remove debris, stale TODOs, abandoned partial paths, and temporary implementation residue introduced by the task before reporting completion.
+各taskで次を行う。
 
-A large amount of generated structure is not evidence of completeness.
+- 編集前に既存file、contract、test、validation command、関連文書を確認する。
+- taskを満たす、保守可能で最小の変更を実装する。
+- リポジトリ固有の境界を保持する。
+- 機会的refactorを行わない。
+- 推測的機能を追加しない。
+- 明示要求なしに、Permission、権限、runtime到達範囲、依存、toolchain、環境前提を広げない。
+- 完了報告前に、taskが導入した残骸、古いTODO、放棄した部分経路、一時的な実装残余を除去する。
 
-### 3.1 P-Series Baseline Freeze
+大量の生成構造は、完全性の証拠ではない。
 
-GitHub Actions / CI workflow は GUI-Shell の品質判定基準面から廃止済み。`.github/workflows` 配下に workflow YAML を置かない。品質判定の基準面は owner / Codex が明示的に実行する local validation、smoke、release verification、Windows 実機 evidence とする。基準面の変更（追加を含む）は active roadmap / phase instruction 経由のみ。検査の削除・弱体化は owner 承認必須。
+#### 3.1 P-Series基準面凍結
 
-### 4. Completion Evidence Rule
+GitHub Actions / CI workflowは、GUI-Shellの品質判定基準面から廃止済みである。`.github/workflows`配下にworkflow YAMLを置かない。品質判定の基準面は、owner / Codexが明示的に実行するlocal validation、smoke、release verification、Windows実機evidenceとする。基準面の変更は、追加を含め、active ROADMAPまたはphase instructionを経由する。検査の削除・弱体化にはowner承認を必須とする。
 
-A completion claim is not evidence.
+### 4. 完成証拠規則
 
-Before reporting a work block as complete, identify:
+完成の主張は証拠ではない。
 
-- the behavior implemented;
-- the production, runtime, contract, or validation path that exercises it;
-- the exact validation commands actually run;
-- the exact results;
-- validation that was not run;
-- remaining stubs, mocks, placeholders, TODOs, unconnected contracts, environment limitations, or known limitations.
+作業blockを完了と報告する前に、次を特定する。
 
-Documentation, schema presence, mock success, fixture success, or unit-test success alone must not be reported as proof that a production path or product behavior is complete.
+- 実装した挙動
+- その挙動を実行するproduction、runtime、contract、validationの経路
+- 実際に実行した正確なvalidation command
+- 正確な結果
+- 実行しなかったvalidation
+- 残存するstub、mock、placeholder、TODO、未接続contract、環境制約、既知の制約
 
-For security-critical, authority-critical, audit-critical, recovery-critical, or release-critical changes, state what evidence demonstrates that the real governed path is exercised.
+文書、Schemaの存在、mock成功、fixture成功、単体test成功だけを、production経路または製品挙動が完成した証拠として報告してはならない。
 
-For any implementation task that modifies repository state, completion also requires repository-state closure unless the owner explicitly limits the task to local-only, audit-only, review-only, or no-commit/no-push work.
+security-critical、authority-critical、audit-critical、recovery-critical、release-criticalな変更では、実際の統治経路が実行されたことを何の証拠が示すかを記載する。
 
-A repository-state-modifying task is not complete until:
+リポジトリ状態を変更する実装taskでは、オーナーがlocal-only、audit-only、review-only、no-commit、no-pushに明示限定しない限り、完成にはリポジトリ状態の閉包も必要である。
 
-- the current pushed repository state is preserved before file edits using the repository two-generation backup convention;
-- intended changes are implemented and no task debris remains;
-- required validation has run and exact results are known;
-- all intended changes are committed with an accurate message;
-- the commit is pushed to the designated remote branch;
-- the pushed remote HEAD is verified to match the reported commit;
-- two recoverable backup generations are verified according to the repository backup convention;
-- working tree and branch alignment are verified after push.
+リポジトリ状態を変更するtaskは、次を満たすまで完了ではない。
 
-The completion report for repository-state-modifying work must include:
+- file編集前に、リポジトリの2世代backup規約で現在push済みのリポジトリ状態を保存する。
+- 意図した変更を実装し、taskの残骸を残さない。
+- 必須validationを実行し、正確な結果を把握する。
+- 意図した変更をすべて正確なmessageでcommitする。
+- 指定remote branchへcommitをpushする。
+- push先remote HEADが報告commitと一致することを確認する。
+- リポジトリbackup規約に従って、復旧可能な2世代backupを確認する。
+- push後にworking treeとbranchの整合を確認する。
 
-- working branch;
-- commit hash;
-- push result;
-- remote HEAD verification;
-- backup generation refs and hashes;
-- rollback point;
-- validation results.
+リポジトリ状態を変更した作業の完了報告には、次を含める。
 
-If commit, push, remote verification, or backup confirmation cannot be completed, do not report the task as complete. Report the exact failed command, reason, current repository state, and the safest recovery point.
+- 作業branch
+- commit hash（コミット識別値）
+- push結果
+- remote HEAD確認
+- backup世代のrefとhash
+- rollback point（復旧地点）
+- validation結果
 
-### 5. Evidence Source / No Ghost Invariants Rule
+commit、push、remote確認、backup確認を完了できない場合、taskを完了と報告しない。失敗した正確なcommand、理由、現在のリポジトリ状態、最も安全な復旧点を報告する。
 
-Do not report runtime health, system integrity, security invariants, authority integrity, or release readiness based only on:
+### 5. 証拠源・幽霊不変条件禁止規則
 
-- configuration validation;
-- schema validation;
-- self-generated state objects;
-- mocked runtime state;
-- fixture-only results;
-- static object or dictionary consistency checks.
+次だけに基づいて、runtime health、system integrity、security invariant、authority integrity、release readinessを報告してはならない。
 
-When adding or modifying a health check, invariant check, conformance check, or integrity report, classify its evidence source as one or more of:
+- configurationの検証
+- Schemaの検証
+- 自己生成したstate object
+- mock化したruntime state
+- fixtureのみの結果
+- 静的objectまたはdictionaryの整合確認
 
-- CONFIG
-- INTERNAL_STATE
-- LIVE_RUNTIME
-- EXTERNAL_EVIDENCE
-- FIXTURE
+health check、invariant check、conformance check、integrity reportを追加・変更するときは、その証拠源を次の1つ以上へ分類する。
 
-Each evidence class proves only the scope it actually observes.
+- `CONFIG`
+- `INTERNAL_STATE`
+- `LIVE_RUNTIME`
+- `EXTERNAL_EVIDENCE`
+- `FIXTURE`
 
-CONFIG, INTERNAL_STATE, or FIXTURE results must not be promoted into live-runtime or external-integrity guarantees without corresponding evidence.
+各証拠classは、実際に観測した範囲だけを証明する。
 
-If required evidence is unavailable, report the limitation or return SUSPEND where the repository contract requires fail-closed behavior.
+`CONFIG`、`INTERNAL_STATE`、`FIXTURE`の結果を、対応する証拠なしにlive runtimeまたはexternal integrityの保証へ昇格してはならない。
 
-### 6. Trust Boundary and Input Verification Rule
+必要な証拠が利用不能なら、その制約を報告するか、リポジトリcontractがfail-closedを要求する箇所ではSUSPENDを返す。
 
-Do not assume inbound data is safe merely because it is structured, parsed, schema-shaped, or supplied by another component.
+### 6. 信頼境界・入力検証規則
 
-For any input that may affect authority, permission, execution, approval, audit identity, workspace scope, command scope, content visibility, recovery, or release behavior, the responsible boundary must explicitly account for the applicable parts of:
+受信dataが構造化済み、parse済み、Schema形状、または別component提供というだけで安全と仮定しない。
 
-- raw input retention for audit;
-- canonicalization / normalization;
-- schema or structural validation;
-- origin or source validation;
-- integrity or tamper checks;
-- replay protection;
-- authority or execution-eligibility evaluation;
-- audit emission;
-- fail-closed or SUSPEND behavior.
+権限、Permission、execution、Approval、audit identity、workspace scope、command scope、content visibility、Recovery、release挙動へ影響し得る入力について、責任境界は該当する次の項目を明示的に扱う。
 
-External data, UI state, adapter metadata, channel metadata, previous state, memory, history, diagnostics, and tool output must not create, escalate, replace, or bypass authority unless the repository extension explicitly defines a bounded, validated authority path.
+- 監査用raw inputの保持
+- 正本化 / normalization
+- Schemaまたは構造validation
+- originまたはsource validation
+- integrityまたはtamper check
+- replay防護
+- authorityまたはexecution eligibilityの評価
+- audit出力
+- fail-closedまたはSUSPEND挙動
 
-### 7. Active Production Path Minimization Rule
+リポジトリ拡張規則が境界付きで検証済みの権限経路を明示定義しない限り、外部data、UI state、Adapter metadata、channel metadata、previous state、memory、history、diagnostics、tool outputは、権限を生成、昇格、置換、迂回してはならない。
 
-Keep the normal production or runtime execution path minimal and responsibility-bounded.
+### 7. 現行production経路最小化規則
 
-Do not silently mix ordinary runtime behavior with:
+通常のproductionまたはruntime execution pathは、最小かつ責任境界付きに保つ。
 
-- diagnostic functionality;
-- repair or recovery tooling;
-- migrations;
-- release-only verification;
-- development-only fixtures;
-- bootstrap-only tooling;
-- administrative commands.
+通常のruntime挙動へ次を無言で混在させない。
 
-When adding privileged or operational functionality, classify it as one of:
+- 診断機能
+- 修復・復旧tooling
+- migration
+- release専用検証
+- development専用fixture
+- bootstrap専用tooling
+- 管理用command
 
-- runtime path;
-- control path;
-- diagnostic path;
-- repair / recovery path;
-- build / release path;
-- development-only path.
+権限付き機能または運用機能を追加するときは、次のいずれかに分類する。
 
-If non-runtime functionality must be reachable from an ordinary runtime path, document why, identify its authority and audit consequences, and validate that it does not expand hidden execution power.
+- runtime経路
+- control経路
+- diagnostic経路
+- repair / recovery経路
+- build / release経路
+- development専用経路
 
-### 8. Wrapper / Workaround Accountability Rule
+通常runtime pathから非runtime機能へ到達させる必要がある場合、理由、権限・監査上の影響を文書化し、隠れた実行権限を拡大しないことを検証する。
 
-Do not introduce wrapper scripts, shims, custom execution layers, alternate build paths, environment bypasses, or host-specific workaround logic merely to make a failing task appear complete.
+### 8. Wrapper・回避策説明責任規則
 
-If such a mechanism is required and not prohibited by the repository extension, document:
+失敗中のtaskを完成したように見せるためだけに、wrapper script、shim、custom execution layer、alternate build path、environment bypass、host固有のworkaround logicを導入してはならない。
 
-- the original failure;
-- the root cause;
-- why the native or existing repository mechanism is insufficient;
-- the exact responsibility of the added mechanism;
-- the environments in which it applies;
-- validation performed;
-- whether it is temporary or permanent;
-- its removal condition or formalization condition.
+そのような機構が必要で、かつリポジトリ拡張規則で禁止されていない場合は、次を文書化する。
 
-A deliberate, tested, bounded, documented normalization mechanism may be acceptable unless prohibited by the repository extension.
+- 元の失敗
+- 根本原因
+- nativeまたは既存リポジトリ機構では不十分な理由
+- 追加機構の正確な責任
+- 適用環境
+- 実行したvalidation
+- 一時的か恒久的か
+- 除去条件または正式化条件
 
-An unexplained, unbounded, or symptom-hiding workaround is not acceptable.
+意図的で、test済みで、境界付きで、文書化されたnormalization機構は、リポジトリ拡張規則で禁止されない限り許容できる。
 
-### 9. Environment and Product-Proof Separation Rule
+説明がなく、境界がなく、症状を隠すworkaroundは許容しない。
 
-Keep development environment, local validation environment, release-proof environment, external runner environment, and target product environment conceptually separate.
+### 9. 環境・製品証拠分離規則
 
-Do not report success in one environment as proof of success in another environment unless the repository explicitly defines that equivalence and evidence supports it.
+development environment、local validation environment、release-proof environment、external runner environment、target product environmentを概念上分離する。
 
-When validation is blocked or distorted by host environment limitations:
+リポジトリが同等性を明示定義し、証拠がそれを支持しない限り、ある環境での成功を別環境での成功証拠として報告しない。
 
-- identify the environment limitation;
-- distinguish it from a product regression;
-- do not modify product architecture merely to hide the host failure;
-- report what remains unverified in the target environment.
+host environmentの制約によってvalidationが阻害または歪曲される場合は、次を行う。
 
-Local development convenience must not silently become permanent product architecture or release evidence.
+- 環境制約を特定する。
+- 製品regressionと区別する。
+- host failureを隠すためだけに製品architectureを変更しない。
+- target environmentで未検証の範囲を報告する。
 
-### 10. Contract-to-Runtime Connection Rule
+local developmentの利便性を、恒久的な製品architectureまたはrelease evidenceへ無言昇格してはならない。
 
-A schema, interface, protocol object, adapter contract, audit contract, invariant contract, fixture, or success profile is not complete merely because it exists.
+### 10. Contract・runtime接続規則
 
-When adding or modifying a contract intended to affect real behavior, identify:
+Schema、interface、protocol object、Adapter Contract、audit contract、invariant contract、fixture、success profileは、存在するだけでは完成していない。
 
-- its consuming production, runtime, validator, or governed execution path;
-- the validation or conformance path that exercises it;
-- the negative or failure case that must be rejected, blocked, audited, or suspended;
-- any part that remains intentionally unconnected or deferred.
+実挙動へ影響するcontractを追加・変更するときは、次を特定する。
 
-Do not claim behavioral completion for contracts that are defined but not exercised by the intended governed path.
+- それを消費するproduction、runtime、validator、または統治されたexecution path
+- それを実行するvalidationまたはconformance path
+- reject、block、audit、SUSPENDすべきnegative caseまたはfailure case
+- 意図的に未接続または延期する部分
 
-### 11. Audit Outcome and Reporting Rule
+意図した統治経路で実行されないcontractについて、挙動の完成を主張しない。
 
-Every completed work report must distinguish:
+### 11. 監査結果・報告規則
 
-- observed implementation facts;
-- validation actually executed;
-- unverified claims;
-- environment-limited checks;
-- remaining risks;
-- intentionally deferred scope;
-- repository-specific release blockers.
+完了した全作業報告で、次を区別する。
 
-Where the repository uses release-gate classifications, preserve and apply them.
+- 観測した実装事実
+- 実際に実行したvalidation
+- 未検証の主張
+- 環境制約付きcheck
+- 残存risk
+- 意図的な延期範囲
+- リポジトリ固有のrelease blocker
 
-Where a safety-critical, authority-critical, or execution-critical requirement cannot be verified, do not infer success. Report SUSPEND, blocker, or the repository-specific equivalent.
+リポジトリがrelease gate分類を使用する場合、その分類を保持して適用する。
 
-## Part II. Repository Extension
+safety-critical、authority-critical、execution-criticalな要件を検証できない場合、成功を推論しない。SUSPEND、blocker、またはリポジトリ固有の同等状態を報告する。
 
-### 12. Repository Identity and Scope
+## 第II部 リポジトリ拡張規則
 
-Do not treat this repository as a normal app scaffold.
+### 12. リポジトリの同一性と射程
 
-GUI Shell is a generic Runtime Operation Shell control plane.
+本リポジトリを通常のapp scaffoldとして扱わない。
 
-Flutter, adapters, reference runtimes, local caches, memory, installers, native helpers, and product UI are downstream or bounded implementation surfaces. They do not own authority.
+GUI Shellは、汎用のRuntime Operation Shell制御planeである。
 
-GUI Shell implements a generic GUI Shell / Runtime Operation Shell.
+Flutter、Adapter、reference runtime、local cache、memory、installer、native helper、product UIは、下流または境界付きの実装面であり、権限を所有しない。
 
-It is not a BLUE-TANUKI-specific GUI.
+GUI Shellは、汎用のGUI Shell / Runtime Operation Shellを実装する。
 
-BLUE-TANUKI is the first reference runtime and must connect through an adapter boundary.
+BLUE-TANUKI専用GUIではない。
 
-GUI Shell is also an LLM-readable application responsibility substrate. Its contracts, safety boundaries, adapter model, approval model, audit model, recovery model, and extension rules are intended to be read and used by LLM development / integration agents as first-class implementation and integration surfaces.
+BLUE-TANUKIは最初のreference runtimeであり、Adapter Boundaryを介して接続しなければならない。
 
-LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
+GUI Shellは、LLMが読むapplication responsibility substrateでもある。contract、安全境界、Adapter model、Approval model、Audit model、Recovery model、拡張規則は、LLM開発・統合エージェントが第一級の実装・統合面として読み、使用することを意図する。
 
-#### LLM Development / Integration Agent Rules
+LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源には決してならない。
 
-Any AI or LLM implementation agent working in this repository must:
+#### LLM開発・統合エージェント規則
 
-- treat GUI Shell contracts as the mandatory connection surface for new functions, modules, adapters, tools, services, or runtime integrations;
-- identify whether each change belongs to runtime path, control path, diagnostic path, repair / recovery path, build / release path, or development-only path;
-- avoid adding adapters, tools, modules, external connections, or privileged behavior outside declared contract and conformance boundaries;
-- avoid granting authority through LLM output, memory, external metadata, generated configuration, GUI state, adapter metadata, tool responses, local cache, previous state, or diagnostics;
-- never approve its own sensitive action;
-- never weaken approval, audit, recovery, authority-strip, content exposure, or broker boundary behavior to make integration easier;
-- identify the consumed contract, required conformance test, required failure case, and governed runtime path before claiming an extension complete;
-- report when a proposed integration requires a new contract instead of silently improvising a shortcut;
-- keep human owner approval, recovery decisions, release claims, and final responsibility explicit.
+本リポジトリで作業するAIまたはLLM実装エージェントは、次を守る。
 
-### 13. Architecture Constraints
+- 新機能、module、Adapter、tool、service、runtime integrationの必須接続面としてGUI Shell contractを扱う。
+- 各変更がruntime path、control path、diagnostic path、repair / recovery path、build / release path、development-only pathのどれに属するかを特定する。
+- 宣言済みcontractとconformance boundaryの外へ、Adapter、tool、module、external connection、privileged behaviorを追加しない。
+- LLM output、memory、external metadata、generated configuration、GUI state、Adapter metadata、tool response、local cache、previous state、diagnosticsを通じて権限を与えない。
+- 自身のsensitive actionを決して自己承認しない。
+- 統合を容易にするために、Approval、Audit、Recovery、Authority Strip、Content Exposure、broker boundaryの挙動を弱めない。
+- 拡張の完成を主張する前に、消費contract、必須conformance test、必須failure case、統治されたruntime pathを特定する。
+- 提案統合に新contractが必要な場合、shortcutを無言で即興せず、その必要性を報告する。
+- human ownerのApproval、Recovery判断、release claim、最終責任を明示状態に保つ。
 
-- UI framework: Flutter
-- Native helper: Rust
-- Contracts: JSON Schema
-- Language policy: `docs/LANGUAGE_POLICY.md`
-- Reference runtime: BLUE-TANUKI via adapter only
-- Shell Core must remain framework-independent
-- Adapter contracts must remain runtime-neutral
-- Flutter must remain a replaceable UI layer
-- Flutter / Dart is the UI product layer and must not become the authority boundary
-- Rust is the native safety boundary for authority-sensitive helper, broker, IPC, audit, signature, and runtime command-envelope work
-- TypeScript / Node must not become GUI-Shell core runtime; keep it limited to external SDK, adapter sample, protocol client sample, or bridge example scope
-- Python must not become GUI-Shell runtime dependency; keep it limited to dev-only tooling, schema generation, migration helper, local validation, release evidence validation, or temporary validation script scope
-- Authority-sensitive Flutter-Rust connection must prefer independent process IPC; FFI/direct bridge is allowed only outside authority, signature, approval-token, external command dispatch, and audit finalization boundaries
-- BLUE-TANUKI implementation must not be modified for GUI Shell convenience unless the owner explicitly requests it
+### 13. 構造制約
 
-### 14. Boundary Semantics
+- UI frameworkはFlutter
+- Native helperはRust
+- Contract: JSON Schema
+- 実装言語・安全境界方針: `docs/LANGUAGE_POLICY.md`
+- 日本語基底・意味正本: `規定/00_日本語基底規定.md`
+- Reference runtime: BLUE-TANUKI。Adapter経由に限る
+- Shell Coreはframework非依存を保つ
+- Adapter Contractはruntime中立を保つ
+- Flutterは交換可能なUI Layerを保つ
+- Flutter / DartはUI Product Layerであり、Authority Boundaryになってはならない
+- Rustは、権限に敏感なhelper、broker、IPC、Audit、signature、runtime command envelope作業のnative safety boundaryとする
+- TypeScript / NodeをGUI-Shell core runtimeにしてはならない。external SDK、Adapter sample、protocol client sample、bridge exampleの範囲に限定する
+- PythonをGUI-Shell runtime dependencyにしてはならない。dev-only tooling、Schema generation、migration helper、local validation、release evidence validation、一時validation scriptの範囲に限定する
+- Authority-sensitiveなFlutter-Rust接続は、独立process IPCを優先する。FFI / direct bridgeは、authority、signature、approval token、external command dispatch、audit finalizationの境界外でのみ許可する
+- オーナーが明示要求しない限り、GUI Shellの利便性のためにBLUE-TANUKI実装を変更してはならない
+
+### 14. 境界の意味
 
 #### Shell Core
 
-Shell Core owns:
+Shell Coreは次を所有する。
 
-- runtime registry
-- permission ledger
-- approval queue
-- audit store
-- recovery catalog
-- update policy
-- content exposure enforcement
-- adapter conformance enforcement
+- runtimeのregistry
+- permissionのledger
+- approvalのqueue
+- auditのstore
+- recoveryのcatalog
+- updateのpolicy
+- content exposureの強制
+- adapter conformanceの強制
 
-Shell Core must not:
+Shell Coreは次を行ってはならない。
 
-- import Flutter
-- contain BLUE-TANUKI-specific logic
-- trust adapter metadata
-- use memory/cache/previous state as authority by itself
-- silently broaden permission
+- Flutterをimportする
+- BLUE-TANUKI固有logicを含む
+- Adapter metadataを信頼する
+- memory、cache、previous stateだけを権限として使用する
+- Permissionを無言で広げる
 
-#### UI Layer
+#### UI層（Layer）
 
-Flutter may own:
+Flutterは次を所有できる。
 
 - rendering
-- operator input
+- operatorの入力
 - navigation
-- local UI state
+- localのUI state
 - theme
 - localization
 - accessibility
 
-Flutter must not own:
+Flutterは次を所有してはならない。
 
-- authority decisions
-- permission semantics
-- approval semantics
-- audit semantics
-- recovery classification
-- content visibility rules
-- runtime trust rules
+- authorityの判定
+- Permissionの意味
+- Approvalの意味
+- Auditの意味
+- Recoveryの分類
+- content visibilityの規則
+- runtime trustの規則
 
-GUI display success is not proof of runtime-contract completion or authority safety.
+GUI表示成功は、runtime contract完成または権限安全性の証拠ではない。
 
-#### Adapter Layer
+#### Adapter層（Layer）
 
-Adapters may:
+Adapterは次を行える。
 
-- normalize runtime state
-- expose runtime health
-- expose runtime diagnostics
-- translate runtime events into GUI Shell schemas
+- runtime stateを正規化する
+- runtime healthを露出する
+- runtime diagnosticsを露出する
+- runtime eventをGUI Shell Schemaへ変換する
 
-Adapters must not:
+Adapterは次を行ってはならない。
 
-- grant permission through metadata
-- create authority context not granted by runtime
-- display raw payloads beyond allowed visibility
-- edit sealed, hidden, sacred, or authority fields
-- bypass approval state
-- bypass audit creation
+- metadataを通じてPermissionを付与する
+- runtimeが付与していないauthority contextを生成する
+- 許可されたvisibilityを超えてraw payloadを表示する
+- sealed、hidden、sacred、authority fieldを編集する
+- Approval stateを迂回する
+- Audit生成を迂回する
 
-Adapter-exposed health or diagnostics must state the evidence scope they represent.
+Adapterが露出するhealthまたはdiagnosticsは、それが表す証拠範囲を記載しなければならない。
 
-#### Rust Helper
+#### Rust helper層
 
-Rust helper may perform bounded native diagnostics and operations.
+Rust helperは、境界付きのnative diagnosticsとoperationを実行できる。
 
-Rust helper must not:
+Rust helperは次を行ってはならない。
 
-- become a hidden authority path
-- silently introduce filesystem, process, network, credential, IPC, or update access
-- execute sensitive actions without capability / permission / approval / audit / recovery mapping
-- return unstructured sensitive data
+- 隠れた権限経路になる
+- filesystem、process、network、credential、IPC、updateへのaccessを無言で導入する
+- Capability、Permission、Approval、Audit、Recoveryの対応なしにsensitive actionを実行する
+- 構造化されていないsensitive dataを返す
 
-### 15. Repository-Specific Forbidden Patterns
+### 15. リポジトリ固有の禁止pattern
 
-Do not:
+次を行ってはならない。
 
-- put authority decisions in UI widgets
-- let adapter metadata grant permissions
-- let adapter metadata create authority context
-- let memory, local cache, or previous state grant authority by itself
-- display full content unless `content_visibility=full`
-- edit authority, sealed, hidden, or sacred fields in approval payloads
-- introduce hidden network, filesystem, process, credential, IPC, or update access
-- silently broaden runtime permissions
-- add BLUE-TANUKI-specific logic to Shell Core
-- place core contracts inside Flutter-specific code
-- claim release readiness without validation evidence
-- treat first-run success as product completion
-- treat product UI completion as contract completion
-- create speculative features outside the roadmap
-- perform broad refactors unless required by the task
+- UI widgetへauthority decisionを置く
+- Adapter metadataにPermissionを付与させる
+- Adapter metadataにauthority contextを生成させる
+- memory、local cache、previous stateだけに権限を付与させる
+- `content_visibility=full`でないのに全文contentを表示する
+- Approval payloadのauthority、sealed、hidden、sacred fieldを編集する
+- 隠れたnetwork、filesystem、process、credential、IPC、update accessを導入する
+- runtime Permissionを無言で広げる
+- BLUE-TANUKI固有logicをShell Coreへ追加する
+- core contractをFlutter固有code内へ置く
+- validation evidenceなしにrelease readinessを主張する
+- first-run成功を製品完成として扱う
+- Product UI完成をcontract完成として扱う
+- ROADMAP外の推測的機能を作る
+- taskに必要でない広範なrefactorを行う
 
-### 16. Required Audit Mapping
+### 16. 必須監査対応
 
-Every sensitive action must map to:
+すべてのsensitive actionは、次へ対応づけなければならない。
 
 - Capability
 - Permission
 - Approval state
 - AuditEvent
-- RecoveryAction on failure
+- failure時のRecoveryAction
 
-Sensitive actions include:
+sensitive actionには次を含む。
 
-- filesystem access
-- process execution/control
-- network access
-- credential access
+- filesystemへのaccess
+- processのexecution / control
+- networkへのaccess
+- credentialへのaccess
 - IPC
-- update verification
-- runtime adapter actions
-- approval payload edits
-- audit export/inspection
-- recovery execution
-- installer state changes
-- device pairing
+- updateのverification
+- runtime Adapterのaction
+- Approval payloadのedit
+- Auditのexport / inspection
+- Recoveryのexecution
+- installer stateのchange
+- deviceのpairing
 
-### 17. Content Exposure Rules
+### 17. 内容露出規則
 
-Allowed content visibility values:
+許可するcontent visibility値:
 
 ```text
 none
@@ -417,164 +421,164 @@ redacted
 full
 ```
 
-Rules:
+規則:
 
-- `none`: do not display raw content
-- `hash_only`: display only payload hash
-- `summary`: display only approved summary
-- `redacted`: display only redacted projection
-- `full`: full content may be displayed
+- `none`: raw contentを表示しない
+- `hash_only`: payload hashだけを表示する
+- `summary`: 承認済みsummaryだけを表示する
+- `redacted`: redacted projectionだけを表示する
+- `full`: full contentを表示できる
 
-Only `full` permits full payload display.
+全文payload表示を許可するのは`full`だけである。
 
-### 18. Approval Edit Rules
+### 18. Approval編集規則
 
-Approval editing must be field-scoped.
+Approval編集はfield scopeを限定しなければならない。
 
-Do not allow editing of:
+次の編集を許可しない。
 
-- authority fields
-- sealed fields
-- hidden fields
-- sacred domain fields
-- runtime identity
-- permission identity
-- audit identity
-- payload hash directly
+- authorityのfield
+- sealedのfield
+- hiddenのfield
+- sacred domainのfield
+- runtimeのidentity
+- permissionのidentity
+- auditのidentity
+- payload hashの直接編集
 
-After any allowed edit:
+許可された編集の後は、次を行う。
 
-- rehash payload
-- revalidate payload
-- mark approval as requiring validation when needed
-- emit audit event
+- payloadを再hashする
+- payloadを再validationする
+- 必要に応じてApprovalをvalidation requiredとしてmarkする
+- AuditEventをemitする
 
-### 19. Required Validation Before Commit
+### 19. コミット前の必須検証
 
-Run at minimum:
+最低限、次を実行する。
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-If `python` is unavailable:
+`python`が利用不能なら、次を実行する。
 
 ```bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
 ```
 
-If Rust is installed and Rust helper is touched:
+Rustが導入済みでRust helperを変更した場合は、次を実行する。
 
 ```bash
 cd native/rust_helper && cargo test
 ```
 
-If Flutter is installed and Flutter app is touched:
+Flutterが導入済みでFlutter appを変更した場合は、次を実行する。
 
 ```bash
 cd apps/desktop_flutter && flutter analyze
 cd apps/mobile_flutter && flutter analyze
 ```
 
-If validation cannot run, report why.
+validationを実行できない場合は、理由を報告する。
 
-Never claim validation passed unless it actually passed.
+実際に成功していないvalidationを、成功したと主張してはならない。
 
-### 20. Git Operation Policy
+### 20. Git運用方針
 
-This repository uses a direct-main owner workflow.
+本リポジトリは、direct-main owner workflowを使用する。
 
-Every completed work block must be committed and pushed. Do not leave completed repository changes only in the local working tree unless the owner explicitly says not to commit or not to push.
+完了した各作業blockはcommitし、pushしなければならない。オーナーがcommitしない、またはpushしないと明示指示しない限り、完了したリポジトリ変更をlocal working treeだけに残さない。
 
-Default workflow:
+標準workflow:
 
-1. Work on `main`
-2. Do not create feature branches or pull requests unless the owner explicitly asks
-3. Before changing files for a repository-state-modifying task, fetch/prune `origin` and verify that `main` is clean and aligned with `origin/main`; if it is not aligned, reconcile or report the blocker before editing
-4. Rotate the local two-generation backup pair to preserve the current pushed pre-change state:
-   - If `codex/backup-main` exists, force-update `codex/backup-main-prev` to `codex/backup-main`
-   - Force-update `codex/backup-main` to current pushed `main`
-5. Push the two backup generations as PR-neutral remote tags, not remote branches:
+1. `main`で作業する
+2. オーナーが明示要求しない限り、feature branchまたはpull requestを作らない
+3. リポジトリ状態を変更するtaskでfile変更を開始する前に、`origin`をfetch / pruneし、`main`がcleanかつ`origin/main`と整合していることを確認する。不整合なら、編集前に解消するかblockerを報告する
+4. localの2世代backup pairをrotateし、現在push済みの変更前状態を保存する
+   - `codex/backup-main`が存在する場合、`codex/backup-main-prev`を`codex/backup-main`へforce-updateする
+   - `codex/backup-main`を現在push済みの`main`へforce-updateする
+5. 2つのbackup世代をremote branchではなく、PR-neutralなremote tagとしてpushする
    - `git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`
-6. Perform bounded implementation work and required validation
-7. Commit the completed work block directly on `main`
-8. Push `main` immediately after the commit
-9. Verify that `git ls-remote origin refs/heads/main` matches the local `HEAD`
-10. Verify that remote backup tags exist and record their hashes:
+6. 境界付き実装と必須validationを行う
+7. 完了した作業blockを`main`へ直接commitする
+8. commit直後に`main`をpushする
+9. `git ls-remote origin refs/heads/main`がlocal `HEAD`と一致することを確認する
+10. remote backup tagの存在を確認してhashを記録する
     - `refs/tags/codex/backup-main`
     - `refs/tags/codex/backup-main-prev`
-11. If remote `codex/backup-main` or `codex/backup-main-prev` branches exist, delete those remote backup branches after `main` is clean and aligned; backup branches on GitHub create pull-request candidates and must not be retained
-12. Verify `git status --short --branch` is clean and aligned with `origin/main`
-13. If backup, commit, push, remote HEAD verification, or remote-backup verification fails, report the exact failed command and reason
+11. remoteに`codex/backup-main`または`codex/backup-main-prev` branchが存在する場合、`main`がcleanかつ整合した後にremote backup branchを削除する。GitHub上のbackup branchはpull request候補を生成するため、保持してはならない
+12. `git status --short --branch`がcleanかつ`origin/main`と整合することを確認する
+13. backup、commit、push、remote HEAD確認、remote backup確認のいずれかが失敗した場合、失敗した正確なcommandと理由を報告する
 
-Backup branches:
+バックアップブランチ:
 
 ```text
 codex/backup-main
 codex/backup-main-prev
 ```
 
-Remote backup refs:
+リモートバックアップref:
 
 ```text
 refs/tags/codex/backup-main
 refs/tags/codex/backup-main-prev
 ```
 
-Backup branches are local recovery refs only. Remote backup generations must be pushed as tags so GitHub does not present them as pull request candidates. Do not open, request, or merge pull requests from backup refs.
+Backup branchはlocal recovery refに限る。GitHubがpull request候補として表示しないよう、remote backup世代はtagとしてpushする。backup refからpull requestをopen、request、mergeしてはならない。
 
-Push backup branches as remote branches only when the owner explicitly requests that exact emergency handoff. If backup branches are pushed to GitHub for that exception, report that GitHub may show them as pull request candidates and clean them up once the owner no longer needs them.
+オーナーがその緊急handoffを明示要求した場合に限り、backup branchをremote branchとしてpushする。この例外でbackup branchをGitHubへpushした場合、GitHubがpull request候補として表示し得ることを報告し、オーナーが不要とした時点でcleanupする。
 
-Do not create additional backup generations.
+追加のbackup世代を作らない。
 
-Do not stage:
+次をstageしてはならない。
 
-- secrets
-- local runtime state
-- Flutter build output
-- Rust target output
-- installer artifacts
-- local caches
-- generated logs unless explicitly requested
+- secret
+- localのruntime state
+- Flutterのbuild output
+- Rustのtarget output
+- installerのartifact
+- localのcache
+- 明示要求されていないgenerated log
 
-### 21. Completion Report and Release-Gate Classification
+### 21. 完了報告とリリース関門分類
 
-Every completed change report must include:
+完了したすべての変更報告に、次を含める。
 
-1. Summary
-2. Changed files
-3. Risk classification
-4. Validation results
-5. Release-gate classification
-6. Remaining risks, classified
-7. Working branch
-8. Commit hash, or `not committed`
-9. Push result, or `not pushed`
-10. Remote HEAD verification
-11. Backup generation refs and hashes
-12. Rollback point
+1. 概要
+2. 変更file
+3. risk分類
+4. validation結果
+5. release gate分類
+6. 分類済みの残存risk
+7. 作業branch
+8. commit hash、または`not committed`
+9. push結果、または`not pushed`
+10. remote HEAD確認
+11. backup世代refとhash
+12. rollback point（復旧地点）
 
-Validation results must explicitly say which commands passed, failed, or were not run.
+validation結果は、どのcommandが成功、失敗、未実行かを明記しなければならない。
 
-In this repository, "release" means completed product release.
+本リポジトリで`release`は、完成した製品releaseを意味する。
 
-Any final report, release report, validation report, or remaining-risk section must classify every unfinished item as:
+final report、release report、validation report、remaining risk sectionでは、未完了項目をすべて次のいずれかに分類する。
 
 - `release_blocker`
 - `post_v1_scope`
 - `known_limitation`
 
-No unclassified "remaining risks", "still needed", "not run", "not implemented", "not verified", "TODO", "skeleton only", or "future work" item is allowed.
+分類のない`remaining risks`、`still needed`、`not run`、`not implemented`、`not verified`、`TODO`、`skeleton only`、`future work`項目を許可しない。
 
-Any `release_blocker` prevents release claim.
+`release_blocker`が1つでもあればreleaseを主張できない。
 
-Any `post_v1_scope` item must explicitly state why it is outside v1.0 scope.
+`post_v1_scope`項目は、v1.0 scope外である理由を明記しなければならない。
 
-Any `known_limitation` must be documented in `README.md`, `CLAIM.md`, or `RELEASE_CHECKLIST.md` before release.
+`known_limitation`は、release前に`README.md`、`CLAIM.md`、`RELEASE_CHECKLIST.md`のいずれかへ文書化しなければならない。
 
-Remaining risks format:
+残存riskの形式:
 
 ```text
 - item:
@@ -584,20 +588,34 @@ Remaining risks format:
   blocks_release: yes | no
 ```
 
-### 22. Documentation Language
+### 22. 日本語基底・文書言語
 
-Primary human-facing documentation language is Japanese.
+GUI-Shellの基底言語、規定言語、内部意味正本、設計言語、監査言語、運用報告言語は日本語とする。詳細な対象、局所例外、意味監査、版差境界は`規定/00_日本語基底規定.md`を正本とし、現行正本と外部参照固定点は`規定/正本索引.json`で確認する。
 
-English is allowed for:
+```text
+日本語で対象化・差異化・関係化
+→ 日本語で定義・設計・監査
+→ 日本語正本成立
+→ 実務上やむを得ない外部接続だけ他言語へ局所射影
+```
 
-- code comments where conventional
-- schema identifiers
-- protocol terms
-- command names
-- package metadata
-- concise agent instruction text
+他言語は、正確性、互換性、実行可能性、検索再現性のため必要な接続面に限り、局所例外として使用できる。
 
-Preserve established terms:
+局所例外には次を含む。
+
+- conventionalなcode commentのうち、外部規約または既存project慣行が固定する表現
+- Schemaのidentifier
+- protocolのterm
+- command nameとoption
+- packageのmetadata
+- programming languageの予約語・標準構文
+- 外部API・library・frameworkの固定識別子
+- URL、path、environment variable、commit hash、branch、tag、版識別子
+- 外部toolが固定文言を要求する短いagent instruction text
+
+例外表記の一般語義を内部意味へ逆流させず、GUI-Shell側の責任、境界、採否、失敗時挙動は日本語で定義する。
+
+次の確立用語・固有名は原形を保持する。
 
 - GUI Shell
 - Runtime Operation Shell
@@ -612,78 +630,86 @@ Preserve established terms:
 - BLUE-TANUKI
 - Rust helper
 
-### 23. Product Stance
+既存文書に英語正本または日英並列正本が残ることを、本規定への適合とみなさない。移行は対象、責任、互換性、test、履歴を固定した境界付き変更として行い、機械翻訳や一括置換を完成証拠にしない。
 
-GUI Shell may make operation comfortable.
+### 23. 製品姿勢
 
-GUI Shell must not hide authority.
+GUI Shellは、操作を快適にしてよい。
 
-The UI is a surface, not the system authority.
+GUI Shellは、権限を隠してはならない。
 
-Schemas and conformance are the contract gate.
+UIは操作面であり、system authorityではない。
 
-Do not weaken approval, audit, visibility, or recovery requirements to improve comfort.
+Schemaとconformanceはcontract gateである。
 
-Do not use local owner operation as an excuse to reduce robustness.
+快適性のために、Approval、Audit、visibility、Recovery要件を弱めない。
 
-Do not treat product UI completion as contract completion.
+local owner operationを、堅牢性低下の理由にしない。
 
-## Part III. Active Work and Phase Guidance
+Product UI完成をcontract完成として扱わない。
 
-### 24. Source of Truth
+## 第III部 現行作業・phase指針
 
-Within the precedence model in Part I, use this repository-specific active guidance order:
+### 24. 正本
+
+第I部の優先順位modelの範囲内で、リポジトリ固有の現行指針を次の順に使用する。
 
 1. `docs/specs/gui-shell-spec-v1.md`
-2. `docs/specs/adapter-conformance.md`, `docs/specs/content-exposure-policy.md`, `docs/specs/approval-visibility-boundary.md`, and related `docs/specs/` contract documents
+2. `docs/specs/adapter-conformance.md`、`docs/specs/content-exposure-policy.md`、`docs/specs/approval-visibility-boundary.md`、および関連する`docs/specs/` contract文書
 3. `specs/*.schema.json`
 4. `tooling/conformance_tests/`
-5. `ROADMAP.md` and `docs/standards/gui-shell-extended-standard.md` for phase and technology-selection context
-6. Existing implementation patterns
+5. phaseおよび技術選択の文脈を示す`ROADMAP.md`と`docs/standards/gui-shell-extended-standard.md`
+6. 既存実装pattern
 
-If conflict exists, choose the stricter rule that preserves Shell Core authority boundaries, schema integrity, conformance coverage, and operator safety.
+日本語の意味正本については`規定/00_日本語基底規定.md`、正本の所在と責任については`規定/正本索引.json`を併せて確認する。これらは、上記実装contractの安全要件を弱めない。
 
-### 25. Required Work Order
+衝突がある場合は、Shell Core authority boundary、Schema integrity、conformance coverage、operator safetyを保持する、より厳格な規則を選ぶ。
 
-Unless the owner explicitly instructs otherwise, work in this order:
+### 25. 必須作業順序
 
-1. Read `docs/specs/gui-shell-spec-v1.md`
-2. Read relevant `docs/specs/` contract documents
-3. Read `docs/standards/gui-shell-extended-standard.md`
-4. Read relevant schemas under `specs/`
-5. Preserve Shell Core / UI / Adapter / Rust helper boundaries
-6. Add or update schemas before implementation when contracts change
-7. Add or update conformance tests before product UI
-8. Implement minimal bounded code
-9. Run validation
-10. Report exact results
+オーナーが明示的に別の指示をしない限り、次の順で作業する。
 
-Do not optimize a local task in a way that makes later phases less safe, less inspectable, or harder to validate.
+1. `docs/specs/gui-shell-spec-v1.md`を読む
+2. 関連する`docs/specs/` contract文書を読む
+3. `docs/standards/gui-shell-extended-standard.md`を読む
+4. `specs/`配下の関連Schemaを読む
+5. Shell Core / UI / Adapter / Rust helperの境界を保持する
+6. contract変更時は実装前にSchemaを追加または更新する
+7. Product UIより前にconformance testを追加または更新する
+8. 最小かつ境界付きのcodeを実装する
+9. validationを実行する
+10. 正確な結果を報告する
 
-### 26. Active Instruction / Roadmap References
+後続phaseの安全性、検査可能性、validation可能性を低下させる方法でlocal taskを最適化してはならない。
 
-The canonical active roadmap is `ROADMAP.md`.
+### 26. 現行指示・ROADMAP参照
 
-The formal implementation specification is `docs/specs/gui-shell-spec-v1.md`.
+現行ROADMAPの正本は`ROADMAP.md`である。
 
-The extended standard is `docs/standards/gui-shell-extended-standard.md`.
+正式実装仕様は`docs/specs/gui-shell-spec-v1.md`である。
 
-The language and safety-boundary policy is `docs/LANGUAGE_POLICY.md`.
+拡張標準は`docs/standards/gui-shell-extended-standard.md`である。
 
-Schemas under `specs/` define the contract gate for runtime, adapter, capability, permission, approval, audit, recovery, diagnostic, update, content exposure, framework risk, runtime manifest, adapter manifest, and agent runtime surfaces.
+日本語基底と意味正本は`規定/00_日本語基底規定.md`である。
 
-### 27. Phase-Specific Rules
+現行正本、責任地図、外部参照固定点は`規定/正本索引.json`である。
 
-Follow the current phase and release boundary in `ROADMAP.md`.
+実装言語と安全境界の方針は`docs/LANGUAGE_POLICY.md`である。
 
-Completed product release must not be claimed until the release-gate blockers in repository documentation are resolved, strict validation passes, and explicit owner GO exists.
+`specs/`配下のSchemaは、runtime、Adapter、Capability、Permission、Approval、Audit、Recovery、diagnostic、update、content exposure、framework risk、runtime manifest、Adapter manifest、agent runtimeの各surfaceに対するcontract gateを定義する。
 
-Phase-specific implementation must preserve:
+### 27. 段階固有規則
 
-- schema-first contract changes;
-- conformance-first coverage;
-- Shell Core independence from Flutter;
-- BLUE-TANUKI reference runtime isolation behind adapter boundaries;
-- bounded Rust helper authority;
-- Windows-first release evidence separation from Linux development evidence;
-- macOS known-limitation handling until macOS host validation exists.
+`ROADMAP.md`の現行phaseとrelease boundaryに従う。
+
+リポジトリ文書内のrelease gate blockerが解消され、strict validationが成功し、明示的なowner GOがあるまで、完成製品releaseを主張してはならない。
+
+phase固有実装は、次を保持する。
+
+- Schema-firstのcontract change
+- conformance-firstのcoverage
+- Shell CoreのFlutterからの独立
+- BLUE-TANUKI reference runtimeのAdapter Boundary背後への隔離
+- 境界付きRust helper authority
+- Windows-first release evidenceとLinux development evidenceの分離
+- macOS host validationが成立するまでのmacOS known limitation処理

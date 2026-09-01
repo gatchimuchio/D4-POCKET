@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/action_envelope.schema.json",
-  "title": "ActionEnvelope",
+  "title": "作用封筒（ActionEnvelope）",
   "type": "object",
   "required": [
     "envelope_id",

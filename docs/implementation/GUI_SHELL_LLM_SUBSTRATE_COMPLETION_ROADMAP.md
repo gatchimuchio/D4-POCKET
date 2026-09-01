@@ -1,147 +1,147 @@
-# GUI Shell LLM Substrate Completion Roadmap
+# GUI Shell LLM 基盤完成ロードマップ
 
-Status: C0 definition and evidence closure
-Scope: Windows-first OSS v1.0 product completion, demonstrated LLM-readable extension substrate capability, initial public release, and post-public product QC
-Current baseline: `main` after LLM-readable substrate definition lock
+状態: C0 の定義・証拠閉包
+範囲: Windows-first OSS v1.0 製品完成、実証済み LLM 可読拡張基盤能力、初回公開リリース、公開後の製品品質管理
+現在の baseline: LLM 可読基盤の定義固定後の `main`
 
-## 1. Product Definition
+## 1. 製品定義
 
-GUI Shell is a generic Runtime Operation Shell and LLM-readable application responsibility substrate.
+GUI Shell は汎用 Runtime Operation Shell であり、LLM 可読な application responsibility substrate である。
 
-It is designed for two first-class roles.
+次の二つを第一級の役割として設計する。
 
-Human operator / owner:
+人間の operator / owner:
 
-- observes product and runtime state;
-- grants or denies approval;
-- authorizes recovery;
-- accepts release claims;
-- remains the final responsibility holder;
-- remains the only source of final product GO.
+- 製品と runtime state を観測する。
+- approval を許可または拒否する。
+- recovery を承認する。
+- release claim を受け入れる。
+- 最終責任主体であり続ける。
+- 最終製品 GO の唯一の源であり続ける。
 
-LLM development / integration agent:
+LLM 開発 / 統合エージェント:
 
-- reads GUI Shell architecture, standards, schemas, conformance rules, and operating procedures;
-- implements bounded modules, adapters, tools, or runtime integrations;
-- connects extensions through declared GUI Shell contracts;
-- runs validation and reports evidence;
-- must not create authority, approve its own sensitive operations, widen permissions silently, bypass conformance, or convert generated output, memory, tool output, metadata, UI state, or generated configuration into trusted authority.
+- GUI Shell の構造、標準、schema、conformance rule、運用手順を読む。
+- 限定された module、adapter、tool、または runtime integration を実装する。
+- 宣言済み GUI Shell contract を介して拡張を接続する。
+- validation を実行して evidence を報告する。
+- 権限の生成、自身の sensitive operation の承認、permission の無言拡大、conformance の迂回、generated output・memory・tool output・metadata・UI state・generated configuration の信頼済み権限への変換をしてはならない。
 
-Critical invariant:
+重要な不変条件:
 
 ```text
 LLMs are first-class implementation and integration consumers of GUI Shell contracts, but are never authority sources.
 ```
 
-GUI Shell remains generic and is not BLUE-TANUKI-specific. BLUE-TANUKI remains the first reference consumer/runtime through adapter boundaries only. Shell Core must remain runtime-neutral. Flutter remains the operator-facing UI layer and must not own authority. Rust Security Broker remains the authority-sensitive production boundary. Python may remain for tooling, local validation, migration oracle, parity comparison, and evidence validation, but must not remain required for the installed active authority runtime.
+GUI Shell は汎用であり続け、BLUE-TANUKI 固有にはしない。BLUE-TANUKI は adapter 境界だけを介する最初の reference consumer/runtime であり続ける。Shell Core は runtime-neutral でなければならない。Flutter は operator-facing UI layer であり続け、権限を所有してはならない。Rust Security Broker は権限依存の製品境界であり続ける。Python は tooling、local validation、migration oracle、parity comparison、evidence validation に残してよいが、インストール済み active authority runtime の必須要件として残してはならない。
 
-## 2. Current Verified Starting Point
+## 2. 検証済みの現在の開始点
 
-Completed / already established:
+完了済み / 成立済み:
 
-- Phase A: personal Windows trial operation is complete.
-- Phase B: owner-use operational hardening is complete.
-- GUI Shell is documented as a generic Runtime Operation Shell, control plane, and LLM-readable application responsibility substrate.
-- Human final authority remains explicit.
-- BLUE-TANUKI remains adapter-only reference consumer/runtime.
-- Flutter product path has begun broker-mediated integration.
-- Rust Security Broker process, authenticated loopback IPC, durable audit/replay/session storage, authority parity operations, fail-closed handling, and release runtime assertions exist for the current scope.
+- Phase A: 個人 Windows 試験運用は完了している。
+- Phase B: owner-use の運用 hardening は完了している。
+- GUI Shell は汎用 Runtime Operation Shell、control plane、LLM 可読 application responsibility substrate として文書化されている。
+- 人間の最終権限は引き続き明示されている。
+- BLUE-TANUKI は adapter 専用の reference consumer/runtime であり続ける。
+- Flutter 製品経路は broker-mediated integration を開始済みである。
+- 現在の範囲について、Rust Security Broker process、authenticated loopback IPC、durable audit/replay/session storage、authority parity operation、fail-closed handling、release runtime assertion が存在する。
 
-Current C0 validation evidence:
+現在の C0 validation evidence:
 
-- `python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py`: passed through `python3` fallback with `schema check passed: 26 schemas, 26 examples, 28 negative fixtures`.
-- `python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py`: passed through `python3` fallback with `conformance skeleton passed: 139 checks`.
-- `python3 tooling/manifest.py --check`: passed with `manifest check passed`.
-- `python3 tooling/release_gate_check.py`: passed with `release gate check passed`.
-- `python3 tooling/evidence_bundle.py --check`: passed with structured release blocker metadata preserved, `release_ready=False`, and `classification=development_evidence`.
+- `python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py`: `python3` fallback により合格し、結果は `schema check passed: 26 schemas, 26 examples, 28 negative fixtures` だった。
+- `python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py`: `python3` fallback により合格し、結果は `conformance skeleton passed: 139 checks` だった。
+- `python3 tooling/manifest.py --check`: `manifest check passed` で合格した。
+- `python3 tooling/release_gate_check.py`: `release gate check passed` で合格した。
+- `python3 tooling/evidence_bundle.py --check`: 構造化された release blocker metadata、`release_ready=False`、`classification=development_evidence` を維持して合格した。
 
-Historical validation entries that record `96 checks` remain preserved as earlier evidence. They must not be rewritten as current evidence.
+`96 checks` を記録した過去の validation entry は、以前の証拠として維持する。現在の証拠へ書き換えてはならない。
 
-Still incomplete / blockers that remain visible:
+引き続き未完了 / 可視のまま維持する blocker:
 
-- Rust Broker production authority cutover remains incomplete: `authority_cutover_status=not_active`, real external command dispatch remains suspended, and process / credential / update gated execution remains incomplete.
-- Installed product proof remains incomplete: installed no-Python-runtime evidence, Windows installed-path broker proof, installed first-run proof, installed Setup Doctor proof, and strict Windows release validation.
-- Owner GO is not recorded.
-- LLM-readable substrate is definition-locked, bounded reference extension conformance exists for the current contract/conformance layer, and one bounded cross-agent reproduction report exists for a controlled non-authoritative extension task. Public external claim evidence remains outside the current evidence scope.
+- Rust Broker の製品権限 cutover は未完了のままである。`authority_cutover_status=not_active`、実際の external command dispatch は suspended、process / credential / update gated execution は未完了のままである。
+- インストール済み製品の証拠は未完了のままである。`installed no-Python-runtime evidence`、`Windows installed-path broker proof`、`installed first-run proof`、`installed Setup Doctor proof`、`strict Windows release validation` が含まれる。
+- Owner GO は記録されていない。
+- LLM 可読基盤は定義を固定済みで、現在の contract/conformance layer に限定 reference extension conformance が存在し、管理された非権限 extension task について一件の限定 cross-agent reproduction report が存在する。公開用の外部表明証拠は現在の証拠範囲外のままである。
 
-## 3. Completion Target Definitions
+## 3. 完成目標の定義
 
-### Target T0: Definition and Evidence Closure
+### 目標 T0: 定義と証拠の閉包
 
-Product definition is internally consistent. LLM-readable substrate wording is aligned across governing documents. Current validation evidence is internally consistent. No unsupported product or ecosystem claim exists.
+製品定義は内部で整合する。LLM 可読基盤の表現は統治文書間で整合する。現在の validation evidence は内部で整合する。根拠のない製品または ecosystem の表明は存在しない。
 
-T0 is documentation/governance closure only. It does not prove runtime completion or LLM extension functionality.
+T0 は documentation/governance の閉包に限られる。runtime completion または LLM extension functionality を証明しない。
 
-### Target T1: LLM-Readable Extension Substrate Demonstrated
+### 目標 T1: LLM 可読拡張基盤の実証
 
-GUI Shell has explicit extension/integration contract coverage adequate for bounded LLM-built extensions. A bounded reference module or adapter can be added through declared contracts. Conformance proves the extension cannot create or escalate authority, bypass approval, bypass content exposure rules, bypass audit, bypass recovery, or bypass runtime neutrality. At least two independent LLM development agents can execute the same bounded extension task in isolated workspaces and preserve the required boundaries.
+GUI Shell は限定された LLM-built extension に十分な、明示的な extension/integration contract coverage を持つ。限定 reference module または adapter を宣言済み contract を介して追加できる。Conformance は、extension が authority の生成・昇格、approval の迂回、content exposure rule の迂回、audit の迂回、recovery の迂回、runtime neutrality の迂回をできないことを証明する。少なくとも二つの独立 LLM 開発エージェントが、分離した workspace で同じ限定 extension task を実行し、必須境界を維持できる。
 
-Permitted claim only after T1:
+T1 後に限り許可する表明:
 
 ```text
 GUI Shell demonstrates a contract-governed LLM-readable extension substrate for bounded reference integrations.
 ```
 
-Do not claim public standard status or broad ecosystem adoption.
+公開標準としての状態または広範な ecosystem adoption を表明してはならない。
 
-### Target T2: Windows-First OSS v1.0 Completed Product Release
+### 目標 T2: Windows-First OSS v1.0 完成製品リリース
 
-Rust Security Broker authority-sensitive production path is complete for v1.0 scope. Installed product does not require Python for active authority runtime. No Flutter/Rust FFI authority bypass exists. Broker failure paths fail closed. Windows installed-path first-run, Setup Doctor, broker, UIAutomation, artifact hash, no-Python-runtime, audit probe, and recovery evidence pass. Strict Windows release validation passes with no v1.0 release blockers. Owner explicitly grants GO.
+Rust Security Broker の権限依存製品経路が v1.0 範囲について完了している。インストール済み製品は active authority runtime に Python を必要としない。Flutter/Rust FFI の authority bypass が存在しない。Broker failure path は fail closed する。Windows installed-path の first-run、Setup Doctor、broker、UIAutomation、artifact hash、no-Python-runtime、audit probe、recovery evidence が合格する。厳格な Windows release validation が v1.0 release blocker なしで合格する。Owner が明示的に GO を与える。
 
-### Target T3: Initial Public Release with Central LLM-Substrate Positioning
+### 目標 T3: LLM 基盤を中核に位置付ける初回公開リリース
 
-Default release strategy: public OSS v1.0 should not be positioned around the new LLM-readable substrate identity until both T1 and T2 have passed.
+既定リリース戦略: T1 と T2 の両方が合格するまで、公開 OSS v1.0 を新しい LLM 可読基盤 identity を中核として位置付けるべきではない。
 
-If the owner explicitly chooses to release T2 before T1, external language must state only that the architecture is designed for LLM-readable extension and that demonstrated cross-agent extension evidence is not yet complete.
+owner が T1 より前に T2 を release することを明示的に選ぶ場合、外部向け表現は、構造が LLM-readable extension 用に設計されていることと、実証済み cross-agent extension evidence は未完了であることだけを述べなければならない。
 
-### Target T4: Post-Public Commercial / Product QC Readiness
+### 目標 T4: 公開後の商用 / 製品品質管理準備
 
-T4 covers product support boundary, official distribution policy, paid/free scope separation, dependency/license/legal review, long-run stability, rollback/update servicing, user-facing failure recovery, commercial responsibility boundary, and owner-selected enterprise or third-party integration scope.
+T4 は product support boundary、official distribution policy、paid/free scope separation、dependency/license/legal review、long-run stability、rollback/update servicing、user-facing failure recovery、commercial responsibility boundary、owner が選ぶ enterprise または third-party integration scope を扱う。
 
-T4 is planned after initial public release unless the owner explicitly changes release strategy.
+owner が release strategy を明示的に変更しない限り、T4 は初回公開リリース後に計画する。
 
-## 4. Two-Track Execution Architecture
+## 4. 二経路の実行構造
 
-Track R: Runtime / Product Responsibility Completion.
+Track R: Runtime / 製品責任の完成。
 
-Purpose: complete the actual Windows-first product responsibility path.
+目的: 実際の Windows-first 製品責任経路を完成させる。
 
-Track R owns Rust Security Broker production convergence, authority cutover, command/process/credential/update gating, fail-closed runtime behavior, installed-path Windows evidence, installer / Setup Doctor / first-run proof, strict release validation, and owner GO.
+Track R は `Rust Security Broker production convergence`、authority cutover、command/process/credential/update gating、fail-closed runtime behavior、installed-path Windows evidence、installer / Setup Doctor / first-run proof、strict release validation、owner GO に責任を持つ。
 
-Track L: LLM-Readable Extension Substrate Demonstration.
+Track L: LLM 可読拡張基盤の実証。
 
-Purpose: prove that GUI Shell is usable as a safe contract reference and extension substrate for LLM development agents.
+目的: GUI Shell が LLM 開発エージェントにとって安全な contract reference および extension substrate として利用可能であることを証明する。
 
-Track L owns contract sufficiency audit, extension/module onboarding model, bounded extension conformance, negative tests, agent-facing task packet, cross-agent independent reproduction, and claim promotion evidence.
+Track L は contract sufficiency audit、extension/module onboarding model、bounded extension conformance、negative test、agent-facing task packet、cross-agent independent reproduction、claim promotion evidence に責任を持つ。
 
-Merge rule:
+統合規則:
 
-- Track L may develop using development/fixture/conformance evidence before Track R completes.
-- Track L evidence must not be described as installed-product proof.
-- Track R product completion must not be described as LLM-extension proof.
-- Central public claim of GUI Shell as a demonstrated LLM-readable substrate requires both Track L and Track R completion unless the owner explicitly authorizes narrower wording.
+- Track L は Track R の完了前に development/fixture/conformance evidence を使って開発してよい。
+- Track L evidence を installed-product proof と説明してはならない。
+- Track R の製品完成を LLM-extension proof と説明してはならない。
+- 実証済み LLM-readable substrate として GUI Shell を中核に据える公開表明には、owner がより狭い表現を明示的に許可しない限り、Track L と Track R の両方の完了を必要とする。
 
-## 5. Block-by-Block Roadmap
+## 5. Block 別ロードマップ
 
-Each repository-state-modifying block must preserve the pushed pre-change state using the two-generation backup convention, implement only the scoped change, validate, update manifest if tracked files changed, commit, push, verify remote `main`, verify both backup-generation tags, verify clean/aligned working tree, and report rollback point.
+repository state を変更する各 block は、二世代 backup 規約により push 済み変更前状態を保存し、対象範囲の変更だけを実装し、validate し、tracked file が変わった場合は manifest を更新し、commit、push、remote `main` の検証、両 backup-generation tag の検証、clean/aligned working tree の検証を行い、rollback point を報告しなければならない。
 
-### Block C0: Validation Evidence and Roadmap Closure
+### Block C0: Validation evidence とロードマップの閉包
 
-Objective: close the current evidence inconsistency and establish this canonical completion roadmap.
+目的: 現在の証拠不整合を閉じ、この正本完成ロードマップを成立させる。
 
-Allowed surface: `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`, `ROADMAP.md`, `docs/PHASE_STRATEGY.md`, `RELEASE_CHECKLIST.md`, `CLAIM.md`, `README.md`, `VALIDATION.txt`, `MANIFEST.sha256.json`.
+許可範囲: `docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md`、`ROADMAP.md`、`docs/PHASE_STRATEGY.md`、`RELEASE_CHECKLIST.md`、`CLAIM.md`、`README.md`、`VALIDATION.txt`、`MANIFEST.sha256.json`。
 
-Expected deliverables:
+期待成果物:
 
-- canonical roadmap document exists;
-- current validation evidence records 139 conformance checks;
-- historical 96-check evidence remains preserved as history;
-- release blockers remain open;
-- manifest passes.
+- 正本 roadmap 文書が存在する。
+- 現在の validation evidence が139件の conformance check を記録する。
+- 過去の96件 check evidence を履歴として維持する。
+- release blocker を open のまま維持する。
+- manifest が合格する。
 
-Prohibited scope expansion: no Rust, Flutter, installer, schema, conformance feature implementation, extension/module loader, agent integration, or release claim promotion.
+禁止する範囲拡大: Rust、Flutter、installer、schema、conformance feature implementation、extension/module loader、agent integration、release claim promotion を行わない。
 
-Validation:
+検証:
 
 ```bash
 python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
@@ -151,217 +151,235 @@ python3 tooling/release_gate_check.py
 python3 tooling/evidence_bundle.py --check
 ```
 
-Exit criteria: current validation evidence is appended and internally consistent; historical evidence is not falsified; existing release blockers remain open; commit/push/remote verification/backup verification complete.
+終了条件: 現在の validation evidence が追記され内部で整合する。過去の evidence を偽装しない。既存 release blocker が open のままである。commit/push/remote verification/backup verification が完了する。
 
-Release/claim impact: T0 progress only. No runtime or LLM-substrate demonstration claim is promoted.
+リリース / 表明への影響: T0 の進行だけである。runtime または LLM-substrate demonstration claim を昇格させない。
 
-Rollback point: pre-change `refs/tags/codex/backup-main`.
+ロールバック地点: 変更前の `refs/tags/codex/backup-main`。
 
-### Block L1: Existing Contract Sufficiency Audit for LLM Extensions
+### Block L1: LLM 拡張に対する既存 contract 充足性監査
 
-Objective: determine whether GUI Shell already has sufficient contract families for bounded LLM-built extensions, or whether a minimal explicit extension/integration contract is required.
+目的: GUI Shell が限定 LLM-built extension に十分な contract family を既に持つか、または最小限の明示的 extension/integration contract が必要かを判断する。
 
-Allowed surface: documentation and contract analysis only.
+許可範囲: documentation と contract analysis だけ。
 
-Expected deliverable: `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`.
+期待成果物: `docs/implementation/LLM_EXTENSION_CONTRACT_GAP_ANALYSIS.md`。
 
-Required analysis surface: runtime, adapter, capability, permission, approval, audit, recovery, content exposure, update/install contracts, Agent Runtime Contract, Runtime Catalog, existing adapter examples, and the LLM-readable standard.
+必須分析範囲: runtime、adapter、capability、permission、approval、audit、recovery、content exposure、update/install contract、Agent Runtime Contract、Runtime Catalog、既存 adapter example、LLM-readable standard。
 
-Exit criteria: contract gap decision is documented, no speculative schema is added without necessity, and the exact next conformance block is defined.
+終了条件: contract gap decision が文書化され、必要性なしに推測的 schema を追加せず、次の正確な conformance block が定義される。
 
-Release/claim impact: blocks demonstrated LLM-substrate claim until resolved; does not automatically block a narrowly described Windows desktop product release.
+リリース / 表明への影響: 解決まで実証済み LLM-substrate claim を阻止する。範囲を狭く説明した Windows desktop product release を自動的には阻止しない。
 
-### Block L2: Minimal Extension Contract Closure
+### Block L2: 最小拡張 contract の閉包
 
-Execute only if L1 proves a contract gap.
+L1 が contract gap を証明した場合だけ実行する。
 
-Objective: introduce the smallest machine-readable contract required to represent bounded LLM-built extension onboarding safely.
+目的: 限定 LLM-built extension の onboarding を安全に表現するために必要な最小の machine-readable contract を導入する。
 
-Possible contracts only if justified: `specs/extension_manifest.schema.json` or `specs/extension_submission.schema.json`. Do not create both unless the distinction is proven necessary.
+正当化された場合に限る候補 contract: `specs/extension_manifest.schema.json` または `specs/extension_submission.schema.json`。区別の必要性が証明されない限り両方を作成しない。
 
-Required negative coverage: authority escalation metadata, self-approved sensitive behavior, undeclared capability use, undeclared permission use, audit omission, recovery omission, content exposure bypass, runtime-specific logic injected into Shell Core, and generated configuration attempting to create authority.
+必須 negative coverage: authority escalation metadata、self-approved sensitive behavior、undeclared capability use、undeclared permission use、audit omission、recovery omission、content exposure bypass、Shell Core に注入された runtime-specific logic、authority 生成を試みる generated configuration。
 
-Exit criteria: schema/fixture/negative fixture coverage exists only where required, conformance checks use the actual governing contract path, and no new runtime execution path is activated.
+終了条件: schema/fixture/negative fixture coverage は必要箇所だけに存在し、conformance check が実際の統治 contract path を使い、新規 runtime execution path を有効化しない。
 
-### Block L3: Bounded Reference Extension Conformance Harness
+### Block L3: 限定参照拡張の conformance 検査基盤
 
-Objective: prove the LLM-readable substrate claim at the contract/conformance layer.
+目的: contract/conformance layer で LLM-readable substrate claim を証明する。
 
-Reference task: add a bounded reference adapter or non-authoritative diagnostic module with declared capability only, no privileged execution, audit evidence, failure mapping to RecoveryAction or SUSPEND, and runtime neutrality.
+参照 task: 宣言済み capability だけを持ち、privileged execution がなく、audit evidence、RecoveryAction または SUSPEND への failure mapping、runtime neutrality を備えた限定 reference adapter または非権限 diagnostic module を追加する。
 
-Required tests: the bounded extension can be registered only through declared contracts and cannot create authority, grant permission, approve itself, expose full content without policy, omit audit evidence, omit recovery mapping, use metadata/memory/generated config/tool response/UI state as authority, pull runtime-specific logic into Shell Core, or pass when malformed or unauthorized.
+必須 test: 限定 extension は宣言済み contract だけを介して登録でき、authority の生成、permission の付与、自己承認、方針なしの full content 露出、audit evidence の省略、recovery mapping の省略、metadata/memory/generated config/tool response/UI state の authority としての利用、runtime-specific logic の Shell Core への持込み、malformed または unauthorized 状態での合格ができないこと。
 
-Evidence classification: contract/conformance demonstration; not installed-product evidence, not cross-agent reproduction evidence, and not public standard adoption evidence.
+証拠分類: `contract/conformance demonstration`。`installed-product evidence`、`cross-agent reproduction evidence`、`public standard adoption evidence` ではない。
 
-### Block L4: LLM Agent Task Packet and Repository Reading Surface
+### Block L4: LLM エージェント task packet と repository 読取り面
 
-Objective: make the repository consumable by independent LLM development agents without requiring human oral explanation.
+目的: 人間による口頭説明を必要とせず、独立 LLM 開発エージェントが repository を利用できるようにする。
 
-Expected deliverables: `docs/implementation/LLM_EXTENSION_TASK_PACKET.md` and `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md`, or an equivalent bounded documentation set.
+期待成果物: `docs/implementation/LLM_EXTENSION_TASK_PACKET.md` と `docs/implementation/LLM_EXTENSION_EVIDENCE_TEMPLATE.md`、または同等の限定 documentation set。
 
-Constraints: not an SDK, marketplace, plugin registry, or live Codex/Claude/Copilot integration.
+制約: SDK、marketplace、plugin registry、live Codex/Claude/Copilot integration ではない。
 
-Exit criteria: an independent LLM agent can be given the repository, task packet, and ordinary repository instructions and can attempt the bounded extension without additional owner explanation.
+終了条件: 独立 LLM エージェントに repository、task packet、通常の repository instruction を与えることで、owner の追加説明なしに限定 extension を試行できる。
 
-### Block L5: Cross-Agent Reproduction Evidence
+### Block L5: エージェント間再現証拠
 
-Objective: test whether more than one independent LLM development agent can read GUI Shell contracts and implement the same bounded extension while preserving responsibility boundaries.
+目的: 複数の独立 LLM 開発エージェントが GUI Shell contract を読み、責任境界を維持しながら同じ限定 extension を実装できるか検査する。
 
-Method: at least two independent development-agent executions in isolated branches, clones, or reproducible workspaces from the same baseline commit.
+方法: 同じ baseline commit から分離 branch、clone、または再現可能 workspace で、少なくとも二つの独立 development-agent execution を行う。
 
-Expected report: `docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md`.
+期待報告: `docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md`。
 
-Required evidence: baseline commit, task packet, resulting diff, validation commands and outputs, boundary failures, manual repair status, and unauthorized scope expansion attempts.
+必須証拠: baseline commit、task packet、resulting diff、validation command と output、boundary failure、manual repair status、`unauthorized scope expansion attempt`。
 
-Claim rule: only if reproduction passes may public documentation claim demonstrated bounded cross-agent LLM-readable extension behavior. Do not claim industry standard status or general ecosystem compatibility.
+表明規則: reproduction が合格した場合に限り、public documentation で実証済み bounded cross-agent LLM-readable extension behavior を表明してよい。industry standard status または general ecosystem compatibility を表明してはならない。
 
-### Block R1: Rust Security Broker Responsibility Cutover Closure
+### Block R1: Rust Security Broker 責任切替えの閉包
 
-Objective: complete the authority-sensitive product runtime path required for Windows-first v1.0.
+目的: Windows-first v1.0 に必要な権限依存 product runtime path を完成させる。
 
-Migration order:
+移行順序:
 
-1. authority normalization / strip / quarantine;
-2. capability and permission eligibility;
-3. approval validation / protected field enforcement / rehash;
-4. content visibility enforcement;
-5. audit append / hash-chain verification / tamper rejection;
-6. recovery classification;
-7. command-envelope eligibility;
-8. process / credential / update gated execution.
+1. authority の正規化 / 除去 / 隔離。
+2. capability と permission の eligibility。
+3. approval 検証 / 保護 field の強制 / rehash。
+4. content visibility の強制。
+5. audit 追記 / hash-chain 検証 / 改ざん拒否。
+6. recovery の分類。
+7. command-envelope の eligibility 判定。
+8. process / credential / update の関門付き実行。
 
-Mandatory rule for every responsibility: Python oracle behavior is enumerated where applicable, Rust implementation exists, parity evidence passes for accepted cases, Rust rejects at least equivalent negative cases, Rust-specific IPC/session/replay failures are audited, active product invocation no longer depends on Python for that responsibility, and rollback point is recorded.
+各責任の必須規則: 該当する場合は Python oracle behavior を列挙し、Rust implementation が存在し、accepted case の parity evidence が合格し、Rust が少なくとも同等の negative case を拒否し、Rust 固有 IPC/session/replay failure を監査し、その責任に関する active product invocation が Python に依存せず、rollback point を記録する。
 
-Prohibited shortcuts: no FFI authority bridge, hidden Python runtime authority path, UI-owned authority, metadata-created authority, or command dispatch activation before eligibility, audit, recovery, and rollback evidence exist.
+禁止する近道: FFI authority bridge、隠れた Python runtime authority path、UI 所有 authority、metadata 生成 authority を設けず、eligibility、audit、recovery、rollback evidence が揃う前に command dispatch を有効化しない。
 
-Exit criteria: `authority_cutover_status` may become active only when justified by measured evidence.
+終了条件: `authority_cutover_status` は測定済み証拠により正当化された場合だけ active にできる。
 
-### Block R2: Windows Installed-Path Product Evidence
+### Block R2: Windows インストール済み経路の製品証拠
 
-Objective: prove the actual installed Windows application path, not merely local development behavior.
+目的: local development behavior だけでなく、実際の installed Windows application path を証明する。
 
-Required measured evidence: installed application artifact hash, installed executable launch, broker-mediated product launch, no-Python-runtime active authority evidence, non-zero main window handle, real UIAutomation per-surface evidence, no aggregate/native fake surface shortcut, first-run config creation and JSON parsing, audit directory write/read/delete probe, Setup Doctor from installed app path, broker authenticated IPC, restricted loopback or approved transport, durable store readiness, restart replay rejection, crash fail-closed behavior, no Flutter/Rust FFI authority bridge, and recovery evidence.
+必須の測定済み証拠は次のとおり。
 
-Execution boundary: Ubuntu-side Codex prepares source and scripts. Native Windows executes evidence collection. Native Windows must not introduce ad hoc code changes to make proof pass.
+- インストール済み application の artifact hash（`installed application artifact hash`）。
+- インストール済み executable の起動（`installed executable launch`）。
+- broker を介した製品起動（`broker-mediated product launch`）。
+- Python runtime 非依存の active authority evidence（`no-Python-runtime active authority evidence`）。
+- 非ゼロの main window handle。
+- 実際の surface ごとの UIAutomation evidence（`UIAutomation per-surface evidence`）。
+- aggregate/native fake surface の近道がないこと。
+- first-run config の作成と JSON parsing。
+- audit directory の write/read/delete probe。
+- installed app path からの Setup Doctor。
+- broker の authenticated IPC。
+- restricted loopback または approved transport。
+- durable store の readiness。
+- restart 時の replay rejection。
+- crash 時の fail-closed behavior。
+- Flutter/Rust FFI authority bridge がないこと。
+- recovery の evidence。
 
-Exit criteria: Windows evidence validator passes with non-synthetic evidence tied to exact implementation commit.
+実行境界: Ubuntu 側 Codex が source と script を準備する。Native Windows が evidence collection を実行する。Native Windows は証拠を合格させるための場当たり的な code change を導入してはならない。
 
-### Block R3: Strict Windows Release Candidate Gate
+終了条件: Windows evidence validator が、正確な implementation commit に結び付く non-synthetic evidence で合格する。
 
-Objective: produce an OSS v1.0 release candidate with all Windows-first product blockers closed.
+### Block R3: 厳格 Windows release candidate 関門
 
-Required validation includes schema check, conformance skeleton, manifest check, release gate check, evidence bundle check, release runtime assertions, Windows release evidence, `validate_all.py --strict-release --desktop-platform=windows`, Rust `cargo fmt --check`, Rust `cargo test`, and required native Windows Flutter build/test/launch validations.
+目的: すべての Windows-first product blocker を閉じた OSS v1.0 release candidate を生成する。
 
-Exit criteria: no Windows-first `release_blocker` remains except owner GO; claim documentation matches evidence exactly; known limitations remain visible; macOS remains unclaimed unless separately validated; BLUE-TANUKI remains non-blocking reference consumer/runtime.
+必須 validation は schema check、conformance skeleton、manifest check、release gate check、evidence bundle check、release runtime assertion、Windows release evidence、`validate_all.py --strict-release --desktop-platform=windows`、Rust `cargo fmt --check`、Rust `cargo test`、必須 native Windows Flutter build/test/launch validation を含む。
 
-### Block P1: Public Claim Hygiene and Release Packaging
+終了条件: owner GO を除き Windows-first `release_blocker` が残らない。claim documentation が evidence と正確に一致する。known limitation を可視のまま維持する。別途 validation しない限り macOS を表明対象にしない。BLUE-TANUKI は非阻止 reference consumer/runtime であり続ける。
 
-Objective: prepare public OSS-facing material without overclaim.
+### Block P1: 公開表明の健全性とリリース packaging
 
-Required public surfaces: README, CLAIM, RELEASE_CHECKLIST, ROADMAP, PHASE_STRATEGY, AUDIT, SECURITY, installation instructions, evidence reports, release notes, manifest, and rollback instructions.
+目的: 過剰表明なしに public OSS-facing material を準備する。
 
-Required claim tiers:
+必須公開面: README、CLAIM、RELEASE_CHECKLIST、ROADMAP、PHASE_STRATEGY、AUDIT、SECURITY、installation instruction、evidence report、release note、manifest、rollback instruction。
 
-1. architecture-defined: designed as an LLM-readable responsibility substrate;
-2. conformance-demonstrated: bounded extension behavior is contract/conformance-tested;
-3. cross-agent-demonstrated: multiple independent LLM agents reproduced bounded extension behavior;
-4. completed Windows-first product release: installed product evidence and strict release gate passed.
+必須の表明段階:
 
-Never combine these levels without evidence.
+1. 構造定義済み: LLM 可読な responsibility substrate として設計されている。
+2. conformance 実証済み: 限定 extension behavior を contract/conformance で検査済みである。
+3. cross-agent 実証済み: 複数の独立 LLM エージェントが限定 extension behavior を再現した。
+4. Windows-first 完成製品リリース: installed product evidence と strict release gate が合格した。
 
-### Block P2: Owner GO and Initial Public OSS Release
+証拠なしにこれらの段階を統合してはならない。
 
-Objective: perform the initial public release only after required evidence is closed.
+### Block P2: Owner GO と初回公開 OSS リリース
 
-Default owner-GO prerequisites: T1 passed, T2 passed, public claims aligned, manifest and rollback point preserved, final owner review and explicit GO.
+目的: 必須証拠を閉じた後に限り初回公開リリースを行う。
 
-Owner-controlled exception: the owner may explicitly approve a public release before cross-agent reproduction only if public wording is reduced to design intent and states that independent cross-agent reproduction evidence is not yet complete.
+既定 owner-GO 前提: T1 合格、T2 合格、public claim 整合、manifest と rollback point の維持、最終 owner review、明示的 GO。
 
-### Block F1: Post-Public Commercial / Product QC
+Owner 管理例外: 公開表現を設計意図に限定し、独立 cross-agent reproduction evidence が未完了であると明記する場合に限り、owner は cross-agent reproduction 前の public release を明示的に承認できる。
 
-Objective: transition from open/public initial release toward commercial product responsibility only after the owner chooses that path.
+### Block F1: 公開後の商用 / 製品品質管理
 
-Scope candidates: official distribution channel, paid/free boundary, enterprise deployment boundary, support and incident responsibility, installer/update servicing policy, long-run operation testing, dependency and license audit, vulnerability response, telemetry/privacy policy if introduced, commercial integrations, and additional runtimes or agent products.
+目的: owner がその経路を選んだ後に限り、open/public initial release から commercial product responsibility へ移行する。
 
-Rule: do not prematurely burden the initial open/public release with speculative enterprise features. Do not omit product responsibility work once commercial distribution is chosen.
+範囲候補: `official distribution channel`、paid/free boundary、enterprise deployment boundary、support と incident の責任、installer/update servicing policy、long-run operation testing、dependency と license の監査、vulnerability response、導入する場合の telemetry/privacy policy、commercial integration、追加 runtime または agent product。
 
-## 6. Dependency and Merge-Gate Model
+規則: 推測的 enterprise feature で initial open/public release に早すぎる負担を課さない。commercial distribution を選んだ後は product responsibility work を省略しない。
 
-| Block | Depends On | May Run Before Product Release? | Required for Central LLM-Substrate Public Claim? | Required for Windows OSS v1.0 Product Release? |
+## 6. 依存関係と統合関門の model
+
+| Block（工程） | 依存先 | 製品リリース前に実行可能か | 中核 LLM 基盤の公開表明に必須か | Windows OSS v1.0 製品リリースに必須か |
 | ----- | ---------- | ------------------------------: | -----------------------------------------------: | ----------------------------------------------: |
-| C0 | Current `main` | Yes | Yes | Yes |
-| L1 | C0 | Yes | Yes | No, unless claim used |
-| L2 | L1 gap decision | Yes | If gap exists | No, unless claim used |
-| L3 | L1/L2 | Yes | Yes | No, unless claim used |
-| L4 | L3 | Yes | Yes | No |
-| L5 | L4 | Yes | Yes | No unless owner adopts default combined release |
-| R1 | C0 | Yes | Yes for installed/product-backed positioning | Yes |
-| R2 | R1 | No final claim before pass | Yes for product-backed positioning | Yes |
-| R3 | R2 | No | Yes for completed product claim | Yes |
-| P1 | L/R evidence as applicable | Yes | Yes | Yes |
-| P2 | P1 + owner GO | Release event | Yes under default strategy | Yes |
-| F1 | Public release / owner decision | Post-release | No | No |
+| C0（定義・証拠閉包） | 現在の `main` | Yes（可） | Yes（必須） | Yes（必須） |
+| L1（contract 監査） | C0（完了後） | Yes（可） | Yes（必須） | No（表明を使う場合を除き不要） |
+| L2（contract 閉包） | L1 の gap 判断 | Yes（可） | gap が存在する場合に必須 | No（表明を使う場合を除き不要） |
+| L3（限定 conformance） | L1/L2（該当完了後） | Yes（可） | Yes（必須） | No（表明を使う場合を除き不要） |
+| L4（作業指示 packet） | L3（完了後） | Yes（可） | Yes（必須） | No（不要） |
+| L5（エージェント間再現） | L4（完了後） | Yes（可） | Yes（必須） | owner が既定の統合 release を採用しない限り No（不要） |
+| R1（責任切替え） | C0（完了後） | Yes（可） | installed/product-backed positioning には Yes（必須） | Yes（必須） |
+| R2（Windows 証拠） | R1（完了後） | 合格前の最終表明は No（不可） | product-backed positioning には Yes（必須） | Yes（必須） |
+| R3（厳格関門） | R2（完了後） | No（不可） | completed product claim には Yes（必須） | Yes（必須） |
+| P1（公開準備） | 該当する L/R evidence | Yes（可） | Yes（必須） | Yes（必須） |
+| P2（公開リリース） | P1 + owner GO（完了後） | release event（リリース時） | 既定戦略では Yes（必須） | Yes（必須） |
+| F1（公開後品質管理） | public release / owner decision（完了後） | post-release（公開後） | No（不要） | No（不要） |
 
-## 7. Evidence and Validation Model
+## 7. 証拠と検証の model
 
-Every future block must distinguish:
+今後の各 block は次を区別しなければならない。
 
-- CONFIG evidence;
-- INTERNAL_STATE evidence;
-- FIXTURE evidence;
-- LIVE_RUNTIME evidence;
-- EXTERNAL_EVIDENCE;
-- cross-agent reproduction evidence.
+- CONFIG evidence（設定証拠）。
+- INTERNAL_STATE evidence（内部状態証拠）。
+- FIXTURE evidence（fixture 証拠）。
+- LIVE_RUNTIME evidence（実 runtime 証拠）。
+- EXTERNAL_EVIDENCE（外部証拠）。
+- cross-agent reproduction evidence（エージェント間再現証拠）。
 
-Never promote documentation into runtime proof, fixture success into installed-product proof, one LLM's successful diff into cross-agent reproducibility, local Windows build into installed-path release proof, or architecture definition into public standard adoption.
+documentation を runtime proof に、fixture success を installed-product proof に、一つの LLM による successful diff を cross-agent reproducibility に、local Windows build を installed-path release proof に、architecture definition を public standard adoption に決して昇格させない。
 
-Each block must record behavior implemented, contract path exercised, runtime/governed path exercised, negative case rejected, commands executed, exact outputs, unverified claims, remaining blockers, and rollback point.
+各 block は implemented behavior、実行した contract path、実行した runtime/governed path、拒否した negative case、実行 command、正確な output、未検証 claim、残存 blocker、rollback point を記録しなければならない。
 
-## 8. Claim Promotion Rules
+## 8. 表明昇格規則
 
-Existing product release blockers remain release blockers:
+既存の product release blocker は release blocker のまま維持する。
 
-- Rust Security Broker production convergence;
-- installed no-Python-runtime evidence;
-- Windows installed-path first-run evidence;
-- Setup Doctor evidence;
-- strict Windows release validation;
-- owner GO.
+- Rust Security Broker の製品収束。
+- installed no-Python-runtime evidence（Python 非依存証拠）。
+- Windows installed-path first-run evidence（初回起動証拠）。
+- Setup Doctor evidence（診断証拠）。
+- strict Windows release validation（厳格検証）。
+- owner GO（所有者承認）。
 
-LLM-readable claim blockers:
+LLM-readable claim の blocker:
 
-- LLM extension contract sufficiency unresolved blocks demonstrated LLM-substrate claim but does not automatically block a narrowly described desktop product release.
-- Bounded extension conformance not passed blocks claims that LLM-built integrations are demonstrated.
-- Cross-agent reproduction not passed blocks claims that the substrate is demonstrated across independent LLM agents.
+- LLM extension contract sufficiency の未解決は実証済み LLM-substrate claim を阻止するが、範囲を狭く説明した desktop product release を自動的には阻止しない。
+- Bounded extension conformance の未合格は、LLM-built integration が実証済みであるとの表明を阻止する。
+- Cross-agent reproduction の未合格は、独立 LLM エージェント間で substrate が実証済みであるとの表明を阻止する。
 
-Default combined-public-release rule:
+既定の統合公開リリース規則:
 
-- Because LLM-readable substrate is now central product positioning, do not make it the central public product claim until both product runtime proof and LLM extension proof pass.
-- Owner may override only explicitly and with narrower claims.
+- LLM-readable substrate が現在の中核 product positioning であるため、product runtime proof と LLM extension proof の両方が合格するまで、中核の public product claim にしてはならない。
+- Owner は、より狭い表明を伴って明示する場合だけ上書きできる。
 
-## 9. Rollback and Backup Requirements
+## 9. ロールバックと backup の要件
 
-Every repository-state-modifying block must follow the two-generation backup convention:
+repository state を変更するすべての block は二世代 backup 規約に従わなければならない。
 
 - `refs/tags/codex/backup-main`;
 - `refs/tags/codex/backup-main-prev`.
 
-Remote backup branches must not be retained unless the owner explicitly requests emergency handoff. If push, remote HEAD verification, or backup verification fails, the block is not complete.
+owner が緊急 handoff を明示的に要求しない限り、remote backup branch を保持してはならない。push、remote HEAD verification、または backup verification に失敗した場合、その block は未完了である。
 
-Rollback point for each block is the pre-change `refs/tags/codex/backup-main` hash reported in the completion report.
+各 block の rollback point は、completion report で報告した変更前 `refs/tags/codex/backup-main` hash である。
 
-## 10. Explicit Out-of-Scope / Post-Public Items
+## 10. 明示的な範囲外 / 公開後の項目
 
-Out of scope for C0 through initial public release unless explicitly promoted by owner:
+owner が明示的に昇格させない限り、C0 から初回公開リリースまでの範囲外とする項目:
 
-- plugin registry;
-- marketplace;
-- SDK;
-- enterprise administration;
-- commercial integrations;
-- cloud service;
-- mobile full release;
-- broad third-party runtime catalog;
-- public standard adoption claim;
-- telemetry/privacy policy unless telemetry is introduced;
-- BLUE-TANUKI product completion as a GUI Shell release dependency.
+- plugin registry（登録機構）。
+- marketplace（市場機構）。
+- SDK（開発 kit）。
+- enterprise administration（企業管理）。
+- commercial integration（商用統合）。
+- cloud service（クラウドサービス）。
+- mobile full release（mobile 完全リリース）。
+- 広範な third-party runtime catalog。
+- 公開標準採用の表明。
+- telemetry を導入しない限り telemetry/privacy policy。
+- GUI Shell release の依存条件としての BLUE-TANUKI product completion。

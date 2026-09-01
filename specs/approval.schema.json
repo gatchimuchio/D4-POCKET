@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/approval.schema.json",
-  "title": "Approval",
+  "title": "承認（Approval）",
   "type": "object",
   "required": [
     "approval_id",
@@ -64,7 +64,7 @@
     },
     "full_payload": {
       "type": "object",
-      "description": "Storage-only full payload. UI projection must not expose this unless content_visibility=full.",
+      "description": "保管専用の完全内容です。content_visibility=fullでない限り、UI射影で公開してはなりません。",
       "additionalProperties": true
     },
     "editable_fields": {
@@ -72,7 +72,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Only these non-authority fields may be edited."
+      "description": "権限を持たない項目のうち、ここで列挙した項目だけ編集できます。"
     },
     "sealed_fields": {
       "type": "array",
@@ -85,14 +85,14 @@
       "items": {
         "type": "string"
       },
-      "description": "Fields that must not be shown or edited by UI."
+      "description": "UIで表示または編集してはならない項目です。"
     },
     "sacred_fields": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Domain-critical fields that must not be edited by UI or adapter."
+      "description": "UIまたはアダプターで編集してはならない領域重要項目です。"
     },
     "authority_fields": {
       "type": "array",

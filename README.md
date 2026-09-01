@@ -2,11 +2,11 @@
 
 <h1>
   <br>
-  🐚 GUI&nbsp;Shell
+  🐚 GUI&nbsp;Shell ／ 汎用 Runtime 操作基盤
 </h1>
 
-<h3>A PC-first AI Runtime / Agent Operation Shell</h3>
-<p><em>ランタイム・エージェント操作の制御プレーン、かつ LLM が読む「アプリケーション責任基盤」</em></p>
+<h3>PC を第一対象とする AI Runtime / Agent Operation Shell</h3>
+<p><em>Runtime・Agent 操作の control plane、かつ LLM が読む「アプリケーション責任基盤」</em></p>
 
 <p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
@@ -24,11 +24,11 @@
 </p>
 
 <p>
-  <a href="#-what-this-is--これは何か">What this is</a> •
-  <a href="#-for-llm-agents--llm-エージェント向け">For LLM agents</a> •
-  <a href="#-architecture--アーキテクチャ">Architecture</a> •
-  <a href="#-quickstart">Quickstart</a> •
-  <a href="#-claim-boundary--クレーム境界">Claim boundary</a> •
+  <a href="#what-this-is">これは何か</a> •
+  <a href="#for-llm-agents">LLM エージェント向け</a> •
+  <a href="#architecture">アーキテクチャ</a> •
+  <a href="#quickstart">クイックスタート</a> •
+  <a href="#claim-boundary">主張境界</a> •
   <a href="AGENTS.md">AGENTS.md</a>
 </p>
 
@@ -36,89 +36,83 @@
 
 ---
 
-> **GUI Shell is two things at once.**
-> ① a generic Runtime Operation Shell control plane, and ② an **LLM-readable application responsibility substrate** — a stable, machine-readable responsibility structure that LLM development / integration agents read and build on.
-> Agents are **first-class implementation and integration consumers** of its contracts. They are **never an authority source**: the human owner keeps final approval, recovery, and release authority.
->
-> GUI Shell は二重の存在です。①汎用ランタイム操作シェルの制御プレーン、②**LLM が読む「アプリケーション責任基盤」**。LLM 開発/統合エージェントが契約を読み、その上に実装・接続するための、機械可読な責任構造です。エージェントは契約の第一級コンシューマですが、**決して権限源にはなりません**。最終承認・復旧・リリース権限は人間のオーナーが保持します。
+> **GUI Shell には二つの役割がある。**
+> ① 汎用 Runtime Operation Shell の control plane、② **LLM が読む「アプリケーション責任基盤」**である。後者は、LLM 開発/統合エージェントが読み、その上に実装・接続するための、安定した machine-readable な責任構造を指す。
+> Agent は Contract の**第一級の実装・統合コンシューマ**だが、**決して権限源ではない**。最終的な Approval、Recovery、release の権限は Human owner が保持する。
 
-> **Process note.** This project was built by a non-programmer / non-software developer through LLM direction in less than one month of part-time work. The construction is a bounded demonstration of the design goal: an LLM-readable responsibility substrate can guide implementation without making the LLM an authority source.
->
-> **プロセス注記。** 本プロジェクトは、プログラマーではない個人が、1か月未満の兼業作業で LLM に指示しながら構築しました。構築できたことは、その設計目標の限定的な実証です。つまり、LLM が権限源にならず、LLM が読む責任基盤によって実装を導けることを示しています。
+> **構築過程の注記。** 本プロジェクトは、プログラマーでもソフトウェア開発者でもない個人が、1か月未満の兼業作業で LLM に指示しながら構築した。この構築は、LLM を権限源にせず、LLM が読む責任基盤によって実装を導けるという設計目標を、限定された範囲で実証する。
 
 <br>
 
-## 🎯 What this is — これは何か
+<a id="what-this-is"></a>
+## 🎯 これは何か
 
-GUI Shell is **not** a normal app template, and it is **not** a BLUE-TANUKI-specific GUI.
-GUI Shell は通常のアプリ雛形ではなく、BLUE-TANUKI 専用 GUI でもありません。
+GUI Shell は通常の app template ではなく、BLUE-TANUKI 専用 GUI でもない。
 
-- 🛂 **A control plane.** Flutter renders operator surfaces; it does *not* own authority. / Flutter は操作画面を描画するだけで、権限を持たない。
-- 📐 **A contract.** Runtime / adapter / permission / approval / audit / recovery / content-exposure semantics are **JSON Schema-first** — 26 schemas, each with a valid example and negative fixtures. / 各セマンティクスは JSON Schema ファースト。26スキーマ、各々に正例と負例。
-- 🤖 **A substrate LLMs build on.** New functions, adapters, tools, and integrations connect through declared contracts — not improvised shortcuts. / 新機能・アダプタ・ツールは宣言済み契約を介して接続する。
-- 🔒 **Safety first, robustness second, operator clarity third, product UI after that.** / 安全性が第一、堅牢性が第二、操作明瞭性が第三、プロダクト UI はその後。
+- 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。26 schema のそれぞれに valid example と negative fixture がある。
+- 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
+- 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 
-BLUE-TANUKI is the **first reference runtime**, and it connects **through an adapter boundary only**.
-BLUE-TANUKI は最初の参照ランタイムであり、アダプタ境界を介してのみ接続します。
+BLUE-TANUKI は**最初の Reference Runtime**であり、**Adapter boundary だけを介して**接続する。
 
 <br>
 
-## 🤖 For LLM agents — LLM エージェント向け
+<a id="for-llm-agents"></a>
+## 🤖 LLM エージェント向け
 
-If you are an AI implementation or integration agent working in this repository, read [AGENTS.md](AGENTS.md) and [`docs/standards/llm-readable-extension-surface.md`](docs/standards/llm-readable-extension-surface.md) first.
-このリポジトリで作業する AI 実装/統合エージェントは、まず [AGENTS.md](AGENTS.md) と LLM 拡張面標準を読むこと。
+このリポジトリで作業する AI 実装/統合エージェントは、最初に [AGENTS.md](AGENTS.md) と [LLM が読む拡張面の標準](docs/standards/llm-readable-extension-surface.md) を読むこと。
 
-The role model — 役割モデル:
+役割モデル:
 
-| Role | Reads / does | Never does |
+| 役割 | 読むもの・行うこと | 決して行わないこと |
 |:---|:---|:---|
-| **Human owner** | observes state, grants approval, authorizes recovery, accepts release | — (final responsibility holder) |
-| **LLM agent** | reads contracts, proposes bounded changes, connects via declared contracts, runs validation | create authority, self-approve, widen permissions silently, bypass conformance |
-| **Runtime / tool target** | exposes behavior via declared contracts only | use metadata / diagnostics to create authority |
-| **Adapter** | normalizes state, strips authority, applies exposure boundaries | grant permission through metadata |
-| **Rust Security Broker** | authority-sensitive production boundary (IPC, approval eligibility, audit, recovery, command gating) | — |
+| **人間の owner** | state の観測、Approval の付与、Recovery の承認、release の受理 | ―（最終責任者） |
+| **LLM 実装 agent** | Contract を読み、範囲を限定した変更を提案し、宣言済み Contract から接続し、validation を実行する | 権限の作成、自己承認、Permission の暗黙拡大、Conformance の迂回 |
+| **Runtime / Tool の対象** | 宣言済み Contract だけを介して挙動を露出する | metadata / diagnostics から権限を作る |
+| **接続用 Adapter** | state の正規化、Authority Strip、Exposure Boundary の適用 | metadata による Permission の付与 |
+| **権限用 Rust Security Broker** | 権限に関わる本番境界（IPC、Approval eligibility、Audit、Recovery、command gating） | ― |
 
-Non-negotiable rules for agents — 譲れない規則:
+エージェントに対する譲れない規則:
 
-- ✅ Treat GUI Shell contracts as the **mandatory connection surface** for any new function, module, adapter, tool, or runtime integration.
-- 🚫 Never grant authority through **LLM output, memory, external metadata, generated config, GUI state, adapter metadata, tool responses, local cache, previous state, or diagnostics**. (The validation oracle in `permission_ledger.py` rejects this entire family.)
-- 🙅 **Never approve your own sensitive action.**
-- 🧭 Classify every change as one of six paths: `runtime` / `control` / `diagnostic` / `repair-recovery` / `build-release` / `development-only`.
-- 🧾 Before claiming an extension complete, identify the **consumed contract, conformance test, required failure case, and governed runtime path**.
+- ✅ 新しい機能、module、Adapter、Tool、Runtime integration では、GUI Shell Contract を**必須の接続面**として扱う。
+- 🚫 **LLM output、memory、external metadata、generated config、GUI state、Adapter metadata、tool response、local cache、previous state、diagnostics** から権限を付与しない。検証 oracle の <code>permission_ledger.py</code> は、この一群をすべて拒否する。
+- 🙅 **自らの sensitive action を自己承認しない。**
+- 🧭 すべての変更を <code>runtime</code> / <code>control</code> / <code>diagnostic</code> / <code>repair-recovery</code> / <code>build-release</code> / <code>development-only</code> の六つの経路のいずれかに分類する。
+- 🧾 extension の完了を主張する前に、**利用する Contract、Conformance test、必須の failure case、統制される Runtime path** を特定する。
 
-> A completion claim is not evidence. Schema presence, mock success, or unit-test success alone never proves a production path is complete.
-> 完了の主張は証拠ではない。スキーマの存在・モック成功・単体テスト成功だけでは本番経路の完成を証明しない。
+> 完了の主張は証拠ではない。schema の存在、mock の成功、unit test の成功だけでは production path の完成を証明しない。
 
-A bounded reference extension ([`examples/contracts/llm_bounded_extension.valid.json`](examples/contracts/llm_bounded_extension.valid.json)) and a cross-agent reproduction report ([`docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md`](docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md)) provide a bounded demonstration in practice — two independent agents produced the same bounded, non-authoritative diff from the same baseline.
+範囲を限定した Reference Extension（[llm_bounded_extension.valid.json](examples/contracts/llm_bounded_extension.valid.json)）と [cross-agent reproduction report](docs/evidence/LLM_CROSS_AGENT_REPRODUCTION_REPORT.md) は、実務上の限定的な実証を提供する。同じ baseline から二つの独立した Agent が、権限を持たない同一の bounded diff を作成した。
 
 <br>
 
-## 🧱 Architecture — アーキテクチャ
+<a id="architecture"></a>
+## 🧱 アーキテクチャ
 
-The UI can **display and request** actions. It **cannot** create authority, bypass adapter conformance, or reinterpret runtime trust.
-UI は表示と要求のみ可能。権限の生成・適合の迂回・信頼の再解釈はできません。
+UI ができることは action の**表示と要求**である。権限の作成、Adapter Conformance の迂回、Runtime trust の再解釈はできない。
 
-```mermaid
+~~~mermaid
 flowchart TD
     SRC["Runtime / Agent / Tool / Local Service"]
-    subgraph ADAPTER["🔌 Adapter — untrusted boundary"]
+    subgraph ADAPTER["🔌 Adapter — 信頼しない境界"]
         direction TB
-        A1["authority strip"]
-        A2["content exposure policy"]
-        A3["schema validation"]
-        A4["capability declaration"]
+        A1["Authority Strip"]
+        A2["Content Exposure Policy"]
+        A3["Schema validation"]
+        A4["Capability declaration"]
         A1 --> A2 --> A3 --> A4
     end
-    subgraph CORE["🧠 Shell Core — owns authority, framework-independent"]
+    subgraph CORE["🧠 Shell Core — 権限を所有し framework から独立"]
         direction TB
-        C1["runtime registry"]
-        C2["permission ledger"]
-        C3["approval queue"]
-        C4["audit store (hash-chain)"]
-        C5["recovery catalog"]
+        C1["Runtime Registry"]
+        C2["Permission Ledger"]
+        C3["Approval Queue"]
+        C4["Audit Store（hash-chain）"]
+        C5["Recovery Catalog"]
     end
-    BROKER["🦀 Rust Security Broker — authority-sensitive production boundary<br/>IPC · approval eligibility · audit · recovery · command gating"]
-    subgraph UI["🖥️ UI Layer — Flutter, replaceable"]
+    BROKER["🦀 Rust Security Broker — authority-sensitive production boundary<br/>IPC · Approval eligibility · Audit · Recovery · command gating"]
+    subgraph UI["🖥️ UI Layer — 交換可能な Flutter"]
         direction TB
         U1["rendering"]
         U2["operator input"]
@@ -128,154 +122,153 @@ flowchart TD
     SRC --> ADAPTER --> CORE
     CORE --> BROKER
     CORE --> UI
-```
+~~~
 
 <details>
-<summary><strong>📄 Plain-text architecture (テキスト版)</strong></summary>
+<summary><strong>📄 テキスト版アーキテクチャ</strong></summary>
 
-```
+~~~
 Runtime / Agent / Tool / Local Service
   -> Adapter
-      -> authority strip
-      -> content exposure policy
-      -> schema validation
-      -> capability declaration
+      -> Authority Strip
+      -> Content Exposure Policy
+      -> Schema validation
+      -> Capability declaration
   -> Shell Core
-      -> runtime registry
-      -> permission ledger
-      -> approval queue
-      -> audit store (hash-chain)
-      -> recovery catalog
+      -> Runtime Registry
+      -> Permission Ledger
+      -> Approval Queue
+      -> Audit Store（hash-chain）
+      -> Recovery Catalog
   -> Rust Security Broker   (authority-sensitive production boundary)
   -> UI Layer (Flutter)
       -> rendering / operator input / navigation / local UI state
-```
+~~~
 
 </details>
 
 <br>
 
-## 🚦 Authority & boundary model — 権限と境界モデル
+## 🚦 Authority と Boundary のモデル
 
-### Layer responsibilities — 各層の責務
+### 各 layer の責任
 
-| Layer | Owns | Must NOT own |
+| レイヤー | 所有するもの | 所有してはならないもの |
 |:---|:---|:---|
-| **Shell Core** | runtime registry, permission ledger, approval queue, audit store, recovery catalog | Flutter imports, BLUE-TANUKI logic, trusting adapter metadata |
-| **UI (Flutter)** | rendering, input, navigation, theme, i18n, a11y | authority / permission / approval / audit / recovery / visibility decisions |
-| **Adapter** | normalize state, expose health & diagnostics, translate events to schemas | granting permission via metadata, creating authority, editing sealed fields |
-| **Rust Security Broker** | authority-sensitive IPC, approval eligibility, audit, recovery, command-envelope gating | becoming a silent FS/process/network/IPC/credential bypass |
+| **中核の Shell Core** | 中核台帳: Runtime Registry、Permission Ledger、Approval Queue、Audit Store、Recovery Catalog | Flutter import、BLUE-TANUKI logic、Adapter metadata への信頼 |
+| **画面層 UI（Flutter）** | 表示・入力機能: rendering、input、navigation、theme、i18n、a11y | Authority / Permission / Approval / Audit / Recovery / Visibility の decision |
+| **接続層 Adapter** | state の正規化、health / diagnostics の露出、event から schema への変換 | metadata による Permission の付与、権限の作成、sealed field の編集 |
+| **権限境界の Rust Security Broker** | 権限に関わる IPC、Approval eligibility、Audit、Recovery、command-envelope gating | 暗黙の filesystem / process / network / IPC / credential bypass になること |
 
-### Language policy — 言語ポリシー（非対称・意図的）
+### 実装言語方針（非対称かつ意図的）
 
-- 🦀 **Rust** is the native safety boundary for authority, signature, IPC, audit, and command-envelope work.
-- 🎨 **Flutter / Dart** is the replaceable UI product layer — never the authority boundary.
-- ⚙️ **TypeScript / Node** stays limited to SDK / adapter sample / protocol client / bridge scope — never the core runtime.
-- 🐍 **Python** is the current Shell Core / validation-oracle language, kept as dev/test/migration scope — never the intended installed-product runtime dependency.
+- 🦀 **Rust** は、Authority、signature、IPC、Audit、command-envelope を扱う native safety boundary である。
+- 🎨 **Flutter / Dart** は交換可能な UI product layer であり、決して Authority Boundary ではない。
+- ⚙️ **TypeScript / Node** は SDK / Adapter sample / protocol client / bridge に限定し、core runtime にはしない。
+- 🐍 **Python** は現在の Shell Core / validation oracle の言語であり、dev / test / migration の範囲に保つ。意図された installed-product runtime dependency ではない。
 
-### Content exposure — コンテンツ露出（5値）
+### Content Exposure（5値）
 
-```
-none      → do not display raw content
-hash_only → display only the payload hash
-summary   → display only an approved summary
-redacted  → display only a redacted projection
-full      → full content may be displayed
-```
+~~~
+none      → 未加工の content を表示しない
+hash_only → payload hash だけを表示する
+summary   → 承認済み summary だけを表示する
+redacted  → redacted projection だけを表示する
+full      → content の全文を表示できる
+~~~
 
-Only `full` permits full payload display. / `full` のみが全文表示を許可。
+全文表示を許可するのは <code>full</code> だけである。
 
-### Required audit mapping — 必須監査マッピング
+### 必須の Audit mapping
 
-Every sensitive action (filesystem, process, network, credential, IPC, update, adapter action, approval edit, audit export, recovery, installer, device pairing) **must** map to:
-あらゆる sensitive action は次へマップされること:
+すべての sensitive action（filesystem、process、network、credential、IPC、update、Adapter action、Approval edit、Audit export、Recovery、Installer、device pairing）は、次へ対応付けなければならない。
 
-```
-Capability → Permission → Approval state → AuditEvent → RecoveryAction (on failure)
-```
+~~~
+Capability → Permission → Approval state → AuditEvent → RecoveryAction（失敗時）
+~~~
 
 <br>
 
-## ⚡ Quickstart
+<a id="quickstart"></a>
+## ⚡ クイックスタート
 
-Validation checks the repository contracts and conformance skeleton. This skeleton does **not** assume Flutter or Rust is already installed.
-検証はリポジトリの契約と適合スケルトンを確認します。Flutter / Rust のインストールは前提としません。
+Validation は repository の Contract と Conformance skeleton を検査する。この skeleton は Flutter または Rust がすでに install 済みであることを前提としない。
 
-```bash
+~~~bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
 <details>
-<summary>If the host only exposes <code>python3</code></summary>
+<summary>host が <code>python3</code> だけを提供する場合</summary>
 
-```bash
+~~~bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
 </details>
 
-Expected successful output / 期待される出力:
+期待する成功時の出力:
 
-```text
-schema check passed: 26 schemas, 26 examples, 28 negative fixtures
-conformance skeleton passed: 139 checks
-```
+~~~text
+schema checkが合格: schema 26件、example 26件、negative fixture 28件
+conformance skeletonが合格: 141 件のcheck
+~~~
 
-➡️ See **[QUICKSTART.md](QUICKSTART.md)**.
+➡️ **[QUICKSTART.md](QUICKSTART.md)** も参照すること。
 
 <br>
 
-## ✅ Validation
+## ✅ 検証
 
-Required **before reporting implementation work** / 実装報告の前に必須:
+実装作業を報告する前に、次を必ず実行する。
 
-```bash
+~~~bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
-Conditional toolchain checks / 条件付きツールチェーン検証:
+toolchain に応じた条件付き検証:
 
-```bash
+~~~bash
 cd native/rust_helper      && cargo test
 cd apps/desktop_flutter    && flutter analyze
-```
+~~~
 
-Mobile Flutter is `post_v1_scope` and is excluded from the v1.0 product release gate unless the owner explicitly opts it in.
+Mobile Flutter は <code>post_v1_scope</code> であり、owner が明示的に含めない限り v1.0 product release gate の対象外である。
 
-Or run the aggregate reporter / 一括レポーター:
+一括 reporter を使う場合:
 
-```bash
+~~~bash
 python3 tooling/validate_all.py            # development slice
 python3 tooling/validate_all.py --strict-release --desktop-platform=windows
-```
+~~~
 
-Strict Windows release validation requires native Windows isolated installed-path evidence with source commit, clean worktree state, artifact hashes, UIAutomation diagnostic tree, broker measured field provenance, and installed-app generated Setup Doctor product export. Historical Windows PASS records are owner-trial history only.
+厳格な Windows release validation には、native Windows の隔離された installed-path evidence が必要である。その evidence は source commit、clean worktree state、artifact hash、UIAutomation diagnostic tree、Broker の measured field provenance、installed app が生成した Setup Doctor の product export を含まなければならない。過去の Windows PASS record は owner-trial の履歴にすぎない。
 
-> Never claim validation passed unless it actually passed. / 実際に通っていない検証を「通った」と報告しないこと。
+> 実際に通っていない validation を「通った」と報告してはならない。
 
-➡️ See **[VALIDATION.txt](VALIDATION.txt)** for the full recorded evidence history.
-
-<br>
-
-## 🔒 Phase 0 locked surface — フェーズ0 確定スコープ
-
-- Generic Runtime Operation Shell direction / 汎用ランタイム操作シェルの方向性
-- BLUE-TANUKI frozen as Phase 0 reference runtime contract target, **through adapter only**
-- **Flutter + Rust helper** as primary implementation candidate
-- **Compose Multiplatform** watchlist / **Tauri** desktop-heavy fallback
-- `FrameworkRiskProfile` for UI framework governance risk
-- Adapter Conformance / Content Exposure Boundary / Authority Strip Conformance
-- Schema-first / conformance-first work order
+記録済み evidence の全履歴は **[VALIDATION.txt](VALIDATION.txt)** を参照すること。
 
 <br>
 
-## 📂 Repository layout — リポジトリ構成
+## 🔒 Phase 0 で固定した面
 
-```
-specs/                       # 26 contract schemas (the gate)
+- 汎用 Runtime Operation Shell の方向性
+- BLUE-TANUKI を Phase 0 Reference Runtime Contract の対象として固定し、**Adapter だけを介して**接続する。
+- **Flutter + Rust helper** を第一の実装候補とする。
+- **Compose Multiplatform** を watchlist、**Tauri** を desktop-heavy fallback とする。
+- UI framework の governance risk には <code>FrameworkRiskProfile</code> を使う。
+- 適合境界: Adapter Conformance / Content Exposure Boundary / Authority Strip Conformance
+- Schema-first / Conformance-first の作業順序
+
+<br>
+
+## 📂 リポジトリ構成
+
+~~~
+specs/                       # gate を担う26の Contract schema
   runtime · runtime_manifest · adapter · adapter_manifest
   capability · permission · approval · audit · recovery
   content_exposure · diagnostic · update · framework_risk_profile
@@ -285,93 +278,89 @@ specs/                       # 26 contract schemas (the gate)
   ipc_request · ipc_response
 
 packages/
-  shell_core/         # authority-owning core (Python, framework-independent)
+  shell_core/         # 権限を所有する core（Python、framework 非依存）
   shell_ui/           # UI 部品
-  shell_contracts/    # 契約定義
-  runtime_catalog/    # runtime registry reference
-  agent_runtime/      # agent runtime reference
-  blue_tanuki_adapter/# 参照ランタイム用アダプタ
+  shell_contracts/    # Contract 定義
+  runtime_catalog/    # Runtime Registry の参照実装
+  agent_runtime/      # Agent Runtime の参照実装
+  blue_tanuki_adapter/# Reference Runtime 用 Adapter
 
 apps/
   desktop_flutter/  mobile_flutter/
 
 native/
-  rust_helper/        # Rust Security Broker (authority-sensitive boundary)
+  rust_helper/        # Rust Security Broker（authority-sensitive boundary）
 
-examples/contracts/   # valid + invalid fixtures, incl. llm_bounded_extension
+examples/contracts/   # valid / invalid fixture、llm_bounded_extension を含む
 docs/
   standards/ · specs/ · architecture/ · security/
   implementation/ · evidence/ · research/
 installer/  windows/ · macos/ · linux/
 tooling/    schema_check · conformance_tests · broker_parity · ...
-```
+~~~
 
 <br>
 
-## 📊 Current status — 現状
+## 📊 現状
 
-This repository is a **v1.0 product-completion effort, not yet a claimed product release.**
-本リポジトリは v1.0 完成に向けた作業中であり、まだ製品リリースを宣言していません。
+この repository は **v1.0 product completion に向けた作業中であり、product release をまだ主張していない。** 機械判定上の状態は `not yet a completed product release` である。
 
-A GitHub Release tagged as a public review snapshot is not a completed product release. In this repository, completed product release readiness remains gated by `release_blockers.registry.json` and explicit owner GO.
-GitHub Release として固定する public review snapshot は、完成製品リリースではありません。本リポジトリにおける完成製品リリース可否は、`release_blockers.registry.json` と明示的な owner GO によって別途判定されます。
+Public review snapshot として tag を付けた GitHub Release は、完成製品の release ではない。この repository における完成製品の release readiness は、<code>release_blockers.registry.json</code> と明示的な owner GO によって引き続き gate される。
 
-It intentionally prioritizes / 意図的に以下の順で優先します:
+意図的に、次の順で優先する。
 
-```
-1. standards            標準
-2. specs                仕様
-3. conformance boundaries  適合境界
-4. runtime adapter contracts  ランタイムアダプタ契約
-5. helper boundaries    ヘルパー境界
-        ── before product UI ──  プロダクトUIより先に
-```
+~~~
+1. standard
+2. specification
+3. Conformance Boundary
+4. Runtime Adapter Contract
+5. Helper Boundary
+        ── product UI より先に ──
+~~~
 
 <br>
 
-## 🧾 Claim boundary — クレーム境界
+<a id="claim-boundary"></a>
+## 🧾 主張境界
 
-What is true today, stated without inflation — 誇張なしの現状:
+誇張せずに述べた現在の事実:
 
-- ✅ **Phase A/B owner-use complete.** The owner can run the desktop shell for daily local operation with status, problems, evidence, recovery, trust, runtime, and authority surfaces visible.
-- ✅ **Schema + conformance pass** as a development slice (26 schemas, 139 checks).
-- ✅ **LLM-readable substrate is definition-locked**, with one bounded reference extension and one cross-agent reproduction report.
-- ⛔ **v1.0 product release is NOT yet claimed.** Active `release_blocker` items are canonicalized in `release_blockers.registry.json`: Windows installed-path provenance, first-run, Setup Doctor, broker evidence, audit anchor external tamper-evidence proof, and explicit owner GO. Rust Broker production authority cutover wording is represented through the Windows installed-path broker/runtime evidence blocker, not as an independent registry blocker.
-- 🧪 **Public proof pack boundary.** The public Windows proof pack contains redacted review copies derived from measured Windows installed-path evidence. These copies are not canonical release evidence and do not close completed product release blockers in this public repository.
-- 🧪 **公開 proof pack 境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copies が含まれます。これらは canonical release evidence ではなく、この公開リポジトリ上の完成製品リリース blockers を閉じません。
-- ⚠️ **Windows-first.** Linux validation is a development slice, not final product proof. **macOS is unverified** and must not be advertised as supported.
-- ⚠️ The substrate work provides a bounded demonstration of controlled LLM-readable extension behavior for a non-authoritative task. It does **not** prove public-standard adoption, broad third-party interoperability, or installed-product behavior.
+- ✅ **Phase A/B は owner-use の範囲で完了している。** owner は desktop shell を日常の local operation に使え、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。
+- ✅ development slice として **schema + conformance が通過**している（26 schema、139 check）。
+- ✅ **LLM が読む基盤は definition-locked** であり、範囲を限定した Reference Extension が一つ、cross-agent reproduction report が一つある。
+- ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。
+- 🧪 **公開 proof pack の境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。
+- ⚠️ **Windows-first。** Linux validation は development slice であり、最終的な product proof ではない。**macOS は未検証（<code>unverified</code>）**であり、supported として宣伝してはならない。
+- ⚠️ この基盤作業は、権限を持たない task に対して統制された LLM-readable extension behavior を限定的に実証する。public standard への採用、広範な第三者 interoperability、installed-product behavior は証明しない。
 
-Every unfinished item in repository docs is classified `release_blocker` / `post_v1_scope` / `known_limitation`. See [CLAIM.md](CLAIM.md) and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
-
-<br>
-
-## 📚 Top-level references — 主要ドキュメント
-
-| Document | Description | 説明 |
-|:---|:---|:---|
-| [AGENTS.md](AGENTS.md) | Repository agent rules & work discipline | エージェント規則・作業規律 |
-| [docs/specs/gui-shell-spec-v1.md](docs/specs/gui-shell-spec-v1.md) | GUI-Shell v1 implementation specification | v1 実装仕様 |
-| [docs/standards/llm-readable-extension-surface.md](docs/standards/llm-readable-extension-surface.md) | LLM-readable substrate standard | LLM 責任基盤の標準 |
-| [docs/standards/gui-shell-extended-standard.md](docs/standards/gui-shell-extended-standard.md) | Extended standard | 拡張標準 |
-| [ROADMAP.md](ROADMAP.md) | Phase roadmap & execution order | フェーズ計画と実行順序 |
-| [docs/OPERATING_MODEL.md](docs/OPERATING_MODEL.md) | Repository flow, backup model, validation gates | 運用フロー・検証ゲート |
-| [CLAIM.md](CLAIM.md) | Current claim boundary | クレーム境界 |
-| [AUDIT.md](AUDIT.md) | Audit & invariant expectations | 監査・不変条件 |
-| [SECURITY.md](SECURITY.md) | Security posture & reporting | セキュリティ方針 |
-| [docs/architecture/RUST_BROKER_IPC_PROTOCOL.md](docs/architecture/RUST_BROKER_IPC_PROTOCOL.md) | Rust broker IPC protocol | Rust ブローカー IPC |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Validation & setup failure guide | 障害対応ガイド |
+repository 文書にある未完了項目は、すべて <code>release_blocker</code> / <code>post_v1_scope</code> / <code>known_limitation</code> に分類する。[CLAIM.md](CLAIM.md) と [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) を参照すること。
 
 <br>
 
-## 📝 License — ライセンス
+## 📚 主要文書
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE).
-**MIT ライセンス** で配布されています。
+| 文書 | 説明 |
+|:---|:---|
+| [AGENTS.md](AGENTS.md) | repository の Agent 規則と作業規律 |
+| [docs/specs/gui-shell-spec-v1.md](docs/specs/gui-shell-spec-v1.md) | GUI-Shell v1 実装仕様 |
+| [docs/standards/llm-readable-extension-surface.md](docs/standards/llm-readable-extension-surface.md) | LLM が読む責任基盤の標準 |
+| [docs/standards/gui-shell-extended-standard.md](docs/standards/gui-shell-extended-standard.md) | 拡張標準 |
+| [ROADMAP.md](ROADMAP.md) | Phase の計画と実行順序 |
+| [docs/OPERATING_MODEL.md](docs/OPERATING_MODEL.md) | リポジトリの作業流、backup model、validation gate |
+| [CLAIM.md](CLAIM.md) | 現在の主張境界 |
+| [AUDIT.md](AUDIT.md) | Audit と invariant の要件 |
+| [SECURITY.md](SECURITY.md) | セキュリティ姿勢と報告方法 |
+| [Rust Broker IPC 通信規約](docs/architecture/RUST_BROKER_IPC_PROTOCOL.md) | Rust Broker の IPC 通信規約 |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | validation / setup の失敗対応 |
+
+<br>
+
+## 📝 ライセンス
+
+**MIT License** で配布する。[LICENSE](LICENSE) を参照すること。
 
 <br>
 
 <div align="center">
-<sub>Schema-first. Conformance-first. Safety-first. A substrate LLMs build on — never an authority they hold.</sub><br>
-<sub>スキーマファースト・適合ファースト・安全性ファースト。LLM が築く基盤であり、LLM が握る権限ではない。</sub>
+<sub>Schema-first・Conformance-first・Safety-first。LLM がその上に構築する基盤であり、LLM が保持する権限ではない。</sub>
 </div>

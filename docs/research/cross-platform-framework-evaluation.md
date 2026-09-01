@@ -1,11 +1,11 @@
-# Cross-platform Framework Evaluation
+# Cross-platform framework 評価
 
-| Axis | Flutter + Rust helper | Compose MP + Rust helper | Tauri + TypeScript + Rust |
+| 評価軸 | Flutter + Rust helper 案 | Compose MP + Rust helper 案 | Tauri + TypeScript + Rust 案 |
 |---|---|---|---|
-| Safety | Good, if authority stays outside UI | Good, if authority stays outside UI | Good but bridge auditing is heavier |
-| Robustness | Strong | Medium to strong | Strong on desktop |
-| Stability | Medium | Medium to strong | Medium |
-| PC/mobile parity | Strong | Medium to strong | Desktop-heavy |
-| Production maturity | Strong | Medium | Strong on desktop |
-| Governance risk | Google-dependent | JetBrains/Kotlin-dependent | WebView/Rust/TS-dependent |
-| Current role | First candidate | Watchlist | Desktop-heavy fallback |
+| 安全性 | 権限を UI 外に保てば良好 | 権限を UI 外に保てば良好 | 良好だが bridge audit の負担が大きい |
+| 頑強性 | 高い | 中〜高 | desktop で高い |
+| 安定性 | 中 | 中〜高 | 中 |
+| PC/mobile 等価性 | 高い | 中〜高 | desktop 偏重 |
+| 製品成熟度 | 高い | 中 | desktop で高い |
+| 運営主体の risk | Google 依存 | JetBrains/Kotlin 依存 | WebView/Rust/TS 依存 |
+| 現行の役割 | 第一候補 | 監視対象 | desktop 偏重時の fallback |

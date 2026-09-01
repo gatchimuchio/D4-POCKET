@@ -10,5 +10,5 @@ class RecoveryCatalog:
 
     def get(self, recovery_id: str) -> dict:
         if recovery_id not in self._actions:
-            raise KeyError(f"recovery action not registered: {recovery_id}")
+            raise KeyError(f"未登録の recovery action です: {recovery_id}")
         return copy.deepcopy(self._actions[recovery_id])

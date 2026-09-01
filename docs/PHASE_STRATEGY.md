@@ -1,101 +1,109 @@
-# Phase Strategy
+# Phase 戦略
 
-GUI-Shell uses phase-based readiness language so owner-use progress is not confused with completed product release readiness.
+GUI-Shell は、owner-use の進捗と completed product の release readiness を混同しないよう、Phase に基づく readiness 表現を使用する。
 
-## Current Phase
+## 現在の Phase
 
+~~~yaml
 - phase: A
   name: personal Windows trial operation
   status: complete
-  evidence: Windows desktop build and native launch smoke passed; Dashboard, NavigationRail, Runtime Status, and Invariant Status were visible.
+  evidence: Windows desktop build と native launch smoke は通過し、Dashboard、NavigationRail、Runtime Status、Invariant Status の表示を確認した。
 
 - phase: B
   name: owner-use operational hardening
   status: complete
-  goal: make GUI-Shell useful for daily personal operation while preserving authority, audit, approval, recovery, and evidence boundaries.
-  current_surfaces: Dashboard phase status, persistent status bar, Problems Panel, Evidence Center, Recovery Playbook, Trust Center, Runtime Center, and Authority Map are available as display-only owner-operation surfaces.
+  goal: authority、audit、approval、recovery、evidence の boundary を保持しながら、GUI-Shell を日常の personal operation に役立つ状態にする。
+  current_surfaces: Dashboard の Phase status、persistent status bar、Problems Panel、Evidence Center、Recovery Playbook、Trust Center、Runtime Center、Authority Map は、表示専用の owner-operation surface として利用できる。
+~~~
 
-## Phase B Roadmap
+## Phase B ロードマップ
 
+~~~yaml
 - item: B-1 owner operation console
   classification: required_for_v1
   status: complete
-  evidence: Dashboard phase status, persistent status bar, Problems Panel, Evidence Center, Recovery Playbook, and release-not-claimed UI are implemented.
+  evidence: Dashboard の Phase status、persistent status bar、Problems Panel、Evidence Center、Recovery Playbook、release-not-claimed UI を実装済みである。
   blocks_release: no
 
 - item: B-2 local snapshot / local runtime wiring
   classification: required_for_v1
   status: complete
-  evidence: `ShellCoreClient.local()` remains available for development / diagnostic inspection and loads `GUI_SHELL_SNAPSHOT_JSON`, `%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json`, or `.gui_shell/shell_snapshot.json`; parse/missing failures fall back safely without release claim.
+  evidence: ShellCoreClient.local() は development／diagnostic inspection 用として利用可能なままで、GUI_SHELL_SNAPSHOT_JSON、%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json、または .gui_shell/shell_snapshot.json を読み込む。parse／missing failure は release claim を行わず安全に fallback する。
   blocks_release: no
 
 - item: B-3 owner launch flow
   classification: required_for_v1
   status: complete
-  evidence: `scripts/launch_owner_desktop.sh` and `scripts/launch_owner_desktop.ps1` start the Rust broker, export `GUI_SHELL_BROKER_ENDPOINT_JSON`, and launch Flutter desktop without strict release validation or release evidence generation.
+  evidence: scripts/launch_owner_desktop.sh と scripts/launch_owner_desktop.ps1 は Rust broker を起動し、GUI_SHELL_BROKER_ENDPOINT_JSON を export し、strict release validation または release evidence generation なしで Flutter desktop を起動する。
   blocks_release: no
 
 - item: B-4 Problems to Recovery loop
   classification: required_for_v1
   status: complete
-  evidence: Problems rows carry `recovery_id`, `safe_to_ignore_for_phase_b`, `blocks_owner_use`, and `blocks_completed_product_release`; the Problems Panel displays the matching recovery command/path without executing privileged auto-fix.
+  evidence: Problems の row は recovery_id、safe_to_ignore_for_phase_b、blocks_owner_use、blocks_completed_product_release を保持する。Problems Panel は privileged auto-fix を実行せず、対応する recovery command／path を表示する。
   blocks_release: no
 
 - item: B-5 Trust / Authority / Runtime Map
   classification: required_for_v1
   status: complete
-  evidence: Trust Center and Authority Map are restored in desktop navigation; Runtime Center displays Runtime -> Capability -> Permission -> Approval -> Audit -> Recovery while preserving Flutter display-only authority boundaries.
+  evidence: Trust Center と Authority Map は desktop navigation に復元されている。Runtime Center は Flutter の display-only authority boundary を保持しながら Runtime -> Capability -> Permission -> Approval -> Audit -> Recovery を表示する。
   blocks_release: no
 
 - item: B-6 owner-use completion gate
   classification: required_for_v1
   status: complete
-  evidence: Owner launch helpers generate local snapshots and open the desktop shell; status, problems, evidence, recovery, trust, runtime, and authority surfaces are visible; local snapshot/fallback preserves `release_state: not claimed`.
+  evidence: owner launch helper は local snapshot を生成して desktop Shell を開く。status、problem、evidence、recovery、trust、Runtime、authority の各 surface が表示され、local snapshot／fallback は release_state: not claimed を保持する。
   blocks_release: no
+~~~
 
-## Later Phases
+## 後続 Phase
 
+~~~yaml
 - phase: C
   name: OSS claim hygiene
   status: next
-  goal: keep README, CLAIM, release checklist, audit, installer, security, strategy docs, and language-policy convergence blockers aligned so external readers cannot mistake Phase B for release readiness.
+  goal: README、CLAIM、release checklist、audit、installer、security、strategy document と language-policy convergence blocker の整合を保ち、外部読者が Phase B を release readiness と誤認できないようにする。
 
 - phase: D
   name: measured Windows release evidence
   status: later
-  goal: collect native Windows installed-path evidence and pass the hardened Windows evidence validator.
+  goal: native Windows の installed-path evidence を収集し、強化した Windows evidence validator を通過させる。
 
 - phase: E
   name: OSS v1.0 release candidate
   status: later
-  goal: pass strict Windows release validation, preserve known limitations, and wait for owner GO.
+  goal: strict Windows release validation を通過し、known limitation を保持し、owner GO を待つ。
 
 - phase: F
   name: paid/product QC
   status: later
-  goal: complete support, rollback, long-run, legal, dependency, installer, and third-party-user quality gates.
+  goal: support、rollback、long-run、legal、dependency、installer、third-party-user の quality gate を完了する。
+~~~
 
-## Unified Completion Roadmap
+## 統合完了ロードマップ
 
-The canonical execution roadmap for moving from the current Phase B owner-use state through Windows-first product completion, LLM-readable substrate demonstration, initial public release, and post-public product QC is:
+現在の Phase B における owner-use state から Windows-first product の completion、LLM-readable substrate の demonstration、initial public release、post-public product QC へ進む正本の実行ロードマップは、次に置く。
 
-```text
+~~~text
 docs/implementation/GUI_SHELL_LLM_SUBSTRATE_COMPLETION_ROADMAP.md
-```
+~~~
 
-This roadmap adds C/L/R/P/F execution blocks without changing the completed Phase A or Phase B status. Its LLM-readable substrate claim gates must not conceal the existing Rust Broker, Windows installed-path evidence, strict release validation, or owner GO release blockers.
+このロードマップは、完了済みの Phase A／Phase B status を変更せず、C／L／R／P／F の execution block を追加する。その LLM-readable substrate の claim gate によって、既存の Rust Broker、Windows installed-path evidence、strict release validation、owner GO の release blocker を隠してはならない。
 
-## Release Rule
+## release 規則
 
-Do not claim completed product release until language policy runtime convergence is proven, strict Windows release validation passes, and owner GO is explicit.
+実装言語方針の Runtime convergence が実証され、strict Windows release validation が通過し、owner GO が明示されるまでは、completed product release を主張しない。
 
-Phase B may improve owner usability without weakening strict release gates.
+Phase B は、strict release gate を弱めずに owner usability を改善してよい。
 
-## Language Policy Gate
+## 実装言語方針の gate
 
+~~~yaml
 - item: Rust Security Broker migration
   classification: release_blocker
   status: partially_started_not_passed
-  reason: Rust broker skeleton and JSON envelope rejection tests exist, but current owner-use and validation Shell Core behavior is still implemented in Python, and the broker is not yet the production authority path.
-  required_action: Complete production IPC transport, parity migration, Flutter broker-mediated authority path, no-Python-runtime assertion, and no-FFI-authority assertion before Phase D evidence can support a completed product release claim.
+  reason: Rust broker skeleton と JSON envelope rejection test は存在するが、現在の owner-use および validation Shell Core behavior は引き続き Python で実装され、broker はまだ production authority path ではない。
+  required_action: Phase D evidence が completed product release claim を支えられるようになる前に、production IPC transport、parity migration、Flutter broker-mediated authority path、no-Python-runtime assertion、no-FFI-authority assertion を完成させる。
   blocks_release: yes
+~~~

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release_ready": false,
-  "release_ready_reason": "Windows installed-path evidence, audit anchor external tamper-evidence proof, and owner GO are required before completed product release.",
+  "release_ready_reason": "完成製品をリリースする前に、Windowsインストール先の証拠、監査アンカーの外部改ざん耐性証明、所有者GOが必要です。",
   "blockers": [
     {
       "name": "windows_evidence_provenance_isolation",
@@ -11,8 +11,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Isolated Windows source/artifact/evidence provenance must pass machine validation before release.",
-      "required_action": "Create release_evidence/windows_installed_smoke.json from an isolated native Windows run tied to the exact source commit and artifact hashes, then pass tooling/windows_release_evidence.py."
+      "reason": "分離したWindowsソース・成果物・証拠の由来が、リリース前に機械検証へ合格する必要があります。",
+      "required_action": "正確なソースcommitと成果物ハッシュに結び付く分離済みネイティブWindows実行からrelease_evidence/windows_installed_smoke.jsonを作成し、tooling/windows_release_evidence.pyへ合格させてください。"
     },
     {
       "name": "windows_installer_first_run_smoke",
@@ -22,8 +22,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Windows installed first-run evidence must pass machine validation before release.",
-      "required_action": "Collect native Windows installed-app first-run smoke with broker-mediated Flutter .exe launch, no-Python-runtime launch, visible surfaces, config, and audit probe evidence, then pass tooling/windows_release_evidence.py."
+      "reason": "Windowsインストール後の初回起動証拠が、リリース前に機械検証へ合格する必要があります。",
+      "required_action": "ブローカー経由のFlutter .exe起動、Python実行系なしの起動、可視画面、設定、監査試行を含むネイティブWindowsインストール済みアプリの初回起動簡易証拠を収集し、tooling/windows_release_evidence.pyへ合格させてください。"
     },
     {
       "name": "windows_setup_doctor_smoke",
@@ -33,8 +33,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Installed-app generated Setup Doctor product evidence must pass machine validation before release.",
-      "required_action": "Run native Windows installed smoke so the installed app writes machine-readable Setup Doctor product evidence, then pass tooling/windows_release_evidence.py."
+      "reason": "インストール済みアプリが生成した環境診断の製品証拠が、リリース前に機械検証へ合格する必要があります。",
+      "required_action": "インストール済みアプリが機械可読な環境診断製品証拠を書き出すようネイティブWindowsのインストール簡易検査を実行し、tooling/windows_release_evidence.pyへ合格させてください。"
     },
     {
       "name": "windows_broker_installed_smoke",
@@ -44,8 +44,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Installed Rust broker launch/connect/restart/crash evidence must pass machine validation before release.",
-      "required_action": "Run installer/windows/collect_broker_smoke.ps1 and include broker evidence in release_evidence/windows_installed_smoke.json, then pass tooling/windows_release_evidence.py."
+      "reason": "インストール済みRustブローカーの起動・接続・再起動・異常終了証拠が、リリース前に機械検証へ合格する必要があります。",
+      "required_action": "installer/windows/collect_broker_smoke.ps1を実行してブローカー証拠をrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyへ合格させてください。"
     },
     {
       "name": "audit_anchor_external_tamper_evidence_proof",
@@ -55,8 +55,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Local HMAC audit anchor evidence does not prove same-user or administrator/root rewrite resistance.",
-      "required_action": "Collect Windows installed-path ACL/DPAPI, external-anchor, or signed-evidence proof for audit_anchor.key, audit_anchor.json, and audit.jsonl."
+      "reason": "ローカルHMAC監査アンカー証拠だけでは、同一ユーザーまたは管理者／rootによる書換えへの耐性を証明できません。",
+      "required_action": "audit_anchor.key、audit_anchor.json、audit.jsonlについて、Windowsインストール先のACL／DPAPI、外部アンカー、または署名済み証拠を収集してください。"
     },
     {
       "name": "owner_go",
@@ -65,8 +65,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Explicit owner GO has not been recorded.",
-      "required_action": "Record explicit owner GO only after measured installed-path release evidence and strict validation pass."
+      "reason": "所有者の明示GOが記録されていません。",
+      "required_action": "インストール先のリリース実測証拠と厳格検証が合格した後に限り、所有者の明示GOを記録してください。"
     }
   ]
 }

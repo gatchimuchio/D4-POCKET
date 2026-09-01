@@ -12,25 +12,27 @@ class PermissionCenter extends StatelessWidget {
   Widget build(BuildContext context) {
     final snapshot = client.getSnapshot();
     return ShellPage(
-      title: 'Permission Center',
+      title: '許可センター',
       children: [
         DataTable(
           columns: const [
-            DataColumn(label: Text('Permission')),
-            DataColumn(label: Text('Capability')),
-            DataColumn(label: Text('Decision')),
-            DataColumn(label: Text('Source')),
-            DataColumn(label: Text('Expiry')),
+            DataColumn(label: Text('許可')),
+            DataColumn(label: Text('能力')),
+            DataColumn(label: Text('判断')),
+            DataColumn(label: Text('出所')),
+            DataColumn(label: Text('有効期限')),
           ],
           rows: [
             for (final permission in snapshot.permissions)
-              DataRow(cells: [
-                DataCell(Text(permission.permissionId)),
-                DataCell(Text(permission.capabilityId)),
-                DataCell(Text(permission.decision)),
-                DataCell(Text(permission.source)),
-                DataCell(Text(permission.expiresAt ?? 'none')),
-              ]),
+              DataRow(
+                cells: [
+                  DataCell(Text(permission.permissionId)),
+                  DataCell(Text(permission.capabilityId)),
+                  DataCell(Text(permission.decision)),
+                  DataCell(Text(permission.source)),
+                  DataCell(Text(permission.expiresAt ?? 'なし')),
+                ],
+              ),
           ],
         ),
       ],

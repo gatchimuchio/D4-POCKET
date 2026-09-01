@@ -1,102 +1,102 @@
-# GUI Shell Extended Standard v0.3.1
+# GUI Shell 拡張標準 v0.3.1
 
-Status: Phase 0 Lock  
-Scope: GUI Shell / Cross-device Runtime Operation Shell  
-Primary decision: Flutter + Rust helper  
-Reference runtime: BLUE-TANUKI  
-Important note: BLUE-TANUKI is frozen as the Phase 0 reference runtime contract target.
+状態: Phase 0 Lock
+適用範囲: GUI Shell / cross-device Runtime Operation Shell
+主要決定: Flutter + Rust helper
+参照 Runtime: BLUE-TANUKI
+重要事項: BLUE-TANUKI は、Phase 0 における Reference Runtime Contract の対象として固定する。
 
-Formal implementation constraints for GUI-Shell v1.0 live in `docs/specs/gui-shell-spec-v1.md`. This Phase 0 extended standard remains the technology-selection and design-posture record.
+GUI-Shell v1.0 の正式な実装制約は `docs/specs/gui-shell-spec-v1.md` に置く。この Phase 0 拡張標準は、技術選定と設計姿勢の記録として維持する。
 
-## 1. Definition
+## 1. 定義
 
-GUI Shell is a generic runtime operation shell for multiple Runtime / Agent / Tool / Local Service targets.
+GUI Shell は、複数の Runtime / Agent / Tool / Local Service を対象とする汎用 Runtime Operation Shell である。
 
-GUI Shell is also an LLM-readable application responsibility substrate: LLM development / integration agents may read and consume GUI Shell contracts as first-class implementation and integration surfaces, but LLMs are never authority sources.
+GUI Shell は、LLM が読む「アプリケーション責任基盤」でもある。LLM 開発/統合エージェントは GUI Shell の contract を第一級の実装・統合面として読み、利用できるが、LLM は決して権限源ではない。
 
-It provides:
+GUI Shell は、次を提供する。
 
-- installation-to-start experience
-- runtime launch and status monitoring
-- capability and permission control
-- approval workflow
-- audit trail
-- recovery workflow
-- update policy
-- device coordination
-- adapter-based runtime integration
+- install から起動までの体験
+- Runtime の起動と status monitoring
+- Capability と Permission の制御
+- Approval の作業流
+- Audit の追跡記録
+- Recovery の作業流
+- Update の方針
+- device 間の調整
+- Adapter による Runtime 統合
 
-## 2. Non-goals
+## 2. 対象外
 
-GUI Shell must not:
+GUI Shell は、次を行ってはならない。
 
-- become a BLUE-TANUKI-specific MVP
-- embed BLUE-TANUKI-specific logic into Shell Core
-- expose low-level CLI/WSL/npm/Git/runtime complexity to normal users
-- become a terminal wrapper
-- treat LLM/Agent output as authority
-- treat LLM implementation work as proof of release readiness or external standard adoption
-- store core assets in Flutter-only code
+- BLUE-TANUKI 専用の MVP になる。
+- BLUE-TANUKI 固有の logic を Shell Core に組み込む。
+- 低水準の CLI / WSL / npm / Git / Runtime の複雑性を通常のユーザーへ露出する。
+- terminal wrapper になる。
+- LLM / Agent の output を権限として扱う。
+- LLM による実装作業を、release readiness または外部標準への採用を示す証拠として扱う。
+- 中核 asset を Flutter 固有の code に保存する。
 
-## 3. Core assets
+## 3. 中核 asset
 
-The following assets must remain framework-independent:
+次の asset は、framework から独立した状態を維持しなければならない。
 
-- schema
-- Adapter Contract
-- Runtime Model
-- Capability Model
-- Permission Model
-- Approval Model
-- Audit Event Format
-- Recovery Action Format
-- Content Exposure Boundary
-- Authority Strip Conformance
-- Rust helper boundary
-- conformance tests
+- 契約 schema
+- Adapter の契約（Adapter Contract）
+- Runtime のモデル（Runtime Model）
+- Capability のモデル
+- Permission のモデル
+- Approval のモデル
+- Audit event の形式
+- Recovery action の形式
+- 内容露出の境界（Content Exposure Boundary）
+- 権限除去の適合規則（Authority Strip Conformance）
+- Rust helper の境界
+- conformance の test
 
-## 4. UI framework boundary
+## 4. UI framework の境界
 
-Flutter may own:
+Flutter は、次を所有してよい。
 
-- rendering
-- user input
-- UI state
-- navigation
-- theme
-- localization
-- accessibility
+- 画面の rendering
+- user input の収集
+- UI state の保持
+- 画面の navigation
+- 表示 theme
+- 表示の localization
+- accessibility 対応
 
-Flutter must not own:
+Flutter は、次を所有してはならない。
 
-- authority decisions
-- permission semantics
-- audit semantics
-- adapter conformance
-- recovery classification
-- content visibility rules
-- runtime trust rules
+- authority の decision
+- Permission の semantics
+- Audit の semantics
+- Adapter の Conformance
+- Recovery の classification
+- Content Visibility の rule
+- Runtime Trust の rule
 
-## 5. Phase 0 Lock decisions
+## 5. Phase 0 Lock の決定事項
 
-- Generic GUI Shell direction: locked
-- BLUE-TANUKI as reference runtime only: locked
-- BLUE-TANUKI Phase 0 reference runtime contract target: locked
-- Flutter + Rust helper as first candidate: locked
-- Compose MP as watchlist candidate: locked
-- Tauri as desktop-heavy fallback: locked
-- Schema-first: locked
-- Conformance-first: locked
+- 汎用 GUI Shell の方向性: locked
+- BLUE-TANUKI を Reference Runtime のみにする: locked
+- BLUE-TANUKI を Phase 0 Reference Runtime Contract の対象にする: locked
+- Flutter + Rust helper を第一候補にする: locked
+- Compose MP を watchlist candidate にする: locked
+- Tauri を desktop-heavy fallback にする: locked
+- schema の作業順序は Schema-first: locked
+- 適合性の作業順序は Conformance-first: locked
 
-## 6. Runtime safety invariants
+## 6. Runtime の安全 invariant
 
-The shell must enforce or test:
+Shell は、次を強制または検査しなければならない。
 
-- inbound authority keys are stripped
-- external metadata cannot escalate authority
-- runtime-disallowed authority context cannot be created by GUI
-- GUI input is not authority
-- content visibility is respected
-- approval edits are field-scoped
-- edited payloads are rehashed and revalidated
-- all sensitive actions create audit events
+- inbound authority key を除去する。
+- external metadata は権限を昇格できない。
+- Runtime が許可していない `authority_context` を GUI から作成できない。
+- GUI input は権限ではない。
+- Content Visibility を遵守する。
+- Approval の編集範囲は field 単位に限定する。
+- 編集後の payload を再 hash 化し、再検証する。
+- すべての sensitive action について AuditEvent を作成する。

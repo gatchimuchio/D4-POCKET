@@ -185,7 +185,7 @@ fn spawn_broker(workspace: &Workspace, max_request_bytes: usize) -> BrokerProces
         .unwrap();
     let endpoint = wait_for_endpoint(&workspace.session_file).unwrap_or_else(|| {
         let _ = child.kill();
-        panic!("broker endpoint file was not created")
+        panic!("broker endpoint fileが作成されなかった")
     });
     BrokerProcess { child, endpoint }
 }
@@ -243,7 +243,7 @@ fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::
     if response.trim().is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::UnexpectedEof,
-            "broker IPC response was empty",
+        "broker IPC responseが空だった",
         ));
     }
     serde_json::from_str(response.trim())

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/diagnostic.schema.json",
-  "title": "DiagnosticReport",
+  "title": "診断報告（DiagnosticReport）",
   "type": "object",
   "required": [
     "diagnostic_id",

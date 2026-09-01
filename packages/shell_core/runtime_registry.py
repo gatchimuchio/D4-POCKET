@@ -11,7 +11,7 @@ class RuntimeRegistry:
 
     def get(self, runtime_id: str) -> dict:
         if runtime_id not in self._runtimes:
-            raise KeyError(f"runtime not registered: {runtime_id}")
+            raise KeyError(f"未登録の runtime です: {runtime_id}")
         return copy.deepcopy(self._runtimes[runtime_id])
 
     def snapshot(self) -> list[dict]:

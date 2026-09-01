@@ -1,60 +1,71 @@
-# Release Validation
+# リリース検証
 
-In this repository, "release" means completed product release.
+このリポジトリで「リリース」とは、完成製品のリリースを意味する。
 
-- item: skeleton, preview, alpha, beta, and scaffold states
+~~~yaml
+- item: skeleton、preview、alpha、beta、およびscaffoldの各状態
   classification: release_blocker
   example: true
-  reason: these states are not completed product release states.
+  reason: これらの状態は完成製品のリリース状態ではない。
   blocks_release: yes
+~~~
 
-## Development Validation
+## 開発検証
 
-Development validation:
+開発検証では次を満たす。
 
-- schema check must pass
-- conformance must pass
-- unavailable toolchains may be recorded as `not_run`
+- スキーマ検査が合格しなければならない。
+- 適合性検査が合格しなければならない。
+- 利用できないツールチェーンは`not_run`として記録してよい。
+
+~~~yaml
   classification: release_blocker
   blocks_release: yes
-- development validation is not suitable for completed product release
+~~~
+
+- 開発検証は完成製品のリリース判定には適さない。
+
+~~~yaml
   classification: release_blocker
   blocks_release: yes
+~~~
 
-`not_run` is acceptable only in development validation.
+`not_run`を許容するのは開発検証だけである。
 
-## Release Validation
+## リリース検証
 
-Release validation:
+リリース検証では次を満たす。
 
-- no `not_run` allowed for in-scope components
-- no unclassified remaining risk allowed
-- any `release_blocker` fails validation
-- `validate_all.py --strict-release` must pass
-- `python3 tooling/release_smoke.py` must pass
-- `python3 tooling/evidence_bundle.py --check` must pass
-- `python3 tooling/release_runtime_assertions.py --check` must pass
-- `python3 tooling/windows_release_evidence.py` must pass for Windows completed product release
-- `installer\windows\collect_broker_smoke.ps1` evidence must be included in Windows installed smoke evidence
-- installed-app generated Setup Doctor product export evidence must be included; `installer\windows\collect_setup_doctor.ps1` is external probe evidence only
-- Windows installed first-run evidence must launch the installed Flutter `.exe` through the installed Rust broker with `-NoPythonRuntime` launch evidence
-- `cargo test` must pass if Rust helper is in release scope
-- desktop `flutter analyze` must pass if desktop app is in release scope
-- mobile `flutter analyze` is required only if mobile is in release scope
-- installer smoke must pass with machine-readable installed-path evidence if installer is in release scope
+- 範囲内の構成要素に`not_run`を認めない。
+- 未分類の残存リスクを認めない。
+- いずれかの`release_blocker`が存在すれば検証は失敗する。
+- `validate_all.py --strict-release`が合格しなければならない。
+- `python3 tooling/release_smoke.py`が合格しなければならない。
+- `python3 tooling/evidence_bundle.py --check`が合格しなければならない。
+- `python3 tooling/release_runtime_assertions.py --check`が合格しなければならない。
+- Windows完成製品のリリースでは`python3 tooling/windows_release_evidence.py`が合格しなければならない。
+- Windowsのインストール済みスモーク証拠には`installer\windows\collect_broker_smoke.ps1`の証拠を含めなければならない。
+- インストール済みアプリが生成したSetup Doctor製品エクスポート証拠を含めなければならない。`installer\windows\collect_setup_doctor.ps1`は外部プローブ証拠に限る。
+- Windowsのインストール済み初回実行証拠は、インストール済みRustブローカーを介し、`-NoPythonRuntime`起動証拠を伴って、インストール済みFlutterの`.exe`を起動しなければならない。
+- Rustヘルパーがリリース範囲内なら`cargo test`が合格しなければならない。
+- デスクトップアプリがリリース範囲内ならデスクトップの`flutter analyze`が合格しなければならない。
+- モバイルの`flutter analyze`が必要なのは、モバイルがリリース範囲内の場合だけである。
+- インストーラーがリリース範囲内なら、機械可読なインストール先証拠を伴うインストーラー・スモークが合格しなければならない。
 
-`not_run` is a `release_blocker` in release validation for in-scope components.
+範囲内の構成要素について、リリース検証での`not_run`は`release_blocker`である。
 
-## Classification Rules
+## 分類規則
 
+~~~yaml
 - classification: `release_blocker`
-  reason: Required for v1.0 completed product release and unfinished, unverified, failed, or not run.
+  reason: v1.0完成製品のリリースに必要であり、未完了、未検証、失敗、または未実行の状態である。
   blocks_release: yes
 
 - classification: `post_v1_scope`
-  reason: Explicitly outside v1.0 completed desktop product scope.
+  reason: v1.0完成デスクトップ製品の範囲外であることを明示している。
   blocks_release: no
 
 - classification: `known_limitation`
-  reason: Accepted v1.0 limitation documented in release-facing claims.
+  reason: リリース向け主張に記載した、受容済みのv1.0制限である。
   blocks_release: no
+~~~

@@ -1,13 +1,13 @@
-# UI Snapshot Tests
+# UI スナップショット試験
 
-Post-v1 planned Flutter UI snapshot test boundary.
+v1後に計画する Flutter UI snapshot test 境界。
 
 classification: post_v1_scope
-reason: current v1.0 gate uses Flutter analyze/test plus conformance-backed operation surface checks; full snapshot testing remains deferred.
+reason: 現行 v1.0 gate は Flutter analyze/test と conformance に裏付けられた操作表層検査を使い、完全な snapshot test は延期する。
 blocks_release: no
 
-Purpose:
+目的:
 
-- prevent accidental UI regressions
-- keep migration cost visible
-- document expected product screens
+- 意図しない UI regression を防ぐ
+- 移行費用を可視に保つ
+- 期待する製品画面を文書化する

@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$FlutterReleaseDir,
 
@@ -81,10 +81,10 @@ if ($GitRoot -eq "") {
 }
 
 if ((Test-Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
-  throw "InstallRoot already exists; formal evidence requires a fresh isolated run root: $InstallRoot"
+  throw "InstallRoot はすでに存在します。正式証拠には新規の分離実行 root が必要です: $InstallRoot"
 }
 if ((Test-LegacyFixedInstallRoot -Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
-  throw "Legacy shared fixed InstallRoot is not valid for formal Windows evidence: $InstallRoot"
+  throw "従来の共有固定 InstallRoot は正式な Windows 証拠として無効です: $InstallRoot"
 }
 
 $sourceCommit = Invoke-GitString -Root $GitRoot -Arguments @("rev-parse", "HEAD")
@@ -141,13 +141,13 @@ try {
     }
     $Broker.Refresh()
     if ($Broker.HasExited) {
-      throw "Rust broker exited before endpoint was ready: $($Broker.ExitCode)"
+      throw "Rust broker が endpoint 準備前に終了しました: $($Broker.ExitCode)"
     }
     Start-Sleep -Milliseconds 50
   }
 
   if (-not (Test-Path $SessionFile)) {
-    throw "Rust broker endpoint file was not created: $SessionFile"
+    throw "Rust broker endpoint ファイルが作成されませんでした: $SessionFile"
   }
 
   $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $SessionFile
@@ -224,5 +224,5 @@ $manifest = [ordered]@{
 
 $manifestPath = Join-Path $installRootPath.FullName "installed_manifest.json"
 Write-JsonEvidence -Value $manifest -Path $manifestPath -Depth 8
-Write-Host "staged GUI-Shell installed app at $($installRootPath.FullName)"
+Write-Host "GUI-Shell のインストール済み app を stage しました: $($installRootPath.FullName)"
 Write-Host "manifest $manifestPath"

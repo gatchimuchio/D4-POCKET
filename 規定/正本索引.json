@@ -1,0 +1,218 @@
+{
+  "状態": "現行局所正本",
+  "版": "2026-09-02-日本語基底-1",
+  "正式名称": "GUI-Shell 日本語基底・責任正本索引",
+  "規定言語": "日本語",
+  "基底言語": "日本語",
+  "他言語原則": "実務上やむを得ない外部接続に限り局所例外として原形を保持する",
+  "対象リポジトリ": {
+    "名称": "GUI-Shell",
+    "リポジトリ": "https://github.com/gatchimuchio/GUI-Shell",
+    "正本ブランチ": "main",
+    "本索引成立前基準コミット": "56ef103717acba04c61244aaf29e6c8641729b6d"
+  },
+  "最上位理論参照": {
+    "名称": "認知工学基底理論体系",
+    "リポジトリ": "https://github.com/gatchimuchio/cognitive-engineering-foundations",
+    "参照コミット": "60131da52ba7931ed7f82c7648a74ac790f50d08",
+    "参照資料": [
+      "PUBLICATION_POLICY.md",
+      "00_認知工学とは何か_v0_3_ja_en.md",
+      "01_情報工学における言語基底論_v0_3_ja_en.md"
+    ],
+    "局所射影": [
+      "日本語原典先行",
+      "日本語による対象化・差異化・関係化・監査",
+      "版内固定と変更追跡",
+      "局所閉包と全体再開放の分離",
+      "旧版の非遡及改変",
+      "規定自身への自己適用"
+    ],
+    "非採用": "上位理論本文をGUI-Shellの局所正本として複製しない"
+  },
+  "責任別外部参照": {
+    "大規模言語模型成立規定": {
+      "リポジトリ": "https://github.com/gatchimuchio/LLM-Constitutive-Specification",
+      "参照コミット": "3f5eb7b704dba5a06c717399c3400405b5e8944e",
+      "版": "2026-08-29-成立規定-9",
+      "状態": "凍結正本・射程内反例時のみ再開放",
+      "GUI-Shellへの適用射程": [
+        "言語模型物・言語模型実行系・利用系の責任分離",
+        "利用系の成立を模型能力・意思決定構造・能力主体へ無言昇格させない"
+      ],
+      "GUI-Shellへの非適用": [
+        "厳密言語模型成立条件をGUI-Shell製品成立条件へしない",
+        "能力作用構成をGUI-Shellの局所構造へ丸ごと移植しない",
+        "HDS内部原理をGUI-Shellで定義しない"
+      ]
+    },
+    "NOTNN-LLM-MINIDORA": {
+      "リポジトリ": "https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA",
+      "調査時main参照コミット": "010a4b63f23027a1ec192b55cdad0e97aa85325c",
+      "同コミットのLLM成立規定参照版": "2026-08-28-成立規定-8",
+      "同コミットのLLM成立規定参照コミット": "fcbc2fa4bc89d749942e8ebee2764115488d29c4",
+      "GUI-Shellへの適用射程": [
+        "日本語基底の局所射影方法",
+        "外部例外の局所化",
+        "権威順序と責任別正本",
+        "文字率ではなく意味を対象とする監査"
+      ],
+      "GUI-Shellへの非適用": [
+        "MINIDORA固有の模型構造",
+        "Compiler構造",
+        "評価問題固有の構造",
+        "能力作用構成",
+        "HDS運用"
+      ]
+    }
+  },
+  "版差境界": {
+    "観測事実": "MINIDORAの調査時mainはLLM成立規定v8を固定参照し、LLM成立規定の現行mainはv9である",
+    "処理": [
+      "v8とv9を同一版として扱わない",
+      "GUI-Shellはv9から明示した運用境界だけを参照する",
+      "MINIDORAからは日本語基底の運用パターンだけを参照する",
+      "外部参照更新時は旧版との差とGUI-Shellへの適用射程を再監査する"
+    ]
+  },
+  "現行正本": [
+    {
+      "path": "AGENTS.md",
+      "責任": "作業規律、規則優先順位、安全、権限、Git運用、検証、完了報告"
+    },
+    {
+      "path": "規定/00_日本語基底規定.md",
+      "責任": "日本語基底、意味正本、多言語例外、移行、意味監査、再開放"
+    },
+    {
+      "path": "規定/日本語基底例外.json",
+      "責任": "日本語基底の局所例外分類、範囲、理由、整合性固定、再監査条件"
+    },
+    {
+      "path": "規定/正本索引.json",
+      "責任": "現行正本、責任地図、外部参照固定点、版差境界の機械可読索引"
+    },
+    {
+      "path": "tooling/日本語基底監査.py",
+      "責任": "追跡済みおよび非ignore未追跡資産の日本語基底機械監査、局所例外整合性検証、監査限界の明示"
+    },
+    {
+      "path": "docs/specs/gui-shell-spec-v1.md",
+      "責任": "GUI-Shell v1の正式実装仕様"
+    },
+    {
+      "path": "docs/specs/adapter-conformance.md",
+      "責任": "Adapter適合境界"
+    },
+    {
+      "path": "docs/specs/content-exposure-policy.md",
+      "責任": "Content Exposure Boundary"
+    },
+    {
+      "path": "docs/specs/approval-visibility-boundary.md",
+      "責任": "Approvalの表示・編集境界"
+    },
+    {
+      "path": "specs/*.schema.json",
+      "責任": "runtime、Adapter、Capability、Permission、Approval、Audit、Recovery等の機械契約"
+    },
+    {
+      "path": "tooling/conformance_tests/",
+      "責任": "契約適合と拒否経路の検証"
+    },
+    {
+      "path": "ROADMAP.md",
+      "責任": "現行phase、v1.0射程、release blocker"
+    },
+    {
+      "path": "docs/standards/gui-shell-extended-standard.md",
+      "責任": "拡張標準と技術選択文脈"
+    },
+    {
+      "path": "docs/LANGUAGE_POLICY.md",
+      "責任": "実装言語と安全境界の分担。自然言語の日本語基底は規定/00_日本語基底規定.mdが正本"
+    },
+    {
+      "path": "CLAIM.md",
+      "責任": "外部へ主張できる成立範囲"
+    },
+    {
+      "path": "RELEASE_CHECKLIST.md",
+      "責任": "release判定条件"
+    },
+    {
+      "path": "release_blockers.registry.json",
+      "責任": "release blockerの機械可読台帳"
+    }
+  ],
+  "責任地図": {
+    "人間オーナー": [
+      "最終承認",
+      "復旧判断",
+      "release GO",
+      "最終責任"
+    ],
+    "AI実装・統合エージェント": [
+      "契約読取",
+      "境界付き変更提案・実装",
+      "検証",
+      "証拠と未検証範囲の報告",
+      "権限源にはならない",
+      "自己承認しない"
+    ],
+    "Shell Core": [
+      "runtime registry",
+      "permission ledger",
+      "approval queue",
+      "audit store",
+      "recovery catalog",
+      "update policy",
+      "content exposure enforcement",
+      "adapter conformance enforcement"
+    ],
+    "UI Layer": [
+      "rendering",
+      "operator input",
+      "navigation",
+      "local UI state",
+      "権限・Permission・Approval・Audit・Recovery・可視性・runtime trustを決定しない"
+    ],
+    "Adapter": [
+      "runtime stateの正規化",
+      "healthとdiagnosticsの露出",
+      "runtime eventのGUI-Shell schemaへの射影",
+      "metadataから権限を生成しない"
+    ],
+    "Rust Security Broker": [
+      "authority-sensitive IPC",
+      "approval eligibility",
+      "audit",
+      "recovery",
+      "command-envelope gating",
+      "隠れた権限経路にならない"
+    ]
+  },
+  "規則優先順位": [
+    "現在taskに対するオーナーまたはユーザーの明示指示。ただし安全・権限・証拠・release gate・owner GO・release_ready・監査・復旧・content exposure境界を弱めない",
+    "AGENTS.mdの共通基底規律",
+    "AGENTS.mdのリポジトリ拡張規則",
+    "規定/00_日本語基底規定.md。ただし言語・意味正本の責任範囲に限り、上位の安全規則を変更しない",
+    "現行実装指示・ROADMAP・phase文書",
+    "リポジトリ契約・Schema・test・validation script",
+    "既存実装pattern"
+  ],
+  "索引境界": [
+    "本索引は正本の所在と責任を示し、各正本の実質要求を置き換えない",
+    "本索引と実ファイルが矛盾する場合は不整合としてSUSPENDし、責任正本を確認する",
+    "外部リポジトリのmain更新をGUI-Shellへ自動適用しない",
+    "HDSの非公開内部を記録しない"
+  ],
+  "日本語基底監査": [
+    "内部意味の主語が日本語で成立している",
+    "対象・状態・作用・関係・権限・境界・採否・失敗を日本語で区別できる",
+    "多言語例外に実務上の必要性があり局所境界に閉じている",
+    "外部識別子の一般語義から内部意味を逆定義しない",
+    "既存契約の日本語化に互換・移行・復旧・監査境界がある",
+    "日本語化をruntime・contract・release完成証拠へ昇格しない"
+  ]
+}

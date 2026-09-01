@@ -1,20 +1,20 @@
-# shell_core
+# shell_core 責任境界
 
-Framework-independent Shell Core.
+framework に依存しない Shell Core。
 
-Owns:
+所有する責任:
 
-- runtime registry semantics
-- permission ledger semantics
-- approval queue semantics
-- audit event creation
-- recovery classification
-- content exposure validation
-- framework risk profile handling
+- runtime registry の意味
+- permission ledger の意味
+- approval queue の意味
+- audit event の作成
+- recovery の分類
+- content exposure の検証
+- framework risk profile の取扱い
 
-Must not depend on Flutter.
+Flutter に依存してはならない。
 
-Phase 3 skeleton modules:
+段階3の骨格 module:
 
 - `runtime_registry`
 - `adapter_loader`
@@ -25,4 +25,4 @@ Phase 3 skeleton modules:
 - `update_policy_store`
 - `content_exposure`
 
-The implementation is intentionally minimal and deterministic. It does not import Flutter or BLUE-TANUKI internals.
+実装は意図的に必要最小限かつ決定的とする。Flutter または BLUE-TANUKI 内部は import しない。

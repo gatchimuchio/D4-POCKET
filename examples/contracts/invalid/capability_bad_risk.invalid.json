@@ -1,6 +1,6 @@
 {
   "capability_id": "capability.bad",
-  "name": "Bad Capability",
+  "name": "不正な能力",
   "risk_level": "severe",
   "default_permission": "ask"
 }

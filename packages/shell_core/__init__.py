@@ -1,4 +1,4 @@
-"""Framework-independent Shell Core skeleton."""
+"""framework に依存しない Shell Core 骨格。"""
 
 from .adapter_loader import AdapterRecord, load_adapter
 from .action_envelope import build_action_envelope

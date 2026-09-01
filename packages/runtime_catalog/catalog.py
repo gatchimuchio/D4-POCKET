@@ -10,14 +10,14 @@ class RuntimeCatalog:
 
     def register_runtime_manifest(self, manifest: dict) -> None:
         if manifest.get("signed_manifest") is not True:
-            raise ValueError("runtime manifest must be signed")
+            raise ValueError("runtime manifest には署名が必要です")
         self._runtimes[manifest["runtime_id"]] = copy.deepcopy(manifest)
 
     def register_adapter_manifest(self, manifest: dict) -> None:
         if manifest.get("authority_strip") is not True:
-            raise ValueError("adapter manifest must require authority_strip=true")
+            raise ValueError("adapter manifest は authority_strip=true を必須としなければなりません")
         if manifest.get("signed_manifest") is not True:
-            raise ValueError("adapter manifest must be signed")
+            raise ValueError("adapter manifest には署名が必要です")
         self._adapters[manifest["adapter_id"]] = copy.deepcopy(manifest)
 
     def runtime_manifests(self) -> list[dict]:

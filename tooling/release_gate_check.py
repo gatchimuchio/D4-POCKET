@@ -100,14 +100,14 @@ def classified_near(lines: list[str], index: int) -> bool:
 
 def scan_file(path: Path) -> list[str]:
     if not path.exists():
-        return [f"{path.relative_to(ROOT)} missing"]
+        return [f"{path.relative_to(ROOT)} が存在しない"]
     lines = path.read_text(encoding="utf-8").splitlines()
     errors = []
     for index, line in enumerate(lines):
         lowered = line.lower()
         for pattern in PATTERNS:
             if pattern.lower() in lowered and not classified_near(lines, index):
-                errors.append(f"{path.relative_to(ROOT)}:{index + 1}: unclassified unfinished item: {pattern}")
+                errors.append(f"{path.relative_to(ROOT)}:{index + 1}: 未分類の未完了item: {pattern}")
     return errors
 
 
@@ -127,7 +127,7 @@ def macos_support_claim_errors(text: str) -> list[str]:
             end = min(len(lower), match.end() + 120)
             window = lower[start:end]
             if not any(hint in window for hint in MACOS_NEGATION_HINTS):
-                errors.append("macOS support appears claimed without validation evidence")
+                errors.append("validation evidenceなしにmacOS supportを主張しているように見える")
                 return errors
     return errors
 
@@ -145,22 +145,22 @@ def manifest_check_errors() -> list[str]:
         return []
     output = result.stdout.strip()
     if not output:
-        return ["manifest check failed without output"]
-    return [f"manifest check failed: {line}" for line in output.splitlines()]
+        return ["manifest checkが出力なしで失敗"]
+    return [f"manifest checkが失敗: {line}" for line in output.splitlines()]
 
 
 def registry_errors() -> list[str]:
     try:
         registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return ["release blockers registry missing"]
+        return ["release blocker registryがない"]
     except json.JSONDecodeError as exc:
-        return [f"release blockers registry invalid JSON: {exc}"]
+        return [f"release blocker registryが無効なJSON: {exc}"]
     if not isinstance(registry, dict):
-        return ["release blockers registry must be an object"]
+        return ["release blocker registryはobjectでなければならない"]
     blockers = registry.get("blockers")
     if not isinstance(blockers, list):
-        return ["release blockers registry must contain a blockers list"]
+        return ["release blocker registryはblockers listを含まなければならない"]
     errors: list[str] = []
     required_fields = {
         "name",
@@ -175,37 +175,37 @@ def registry_errors() -> list[str]:
     names: set[str] = set()
     for index, blocker in enumerate(blockers):
         if not isinstance(blocker, dict):
-            errors.append(f"release blockers registry entry {index} is not an object")
+            errors.append(f"リリース阻止事項の登録項目 {index} がobjectではない")
             continue
         missing = sorted(required_fields - set(blocker))
         if missing:
-            errors.append(f"release blockers registry entry {index} missing fields: {', '.join(missing)}")
+                errors.append(f"リリース阻止事項の登録項目 {index} にfieldがない: {', '.join(missing)}")
         name = blocker.get("name")
         if not isinstance(name, str) or not name:
-            errors.append(f"release blockers registry entry {index} has invalid name")
+            errors.append(f"リリース阻止事項の登録項目 {index} のnameが無効")
         elif name in names:
-            errors.append(f"duplicate release blocker name: {name}")
+            errors.append(f"release blocker nameが重複: {name}")
         else:
             names.add(name)
         if blocker.get("classification") != "release_blocker":
-            errors.append(f"release blocker {name or index} must be classified release_blocker")
+            errors.append(f"release blocker {name or index}はrelease_blockerに分類しなければならない")
         if blocker.get("blocks_release") is not True:
-            errors.append(f"release blocker {name or index} must set blocks_release=true")
+            errors.append(f"release blocker {name or index}はblocks_release=trueを設定しなければならない")
         if blocker.get("active") not in (True, False):
-            errors.append(f"release blocker {name or index} active must be boolean")
+            errors.append(f"release blocker {name or index}のactiveはbooleanでなければならない")
         if blocker.get("status") not in {"unresolved", "resolved"}:
-            errors.append(f"release blocker {name or index} status must be unresolved or resolved")
+            errors.append(f"release blocker {name or index}のstatusはunresolvedまたはresolvedでなければならない")
         status_source = blocker.get("status_source")
         if status_source not in {"manual", WINDOWS_EVIDENCE_STATUS_SOURCE}:
-            errors.append(f"release blocker {name or index} status_source must be manual or {WINDOWS_EVIDENCE_STATUS_SOURCE}")
+            errors.append(f"release blocker {name or index}のstatus_sourceはmanualまたは{WINDOWS_EVIDENCE_STATUS_SOURCE}でなければならない")
         if status_source == WINDOWS_EVIDENCE_STATUS_SOURCE:
             evidence_result = blocker.get("evidence_result")
             if not isinstance(evidence_result, str) or not evidence_result:
-                errors.append(f"release blocker {name or index} evidence_result missing for {WINDOWS_EVIDENCE_STATUS_SOURCE}")
+                errors.append(f"release blocker {name or index}に{WINDOWS_EVIDENCE_STATUS_SOURCE}用evidence_resultがない")
         if not isinstance(blocker.get("reason"), str) or not blocker.get("reason"):
-            errors.append(f"release blocker {name or index} reason missing")
+            errors.append(f"release blocker {name or index}にreasonがない")
         if not isinstance(blocker.get("required_action"), str) or not blocker.get("required_action"):
-            errors.append(f"release blocker {name or index} required_action missing")
+            errors.append(f"release blocker {name or index}にrequired_actionがない")
     return errors
 
 
@@ -265,13 +265,13 @@ def effective_release_blocker(blocker: dict, windows_results: dict[str, object])
     effective["effective_status_source"] = WINDOWS_EVIDENCE_STATUS_SOURCE
     if result is None:
         effective["status"] = "unresolved"
-        effective["reason"] = f"Windows evidence result missing: {evidence_result_name}"
-        effective["required_action"] = "Run tooling/windows_release_evidence.py and keep the registry evidence_result names synchronized."
+        effective["reason"] = f"Windows evidence resultがない: {evidence_result_name}"
+        effective["required_action"] = "tooling/windows_release_evidence.pyを実行し、registryのevidence_result nameを同期させる。"
         return effective
 
     if getattr(result, "status", "") == "passed" and getattr(result, "classification", "") != "release_blocker":
         effective["status"] = "resolved"
-        effective["reason"] = f"resolved by Windows evidence: {getattr(result, 'reason', '')}"
+        effective["reason"] = f"Windows evidenceにより解決: {getattr(result, 'reason', '')}"
         effective["required_action"] = getattr(result, "required_action", "")
         return effective
 
@@ -349,19 +349,19 @@ def release_blocker_doc_sync_errors() -> list[str]:
     for relative in CURRENT_FACING_RELEASE_DOCS:
         path = ROOT / relative
         if not path.exists():
-            errors.append(f"{relative} missing from release blocker doc sync scan")
+            errors.append(f"{relative}がrelease blocker文書同期scanにない")
             continue
         lines = path.read_text(encoding="utf-8").splitlines()
         for line_number, block in _release_blocker_doc_blocks(lines):
             if not _has_doc_sync_marker(block):
                 errors.append(
-                    f"{relative}:{line_number}: release_blocker block missing registry_id, aggregate_of, superseded_by, historical, or example marker"
+                    f"{relative}:{line_number}: release_blocker blockにregistry_id、aggregate_of、superseded_by、historical、example markerのいずれもない"
                 )
                 continue
             unknown = _unknown_registry_refs(block, names)
             if unknown:
                 errors.append(
-                    f"{relative}:{line_number}: release_blocker block references unknown registry blocker: {', '.join(unknown)}"
+                    f"{relative}:{line_number}: release_blocker blockが未知のregistry blockerを参照: {', '.join(unknown)}"
                 )
             if (
                 not _metadata_values(block, "registry_id")
@@ -371,7 +371,7 @@ def release_blocker_doc_sync_errors() -> list[str]:
                 and not _has_truthy_marker(block, "example")
             ):
                 errors.append(
-                    f"{relative}:{line_number}: release_blocker marker exists but does not bind to registry, aggregate, superseded, historical=true, or example=true"
+                    f"{relative}:{line_number}: release_blocker markerは存在するがregistry、aggregate、superseded、historical=true、example=trueのいずれにも結び付かない"
                 )
     return errors
 
@@ -395,21 +395,21 @@ def main() -> int:
     if args.strict_release and not errors:
         for blocker in unresolved_active_blockers():
             errors.append(
-                "strict release active blocker unresolved: "
+            "strict releaseのactive blockerが未解決: "
                 f"{blocker['name']} - {blocker['reason']}"
             )
     if release_claim_exists_without_classification(combined):
-        errors.append("release claim appears while release_blocker exists")
+        errors.append("release_blockerが存在するのにrelease claimがある")
     errors.extend(macos_support_claim_errors(combined))
     errors.extend(manifest_check_errors())
 
     if errors:
-        print("release gate check failed:")
+        print("release gate checkが失敗:")
         for error in errors:
             print(f"  - {error}")
         return 1
 
-    print("release gate check passed")
+    print("release gate checkが合格")
     return 0
 
 

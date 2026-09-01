@@ -24,13 +24,13 @@ class SchemaCatalog:
 
     def get(self, name: str) -> dict:
         if name not in self._schemas:
-            raise KeyError(f"schema not loaded: {name}")
+            raise KeyError(f"読込み済みでない schema です: {name}")
         return copy.deepcopy(self._schemas[name])
 
     def require(self, names: set[str]) -> None:
         missing = sorted(names - set(self._schemas))
         if missing:
-            raise KeyError(f"missing schemas: {', '.join(missing)}")
+            raise KeyError(f"欠落した schema があります: {', '.join(missing)}")
 
 
 def load_default_catalog() -> SchemaCatalog:

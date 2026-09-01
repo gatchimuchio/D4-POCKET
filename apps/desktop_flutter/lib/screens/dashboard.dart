@@ -15,78 +15,88 @@ class Dashboard extends StatelessWidget {
     final operation = snapshot.operationStatus;
     final evidence = snapshot.evidenceSummary;
     return ShellPage(
-      title: 'Dashboard',
+      title: '概要',
+      evidenceTitle: 'Dashboard',
       children: [
         SectionList(
-          title: 'Phase Status',
+          title: '段階状態',
           rows: [
-            'Phase A: ${phase.phaseAStatus}',
-            'Phase B: ${phase.phaseBStatus}',
-            'Phase C: ${phase.phaseCStatus}',
-            'Phase D: ${phase.phaseDStatus}',
-            'Phase E: ${phase.phaseEStatus}',
-            'Phase F: ${phase.phaseFStatus}',
-            'Owner-use operation: active',
-            'Completed product release: ${phase.completedProductReleaseClaimed ? 'claimed' : 'not claimed'}',
-            'Strict Windows installed-path evidence: pending',
+            '段階A: ${phase.phaseAStatus}',
+            '段階B: ${phase.phaseBStatus}',
+            '段階C: ${phase.phaseCStatus}',
+            '段階D: ${phase.phaseDStatus}',
+            '段階E: ${phase.phaseEStatus}',
+            '段階F: ${phase.phaseFStatus}',
+            '所有者利用: 稼働中',
+            '完成製品リリース: ${phase.completedProductReleaseClaimed ? '主張済み' : '未主張'}',
+            'Windowsインストール先の厳格証拠: 保留',
           ],
         ),
-        MetricRow(items: [
-          MetricItem(label: 'Runtime Status', value: operation.runtimeStatus),
-          MetricItem(
-              label: 'Invariant Status', value: operation.invariantStatus),
-          MetricItem(
-              label: 'Pending Approvals',
-              value: '${operation.pendingApprovalsCount}'),
-          MetricItem(label: 'Problems', value: '${operation.problemsCount}'),
-          MetricItem(label: 'Evidence', value: evidence.evidenceBundle),
-          MetricItem(
-              label: 'Recovery',
-              value: '${snapshot.recoveryPlaybook.length} items'),
-        ]),
+        MetricRow(
+          items: [
+            MetricItem(
+              label: '実行系状態',
+              evidenceLabel: 'Runtime Status',
+              value: operation.runtimeStatus,
+            ),
+            MetricItem(
+              label: '不変条件状態',
+              evidenceLabel: 'Invariant Status',
+              value: operation.invariantStatus,
+            ),
+            MetricItem(
+              label: '保留中の承認',
+              value: '${operation.pendingApprovalsCount}',
+            ),
+            MetricItem(label: '問題', value: '${operation.problemsCount}'),
+            MetricItem(label: '証拠', value: evidence.evidenceBundle),
+            MetricItem(
+              label: '復旧',
+              value: '${snapshot.recoveryPlaybook.length}件',
+            ),
+          ],
+        ),
         const SectionList(
-          title: 'Owner Operation Boundary',
+          title: '所有者操作の境界',
           rows: [
-            'Phase B owner-use operation is complete.',
-            'Completed product release is not claimed.',
-            'Missing release evidence blocks completed product release, not Phase B owner-use operation.',
+            '段階Bの所有者利用機能は完了しています。',
+            '完成製品としてのリリースは主張していません。',
+            'リリース証拠の不足は完成製品リリースを遮断しますが、段階Bの所有者利用は遮断しません。',
           ],
         ),
         SnapshotInfoPanel(snapshot: snapshot),
         if (snapshot.snapshotSource == 'fallback')
           const EmptyStatePanel(
-            title: 'No local snapshot',
-            meaning:
-                'GUI-Shell is using the safe fallback projection instead of a local owner snapshot.',
+            title: 'ローカルスナップショットなし',
+            meaning: 'GUI-Shellは所有者のローカルスナップショットではなく、安全な代替射影を使用しています。',
             phaseBBlocked: false,
-            nextAction:
-                'Refresh the development diagnostic snapshot before local inspection.',
+            nextAction: 'ローカル状態を確認する前に、開発診断スナップショットを更新してください。',
           ),
         SectionList(
-          title: 'Trust Status',
+          title: '信頼状態',
           rows: [
             for (final trust in snapshot.trustRecords)
-              '${trust.scope}: ${trust.state} (${trust.source})'
+              '${trust.scope}: ${trust.state} (${trust.source})',
           ],
         ),
         SectionList(
-          title: 'Problems / Blockers',
+          title: '問題／遮断要因',
           rows: snapshot.problems.isEmpty
               ? [
-                  'No problems are present in the current snapshot.',
-                  'Phase B owner-use is not blocked.',
-                  'Open Evidence Center or refresh diagnostics if local state changed.',
+                  '現在のスナップショットに問題はありません。',
+                  '段階Bの所有者利用は遮断されていません。',
+                  'ローカル状態が変わった場合は、証拠センターを開くか診断を更新してください。',
                 ]
               : [
                   for (final problem in snapshot.problems)
-                    '${problem.item}: ${problem.classification}; blocks_release: ${problem.blocksRelease ? 'yes' : 'no'}'
+                    '${problem.item}: ${problem.classification}; リリース遮断: ${problem.blocksRelease ? 'はい' : 'いいえ'}',
                 ],
         ),
         SectionList(
-          title: 'Evidence Summary',
+          title: '証拠概要',
           rows: [
             'schema_check: ${evidence.schemaCheck}',
-            'conformance_skeleton: passed, ${evidence.conformanceCheckCount} checks',
+            'conformance_skeleton: 通過、${evidence.conformanceCheckCount}件の check',
             'release_smoke: ${evidence.releaseSmoke}',
             'release_gate_check: ${evidence.releaseGateCheck}',
             'evidence_bundle: ${evidence.evidenceBundle}',
@@ -95,24 +105,24 @@ class Dashboard extends StatelessWidget {
           ],
         ),
         SectionList(
-          title: 'Recent Audit Events',
+          title: '最近の監査事象',
           rows: [
             for (final event in snapshot.auditEvents)
-              '${event.eventId}: ${event.action} ${event.result}'
+              '${event.eventId}: ${event.action} ${event.result}',
           ],
         ),
         SectionList(
-          title: 'Runtime Status',
+          title: '実行系状態',
           rows: [
             for (final runtime in snapshot.runtimes)
-              '${runtime.name}  ${runtime.status}  ${runtime.adapterId}'
+              '${runtime.name}  ${runtime.status}  ${runtime.adapterId}',
           ],
         ),
         SectionList(
-          title: 'Invariant Status',
+          title: '不変条件状態',
           rows: [
             for (final entry in snapshot.invariantFlags.entries)
-              '${entry.key}: ${entry.value ? 'violation' : 'ok'}'
+              '${entry.key}: ${entry.value ? '違反' : '正常'}',
           ],
         ),
       ],

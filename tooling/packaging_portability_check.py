@@ -20,18 +20,31 @@ WINDOWS_GIT_UNZIP_CANDIDATES = [
     Path(r"C:\Program Files\Git\usr\bin\unzip.exe"),
     Path(r"C:\Program Files (x86)\Git\usr\bin\unzip.exe"),
 ]
+UTF8_GOVERNANCE_PATH_ALLOWLIST = frozenset(
+    {
+        "規定/00_日本語基底規定.md",
+        "規定/正本索引.json",
+        "規定/日本語基底例外.json",
+        "tooling/日本語基底監査.py",
+    }
+)
 
 
 def portable_path_errors(paths: list[Path]) -> list[str]:
     errors: list[str] = []
     for path in paths:
         rel = relative(path)
+        allowlisted_utf8_path = rel in UTF8_GOVERNANCE_PATH_ALLOWLIST
         try:
             rel.encode("ascii")
         except UnicodeEncodeError:
-            errors.append(f"non-ASCII packaged path: {rel}")
-        if any(ord(character) < 32 or ord(character) >= 127 for character in rel):
-            errors.append(f"non-portable packaged path: {rel}")
+            if not allowlisted_utf8_path:
+                errors.append(f"非ASCIIのpackaged path: {rel}")
+        if any(ord(character) < 32 for character in rel) or (
+            not allowlisted_utf8_path
+            and any(ord(character) >= 127 for character in rel)
+        ):
+            errors.append(f"portableではないpackaged path: {rel}")
     return errors
 
 
@@ -44,7 +57,7 @@ def timeout_output(exc: subprocess.TimeoutExpired) -> str:
     if isinstance(output, bytes):
         output = output.decode("utf-8", errors="replace")
     output = str(output).strip()
-    return output or "no partial output"
+    return output or "部分出力なし"
 
 
 def find_unzip() -> str | None:
@@ -78,15 +91,15 @@ def run_check(
         )
     except subprocess.TimeoutExpired as exc:
         return [
-            f"{command_label(command)} timed out after {timeout_seconds}s: "
+            f"{command_label(command)}が{timeout_seconds}s後にtimeout: "
             f"{timeout_output(exc)}"
         ]
     if completed.returncode == 0:
         return []
     output = completed.stdout.strip()
     if not output:
-        output = "no output"
-    return [f"{command_label(command)} failed: {output}"]
+        output = "出力なし"
+    return [f"{command_label(command)} が失敗: {output}"]
 
 
 def main() -> int:
@@ -96,13 +109,13 @@ def main() -> int:
     if unzip is None:
         if sys.platform == "win32":
             errors.append(
-                "unzip not found on PATH or in Git for Windows at "
+                "unzipがPATHにもGit for Windowsの次の場所にも見つからない: "
                 + ", ".join(str(path) for path in WINDOWS_GIT_UNZIP_CANDIDATES)
             )
         else:
-            errors.append("unzip not found on PATH")
+            errors.append("unzipがPATHに見つからない")
     if errors:
-        print("packaging portability check failed:")
+        print("packaging portability checkが失敗:")
         for error in errors:
             print(f"  - {error}")
         return 1
@@ -132,16 +145,16 @@ def main() -> int:
                 timeout=DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:
-            print("packaging portability check failed:")
+            print("packaging portability checkが失敗:")
             print(
-                "  - "
-                f"{command_label(unzip_command)} timed out after "
+                "  - タイムアウト: "
+                f"{command_label(unzip_command)} が次の秒数後にタイムアウト: "
                 f"{DEFAULT_SUBPROCESS_TIMEOUT_SECONDS}s: {timeout_output(exc)}"
             )
             return 1
         if completed.returncode != 0:
-            print("packaging portability check failed:")
-            print(f"  - unzip extraction failed: {completed.stdout.strip()}")
+            print("packaging portability checkが失敗:")
+            print(f"  - unzipのextractに失敗: {completed.stdout.strip()}")
             return 1
 
         errors = []
@@ -149,11 +162,11 @@ def main() -> int:
         errors.extend(run_check(extract_root, [sys.executable, "tooling/conformance_tests/run_conformance_skeleton.py"]))
         errors.extend(run_check(extract_root, [sys.executable, "tooling/release_gate_check.py"]))
         if errors:
-            print("packaging portability check failed:")
+            print("packaging portability checkが失敗:")
             for error in errors:
                 print(f"  - {error}")
             return 1
-    print("packaging portability check passed")
+    print("packaging portability checkが合格")
     return 0
 
 

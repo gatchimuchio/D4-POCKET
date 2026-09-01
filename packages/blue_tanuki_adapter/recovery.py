@@ -7,12 +7,12 @@ def recovery_candidates(reason: str) -> list[dict]:
             "operation": "runtime.read",
             "class": recovery_class,
             "severity": "warning",
-            "user_visible_message": "Check BLUE-TANUKI runtime connectivity and retry after it is ready.",
+            "user_visible_message": "BLUE-TANUKI runtime の接続を確認し、準備完了後に再実行してください。",
             "safe_to_retry": True,
             "steps": [
-                "Open Runtime Center.",
-                "Check BLUE-TANUKI adapter health.",
-                "Retry after runtime status is ready.",
+                "実行系センターを開いてください。",
+                "BLUE-TANUKI adapter の health を確認してください。",
+                "runtime 状態が ready になってから再実行してください。",
             ],
             "requires_user_action": True,
         }

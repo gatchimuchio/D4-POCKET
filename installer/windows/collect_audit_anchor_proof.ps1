@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$InstalledRoot,
 
@@ -141,10 +141,10 @@ function Get-AclEvidence {
         broad_write_rules = @($broadWriteRules)
       })
       if ($broadWriteRules.Count -gt 0) {
-        $errors.Add("broad write ACL detected on $path")
+        $errors.Add("広範な write ACL を検出しました: $path")
       }
     } catch {
-      $errors.Add("failed to read ACL for $path`: $($_.Exception.Message)")
+      $errors.Add("ACL の読取りに失敗しました: $path`: $($_.Exception.Message)")
     }
   }
   return [ordered]@{
@@ -161,7 +161,7 @@ if ($AuditDir -eq "") {
 }
 $auditDirPath = Resolve-Path $AuditDir -ErrorAction SilentlyContinue
 if ($null -eq $auditDirPath) {
-  $errors.Add("audit directory missing: $AuditDir")
+  $errors.Add("audit directory がありません: $AuditDir")
 }
 
 $requiredAuditFiles = @()
@@ -173,7 +173,7 @@ if ($null -ne $auditDirPath) {
   )
   foreach ($path in $requiredAuditFiles) {
     if (!(Test-Path $path)) {
-      $errors.Add("required audit anchor file missing: $path")
+      $errors.Add("必須の audit anchor file がありません: $path")
     }
   }
 }
@@ -193,7 +193,7 @@ $installedPathVerified = $true
 foreach ($path in $checkedPaths) {
   if (!(Test-PathUnderRoot -Path $path -Root $root.Path)) {
     $installedPathVerified = $false
-    $errors.Add("path is outside installed root: $path")
+    $errors.Add("path が installed root の外部です: $path")
   }
 }
 
@@ -209,7 +209,7 @@ if ($ExternalAnchorPath -ne "") {
     $externalAnchorVerified = $true
     $externalAnchorSha256 = Get-TaggedSha256 -Path $externalAnchor.Path
   } else {
-    $errors.Add("external anchor path missing: $ExternalAnchorPath")
+    $errors.Add("external anchor path がありません: $ExternalAnchorPath")
   }
 }
 
@@ -222,10 +222,10 @@ if ($SignedEvidencePath -ne "") {
     $signedEvidenceVerified = ($signature.Status -eq "Valid")
     $signedEvidenceSha256 = Get-TaggedSha256 -Path $signedEvidence.Path
     if (!$signedEvidenceVerified) {
-      $errors.Add("signed evidence Authenticode status is $($signature.Status): $SignedEvidencePath")
+      $errors.Add("signed evidence の Authenticode status は $($signature.Status) です: $SignedEvidencePath")
     }
   } else {
-    $errors.Add("signed evidence path missing: $SignedEvidencePath")
+    $errors.Add("signed evidence path がありません: $SignedEvidencePath")
   }
 }
 
@@ -304,4 +304,4 @@ if ($outputParent -ne "") {
 }
 $output = New-Item -ItemType File -Force -Path $OutputPath
 Write-JsonEvidence -Value $result -Path $output.FullName -Depth 10
-Write-Host "wrote $($output.FullName)"
+Write-Host "書き出しました: $($output.FullName)"

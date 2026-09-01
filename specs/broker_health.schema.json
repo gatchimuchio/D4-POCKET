@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/broker_health.schema.json",
-  "title": "BrokerHealth",
+  "title": "ブローカー健全性（BrokerHealth）",
   "type": "object",
   "required": [
     "broker_id",

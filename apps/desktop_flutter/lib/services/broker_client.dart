@@ -15,20 +15,18 @@ class BrokerClient implements BrokerTransport {
   final BrokerEndpoint _endpoint;
   int _counter = 0;
 
-  static Future<BrokerClient> connect({
-    String? sessionFile,
-  }) async {
+  static Future<BrokerClient> connect({String? sessionFile}) async {
     final resolvedSession = sessionFile ??
         Platform.environment['GUI_SHELL_BROKER_ENDPOINT_JSON'] ??
         Platform.environment['GUI_SHELL_BROKER_SESSION_JSON'] ??
         _candidateSessionFilePath();
     if (resolvedSession == null || resolvedSession.isEmpty) {
-      throw const BrokerClientException('broker endpoint file not configured');
+      throw const BrokerClientException('broker endpoint ファイルが設定されていません');
     }
     final file = File(resolvedSession);
     if (!file.existsSync()) {
       throw BrokerClientException(
-        'broker endpoint file not found: $resolvedSession',
+        'broker endpoint ファイルが見つかりません: $resolvedSession',
       );
     }
     return BrokerClient._(
@@ -70,12 +68,12 @@ class BrokerClient implements BrokerTransport {
           .timeout(const Duration(seconds: 5));
       final lines = raw.trim().split('\n').where((item) => item.isNotEmpty);
       if (lines.isEmpty) {
-        throw const BrokerClientException('broker response was empty');
+        throw const BrokerClientException('broker 応答が空です');
       }
       final line = lines.last;
       final decoded = jsonDecode(line);
       if (decoded is! Map) {
-        throw const BrokerClientException('broker response was not an object');
+        throw const BrokerClientException('broker 応答が object ではありません');
       }
       return Map<String, Object?>.from(decoded);
     } finally {
@@ -127,7 +125,7 @@ class BrokerClientException implements Exception {
 Map<String, Object?> _readJsonFile(String path) {
   final decoded = jsonDecode(File(path).readAsStringSync());
   if (decoded is! Map) {
-    throw const BrokerClientException('broker endpoint file was not an object');
+    throw const BrokerClientException('broker endpoint ファイルが object ではありません');
   }
   return Map<String, Object?>.from(decoded);
 }

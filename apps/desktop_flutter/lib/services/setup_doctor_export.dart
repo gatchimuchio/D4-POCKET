@@ -45,7 +45,8 @@ Future<void> writeSetupDoctorProductExportIfRequested(
 }
 
 Future<void> _ensureInstalledFirstRunConfig(
-    Map<String, Object?> context) async {
+  Map<String, Object?> context,
+) async {
   final configPath = _stringValue(context['config_path']);
   if (configPath.isEmpty) {
     return;
@@ -80,8 +81,10 @@ Map<String, Object?> buildSetupDoctorProductExport(
   final configProbe = _probeConfigJson(_stringValue(context['config_path']));
   final auditProbe = _probeAuditDir(_stringValue(context['audit_dir']));
   final brokerIpcReady = _snapshotCheckPassed(snapshot, 'broker.ipc');
-  final brokerPersistenceReady =
-      _snapshotCheckPassed(snapshot, 'broker.persistence');
+  final brokerPersistenceReady = _snapshotCheckPassed(
+    snapshot,
+    'broker.persistence',
+  );
   final brokerReady = snapshot.snapshotSource == 'broker' &&
       brokerIpcReady &&
       brokerPersistenceReady;
@@ -197,10 +200,7 @@ Map<String, Object?> _loadContext(String? path) {
   if (decoded is! Map) {
     return {'context_path': path};
   }
-  return {
-    ...Map<String, Object?>.from(decoded),
-    'context_path': path,
-  };
+  return {...Map<String, Object?>.from(decoded), 'context_path': path};
 }
 
 Map<String, Object?> _check(
@@ -229,32 +229,23 @@ bool _snapshotCheckPassed(ShellSnapshot snapshot, String checkId) {
 
 _ProbeResult _probeConfigJson(String path) {
   if (path.isEmpty) {
-    return const _ProbeResult(
-      false,
-      'No config path was supplied to the product export context.',
-    );
+    return const _ProbeResult(false, '製品出力の文脈に設定 path が指定されていません。');
   }
   try {
     final file = File(path);
     final decoded = jsonDecode(file.readAsStringSync());
     if (decoded is Map) {
-      return _ProbeResult(true, 'Config JSON parsed at $path.');
+      return _ProbeResult(true, '$path の設定 JSON を解析しました。');
     }
-    return _ProbeResult(
-      false,
-      'Config file did not contain a JSON object at $path.',
-    );
+    return _ProbeResult(false, '$path の設定ファイルに JSON object がありません。');
   } catch (error) {
-    return _ProbeResult(false, 'Config JSON was not readable at $path: $error');
+    return _ProbeResult(false, '$path の設定 JSON を読み取れません: $error');
   }
 }
 
 _ProbeResult _probeAuditDir(String path) {
   if (path.isEmpty) {
-    return const _ProbeResult(
-      false,
-      'No audit directory was supplied to the product export context.',
-    );
+    return const _ProbeResult(false, '製品出力の文脈に監査ディレクトリが指定されていません。');
   }
   try {
     final directory = Directory(path)..createSync(recursive: true);
@@ -268,11 +259,11 @@ _ProbeResult _probeAuditDir(String path) {
     return _ProbeResult(
       readOk && deleteOk,
       readOk && deleteOk
-          ? 'Audit directory write/read/delete probe passed at $path.'
-          : 'Audit directory probe did not complete at $path.',
+          ? '$path の監査ディレクトリで書込み・読取り・削除の確認に成功しました。'
+          : '$path の監査ディレクトリ確認が完了しませんでした。',
     );
   } catch (error) {
-    return _ProbeResult(false, 'Audit directory probe failed at $path: $error');
+    return _ProbeResult(false, '$path の監査ディレクトリ確認に失敗しました: $error');
   }
 }
 

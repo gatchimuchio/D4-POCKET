@@ -1,6 +1,6 @@
 {
   "runtime_id": "mock_local_llm",
-  "display_name": "Mock Local LLM",
+  "display_name": "模擬ローカルLLM",
   "runtime_type": "llm_runtime",
   "supported_platforms": ["linux", "macos", "windows"],
   "required_tools": ["python3"],

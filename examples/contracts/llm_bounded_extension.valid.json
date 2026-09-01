@@ -8,7 +8,7 @@
   ],
   "runtime": {
     "runtime_id": "llm_bounded_diagnostic",
-    "name": "LLM Bounded Diagnostic",
+    "name": "LLM境界内診断",
     "kind": "tool",
     "status": "ready",
     "adapter_id": "llm_bounded_diagnostic_adapter",
@@ -19,7 +19,7 @@
     "capabilities": [
       "diagnostic.read.bounded"
     ],
-    "diagnostic_summary": "Non-authoritative bounded diagnostic reference extension."
+    "diagnostic_summary": "権限を持たない境界内診断の参照拡張。"
   },
   "adapter": {
     "adapter_id": "llm_bounded_diagnostic_adapter",
@@ -32,13 +32,13 @@
       "diagnostic.read.bounded"
     ],
     "metadata": {
-      "note": "descriptive only",
+      "note": "説明専用",
       "evidence_classification": "contract_conformance"
     }
   },
   "runtime_manifest": {
     "runtime_id": "llm_bounded_diagnostic",
-    "display_name": "LLM Bounded Diagnostic",
+    "display_name": "LLM境界内診断",
     "runtime_type": "tool_runtime",
     "supported_platforms": [
       "linux",
@@ -73,15 +73,15 @@
       "diagnostic.read.bounded"
     ],
     "metadata": {
-      "note": "manifest metadata is descriptive only"
+      "note": "マニフェストのメタデータは説明専用"
     },
     "signed_manifest": true
   },
   "capability": {
     "capability_id": "diagnostic.read.bounded",
     "runtime_id": "llm_bounded_diagnostic",
-    "name": "Bounded Diagnostic Read",
-    "description": "Read a redacted diagnostic summary without privileged execution.",
+    "name": "境界内診断の読取り",
+    "description": "権限付き実行を行わず、墨消し済み診断概要を読み取ります。",
     "risk_level": "low",
     "default_permission": "ask",
     "requires_approval": true,
@@ -112,7 +112,7 @@
     "status": "approved",
     "content_visibility": "redacted",
     "payload_hash": "sha256:23d8ce200562dad1091d3c7bc8062c686f957cb91bbd7083a13ec82fbc43d138",
-    "summary": "Read redacted diagnostics from the bounded reference extension.",
+    "summary": "境界内の参照拡張から墨消し済み診断を読み取ります。",
     "redacted_payload": {
       "diagnostic": "[redacted]",
       "status": "ready"
@@ -158,11 +158,11 @@
     "operation": "diagnostic.read.bounded",
     "class": "permission_denied",
     "severity": "warning",
-    "user_visible_message": "The bounded diagnostic extension cannot run until its declared permission and approval path is valid.",
+    "user_visible_message": "宣言済みの許可・承認経路が有効になるまで、境界内診断拡張は実行できません。",
     "safe_to_retry": true,
     "steps": [
-      "Review the declared capability and permission.",
-      "Retry only after approval and audit mapping are present."
+      "宣言済みの能力と許可を確認してください。",
+      "承認と監査対応が存在する場合に限り再試行してください。"
     ],
     "requires_user_action": true
   },

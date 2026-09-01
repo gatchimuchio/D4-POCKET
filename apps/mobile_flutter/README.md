@@ -1,18 +1,18 @@
-# Mobile Flutter App
+# モバイル Flutter app
 
-Post-v1 planned mobile shell / companion boundary.
+v1 後に計画する mobile shell / companion 境界。
 
 classification: post_v1_scope
-reason: mobile full release is outside v1.0 Windows-first desktop scope.
+reason: mobile 完全 release は Windows 優先のv1.0デスクトップ範囲外である。
 blocks_release: no
 
-Expected initial scope:
+想定する初期範囲:
 
-- device pairing
-- notifications
+- 端末の pairing
+- 通知
 - approval
-- runtime status
-- emergency stop
-- recovery instruction
+- runtime 状態
+- 緊急停止
+- 復旧手順
 
-Mobile must not bypass desktop/runtime authority boundaries.
+Mobile は desktop/runtime の権限境界を迂回してはならない。

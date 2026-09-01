@@ -1,39 +1,39 @@
-# Flutter Governance Risk Register
+# Flutter governance risk 台帳
 
-Status: Active watch item
+状態: 能動監視項目
 
-## Risk
+## 危険性
 
-Flutter is Google-led and may be affected by:
+Flutter は Google 主導であり、次の影響を受ける可能性がある。
 
-- organizational restructuring
-- priority changes
-- desktop deprioritization
-- Dart/Flutter team resourcing changes
-- ecosystem slowdown
+- 組織再編
+- 優先順位の変更
+- desktop の優先度低下
+- Dart/Flutter team の資源変更
+- ecosystem の減速
 
-## Impact
+## 影響
 
-Potential impact areas:
+想定する影響領域:
 
-- desktop support quality
-- tooling quality
-- platform channel stability
-- package ecosystem health
-- issue resolution speed
+- desktop support 品質
+- tooling 品質
+- platform channel 安定性
+- package ecosystem の健全性
+- issue 解決速度
 
-## Mitigation
+## 緩和策
 
-- Keep core schemas framework-independent.
-- Keep Rust helper outside Flutter.
-- Keep Adapter Contract outside Flutter.
-- Limit Dart to UI layer.
-- Maintain conformance tests independent of Flutter.
-- Re-evaluate every 6 months through `FrameworkRiskProfile`.
+- core schema を framework 非依存に保つ。
+- Rust helper を Flutter の外に保つ。
+- Adapter Contract を Flutter の外に保つ。
+- Dart を UI 層に限定する。
+- Flutter に依存しない conformance test を維持する。
+- `FrameworkRiskProfile` を通じて6ヶ月ごとに再評価する。
 
-## Exit signals
+## 離脱信号
 
-- desktop support materially degrades
-- official roadmap deprioritizes desktop
-- critical Flutter-originated GUI Shell bug becomes unavoidable
-- ecosystem health declines enough to block stable product delivery
+- desktop support が実質的に劣化する
+- 公式 roadmap で desktop の優先度が下がる
+- Flutter 起因の重大な GUI Shell bug を回避できなくなる
+- ecosystem の健全性が安定した製品提供を遮断するまで低下する

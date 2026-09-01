@@ -1,53 +1,53 @@
-# Tauri Fallback
+# Tauri fallback
 
-Status: watchlist / desktop-heavy fallback  
-Primary candidate remains: Flutter + Rust helper  
-Fallback trigger: Flutter desktop viability materially degrades or strategy becomes desktop-heavy
+状態: 監視表 / desktop 偏重時の fallback
+第一候補は引き続き Flutter + Rust helper
+Fallback 開始条件: Flutter desktop の実用性が実質的に劣化するか、戦略が desktop 偏重になる
 
-## Position
+## 位置づけ
 
-Tauri is not the primary GUI Shell implementation candidate.
+Tauri は GUI Shell 実装の第一候補ではない。
 
-It remains a fallback for a desktop-heavy direction because it provides:
+次を提供するため、desktop 偏重の方向に対する fallback として残す。
 
-- Rust backend alignment;
-- explicit capability-style thinking;
-- smaller desktop footprint than Electron;
-- strong fit for local desktop host surfaces.
+- Rust backend との整合
+- 明示的な capability style の考え方
+- Electron より小さい desktop footprint
+- 局所 desktop host 表層への高い適合性
 
-## Why not primary
+## 第一候補でない理由
 
-GUI Shell treats PC and mobile as equally important.
+GUI Shell は PC と mobile を同等に重視する。
 
-Tauri is weaker than Flutter for the current target because:
+現行対象に対し、Tauri は次の理由で Flutter より弱い。
 
-- mobile parity requires more validation;
-- WebView / JavaScript / native bridge audit burden is high;
-- UI consistency across desktop and mobile is less direct;
-- Shell Core contracts must remain framework-independent either way.
+- mobile 等価性により多くの検証が必要
+- WebView / JavaScript / native bridge audit の負担が大きい
+- desktop と mobile の UI 一貫性がより間接的
+- どの場合でも Shell Core contract はframework非依存に保つ必要がある
 
-## Re-evaluation triggers
+## 再評価条件
 
-Re-evaluate Tauri if:
+次の場合に Tauri を再評価する。
 
-- GUI Shell strategy changes to desktop host first;
-- mobile becomes companion-only;
-- Flutter desktop support materially degrades;
-- Flutter tooling or package ecosystem becomes unsuitable;
-- TypeScript asset reuse becomes more important than unified Flutter UI.
+- GUI Shell 戦略が desktop host 優先へ変わる
+- mobile が companion 専用になる
+- Flutter desktop support が実質的に劣化する
+- Flutter tooling または package ecosystem が不適合になる
+- TypeScript asset の再利用が統合 Flutter UI より重要になる
 
-## Boundary rule
+## 境界規則
 
-If Tauri is adopted later, it remains a UI/runtime host layer only.
+後で Tauri を採用しても、UI/runtime host 層の責任だけに留める。
 
-The following assets must not move into Tauri-specific code:
+次の asset を Tauri 固有 code へ移してはならない。
 
-- JSON Schemas;
-- Adapter Contract;
-- Permission model;
-- Approval model;
-- AuditEvent model;
-- RecoveryAction model;
-- Content Exposure Boundary;
-- Authority Strip Conformance;
-- Shell Core authority decisions.
+- JSON Schema
+- Adapter Contract
+- Permission model
+- Approval model
+- AuditEvent model
+- RecoveryAction model
+- Content Exposure Boundary
+- Authority Strip Conformance
+- Shell Core の権限判定

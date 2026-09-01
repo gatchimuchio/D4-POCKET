@@ -12,16 +12,14 @@ class ApprovalCenter extends StatelessWidget {
   Widget build(BuildContext context) {
     final approvals = client.getSnapshot().pendingApprovals;
     return ShellPage(
-      title: 'Approval Center',
+      title: '承認センター',
       children: [
         if (approvals.isEmpty)
           const EmptyStatePanel(
-            title: 'No pending approvals',
-            meaning:
-                'Shell Core has no approval projection waiting for owner review.',
+            title: '保留中の承認なし',
+            meaning: 'Shell Coreには、所有者の確認を待つ承認射影がありません。',
             phaseBBlocked: false,
-            nextAction:
-                'Continue owner-use operation; new approvals will appear here when Shell Core emits them.',
+            nextAction: '所有者利用を継続できます。Shell Coreが新しい承認を発行すると、ここに表示されます。',
           )
         else
           for (final approval in approvals)
@@ -29,20 +27,24 @@ class ApprovalCenter extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${approval.operation}  ${approval.status}',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    '${approval.operation}  ${approval.status}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
-                  Text('Visibility: ${approval.contentVisibility}'),
+                  Text('可視性: ${approval.contentVisibility}'),
                   const SizedBox(height: 8),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final entry in approval.projectedContent.entries)
-                      Chip(label: Text('${entry.key}: ${entry.value}')),
-                  ]),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final entry in approval.projectedContent.entries)
+                        Chip(label: Text('${entry.key}: ${entry.value}')),
+                    ],
+                  ),
                   const SizedBox(height: 8),
-                  SectionList(
-                      title: 'Editable Fields', rows: approval.editableFields),
-                  SectionList(
-                      title: 'Locked Fields', rows: approval.protectedFields),
+                  SectionList(title: '編集可能な項目', rows: approval.editableFields),
+                  SectionList(title: '保護された項目', rows: approval.protectedFields),
                 ],
               ),
             ),

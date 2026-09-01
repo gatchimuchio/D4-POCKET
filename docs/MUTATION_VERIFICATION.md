@@ -1,60 +1,66 @@
-# Mutation Verification
+# 変異検証
 
-Status date: 2026-05-25
+状態基準日: 2026-05-25
 
-This file records mutation verification evidence for the conformance tautology fix. No broken mutation code was committed.
+このファイルは、適合性検査の恒真性修正に対する変異検証の証拠を記録する。破壊した変異コードはコミットしていない。
 
-## Conformance Tautology Fix
+## 適合性検査の恒真性修正
 
-- item: production authority strip mutation
-  mutation_target: `packages/shell_core/adapter_loader.py::strip_authority_keys`
-  mutation: temporarily returned the input value unchanged
-  expected_failure: conformance must fail because inbound authority keys and authority metadata survive stripping
-  observed_failure: `python3 tooling/conformance_tests/run_conformance_skeleton.py` failed with unstripped `authority`, `permission_grant`, `approval_state`, `role`, and `trust_level` evidence
-  revert_confirmation: production `strip_authority_keys` was restored; final conformance passed
-  final_validation_result: prior mutation verification baseline passed; current expanded conformance baseline passes with 78 checks
+~~~yaml
+- item: 本番authority stripの変異
+  mutation_target: packages/shell_core/adapter_loader.py::strip_authority_keys
+  mutation: 一時的に入力値を未変更のまま返した。
+  expected_failure: 入力authority keyとauthority metadataが除去後も残るため、適合性検査は失敗しなければならない。
+  observed_failure: python3 tooling/conformance_tests/run_conformance_skeleton.pyは、除去されなかったauthority、permission_grant、approval_state、role、trust_levelの証拠を伴って失敗した。
+  revert_confirmation: 本番strip_authority_keysを復元し、最終の適合性検査は合格した。
+  final_validation_result: 従来の変異検証基準線は合格し、現在の拡張適合性基準線は78検査で合格する。
 
-- item: production approval can_edit mutation
-  mutation_target: `packages/shell_core/approval_queue.py::ApprovalQueue.can_edit`
-  mutation: temporarily returned `True` for every field
-  expected_failure: conformance must fail because authority, sealed, hidden, sacred, and protected fields become editable
-  observed_failure: `python3 tooling/conformance_tests/run_conformance_skeleton.py` failed with protected fields reported editable and writable
-  revert_confirmation: production `ApprovalQueue.can_edit` was restored; final conformance passed
-  final_validation_result: prior mutation verification baseline passed; current expanded conformance baseline passes with 78 checks
+- item: 本番approval can_editの変異
+  mutation_target: packages/shell_core/approval_queue.py::ApprovalQueue.can_edit
+  mutation: すべてのフィールドについて一時的にTrueを返した。
+  expected_failure: authority、sealed、hidden、sacred、protectedの各フィールドが編集可能になるため、適合性検査は失敗しなければならない。
+  observed_failure: python3 tooling/conformance_tests/run_conformance_skeleton.pyは、保護フィールドが編集・書き込み可能と報告されて失敗した。
+  revert_confirmation: 本番ApprovalQueue.can_editを復元し、最終の適合性検査は合格した。
+  final_validation_result: 従来の変異検証基準線は合格し、現在の拡張適合性基準線は78検査で合格する。
 
-- item: production approval edit guard mutation
-  mutation_target: `packages/shell_core/approval_queue.py::ApprovalQueue.edit`
-  mutation: temporarily bypassed the protected-field guard
-  expected_failure: conformance must fail because protected fields can be written and queued approval state changes
-  observed_failure: `python3 tooling/conformance_tests/run_conformance_skeleton.py` failed with protected fields written and queued approval mutations detected
-  revert_confirmation: production `ApprovalQueue.edit` guard was restored; final conformance passed
-  final_validation_result: prior mutation verification baseline passed; current expanded conformance baseline passes with 78 checks
+- item: 本番approval edit guardの変異
+  mutation_target: packages/shell_core/approval_queue.py::ApprovalQueue.edit
+  mutation: 保護フィールドのガードを一時的に迂回した。
+  expected_failure: 保護フィールドを書き込め、待機中の承認状態が変化するため、適合性検査は失敗しなければならない。
+  observed_failure: python3 tooling/conformance_tests/run_conformance_skeleton.pyは、保護フィールドへの書き込みと待機中承認の変異を検出して失敗した。
+  revert_confirmation: 本番ApprovalQueue.editのガードを復元し、最終の適合性検査は合格した。
+  final_validation_result: 従来の変異検証基準線は合格し、現在の拡張適合性基準線は78検査で合格する。
+~~~
 
-## Final Validation
+## 最終検証
 
-- command: `python3 tooling/schema_check/check_schemas.py`
+~~~yaml
+- command: python3 tooling/schema_check/check_schemas.py
   status: passed
-  evidence: `schema check passed: 19 schemas, 19 examples, 19 negative fixtures`
+  evidence: schema check passed: 19 schemas, 19 examples, 19 negative fixtures
 
-- command: `python3 tooling/conformance_tests/run_conformance_skeleton.py`
+- command: python3 tooling/conformance_tests/run_conformance_skeleton.py
   status: passed
-  evidence: `conformance skeleton passed: 78 checks`
+  evidence: conformance skeleton passed: 78 checks
 
-- command: `python3 tooling/validate_all.py`
+- command: python3 tooling/validate_all.py
   status: passed
-  evidence: development validation passed with schema, conformance, release gate check, Rust helper tests, desktop Flutter analyze/test/build, and mobile Flutter analyze
+  evidence: 開発検証は、スキーマ、適合性、リリースゲート、Rustヘルパーテスト、デスクトップFlutterの静的解析・テスト・ビルド、およびモバイルFlutter静的解析を伴って合格した。
+~~~
 
-## Release Classification
+## リリース分類
 
-- item: conformance tautology blocker
+~~~yaml
+- item: 適合性検査の恒真性blocker
   classification: required_for_v1
   status: resolved
-  reason: production authority stripping and production approval guard behavior are covered by conformance tests and mutation-verified
+  reason: 本番authority strippingと本番approval guardの挙動は適合性検査で網羅され、変異検証済みである。
   blocks_release: no
 
-- item: future duplicate authority key definition
+- item: 将来のauthority key重複定義
   classification: release_blocker
   status: policy
-  reason: authority key duplication can recreate test-local or module-local tautologies
-  required_action: keep `packages/shell_core/authority_keys.py` as the single source for `AUTHORITY_KEYS`
+  reason: authority keyの重複は、テストローカルまたはモジュールローカルな恒真性を再発させ得る。
+  required_action: packages/shell_core/authority_keys.pyをAUTHORITY_KEYSの単一情報源として維持する。
   blocks_release: yes
+~~~

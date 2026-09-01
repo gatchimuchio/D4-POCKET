@@ -19,21 +19,21 @@ SCHEMA_CONTRACT_MISSING = "schema_contract_missing"
 
 
 RECOVERY_HINTS = {
-    UNKNOWN_RUNTIME: "Register the runtime before routing this operation.",
-    UNKNOWN_CAPABILITY: "Register the capability in Shell Core before use.",
-    UNKNOWN_PERMISSION: "Record an explicit permission decision before use.",
-    PERMISSION_DENIED: "Request or grant permission through an authority source.",
-    RELATION_MISMATCH: "Resolve runtime, capability, permission, approval, recovery, and target scope from one broker-owned action relation.",
-    PAYLOAD_HASH_MISMATCH: "Recompute the canonical payload hash and bind approval/audit to the submitted payload.",
-    APPROVAL_MISSING: "Create an approval and wait for an approved state.",
-    APPROVAL_NOT_VALID: "Revalidate or approve the current approval request.",
-    AUDIT_MAPPING_MISSING: "Attach an AuditEvent with an event_id and required payload_hash.",
-    RECOVERY_MAPPING_MISSING: "Attach a RecoveryAction with a recovery_id.",
-    CONTENT_VISIBILITY_VIOLATION: "Project approval content according to content_visibility.",
-    ADAPTER_METADATA_ESCALATION_ATTEMPT: "Remove authority claims from adapter metadata.",
-    NON_AUTHORITY_SOURCE_ATTEMPT: "Use an authority source; memory, cache, previous_state, and local_ui_state cannot grant authority.",
-    UPDATE_SIGNATURE_REQUIRED: "Require a valid update signature before update operations.",
-    SCHEMA_CONTRACT_MISSING: "Load the required schema contract before validation.",
+    UNKNOWN_RUNTIME: "この操作を route する前に runtime を登録してください。",
+    UNKNOWN_CAPABILITY: "利用前に capability を Shell Core へ登録してください。",
+    UNKNOWN_PERMISSION: "利用前に明示的な permission 判定を記録してください。",
+    PERMISSION_DENIED: "権限源を通じて permission を要求または付与してください。",
+    RELATION_MISMATCH: "broker が所有する一つの action 関係から runtime、capability、permission、approval、recovery、target scope を解決してください。",
+    PAYLOAD_HASH_MISMATCH: "正規 payload hash を再計算し、approval/audit を送信 payload へ結び付けてください。",
+    APPROVAL_MISSING: "approval を作成し、approved 状態を待ってください。",
+    APPROVAL_NOT_VALID: "現在の approval 要求を再検証または承認してください。",
+    AUDIT_MAPPING_MISSING: "event_id と必要な payload_hash を持つ AuditEvent を付与してください。",
+    RECOVERY_MAPPING_MISSING: "recovery_id を持つ RecoveryAction を付与してください。",
+    CONTENT_VISIBILITY_VIOLATION: "content_visibility に従って approval 内容を射影してください。",
+    ADAPTER_METADATA_ESCALATION_ATTEMPT: "adapter metadata から権限主張を削除してください。",
+    NON_AUTHORITY_SOURCE_ATTEMPT: "権限源を利用してください。memory、cache、previous_state、local_ui_state は権限を与えられません。",
+    UPDATE_SIGNATURE_REQUIRED: "update 操作の前に有効な update 署名を必須にしてください。",
+    SCHEMA_CONTRACT_MISSING: "検証前に必要な schema 契約を読み込んでください。",
 }
 
 

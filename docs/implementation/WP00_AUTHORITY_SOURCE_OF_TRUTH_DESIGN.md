@@ -1,13 +1,13 @@
-# WP00 Authority Source-of-Truth Design Report
+# WP00 権限正本の設計報告
 
-Date: 2026-06-05
-Scope: D-P0-00 / D-P0-01 and prerequisite slices of D-P0-07 / D-P0-08.
+日付: 2026-06-05
+範囲: D-P0-00 / D-P0-01、および D-P0-07 / D-P0-08 の前提部分。
 
-This report is the required pre-implementation design record for Work Package 00.
+本報告は Work Package 00 に必須の実装前設計記録である。
 
-## Affected Symbols
+## 影響を受けるシンボル
 
-Rust production path:
+Rust 製品経路:
 
 - `native/rust_helper/src/broker/protocol.rs`
   - `BrokerOperation`
@@ -18,21 +18,21 @@ Rust production path:
   - `BrokerHealth.authority_cutover_status`
   - `BrokerHealth.command_dispatch_enabled`
 - `native/rust_helper/src/broker/authority.rs`
-  - current fixture-style `evaluate_authority`
-  - authority source rejection logic
-  - audit mapping requirement logic
+  - 現行の fixture 形式 `evaluate_authority`
+  - 権限源の拒否ロジック
+  - 監査対応付けの要求ロジック
 - `native/rust_helper/tests/broker_ipc.rs`
-  - IPC negative tests for production authority requests.
+  - 製品権限要求に対する IPC negative test。
 
-Python fixture / parity path:
+Python fixture / parity 経路:
 
 - `tooling/broker_parity/run_authority_parity.py`
-  - current calls to `authority_evaluate` with `{"state": ..., "action": ...}`
-  - command-envelope expectations.
+  - `{"state": ..., "action": ...}` を伴う現行の `authority_evaluate` 呼出し
+  - command-envelope の期待値。
 - `packages/shell_core/policy_evaluator.py`
-  - retained as Python fixture/oracle evaluator for conformance and parity.
+  - conformance と parity の Python fixture/oracle evaluator として維持。
 - `packages/shell_core/runtime_state.py`
-  - retained as fixture/runtime-state object, not production broker authority state.
+  - 製品 broker の権限状態ではなく、fixture/runtime-state object として維持。
 - `packages/shell_core/runtime_registry.py`
 - `packages/shell_core/permission_ledger.py`
 - `packages/shell_core/approval_queue.py`
@@ -40,46 +40,46 @@ Python fixture / parity path:
 - `packages/shell_core/recovery_catalog.py`
 - `packages/shell_core/update_policy_store.py`
 
-Dart product path:
+Dart 製品経路:
 
 - `apps/desktop_flutter/lib/services/broker_client.dart`
-  - no contract change required for generic broker requests.
+  - 汎用 broker 要求について contract の変更は不要。
 - `apps/desktop_flutter/lib/services/shell_core_client.dart`
-  - `_brokerCommandProbePayload` currently sends caller fixture `state` and caller `audit_event`.
+  - `_brokerCommandProbePayload` は現在、呼出し側 fixture の `state` と呼出し側の `audit_event` を送信する。
 - `apps/desktop_flutter/test/widget_test.dart`
-  - fake command response may need eligibility expectation updates only.
+  - fake command response では eligibility の期待値更新だけが必要となる可能性がある。
 
-Schemas and protocol documents:
+schema と protocol 文書:
 
 - `specs/ipc_request.schema.json`
-  - add fixture-only `authority_fixture_evaluate`.
+  - fixture 専用の `authority_fixture_evaluate` を追加。
 - `specs/broker_error.schema.json`
-  - add production authority contract rejection code.
+  - 製品権限 contract の拒否コードを追加。
 - `docs/architecture/RUST_BROKER_IPC_PROTOCOL.md`
-  - distinguish production authority evaluation from fixture parity evaluation.
+  - 製品権限評価と fixture parity 評価を区別。
 - `GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md`
-  - canonical ledger already added for this work package.
+  - この Work Package の正本 ledger は追加済み。
 
-## Reused Components
+## 再利用する構成要素
 
-The existing Python components are retained as development/fixture components:
+既存の Python 構成要素は development/fixture 構成要素として維持する。
 
-- `RuntimeState` continues to support conformance fixtures and Python oracle tests.
-- `PolicyEvaluator(RuntimeState)` remains the fixture evaluator used by `authority_fixture_evaluate`.
-- `RuntimeRegistry`, `PermissionLedger`, `ApprovalQueue`, `AuditStore`, `RecoveryCatalog`, and `UpdatePolicyStore` are small broker-owned-state candidates, but they are Python components and are not directly imported into the Rust broker production process.
+- `RuntimeState` は conformance fixture と Python oracle test を引き続き支える。
+- `PolicyEvaluator(RuntimeState)` は `authority_fixture_evaluate` が使う fixture evaluator として維持する。
+- `RuntimeRegistry`、`PermissionLedger`、`ApprovalQueue`、`AuditStore`、`RecoveryCatalog`、`UpdatePolicyStore` は小規模な broker 所有状態の候補だが、Python 構成要素であり Rust broker 製品 process へ直接 import しない。
 
-For WP00, the Rust broker gets a minimal internal authority registry model in the Rust authority module. It is intentionally conservative:
+WP00 では、Rust broker の Rust authority module に最小限の内部権限 registry model を置く。これは意図的に保守的な設計である。
 
-- it is broker-owned, not caller supplied;
-- it is closed over a small broker command-dispatch record set;
-- it keeps permission denied while command dispatch is suspended;
-- it emits decision results from broker-owned state only.
+- 呼出し側が供給するのではなく、broker が所有する。
+- 小規模な broker command-dispatch record 集合に閉じる。
+- command dispatch が suspended の間は permission denied を維持する。
+- broker 所有状態だけから判定結果を出力する。
 
-Full persisted registry migration, richer relation closure, canonical ActionEnvelope, and cross-language canonical payload hash are deferred to WP01.
+永続化 registry の完全移行、より豊かな関係閉包、正本 `ActionEnvelope`、言語間の正本 payload hash は WP01 に延期する。
 
-## Production Authority Input Contract
+## 製品権限入力 contract
 
-Production `authority_evaluate` accepts an action request only:
+製品用 `authority_evaluate` は action 要求のみを受け付ける。
 
 ```json
 {
@@ -95,54 +95,54 @@ Production `authority_evaluate` accepts an action request only:
 }
 ```
 
-Production `authority_evaluate` rejects payloads containing `state`. It also rejects caller-declared authority provenance fields and caller-submitted `audit_event` mappings. Broker audit emission is the only production audit source for the decision.
+製品用 `authority_evaluate` は `state` を含む payload を拒否する。呼出し側が宣言した authority provenance field と、呼出し側が提出した `audit_event` mapping も拒否する。判定に対する製品監査源は broker による audit emission だけである。
 
-`command_envelope` remains suspended. Its eligibility section is derived from the same broker-owned authority state and no longer treats caller fixture state as proof.
+`command_envelope` は suspended のままとする。その eligibility section は同じ broker 所有権限状態から導出し、呼出し側の fixture state を証拠として扱わない。
 
-## Fixture Isolation
+## Fixture の分離
 
-The existing state/action parity evaluator is moved behind a separate operation:
+既存の state/action parity evaluator は、独立した次の operation の背後へ移す。
 
 ```text
 authority_fixture_evaluate
 ```
 
-This operation is for Python-oracle parity and conformance only. It keeps the existing `{"state": ..., "action": ...}` payload shape so existing fixture coverage remains useful, but production UI and command-envelope code must not use it.
+この operation は Python-oracle parity と conformance 専用である。既存の fixture coverage を活用できるよう `{"state": ..., "action": ...}` payload 形式を維持するが、製品 UI と command-envelope code はこれを使ってはならない。
 
-## Internal Provenance / Issuer Rules
+## 内部 provenance / issuer 規則
 
-Production authority provenance is internal to the broker:
+製品権限の provenance は broker 内部に置く。
 
 - issuer: `gui-shell-rust-broker`
 - source: `rust_security_broker`
-- evidence source: `INTERNAL_STATE` for denied/suspended authority decisions until cutover
-- caller-provided `authority_source` is not an authority source, even if it names the broker.
-- unknown, forged, or denylisted caller authority source values deny the decision.
+- 証拠源: cutover までの denied/suspended 権限判定には `INTERNAL_STATE`
+- 呼出し側が提供する `authority_source` は、broker 名を指定していても権限源ではない。
+- 未知、偽造、または denylist 対象の呼出し側権限源値は判定を拒否させる。
 
-## Broker-Emitted Audit Sequencing
+## Broker が出力する監査の順序
 
-For production authority evaluation:
+製品権限評価では、次の順序に従う。
 
-1. IPC envelope validation, freshness, session, replay, metadata authority stripping, and persistence checks run first.
-2. Replay nonce is recorded before operation handling.
-3. Broker-owned authority state evaluates the action request.
-4. The broker appends one audit event for the decision.
-5. If audit append fails, the broker returns suspended `broker_audit_append_failed`.
-6. The response body includes the authority decision; top-level transport status may be `accepted` when the request was processed, but the broker audit event decision is `authorized`, `denied`, or `suspended`.
+1. IPC envelope validation、freshness、session、replay、metadata authority stripping、persistence check を先に実行する。
+2. operation 処理前に replay nonce を記録する。
+3. broker 所有権限状態が action 要求を評価する。
+4. broker が判定について一つの audit event を追記する。
+5. audit append に失敗した場合、broker は suspended `broker_audit_append_failed` を返す。
+6. response body は権限判定を含む。要求を処理した場合、最上位 transport status は `accepted` となり得るが、broker audit event の decision は `authorized`、`denied`、または `suspended` である。
 
-Caller-supplied audit event mappings are never accepted as authority prerequisites in the production path.
+製品経路では、呼出し側が提供した audit event mapping を権限の前提として決して受理しない。
 
-## Migration Impact And WP01 Deferrals
+## 移行への影響と WP01 への延期事項
 
-WP00 intentionally does not activate command dispatch and does not make authority cutover active.
+WP00 では意図的に command dispatch を有効化せず、authority cutover も active にしない。
 
-Deferred to WP01:
+WP01 へ延期する事項:
 
-- canonical `ActionEnvelope` schema;
-- full runtime/capability/operation/permission/approval/recovery/target-scope relation closure;
-- required `permission.runtime_id` migration;
-- persisted broker-owned registries;
-- canonical payload hash binding across Dart/Rust/Python;
-- normalization key collision rejection;
-- adapter ingress single-route closure;
-- `SensitiveActionRouter` production fail-closed redesign.
+- 正本 `ActionEnvelope` schema。
+- runtime/capability/operation/permission/approval/recovery/target-scope 関係閉包の完全化。
+- 必須の `permission.runtime_id` 移行。
+- 永続化された broker 所有 registry。
+- Dart/Rust/Python 間で正本 payload hash を結び付けること。
+- normalization key collision の拒否。
+- adapter ingress の単一路閉包。
+- `SensitiveActionRouter` の製品用 fail-closed 再設計。

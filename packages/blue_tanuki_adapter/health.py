@@ -2,7 +2,7 @@ def health() -> dict:
     return {
         "runtime_id": "blue_tanuki",
         "status": "ready",
-        "message": "reference runtime mock health is ready",
+        "message": "参照 runtime mock の health は準備済みです",
     }
 
 

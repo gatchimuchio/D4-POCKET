@@ -1,26 +1,26 @@
-# Agent Runtime Contract
+# Agent Runtime の契約（Agent Runtime Contract）
 
-Agent runtimes are first-class runtime types. They must be controlled by Shell Core permission, approval, audit, and recovery semantics.
+Agent Runtime は第一級の Runtime type である。Shell Core の Permission、Approval、Audit、Recovery の各 semantics によって制御しなければならない。
 
-Core records:
+中核 record:
 
-- AgentRuntime
-- AgentSession
-- AgentTask
-- AgentWorkspace
-- AgentToolCall
-- AgentPermissionRequest
-- AgentDiff
-- AgentCommit
-- AgentPullRequest
-- AgentRunLog
+- `AgentRuntime`
+- `AgentSession`
+- `AgentTask`
+- `AgentWorkspace`
+- `AgentToolCall`
+- `AgentPermissionRequest`
+- `AgentDiff`
+- `AgentCommit`
+- `AgentPullRequest`
+- `AgentRunLog`
 
-Conformance requirements:
+Conformance 要件:
 
-- workspace-external access is default deny
-- secret path read is default deny
-- shell command requires permission mapping
-- git push requires explicit approval
-- generated diff requires audit evidence
-- agent auto-permission mode is advisory only
-- rollback candidate is required for state-changing actions
+- workspace 外への access は default deny とする。
+- secret path の read は default deny とする。
+- shell command には Permission mapping が必要である。
+- `git push` には明示的な Approval が必要である。
+- 生成された diff には Audit evidence が必要である。
+- Agent の auto-permission mode は advisory に限定する。
+- state-changing action には rollback candidate が必要である。

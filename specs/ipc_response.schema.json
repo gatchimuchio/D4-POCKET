@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/ipc_response.schema.json",
-  "title": "IpcResponse",
+  "title": "IPC応答（IpcResponse）",
   "type": "object",
   "required": [
     "request_id",

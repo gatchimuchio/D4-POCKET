@@ -104,7 +104,7 @@ pub fn evaluate_broker_authority(registry: &BrokerAuthorityRegistry, payload: &V
     if let Some(source) = action.get("authority_source").and_then(Value::as_str) {
         caller_errors.push(shell_error(
             "caller_authority_source_rejected",
-            &format!("{source} cannot grant authority from a caller request"),
+            &format!("{source}は呼出し側requestからauthorityを付与できない"),
             operation,
         ));
     }
@@ -113,7 +113,7 @@ pub fn evaluate_broker_authority(registry: &BrokerAuthorityRegistry, payload: &V
         if action.get(&source_flag).and_then(Value::as_bool) == Some(true) {
             caller_errors.push(shell_error(
                 "caller_authority_source_rejected",
-                &format!("{source} cannot grant authority"),
+                &format!("{source}はauthorityを付与できない"),
                 operation,
             ));
         }
@@ -128,7 +128,7 @@ pub fn evaluate_broker_authority(registry: &BrokerAuthorityRegistry, payload: &V
     let result_errors = result
         .get_mut("errors")
         .and_then(Value::as_array_mut)
-        .expect("authority result errors must be an array");
+        .expect("authority resultのerrorsはarrayでなければならない");
     result_errors.splice(0..0, caller_errors);
     let allowed = result_errors.is_empty();
     result["allowed"] = Value::Bool(allowed);
@@ -157,7 +157,7 @@ fn evaluate_authority_from_state(
         if !contains_id(state, "runtimes", "runtime_id", runtime_id) {
             errors.push(shell_error(
                 "unknown_runtime",
-                &format!("unknown runtime: {runtime_id}"),
+                &format!("未知のruntime: {runtime_id}"),
                 operation,
             ));
         }
@@ -200,7 +200,7 @@ fn evaluate_authority_from_state(
         } else {
             errors.push(shell_error(
                 "unknown_capability",
-                &format!("unknown capability: {capability_id}"),
+                &format!("未知のcapability: {capability_id}"),
                 operation,
             ));
         }
@@ -218,7 +218,7 @@ fn evaluate_authority_from_state(
     match (permission_id, permission) {
         (None, _) | (_, None) => errors.push(shell_error(
             "unknown_permission",
-            &format!("unknown permission: {}", permission_id.unwrap_or("null")),
+            &format!("未知のpermission: {}", permission_id.unwrap_or("null")),
             operation,
         )),
         (Some(_), Some(permission)) => {
@@ -229,7 +229,7 @@ fn evaluate_authority_from_state(
             if !matches!(decision, "allow" | "approved") {
                 errors.push(shell_error(
                     "permission_denied",
-                    &format!("permission decision is not allow or approved: {decision}"),
+                    &format!("permission decisionがallowまたはapprovedではない: {decision}"),
                     operation,
                 ));
             }
@@ -248,7 +248,7 @@ fn evaluate_authority_from_state(
                 {
                     errors.push(shell_error(
                         "relation_mismatch",
-                        &format!("permission {field} does not match requested action"),
+                        &format!("permissionの{field}が要求actionと一致しない"),
                         operation,
                     ));
                 }
@@ -265,7 +265,7 @@ fn evaluate_authority_from_state(
         Some(approval_id) => match find_record(state, "approvals", "approval_id", approval_id) {
             None => errors.push(shell_error(
                 "approval_missing",
-                &format!("unknown approval: {approval_id}"),
+                &format!("未知のapproval: {approval_id}"),
                 operation,
             )),
             Some(approval)
@@ -273,7 +273,7 @@ fn evaluate_authority_from_state(
             {
                 errors.push(shell_error(
                     "approval_not_valid",
-                    &format!("approval is not approved: {approval_id}"),
+                    &format!("approvalがapprovedではない: {approval_id}"),
                     operation,
                 ));
             }
@@ -284,7 +284,7 @@ fn evaluate_authority_from_state(
                     {
                         errors.push(shell_error(
                             "relation_mismatch",
-                            &format!("approval {field} does not match requested action"),
+                            &format!("approvalの{field}が要求actionと一致しない"),
                             operation,
                         ));
                     }
@@ -396,7 +396,7 @@ fn evaluate_authority_from_state(
                     {
                         errors.push(shell_error(
                             "relation_mismatch",
-                            &format!("recovery {field} does not match requested action"),
+                            &format!("recoveryの{field}が要求actionと一致しない"),
                             operation,
                         ));
                     }
@@ -404,7 +404,7 @@ fn evaluate_authority_from_state(
             } else {
                 errors.push(shell_error(
                     "recovery_mapping_missing",
-                    &format!("unknown recovery action: {recovery_id}"),
+                    &format!("未知のrecovery action: {recovery_id}"),
                     operation,
                 ));
             }
@@ -432,7 +432,7 @@ fn evaluate_authority_from_state(
             {
                 errors.push(shell_error(
                     "non_authority_source_attempt",
-                    &format!("{source} cannot grant authority"),
+                    &format!("{source}はauthorityを付与できない"),
                     operation,
                 ));
             }
@@ -463,7 +463,7 @@ pub fn edit_approval(payload: &Value) -> Value {
     if !can_edit(&approval_object, field) {
         return json!({
             "ok": false,
-            "error": format!("field is not editable: {field}")
+            "error": format!("fieldは編集不可: {field}")
         });
     }
     let mut full_payload = approval_object
@@ -504,7 +504,7 @@ pub fn project_approval_content(approval: &Value) -> Value {
         "full" => {
             json!({"full_payload": approval.get("full_payload").cloned().unwrap_or_else(|| json!({}))})
         }
-        _ => json!({"error": format!("unknown content visibility: {visibility}")}),
+        _ => json!({"error": format!("未知のcontent visibility: {visibility}")}),
     }
 }
 
@@ -518,15 +518,15 @@ pub fn verify_audit_chain(events: &Value) -> Value {
     let mut seen_event_ids = BTreeSet::new();
     for (index, event) in events.iter().enumerate() {
         let Some(object) = event.as_object() else {
-            errors.push(format!("event {index} is not an object"));
+            errors.push(format!("event {index}がobjectではない"));
             continue;
         };
         if let Some(event_id) = object.get("event_id").and_then(Value::as_str) {
             if !seen_event_ids.insert(event_id.to_string()) {
-                errors.push(format!("event {index} duplicate event_id {event_id}"));
+                errors.push(format!("event {index} の event_id {event_id} が重複しています"));
             }
         } else {
-            errors.push(format!("event {index} missing event_id"));
+            errors.push(format!("event {index} に event_id がありません"));
         }
         if object
             .get("previous_event_hash")
@@ -534,14 +534,14 @@ pub fn verify_audit_chain(events: &Value) -> Value {
             .unwrap_or(Value::Null)
             != previous
         {
-            errors.push(format!("event {index} previous hash mismatch"));
+            errors.push(format!("event {index} の previous hash が一致しません"));
         }
         let mut expected_object = object.clone();
         expected_object.remove("event_hash");
         expected_object.insert("previous_event_hash".to_string(), previous.clone());
         let expected_hash = canonical_hash(&Value::Object(expected_object));
         if object.get("event_hash").and_then(Value::as_str) != Some(expected_hash.as_str()) {
-            errors.push(format!("event {index} hash mismatch"));
+            errors.push(format!("event {index} の hash が一致しません"));
         }
         latest = object.get("event_hash").cloned().unwrap_or(Value::Null);
         previous = latest.clone();

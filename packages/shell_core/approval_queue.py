@@ -36,7 +36,7 @@ class ApprovalQueue:
 
     def get(self, approval_id: str) -> dict:
         if approval_id not in self._approvals:
-            raise KeyError(f"approval not queued: {approval_id}")
+            raise KeyError(f"queue にない approval です: {approval_id}")
         return copy.deepcopy(self._approvals[approval_id])
 
     def can_edit(self, approval_id: str, field: str) -> bool:
@@ -45,7 +45,7 @@ class ApprovalQueue:
 
     def edit(self, approval_id: str, field: str, value) -> dict:
         if not self.can_edit(approval_id, field):
-            raise ValueError(f"field is not editable: {field}")
+            raise ValueError(f"編集できない field です: {field}")
         approval = self.get(approval_id)
         payload = copy.deepcopy(approval.get("full_payload", {}))
         payload[field] = value

@@ -33,13 +33,13 @@ pub fn diagnose_filesystem(
     let diagnostics = if secret_path_detected {
         vec![Diagnostic {
             code: "filesystem_secret_path_diagnostic_blocked".to_string(),
-            message: "filesystem diagnostic target resolves to a secret path; content was not read"
+            message: "filesystem diagnosticのtargetがsecret pathへ解決されたため、contentを読まなかった"
                 .to_string(),
         }]
     } else if symlink_detected {
         vec![Diagnostic {
             code: "filesystem_symlink_diagnostic_observed".to_string(),
-            message: "filesystem diagnostic target is a symlink; content was not read".to_string(),
+            message: "filesystem diagnosticのtargetがsymlinkであるため、contentを読まなかった".to_string(),
         }]
     } else {
         vec![]

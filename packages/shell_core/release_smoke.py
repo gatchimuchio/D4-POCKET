@@ -35,7 +35,7 @@ def build_reference_state() -> RuntimeState:
         {
             "capability_id": "filesystem.write",
             "runtime_id": "blue_tanuki",
-            "name": "Filesystem Write",
+            "name": "ファイルシステム書込み",
             "risk_level": "high",
             "default_permission": "ask",
             "requires_approval": True,
@@ -82,7 +82,7 @@ def build_reference_state() -> RuntimeState:
             "class": "permission_denied",
             "severity": "warning",
             "safe_to_retry": True,
-            "user_visible_message": "Permission is required before this action can run.",
+            "user_visible_message": "この action を実行する前に permission が必要です。",
         }
     )
     state.append_audit_event(
@@ -127,7 +127,7 @@ def run_shell_core_release_smoke(root: Path) -> dict:
     snapshot = persistence.save_snapshot(state)
     loaded = persistence.load_snapshot()
     if loaded != snapshot:
-        errors.append("saved state snapshot did not load deterministically")
+        errors.append("保存済み state snapshot を決定的に読み込めませんでした")
 
     first_event = persistence.append_audit_event(
         {
@@ -147,11 +147,11 @@ def run_shell_core_release_smoke(root: Path) -> dict:
     )
     verification = persistence.verify_audit_chain()
     if verification["ok"] is not True:
-        errors.append("append-only audit chain did not verify")
+        errors.append("追記専用 audit chain の検証に失敗しました")
     if verification.get("anchor_verified") is not True:
-        errors.append("audit anchor HMAC did not verify")
+        errors.append("audit anchor HMAC の検証に失敗しました")
     if second_event.get("previous_event_hash") != first_event.get("event_hash"):
-        errors.append("audit chain did not link second event to first event")
+        errors.append("audit chain が2番目の event を1番目の event へ接続しませんでした")
 
     events = persistence.audit_events()
     tampered = copy.deepcopy(events)
@@ -162,7 +162,7 @@ def run_shell_core_release_smoke(root: Path) -> dict:
         encoding="utf-8",
     )
     if persistence.detect_tamper() is not True:
-        errors.append("tamper detection did not flag modified audit event")
+        errors.append("改変検知が変更済み audit event を検出しませんでした")
     tamper_path.write_text(
         "\n".join(json.dumps(event, sort_keys=True, separators=(",", ":")) for event in events) + "\n",
         encoding="utf-8",
@@ -175,13 +175,13 @@ def run_shell_core_release_smoke(root: Path) -> dict:
     queue.enqueue(approval)
     edited = queue.edit("approval-1", "path", "notes/tomorrow.md")
     if edited["status"] != "requires_validation":
-        errors.append("approval edit did not require validation")
+        errors.append("approval 編集が再検証必要状態になりませんでした")
     if edited["payload_hash"] != canonical_hash({"path": "notes/tomorrow.md", "content": "hello"}):
-        errors.append("approval edit did not rehash edited payload")
+        errors.append("approval 編集が編集済み payload を再 hash 化しませんでした")
 
     policy_result = PolicyEvaluator(state).evaluate(build_sensitive_action())
     if policy_result["allowed"] is not True:
-        errors.append("policy evaluator rejected integrated reference action")
+        errors.append("policy evaluator が統合参照 action を拒否しました")
 
     return {
         "ok": not errors,

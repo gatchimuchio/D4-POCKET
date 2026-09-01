@@ -116,7 +116,7 @@ def expected_files() -> tuple[list[Path], list[str]]:
             if path.is_file() and not is_excluded(path):
                 files.add(path)
         if not files:
-            errors.append("git-tracked source file list is empty")
+            errors.append("Git追跡済みsource file一覧が空である")
         return sorted(files, key=relative), errors
 
     for path in ROOT.rglob("*"):
@@ -126,11 +126,11 @@ def expected_files() -> tuple[list[Path], list[str]]:
     for name in EXACT_FILES:
         path = ROOT / name
         if not path.exists():
-            errors.append(f"required file missing from workspace: {name}")
+            errors.append(f"workspaceに必須fileがない: {name}")
 
     shell_core_files = sorted((ROOT / "packages" / "shell_core").glob("**/*.py"))
     if not shell_core_files:
-        errors.append("core Shell Core files are absent")
+        errors.append("Shell Coreの中核fileがない")
 
     return sorted(files, key=relative), errors
 
@@ -160,7 +160,7 @@ def build_manifest() -> tuple[dict, list[str]]:
     return {
         "version": 1,
         "hash": "sha256",
-        "self_reference_policy": "MANIFEST.sha256.json is excluded from its own file list.",
+        "self_reference_policy": "MANIFEST.sha256.jsonは自身のfile一覧から除外する。",
         "coverage": {
             "glob_patterns": GLOB_PATTERNS,
             "exact_files": EXACT_FILES,
@@ -175,13 +175,13 @@ def load_manifest() -> tuple[dict | None, list[str]]:
     try:
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return None, ["MANIFEST.sha256.json missing"]
+        return None, ["MANIFEST.sha256.jsonがない"]
     except json.JSONDecodeError as exc:
-        return None, [f"MANIFEST.sha256.json is invalid JSON: {exc}"]
+        return None, [f"MANIFEST.sha256.jsonが無効なJSON: {exc}"]
     if not isinstance(data, dict):
-        return None, ["MANIFEST.sha256.json must contain a JSON object"]
+        return None, ["MANIFEST.sha256.jsonはJSON objectを含まなければならない"]
     if not isinstance(data.get("files"), list):
-        return None, ["MANIFEST.sha256.json must contain a files list"]
+        return None, ["MANIFEST.sha256.jsonはfiles listを含まなければならない"]
     return data, []
 
 
@@ -197,32 +197,32 @@ def check_manifest() -> list[str]:
 
     for index, entry in enumerate(actual["files"]):
         if not isinstance(entry, dict):
-            errors.append(f"manifest entry {index} is not an object")
+            errors.append(f"manifest entry {index}がobjectではない")
             continue
         path = entry.get("path")
         digest = entry.get("sha256")
         if not isinstance(path, str) or not isinstance(digest, str):
-            errors.append(f"manifest entry {index} must contain string path and sha256")
+            errors.append(f"manifest entry {index}はstringのpathとsha256を含まなければならない")
             continue
         if path in actual_by_path:
-            errors.append(f"duplicate manifest entry: {path}")
+            errors.append(f"manifest entryが重複: {path}")
         actual_by_path[path] = digest
         if matches_forbidden(path):
-            errors.append(f"forbidden generated or self-referenced file listed: {path}")
+            errors.append(f"禁止された生成fileまたは自己参照fileが記載されている: {path}")
         file_path = ROOT / path
         if not file_path.exists():
-            errors.append(f"listed file missing: {path}")
+            errors.append(f"記載fileがない: {path}")
         elif file_path.is_file():
             actual_digest = sha256(file_path)
             if actual_digest != digest:
-                errors.append(f"hash mismatch: {path}")
+                errors.append(f"hashが不一致: {path}")
 
     for path in sorted(set(expected_by_path) - set(actual_by_path)):
-        errors.append(f"required source file missing from manifest: {path}")
+        errors.append(f"manifestに必須source fileがない: {path}")
 
     shell_core_listed = [path for path in actual_by_path if path.startswith("packages/shell_core/") and path.endswith(".py")]
     if not shell_core_listed:
-        errors.append("core Shell Core files are absent from manifest")
+        errors.append("manifestにShell Coreの中核fileがない")
 
     return errors
 
@@ -231,21 +231,21 @@ def write_manifest() -> int:
     manifest, errors = build_manifest()
     if errors:
         for error in errors:
-            print(f"manifest generation failed: {error}")
+            print(f"manifest生成が失敗: {error}")
         return 1
     MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8")
-    print(f"wrote {MANIFEST.relative_to(ROOT)} with {len(manifest['files'])} files")
+    print(f"{MANIFEST.relative_to(ROOT)}へfile {len(manifest['files'])}件を書込んだ")
     return 0
 
 
 def run_check() -> int:
     errors = check_manifest()
     if errors:
-        print("manifest check failed:")
+        print("manifest checkが失敗:")
         for error in errors:
             print(f"  - {error}")
         return 1
-    print("manifest check passed")
+    print("manifest checkが合格")
     return 0
 
 

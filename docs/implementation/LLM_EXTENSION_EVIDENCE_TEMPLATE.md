@@ -1,16 +1,16 @@
-# LLM Extension Evidence Template
+# LLM 拡張証拠 template
 
-Status: Block L4 evidence template for future L5 reproduction
-Date: 2026-06-04
-Scope: Bounded LLM-readable extension task evidence capture
+状態: 将来の L5 再現用 Block L4 evidence template
+日付: 2026-06-04
+範囲: 限定 LLM 可読 extension task の evidence capture
 
-## 1. Evidence Record
+## 1. 証拠記録
 
-Use this template for each independent LLM development / integration agent execution.
+独立した各 LLM 開発 / 統合エージェント実行にこの template を使う。
 
-Do not fill this template with invented evidence. If a command was not run, record `not_run` and classify the remaining risk.
+捏造した証拠でこの template を埋めてはならない。command を実行しなかった場合は `not_run` を記録し、残存 risk を分類する。
 
-## 2. Execution Identity
+## 2. 実行 identity
 
 ```yaml
 execution_id:
@@ -25,7 +25,7 @@ start_time_utc:
 end_time_utc:
 ```
 
-## 3. Starting Repository State
+## 3. 開始時の repository state
 
 ```yaml
 starting_state:
@@ -39,7 +39,7 @@ starting_state:
   notes:
 ```
 
-## 4. Task Summary
+## 4. Task の要約
 
 ```yaml
 task_summary:
@@ -55,7 +55,7 @@ task_summary:
   raw_evidence_changed: yes | no
 ```
 
-## 5. Contract Path Exercised
+## 5. 実行した contract path
 
 ```yaml
 contract_path:
@@ -74,7 +74,7 @@ contract_path:
   notes:
 ```
 
-## 6. Negative Case Evidence
+## 6. Negative case の証拠
 
 ```yaml
 negative_cases:
@@ -85,22 +85,22 @@ negative_cases:
     evidence_classification: CONFIG | INTERNAL_STATE | FIXTURE
 ```
 
-Required categories to consider:
+検討必須の category:
 
-- authority escalation metadata;
-- self-approved sensitive behavior;
-- undeclared capability;
-- undeclared permission;
-- missing audit evidence;
-- missing recovery mapping;
-- full content exposure without policy;
-- non-authority source attempting to create authority;
-- runtime-specific logic entering Shell Core;
-- BLUE-TANUKI-specific logic entering Shell Core.
+- authority escalation metadata（権限昇格 metadata）。
+- self-approved sensitive behavior（自己承認した機微挙動）。
+- undeclared capability（未宣言能力）。
+- undeclared permission（未宣言許可）。
+- missing audit evidence（監査証拠欠落）。
+- missing recovery mapping（回復対応欠落）。
+- 方針のない full content exposure。
+- authority 生成を試みる non-authority source。
+- Shell Core に入る runtime-specific logic。
+- Shell Core に入る BLUE-TANUKI-specific logic。
 
-## 7. Validation Results
+## 7. 検証結果
 
-Record exact commands and exact outputs.
+正確な command と正確な output を記録する。
 
 ```yaml
 validation:
@@ -151,7 +151,7 @@ validation:
     blocks_release: yes | no
 ```
 
-## 8. Diff Summary
+## 8. 差分の要約
 
 ```yaml
 diff_summary:
@@ -164,7 +164,7 @@ diff_summary:
   commit_message:
 ```
 
-## 9. Boundary Review
+## 9. 境界 review
 
 ```yaml
 boundary_review:
@@ -182,7 +182,7 @@ boundary_review:
   notes:
 ```
 
-## 10. Scope Control
+## 10. 範囲管理
 
 ```yaml
 scope_control:
@@ -194,7 +194,7 @@ scope_control:
   stop_reason:
 ```
 
-## 11. Evidence Classification
+## 11. 証拠分類
 
 ```yaml
 evidence_classification:
@@ -205,7 +205,7 @@ evidence_classification:
   not_public_standard_adoption_evidence: true
 ```
 
-## 12. Release and Claim Impact
+## 12. リリースと表明への影響
 
 ```yaml
 release_claim_impact:
@@ -216,9 +216,9 @@ release_claim_impact:
   owner_go_recorded: yes | no
 ```
 
-## 13. Remaining Risks
+## 13. 残存 risk
 
-Use repository classifications only.
+repository の classification だけを使う。
 
 ```yaml
 remaining_risks:
@@ -229,7 +229,7 @@ remaining_risks:
     blocks_release: yes | no
 ```
 
-## 14. Git Closure
+## 14. Git の閉包
 
 ```yaml
 git_closure:
@@ -245,9 +245,9 @@ git_closure:
   final_status_short_branch:
 ```
 
-## 15. L5 Comparison Fields
+## 15. L5 比較 field
 
-The L5 comparison report should extract these fields from each agent execution:
+L5 比較 report は各 agent execution から次の field を抽出する。
 
 ```yaml
 l5_comparison:
@@ -263,8 +263,8 @@ l5_comparison:
   outcome: reproduced_successfully | reproduced_with_bounded_differences | failed_safely | failed_through_boundary_violation | inconclusive
 ```
 
-## 16. Non-Claims
+## 16. 非表明事項
 
-Completing one template instance does not prove cross-agent reproduction.
+template instance を一つ完成させても cross-agent reproduction は証明されない。
 
-Cross-agent reproduction requires at least two independent agent executions from the same baseline, followed by a comparison report that classifies outcomes and boundary failures.
+Cross-agent reproduction には、同じ baseline から少なくとも二つの独立 agent execution を行い、その後に outcome と boundary failure を分類する comparison report を作成することが必要である。

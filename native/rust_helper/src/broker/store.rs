@@ -77,7 +77,7 @@ impl BrokerPersistentStore {
     ) -> Result<(Self, BrokerPersistentState), BrokerStoreError> {
         let root = root.as_ref().to_path_buf();
         fs::create_dir_all(&root).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to create broker store directory: {error}"))
+            BrokerStoreError::Io(format!("broker store directoryの作成に失敗: {error}"))
         })?;
 
         let store = Self {
@@ -109,11 +109,11 @@ impl BrokerPersistentStore {
     pub fn append_audit_event(&self, event: &BrokerAuditEvent) -> Result<(), BrokerStoreError> {
         let serialized = serde_json::to_string(event).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
-                "failed to serialize broker audit event: {error}"
+                "broker audit eventのserializeに失敗: {error}"
             ))
         })?;
         append_jsonl_line(&self.audit_path, &serialized).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to append audit event: {error}"))
+            BrokerStoreError::Io(format!("audit eventの追記に失敗: {error}"))
         })?;
         let anchored_log = self.load_audit_log()?;
         self.write_audit_anchor(&anchored_log)
@@ -130,11 +130,11 @@ impl BrokerPersistentStore {
         })
         .map_err(|error| {
             BrokerStoreError::MalformedReplayState(format!(
-                "failed to serialize replay nonce: {error}"
+                "replay nonceのserializeに失敗: {error}"
             ))
         })?;
         append_jsonl_line(&self.replay_path, &serialized).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to append replay nonce: {error}"))
+            BrokerStoreError::Io(format!("replay nonceの追記に失敗: {error}"))
         })?;
         let nonces = self.load_replay_nonces(recorded_at_epoch_seconds)?;
         self.compact_replay_nonces(&nonces)?;
@@ -153,7 +153,7 @@ impl BrokerPersistentStore {
             .map(|_| ())
             .map_err(|error| {
                 BrokerStoreError::Io(format!(
-                    "failed to initialize broker store file {}: {error}",
+                "broker store file {}の初期化に失敗: {error}",
                     path.display()
                 ))
             })
@@ -161,14 +161,14 @@ impl BrokerPersistentStore {
 
     fn load_audit_log(&self) -> Result<BrokerAuditLog, BrokerStoreError> {
         let file = File::open(&self.audit_path).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to open broker audit store: {error}"))
+            BrokerStoreError::Io(format!("broker audit storeのopenに失敗: {error}"))
         })?;
         let reader = BufReader::new(file);
         let mut events = Vec::new();
         for (index, line) in reader.lines().enumerate() {
             let line = line.map_err(|error| {
                 BrokerStoreError::MalformedAuditState(format!(
-                    "failed to read broker audit event line {}: {error}",
+                    "broker audit eventのline {}の読取りに失敗: {error}",
                     index + 1
                 ))
             })?;
@@ -177,7 +177,7 @@ impl BrokerPersistentStore {
             }
             let event: BrokerAuditEvent = serde_json::from_str(&line).map_err(|error| {
                 BrokerStoreError::MalformedAuditState(format!(
-                    "malformed broker audit event line {}: {error}",
+                    "broker audit eventのline {}がmalformed: {error}",
                     index + 1
                 ))
             })?;
@@ -191,14 +191,14 @@ impl BrokerPersistentStore {
         now_epoch_seconds: i64,
     ) -> Result<HashMap<String, i64>, BrokerStoreError> {
         let file = File::open(&self.replay_path).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to open broker replay store: {error}"))
+            BrokerStoreError::Io(format!("broker replay storeのopenに失敗: {error}"))
         })?;
         let reader = BufReader::new(file);
         let mut nonces = BTreeMap::new();
         for (index, line) in reader.lines().enumerate() {
             let line = line.map_err(|error| {
                 BrokerStoreError::MalformedReplayState(format!(
-                    "failed to read replay nonce line {}: {error}",
+                    "replay nonceのline {}の読取りに失敗: {error}",
                     index + 1
                 ))
             })?;
@@ -207,13 +207,13 @@ impl BrokerPersistentStore {
             }
             let record: ReplayNonceRecord = serde_json::from_str(&line).map_err(|error| {
                 BrokerStoreError::MalformedReplayState(format!(
-                    "malformed replay nonce line {}: {error}",
+                    "replay nonceのline {}がmalformed: {error}",
                     index + 1
                 ))
             })?;
             if record.nonce.trim().is_empty() {
                 return Err(BrokerStoreError::MalformedReplayState(format!(
-                    "empty replay nonce line {}",
+                    "replay nonceのline {}が空である",
                     index + 1
                 )));
             }
@@ -248,14 +248,14 @@ impl BrokerPersistentStore {
             })
             .map_err(|error| {
                 BrokerStoreError::MalformedReplayState(format!(
-                    "failed to serialize compacted replay nonce: {error}"
+                    "compact済みreplay nonceのserializeに失敗: {error}"
                 ))
             })?;
             serialized.push_str(&line);
             serialized.push('\n');
         }
         atomic_write(&self.replay_path, serialized.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to compact replay nonce store: {error}"))
+            BrokerStoreError::Io(format!("replay nonce storeのcompactに失敗: {error}"))
         })
     }
 
@@ -265,22 +265,22 @@ impl BrokerPersistentStore {
         }
         let raw = fs::read_to_string(&self.session_path).map_err(|error| {
             BrokerStoreError::MalformedSessionState(format!(
-                "failed to read broker session state: {error}"
+                "broker session stateの読取りに失敗: {error}"
             ))
         })?;
         if raw.trim().is_empty() {
             return Err(BrokerStoreError::MalformedSessionState(
-                "broker session state is empty".to_string(),
+                "broker session stateが空である".to_string(),
             ));
         }
         let record: SessionRecord = serde_json::from_str(&raw).map_err(|error| {
             BrokerStoreError::MalformedSessionState(format!(
-                "malformed broker session state: {error}"
+                "broker session stateがmalformed: {error}"
             ))
         })?;
         if record.session_id.trim().is_empty() || record.state != "active" {
             return Err(BrokerStoreError::MalformedSessionState(
-                "broker session state is invalid".to_string(),
+                "broker session stateがinvalidである".to_string(),
             ));
         }
         Ok(())
@@ -294,11 +294,11 @@ impl BrokerPersistentStore {
         };
         let serialized = serde_json::to_string_pretty(&record).map_err(|error| {
             BrokerStoreError::MalformedSessionState(format!(
-                "failed to serialize broker session state: {error}"
+                "broker session stateのserializeに失敗: {error}"
             ))
         })?;
         atomic_write(&self.session_path, serialized.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to write broker session state: {error}"))
+            BrokerStoreError::Io(format!("broker session stateの書込みに失敗: {error}"))
         })
     }
 
@@ -308,22 +308,22 @@ impl BrokerPersistentStore {
                 Ok(())
             } else {
                 Err(BrokerStoreError::TamperedAuditState(
-                    "broker audit anchor is missing for non-empty audit log".to_string(),
+                "空でないaudit logにbroker audit anchorがない".to_string(),
                 ))
             };
         }
         let raw = fs::read_to_string(&self.audit_anchor_path).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
-                "failed to read broker audit anchor: {error}"
+                "broker audit anchorの読取りに失敗: {error}"
             ))
         })?;
         let record: AuditAnchorRecord = serde_json::from_str(&raw).map_err(|error| {
-            BrokerStoreError::MalformedAuditState(format!("malformed broker audit anchor: {error}"))
+            BrokerStoreError::MalformedAuditState(format!("broker audit anchorがmalformed: {error}"))
         })?;
         let expected = self.build_audit_anchor(audit_log);
         if record != expected {
             return Err(BrokerStoreError::TamperedAuditState(
-                "broker audit anchor HMAC does not match audit head".to_string(),
+                "broker audit anchor HMACがaudit headと一致しない".to_string(),
             ));
         }
         Ok(())
@@ -333,11 +333,11 @@ impl BrokerPersistentStore {
         let record = self.build_audit_anchor(audit_log);
         let serialized = serde_json::to_string_pretty(&record).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
-                "failed to serialize broker audit anchor: {error}"
+                "broker audit anchorのserializeに失敗: {error}"
             ))
         })?;
         atomic_write(&self.audit_anchor_path, serialized.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to write broker audit anchor: {error}"))
+            BrokerStoreError::Io(format!("broker audit anchorの書込みに失敗: {error}"))
         })
     }
 
@@ -389,19 +389,19 @@ fn load_or_create_anchor_key(path: &Path) -> Result<Vec<u8>, BrokerStoreError> {
     if path.exists() {
         let raw = fs::read_to_string(path).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
-                "failed to read broker audit anchor key: {error}"
+                "broker audit anchor keyの読取りに失敗: {error}"
             ))
         })?;
         return hex::decode(raw.trim()).map_err(|error| {
             BrokerStoreError::MalformedAuditState(format!(
-                "malformed broker audit anchor key: {error}"
+                "broker audit anchor keyがmalformed: {error}"
             ))
         });
     }
     let mut key = vec![0u8; 32];
     getrandom::getrandom(&mut key).map_err(|error| {
         BrokerStoreError::Io(format!(
-            "failed to generate broker audit anchor key: {error}"
+                "broker audit anchor keyの生成に失敗: {error}"
         ))
     })?;
     let encoded = hex::encode(&key);
@@ -414,13 +414,13 @@ fn load_or_create_anchor_key(path: &Path) -> Result<Vec<u8>, BrokerStoreError> {
             options.mode(0o600);
         }
         let mut file = options.open(path).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to create broker audit anchor key: {error}"))
+            BrokerStoreError::Io(format!("broker audit anchor keyの作成に失敗: {error}"))
         })?;
         file.write_all(encoded.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!("failed to write broker audit anchor key: {error}"))
+            BrokerStoreError::Io(format!("broker audit anchor keyの書込みに失敗: {error}"))
         })?;
         file.sync_data().map_err(|error| {
-            BrokerStoreError::Io(format!("failed to sync broker audit anchor key: {error}"))
+            BrokerStoreError::Io(format!("broker audit anchor keyのsyncに失敗: {error}"))
         })?;
     }
     Ok(key)

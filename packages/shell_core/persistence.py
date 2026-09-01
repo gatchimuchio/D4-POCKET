@@ -21,16 +21,16 @@ class JsonPersistence:
         self.root.mkdir(parents=True, exist_ok=True)
         event_id = event.get("event_id")
         if not event_id:
-            raise ValueError("audit event_id is required")
+            raise ValueError("audit event_id は必須です")
         events = self.audit_events()
         verification = verify_audit_chain(events)
         if verification["ok"] is not True:
             raise ValueError(
-                "cannot append to invalid audit chain: "
+                "不正な audit chain へ追記できません: "
                 + "; ".join(verification.get("errors", []))
             )
         if any(stored.get("event_id") == event_id for stored in events):
-            raise ValueError(f"duplicate audit event_id: {event_id}")
+            raise ValueError(f"重複した audit event_id です: {event_id}")
         previous = events[-1].get("event_hash") if events else None
         chained = chain_event(event, previous)
         with self.audit_path.open("a", encoding="utf-8") as handle:
@@ -55,10 +55,10 @@ class JsonPersistence:
             try:
                 parsed = json.loads(line)
             except json.JSONDecodeError as exc:
-                errors.append(f"corrupt audit JSONL line {index}: {exc.msg}")
+                errors.append(f"audit JSONL の {index} 行目が破損しています: {exc.msg}")
                 continue
             if not isinstance(parsed, dict):
-                errors.append(f"corrupt audit JSONL line {index}: event is not an object")
+                errors.append(f"audit JSONL の {index} 行目が破損しています: event が object ではありません")
                 continue
             events.append(parsed)
         return {"events": events, "errors": errors}
@@ -128,16 +128,16 @@ class JsonPersistence:
         if events and not self.audit_anchor_path.exists():
             return {
                 "ok": False,
-                "errors": ["audit anchor missing for non-empty audit chain"],
+                "errors": ["空でない audit chain に audit anchor がありません"],
             }
         try:
             stored = json.loads(self.audit_anchor_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            return {"ok": False, "errors": [f"audit anchor unreadable: {exc}"]}
+            return {"ok": False, "errors": [f"audit anchor を読み取れません: {exc}"]}
         expected = self._anchor_record(events)
         if stored != expected:
             return {
                 "ok": False,
-                "errors": ["audit anchor HMAC does not match audit chain head"],
+                "errors": ["audit anchor HMAC が audit chain head と一致しません"],
             }
         return {"ok": True, "errors": []}

@@ -7,7 +7,7 @@ def diagnostics_export() -> dict:
             {
                 "check_id": "adapter_contract",
                 "status": "pass",
-                "message": "mock adapter contract is available",
+                "message": "mock adapter 契約を利用できます",
             }
         ],
     }

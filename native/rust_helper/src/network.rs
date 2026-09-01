@@ -21,7 +21,7 @@ pub fn diagnose_network(
     if request.external_fetch_url.is_some() {
         diagnostics.push(Diagnostic {
             code: "external_fetch_ignored".to_string(),
-            message: "network diagnostics do not perform arbitrary external fetches".to_string(),
+            message: "network diagnosticsは任意の外部fetchを実行しない".to_string(),
         });
     }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_tool_call.schema.json",
-  "title": "AgentToolCall",
+  "title": "エージェント道具呼出し（AgentToolCall）",
   "type": "object",
   "required": ["tool_call_id", "session_id", "tool_name", "permission_id", "approval_required", "audit_event_id"],
   "additionalProperties": false,

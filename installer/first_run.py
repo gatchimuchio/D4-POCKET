@@ -36,11 +36,11 @@ def first_run_smoke(app_root: Path) -> dict:
     setup_report = setup_doctor_report()
     errors: list[str] = []
     if setup_report.get("installer_grants_authority") is not False:
-        errors.append("setup doctor grants authority")
+        errors.append("環境診断が権限を付与している")
     if setup_report.get("installer_silently_approves_permissions") is not False:
-        errors.append("setup doctor silently approves permissions")
+        errors.append("環境診断が権限要求を無言で承認している")
     if any(check.get("grants_authority") is not False for check in setup_report.get("checks", [])):
-        errors.append("setup doctor check grants authority")
+        errors.append("環境診断の検査項目が権限を付与している")
 
     return {
         "ok": not errors,

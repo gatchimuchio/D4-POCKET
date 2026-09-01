@@ -12,45 +12,51 @@ class AuthorityMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final snapshot = client.getSnapshot();
     return ShellPage(
-      title: 'Authority Map',
+      title: '権限対応図',
       children: [
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
             columns: const [
-              DataColumn(label: Text('Runtime')),
-              DataColumn(label: Text('Capability')),
-              DataColumn(label: Text('Permission')),
-              DataColumn(label: Text('Approval')),
-              DataColumn(label: Text('Audit')),
-              DataColumn(label: Text('Recovery')),
-              DataColumn(label: Text('Risk')),
+              DataColumn(label: Text('実行系')),
+              DataColumn(label: Text('能力')),
+              DataColumn(label: Text('許可')),
+              DataColumn(label: Text('承認')),
+              DataColumn(label: Text('監査')),
+              DataColumn(label: Text('復旧')),
+              DataColumn(label: Text('危険度')),
             ],
             rows: [
               for (final item in snapshot.authorityMap)
-                DataRow(cells: [
-                  DataCell(Text(item.runtimeId)),
-                  DataCell(Text(item.capabilityId)),
-                  DataCell(Text(item.permissionId)),
-                  DataCell(Text(item.approvalId)),
-                  DataCell(Text(item.auditEventId)),
-                  DataCell(Text(item.recoveryId)),
-                  DataCell(Text(item.dangerous
-                      ? 'dangerous'
-                      : (item.warning.isEmpty ? 'mapped' : item.warning))),
-                ]),
+                DataRow(
+                  cells: [
+                    DataCell(Text(item.runtimeId)),
+                    DataCell(Text(item.capabilityId)),
+                    DataCell(Text(item.permissionId)),
+                    DataCell(Text(item.approvalId)),
+                    DataCell(Text(item.auditEventId)),
+                    DataCell(Text(item.recoveryId)),
+                    DataCell(
+                      Text(
+                        item.dangerous
+                            ? '危険'
+                            : (item.warning.isEmpty ? '対応済み' : item.warning),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
         const SectionList(
-          title: 'Display Boundary',
+          title: '表示境界',
           rows: [
-            'Authority decisions remain in Shell Core.',
-            'Non-authority source attempts are warnings until Shell Core audit and recovery mappings authorize action.',
+            '権限判断はShell Coreに保持します。',
+            '非権限源からの試行は、Shell Coreの監査と復旧対応が作用を許可するまで警告として扱います。',
           ],
         ),
         SectionList(
-          title: 'Export Preview',
+          title: '書き出し前確認',
           rows: [
             for (final item in snapshot.authorityMap)
               '${item.runtimeId} -> ${item.capabilityId} -> ${item.permissionId} -> ${item.approvalId} -> ${item.auditEventId} -> ${item.recoveryId}',

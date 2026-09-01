@@ -1,17 +1,17 @@
-# Desktop Flutter App
+# デスクトップ Flutter app
 
-Reserved desktop Flutter shell boundary.
+予約されたデスクトップ Flutter shell 境界。
 
 classification: required_for_v1
-reason: desktop Flutter is the replaceable operator UI surface and must remain UI-only.
+reason: デスクトップ Flutter は交換可能な操作者用 UI 表層であり、UI の責任だけに留める。
 blocks_release: no
 
-This app must remain UI-only:
+この app は UI の責任だけに留める。
 
-- render dashboard
-- show runtime status
-- show permission/approval/audit/recovery centers
-- call generated contract clients
-- call adapter/runtime APIs through explicit boundaries
+- 概要画面を描画する
+- runtime 状態を表示する
+- permission、approval、audit、recovery の各センターを表示する
+- 生成済み contract client を呼び出す
+- 明示的な境界を通じて adapter/runtime API を呼び出す
 
-It must not own authority decisions.
+権限判定を所有してはならない。

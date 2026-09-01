@@ -12,31 +12,31 @@ class AgentCenter extends StatelessWidget {
   Widget build(BuildContext context) {
     final sessions = client.getSnapshot().agentSessions;
     return ShellPage(
-      title: 'Agent Center',
+      title: 'エージェントセンター',
       children: [
         for (final session in sessions)
           BorderedPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(session.sessionId,
-                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  session.sessionId,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
-                SectionList(title: 'Workspace', rows: [session.workspace]),
-                SectionList(title: 'Task', rows: [session.task]),
-                SectionList(title: 'Changed Files', rows: session.changedFiles),
-                SectionList(title: 'Tool Calls', rows: session.toolCalls),
+                SectionList(title: '作業領域', rows: [session.workspace]),
+                SectionList(title: 'タスク', rows: [session.task]),
+                SectionList(title: '変更ファイル', rows: session.changedFiles),
+                SectionList(title: '道具呼出し', rows: session.toolCalls),
+                SectionList(title: 'シェルコマンド', rows: session.shellCommands),
+                SectionList(title: '試験状態', rows: [session.testStatus]),
+                SectionList(title: '差分概要', rows: [session.diffSummary]),
                 SectionList(
-                    title: 'Shell Commands', rows: session.shellCommands),
-                SectionList(title: 'Test Status', rows: [session.testStatus]),
-                SectionList(title: 'Diff Summary', rows: [session.diffSummary]),
-                SectionList(
-                    title: 'Pending Approvals',
-                    rows: ['${session.pendingApprovalCount}']),
-                SectionList(
-                    title: 'Rollback Candidate',
-                    rows: [session.rollbackCandidate]),
-                SectionList(title: 'Audit Link', rows: [session.auditEventId]),
+                  title: '保留中の承認',
+                  rows: ['${session.pendingApprovalCount}'],
+                ),
+                SectionList(title: '巻戻し候補', rows: [session.rollbackCandidate]),
+                SectionList(title: '監査リンク', rows: [session.auditEventId]),
               ],
             ),
           ),

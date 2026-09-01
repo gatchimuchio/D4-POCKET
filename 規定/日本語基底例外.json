@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "policy": "規定/00_日本語基底規定.md",
+  "purpose_japanese": "GUI-Shell の日本語基底から外れる必要最小限の領域だけを固定し、既存の非日本語資産を便宜的に例外へ格上げしないための台帳。",
+  "exceptions": [
+    {
+      "id": "JBE-001",
+      "scopes": [
+        "LICENSE"
+      ],
+      "region": "MIT License の法的原文全体",
+      "category": "法的原文",
+      "handling": "exclude_file",
+      "integrity": "sha256",
+      "unavoidable_reason_japanese": "標準ライセンス原文の同一性と外部照合可能性を維持する必要があるため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "ライセンス種別、原文、または配布方法を変更するとき"
+    },
+    {
+      "id": "JBE-002",
+      "scopes": [
+        "**/*.lock",
+        "apps/desktop_flutter/.metadata",
+        "apps/desktop_flutter/lib/models/generated_contracts.dart",
+        "apps/desktop_flutter/linux/**",
+        "apps/desktop_flutter/windows/**",
+        "MANIFEST.sha256.json"
+      ],
+      "region": "依存固定ファイル、Flutter 生成物、コントラクト生成物、整合性 manifest",
+      "category": "生成物・依存固定",
+      "handling": "exclude_file",
+      "integrity": "review_on_change",
+      "unavoidable_reason_japanese": "人間が意味を成立させる正本ではなく、外部 toolchain またはリポジトリ内生成元から機械的に導出されるため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "生成元、生成手順、依存解決、または生成物を直接修正するとき"
+    },
+    {
+      "id": "JBE-003",
+      "scopes": [
+        "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
+        "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
+        "openai_submission_assets/windows_proof_pack/**"
+      ],
+      "region": "成立時点の監査、再現、受入、実機証拠の原文全体",
+      "category": "保存証拠",
+      "handling": "exclude_file",
+      "integrity": "sha256",
+      "unavoidable_reason_japanese": "過去の判断・検証・外部照合に使用した原文を後から翻訳で置き換えると、当時の証拠との同一性が失われるため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "保存形式、証拠検証方法、または現行仕様としての参照方法を変更するとき"
+    },
+    {
+      "id": "JBE-004",
+      "scopes": [
+        "**/*.md",
+        "**/*.dart",
+        "**/*.py",
+        "**/*.rs",
+        "**/*.sh",
+        "**/*.ps1",
+        "**/*.cpp",
+        "**/*.cc",
+        "**/*.h",
+        "**/*.json"
+      ],
+      "region": "Markdown の code fence・inline code、予約語、識別子、パス、CLI 構文、URL、hash、JSON キー、protocol 固定値",
+      "category": "機械構文・外部互換",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "unavoidable_reason_japanese": "プログラム構文、外部 API、protocol、CLI、ファイル形式、検索・監査再現性との互換を維持する必要があるため。この例外は周囲の人間向け説明まで除外しない。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "検出対象言語、外部互換面、または機械領域の除外ロジックを変更するとき"
+    },
+    {
+      "id": "JBE-005",
+      "scopes": [
+        "**/*.md",
+        "**/*.dart",
+        "**/*.py",
+        "**/*.rs",
+        "**/*.sh",
+        "**/*.ps1",
+        "**/*.cpp",
+        "**/*.cc",
+        "**/*.h",
+        "**/*.json"
+      ],
+      "region": "外部製品名、言語名、OS 名、標準名などの固有名・固定表記のみ",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "GUI Shell",
+        "GUI-Shell",
+        "Runtime Operation Shell",
+        "Shell Core",
+        "BLUE-TANUKI",
+        "Flutter",
+        "Dart",
+        "Rust",
+        "Python",
+        "JSON Schema",
+        "Windows",
+        "Linux",
+        "macOS",
+        "GitHub",
+        "OpenAI",
+        "Codex",
+        "PowerShell",
+        "WebSocket",
+        "Cargo",
+        "pubspec",
+        "LLM",
+        "IPC",
+        "API",
+        "CLI",
+        "URL",
+        "SHA-256",
+        "WSL",
+        "WSLg",
+        "Tauri",
+        "Electron",
+        "Material",
+        "Rust helper"
+      ],
+      "unavoidable_reason_japanese": "外部で識別・検索・互換に使われる固有名と固定表記は維持する必要があるため。固有名の周囲にある意味、境界、採否、検証は日本語基底の対象のままとする。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "固有名を追加するとき、または固有名が人間向け規範文を隠すと判明したとき"
+    },
+    {
+      "id": "JBE-006",
+      "scopes": [
+        "**/*.md",
+        "**/*.py",
+        "**/*.rs",
+        "**/*.sh",
+        "**/*.ps1",
+        "**/*.cpp",
+        "**/*.cc",
+        "**/*.h",
+        "**/*.json"
+      ],
+      "region": "既存公開契約と適合検査面の固定識別名のみ。Dart の利用者向け表示は対象外",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "Adapter Contract",
+        "Authority Strip Conformance",
+        "Content Exposure Boundary",
+        "FrameworkRiskProfile",
+        "Capability",
+        "Permission",
+        "Approval",
+        "AuditEvent",
+        "RecoveryAction"
+      ],
+      "unavoidable_reason_japanese": "公開契約識別子、適合検査名、Schema 参照名との同一性を維持するため。利用者向けの画面表示や、識別名の周囲にある診断・責任説明は除外しない。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "公開契約識別子を追加・改名するとき、または表示文字列へ例外が漏れると判明したとき"
+    }
+  ],
+  "frozen_assets": [
+    {
+      "path": "LICENSE",
+      "sha256": "44b5106631e1551b963c767d73ad38949c6890e47b9a17e6543546cfadf64f96",
+      "exception_id": "JBE-001"
+    },
+    {
+      "path": "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
+      "sha256": "4b22a92df9d020dc5768bf704b5d3aa67e1153de85a4351ffe2cecadc8cbbddd",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
+      "sha256": "4ffe5044eba54e281aaecd41ffe5b64b51e75e33d0dbec18c6d7cbf9df7e123e",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/00_WINDOWS_PROOF_INDEX.md",
+      "sha256": "13d2f8743c314b51bc5f2b253940fd4f5cdca9bd42ae164ec454a256163aee5c",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/EVIDENCE_HASHES.txt",
+      "sha256": "4d6a34f0538462a022be894e854bfef0f390b9594251e83de157d844f937ce8e",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/audit_anchor_external_tamper_evidence.json",
+      "sha256": "21b0a4ebe9d11cec0d89a9604a7b4b2bbc3582e63bdb908a6b5953d4f48151fb",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/release_runtime_assertions.json",
+      "sha256": "587659d05ddc3d416f85f744b4850481dfdbc26ab0023d9b2537670cb47bb511",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_context.json",
+      "sha256": "6cf76c0044263bbbf3f452920b94dfd3418ae75694da3c0d02638b627c223039",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/setup_doctor_installed.json",
+      "sha256": "2b610ff480e54a2fdb93d348d1b40abe7b57b64973cfe54300df7fde95ec2b74",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/surface_semantics_export.json",
+      "sha256": "1e63388f2eb5d991e7127717874e60be7317d0d696a87e473d8070d34d52c8c3",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/visible_surfaces_collected.json",
+      "sha256": "639078d5f16d7bd25ecb50bc3f57c4ee38049076f7163c04579b7bac23bf2e6e",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_broker_smoke.json",
+      "sha256": "c4950fa9fa16d57fd423798a287931e762b36a9e84b37c43a20040c4512d8ae6",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/evidence_copies/windows_installed_smoke.json",
+      "sha256": "dd34bb8a50481350255dae4b5ea401c3df7b4cb900be2ee464a6901378b284d5",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/hashes/artifact_hashes.txt",
+      "sha256": "25faa52e2cb5a85a4c8a418bb7c422834fb3a4dcf163175873892bee96c4a93d",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/build_validation.log",
+      "sha256": "cbc83c86483c1fbb817659e37682259ead97a0a2e44dbf328639fa33453e871a",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/validation.log",
+      "sha256": "ec2b77d928a46df007f1953aed4fe1138074a0a2409ff785717468ca4af44a0d",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/logs/windows_environment.log",
+      "sha256": "90047fe22a5b3eaa6b32bfaf9c2b65ecc6ef3454ff18c3cf31095a3bbdcd59fe",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/notes/repo_state.txt",
+      "sha256": "03787c755b21b764d73671741de78ebe5238ec1ea36564a8adfee10cb42e3742",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/01_main_window.png",
+      "sha256": "7f6170c3a4d0be003b7692ae0e866f56e402e98837d8976f8d19405cd9c7f1ce",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/02_setup_doctor_or_status.png",
+      "sha256": "7f6170c3a4d0be003b7692ae0e866f56e402e98837d8976f8d19405cd9c7f1ce",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/03_validation_pass.png",
+      "sha256": "00b6219a3a4343377557605e39f922c48abb44661abc957590ca07b275381a9d",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/04_strict_release_owner_go_only.png",
+      "sha256": "b0939af74eff8bdcc7fa9eb25a7c6561a9f633d6ad7330620a878c6105220c43",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/05_windows_build_artifact.png",
+      "sha256": "df10c10ab47356294c03e78c328d752639f05b5535af8b8d8306d45b559834d8",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/06_release_evidence_files.png",
+      "sha256": "b53b4f00db4ffbdfe92484402501e3b44eb0a7fa6e11d87311c13aed8bdef5c4",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/07_flutter_build_success.png",
+      "sha256": "91e0187a21bebd6d52cf69d75b51600fe40665821f46751b4d22a2d6ac8b9221",
+      "exception_id": "JBE-003"
+    },
+    {
+      "path": "openai_submission_assets/windows_proof_pack/screenshots/08_cargo_test_success.png",
+      "sha256": "14a54d853dc03aaa1e992b072d484de01c38117144b35e4d415cfbca73acd40d",
+      "exception_id": "JBE-003"
+    }
+  ]
+}

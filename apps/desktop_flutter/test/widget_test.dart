@@ -32,18 +32,17 @@ void main() {
     );
   }
 
-  testWidgets('GUI Shell desktop app smoke test', (WidgetTester tester) async {
+  testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.text('Dashboard'), findsWidgets);
-    expect(find.text('Trust'), findsOneWidget);
-    expect(find.text('Authority'), findsOneWidget);
+    expect(find.text('概要'), findsWidgets);
+    expect(find.text('信頼'), findsOneWidget);
+    expect(find.text('権限'), findsOneWidget);
   });
 
-  testWidgets('GUI Shell desktop app has product baseline shell chrome',
-      (WidgetTester tester) async {
+  testWidgets('GUI Shellデスクトップアプリが製品基準の外枠を持つ', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
@@ -54,8 +53,7 @@ void main() {
     expect(find.byType(GuiShellFatalErrorScreen), findsNothing);
   });
 
-  testWidgets('Windows acceptance surfaces expose semantic labels',
-      (WidgetTester tester) async {
+  testWidgets('Windows受入画面が意味ラベルを公開する', (WidgetTester tester) async {
     final semantics = tester.ensureSemantics();
     SurfaceSemanticsRegistry.resetForTest();
     try {
@@ -69,10 +67,10 @@ void main() {
       ]) {
         expect(findSurfaceSemanticsIdentifier(label), findsOneWidget);
       }
-      expect(find.bySemanticsLabel(RegExp('Dashboard')), findsWidgets);
-      expect(find.bySemanticsLabel(RegExp('NavigationRail')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('Runtime Status')), findsWidgets);
-      expect(find.bySemanticsLabel(RegExp('Invariant Status')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('概要')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('ナビゲーション')), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('実行系状態')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('不変条件状態')), findsWidgets);
       final export = buildSurfaceSemanticsExport(path: 'surface.json');
       expect(export['source'], 'flutter_semantics_runtime_export');
       expect(export['path'], 'surface.json');
@@ -87,22 +85,19 @@ void main() {
     }
   });
 
-  testWidgets('Dashboard shows Phase A complete and Phase B complete',
-      (WidgetTester tester) async {
+  testWidgets('概要画面が段階Aと段階Bの完了状態を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: Dashboard(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.textContaining('Phase A: complete'), findsOneWidget);
-    expect(find.textContaining('Phase B: complete'), findsOneWidget);
-    expect(find.textContaining('Completed product release: not claimed'),
-        findsOneWidget);
+    expect(find.textContaining('段階A: complete'), findsOneWidget);
+    expect(find.textContaining('段階B: complete'), findsOneWidget);
+    expect(find.textContaining('完成製品リリース: 未主張'), findsOneWidget);
   });
 
-  testWidgets('Status bar shows Phase B owner-use and release not claimed',
-      (WidgetTester tester) async {
+  testWidgets('状態バーが段階Bの所有者利用とリリース未主張を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -111,12 +106,11 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('Phase: B owner-use'), findsOneWidget);
-    expect(find.textContaining('Release: not claimed'), findsOneWidget);
+    expect(find.textContaining('段階: B 所有者利用'), findsOneWidget);
+    expect(find.textContaining('リリース: not claimed'), findsOneWidget);
   });
 
-  testWidgets('Command palette searches and navigates',
-      (WidgetTester tester) async {
+  testWidgets('コマンドパレットが検索して移動する', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
@@ -124,41 +118,43 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'problems');
+    await tester.enterText(find.byType(TextField), '問題');
     await tester.pumpAndSettle();
-    expect(find.text('Open Problems Panel'), findsOneWidget);
-    await tester.tap(find.text('Open Problems Panel'));
+    expect(find.text('問題一覧を開く'), findsOneWidget);
+    await tester.tap(find.text('問題一覧を開く'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Problems Panel'), findsWidgets);
+    expect(find.text('問題一覧'), findsWidgets);
   });
 
-  testWidgets('Problems panel shows release blockers without Phase B failure',
-      (WidgetTester tester) async {
+  testWidgets('問題一覧が段階Bを失敗扱いにせずリリース遮断要因を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: ProblemsPanel(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Problems Panel'), findsOneWidget);
-    expect(find.textContaining('measured Windows installed-path first-run'),
-        findsOneWidget);
+    expect(find.text('問題一覧'), findsOneWidget);
+    expect(
+      find.textContaining('Windowsインストール先の初回起動実測証拠なし'),
+      findsOneWidget,
+    );
     expect(find.textContaining('release_blocker'), findsWidgets);
-    expect(find.text('Recovery'), findsOneWidget);
-    expect(find.text('Blocks Owner Use'), findsOneWidget);
-    expect(find.text('Blocks Product Release'), findsOneWidget);
+    expect(find.text('復旧'), findsOneWidget);
+    expect(find.text('所有者利用を遮断'), findsOneWidget);
+    expect(find.text('製品リリースを遮断'), findsOneWidget);
     expect(find.textContaining('recover-windows-evidence'), findsWidgets);
-    expect(find.textContaining('release_evidence/windows_installed_smoke.json'),
-        findsWidgets);
-    expect(find.textContaining('without making Phase B owner-use fail'),
-        findsOneWidget);
+    expect(
+      find.textContaining('release_evidence/windows_installed_smoke.json'),
+      findsWidgets,
+    );
+    expect(find.textContaining('段階Bの所有者利用を失敗扱いにせず'), findsOneWidget);
   });
 
-  testWidgets('Evidence center shows strict Windows expected failure',
-      (WidgetTester tester) async {
-    final releaseEvidence =
-        File('release_evidence/windows_installed_smoke.json');
+  testWidgets('証拠センターがWindows厳格検証の予期された失敗を表示する', (WidgetTester tester) async {
+    final releaseEvidence = File(
+      'release_evidence/windows_installed_smoke.json',
+    );
     final existedBefore = releaseEvidence.existsSync();
     await tester.pumpWidget(
       MaterialApp(
@@ -166,57 +162,56 @@ void main() {
       ),
     );
 
-    expect(find.text('Evidence Center'), findsOneWidget);
-    expect(find.textContaining('strict_windows_release: expected fail'),
-        findsOneWidget);
+    expect(find.text('証拠センター'), findsOneWidget);
     expect(
-        find.textContaining(
-            'missing measured Windows evidence: release_blocker'),
-        findsOneWidget);
+      find.textContaining('strict_windows_release: expected fail'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Windows実測証拠の不足: release_blocker'),
+      findsOneWidget,
+    );
     expect(releaseEvidence.existsSync(), existedBefore);
   });
 
-  testWidgets(
-      'Evidence center exposes display-only export and snapshot compare',
-      (WidgetTester tester) async {
+  testWidgets('証拠センターが表示専用の書出しとスナップショット比較を提供する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: EvidenceCenter(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Evidence Bundle Export'), findsOneWidget);
-    expect(find.text('Snapshot Import / Export'), findsOneWidget);
-    expect(find.text('Copy Validation Summary'), findsOneWidget);
-    expect(find.text('Preview Import / Compare'), findsOneWidget);
+    expect(find.text('証拠束の書き出し'), findsOneWidget);
+    expect(find.text('スナップショットの読込み／書出し'), findsOneWidget);
+    expect(find.text('検証概要をコピー'), findsOneWidget);
+    expect(find.text('読込み前確認／比較'), findsOneWidget);
   });
 
-  testWidgets('Recovery playbook marks Windows evidence safe for Phase B',
-      (WidgetTester tester) async {
+  testWidgets('復旧手順がWindows証拠を段階Bで継続可能と表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: RecoveryCenter(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Recovery Playbook'), findsOneWidget);
+    expect(find.text('復旧手順'), findsOneWidget);
     expect(
-        find.textContaining('measured Windows installed-path evidence missing'),
-        findsOneWidget);
-    expect(find.textContaining('true'), findsWidgets);
-    expect(find.text('Command'), findsOneWidget);
-    expect(find.text('Path'), findsOneWidget);
+      find.textContaining('Windowsインストール先の実測証拠なし'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('はい'), findsWidgets);
+    expect(find.text('コマンド'), findsOneWidget);
+    expect(find.text('パス'), findsOneWidget);
   });
 
-  testWidgets('Settings screen searches and filters phase release settings',
-      (WidgetTester tester) async {
+  testWidgets('設定画面が段階／リリース設定を検索して絞り込む', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SettingsScreen(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('設定'), findsWidgets);
     await tester.enterText(find.byType(TextField), 'release');
     await tester.pumpAndSettle();
 
@@ -224,17 +219,16 @@ void main() {
     expect(find.textContaining('not claimed'), findsWidgets);
   });
 
-  testWidgets('Trust and Authority surfaces are restored',
-      (WidgetTester tester) async {
+  testWidgets('信頼画面と権限画面が利用可能である', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: TrustCenter(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Trust Center'), findsOneWidget);
+    expect(find.text('信頼センター'), findsOneWidget);
     expect(find.textContaining('workspace_trust'), findsOneWidget);
-    expect(find.textContaining('Shell Core capability'), findsOneWidget);
+    expect(find.textContaining('Shell Coreの能力'), findsOneWidget);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -242,23 +236,21 @@ void main() {
       ),
     );
 
-    expect(find.text('Authority Map'), findsOneWidget);
+    expect(find.text('権限対応図'), findsOneWidget);
     expect(find.textContaining('filesystem.write'), findsWidgets);
-    expect(find.textContaining('Authority decisions remain in Shell Core'),
-        findsOneWidget);
+    expect(find.textContaining('権限判断はShell Coreに保持'), findsOneWidget);
   });
 
-  testWidgets('Runtime detail pane and audit filters are visible',
-      (WidgetTester tester) async {
+  testWidgets('実行系詳細と監査絞込みが表示される', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: RuntimeCenter(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Runtime Detail'), findsOneWidget);
-    expect(find.textContaining('runtime_id: blue_tanuki'), findsOneWidget);
-    expect(find.textContaining('capabilities:'), findsOneWidget);
+    expect(find.text('実行系の詳細'), findsOneWidget);
+    expect(find.textContaining('実行系ID: blue_tanuki'), findsOneWidget);
+    expect(find.text('能力: filesystem.write'), findsOneWidget);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -266,12 +258,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Audit Timeline Filters'), findsOneWidget);
-    expect(find.textContaining('hash_chain_status'), findsOneWidget);
-    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('監査時系列の絞込み'), findsOneWidget);
+    expect(find.textContaining('ハッシュ鎖状態'), findsOneWidget);
+    expect(find.text('コピー'), findsOneWidget);
   });
 
-  test('Setup Doctor client surface is structured and non-authoritative', () {
+  test('環境診断のクライアント面が構造化され権限を持たない', () {
     final snapshot = ShellCoreClient.local().getSnapshot();
 
     expect(ShellCoreClient.local().mode, 'local');
@@ -285,12 +277,12 @@ void main() {
     );
   });
 
-  test('product client renders broker-mediated authority snapshot', () async {
+  test('製品クライアントがブローカー経由の権限スナップショットを描画する', () async {
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
-        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'}
+        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
       }),
       _brokerAcceptedBody('approval_edit', {
         'ok': false,
@@ -311,26 +303,33 @@ void main() {
     expect(snapshot.pendingApprovals, isEmpty);
     expect(snapshot.authorityMap, isEmpty);
     expect(
-      snapshot.evidence.any((record) =>
-          record.evidenceId == 'broker-redacted-projection-probe' &&
-          record.status == 'pass'),
+      snapshot.evidence.any(
+        (record) =>
+            record.evidenceId == 'broker-redacted-projection-probe' &&
+            record.status == 'pass',
+      ),
       isTrue,
     );
     expect(
-      snapshot.setupDoctorChecks.any((check) =>
-          check.checkId == 'broker.protected_field_edit' &&
-          check.status == 'pass'),
-      isTrue,
-    );
-    expect(
-      snapshot.problems.any((problem) =>
-          problem.item == 'broker command dispatch suspended' &&
-          problem.classification == 'release_blocker'),
+      snapshot.setupDoctorChecks.any(
+        (check) =>
+            check.checkId == 'broker.protected_field_edit' &&
+            check.status == 'pass',
+      ),
       isTrue,
     );
     expect(
       snapshot.problems.any(
-          (problem) => problem.requiredAction.toLowerCase().contains('python')),
+        (problem) =>
+            problem.problemId == 'broker-command-dispatch-suspended' &&
+            problem.classification == 'release_blocker',
+      ),
+      isTrue,
+    );
+    expect(
+      snapshot.problems.any(
+        (problem) => problem.requiredAction.toLowerCase().contains('python'),
+      ),
       isFalse,
     );
     expect(transport.operations, [
@@ -342,7 +341,7 @@ void main() {
     ]);
   });
 
-  test('product client fails closed when broker is unavailable', () async {
+  test('ブローカー利用不可時に製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: const _FailingBrokerTransport('broker unavailable'),
     );
@@ -356,12 +355,14 @@ void main() {
     expect(snapshot.problems.single.classification, 'release_blocker');
     expect(snapshot.problems.single.blocksRelease, isTrue);
     expect(
-        snapshot.setupDoctorChecks
-            .where((check) => check.checkId == 'broker.fail_closed'),
-        isNotEmpty);
+      snapshot.setupDoctorChecks.where(
+        (check) => check.checkId == 'broker.fail_closed',
+      ),
+      isNotEmpty,
+    );
   });
 
-  test('product client fails closed on authentication rejection', () async {
+  test('認証拒否時に製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
         _brokerRejectedResponse(
@@ -376,7 +377,7 @@ void main() {
     expect(client.getSnapshot().operationStatus.runtimeStatus, 'suspend');
   });
 
-  test('product client fails closed on stale broker session', () async {
+  test('期限切れブローカーセッションで製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
         _brokerHealthResponse(),
@@ -392,7 +393,7 @@ void main() {
     expect(client.getSnapshot().operationStatus.trustStatus, 'blocked');
   });
 
-  test('product client fails closed on malformed broker response', () async {
+  test('不正なブローカー応答で製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
         {'status': 'accepted', 'operation': 'health'},
@@ -403,55 +404,56 @@ void main() {
     expect(client.getSnapshot().snapshotSource, 'broker_unavailable');
   });
 
-  testWidgets('Setup Doctor shows lightweight environment snapshot',
-      (WidgetTester tester) async {
+  testWidgets('環境診断が軽量な環境スナップショットを表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SetupDoctor(client: ShellCoreClient.mock())),
       ),
     );
 
-    expect(find.text('Environment Snapshot'), findsOneWidget);
-    expect(find.textContaining('network_exposure:'), findsOneWidget);
-    expect(find.textContaining('config/snapshot path:'), findsOneWidget);
+    expect(find.text('環境スナップショット'), findsOneWidget);
+    expect(find.textContaining('ネットワーク公開範囲:'), findsOneWidget);
+    expect(find.textContaining('設定／スナップショットのパス:'), findsOneWidget);
   });
 
-  test('local client reads structured snapshot data', () {
+  test('ローカルクライアントが構造化スナップショットを読む', () {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-test-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final snapshotFile = File('${tempDir.path}/shell_snapshot.json');
-    snapshotFile.writeAsStringSync(jsonEncode({
-      'runtimes': [
-        {
-          'runtime_id': 'runtime-from-json',
-          'name': 'Runtime From Json',
-          'status': 'ready',
-          'adapter_id': 'adapter-from-json',
-          'diagnostic_summary': 'loaded from local snapshot'
-        }
-      ],
-      'agent_sessions': [],
-      'permissions': [],
-      'pending_approvals': [],
-      'audit_events': [],
-      'recovery_actions': [],
-      'invariant_flags': {
-        'flutter_imported_by_shell_core': true,
-        'blue_tanuki_imported_by_shell_core': false
-      },
-      'setup_doctor_status': 'pass',
-      'installer_grants_authority': false,
-      'installer_silently_approves_permissions': false,
-      'setup_doctor_checks': [
-        {
-          'check_id': 'local.json',
-          'status': 'pass',
-          'message': 'Loaded local diagnostic JSON',
-          'recovery_instruction': null,
-          'grants_authority': false
-        }
-      ]
-    }));
+    snapshotFile.writeAsStringSync(
+      jsonEncode({
+        'runtimes': [
+          {
+            'runtime_id': 'runtime-from-json',
+            'name': 'Runtime From Json',
+            'status': 'ready',
+            'adapter_id': 'adapter-from-json',
+            'diagnostic_summary': 'loaded from local snapshot',
+          },
+        ],
+        'agent_sessions': [],
+        'permissions': [],
+        'pending_approvals': [],
+        'audit_events': [],
+        'recovery_actions': [],
+        'invariant_flags': {
+          'flutter_imported_by_shell_core': true,
+          'blue_tanuki_imported_by_shell_core': false,
+        },
+        'setup_doctor_status': 'pass',
+        'installer_grants_authority': false,
+        'installer_silently_approves_permissions': false,
+        'setup_doctor_checks': [
+          {
+            'check_id': 'local.json',
+            'status': 'pass',
+            'message': 'Loaded local diagnostic JSON',
+            'recovery_instruction': null,
+            'grants_authority': false,
+          },
+        ],
+      }),
+    );
 
     final client = ShellCoreClient.local(snapshotPath: snapshotFile.path);
     final snapshot = client.getSnapshot();
@@ -464,7 +466,7 @@ void main() {
     expect(snapshot.operationStatus.releaseState, 'not claimed');
   });
 
-  test('Setup Doctor product export is formal app-generated evidence', () {
+  test('環境診断の製品書出しが正式なアプリ生成証拠である', () {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-export-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final configFile = File('${tempDir.path}/gui_shell.json')
@@ -506,8 +508,7 @@ void main() {
     );
   });
 
-  test('Setup Doctor product export creates installed first-run config',
-      () async {
+  test('環境診断の製品書出しがインストール後初回設定を作成する', () async {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-export-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final exportFile = File('${tempDir.path}/setup_doctor.json');
@@ -516,14 +517,16 @@ void main() {
     final auditDir = Directory('${tempDir.path}/audit')..createSync();
     const exePath =
         r'C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-1\app\gui_shell_desktop.exe';
-    await contextFile.writeAsString(jsonEncode({
-      'installed_app_path': exePath,
-      'installed_app_path_confirmed': true,
-      'app_artifact_sha256': 'sha256:${List.filled(64, '1').join()}',
-      'config_path': configFile.path,
-      'audit_dir': auditDir.path,
-      'restricted_loopback_bind': true,
-    }));
+    await contextFile.writeAsString(
+      jsonEncode({
+        'installed_app_path': exePath,
+        'installed_app_path_confirmed': true,
+        'app_artifact_sha256': 'sha256:${List.filled(64, '1').join()}',
+        'config_path': configFile.path,
+        'audit_dir': auditDir.path,
+        'restricted_loopback_bind': true,
+      }),
+    );
 
     await writeSetupDoctorProductExportIfRequested(
       ShellCoreClient.mock().getSnapshot(),
@@ -549,75 +552,83 @@ void main() {
     expect(configCheck['status'], 'pass');
   });
 
-  test('local snapshot fallback does not claim release-ready', () {
+  test('ローカルスナップショットの代替処理がリリース準備完了を主張しない', () {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-missing-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final missingPath = '${tempDir.path}/missing_snapshot.json';
 
-    final snapshot =
-        ShellCoreClient.local(snapshotPath: missingPath).getSnapshot();
+    final snapshot = ShellCoreClient.local(
+      snapshotPath: missingPath,
+    ).getSnapshot();
 
     expect(snapshot.snapshotSource, 'fallback');
     expect(snapshot.snapshotFreshness, 'missing');
     expect(snapshot.operationStatus.releaseState, 'not claimed');
     expect(
-        snapshot.problems
-            .any((problem) => problem.item == 'local snapshot missing'),
-        isTrue);
+      snapshot.problems.any(
+        (problem) => problem.problemId == 'local-snapshot-missing',
+      ),
+      isTrue,
+    );
   });
 
-  test('local snapshot parse failure falls back safely', () {
+  test('ローカルスナップショットの解析失敗が安全に代替処理へ移る', () {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-bad-json-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final snapshotFile = File('${tempDir.path}/bad_snapshot.json')
       ..writeAsStringSync('{bad json');
 
-    final snapshot =
-        ShellCoreClient.local(snapshotPath: snapshotFile.path).getSnapshot();
+    final snapshot = ShellCoreClient.local(
+      snapshotPath: snapshotFile.path,
+    ).getSnapshot();
 
     expect(snapshot.snapshotSource, 'fallback');
     expect(snapshot.snapshotFreshness, 'parse failed');
+    expect(snapshotAgeLabel(snapshot), '解析失敗');
     expect(snapshot.operationStatus.releaseState, 'not claimed');
     expect(
-        snapshot.problems
-            .any((problem) => problem.item == 'local snapshot parse failed'),
-        isTrue);
+      snapshot.problems.any(
+        (problem) => problem.problemId == 'local-snapshot-parse-failed',
+      ),
+      isTrue,
+    );
   });
 
-  testWidgets('Setup Doctor UI displays local diagnostic data',
-      (WidgetTester tester) async {
+  testWidgets('環境診断UIがローカル診断データを表示する', (WidgetTester tester) async {
     final tempDir = Directory.systemTemp.createTempSync('gui-shell-ui-test-');
     addTearDown(() => tempDir.deleteSync(recursive: true));
     final snapshotFile = File('${tempDir.path}/shell_snapshot.json');
-    snapshotFile.writeAsStringSync(jsonEncode({
-      'runtimes': [
-        {
-          'runtime_id': 'runtime-ui-json',
-          'name': 'Runtime UI Json',
-          'status': 'ready',
-          'adapter_id': 'adapter-ui-json',
-          'diagnostic_summary': 'loaded from local snapshot'
-        }
-      ],
-      'agent_sessions': [],
-      'permissions': [],
-      'pending_approvals': [],
-      'audit_events': [],
-      'recovery_actions': [],
-      'invariant_flags': {},
-      'setup_doctor_status': 'pass',
-      'installer_grants_authority': false,
-      'installer_silently_approves_permissions': false,
-      'setup_doctor_checks': [
-        {
-          'check_id': 'local.ui',
-          'status': 'pass',
-          'message': 'UI loaded local diagnostic JSON',
-          'recovery_instruction': null,
-          'grants_authority': false
-        }
-      ]
-    }));
+    snapshotFile.writeAsStringSync(
+      jsonEncode({
+        'runtimes': [
+          {
+            'runtime_id': 'runtime-ui-json',
+            'name': 'Runtime UI Json',
+            'status': 'ready',
+            'adapter_id': 'adapter-ui-json',
+            'diagnostic_summary': 'loaded from local snapshot',
+          },
+        ],
+        'agent_sessions': [],
+        'permissions': [],
+        'pending_approvals': [],
+        'audit_events': [],
+        'recovery_actions': [],
+        'invariant_flags': {},
+        'setup_doctor_status': 'pass',
+        'installer_grants_authority': false,
+        'installer_silently_approves_permissions': false,
+        'setup_doctor_checks': [
+          {
+            'check_id': 'local.ui',
+            'status': 'pass',
+            'message': 'UI loaded local diagnostic JSON',
+            'recovery_instruction': null,
+            'grants_authority': false,
+          },
+        ],
+      }),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -631,15 +642,14 @@ void main() {
     expect(find.textContaining('runtime-ui-json: ready'), findsOneWidget);
   });
 
-  testWidgets('Approval Center does not expose hidden full payload',
-      (WidgetTester tester) async {
+  testWidgets('承認センターが非表示の完全内容を公開しない', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: ApprovalCenter(client: ShellCoreClient.local())),
       ),
     );
 
-    expect(find.textContaining('Visibility: redacted'), findsOneWidget);
+    expect(find.textContaining('可視性: redacted'), findsOneWidget);
     expect(find.textContaining('[redacted]'), findsOneWidget);
     expect(find.textContaining('hello'), findsNothing);
   });
@@ -658,7 +668,7 @@ class _FakeBrokerTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     if (_responses.isEmpty) {
-      throw BrokerClientException('no fake broker response for $operation');
+      throw BrokerClientException('$operation 用の fake broker 応答がありません');
     }
     return _responses.removeAt(0);
   }

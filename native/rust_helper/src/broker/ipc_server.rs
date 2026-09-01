@@ -61,13 +61,13 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
 
     let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), config.port);
     let listener = TcpListener::bind(bind_addr)
-        .map_err(|error| BrokerServerError::new(format!("failed to bind broker IPC: {error}")))?;
+        .map_err(|error| BrokerServerError::new(format!("broker IPCのbindに失敗: {error}")))?;
     let local_addr = listener.local_addr().map_err(|error| {
-        BrokerServerError::new(format!("failed to read broker IPC addr: {error}"))
+            BrokerServerError::new(format!("broker IPC addrの読取りに失敗: {error}"))
     })?;
     if local_addr.ip() != IpAddr::V4(Ipv4Addr::LOCALHOST) {
         return Err(BrokerServerError::new(
-            "broker IPC refused to expose a non-loopback bind address",
+            "broker IPCはloopback以外のbind address露出を拒否した",
         ));
     }
 
@@ -106,17 +106,17 @@ fn handle_stream(
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| {
-            BrokerServerError::new(format!("failed to set IPC read timeout: {error}"))
+            BrokerServerError::new(format!("IPC read timeoutの設定に失敗: {error}"))
         })?;
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| {
-            BrokerServerError::new(format!("failed to set IPC write timeout: {error}"))
+            BrokerServerError::new(format!("IPC write timeoutの設定に失敗: {error}"))
         })?;
 
     let mut reader =
         BufReader::new(stream.try_clone().map_err(|error| {
-            BrokerServerError::new(format!("failed to clone IPC stream: {error}"))
+            BrokerServerError::new(format!("IPC streamのcloneに失敗: {error}"))
         })?);
 
     let auth_line = match read_limited_line(&mut reader, AUTH_LINE_MAX_BYTES) {
@@ -188,7 +188,7 @@ fn read_limited_line(
     let mut buffer = Vec::new();
     loop {
         let available = reader.fill_buf().map_err(|error| {
-            IpcLineError::Io(format!("failed to read broker IPC line: {error}"))
+            IpcLineError::Io(format!("broker IPC lineの読取りに失敗: {error}"))
         })?;
         if available.is_empty() {
             if buffer.is_empty() {
@@ -217,7 +217,7 @@ fn read_limited_line(
     }
     String::from_utf8(buffer)
         .map(Some)
-        .map_err(|error| IpcLineError::Io(format!("broker IPC line is not UTF-8: {error}")))
+        .map_err(|error| IpcLineError::Io(format!("broker IPC lineがUTF-8ではない: {error}")))
 }
 
 fn write_response(
@@ -225,19 +225,19 @@ fn write_response(
     response: &BrokerResponse,
 ) -> Result<(), BrokerServerError> {
     let encoded = response.to_json_string().map_err(|error| {
-        BrokerServerError::new(format!("failed to encode broker response: {error}"))
+        BrokerServerError::new(format!("broker responseのencodeに失敗: {error}"))
     })?;
     stream
         .write_all(encoded.as_bytes())
         .and_then(|_| stream.write_all(b"\n"))
         .map_err(|error| {
-            BrokerServerError::new(format!("failed to write broker response: {error}"))
+        BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
         })
 }
 
 fn write_endpoint_file(path: &PathBuf, endpoint: &BrokerEndpoint) -> Result<(), BrokerServerError> {
     let encoded = serde_json::to_string(endpoint).map_err(|error| {
-        BrokerServerError::new(format!("failed to encode broker endpoint: {error}"))
+        BrokerServerError::new(format!("broker endpointのencodeに失敗: {error}"))
     })?;
     let temporary_path = path.with_extension("json.tmp");
     {
@@ -249,24 +249,24 @@ fn write_endpoint_file(path: &PathBuf, endpoint: &BrokerEndpoint) -> Result<(), 
             options.mode(0o600);
         }
         let mut file = options.open(&temporary_path).map_err(|error| {
-            BrokerServerError::new(format!("failed to create broker endpoint file: {error}"))
+        BrokerServerError::new(format!("broker endpoint fileの作成に失敗: {error}"))
         })?;
         file.write_all(encoded.as_bytes()).map_err(|error| {
-            BrokerServerError::new(format!("failed to write broker endpoint file: {error}"))
+        BrokerServerError::new(format!("broker endpoint fileの書込みに失敗: {error}"))
         })?;
         file.sync_data().map_err(|error| {
-            BrokerServerError::new(format!("failed to sync broker endpoint file: {error}"))
+        BrokerServerError::new(format!("broker endpoint fileのsyncに失敗: {error}"))
         })?;
     }
     std::fs::rename(&temporary_path, path).map_err(|error| {
-        BrokerServerError::new(format!("failed to commit broker endpoint file: {error}"))
+        BrokerServerError::new(format!("broker endpoint fileのcommitに失敗: {error}"))
     })
 }
 
 fn random_hex(byte_count: usize) -> Result<String, BrokerServerError> {
     let mut bytes = vec![0u8; byte_count];
     getrandom::getrandom(&mut bytes).map_err(|error| {
-        BrokerServerError::new(format!("failed to generate broker secret: {error}"))
+        BrokerServerError::new(format!("broker secretの生成に失敗: {error}"))
     })?;
     Ok(hex::encode(bytes))
 }

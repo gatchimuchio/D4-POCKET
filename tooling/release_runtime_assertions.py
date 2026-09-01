@@ -71,7 +71,7 @@ def _scan_files(paths: list[Path], tokens: list[str]) -> list[str]:
         text = path.read_text(encoding="utf-8")
         for token in tokens:
             if token in text:
-                findings.append(f"{path.relative_to(ROOT).as_posix()} contains {token}")
+                findings.append(f"{path.relative_to(ROOT).as_posix()} が{token}を含む")
     return findings
 
 
@@ -85,21 +85,21 @@ def assert_flutter_product_entry_uses_broker() -> RuntimeAssertion:
         return _fail(
             "flutter_product_entry_uses_broker",
             "CONFIG",
-            "apps/desktop_flutter/lib/main.dart does not call ShellCoreClient.product() in the product entry path.",
-            "Route product startup through ShellCoreClient.product() before release validation.",
+            "apps/desktop_flutter/lib/main.dartが製品entry pathでShellCoreClient.product()を呼び出していない。",
+            "release validationの前に製品起動をShellCoreClient.product()経由にする。",
         )
     if "ShellCoreClient.local(" in main:
         return _fail(
             "flutter_product_entry_uses_broker",
             "CONFIG",
-            "apps/desktop_flutter/lib/main.dart still references ShellCoreClient.local() in product startup code.",
-            "Remove local snapshot authority use from product startup.",
+            "apps/desktop_flutter/lib/main.dartの製品起動codeがまだShellCoreClient.local()を参照している。",
+            "製品起動からlocal snapshotのauthority利用を除去する。",
         )
     return _pass(
         "flutter_product_entry_uses_broker",
         "CONFIG",
-        "Product main.dart initializes ShellCoreClient.product() and does not reference ShellCoreClient.local().",
-        "Keep product startup on the broker-mediated client.",
+        "製品のmain.dartがShellCoreClient.product()を初期化し、ShellCoreClient.local()を参照していない。",
+        "製品起動はbroker-mediated client経由を維持する。",
     )
 
 
@@ -119,8 +119,8 @@ def assert_flutter_authority_operations_are_broker_mediated() -> RuntimeAssertio
         return _fail(
             "flutter_authority_operations_broker_mediated",
             "CONFIG",
-            "ShellCoreClient.product() is missing broker-mediated authority tokens: " + ", ".join(missing),
-            "Keep authority-sensitive product snapshot data sourced from broker responses.",
+            "ShellCoreClient.product()にbroker-mediated authority tokenがない: " + ", ".join(missing),
+            "authority-sensitiveな製品snapshot dataはbroker response由来に保つ。",
         )
     forbidden = ["ShellCoreClient.local(", "tooling/shell_snapshot.py", "python3 tooling/shell_snapshot.py"]
     findings = [token for token in forbidden if token in body]
@@ -128,14 +128,14 @@ def assert_flutter_authority_operations_are_broker_mediated() -> RuntimeAssertio
         return _fail(
             "flutter_authority_operations_broker_mediated",
             "CONFIG",
-            "ShellCoreClient.product() still references local/Python authority fallback tokens: " + ", ".join(findings),
-            "Remove local/Python fallback from the product authority path.",
+            "ShellCoreClient.product()がlocal/Python authority fallback tokenをまだ参照している: " + ", ".join(findings),
+            "製品authority pathからlocal/Python fallbackを除去する。",
         )
     return _pass(
         "flutter_authority_operations_broker_mediated",
         "CONFIG",
-        "ShellCoreClient.product() requests health, normalization, content projection, protected-field edit rejection, and command-envelope state from the broker and fail-closes through a broker_unavailable snapshot.",
-        "Keep new authority surfaces broker-mediated and fail-closed.",
+        "ShellCoreClient.product()はhealth、normalization、content projection、protected-field編集拒否、command-envelope stateをbrokerへ要求し、broker_unavailable snapshot経由でfail-closeする。",
+        "新しいauthority surfaceはbroker-mediatedかつfail-closedに保つ。",
     )
 
 
@@ -151,7 +151,7 @@ def assert_flutter_product_snapshot_does_not_promote_probe_state() -> RuntimeAss
     findings = [token for token in forbidden_snapshot_tokens if token in broker_snapshot]
     forbidden_probe_tokens = ["'state':", "'audit_event':"]
     findings.extend(
-        f"_brokerCommandProbePayload contains {token}"
+        f"_brokerCommandProbePayloadが{token}を含む"
         for token in forbidden_probe_tokens
         if token in command_probe
     )
@@ -159,15 +159,15 @@ def assert_flutter_product_snapshot_does_not_promote_probe_state() -> RuntimeAss
         return _fail(
             "flutter_product_snapshot_does_not_promote_probe_state",
             "CONFIG",
-            "ShellCoreClient.product() promotes diagnostic probe state into product records: "
+            "ShellCoreClient.product()がdiagnostic probe stateを製品recordへ昇格させている: "
             + "; ".join(findings),
-            "Keep broker probes as LIVE_RUNTIME evidence/setup checks only; do not emit synthetic permissions, approvals, authority maps, caller state, or caller audit mappings from the product snapshot.",
+            "broker probeはLIVE_RUNTIME evidence/setup checkのみとし、製品snapshotからsynthetic permission、approval、authority map、caller state、caller audit mappingを出力しない。",
         )
     return _pass(
         "flutter_product_snapshot_does_not_promote_probe_state",
         "CONFIG",
-        "ShellCoreClient.product() keeps broker projection/command probes out of product permissions, approvals, authority_map, caller state, and caller audit mappings.",
-        "Keep future product records sourced from broker-owned state exports, not Flutter-created probes.",
+        "ShellCoreClient.product()はbroker projection/command probeを製品のpermission、approval、authority_map、caller state、caller audit mappingに入れない。",
+        "将来の製品recordはFlutter生成probeではなく、broker所有のstate export由来に保つ。",
     )
 
 
@@ -187,20 +187,20 @@ def assert_flutter_models_do_not_default_evidence_to_passed() -> RuntimeAssertio
         text,
     )
     if conformance_default:
-        findings.append(f"nonzero conformance_check_count default: {conformance_default.group(0)}")
+        findings.append(f"0以外のconformance_check_count default: {conformance_default.group(0)}")
     if findings:
         return _fail(
             "flutter_models_do_not_default_evidence_to_passed",
             "CONFIG",
-            "Dart evidence summary defaults can synthesize PASS values: "
+            "Dart evidence summaryのdefaultがPASS valueを合成できる: "
             + "; ".join(findings),
-            "Default missing evidence summary fields to not reported/0 and keep release PASS values sourced from explicit evidence.",
+            "欠落したevidence summary fieldのdefaultはnot reported/0とし、release PASS valueは明示的evidence由来に保つ。",
         )
     return _pass(
         "flutter_models_do_not_default_evidence_to_passed",
         "CONFIG",
-        "Dart evidence summary defaults do not synthesize PASS or fixed check counts when source JSON omits evidence fields.",
-        "Keep missing evidence visibly missing until an explicit validator/export supplies it.",
+        "source JSONがevidence fieldを省略したとき、Dart evidence summaryのdefaultはPASSや固定check countを合成しない。",
+        "明示的なvalidator/exportが供給するまで、欠落したevidenceは欠落として表示する。",
     )
 
 
@@ -222,14 +222,14 @@ def assert_flutter_does_not_spawn_python_product_path() -> RuntimeAssertion:
         return _fail(
             "flutter_product_path_does_not_spawn_python",
             "CONFIG",
-            "Product Flutter or owner launch path contains Python/process authority tokens: " + "; ".join(findings),
-            "Remove Python process launch and snapshot generation from product authority startup.",
+            "製品Flutterまたはowner launch pathがPython/process authority tokenを含む: " + "; ".join(findings),
+            "製品authority起動からPython process launchとsnapshot生成を除去する。",
         )
     return _pass(
         "flutter_product_path_does_not_spawn_python",
         "CONFIG",
-        "Desktop Flutter lib and owner launch scripts contain no Python snapshot generator invocation or Dart process-spawn API.",
-        "Keep Python limited to tooling, local validation, schema validation, and migration parity.",
+        "Desktop Flutter libとowner launch scriptはPython snapshot generatorの呼出しやDart process-spawn APIを含まない。",
+        "Pythonはtooling、local validation、schema validation、migration parityに限定する。",
     )
 
 
@@ -243,22 +243,22 @@ def assert_launch_scripts_start_broker_without_python_snapshot() -> RuntimeAsser
         text = path.read_text(encoding="utf-8")
         for token in ["broker-server", "GUI_SHELL_BROKER_ENDPOINT_JSON"]:
             if token not in text:
-                errors.append(f"{path.relative_to(ROOT).as_posix()} missing {token}")
+                errors.append(f"{path.relative_to(ROOT).as_posix()} に{token}がない")
         for token in ["shell_snapshot.py", "python tooling/", "python3 tooling/"]:
             if token in text:
-                errors.append(f"{path.relative_to(ROOT).as_posix()} contains {token}")
+                errors.append(f"{path.relative_to(ROOT).as_posix()} が{token}を含む")
     if errors:
         return _fail(
             "owner_launch_path_starts_broker_without_python_snapshot",
             "CONFIG",
             "; ".join(errors),
-            "Start the Rust broker and pass its endpoint file to Flutter without generating product authority snapshots.",
+            "製品authority snapshotを生成せずにRust brokerを起動し、endpoint fileをFlutterへ渡す。",
         )
     return _pass(
         "owner_launch_path_starts_broker_without_python_snapshot",
         "CONFIG",
-        "Owner desktop launch scripts start gui_shell_rust_helper broker-server and pass GUI_SHELL_BROKER_ENDPOINT_JSON without running Python snapshot generation.",
-        "Keep broker launch in launcher/supervisor code and out of Flutter authority logic.",
+        "owner desktop launch scriptはPython snapshot生成を実行せず、gui_shell_rust_helper broker-serverを起動してGUI_SHELL_BROKER_ENDPOINT_JSONを渡す。",
+        "broker launchはlauncher/supervisor codeに保ち、Flutter authority logicから分離する。",
     )
 
 
@@ -271,14 +271,14 @@ def assert_no_ffi_or_direct_bridge_authority_path() -> RuntimeAssertion:
         return _fail(
             "no_ffi_authority_path",
             "CONFIG",
-            "Authority-sensitive Flutter/Rust direct bridge token found: " + "; ".join(findings),
-            "Use restricted broker IPC for authority, approval, audit, recovery, credential, and command-dispatch paths.",
+            "authority-sensitiveなFlutter/Rust direct bridge tokenを検出した: " + "; ".join(findings),
+            "authority、approval、audit、recovery、credential、command-dispatch pathには制限されたbroker IPCを使う。",
         )
     return _pass(
         "no_ffi_authority_path",
         "CONFIG",
-        "No Dart FFI, flutter_rust_bridge, MethodChannel, or Rust FFI export token was found in the Flutter/Rust authority surface scan.",
-        "Keep authority-sensitive Flutter-Rust communication on independent-process IPC.",
+        "Flutter/Rust authority surfaceのscanでDart FFI、flutter_rust_bridge、MethodChannel、Rust FFI export tokenは検出されなかった。",
+        "authority-sensitiveなFlutter-Rust通信はindependent-process IPC上に保つ。",
     )
 
 
@@ -297,20 +297,20 @@ def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
     if missing or findings:
         pieces = []
         if missing:
-            pieces.append("missing " + ", ".join(missing))
+            pieces.append("欠落: " + ", ".join(missing))
         if findings:
-            pieces.append("forbidden " + ", ".join(findings))
+            pieces.append("禁止token: " + ", ".join(findings))
         return _fail(
             "broker_client_uses_authenticated_loopback_ipc",
             "CONFIG",
             "; ".join(pieces),
-            "Keep BrokerClient on authenticated loopback IPC with an endpoint/session file.",
+            "BrokerClientはendpoint/session fileを用いた認証付きloopback IPC上に保つ。",
         )
     return _pass(
         "broker_client_uses_authenticated_loopback_ipc",
         "CONFIG",
-        "BrokerClient uses Socket.connect with broker endpoint/session fields and has no direct bridge or process-start token.",
-        "Keep request authentication and endpoint discovery covered by broker tests.",
+        "BrokerClientはbrokerのendpoint/session fieldとSocket.connectを使い、direct bridgeやprocess-start tokenを持たない。",
+        "request authenticationとendpoint discoveryはbroker testの対象に保つ。",
     )
 
 
@@ -322,20 +322,20 @@ def assert_broker_client_binds_payload_hash_to_payload() -> RuntimeAssertion:
     if missing or fixed_hash in text:
         pieces = []
         if missing:
-            pieces.append("missing " + ", ".join(missing))
+            pieces.append("欠落: " + ", ".join(missing))
         if fixed_hash in text:
-            pieces.append("fixed dummy payload_hash remains")
+            pieces.append("固定dummy payload_hashが残っている")
         return _fail(
             "broker_client_binds_payload_hash_to_payload",
             "CONFIG",
             "; ".join(pieces),
-            "Compute request payload_hash from canonical JSON payload and let Rust broker reject mismatches.",
+            "canonical JSON payloadからrequest payload_hashを計算し、不一致はRust brokerに拒否させる。",
         )
     return _pass(
         "broker_client_binds_payload_hash_to_payload",
         "CONFIG",
-        "BrokerClient computes payload_hash from canonical JSON payload instead of sending a fixed dummy hash.",
-        "Keep Rust broker payload hash mismatch tests passing.",
+        "BrokerClientは固定dummy hashを送らず、canonical JSON payloadからpayload_hashを計算する。",
+        "Rust brokerのpayload hash mismatch testを合格状態に保つ。",
     )
 
 
@@ -350,24 +350,24 @@ def assert_broker_secret_not_projected_to_ui() -> RuntimeAssertion:
         return _fail(
             "broker_secret_not_projected_to_ui",
             "CONFIG",
-            "Broker session secret token appears outside BrokerClient: " + "; ".join(findings),
-            "Keep broker session secrets out of UI models, text, audit payloads, and snapshots.",
+            "Broker session secret tokenがBrokerClientの外に現れる: " + "; ".join(findings),
+            "broker session secretをUI model、text、audit payload、snapshotに入れない。",
         )
     return _pass(
         "broker_secret_not_projected_to_ui",
         "CONFIG",
-        "Broker session secret tokens are confined to BrokerClient and are not projected through UI/snapshot files.",
-        "Keep secrets out of display and audit payloads.",
+        "Broker session secret tokenはBrokerClientに限定され、UI/snapshot file経由で射影されない。",
+        "secretをdisplayとaudit payloadから分離する。",
     )
 
 
 def assert_flutter_fail_closed_tests_exist() -> RuntimeAssertion:
     test_text = _read("apps/desktop_flutter/test/widget_test.dart")
     required = [
-        "product client fails closed when broker is unavailable",
-        "product client fails closed on authentication rejection",
-        "product client fails closed on stale broker session",
-        "product client fails closed on malformed broker response",
+        "ブローカー利用不可時に製品クライアントが閉鎖側へ失敗する",
+        "認証拒否時に製品クライアントが閉鎖側へ失敗する",
+        "期限切れブローカーセッションで製品クライアントが閉鎖側へ失敗する",
+        "不正なブローカー応答で製品クライアントが閉鎖側へ失敗する",
         "broker.fail_closed",
         "broker_unavailable",
     ]
@@ -376,14 +376,14 @@ def assert_flutter_fail_closed_tests_exist() -> RuntimeAssertion:
         return _fail(
             "flutter_broker_fail_closed_test_coverage",
             "FIXTURE",
-            "Flutter fail-closed test tokens missing: " + ", ".join(missing),
-            "Add Flutter tests for broker unavailable, auth failure, stale session, malformed response, and blocked authority actions.",
+            "Flutter fail-closed test tokenがない: " + ", ".join(missing),
+            "broker利用不可、認証失敗、stale session、malformed response、拒否されたauthority actionのFlutter testを追加する。",
         )
     return _pass(
         "flutter_broker_fail_closed_test_coverage",
         "FIXTURE",
-        "Flutter tests cover broker unavailable, authentication rejection, stale session, malformed response, and broker.fail_closed setup diagnostics.",
-        "Keep fail-closed UI tests passing on release candidates.",
+        "Flutter testはbroker利用不可、認証拒否、stale session、malformed response、broker.fail_closed setup diagnosticを対象にする。",
+        "release candidateでfail-closed UI testを合格状態に保つ。",
     )
 
 
@@ -405,14 +405,14 @@ def assert_broker_runtime_restart_and_crash_tests_exist() -> RuntimeAssertion:
         return _fail(
             "broker_runtime_restart_persistence_and_shutdown_coverage",
             "FIXTURE",
-            "Broker runtime persistence/shutdown test tokens missing: " + ", ".join(missing),
-            "Cover broker launch/connect/shutdown, restart replay rejection, audit chain restart verification, and persisted-state tamper rejection.",
+            "Broker runtimeのpersistence/shutdown test tokenがない: " + ", ".join(missing),
+            "broker launch/connect/shutdown、再起動後replay拒否、audit chainの再起動時検証、永続state改ざん拒否を対象にする。",
         )
     return _pass(
         "broker_runtime_restart_persistence_and_shutdown_coverage",
         "FIXTURE",
-        "Rust broker test fixtures contain local broker process launch/connect/shutdown, unavailable-after-shutdown behavior, replay rejection after restart, audit chain verification after restart, and tampered/malformed persisted-state rejection coverage. This is not installed product runtime proof.",
-        "Keep Rust broker IPC and persistence tests passing; Windows installed-path evidence remains a separate release gate.",
+        "Rust broker test fixtureはlocal broker processのlaunch/connect/shutdown、shutdown後の利用不可挙動、再起動後のreplay拒否とaudit chain検証、改ざん/不正形式の永続state拒否を対象にする。これはinstalled product runtime proofではない。",
+        "Rust broker IPCとpersistence testを合格状態に保つ。Windows installed-path evidenceは別のrelease gateのままである。",
     )
 
 
@@ -444,8 +444,8 @@ def build_report() -> dict:
         "release_gate_note": {
             "classification": "release_blocker",
             "blocks_release": "yes",
-            "reason": "Windows installed-path no-Python-runtime and broker-mediated LIVE_RUNTIME evidence is still required before completed product release.",
-            "required_action": "Run Windows installed-path broker launch/connect/restart/crash/no-Python-runtime smoke and pass strict Windows release validation.",
+            "reason": "完成製品releaseの前にWindows installed-pathのno-Python-runtime evidenceとbroker-mediated LIVE_RUNTIME evidenceが引き続き必要である。",
+            "required_action": "Windows installed-pathでbrokerのlaunch/connect/restart/crash/no-Python-runtime smokeを実行し、strict Windows release validationに合格させる。",
         },
     }
 
@@ -461,9 +461,9 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif args.check:
         print(
-            "release runtime assertions: "
-            f"{len(report['assertions']) - report['failure_count']} passed, "
-            f"{report['failure_count']} failed, "
+            "release runtime assertion結果: "
+            f"合格 {len(report['assertions']) - report['failure_count']} 件、"
+            f"失敗 {report['failure_count']} 件、"
             f"evidence_scope={','.join(report['evidence_scope'])}"
         )
         for item in report["assertions"]:

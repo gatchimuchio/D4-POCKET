@@ -1,259 +1,273 @@
-# GUI-Shell Completion Strategy Instruction
+# GUI-Shell 完了戦略指示
 
-Status: Phase B owner-use complete; not OSS v1.0 RC or paid/product release  
-Repository: `gatchimuchio/GUI-Shell`  
-Primary goal: complete GUI-Shell as a desktop-first AI Runtime / Agent Operation Shell.  
-Reference consumer/runtime: BLUE-TANUKI through adapter contract only.  
+状態: Phase B の owner-use は complete。OSS v1.0 RC または paid／product release ではない
+repository の識別子: <code>gatchimuchio/GUI-Shell</code>
+主要目標: GUI-Shell を desktop-first AI Runtime／Agent Operation Shell として完成させる
+参照 consumer／Runtime: adapter contract のみを介した BLUE-TANUKI
 
-## 0. Current Position
+## 0. 現在位置
 
-GUI-Shell currently has:
+GUI-Shell には現在、次が存在する。
 
-- Phase 0 standard / selection lock
-- Phase 1 schema / contract skeleton
-- Phase 2 conformance skeleton
-- Phase 3H Shell Core hardening skeleton
-- Phase 4 Rust helper boundary skeleton
-- Phase 5 BLUE-TANUKI mock reference adapter skeleton
-- Phase 6 Desktop Flutter operator shell skeleton
-- Phase 7 Installer / Setup Doctor skeleton
-- Phase 8 Mobile companion skeleton
-- Phase 9 release-hardening documents
-- 19 schemas
-- 19 valid examples
-- 19 negative fixtures
-- 67 conformance checks
+- Phase 0 の standard／selection lock
+- Phase 1 の schema／contract skeleton
+- Phase 2 の conformance skeleton
+- Phase 3H の Shell Core hardening skeleton
+- Phase 4 の Rust helper boundary skeleton
+- Phase 5 の BLUE-TANUKI mock reference adapter の skeleton
+- Phase 6 の desktop 用 Flutter operator Shell skeleton
+- Phase 7 の Installer／Setup Doctor skeleton
+- Phase 8 の mobile companion skeleton
+- Phase 9 の release-hardening document
+- schema 数: 19
+- valid example 数: 19
+- negative fixture 数: 19
+- conformance check 数: 67
 
-Current claim boundary:
+現在の claim boundary:
 
-```text
-Phase B owner-use completion exists.
-Not yet OSS v1.0 RC.
-Not yet paid/product QC.
-Not yet live BLUE-TANUKI adapter completion.
-Not yet measured Windows installed-path release evidence.
-Not yet mobile release ready.
-```
+~~~text
+Phase B の owner-use completion は存在する。
+OSS v1.0 RC には未到達である。
+paid／product QC には未到達である。
+live BLUE-TANUKI adapter completion には未到達である。
+measured Windows installed-path release evidence は未成立である。
+mobile は release ready ではない。
+~~~
 
-## 1. Non-Negotiable Rules
+## 1. 譲れない規則
 
-Follow these rules throughout all phases:
+すべての Phase で次の規則に従う。
 
-1. Safety first.
-2. Robustness second.
-3. Operator clarity / UX third.
-4. Product features fourth.
-5. Convenience last.
+1. 安全性を第一とする。
+2. 堅牢性を第二とする。
+3. operator にとっての明瞭さ／UX を第三とする。
+4. 製品機能を第四とする。
+5. 利便性を最後とする。
 
-Do not weaken authority boundaries for comfort.
+快適性のために authority boundary を弱めない。
 
-Do not import Flutter into Shell Core.
+Shell Core に Flutter を import しない。
 
-Do not import BLUE-TANUKI internals into Shell Core.
+Shell Core に BLUE-TANUKI の内部実装を import しない。
 
-Do not modify BLUE-TANUKI Core for GUI-Shell convenience unless explicitly instructed by the owner.
+owner が明示的に指示しない限り、GUI-Shell の利便性のために BLUE-TANUKI Core を変更しない。
 
-Do not treat adapter metadata, memory, cache, previous state, local UI state, installer state, or mobile state as authority.
+adapter metadata、memory、cache、previous state、local UI state、installer state、mobile state を authority として扱わない。
 
-Every sensitive action must map to:
+すべての sensitive action を次へ対応付けなければならない。
 
-- Capability
-- Permission
-- Approval state
-- AuditEvent
-- RecoveryAction
+- 能力宣言（Capability）
+- 許可（Permission）
+- 承認状態（Approval state）
+- 監査事象（AuditEvent）
+- 修復手順（RecoveryAction）
 
-Never claim validation passed unless it actually passed.
+validation が実際に通過していない限り、通過したと主張しない。
 
-## 2. Implemented Skeleton Map
+## 2. 実装済み skeleton の地図
 
 ### Shell Core
 
-Relevant files:
+関連 file:
 
-- `packages/shell_core/error_taxonomy.py`
-- `packages/shell_core/policy_evaluator.py`
-- `packages/shell_core/runtime_state.py`
-- `packages/shell_core/state_snapshot.py`
-- `packages/shell_core/permission_ledger.py`
-- `packages/shell_core/approval_queue.py`
-- `packages/shell_core/audit_store.py`
-- `packages/shell_core/recovery_catalog.py`
+~~~text
+packages/shell_core/error_taxonomy.py
+packages/shell_core/policy_evaluator.py
+packages/shell_core/runtime_state.py
+packages/shell_core/state_snapshot.py
+packages/shell_core/permission_ledger.py
+packages/shell_core/approval_queue.py
+packages/shell_core/audit_store.py
+packages/shell_core/recovery_catalog.py
+~~~
 
-The Shell Core skeleton must remain framework-independent and BLUE-TANUKI-internal-free.
+Shell Core skeleton は framework-independent かつ BLUE-TANUKI-internal-free の状態を維持しなければならない。
 
-### Rust Helper
+### Rust helper
 
-Relevant files:
+関連 file:
 
-- `native/rust_helper/src/lib.rs`
-- `native/rust_helper/src/process.rs`
-- `native/rust_helper/src/filesystem.rs`
-- `native/rust_helper/src/network.rs`
-- `native/rust_helper/src/diagnostics.rs`
-- `native/rust_helper/src/update_verification.rs`
-- `native/rust_helper/src/audit_hash.rs`
-- `native/rust_helper/src/ipc.rs`
+~~~text
+native/rust_helper/src/lib.rs
+native/rust_helper/src/process.rs
+native/rust_helper/src/filesystem.rs
+native/rust_helper/src/network.rs
+native/rust_helper/src/diagnostics.rs
+native/rust_helper/src/update_verification.rs
+native/rust_helper/src/audit_hash.rs
+native/rust_helper/src/ipc.rs
+~~~
 
-The Rust helper is a bounded helper surface only. It must not become an authority path.
+Rust helper は限定的な helper surface にすぎない。authority path になってはならない。
 
-### BLUE-TANUKI Adapter
+### BLUE-TANUKI 用 Adapter
 
-Relevant files:
+関連 file:
 
-- `packages/blue_tanuki_adapter/adapter.py`
-- `packages/blue_tanuki_adapter/health.py`
-- `packages/blue_tanuki_adapter/runtime_snapshot.py`
-- `packages/blue_tanuki_adapter/authority_trace.py`
-- `packages/blue_tanuki_adapter/notifications.py`
-- `packages/blue_tanuki_adapter/approvals.py`
-- `packages/blue_tanuki_adapter/audit_export.py`
-- `packages/blue_tanuki_adapter/diagnostics.py`
-- `packages/blue_tanuki_adapter/recovery.py`
+~~~text
+packages/blue_tanuki_adapter/adapter.py
+packages/blue_tanuki_adapter/health.py
+packages/blue_tanuki_adapter/runtime_snapshot.py
+packages/blue_tanuki_adapter/authority_trace.py
+packages/blue_tanuki_adapter/notifications.py
+packages/blue_tanuki_adapter/approvals.py
+packages/blue_tanuki_adapter/audit_export.py
+packages/blue_tanuki_adapter/diagnostics.py
+packages/blue_tanuki_adapter/recovery.py
+~~~
 
-The current adapter is mock-contract based. Live runtime integration is not complete.
+現在の adapter は mock-contract に基づく。live Runtime integration は complete ではない。
 
-### Desktop Flutter
+### desktop Flutter
 
-Relevant files:
+関連 file:
 
-- `apps/desktop_flutter/lib/main.dart`
-- `apps/desktop_flutter/lib/screens/`
-- `apps/desktop_flutter/lib/services/shell_core_client.dart`
-- `apps/desktop_flutter/lib/models/generated_contracts.dart`
+~~~text
+apps/desktop_flutter/lib/main.dart
+apps/desktop_flutter/lib/screens/
+apps/desktop_flutter/lib/services/shell_core_client.dart
+apps/desktop_flutter/lib/models/generated_contracts.dart
+~~~
 
-Flutter is an operator surface only. It must not define authority, permission semantics, approval semantics, audit semantics, or recovery semantics.
+Flutter は operator surface にすぎない。authority、permission semantics、approval semantics、audit semantics、recovery semantics を定義してはならない。
 
-### Installer / Setup Doctor
+### 導入部（Installer／Setup Doctor）
 
-Relevant files:
+関連 file:
 
-- `installer/setup_doctor.py`
-- `docs/FIRST_RUN.md`
-- `docs/SETUP_DOCTOR.md`
-- `docs/INSTALLER_BOUNDARY.md`
+~~~text
+installer/setup_doctor.py
+docs/FIRST_RUN.md
+docs/SETUP_DOCTOR.md
+docs/INSTALLER_BOUNDARY.md
+~~~
 
-Installer state must never grant authority or silently approve permissions.
+Installer state は authority を付与したり、permission を暗黙に approve したりしてはならない。
 
-### Mobile Companion
+### モバイル companion
 
-Relevant files:
+関連 file:
 
-- `apps/mobile_flutter/lib/main.dart`
-- `apps/mobile_flutter/lib/screens/`
+~~~text
+apps/mobile_flutter/lib/main.dart
+apps/mobile_flutter/lib/screens/
+~~~
 
-Mobile may observe, review, notify, request emergency stop, and show recovery instructions. It must not become independent authority.
+mobile は observe、review、notify、emergency stop request、recovery instruction の表示を行ってよい。独立した authority になってはならない。
 
-### Release Hardening
+### release の強化
 
-Relevant files:
+関連 file:
 
-- `RELEASE_CHECKLIST.md`
-- `SECURITY_REVIEW.md`
-- `COMPATIBILITY_MATRIX.md`
-- `CONFORMANCE_REPORT.md`
-- `AUDIT_EVIDENCE.md`
-- `INSTALLER_STATUS.md`
-- `MOBILE_STATUS.md`
-- `VALIDATION.txt`
+~~~text
+RELEASE_CHECKLIST.md
+SECURITY_REVIEW.md
+COMPATIBILITY_MATRIX.md
+CONFORMANCE_REPORT.md
+AUDIT_EVIDENCE.md
+INSTALLER_STATUS.md
+MOBILE_STATUS.md
+VALIDATION.txt
+~~~
 
-Release claim promotion requires owner GO and direct evidence.
+release claim の promotion には owner GO と直接 evidence が必要である。
 
-## 3. Immediate Next Work
+## 3. 直近の次作業
 
-Continue from skeleton to production-grade behavior in this order:
+skeleton から production-grade behavior へ、次の順序で進める。
 
-```text
-1. Make Rust helper compile and pass cargo test.
-2. Run Flutter analyze for desktop and mobile.
-3. Replace mock Shell Core client with a real local Shell Core boundary.
-4. Add durable audit storage and hash-chain verification.
-5. Add live BLUE-TANUKI adapter integration through generic contracts only.
-6. Add installer packaging after Setup Doctor behavior is stable.
-7. Add real mobile pairing with audit, revocation, and recovery path.
-8. Re-run release claim review after evidence exists.
-```
+~~~text
+1. Rust helper を compile 可能にし、cargo test を通過させる。
+2. desktop／mobile の Flutter analyze を実行する。
+3. mock の Shell Core client を real local Shell Core boundary に置き換える。
+4. durable audit storage と hash-chain verification を追加する。
+5. 汎用 contract のみを介した live BLUE-TANUKI adapter integration を追加する。
+6. Setup Doctor behavior の安定後に installer packaging を追加する。
+7. audit、revocation、recovery path を伴う real mobile pairing を追加する。
+8. evidence が存在した後に release claim review を再実行する。
+~~~
 
-Do not skip toolchain validation. If a tool is unavailable, report `not run` with the exact reason.
+toolchain validation を省略しない。tool を利用できない場合は、正確な理由とともに <code>not run</code> を報告する。
 
-## 4. Production-Hardening Requirements
+## 4. production hardening の要件
 
-### 4.1 Policy Evaluation
+### 4.1 方針評価（policy evaluation）
 
-`PolicyEvaluator` must reject:
+<code>PolicyEvaluator</code> は、次を拒否しなければならない。
 
-- unknown runtime
-- unknown capability
-- unknown permission
-- denied permission
-- missing approval
-- invalid approval state
-- missing audit event
-- missing audit payload hash when payload exists
-- missing recovery action
-- adapter metadata authority claims
-- non-authority source attempts
+- 未知の Runtime
+- 未知の Capability
+- 未知の Permission
+- deny された Permission
+- Approval の欠落
+- 無効な Approval state
+- audit event の欠落
+- payload が存在する場合の audit payload hash の欠落
+- recovery action の欠落
+- adapter metadata による authority claim
+- non-authority source による試行
 
-Output shape:
+出力形状:
 
-```python
+~~~python
 {
   "allowed": bool,
   "errors": [...],
   "required_recovery": dict | None,
   "audit_required": bool
 }
-```
+~~~
 
-### 4.2 State Snapshot
+### 4.2 状態 snapshot
 
-State snapshots must be deterministic and include:
+state snapshot は deterministic で、次を含まなければならない。
 
-- runtimes
-- adapters
-- permissions
-- pending approvals
-- audit summary
-- recovery catalog summary
-- update policy summary
-- invariant flags
+- 実行対象（Runtime）
+- adapter
+- Permission
+- 承認待ち（pending Approval）
+- audit の summary
+- recovery catalog の summary
+- update policy の summary
+- invariant の flag
 
-Invariant flags must include:
+invariant flag は次を含まなければならない。
 
-```text
+~~~text
 flutter_imported_by_shell_core=false
 blue_tanuki_imported_by_shell_core=false
 adapter_metadata_can_escalate_authority=false
 memory_cache_previous_state_can_grant_authority=false
 full_payload_projected_without_full_visibility=false
-```
+~~~
 
-### 4.3 Rust Helper
+### 4.3 Rust helper
 
-Allowed responsibilities:
+許可する責任:
 
-- process diagnostics
-- filesystem diagnostics
-- port/network diagnostics
-- audit hash utilities
-- update signature verification
-- secure IPC message framing
-- recovery helper stubs
+- process の診断
+- filesystem の診断
+- port／network の診断
+- audit hash 用 utility
+- update signature の検証
+- 安全な IPC message framing
+- recovery helper の stub
 
-Forbidden:
+禁止事項:
 
-- becoming an authority path
-- arbitrary command execution
-- arbitrary file content read by default
-- arbitrary file write
-- arbitrary external fetch by default
-- credential access without explicit contract
-- bypassing audit
-- bypassing recovery mapping
+- authority path になること
+- 任意 command の実行
+- 既定で任意 file content を読むこと
+- 任意 file への書込み
+- 既定で任意の external fetch を行うこと
+- 明示 contract なしに credential へ access すること
+- audit を迂回すること
+- recovery mapping を迂回すること
 
-Helper response shape:
+helper response の形状:
 
-```json
+~~~json
 {
   "ok": true,
   "operation": "string",
@@ -261,11 +275,11 @@ Helper response shape:
   "diagnostics": [],
   "error": null
 }
-```
+~~~
 
-Failure shape:
+failure の形状:
 
-```json
+~~~json
 {
   "ok": false,
   "operation": "string",
@@ -277,172 +291,170 @@ Failure shape:
     "recoverable": true
   }
 }
-```
+~~~
 
-### 4.4 BLUE-TANUKI Adapter
+### 4.4 BLUE-TANUKI 用 Adapter
 
-Adapter surfaces:
+adapter の surface:
 
-- health
-- ready
-- runtime snapshot
-- authority trace
-- notifications
-- approvals
-- audit events
-- diagnostics export
-- recovery actions
+- health の確認
+- ready 状態
+- Runtime の snapshot
+- authority の trace
+- notification
+- Approval
+- audit の event
+- diagnostics の export
+- recovery の action
 
-Rules:
+規則:
 
-- Runtime-specific mapping stays inside `packages/blue_tanuki_adapter/`.
-- Adapter metadata remains untrusted.
-- Adapter cannot grant permission.
-- Adapter cannot approve actions.
-- Adapter cannot bypass content exposure policy.
-- Adapter cannot bypass audit.
+- Runtime 固有 mapping は <code>packages/blue_tanuki_adapter/</code> 内に留める。
+- Adapter metadata は untrusted のままとする。
+- Adapter は Permission を付与できない。
+- Adapter は action を approve できない。
+- Adapter は content exposure policy を迂回できない。
+- Adapter は audit を迂回できない。
 
-If BLUE-TANUKI runtime is unavailable, use mock fixtures. Do not block contract tests on live runtime.
+BLUE-TANUKI Runtime を利用できない場合は mock fixture を使用する。live Runtime を理由に contract test を block しない。
 
-### 4.5 Flutter Desktop
+### 4.5 デスクトップ Flutter
 
-Required screens:
+必須画面:
 
-- Dashboard
-- Setup Doctor
-- Runtime Center
-- Permission Center
-- Approval Center
-- Audit Viewer
-- Recovery Center
-- Settings
+- 概況画面（Dashboard）
+- 診断画面（Setup Doctor）
+- Runtime 管理画面（Runtime Center）
+- Permission 管理画面（Permission Center）
+- Approval 管理画面（Approval Center）
+- Audit 閲覧画面（Audit Viewer）
+- Recovery 管理画面（Recovery Center）
+- 設定画面（Settings）
 
-UI forbidden rules:
+UI の禁止規則:
 
-- Flutter must not define authority.
-- Flutter must not define permission semantics.
-- Flutter must not approve without Shell Core.
-- Flutter must not display `full_payload` unless Shell Core projection allows it.
-- Flutter must not bypass adapter conformance.
-- Flutter must not bypass audit creation.
-- Flutter must not mutate protected approval fields.
+- Flutter は authority を定義してはならない。
+- Flutter は permission semantics を定義してはならない。
+- Flutter は Shell Core なしに approve してはならない。
+- Shell Core projection が許可しない限り、Flutter は <code>full_payload</code> を表示してはならない。
+- Flutter は adapter conformance を迂回してはならない。
+- Flutter は audit creation を迂回してはならない。
+- Flutter は保護された approval field を変更してはならない。
 
-### 4.6 Installer / Setup Doctor
+### 4.6 Installer／Setup Doctor の診断
 
-Setup Doctor must check:
+Setup Doctor は次を検査しなければならない。
 
-- Python availability
-- Rust availability when needed
-- Flutter availability when needed
-- runtime connection
-- local permissions
-- update policy
-- audit storage
-- recovery catalog
-- adapter readiness
+- Python の availability
+- 必要な場合の Rust availability
+- 必要な場合の Flutter availability
+- Runtime の connection
+- local Permission
+- update の policy
+- audit の storage
+- recovery の catalog
+- adapter の readiness
 
-Rules:
+規則:
 
-- Installer state must not grant authority.
-- Installer must not silently approve permissions.
-- Installer must not hide failures.
-- Failure messages must be operator-readable.
+- Installer state は authority を付与してはならない。
+- Installer は permission を暗黙に approve してはならない。
+- Installer は failure を隠してはならない。
+- failure message は operator-readable でなければならない。
 
-### 4.7 Mobile Companion
+### 4.7 モバイル companion
 
-Mobile allowed:
+mobile で許可する事項:
 
-- view runtime status
-- receive notifications
-- review approvals
-- request emergency stop
-- view recovery instructions
+- Runtime status の表示
+- notification の受信
+- Approval の review
+- emergency stop の request
+- recovery instruction の表示
 
-Mobile forbidden:
+mobile で禁止する事項:
 
-- bypass Shell Core
-- bypass approval visibility
-- bypass protected field rules
-- become independent authority
-- silently pair devices
-- approve hidden payloads
+- Shell Core の迂回
+- Approval visibility の迂回
+- protected field rule の迂回
+- 独立した authority になること
+- device を暗黙に pair すること
+- hidden payload を approve すること
 
-Device pairing must include:
+device pairing は次を含まなければならない。
 
-- device_id
-- pairing_id
-- operator confirmation
-- audit event
-- revocation path
-- recovery path
+- <code>device_id</code>
+- <code>pairing_id</code>
+- operator の確認
+- audit の event
+- revocation の path
+- recovery の path
 
-## 5. Validation Commands
+## 5. validation の command
 
-Always run:
+常に次を実行する。
 
-```bash
+~~~bash
 python3 tooling/schema_check/check_schemas.py
 python3 tooling/conformance_tests/run_conformance_skeleton.py
-```
+~~~
 
-Aggregate reporter:
+集約 reporter:
 
-```bash
+~~~bash
 python3 tooling/validate_all.py
-```
+~~~
 
-When Rust is available:
+Rust を利用できる場合:
 
-```bash
+~~~bash
 cd native/rust_helper && cargo test
-```
+~~~
 
-When Flutter is available:
+Flutter を利用できる場合:
 
-```bash
+~~~bash
 cd apps/desktop_flutter && flutter analyze
 cd apps/mobile_flutter && flutter analyze
-```
+~~~
 
-Current known environment result:
+現在知られている environment result:
 
-```text
+~~~text
 schema check passed: 19 schemas, 19 examples, 19 negative fixtures
 conformance skeleton passed: 67 checks
 cargo test: not run, cargo not found on PATH
 desktop flutter analyze: not run, flutter not found on PATH
 mobile flutter analyze: not run, flutter not found on PATH
-```
+~~~
 
-## 6. Release Claim Rules
+## 6. release claim の規則
 
-Do not claim:
+evidence が存在しない限り、次を主張しない。
 
-- production readiness
-- installer readiness
-- mobile readiness
-- stable runtime support
-- security completeness
+- production の readiness
+- installer の readiness
+- mobile の readiness
+- 安定した Runtime support
+- security の completeness
 
-unless evidence exists.
+release claim を promotion する前には owner GO が必要である。
 
-Owner GO is required before any release claim promotion.
+## 7. 必須の最終報告形式
 
-## 7. Required Final Report Format
+完了した各 work block では、次を報告しなければならない。
 
-Every completed work block must report:
+1. 概要
+2. 変更 file
+3. risk 分類
+4. validation 結果
+5. 残存 risk
+6. commit hash、または <code>not committed</code>
 
-1. Summary
-2. Changed files
-3. Risk classification
-4. Validation results
-5. Remaining risks
-6. Commit hash, or `not committed`
-
-Validation must explicitly say:
+validation では、次を明示しなければならない。
 
 - passed
 - failed
-- not run
-- exact command
-- exact reason if not run
+- 未実行（not run）
+- 正確な command
+- not run の場合は正確な理由

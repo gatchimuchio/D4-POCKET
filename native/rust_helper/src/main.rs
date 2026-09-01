@@ -15,8 +15,8 @@ fn main() {
     if let Some(exit_code) = maybe_run_dev_stdin_smoke() {
         std::process::exit(exit_code);
     }
-    eprintln!("usage: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
-    eprintln!("dev-only: gui_shell_rust_helper dev-stdin-smoke");
+    eprintln!("使用法: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
+    eprintln!("開発専用: gui_shell_rust_helper dev-stdin-smoke");
     std::process::exit(2);
 }
 
@@ -38,57 +38,57 @@ fn maybe_run_broker_server() -> Option<i32> {
         match argument.as_str() {
             "--store-dir" => {
                 let Some(value) = args.next() else {
-                    eprintln!("--store-dir requires a value");
+                eprintln!("--store-dirには値が必要");
                     return Some(2);
                 };
                 store_dir = Some(PathBuf::from(value));
             }
             "--session-file" => {
                 let Some(value) = args.next() else {
-                    eprintln!("--session-file requires a value");
+                eprintln!("--session-fileには値が必要");
                     return Some(2);
                 };
                 session_file = Some(PathBuf::from(value));
             }
             "--port" => {
                 let Some(value) = args.next() else {
-                    eprintln!("--port requires a value");
+                eprintln!("--portには値が必要");
                     return Some(2);
                 };
                 let Ok(parsed) = value.parse::<u16>() else {
-                    eprintln!("--port must be a TCP port number");
+                    eprintln!("--portはTCP port番号でなければならない");
                     return Some(2);
                 };
                 port = parsed;
             }
             "--max-request-bytes" => {
                 let Some(value) = args.next() else {
-                    eprintln!("--max-request-bytes requires a value");
+                eprintln!("--max-request-bytesには値が必要");
                     return Some(2);
                 };
                 let Ok(parsed) = value.parse::<usize>() else {
-                    eprintln!("--max-request-bytes must be a positive integer");
+                    eprintln!("--max-request-bytesは正のintegerでなければならない");
                     return Some(2);
                 };
                 if parsed == 0 {
-                    eprintln!("--max-request-bytes must be non-zero");
+                    eprintln!("--max-request-bytesはゼロ以外でなければならない");
                     return Some(2);
                 }
                 max_request_bytes = parsed;
             }
             _ => {
-                eprintln!("unknown broker-server argument: {argument}");
+            eprintln!("未知のbroker-server引数: {argument}");
                 return Some(2);
             }
         }
     }
 
     let Some(store_dir) = store_dir else {
-        eprintln!("broker-server requires --store-dir");
+        eprintln!("broker-serverには--store-dirが必要");
         return Some(2);
     };
     let Some(session_file) = session_file else {
-        eprintln!("broker-server requires --session-file");
+        eprintln!("broker-serverには--session-fileが必要");
         return Some(2);
     };
     let mut config = BrokerServerConfig::new(store_dir, session_file);
@@ -98,7 +98,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     match run_loopback_server(config) {
         Ok(()) => Some(0),
         Err(error) => {
-            eprintln!("broker-server failed: {}", error.message);
+            eprintln!("broker-serverが失敗: {}", error.message);
             Some(1)
         }
     }
@@ -113,7 +113,7 @@ fn maybe_run_dev_stdin_smoke() -> Option<i32> {
         return None;
     }
     if args.next().is_some() {
-        eprintln!("dev-stdin-smoke accepts no arguments");
+        eprintln!("dev-stdin-smokeは引数を受け付けない");
         return Some(2);
     }
     run_dev_stdin_smoke();

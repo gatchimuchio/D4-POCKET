@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/capability.schema.json",
-  "title": "Capability",
+  "title": "能力（Capability）",
   "type": "object",
   "required": [
     "capability_id",

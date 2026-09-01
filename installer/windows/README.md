@@ -1,6 +1,6 @@
-# Windows installed path
+# Windows インストール先
 
-GUI-Shell v1.0 is Windows-first. The installed path must launch the Flutter UI through a broker-mediated runtime path:
+GUI-Shell v1.0 は Windows を優先する。インストール先は、broker 介在の runtime 経路を通じて Flutter UI を起動しなければならない。
 
 ```text
 GUI-Shell.brokered.cmd
@@ -9,10 +9,10 @@ GUI-Shell.brokered.cmd
   -> gui_shell_desktop.exe with GUI_SHELL_BROKER_ENDPOINT_JSON
 ```
 
-Use `stage_installed_app.ps1` to create a run-unique staged installed directory from an already-built Flutter Windows release directory and a Windows `gui_shell_rust_helper.exe`. The default install root is `%LOCALAPPDATA%\GUI-Shell\installed-runs\<run_id>` and the generated manifest records source commit, clean worktree state, artifact hashes, and isolated runtime/config/audit/store paths.
+`stage_installed_app.ps1` は、build 済みの Flutter Windows release directory と Windows 用 `gui_shell_rust_helper.exe` から、実行ごとに固有の staged install directory を作成する。既定の install root は `%LOCALAPPDATA%\GUI-Shell\installed-runs\<run_id>` である。生成 manifest は source commit、作業ツリーの clean 状態、artifact hash、分離した runtime/config/audit/store path を記録する。
 
-Use `collect_broker_smoke.ps1` before final installed evidence collection. It validates authenticated broker IPC, restricted `127.0.0.1` bind, durable store readiness, replay rejection after broker restart, and crash fail-closed connection behavior. No-Python/no-FFI values are recorded only as non-formal static declarations, not as broker runtime proof.
+最終的なインストール証拠を収集する前に `collect_broker_smoke.ps1` を使う。これは認証済み broker IPC、`127.0.0.1` へ制限された bind、永続 store の準備状態、broker 再起動後の replay 拒否、crash 時の fail-closed 接続挙動を検証する。No-Python/no-FFI 値は broker runtime 証拠ではなく、非正式な静的宣言としてのみ記録する。
 
-Use `collect_setup_doctor.ps1` only as an external installer/config/broker probe; it is not formal product evidence. `collect_installed_smoke.ps1` starts the installed Rust broker, launches the installed Flutter `.exe` with `GUI_SHELL_BROKER_ENDPOINT_JSON`, requests an installed-app Setup Doctor product export with `GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON`, applies `-NoPythonRuntime` PATH scrubbing for launch evidence, captures UIAutomation visible-surface evidence and diagnostic tree projection when `-VisibleSurfacesJson` is not supplied, and combines app first-run evidence, app-generated Setup Doctor evidence, visible-surface evidence, broker evidence, provenance, and field provenance into `release_evidence/windows_installed_smoke.json`.
+`collect_setup_doctor.ps1` は外部 installer/config/broker 確認にのみ使い、正式な製品証拠として扱わない。`collect_installed_smoke.ps1` は、インストール済み Rust broker を起動し、`GUI_SHELL_BROKER_ENDPOINT_JSON` を与えてインストール済み Flutter `.exe` を起動する。また、`GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON` でインストール済み app の環境診断製品出力を要求し、起動証拠用に `-NoPythonRuntime` PATH 無効化を適用する。`-VisibleSurfacesJson` が指定されない場合は UIAutomation の可視表層証拠と診断 tree 射影を取得し、app 初回起動証拠、app 生成の環境診断証拠、可視表層証拠、broker 証拠、由来、field 由来を `release_evidence/windows_installed_smoke.json` へ統合する。
 
-Normal users must not be required to manually use terminal, WSL, npm, Git, port setup, or runtime root discovery. The staged `.cmd` launcher is a bounded packaging step until a signed installer/MSIX wrapper is added.
+通常の利用者に、terminal、WSL、npm、Git、port設定、runtime root 検出の手動操作を必須にしてはならない。staged `.cmd` launcher は、署名済み installer/MSIX wrapper を追加するまでの局所的な packaging 工程である。

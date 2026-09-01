@@ -1,64 +1,66 @@
-# Competitor Analysis
+# 競合製品分析
 
-Sources reviewed:
+確認した情報源:
 
-- Docker Desktop documentation: https://docs.docker.com/desktop/
-- AnythingLLM Desktop documentation: https://docs.anythingllm.com/installation-desktop/overview
-- OpenHands quick start documentation: https://docs.openhands.dev/overview/quickstart
-- LM Studio documentation: https://lmstudio.ai/docs
-- Open WebUI documentation: https://docs.openwebui.com/
-- Ollama documentation: https://docs.ollama.com/
-- AIDev paper: https://arxiv.org/abs/2602.09185
+- Docker Desktop 文書: https://docs.docker.com/desktop/
+- AnythingLLM Desktop 文書: https://docs.anythingllm.com/installation-desktop/overview
+- OpenHands クイックスタート文書: https://docs.openhands.dev/overview/quickstart
+- LM Studio 文書: https://lmstudio.ai/docs
+- Open WebUI 文書: https://docs.openwebui.com/
+- Ollama 文書: https://docs.ollama.com/
+- AIDev 論文: https://arxiv.org/abs/2602.09185
 
-## Classified Requirements
+## 分類済み要求
 
-- requirement: Desktop GUI hides lower-level runtime complexity while exposing install, settings, logs, troubleshooting, backup, security, and AI/agent surfaces.
+~~~yaml
+- requirement: デスクトップGUIは下位層のランタイム複雑性を隠しつつ、インストール、設定、ログ、トラブルシューティング、バックアップ、セキュリティ、およびAI・エージェント操作面を公開する。
   source/competitor: Docker Desktop
-  implementation target: Dashboard, Setup Doctor, Runtime Center, Agent Center, Audit Viewer, Recovery Center
+  implementation target: Dashboard、Setup Doctor、Runtime Center、Agent Center、Audit Viewer、Recovery Center
   classification: required_for_v1
   blocks_release: yes
 
-- requirement: Single-user local-first desktop product with low-friction install path.
+- requirement: 導入時の負担が少ない、単一ユーザー向けローカル優先デスクトップ製品とする。
   source/competitor: AnythingLLM Desktop
-  implementation target: Desktop app plus installer first-run flow
+  implementation target: デスクトップアプリとインストーラー初回実行フロー
   classification: required_for_v1
   blocks_release: yes
 
-- requirement: Local GUI and environment control without forcing normal users through Docker/CLI setup.
+- requirement: 通常ユーザーにDockerやCLIのセットアップを強制せず、ローカルGUIと環境制御を提供する。
   source/competitor: OpenHands
-  implementation target: Setup Doctor and installer recovery actions
+  implementation target: Setup Doctorとインストーラーの復旧操作
   classification: required_for_v1
   blocks_release: yes
 
-- requirement: Runtime manifests and adapter manifests for local LLM runtimes.
-  source/competitor: LM Studio, Open WebUI, Ollama
+- requirement: ローカルLLMランタイム向けにランタイムマニフェストとアダプターマニフェストを提供する。
+  source/competitor: LM Studio、Open WebUI、Ollama
   implementation target: Runtime Catalog
   classification: required_for_v1
   blocks_release: yes
 
-- requirement: Agent sessions, tasks, workspaces, tool calls, diffs, commits, approvals, and audit logs as first-class contracts.
-  source/competitor: Codex-like coding agents and AIDev paper
+- requirement: エージェントセッション、タスク、ワークスペース、ツール呼び出し、差分、コミット、承認、監査ログを第一級の契約として扱う。
+  source/competitor: Codex系コーディングエージェントおよびAIDev論文
   implementation target: Agent Runtime Contract
   classification: required_for_v1
   blocks_release: yes
 
-- requirement: Live integrations for all major coding agents.
-  source/competitor: Codex, Claude Code, Copilot, Cursor, Devin, OpenHands
-  implementation target: adapter packages
+- requirement: 主要なコーディングエージェントすべてとの実運用統合を提供する。
+  source/competitor: Codex、Claude Code、Copilot、Cursor、Devin、OpenHands
+  implementation target: アダプターパッケージ
   classification: post_v1_scope
-  reason: v1.0 requires generic Agent Runtime contract and mock/reference agent.
+  reason: v1.0では汎用のAgent Runtime契約とmock/reference agentが必要である。
   blocks_release: no
 
-- requirement: Cloud sync and multi-user administration.
-  source/competitor: broader runtime management products
-  implementation target: post-v1 service layer
+- requirement: クラウド同期と複数ユーザー管理を提供する。
+  source/competitor: より広いランタイム管理製品群
+  implementation target: v1以後のサービス層
   classification: post_v1_scope
-  reason: v1.0 is desktop-first, local-first, single-user.
+  reason: v1.0はデスクトップ優先、ローカル優先、単一ユーザー向けである。
   blocks_release: no
 
-- requirement: Only local single-user mode in v1.0.
-  source/competitor: AnythingLLM Desktop positioning
-  implementation target: README, CLAIM, installer, Shell Core assumptions
+- requirement: v1.0ではローカル単一ユーザーモードだけを提供する。
+  source/competitor: AnythingLLM Desktopの位置付け
+  implementation target: README、CLAIM、インストーラー、Shell Coreの前提
   classification: known_limitation
-  reason: deliberate v1.0 scope.
+  reason: 意図して定めたv1.0の範囲である。
   blocks_release: no
+~~~

@@ -1,6 +1,6 @@
-# Content Exposure Policy
+# 内容露出方針（Content Exposure Policy）
 
-## Visibility levels
+## 表示範囲の level
 
 ```text
 none
@@ -10,20 +10,20 @@ redacted
 full
 ```
 
-## Rules
+## 規則
 
-- `none`: raw content must not be shown.
-- `hash_only`: only payload hash may be shown.
-- `summary`: only runtime/adapter-approved summary may be shown.
-- `redacted`: only redacted diff/content may be shown.
-- `full`: full content may be shown.
+- `none`: 未加工の content を表示してはならない。
+- `hash_only`: payload hash だけを表示できる。
+- `summary`: Runtime / Adapter が承認した summary だけを表示できる。
+- `redacted`: redacted diff / content だけを表示できる。
+- `full`: content の全文を表示できる。
 
-## Default
+## 既定値
 
-Default is `none`.
+default は `none` である。
 
-Policies may allow stronger visibility values, but the safe default must remain `none`.
+Policy はより強い visibility value を許可できるが、安全側の default は `none` のまま維持しなければならない。
 
-Full payload display is permitted only when the effective approval or content exposure contract says `content_visibility=full`.
+有効な Approval Contract または Content Exposure Contract が `content_visibility=full` と定める場合に限り、full payload の表示を許可する。
 
-`full_payload` may exist in approval storage. Storage presence is not display permission. UI projection must suppress it unless the effective visibility is `full`.
+`full_payload` は Approval の保存領域に存在し得る。保存されていること自体は表示権限ではない。有効な visibility が `full` でない限り、UI projection はこれを抑止しなければならない。

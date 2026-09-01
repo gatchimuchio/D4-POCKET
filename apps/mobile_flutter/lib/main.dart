@@ -17,9 +17,12 @@ class GuiShellMobileApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GUI Shell Mobile',
+      title: 'GUI Shell モバイル',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xff2f6f5e), useMaterial3: true),
+      theme: ThemeData(
+        colorSchemeSeed: const Color(0xff2f6f5e),
+        useMaterial3: true,
+      ),
       home: const MobileHome(),
     );
   }
@@ -51,12 +54,36 @@ class _MobileHomeState extends State<MobileHome> {
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) => setState(() => selectedIndex = index),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'Review'),
-          NavigationDestination(icon: Icon(Icons.notifications_outlined), selectedIcon: Icon(Icons.notifications), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: 'Runtime'),
-          NavigationDestination(icon: Icon(Icons.stop_circle_outlined), selectedIcon: Icon(Icons.stop_circle), label: 'Stop'),
-          NavigationDestination(icon: Icon(Icons.health_and_safety_outlined), selectedIcon: Icon(Icons.health_and_safety), label: 'Recover'),
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: '概要',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check),
+            label: '確認',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications),
+            label: '通知',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.hub_outlined),
+            selectedIcon: Icon(Icons.hub),
+            label: '実行系',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.stop_circle_outlined),
+            selectedIcon: Icon(Icons.stop_circle),
+            label: '停止',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.health_and_safety_outlined),
+            selectedIcon: Icon(Icons.health_and_safety),
+            label: '復旧',
+          ),
         ],
       ),
     );
