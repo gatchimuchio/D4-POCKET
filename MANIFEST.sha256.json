@@ -78,7 +78,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1c3137fe57afd56dd429b52f43b2c21cd7f0f10c5657c9f5238ff6c7b442c1a2"
+      "sha256": "3cf73245e4f7eb6ea88b18971e0f46f255ce4a6c8d581b7a6ef8ad50030072a5"
     },
     {
       "path": "CLAIM.md",
@@ -106,11 +106,23 @@
     },
     {
       "path": "LICENSE",
-      "sha256": "44b5106631e1551b963c767d73ad38949c6890e47b9a17e6543546cfadf64f96"
+      "sha256": "b0e07c0d741166e333759d8352bb403742878d5514474a8cad77c483103218be"
+    },
+    {
+      "path": "LICENSE-APACHE-2.0",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "LICENSE-CC-BY-4.0",
+      "sha256": "b80efe348d5085aa93b894fce39d4aa2d7dc9616030fdadfd5dde9ea5e474104"
     },
     {
       "path": "MOBILE_STATUS.md",
       "sha256": "275500617e8f1ad5f2a8eba550d44e851d01a804d37dea10bd60ec83c1a79dd8"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "e72da805f9e728fa5b87e582d2567f21b50b2553470b0a6cf6799d7240bcc84a"
     },
     {
       "path": "QUICKSTART.md",
@@ -118,7 +130,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "5174132e89105a179b141ea73f3aae2d97efa9f378216e392b0bfdb03b5c82ad"
+      "sha256": "0e0ee7ec83c1047300bc142eac675a601ff4e39db6599faf3e465748c95b5f5c"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -862,7 +874,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "41419f2bc3dc6e97651f5969351b64d68658332a9f3b89e449e2ff699d388b69"
+      "sha256": "19dd5e99c5bcbd38ac6a0772243a5795beefdc6fe5672e9e2ebf20ceeb4ce068"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -1410,7 +1422,7 @@
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",
-      "sha256": "176ada0c2b063f56975c600196c368e366798812426a963121fd267adb7dc358"
+      "sha256": "a98b240f0bbf36ed800b6eae23e30107d2c25a63c62505e0235b36fa700b4c0a"
     },
     {
       "path": "\u898f\u5b9a/00_\u65e5\u672c\u8a9e\u57fa\u5e95\u898f\u5b9a.md",
@@ -1418,7 +1430,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u65e5\u672c\u8a9e\u57fa\u5e95\u4f8b\u5916.json",
-      "sha256": "5e50e8abd8409b8e70be6a7b9f9a20203f4982783ac521536c97b0dc3b20caa8"
+      "sha256": "b60bf14db2df199a1693cb0606a357bf8d94436d9a0ce1218c68ca1289447696"
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",

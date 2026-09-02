@@ -13,6 +13,7 @@
 - 有効な contract 例と無効 fixture 拒否により schema 検証を強化した。
 - Tauri fallback 調査 note を追加した。
 - MIT license を追加した。
+- ライセンスを、ソフトウェアは Apache-2.0、文書は CC-BY-4.0 とする成果物種別別の構成へ更新した。選択式デュアルライセンスではなく、MINIDORA の現行ライセンス構成（参照commit `5d0c01f0f85ea23d1002819f978c7de9ddd4a3d0`）と整合させた。
 - 曖昧な BLUE-TANUKI 固定表現を、段階0の参照 runtime contract 対象という表現へ置き換えた。
 - adapter 権限昇格、安全でない update policy、不正な approval hash、content exposure の既定 full 表示に対する negative contract fixture を追加した。
 - `examples/contracts/*.valid.json` から検査を駆動する conformance coverage を追加した。

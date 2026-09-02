@@ -9,7 +9,8 @@
 <p><em>Runtime・Agent 操作の control plane、かつ LLM が読む「アプリケーション責任基盤」</em></p>
 
 <p>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <a href="LICENSE-APACHE-2.0"><img alt="Software License: Apache-2.0" src="https://img.shields.io/badge/Software-Apache--2.0-blue.svg"></a>
+  <a href="LICENSE-CC-BY-4.0"><img alt="Documentation License: CC BY 4.0" src="https://img.shields.io/badge/Documentation-CC%20BY%204.0-lightgrey.svg"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20in%20progress-orange.svg">
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
@@ -357,7 +358,12 @@ repository 文書にある未完了項目は、すべて <code>release_blocker</
 
 ## 📝 ライセンス
 
-**MIT License** で配布する。[LICENSE](LICENSE) を参照すること。
+成果物の種類ごとにライセンスを分離する。
+
+- ソースコード、テスト、ツールその他のソフトウェア構成物: [Apache License 2.0](LICENSE-APACHE-2.0)
+- 仕様、設計、READMEその他の文書・知的成果物: [Creative Commons Attribution 4.0 International](LICENSE-CC-BY-4.0)
+
+これは、すべてのファイルについていずれかを任意に選べるデュアルライセンスではない。適用範囲と第三者由来物の扱いは [LICENSE](LICENSE) と [NOTICE](NOTICE) を参照すること。
 
 <br>
 

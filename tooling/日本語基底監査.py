@@ -245,6 +245,14 @@ def _scope_has_wildcard(scope: str) -> bool:
     return any(char in scope for char in "*?[")
 
 
+def _allowed_legal_text_scope(scope: str) -> bool:
+    return re.fullmatch(
+        r"(?:LICENSE|LICENCE|COPYING|NOTICE)(?:[-.][A-Za-z0-9][A-Za-z0-9.+-]*)?",
+        Path(scope).name,
+        flags=re.IGNORECASE,
+    ) is not None
+
+
 def _allowed_generated_scope(scope: str) -> bool:
     name = Path(scope).name.lower()
     return (
@@ -353,7 +361,7 @@ def load_registry(root: Path, repository_files: list[str], failures: list[str]) 
                     failures.append(f"{label}: 保存証拠の wildcard scope が局所 proof pack ではない: {scope}")
         if category == "法的原文":
             for scope in scopes_raw:
-                if Path(str(scope)).name.upper() not in {"LICENSE", "COPYING", "NOTICE"}:
+                if not _allowed_legal_text_scope(str(scope)):
                     failures.append(f"{label}: 法的原文 scope の種類が不明: {scope}")
         if category == "保存証拠":
             for scope in scopes_raw:
@@ -1438,6 +1446,8 @@ def run_self_tests() -> int:
     registry = Registry((entry,), ())
     check(exception_for_path("LICENSE", registry) == entry, "固定 path 例外の一致失敗")
     check(exception_for_path("README.md", registry) is None, "局所例外が能動文書へ漏れた")
+    check(_allowed_legal_text_scope("LICENSE-APACHE-2.0"), "SPDX付きライセンス名の分類失敗")
+    check(not _allowed_legal_text_scope("README-LICENSE"), "一般文書を法的原文名として許可した")
     check(_allowed_generated_scope("**/*.lock"), "lockfile scope を生成物として分類できない")
     check(
         not _allowed_generated_scope("docs/**"),

@@ -6,9 +6,9 @@
     {
       "id": "JBE-001",
       "scopes": [
-        "LICENSE"
+        "LICENSE-APACHE-2.0"
       ],
-      "region": "MIT License の法的原文全体",
+      "region": "Apache License 2.0 の法的原文全体",
       "category": "法的原文",
       "handling": "exclude_file",
       "integrity": "sha256",
@@ -168,8 +168,8 @@
   ],
   "frozen_assets": [
     {
-      "path": "LICENSE",
-      "sha256": "44b5106631e1551b963c767d73ad38949c6890e47b9a17e6543546cfadf64f96",
+      "path": "LICENSE-APACHE-2.0",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "exception_id": "JBE-001"
     },
     {
