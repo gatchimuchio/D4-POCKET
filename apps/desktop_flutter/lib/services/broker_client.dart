@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-abstract class BrokerTransport {
-  Future<Map<String, Object?>> request(
-    String operation, {
-    Map<String, Object?>? payload,
-  });
-}
+import 'package:gui_shell_ui/runtime_dialogue_client.dart'
+    show BrokerTransport, BrokerClientException;
+export 'package:gui_shell_ui/runtime_dialogue_client.dart'
+    show BrokerTransport, BrokerClientException;
 
 class BrokerClient implements BrokerTransport {
   BrokerClient._(this._endpoint);
@@ -63,7 +61,8 @@ class BrokerClient implements BrokerTransport {
       socket.write('${_endpoint.sessionSecret}\n');
       socket.write('${jsonEncode(request)}\n');
       await socket.flush();
-      final bytes = await socket.fold<BytesBuilder>(BytesBuilder(copy: false), (buffer, chunk) {
+      final bytes = await socket.fold<BytesBuilder>(BytesBuilder(copy: false),
+          (buffer, chunk) {
         if (buffer.length + chunk.length > 4 * 1024 * 1024) {
           throw const BrokerClientException('broker応答が受信上限を超えました');
         }
@@ -107,14 +106,19 @@ class BrokerEndpoint {
   final int maxRequestBytes;
 
   factory BrokerEndpoint.fromJson(Map<String, Object?> json) {
-    if (json['host'] != '127.0.0.1' || json['port'] is! int ||
-        (json['port']! as int) < 1 || (json['port']! as int) > 65535 ||
+    if (json['host'] != '127.0.0.1' ||
+        json['port'] is! int ||
+        (json['port']! as int) < 1 ||
+        (json['port']! as int) > 65535 ||
         json['transport'] != 'authenticated_loopback_tcp' ||
-        json['session_id'] is! String || (json['session_id']! as String).isEmpty ||
+        json['session_id'] is! String ||
+        (json['session_id']! as String).isEmpty ||
         json['session_secret'] is! String ||
-        !RegExp(r'^[a-f0-9]{64}$').hasMatch(json['session_secret']! as String) ||
+        !RegExp(r'^[a-f0-9]{64}$')
+            .hasMatch(json['session_secret']! as String) ||
         (json['session_secret']! as String).length != 64 ||
-        json['max_request_bytes'] is! int || (json['max_request_bytes']! as int) < 1) {
+        json['max_request_bytes'] is! int ||
+        (json['max_request_bytes']! as int) < 1) {
       throw const BrokerClientException('brokerの接続先または通常資格が不正です');
     }
     return BrokerEndpoint(
@@ -126,15 +130,6 @@ class BrokerEndpoint {
       maxRequestBytes: json['max_request_bytes'] as int? ?? 0,
     );
   }
-}
-
-class BrokerClientException implements Exception {
-  const BrokerClientException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }
 
 Map<String, Object?> _readJsonFile(String path) {

@@ -7,6 +7,8 @@ environment:
   sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
+  gui_shell_ui:
+    path: ../../packages/gui_shell_ui
   flutter:
     sdk: flutter
 

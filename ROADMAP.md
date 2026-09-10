@@ -13,6 +13,8 @@
 
 実行系対話要求・応答・セッション・比較結果を日本語で先に定義し、Flutter → Shell Core / Rust broker → Adapter → Runtime の責任を維持する。MINIDORA の実物 API は実装前に確認し、内部実装を Shell Core へ輸入しない。
 
+Flutter共通化単位では `packages/gui_shell_ui` の analyze/test をlocal validationへ追加する。共有層は表示・通常client契約に限定し、DesktopとMobileの接続・資格保管はplatform側に残す。Mobile正式projectの足場と端末連携の完成を区別し、未接続の画面を実状態として報告しない。
+
 ## 完了監査の優先事項
 
 ~~~yaml

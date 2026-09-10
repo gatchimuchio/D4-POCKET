@@ -109,6 +109,13 @@ server.serve_forever()
                     dart = shutil.which("dart")
                     if dart is None:
                         raise RuntimeError("Dart実行環境がない")
+                    # Windowsのbatを親にすると失敗時の子Dartがlogを保持する。
+                    # Flutter同梱の実executableを直接使い、終了責任をこのprocessへ結合する。
+                    if os.name == "nt" and Path(dart).suffix.lower() == ".bat":
+                        executable = Path(dart).parent / "cache/dart-sdk/bin/dart.exe"
+                        if not executable.is_file():
+                            raise RuntimeError("Flutter同梱Dart executableがない")
+                        dart = str(executable)
                     driver = subprocess.Popen([dart, "run", str(ROOT / "apps/desktop_flutter/tool/dialogue_live_client.dart"),
                         str(normal_file), str(root)], cwd=ROOT / "apps/desktop_flutter", stdout=log, stderr=log)
                     processes.append(driver)

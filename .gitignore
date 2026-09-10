@@ -6,6 +6,9 @@ apps/desktop_flutter/.dart_tool/
 apps/desktop_flutter/build/
 apps/mobile_flutter/.dart_tool/
 apps/mobile_flutter/build/
-apps/mobile_flutter/pubspec.lock
 /release_evidence/*
 !/release_evidence/.gitkeep
+
+packages/gui_shell_ui/.dart_tool/
+packages/gui_shell_ui/build/
+packages/gui_shell_ui/pubspec.lock
