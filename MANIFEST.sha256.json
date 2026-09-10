@@ -170,7 +170,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "d93ebcda89afe77548066e9cb433f827a7440a45d8c8d4fab06d7f349a00440e"
+      "sha256": "f3661dc58b727dd95f73adc23157d608ad69e234ae36adee364ed04ae958a996"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -303,6 +303,114 @@
     {
       "path": "apps/desktop_flutter/linux/runner/my_application.h",
       "sha256": "a4218d7ac0db8a9a6716daf216b2d4fc6bdc7ac647e3183078b2c962ebdfcf70"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/.gitignore",
+      "sha256": "236a523a43625a2d63af3cd0f2ce8600a3668846f8cb278c1c7c5cbfd4aa4088"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Flutter/Flutter-Debug.xcconfig",
+      "sha256": "7e9b3ee3961b7d7718b418ceaed812a5f06a4e4cec894aae712a78e159c32ab0"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Flutter/Flutter-Release.xcconfig",
+      "sha256": "7e9b3ee3961b7d7718b418ceaed812a5f06a4e4cec894aae712a78e159c32ab0"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner.xcodeproj/project.pbxproj",
+      "sha256": "0e5dfbda09a7092d2dd6ed477283d3ef5e9607a1f161a15f50f30dc6a52b0a70"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "d557c2c32fc6258ec28981fa45dc847b76c9968beb90a2e26d13ef9c4ea45c30"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme",
+      "sha256": "61a6211e83d81a940ad3c86f998a5417d1d1417d2a88d9eecccece711880f6aa"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner.xcworkspace/contents.xcworkspacedata",
+      "sha256": "706a4c812f2a1e220e6785c27580020d58048e2ae4d30d1280f3c43344ce6b38"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "d557c2c32fc6258ec28981fa45dc847b76c9968beb90a2e26d13ef9c4ea45c30"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/AppDelegate.swift",
+      "sha256": "5b9cbdcb563ad8578a99b7c283958490e4af537322e9092fe1efbb3c29ab3e1b"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "sha256": "992ba63d183dfb8f8e3af38ac203d834d23c004da1417c438b4c5a3d7d1d7103"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png",
+      "sha256": "6232e5815af17e25e0268b2fec7aea9e068cc92ec709e9605c2b31df4ff2a313"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png",
+      "sha256": "15591f03f31313af6fd644ed0512106cc04365130b8b73244f1cfa6dddfb4400"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png",
+      "sha256": "cc6928b5adfc00dbf526192e2705dd9af641cdf20ab4c6c7ca7cd4936dca59f0"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png",
+      "sha256": "416efd77cde932d42ef34168da24dd428a495b1f4f34bbbd125a18d2add186a2"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png",
+      "sha256": "ae8c4458e41f1e28b1e851ed87d3268d4a0351ceea427fa2a84cc94ddfb6d4c5"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png",
+      "sha256": "0a91c6c1bf242e54ee179e34629e9ef3e8a6d286c0fce01e302280a8be9277e6"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png",
+      "sha256": "6ad229623498e5f1277800db3ab7cb11faf85eb2569e1213f7d8e55003c07b42"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Base.lproj/MainMenu.xib",
+      "sha256": "776c35481f6581f14148b90071558b25f6ce6262e771988985e9fe8d3e70a472"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Configs/AppInfo.xcconfig",
+      "sha256": "17088956adae6310675528cda8dec45a7a1663aaf5771f47591860520181c606"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Configs/Debug.xcconfig",
+      "sha256": "86be603022e2a385dd7884fce4cc29255676c3dda579d3d4a56c958bf1e57de0"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Configs/Release.xcconfig",
+      "sha256": "d1bf3f0349aadd5c58ee9d46c0ce4ce45467127c438936e9bb481d861d296565"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Configs/Warnings.xcconfig",
+      "sha256": "aa8ded4c14068cb05f51f5446509fe56805cf1e29961ad6d5a97233bb0632bc1"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/DebugProfile.entitlements",
+      "sha256": "c4d7ab88d5ad386cbe2d6b6bbdb64d1eb6adf76e5a52ee0e8d17e45e5776bc5f"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Info.plist",
+      "sha256": "047f9cb0f1122c04589483beaedbbe23492fdc8946b94e09bb13080736af4f93"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/MainFlutterWindow.swift",
+      "sha256": "8178ad756f958f986f794a8bb06e321a6630ceaaf8f235b3b4ae3936e415dc7c"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Runner/Release.entitlements",
+      "sha256": "dfd7e9f018d1556583b13f731e0786132f674a1a70c6ee111386513e0140e9a4"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/RunnerTests/RunnerTests.swift",
+      "sha256": "c204541e2cae12bd71ef7fe1ebecb8c9360bcb3a29a2b28e91b73497aa8962fe"
     },
     {
       "path": "apps/desktop_flutter/pubspec.lock",
@@ -770,7 +878,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "3f3aa70cd6ebf0deff405bd38f0e3886747e23140c5d7d745c2295e383b4449c"
+      "sha256": "7a0adc5240385554aa4582de435e866a81b818282e92514e8cab1812b742367d"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

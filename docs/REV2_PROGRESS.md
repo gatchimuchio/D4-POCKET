@@ -191,3 +191,6 @@ JDK17の`jarsigner -verify`は終了値0だが、自己署名・timestampなし�
   blocks_release: yes
 
 workflow追加のlocal検証はSchema（35正常・37否定）、conformance（147項目）、日本語厳格監査がPASS。これは手動起動限定のCONFIG検証であり、外部build結果は手動実行後に記録する。
+
+
+Apple初回補助実行（run 34445302630、対象52bcbd2cc82519f5f6ebc6c80c8c60f96a1e12af）はRust64単体・5統合およびarm64 Mach-O buildがPASS。macOS project未追加によりFlutter buildがFAILし、iOSは未実行となった。分類はproduct regressionではなく未実装構成の検出であり、この時点のApple buildはrelease_blockerである。固定Flutter標準生成元からmacOS projectを追加し、Sandboxを保持したまま既存broker用network.clientを指定する。正式配布・実機資格配置はDesktop READMEのrelease_blockerへ保持する。

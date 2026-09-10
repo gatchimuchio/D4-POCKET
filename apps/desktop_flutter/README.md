@@ -15,3 +15,14 @@ blocks_release: no
 - 明示的な境界を通じて adapter/runtime API を呼び出す
 
 権限判定を所有してはならない。
+
+
+## macOS開発構成
+
+Flutter 3.44.0の標準macOS projectを追加した。App Sandboxを保持し、既存の認証付きloopback brokerへの接続にnetwork.clientを指定する。Debug/Profileのnetwork.serverとJITはFlutter標準の開発用設定であり、Releaseには追加しない。広域file accessやowner資格の読取権限は追加しない。通常資格fileはapp container内に明示配置する必要があり、外部pathを設定するだけではSandbox外の読取を許可しない。
+
+- item: macOS実機のbroker資格配置・起動・配布
+  classification: release_blocker
+  reason: 標準projectと補助buildは実機のcontainer内資格配置・対話・署名を証明しない。bundle identifierは開発用である。
+  required_action: Mac実機で資格配置と実対話を確認し、正式識別子・署名・配布手順を確定する。
+  blocks_release: yes
