@@ -80,6 +80,25 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  testWidgets('停止中は接続せず復帰時に照会だけ再開する', (tester) async {
+    final f = DialogueFixture();
+    Widget screen(bool active) => MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                connect: () async => RuntimeDialogueClient(f),
+                active: active)));
+    await tester.pumpWidget(screen(false));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+    expect(f.calls, isEmpty);
+    await tester.pumpWidget(screen(true));
+    await tester.pumpAndSettle();
+    expect(f.calls, ['実行系列挙']);
+    await tester.pumpWidget(screen(false));
+    await tester.pump(const Duration(seconds: 2));
+    expect(f.calls, ['実行系列挙']);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('デモ表示は対話を送信しない', (tester) async {
     final f = DialogueFixture();
     await tester.pumpWidget(MaterialApp(

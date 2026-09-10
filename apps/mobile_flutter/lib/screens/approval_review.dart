@@ -13,7 +13,7 @@ class ApprovalReview extends StatelessWidget {
         StatusTile(
           icon: Icons.visibility_off_outlined,
           title: '射影',
-          subtitle: 'content_visibility=redacted。非表示の内容は利用できません',
+          subtitle: 'この画面では承認対象を取得していません。対話結果はCoreが許可した表示範囲だけを表示します',
         ),
         StatusTile(
           icon: Icons.lock_outline,

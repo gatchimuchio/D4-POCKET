@@ -146,6 +146,9 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             else "owner が mobile を明示的に含めない限り、mobile 完全 release は v1.0 desktop scope 外である",
         )
     )
+    if not python_only:
+        steps.append(ValidationStep("mobile_flutter_test", ["flutter", "test"],
+            ROOT / "apps" / "mobile_flutter", "flutter"))
     return steps
 
 

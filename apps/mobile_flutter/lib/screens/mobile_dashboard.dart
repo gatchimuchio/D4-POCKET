@@ -3,27 +3,24 @@ import 'package:flutter/material.dart';
 import 'shared.dart';
 
 class MobileDashboard extends StatelessWidget {
-  const MobileDashboard({super.key});
+  const MobileDashboard({super.key, this.status = '未接続'});
+  final String status;
 
   @override
   Widget build(BuildContext context) {
-    return const MobilePage(
+    return MobilePage(
       title: 'モバイル概要',
       children: [
-        StatusTile(
-          icon: Icons.hub_outlined,
-          title: '実行系',
-          subtitle: 'BLUE-TANUKIはアダプター契約を通じて準備完了です',
-        ),
+        StatusTile(icon: Icons.hub_outlined, title: '実行系', subtitle: status),
         StatusTile(
           icon: Icons.fact_check_outlined,
           title: '承認',
-          subtitle: '墨消し射影による確認が1件保留中です',
+          subtitle: '対話ごとにDesktop ownerの承認が必要です。Mobileは承認資格を保持しません',
         ),
         StatusTile(
           icon: Icons.link_outlined,
           title: 'ペアリング',
-          subtitle: 'device_id、pairing_id、操作者確認が必要です',
+          subtitle: '接続先画面で端末IDと招待を確認して結合します',
         ),
       ],
     );

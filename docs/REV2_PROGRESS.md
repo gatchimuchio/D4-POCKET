@@ -147,3 +147,35 @@ Desktop単位の最終検証: Windowsの一括14検査はすべてPASS（終了�
 集約検証は14項目PASS、2項目（broker authority parity、cargo test）が起動中のWindows binaryと再buildの競合によるOS error 5で失敗した。実通信processの終了後に順番を分け、両項目を再実行してPASS。製品や検査に回避層は追加していない。修正後の実TLS＋実MINIDORA＋製品Dart clientも再実行してPASSした。
 
 最終監査では、試験内のraw file読取がhelper境界の禁止patternに該当したため、既存の `BrokerPersistentStore` 再読取・chain検証経路で監査記録を確認する試験へ置換した。検出器は変更していない。また高負荷時に既存取消試験の固定150ms待機が不足したため、取消の即時結果と空本文のassertionを保持し、2秒以内の実受信完了を待ってraw保持を検査する形へ修正した。再実行は63単体・5統合でPASS。TLS session再開も無効にし、毎接続の端末資格検査を維持した。
+
+
+## Mobile製品client・安全保管・lifecycle
+
+MobileのTLS clientは招待のHost・端末ID・証明書hashを固定し、実peer照合と証明書有効期間の確認より前にapplication資格を送らない。重複field・未知field・不正型・期限・private IPv4境界を拒否する。通常操作allowlistと有限通信期限を持ち、owner資格やRuntime直結を導入しない。
+
+Androidの安全保管とiOS Keychainを接続し、書込後の再読取を必須にした。保管失敗時の平文fallbackはない。Android backup・device transferを除外した。復帰時は資格を再確認し、background中の通信と保留入力の自動再送を停止する。失効・不正資格・通信失敗時は入力を止め、正常解除と通信不能時のlocal削除を区別する。
+
+既存6画面を維持し、対話・接続先・設定を追加した。固定previewの準備完了・承認件数を除去した。共有対話画面はinactive時に接続・polling・送信を停止し、再開時に照会する。旧previewのdevice_id / pairing_idと現行端末ID / 結合IDの対応を復旧画面ソースへ記録し、既存conformanceの用語検査を保持した。
+
+`python tooling/minidora_live_check.py --reference C:/Users/mzcum/codex-work/MINIDORA-reference --dart-mobile-client` はPASS。Mobile製品Dart client → 実TLS → Rust Core → 実MINIDORA二processで本文・追跡・owner承認を検証した。異なる証明書の拒否、停止・再確認、失効後の拒否もPASS。OS安全保管と実機lifecycleの証拠には昇格しない。
+
+`flutter analyze` と `flutter test`（Mobile12件）はPASS。初回widget試験は概要とdrawerの同名表示を両方拾って失敗したため、検査対象を実際のNavigationDrawerに限定して再実行した。安全保管失敗、期限・構造・Host不一致、資格確認と復帰の競合、local削除、破損資格の上書き拒否を含むFIXTURE検証である。
+
+Android初回buildはFlutter生成値のGradle heap 8GBでnative memory allocationに失敗した（環境要因）。heap 2GB、metaspace 768MB、worker 2に限定した。次のbuildではflutter_secure_storage 11がSDK 37を要求し、AGP 9.0.1が新しいandroid-37.0を解決できず失敗した（toolchain互換性）。標準のSDK packageが不存在の`platforms;android-37`を要求するsdkmanagerコマンドも失敗した。公式対応表に従いAGP 9.1.1 / Gradle 9.3.1へ更新した。SDK directoryの偽装・pluginソース改変・依存検査の抑止は行わない。
+
+一次資料: [AGP 9.1.1の対応範囲](https://developer.android.com/build/releases/agp-9-1-0-release-notes)、[FlutterのAGP 9移行](https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin)。
+
+- item: Android/iOSのOS安全保管・実機install・launch・lifecycle
+  classification: release_blocker
+  reason: host上のDart実通信とFlutter fixtureは実機での成立を証明しない。ADB接続済み実機はまだ検出されていない。
+  required_action: buildを成立させ、実機で保存・再起動・結合・対話・失効・復帰を測定する。
+  blocks_release: yes
+
+集約検証は17項目中16項目がPASSし、共有UI analyzeの波括弧lintだけが失敗した。修正後の共有analyzeはPASS。共有6試験・Desktop32試験・Rust63単体と5統合・broker parity・packaging・Schema・conformanceは集約時にPASSした。MobileはHost照合前の送信禁止と保管障害からの復帰試験を追加し、最終analyze・14試験がPASSした。
+
+
+AndroidのAGP修正後、`flutter build apk --debug` はPASS（初回1778.1秒）。IME学習・自動入力の無効指定を含む最終ソースで再buildし38.5秒、`flutter build appbundle --debug` は42.0秒でPASS。SDK 35とCMake 3.22.1もpluginの標準依存として導入された。Kotlinの生存markerは`.kotlin` cacheとしてignoreし、生成物をcommitしない。
+
+開発APKは175738543 bytes、SHA-256 `e5c5f30108f812d92e444993087c417a812806c2f47f3a445454035743dffdb6`。開発AABは71596894 bytes、SHA-256 `0ce3fdb996e048c98e665c5c770bac8a188a5e39dc3b57b115a395da35764586`。APKはarm64-v8a、armeabi-v7a、x86_64を含む。`apksigner verify --verbose --print-certs` はPASS、Android DebugのRSA 2048 / v2署名であり公開配布署名ではない。`zipalign -c -P 16 4` はPASS。`apkanalyzer manifest print` でmin SDK 24、target SDK 36、debuggable=true、allowBackup=false、fullBackupContent=false、usesCleartextTraffic=false、dataExtractionRulesの実格納を確認した。これは生成物のCONFIG / EXTERNAL_EVIDENCEであり実機の動作証拠ではない。
+
+JDK17の`jarsigner -verify`は終了値0だが、自己署名・timestampなし・POSIX属性・JarFileとJarInputStreamの検証差について警告した。警告を削除するための再梱包は行わない。公式bundletool 1.18.3（公開asset SHA-256 `a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29` を照合）の`validate --bundle=...`と`build-apks --bundle=... --mode=universal --output=...`はいずれもPASS。変換したuniversal APKのapksigner検証もPASS。AABのAndroid工具による消費は確認できたが、正式配布・署名・汎用JAR stream検証差は次の配布前確認へ保持する。

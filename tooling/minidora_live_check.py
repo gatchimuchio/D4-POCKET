@@ -67,7 +67,7 @@ def 終了(process):
         process.wait(timeout=5)
 
 
-def 検証(reference, binary, dart_client=False, mobile_client=False):
+def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False):
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -100,7 +100,7 @@ server.serve_forever()
                 owner_file = root / "owner.json"
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file),
-                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client else [])], cwd=root, stdout=log, stderr=log)
+                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = file待機(normal_file, broker)
                 owner = file待機(owner_file, broker)
@@ -109,7 +109,7 @@ server.serve_forever()
                 if mobile_client:
                     from tooling.device_link_live_check import 検証 as 端末検証
                     assert 端末検証(normal, owner, binary, root) == "PASS"
-                if dart_client:
+                if dart_client or dart_mobile_client:
                     dart = shutil.which("dart")
                     if dart is None:
                         raise RuntimeError("Dart実行環境がない")
@@ -120,18 +120,28 @@ server.serve_forever()
                         if not executable.is_file():
                             raise RuntimeError("Flutter同梱Dart executableがない")
                         dart = str(executable)
-                    driver = subprocess.Popen([dart, "run", str(ROOT / "apps/desktop_flutter/tool/dialogue_live_client.dart"),
-                        str(normal_file), str(root)], cwd=ROOT / "apps/desktop_flutter", stdout=log, stderr=log)
-                    processes.append(driver)
-                    ready = file待機(root / "dart-ready.json", driver)
-                    pending = 成功(owner, "対話承認待ち", {})["要求"]
-                    selected = [v for v in pending if v["要求"]["要求ID"] in ready["requests"]]
-                    assert len(selected) == 2
-                    for item in selected:
-                        成功(owner, "対話承認", {"要求ID": item["要求"]["要求ID"], "要求hash": item["要求hash"], "表示範囲": "full"})
-                    driver.wait(timeout=25)
-                    assert driver.returncode == 0, "Dart製品clientの試験失敗"
-                    assert json.loads((root / "dart-result.json").read_text())["result"] == "PASS"
+                    drivers = []
+                    if dart_client:
+                        drivers.append(("desktop_flutter", "dialogue_live_client.dart", normal_file, "dart"))
+                    if dart_mobile_client:
+                        import uuid
+                        invitation_file = root / "mobile-dart-invitation.json"
+                        subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file),
+                            "端末招待", uuid.uuid4().hex, "127.0.0.1", str(invitation_file)], check=True, stdout=log, stderr=log, timeout=10)
+                        drivers.append(("mobile_flutter", "device_link_live_client.dart", invitation_file, "mobile-dart"))
+                    for app, script, credential_file, prefix in drivers:
+                        driver = subprocess.Popen([dart, "run", str(ROOT / "apps" / app / "tool" / script),
+                            str(credential_file), str(root)], cwd=ROOT / "apps" / app, stdout=log, stderr=log)
+                        processes.append(driver)
+                        ready = file待機(root / f"{prefix}-ready.json", driver)
+                        pending = 成功(owner, "対話承認待ち", {})["要求"]
+                        selected = [v for v in pending if v["要求"]["要求ID"] in ready["requests"]]
+                        assert len(selected) == 2
+                        for item in selected:
+                            成功(owner, "対話承認", {"要求ID": item["要求"]["要求ID"], "要求hash": item["要求hash"], "表示範囲": "full"})
+                        driver.wait(timeout=25)
+                        assert driver.returncode == 0, "Dart製品clientの試験失敗"
+                        assert json.loads((root / f"{prefix}-result.json").read_text())["result"] == "PASS"
 
                 def 対話(runtime, scope, message="こんにちは"):
                     session = 成功(normal, "対話開始", {"実行系ID": runtime})["対話セッションID"]
@@ -188,6 +198,7 @@ server.serve_forever()
                         "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
+                        "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
@@ -203,9 +214,10 @@ def main():
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--dart-client", action="store_true")
     parser.add_argument("--mobile-client", action="store_true")
+    parser.add_argument("--dart-mobile-client", action="store_true")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client, args.dart_mobile_client), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

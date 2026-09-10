@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.gui_shell_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // 安全保管plugin 11の公開build要件。targetとminはFlutterの指定を保持する。
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

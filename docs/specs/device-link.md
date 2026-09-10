@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: Rustの暗号化端末経路とowner制御を実装。Mobile製品clientと安全保管の接続は次単位。契約試験はFIXTUREであり、暗号化や端末実機の証拠とは区別する。
+状態: Rustの暗号化端末経路とowner制御、Mobile製品client・安全保管・lifecycleの接続を実装。Dart製品TLSから実MINIDORAへの接続を検証。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
 
 ## 対象と責任
 

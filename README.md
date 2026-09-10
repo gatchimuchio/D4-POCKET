@@ -238,6 +238,7 @@ cd apps/desktop_flutter    && flutter analyze
 ~~~
 
 Mobile Flutter は <code>post_v1_scope</code> であり、owner が明示的に含めない限り v1.0 product release gate の対象外である。
+現在のowner rev2指示ではMobileを明示的に含めているため、`--include-mobile-release`を使用する。Dart製品clientのTLS・実対話は検証済みだが、iOSのbuild・Android/iOSのOS安全保管・実機lifecycleの未成立は`release_blocker`として扱う。Android開発APK/AABの生成と構造検証は確認した。詳細は`apps/mobile_flutter/README.md`と`docs/REV2_PROGRESS.md`に記録する。
 
 一括 reporter を使う場合:
 

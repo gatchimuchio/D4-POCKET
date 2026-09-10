@@ -5,10 +5,15 @@ import 'runtime_dialogue_client.dart';
 /// 対話の表示と入力だけを所有する。実行の採否はbrokerから取得する。
 class RuntimeDialogueScreen extends StatefulWidget {
   const RuntimeDialogueScreen(
-      {super.key, required this.connect, this.client, this.readOnly = false});
+      {super.key,
+      required this.connect,
+      this.client,
+      this.readOnly = false,
+      this.active = true});
   final Future<RuntimeDialogueClient> Function() connect;
   final RuntimeDialogueClient? client;
   final bool readOnly;
+  final bool active;
   @override
   State<RuntimeDialogueScreen> createState() => _RuntimeDialogueScreenState();
 }
@@ -46,7 +51,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _connect() async {
-    if (_connecting) return;
+    if (_connecting || !widget.active) return;
     setState(() {
       _connecting = true;
       _connectionError = null;
@@ -71,6 +76,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _newSession(_Conversation side) async {
+    if (!widget.active || widget.readOnly) return;
     final client = _client;
     final runtime = side.runtime;
     if (client == null || runtime == null || side.busy || side.pending) return;
@@ -81,6 +87,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     try {
       if (side.session != null) await client.close(side.session!);
       side.session = null;
+      if (!mounted || !widget.active) return;
       final session = await client.start(runtime);
       if (!mounted) {
         await client.close(session);
@@ -104,7 +111,9 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   Future<void> _sendSide(_Conversation side, String input) async {
     final client = _client!;
     if (side.session == null) await _newSession(side);
-    if (!mounted || side.session == null) return;
+    if (!mounted || !widget.active || widget.readOnly || side.session == null) {
+      return;
+    }
     setState(() {
       side.busy = true;
       side.result = null;
@@ -134,7 +143,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _send() async {
-    if (widget.readOnly) return;
+    if (widget.readOnly || !widget.active) return;
     final input = _input.text;
     if (_sending ||
         _client == null ||
@@ -159,10 +168,11 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _poll() async {
-    if (_polling || _client == null || !mounted) return;
+    if (_polling || _client == null || !mounted || !widget.active) return;
     _polling = true;
     try {
       for (final side in [_left, _right]) {
+        if (!widget.active) return;
         if (!side.pending || side.busy || side.request == null) continue;
         final request = side.request!;
         try {
@@ -191,6 +201,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _cancel(_Conversation side) async {
+    if (!widget.active || widget.readOnly) return;
     if (!side.pending || side.request == null || side.busy) return;
     setState(() => side.busy = true);
     try {
@@ -213,6 +224,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _closeSession(_Conversation side) async {
+    if (!widget.active || widget.readOnly) return;
     if (side.busy || side.pending || side.session == null) return;
     setState(() => side.busy = true);
     try {
@@ -237,6 +249,18 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant RuntimeDialogueScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      if (_client == null) {
+        unawaited(_connect());
+      } else {
+        unawaited(_poll());
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _input.dispose();
@@ -256,7 +280,8 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.readOnly ||
+    final active = !widget.active ||
+        widget.readOnly ||
         _sending ||
         _left.pending ||
         _right.pending ||
@@ -267,6 +292,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('実行系との対話', style: Theme.of(context).textTheme.headlineSmall),
         if (widget.readOnly) const Text('デモ表示では送信・セッション変更はできません。'),
+        if (!widget.active) const Text('接続確認または画面復帰まで通信を停止しています。'),
         const SizedBox(height: 8),
         const Text('送信後はownerの承認を待ちます。中止は応答の採用を止めますが、実行系の処理停止や巻戻しを保証しません。'),
         if (_connectionError != null)
@@ -279,7 +305,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
           Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonal(
-                  onPressed: _connecting ? null : _connect,
+                  onPressed: _connecting || !widget.active ? null : _connect,
                   child: Text(_connecting ? '接続中' : '接続を再試行'))),
         if (_client != null && _runtimes.isEmpty)
           const Text('登録された実行系がありません。起動時の実行系登録を確認してください。'),
@@ -350,7 +376,10 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
                         onPressed: active ? null : () => _closeSession(side),
                         child: const Text('セッション終了')),
                   OutlinedButton(
-                      onPressed: !widget.readOnly && side.pending && !side.busy
+                      onPressed: widget.active &&
+                              !widget.readOnly &&
+                              side.pending &&
+                              !side.busy
                           ? () => _cancel(side)
                           : null,
                       child: const Text('中止')),
