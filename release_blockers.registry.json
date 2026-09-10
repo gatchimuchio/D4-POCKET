@@ -95,8 +95,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Windowsの画面回帰はEscで中断し、Linuxの最新binaryの起動再観測も未取得。",
-      "required_action": "画面操作再開のowner指示後にWindows回帰を継続し、Linuxの起動を観測する。"
+      "reason": "Linuxの最新release起動とbroker監査は実測したが、Windowsの画面回帰はEscで中断している。",
+      "required_action": "画面操作再開のowner指示後にWindows回帰を継続する。"
     }
   ]
 }

@@ -376,7 +376,7 @@ repository 文書にある未完了項目は、すべて <code>release_blocker</
 
 - item: Linux対話UIの実起動証拠はWSLgのX11に限定
   classification: known_limitation
-  reason: Linuxで解析・37試験・debug build・製品Dart clientの実MINIDORA接続は成立した。実ウィンドウの可視状態はGTK標準の `GDK_BACKEND=x11` を指定して確認した。既定WaylandのウィンドウはX11検査器では観測できず、Waylandの画面成立をこの証拠から主張しない。
+  reason: Linuxで解析・共有6試験・Desktop32試験・Mobile14試験・release build・製品Dart clientの実MINIDORA接続は成立した。最新releaseのPID一致とIsViewableも観測した。DRI3取得のlibEGL警告があり、GPU性能の保証はしない。実ウィンドウの可視状態はGTK標準の `GDK_BACKEND=x11` を指定して確認した。既定WaylandのウィンドウはX11検査器では観測できず、Waylandの画面成立をこの証拠から主張しない。
   required_action: Wayland環境の画面対応を主張するときは、その環境に対応した表示検証を別途行う。
   blocks_release: no
 

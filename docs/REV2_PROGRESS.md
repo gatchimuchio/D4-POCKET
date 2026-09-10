@@ -216,17 +216,17 @@ rev2全体は未完了。実装済みの対話Core・MINIDORA Adapter・Desktop�
 |Android版|analyze/test、APK/AAB、署名・alignment・bundletool PASS|実機install以降はrelease_blocker|
 |Apple版|手動実行34446194013、対象`27b8713fd1a9ecdb81abe1d4225b99b26bda84ba`でRust単体64・統合5試験、macOS開発app・iOS Simulator appのビルドに合格|実機launch・Keychain・対話はrelease_blocker|
 |Windows版|共有化・端末連携後の集約検査でlint修正後PASS、最新debug build PASS|今回の画面回帰は操作者のEscで中断。installed-path証拠もrelease_blocker|
-|Linux版|最新対話実装のFlutter build、各analyze/test、Rust試験、Desktop/Mobile製品Dart clientと実MINIDORA PASS|最新binaryのlaunch再確認はrelease_blockerとして保持|
+|Linux版|最新対話実装のFlutter build、各analyze/test、Rust試験、Desktop/Mobile製品Dart clientと実MINIDORA PASS|最新release起動とPID一致の可視window・broker監査も確認。WSLg X11の範囲|
 |manifest・梱包|改行修復後のWindows/Linux Python系9検査 PASS。conformance148件|開発検証のpassはstrict releaseのpassではない|
 
 Apple成果物は外部artifact `10139803376`（86677901 bytes）を取得しZIP SHA-256 `3110e6493467eef9c38dc371746655dbbbb7efeb89696ba03421c4916752a9ac` を照合した。内部tar SHA-256 `59496c1c87f3b36f4bb3d7f592457df3315af3099155066f24b0200495041cca` も一致し、両app・Rust実行file・iOS安全保管plugin資産を確認した。環境はmacOS15.7.9 arm64、Xcode16.4、iOS Simulator SDK18.5。追跡差分patchは空。Flutterが生成したmacOS registrantは既存Windows/Linuxと同じく追跡対象へ追加する。生成内容を手編集せず、依存の生成元はpubspecである。
 
 artifact取得の初回HTTP直取得はredirect先で401となり、認証headerを別hostへ引き継がない取得で回復した。ログ表示のcp932 UnicodeEncodeErrorはPYTHONUTF8=1で回復した。いずれも製品build失敗ではない。
 
-- item: Windowsの画面回帰とLinuxの最新binary起動観測
+- item: Windowsの画面回帰
   classification: release_blocker
-  reason: Windows画面操作はEscによる停止を検出し中断した。最新LinuxのbuildとRuntime pathは成立したが今回の起動観測は未取得。
-  required_action: 操作者の画面操作再開許可後に回帰を継続し、Linux起動を観測する。
+  reason: Windows画面操作はEscによる停止を検出し中断した。Linuxの最新build・Runtime path・起動観測は取得した。
+  required_action: 操作者の画面操作再開許可後にWindows回帰を継続する。
   blocks_release: yes
 
 - item: 実機・installed-path・正式配布・owner GO
@@ -234,3 +234,14 @@ artifact取得の初回HTTP直取得はredirect先で401となり、認証header
   reason: Android接続実機なし、Mac/iOS実機なし。Windows installed-pathの隔離・外部改竄証拠と正式配布署名も未成立。
   required_action: 必要な実機とowner指定を取得し、対応する実測とstrict validationを実施する。
   blocks_release: yes
+
+
+## Windows隔離配置・Linux最新起動の追加証拠
+
+対象ソースはcleanな `47299ce839f51f0bcb39cd3d19d98f69f1510003`。Windowsの `cargo build --release --locked --manifest-path native/rust_helper/Cargo.toml` は95秒、`flutter build windows --release` は92.4秒でPASS。`installer/windows/stage_installed_app.ps1` で新規run `rev2-47299ce-20260910` を作成し、source_worktree_clean=trueと生成manifestの実artifact hash一致を確認した。Flutter exe SHA-256は `e671cd41eeb1c1d9c147178f5a4ae5a53052ac375807f421c9bc31e49769f7e6`、Rust exeは `d2015557a120f6552aceb518fc6e30fce36c744b4b384e19bd97161548dbbf07`。
+
+この配置に対する `installer/windows/collect_broker_smoke.ps1` はstatus=passed、errors=[]。制限loopback、認証付きIPC、永続store、再起動後のnonce再使用拒否、新規要求の受理、強制終了後の接続拒否を実測した。証拠は `%LOCALAPPDATA%/GUI-Shell/installed-runs/rev2-47299ce-20260910/runtime/evidence/windows_broker_smoke.json`。画面・Setup Doctor・監査アンカー保護を測定していないため、Windows installed製品全体のgateは解除しない。
+
+Linuxは同じソース系統のrelease binary（SHA-256 `6582fd0acc0b94f0a1c09239af5626c1ada4180150f1ff00a9d25a7bc47268c8`）を実MINIDORA二processとRust brokerに接続して起動した。`GDK_BACKEND=x11` のWSLg環境で、`xwininfo -root -tree`、対象の`xprop -id <観測ID> _NET_WM_PID`、`xwininfo -id <観測ID>` により起動PID411との一致とIsViewableを観測した。app終了前に生存も確認し、検証後に自身のprocessを終了した。
+
+永続監査にはflutter-request-1から5が記録された。health、normalize_payload、content_projection、approval_editの受理と、command_envelopeのsuspendedを確認した。これは起動時の既存broker経路の証拠であり、画面からの対話入力・表示内容全体の証拠ではない。Desktop/Mobile製品Dart clientから実MINIDORAまでの経路は別の実通信検証でPASSしている。DRI3 deviceを取得できないlibEGL警告は出たが起動は成立した。描画性能・Wayland・物理Linux端末への同等性は主張しない。
