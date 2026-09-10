@@ -15,6 +15,7 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 REFERENCE = "3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8"
 
 
@@ -66,7 +67,7 @@ def 終了(process):
         process.wait(timeout=5)
 
 
-def 検証(reference, binary, dart_client=False):
+def 検証(reference, binary, dart_client=False, mobile_client=False):
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -99,12 +100,15 @@ server.serve_forever()
                 owner_file = root / "owner.json"
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file),
-                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}"], cwd=root, stdout=log, stderr=log)
+                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = file待機(normal_file, broker)
                 owner = file待機(owner_file, broker)
                 assert 操作(normal, "対話承認待ち", {})["status"] == "rejected"
                 assert 成功(normal, "実行系列挙", {})["実行系"] == ["left", "right"]
+                if mobile_client:
+                    from tooling.device_link_live_check import 検証 as 端末検証
+                    assert 端末検証(normal, owner, binary, root) == "PASS"
                 if dart_client:
                     dart = shutil.which("dart")
                     if dart is None:
@@ -183,6 +187,7 @@ server.serve_forever()
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
+                        "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
@@ -197,9 +202,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--dart-client", action="store_true")
+    parser.add_argument("--mobile-client", action="store_true")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

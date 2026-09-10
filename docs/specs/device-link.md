@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: rev2の契約定義。契約試験はFIXTUREであり、製品の暗号化・認証・安全保管の実装証拠ではない。
+状態: Rustの暗号化端末経路とowner制御を実装。Mobile製品clientと安全保管の接続は次単位。契約試験はFIXTUREであり、暗号化や端末実機の証拠とは区別する。
 
 ## 対象と責任
 
@@ -9,6 +9,8 @@
 経路は Mobile → 暗号化端末連携 → Desktop Rust broker → Shell Core → Adapter → Runtime とする。Mobileへloopback資格やowner制御資格を渡さない。端末資格はowner承認、汎用command、任意URL送信、Permission変更、監査確定を許可しない。Runtimeへの送信は既存の要求hashへのowner承認を引き続き必要とする。
 
 経路分類はcontrol経路。Capabilityは端末招待・結合・通常対話、Permissionは指定Host・端末・当該端末が作った対話、Approvalは招待時のowner操作と対話ごとの既存承認、AuditEventは発行・結合・拒否・取消・失効・通常操作、RecoveryActionは再結合・資格削除・新規対話・監査修復に対応する。
+
+owner制御操作は `端末招待`（端末ID・接続先Host）、`端末一覧`、`端末招待取消`（招待ID）、`端末失効`（結合ID）に限定する。通常loopback資格と端末資格から呼べない。未失効の同一端末を重複結合しない。再結合前にownerが旧資格を失効させる。
 
 ## 招待と結合
 
@@ -55,3 +57,11 @@ Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を
   blocks_release: yes
 
 技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)、[DartのSecureSocket](https://api.dart.dev/dart-io/SecureSocket/connect.html)。これらは暗号化機構のAPI資料でありGUI Shellの権限源ではない。
+
+## Rustの実接続と操作
+
+`broker-server` に `--owner-session-file <owner資格file> --mobile-bind <private IPv4:port>` を指定する。未指定時は従来のloopbackだけを公開する。端末TLSではrustls、起動世代ごとの証明書生成にはrcgen、秘密hash比較にはsubtleを使う。独自暗号やPython runtime依存を追加しない。TLS early dataとticket再開を無効にし、各要求で端末資格を再検査する。
+
+owner CLIは `対話承認操作 --session-file <owner資格file> 端末招待 <端末ID> <接続先Host> <新規招待file>`、`端末一覧`、`端末招待取消 <招待ID>`、`端末失効 <結合ID>`。招待秘密を標準出力へ表示せず新規fileへ保存する。既存fileを上書きしない。通常UIはowner資格を読まない。
+
+`python tooling/minidora_live_check.py --reference <固定参照clone> --mobile-client --dart-client` は実TLSから実MINIDORAへの経路を実行する。テストのPython clientは開発専用であり、Mobile製品client・安全保管・実機lifecycleの証拠にはしない。

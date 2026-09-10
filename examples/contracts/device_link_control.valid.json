@@ -1,0 +1,7 @@
+{
+  "operation": "端末招待",
+  "payload": {
+    "端末ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "接続先Host": "127.0.0.1"
+  }
+}

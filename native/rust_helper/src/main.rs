@@ -23,6 +23,7 @@ fn main() {
     eprintln!("使用法: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
     eprintln!("開発専用: gui_shell_rust_helper dev-stdin-smoke");
     eprintln!("対話登録: broker-server ... --owner-session-file <owner資格file> --minidora-runtime <ID=127.0.0.1:port>");
+    eprintln!("端末経路: broker-server ... --mobile-bind <private IPv4:port>（owner資格必須）");
     eprintln!("owner操作: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>");
     std::process::exit(2);
 }
@@ -42,9 +43,14 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut max_request_bytes: usize = 64 * 1024;
     let mut owner_session_file = None;
     let mut minidora_runtimes = Vec::new();
+    let mut mobile_bind = None;
 
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--mobile-bind" => {
+                let Some(value) = args.next() else {eprintln!("端末bind先の値が必要");return Some(2);};
+                mobile_bind = Some(value);
+            }
             "--owner-session-file" => {
                 let Some(value) = args.next() else { eprintln!("owner資格fileの値が必要"); return Some(2); };
                 owner_session_file = Some(PathBuf::from(value));
@@ -114,6 +120,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     config.max_request_bytes = max_request_bytes;
     config.owner_session_file = owner_session_file;
     config.minidora_runtimes = minidora_runtimes;
+    config.mobile_bind = mobile_bind;
 
     match run_loopback_server(config) {
         Ok(()) => Some(0),

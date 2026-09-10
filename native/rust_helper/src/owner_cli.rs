@@ -9,9 +9,13 @@ use std::time::Duration;
 
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
-        return Err("使用法: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>".into());
+        return Err("使用法: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲> | 端末招待 <端末ID> <接続先Host> <新規出力file> | 端末一覧 | 端末招待取消 <招待ID> | 端末失効 <結合ID>".into());
     }
     let (operation, payload) = match args[2].as_str() {
+        "端末招待" if args.len() == 6 => ("端末招待", json!({"端末ID":args[3],"接続先Host":args[4]})),
+        "端末一覧" if args.len() == 3 => ("端末一覧", json!({})),
+        "端末招待取消" if args.len() == 4 => ("端末招待取消", json!({"招待ID":args[3]})),
+        "端末失効" if args.len() == 4 => ("端末失効", json!({"結合ID":args[3]})),
         "一覧" if args.len() == 3 => ("対話承認待ち", json!({})),
         "承認" if args.len() == 6 => (
             "対話承認",
@@ -68,6 +72,20 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
     // 資格や完全な監査recordは出力しない。要求本文はownerが確認する操作だけに表示する。
     if response["status"] != "accepted" {
         return Err(format!("承認操作を拒否: {}", response["error"]));
+    }
+    if operation == "端末招待" {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut output = options.open(&args[5]).map_err(|_| "招待fileを新規作成できない。既存fileは上書きしない")?;
+        let data = serde_json::to_vec_pretty(&response["body"]).map_err(|_|"招待の保存形式不正")?;
+        output.write_all(&data).map_err(|_|"招待保存失敗")?;
+        output.sync_all().map_err(|_|"招待保存の確定失敗")?;
+        println!("端末招待を指定fileへ保存した。秘密を含むため対面で渡し、結合後に削除する。");
+        return Ok(());
     }
     println!(
         "{}",

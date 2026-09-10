@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/device_link_control.schema.json",
+  "title": "owner専用の端末制御操作",
+  "description": "構造検証はowner資格ではない。通常loopbackと端末資格からの操作を拒否する。",
+  "type": "object",
+  "required": [
+    "operation",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "operation": {
+      "type": "string",
+      "enum": [
+        "端末招待",
+        "端末一覧",
+        "端末招待取消",
+        "端末失効"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "operation": {
+          "const": "端末招待"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "端末ID",
+            "接続先Host"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "端末ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "接続先Host": {
+              "type": "string",
+              "minLength": 7,
+              "maxLength": 15
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "端末一覧"
+        },
+        "payload": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "端末招待取消"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "招待ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "招待ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "端末失効"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "結合ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "結合ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

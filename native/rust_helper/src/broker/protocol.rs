@@ -131,6 +131,14 @@ impl BrokerStateStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
+    #[serde(rename = "端末招待")]
+    端末招待,
+    #[serde(rename = "端末一覧")]
+    端末一覧,
+    #[serde(rename = "端末招待取消")]
+    端末招待取消,
+    #[serde(rename = "端末失効")]
+    端末失効,
     Health,
     Shutdown,
     CommandEnvelope,
@@ -162,6 +170,10 @@ pub enum BrokerOperation {
 impl BrokerOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
+            BrokerOperation::端末招待 => "端末招待",
+            BrokerOperation::端末一覧 => "端末一覧",
+            BrokerOperation::端末招待取消 => "端末招待取消",
+            BrokerOperation::端末失効 => "端末失効",
             BrokerOperation::Health => "health",
             BrokerOperation::Shutdown => "shutdown",
             BrokerOperation::CommandEnvelope => "command_envelope",
@@ -379,6 +391,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
+    端末: Option<super::device_link::端末制御>,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
     state_store: BrokerStateStore,
@@ -392,6 +405,7 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            端末: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
@@ -422,6 +436,7 @@ impl Broker {
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            端末: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
@@ -444,6 +459,7 @@ impl Broker {
     }
 
     fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
+        self.端末期限処理();
         let request_id = envelope
             .request_id
             .clone()
@@ -577,6 +593,7 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
+            operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
@@ -632,6 +649,99 @@ impl Broker {
                 normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+        }
+    }
+
+    pub(crate) fn 端末経路設定(&mut self, certificate_hash: String, port: u16) -> Result<(), &'static str> {
+        if !self.state_store.persistence_ready() || self.端末.is_some() {return Err("端末経路を設定できない");}
+        self.端末 = Some(super::device_link::端末制御::新規(certificate_hash, port)?);
+        Ok(())
+    }
+
+    fn 端末全停止(&mut self) {
+        if let Some(state) = &mut self.端末 {
+            let sessions = state.全停止();
+            self.対話.資格隔離(&sessions);
+        }
+    }
+
+    pub(crate) fn 端末期限処理(&mut self) {
+        let now = self.current_epoch_seconds();
+        if let Some(state) = &mut self.端末 {
+            let (expired, sessions) = state.期限処理(now);
+            self.対話.資格隔離(&sessions);
+            if !expired.is_empty() && self.append_audit("端末期限", "端末失効", "revoked", "期限超過で対話を隔離", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(expired.join(",").as_bytes())).is_err() {
+                self.端末全停止();
+            }
+        }
+    }
+
+    fn 端末制御処理(&mut self, request_id: &str, operation: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+        if !owner {return self.reject_with_payload_hash(request_id, operation, "権限拒否", "owner制御資格が必要", true, hash);}
+        let _event = match self.append_audit(request_id, operation, "received", "端末制御操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash) {
+            Ok(v) => v,
+            Err(_) => {self.端末全停止(); return self.audit_store_failed_response(request_id, operation, "監査失敗", "端末経路を停止");}
+        };
+        let now = self.current_epoch_seconds();
+        let result = self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s| s.制御(operation, payload, now));
+        match result {
+            Ok((body, sessions)) => {
+                self.対話.資格隔離(&sessions);
+                match self.append_audit(request_id, operation, "accepted", "端末制御結果を確定", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(body.to_string().as_bytes())) {
+                    Ok(done) => self.端末成功応答(request_id, operation, body, done.event_id),
+                    Err(_) => {self.端末全停止();self.audit_store_failed_response(request_id,operation,"監査失敗","端末経路を停止")}
+                }
+            }
+            Err(reason) => self.reject_with_payload_hash(request_id, operation, "端末制御拒否", reason, true, hash),
+        }
+    }
+
+    fn 端末成功応答(&self, id: &str, operation: &str, body: Value, audit_id: String) -> BrokerResponse {
+        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:audit_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+    }
+
+    pub(crate) fn 端末要求処理(&mut self, raw: &str) -> BrokerResponse {
+        self.端末期限処理();
+        let hash = sha256_tagged(raw.as_bytes());
+        let parsed = super::device_link::要求読取(raw);
+        let r = match parsed {
+            Ok(v) => v,
+            Err(_) => return self.reject_with_payload_hash("端末不正要求", "端末要求", "要求不正", "端末要求の構造を拒否", true, &hash),
+        };
+        let op = r.操作.as_str();
+        if op != "端末結合" && !super::device_link::許可操作.contains(&op) {
+            return self.reject_with_payload_hash("端末不正要求", "端末要求", "権限拒否", "端末操作を拒否", true, &hash);
+        }
+        let id = if super::device_link::hex形状(&r.nonce,32) {r.nonce.as_str()} else {"端末不正要求"};
+        let _event = match self.append_audit(id, op, "received", "暗号化端末要求を受信", EVIDENCE_SOURCE_LIVE_RUNTIME, &hash) {
+            Ok(v) => v,
+            Err(_) => {self.端末全停止();return self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止");}
+        };
+        let now = self.current_epoch_seconds();
+        let result = if op == "端末結合" {
+            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.結合する(&r,now))
+        } else {
+            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.認証する(&r,now)).and_then(|()|{
+                if op == "端末確認" {return Ok(serde_json::json!({"状態":"接続中"}));}
+                if op == "端末離脱" {
+                    let sessions = self.端末.as_mut().ok_or("端末経路が未設定")?.失効(&r.資格ID)?;
+                    self.対話.資格隔離(&sessions);
+                    return Ok(serde_json::json!({"状態":"失効"}));
+                }
+                let operation: BrokerOperation = serde_json::from_value(Value::String(op.into())).map_err(|_|"操作不正")?;
+                let response = self.対話要求処理(id, operation, &r.内容, false, &hash);
+                if response.status != BrokerStatus::Accepted {return Err("対話操作拒否");}
+                let body = response.body.ok_or("対話応答不正")?;
+                self.端末.as_mut().ok_or("端末経路が未設定")?.所有記録(&r.資格ID,op,&body)?;
+                Ok(body)
+            })
+        };
+        match result {
+            Ok(body) => match self.append_audit(id,op,"accepted","端末要求結果を確定",EVIDENCE_SOURCE_LIVE_RUNTIME,&sha256_tagged(body.to_string().as_bytes())) {
+                Ok(done) => self.端末成功応答(id,op,body,done.event_id),
+                Err(_) => {self.端末全停止();self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止")}
+            },
+            Err(reason) => self.reject_with_payload_hash(id,op,"端末要求拒否",reason,true,&hash),
         }
     }
 
@@ -2224,5 +2334,59 @@ mod tests {
         assert_eq!(response.status, BrokerStatus::Accepted);
         assert!(response.shutdown_requested);
         assert!(broker.shutdown_requested());
+    }
+}
+
+#[cfg(test)]
+mod 端末統治試験 {
+    use super::*;
+    use serde_json::json;
+    use crate::broker::dialogue::識別子生成;
+    struct 環境 {broker: Broker, path: std::path::PathBuf}
+    impl Drop for 環境 {fn drop(&mut self){assert_eq!(self.path.parent(),Some(std::env::temp_dir().as_path()));let _=std::fs::remove_dir_all(&self.path);}}
+    fn 環境生成()->環境 {
+        let path=std::env::temp_dir().join(format!("gui-shell-link-test-{}",識別子生成().unwrap()));
+        let mut broker=Broker::new_persistent("device-test",&path).unwrap();
+        broker.端末経路設定("b".repeat(64),7443).unwrap();
+        broker.実行系登録("local",Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap())).unwrap();
+        環境 {broker,path}
+    }
+    fn 制御(b:&mut Broker,op:&str,p:Value)->BrokerResponse{
+        let id=識別子生成().unwrap();
+        b.owner要求処理(&json!({"request_id":id,"nonce":id,"session_id":"device-test","operation":op,"payload":p,
+            "payload_hash":sha256_tagged(p.to_string().as_bytes()),"issued_at":BrokerRequestEnvelope::current_issued_at(),"metadata":{}}).to_string())
+    }
+    fn 通信(b:&mut Broker,c:&Value,op:&str,p:Value)->BrokerResponse{
+        b.端末要求処理(&json!({"版":1,"HostID":c["HostID"],"端末ID":c["端末ID"],"資格ID":c.get("結合ID").unwrap_or(&c["招待ID"]),
+            "資格秘密":c.get("端末秘密").unwrap_or(&c["招待秘密"]),"nonce":識別子生成().unwrap(),"発行時刻":b.current_epoch_seconds(),"操作":op,"内容":p}).to_string())
+    }
+    fn 準備(b:&mut Broker)->(Value,Value){
+        let i=制御(b,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
+        let c=通信(b,&i,"端末結合",json!({})).body.unwrap();
+        let session=通信(b,&c,"対話開始",json!({"実行系ID":"local"})).body.unwrap();
+        let pending=通信(b,&c,"対話送信",json!({"対話セッションID":session["対話セッションID"],"入力":"こんにちは"})).body.unwrap();
+        (c,pending)
+    }
+    #[test]
+    fn 監査障害時も失効資格の保留送信を隔離する(){
+        let mut e=環境生成();let (c,p)=準備(&mut e.broker);
+        let audit=e.path.join("audit.jsonl");let saved=e.path.join("audit.saved");
+        std::fs::rename(&audit,&saved).unwrap();std::fs::create_dir(&audit).unwrap();
+        let r=制御(&mut e.broker,"端末失効",json!({"結合ID":c["結合ID"]}));assert_ne!(r.status,BrokerStatus::Accepted);
+        std::fs::remove_dir(&audit).unwrap();std::fs::rename(&saved,&audit).unwrap();
+        assert_ne!(通信(&mut e.broker,&c,"端末確認",json!({})).status,BrokerStatus::Accepted);
+        assert_ne!(制御(&mut e.broker,"対話承認",json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})).status,BrokerStatus::Accepted);
+    }
+    #[test]
+    fn 期限処理は実制御の保留要求を隔離し監査する(){
+        let mut e=環境生成();let (c,p)=準備(&mut e.broker);
+        e.broker.current_epoch_seconds_override=Some(c["有効期限"].as_i64().unwrap());
+        e.broker.端末期限処理();
+        assert_ne!(通信(&mut e.broker,&c,"端末確認",json!({})).status,BrokerStatus::Accepted);
+        // 時刻を戻しても、失効した要求のowner承認は復活しない。
+        e.broker.current_epoch_seconds_override=None;
+        assert_ne!(制御(&mut e.broker,"対話承認",json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})).status,BrokerStatus::Accepted);
+        let (_, reopened) = BrokerPersistentStore::open_or_create(&e.path, "audit-check").unwrap();
+        assert!(reopened.audit_log.events().iter().any(|event| event.reason == "期限超過で対話を隔離"));
     }
 }

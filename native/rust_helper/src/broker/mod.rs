@@ -1,5 +1,7 @@
 pub mod audit;
 pub mod dialogue;
+pub(crate) mod device_link;
+pub(crate) mod device_transport;
 pub mod authority;
 pub mod ipc_server;
 pub mod protocol;

@@ -1,7 +1,7 @@
 //! 対話の要求・承認・結果を所有する。実行系固有の通信やUIは所有しない。
 #![allow(non_snake_case)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
@@ -111,6 +111,7 @@ pub struct 対話制御 {
     実行系: BTreeMap<String, Arc<dyn 実行系Adapter>>,
     セッション: BTreeMap<String, セッション>,
     作業: BTreeMap<String, 作業>,
+    失効セッション: BTreeSet<String>,
 }
 impl std::fmt::Debug for 対話制御 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -184,6 +185,33 @@ fn 要求hash(要求: &対話要求) -> String {
 }
 
 impl 対話制御 {
+    /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
+    pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
+        self.失効セッション.extend(sessions.iter().cloned());
+        for work in self.作業.values_mut() {
+            if sessions.contains(&work.要求.対話セッションID) {
+                work.取消.store(true, Ordering::SeqCst);
+                work.状態 = "中止";
+                work.結果 = Some(Err(対話失敗::取消));
+            }
+        }
+        for id in sessions {
+            if let Some(session) = self.セッション.get_mut(id) {
+                session.状態 = "中止後隔離".into();
+            }
+        }
+        self.失効資源解放();
+    }
+
+    fn 失効資源解放(&mut self) {
+        let finished: Vec<_> = self.失効セッション.iter().filter(|id| !self.作業.values().any(|w| &w.要求.対話セッションID == *id && w.受信.is_some())).cloned().collect();
+        for id in finished {
+            self.作業.retain(|_,w| w.要求.対話セッションID != id);
+            self.セッション.remove(&id);
+            self.失効セッション.remove(&id);
+        }
+    }
+
     /// 起動制御面だけが登録する。登録は通信や送信許可を発生させない。
     pub fn 登録(
         &mut self,
@@ -489,6 +517,7 @@ impl 対話制御 {
                 }
             }
         }
+        self.失効資源解放();
         Ok(())
     }
 }
@@ -649,6 +678,40 @@ mod tests {
         panic!("対話完了の待機期限");
     }
     #[test]
+    fn 失効後の遅延応答は監査してから資源解放する() {
+        let (mut c, count) = 準備(false, false, true);
+        let session = 開始(&mut c, "left");
+        let pending = 要求(&mut c, &session);
+        操作(&mut c, "対話承認", 承認(&pending, "full"), true).unwrap();
+        let limit = Instant::now() + Duration::from_secs(2);
+        while count.load(Ordering::SeqCst) == 0 {assert!(Instant::now() < limit, "worker開始待機期限");std::thread::sleep(Duration::from_millis(1));}
+        c.資格隔離(&[session.clone()]);
+        assert!(c.作業.values().any(|v|v.受信.is_some()));
+        let mut discarded = false;
+        for _ in 0..200 {
+            c.進捗反映(100,&mut |reason,_,_|{if reason == "採用終了後応答破棄" {discarded=true;}Ok(())}).unwrap();
+            if c.作業.is_empty() {break;}
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(discarded);
+        assert!(c.作業.is_empty());
+        assert!(c.セッション.is_empty());
+    }
+
+    #[test]
+    fn 端末失効の反復で対話枠を占有し続けない() {
+        let (mut c, _) = 準備(false, false, false);
+        for _ in 0..70 {
+            let session = 開始(&mut c, "left");
+            let pending = 要求(&mut c, &session);
+            c.資格隔離(&[session.clone()]);
+            assert!(操作(&mut c, "対話承認", 承認(&pending, "full"), true).is_err());
+            assert!(c.セッション.is_empty());
+            assert!(c.作業.is_empty());
+        }
+    }
+
+    #[test]
     fn Adapterが期限を無視してもCoreは遅延応答を採用しない() {
         let (mut c, _) = 準備(false, false, true);
         let s = 開始(&mut c, "left");
@@ -780,10 +843,15 @@ mod tests {
                 }
             }
             操作(&mut c, "対話中止", json!({"要求ID":p["要求ID"]}), false).unwrap();
-            std::thread::sleep(Duration::from_millis(150));
-            let v = 操作(&mut c, "対話取得", json!({"要求ID":p["要求ID"]}), false).unwrap();
-            assert_eq!(v["結果"]["状態"], "中止");
-            assert_eq!(v["結果"]["本文"], "");
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                let v = 操作(&mut c, "対話取得", json!({"要求ID":p["要求ID"]}), false).unwrap();
+                assert_eq!(v["結果"]["状態"], "中止");
+                assert_eq!(v["結果"]["本文"], "");
+                if c.作業[p["要求ID"].as_str().unwrap()].受信.is_none() {break;}
+                assert!(Instant::now() < deadline, "取消後応答の受信待機期限");
+                std::thread::sleep(Duration::from_millis(5));
+            }
             assert_eq!(
                 操作(
                     &mut c,

@@ -378,3 +378,13 @@ repository 文書にある未完了項目は、すべて <code>release_blocker</
   reason: Linuxで解析・37試験・debug build・製品Dart clientの実MINIDORA接続は成立した。実ウィンドウの可視状態はGTK標準の `GDK_BACKEND=x11` を指定して確認した。既定WaylandのウィンドウはX11検査器では観測できず、Waylandの画面成立をこの証拠から主張しない。
   required_action: Wayland環境の画面対応を主張するときは、その環境に対応した表示検証を別途行う。
   blocks_release: no
+
+## rev2端末連携の境界
+
+端末連携の操作と責任は [端末連携仕様](docs/specs/device-link.md) を参照する。
+
+- item: Desktop再起動時の端末再結合
+  classification: known_limitation
+  reason: 秘密鍵と結合資格を起動世代内に限定し、Desktop再起動で全招待・結合・未完了対話を失効させる。通信の再接続は有効期限内なら可能だが、Host再起動後の資格自動復元は行わない。
+  required_action: Desktop再起動後はownerが新しい招待を発行しMobileで結合し直す。未完了要求を自動再送しない。
+  blocks_release: no

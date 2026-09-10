@@ -19,6 +19,7 @@ pub struct BrokerServerConfig {
     pub max_request_bytes: usize,
     pub owner_session_file: Option<PathBuf>,
     pub minidora_runtimes: Vec<(String, String)>,
+    pub mobile_bind: Option<String>,
 }
 
 impl BrokerServerConfig {
@@ -30,6 +31,7 @@ impl BrokerServerConfig {
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             owner_session_file: None,
             minidora_runtimes: Vec::new(),
+            mobile_bind: None,
         }
     }
 }
@@ -69,6 +71,10 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     }
     let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
 
+    let mobile = if let Some(address) = &config.mobile_bind {
+        if owner_secret.is_none() {return Err(BrokerServerError::new("端末連携はowner資格設定が必要"));}
+        Some(super::device_transport::DeviceListener::bind(address,&mut broker).map_err(BrokerServerError::new)?)
+    } else {None};
     let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), config.port);
     let listener = TcpListener::bind(bind_addr)
         .map_err(|error| BrokerServerError::new(format!("broker IPCのbindに失敗: {error}")))?;
@@ -104,18 +110,14 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     }
     write_endpoint_file(&config.session_file, &endpoint)?;
 
-    for incoming in listener.incoming() {
-        let stream = match incoming {
-            Ok(stream) => stream,
-            Err(_) => continue,
-        };
-        let shutdown = match handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config) {
-            Ok(shutdown) => shutdown,
-            Err(_) => continue,
-        };
-        if shutdown {
-            break;
+    listener.set_nonblocking(true).map_err(|_|BrokerServerError::new("listener設定失敗"))?;
+    loop {
+        broker.端末期限処理();
+        if let Ok((stream,_)) = listener.accept() {
+            if handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config).unwrap_or(false) {break;}
         }
+        if let Some(mobile) = &mobile {mobile.poll(&mut broker);}
+        std::thread::sleep(Duration::from_millis(10));
     }
     Ok(())
 }
@@ -127,6 +129,7 @@ fn handle_stream(
     broker: &mut Broker,
     config: &BrokerServerConfig,
 ) -> Result<bool, BrokerServerError> {
+    stream.set_nonblocking(false).map_err(|_|BrokerServerError::new("IPC blocking設定失敗"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| {

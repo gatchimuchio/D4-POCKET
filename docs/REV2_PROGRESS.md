@@ -127,3 +127,23 @@ Desktop単位の最終検証: Windowsの一括14検査はすべてPASS（終了�
   reason: この単位は契約と構造検査。TLS・資格・所有関係・安全保管の製品経路は次単位で実装する。
   required_action: RustとMobileの正常・否定経路および実通信を検証する。
   blocks_release: yes
+
+## Rustの端末TLS経路
+
+明示bind時だけ公開するTLS経路を同じDesktop Rust brokerへ接続した。通常loopbackとowner資格の分離を保持し、端末操作は対話・確認・離脱だけを許可する。招待の消費、秘密hash照合、期限、nonce、Host・端末結合、対話所有関係をRustで強制する。入力は全階層の重複fieldを拒否し、受信上限と有限期限を持つ。owner招待秘密は新規fileへ保存して標準出力へ出さない。
+
+既存Rust53単体・5統合は変更後にPASS。端末状態機械の6否定／正常試験と、永続監査障害・期限処理を実Coreへ通す2試験もPASS。実TLSのdev-only clientによる正常結合、再接続、再使用拒否、不正資格、Host不一致、権限昇格拒否、他端末の対話・要求アクセス拒否、実MINIDORA応答、失効後の保留承認拒否、招待取消、離脱を実行した。製品Desktop Dart clientとの併用もPASS。
+
+新依存はTLS・証明書生成・秘密hash比較に限定し、Cargo.lockへ固定した。通常RuntimeのMINIDORA接続は引き続き既存Adapter経路だけである。TLSの実通信証拠をMobile製品画面やOS安全保管の成立へ昇格しない。
+
+- item: Mobile製品clientと安全保管・lifecycle
+  classification: release_blocker
+  reason: Rustの端末経路は実動作したが、Mobile libへの接続とAndroid/iOS実機証拠は未完成。
+  required_action: MobileでHost照合・安全保管・対話画面・復帰処理を接続し検証する。
+  blocks_release: yes
+
+端末失効の反復試験では、当初64回で対話枠が尽きる資源保持を再現した。失効済みsessionを解放し、送信中workerだけは遅延応答のhash監査まで保持する修正を行った。修正後の実TLSによる結合・対話開始・失効70回はすべてPASS。遅延応答の破棄監査と資源解放の回帰試験も追加した。最終Rust検証は63単体・5統合でPASS。
+
+集約検証は14項目PASS、2項目（broker authority parity、cargo test）が起動中のWindows binaryと再buildの競合によるOS error 5で失敗した。実通信processの終了後に順番を分け、両項目を再実行してPASS。製品や検査に回避層は追加していない。修正後の実TLS＋実MINIDORA＋製品Dart clientも再実行してPASSした。
+
+最終監査では、試験内のraw file読取がhelper境界の禁止patternに該当したため、既存の `BrokerPersistentStore` 再読取・chain検証経路で監査記録を確認する試験へ置換した。検出器は変更していない。また高負荷時に既存取消試験の固定150ms待機が不足したため、取消の即時結果と空本文のassertionを保持し、2秒以内の実受信完了を待ってraw保持を検査する形へ修正した。再実行は63単体・5統合でPASS。TLS session再開も無効にし、毎接続の端末資格検査を維持した。
