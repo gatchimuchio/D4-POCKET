@@ -67,6 +67,36 @@
       "blocks_release": true,
       "reason": "所有者の明示GOが記録されていません。",
       "required_action": "インストール先のリリース実測証拠と厳格検証が合格した後に限り、所有者の明示GOを記録してください。"
+    },
+    {
+      "name": "rev2_mobile_device_evidence",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Android/iOS実機のinstall・起動・結合・対話・安全保管・lifecycleの実測がない。",
+      "required_action": "実機を接続し、正常・失効・期限・復帰の製品経路を実測する。"
+    },
+    {
+      "name": "rev2_mobile_distribution",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Mobileの正式配布識別子・署名・配布経路が未確定。",
+      "required_action": "owner指定の正式識別子と署名で配布経路を検証する。"
+    },
+    {
+      "name": "rev2_desktop_launch_regression",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Windowsの画面回帰はEscで中断し、Linuxの最新binaryの起動再観測も未取得。",
+      "required_action": "画面操作再開のowner指示後にWindows回帰を継続し、Linuxの起動を観測する。"
     }
   ]
 }

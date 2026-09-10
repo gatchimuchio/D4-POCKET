@@ -86,11 +86,11 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "35152e1e797901599f766a22390836fd7562730408d501dc056d3965475103f1"
+      "sha256": "61eada359f0e0393520ff6a864f3353a47dbbaa1b04aca3f009dc253f0a1d987"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "24dbd48cbf4fa2a106369e3ea8230cbf209f6de76e1e466bda5b2f508589eb7e"
+      "sha256": "e65b047721747b0f9f9099ed443a1cab2bf0599b60138fd0fa59fc61c898d490"
     },
     {
       "path": "CONFIG.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "275500617e8f1ad5f2a8eba550d44e851d01a804d37dea10bd60ec83c1a79dd8"
+      "sha256": "a804e5b3543dca09af22015a4680d10b28059b890797af64bd922fce5e5cbd1a"
     },
     {
       "path": "NOTICE",
@@ -134,15 +134,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "7fb8d32087bb6717cf46966d55a1033eb463693ab4a29f3d938369ccc62d1a03"
+      "sha256": "56a0925c3c439bd46897464534307b9d6c9e78b39d89165a5df3003ec3261036"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "4a220a9daa12dff69e447920e77f902c180b576692b225032b777f53e3b8d6d6"
+      "sha256": "bf4b27dabacf2b02936a4ba73212c8b041f6fbcc83338bdc0e5f4ae9b852676c"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a49be5e16d2b8098450d820d153e7da06466b44c804c9b5aa1c99843264f292c"
+      "sha256": "9d2bfbd0c72cb71ca2bee75d98ec7875cdedd65f877539d23ea65e785f731db8"
     },
     {
       "path": "SECURITY.md",
@@ -315,6 +315,10 @@
     {
       "path": "apps/desktop_flutter/macos/Flutter/Flutter-Release.xcconfig",
       "sha256": "62290ad8e938bf410206d8c7e131262696b58a6df110d39faf3399396ffe61b1"
+    },
+    {
+      "path": "apps/desktop_flutter/macos/Flutter/GeneratedPluginRegistrant.swift",
+      "sha256": "9ebc54b4d21464b875d1289b3dd5e44cd7e68930dbd6e8c7f954e438eb6ad499"
     },
     {
       "path": "apps/desktop_flutter/macos/Runner.xcodeproj/project.pbxproj",
@@ -878,7 +882,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "43c20b207c759ba35e3edbec4dd84d5404ed9924df6c6ebe973f7937d3e91eb7"
+      "sha256": "33ebadcf88553610cee07706e0a752a64cea0066b9c35af713b2094bbfbe362d"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1790,7 +1794,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e6f36777acfa3069c9f440944aa5d001a175da6b599efb954092f61d048a8f93"
+      "sha256": "bd70816f9513b6439d834fe4a1d704f47769363db4e2a6d90ad2b7ce14cda2bd"
     },
     {
       "path": "requirements-dev.txt",

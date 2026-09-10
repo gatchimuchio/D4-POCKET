@@ -17,6 +17,8 @@ Flutter共通化単位では `packages/gui_shell_ui` の analyze/test をlocal v
 
 Apple platform単位は、ローカルhostがWindows/WSLでMacがないため、`.github/workflows/apple-manual-build.yml` を手動補助に使用する。対象は固定Flutter 3.44.0によるmacOS開発app・iOS Simulator appのbuildとMac上のRust helper試験に限る。triggerはworkflow_dispatchのみ、contents権限はread、actionとFlutterはcommit固定、成果物の保管は3日とする。実行環境・対象commit・log・artifact hash・自動変更差分を記録し、追跡ソースの自動変更は成功として扱わない。実機install・launch・Keychain・対話・owner GOはこの補助実行で証明しない。
 
+rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起動回帰を `release_blockers.registry.json` へ未解決のmanual gateとして追加する。既存Windows証拠とowner GOは保持し、旧post_v1_scopeによるrev2要求の除外を防ぐ。
+
 ## 完了監査の優先事項
 
 ~~~yaml

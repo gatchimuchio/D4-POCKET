@@ -1,5 +1,7 @@
 # rev2 実装進捗と証拠境界
 
+各節は作業時点の履歴である。現在状態は末尾の「現時点の要求監査」を優先し、過去の未実装記述を現在の状態へ読み替えない。
+
 ## 統治変更（2026-09-10）
 
 対象はローカル品質判定と手動補助 Actions の分離。製品 runtime の権限・実行経路は変更しない。自動 CI は禁止を維持し、手動起動条件を構造として検査する。証拠分類は CONFIG / FIXTURE であり、外部実行や branch protection の保証ではない。
@@ -199,3 +201,36 @@ Apple初回補助実行（run 34445302630、対象52bcbd2cc82519f5f6ebc6c80c8c60
 ## 複数OS間のmanifest修復
 
 Linux最新checkoutの集約検証ではFlutter/Rust関連検査はPASSしたが、manifest・release gate・梱包の3検査が失敗した。Windows編集時のCRLFをraw hashへ記録し、Gitが既存.gitattributesに従ってLFへ保存したことが原因である。検証toolのhash照合は変更せず、作業fileを既存の改行規約へ戻してmanifestを再生成する。生成時にはGitのeol属性と作業byteの不一致を拒否し、無言の正規化やhash比較の緩和を行わない。Git実repositoryを使いLF、明示CRLF、binary、混在改行、修復後の正常化を検証する。
+
+
+## 現時点の要求監査（2026-09-10）
+
+rev2全体は未完了。実装済みの対話Core・MINIDORA Adapter・Desktop比較・Mobile端末連携と、実機で未確認の範囲を分離する。完成製品releaseとowner GOは主張しない。
+
+|要求|確認した経路・結果|証拠の限界|
+|---|---|---|
+|統治・日本語意味正本・Schema|手動Actions限定、対話・比較・端末連携の正本、35 Schema、35正常・37否定fixture PASS|CONFIG/FIXTURE|
+|CoreとMINIDORA Adapter|Rustの要求・承認・監査・取消・隔離試験、固定参照commit 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8の実API PASS|基本会話と保留の範囲。基礎Core能力の保証ではない|
+|対話・比較|共有6件、Desktop32件、Mobile14件、左右成功・片側失敗・両失敗・session/権限非混線の試験 PASS|画面fixtureとhost上の実通信を区別|
+|端末連携|製品Dart TLS client、招待・失効・replay・Host・権限否定、実MINIDORA PASS|OS安全保管は実機未確認|
+|Android版|analyze/test、APK/AAB、署名・alignment・bundletool PASS|実機install以降はrelease_blocker|
+|Apple版|手動実行34446194013、対象`27b8713fd1a9ecdb81abe1d4225b99b26bda84ba`でRust単体64・統合5試験、macOS開発app・iOS Simulator appのビルドに合格|実機launch・Keychain・対話はrelease_blocker|
+|Windows版|共有化・端末連携後の集約検査でlint修正後PASS、最新debug build PASS|今回の画面回帰は操作者のEscで中断。installed-path証拠もrelease_blocker|
+|Linux版|最新対話実装のFlutter build、各analyze/test、Rust試験、Desktop/Mobile製品Dart clientと実MINIDORA PASS|最新binaryのlaunch再確認はrelease_blockerとして保持|
+|manifest・梱包|改行修復後のWindows/Linux Python系9検査 PASS。conformance148件|開発検証のpassはstrict releaseのpassではない|
+
+Apple成果物は外部artifact `10139803376`（86677901 bytes）を取得しZIP SHA-256 `3110e6493467eef9c38dc371746655dbbbb7efeb89696ba03421c4916752a9ac` を照合した。内部tar SHA-256 `59496c1c87f3b36f4bb3d7f592457df3315af3099155066f24b0200495041cca` も一致し、両app・Rust実行file・iOS安全保管plugin資産を確認した。環境はmacOS15.7.9 arm64、Xcode16.4、iOS Simulator SDK18.5。追跡差分patchは空。Flutterが生成したmacOS registrantは既存Windows/Linuxと同じく追跡対象へ追加する。生成内容を手編集せず、依存の生成元はpubspecである。
+
+artifact取得の初回HTTP直取得はredirect先で401となり、認証headerを別hostへ引き継がない取得で回復した。ログ表示のcp932 UnicodeEncodeErrorはPYTHONUTF8=1で回復した。いずれも製品build失敗ではない。
+
+- item: Windowsの画面回帰とLinuxの最新binary起動観測
+  classification: release_blocker
+  reason: Windows画面操作はEscによる停止を検出し中断した。最新LinuxのbuildとRuntime pathは成立したが今回の起動観測は未取得。
+  required_action: 操作者の画面操作再開許可後に回帰を継続し、Linux起動を観測する。
+  blocks_release: yes
+
+- item: 実機・installed-path・正式配布・owner GO
+  classification: release_blocker
+  reason: Android接続実機なし、Mac/iOS実機なし。Windows installed-pathの隔離・外部改竄証拠と正式配布署名も未成立。
+  required_action: 必要な実機とowner指定を取得し、対応する実測とstrict validationを実施する。
+  blocks_release: yes
