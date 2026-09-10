@@ -8,6 +8,11 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "runtime_dialogue_request.schema.json",
+    "runtime_dialogue_session.schema.json",
+    "runtime_dialogue_response.schema.json",
+    "runtime_dialogue_comparison.schema.json",
+
     "action_envelope.schema.json",
     "runtime.schema.json",
     "adapter.schema.json",
@@ -83,6 +88,8 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
     if isinstance(value, str):
         if "minLength" in schema and len(value) < schema["minLength"]:
             errors.append(f"{path}: minLength {schema['minLength']}より短い")
+        if "maxLength" in schema and len(value) > schema["maxLength"]:
+            errors.append(f"{path}: maxLength を超過")
         if "pattern" in schema and re.match(schema["pattern"], value) is None:
             errors.append(f"{path}: pattern {schema['pattern']}と一致しない")
 
@@ -93,6 +100,8 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
     if isinstance(value, list):
         if "minItems" in schema and len(value) < schema["minItems"]:
             errors.append(f"{path}: minItems {schema['minItems']}より少ない")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            errors.append(f"{path}: maxItems を超過")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):

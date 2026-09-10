@@ -478,7 +478,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8131d79fce19742efb3615ef3af6d8f39b5fe0ab5dd1c8f8c0ab35f6432d6613"
+      "sha256": "a11a53149914f66cf465d948bf3a669b3d5e3f8c23cc411cfa9fc913fbd7ea04"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -591,6 +591,10 @@
     {
       "path": "docs/specs/runtime-catalog.md",
       "sha256": "1dfc568862fda48c5427bd795590bafdff36632d4b7abd11c58dbb926562dd72"
+    },
+    {
+      "path": "docs/specs/runtime-dialogue.md",
+      "sha256": "25cdbb519d18cbad386785520b8333b43b2eef164590768dcd313472704dda9c"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -789,6 +793,22 @@
       "sha256": "d49f95cb3cbdaafb53e5b0f04eb37d85c11e52227b10d298250627a615de3333"
     },
     {
+      "path": "examples/contracts/invalid/runtime_dialogue_comparison_authority.invalid.json",
+      "sha256": "5703b4c417f9a394a11f6b0c4858f857424e1367ef4b5d76a294ba85e3927d74"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_dialogue_request_authority.invalid.json",
+      "sha256": "26e367120bd546365be5f169bbed33d38f128eac0a94f18e70d316f822571124"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_dialogue_response_authority.invalid.json",
+      "sha256": "5d8bee5a2ca8369c2b5aa50034f04a090467a442525089b182a78f44c8e4c9da"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_dialogue_session_authority.invalid.json",
+      "sha256": "5b73ad15a19daf14a77cec897a5cd015db28cbe75b739628c25a35a6f095e89a"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_manifest_unsigned.invalid.json",
       "sha256": "61876699ea8d752aaaab64d0862fac8bfa688012300860aa4f5536957cde1828"
     },
@@ -819,6 +839,22 @@
     {
       "path": "examples/contracts/runtime.valid.json",
       "sha256": "ecd5265af3621911433c8eef86b3b9d02d2d9cac16dadadb48453daeb40de872"
+    },
+    {
+      "path": "examples/contracts/runtime_dialogue_comparison.valid.json",
+      "sha256": "c217e50cc52fd4c8d1b3ccd3e7e9c81425a45a75566db6ff68a9bf10eef9d98d"
+    },
+    {
+      "path": "examples/contracts/runtime_dialogue_request.valid.json",
+      "sha256": "362ea1a18b1e4a46d67d9d7b132a0b4832885425ae1a891499169aa08a3ba6ed"
+    },
+    {
+      "path": "examples/contracts/runtime_dialogue_response.valid.json",
+      "sha256": "63ee1453f2e659fe4967019bd1324f146ad5592cd586a405d6701fb7248e28a1"
+    },
+    {
+      "path": "examples/contracts/runtime_dialogue_session.valid.json",
+      "sha256": "d4af5b30404ab0e059403a20026973278e648c71d39ae8c2e256e3d7829552e8"
     },
     {
       "path": "examples/contracts/runtime_manifest.valid.json",
@@ -1361,6 +1397,22 @@
       "sha256": "e65ba61764a2573307c2f9ee8da2c8865c768364b1504df3cd785684018fd645"
     },
     {
+      "path": "specs/runtime_dialogue_comparison.schema.json",
+      "sha256": "60c6089ae492bcefac44b54520d9be7631093cb24c247b20986dc3f76fa4f665"
+    },
+    {
+      "path": "specs/runtime_dialogue_request.schema.json",
+      "sha256": "7838faa653a247e087d86fb69d917d1f691595ca20311d150776986eb9c9bd6c"
+    },
+    {
+      "path": "specs/runtime_dialogue_response.schema.json",
+      "sha256": "c00edfac69cb7b0523c14c8f51cd4f08630abe823c0ddeafea04ca5fcd520403"
+    },
+    {
+      "path": "specs/runtime_dialogue_session.schema.json",
+      "sha256": "d52574c63b97d8d9a5d10af61c700066b1c8747d4f177d43238053592ec0db1a"
+    },
+    {
       "path": "specs/runtime_manifest.schema.json",
       "sha256": "1df3d275ab4de0affd4880f64e91052d9e1cc1d783e632b65eeb8977f259700b"
     },
@@ -1382,7 +1434,11 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "d155cfb002c3e481cd773b1052215067b4e73a4c79c0451508846d499e3a2579"
+      "sha256": "26ae60804d151ccbe8567083ecd76c645c42ecdf27a223fa17ce7bdd62997009"
+    },
+    {
+      "path": "tooling/dialogue_contract_check.py",
+      "sha256": "b2d454df0416ec23291a54b65905295139caa9659b41704eacaa4f6d064623f9"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1414,7 +1470,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "67ae4cbc10af05b3c35361f88ff31aca5a7364dbe94d513e528859acacc6836f"
+      "sha256": "c85ce9b92e54d60c750bea6bccdc502c43ef7ac6fbecc968f06ae38a2ebecb25"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -1446,7 +1502,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "d27d9c3748ba48ff2095655a45fd679008e2feca0e1ecdb491b9c408ebb840a2"
+      "sha256": "1160f6fc04752ab2dcc99202099bfd10f03848e4a1aa705cd7c1f3548ae153c9"
     }
   ]
 }

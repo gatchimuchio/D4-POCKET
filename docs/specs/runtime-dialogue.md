@@ -1,0 +1,66 @@
+# 実行系対話の意味正本
+
+状態: rev2 の契約定義。実装接続と実機証拠は別に検証する。
+
+## 対象と責任
+
+実行系対話要求は操作者の入力を特定実行系の特定セッションへ一回送信する要求である。実行系対話応答はその要求に対応する公開可能な結果である。実行系対話セッションは実行系との会話継続の境界であり、broker IPC セッションや承認資格とは別の対象である。実行系比較結果は同一入力に対する独立した二要求の結果であり、共通の権限や共通の会話履歴を作らない。
+
+新規識別子は日本語で定義する。既存 Capability / Permission / Approval / AuditEvent / RecoveryAction と IPC の公開識別子は互換性を保つ。既存 Agent 契約を対話契約へ読み替えない。
+
+## 要求とセッション
+
+要求は `要求ID`、`実行系ID`、`対話セッションID`、`入力` を必須とする。入力は空白だけを拒否し、1〜4096文字に限る。要求IDとセッションIDは broker が生成する128bit以上の乱数に由来する識別子とし、構造検証の成功だけを乱数生成や権限の証拠にしない。
+
+実行系IDは登録済み識別子を参照する。要求中の任意 URL、port、Adapter 名、Permission、Approval、authority_source、metadata から実行先や権限を作らない。未知の追加fieldは拒否する。セッションは作成後に実行系を変更しない。別実行系への切替は別セッションを作る。同一セッションの同時送信は拒否し、再送は新しい要求として操作者が判断する。
+
+セッションの状態は `利用中`、`終了`、`中止後隔離`。終了・中止後隔離からの再利用を拒否する。再起動で保持する場合は、履歴だけで権限を復元せず承認と実行系結合を再検証する。
+
+## 統治経路
+
+Flutter は要求を入力する操作面であり、Runtime へ直接通信しない。Shell Core の製品責任は Rust broker 内の対話制御に置く。Python は契約検証・移行 oracle・開発試験に限る。Rust 側は要求検証、実行系解決、Policy 評価、Adapter 呼出し、応答正規化、Audit、失敗分類、Recovery、取消を所有する。MINIDORA の内部 import は禁止する。
+
+実通信前に Capability（対話送信）、実行系と接続先と操作に束縛された Permission、期限内の Approval、要求hashを持つ AuditEvent、通信失敗時の RecoveryAction を対応づける。これは既存 `command_envelope` の `dispatch_enabled=false` を変更したり、迂回する許可ではない。対話の独立した統治経路を実装・検証するまで外部送信しない。生成された設定、Adapter metadata、UI state、履歴は承認の根拠にならない。
+
+監査記録が作成できなければ送信しない。送信後の監査失敗では結果を確定せず休止し、二重送信を避ける。外部要求の成功を GUI-Shell の監査成功へ昇格しない。自動再試行は行わない。
+
+## 応答と表示範囲
+
+応答は要求ID・実行系ID・対話セッションIDの三つを保持し、要求との一致を消費側で検査する。状態は `成功`、`保留`、`失敗`、`中止`。表示範囲は既存の `none`、`hash_only`、`summary`、`redacted`、`full` を維持し、既定は `none`。
+
+`none` は本文・参照・能力・経路・追跡を全て空にする。`hash_only` は応答hashだけを追加する。`summary` と `redacted` は明示的に承認された射影が存在する場合だけ返す。外部応答にその射影がなければ本文等を空にする。`full` の有効な許可がある場合に限り本文・参照・能力・経路・追跡を返す。Adapter は表示範囲を引き上げない。失敗理由へ外部応答全文や資格を含めない。
+
+`参照` は表示用の文字列の列、`能力` は能力名の列、`経路` は公開経路名、`追跡ID` は公開追跡識別子、`追跡hash` は外部追跡のhashとする。外部の `metadata` や trace の全内容は自動表示しない。外部が返したhashは相手の主張であり検証済み完全性とは異なる。GUI-Shell の `応答hash` は受信した生の応答bytesから計算し、監査に結び付ける。生bytesの保持は監査責任内に閉じ、UIや通常ログに漏らさない。
+
+## 取消と失敗
+
+送信前の取消は外部呼出しを行わない。送信後は結果の採用を止め、セッションを `中止後隔離` とする。Runtime の取消APIがない場合、処理停止や副作用の巻戻しが成立したとは表示しない。遅れて届いた応答は別要求や新セッションへ接続しない。
+
+失敗分類は `要求不正`、`実行系不在`、`権限拒否`、`セッション不一致`、`通信失敗`、`期限超過`、`応答不正`、`監査失敗`、`取消`。復旧は入力修正、実行系再確認、権限再確認、新規セッション、接続再確認、監査修復のいずれかを明示し、自動の権限拡大や再送を行わない。
+
+## 比較
+
+比較は異なる二実行系と異なる二セッションを必須とする。二要求の入力が完全一致していることを確かめる。結果の順序ではなく要求IDと実行系IDで対応づける。片側の成功・失敗・取消・Approval は他側へ転用しない。両成功、片側ずつ失敗、両失敗、応答の到着逆転、セッション・権限・応答の非混線を試験する。
+
+## MINIDORA 外部契約の確認点
+
+参照: `https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA`、commit `3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8`。
+確認した実装: `src/minidora/製品版/api.py`、`型.py`、`製品チャット.py`、`監査.py`。
+
+- `GET /health`: ok、service、api_version を返す。実行系identityや権限の証拠ではない。
+- `GET /api/capabilities`: capabilities の列を返す。能力宣言から Permission を作らない。
+- `POST /api/chat`: message と session_id を受け、session_id、response、status、route、trace_id、trace_hash、capabilities、sources、metadata を返す。
+- `GET /api/trace/{trace_id}`: 小文字16進32桁の追跡IDに対応する trace と valid を返す。valid は Runtime 自身の検証結果である。
+- status は現行実装の `合格` を `成功`、`保留` を `保留` へ射影する。未知の値は失敗扱いにする。
+- sources の現行外部fieldは `識別子`、`題名`、`出典`、`URL`、`公開時刻`、`本文`。表示許可なしに全文を渡さない。
+- 現行 API に取消経路はない。送信後の中止は待機・採用の終了に限り、Runtime停止を主張しない。
+
+## 接続と完成証拠
+
+四つの JSON Schema を `specs/runtime_dialogue_*.schema.json` に置く。Schema catalog と conformance が構造・関係・拒否ケースを消費する。これは契約検証の完成範囲である。
+
+- item: 製品対話・Adapter・Desktop / Mobile・端末連携への接続
+  classification: release_blocker
+  reason: Schema と開発用関係検証だけでは外部送信、実行系操作、認証付き端末連携は成立しない。
+  required_action: Rust の統治経路、実物APIとの通信、UI、端末資格の期限・失効・replay拒否、platform別実機試験を順次実装する。
+  blocks_release: yes

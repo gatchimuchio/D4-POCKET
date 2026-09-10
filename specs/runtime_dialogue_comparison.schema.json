@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_comparison.schema.json",
+  "title": "実行系比較結果",
+  "description": "実行系対話の意味と関係条件は docs/specs/runtime-dialogue.md を正本とする。構造適合だけで権限を付与しない。",
+  "type": "object",
+  "required": [
+    "比較ID",
+    "左要求ID",
+    "右要求ID",
+    "左実行系ID",
+    "右実行系ID",
+    "入力hash",
+    "左状態",
+    "右状態"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "比較ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "左要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "右要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "左実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "右実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "入力hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "左状態": {
+      "type": "string",
+      "enum": [
+        "成功",
+        "保留",
+        "失敗",
+        "中止"
+      ]
+    },
+    "右状態": {
+      "type": "string",
+      "enum": [
+        "成功",
+        "保留",
+        "失敗",
+        "中止"
+      ]
+    }
+  }
+}

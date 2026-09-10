@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_request.schema.json",
+  "title": "実行系対話要求",
+  "description": "実行系対話の意味と関係条件は docs/specs/runtime-dialogue.md を正本とする。構造適合だけで権限を付与しない。",
+  "type": "object",
+  "required": [
+    "要求ID",
+    "実行系ID",
+    "対話セッションID",
+    "入力"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "対話セッションID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "入力": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    }
+  }
+}

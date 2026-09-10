@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_response.schema.json",
+  "title": "実行系対話応答",
+  "description": "実行系対話の意味と関係条件は docs/specs/runtime-dialogue.md を正本とする。構造適合だけで権限を付与しない。",
+  "type": "object",
+  "required": [
+    "要求ID",
+    "実行系ID",
+    "対話セッションID",
+    "状態",
+    "表示範囲",
+    "本文",
+    "参照",
+    "能力",
+    "経路",
+    "追跡ID",
+    "追跡hash",
+    "応答hash",
+    "失敗分類",
+    "復旧"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "対話セッションID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "状態": {
+      "type": "string",
+      "enum": [
+        "成功",
+        "保留",
+        "失敗",
+        "中止"
+      ]
+    },
+    "表示範囲": {
+      "type": "string",
+      "enum": [
+        "none",
+        "hash_only",
+        "summary",
+        "redacted",
+        "full"
+      ]
+    },
+    "本文": {
+      "type": "string",
+      "maxLength": 65536
+    },
+    "参照": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "maxLength": 2048
+      }
+    },
+    "能力": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "maxLength": 256
+      }
+    },
+    "経路": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "追跡ID": {
+      "type": "string",
+      "pattern": "^([a-f0-9]{32})?$(?![\\s\\S])"
+    },
+    "追跡hash": {
+      "type": "string",
+      "pattern": "^(sha256:[a-f0-9]{64})?$(?![\\s\\S])"
+    },
+    "応答hash": {
+      "type": "string",
+      "pattern": "^(sha256:[a-f0-9]{64})?$(?![\\s\\S])"
+    },
+    "失敗分類": {
+      "type": "string",
+      "enum": [
+        "",
+        "要求不正",
+        "実行系不在",
+        "権限拒否",
+        "セッション不一致",
+        "通信失敗",
+        "期限超過",
+        "応答不正",
+        "監査失敗",
+        "取消"
+      ]
+    },
+    "復旧": {
+      "type": "string",
+      "enum": [
+        "",
+        "入力修正",
+        "実行系再確認",
+        "権限再確認",
+        "新規セッション",
+        "接続再確認",
+        "監査修復"
+      ]
+    }
+  }
+}

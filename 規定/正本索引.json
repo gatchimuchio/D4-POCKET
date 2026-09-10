@@ -64,6 +64,17 @@
         "能力作用構成",
         "HDS運用"
       ]
+    },
+    "MINIDORA実行系対話API": {
+      "リポジトリ": "https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA",
+      "参照コミット": "3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8",
+      "参照範囲": [
+        "src/minidora/製品版/api.py",
+        "src/minidora/製品版/型.py",
+        "src/minidora/製品版/製品チャット.py",
+        "src/minidora/製品版/監査.py"
+      ],
+      "責任": "外部APIの入出力確認。既存の日本語基底参照commitを置換せず、GUI-Shellの権限源にしない"
     }
   },
   "版差境界": {
@@ -143,6 +154,10 @@
     {
       "path": "release_blockers.registry.json",
       "責任": "release blockerの機械可読台帳"
+    },
+    {
+      "path": "docs/specs/runtime-dialogue.md",
+      "責任": "実行系対話要求・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点"
     }
   ],
   "責任地図": {

@@ -62,6 +62,11 @@ from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
 REQUIRED_SCHEMA_NAMES = {
+    "runtime_dialogue_request",
+    "runtime_dialogue_session",
+    "runtime_dialogue_response",
+    "runtime_dialogue_comparison",
+
     "action_envelope",
     "runtime",
     "adapter",
@@ -2043,6 +2048,78 @@ def test_packaging_portability_checker_exists() -> list[str]:
     return errors
 
 
+def 対話契約の関係と表示境界を検査する() -> list[str]:
+    from tooling.dialogue_contract_check import 要求関係検査, 応答関係検査, 比較関係検査
+
+    要求 = load_contract_fixture("runtime_dialogue_request.valid.json")
+    セッション = load_contract_fixture("runtime_dialogue_session.valid.json")
+    応答 = load_contract_fixture("runtime_dialogue_response.valid.json")
+    不整合 = 要求関係検査(要求, セッション) + 応答関係検査(要求, 応答, "none")
+    for 変更 in ({"入力": " "}, {"入力": "あ" * 4097}, {"実行系ID": "別実行系"},
+               {"要求ID": "1" * 32 + "\n"}, {"実行系ID": "runtime-a\n"},
+               {"対話セッションID": "3" * 32}, {"authority_source": "gui_state"}):
+        if not 要求関係検査({**要求, **変更}, セッション):
+            不整合.append("不正・越境した要求が許可された")
+    if 要求関係検査({**要求, "入力": "あ" * 4096}, セッション):
+        不整合.append("入力長上限の要求が拒否された")
+    for 状態 in ("終了", "中止後隔離"):
+        if not 要求関係検査(要求, {**セッション, "状態": 状態}):
+            不整合.append("閉じたセッションが再利用された")
+    for 長さ in (65536, 65537):
+        結果 = 応答関係検査(要求, {**応答, "表示範囲": "full", "本文": "あ" * 長さ}, "full")
+        if bool(結果) != (長さ > 65536):
+            不整合.append("応答本文の長さ境界が不正")
+    for 件数 in (64, 65):
+        結果 = 応答関係検査(要求, {**応答, "表示範囲": "full", "参照": ["公開参照"] * 件数}, "full")
+        if bool(結果) != (件数 > 64):
+            不整合.append("参照数の上限境界が不正")
+    for 鍵 in ("要求ID", "実行系ID", "対話セッションID"):
+        if not 応答関係検査(要求, {**応答, 鍵: "3" * 32}, "none"):
+            不整合.append("他要求の応答が採用された")
+    for 範囲 in ("none", "hash_only", "summary", "redacted"):
+        for 鍵, 値 in (("本文", "秘密"), ("参照", ["秘密"]), ("能力", ["秘密"]), ("経路", "秘密")):
+            if not 応答関係検査(要求, {**応答, "表示範囲": 範囲, 鍵: 値}, 範囲):
+                不整合.append("非全文表示へ未承認の内容が漏れた")
+    if not 応答関係検査(要求, {**応答, "表示範囲": "full", "本文": "全文"}, "none"):
+        不整合.append("表示範囲が自己昇格された")
+    if 応答関係検査(要求, {**応答, "表示範囲": "full", "本文": "全文"}, "full"):
+        不整合.append("許可済み全文の契約が拒否された")
+    if not 応答関係検査(要求, {**応答, "状態": "失敗"}, "none"):
+        不整合.append("復旧のない失敗結果が許可された")
+    return 不整合
+
+
+def 二実行系比較の非混線を検査する() -> list[str]:
+    from tooling.dialogue_contract_check import 比較関係検査
+
+    左要求 = load_contract_fixture("runtime_dialogue_request.valid.json")
+    右要求 = {**左要求, "要求ID": "4" * 32, "実行系ID": "runtime-b", "対話セッションID": "5" * 32}
+    左応答 = load_contract_fixture("runtime_dialogue_response.valid.json")
+    右応答 = {**左応答, **{鍵: 右要求[鍵] for 鍵 in ("要求ID", "実行系ID", "対話セッションID")}}
+    比較 = load_contract_fixture("runtime_dialogue_comparison.valid.json")
+    比較["入力hash"] = "sha256:" + hashlib.sha256(左要求["入力"].encode("utf-8")).hexdigest()
+    不整合 = []
+    for 左状態, 右状態 in (("成功", "成功"), ("失敗", "成功"), ("成功", "失敗"), ("失敗", "失敗")):
+        左 = {**左応答, "状態": 左状態, "失敗分類": "通信失敗" if 左状態 == "失敗" else "", "復旧": "接続再確認" if 左状態 == "失敗" else ""}
+        右 = {**右応答, "状態": 右状態, "失敗分類": "通信失敗" if 右状態 == "失敗" else "", "復旧": "接続再確認" if 右状態 == "失敗" else ""}
+        記録 = {**比較, "左状態": 左状態, "右状態": 右状態}
+        if 比較関係検査(記録, 左要求, 右要求, 左, 右, "none", "none"):
+            不整合.append("比較の独立した成功・失敗が拒否された")
+        if not 比較関係検査(記録, 左要求, 右要求, 右, 左, "none", "none"):
+            不整合.append("左右の応答が混線した")
+    記録 = {**比較, "左状態": "成功", "右状態": "成功"}
+    空白記録 = {**記録, "入力hash": "sha256:" + hashlib.sha256(b" ").hexdigest()}
+    if not 比較関係検査(空白記録, {**左要求, "入力": " "}, {**右要求, "入力": " "}, 左応答, 右応答, "none", "none"):
+        不整合.append("比較側で空白だけの入力が採用された")
+    if not 比較関係検査(記録, 左要求, {**右要求, "入力": "別入力"}, 左応答, 右応答, "none", "none"):
+        不整合.append("異なる比較入力が許可された")
+    if not 比較関係検査(記録, 左要求, {**右要求, "対話セッションID": 左要求["対話セッションID"]}, 左応答, 右応答, "none", "none"):
+        不整合.append("比較で同じセッションが共有された")
+    if not 比較関係検査(記録, 左要求, 右要求, {**左応答, "表示範囲": "full", "本文": "全文"}, 右応答, "none", "full"):
+        不整合.append("右側の表示許可が左へ転用された")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -3403,6 +3480,8 @@ def main() -> int:
         test_packaging_portability_checker_exists,
         test_packaging_portability_utf8_governance_allowlist_is_exact,
         書庫展開で日本語名と内容を保持する,
+        対話契約の関係と表示境界を検査する,
+        二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,
