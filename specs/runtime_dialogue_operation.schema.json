@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_operation.schema.json",
+  "title": "実行系対話の操作と入力",
+  "description": "通常操作とowner専用操作をRustが分離し、operationごとのpayloadを検証する。対話承認と対話承認待ちはowner専用。構造適合は承認資格ではない。",
+  "type": "object",
+  "required": [
+    "operation",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "operation": {
+      "type": "string",
+      "enum": [
+        "実行系列挙",
+        "対話開始",
+        "対話送信",
+        "対話取得",
+        "対話中止",
+        "対話終了",
+        "対話承認",
+        "対話承認待ち"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "operation": {
+          "const": "実行系列挙"
+        },
+        "payload": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話開始"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "実行系ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "実行系ID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話送信"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "対話セッションID",
+            "入力"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "対話セッションID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "入力": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話取得"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話中止"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話終了"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "対話セッションID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "対話セッションID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話承認"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID",
+            "要求hash",
+            "表示範囲"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "要求hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            },
+            "表示範囲": {
+              "type": "string",
+              "enum": [
+                "none",
+                "hash_only",
+                "summary",
+                "redacted",
+                "full"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話承認待ち"
+        },
+        "payload": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    }
+  ]
+}

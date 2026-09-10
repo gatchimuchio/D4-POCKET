@@ -298,6 +298,50 @@ fn null_payload_hash_hex() -> &'static str {
     "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
 }
 
+#[test]
+fn owner制御資格を通常資格や要求metadataで置換できない() {
+    use gui_shell_rust_helper::audit_hash::sha256_tagged;
+    use serde_json::json;
+    let workspace = temp_workspace("owner-control");
+    let owner_file = workspace.session_file.with_file_name("owner.json");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["broker-server", "--store-dir"]).arg(&workspace.store_dir)
+        .arg("--session-file").arg(&workspace.session_file)
+        .arg("--owner-session-file").arg(&owner_file)
+        .args(["--minidora-runtime", "local=127.0.0.1:9"])
+        .stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+    let endpoint = wait_for_endpoint(&workspace.session_file).unwrap_or_else(|| { let _ = child.kill(); panic!("通常資格file不在") });
+    let process = BrokerProcess { child, endpoint };
+    let owner = wait_for_endpoint(&owner_file).unwrap();
+    assert_ne!(process.endpoint.session_secret, owner.session_secret);
+    let request = |op: &str, payload: Value| {
+        let nonce = gui_shell_rust_helper::broker::dialogue::識別子生成().unwrap();
+        json!({"request_id": nonce, "nonce":nonce, "session_id":process.endpoint.session_id,
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),"operation":op,"metadata":{},
+            "payload_hash":sha256_tagged(payload.to_string().as_bytes()),"payload":payload}).to_string()
+    };
+    let normal = send_request(&process.endpoint,&request("対話承認待ち",json!({})));
+    assert_eq!(normal["error"]["code"],"権限拒否");
+    let listed = send_request(&owner,&request("対話承認待ち",json!({})));
+    assert_eq!(listed["status"],"accepted");
+    let s=send_request(&process.endpoint,&request("対話開始",json!({"実行系ID":"local"})));
+    assert_eq!(s["status"],"accepted");
+    let p=send_request(&process.endpoint,&request("対話送信",json!({"対話セッションID":s["body"]["対話セッションID"],"入力":"こんにちは"})));
+    assert_eq!(p["body"]["状態"],"承認待ち");
+    let payload=json!({"要求ID":p["body"]["要求ID"],"要求hash":p["body"]["要求hash"],"表示範囲":"full"});
+    assert_eq!(send_request(&process.endpoint,&request("対話承認",payload.clone()))["error"]["code"],"権限拒否");
+    let mut forged: Value=serde_json::from_str(&request("対話承認",payload.clone())).unwrap();
+    forged["metadata"]=json!({"authority":"owner"});
+    assert_ne!(send_request(&process.endpoint,&forged.to_string())["status"],"accepted");
+    let cli=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作","--session-file"]).arg(&owner_file).arg("一覧").output().unwrap();
+    assert!(cli.status.success(),"{}",String::from_utf8_lossy(&cli.stderr));
+    let out=String::from_utf8(cli.stdout).unwrap();
+    assert!(out.contains("こんにちは")); assert!(!out.contains(&owner.session_secret));
+    assert_eq!(send_request(&owner,&request("対話承認",payload.clone()))["status"],"accepted");
+    assert_ne!(send_request(&owner,&request("対話承認",payload))["status"],"accepted");
+}
+
 struct Workspace {
     store_dir: PathBuf,
     session_file: PathBuf,

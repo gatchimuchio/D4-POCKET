@@ -34,7 +34,15 @@
         "approval_edit",
         "content_projection",
         "audit_verify",
-        "normalize_payload"
+        "normalize_payload",
+        "実行系列挙",
+        "対話開始",
+        "対話送信",
+        "対話取得",
+        "対話中止",
+        "対話終了",
+        "対話承認",
+        "対話承認待ち"
       ]
     },
     "payload_hash": {

@@ -62,6 +62,7 @@ from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
 REQUIRED_SCHEMA_NAMES = {
+    "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_session",
     "runtime_dialogue_response",
@@ -2048,6 +2049,30 @@ def test_packaging_portability_checker_exists() -> list[str]:
     return errors
 
 
+def 対話操作の分岐と未知fieldを検査する() -> list[str]:
+    schema = load_schema("runtime_dialogue_operation.schema.json")
+    errors = []
+    samples = {
+        "実行系列挙": {}, "対話承認待ち": {}, "対話開始": {"実行系ID": "local"},
+        "対話送信": {"対話セッションID": "a" * 32, "入力": "こんにちは"},
+        "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32},
+        "対話終了": {"対話セッションID": "a" * 32},
+        "対話承認": {"要求ID": "b" * 32, "要求hash": "sha256:" + "c" * 64, "表示範囲": "full"},
+    }
+    for operation, payload in samples.items():
+        errors.extend(validate_instance({"operation": operation, "payload": payload}, schema))
+        if not validate_instance({"operation": operation, "payload": {**payload, "authority": "owner"}}, schema):
+            errors.append("対話操作が未知の権限fieldを受理した")
+        if payload and not validate_instance({"operation": operation, "payload": {}}, schema):
+            errors.append("対話操作が必須fieldの欠落を受理した")
+    for value in ({"operation": "未知操作", "payload": {}}, {"operation": "対話取得", "payload": {"実行系ID": "local"}}):
+        if not validate_instance(value, schema):
+            errors.append("操作とpayloadの不整合を受理した")
+    if not validate_instance({}, {"oneOf": [{"type": "object"}, {"type": "object"}]}):
+        errors.append("oneOfの複数一致を拒否しなかった")
+    return errors
+
+
 def 対話契約の関係と表示境界を検査する() -> list[str]:
     from tooling.dialogue_contract_check import 要求関係検査, 応答関係検査, 比較関係検査
 
@@ -3481,6 +3506,7 @@ def main() -> int:
         test_packaging_portability_utf8_governance_allowlist_is_exact,
         書庫展開で日本語名と内容を保持する,
         対話契約の関係と表示境界を検査する,
+        対話操作の分岐と未知fieldを検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

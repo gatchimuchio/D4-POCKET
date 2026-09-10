@@ -17,6 +17,8 @@ pub struct BrokerServerConfig {
     pub session_file: PathBuf,
     pub port: u16,
     pub max_request_bytes: usize,
+    pub owner_session_file: Option<PathBuf>,
+    pub minidora_runtimes: Vec<(String, String)>,
 }
 
 impl BrokerServerConfig {
@@ -26,6 +28,8 @@ impl BrokerServerConfig {
             session_file,
             port: 0,
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
+            owner_session_file: None,
+            minidora_runtimes: Vec::new(),
         }
     }
 }
@@ -59,6 +63,12 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
 
+    for (id, address) in &config.minidora_runtimes {
+        let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
+        broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
+    }
+    let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
+
     let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), config.port);
     let listener = TcpListener::bind(bind_addr)
         .map_err(|error| BrokerServerError::new(format!("broker IPCのbindに失敗: {error}")))?;
@@ -79,6 +89,19 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         transport: "authenticated_loopback_tcp".to_string(),
         max_request_bytes: config.max_request_bytes,
     };
+    if let Some(path) = &config.owner_session_file {
+        let absolute = |p: &std::path::Path| -> Result<String, BrokerServerError> {
+            let parent = p.parent().filter(|v| !v.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
+            let parent = std::fs::canonicalize(parent).map_err(|_| BrokerServerError::new("資格fileの親directoryを確認できない"))?;
+            Ok(parent.join(p.file_name().ok_or_else(|| BrokerServerError::new("資格file名が不正"))?).to_string_lossy().to_lowercase())
+        };
+        if absolute(path)? == absolute(&config.session_file)? || path.is_symlink() || config.session_file.is_symlink() {
+            return Err(BrokerServerError::new("owner資格と通常資格は異なる通常fileを指定する"));
+        }
+        let mut control = endpoint.clone();
+        control.session_secret = owner_secret.clone().ok_or_else(|| BrokerServerError::new("owner資格がない"))?;
+        write_endpoint_file(path, &control)?;
+    }
     write_endpoint_file(&config.session_file, &endpoint)?;
 
     for incoming in listener.incoming() {
@@ -86,7 +109,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let shutdown = match handle_stream(stream, &endpoint.session_secret, &mut broker, &config) {
+        let shutdown = match handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config) {
             Ok(shutdown) => shutdown,
             Err(_) => continue,
         };
@@ -100,6 +123,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
 fn handle_stream(
     mut stream: TcpStream,
     session_secret: &str,
+    owner_secret: Option<&str>,
     broker: &mut Broker,
     config: &BrokerServerConfig,
 ) -> Result<bool, BrokerServerError> {
@@ -142,7 +166,8 @@ fn handle_stream(
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
     };
 
-    if auth_line != session_secret {
+    let owner = owner_secret.is_some_and(|secret| auth_line == secret);
+    if auth_line != session_secret && !owner {
         let response = broker.reject_ipc(
             "broker_authentication_failed",
             "broker IPC authentication failed",
@@ -175,7 +200,7 @@ fn handle_stream(
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
     };
 
-    let response = broker.handle_json(&request_json);
+    let response = if owner { broker.owner要求処理(&request_json) } else { broker.handle_json(&request_json) };
     let shutdown = response.shutdown_requested;
     write_response(&mut stream, &response)?;
     Ok(shutdown)

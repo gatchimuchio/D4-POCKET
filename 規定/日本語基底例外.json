@@ -164,6 +164,28 @@
       "japanese_reference": "規定/00_日本語基底規定.md",
       "authority_effect": "none",
       "review_trigger": "公開契約識別子を追加・改名するとき、または表示文字列へ例外が漏れると判明したとき"
+    },
+    {
+      "id": "JBE-007",
+      "scopes": [
+        "native/rust_helper/src/adapters/minidora.rs"
+      ],
+      "region": "HTTP要求の外部固定ヘッダー名と値だけ。周囲の説明と診断は除外しない。",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "HTTP/1.1",
+        "Host:",
+        "Content-Type: application/json",
+        "Content-Length:",
+        "Connection: close",
+        "\\r\\n"
+      ],
+      "unavoidable_reason_japanese": "MINIDORAのHTTP接続に必要な固定構文であり、翻訳すると通信互換性を壊すため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "HTTP接続のヘッダーまたは対象実行系を変更するとき"
     }
   ],
   "frozen_assets": [

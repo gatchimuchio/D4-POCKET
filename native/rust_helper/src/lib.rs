@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod audit_hash;
+pub mod adapters;
 pub mod broker;
 pub mod diagnostics;
 pub mod filesystem;

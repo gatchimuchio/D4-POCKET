@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod owner_cli;
 
 use std::env;
 use std::io::{self, BufRead};
@@ -9,6 +10,10 @@ use gui_shell_rust_helper::broker::{
 };
 
 fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    if args.first().is_some_and(|v| v == "対話承認操作") {
+        match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if let Some(exit_code) = maybe_run_broker_server() {
         std::process::exit(exit_code);
     }
@@ -17,6 +22,8 @@ fn main() {
     }
     eprintln!("使用法: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
     eprintln!("開発専用: gui_shell_rust_helper dev-stdin-smoke");
+    eprintln!("対話登録: broker-server ... --owner-session-file <owner資格file> --minidora-runtime <ID=127.0.0.1:port>");
+    eprintln!("owner操作: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>");
     std::process::exit(2);
 }
 
@@ -33,9 +40,20 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut session_file: Option<PathBuf> = None;
     let mut port: u16 = 0;
     let mut max_request_bytes: usize = 64 * 1024;
+    let mut owner_session_file = None;
+    let mut minidora_runtimes = Vec::new();
 
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--owner-session-file" => {
+                let Some(value) = args.next() else { eprintln!("owner資格fileの値が必要"); return Some(2); };
+                owner_session_file = Some(PathBuf::from(value));
+            }
+            "--minidora-runtime" => {
+                let Some(value) = args.next() else { eprintln!("実行系ID=127.0.0.1:portの値が必要"); return Some(2); };
+                let Some((id, address)) = value.split_once('=') else { eprintln!("実行系登録の形式が不正"); return Some(2); };
+                minidora_runtimes.push((id.to_owned(), address.to_owned()));
+            }
             "--store-dir" => {
                 let Some(value) = args.next() else {
                 eprintln!("--store-dirには値が必要");
@@ -94,6 +112,8 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut config = BrokerServerConfig::new(store_dir, session_file);
     config.port = port;
     config.max_request_bytes = max_request_bytes;
+    config.owner_session_file = owner_session_file;
+    config.minidora_runtimes = minidora_runtimes;
 
     match run_loopback_server(config) {
         Ok(()) => Some(0),

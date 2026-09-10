@@ -47,6 +47,10 @@ example と negative fixture は `examples/contracts/` 配下に置く。
 - `content_projection`
 - `audit_verify`
 - `normalize_payload`
+- `実行系列挙`、`対話開始`、`対話送信`、`対話取得`、`対話中止`、`対話終了`
+- owner制御資格専用の `対話承認待ち`、`対話承認`
+
+rev2の対話操作は `runtime_dialogue_operation.schema.json` と `docs/specs/runtime-dialogue.md` に従う。通常資格とowner資格は独立した乱数であり、認証済み接続からだけroleを決める。入力fieldやmetadataでroleを指定できない。owner CLIはローカル制御面であり、通常UIのruntime経路に含めない。永続監査がないbrokerでは対話操作を拒否する。
 
 `authority_evaluate` は製品権限判定 operation である。action 要求だけを受理し、呼出し側が提供する `payload.state` を拒否する。runtime、capability、permission、approval、audit、recovery の各 state は broker が所有しなければならない。`authority_fixture_evaluate` は development/parity 専用であり、Python oracle 比較のために fixture `state` を利用してよい。
 

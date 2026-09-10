@@ -64,3 +64,21 @@ Flutter は要求を入力する操作面であり、Runtime へ直接通信し�
   reason: Schema と開発用関係検証だけでは外部送信、実行系操作、認証付き端末連携は成立しない。
   required_action: Rust の統治経路、実物APIとの通信、UI、端末資格の期限・失効・replay拒否、platform別実機試験を順次実装する。
   blocks_release: yes
+
+## Rustの局所承認経路
+
+ownerの継続指示に基づき、既存外部承認系を前提にしない専用ローカル制御操作を採用する。broker起動時に指定された実行系登録は接続先の宣言に限り、送信許可を付与しない。通常IPC資格と独立したowner制御資格を別ファイルへ出力する。通常Flutterへowner資格を渡さない。ownerのローカル制御CLIが承認待ちの要求ID、要求hash、実行系、入力を確認して、一回の要求に対し表示範囲を指定して承認する。
+
+`対話送信` は不変の要求を待ち行列に作るだけで、ネットワークを呼ばない。`対話承認` はowner専用、要求hash一致・作成から300秒以内・未使用・実行系結合・永続監査成功を全て満たす場合だけAdapterを一度呼ぶ。Capabilityは対話送信、Permissionは当該実行系の固定接続先、Approvalは当該要求hashへのowner操作、AuditEventは送信前・完了・取消の記録、RecoveryActionは契約の失敗分類に対応する。結果は非同期に `対話取得` で受け取る。`対話中止` は未送信なら送信を防止し、送信後なら採用を止めてセッションを隔離する。
+
+操作のSchemaは `runtime_dialogue_operation.schema.json`。通常操作は実行系列挙、対話開始、対話送信、対話取得、対話中止、対話終了。owner専用操作は対話承認待ち、対話承認。通常要求のfieldやmetadataからowner roleを選ばせない。起動毎に資格とセッションを更新し、古い資格・nonce・承認を再利用しない。pending要求は再起動で復元せず、再送は操作者が判断する。
+
+owner資格はローカルOS利用者の保管責任を伴う。Unixでは0600で生成する。現行Windowsは既存brokerと同じ利用者境界であり、同一利用者の任意processがファイルを読める環境に対する隔離保証や管理者耐性は主張しない。OS保護とinstalled-path証拠は引き続きrelease_blocker。制御資格による認証と、人間本人が操作したことの証明を同一視しない。
+
+Shell Coreは汎用Adapter traitだけを参照する。MINIDORA Adapterは別moduleとし、明示登録された127.0.0.1のHTTP接続先と固定API経路だけを使う。任意URL、redirect、proxy、DNS解決を追加しない。接続・読書き・全体時間と受信量を制限する。現行MINIDORAのContent-Length付きJSON応答を受理し、未対応の転送形式や不整合応答を拒否する。
+
+受理した各HTTP本文はparse前のbytesを要求に結合してCoreメモリへ保持する。上限は四応答、各1MiBである。JSON不正、session不一致、取消後応答もこの保持とhash監査の対象とする。HTTP framing自体が不正な場合は本文として受理せず破棄する。永続監査には要求hashと受信hash集合へのhashを記録し、raw内容は書き込まない。raw保持は対話終了・process終了までであり、永続raw保管や管理者耐性を保証しない。
+
+CoreはAdapterの成功応答にもセッション一致、本文・参照・能力の上限、追跡ID/hashの構造を要求する。summary/redacted用の承認済み射影が現在の実行系にないため、この二scopeではhashだけを返す。UIが本文を代替生成してはならない。
+
+brokerは最大64セッション、128要求、実行中worker8件を保持する。操作全体の通信期限は10秒以内。取消は即時に採用を停止するが、通信workerの解放までは同時実行枠を保持する。Adapter追加時は同じ期限・取消・受信上限とconformanceを満たす必要がある。

@@ -14,6 +14,8 @@ use crate::broker::authority::{
     project_approval_content, verify_audit_chain, BrokerAuthorityRegistry,
 };
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
+use crate::broker::dialogue::{対話制御, 対話失敗, 実行系Adapter};
+use std::sync::Arc;
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
@@ -138,6 +140,23 @@ pub enum BrokerOperation {
     ContentProjection,
     AuditVerify,
     NormalizePayload,
+    #[serde(rename = "実行系列挙")]
+    実行系列挙,
+    #[serde(rename = "対話開始")]
+    対話開始,
+    #[serde(rename = "対話送信")]
+    対話送信,
+    #[serde(rename = "対話取得")]
+    対話取得,
+    #[serde(rename = "対話中止")]
+    対話中止,
+    #[serde(rename = "対話終了")]
+    対話終了,
+    #[serde(rename = "対話承認")]
+    対話承認,
+    #[serde(rename = "対話承認待ち")]
+    対話承認待ち,
+
 }
 
 impl BrokerOperation {
@@ -152,6 +171,15 @@ impl BrokerOperation {
             BrokerOperation::ContentProjection => "content_projection",
             BrokerOperation::AuditVerify => "audit_verify",
             BrokerOperation::NormalizePayload => "normalize_payload",
+            BrokerOperation::実行系列挙 => "実行系列挙",
+            BrokerOperation::対話開始 => "対話開始",
+            BrokerOperation::対話送信 => "対話送信",
+            BrokerOperation::対話取得 => "対話取得",
+            BrokerOperation::対話中止 => "対話中止",
+            BrokerOperation::対話終了 => "対話終了",
+            BrokerOperation::対話承認 => "対話承認",
+            BrokerOperation::対話承認待ち => "対話承認待ち",
+
         }
     }
 }
@@ -344,12 +372,13 @@ impl BrokerResponse {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Broker {
     session_id: String,
     seen_nonces: HashMap<String, i64>,
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
+    対話: 対話制御,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
     state_store: BrokerStateStore,
@@ -362,6 +391,7 @@ impl Broker {
             seen_nonces: HashMap::new(),
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
+            対話: 対話制御::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
@@ -391,6 +421,7 @@ impl Broker {
             seen_nonces: persistent_state.seen_nonces,
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
+            対話: 対話制御::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
@@ -398,6 +429,21 @@ impl Broker {
     }
 
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
+        self.処理(envelope, false)
+    }
+
+    pub fn 実行系登録(&mut self, 名前: &str, adapter: Arc<dyn 実行系Adapter>) -> Result<(), 対話失敗> {
+        self.対話.登録(名前, adapter)
+    }
+
+    pub(crate) fn owner要求処理(&mut self, input: &str) -> BrokerResponse {
+        match BrokerRequestEnvelope::from_json_str(input) {
+            Ok(envelope) => self.処理(envelope, true),
+            Err(_) => self.reject("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true),
+        }
+    }
+
+    fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
         let request_id = envelope
             .request_id
             .clone()
@@ -531,6 +577,7 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
+            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
             BrokerOperation::CommandEnvelope => self.suspend_command(
@@ -585,6 +632,32 @@ impl Broker {
                 normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+        }
+    }
+
+    fn 対話要求処理(&mut self, request_id: &str, operation: BrokerOperation, payload: &Value, owner: bool, payload_hash: &str) -> BrokerResponse {
+        if !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "broker_persistence_unavailable", "対話には永続監査が必要", true, payload_hash);
+        }
+        if matches!(operation, BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) && !owner {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "権限拒否", "owner制御資格が必要", true, payload_hash);
+        }
+        let initial = self.append_audit(request_id, operation.as_str(), "received", "対話操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash);
+        let mut last_event = match initial {
+            Ok(event) => event.event_id,
+            Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
+        };
+        let mut 対話 = std::mem::take(&mut self.対話);
+        let now = self.current_epoch_seconds();
+        let result = 対話.操作(operation.as_str(), payload, owner, now, &mut |reason, id, hash| {
+            let event = self.append_audit(id, operation.as_str(), "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash).map_err(|_| 対話失敗::監査失敗)?;
+            last_event = event.event_id; Ok(())
+        });
+        self.対話 = 対話;
+        match result {
+            Ok(body) => BrokerResponse { request_id: request_id.into(), operation: operation.as_str().into(), status: BrokerStatus::Accepted, evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(), audit_event_id: last_event, error: None, health: None, body: Some(body), shutdown_requested: false },
+            Err(対話失敗::監査失敗) => self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", "対話の監査を確定できない"),
+            Err(e) => self.reject_with_payload_hash(request_id, operation.as_str(), e.分類(), e.復旧(), true, payload_hash),
         }
     }
 

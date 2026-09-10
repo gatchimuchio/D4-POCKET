@@ -8,6 +8,7 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "runtime_dialogue_operation.schema.json",
     "runtime_dialogue_request.schema.json",
     "runtime_dialogue_session.schema.json",
     "runtime_dialogue_response.schema.json",
@@ -68,6 +69,10 @@ def type_matches(value, expected_type: str) -> bool:
 
 def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
     errors: list[str] = []
+    if "oneOf" in schema:
+        一致数 = sum(not validate_instance(value, 分岐, path) for 分岐 in schema["oneOf"])
+        if 一致数 != 1:
+            errors.append(f"{path}: oneOfの一致数が1ではない")
     expected_type = schema.get("type")
 
     if isinstance(expected_type, list):
