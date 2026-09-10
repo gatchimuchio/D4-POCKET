@@ -16,10 +16,6 @@ from tooling.manifest import expected_files, relative
 
 
 DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = 120
-WINDOWS_GIT_UNZIP_CANDIDATES = [
-    Path(r"C:\Program Files\Git\usr\bin\unzip.exe"),
-    Path(r"C:\Program Files (x86)\Git\usr\bin\unzip.exe"),
-]
 UTF8_GOVERNANCE_PATH_ALLOWLIST = frozenset(
     {
         "規定/00_日本語基底規定.md",
@@ -60,15 +56,17 @@ def timeout_output(exc: subprocess.TimeoutExpired) -> str:
     return output or "部分出力なし"
 
 
-def find_unzip() -> str | None:
-    resolved = shutil.which("unzip")
-    if resolved is not None:
-        return resolved
+def 展開命令(書庫: Path, 展開先: Path) -> list[str]:
+    """日本語名を保持する OS 標準展開器を使い、不在を隠さない。"""
     if sys.platform == "win32":
-        for candidate in WINDOWS_GIT_UNZIP_CANDIDATES:
-            if candidate.is_file():
-                return str(candidate)
-    return None
+        展開器 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "tar.exe"
+        if not 展開器.is_file():
+            raise FileNotFoundError("Windows 標準 tar.exe が見つからない")
+        return [str(展開器), "-xf", str(書庫), "-C", str(展開先)]
+    展開器 = shutil.which("unzip")
+    if 展開器 is None:
+        raise FileNotFoundError("unzip が PATH に見つからない")
+    return [展開器, "-qq", str(書庫), "-d", str(展開先)]
 
 
 def run_check(
@@ -105,15 +103,6 @@ def run_check(
 def main() -> int:
     source_files, errors = expected_files()
     errors.extend(portable_path_errors(source_files))
-    unzip = find_unzip()
-    if unzip is None:
-        if sys.platform == "win32":
-            errors.append(
-                "unzipがPATHにもGit for Windowsの次の場所にも見つからない: "
-                + ", ".join(str(path) for path in WINDOWS_GIT_UNZIP_CANDIDATES)
-            )
-        else:
-            errors.append("unzipがPATHに見つからない")
     if errors:
         print("packaging portability checkが失敗:")
         for error in errors:
@@ -124,6 +113,7 @@ def main() -> int:
         tmp = Path(raw_tmp)
         archive = tmp / "gui_shell_source.zip"
         extract_root = tmp / "extract"
+        extract_root.mkdir()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as handle:
             for path in source_files:
                 handle.write(path, relative(path))
@@ -133,7 +123,11 @@ def main() -> int:
         env = os.environ.copy()
         env["LC_ALL"] = "C"
         env["LANG"] = "C"
-        unzip_command = [unzip, "-qq", str(archive), "-d", str(extract_root)]
+        try:
+            unzip_command = 展開命令(archive, extract_root)
+        except FileNotFoundError as exc:
+            print(f"packaging portability checkが失敗: {exc}")
+            return 1
         try:
             completed = subprocess.run(
                 unzip_command,
@@ -152,9 +146,12 @@ def main() -> int:
                 f"{DEFAULT_SUBPROCESS_TIMEOUT_SECONDS}s: {timeout_output(exc)}"
             )
             return 1
+        except OSError as exc:
+            print(f"packaging portability checkが失敗: 展開器を起動できない: {exc}")
+            return 1
         if completed.returncode != 0:
             print("packaging portability checkが失敗:")
-            print(f"  - unzipのextractに失敗: {completed.stdout.strip()}")
+            print(f"  - 展開に失敗: {completed.stdout.strip()}")
             return 1
 
         errors = []

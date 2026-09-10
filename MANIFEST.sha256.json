@@ -478,7 +478,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "7644defa8ff1ebd3cd4257abf63de2ac4efca7fcdabf9b4536cfc030e5b473cf"
+      "sha256": "8131d79fce19742efb3615ef3af6d8f39b5fe0ab5dd1c8f8c0ab35f6432d6613"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1382,7 +1382,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3deb9097454b1619dafce46229266ae990dd4fc1bb3c400b4efa9ad87b4aeefb"
+      "sha256": "d155cfb002c3e481cd773b1052215067b4e73a4c79c0451508846d499e3a2579"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1398,7 +1398,7 @@
     },
     {
       "path": "tooling/packaging_portability_check.py",
-      "sha256": "a1eba56caa047c20e9943ef68d8074b4e25c6ed8c503d2a0a968b77535835870"
+      "sha256": "f0f6924fcd7d5128e593585583c7279bbce8106bbac6ebe148500a9124736ba3"
     },
     {
       "path": "tooling/release_gate_check.py",

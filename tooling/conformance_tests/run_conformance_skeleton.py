@@ -2043,6 +2043,50 @@ def test_packaging_portability_checker_exists() -> list[str]:
     return errors
 
 
+def 書庫展開で日本語名と内容を保持する() -> list[str]:
+    import hashlib
+    import os
+    import zipfile
+    from unittest.mock import patch
+    from tooling.packaging_portability_check import 展開命令
+
+    不整合 = []
+    with tempfile.TemporaryDirectory() as 場所:
+        ルート = Path(場所)
+        書庫 = ルート / "source.zip"
+        展開先 = ルート / "展開 先"
+        展開先.mkdir()
+        名前 = "規定/日本語 名前.txt"
+        内容 = "本文と改行\n".encode("utf-8")
+        with zipfile.ZipFile(書庫, "w", zipfile.ZIP_DEFLATED) as 保存:
+            保存.writestr(名前, 内容)
+            保存.writestr("ascii.txt", b"ascii")
+        環境 = os.environ.copy()
+        環境.update(LC_ALL="C", LANG="C")
+        結果 = subprocess.run(展開命令(書庫, 展開先), env=環境, capture_output=True, timeout=30)
+        if 結果.returncode != 0 or not (展開先 / 名前).is_file():
+            不整合.append("標準展開器が日本語名を保持しなかった")
+        elif hashlib.sha256((展開先 / 名前).read_bytes()).digest() != hashlib.sha256(内容).digest():
+            不整合.append("標準展開器が内容を変更した")
+        書庫.write_bytes(b"broken archive")
+        結果 = subprocess.run(展開命令(書庫, 展開先), env=環境, capture_output=True, timeout=30)
+        if 結果.returncode == 0:
+            不整合.append("破損した書庫が成功と判定された")
+        with patch("tooling.packaging_portability_check.sys.platform", "win32"), patch.dict(os.environ, {"SystemRoot": str(ルート / "不在")}):
+            try:
+                展開命令(書庫, 展開先)
+                不整合.append("不在の Windows 展開器が許可された")
+            except FileNotFoundError:
+                pass
+        with patch("tooling.packaging_portability_check.sys.platform", "linux"), patch("tooling.packaging_portability_check.shutil.which", return_value=None):
+            try:
+                展開命令(書庫, 展開先)
+                不整合.append("不在の POSIX 展開器が許可された")
+            except FileNotFoundError:
+                pass
+    return 不整合
+
+
 def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]:
     errors = []
     allowlisted_paths = [
@@ -3358,6 +3402,7 @@ def main() -> int:
         test_release_gate_scans_ipc_threat_model,
         test_packaging_portability_checker_exists,
         test_packaging_portability_utf8_governance_allowlist_is_exact,
+        書庫展開で日本語名と内容を保持する,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,
