@@ -1,0 +1,57 @@
+# 端末連携の意味正本
+
+状態: rev2の契約定義。契約試験はFIXTUREであり、製品の暗号化・認証・安全保管の実装証拠ではない。
+
+## 対象と責任
+
+端末招待は、Desktopのownerが指定した端末を一回だけ結合するための期限付き資格である。端末結合資格は、そのDesktop起動世代と端末に結合する通常操作資格である。HostIDはDesktopの起動世代を、証明書hashは暗号化接続先の公開証明書を識別する。接続先Hostとportは到達先であり、それだけで信頼や権限を生じない。
+
+経路は Mobile → 暗号化端末連携 → Desktop Rust broker → Shell Core → Adapter → Runtime とする。Mobileへloopback資格やowner制御資格を渡さない。端末資格はowner承認、汎用command、任意URL送信、Permission変更、監査確定を許可しない。Runtimeへの送信は既存の要求hashへのowner承認を引き続き必要とする。
+
+経路分類はcontrol経路。Capabilityは端末招待・結合・通常対話、Permissionは指定Host・端末・当該端末が作った対話、Approvalは招待時のowner操作と対話ごとの既存承認、AuditEventは発行・結合・拒否・取消・失効・通常操作、RecoveryActionは再結合・資格削除・新規対話・監査修復に対応する。
+
+## 招待と結合
+
+Desktopは明示的な起動設定がある場合だけ、指定したprivate IPv4またはloopbackで端末経路を開く。wildcard bind、公衆IP、名前解決、UPnP、firewall変更、自動探索を行わない。エミュレータ用の到達先とbind先が異なる場合もownerが明示する。
+
+ownerはMobileで生成した128bit以上の端末IDを確認して招待を発行する。招待IDは128bit以上、招待秘密は256bit以上の乱数とし、発行から300秒で失効する。招待は端末ID、HostID、証明書hash、到達先に固定する。ownerからMobileへ安全な対面手段で渡すことが最初の信頼の根拠であり、networkやmetadataから招待を自動採用しない。操作者にHostと証明書hashを表示して確認を求める。
+
+端末結合の成功時に招待を消費し、新しい256bit以上の端末秘密を返す。Desktopは秘密のhashだけを保持する。結合資格は最大8時間で失効し、自動延長しない。同じ招待の再送・別端末での使用・取消済み招待を拒否する。結合応答を受け取れなかった場合も招待は再使用せず、ownerが新しい招待を発行する。
+
+最大32件の未失効招待と32件の結合を許容し、上限時は追加を拒否する。端末IDの自己申告を人間本人性の証明と扱わない。秘密の所持とownerの招待は同一OS利用者の悪意あるprocessや管理者への耐性を保証しない。
+
+## 暗号化と入力
+
+TLSの確立後、application資格を送る前に招待／保管値の証明書hashと実peer証明書を照合する。OSが証明書を信頼している場合も固定hashを省略しない。検証無効化や任意証明書の受理を禁止する。証明書の有効期間も確認する。秘密を平文TCP、URL、log、監査本文へ出力しない。
+
+要求は64KiB以内のUTF-8 JSON一行、応答は4MiB以内とし、読書きと接続に有限の期限を設ける。未知field、重複field、不正型、未知操作、過大入力を拒否する。受信内容のhashをparse前に計算して監査に結合し、生資格を含むrawは永続logへ書かない。
+
+要求のHostID・端末ID・資格ID・秘密・有効期限をDesktopで照合する。発行時刻はserver時刻との差60秒以内とし、nonceは128bit以上の乱数を使用する。同一結合でnonceを再使用しない。最大4096nonceを保持し、上限時は安全側に拒否して再結合を求める。再接続でもnonce履歴と所有関係を維持する。入力の構造適合やMobile保存状態だけで認証成功を推定しない。
+
+## 所有関係と失効
+
+端末経路からの対話開始で作られたsessionは結合IDに帰属し、送信要求も同じ結合へ帰属する。別端末・別結合・Desktopで作ったsessionと要求の取得、送信、中止、終了を拒否する。実行系の列挙は接続先の観測だけであり送信権限を付与しない。応答の表示範囲は既存Coreの射影を保持する。
+
+ownerの招待取消は未使用招待を失効させる。ownerの端末失効およびMobileの端末離脱は以降の全操作を拒否し、当該結合の対話を終了・隔離して未送信の送信と遅延結果の採用を防ぐ。送信済みRuntimeの計算停止を保証したとは報告しない。監査永続化に失敗した場合は資格付与や結果公開を拒否する。安全側の利用停止は監査障害でも維持し、通常利用への復帰はownerによる復旧を必要とする。
+
+Desktop再起動時はHostIDと証明書を更新し、全端末資格・招待・未完了対話を失効させる。これは起動世代を跨ぐ復元を実装しない明示的境界である。古い資格から自動再結合・自動再送しない。
+
+## Mobileの保管とlifecycle
+
+Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限だけをAndroidの安全保管／iOS Keychainへ保存する。招待秘密は結合後に消去する。一般設定、標準preferences、log、clipboardへの自動書出し、バックアップからの自動復元へ秘密を置かない。保管失敗時に平文へfallbackしない。
+
+起動・復帰は資格の読取後に端末確認を行い、失効・期限切れ・Host不一致では入力と送信を無効にする。background中はpollingと新規送信を停止する。応答待ちは復帰後に同じ要求を照会し、自動再送しない。離脱はserver失効を先に要求する。通信不能時のlocal削除はserver失効と区別し、owner側の失効操作を案内する。
+
+既存の概要・確認・通知・実行系・停止・復旧画面は維持する。接続前の固定preview値を実Runtime状態として表示せず、未接続を明示する。未実装の承認や停止操作を成功表示しない。
+
+## 受入試験と残存境界
+
+Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を検査する。Rustの実経路では正常結合、再接続、招待取消、端末失効、期限切れ、不正資格、nonce再使用、Host不一致、他端末の所有物操作、owner昇格、監査障害を検査する。TLS実接続、異なる証明書拒否、Mobile安全保管、MINIDORA実対話、lifecycleは別のLIVE_RUNTIME証拠を必要とする。
+
+- item: 端末連携の実装と実機検証
+  classification: release_blocker
+  reason: 契約定義とfixtureは製品接続の成立を証明しない。
+  required_action: Rust・Flutterの消費経路と否定経路を実装し、Android/iOSのbuild・install・launch・結合・対話・lifecycleを測定する。
+  blocks_release: yes
+
+技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)、[DartのSecureSocket](https://api.dart.dev/dart-io/SecureSocket/connect.html)。これらは暗号化機構のAPI資料でありGUI Shellの権限源ではない。

@@ -1,0 +1,14 @@
+{
+  "版": 1,
+  "HostID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "端末ID": "cccccccccccccccccccccccccccccccc",
+  "資格ID": "dddddddddddddddddddddddddddddddd",
+  "資格秘密": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "nonce": "ffffffffffffffffffffffffffffffff",
+  "発行時刻": 1999999900,
+  "操作": "対話開始",
+  "内容": {
+    "実行系ID": "local"
+  },
+  "authority": "owner"
+}

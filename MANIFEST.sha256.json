@@ -738,7 +738,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "2ae67729f0e44b59535063eb843f3949a5da0eee5bb4fe41ae9815426aaed598"
+      "sha256": "3788d8327820fbedd5b4c0b7f163b33a1b6db19a1b837c3c3d2ec69eee56e687"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -845,6 +845,10 @@
       "sha256": "1f817b19a9fe27b2dc58b51524ed61b924d1d762177678bf5d8698843ff3e742"
     },
     {
+      "path": "docs/specs/device-link.md",
+      "sha256": "ccf16e1ef8bf0abb22691da07764767d10c28a83a073d6a1e6e4346468204841"
+    },
+    {
       "path": "docs/specs/gui-shell-spec-v1.md",
       "sha256": "fe8fb02986f6cc64ecf6084a07b1a70808a7d51c58fb2d3e7be9358136f9c31a"
     },
@@ -941,6 +945,18 @@
       "sha256": "882edbdf0cbf0ad4565a580a950f67a2c8e92d50684671a521d99e9d122f0caf"
     },
     {
+      "path": "examples/contracts/device_link_credential.valid.json",
+      "sha256": "00e845b11f23108339510941f89616abe7510587d89a5cb1a3fb3c3c95c25509"
+    },
+    {
+      "path": "examples/contracts/device_link_invitation.valid.json",
+      "sha256": "6fe375e346ffd3ef819881b60ed6597cd1c1936eaf976da8e4f09ef473fbea00"
+    },
+    {
+      "path": "examples/contracts/device_link_request.valid.json",
+      "sha256": "c85c2f4272e6447b3e9172157afc6238c3cd8433898d2d858a7926cabf74eb20"
+    },
+    {
       "path": "examples/contracts/diagnostic.valid.json",
       "sha256": "95121ea98da3e2269b27694da009c00c033472e1459ff92abd1c9c22dc3b5a88"
     },
@@ -1023,6 +1039,18 @@
     {
       "path": "examples/contracts/invalid/content_exposure_default_full.invalid.json",
       "sha256": "6071daba2584ef5d453ea6b0d3bc7fc9dea94318f417707f1fb66e13fc392c83"
+    },
+    {
+      "path": "examples/contracts/invalid/device_link_credential.invalid.json",
+      "sha256": "c9def90c20fffa1dc83bd6d6dad34d97ea368cdd35d3805026d137407ad935a5"
+    },
+    {
+      "path": "examples/contracts/invalid/device_link_invitation.invalid.json",
+      "sha256": "c811ceda73a5c8c7b2c12a4cdb7832f9a1a3e7bd03aaf5cb5e4562267b6ab3ca"
+    },
+    {
+      "path": "examples/contracts/invalid/device_link_request.invalid.json",
+      "sha256": "c30484ba13c21eb0685ae1c024e6c963c1189ba914341cd15bb4a2b521faeb8a"
     },
     {
       "path": "examples/contracts/invalid/diagnostic_bad_check_status.invalid.json",
@@ -1689,6 +1717,18 @@
       "sha256": "037b544a8f26ab65efc2c216d619055dd86361339252a7f55a0783edc466639d"
     },
     {
+      "path": "specs/device_link_credential.schema.json",
+      "sha256": "57ae8b23d745977db92edd25426c44f045fcb8be326dc53ea2763aeeb470e376"
+    },
+    {
+      "path": "specs/device_link_invitation.schema.json",
+      "sha256": "3b2075ce48ff4cfad4a7ebac759641d19359f5d3abbb54a43ee85f4e68c3df1b"
+    },
+    {
+      "path": "specs/device_link_request.schema.json",
+      "sha256": "eb1b4908c16da06d5df7b66d58d37beb4800584c00ef98e7fa9c71ec8812dbce"
+    },
+    {
       "path": "specs/diagnostic.schema.json",
       "sha256": "b5a8eee5fa4a93f4d3779add9dc12ce50fe9388256a0f0de17097b5c5d885437"
     },
@@ -1758,7 +1798,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8dfa5b2d3fdd39d62db5c6676e117a1b6c341466dff93091fd3c8c59ed44e0c4"
+      "sha256": "6525c888f0204727f6ce5f974bb2277c581d0bc0e937d1f7163e0611491488eb"
     },
     {
       "path": "tooling/dialogue_contract_check.py",
@@ -1798,7 +1838,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "c4782e96be867db7f2355f4530d993d7b3fb256949f7e701ec828191bb475e70"
+      "sha256": "a99523a52f66e230dda9899dc908693807f1c704f787b37cd2298ff425802a86"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -1830,7 +1870,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "1160f6fc04752ab2dcc99202099bfd10f03848e4a1aa705cd7c1f3548ae153c9"
+      "sha256": "01bc3576bcf76034c9bc4a5e1a4609a209f51fc835c27199edbeff51b2c2e674"
     }
   ]
 }

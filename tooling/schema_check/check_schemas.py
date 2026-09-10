@@ -8,6 +8,9 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "device_link_invitation.schema.json",
+    "device_link_credential.schema.json",
+    "device_link_request.schema.json",
     "runtime_dialogue_operation.schema.json",
     "runtime_dialogue_request.schema.json",
     "runtime_dialogue_session.schema.json",
@@ -101,6 +104,9 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
     if isinstance(value, int) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:
             errors.append(f"{path}: minimum {schema['minimum']}未満")
+
+        if "maximum" in schema and value > schema["maximum"]:
+            errors.append(f"{path}: maximum を超過")
 
     if isinstance(value, list):
         if "minItems" in schema and len(value) < schema["minItems"]:

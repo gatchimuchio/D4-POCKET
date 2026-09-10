@@ -115,3 +115,15 @@ Desktop単位の最終検証: Windowsの一括14検査はすべてPASS（終了�
 修正後の conformance（146件）と packaging portability はPASS。共通・Desktop・Mobile analyze、共通5件・Desktop32件test、Rust53単体・5統合は集約検証でPASSした。
 
 共有化後の lutter build windows --debug もPASS。Android/iOSのnative buildはこの単位では未検証であり、上記platform別release_blockerに含める。
+
+## 端末連携の契約
+
+招待・結合資格・暗号化要求の三Schemaと日本語意味正本を追加した。通常操作のallowlist、Host証明書固定、端末所有関係、招待300秒・結合8時間、nonce再使用拒否、失効・lifecycle・安全保管を定義した。port上限を機械検証するためSchema検証器にmaximum検査を追加した。
+
+`python tooling/schema_check/check_schemas.py` は34 Schema・34正常例・36否定例、`python tooling/conformance_tests/run_conformance_skeleton.py` は147項目でPASS。必須field欠落、未知権限field、不正型、port境界、禁止操作、操作と内容の不一致を含む。証拠classはFIXTUREであり、暗号化や端末認証の実動作を証明しない。
+
+- item: 端末連携の製品消費経路
+  classification: release_blocker
+  reason: この単位は契約と構造検査。TLS・資格・所有関係・安全保管の製品経路は次単位で実装する。
+  required_action: RustとMobileの正常・否定経路および実通信を検証する。
+  blocks_release: yes

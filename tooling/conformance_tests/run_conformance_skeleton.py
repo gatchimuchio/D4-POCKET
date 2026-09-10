@@ -2049,6 +2049,41 @@ def test_packaging_portability_checker_exists() -> list[str]:
     return errors
 
 
+def 端末契約の構造と禁止操作を検査する() -> list[str]:
+    errors = []
+    for name in ("device_link_invitation", "device_link_credential", "device_link_request"):
+        schema = load_schema(name + ".schema.json")
+        sample = load_contract_fixture(name + ".valid.json")
+        errors.extend(validate_instance(sample, schema))
+        for key in sample:
+            missing = dict(sample)
+            del missing[key]
+            if not validate_instance(missing, schema):
+                errors.append("端末契約が必須field欠落を受理: " + key)
+        for change in ({"authority": "owner"}, {"HostID": "a" * 32 + "\n"}, {"端末ID": ""}, {"版": True}):
+            if not validate_instance({**sample, **change}, schema):
+                errors.append("端末契約が不正構造を受理: " + name)
+        if name != "device_link_request":
+            for port in (0, 65536, True):
+                if not validate_instance({**sample, "port": port}, schema):
+                    errors.append("端末契約がport境界を受理")
+    schema = load_schema("device_link_request.schema.json")
+    sample = load_contract_fixture("device_link_request.valid.json")
+    operations = {"端末結合": {}, "端末確認": {}, "端末離脱": {}, "実行系列挙": {},
+                  "対話開始": {"実行系ID": "local"}, "対話送信": {"対話セッションID": "a" * 32, "入力": "こんにちは"},
+                  "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32}, "対話終了": {"対話セッションID": "a" * 32}}
+    for operation, payload in operations.items():
+        errors.extend(validate_instance({**sample, "操作": operation, "内容": payload}, schema))
+        if not validate_instance({**sample, "操作": operation, "内容": {**payload, "owner": True}}, schema):
+            errors.append("端末操作が権限fieldを受理")
+    for operation in ("対話承認", "対話承認待ち", "shutdown", "command_envelope", "端末招待", "端末失効"):
+        if not validate_instance({**sample, "操作": operation, "内容": {}}, schema):
+            errors.append("端末経路が禁止操作を受理: " + operation)
+    if not validate_instance({**sample, "操作": "対話取得", "内容": {"対話セッションID": "a" * 32}}, schema):
+        errors.append("端末要求が操作と内容の不一致を受理")
+    return errors
+
+
 def 対話操作の分岐と未知fieldを検査する() -> list[str]:
     schema = load_schema("runtime_dialogue_operation.schema.json")
     errors = []
@@ -3507,6 +3542,7 @@ def main() -> int:
         書庫展開で日本語名と内容を保持する,
         対話契約の関係と表示境界を検査する,
         対話操作の分岐と未知fieldを検査する,
+        端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/device_link_request.schema.json",
+  "title": "暗号化端末経路の要求",
+  "description": "端末連携の意味は docs/specs/device-link.md を正本とする。構造適合は資格・権限・期限・所有関係の証拠ではない。",
+  "type": "object",
+  "required": [
+    "版",
+    "HostID",
+    "端末ID",
+    "資格ID",
+    "資格秘密",
+    "nonce",
+    "発行時刻",
+    "操作",
+    "内容"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "type": "integer",
+      "const": 1
+    },
+    "HostID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "端末ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "資格ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "資格秘密": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "発行時刻": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "操作": {
+      "type": "string",
+      "enum": [
+        "端末結合",
+        "端末確認",
+        "端末離脱",
+        "実行系列挙",
+        "対話開始",
+        "対話送信",
+        "対話取得",
+        "対話中止",
+        "対話終了"
+      ]
+    },
+    "内容": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "操作": {
+          "const": "端末結合"
+        },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "端末確認"
+        },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "端末離脱"
+        },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "実行系列挙"
+        },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "対話開始"
+        },
+        "内容": {
+          "type": "object",
+          "required": [
+            "実行系ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "実行系ID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "対話送信"
+        },
+        "内容": {
+          "type": "object",
+          "required": [
+            "対話セッションID",
+            "入力"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "対話セッションID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "入力": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "対話取得"
+        },
+        "内容": {
+          "type": "object",
+          "required": [
+            "要求ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "対話中止"
+        },
+        "内容": {
+          "type": "object",
+          "required": [
+            "要求ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": {
+          "const": "対話終了"
+        },
+        "内容": {
+          "type": "object",
+          "required": [
+            "対話セッションID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "対話セッションID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
