@@ -179,3 +179,15 @@ AndroidのAGP修正後、`flutter build apk --debug` はPASS（初回1778.1秒�
 開発APKは175738543 bytes、SHA-256 `e5c5f30108f812d92e444993087c417a812806c2f47f3a445454035743dffdb6`。開発AABは71596894 bytes、SHA-256 `0ce3fdb996e048c98e665c5c770bac8a188a5e39dc3b57b115a395da35764586`。APKはarm64-v8a、armeabi-v7a、x86_64を含む。`apksigner verify --verbose --print-certs` はPASS、Android DebugのRSA 2048 / v2署名であり公開配布署名ではない。`zipalign -c -P 16 4` はPASS。`apkanalyzer manifest print` でmin SDK 24、target SDK 36、debuggable=true、allowBackup=false、fullBackupContent=false、usesCleartextTraffic=false、dataExtractionRulesの実格納を確認した。これは生成物のCONFIG / EXTERNAL_EVIDENCEであり実機の動作証拠ではない。
 
 JDK17の`jarsigner -verify`は終了値0だが、自己署名・timestampなし・POSIX属性・JarFileとJarInputStreamの検証差について警告した。警告を削除するための再梱包は行わない。公式bundletool 1.18.3（公開asset SHA-256 `a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29` を照合）の`validate --bundle=...`と`build-apks --bundle=... --mode=universal --output=...`はいずれもPASS。変換したuniversal APKのapksigner検証もPASS。AABのAndroid工具による消費は確認できたが、正式配布・署名・汎用JAR stream検証差は次の配布前確認へ保持する。
+
+## Apple platformの手動補助build
+
+このローカルhostはWindows/WSLであり、ローカルMacはない。owner rev2とAGENTS 3.1に従い、workflow_dispatchだけの補助workflowを追加した。Windowsで検証したFlutter commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42` とRust 1.95.0を用い、macOS開発app・iOS Simulator app・Rust helperのbuildを対象とする。GitHubの品質必須statusや自動CIは追加しない。対象commitと環境情報、log、tar成果物、hash、buildによるソース差分を収集する。追跡ソースが自動変更された場合は成功とせず、差分を確認する。
+
+- item: Apple補助実行と実機証拠
+  classification: release_blocker
+  reason: workflowの追加は外部実行の成功やMac/iOS実機の成立を証明しない。
+  required_action: 手動実行の対象commit・結果・artifactを確認し、実機install・launch・安全保管・lifecycleは別途測定する。
+  blocks_release: yes
+
+workflow追加のlocal検証はSchema（35正常・37否定）、conformance（147項目）、日本語厳格監査がPASS。これは手動起動限定のCONFIG検証であり、外部build結果は手動実行後に記録する。

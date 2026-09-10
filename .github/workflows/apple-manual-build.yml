@@ -1,0 +1,76 @@
+name: Apple platform 手動補助build
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  apple-build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 実行環境と対象を記録
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          {
+            git rev-parse HEAD
+            uname -a
+            sw_vers
+            xcodebuild -version
+            xcodebuild -showsdks
+          } | tee evidence/environment.txt
+      - name: 固定Flutterを導入
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version | tee evidence/flutter.txt
+      - name: Rust helperをMac環境で検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/rust-test.txt
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/rust-build.txt
+          file native/rust_helper/target/debug/gui_shell_rust_helper | tee evidence/rust-binary.txt
+      - name: macOS開発appをbuild
+        working-directory: apps/desktop_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build macos --debug 2>&1 | tee ../../evidence/macos-build.txt
+      - name: iOS Simulator appをbuild
+        working-directory: apps/mobile_flutter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build ios --simulator --debug 2>&1 | tee ../../evidence/ios-build.txt
+      - name: build成果物と差分を保存
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short > evidence/build-working-tree.txt
+          git diff --binary > evidence/build-migrations.patch
+          tar -czf evidence/apple-builds.tar.gz apps/desktop_flutter/build/macos/Build/Products/Debug/*.app apps/mobile_flutter/build/ios/iphonesimulator/*.app native/rust_helper/target/debug/gui_shell_rust_helper
+          shasum -a 256 evidence/apple-builds.tar.gz > evidence/artifact-sha256.txt
+          git diff --exit-code
+          git diff --cached --exit-code
+      - name: 補助証拠をアップロード
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: apple-build-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
