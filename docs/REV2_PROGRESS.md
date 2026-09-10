@@ -194,3 +194,8 @@ workflow追加のlocal検証はSchema（35正常・37否定）、conformance（1
 
 
 Apple初回補助実行（run 34445302630、対象52bcbd2cc82519f5f6ebc6c80c8c60f96a1e12af）はRust64単体・5統合およびarm64 Mach-O buildがPASS。macOS project未追加によりFlutter buildがFAILし、iOSは未実行となった。分類はproduct regressionではなく未実装構成の検出であり、この時点のApple buildはrelease_blockerである。固定Flutter標準生成元からmacOS projectを追加し、Sandboxを保持したまま既存broker用network.clientを指定する。正式配布・実機資格配置はDesktop READMEのrelease_blockerへ保持する。
+
+
+## 複数OS間のmanifest修復
+
+Linux最新checkoutの集約検証ではFlutter/Rust関連検査はPASSしたが、manifest・release gate・梱包の3検査が失敗した。Windows編集時のCRLFをraw hashへ記録し、Gitが既存.gitattributesに従ってLFへ保存したことが原因である。検証toolのhash照合は変更せず、作業fileを既存の改行規約へ戻してmanifestを再生成する。生成時にはGitのeol属性と作業byteの不一致を拒否し、無言の正規化やhash比較の緩和を行わない。Git実repositoryを使いLF、明示CRLF、binary、混在改行、修復後の正常化を検証する。

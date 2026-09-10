@@ -227,13 +227,41 @@ def check_manifest() -> list[str]:
     return errors
 
 
+def working_tree_eol_errors(root: Path = ROOT) -> list[str]:
+    """Gitの改行規約と実byteの不一致を、hash生成より前に拒否する。"""
+    if not (root / ".git").exists():
+        return []
+    result = subprocess.run(
+        ["git", "ls-files", "--eol", "-z"], cwd=root,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if result.returncode != 0:
+        return ["Gitの改行規約を確認できない"]
+    errors = []
+    for record in result.stdout.decode("utf-8", errors="strict").split("\0"):
+        if not record:
+            continue
+        metadata, name = record.split("\t", 1)
+        fields = metadata.split()
+        actual = fields[1].removeprefix("w/")
+        expected = "lf" if "eol=lf" in fields else "crlf" if "eol=crlf" in fields else None
+        if expected and actual not in (expected, "none", "-text"):
+            errors.append(f"改行規約が不一致: {name} (期待={expected}, 実際={actual})")
+    return errors
+
+
 def write_manifest() -> int:
+    eol_errors = working_tree_eol_errors()
+    if eol_errors:
+        for error in eol_errors:
+            print(f"manifest生成が失敗: {error}")
+        return 1
     manifest, errors = build_manifest()
     if errors:
         for error in errors:
             print(f"manifest生成が失敗: {error}")
         return 1
-    MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
     print(f"{MANIFEST.relative_to(ROOT)}へfile {len(manifest['files'])}件を書込んだ")
     return 0
 

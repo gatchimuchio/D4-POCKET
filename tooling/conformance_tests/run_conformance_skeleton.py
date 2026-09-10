@@ -44,7 +44,7 @@ from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from tooling.schema_check.check_schemas import validate_instance
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
-from tooling.manifest import build_manifest, matches_forbidden
+from tooling.manifest import build_manifest, matches_forbidden, working_tree_eol_errors
 from tooling.packaging_portability_check import portable_path_errors
 from tooling.release_gate_check import (
     CURRENT_FACING_RELEASE_DOCS,
@@ -2873,6 +2873,30 @@ def test_manifest_integrity_tooling_exists() -> list[str]:
     return errors
 
 
+def test_manifest_rejects_working_tree_eol_mismatch() -> list[str]:
+    errors = []
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+        (root / ".gitattributes").write_bytes(b"* text=auto eol=lf\n*.bat text eol=crlf\n*.png binary\n")
+        text = root / "source.txt"
+        text.write_bytes(b"first\nsecond\n")
+        (root / "run.bat").write_bytes(b"@echo off\r\n")
+        (root / "image.png").write_bytes(b"\x00\r\n\xff")
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        if working_tree_eol_errors(root):
+            errors.append("規定LF・明示CRLF・binaryを誤拒否した")
+        for invalid in (b"first\r\nsecond\r\n", b"first\nsecond\r\n"):
+            text.write_bytes(invalid)
+            rejected = working_tree_eol_errors(root)
+            if len(rejected) != 1 or "source.txt" not in rejected[0]:
+                errors.append("CRLFまたは混在改行の生成を拒否しなかった")
+        text.write_bytes(b"first\nsecond\n")
+        if working_tree_eol_errors(root):
+            errors.append("規定改行への修復後も拒否した")
+    return errors
+
+
 def test_claim_documents_do_not_contain_stale_phase_or_check_counts() -> list[str]:
     stale_patterns = ["23 checks", "49 checks", "51 checks", "53 checks", "55 checks", "Phase 0 / Phase 1"]
     errors = []
@@ -3545,6 +3569,7 @@ def main() -> int:
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,
+        test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
         test_runtime_manifest_invalid_fixture_rejected,
         test_adapter_manifest_authority_escalation_rejected,
