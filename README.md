@@ -370,3 +370,11 @@ repository 文書にある未完了項目は、すべて <code>release_blocker</
 <div align="center">
 <sub>Schema-first・Conformance-first・Safety-first。LLM がその上に構築する基盤であり、LLM が保持する権限ではない。</sub>
 </div>
+
+## rev2対話のLinux開発検証範囲
+
+- item: Linux対話UIの実起動証拠はWSLgのX11に限定
+  classification: known_limitation
+  reason: Linuxで解析・37試験・debug build・製品Dart clientの実MINIDORA接続は成立した。実ウィンドウの可視状態はGTK標準の `GDK_BACKEND=x11` を指定して確認した。既定WaylandのウィンドウはX11検査器では観測できず、Waylandの画面成立をこの証拠から主張しない。
+  required_action: Wayland環境の画面対応を主張するときは、その環境に対応した表示検証を別途行う。
+  blocks_release: no

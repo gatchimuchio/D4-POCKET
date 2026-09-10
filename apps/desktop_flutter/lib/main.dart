@@ -15,6 +15,7 @@ import 'screens/authority_map.dart';
 import 'screens/problems_panel.dart';
 import 'screens/recovery_center.dart';
 import 'screens/runtime_center.dart';
+import 'screens/runtime_dialogue.dart';
 import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
@@ -169,11 +170,13 @@ class ShellHomePage extends StatefulWidget {
 
 class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
+  bool _dialogueVisited = false;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
 
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.client.getSnapshot();
+    _dialogueVisited = _dialogueVisited || selectedIndex == 12;
     final pages = [
       Dashboard(client: widget.client),
       SetupDoctor(client: widget.client),
@@ -187,6 +190,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ProblemsPanel(client: widget.client),
       EvidenceCenter(client: widget.client),
       SettingsScreen(client: widget.client),
+      if (_dialogueVisited) RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo) else const SizedBox.shrink(),
     ];
     final pageEntries = _pageEntries();
 
@@ -306,6 +310,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.settings),
                                       label: Text('設定'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.chat_bubble_outline),
+                                      selectedIcon: Icon(Icons.chat_bubble),
+                                      label: Text('対話'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -314,11 +323,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                         ),
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: pages[selectedIndex]),
+                      Expanded(child: IndexedStack(index: selectedIndex, children: pages)),
                     ],
                   ),
                 ),
-                ShellStatusBar(snapshot: snapshot),
+                ShellStatusBar(snapshot: snapshot, dialogueContext: selectedIndex == 12),
               ],
             ),
           ),
@@ -341,6 +350,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ShellPageEntry(9, '問題一覧', Icons.report_problem_outlined),
       _ShellPageEntry(10, '証拠センター', Icons.inventory_2_outlined),
       _ShellPageEntry(11, '設定', Icons.settings_outlined),
+      _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline),
     ];
   }
 

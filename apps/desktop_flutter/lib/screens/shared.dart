@@ -202,9 +202,10 @@ class StatusPill extends StatelessWidget {
 }
 
 class ShellStatusBar extends StatelessWidget {
-  const ShellStatusBar({super.key, required this.snapshot});
+  const ShellStatusBar({super.key, required this.snapshot, this.dialogueContext = false});
 
   final ShellSnapshot snapshot;
+  final bool dialogueContext;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +223,7 @@ class ShellStatusBar extends StatelessWidget {
             children: [
               const StatusPill(label: '段階', value: 'B 所有者利用'),
               const SizedBox(width: 8),
-              StatusPill(label: '実行系', value: operation.runtimeStatus),
+              StatusPill(label: dialogueContext ? '対話状態' : '実行系', value: dialogueContext ? '各実行系欄に表示' : operation.runtimeStatus),
               const SizedBox(width: 8),
               StatusPill(
                 label: '信頼／不変条件',
@@ -231,7 +232,7 @@ class ShellStatusBar extends StatelessWidget {
               const SizedBox(width: 8),
               StatusPill(
                 label: '承認',
-                value: '${operation.pendingApprovalsCount}件保留',
+                value: dialogueContext ? '各対話要求を個別確認' : '${operation.pendingApprovalsCount}件保留',
               ),
               const SizedBox(width: 8),
               StatusPill(label: '監査', value: operation.auditChainStatus),

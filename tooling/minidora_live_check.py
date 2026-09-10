@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -65,7 +66,7 @@ def 終了(process):
         process.wait(timeout=5)
 
 
-def 検証(reference, binary):
+def 検証(reference, binary, dart_client=False):
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -104,6 +105,22 @@ server.serve_forever()
                 owner = file待機(owner_file, broker)
                 assert 操作(normal, "対話承認待ち", {})["status"] == "rejected"
                 assert 成功(normal, "実行系列挙", {})["実行系"] == ["left", "right"]
+                if dart_client:
+                    dart = shutil.which("dart")
+                    if dart is None:
+                        raise RuntimeError("Dart実行環境がない")
+                    driver = subprocess.Popen([dart, "run", str(ROOT / "apps/desktop_flutter/tool/dialogue_live_client.dart"),
+                        str(normal_file), str(root)], cwd=ROOT / "apps/desktop_flutter", stdout=log, stderr=log)
+                    processes.append(driver)
+                    ready = file待機(root / "dart-ready.json", driver)
+                    pending = 成功(owner, "対話承認待ち", {})["要求"]
+                    selected = [v for v in pending if v["要求"]["要求ID"] in ready["requests"]]
+                    assert len(selected) == 2
+                    for item in selected:
+                        成功(owner, "対話承認", {"要求ID": item["要求"]["要求ID"], "要求hash": item["要求hash"], "表示範囲": "full"})
+                    driver.wait(timeout=25)
+                    assert driver.returncode == 0, "Dart製品clientの試験失敗"
+                    assert json.loads((root / "dart-result.json").read_text())["result"] == "PASS"
 
                 def 対話(runtime, scope, message="こんにちは"):
                     session = 成功(normal, "対話開始", {"実行系ID": runtime})["対話セッションID"]
@@ -158,6 +175,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "監査chain再読取"],
+                        "dart_product_client": "PASS" if dart_client else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
@@ -171,9 +189,10 @@ server.serve_forever()
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, required=True)
+    parser.add_argument("--dart-client", action="store_true")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve()), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

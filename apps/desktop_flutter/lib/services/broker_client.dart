@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 abstract class BrokerTransport {
   Future<Map<String, Object?>> request(
@@ -62,10 +63,14 @@ class BrokerClient implements BrokerTransport {
       socket.write('${_endpoint.sessionSecret}\n');
       socket.write('${jsonEncode(request)}\n');
       await socket.flush();
-      final raw = await utf8.decoder
-          .bind(socket)
-          .join()
-          .timeout(const Duration(seconds: 5));
+      final bytes = await socket.fold<BytesBuilder>(BytesBuilder(copy: false), (buffer, chunk) {
+        if (buffer.length + chunk.length > 4 * 1024 * 1024) {
+          throw const BrokerClientException('broker応答が受信上限を超えました');
+        }
+        buffer.add(chunk);
+        return buffer;
+      }).timeout(const Duration(seconds: 5));
+      final raw = utf8.decode(bytes.takeBytes());
       final lines = raw.trim().split('\n').where((item) => item.isNotEmpty);
       if (lines.isEmpty) {
         throw const BrokerClientException('broker 応答が空です');
@@ -102,6 +107,16 @@ class BrokerEndpoint {
   final int maxRequestBytes;
 
   factory BrokerEndpoint.fromJson(Map<String, Object?> json) {
+    if (json['host'] != '127.0.0.1' || json['port'] is! int ||
+        (json['port']! as int) < 1 || (json['port']! as int) > 65535 ||
+        json['transport'] != 'authenticated_loopback_tcp' ||
+        json['session_id'] is! String || (json['session_id']! as String).isEmpty ||
+        json['session_secret'] is! String ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(json['session_secret']! as String) ||
+        (json['session_secret']! as String).length != 64 ||
+        json['max_request_bytes'] is! int || (json['max_request_bytes']! as int) < 1) {
+      throw const BrokerClientException('brokerの接続先または通常資格が不正です');
+    }
     return BrokerEndpoint(
       host: json['host'] as String? ?? '127.0.0.1',
       port: json['port'] as int? ?? 0,
