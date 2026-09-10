@@ -66,7 +66,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "d71bfc3a6594960a6e5da8bbe78982337ff0fce91cb1e285ffae2b545357ecd6"
+      "sha256": "25985e5cfe76c93da2463e658c58da9c63b3b3671b8b0649060e715cf1b0a544"
     },
     {
       "path": "AUDIT.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9a6f4c99c43f7860c652873bd89baba23470acac88fa127b18c0e111c55555f4"
+      "sha256": "e571abac020f6314470c49c84caba8c0d70d2d1820416585d9a1dd39fcfa6fe3"
     },
     {
       "path": "SECURITY.md",
@@ -462,7 +462,7 @@
     },
     {
       "path": "docs/OPERATING_MODEL.md",
-      "sha256": "1c29e95a331b241e6db6da3739aa075f6586f8e995b43b9d3d9becc58b6611ca"
+      "sha256": "e7627b840defe7c0ca71c09ce44b4acbf2211c154b46ef831fcce52a49b57b3b"
     },
     {
       "path": "docs/PHASE_STRATEGY.md",
@@ -475,6 +475,10 @@
     {
       "path": "docs/RELEASE_VALIDATION.md",
       "sha256": "4dcc0dfb17332bd291e3f5b08c9b6f3ee13dd891b9aebdb68b74cab6e5a6dea5"
+    },
+    {
+      "path": "docs/REV2_PROGRESS.md",
+      "sha256": "7644defa8ff1ebd3cd4257abf63de2ac4efca7fcdabf9b4536cfc030e5b473cf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1249,6 +1253,10 @@
       "sha256": "e6f36777acfa3069c9f440944aa5d001a175da6b599efb954092f61d048a8f93"
     },
     {
+      "path": "requirements-dev.txt",
+      "sha256": "81d8e34beb0d8675c1f62a89e47c8100fb0a4d4bac5398ac5b1362d4f991605a"
+    },
+    {
       "path": "scripts/launch_owner_desktop.ps1",
       "sha256": "de05c2220d0b976a9d541bf9f9768228186550ceb8ba68525a99e462b0a98a7a"
     },
@@ -1374,7 +1382,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0bf1446fff932bc27d77dca441261d3dd3a39a5822534a6e679abcf79f5b1cf5"
+      "sha256": "3deb9097454b1619dafce46229266ae990dd4fc1bb3c400b4efa9ad87b4aeefb"
     },
     {
       "path": "tooling/evidence_bundle.py",
@@ -1383,6 +1391,10 @@
     {
       "path": "tooling/manifest.py",
       "sha256": "9212fbbd9348968639666570c5017fb83ed6e0e8688814fa62d258b77c41e2c9"
+    },
+    {
+      "path": "tooling/manual_workflow_check.py",
+      "sha256": "2dd0e40c42475bab90f7296971397eba42e506d6c437e723d0bba15033958daf"
     },
     {
       "path": "tooling/packaging_portability_check.py",

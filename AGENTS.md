@@ -57,9 +57,13 @@
 
 大量の生成構造は、完全性の証拠ではない。
 
-#### 3.1 P-Series基準面凍結
+#### 3.1 ローカル品質基準と手動補助実行
 
-GitHub Actions / CI workflowは、GUI-Shellの品質判定基準面から廃止済みである。`.github/workflows`配下にworkflow YAMLを置かない。品質判定の基準面は、owner / Codexが明示的に実行するlocal validation、smoke、release verification、Windows実機evidenceとする。基準面の変更は、追加を含め、active ROADMAPまたはphase instructionを経由する。検査の削除・弱体化にはowner承認を必須とする。
+開発、試験、差分監査、品質判定の正本はローカル作業ツリーに置く。GitHub は完成した局所成果を順次還元する記録・共有面とする。自動 CI、push / pull_request / merge_group trigger、CI 必須 status check、CI green による完成判定は禁止する。
+
+GitHub Actions は、ローカルに存在しない OS の build、artifact 生成、重い手動検証の補助に限り、`workflow_dispatch` のみで使用できる。workflow は品質基準面ではなく、実機起動、製品完成、release readiness の証拠を代替しない。必要性、対象 commit、trigger、結果、artifact、証明する範囲としない範囲を記録する。workflow を追加する場合は active ROADMAP または phase instruction に目的を置き、ローカルの conformance で手動起動限定を検査する。
+
+品質基準面は owner / Codex が実行する local validation、smoke、release verification、Windows 実機 evidence とする。Codex は要求から正常・境界・失敗・権限否定・回帰試験を導出して実行し、未試験を成功へ昇格しない。完成した作業単位ごとに試験、監査、commit、push、remote HEAD 確認を閉じてから次単位へ進む。検査の削除・弱体化には owner 承認を必須とし、Authority、Approval、Audit、Recovery、Content Exposure Boundary、owner GO、release gate を弱めない。
 
 ### 4. 完成証拠規則
 

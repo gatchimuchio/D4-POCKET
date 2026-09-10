@@ -129,7 +129,13 @@ Phase ごとの backup branch または追加の backup generation を作成し�
 
 ## 5. validation の gate
 
-GitHub Actions／CI workflow は GUI Shell の quality gate ではない。<code>.github/workflows</code> 配下に workflow YAML を置かない。validation の基準は、owner／Codex が明示的に実行する local validation、smoke、release verification、Windows device evidence である。
+開発と品質判定はローカル作業ツリーで行う。GitHub は完成した局所成果の記録・共有面とし、各単位で試験、差分監査、commit、push、remote HEAD 確認を完了する。自動 CI と CI 必須 status check は使用しない。
+
+GitHub Actions は `workflow_dispatch` のみの手動補助に限る。ローカルにない OS の build、artifact 生成、重い手動検証の必要性を ROADMAP または phase instruction に記録する。実行時は理由、対象 commit、trigger、結果、artifact、証拠範囲を報告する。Actions 成功は実機動作、製品完成、release readiness、owner GO の代替にならない。
+
+conformance は YAML の構造を解析して `workflow_dispatch` 以外の起動、重複鍵、不正形式を拒否する。解析依存は dev-only の `requirements-dev.txt` に固定し、`python -m pip install -r requirements-dev.txt` で準備する。これは CONFIG 証拠であり、GitHub 側の branch protection や実行権限の監査を証明しない。
+
+validation の基準は owner／Codex が明示的に実行する local validation、smoke、release verification、Windows device evidence である。要求ごとに production path、正常、境界、失敗、security / authority negative case、回帰、実行試験を対応させる。
 
 最低限の validation:
 

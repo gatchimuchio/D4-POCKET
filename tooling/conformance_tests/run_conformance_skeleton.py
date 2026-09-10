@@ -3136,15 +3136,9 @@ def test_platform_hardening_configuration_exists() -> list[str]:
             if token not in text:
                 errors.append(f".gitattributesにtokenがない: {token}")
 
-    workflow_dir = ROOT / ".github" / "workflows"
-    if workflow_dir.exists():
-        workflow_files = sorted(
-            path.relative_to(ROOT).as_posix()
-            for pattern in ("*.yml", "*.yaml")
-            for path in workflow_dir.glob(pattern)
-        )
-        for workflow_file in workflow_files:
-            errors.append(f"GitHub Actions workflowは存在しないままでなければならない: {workflow_file}")
+    from tooling.manual_workflow_check import 手動補助一覧検査
+
+    errors.extend(手動補助一覧検査(ROOT))
 
     main_rs = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
     if "dev-stdin-smoke" not in main_rs:
@@ -3152,6 +3146,48 @@ def test_platform_hardening_configuration_exists() -> list[str]:
     if "使用法: gui_shell_rust_helper broker-server" not in main_rs:
         errors.append("Rust helperが未知/引数なしの呼び出しでusageへfail closedにならない")
     return errors
+
+
+def 手動補助の起動境界を検査する() -> list[str]:
+    from tooling.manual_workflow_check import 手動起動検査, 手動補助一覧検査
+
+    不整合 = []
+    for 本文 in (
+        "on: workflow_dispatch\n",
+        "on: [workflow_dispatch]\n",
+        "on:\n  workflow_dispatch:\n",
+        '\"on\": {workflow_dispatch: {inputs: {target: {type: string}}}}\n',
+        "on: workflow_dispatch\njobs: {build: {steps: [{run: 'echo push'}]}}\n",
+    ):
+        if 手動起動検査(本文):
+            不整合.append("手動補助の正規起動が拒否された")
+    for 本文 in (
+        "", "[]", "on: push", "on: [workflow_dispatch, push]",
+        "on: {workflow_dispatch: {}, pull_request: {}}",
+        "on: {merge_group: {}}", "on: {schedule: []}",
+        "on: {workflow_call: {}}", "on: {repository_dispatch: {}}",
+        "on: workflow_dispatch\non: push", "on: push\non: workflow_dispatch",
+        "on: {workflow_dispatch: {}, workflow_dispatch: {}}",
+        "on: [", "on: workflow_dispatch\n---\non: push",
+        "on: {$ref: workflow_dispatch}", "on: {workflow_dispatch: false}",
+        "on: workflow_dispatch\n<<: {on: push}",
+        "on: workflow_dispatch\njobs: !!python/object/apply:os.system []",
+    ):
+        if not 手動起動検査(本文):
+            不整合.append(f"禁止または不正な起動条件が許可された: {本文}")
+    with tempfile.TemporaryDirectory() as 場所:
+        ルート = Path(場所)
+        if 手動補助一覧検査(ルート):
+            不整合.append("workflow 不在が拒否された")
+        格納先 = ルート / ".github" / "workflows"
+        格納先.mkdir(parents=True)
+        (格納先 / "manual.yml").write_text("on: workflow_dispatch", encoding="utf-8")
+        if 手動補助一覧検査(ルート):
+            不整合.append("手動 workflow ファイルが拒否された")
+        (格納先 / "automatic.yaml").write_text("on: push", encoding="utf-8")
+        if not 手動補助一覧検査(ルート):
+            不整合.append("実ファイル経路で自動起動が見逃された")
+    return 不整合
 
 
 def test_setup_doctor_public_bind_warning_exists() -> list[str]:
@@ -3341,6 +3377,7 @@ def main() -> int:
         test_audit_chain_rejects_duplicate_event_ids,
         test_json_persistence_reports_corrupt_audit_jsonl,
         test_platform_hardening_configuration_exists,
+        手動補助の起動境界を検査する,
         test_setup_doctor_public_bind_warning_exists,
         test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
