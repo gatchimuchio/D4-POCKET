@@ -360,7 +360,16 @@ function Collect-VisibleSurfaces {
     if ($null -eq $Text -or $Text.Trim() -eq "") {
       return $false
     }
-    return ($Text -match [regex]::Escape($Label))
+    $surfaceNames = @{
+      "Dashboard" = @("概要", "gui_shell.surface.dashboard")
+      "NavigationRail" = @("ナビゲーション", "gui_shell.surface.navigation_rail")
+      "Runtime Status" = @("実行系状態", "gui_shell.surface.runtime_status")
+      "Invariant Status" = @("不変条件状態", "gui_shell.surface.invariant_status")
+    }
+    $mapped = $surfaceNames[$Label]
+    $normalized = Normalize-SurfaceText -Text $Text
+    return ($normalized -eq $mapped[0] -or $normalized -eq "$($mapped[0]) $($mapped[0])" -or
+      $normalized -eq $mapped[1] -or $Text -match ("(?<![a-z0-9_.])" + [regex]::Escape($Label) + "(?![a-z0-9_.])"))
   }
 
   function Get-ElementString {
@@ -476,10 +485,9 @@ function Collect-VisibleSurfaces {
     $controlType = Get-ControlTypeName -Element $Element
     $runtimeId = Get-RuntimeIdString -Element $Element
     $parentRuntimeId = $(if ($IsRoot) { "" } else { Get-ParentRuntimeIdString -Element $Element })
-    $searchText = Normalize-SurfaceText -Text "$name $automationId"
     $surfacesPresent = @()
     foreach ($label in $expected) {
-      if (Test-SurfaceTextContains -Text $searchText -Label $label) {
+      if ((Test-SurfaceTextContains -Text $name -Label $label) -or (Test-SurfaceTextContains -Text $automationId -Label $label)) {
         $surfacesPresent += $label
       }
     }
@@ -528,9 +536,8 @@ function Collect-VisibleSurfaces {
       $element = $elements.Item($index)
       $name = Get-ElementString -Element $element -PropertyName "Name"
       $automationId = Get-ElementString -Element $element -PropertyName "AutomationId"
-      $searchText = Normalize-SurfaceText -Text "$name $automationId"
       foreach ($label in $expected) {
-        if (Test-SurfaceTextContains -Text $searchText -Label $label) {
+        if ((Test-SurfaceTextContains -Text $name -Label $label) -or (Test-SurfaceTextContains -Text $automationId -Label $label)) {
           $seen[$label] = $true
         }
       }

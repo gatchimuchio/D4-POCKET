@@ -437,3 +437,18 @@ clean source 53182cd4cab77e025c61913357cf527270f4dd11をrev2-53182cd-20260911へ
   reason: UIAutomationの現経路ではwindow枠しか取得できず、MSAAは診断実測のみ。今回の可視性負例はFIXTUREであり、正式installed初回起動の合格ではない。
   required_action: MSAAの要素同一性・親子関係・実矩形と日本語surfaceを正式収集へ結合し、実画面と負例を再検証する。
   blocks_release: yes
+
+
+## 日本語surfaceを既存UIAutomation経路で実測（2026-09-11）
+
+前単位ではMSAA接続が必要と判断したが、新しい診断runでは日本語label対応を追加した既存UIAutomation経路だけで108要素を取得した。別起動とMSAA追加コード除去後も計3 runで必須4surfaceと観測tree・矩形交差の検証が通った。前のwindow枠2要素との時間・観測経路による差の詳細は未確定であり、日本語対応がOS側tree公開自体を変えたとは主張しない。MSAAの独自collectorは未使用で、必要性を実証できないため採用せず除去した。新言語・依存・実行経路は追加しない。
+
+修正はcollectorとconsumerの意味対応に限る。概要、ナビゲーション、実行系状態、不変条件状態、および既存Dart安定identifierを固定し、日本語名は空白正規化後の完全一致または見出し二重連結だけを許可する。元の観測名、UIA element key、runtime ID、親子関係、座標を保持する。説明文やTab名、identifierの余分なsuffixは拒否する。
+
+診断実測はrev2-53182cd-20260911/runtime内のmsaa-check、uia-japanese-repeat、uia-only-finalへ保存した。すべてsource=uiautomationであり、製品registryでもMSAAの合成出力でもない。診断専用のため正式初回起動の合格と扱わない。Schema36/正常36/負例38、conformance150件はPASS。MSAA接続そのものを残作業とした直前の判断は撤回し、現行commitのcleanな分離配置からの正式再収集を次の境界とする。
+
+- item: 日本語surface対応後の正式Windows再収集
+  classification: release_blocker
+  reason: 現行collectorの個別surface実測は成功したが、上記は変更中の診断専用runであり、現行clean commitからの正式統合runは別に必要。
+  required_action: commit後に分離配置して同collectorを通常モードで実行し、署名を除く各関門の実結果を確認する。
+  blocks_release: yes

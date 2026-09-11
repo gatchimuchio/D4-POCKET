@@ -136,3 +136,7 @@ surface matchは同じ収集結果のelement_keyに結合し、名前、Automati
 可視候補はrootでもnative containerでもなく、状態を取得できた要素に限る。要素からrootまでis_offscreen=falseと有限な正の矩形を要求し、その全矩形の共通領域が正の面積を持つ場合だけ候補とする。画面外、親の表示領域外、ゼロ面積、座標欠落、NaN/Infinity、状態取得失敗を可視へ昇格しない。UIAutomationの親はRawViewWalkerで取得し、列挙する全要素と同じtreeを用いる。
 
 これはアクセシビリティtree上の表示領域との交差を検証する。別windowによる遮蔽やpixel内容を証明しない。MSAA等の新しい収集経路もこの境界を満たす必要があり、名前だけの登録履歴で代替してはならない。
+
+## 日本語surfaceの対応
+
+surfaceの意味対応は固定する。Dashboard=概要、NavigationRail=ナビゲーション、Runtime Status=実行系状態、Invariant Status=不変条件状態。日本語名は空白正規化後の完全一致（同じ見出しが二度連結された場合を含む）に限り、長い説明文やTab名の部分一致を使用しない。既存の英語labelとDartのgui_shell.surface.*識別子も対応する。元の観測名を英語へ書き換えない。

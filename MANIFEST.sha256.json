@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "b3f97fa4811718a0b1590db02f41dcf47336b603fdd3ec1d9dfd4018f50f4e28"
+      "sha256": "26019152212b785c0f5ebda21440c9c26c911870093ba58f33806b6e516da521"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -902,7 +902,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "27130eb94f51efcafd09a609704a8c138c7de28536d53acaee57b91dff5a4ebd"
+      "sha256": "2418b02b5a97d58e308407124051be004774f3a2c58b4f72a1abf74f4c8a8a3e"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -1366,7 +1366,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "68445bd9ae609fdceefd007213dcf5403f9256b8567580accb56cd2d9cb725e9"
+      "sha256": "ab1cad23862f4e358f2109323082f6162090c34578a3dcf018e29a377af95a76"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -2006,7 +2006,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2df241222392f2e4aac86d25584c0bf5eb8ad24fee489e496dd6333152f17fd7"
+      "sha256": "5227b80408b18716b06d3b19a65fa422a860c192fac81a5e293c064914a94e87"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2074,7 +2074,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "615694c50ceea221bf1ca8c676aa2885fef36cba68124ad4f2099fb350f54e2d"
+      "sha256": "8f806990c0f5a34a6f2266b519a65ddbe7584c28166620b5827777d1f22def77"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

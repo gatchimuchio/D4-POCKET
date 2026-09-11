@@ -121,8 +121,19 @@ def _normalised_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
+SURFACE_NAMES = {
+    "Dashboard": ("概要", "gui_shell.surface.dashboard"),
+    "NavigationRail": ("ナビゲーション", "gui_shell.surface.navigation_rail"),
+    "Runtime Status": ("実行系状態", "gui_shell.surface.runtime_status"),
+    "Invariant Status": ("不変条件状態", "gui_shell.surface.invariant_status"),
+}
+
+
 def _contains_surface_label(value: Any, label: str) -> bool:
-    return bool(re.search(re.escape(label), str(value or ""), flags=re.IGNORECASE))
+    japanese, identifier = SURFACE_NAMES[label]
+    normalized = _normalised_text(value)
+    return normalized in (japanese, japanese + " " + japanese, identifier) or bool(
+        re.search(r"(?<![a-z0-9_.])" + re.escape(label) + r"(?![a-z0-9_.])", normalized, flags=re.IGNORECASE))
 
 
 def _contains_all_required_surfaces(value: Any) -> bool:

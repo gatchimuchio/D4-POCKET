@@ -1716,6 +1716,28 @@ def test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_
     return []
 
 
+def test_windows_japanese_surface_labels() -> list[str]:
+    from tooling.windows_release_evidence import _validate_surface_match_evidence, _contains_surface_label, SURFACE_NAMES
+    errors = []
+    for label, (name, identifier) in SURFACE_NAMES.items():
+        for accepted in (name, name + "\n" + name, identifier):
+            if not _contains_surface_label(accepted, label):
+                errors.append(f"{label}の固定対応を拒否した")
+        for rejected in (name + " Tab 1 of 13", "説明 " + name, identifier + ".extra"):
+            if _contains_surface_label(rejected, label):
+                errors.append(f"{label}を部分一致で誤認した")
+    for use_identifier in (False, True):
+        surface = _valid_windows_installed_evidence()["first_run"]["visible_surfaces_evidence"]
+        nodes = {n["element_key"]: n for n in surface["diagnostic_tree"]["observed_elements"]}
+        for label, match in surface["surface_matches"].items():
+            name, identifier = SURFACE_NAMES[label]
+            for target in (match, nodes[match["element_key"]]):
+                target["name"] = name if not use_identifier else ""
+                target["automation_id"] = identifier if use_identifier else ""
+        errors.extend(_validate_surface_match_evidence(surface))
+    return errors
+
+
 def test_windows_surface_geometry_and_identity() -> list[str]:
     from tooling.windows_release_evidence import _validate_surface_match_evidence
     surface = _valid_windows_installed_evidence()["first_run"]["visible_surfaces_evidence"]
@@ -3606,6 +3628,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
+        test_windows_japanese_surface_labels,
         test_windows_surface_geometry_and_identity,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
