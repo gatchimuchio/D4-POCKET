@@ -262,7 +262,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/surface_semantics_export.dart",
-      "sha256": "7bb753be890b681cafad7022366acc1ba68a56aa5f4e5e149d1bcb3914c75a17"
+      "sha256": "59c08ad50e90fa02d0d8f7eac1d25ed7346909d97e2d80059ab5b2a945a5d6f4"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -434,7 +434,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "6d9d6b099450b68abdf53c146e006350de0c80b62c4d3017dd775f74b93d79fb"
+      "sha256": "a048338eb3f9cfdea4f04105cef512884db79c834f4adf36b30f55c84724a0c2"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "59433e4dd73a058305610cda29bc6714c3889fa14b69d2e98a7113abb0dd9011"
+      "sha256": "13a870f0347aae312b68348c4bb5202af00dafc4d86683a4129957bf960c63d0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1354,7 +1354,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "7bf82fa5c10bbf8aa367b3ab323167f4606beab08c32b77fa2168afb293925f3"
+      "sha256": "0fdbd702f4c74b1b55ca92d925486eb1ff9d90a891dcc529085a91ab4416a614"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",

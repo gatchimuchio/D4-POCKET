@@ -349,3 +349,29 @@ source `7a4afd838aed44489c71d560dcd6a876b53ce9dd` をLinuxへfast-forwardし、`
   reason: build registryによる誤受理は修正したが、現windowの個別surfaceを外部から確認する厳格な統合証拠は未成立。
   required_action: 実描画・可視性を観測する経路を初回起動と結合し、非表示・破棄・別起動の負例も検証する。
   blocks_release: yes
+
+
+## 可視性を捏造しない製品診断出力（2026-09-11）
+
+固定Flutter 3.44.0のWindows engineソース `flutter_window.cc::OnGetObject` を確認した。UIAutomation応答は `FLUTTER_ENGINE_USE_UIA` のコンパイル条件内で、MSAA応答は別経路にある。公式の背景説明は [Flutter issue 114547](https://github.com/flutter/flutter/issues/114547) にある。これは個別widgetを取得できない既観測と整合するが、配布済みDLLのコンパイル条件や外部tool側の挙動まで確認した証拠ではない。独自engineへの差替えは行っていない。
+
+前単位で受入れ側を修正したbuild registry出力について、生成元にも残っていた架空の座標、is_offscreen=false、node ID、可視surfaceの合格を除去した。登録履歴はregistered_surfaces / registered_identifiersへ保存し、起動PID、INTERNAL_STATE、visibility_measured=false、formal_release_input=falseを明示する。旧source / diagnostic mode識別子を維持し、既存collectorとrelease検証器で診断資料として扱い、可視証拠への昇格を拒否する。通常UIの描画・Semantics識別子・権限経路は変更しない。
+
+非表示Offstageのwidgetを実際にbuildした試験で、旧出力が必須4surfaceをすべてvisible_surfacesへ入れることを再現した。修正後は非表示時と破棄後の双方でvisible_surfaces・surface_matches・観測nodeが空となり、登録履歴だけを残す。Desktop全33試験とanalyze、Schema36/正常36/負例38、conformance148がPASS。
+
+- item: 外部から観測したWindows個別surface
+  classification: release_blocker
+  reason: 診断出力の虚偽の可視性表現は除去したが、実画面の外部観測を厳格な初回起動証拠へ結合する経路は未成立。
+  required_action: 固定toolchainの対応アクセシビリティ経路と利用可能な観測toolの接続を確認し、現在window・個別surface・非表示の負例を実測する。
+  blocks_release: yes
+
+
+Windows releaseビルド後、実broker経由でappを起動し、生成されたsurface.jsonのprocess_idが起動PID 14112と一致することを確認した。登録履歴は存在するが可視surface・match・観測nodeは空で、INTERNAL_STATE / visibility_measured=false / formal_release_input=falseを確認した。実測は `%TEMP%/gui-shell-build-registry-zaynljnf/result.json` に保存し、起動したappとbrokerは終了した。Mobile analyzeもPASS。これは製品診断出力の実行証拠であり、外部可視性の証明ではない。
+
+このビルドでrunner exeのSHA-256は既存配置と同じ `e671cd41eeb1c1d9c147178f5a4ae5a53052ac375807f421c9bc31e49769f7e6` だった。一方、Dart AOTのdata/app.soは旧配置 `1c8776ff3a88b4af1bbaf6b9902a7231053be36da6d6c1f8eafe0f1fc0da513b` から `03590c9ea67be5fc603c1bcb32e1e7a7a5a4e3f1bcf5cf3440f786753f4af157` へ変化した。native/rust_helper/src/checkpoint.rsのmeasureはartifact引数の単一fileだけをhashし、現在のWindows collectorはapp exeを渡している。source commitの一致だけでは配置後のapp.so改変を検出しない。
+
+- item: 監査checkpointの配置成果物hash範囲
+  classification: release_blocker
+  reason: 現行のexe単体hashではDart AOT、engine、plugin等の実行配布物の置換を検出できない。
+  required_action: 配置app/brokerの実行配布物一式をcanonical manifest等へ結合し、欠落・追加・置換・path改変の負例を含めてcheckpointとrelease再検証へ接続する。
+  blocks_release: yes

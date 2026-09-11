@@ -75,13 +75,44 @@ void main() {
       expect(export['source'], 'flutter_semantics_runtime_export');
       expect(export['path'], 'surface.json');
       expect(
-        export['visible_surfaces'],
+        export['registered_surfaces'],
         containsAll(kRequiredSurfaceSemanticsLabels),
       );
-      expect(export['surface_match_requirements_met'], isTrue);
+      expect(export['visible_surfaces'], isEmpty);
+      expect(export['surface_match_requirements_met'], isFalse);
+      expect(export['evidence_class'], 'INTERNAL_STATE');
     } finally {
       SurfaceSemanticsRegistry.resetForTest();
       semantics.dispose();
+    }
+  });
+
+  testWidgets('非表示でbuildした要素と破棄済み要素を可視証拠にしない', (tester) async {
+    SurfaceSemanticsRegistry.resetForTest();
+    try {
+      await tester.pumpWidget(MaterialApp(
+        home: Offstage(
+          child: Column(children: [
+            for (final label in kRequiredSurfaceSemanticsLabels)
+              SurfaceSemantics(label: label, child: const Text('非表示')),
+          ]),
+        ),
+      ));
+      expect(find.text('非表示'), findsNothing);
+      for (final remove in [false, true]) {
+        if (remove) await tester.pumpWidget(const SizedBox.shrink());
+        final export = buildSurfaceSemanticsExport();
+        expect(export['visible_surfaces'], isEmpty);
+        expect(export['registered_surfaces'],
+            containsAll(kRequiredSurfaceSemanticsLabels));
+        expect(export['surface_matches'], isEmpty);
+        expect(export['surface_match_requirements_met'], isFalse);
+        final tree = export['diagnostic_tree'] as Map;
+        expect(tree['observed_elements'], isEmpty);
+        expect(export['evidence_class'], 'INTERNAL_STATE');
+      }
+    } finally {
+      SurfaceSemanticsRegistry.resetForTest();
     }
   });
 

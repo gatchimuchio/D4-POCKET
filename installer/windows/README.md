@@ -50,3 +50,6 @@ release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続
   reason: Flutter build registryだけでは可視性を証明できず、現環境の外部accessibility観測では個別widgetを取得できていない。
   required_action: 実配置の現在windowから個別surfaceの可視性を取得し、初回起動と由来の検証へ接続する。Computer Useの画面観測だけを既存collectorの厳格な機械証拠へ付け替えない。
   blocks_release: yes
+
+
+製品側のbuild registry診断出力も `evidence_class=INTERNAL_STATE`、`visibility_measured=false`、`formal_release_input=false` を明記する。登録履歴は `registered_surfaces` と `registered_identifiers` に残すが、`visible_surfaces`・`surface_matches`・観測nodeは空とし、座標・非表示判定・実Semantics node IDを捏造しない。非表示でbuildされた要素や破棄済みの登録が残り得るため、現在画面の代用にしない。
