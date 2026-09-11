@@ -19,6 +19,8 @@ Apple platform単位は、ローカルhostがWindows/WSLでMacがないため、
 
 rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起動回帰を `release_blockers.registry.json` へ未解決のmanual gateとして追加する。既存Windows証拠とowner GOは保持し、旧post_v1_scopeによるrev2要求の除外を防ぐ。
 
+2026-09-11のowner指示: Windows画面検証を再開する。Android実機検証は凍結し、再開指示まで実行・端末接続要求を止める。凍結項目は未検証のまま保持し、release gateの合格やowner GOへ置き換えない。
+
 ## 完了監査の優先事項
 
 ~~~yaml

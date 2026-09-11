@@ -6,6 +6,10 @@
 
 既存6画面を保持し、実行系対話・接続先Host・端末結合・設定を追加した。共有表示は `packages/gui_shell_ui`、暗号化端末経路はDesktop Rust brokerを通る。Flutterと端末metadataは権限源にならない。Mobileのpubspec.lockは追跡済みであり、既存MANIFESTの除外規約とは別である。
 
+## Android実機検証の凍結（2026-09-11）
+
+owner指示により、Androidの実機install・launch・端末結合・対話・安全保管・lifecycle検証を凍結する。再開指示まで端末接続を要求せず、実機検証を実施しない。ビルド済みAPK/AABとhost上の検証結果は保持する。凍結は実機合格やrelease許可を意味せず、未検証のrelease_blockerを保持する。iOS実機検証はこの凍結指示の対象外である。
+
 ## 観測した検証
 
 - Mobile analyzeと14試験、共有6試験、Desktop32試験はPASS。
@@ -18,8 +22,8 @@
 - item: Android/iOS実機のinstall・launch・結合・対話・安全保管・lifecycle
   registry_id: rev2_mobile_device_evidence
   classification: release_blocker
-  reason: ADBで接続済み実機を検出していない。host上のDart実通信とfixtureはOS安全保管や端末画面の証拠ではない。
-  required_action: 実機を接続し、実際の資格保存・再起動・Host照合・対話・失効・復帰を測定する。
+  reason: Android実機検証はowner指示で凍結中。iOS実機の証拠も未取得。host上のDart実通信とfixtureはOS安全保管や端末画面の証拠ではない。
+  required_action: Androidはownerの再開指示後に検証する。iOSを含む各platformの実機で資格保存・再起動・Host照合・対話・失効・復帰を測定する。
   blocks_release: yes
 
 - item: 正式配布識別子・署名・配布経路

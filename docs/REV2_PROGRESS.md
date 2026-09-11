@@ -215,7 +215,7 @@ rev2全体は未完了。実装済みの対話Core・MINIDORA Adapter・Desktop�
 |端末連携|製品Dart TLS client、招待・失効・replay・Host・権限否定、実MINIDORA PASS|OS安全保管は実機未確認|
 |Android版|analyze/test、APK/AAB、署名・alignment・bundletool PASS|実機install以降はrelease_blocker|
 |Apple版|手動実行34446194013、対象`27b8713fd1a9ecdb81abe1d4225b99b26bda84ba`でRust単体64・統合5試験、macOS開発app・iOS Simulator appのビルドに合格|実機launch・Keychain・対話はrelease_blocker|
-|Windows版|共有化・端末連携後の集約検査でlint修正後PASS、最新debug build PASS|今回の画面回帰は操作者のEscで中断。installed-path証拠もrelease_blocker|
+|Windows版|共有化・端末連携後の集約検査でlint修正後PASS、最新debug build PASS|2026-09-11に画面回帰を再開し下記の範囲で確認。installed-path証拠はrelease_blocker|
 |Linux版|最新対話実装のFlutter build、各analyze/test、Rust試験、Desktop/Mobile製品Dart clientと実MINIDORA PASS|最新release起動とPID一致の可視window・broker監査も確認。WSLg X11の範囲|
 |manifest・梱包|改行修復後のWindows/Linux Python系9検査 PASS。conformance148件|開発検証のpassはstrict releaseのpassではない|
 
@@ -223,16 +223,12 @@ Apple成果物は外部artifact `10139803376`（86677901 bytes）を取得しZIP
 
 artifact取得の初回HTTP直取得はredirect先で401となり、認証headerを別hostへ引き継がない取得で回復した。ログ表示のcp932 UnicodeEncodeErrorはPYTHONUTF8=1で回復した。いずれも製品build失敗ではない。
 
-- item: Windowsの画面回帰
-  classification: release_blocker
-  reason: Windows画面操作はEscによる停止を検出し中断した。Linuxの最新build・Runtime path・起動観測は取得した。
-  required_action: 操作者の画面操作再開許可後にWindows回帰を継続する。
-  blocks_release: yes
+Windowsの画面回帰は当初Escで中断したが、2026-09-11のowner再開指示後に下記の開発回帰を実測した。installed-pathの独立したrelease blockerは保持する。
 
 - item: 実機・installed-path・正式配布・owner GO
   classification: release_blocker
-  reason: Android接続実機なし、Mac/iOS実機なし。Windows installed-pathの隔離・外部改竄証拠と正式配布署名も未成立。
-  required_action: 必要な実機とowner指定を取得し、対応する実測とstrict validationを実施する。
+  reason: Android実機検証はowner指示で凍結中。Mac/iOS実機なし。Windows installed-path全体の証拠と正式配布署名も未成立。
+  required_action: Androidはownerの再開指示を待つ。それ以外の必要な実機証拠・配布指定とstrict validationは独立して扱う。
   blocks_release: yes
 
 
@@ -245,3 +241,26 @@ artifact取得の初回HTTP直取得はredirect先で401となり、認証header
 Linuxは同じソース系統のrelease binary（SHA-256 `6582fd0acc0b94f0a1c09239af5626c1ada4180150f1ff00a9d25a7bc47268c8`）を実MINIDORA二processとRust brokerに接続して起動した。`GDK_BACKEND=x11` のWSLg環境で、`xwininfo -root -tree`、対象の`xprop -id <観測ID> _NET_WM_PID`、`xwininfo -id <観測ID>` により起動PID411との一致とIsViewableを観測した。app終了前に生存も確認し、検証後に自身のprocessを終了した。
 
 永続監査にはflutter-request-1から5が記録された。health、normalize_payload、content_projection、approval_editの受理と、command_envelopeのsuspendedを確認した。これは起動時の既存broker経路の証拠であり、画面からの対話入力・表示内容全体の証拠ではない。Desktop/Mobile製品Dart clientから実MINIDORAまでの経路は別の実通信検証でPASSしている。DRI3 deviceを取得できないlibEGL警告は出たが起動は成立した。描画性能・Wayland・物理Linux端末への同等性は主張しない。
+
+
+## Windows画面回帰の再開・Android実機検証の凍結（2026-09-11）
+
+ownerの明示指示でWindows画面検証を再開した。対象は `d5341f96f207b57085453af4797536abe125a5ed` の実装を持つWindows debug app、Rust broker、固定参照MINIDORA二process。Computer Useによる可視画面の操作・観測であり、検証入力は「こんにちは」だけとした。設定・権限の変更は行っていない。
+
+概要、環境診断、信頼、実行系、権限、agent、承認、監査、復旧、問題、証拠、設定、対話の13画面へ移動し、表示を確認した。既存画面から対話へ戻った際も入力と左右のsession状態を保持した。監査画面の既存projectionを新しい対話監査の表示証拠へ読み替えていない。
+
+二実行系比較で同一入力を送信し、左右の異なるsession・要求IDと承認待ちを観測した。検証用owner CLIの `対話承認操作 --session-file <検証用owner file> 承認 <要求ID> <要求hash> full` で各要求を承認した後、双方の完了、成功、full、基本会話の応答、別々のtrace/hashを画面で確認した。通常UIへowner資格は渡していない。
+
+次の要求では左を中止しても右の承認待ちが維持され、右も個別に中止できた。左だけ新規sessionへ切り替え、右の中止済みsessionを残して再送すると、左は承認待ち、右は送信失敗と自動再送しない旨を表示した。最後に左も中止した。検証用brokerの永続監査でも対話送信・承認・取得・中止を確認し、検証後は自身が起動したprocessを終了した。これはLIVE_RUNTIMEの開発経路証拠であり、installed製品全体の証拠ではない。
+
+操作上、下方へscrollした位置で座標指定の送信clickに反応を観測できない試行があった。入力欄からTab・Enterで送信でき、その後は上方に表示した送信buttonのmouse clickでも要求発行を確認した。座標操作と製品側のどちらが原因かは確定していない。全画面サイズ・全入力装置の成立は主張しない。初回window列挙のtimeoutは待機後の再取得で回復した。
+
+Androidは実機検証だけを凍結し、ownerの再開指示まで端末接続要求、install、launch、結合、対話、安全保管、lifecycleの実機試験を行わない。APK/AABと既存build結果を保持する。iOSは凍結対象外。凍結を合格やrelease scopeの削除へ置き換えない。
+
+- item: Windows全表示条件とinstalled製品証拠
+  classification: release_blocker
+  reason: 今回の開発画面観測は、全入力・表示条件やinstalled-path、Setup Doctor、外部監査アンカーの証拠を満たさない。scroll後の座標click不成立の原因も未確定。
+  required_action: installed製品の検証時に入力位置と反応を再現確認し、既存の機械検証可能なrelease evidenceを収集する。
+  blocks_release: yes
+
+この文書更新の初回release gate検査は、解決済み項目のblocks_releaseをfalseへ変更した台帳記述を拒否した。既存contractでは分類属性をtrueのまま保持し、status=resolved / active=falseで解決を表すため、台帳だけを修正した。検査器は変更していない。

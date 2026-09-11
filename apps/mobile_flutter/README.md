@@ -1,5 +1,7 @@
 # モバイルFlutter app
 
+2026-09-11のowner指示によりAndroid実機検証を凍結する。再開指示まで端末接続の要求や実機install・launch・結合・安全保管・lifecycle検証を行わない。APK/AABの既存成果物とbuild結果は保持する。凍結は実機検証の合格を意味せず、既存のrelease_blockerを保持する。iOSはこの凍結の対象外。
+
 owner rev2指示によりAndroid/iOSの正式projectを追加した。Flutter共通表示層は `../../packages/gui_shell_ui` を使用する。
 概要・確認・通知・実行系・停止・復旧を維持し、対話・接続先・設定を追加した。接続前は未接続を表示する。実行系一覧はDesktopの登録観測であり稼働保証ではない。対話はMobile → TLS → Desktop Rust → Core → Adapter → Runtimeだけを通る。
 

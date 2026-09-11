@@ -75,8 +75,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Android/iOS実機のinstall・起動・結合・対話・安全保管・lifecycleの実測がない。",
-      "required_action": "実機を接続し、正常・失効・期限・復帰の製品経路を実測する。"
+      "reason": "Android実機検証は2026-09-11のowner指示で凍結中。iOSを含む実機のinstall・起動・結合・対話・安全保管・lifecycleの実測は未取得。",
+      "required_action": "Androidはownerの再開指示後に実機検証を行う。凍結を合格とせず、iOSを含む未検証の実機証拠を取得する。"
     },
     {
       "name": "rev2_mobile_distribution",
@@ -90,13 +90,13 @@
     },
     {
       "name": "rev2_desktop_launch_regression",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Linuxの最新release起動とbroker監査は実測したが、Windowsの画面回帰はEscで中断している。",
-      "required_action": "画面操作再開のowner指示後にWindows回帰を継続する。"
+      "reason": "2026-09-11にWindows開発appの13画面表示、実MINIDORA二系統の承認待ち・応答・個別中止・新規session・片側失敗の隔離を実測した。Linux起動証拠と合わせた開発回帰の範囲。詳細はdocs/REV2_PROGRESS.md。",
+      "required_action": "この開発回帰項目の追加作業はない。Windows installed-path、実機、正式配布の独立したrelease blockerは保持する。"
     }
   ]
 }
