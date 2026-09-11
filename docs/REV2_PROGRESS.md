@@ -279,3 +279,20 @@ Androidは実機検証だけを凍結し、ownerの再開指示まで端末接�
   reason: Setup Doctor単独の製品出力は得たが、可視画面、全体provenance、監査アンカー保護を含むcanonicalなwindows_installed_smoke.jsonは未成立。製品context由来のCONFIGとbroker実観測を全体保証へ昇格しない。
   required_action: 同一隔離runに結び付く統合証拠を収集してWindows release evidence全項目を検証する。
   blocks_release: yes
+
+
+## 監査アンカー収集器の誤った保護成立判定を修正（2026-09-11）
+
+実installed storeに対し `collect_audit_anchor_proof.ps1` がpassed / key_anchor_log_same_user_rewrite_mitigated=trueを返した。しかし同じユーザーでaudit_anchor.key、audit_anchor.json、audit.jsonlのすべてをFileMode.Open / FileAccess.Writeで開けた。byteは書いていない。広範な主体へのwrite ACEがないことを、所有者自身による一括書換え防護へ誤って昇格する既存不具合だった。
+
+収集器はrelease用診断経路に限定して修正した。DPAPI固定文字列の往復はdpapi_availableへ区別し、監査鍵保護を表すdpapi_verifiedを成立させない。外部fileの存在/hashと任意fileのAuthenticode検証も対象chain・独立保管・信頼済み署名者の結合を証明しないため、外部アンカーや署名済み監査証拠の合格へ昇格しない。現行実装に同一ユーザーの書換えを防ぐ独立境界の検証はないため、保護成立を主張せずfailedを返す。runtimeの鍵・ACL・権限は変更していない。
+
+`python -m unittest tooling.conformance_tests.test_windows_anchor_collector` は実PowerShell collectorを3ケース（書込可能なstore、無関係な外部file、署名file）で実行しPASS。Windows conformanceの既存collector接続検査にも組み込んだ。初回はWindows PowerShell 5.1と継承module環境の不一致によりGet-FileHash等の読込みが失敗し、利用可能なPowerShell 7を優先する試験起動へ修正した。製品検査を弱めていない。
+
+同一の実installed storeで修正後に再実行しstatus=failed、same_user_rewrite_mitigated=false、dpapi_verified=false、dpapi_available=trueを観測した。`runtime/setup-doctor-20260911/anchor-before.json` と `anchor-after.json` に比較証拠がある。旧passedはreleaseの根拠に使わない。
+
+- item: 監査アンカーの同一ユーザー書換え防護
+  classification: release_blocker
+  reason: 誤判定は修正したが、独立した保管・信頼基点・chain結合の実装と証拠は未成立。
+  required_action: 独立境界と巻戻し・置換・改変の検出経路を定義して実装・実測する。
+  blocks_release: yes

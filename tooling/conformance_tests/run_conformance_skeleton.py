@@ -1921,6 +1921,13 @@ def test_windows_audit_anchor_proof_collector_is_connected() -> list[str]:
     ]:
         if token not in installed_text:
             errors.append(f"installed smoke collectorにaudit anchor integration tokenがない: {token}")
+    if sys.platform == "win32":
+        measured = subprocess.run(
+            [sys.executable, "-m", "unittest", "tooling.conformance_tests.test_windows_anchor_collector"],
+            cwd=ROOT, capture_output=True, timeout=150,
+        )
+        if measured.returncode != 0:
+            errors.append("Windows監査アンカー収集器の実行回帰が失敗: " + measured.stderr.decode(errors="replace"))
     return errors
 
 

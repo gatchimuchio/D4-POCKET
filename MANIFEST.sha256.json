@@ -882,7 +882,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "d7f81bb5f02eb3740dad04d9d961e13d4ac36d3d482a5a37eb57129b559e4baf"
+      "sha256": "c08230ade3d07a0a9e881df7775145409bc0366d3be39758e6fd4bf60d67d951"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1334,11 +1334,11 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "ec97eeb3cd9f5c638e15605c2ac7861beac5ebcde108928e9d1eca7b86d10896"
+      "sha256": "468c40e2d0c923e125c48ad95870fa15bc3bd1447fd2983cae2610bb518a4d41"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
-      "sha256": "fcd69201079e78601cae4de4f8240d1cdeb8adf750dd5a1e5efe70c78b750708"
+      "sha256": "fea5c743a9d2c768ce71c037f6b6a0ef2e3eba758e919eb703bdbdea518c1193"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -1962,7 +1962,11 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8a81accd4feeab86d629635d5ff6a72b582d6fc0edfb6aef5119aeddf36123cb"
+      "sha256": "b65f921117a52a9ebc24578f20e5f00cf49f8d6a6c6a5f5001058eafad0c78b9"
+    },
+    {
+      "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
+      "sha256": "6a8e26dbe29681a250ba6c35f555dac7f26f340b58d21e68bde6ce72b26483f2"
     },
     {
       "path": "tooling/device_link_live_check.py",

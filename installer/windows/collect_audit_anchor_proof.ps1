@@ -199,14 +199,16 @@ foreach ($path in $checkedPaths) {
 
 $aclEvidence = Get-AclEvidence -Paths @($checkedPaths.ToArray())
 $windowsAclVerified = [bool]$aclEvidence.verified
-$dpapiVerified = Test-DpapiCurrentUser
+$dpapiAvailable = Test-DpapiCurrentUser
+# 固定文字列の往復はOS機能の確認だけであり、監査鍵の保護を証明しない。
+$dpapiVerified = $false
 
 $externalAnchorVerified = $false
 $externalAnchorSha256 = $null
 if ($ExternalAnchorPath -ne "") {
   $externalAnchor = Resolve-Path $ExternalAnchorPath -ErrorAction SilentlyContinue
   if ($null -ne $externalAnchor) {
-    $externalAnchorVerified = $true
+    $errors.Add("外部fileの存在とhashだけでは、監査chainへの結合・独立保管・巻戻し防護を検証できません")
     $externalAnchorSha256 = Get-TaggedSha256 -Path $externalAnchor.Path
   } else {
     $errors.Add("external anchor path がありません: $ExternalAnchorPath")
@@ -219,9 +221,11 @@ if ($SignedEvidencePath -ne "") {
   $signedEvidence = Resolve-Path $SignedEvidencePath -ErrorAction SilentlyContinue
   if ($null -ne $signedEvidence) {
     $signature = Get-AuthenticodeSignature -FilePath $signedEvidence.Path
-    $signedEvidenceVerified = ($signature.Status -eq "Valid")
+    $signedFileSignatureValid = ($signature.Status -eq "Valid")
+    # 任意fileの署名は、この監査chainと信頼済み署名者への結合を証明しない。
+    $errors.Add("署名fileと対象監査chain・信頼済み署名者の結合検証がありません")
     $signedEvidenceSha256 = Get-TaggedSha256 -Path $signedEvidence.Path
-    if (!$signedEvidenceVerified) {
+    if (!$signedFileSignatureValid) {
       $errors.Add("signed evidence の Authenticode status は $($signature.Status) です: $SignedEvidencePath")
     }
   } else {
@@ -229,11 +233,11 @@ if ($SignedEvidencePath -ne "") {
   }
 }
 
-$sameUserMitigated = (
-  $installedPathVerified -and
-  $windowsAclVerified -and
-  ($checkedPaths.Count -ge 5)
-)
+# 広範な主体へのwrite ACEがないことは、所有者自身による三fileの
+# 一括書換え・親directory経由の置換を防ぐ証拠ではない。
+# 現行collectorに独立した保護境界の検証はないため合格へ昇格しない。
+$sameUserMitigated = $false
+$errors.Add("同一ユーザーによる鍵・アンカー・ログの一括書換えを防ぐ独立した保護境界は未検証です")
 
 $sourceKind = "windows_acl_dpapi_probe"
 $evidenceClass = "LIVE_RUNTIME"
@@ -252,6 +256,7 @@ $proofMaterial = [ordered]@{
   installed_path_verified = $installedPathVerified
   windows_acl_verified = $windowsAclVerified
   dpapi_verified = $dpapiVerified
+  dpapi_available = $dpapiAvailable
   external_anchor_verified = $externalAnchorVerified
   signed_evidence_verified = $signedEvidenceVerified
   acl_report = $aclEvidence.reports
@@ -279,6 +284,7 @@ $result = [ordered]@{
   key_anchor_log_same_user_rewrite_mitigated = $sameUserMitigated
   windows_acl_verified = $windowsAclVerified
   dpapi_verified = $dpapiVerified
+  dpapi_available = $dpapiAvailable
   external_anchor_verified = $externalAnchorVerified
   signed_evidence_verified = $signedEvidenceVerified
   administrator_root_resistance_claimed = $false
