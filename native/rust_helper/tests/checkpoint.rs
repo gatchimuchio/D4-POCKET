@@ -196,9 +196,19 @@ fn 配布物のlinkと規約外pathを拒否する() {
     #[cfg(windows)] std::fs::remove_dir(&link).unwrap();
     let invalid=root.join("app/規約外");std::fs::write(&invalid,b"x").unwrap();
     assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err());std::fs::remove_file(invalid).unwrap();
-    #[cfg(unix)] {
-        std::fs::write(root.join("app/CASE"),b"a").unwrap();std::fs::write(root.join("app/case"),b"b").unwrap();
-        assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err());
+    // OS名からfilesystemの大小文字規則を推定しない。
+    std::fs::write(root.join("app/CASE"),b"a").unwrap();std::fs::write(root.join("app/case"),b"b").unwrap();
+    let count=std::fs::read_dir(root.join("app")).unwrap().filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().eq_ignore_ascii_case("case")).count();
+    match count {
+        2 => assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err()),
+        1 => {
+            let bytes=gui_shell_rust_helper::installed_artifact::canonical(&root).unwrap();
+            let manifest:serde_json::Value=serde_json::from_slice(&bytes).unwrap();
+            let entries:Vec<_>=manifest["entries"].as_array().unwrap().iter().filter(|e| e["path"].as_str().unwrap().eq_ignore_ascii_case("app/case")).collect();
+            assert_eq!(entries.len(),1);
+            assert_eq!(entries[0]["sha256"],sha256_tagged(b"b"));
+        },
+        _ => panic!("試験fileのentry数が不正"),
     }
     std::fs::remove_dir_all(root).unwrap();
 }

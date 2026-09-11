@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "74b4ef3a4dea03d07b1ea2616cedf1abf973a41d015fc277c591667bd06c902a"
+      "sha256": "a9ea3d7931101a95012405462029cc62154527e5b18fddbb41efebf7b53e3bd0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1514,7 +1514,7 @@
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
-      "sha256": "547d616eb9f5d9bc115ca209e4567cec0b0dc7c63b12335fb1271369541dff87"
+      "sha256": "a17f5d87746bebc8ec23d18dcced81fca155877cb77cf3c214db6932573f718c"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",

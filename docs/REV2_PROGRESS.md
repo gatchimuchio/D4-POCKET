@@ -394,3 +394,10 @@ Schema36/正常36/負例38、conformance148もPASS。配布物の変更を止め
   reason: 配布物一式を結合する実装・負例は検証したが、owner公開鍵固定と実署名は延期中。
   required_action: 正式release直前にclean commitから配置し、外部媒体上のowner鍵でversion 2を署名して現配置を再検証する。
   blocks_release: yes
+
+
+## 現在commitの集約回帰とfilesystem境界試験（2026-09-11）
+
+source `0cdbab7a13629cc6d96618160883286e7a718336` で `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` の開発検証17項目、Linuxで同commandのplatform=linuxを指定した18項目が全PASSした。Windowsの正式統合証拠がRepository既定pathに存在しないことによる個別release blockerは残る。開発モードのrelease_gate: passを厳格releaseの合格と扱わない。ログはRepository外のGUI-Shell-0cdbab7-windows-validation.txt / GUI-Shell-0cdbab7-linux-validation.txtへ保存した。
+
+配布物のpath試験にあった「UnixならCASE/caseを別entryとして作れる」という前提を除去した。実directoryを列挙して2 entryなら大小文字衝突を拒否、1 entryなら一つだけを測定し最後に書いたbyteのhashと一致することを検査する。OSによる試験除外も不要とした。production codeと拒否要件は変更しない。変更後のcheckpoint試験はWindows8件・Linux7件PASS、Schema36/正常36/負例38・conformance148もPASS。
