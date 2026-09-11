@@ -296,3 +296,16 @@ Androidは実機検証だけを凍結し、ownerの再開指示まで端末接�
   reason: 誤判定は修正したが、独立した保管・信頼基点・chain結合の実装と証拠は未成立。
   required_action: 独立境界と巻戻し・置換・改変の検出経路を定義して実装・実測する。
   blocks_release: yes
+
+
+## 旧アンカー合格記録のrelease受入れを拒否（2026-09-11）
+
+前項の収集器修正だけでは、修正前の `anchor-before.json` をWindows release検証器へ渡すとwindows audit anchor gateがpassedとなった。実測recordを検証用provenanceへ組み込んだ検証器単位の再現であり、統合releaseの成功を示すものではない。
+
+`validate_audit_anchor_external_tamper_evidence` は、現行形式のcollector自己申告だけでは対象chainと独立した信頼基点の結合を検証できないことを明示し、release_blockerを返すよう修正した。同じ実測recordを再投入するとfailedへ変わった。external_anchor / signed_evidenceへsource_kindを付け替えてverified=trueとする3種類のfixtureも拒否し、他のWindows gateの正常fixtureは合格を維持した。元の全項目合格fixtureはこの未検証の保証を誤って正常扱いしていたため、他の正常経路の成立とアンカーの拒否を別々にassertする試験へ修正した。
+
+- item: 独立したアンカー証拠の受理経路
+  classification: release_blocker
+  reason: 現行形式に信頼済み署名者・対象chain・置換や巻戻しを検証する消費経路がない。過去のpassedも保護を証明しない。
+  required_action: 独立した信頼基点と保管先の境界を決め、chainへ結合した証拠を実際に検証する経路と否定試験を実装する。
+  blocks_release: yes

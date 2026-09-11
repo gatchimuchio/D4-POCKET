@@ -599,6 +599,10 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
     if not isinstance(evidence, dict):
         errors.append("audit_anchor_external_tamper_evidence object がない")
     else:
+        # 現行形式はcollectorの自己申告であり、対象chain、独立した信頼基点、
+        # 置換・巻戻し防護をこの検証器で照合する経路を持たない。
+        # 旧collectorのpassedやsource_kindの付替えでreleaseを解除しない。
+        errors.append("監査アンカーの対象chainと独立した信頼基点の結合を検証する経路が未成立です。現行形式の保護済み宣言だけではreleaseを解除できません")
         if evidence.get("status") != "passed":
             errors.append("audit_anchor_external_tamper_evidence.status は passed でなければならない")
         if evidence.get("installed_path_verified") is not True:

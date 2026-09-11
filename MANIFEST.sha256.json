@@ -882,7 +882,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "c08230ade3d07a0a9e881df7775145409bc0366d3be39758e6fd4bf60d67d951"
+      "sha256": "68958ea58a8d82a6afd75d1c75f9397597150c76ef1d6ad0c195356cf6bf4f53"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1334,7 +1334,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "468c40e2d0c923e125c48ad95870fa15bc3bd1447fd2983cae2610bb518a4d41"
+      "sha256": "633e287ff9977fee1e644957bc9cb6fe8f6408f1e5ebc0ef6069b76f96a2a5c7"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -1962,7 +1962,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b65f921117a52a9ebc24578f20e5f00cf49f8d6a6c6a5f5001058eafad0c78b9"
+      "sha256": "396e88e6a6239e3cd89a692115f0d46e3416d92f26005897919b654a77652ae4"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2026,7 +2026,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "0d960069470ef9622fe185b3b527e9138e0d09c00881fcbf153ddee1028dedb6"
+      "sha256": "2bceddfa4e0c3ab82dc526a1400dcfab0fb8847d7c720a4a3fa074ce8b866d0f"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

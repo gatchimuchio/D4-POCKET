@@ -1559,17 +1559,25 @@ def _valid_windows_installed_evidence() -> dict:
     }
 
 
-def test_windows_release_evidence_validator_accepts_valid_installed_smoke() -> list[str]:
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "windows_installed_smoke.json"
-        path.write_text(json.dumps(_valid_windows_installed_evidence()), encoding="utf-8")
-        results = validate_windows_release_evidence(path)
+def test_windows_release_evidence_validator_accepts_other_checks_but_rejects_unbound_anchor() -> list[str]:
     errors = []
-    for result in results:
-        if result.status != "passed":
-            errors.append(f"{result.name} が有効なWindows evidenceを拒否した: {result.reason}")
-        if result.classification == "release_blocker":
-            errors.append(f"{result.name} が有効なWindows evidenceをrelease_blockerに分類した")
+    # 他の製品経路の正常fixtureは維持し、未接続のアンカー宣言だけを拒否する。
+    for source_kind in ("windows_acl_dpapi_probe", "external_anchor", "signed_evidence"):
+        data = _valid_windows_installed_evidence()
+        anchor = data["audit_anchor_external_tamper_evidence"]
+        anchor["evidence_source"]["source_kind"] = source_kind
+        anchor["external_anchor_verified"] = source_kind == "external_anchor"
+        anchor["signed_evidence_verified"] = source_kind == "signed_evidence"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        for result in results:
+            if result.name == "audit_anchor_external_tamper_evidence_proof":
+                if result.status == "passed" or result.classification != "release_blocker":
+                    errors.append(f"{source_kind}の未結合アンカー宣言を受理した")
+            elif result.status != "passed" or result.classification == "release_blocker":
+                errors.append(f"{result.name} が他の有効なWindows evidenceを拒否した: {result.reason}")
     return errors
 
 
@@ -3513,7 +3521,7 @@ def main() -> int:
         test_shell_snapshot_contains_gui_operation_state,
         test_shell_snapshot_generator_writes_phase_b_local_snapshot,
         test_evidence_bundle_is_development_classified_and_non_authoritative,
-        test_windows_release_evidence_validator_accepts_valid_installed_smoke,
+        test_windows_release_evidence_validator_accepts_other_checks_but_rejects_unbound_anchor,
         test_windows_release_evidence_validator_rejects_missing_provenance,
         test_windows_release_evidence_validator_preserves_audit_anchor_external_blocker,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
