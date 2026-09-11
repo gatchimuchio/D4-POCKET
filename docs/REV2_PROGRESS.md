@@ -401,3 +401,20 @@ Schema36/正常36/負例38、conformance148もPASS。配布物の変更を止め
 source `0cdbab7a13629cc6d96618160883286e7a718336` で `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` の開発検証17項目、Linuxで同commandのplatform=linuxを指定した18項目が全PASSした。Windowsの正式統合証拠がRepository既定pathに存在しないことによる個別release blockerは残る。開発モードのrelease_gate: passを厳格releaseの合格と扱わない。ログはRepository外のGUI-Shell-0cdbab7-windows-validation.txt / GUI-Shell-0cdbab7-linux-validation.txtへ保存した。
 
 配布物のpath試験にあった「UnixならCASE/caseを別entryとして作れる」という前提を除去した。実directoryを列挙して2 entryなら大小文字衝突を拒否、1 entryなら一つだけを測定し最後に書いたbyteのhashと一致することを検査する。OSによる試験除外も不要とした。production codeと拒否要件は変更しない。変更後のcheckpoint試験はWindows8件・Linux7件PASS、Schema36/正常36/負例38・conformance148もPASS。
+
+
+## WindowsのSemantics起動順序を修正（2026-09-11）
+
+DesktopのmainでOS要求より先に保持していたSemanticsHandleを除去し、Flutter標準のplatform lifecycleに有効化を任せた。独自engine、UIAutomation wrapper、依存追加はない。固定Flutter 3.44.0のbindingとWindows engineを調べると、手動handleがある場合は後続のOS要求でDart側の有効状態が変化しない。この順序が初回treeの欠落に関係するという仮説で、同一broker起動ハーネスとreleaseビルドを比較した。engine内部の通知順序をtraceしたわけではないため、詳細な因果経路は推論として保持する。
+
+変更前のPID15840 / window3999218では外部アクセシビリティ照会にwindow枠だけが現れた。8行の起動処理を除去した比較版PID6884 / window1770286では、初回に108要素を観測し、概要、ナビゲーション、実行系状態、不変条件の個別groupと内容を取得できた。診断へのクリック後は環境診断、broker IPC、保護項目拒否を含むtreeへ切り替わり、概要へ戻ると実行系・不変条件の内容が再出現した。再描画で要素番号が失効したクリック2回は未成立として扱い、画面を再取得して座標操作後に遷移完了を再観測した。先行文書のUIAコンパイル条件は今回の原因を確定する証拠ではなく、この標準engineでも個別widgetを取得できることが新たな観測である。
+
+観測はComputer Useの外部treeであり、製品build registryから合成していない。Repository外のGUI-Shell-semantics-external-observation.jsonに診断と概要復帰の実treeを保存した。ハーネスの診断出力は引き続きINTERNAL_STATE、可視surface空、formal_release_input=falseを確認した。署名鍵は使用していない。
+
+`flutter build windows --release` とDesktopの `flutter test --reporter compact`（33件）、Desktop/Mobileの `flutter analyze`、Schema36/正常36/負例38、conformance148はPASS。厳格なinstalled collectorの再収集をこの開発用起動で代替しない。
+
+- item: 現行配置からの厳格なWindows可視surface証拠
+  classification: release_blocker
+  reason: 外部tree取得と画面切替を実測したが、clean sourceと分離配置に結合した正式collectorの証拠は未成立。
+  required_action: 現行commitを分離配置し、個別surfaceの実観測と非表示の負例を厳格な収集・検証経路で確認する。
+  blocks_release: yes

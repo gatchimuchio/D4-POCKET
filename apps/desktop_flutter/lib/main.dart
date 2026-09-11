@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import 'models/generated_contracts.dart';
@@ -27,14 +26,11 @@ import 'services/surface_semantics_export.dart';
 const String kGuiShellProductTitle = 'GUI Shell';
 const double _navigationRailMinScrollableExtent = 760;
 
-SemanticsHandle? _appSemanticsHandle;
-
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       _installFatalErrorHandlers();
-      _ensureAccessibilitySemantics();
       final client = await ShellCoreClient.product();
       await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
       runApp(GuiShellDesktopApp(client: client));
@@ -53,10 +49,6 @@ Future<void> main() async {
       );
     },
   );
-}
-
-void _ensureAccessibilitySemantics() {
-  _appSemanticsHandle ??= SemanticsBinding.instance.ensureSemantics();
 }
 
 void _installFatalErrorHandlers() {

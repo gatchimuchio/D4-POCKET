@@ -178,7 +178,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "fc59282205cbfe06176391131586015283b9d39b6a3fd4ab11b06e94df0efd2b"
+      "sha256": "987b388d57763165b906f168806e8cb7aac5f5c37c93ec7e422c092107863960"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a9ea3d7931101a95012405462029cc62154527e5b18fddbb41efebf7b53e3bd0"
+      "sha256": "e39ec8146bdf129567af7465f57a1c0e470ec40ac1396cd1ef08ce40259e8576"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
