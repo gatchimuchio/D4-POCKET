@@ -330,3 +330,22 @@ Rust試験はメモリ上の使い捨て鍵を用い、正常署名、不正署�
 この単位の初回集約検証は配布パス検査だけがFAILした。新しい公開鍵固定fileの日本語pathが既存ASCII配布規約に合わなかったため、機械読取りpathをconfig/audit_signing_trust.jsonへ変更し、日本語意味正本と責任索引を保持した。検査allowlistは拡大していない。修正後の署名6試験（Rust CLI・Collector・release再検証を含む）はPASSし、ringで署名したcheckpointをOpenSSL標準検証でも受理することを確認した。
 
 最終の `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` は開発検証17項目すべてPASS。Rust63単体・5 IPC・6 checkpoint試験、共有6・Desktop32・Mobile14試験を含む。これは実owner署名とWindows統合release証拠の合格ではなく、owner手動操作の前で停止する。
+
+
+## 実運用鍵を延期してWindows統合収集を検証（2026-09-11）
+
+owner指示により、監査アンカーの実運用鍵・実署名は正式release直前まで外部条件待ちとする。Android実機検証の凍結も維持する。他の実装・検証は継続する。
+
+source `7a4afd838aed44489c71d560dcd6a876b53ce9dd` をLinuxへfast-forwardし、`CARGO_TARGET_DIR=/home/mzcum/.cache/gui-shell-rev2-target python3 tooling/validate_all.py --desktop-platform linux --include-mobile-release` は18項目PASS（Rust64単体、5 IPC、5 checkpointを含む）。Windowsは `flutter build windows --release` と `cargo build --locked --release` から `rev2-7a4afd8-20260911` へ分離配置した。実broker検証とSetup Doctor製品出力10項目はPASS。Computer Useで配置先windowの概要・環境診断への遷移とscrollを観測した。
+
+同配置で `collect_installed_smoke.ps1 -NoPythonRuntime` の `-VisibleSurfacesJson` に、その起動で製品が生成するsurface_semantics_export.jsonを指定した。UIAutomationは実行していない。旧検証器はWindows4関門をPASSとしたが、出力の生成元を確認すると `SurfaceSemanticsRegistry` はbuild時の名前を蓄積するだけで、現在の描画・可視性・破棄を観測していなかった。したがって、この初回起動PASSを完成証拠には採用しない。
+
+収集器はこの既知のbuild registry形式をINTERNAL_STATEとして保存し、可視surface・初回起動を合格へ昇格しない。release検証器も旧collectorのpassedと、source名だけを変更した同形式を拒否する。既存の受入れ試験はこの誤った保証を正常扱いしていたため、拒否の回帰試験に置き換えた。初回の試験編集では別の不足fieldによる拒否を拾っていたため、元fixtureのfieldを保持して再実行し、修正前FAIL・修正後PASSを確認した。
+
+実collector再実行は `runtime/registry-rejection/windows_installed_smoke.json` に保存した。first_run=failed、visible_surfacesのevidence_class=INTERNAL_STATE、formal_release_input=falseを観測。旧記録の再投入もfirst-run=failedとなり、両記録でSetup DoctorとbrokerはPASSを維持した。ログ・実配置・証拠・秘密をRepositoryへstageしていない。
+
+- item: Windows初回起動の可視surface証拠
+  classification: release_blocker
+  reason: build registryによる誤受理は修正したが、現windowの個別surfaceを外部から確認する厳格な統合証拠は未成立。
+  required_action: 実描画・可視性を観測する経路を初回起動と結合し、非表示・破棄・別起動の負例も検証する。
+  blocks_release: yes

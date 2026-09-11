@@ -39,3 +39,14 @@ release検証器も旧形式のアンカー保護宣言だけでは受理しな�
 release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続性記録のpathを指定する。これは秘密鍵ではない。証拠JSONが指定する過去floorを採用せず、現在のfileとRepository固定公開鍵をRustで再検証する。`cargo build --locked --manifest-path native/rust_helper/Cargo.toml` で現在の検証器を構築してから実行する。外部継続性記録をlocal証拠と一緒に巻き戻さない。
 
 署名bundleはcheckpoint.json、signature.bin、public-key.derで構成し、Collector出力にfingerprint、署名済みhash、previous hash、sequence、verification resultを保存する。秘密鍵は扱わない。ownerの手動コマンドは `docs/OFFLINE_SIGNING_OWNER.md` に記載する。
+
+
+## 可視画面証拠の限界
+
+`flutter_semantics_runtime_export` はwidgetのbuild時に登録した名前一覧であり、非表示・破棄済みwidget、画面外、実際の描画を区別しない。`is_offscreen=false` も測定値ではない。収集器はこれを `INTERNAL_STATE` の診断資料として保持するが、可視surface・初回起動の合格へ昇格しない。release検証器は旧collectorのpassed、およびsourceだけをaccessibility_tree等へ変更した既知のbuild registry形式も拒否する。
+
+- item: Windows可視surfaceの実観測
+  classification: release_blocker
+  reason: Flutter build registryだけでは可視性を証明できず、現環境の外部accessibility観測では個別widgetを取得できていない。
+  required_action: 実配置の現在windowから個別surfaceの可視性を取得し、初回起動と由来の検証へ接続する。Computer Useの画面観測だけを既存collectorの厳格な機械証拠へ付け替えない。
+  blocks_release: yes

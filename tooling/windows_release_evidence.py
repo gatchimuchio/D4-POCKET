@@ -174,6 +174,8 @@ def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[s
     ):
         errors.append("必須 surface のすべてが単一の automation 要素に依存している")
     diagnostic_tree = surface_evidence.get("diagnostic_tree")
+    if isinstance(diagnostic_tree, dict) and diagnostic_tree.get("mode") == "flutter_dart_surface_semantics_runtime_export":
+        errors.append("Flutter build registryのINTERNAL_STATEを可視surfaceのLIVE_RUNTIME証拠として受理しない")
     if not isinstance(diagnostic_tree, dict):
         errors.append("可視 surface 証拠に diagnostic_tree がない")
     else:
@@ -406,9 +408,8 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         if surface_evidence.get("source") not in {
             "uiautomation",
             "accessibility_tree",
-            "flutter_semantics_runtime_export",
         }:
-            errors.append("可視 surface の evidence source は uiautomation、accessibility_tree、flutter_semantics_runtime_export のいずれかでなければならない")
+            errors.append("可視 surface の evidence source は uiautomation または accessibility_tree でなければならない。Flutter build registry は可視性を証明しない")
         if not surface_evidence.get("path"):
             errors.append("可視 surface の evidence path がない")
         errors.extend(_validate_surface_match_evidence(surface_evidence))

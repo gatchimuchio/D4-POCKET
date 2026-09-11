@@ -1727,16 +1727,19 @@ def test_windows_release_evidence_validator_rejects_screenshot_surface_source() 
     return []
 
 
-def test_windows_release_evidence_validator_accepts_flutter_semantics_surface_source() -> list[str]:
-    valid = _valid_windows_installed_evidence()
-    valid["first_run"]["visible_surfaces_evidence"]["source"] = "flutter_semantics_runtime_export"
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "windows_installed_smoke.json"
-        path.write_text(json.dumps(valid), encoding="utf-8")
-        results = validate_windows_release_evidence(path)
-    result_by_name = {result.name: result for result in results}
-    if result_by_name["windows_installer_first_run_smoke"].status != "passed":
-        return ["Windows first-run evidence validatorがFlutter semanticsのruntime surface evidenceを拒否した"]
+def test_windows_release_evidence_validator_rejects_flutter_build_registry_as_visibility() -> list[str]:
+    for source in ("flutter_semantics_runtime_export", "uiautomation", "accessibility_tree"):
+        bad = _valid_windows_installed_evidence()
+        surface = bad["first_run"]["visible_surfaces_evidence"]
+        surface["source"] = source
+        surface["diagnostic_tree"]["mode"] = "flutter_dart_surface_semantics_runtime_export"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+            return [f"Windows first-run evidence validatorがbuild registryを可視証拠として受け入れた: {source}"]
     return []
 
 
@@ -3530,7 +3533,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
-        test_windows_release_evidence_validator_accepts_flutter_semantics_surface_source,
+        test_windows_release_evidence_validator_rejects_flutter_build_registry_as_visibility,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,

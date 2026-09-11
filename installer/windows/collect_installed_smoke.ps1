@@ -876,7 +876,12 @@ $aggregateSurfaceShortcutDetected = (
 $surfaceMatchRequirementsMet = (
   Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_match_requirements_met"
 ) -eq $true
-$visibleSurfacesComplete = $true
+# build時の登録は、現在の描画・可視性を測定していない。
+$surfaceBuildRegistry = (
+  (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "source") -eq "flutter_semantics_runtime_export" -or
+  (Get-EvidenceValue -Object (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "diagnostic_tree") -Name "mode") -eq "flutter_dart_surface_semantics_runtime_export"
+)
+$visibleSurfacesComplete = !$surfaceBuildRegistry
 foreach ($surface in $requiredVisibleSurfaces) {
   if ($visibleSurfaceLabels -notcontains $surface) {
     $visibleSurfacesComplete = $false
@@ -926,7 +931,11 @@ $evidence = [ordered]@{
   field_provenance = [ordered]@{
     artifact = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $true }
     "first_run.process" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
-    "first_run.visible_surfaces" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.visible_surfaces" = [ordered]@{
+      source_type = $(if ($surfaceBuildRegistry) { "product_export" } else { "directly_measured" })
+      evidence_class = $(if ($surfaceBuildRegistry) { "INTERNAL_STATE" } else { "LIVE_RUNTIME" })
+      formal_release_input = !$surfaceBuildRegistry
+    }
     "first_run.config_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     "first_run.installer_authority_boundary" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
     setup_doctor = [ordered]@{
@@ -940,7 +949,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "7"
+    collector_version = "8"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
