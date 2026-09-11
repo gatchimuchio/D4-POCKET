@@ -264,3 +264,18 @@ Androidは実機検証だけを凍結し、ownerの再開指示まで端末接�
   blocks_release: yes
 
 この文書更新の初回release gate検査は、解決済み項目のblocks_releaseをfalseへ変更した台帳記述を拒否した。既存contractでは分類属性をtrueのまま保持し、status=resolved / active=falseで解決を表すため、台帳だけを修正した。検査器は変更していない。
+
+
+## インストール済みSetup Doctorの製品出力（2026-09-11）
+
+既存隔離配置 `rev2-47299ce-20260910` のrelease Flutter appとRust brokerを、新規runtime領域 `runtime/setup-doctor-20260911` で実行した。app SHA-256は `e671cd41eeb1c1d9c147178f5a4ae5a53052ac375807f421c9bc31e49769f7e6`、brokerは `d2015557a120f6552aceb518fc6e30fce36c744b4b384e19bd97161548dbbf07` で、以前の隔離配置の値と一致した。
+
+実行commandはrepository外の `python ../GUI-Shell-installed-export-check.py`。この補助は既存のbroker-serverを起動し、実測path・hashを製品出力contextへ渡し、既存の `GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON` / `GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON` 経路を起動するだけで、diagnostic checkを生成・改変しない。collector自体はPythonを使用するが、起動したappのPATHはWindowsとSystem32に限定した。この環境指定だけをPython非依存の完全な証拠には扱わない。製品経路の置換やUI操作の代替ではなく、既存製品出力に限定した開発用測定である。統合collectorの正式証拠へ接続した時点で補助測定は不要になる。
+
+製品が書き出した `product.json` はSHA-256 `903e46b4f574e1b5768eb5e32be922b780eb3a175ada777777adf445f727c501`。`tooling.windows_release_evidence.validate_setup_doctor` へそのまま渡し、windows_setup_doctor_smoke=passedを得た。製品内の10項目はすべてpassであり、設定生成・監査領域書込み・認証付きbrokerと永続化の接続を含む。出力時のapp PID4904の生存を確認し、検証終了時に自身のappとbrokerを終了した。証拠は `%LOCALAPPDATA%/GUI-Shell/installed-runs/rev2-47299ce-20260910/runtime/setup-doctor-20260911/result.json` と同directoryの製品出力である。
+
+- item: Windows統合release evidence
+  classification: release_blocker
+  reason: Setup Doctor単独の製品出力は得たが、可視画面、全体provenance、監査アンカー保護を含むcanonicalなwindows_installed_smoke.jsonは未成立。製品context由来のCONFIGとbroker実観測を全体保証へ昇格しない。
+  required_action: 同一隔離runに結び付く統合証拠を収集してWindows release evidence全項目を検証する。
+  blocks_release: yes
