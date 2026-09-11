@@ -375,3 +375,22 @@ Windows releaseビルド後、実broker経由でappを起動し、生成され�
   reason: 現行のexe単体hashではDart AOT、engine、plugin等の実行配布物の置換を検出できない。
   required_action: 配置app/brokerの実行配布物一式をcanonical manifest等へ結合し、欠落・追加・置換・path改変の負例を含めてcheckpointとrelease再検証へ接続する。
   blocks_release: yes
+
+
+## checkpointをWindows配布物一式へ結合（2026-09-11）
+
+checkpoint version 2へ更新し、installed_artifact_sha256をRustがinstalled rootから実測するcanonical配布物一覧のhashへ変更した。app/broker以下の全file・directoryと両launcherを含み、path・種別・size・内容hashを結合する。runtimeとinstalled_manifest.json以外のroot追加、必須成果物欠落、規約外path、symbolic link/junction/reparse point、特殊file、大小文字衝突を拒否する。上限付きで二度走査し、変化すれば失敗する。旧exe単体署名version 1は拒否する。
+
+Schemaと正本を先に更新し、prepare / verifyの引数をinstalled rootへ変更、artifact-manifest CLIを追加した。CollectorとPython release再検証も同じrootを渡し、version 2の実検証結果のみ受理する。通常runtimeの経路や新しい依存は増やしていない。ownerの実運用鍵・署名は正式release直前まで外部条件待ちのまま。
+
+Rustは63単体・5 IPC・8 checkpoint試験PASS。既存の署名・chain・sequence・source不一致に加え、AOT/engine/broker/launcherの改変・削除、追加file、rename、root追加、junction、規約外path、旧version拒否を確認した。実CLI → OpenSSL公開鍵検証 → PowerShell Collector → Python release consumer → Rust再検証で、runnerを変えずにAOTだけを改変すると拒否する。秘密の試験鍵はprocessメモリ内だけに生成し、実運用鍵を扱っていない。初回は試験内のJSON型代入がcompile errorとなり修正した。junction試験のmklink引数にforward slashが残っていたためInvalid switchとなり、Windows path componentの組立てを修正して全試験を再実行した。
+
+実配置 `rev2-7a4afd8-20260911` の15 file / 21 entryをRustで測定し、Pythonで独立に列挙したpath・size・SHA-256と全件一致した。別の検証用コピーでapp.soだけを改変し、runner hashが変わらないまま成果物一覧hashが `027f460e382cf4913d701d9d605a108111db89cbef00dc1c038cdced2de72238` から `308feef71c18b8c4c3c52be4ebbebdfa2ca6b94eee9827e261cdb672a12457d7` へ変化した。実測は `%TEMP%/gui-shell-artifact-actual-tafn4o16/runtime/result.json` とbefore/after一覧へ保存した。これは未署名の実配布物測定であり、owner署名証拠ではない。
+
+Schema36/正常36/負例38、conformance148もPASS。配布物の変更を止めた検証時点のsnapshotを扱い、原子的なfilesystem snapshotや検証後の実行時差替え防止は主張しない。正本にその境界を明記した。
+
+- item: 実運用署名済み配布物checkpoint
+  classification: release_blocker
+  reason: 配布物一式を結合する実装・負例は検証したが、owner公開鍵固定と実署名は延期中。
+  required_action: 正式release直前にclean commitから配置し、外部媒体上のowner鍵でversion 2を署名して現配置を再検証する。
+  blocks_release: yes

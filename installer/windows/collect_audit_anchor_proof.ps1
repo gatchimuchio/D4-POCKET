@@ -258,10 +258,10 @@ if ($CheckpointBundle -ne "") {
     $verifier = Join-Path $repositoryRoot "native/rust_helper/target/debug/gui_shell_rust_helper.exe"
     $trust = Join-Path $repositoryRoot "config/audit_signing_trust.json"
     $checkpointInputs = [ordered]@{ installed_root=$root.Path; audit_dir=$auditDirPath.Path; bundle=(Resolve-Path -LiteralPath $CheckpointBundle).Path; previous_bundle=$PreviousCheckpointBundle }
-    $nativeOutput = & $verifier 監査チェックポイント verify $auditDirPath.Path $artifact $sourceCommit $trust $TrustedHeadPath $CheckpointBundle $PreviousCheckpointBundle
+    $nativeOutput = & $verifier 監査チェックポイント verify $auditDirPath.Path $root.Path $sourceCommit $trust $TrustedHeadPath $CheckpointBundle $PreviousCheckpointBundle
     if ($LASTEXITCODE -ne 0) { throw "Rustの署名checkpoint検証が失敗しました" }
     $checkpointResult = ($nativeOutput -join "`n") | ConvertFrom-Json
-    if ($checkpointResult.status -ne "passed" -or $checkpointResult.verification_kind -ne "offline_ed25519_checkpoint_v1") { throw "Rustの検証結果が不正です" }
+    if ($checkpointResult.status -ne "passed" -or $checkpointResult.verification_kind -ne "offline_ed25519_checkpoint_v2") { throw "Rustの検証結果が不正です" }
     $signedEvidenceVerified = $true
     $sameUserMitigated = $true
   } catch {

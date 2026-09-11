@@ -4,6 +4,12 @@ use std::{path::Path, time::{SystemTime, UNIX_EPOCH}};
 
 pub fn run(args: &[String]) -> Result<(), String> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| "時計不正")?.as_secs();
+    if args.first().map(String::as_str) == Some("artifact-manifest") && args.len() == 2 {
+        use std::io::Write;
+        let bytes = gui_shell_rust_helper::installed_artifact::canonical(Path::new(&args[1]))?;
+        std::io::stdout().write_all(&bytes).map_err(|_| "成果物一覧出力失敗")?;
+        return Ok(());
+    }
     if args.first().map(String::as_str) == Some("fingerprint") && args.len() == 2 {
         let der = read(Path::new(&args[1]), 44)?;
         println!("{}", gui_shell_rust_helper::audit_hash::sha256_tagged(public_key(&der)?));
@@ -33,7 +39,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         };
         let measured = measure(Path::new(&args[1]), Path::new(&args[2]), &args[3], cp.sequence, cp.previous_checkpoint_hash.clone(), now)?;
         let accepted = verify(&bytes, &sig, &der, &trust, &head, previous.as_ref().map(|(b,s)| (b.as_slice(),s.as_slice())), &measured, now)?;
-        println!("{}", serde_json::json!({"status":"passed","verification_kind":"offline_ed25519_checkpoint_v1",
+        println!("{}", serde_json::json!({"status":"passed","verification_kind":"offline_ed25519_checkpoint_v2",
             "signer_public_key_fingerprint":trust.public_key_fingerprint,"signed_checkpoint_hash":accepted.signed_checkpoint_hash,
             "sequence":accepted.sequence,"previous_checkpoint_hash":cp.previous_checkpoint_hash,
             "source_commit":cp.source_commit,"installed_artifact_sha256":cp.installed_artifact_sha256,
@@ -41,5 +47,5 @@ pub fn run(args: &[String]) -> Result<(), String> {
             "administrator_root_resistance_claimed":false}));
         return Ok(());
     }
-    Err("使用法: 監査チェックポイント fingerprint <public-key.der> | prepare <store> <exe> <source commit> <trusted-head.json> <新規checkpoint.json> | verify <store> <exe> <source commit> <Repository信頼設定> <owner継続性記録> <署名bundle> <直前bundleまたは->".into())
+    Err("使用法: 監査チェックポイント artifact-manifest <installed root> | fingerprint <public-key.der> | prepare <store> <installed root> <source commit> <trusted-head.json> <新規checkpoint.json> | verify <store> <installed root> <source commit> <Repository信頼設定> <owner継続性記録> <署名bundle> <直前bundleまたは->".into())
 }

@@ -12,8 +12,14 @@ fn key() -> (Ed25519KeyPair, Vec<u8>, Trust) {
     let trust = Trust {version:1,algorithm:"Ed25519".into(),public_key_fingerprint:Some(sha256_tagged(key.public_key().as_ref()))};
     (key,der,trust)
 }
+fn installation(root: &std::path::Path) {
+    for path in ["app/gui_shell_desktop.exe", "app/data/app.so", "app/flutter_windows.dll", "broker/gui_shell_rust_helper.exe", "GUI-Shell.brokered.cmd", "GUI-Shell.brokered.ps1"] {
+        let file = root.join(path); std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, path.as_bytes()).unwrap();
+    }
+}
 fn checkpoint() -> Checkpoint {
-    Checkpoint {format:"gui-shell-audit-checkpoint".into(),version:1,audit_chain_head:Some(sha256_tagged(b"head")),
+    Checkpoint {format:"gui-shell-audit-checkpoint".into(),version:2,audit_chain_head:Some(sha256_tagged(b"head")),
         audit_log_sha256:sha256_tagged(b"log"),audit_anchor_sha256:sha256_tagged(b"anchor"),source_commit:"a".repeat(40),
         installed_artifact_sha256:sha256_tagged(b"exe"),generated_at:1000,sequence:1,previous_checkpoint_hash:None}
 }
@@ -79,18 +85,18 @@ fn 実fileの改変と不正chainを検出する() {
     let anchor=serde_json::json!({"version":1,"event_count":1,"head_event_hash":event.event_hash,"anchor_hmac":sha256_tagged(b"fixture")});
     std::fs::write(root.join("audit.jsonl"),&log_bytes).unwrap();
     std::fs::write(root.join("audit_anchor.json"),serde_json::to_vec(&anchor).unwrap()).unwrap();
-    std::fs::write(root.join("app.exe"),b"fixture artifact").unwrap();
-    let cp=measure(&root,&root.join("app.exe"),&"a".repeat(40),1,None,1000).unwrap();
+    installation(&root.join("installed"));
+    let cp=measure(&root,&root.join("installed"),&"a".repeat(40),1,None,1000).unwrap();
     let (key,der,trust)=key();let b=canonical(&cp).unwrap();let sig=key.sign(&b);let zero=TrustedHead{version:1,sequence:0,signed_checkpoint_hash:None};
     std::fs::write(root.join("audit.jsonl"),[log_bytes.as_slice(),b"\n"].concat()).unwrap();
-    let changed=measure(&root,&root.join("app.exe"),&"a".repeat(40),1,None,1000).unwrap();
+    let changed=measure(&root,&root.join("installed"),&"a".repeat(40),1,None,1000).unwrap();
     assert!(verify(&b,sig.as_ref(),&der,&trust,&zero,None,&changed,1000).is_err());
     std::fs::write(root.join("audit.jsonl"),&log_bytes).unwrap();
     std::fs::write(root.join("audit_anchor.json"),serde_json::to_vec_pretty(&anchor).unwrap()).unwrap();
-    let changed=measure(&root,&root.join("app.exe"),&"a".repeat(40),1,None,1000).unwrap();
+    let changed=measure(&root,&root.join("installed"),&"a".repeat(40),1,None,1000).unwrap();
     assert!(verify(&b,sig.as_ref(),&der,&trust,&zero,None,&changed,1000).is_err());
     std::fs::write(root.join("audit.jsonl"),b"{\"event_hash\":\"forged\"}").unwrap();
-    assert!(measure(&root,&root.join("app.exe"),&"a".repeat(40),1,None,1000).is_err());
+    assert!(measure(&root,&root.join("installed"),&"a".repeat(40),1,None,1000).is_err());
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -102,21 +108,22 @@ fn 実コマンドと収集器と再検証を接続し改変を拒否する() {
     let repository=Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let mut id=[0u8;16];getrandom::getrandom(&mut id).unwrap();
     let root=std::env::temp_dir().join(format!("gui-shell-checkpoint-integration-{}",hex::encode(id)));
-    let store=root.join("installed/store"); let bundle=root.join("bundle");
+    let store=root.join("installed/runtime/store"); let bundle=root.join("bundle");
     for dir in [&store,&bundle,&root.join("config"),&root.join("installer/windows"),&root.join("native/rust_helper/target/debug")] {std::fs::create_dir_all(dir).unwrap();}
     let binary=root.join("native/rust_helper/target/debug/gui_shell_rust_helper.exe");
     std::fs::copy(env!("CARGO_BIN_EXE_gui_shell_rust_helper"),&binary).unwrap();
     std::fs::copy(repository.join("installer/windows/collect_audit_anchor_proof.ps1"),root.join("installer/windows/collect_audit_anchor_proof.ps1")).unwrap();
     let git=Command::new("git").args(["rev-parse","HEAD"]).current_dir(repository).output().unwrap();assert!(git.status.success());
     let source=String::from_utf8(git.stdout).unwrap().trim().to_owned();
-    let artifact=root.join("installed/app.exe");std::fs::write(&artifact,b"fixture installed artifact").unwrap();
+    installation(&root.join("installed"));
+    let artifact=root.join("installed/app/gui_shell_desktop.exe");std::fs::write(&artifact,b"fixture installed artifact").unwrap();
     let mut log=BrokerAuditLog::default();let event=log.append("integration","health","accepted","試験","FIXTURE",&sha256_tagged(b"null"));
     std::fs::write(store.join("audit.jsonl"),serde_json::to_vec(&event).unwrap()).unwrap();
     std::fs::write(store.join("audit_anchor.json"),serde_json::to_vec(&serde_json::json!({"version":1,"event_count":1,"head_event_hash":event.event_hash,"anchor_hmac":sha256_tagged(b"fixture")})).unwrap()).unwrap();
     std::fs::write(store.join("audit_anchor.key"),b"fixture only; not a signing key").unwrap();
     std::fs::write(root.join("installed/installed_manifest.json"),serde_json::to_vec(&serde_json::json!({"source_commit":source,"source_worktree_clean":true,"app_exe":artifact,"app_artifact_sha256":sha256_tagged(b"fixture installed artifact")})).unwrap()).unwrap();
     let floor=root.join("trusted-head.json");std::fs::write(&floor,b"{\"version\":1,\"sequence\":0,\"signed_checkpoint_hash\":null}").unwrap();
-    let prepared=Command::new(&binary).args(["監査チェックポイント","prepare"]).arg(&store).arg(&artifact).arg(&source).arg(&floor).arg(bundle.join("checkpoint.json")).output().unwrap();
+    let prepared=Command::new(&binary).args(["監査チェックポイント","prepare"]).arg(&store).arg(root.join("installed")).arg(&source).arg(&floor).arg(bundle.join("checkpoint.json")).output().unwrap();
     assert!(prepared.status.success(),"{}",String::from_utf8_lossy(&prepared.stderr));
     let (key,der,trust)=key();let bytes=std::fs::read(bundle.join("checkpoint.json")).unwrap();
     std::fs::write(bundle.join("signature.bin"),key.sign(&bytes).as_ref()).unwrap();
@@ -136,7 +143,62 @@ fn 実コマンドと収集器と再検証を接続し改変を拒否する() {
     let script="import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from tooling import audit_checkpoint_verifier as v;v.ROOT=Path(sys.argv[2]);v.verify_collected(json.loads(Path(sys.argv[3]).read_text(encoding='utf-8-sig')))";
     let run=||Command::new("python").args(["-c",script]).arg(repository).arg(&root).arg(&proof).env("GIT_DIR",repository.join(".git")).env("GUI_SHELL_AUDIT_TRUSTED_HEAD",&floor).output().unwrap();
     let verified=run();assert!(verified.status.success(),"{}",String::from_utf8_lossy(&verified.stderr));
-    std::fs::write(&artifact,b"tampered after collection").unwrap();
+    // runner exeは変更せず、AOTだけの改変をrelease再検証で拒否する。
+    std::fs::write(root.join("installed/app/data/app.so"),b"tampered after collection").unwrap();
     assert!(!run().status.success());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+
+#[test]
+fn 配布物の変更追加削除とpath変更と旧署名を拒否する() {
+    let mut id=[0u8;16];getrandom::getrandom(&mut id).unwrap();
+    let root=std::env::temp_dir().join(format!("gui-shell-artifact-{}",hex::encode(id)));
+    installation(&root);
+    let initial=gui_shell_rust_helper::installed_artifact::canonical(&root).unwrap();
+    let (key,der,trust)=key(); let mut cp=checkpoint(); cp.installed_artifact_sha256=sha256_tagged(&initial);
+    let bytes=canonical(&cp).unwrap(); let sig=key.sign(&bytes);let floor=TrustedHead{version:1,sequence:0,signed_checkpoint_hash:None};
+    let rejects=|| {
+        if let Ok(current)=gui_shell_rust_helper::installed_artifact::canonical(&root) {
+            let mut measured=cp.clone();measured.installed_artifact_sha256=sha256_tagged(&current);
+            assert!(verify(&bytes,sig.as_ref(),&der,&trust,&floor,None,&measured,1000).is_err());
+        }
+    };
+    for path in ["app/data/app.so","app/flutter_windows.dll","broker/gui_shell_rust_helper.exe","GUI-Shell.brokered.ps1"] {
+        let p=root.join(path);let before=std::fs::read(&p).unwrap();
+        std::fs::write(&p,b"altered").unwrap();rejects();std::fs::write(&p,&before).unwrap();
+        std::fs::remove_file(&p).unwrap();rejects();std::fs::write(&p,&before).unwrap();
+    }
+    let plugin=root.join("app/plugin.dll");std::fs::write(&plugin,b"added").unwrap();rejects();std::fs::remove_file(&plugin).unwrap();
+    std::fs::rename(root.join("app/data/app.so"),root.join("app/data/renamed.so")).unwrap();rejects();
+    std::fs::rename(root.join("app/data/renamed.so"),root.join("app/data/app.so")).unwrap();
+    std::fs::write(root.join("outside.dll"),b"extra root").unwrap();rejects();std::fs::remove_file(root.join("outside.dll")).unwrap();
+    std::fs::create_dir(root.join("runtime")).unwrap();std::fs::write(root.join("runtime/state"),b"mutable").unwrap();
+    assert_eq!(gui_shell_rust_helper::installed_artifact::canonical(&root).unwrap(),initial);
+    let old=String::from_utf8(bytes.clone()).unwrap().replacen("\"version\":2", "\"version\":1", 1).into_bytes();
+    assert!(signature_check(&old,key.sign(&old).as_ref(),&der,&trust).is_err());
+    assert!(gui_shell_rust_helper::installed_artifact::canonical(&root.join("app/gui_shell_desktop.exe")).is_err());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn 配布物のlinkと規約外pathを拒否する() {
+    let mut id=[0u8;16];getrandom::getrandom(&mut id).unwrap();
+    let root=std::env::temp_dir().join(format!("gui-shell-artifact-path-{}",hex::encode(id)));installation(&root);
+    let link=root.join("app").join("link");let target=root.join("broker");
+    #[cfg(unix)] std::os::unix::fs::symlink(&target,&link).unwrap();
+    #[cfg(windows)] {
+        let out=std::process::Command::new("cmd").args(["/c","mklink","/J"]).arg(&link).arg(&target).output().unwrap();
+        assert!(out.status.success(),"junction作成失敗: {:?} {} {}",out.status,String::from_utf8_lossy(&out.stdout),String::from_utf8_lossy(&out.stderr));
+    }
+    assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err());
+    #[cfg(unix)] std::fs::remove_file(&link).unwrap();
+    #[cfg(windows)] std::fs::remove_dir(&link).unwrap();
+    let invalid=root.join("app/規約外");std::fs::write(&invalid,b"x").unwrap();
+    assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err());std::fs::remove_file(invalid).unwrap();
+    #[cfg(unix)] {
+        std::fs::write(root.join("app/CASE"),b"a").unwrap();std::fs::write(root.join("app/case"),b"b").unwrap();
+        assert!(gui_shell_rust_helper::installed_artifact::canonical(&root).is_err());
+    }
     std::fs::remove_dir_all(root).unwrap();
 }

@@ -62,3 +62,5 @@ pub fn helper_error<T>(
         }),
     }
 }
+
+pub mod installed_artifact;

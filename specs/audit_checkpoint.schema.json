@@ -22,7 +22,7 @@
       "const": "gui-shell-audit-checkpoint"
     },
     "version": {
-      "const": 1
+      "const": 2
     },
     "audit_chain_head": {
       "type": [
@@ -45,7 +45,8 @@
     },
     "installed_artifact_sha256": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Windows配置app/brokerと起動スクリプトを全走査したcanonical成果物一覧のSHA-256。exe単体hashは不可。"
     },
     "generated_at": {
       "type": "integer",

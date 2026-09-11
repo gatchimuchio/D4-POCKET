@@ -62,7 +62,7 @@ fn tagged(value: &str) -> bool {
 }
 
 pub fn canonical(cp: &Checkpoint) -> Result<Vec<u8>, String> {
-    if cp.format != "gui-shell-audit-checkpoint" || cp.version != 1 || cp.sequence == 0 || cp.generated_at == 0
+    if cp.format != "gui-shell-audit-checkpoint" || cp.version != 2 || cp.sequence == 0 || cp.generated_at == 0
         || cp.source_commit.len() != 40 || !cp.source_commit.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
         || ![&cp.audit_log_sha256, &cp.audit_anchor_sha256, &cp.installed_artifact_sha256].iter().all(|s| tagged(s))
         || cp.audit_chain_head.as_ref().is_some_and(|s| !tagged(s))
@@ -110,11 +110,11 @@ pub fn measure(store: &Path, artifact: &Path, source: &str, sequence: u64, previ
     if anchor.version != 1 || anchor.event_count != events.len() || anchor.head_event_hash != head || !tagged(&anchor.anchor_hmac) {
         return Err("anchorとaudit chain不一致".into());
     }
-    let artifact_bytes = read(artifact, 1024 * 1024 * 1024)?;
+    let artifact_bytes = crate::installed_artifact::canonical(artifact)?;
     if read(&store.join("audit.jsonl"), 256 * 1024 * 1024)? != log || read(&store.join("audit_anchor.json"), 64 * 1024)? != anchor_bytes {
         return Err("採取中に監査fileが変化".into());
     }
-    let cp = Checkpoint { format: "gui-shell-audit-checkpoint".into(), version: 1,
+    let cp = Checkpoint { format: "gui-shell-audit-checkpoint".into(), version: 2,
         audit_chain_head: head, audit_log_sha256: sha256_tagged(&log), audit_anchor_sha256: sha256_tagged(&anchor_bytes),
         source_commit: source.into(), installed_artifact_sha256: sha256_tagged(&artifact_bytes), generated_at: now, sequence,
         previous_checkpoint_hash: previous };

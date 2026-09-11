@@ -53,3 +53,6 @@ release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続
 
 
 製品側のbuild registry診断出力も `evidence_class=INTERNAL_STATE`、`visibility_measured=false`、`formal_release_input=false` を明記する。登録履歴は `registered_surfaces` と `registered_identifiers` に残すが、`visible_surfaces`・`surface_matches`・観測nodeは空とし、座標・非表示判定・実Semantics node IDを捏造しない。非表示でbuildされた要素や破棄済みの登録が残り得るため、現在画面の代用にしない。
+
+
+署名checkpoint version 2のinstalled_artifact_sha256はexe単体ではなく、app/broker directory全体と両launcherのcanonical一覧を結合する。Rustの `監査チェックポイント artifact-manifest <installed root>` で署名前の一覧を確認できる。prepare / verifyへ渡す成果物引数もinstalled rootとする。旧version 1のexe単体署名は受理しない。実運用鍵はowner指示に従い正式release直前まで外部条件待ちとする。

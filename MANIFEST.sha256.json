@@ -870,7 +870,7 @@
     },
     {
       "path": "docs/OFFLINE_SIGNING_OWNER.md",
-      "sha256": "a7675213bf9502d60777dc48dfdafc12df13a63f00692e5fc92c7d2a412b037f"
+      "sha256": "98130ac956e0978617c67a125f48598b65d652e4ce2b3d6236c31ec12b3f25ef"
     },
     {
       "path": "docs/OPERATING_MODEL.md",
@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "13a870f0347aae312b68348c4bb5202af00dafc4d86683a4129957bf960c63d0"
+      "sha256": "74b4ef3a4dea03d07b1ea2616cedf1abf973a41d015fc277c591667bd06c902a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -990,7 +990,7 @@
     },
     {
       "path": "docs/specs/audit-checkpoint.md",
-      "sha256": "03703117bf594c9899616695481c44d47fbe67666c57a529d7a033464da16d6e"
+      "sha256": "cb0f01a12c92f3ea70505b65d1c579755755f557d4d13f01693ba233fd4e4eb5"
     },
     {
       "path": "docs/specs/authority-strip-conformance.md",
@@ -1078,7 +1078,7 @@
     },
     {
       "path": "examples/contracts/audit_checkpoint.valid.json",
-      "sha256": "5ca54472be2032e86aa07113f0c637b577052a7377110e5356fe2a57b2a1d0dc"
+      "sha256": "b619e028482854db1bc4da0256d3a1b056448481e5e7d164c4df69ae550c6cc8"
     },
     {
       "path": "examples/contracts/broker_command_envelope.valid.json",
@@ -1174,7 +1174,7 @@
     },
     {
       "path": "examples/contracts/invalid/audit_checkpoint_zero_sequence.invalid.json",
-      "sha256": "eae31477597247dbc727a5b2e93499bc0c00efa086146cb755f51f391781d2cb"
+      "sha256": "e17949e23aae974c32587165fdf66adca64deff1655c097970086fbc1c1e276b"
     },
     {
       "path": "examples/contracts/invalid/broker_command_envelope_dispatch_enabled.invalid.json",
@@ -1354,11 +1354,11 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "0fdbd702f4c74b1b55ca92d925486eb1ff9d90a891dcc529085a91ab4416a614"
+      "sha256": "8b9c653e87b763414b7a1a1c88118078434188e845568d4930200cc35f3eb19b"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
-      "sha256": "3f5e0e4d798cec58e9bcb08e5d4a700740dbdce4c372031f74d006a0cde52522"
+      "sha256": "c46952554d96beb7526c70d7a604b860931995aae9d0081e3742c86f5069cb81"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -1462,11 +1462,11 @@
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
-      "sha256": "b5c3928d16d8a6f48b2f853b76514d0dc74e278e43a9ae16bf084adc4e4994b6"
+      "sha256": "a6c94a773e69e3a6609d37afb7e5106b6d626a55ebaae88ef90a24420efaee1d"
     },
     {
       "path": "native/rust_helper/src/checkpoint_cli.rs",
-      "sha256": "ec2a52949f9980b7542388815d18043bb0dcc78ad3beedbd628fc9fc8886a01e"
+      "sha256": "08384b18abb8b4a3a293423483370669279596d278dc02bd5372fa6fd36e0c97"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -1477,12 +1477,16 @@
       "sha256": "9edc0ce9abcf5c25b41a3c0c59ca01cd03bb5b03235297721a45fbf9b8185749"
     },
     {
+      "path": "native/rust_helper/src/installed_artifact.rs",
+      "sha256": "e7f9ae84770c76fc65d9eaec614b9dbab87a639ec2b46d4e2613f22d04b8d142"
+    },
+    {
       "path": "native/rust_helper/src/ipc.rs",
       "sha256": "cf0b6fefea5cb0ca2c3dfe6b4c8c3c5759d22f956a33a67ef7cb6935b0b984a0"
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "b402739c94c58b946a6b68ccd4da0d788c68a665b20c190c1e17f3e89fcaca35"
+      "sha256": "75834fdb10ef12686d8b7e427510357757f7d470134a7a7320a3686488831a17"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -1510,7 +1514,7 @@
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
-      "sha256": "d11f83555b4015bd95f1ad06278da7058e64f7afc837dd7a4450c0dcf0b5903f"
+      "sha256": "547d616eb9f5d9bc115ca209e4567cec0b0dc7c63b12335fb1271369541dff87"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -1886,7 +1890,7 @@
     },
     {
       "path": "specs/audit_checkpoint.schema.json",
-      "sha256": "bcf8ea06c6d05d491fe4f1b85c5068da1c816a93985bee4f9b6a3e62ed18b6e3"
+      "sha256": "36522407e6db1ab066a5cdfa601e2fe8fa0d817cf49bb09f2bac609fbeb6779a"
     },
     {
       "path": "specs/broker_command_envelope.schema.json",
@@ -1986,7 +1990,7 @@
     },
     {
       "path": "tooling/audit_checkpoint_verifier.py",
-      "sha256": "64cf6a90df1540fd5545f10cdff22f5c1ff992c3f501aaad2d9019b4f3eac071"
+      "sha256": "272b860007e5b0405153cc1973dbb4f5c7624e7f72c2e923eff65ee8211eb3ef"
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",

@@ -32,13 +32,13 @@ def verify_collected(evidence: dict) -> dict:
     if actual_hash != manifest.get("app_artifact_sha256"):
         raise ValueError("installed artifact hash不一致")
     helper = ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper")
-    result = subprocess.run([str(helper), "監査チェックポイント", "verify", str(store), str(artifact), source,
+    result = subprocess.run([str(helper), "監査チェックポイント", "verify", str(store), str(root), source,
         str(ROOT / "config/audit_signing_trust.json"), floor, inputs["bundle"], inputs.get("previous_bundle", "-")],
         capture_output=True, text=True, encoding="utf-8", timeout=60, cwd=ROOT)
     if result.returncode != 0:
         raise ValueError("Rust署名checkpoint検証失敗: " + result.stderr.strip())
     verified = json.loads(result.stdout)
-    if verified.get("status") != "passed" or verified.get("verification_kind") != "offline_ed25519_checkpoint_v1":
+    if verified.get("status") != "passed" or verified.get("verification_kind") != "offline_ed25519_checkpoint_v2":
         raise ValueError("署名checkpoint実検証結果不正")
     if verified != evidence.get("checkpoint_verification"):
         raise ValueError("Collector結果と現在の再検証が不一致")

@@ -21,10 +21,14 @@ Copy-Item -LiteralPath $publicKeyPath -Destination 'C:\Users\mzcum\codex-work\GU
 
 その後、公開鍵固定済みのclean commitでappとhelperをbuild・stageし、稼働確認後にbrokerを停止する。初回の外部媒体の公開継続性記録は `{"version":1,"sequence":0,"signed_checkpoint_hash":null}`。既存記録を初期化しない。次回以降は最新の受理済みsequence/hashを保持する。
 
-未署名checkpointの生成（pathは当該runに置き換える）:
+実運用鍵・署名操作はowner指示により正式release直前まで外部条件待ちである。
+
+署名前の配置一式一覧は `& $helper 監査チェックポイント artifact-manifest $installedRoot` で確認する。app/broker、Dart AOT・engine・plugin・launcherを含み、exe単体hashではない。実行中のapp/brokerと成果物更新を停止してから次を行う。
+
+未署名checkpoint version 2の生成（pathは当該runに置き換える）:
 
 ```powershell
-& $helper 監査チェックポイント prepare $store $installedExe $sourceCommit $trustedHeadPath $checkpointPath
+& $helper 監査チェックポイント prepare $store $installedRoot $sourceCommit $trustedHeadPath $checkpointPath
 ```
 
 生成物を新しい署名bundle directoryへ置き、ownerが内容のsource・artifact・sequence・previous hashを確認する。署名時だけ媒体を接続して次を実行する。`$checkpointPath`は上で生成したcanonical file、`$bundle`は新しい証拠directory、`$signingKeyPath`は外部媒体上の秘密鍵である。
@@ -39,7 +43,7 @@ Copy-Item -LiteralPath $publicKeyPath -Destination (Join-Path $bundle 'public-ke
 bundleのcheckpoint.jsonはcanonical byteのまま保持する。秘密鍵をbundleへ入れない。媒体を切り離し、公開継続性記録を検証用として指定してCollectorとrelease検証を行う。`GUI_SHELL_AUDIT_TRUSTED_HEAD`は公開記録のpathのみであり秘密鍵ではない。公開記録の最新版はownerが媒体上で保持し、検証対象から渡された過去記録へ差し替えない。
 
 ```powershell
-& $helper 監査チェックポイント verify $store $installedExe $sourceCommit 'config/audit_signing_trust.json' $trustedHeadPath $bundle $previousBundle
+& $helper 監査チェックポイント verify $store $installedRoot $sourceCommit 'config/audit_signing_trust.json' $trustedHeadPath $bundle $previousBundle
 & './installer/windows/collect_audit_anchor_proof.ps1' -InstalledRoot $installedRoot -AuditDir $store -OutputPath $proofPath -CheckpointBundle $bundle -TrustedHeadPath $trustedHeadPath -PreviousCheckpointBundle $previousBundle
 $env:GUI_SHELL_AUDIT_TRUSTED_HEAD = $trustedHeadPath
 python tooling/windows_release_evidence.py --evidence $installedEvidencePath
