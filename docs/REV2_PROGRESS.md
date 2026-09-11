@@ -309,3 +309,24 @@ Androidは実機検証だけを凍結し、ownerの再開指示まで端末接�
   reason: 現行形式に信頼済み署名者・対象chain・置換や巻戻しを検証する消費経路がない。過去のpassedも保護を証明しない。
   required_action: 独立した信頼基点と保管先の境界を決め、chainへ結合した証拠を実際に検証する経路と否定試験を実装する。
   blocks_release: yes
+
+
+## owner確定方式のオフライン署名checkpoint（2026-09-11）
+
+ownerが指定したEd25519オフライン署名方式を、Rustのrelease専用CLI・Schema・Collector・release再検証へ接続した。固定順序canonical checkpointは監査head、log/anchorのraw SHA-256、source commit、実artifact hash、時刻、sequence、前署名checkpoint hash、versionを署名対象にする。Repositoryの公開鍵fingerprintが未固定なら拒否する。通常brokerのIPC・runtimeから到達せず、秘密鍵の読取り・署名APIを追加していない。
+
+継続性記録を証拠から自己採用しない。owner管理の最新sequence/hashを別に与え、直前署名の検証と連続性・同番号置換・後退を検査する。検証対象と継続性記録の両方を巻き戻す場合の限界、ownerの意図的再署名・物理侵害の対象外、administrator_root_resistance_claimed=falseを正本へ明記した。
+
+Rust試験はメモリ上の使い捨て鍵を用い、正常署名、不正署名、別鍵、未固定鍵、checkpoint byte改変・非canonical・重複field、log/anchor/head/source/artifactの不一致、時刻、previous不一致、巻戻し・同sequence別署名を検証した。実fileの変更と、実Rust CLI → PowerShell Collector → Python release consumer → Rust再検証も検証し、収集後のartifact改変で拒否した。これらはFIXTUREの実実行でありowner署名証拠ではない。実秘密鍵は生成・保存・読取りしていない。
+
+最初の編集commandでUTF-8 fileをcp932として読もうとして失敗した。書込み前の失敗で、明示UTF-8で再実行した。追加暗号依存は既存rustls依存でも使用しているring 0.17.14を直接参照しただけで、独自暗号方式を追加していない。
+
+- item: 実ownerの公開鍵固定と署名済み証拠
+  classification: release_blocker
+  reason: 実装と試験用署名経路は成立したが、実運用fingerprintはnullであり、実owner署名・外部媒体の継続性記録は未取得。
+  required_action: docs/OFFLINE_SIGNING_OWNER.mdのownerローカル操作を実施し、公開鍵・署名証拠だけを取得して実配置で検証する。
+  blocks_release: yes
+
+この単位の初回集約検証は配布パス検査だけがFAILした。新しい公開鍵固定fileの日本語pathが既存ASCII配布規約に合わなかったため、機械読取りpathをconfig/audit_signing_trust.jsonへ変更し、日本語意味正本と責任索引を保持した。検査allowlistは拡大していない。修正後の署名6試験（Rust CLI・Collector・release再検証を含む）はPASSし、ringで署名したcheckpointをOpenSSL標準検証でも受理することを確認した。
+
+最終の `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` は開発検証17項目すべてPASS。Rust63単体・5 IPC・6 checkpoint試験、共有6・Desktop32・Mobile14試験を含む。これは実owner署名とWindows統合release証拠の合格ではなく、owner手動操作の前で停止する。

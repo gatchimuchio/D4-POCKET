@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gui-shell.dev/specs/audit_checkpoint.schema.json",
+  "title": "署名対象の監査チェックポイント",
+  "description": "オフライン署名で現在監査と実装・成果物を結合する。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "audit_chain_head",
+    "audit_log_sha256",
+    "audit_anchor_sha256",
+    "source_commit",
+    "installed_artifact_sha256",
+    "generated_at",
+    "sequence",
+    "previous_checkpoint_hash"
+  ],
+  "properties": {
+    "format": {
+      "const": "gui-shell-audit-checkpoint"
+    },
+    "version": {
+      "const": 1
+    },
+    "audit_chain_head": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "audit_log_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "audit_anchor_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "installed_artifact_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "generated_at": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previous_checkpoint_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

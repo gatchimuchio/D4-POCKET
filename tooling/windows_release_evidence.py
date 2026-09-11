@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import sys
 import argparse
 import hashlib
+import subprocess
 import json
 import re
 from dataclasses import dataclass
@@ -10,6 +12,8 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 DEFAULT_EVIDENCE_PATH = ROOT / "release_evidence" / "windows_installed_smoke.json"
 SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -599,10 +603,11 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
     if not isinstance(evidence, dict):
         errors.append("audit_anchor_external_tamper_evidence object がない")
     else:
-        # 現行形式はcollectorの自己申告であり、対象chain、独立した信頼基点、
-        # 置換・巻戻し防護をこの検証器で照合する経路を持たない。
-        # 旧collectorのpassedやsource_kindの付替えでreleaseを解除しない。
-        errors.append("監査アンカーの対象chainと独立した信頼基点の結合を検証する経路が未成立です。現行形式の保護済み宣言だけではreleaseを解除できません")
+        try:
+            from tooling.audit_checkpoint_verifier import verify_collected
+            verify_collected(evidence)
+        except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
+            errors.append("署名checkpointの独立した実検証が失敗: " + str(error))
         if evidence.get("status") != "passed":
             errors.append("audit_anchor_external_tamper_evidence.status は passed でなければならない")
         if evidence.get("installed_path_verified") is not True:
@@ -648,7 +653,7 @@ def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> Evid
         return _failed(
             "audit_anchor_external_tamper_evidence_proof",
             "; ".join(errors),
-            "product release claim の前に、audit_anchor.key、audit_anchor.json、audit.jsonl に対する Windows installed-path の ACL/DPAPI、external-anchor、signed-evidence のいずれかの証明を収集する。",
+            "ownerの公開鍵fingerprintと外部継続性記録を固定し、現在installed状態に結合したオフライン署名checkpointを収集・再検証する。",
         )
     return _passed(
         "audit_anchor_external_tamper_evidence_proof",
@@ -684,7 +689,7 @@ def validate_windows_release_evidence(path: Path = DEFAULT_EVIDENCE_PATH) -> lis
             _failed(
                 "audit_anchor_external_tamper_evidence_proof",
                 error or "Audit anchor の external tamper-evidence proof がない",
-                "product release claim の前に、audit_anchor.key、audit_anchor.json、audit.jsonl に対する Windows installed-path の ACL/DPAPI、external-anchor、signed-evidence のいずれかの証明を収集する。",
+                "ownerの公開鍵fingerprintと外部継続性記録を固定し、現在installed状態に結合したオフライン署名checkpointを収集・再検証する。",
             ),
         ]
     return [

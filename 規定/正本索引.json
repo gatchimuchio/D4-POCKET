@@ -162,6 +162,14 @@
     {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
+    },
+    {
+      "path": "docs/specs/audit-checkpoint.md",
+      "責任": "オフライン署名checkpointの正本化・現在状態結合・継続性・信頼基点と脅威境界"
+    },
+    {
+      "path": "config/audit_signing_trust.json",
+      "責任": "owner固定の公開鍵fingerprint。配布工具の互換性のためpathのみASCIIとする。秘密鍵は保持しない"
     }
   ],
   "責任地図": {

@@ -55,8 +55,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "ローカルHMAC監査アンカー証拠だけでは、同一ユーザーまたは管理者／rootによる書換えへの耐性を証明できません。",
-      "required_action": "audit_anchor.key、audit_anchor.json、audit.jsonlについて、Windowsインストール先のACL／DPAPI、外部アンカー、または署名済み証拠を収集してください。"
+      "reason": "オフラインEd25519署名checkpointの実検証経路は実装したが、owner公開鍵固定・実署名・独立した最新継続性記録は未取得。",
+      "required_action": "ownerが外部媒体上で鍵生成・署名し、公開鍵fingerprintをRepositoryへ固定する。実installed状態と署名checkpointをCollectorおよびrelease検証器で再検証する。"
     },
     {
       "name": "owner_go",

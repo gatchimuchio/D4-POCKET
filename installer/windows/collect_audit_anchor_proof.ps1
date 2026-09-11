@@ -8,7 +8,11 @@
 
   [string]$ExternalAnchorPath = "",
 
-  [string]$SignedEvidencePath = ""
+  [string]$SignedEvidencePath = "",
+
+  [string]$CheckpointBundle = "",
+  [string]$TrustedHeadPath = "",
+  [string]$PreviousCheckpointBundle = "-"
 )
 
 $ErrorActionPreference = "Stop"
@@ -235,9 +239,37 @@ if ($SignedEvidencePath -ne "") {
 
 # 広範な主体へのwrite ACEがないことは、所有者自身による三fileの
 # 一括書換え・親directory経由の置換を防ぐ証拠ではない。
-# 現行collectorに独立した保護境界の検証はないため合格へ昇格しない。
+# ACLだけでは昇格せず、下記の独立した署名checkpoint検証を必須にする。
 $sameUserMitigated = $false
-$errors.Add("同一ユーザーによる鍵・アンカー・ログの一括書換えを防ぐ独立した保護境界は未検証です")
+$checkpointResult = $null
+$checkpointInputs = $null
+if ($CheckpointBundle -ne "") {
+  try {
+    if ($TrustedHeadPath -eq "") { throw "owner管理の継続性記録が必要です" }
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+    $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "現在source commitを取得できません" }
+    $manifestPath = Join-Path $root.Path "installed_manifest.json"
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.source_commit -ne $sourceCommit -or $manifest.source_worktree_clean -ne $true) { throw "installed source commitが現在sourceと一致しません" }
+    $artifact = (Resolve-Path -LiteralPath $manifest.app_exe).Path
+    if (!(Test-PathUnderRoot -Path $artifact -Root $root.Path)) { throw "artifactがinstalled root外です" }
+    if ((Get-TaggedSha256 -Path $artifact) -ne $manifest.app_artifact_sha256) { throw "installed manifestのartifact hash不一致" }
+    $verifier = Join-Path $repositoryRoot "native/rust_helper/target/debug/gui_shell_rust_helper.exe"
+    $trust = Join-Path $repositoryRoot "config/audit_signing_trust.json"
+    $checkpointInputs = [ordered]@{ installed_root=$root.Path; audit_dir=$auditDirPath.Path; bundle=(Resolve-Path -LiteralPath $CheckpointBundle).Path; previous_bundle=$PreviousCheckpointBundle }
+    $nativeOutput = & $verifier 監査チェックポイント verify $auditDirPath.Path $artifact $sourceCommit $trust $TrustedHeadPath $CheckpointBundle $PreviousCheckpointBundle
+    if ($LASTEXITCODE -ne 0) { throw "Rustの署名checkpoint検証が失敗しました" }
+    $checkpointResult = ($nativeOutput -join "`n") | ConvertFrom-Json
+    if ($checkpointResult.status -ne "passed" -or $checkpointResult.verification_kind -ne "offline_ed25519_checkpoint_v1") { throw "Rustの検証結果が不正です" }
+    $signedEvidenceVerified = $true
+    $sameUserMitigated = $true
+  } catch {
+    $errors.Add("署名checkpoint検証失敗: $($_.Exception.Message)")
+  }
+} else {
+  $errors.Add("同一ユーザーの書換え防護にはオフライン署名checkpointとowner継続性記録が必要です")
+}
 
 $sourceKind = "windows_acl_dpapi_probe"
 $evidenceClass = "LIVE_RUNTIME"
@@ -259,6 +291,8 @@ $proofMaterial = [ordered]@{
   dpapi_available = $dpapiAvailable
   external_anchor_verified = $externalAnchorVerified
   signed_evidence_verified = $signedEvidenceVerified
+  checkpoint_verification = $checkpointResult
+  checkpoint_inputs = $checkpointInputs
   acl_report = $aclEvidence.reports
   errors = @($errors.ToArray())
 }
@@ -289,6 +323,8 @@ $result = [ordered]@{
   signed_evidence_verified = $signedEvidenceVerified
   administrator_root_resistance_claimed = $false
   checked_paths = @($checkedPaths.ToArray())
+  checkpoint_verification = $checkpointResult
+  checkpoint_inputs = $checkpointInputs
   acl_report = $aclEvidence.reports
   external_anchor_sha256 = $externalAnchorSha256
   signed_evidence_sha256 = $signedEvidenceSha256

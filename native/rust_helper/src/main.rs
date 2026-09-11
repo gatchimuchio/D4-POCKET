@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod owner_cli;
+mod checkpoint_cli;
 
 use std::env;
 use std::io::{self, BufRead};
@@ -11,6 +12,9 @@ use gui_shell_rust_helper::broker::{
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+    if args.first().is_some_and(|v| v == "監査チェックポイント") {
+        match checkpoint_cli::run(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if args.first().is_some_and(|v| v == "対話承認操作") {
         match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }

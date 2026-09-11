@@ -142,7 +142,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "618a9815c3dece9456e6ae3274b5a73f43f5428541703db5e72c792774f993c6"
+      "sha256": "82c9b476bcba7a1ce74e305803fe9bb03cc650d39caa4b469855cddcdbff5ab9"
     },
     {
       "path": "SECURITY.md",
@@ -825,6 +825,10 @@
       "sha256": "6d52344282dc607d0fd842e1264d4d2087d9a99059ec153551ff38ce56f2a983"
     },
     {
+      "path": "config/audit_signing_trust.json",
+      "sha256": "f8a2714bec1699148da1f6cda440ca56c20d286a89446717a2598d968cac8d41"
+    },
+    {
       "path": "docs/COMPETITOR_ANALYSIS.md",
       "sha256": "f97cf231e985cd9c130af372470283bc1b55682d3dde4aee84908b9910ed1666"
     },
@@ -865,6 +869,10 @@
       "sha256": "4cc27825a1abb0a4542e227be3b66f2880c915db62a05d48688afb948a1a5c48"
     },
     {
+      "path": "docs/OFFLINE_SIGNING_OWNER.md",
+      "sha256": "a7675213bf9502d60777dc48dfdafc12df13a63f00692e5fc92c7d2a412b037f"
+    },
+    {
       "path": "docs/OPERATING_MODEL.md",
       "sha256": "e7627b840defe7c0ca71c09ce44b4acbf2211c154b46ef831fcce52a49b57b3b"
     },
@@ -882,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "68958ea58a8d82a6afd75d1c75f9397597150c76ef1d6ad0c195356cf6bf4f53"
+      "sha256": "3e10cd685e202a302e335f5d68e53b3f24af69635b1b8b28e27fd7540bbb68dd"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -981,6 +989,10 @@
       "sha256": "f4e3ea2b46dc79657019087c5b5208fcbafa147e9fd05b71b6771f990f6e01e3"
     },
     {
+      "path": "docs/specs/audit-checkpoint.md",
+      "sha256": "03703117bf594c9899616695481c44d47fbe67666c57a529d7a033464da16d6e"
+    },
+    {
       "path": "docs/specs/authority-strip-conformance.md",
       "sha256": "c61c54e187b10419910fd892fbe5e3017212831ed222f853e2852f951dc4bfd2"
     },
@@ -1063,6 +1075,10 @@
     {
       "path": "examples/contracts/audit.valid.json",
       "sha256": "b2811180e64ed94fe4c32c77691687a4c33f85d51c577e9900b0f2b4118ab3eb"
+    },
+    {
+      "path": "examples/contracts/audit_checkpoint.valid.json",
+      "sha256": "5ca54472be2032e86aa07113f0c637b577052a7377110e5356fe2a57b2a1d0dc"
     },
     {
       "path": "examples/contracts/broker_command_envelope.valid.json",
@@ -1155,6 +1171,10 @@
     {
       "path": "examples/contracts/invalid/audit_bad_payload_hash.invalid.json",
       "sha256": "08db1fab6cfb6188c599dce2c09da67dfd6d164c93ec783a8435ad9536885818"
+    },
+    {
+      "path": "examples/contracts/invalid/audit_checkpoint_zero_sequence.invalid.json",
+      "sha256": "eae31477597247dbc727a5b2e93499bc0c00efa086146cb755f51f391781d2cb"
     },
     {
       "path": "examples/contracts/invalid/broker_command_envelope_dispatch_enabled.invalid.json",
@@ -1334,11 +1354,11 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "633e287ff9977fee1e644957bc9cb6fe8f6408f1e5ebc0ef6069b76f96a2a5c7"
+      "sha256": "7900ae2610296e513f055b548ceb78d545f4024d50a668f51f76c0c8b3ab1650"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
-      "sha256": "fea5c743a9d2c768ce71c037f6b6a0ef2e3eba758e919eb703bdbdea518c1193"
+      "sha256": "3f5e0e4d798cec58e9bcb08e5d4a700740dbdce4c372031f74d006a0cde52522"
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
@@ -1358,11 +1378,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "f28d5a22abd9f581dcc9585fc0d87836275f759a1494574180d9661813bdc4d5"
+      "sha256": "19d56a6386b51dc79bc126804c576d1f6b4f6a4442be04b3033110090f053b70"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "df3585e30129ef099e9cf03a6bc84fbf51fa24e62778bc58ab1ff20701b497a9"
+      "sha256": "158a346468a2d4030558cecf9ccc4bf0de03583be5315effe185a093fba3759f"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -1441,6 +1461,14 @@
       "sha256": "560b326bfaf330a737f76e86dc6d210638dd609a6e9f2139c509c3ac7f837ee0"
     },
     {
+      "path": "native/rust_helper/src/checkpoint.rs",
+      "sha256": "b5c3928d16d8a6f48b2f853b76514d0dc74e278e43a9ae16bf084adc4e4994b6"
+    },
+    {
+      "path": "native/rust_helper/src/checkpoint_cli.rs",
+      "sha256": "ec2a52949f9980b7542388815d18043bb0dcc78ad3beedbd628fc9fc8886a01e"
+    },
+    {
       "path": "native/rust_helper/src/diagnostics.rs",
       "sha256": "23483371de1eb90a48404a88710c4a1f95305e711c7d181e6dffa46ea0892270"
     },
@@ -1454,11 +1482,11 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "bec864d46367c01c0e0b75f348360fbab27e8c00f0fc65ac5b1b7db71d7bc085"
+      "sha256": "b402739c94c58b946a6b68ccd4da0d788c68a665b20c190c1e17f3e89fcaca35"
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "9bc716e9daaa4233600409d3ccaa4137c7d197d8fa82897f69fd3137dd4b9fea"
+      "sha256": "3ed917dbd26e06f2739780c395cec1a17b2303677c94520ae181296f79b65f19"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1479,6 +1507,10 @@
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
       "sha256": "45801f3d8fbaa20ec7d2e107a975ac68687b182f7139949e64b01d0cc515516d"
+    },
+    {
+      "path": "native/rust_helper/tests/checkpoint.rs",
+      "sha256": "d11f83555b4015bd95f1ad06278da7058e64f7afc837dd7a4450c0dcf0b5903f"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -1794,7 +1826,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0f4dc5717d30f39349517a6f9c8bf0af6815e402ac8506a69c3604ba9f17a592"
+      "sha256": "fde563daf11b05d3941094905954fd5c387a0fff5be512f81cb471eeed2bdb5f"
     },
     {
       "path": "requirements-dev.txt",
@@ -1851,6 +1883,10 @@
     {
       "path": "specs/audit.schema.json",
       "sha256": "374c99e9ccd7788be87f7ba128b87d221115cc264f9ba2335503f197a3d81e58"
+    },
+    {
+      "path": "specs/audit_checkpoint.schema.json",
+      "sha256": "bcf8ea06c6d05d491fe4f1b85c5068da1c816a93985bee4f9b6a3e62ed18b6e3"
     },
     {
       "path": "specs/broker_command_envelope.schema.json",
@@ -1949,6 +1985,10 @@
       "sha256": "b1fce1fb95b26840af05284f71d28ac61577c32a8bf03f883d097d7b8db9dbf0"
     },
     {
+      "path": "tooling/audit_checkpoint_verifier.py",
+      "sha256": "64cf6a90df1540fd5545f10cdff22f5c1ff992c3f501aaad2d9019b4f3eac071"
+    },
+    {
       "path": "tooling/broker_parity/run_authority_parity.py",
       "sha256": "32a8b2c8aec01bdf2645aee0b6a575543201168e597c1b663278058fb6388ae6"
     },
@@ -2010,7 +2050,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "fb648b4005d8443d84d85a046ffa29c59f5e6f97a29336da56abc4e423558498"
+      "sha256": "0da9842dc26cd293125a5aabb5b3c9da466af150febda4907af72a41727f6b7d"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -2026,7 +2066,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "2bceddfa4e0c3ab82dc526a1400dcfab0fb8847d7c720a4a3fa074ce8b866d0f"
+      "sha256": "e74e4ec83288993d58db04752e1b0f676648686cfc3cb0a34bbf5aa1650b8759"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",
@@ -2042,7 +2082,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "acd91d04b88b518a296fbd1c91bd7496f527f3abb8329fcec620703eecbb1eca"
+      "sha256": "66ad91a9240a8a6c314819672fb1c02480910d6b85710f55d24b055ef3d237e6"
     }
   ]
 }

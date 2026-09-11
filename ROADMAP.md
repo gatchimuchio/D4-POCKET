@@ -21,6 +21,8 @@ rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起
 
 2026-09-11のowner指示: Windows画面検証を再開する。Android実機検証は凍結し、再開指示まで実行・端末接続要求を止める。凍結項目は未検証のまま保持し、release gateの合格やowner GOへ置き換えない。
 
+2026-09-11のowner確定指示: 監査アンカーはオフラインEd25519署名checkpoint方式を採用する。独立したRust release検証経路、Collectorとrelease再検証、owner管理の継続性記録を追加する。秘密鍵を本体・Repository・設定・環境変数へ保存せず、実鍵生成と署名はownerの手動操作に限定する。
+
 ## 完了監査の優先事項
 
 ~~~yaml

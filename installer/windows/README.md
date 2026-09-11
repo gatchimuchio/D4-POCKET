@@ -19,14 +19,23 @@ GUI-Shell.brokered.cmd
 
 ## 監査アンカー収集器の証拠範囲
 
-`collect_audit_anchor_proof.ps1` のACL検査は広範な主体への書込ACEを調べ、`dpapi_available` は固定文字列でOSの往復機能を調べる。いずれも同一ユーザーによる監査鍵・アンカー・ログの一括書換えを防ぐ証拠ではない。任意外部fileの存在/hash、任意fileのAuthenticode署名も、対象chain・独立保管・信頼済み署名者との結合を証明しない。現行収集器はこの範囲で保護成立を報告せずfailedを返す。過去のpassedを独立した保護証拠として使用しない。
+`collect_audit_anchor_proof.ps1` のACL検査は広範な主体への書込ACEを調べ、`dpapi_available` は固定文字列でOSの往復機能を調べる。いずれも同一ユーザーによる監査鍵・アンカー・ログの一括書換えを防ぐ証拠ではない。任意外部fileの存在/hash、任意fileのAuthenticode署名も、対象chain・独立保管・信頼済み署名者との結合を証明しない。この範囲だけでは保護成立を報告せずfailedを返す。owner指定のオフラインEd25519 checkpointは別の実検証経路で扱う。過去のpassedを独立した保護証拠として使用しない。
 
 - item: 監査アンカーの独立した保護境界
   classification: release_blocker
-  reason: 対象chainへ結合し、同一ユーザーによる一括書換え・置換を検出する外部証拠の検証経路は未成立。
-  required_action: 独立した保管・署名者・信頼基点とchain結合を定義し、改変・置換・巻戻しの否定試験を伴う検証経路を実装する。
+  reason: オフライン署名checkpointの実検証経路は実装したが、owner公開鍵固定・実署名・独立した最新継続性記録は未取得。
+  required_action: ownerが外部媒体で鍵生成・署名し、公開物だけを渡して実installed証拠を検証する。
   blocks_release: yes
 
 Windows回帰試験: `python -m unittest tooling.conformance_tests.test_windows_anchor_collector`。書込可能な検証用storeと無関係な外部file・署名fileを実collectorへ渡し、不正な合格と内容変更がないことを確認する。
 
-release検証器も現行形式のアンカー保護宣言を拒否する。旧collectorのpassed、external_anchor / signed_evidenceへのsource_kind変更、verified=trueの指定だけでは解除しない。アンカー以外の独立した検証結果は維持する。受理を有効化するには、対象chainと独立した信頼基点・保管先を実際に検証するcontractと消費経路が必要である。
+release検証器も旧形式のアンカー保護宣言だけでは受理しない。旧collectorのpassed、external_anchor / signed_evidenceへのsource_kind変更、verified=trueの指定だけでは解除しない。アンカー以外の独立した検証結果は維持する。受理を有効化するには、対象chainと独立した信頼基点・保管先を実際に検証するcontractと消費経路が必要である。
+
+
+## オフラインEd25519署名checkpoint
+
+正本は `docs/specs/audit-checkpoint.md`。Collectorへ `-CheckpointBundle <directory> -TrustedHeadPath <owner公開継続性記録> -PreviousCheckpointBundle <直前bundleまたは->` を指定する。停止したbroker store、現在commitと一致するclean sourceから配置したappを対象とする。公開鍵fingerprintはRepositoryの `config/audit_signing_trust.json` に固定する。未設定は拒否する。
+
+release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続性記録のpathを指定する。これは秘密鍵ではない。証拠JSONが指定する過去floorを採用せず、現在のfileとRepository固定公開鍵をRustで再検証する。`cargo build --locked --manifest-path native/rust_helper/Cargo.toml` で現在の検証器を構築してから実行する。外部継続性記録をlocal証拠と一緒に巻き戻さない。
+
+署名bundleはcheckpoint.json、signature.bin、public-key.derで構成し、Collector出力にfingerprint、署名済みhash、previous hash、sequence、verification resultを保存する。秘密鍵は扱わない。ownerの手動コマンドは `docs/OFFLINE_SIGNING_OWNER.md` に記載する。
