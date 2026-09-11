@@ -298,6 +298,43 @@ function Enable-NoPythonLaunchPath {
   )
 }
 
+function Test-ObservedSurfaceVisible {
+  param($Element, $ObservedElements)
+  if ($Element.is_root -ne $false -or $Element.is_native_container -ne $false) { return $false }
+  $byId = @{}
+  foreach ($node in $ObservedElements) {
+    if ([string]::IsNullOrEmpty($node.runtime_id) -or $byId.ContainsKey($node.runtime_id)) { return $false }
+    $byId[$node.runtime_id] = $node
+  }
+  $seen = @{}
+  $cursor = $Element
+  $intersection = $null
+  while ($null -ne $cursor) {
+    if ($seen.ContainsKey($cursor.runtime_id) -or $seen.Count -ge 128) { return $false }
+    $seen[$cursor.runtime_id] = $true
+    if ($cursor.is_offscreen -ne $false) { return $false }
+    $rect = $cursor.bounding_rectangle
+    if ($null -eq $rect) { return $false }
+    foreach ($value in @($rect.x, $rect.y, $rect.width, $rect.height)) {
+      if ($null -eq $value -or $value -is [bool] -or $value -is [string]) { return $false }
+      if ([double]::IsNaN([double]$value) -or [double]::IsInfinity([double]$value)) { return $false }
+    }
+    if ($rect.width -le 0 -or $rect.height -le 0) { return $false }
+    $bounds = @([double]$rect.x, [double]$rect.y, ([double]$rect.x + $rect.width), ([double]$rect.y + $rect.height))
+    if ([double]::IsInfinity($bounds[2]) -or [double]::IsInfinity($bounds[3])) { return $false }
+    if ($null -eq $intersection) { $intersection = $bounds }
+    else {
+      $intersection = @([Math]::Max($intersection[0], $bounds[0]), [Math]::Max($intersection[1], $bounds[1]),
+                        [Math]::Min($intersection[2], $bounds[2]), [Math]::Min($intersection[3], $bounds[3]))
+    }
+    if ($intersection[2] -le $intersection[0] -or $intersection[3] -le $intersection[1]) { return $false }
+    if ($cursor.is_root -eq $true) { return ($cursor.parent_runtime_id -eq "") }
+    if ([string]::IsNullOrEmpty($cursor.parent_runtime_id) -or !$byId.ContainsKey($cursor.parent_runtime_id)) { return $false }
+    $cursor = $byId[$cursor.parent_runtime_id]
+  }
+  return $false
+}
+
 function Collect-VisibleSurfaces {
   param(
     [System.Diagnostics.Process]$Process,
@@ -371,7 +408,7 @@ function Collect-VisibleSurfaces {
   function Get-ParentRuntimeIdString {
     param($Element)
     try {
-      $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($Element)
+      $parent = [System.Windows.Automation.TreeWalker]::RawViewWalker.GetParent($Element)
       if ($null -eq $parent) {
         return ""
       }
@@ -422,7 +459,7 @@ function Collect-VisibleSurfaces {
     try {
       return [bool]$Element.Current.$PropertyName
     } catch {
-      return $false
+      return $null
     }
   }
 
@@ -575,7 +612,9 @@ function Collect-VisibleSurfaces {
   $surfaceMatches = [ordered]@{}
   $visible = @()
   foreach ($label in $expected) {
-    $candidates = @($observedElements | Where-Object { $_.surfaces_present -contains $label })
+    $candidates = @($observedElements | Where-Object {
+      $_.surfaces_present -contains $label -and (Test-ObservedSurfaceVisible -Element $_ -ObservedElements $observedElements)
+    })
     $preferred = $null
     if ($candidates.Count -gt 0) {
       $preferred = @(

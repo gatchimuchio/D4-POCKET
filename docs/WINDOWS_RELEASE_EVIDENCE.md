@@ -128,3 +128,11 @@ python tooling\validate_all.py --strict-release --desktop-platform=windows
 - `tooling/release_runtime_assertions.py`は`CONFIG/FIXTURE` evidenceである。installed product runtime proofへの昇格を禁止する。
 
 証拠が欠けている状態は引き続き`release_blocker`である。
+
+## 個別surfaceと観測treeの結合
+
+surface matchは同じ収集結果のelement_keyに結合し、名前、AutomationId、ControlType、ClassName、FrameworkId、root/container分類が観測要素と一致しなければならない。別途生成したmatch宣言だけを受理しない。観測件数、要素識別子、親子edgeも全件検証し、重複、欠落、循環、rootへ到達しない要素を拒否する。
+
+可視候補はrootでもnative containerでもなく、状態を取得できた要素に限る。要素からrootまでis_offscreen=falseと有限な正の矩形を要求し、その全矩形の共通領域が正の面積を持つ場合だけ候補とする。画面外、親の表示領域外、ゼロ面積、座標欠落、NaN/Infinity、状態取得失敗を可視へ昇格しない。UIAutomationの親はRawViewWalkerで取得し、列挙する全要素と同じtreeを用いる。
+
+これはアクセシビリティtree上の表示領域との交差を検証する。別windowによる遮蔽やpixel内容を証明しない。MSAA等の新しい収集経路もこの境界を満たす必要があり、名前だけの登録履歴で代替してはならない。

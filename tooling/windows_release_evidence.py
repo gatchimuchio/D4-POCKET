@@ -6,6 +6,7 @@ import hashlib
 import subprocess
 import json
 import re
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -128,6 +129,100 @@ def _contains_all_required_surfaces(value: Any) -> bool:
     return all(_contains_surface_label(value, label) for label in REQUIRED_VISIBLE_SURFACES)
 
 
+def _finite_coordinate(value: Any) -> bool:
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _surface_tree_errors(tree: dict[str, Any], matches: dict[str, Any]) -> list[str]:
+    """収集済みtreeの同一性と表示領域を検証する。pixelや遮蔽の証明ではない。"""
+    nodes = tree.get("observed_elements")
+    if not isinstance(nodes, list) or not 1 <= len(nodes) <= 10000:
+        return ["可視surfaceの観測要素数が不正"]
+    if type(tree.get("observed_element_count")) is not int or tree["observed_element_count"] != len(nodes):
+        return ["可視surfaceの観測件数が不一致"]
+    required = {"element_key", "runtime_id", "parent_runtime_id", "name", "automation_id",
+                "control_type", "class_name", "framework_id", "supported_patterns",
+                "is_root", "is_native_container"}
+    by_id: dict[str, dict[str, Any]] = {}
+    by_key: dict[str, dict[str, Any]] = {}
+    for node in nodes:
+        if not isinstance(node, dict) or not required <= node.keys():
+            return ["可視surfaceの観測要素に診断項目が欠落"]
+        key, rid = node["element_key"], node["runtime_id"]
+        if not isinstance(key, str) or not key or not isinstance(rid, str) or not rid:
+            return ["可視surfaceの観測識別子が不正"]
+        if key in by_key or rid in by_id:
+            return ["可視surfaceの観測識別子が重複"]
+        if not isinstance(node["parent_runtime_id"], str):
+            return ["可視surfaceの親識別子が不正"]
+        by_key[key], by_id[rid] = node, node
+    roots = [n for n in nodes if n["is_root"] is True and n["parent_runtime_id"] == ""]
+    if len(roots) != 1:
+        return ["可視surfaceのrootが一意でない"]
+    root = roots[0]
+    expected_edges = []
+    for node in nodes:
+        if node is not root:
+            if node["is_root"] is not False or node["parent_runtime_id"] not in by_id:
+                return ["可視surfaceの親が欠落またはroot分類が不正"]
+            expected_edges.append({"child_runtime_id": node["runtime_id"],
+                                   "parent_runtime_id": node["parent_runtime_id"],
+                                   "child_element_key": node["element_key"]})
+        seen: set[str] = set()
+        cursor = node
+        while cursor is not root:
+            if cursor["runtime_id"] in seen or len(seen) >= 128:
+                return ["可視surfaceの親子関係が循環または深すぎる"]
+            seen.add(cursor["runtime_id"])
+            cursor = by_id.get(cursor["parent_runtime_id"])
+            if cursor is None:
+                return ["可視surfaceがrootへ到達しない"]
+    edges = tree.get("tree_edges")
+    if not isinstance(edges, list) or len(edges) != len(expected_edges) or any(e not in edges for e in expected_edges):
+        return ["可視surfaceの親子edgeが観測要素と不一致"]
+
+    errors = []
+    projection = ("name", "automation_id", "control_type", "class_name", "framework_id", "is_root", "is_native_container")
+    for label, match in matches.items():
+        if not isinstance(match, dict):
+            continue
+        node = by_key.get(str(match.get("element_key", "")))
+        if node is None or any(node.get(k) != match.get(k) for k in projection):
+            errors.append(f"{label} のmatchが実観測要素と不一致")
+            continue
+        if node["is_root"] is not False or node["is_native_container"] is not False:
+            errors.append(f"{label} はrootまたはnative containerを流用している")
+            continue
+        intersection = None
+        cursor = node
+        while True:
+            rect = cursor.get("bounding_rectangle")
+            values = [rect.get(k) for k in ("x", "y", "width", "height")] if isinstance(rect, dict) else []
+            if (cursor.get("is_offscreen") is not False or len(values) != 4
+                    or any(not _finite_coordinate(v) for v in values)
+                    or values[2] <= 0 or values[3] <= 0):
+                errors.append(f"{label} の要素または親の表示状態・座標を確認できない")
+                break
+            x, y, w, h = values
+            bounds = (x, y, x + w, y + h)
+            if not all(math.isfinite(v) for v in bounds):
+                errors.append(f"{label} の矩形端点が非有限")
+                break
+            intersection = bounds if intersection is None else (
+                max(intersection[0], bounds[0]), max(intersection[1], bounds[1]),
+                min(intersection[2], bounds[2]), min(intersection[3], bounds[3]))
+            if intersection[2] <= intersection[0] or intersection[3] <= intersection[1]:
+                errors.append(f"{label} が表示領域外")
+                break
+            if cursor is root:
+                break
+            cursor = by_id[cursor["parent_runtime_id"]]
+    return errors
+
+
 def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if surface_evidence.get("aggregate_surface_shortcut_detected") is not False:
@@ -179,22 +274,7 @@ def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[s
     if not isinstance(diagnostic_tree, dict):
         errors.append("可視 surface 証拠に diagnostic_tree がない")
     else:
-        observed = diagnostic_tree.get("observed_elements")
-        if not isinstance(observed, list) or not observed:
-            errors.append("可視 surface の diagnostic_tree.observed_elements がない")
-        else:
-            required_keys = {"element_key", "runtime_id", "parent_runtime_id", "name", "automation_id", "control_type", "class_name", "framework_id", "supported_patterns"}
-            for index, element in enumerate(observed[: min(len(observed), 20)]):
-                if not isinstance(element, dict):
-                    errors.append(f"可視 surface の観測要素 {index} が object ではない")
-                    continue
-                missing = sorted(required_keys - set(element))
-                if missing:
-                    errors.append(f"可視 surface の観測要素 {index} に診断 key がない: {', '.join(missing)}")
-                    break
-        tree_edges = diagnostic_tree.get("tree_edges")
-        if not isinstance(tree_edges, list):
-            errors.append("可視 surface の diagnostic_tree.tree_edges がない")
+        errors.extend(_surface_tree_errors(diagnostic_tree, surface_matches))
     return errors
 
 

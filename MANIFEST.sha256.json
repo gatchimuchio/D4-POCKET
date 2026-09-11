@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "e39ec8146bdf129567af7465f57a1c0e470ec40ac1396cd1ef08ce40259e8576"
+      "sha256": "b3f97fa4811718a0b1590db02f41dcf47336b603fdd3ec1d9dfd4018f50f4e28"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -902,7 +902,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "ea9ee0a6c71e6f99801fb2a2a7795cebaa81071f4332887151c4f00f3760513b"
+      "sha256": "27130eb94f51efcafd09a609704a8c138c7de28536d53acaee57b91dff5a4ebd"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -1366,7 +1366,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "b93c0f6f96fb37f1b9f92c8dbae4c8a778d79eb011d5fd86680792263998cfaa"
+      "sha256": "68445bd9ae609fdceefd007213dcf5403f9256b8567580accb56cd2d9cb725e9"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -2006,11 +2006,15 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5004d2e9564734c29f518822ff6b2cdce8180f8efbdf5855a6536a3645eafa04"
+      "sha256": "2df241222392f2e4aac86d25584c0bf5eb8ad24fee489e496dd6333152f17fd7"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
       "sha256": "6a8e26dbe29681a250ba6c35f555dac7f26f340b58d21e68bde6ce72b26483f2"
+    },
+    {
+      "path": "tooling/conformance_tests/windows_surface_geometry.ps1",
+      "sha256": "181de4451db2c3689e125727691522aafe170490eafac25ef787b5610eb7096a"
     },
     {
       "path": "tooling/device_link_live_check.py",
@@ -2070,7 +2074,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "235baf171f5703a9e4a6af1ef921144ec53845d251c783cfca7c073af15817df"
+      "sha256": "615694c50ceea221bf1ca8c676aa2885fef36cba68124ad4f2099fb350f54e2d"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

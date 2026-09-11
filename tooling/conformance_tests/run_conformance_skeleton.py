@@ -1295,7 +1295,7 @@ def _valid_windows_installed_evidence() -> dict:
                 "grants_authority": False,
             }
         )
-    return {
+    data = {
         "platform": "windows",
         "provenance": {
             "evidence_contract_version": 2,
@@ -1558,6 +1558,23 @@ def _valid_windows_installed_evidence() -> dict:
         },
     }
 
+    surface = data["first_run"]["visible_surfaces_evidence"]
+    tree = surface["diagnostic_tree"]
+    root = tree["observed_elements"][0]
+    root.update(is_root=True, is_native_container=True, is_offscreen=False,
+                bounding_rectangle={"x": 0, "y": 0, "width": 1000, "height": 800})
+    tree["observed_elements"] = [root]
+    tree["tree_edges"] = []
+    for index, match in enumerate(surface["surface_matches"].values(), 1):
+        node = {k: v for k, v in match.items() if k != "matched"}
+        node.update(runtime_id=f"1.2.{index}", parent_runtime_id="1.2",
+                    supported_patterns=[], is_offscreen=False,
+                    bounding_rectangle={"x": 10, "y": index * 50, "width": 100, "height": 30})
+        tree["observed_elements"].append(node)
+        tree["tree_edges"].append({"child_runtime_id": node["runtime_id"],
+                                   "parent_runtime_id": "1.2", "child_element_key": node["element_key"]})
+    return data
+
 
 def test_windows_release_evidence_validator_accepts_other_checks_but_rejects_unbound_anchor() -> list[str]:
     errors = []
@@ -1697,6 +1714,64 @@ def test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_
     if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
         return ["Windows broker validatorがtop-levelのunmeasured authority declarationを受け入れた"]
     return []
+
+
+def test_windows_surface_geometry_and_identity() -> list[str]:
+    from tooling.windows_release_evidence import _validate_surface_match_evidence
+    surface = _valid_windows_installed_evidence()["first_run"]["visible_surfaces_evidence"]
+    if _validate_surface_match_evidence(surface):
+        return ["完全な観測treeの正常surfaceを拒否した"]
+    cases = {
+        "画面外": lambda s, ns: ns[1]["bounding_rectangle"].update(x=2000),
+        "非表示": lambda s, ns: ns[1].update(is_offscreen=True),
+        "状態欠落": lambda s, ns: ns[1].pop("is_offscreen"),
+        "座標欠落": lambda s, ns: ns[1].pop("bounding_rectangle"),
+        "ゼロ面積": lambda s, ns: ns[1]["bounding_rectangle"].update(width=0),
+        "非有限": lambda s, ns: ns[1]["bounding_rectangle"].update(x=float("nan")),
+        "過大整数": lambda s, ns: ns[1]["bounding_rectangle"].update(x=10**400),
+        "親領域外": lambda s, ns: ns[0]["bounding_rectangle"].update(height=40),
+        "親非表示": lambda s, ns: ns[0].update(is_offscreen=True),
+        "存在しない親": lambda s, ns: ns[1].update(parent_runtime_id="missing"),
+        "循環": lambda s, ns: ns[1].update(parent_runtime_id=ns[1]["runtime_id"]),
+        "重複ID": lambda s, ns: ns[2].update(runtime_id=ns[1]["runtime_id"]),
+        "重複key": lambda s, ns: ns[2].update(element_key=ns[1]["element_key"]),
+        "宣言の差替え": lambda s, ns: ns[1].update(name="別の要素"),
+        "未観測match": lambda s, ns: ns.pop(),
+        "件数不一致": lambda s, ns: s["diagnostic_tree"].update(observed_element_count=9),
+        "edge欠落": lambda s, ns: s["diagnostic_tree"]["tree_edges"].pop(),
+        "container流用": lambda s, ns: ns[1].update(is_native_container=True),
+    }
+    errors = []
+    for name, mutate in cases.items():
+        bad = json.loads(json.dumps(surface))
+        mutate(bad, bad["diagnostic_tree"]["observed_elements"])
+        if not _validate_surface_match_evidence(bad):
+            errors.append(f"可視surfaceの{name}を受理した")
+    if sys.platform == "win32":
+        cases_for_collector = [{"name": "正常", "nodes": surface["diagnostic_tree"]["observed_elements"], "expected": True}]
+        for name in ("画面外", "非表示", "状態欠落", "座標欠落", "ゼロ面積", "親領域外", "親非表示", "存在しない親", "循環", "重複ID", "container流用"):
+            bad = json.loads(json.dumps(surface))
+            nodes = bad["diagnostic_tree"]["observed_elements"]
+            cases[name](bad, nodes)
+            cases_for_collector.append({"name": name, "nodes": nodes, "expected": False})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cases.json"
+            path.write_text(json.dumps(cases_for_collector, ensure_ascii=False), encoding="utf-8")
+            import base64
+            def ps_literal(value):
+                return "'" + str(value).replace("'", "''") + "'"
+            # Windows PowerShell 5.1でも日本語sourceをUTF-8として読む試験用入口。
+            script = ROOT / "tooling/conformance_tests/windows_surface_geometry.ps1"
+            command = ("& ([scriptblock]::Create([IO.File]::ReadAllText(" + ps_literal(script)
+                       + ", [Text.Encoding]::UTF8))) -CollectorPath "
+                       + ps_literal(INSTALLER / "windows/collect_installed_smoke.ps1")
+                       + " -CasesJson " + ps_literal(path))
+            result = subprocess.run(["powershell.exe", "-NoProfile", "-EncodedCommand",
+                base64.b64encode(command.encode("utf-16-le")).decode("ascii")],
+                capture_output=True, timeout=30)
+            if result.returncode != 0:
+                errors.append("実collectorの可視判定回帰試験が失敗: " + result.stderr.decode(errors="replace"))
+    return errors
 
 
 def test_windows_release_evidence_validator_rejects_missing_surface_matches() -> list[str]:
@@ -3531,6 +3606,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
+        test_windows_surface_geometry_and_identity,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_flutter_build_registry_as_visibility,

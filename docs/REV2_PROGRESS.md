@@ -418,3 +418,22 @@ DesktopのmainでOS要求より先に保持していたSemanticsHandleを除去�
   reason: 外部tree取得と画面切替を実測したが、clean sourceと分離配置に結合した正式collectorの証拠は未成立。
   required_action: 現行commitを分離配置し、個別surfaceの実観測と非表示の負例を厳格な収集・検証経路で確認する。
   blocks_release: yes
+
+
+## 可視surfaceの宣言と実観測の結合（2026-09-11）
+
+clean source 53182cd4cab77e025c61913357cf527270f4dd11をrev2-53182cd-20260911へ分離配置した。Windows releaseビルドとRust releaseビルド、配置先broker smokeは成功し、正式consumerではSetup Doctorとbrokerの2関門がPASS。初回起動と可視証拠provenanceはFAIL、実運用署名は延期によるFAILを維持した。実証拠とvalidation-result.jsonは配置先runtime/evidenceに保存している。
+
+標準MSAA APIの実測ではwidgetの名前・役割・座標を取得できたが、画面外要素も非表示bitなしで返った。既存collectorは名前だけで候補を選び、consumerはmatchを観測treeへ結合せず、診断keyも先頭20件しか調べていなかった。正常fixtureも4surface宣言に対しrootと1surfaceしか記録していなかった。今回の単位はbuild/release経路のこの誤受理を修正する。
+
+正本を更新し、全観測要素の識別子・root・親子edge・件数を検証する。matchは同じelement_keyの実観測属性と一致し、root/containerでないことを要求する。要素からrootまで明示的なis_offscreen=falseと有限・正の矩形を要求し、共通領域が正面積の候補だけを可視とする。collectorも同じ幾何条件で候補を選び、状態取得失敗はnullとして保持する。親列挙をRawViewWalkerへ揃えた。
+
+17負例は変更前すべて誤受理、変更後すべて拒否した。過大整数座標の例外化も拒否する試験を追加し、負例は計18件。画面外、親領域外、非表示、状態・座標欠落、ゼロ面積、非有限座標、親欠落・循環、識別子重複、match差替え、未観測match、件数・edge不一致、container流用を含む。実collectorの純粋判定関数も正常と11負例で試験した。Windows PowerShell 5.1ではUTF-8 BOMなしの日本語scriptを既定encodingで読むと構文エラーになるため、試験入口とAST読込みでUTF-8を明示した。production用wrapperや新依存は追加していない。Schema36/正常36/負例38、conformance149件、日本語基底監査はPASS。
+
+これは収集済みtree上の表示領域交差の検証であり、別windowによる遮蔽やpixel内容の証明ではない。MSAA実測を正式collectorへ接続する作業は、この条件を省略せず続行する。
+
+- item: MSAA実測と正式Windows収集経路の接続
+  classification: release_blocker
+  reason: UIAutomationの現経路ではwindow枠しか取得できず、MSAAは診断実測のみ。今回の可視性負例はFIXTUREであり、正式installed初回起動の合格ではない。
+  required_action: MSAAの要素同一性・親子関係・実矩形と日本語surfaceを正式収集へ結合し、実画面と負例を再検証する。
+  blocks_release: yes
