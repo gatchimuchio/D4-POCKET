@@ -1,0 +1,387 @@
+{
+  "目的": "owner添付3文書を欠落なく保持し、C0からC34全体を実装対象とする",
+  "変更": "UTF-8/LFで保存。外部識別子を保持したまま、人間向けの見出し・用語一覧へ日本語の意味表記を付した。要求本文やコード識別子の意味は変更しない。対応は日本語表記対応へ記録。",
+  "添付": [
+    {
+      "file": "実装指示書.md",
+      "attachment_id": "6ddb1555-5ebd-41d6-ac5d-424a43c6ef4c",
+      "source_sha256": "dd662c58368d93e5ea09364277b637f6f6b9d25e693e331c6dba4ef019801d63",
+      "received_normalized_sha256": "5bbc9579de111316b7c75e06e579d59c7804fad5ea89955da14d665d05937c8f",
+      "repository_text_sha256": "bcd18701afaf6ee43163bbcb2c362112eeb25de88da42e691ab16605c47e1906"
+    },
+    {
+      "file": "工程表.md",
+      "attachment_id": "17e8154d-6ebb-4165-8715-5514da4b9256",
+      "source_sha256": "1ce6fce83f3ed13e2bf2ed60b223abf685c0472f080b8ee25d9f0f9a335bbdbd",
+      "received_normalized_sha256": "2edfe42956f12b8294e4b328d69a89070d461fe9030a5c2b5c3a9b20a60996b8",
+      "repository_text_sha256": "c7619c0a26f25664de25eb89f5e713b702553c36508113973c4132ea61749e7a"
+    },
+    {
+      "file": "実装仕様書.md",
+      "attachment_id": "fde31ea6-b02c-442f-9772-b5d99240073b",
+      "source_sha256": "d128e037e696a0cf90d95f2c61a6a29cab1605c1879f11695300eac8915ba41b",
+      "received_normalized_sha256": "64e5ce7a96254b3e1a8613c619ab39181b105d3f1c9842ded8e3be007ecf5969",
+      "repository_text_sha256": "328149770ee17c84799fb464fa18d2a6180df9df26b0dc928e5fe9c822ffb8be"
+    }
+  ],
+  "工程": [
+    {
+      "番号": "C0",
+      "名称": "Baseline再固定"
+    },
+    {
+      "番号": "C1",
+      "名称": "作業領域インスペクタ"
+    },
+    {
+      "番号": "C2",
+      "名称": "実行履歴・再実行・分岐"
+    },
+    {
+      "番号": "C3",
+      "名称": "資源監視"
+    },
+    {
+      "番号": "C4",
+      "名称": "Runtimeライフサイクル"
+    },
+    {
+      "番号": "C5",
+      "名称": "評価ラボ"
+    },
+    {
+      "番号": "C6",
+      "名称": "対話→回帰case登録"
+    },
+    {
+      "番号": "C7",
+      "名称": "資格情報保管庫"
+    },
+    {
+      "番号": "C8",
+      "名称": "MCP Contract"
+    },
+    {
+      "番号": "C9",
+      "名称": "MCP接続センター"
+    },
+    {
+      "番号": "C10",
+      "名称": "運用プロファイル"
+    },
+    {
+      "番号": "C11",
+      "名称": "更新センター"
+    },
+    {
+      "番号": "C12",
+      "名称": "通知センター"
+    },
+    {
+      "番号": "C13",
+      "名称": "観測センター"
+    },
+    {
+      "番号": "C14",
+      "名称": "Trace Inspector"
+    },
+    {
+      "番号": "C15",
+      "名称": "A2A Contract"
+    },
+    {
+      "番号": "C16",
+      "名称": "A2A接続センター"
+    },
+    {
+      "番号": "C17",
+      "名称": "複数Host"
+    },
+    {
+      "番号": "C18",
+      "名称": "Host操作面"
+    },
+    {
+      "番号": "C19",
+      "名称": "Adapter管理操作"
+    },
+    {
+      "番号": "C20",
+      "名称": "Windows system tray"
+    },
+    {
+      "番号": "C21",
+      "名称": "Command Palette拡張"
+    },
+    {
+      "番号": "C22",
+      "名称": "グローバル検索"
+    },
+    {
+      "番号": "C23",
+      "名称": "Desktop UX統合"
+    },
+    {
+      "番号": "C24",
+      "名称": "Mobile対応"
+    },
+    {
+      "番号": "C25",
+      "名称": "Apple補助検証"
+    },
+    {
+      "番号": "C26",
+      "名称": "Android build回帰"
+    },
+    {
+      "番号": "C27",
+      "名称": "全数性能試験"
+    },
+    {
+      "番号": "C28",
+      "名称": "長時間運用試験"
+    },
+    {
+      "番号": "C29",
+      "名称": "障害注入"
+    },
+    {
+      "番号": "C30",
+      "名称": "全数回帰"
+    },
+    {
+      "番号": "C31",
+      "名称": "文書更新"
+    },
+    {
+      "番号": "C32",
+      "名称": "最終開発監査"
+    },
+    {
+      "番号": "C33",
+      "名称": "Windows最大到達点"
+    },
+    {
+      "番号": "C34",
+      "名称": "正式release前作業"
+    }
+  ],
+  "日本語表記対応": [
+    {
+      "file": "実装仕様書.md",
+      "line": 24,
+      "受領表記": "* Authority",
+      "日本語表記": "* Authority（権限境界）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 27,
+      "受領表記": "* Audit",
+      "日本語表記": "* Audit（監査）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 28,
+      "受領表記": "* Recovery",
+      "日本語表記": "* Recovery（復旧）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 29,
+      "受領表記": "* Content Exposure",
+      "日本語表記": "* Content Exposure（内容露出）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 30,
+      "受領表記": "* Adapter",
+      "日本語表記": "* Adapter（接続境界）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 31,
+      "受領表記": "* Runtime",
+      "日本語表記": "* Runtime（実行系）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 32,
+      "受領表記": "* Broker",
+      "日本語表記": "* Broker（制御仲介）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 117,
+      "受領表記": "# 4. GitHub CI / Actions",
+      "日本語表記": "# 4. GitHub CI / Actionsの運用境界"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 217,
+      "受領表記": "* unified diff",
+      "日本語表記": "* unified diff（統合差分）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 218,
+      "受領表記": "* side-by-side diff",
+      "日本語表記": "* side-by-side diff（左右比較差分）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 710,
+      "受領表記": "# 32. Trace Inspector",
+      "日本語表記": "# 32. 追跡情報の閲覧（Trace Inspector）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 739,
+      "受領表記": "# 33. Metric",
+      "日本語表記": "# 33. 計測値（Metric）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 774,
+      "受領表記": "# 35. A2A Authority",
+      "日本語表記": "# 35. A2Aの権限境界（Authority）"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 984,
+      "受領表記": "# 47. Apple",
+      "日本語表記": "# 47. Apple環境の補助検証"
+    },
+    {
+      "file": "実装仕様書.md",
+      "line": 1014,
+      "受領表記": "# 48. Android",
+      "日本語表記": "# 48. Android環境の開発と検証"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 58,
+      "受領表記": "# 4. Local-first",
+      "日本語表記": "# 4. ローカルを基準とする作業（Local-first）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 196,
+      "受領表記": "# 14. Runtime lifecycle",
+      "日本語表記": "# 14. 実行系ライフサイクル（Runtime lifecycle）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 222,
+      "受領表記": "# 17. MCP",
+      "日本語表記": "# 17. 外部道具接続（MCP）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 230,
+      "受領表記": "# 18. A2A",
+      "日本語表記": "# 18. エージェント間接続（A2A）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 249,
+      "受領表記": "# 20. Update",
+      "日本語表記": "# 20. 更新（Update）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 257,
+      "受領表記": "# 21. Profile",
+      "日本語表記": "# 21. 運用プロファイル（Profile）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 265,
+      "受領表記": "# 22. Multi Host",
+      "日本語表記": "# 22. 複数Host管理（Multi Host）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 281,
+      "受領表記": "# 24. Windows-first",
+      "日本語表記": "# 24. Windows優先（Windows-first）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 295,
+      "受領表記": "# 25. macOS/iOS",
+      "日本語表記": "# 25. macOS/iOSの補助検証"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 305,
+      "受領表記": "# 26. Android",
+      "日本語表記": "# 26. Androidの開発と検証"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 315,
+      "受領表記": "# 27. release blocker",
+      "日本語表記": "# 27. 正式releaseの未成立条件（release blocker）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 333,
+      "受領表記": "# 29. Performance",
+      "日本語表記": "# 29. 性能（Performance）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 351,
+      "受領表記": "# 31. Error",
+      "日本語表記": "# 31. エラー処理（Error）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 370,
+      "受領表記": "# 32. Negative tests",
+      "日本語表記": "# 32. 否定試験（Negative tests）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 451,
+      "受領表記": "## production path",
+      "日本語表記": "## 本番実行経路（production path）"
+    },
+    {
+      "file": "実装指示書.md",
+      "line": 485,
+      "受領表記": "## GitHub Actions",
+      "日本語表記": "## GitHub Actionsの補助結果"
+    },
+    {
+      "file": "工程表.md",
+      "line": 226,
+      "受領表記": "# C8 — MCP Contract",
+      "日本語表記": "# C8 — 外部道具接続契約（MCP Contract）"
+    },
+    {
+      "file": "工程表.md",
+      "line": 310,
+      "受領表記": "Desktop notification store / surface。",
+      "日本語表記": "Desktopの通知保管・操作面（notification store / surface）。"
+    },
+    {
+      "file": "工程表.md",
+      "line": 350,
+      "受領表記": "# C14 — Trace Inspector",
+      "日本語表記": "# C14 — 追跡情報の閲覧（Trace Inspector）"
+    },
+    {
+      "file": "工程表.md",
+      "line": 360,
+      "受領表記": "# C15 — A2A Contract",
+      "日本語表記": "# C15 — エージェント間接続契約（A2A Contract）"
+    },
+    {
+      "file": "工程表.md",
+      "line": 448,
+      "受領表記": "# C20 — Windows system tray",
+      "日本語表記": "# C20 — Windows常駐トレイ（system tray）"
+    }
+  ]
+}

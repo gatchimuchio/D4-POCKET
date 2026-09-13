@@ -146,7 +146,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "135cc07d5415d669eae519311cfdf033aaa98dc91c51d62798a90d966382c1ea"
+      "sha256": "04d6f5091a662f77370b5dfde240e2687ae02d7ad5d3b4e5798ed11e8fac971f"
     },
     {
       "path": "SECURITY.md",
@@ -1045,6 +1045,26 @@
       "sha256": "b800c3990332eecbb39356f0de08ce2dde6510b7473764596b7b0582db80efeb"
     },
     {
+      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u53d7\u9818\u8a18\u9332.json",
+      "sha256": "a0040c830f78f1ca76569f4c5552b4726ee7fa0b98f0029f19e40fea1bf3509c"
+    },
+    {
+      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5b9f\u88c5\u4ed5\u69d8\u66f8.md",
+      "sha256": "328149770ee17c84799fb464fa18d2a6180df9df26b0dc928e5fe9c822ffb8be"
+    },
+    {
+      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5b9f\u88c5\u6307\u793a\u66f8.md",
+      "sha256": "bcd18701afaf6ee43163bbcb2c362112eeb25de88da42e691ab16605c47e1906"
+    },
+    {
+      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u5de5\u7a0b\u8868.md",
+      "sha256": "c7619c0a26f25664de25eb89f5e713b702553c36508113973c4132ea61749e7a"
+    },
+    {
+      "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
+      "sha256": "2435a548a53ff5703ea79d95c37f0879ded534feedf4dc389aa9c67c22513c73"
+    },
+    {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
       "sha256": "8bf60cf212c897bdb8d5d8553951b1bcc3ab8ba7fca4e5d8f2b0c252e9504b23"
     },
@@ -1854,7 +1874,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "fde563daf11b05d3941094905954fd5c387a0fff5be512f81cb471eeed2bdb5f"
+      "sha256": "be9470e87b691e7cd315374a65a11077d97eecab954b20fb1f57ed93a66ad487"
     },
     {
       "path": "requirements-dev.txt",
@@ -2114,7 +2134,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "66ad91a9240a8a6c314819672fb1c02480910d6b85710f55d24b055ef3d237e6"
+      "sha256": "c82113dc906068f2513a2edc174229d1ca2cac603de4d75a9a2b3f312769b814"
     }
   ]
 }

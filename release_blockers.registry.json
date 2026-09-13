@@ -1,7 +1,7 @@
 {
   "version": 1,
   "release_ready": false,
-  "release_ready_reason": "完成製品をリリースする前に、Windowsインストール先の証拠、監査アンカーの外部改ざん耐性証明、所有者GOが必要です。",
+  "release_ready_reason": "完成製品のreleaseには総合機能拡張rev1の全数完成証拠、対象platformの必要証拠、監査署名、正式配布条件、owner GOが必要。",
   "blockers": [
     {
       "name": "windows_evidence_provenance_isolation",
@@ -97,6 +97,16 @@
       "blocks_release": true,
       "reason": "2026-09-11にWindows開発appの13画面表示、実MINIDORA二系統の承認待ち・応答・個別中止・新規session・片側失敗の隔離を実測した。Linux起動証拠と合わせた開発回帰の範囲。詳細はdocs/REV2_PROGRESS.md。",
       "required_action": "この開発回帰項目の追加作業はない。Windows installed-path、実機、正式配布の独立したrelease blockerは保持する。"
+    },
+    {
+      "name": "comprehensive_extension_rev1_completion",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。",
+      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
     }
   ]
 }
