@@ -1,3 +1,5 @@
+#[cfg(any(windows, test))]
+pub(crate) mod content_access;
 pub(crate) mod history_access;
 pub(crate) mod execution_history;
 pub mod audit;

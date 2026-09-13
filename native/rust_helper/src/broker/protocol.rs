@@ -203,6 +203,15 @@ pub enum BrokerOperation {
     対話承認待ち,
     #[serde(rename = "対話内容保存")]
     対話内容保存,
+    #[serde(rename = "対話内容承認")]
+    対話内容承認,
+    #[serde(rename = "対話内容失効")]
+    対話内容失効,
+    #[serde(rename = "対話内容閲覧状態")]
+    対話内容閲覧状態,
+    #[serde(rename = "対話内容閲覧")]
+    対話内容閲覧,
+
 
 }
 
@@ -249,6 +258,11 @@ impl BrokerOperation {
             BrokerOperation::対話承認 => "対話承認",
             BrokerOperation::対話承認待ち => "対話承認待ち",
             BrokerOperation::対話内容保存 => "対話内容保存",
+            BrokerOperation::対話内容承認 => "対話内容承認",
+            BrokerOperation::対話内容失効 => "対話内容失効",
+            BrokerOperation::対話内容閲覧状態 => "対話内容閲覧状態",
+            BrokerOperation::対話内容閲覧 => "対話内容閲覧",
+
 
         }
     }
@@ -454,6 +468,8 @@ pub struct Broker {
     端末: Option<super::device_link::端末制御>,
     #[cfg(windows)]
     protected_store: Option<crate::protected_store::ProtectedStore>,
+    #[cfg(windows)]
+    内容閲覧: super::content_access::ContentAccess,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
     state_store: BrokerStateStore,
@@ -472,6 +488,8 @@ impl Broker {
             端末: None,
             #[cfg(windows)]
             protected_store: None,
+            #[cfg(windows)]
+            内容閲覧: Default::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
@@ -507,6 +525,8 @@ impl Broker {
             端末: None,
             #[cfg(windows)]
             protected_store: None,
+            #[cfg(windows)]
+            内容閲覧: Default::default(),
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
@@ -666,6 +686,7 @@ impl Broker {
             operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
@@ -1426,6 +1447,8 @@ impl Broker {
         );
         if let Err(error) = self.state_store.append_audit_event(&event) {
             self.作業領域 = Default::default();
+            #[cfg(windows)]
+            self.内容閲覧.revoke();
             return Err(error);
         }
         self.audit_log
@@ -2700,3 +2723,6 @@ mod replay;
 #[cfg(all(test, windows))]
 #[path = "../../tests/unit/content_save.rs"]
 mod content_save_tests;
+
+#[path = "content_control.rs"]
+mod content_control;

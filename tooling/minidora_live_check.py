@@ -289,6 +289,21 @@ server.serve_forever()
                     assert viewed_receipt["page"]["entries"][0]["content_receipt"] == entry_receipt
                     成功(owner, "対話履歴失効", {})
                     assert 操作(normal, "対話履歴閲覧", receipt_query)["body"] is None
+                    content_target = {"要求ID": p["要求ID"], "保存監査ID": entry_receipt["audit_event_id"], "保存監査hash": entry_receipt["event_hash"]}
+                    assert 操作(normal, "対話内容承認", content_target)["status"] == "rejected"
+                    current_content = json.loads(subprocess.check_output([str(binary), "対話承認操作", "--session-file", str(owner_file), "内容閲覧承認", p["要求ID"], entry_receipt["audit_event_id"], entry_receipt["event_hash"]], timeout=10))
+                    content_query = {"approval_id": current_content["grant"]["approval_id"]}
+                    opened = 成功(normal, "対話内容閲覧", content_query)
+                    access_schema = json.loads((ROOT / "specs/runtime_content_access.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(opened, access_schema)
+                    assert opened["content"]["結果"] == a
+                    assert opened["content"]["要求"]["入力"] == "こんにちは"
+                    assert opened["content"]["要求hash"] == p["要求hash"]
+                    assert opened["content"]["実行記録"]["終了監査ID"] == receipt["終了監査ID"]
+                    assert current_content["content"] is None
+                    成功(owner, "対話内容失効", {})
+                    assert 操作(normal, "対話内容閲覧", content_query)["body"] is None
+
 
                 else:
                     assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"

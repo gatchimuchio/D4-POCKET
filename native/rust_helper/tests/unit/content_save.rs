@@ -43,9 +43,26 @@ fn explicit_save_encrypts_and_binds_audits_without_overwrite() {
     b.保管先起動登録(&vault,true,&[root.join("audit")]).unwrap();
     assert_eq!(call(&mut b,BrokerOperation::対話内容保存,select.clone(),false).status,BrokerStatus::Rejected);
     let receipt=accepted(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true));
+    let saved_event=b.audit_events().last().unwrap().clone();
+    let approval_target=json!({"要求ID":select["要求ID"],"保存監査ID":saved_event.event_id,"保存監査hash":saved_event.event_hash});
+    assert_eq!(call(&mut b,BrokerOperation::対話内容承認,approval_target.clone(),false).status,BrokerStatus::Rejected);
+    let grant=accepted(call(&mut b,BrokerOperation::対話内容承認,approval_target.clone(),true));
+    let read=json!({"approval_id":grant["grant"]["approval_id"]});
+    let opened=accepted(call(&mut b,BrokerOperation::対話内容閲覧,read.clone(),false));
+    assert_eq!(opened["content"]["要求"]["入力"],"試験の入力本文");
+    assert_eq!(opened["content"]["結果"]["本文"],"試験の応答本文");
+    accepted(call(&mut b,BrokerOperation::対話内容失効,json!({}),true));
+    assert!(call(&mut b,BrokerOperation::対話内容閲覧,read,false).body.is_none());
     let target=select["要求ID"].as_str().unwrap();
     let cipher_path=vault.join(format!("history-{target}.dpapi"));
     let cipher=std::fs::read(&cipher_path).unwrap();
+    let grant=accepted(call(&mut b,BrokerOperation::対話内容承認,approval_target.clone(),true));
+    let mut corrupt=cipher.clone(); let last=corrupt.len()-1; corrupt[last]^=1;
+    std::fs::write(&cipher_path,&corrupt).unwrap();
+    let denied=call(&mut b,BrokerOperation::対話内容閲覧,json!({"approval_id":grant["grant"]["approval_id"]}),false);
+    assert!(denied.body.is_none());
+    std::fs::write(&cipher_path,&cipher).unwrap();
+    assert!(accepted(call(&mut b,BrokerOperation::対話内容閲覧状態,json!({}),false))["grant"].is_null());
     assert_eq!(receipt["暗号文hash"],sha256_tagged(&cipher));
     let secret=b.protected_store.as_ref().unwrap().read(crate::protected_store::Purpose::History,target,receipt["暗号文hash"].as_str().unwrap()).unwrap();
     let content:Value=serde_json::from_slice(secret.as_bytes()).unwrap();
@@ -67,6 +84,8 @@ fn explicit_save_encrypts_and_binds_audits_without_overwrite() {
     // 保存後段の実監査確定関数へI/O失敗を注入する。成功metadataを公開しない。
     let audit_path=root.join("audit/audit.jsonl");
     std::fs::remove_file(&audit_path).unwrap(); std::fs::create_dir(&audit_path).unwrap();
+    let denied=b.内容閲覧確定("fixture-content-finalization","対話内容閲覧",opened,&sha256_tagged(b"fixture"));
+    assert_eq!(denied.status,BrokerStatus::Suspended); assert!(denied.body.is_none());
     let response=b.対話内容保存確定("fixture-finalization",receipt);
     assert_eq!(response.status,BrokerStatus::Suspended); assert!(response.body.is_none());
     assert_eq!(std::fs::read(&cipher_path).unwrap(),cipher);
