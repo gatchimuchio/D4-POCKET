@@ -1069,7 +1069,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "b54f5d89ae88a60a30dde348556a2479d2b85ca425693b0b8a0e23beb555ed87"
+      "sha256": "1884ef6723c84609da8cb05fab490e5bee7eeb4700f3c5d611862b6f6f0b3b12"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1101,7 +1101,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "4130fde404abc0106a92b5da303d2abde18080c46e8fe6894aeee0e2cd5ca9f9"
+      "sha256": "888b5e3976393a828b303f273b7f034bb37d7a06b648da63a31d591c68479ade"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "926e3c01bf74e897078be29e788bf3d6c6678ab0a9f5a925ceb46997c2e5af42"
+      "sha256": "77f8a643ef19a9f9e8e517a43367bfe62239b02a5b7be69f92807e1cccdaaef6"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -2261,7 +2261,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "f9fc7356b15a072de85932f05ff1678e53ebe044cbae6263d4e4b1aea1d76640"
+      "sha256": "0ec0f4528a95f51e76e4b6833bb721284fbc90eb130e5642e8355ce7c4cb58d3"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2281,7 +2281,7 @@
     },
     {
       "path": "specs/runtime_execution_history_page.schema.json",
-      "sha256": "3f213ae623d3804ee24a84e27bc9e6722ce6de99a878d23b48bf20b31891f5d8"
+      "sha256": "bdb3db8acc32ccbb575b05361c0f3112b011abc00a023e82ff0b04f07a584cac"
     },
     {
       "path": "specs/runtime_execution_record.schema.json",
@@ -2289,7 +2289,7 @@
     },
     {
       "path": "specs/runtime_history_access.schema.json",
-      "sha256": "74da28c30e3270c0fd007e5000740d3c022db838ab218a2878d0ebd350fa4813"
+      "sha256": "dc18736e737b3b62bb4060b972d44218c6e2af3b49eb1c1b90fe24590d741cfd"
     },
     {
       "path": "specs/runtime_manifest.schema.json",
@@ -2373,7 +2373,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "5012c8b634a07fb46c3d2b1cba01daa1e6eb0e6139ef2d6d1e6c578b2bfa3060"
+      "sha256": "173660e0d75a22dfa4852f6333ed1c0e7b9b36a82b9cd1ac2f3f263113a597b3"
     },
     {
       "path": "tooling/packaging_portability_check.py",

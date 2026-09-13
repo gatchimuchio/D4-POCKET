@@ -43,3 +43,10 @@ owner制御資格による対話内容保存は、要求IDと要求hashを対象
 
 
 保存操作の使用形は `対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>`。保存済み監査がある要求は暗号文が消失していても再保存を拒否する。保存直前にdisk上の監査chain・anchorを再検証し、現在Brokerの監査logとの一致を要求する。保管fileの消失は新しい保存承認へ暗黙変換しない。
+
+
+## 保存記録の検証付きmetadata参照
+
+履歴queryのinclude_content_receiptを明示した場合だけ、content_receiptを各entryへ追加する。既定は従来形式を維持する。現在のmetadata閲覧承認またはowner制御資格の範囲内で、検証済みchainから保存記録を結合する。保存されていない履歴・完了前・失敗状態はnull。これは現在chainで観測した保存時の証跡であり、暗号文の現在存在、復号可能性、内容閲覧許可ではない。
+
+保存記録の未知/重複field、版、証拠種別、hash、要求/実行系/セッション/終了監査の対応、保存イベントとその前の明示保存承認および受信監査を検査する。保存承認のpayload hashは対象要求IDと要求hashの正本化から再計算する。元の結果証跡を保存イベントより前のchainで検証し、過去のfull承認・要求hash・完了監査との一致を要求する。同一要求の保存記録重複、別対象承認の転用、未確定/逆順監査、本文混入を拒否し、部分pageを返さない。content_receiptは保存監査ID・event hashとruntime_content_receiptを含む。読取時の新しい承認・復号・削除/Recoveryは引き続きrelease_blocker。

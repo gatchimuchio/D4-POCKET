@@ -632,6 +632,85 @@
                         ]
                       }
                     ]
+                  },
+                  "content_receipt": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "audit_event_id",
+                          "event_hash",
+                          "receipt"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "audit_event_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "event_hash": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                          },
+                          "receipt": {
+                            "type": "object",
+                            "required": [
+                              "版",
+                              "要求ID",
+                              "対話セッションID",
+                              "実行系ID",
+                              "要求hash",
+                              "終了監査ID",
+                              "保存承認監査ID",
+                              "暗号文hash",
+                              "証拠種別"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "版": {
+                                "const": 1
+                              },
+                              "要求ID": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+                              },
+                              "対話セッションID": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+                              },
+                              "実行系ID": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+                              },
+                              "要求hash": {
+                                "type": "string",
+                                "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                              },
+                              "終了監査ID": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "保存承認監査ID": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "暗号文hash": {
+                                "type": "string",
+                                "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                              },
+                              "証拠種別": {
+                                "const": "INTERNAL_STATE"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }

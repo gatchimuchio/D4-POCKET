@@ -267,6 +267,10 @@
             },
             "include_result_evidence": {
               "type": "boolean"
+            },
+            "include_content_receipt": {
+              "type": "boolean",
+              "default": false
             }
           }
         }
@@ -392,6 +396,10 @@
                 },
                 "include_result_evidence": {
                   "type": "boolean"
+                },
+                "include_content_receipt": {
+                  "type": "boolean",
+                  "default": false
                 }
               }
             }

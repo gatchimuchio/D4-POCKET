@@ -276,6 +276,20 @@ server.serve_forever()
                     assert json.loads(committed[0]["reason"].split(":", 1)[1]) == receipt
                     assert any(e["event_id"] == receipt["保存承認監査ID"] and e["reason"].startswith("対話内容保存承認 ") for e in save_events)
                     assert any(e["event_id"] == receipt["終了監査ID"] and e["request_id"] == p["要求ID"] for e in save_events)
+                    receipt_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "include_content_receipt": True, "filter": {"要求ID": p["要求ID"]}})
+                    page_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(receipt_page, page_schema)
+                    entry_receipt = receipt_page["entries"][0]["content_receipt"]
+                    assert entry_receipt["receipt"] == receipt
+                    assert entry_receipt["audit_event_id"] == committed[0]["event_id"]
+                    assert entry_receipt["event_hash"] == committed[0]["event_hash"]
+                    grant = 成功(owner, "対話履歴承認", {"実行系ID": "left"})["grant"]["approval_id"]
+                    receipt_query = {"approval_id": grant, "query": {"after": 0, "limit": 1, "latest_per_request": True, "include_content_receipt": True, "filter": {"実行系ID": "left", "要求ID": p["要求ID"]}}}
+                    viewed_receipt = 成功(normal, "対話履歴閲覧", receipt_query)
+                    assert viewed_receipt["page"]["entries"][0]["content_receipt"] == entry_receipt
+                    成功(owner, "対話履歴失効", {})
+                    assert 操作(normal, "対話履歴閲覧", receipt_query)["body"] is None
+
                 else:
                     assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"
                 parent_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "filter": {"要求ID": p["要求ID"]}})

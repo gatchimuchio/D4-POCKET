@@ -16,6 +16,8 @@ pub(crate) struct Query {
     #[serde(default)]
     pub include_result_evidence: bool,
     #[serde(default)]
+    pub include_content_receipt: bool,
+    #[serde(default)]
     pub filter: std::collections::BTreeMap<String, String>,
 }
 
@@ -216,12 +218,64 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
         if query.include_result_evidence {
             entry["result_evidence"] = result_evidence(&events[..index], &entry["record"])?;
         }
+        if query.include_content_receipt {
+            entry["content_receipt"] = content_receipt(events, &entry["record"])?;
+        }
         entries.push(entry);
         next = index + 1;
     }
     Ok(
         json!({"version":1,"entries":entries,"next_cursor":next,"has_more":more,"head_hash":events.last().map(|v| &v.event_hash)}),
     )
+}
+
+fn content_receipt(events: &[super::audit::BrokerAuditEvent], archive: &Value) -> Result<Value, &'static str> {
+    if !["成功", "保留"].contains(&archive["状態"].as_str().unwrap_or("")) { return Ok(Value::Null); }
+    let record = &archive["実行記録"];
+    let mut found = None;
+    for (index, event) in events.iter().enumerate() {
+        let Some(raw) = event.reason.strip_prefix("対話内容保存記録:") else { continue; };
+        if raw.len() > 16384 { return Err("保存記録の上限超過"); }
+        let receipt: Value = super::json_input::read_unique(raw).map_err(|_| "保存記録の形式が不正")?;
+        if receipt["要求ID"] != record["要求ID"] { continue; }
+        if found.is_some() { return Err("保存記録が重複"); }
+        let keys = ["版","要求ID","対話セッションID","実行系ID","要求hash","終了監査ID","保存承認監査ID","暗号文hash","証拠種別"];
+        let object = receipt.as_object().ok_or("保存記録の形式が不正")?;
+        if object.len() != keys.len() || keys.iter().any(|k| !object.contains_key(*k))
+            || receipt["版"] != 1 || receipt["証拠種別"] != "INTERNAL_STATE"
+            || event.operation != "対話内容保存" || event.decision != "accepted"
+            || event.evidence_source != "INTERNAL_STATE" || event.payload_hash != sha256_tagged(raw.as_bytes()) {
+            return Err("保存記録の監査が不正");
+        }
+        for key in ["要求ID","対話セッションID","実行系ID","終了監査ID"] {
+            if receipt[key] != record[key] { return Err("保存記録の対象対応が不一致"); }
+        }
+        let valid_hash = |v: &Value| v.as_str().and_then(|s|s.strip_prefix("sha256:"))
+            .is_some_and(|s|s.len()==64 && s.bytes().all(|c|c.is_ascii_digit() || (b'a'..=b'f').contains(&c)));
+        if !valid_hash(&receipt["要求hash"]) || !valid_hash(&receipt["暗号文hash"]) { return Err("保存記録のhash形式が不正"); }
+        let approval_id = receipt["保存承認監査ID"].as_str().filter(|s|!s.is_empty()).ok_or("保存承認参照が不正")?;
+        let (approval_index, approval) = events[..index].iter().enumerate().find(|(_,e)| e.event_id == approval_id).ok_or("先行する保存承認が不在")?;
+        let proof = result_evidence(&events[..approval_index], archive)?;
+        if proof.is_null() || proof["表示範囲"] != "full" || proof["要求hash"] != receipt["要求hash"] {
+            return Err("保存記録と元の全文結果証跡が不一致");
+        }
+        let select = json!({"要求ID":receipt["要求ID"],"要求hash":receipt["要求hash"]});
+        let hash = sha256_tagged(select.to_string().as_bytes());
+        let target = receipt["要求ID"].as_str().ok_or("保存対象IDが不正")?;
+        let expected = format!("対話内容保存承認 Capability=対話内容保存 Permission=独立保管先:{target} Approval={hash} RecoveryAction=保管監査再確認");
+        if approval.operation != "対話内容保存" || approval.request_id != event.request_id
+            || approval.decision != "recorded" || approval.evidence_source != "INTERNAL_STATE"
+            || approval.payload_hash != hash || approval.reason != expected {
+            return Err("保存承認の対象と監査が不一致");
+        }
+        let received: Vec<_> = events[..approval_index].iter().filter(|e|e.request_id == event.request_id && e.operation == "対話内容保存" && e.decision == "received").collect();
+        if received.len() != 1 || received[0].reason != "対話内容保存要求を受信"
+            || received[0].payload_hash != hash || received[0].evidence_source != "INTERNAL_STATE" {
+            return Err("保存要求の受信監査が不一致");
+        }
+        found = Some(json!({"audit_event_id":event.event_id,"event_hash":event.event_hash,"receipt":receipt}));
+    }
+    Ok(found.unwrap_or(Value::Null))
 }
 
 #[cfg(test)]
@@ -663,5 +717,55 @@ fn 結果証跡読取は改変と別要求と表示昇格と重複を拒否す�
         if case == 11 { log.append(&request, "対話取得", "recorded", &format!("対話結果証跡:{body}"), "INTERNAL_STATE", &payload); }
         let result = result_evidence(log.events(), &archive);
         if case < 2 { assert_eq!(result.unwrap(), proof); } else { assert!(result.is_err(), "case={case}"); }
+    }
+}
+
+
+#[test]
+fn 保存記録は元の結果と明示承認と先行順序を検査する() {
+    for case in 0..18 {
+        let mut log = BrokerAuditLog::default();
+        let request="a".repeat(32); let hash=sha256_tagged(b"request");
+        let created=log.append(&request,"対話送信","recorded","対話承認待ち作成","INTERNAL_STATE",&hash);
+        let scope=if case==1 {"hash_only"} else {"full"};
+        let start=log.append(&request,"対話承認","recorded",&format!("対話送信承認 Capability=対話送信 Permission=local:127.0.0.1:9 Approval={hash} 表示範囲={scope} RecoveryAction=接続再確認"),"INTERNAL_STATE",&hash);
+        let end=log.append(&request,"対話取得","recorded","対話完了","INTERNAL_STATE",&hash);
+        let archive=json!({"版":1,"状態":"成功","失敗分類":null,"実行記録":{"要求ID":request,"対話セッションID":"b".repeat(32),"実行系ID":"local","作成時刻":100,"開始時刻":101,"終了時刻":102,"作成監査ID":created.event_id,"開始監査ID":start.event_id,"終了監査ID":end.event_id}});
+        let select=json!({"要求ID":request,"要求hash":hash}); let select_hash=sha256_tagged(select.to_string().as_bytes());
+        let mut proof=json!({"版":1,"要求ID":request,"対話セッションID":"b".repeat(32),"実行系ID":"local","要求hash":hash,"終了監査ID":end.event_id,"表示範囲":scope,"応答hash":hash,"能力申告hash":hash,"経路申告hash":hash,"追跡参照hash":hash,"証拠種別":"INTERNAL_STATE"});
+        if case==1 {for k in ["能力申告hash","経路申告hash","追跡参照hash"] {proof[k]=Value::Null;}}
+        let raw=proof.to_string();
+        if case!=14 {log.append(&request,"対話取得","recorded",&format!("対話結果証跡:{raw}"),"INTERNAL_STATE",&sha256_tagged(raw.as_bytes()));}
+        let archive_raw=archive.to_string();
+        log.append(&request,"対話取得","recorded",&format!("対話実行記録:{archive_raw}"),"INTERNAL_STATE",&sha256_tagged(archive_raw.as_bytes()));
+        assert!(content_receipt(log.events(),&archive).unwrap().is_null());
+        if case!=13 {log.append("save-request","対話内容保存","received","対話内容保存要求を受信","INTERNAL_STATE",&select_hash);}
+        let reason=format!("対話内容保存承認 Capability=対話内容保存 Permission=独立保管先:{request} Approval={select_hash} RecoveryAction=保管監査再確認");
+        let approval=log.append(if case==12 {"other-request"} else {"save-request"},"対話内容保存","recorded",&reason,"INTERNAL_STATE",if case==11 {&hash} else {&select_hash});
+        if case==14 {log.append(&request,"対話取得","recorded",&format!("対話結果証跡:{raw}"),"INTERNAL_STATE",&sha256_tagged(raw.as_bytes()));}
+        let mut receipt=json!({"版":1,"要求ID":request,"対話セッションID":"b".repeat(32),"実行系ID":"local","要求hash":hash,"終了監査ID":end.event_id,"保存承認監査ID":approval.event_id,"暗号文hash":hash,"証拠種別":"INTERNAL_STATE"});
+        match case {
+            2=>receipt["対話セッションID"]=json!("c".repeat(32)),
+            3=>receipt["実行系ID"]=json!("other"),
+            4=>receipt["要求hash"]=json!(sha256_tagged(b"other")),
+            5=>receipt["終了監査ID"]=json!(start.event_id),
+            6=>receipt["保存承認監査ID"]=json!(end.event_id),
+            7=>receipt["暗号文hash"]=json!("bad"),
+            8=>receipt["本文"]=json!("漏洩しない"),
+            15=>receipt["版"]=json!(2),
+            16=>receipt["保存承認監査ID"]=json!("future"),
+            _=>(),
+        }
+        let mut body=receipt.to_string();
+        if case==17 { body=body.replacen("{","{\"版\":1,",1); }
+        let payload=if case==9 {hash.clone()} else {sha256_tagged(body.as_bytes())};
+        log.append("save-request","対話内容保存","accepted",&format!("対話内容保存記録:{body}"),"INTERNAL_STATE",&payload);
+        if case==10 {log.append("save-request","対話内容保存","accepted",&format!("対話内容保存記録:{body}"),"INTERNAL_STATE",&payload);}
+        let result=content_receipt(log.events(),&archive);
+        if case==0 {
+            assert_eq!(result.unwrap()["receipt"],receipt);
+            let page=page(&log,Query{limit:100,include_content_receipt:true,..Default::default()}).unwrap();
+            assert_eq!(page["entries"][0]["content_receipt"]["receipt"],receipt);
+        } else {assert!(result.is_err(),"case={case}");}
     }
 }
