@@ -15,7 +15,7 @@
 
 Flutter共通化単位では `packages/gui_shell_ui` の analyze/test をlocal validationへ追加する。共有層は表示・通常client契約に限定し、DesktopとMobileの接続・資格保管はplatform側に残す。Mobile正式projectの足場と端末連携の完成を区別し、未接続の画面を実状態として報告しない。
 
-Apple platform単位は、ローカルhostがWindows/WSLでMacがないため、`.github/workflows/apple-manual-build.yml` を手動補助に使用する。対象は固定Flutter 3.44.0による共有UI・Desktop・Mobileの解析とFlutter試験、macOS開発app・iOS Simulator appのbuild、Mac上のRust helper試験とする。Flutter試験はMac上の開発用試験であり、iOS Simulatorの起動・native plugin・Keychainの実検証とは区別する。triggerはworkflow_dispatchのみ、contents権限はread、actionとFlutterはcommit固定、成果物の保管は3日とする。実行環境・対象commit・log・artifact hash・自動変更差分を記録し、追跡ソースの自動変更は成功として扱わない。実機install・launch・Keychain・対話・owner GOはこの補助実行で証明しない。
+Apple platform単位は、ローカルhostがWindows/WSLでMacがないため、`.github/workflows/apple-manual-build.yml` を手動補助に使用する。対象は固定Flutter 3.44.0による共有UI・Desktop・Mobileの解析とFlutter試験、macOS開発app・iOS Simulator appのbuild、Mac上のRust helper試験とする。Flutter試験はMac上の開発用試験であり、iOS Simulatorの起動・native plugin・Keychainの実検証とは区別する。triggerはworkflow_dispatchのみ、contents権限はread、actionとFlutterはcommit固定、成果物の保管は3日とする。実行環境・対象commit・log・artifact hash・自動変更差分を記録し、追跡ソースの自動変更は成功として扱わない。専用runner上の利用可能なiPhone Simulatorを明示選択し、native安全保管の統合試験を実行する。試験は非秘密値と専用prefixで製品資格から分離し、使用したSimulatorを終了する。実機install・launch・Keychain保護・対話・owner GOはこの補助実行で証明しない。
 
 rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起動回帰を `release_blockers.registry.json` へ未解決のmanual gateとして追加する。既存Windows証拠とowner GOは保持し、旧post_v1_scopeによるrev2要求の除外を防ぐ。
 

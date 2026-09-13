@@ -69,3 +69,9 @@ Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を
 owner CLIは `対話承認操作 --session-file <owner資格file> 端末招待 <端末ID> <接続先Host> <新規招待file>`、`端末一覧`、`端末招待取消 <招待ID>`、`端末失効 <結合ID>`。招待秘密を標準出力へ表示せず新規fileへ保存する。既存fileを上書きしない。通常UIはowner資格を読まない。
 
 `python tooling/minidora_live_check.py --reference <固定参照clone> --mobile-client --dart-client` は実TLSから実MINIDORAへの経路を実行する。テストのPython clientは開発専用であり、Mobile製品client・安全保管・実機lifecycleの証拠にはしない。
+
+## 仮想端末でのnative保管検証
+
+`apps/mobile_flutter/integration_test/native_store_test.dart` はdevelopment専用で、製品のSecureDeviceStoreを実行する。試験ごとのprefixだけを付け、既存端末IDや実資格を読取・上書きしない。非秘密の試験値だけを保存し、終了時に削除を再読取で確認する。平文fallbackやMethodChannel置換を行わない。
+
+別instanceからの読取・更新・削除、端末IDのcontroller再生成後の一致、資格なし・破損資格の接続拒否を検査する。前景切替はcontroller呼出しによるINTERNAL_STATE検査であり、OSのbackground遷移やprocess再起動の証明ではない。保管APIの実行結果は仮想端末上のLIVE_RUNTIME証拠に限定し、実機Keychain保護、端末lock、媒体消去、実TLS再接続へ昇格しない。残る実機・実TLS・OS lifecycleの検証は上記release_blockerに保持する。

@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "f27dc04c008bb2ae142076829f6b4540290d34346ee4907ac636230fb903e04c"
+      "sha256": "561deefe4964f0644039a0ac62a6d5b3bbdfd3bd9b886ccf03e0088296183666"
     },
     {
       "path": ".gitignore",
@@ -142,7 +142,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c68dd59203ece73c08265739d22eb429a9fec97dfab752cc72560da8361300b9"
+      "sha256": "d99d724648beea3aa1b4f3d032fe358d27660d3d67e0ee95a72009d1a230deff"
     },
     {
       "path": "SECURITY.md",
@@ -605,6 +605,10 @@
       "sha256": "a4bb954fc832724d8c6aef689f0d82873af7ae4c6ff630cb19f4e0c7cd837d46"
     },
     {
+      "path": "apps/mobile_flutter/integration_test/native_store_test.dart",
+      "sha256": "145bb6e8d2595ca0669418d4df06b23bbee2175c313034b0f45dd39817bd7974"
+    },
+    {
       "path": "apps/mobile_flutter/ios/.gitignore",
       "sha256": "37380775aeb2499662b7aca80f4ac4c95ae827c3ba2bfa179aa3e9af4812c623"
     },
@@ -814,7 +818,7 @@
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
-      "sha256": "a40038e9190a75cd005c67de2d40bc233c91a4d75e8e3507d9f93a18412316b7"
+      "sha256": "d807424eda75b9381d56af9f497fd17150542b376e4097d6531a16d5d1dc3cd3"
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
@@ -890,7 +894,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "20dbc60f478c717b6fdf6b0b34dbf08b65914430959262f30563c2bee5f1b2cd"
+      "sha256": "40287b3b2b4b59636513f8338a4ba2fd630301606427a507a882037d4be0d253"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1002,7 +1006,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "6b88702200c21040d20660dac1b915f6fb2a1b29682ed7e36d87f579c14168f4"
+      "sha256": "f1fe87ed13bd9922b228655c6749ded818a32ff9e734ae44ea860f799ee97693"
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",

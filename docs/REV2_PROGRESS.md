@@ -19,6 +19,18 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Mobile native安全保管の仮想端末試験経路（2026-09-13）
+
+SDK付属integration_testをdevelopment依存に追加し、実SecureDeviceStoreを使う2試験を作成した。書込・別instance読取・更新・削除、端末IDの再読取、資格なし・破損資格の通信停止を検査する。試験キーはprefixで分離し、既存製品資格を読まない。前景切替はcontroller入力でありOS lifecycleではない。手動Apple補助は利用可能なiPhone Simulatorを選択・起動し、試験後に終了する。契約・本番権限・平文fallbackは変更しない。
+
+変更前b07dba3の手動run `34738095886` は共有18・Desktop33・Mobile29試験と解析、Rust64単体・5 IPC・7 checkpoint、macOS/iOS Simulator buildが成功した。ログはRepository外のGUI-Shell-apple-b07dba3-log.txt。今回追加したnative試験の結果とは区別する。成果物の最初の取得とローカルMobile試験はディスク容量不足で失敗した。処理終了後の空き容量回復を確認し、Mobile試験を再実行して29件PASSを確認した。追加試験を含む `flutter analyze --no-pub`、Schema36/正常36/負例38、conformance150件、厳格日本語監査もPASS。再生成物の削除は自動承認レビューで拒否され、迂回していない。
+
+- item: native安全保管のSimulator実行と実接続・OS lifecycle
+  classification: release_blocker
+  reason: native試験の実行はpush後の手動runnerで確認する必要があり、controller入力だけではOS lifecycleやTLS再接続を証明できない。
+  required_action: Simulator上の実行結果を収集し、次に実TLS接続とOS lifecycleの試験を接続する。非Windows実機は指定どおり延期する。
+  blocks_release: yes
+
 ## Apple手動補助へFlutter解析・試験を追加（2026-09-13）
 
 手動workflowはRust試験とapp buildのみで、共有UI・Desktop・MobileのFlutter試験を実行していなかった。各packageの解析と試験を追加し、依存解決・解析・試験のログを対象commitの補助成果物へ保存する。pipefailにより解析・試験の失敗をbuild成功で隠さない。固定toolchain・手動起動限定・read権限・保管期間・追跡差分拒否は保持する。これはdevelopment専用経路であり、製品の権限や外部送信経路を変更しない。
