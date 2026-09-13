@@ -187,7 +187,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
             side.pending = progress.result == null;
           });
         } catch (_) {
-          if (mounted) {
+          if (mounted && side.request == request && side.pending) {
             setState(() {
               side.error = '応答を取得できません。接続・監査を確認してください。本文の表示は保留しています。';
               side.result = null;

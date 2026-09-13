@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
@@ -31,6 +32,7 @@ class DialogueFixture implements BrokerTransport {
   bool failLeft = false;
   bool failRight = false;
   bool swap = false;
+  Completer<void>? pollWait;
   @override
   Future<Map<String, Object?>> request(String operation,
       {Map<String, Object?>? payload}) async {
@@ -52,6 +54,7 @@ class DialogueFixture implements BrokerTransport {
         inputs.add(p['入力']! as String);
         body = {'要求ID': id, '状態': '承認待ち'};
       case '対話取得':
+        if (pollWait != null) await pollWait!.future;
         final id = p['要求ID']! as String;
         final session = requests[id]!;
         final runtime = sessions[session]!;
@@ -80,6 +83,67 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  testWidgets('現在待機中の要求の通信失敗は表示する', (tester) async {
+    final wait = Completer<void>();
+    final f = DialogueFixture()..pollWait = wait;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                connect: () async => RuntimeDialogueClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '現在の要求');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    wait.completeError(const BrokerClientException('現在の通信失敗'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('応答を取得できません'), findsOneWidget);
+    expect(f.inputs, ['現在の要求']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+  for (final failed in [false, true]) {
+    testWidgets('中止した旧要求の遅延${failed ? '失敗' : '成功'}を新規セッションに表示しない',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final wait = Completer<void>();
+      final f = DialogueFixture()
+        ..complete = true
+        ..pollWait = wait;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: RuntimeDialogueScreen(
+                  connect: () async => RuntimeDialogueClient(f)))));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '旧要求');
+      await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      expect(f.calls.where((v) => v == '対話取得'), hasLength(1));
+      await tester.tap(find.text('中止'));
+      await tester.pumpAndSettle();
+      expect(find.text('状態: 中止'), findsOneWidget);
+      await tester.tap(find.text('新規セッション'));
+      await tester.pumpAndSettle();
+      expect(find.text('状態: 入力待ち'), findsOneWidget);
+      if (failed) {
+        wait.completeError(const BrokerClientException('旧要求の通信失敗'));
+      } else {
+        wait.complete();
+      }
+      await tester.pumpAndSettle();
+      expect(find.textContaining('応答を取得できません'), findsNothing);
+      expect(find.text('leftの応答'), findsNothing);
+      expect(find.text('状態: 入力待ち'), findsOneWidget);
+      expect(f.inputs, ['旧要求']);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+  }
   testWidgets('停止中は接続せず復帰時に照会だけ再開する', (tester) async {
     final f = DialogueFixture();
     Widget screen(bool active) => MaterialApp(

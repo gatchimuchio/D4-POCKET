@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 共有対話画面の遅延失敗を元の要求へ限定（2026-09-13）
+
+応答照会中に中止して新規セッションへ切り替えると、旧要求の遅延通信失敗が新しいセッションのerrorを上書きすることをWidget試験で再現した。成功応答は既に要求IDとpendingを検査していたが、catch側には同じ結合確認がなかった。例外の表示にも現在の要求ID一致と待機中の条件を要求した。経路はDesktop/Mobile共有UIの表示処理で、brokerの採否・取消・監査は変更しない。
+
+初回の再現試験は遅延を設定する前に周期照会が完了し、取消状態の前提を満たせなかった。送信前に応答の待機を設定して順序を固定すると、修正前は遅延成功の除外がPASS、遅延失敗の除外がFAILとなった。修正後は両方PASSで、現在待機中の要求の失敗は表示する対照試験もPASSした。これは製品Widgetを実行するFIXTUREであり、実ネットワーク障害を起こした実機証拠ではない。
+
+共有package・Desktop・Mobileで `flutter test --no-pub --reporter expanded` がそれぞれ9・33・29件PASS、3か所の `flutter analyze --no-pub` もPASS。`python tooling/schema_check/check_schemas.py`（Schema36/正常36/負例38）、`python tooling/conformance_tests/run_conformance_skeleton.py`（150件）、`python tooling/日本語基底監査.py --strict` はPASS。非Windows実機と実運用署名の延期は冒頭のrelease_blockerに保持する。
+
 ## Mobile復帰時の安全保管の再確認（2026-09-13）
 
 仕様が求める復帰時の資格読取に対し、製品controllerはメモリ上の資格だけで端末確認を再開していた。保存資格の削除・破損・秘密変更・Host変更・期限変更・端末ID変更・読取障害の7負例すべてで、変更前に接続再開を再現した。
