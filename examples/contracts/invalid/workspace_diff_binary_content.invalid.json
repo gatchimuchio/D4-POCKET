@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "binary",
+  "before": null,
+  "after": {
+    "bytes": 2,
+    "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "unified": "secret binary payload",
+  "rows": []
+}

@@ -186,6 +186,25 @@
       "japanese_reference": "規定/00_日本語基底規定.md",
       "authority_effect": "none",
       "review_trigger": "HTTP接続のヘッダーまたは対象実行系を変更するとき"
+    },
+    {
+      "id": "JBE-008",
+      "scopes": [
+        "native/rust_helper/src/workspace_diff.rs"
+      ],
+      "region": "Git patchの存在差headerの固定語と行区切りescapeだけ。周囲の説明と診断は除外しない。",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "new file mode",
+        "deleted file mode",
+        "\\n"
+      ],
+      "unavoidable_reason_japanese": "Gitが解釈する外部固定形式で、翻訳すると空fileの追加・削除の互換性を壊すため。実適用と逆適用の試験で確認する。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "差分形式またはGit consumerを変更するとき"
     }
   ],
   "frozen_assets": [

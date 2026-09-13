@@ -62,6 +62,7 @@ from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
 
 REQUIRED_SCHEMA_NAMES = {
+    "workspace_diff",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_session",
@@ -3052,6 +3053,29 @@ def test_runtime_catalog_cannot_grant_authority() -> list[str]:
     return []
 
 
+def test_workspace_diff_content_shape() -> list[str]:
+    schema = json.loads((SPECS / "workspace_diff.schema.json").read_text(encoding="utf-8"))
+    base = {"version": 1, "kind": "binary", "before": None,
+            "after": {"bytes": 1, "sha256": "sha256:" + "0" * 64}, "unified": None, "rows": []}
+    for kind in ["binary", "oversized", "unchanged"]:
+        item = dict(base, kind=kind)
+        if validate_instance(item, schema):
+            return ["metadataだけの差分構造が拒否された"]
+        for injected in [dict(item, unified="本文"), dict(item, rows=[{"kind": "added", "before": None, "after": {"number": 1, "text": "本文", "newline": True}}])]:
+            if not validate_instance(injected, schema):
+                return ["本文禁止の差分へ内容を混入できた"]
+    item = dict(base, kind="text", unified="--- /dev/null\n+++ b/file\n@@ -0,0 +1,1 @@\n+追加\n",
+                rows=[{"kind": "added", "before": None, "after": {"number": 1, "text": "追加", "newline": True}}])
+    if validate_instance(item, schema):
+        return ["text差分の構造が拒否された"]
+    for kind in ["same", "changed", "deleted"]:
+        wrong = copy.deepcopy(item)
+        wrong["rows"][0]["kind"] = kind
+        if not validate_instance(wrong, schema):
+            return ["左右行と変更種類の矛盾を受理した"]
+    return []
+
+
 def test_agent_workspace_outside_access_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -3691,6 +3715,7 @@ def main() -> int:
         test_runtime_manifest_invalid_fixture_rejected,
         test_adapter_manifest_authority_escalation_rejected,
         test_runtime_catalog_cannot_grant_authority,
+        test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,

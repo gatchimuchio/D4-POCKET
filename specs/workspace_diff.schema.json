@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/workspace_diff.schema.json",
+  "title": "作業領域の内部差分",
+  "description": "Rustが生成する内部差分。構造適合は表示権限ではなく、Brokerによる現在の表示範囲の適用が必要。",
+  "type": "object",
+  "required": [
+    "version",
+    "kind",
+    "before",
+    "after",
+    "unified",
+    "rows"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "kind": {
+      "enum": [
+        "unchanged",
+        "binary",
+        "oversized",
+        "text"
+      ]
+    },
+    "before": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "bytes",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "after": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "bytes",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "unified": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 270000
+    },
+    "rows": {
+      "type": "array",
+      "maxItems": 4000,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "before",
+          "after"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "same",
+              "added",
+              "deleted",
+              "changed"
+            ]
+          },
+          "before": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "number",
+              "text",
+              "newline"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 65536
+              },
+              "newline": {
+                "type": "boolean"
+              }
+            }
+          },
+          "after": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "number",
+              "text",
+              "newline"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 65536
+              },
+              "newline": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "same",
+                  "changed"
+                ]
+              },
+              "before": {
+                "type": "object"
+              },
+              "after": {
+                "type": "object"
+              }
+            }
+          },
+          {
+            "properties": {
+              "kind": {
+                "const": "added"
+              },
+              "before": {
+                "type": "null"
+              },
+              "after": {
+                "type": "object"
+              }
+            }
+          },
+          {
+            "properties": {
+              "kind": {
+                "const": "deleted"
+              },
+              "before": {
+                "type": "object"
+              },
+              "after": {
+                "type": "null"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "unified": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "enum": [
+            "unchanged",
+            "binary",
+            "oversized"
+          ]
+        },
+        "unified": {
+          "type": "null"
+        },
+        "rows": {
+          "maxItems": 0
+        }
+      }
+    }
+  ]
+}

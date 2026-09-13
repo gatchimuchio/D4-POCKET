@@ -24,3 +24,5 @@ Conformance 要件:
 - 生成された diff には Audit evidence が必要である。
 - Agent の auto-permission mode は advisory に限定する。
 - state-changing action には rollback candidate が必要である。
+
+作業領域の詳細検査は[作業領域インスペクタの契約](workspace-inspection.md)へ接続する。内部差分の生成成功を、取得権限・表示権限・製品経路の完成とみなさない。

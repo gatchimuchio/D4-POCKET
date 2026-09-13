@@ -1002,7 +1002,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "d8b7279ee263d0f4769e796f7f0f1be8943882da89790f4fc9f167c359eed75c"
+      "sha256": "a12658e3c3c650c4871937f6f29bce233b6c22aba127557abe3d0748e9967af4"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1037,6 +1037,10 @@
       "sha256": "2661b6193d2d308baa17c560d1a24cefef5bbb198053dd88009b7e0165cc4bc1"
     },
     {
+      "path": "docs/specs/workspace-inspection.md",
+      "sha256": "94f8731e476ef8ab82844e10eb6f50d5e91084192bc57e4f9eeb01696c890e67"
+    },
+    {
       "path": "docs/standards/gui-shell-extended-standard.md",
       "sha256": "9a75f6607c23f37e6df506a22fcdd0a6c06ce24dcc70188877fe8891398ac3e4"
     },
@@ -1062,7 +1066,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "4f64397e62d391b1efafc53913fa0073dd29b20cb99f85adc2eda4adbd6e0655"
+      "sha256": "88645f1843c1046e075470a4b23c6123771da0faa3987e1772b9a9f6e61a9f4b"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1321,6 +1325,10 @@
       "sha256": "a229f7d4bea7ceaae89cb89e61a5ec0dacd03c303854f1570c2fb1b3d9697644"
     },
     {
+      "path": "examples/contracts/invalid/workspace_diff_binary_content.invalid.json",
+      "sha256": "b6515154eb9e3c77250600c86bc1cfb4f39fc3bd5635c7b4f3aece43a2bc01fa"
+    },
+    {
       "path": "examples/contracts/ipc_request.valid.json",
       "sha256": "1bda4f73e54fd57a0d4bb13122cbc16517a00a0030db3679a0732dfcf9afc613"
     },
@@ -1371,6 +1379,10 @@
     {
       "path": "examples/contracts/update.valid.json",
       "sha256": "473ff0ab36fc36a6a03f62522a1af8ee42629b34f5d223ee8c10228b9e700c1b"
+    },
+    {
+      "path": "examples/contracts/workspace_diff.valid.json",
+      "sha256": "853b3b874646fdfc531d61c7cdee640d3262dc3472bb70f4336a584a739c369e"
     },
     {
       "path": "examples/framework_risk/flutter_current.json",
@@ -1526,7 +1538,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "75834fdb10ef12686d8b7e427510357757f7d470134a7a7320a3686488831a17"
+      "sha256": "01566b253acb77df55679818939ca335882ee449b22369249ddf431f475ce0f6"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -1549,12 +1561,20 @@
       "sha256": "5e85be1a70b29d84fed6233f084a0d16486f5cf77cf119f4e24d11f6ac448385"
     },
     {
+      "path": "native/rust_helper/src/workspace_diff.rs",
+      "sha256": "e8865cf2e13ee541809d2924865e023e6a3d306eace750873e546cd195f2bfec"
+    },
+    {
       "path": "native/rust_helper/tests/broker_ipc.rs",
       "sha256": "45801f3d8fbaa20ec7d2e107a975ac68687b182f7139949e64b01d0cc515516d"
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
       "sha256": "a17f5d87746bebc8ec23d18dcced81fca155877cb77cf3c214db6932573f718c"
+    },
+    {
+      "path": "native/rust_helper/tests/workspace_diff.rs",
+      "sha256": "56fa34864fe6c1dbec77b32c95184130ddbe012fa60858a25c063e753f032f74"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -2033,6 +2053,10 @@
       "sha256": "b1fce1fb95b26840af05284f71d28ac61577c32a8bf03f883d097d7b8db9dbf0"
     },
     {
+      "path": "specs/workspace_diff.schema.json",
+      "sha256": "5b43c5f1ffe4adb2e7e63ae737d5f4c6d9a5d135f0233d94603e986f7dd1e796"
+    },
+    {
       "path": "tooling/audit_checkpoint_verifier.py",
       "sha256": "272b860007e5b0405153cc1973dbb4f5c7624e7f72c2e923eff65ee8211eb3ef"
     },
@@ -2050,7 +2074,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5227b80408b18716b06d3b19a65fa422a860c192fac81a5e293c064914a94e87"
+      "sha256": "ca39aff43ee82cecf37009c12ae7a7955d39c91d0203f5a8ff07a565787b7419"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2102,7 +2126,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "0da9842dc26cd293125a5aabb5b3c9da466af150febda4907af72a41727f6b7d"
+      "sha256": "402b78c5f29d47d20bc4e70c49a5192dfc935b47dc1c661f988256448e6e8d13"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -2130,11 +2154,11 @@
     },
     {
       "path": "\u898f\u5b9a/\u65e5\u672c\u8a9e\u57fa\u5e95\u4f8b\u5916.json",
-      "sha256": "bdef817f4b18f297d3d78a0195acccfcd3500125029ee45c695a099c56f5bcaf"
+      "sha256": "10668cc1dc3d2496e075d0fd0772aa678c4a6440d8a4b6dc0802010b597d9841"
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "c82113dc906068f2513a2edc174229d1ca2cac603de4d75a9a2b3f312769b814"
+      "sha256": "2c47434785042b3b517d02331450d19b8490b69aee59b2fd37e59648c6fb6a0d"
     }
   ]
 }

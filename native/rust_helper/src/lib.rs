@@ -6,6 +6,7 @@ pub mod adapters;
 pub mod broker;
 pub mod diagnostics;
 pub mod filesystem;
+pub mod workspace_diff;
 pub mod ipc;
 pub mod network;
 pub mod process;
