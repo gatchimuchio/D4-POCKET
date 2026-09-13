@@ -10,6 +10,7 @@ import 'package:gui_shell_desktop/services/workspace_client.dart';
 
 class TestBroker implements BrokerTransport {
   String visibility = 'full';
+  bool folders = false;
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
@@ -74,6 +75,17 @@ class TestBroker implements BrokerTransport {
         '表示範囲': visibility,
         'projection': projection,
       };
+      if (folders && tree && visibility == 'full') {
+        body['projection'] = {
+          'entries': payload!['相対path'] == ''
+              ? [
+                  {'path': 'folder', 'kind': 'directory', 'bytes': null}
+                ]
+              : [
+                  {'path': 'folder/nested.txt', 'kind': 'file', 'bytes': 6}
+                ]
+        };
+      }
       mutate?.call(body);
       evidence = {'full', 'hash_only'}.contains(visibility)
           ? 'LIVE_RUNTIME'
@@ -149,6 +161,8 @@ void main() {
     try {
       final project = await Directory('${root.path}/project').create();
       await File('${project.path}/file.txt').writeAsString('実接続本文');
+      await Directory('${project.path}/folder').create();
+      await File('${project.path}/folder/nested.txt').writeAsString('配下の本文');
       await File('${project.path}/.env').writeAsString('試験の非公開値');
       final config = File('${root.path}/workspace.json');
       await config.writeAsString(jsonEncode({
@@ -201,7 +215,13 @@ void main() {
       final view = await client.read(selected, 'file.txt', tree: false);
       expect(view.projection!['text'], '実接続本文');
       final tree = await client.read(selected, '', tree: true);
-      expect((tree.projection!['entries'] as List).length, 1);
+      expect((tree.projection!['entries'] as List).length, 2);
+      final nested = await client.read(selected, 'folder', tree: true);
+      expect((nested.projection!['entries'] as List).single['path'],
+          'folder/nested.txt');
+      final nestedFile =
+          await client.read(selected, 'folder/nested.txt', tree: false);
+      expect(nestedFile.projection!['text'], '配下の本文');
       await expectLater(client.read(selected, '.env', tree: false),
           throwsA(isA<BrokerClientException>()));
       final revoked = await Process.run(executable, [
@@ -257,6 +277,21 @@ void main() {
           throwsA(isA<BrokerClientException>()));
     }
   });
+  test('directoryの数値サイズとfileのnullサイズを拒否する', () async {
+    for (final entry in [
+      {'path': 'folder', 'kind': 'directory', 'bytes': 0},
+      {'path': 'file.txt', 'kind': 'file', 'bytes': null},
+    ]) {
+      final broker = TestBroker()
+        ..mutate = (v) => v['projection'] = {
+              'entries': [entry]
+            };
+      final client = WorkspaceClient(broker);
+      await expectLater(
+          client.read((await client.list()).single, '', tree: true),
+          throwsA(isA<BrokerClientException>()));
+    }
+  });
   test('取得中の失効と期限切れを拒否する', () async {
     final broker = TestBroker()..revokeAfterRead = true;
     final client = WorkspaceClient(broker);
@@ -289,6 +324,28 @@ void main() {
     expect(find.text('本文'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets('フォルダーから配下本文へ移動しnullサイズを表示しない', (tester) async {
+    final broker = TestBroker()..folders = true;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    expect(find.text('フォルダー'), findsOneWidget);
+    expect(find.text('null バイト'), findsNothing);
+    await tester.tap(find.text('folder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('folder/nested.txt'));
+    await tester.pumpAndSettle();
+    expect(find.text('本文'), findsOneWidget);
+    await tester.tap(find.text('作業領域の先頭へ'));
+    await tester.pumpAndSettle();
+    expect(find.text('folder'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('非表示後に完了した遅延読取を復元しない', (tester) async {
     final broker = TestBroker();
     await tester.pumpWidget(MaterialApp(

@@ -75,3 +75,7 @@ Desktopの製品ShellCoreClientは通常Broker接続を保持し、Agent Center�
 表示中は2秒ごとに現在一覧を再確認し、確認開始時点で内容を消す。一覧成功かつ同一承認のときだけ直前の取得内容を復元する。これは取得時点の内容であり、filesystem変更の自動追従ではない。期限は100msの画面timerで確認し、表示開始から単調時計でも300秒を上限とする。OSの実行停止やUI event loop遅延があるため、失効直後の瞬時消去や秒単位の絶対的応答保証は主張しない。画面非表示・破棄・接続変更・選択変更は世代を更新し、遅延応答を破棄する。過去に表示・読取した内容を人や外部記録から消す方式ではない。
 
 実BrokerとのDart接続試験は試験固有の一時rootとowner資格を用い、実運用承認を代理しない。widget試験は描画と非同期状態の証拠であり、Windows native windowの操作証拠へ昇格しない。差分基準点・履歴・rollback preview・native画面検証はrelease_blockerとして継続する。
+
+### ツリーのfileとdirectoryの区別
+
+列挙結果のbytesは、fileでは0以上の整数、directoryではnullとする。directory配下全体のサイズを未計測なのに0として表示しない。SchemaとDart consumerはkindとbytesの組合せを検査し、directoryは「フォルダー」、fileだけはサイズを表示する。実directory・配下tree・配下本文の接続試験を必須とし、fileだけの正常試験でtree navigationの完成を判断しない。

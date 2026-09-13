@@ -201,8 +201,10 @@ class WorkspaceClient {
                   entryPath.substring(prefix.length).contains('/') ||
                   !seen.add(entryPath) ||
                   !{'file', 'directory'}.contains(entry['kind']) ||
-                  entry['bytes'] is! int ||
-                  (entry['bytes'] as int) < 0) {
+                  (entry['kind'] == 'directory'
+                      ? entry['bytes'] != null
+                      : entry['bytes'] is! int ||
+                          (entry['bytes'] as int) < 0)) {
                 _invalid();
               }
             }

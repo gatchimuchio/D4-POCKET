@@ -250,7 +250,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "150f79cc27611de9a651b3a0c7eb55c827bebedceb3acb697c3c6e7c3d63cf52"
+      "sha256": "356eb9861bfc38973cb6d688b866ccfcecafd96a74609abec4f4c535bbc9d650"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -274,7 +274,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "662ec0d25c0fc889b23c1b083bcd68dc822eb497bc8f2fa2854d966cf4279af1"
+      "sha256": "a42533fa723dc8b7be2149e34119d41b367fb8114c2d97e0a31929f97d1952a6"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -450,7 +450,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "0912eccd1001118d2856bf4ed3e258daaa9695f20a2fdd84ead76f6e815a7d05"
+      "sha256": "477ecdc383096984557e08b67d2b288bb4d6abbe8dec17a2a646816ac6d403bd"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -1050,7 +1050,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "ffa1626b21f69ebce49f6f6358bc51df071c2f1db6b1500b5efb858c7f50bc1f"
+      "sha256": "da102d50165d633237de310305082fe077bc5750ccba8792b4673d6c9452cfbb"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1078,7 +1078,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "706ee243569b7026796831eaef45b1f8f43a5bb0bcd8809de45770454bd6ea8d"
+      "sha256": "8c4fb4fdb0668fe46289eda0dff05f92a56ac1f0048293fd6702beddcfadf682"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2130,7 +2130,7 @@
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "c51e2ccdbc358ad0963a5593921658812bc7fba327c875526ab73322692573e5"
+      "sha256": "565386431523401f990f98bca672d69e5904857b6d8927e80e737598b9530c82"
     },
     {
       "path": "specs/workspace_startup.schema.json",
@@ -2154,7 +2154,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1bc50fdc219519bd9e51d5650fad8e6b162bedceb1739281f43a65dc2f49d9b0"
+      "sha256": "cb87626093459daa792b375fd29bfe1e3183ad4734587e45c1f44587a2f67c3c"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

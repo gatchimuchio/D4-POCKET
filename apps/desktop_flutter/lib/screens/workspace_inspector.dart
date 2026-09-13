@@ -197,7 +197,9 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                   ? Icons.folder
                   : Icons.description),
               title: Text(item['path'] as String),
-              subtitle: Text('${item['bytes']} バイト'),
+              subtitle: Text(item['kind'] == 'directory'
+                  ? 'フォルダー'
+                  : '${item['bytes']} バイト'),
               onTap: _busy
                   ? null
                   : () => _read(view.registration, item['path'] as String,

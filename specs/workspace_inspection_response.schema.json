@@ -316,30 +316,53 @@
               "type": "array",
               "maxItems": 1024,
               "items": {
-                "type": "object",
-                "required": [
-                  "path",
-                  "kind",
-                  "bytes"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1024
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "kind",
+                      "bytes"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "kind": {
+                        "const": "file"
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
                   },
-                  "kind": {
-                    "enum": [
-                      "file",
-                      "directory"
-                    ]
-                  },
-                  "bytes": {
-                    "type": "integer",
-                    "minimum": 0
+                  {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "kind",
+                      "bytes"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "kind": {
+                        "const": "directory"
+                      },
+                      "bytes": {
+                        "type": "null"
+                      }
+                    }
                   }
-                }
+                ]
               }
             }
           }

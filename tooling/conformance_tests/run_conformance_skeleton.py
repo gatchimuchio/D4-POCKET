@@ -3080,6 +3080,13 @@ def 作業領域応答の露出境界を検査する() -> list[str]:
             errors.append("応答結合fieldの欠落を受理した")
     if not validate_instance(dict(base, projection=dict(base["projection"], binary=True)), schema):
         errors.append("binary本文を受理した")
+    for kind, size in (("directory", None), ("file", 0)):
+        entry = {"path": "entry", "kind": kind, "bytes": size}
+        tree = dict(base, operation="作業領域ツリー", projection={"entries": [entry]})
+        errors.extend(validate_instance(tree, schema))
+        wrong = dict(tree, projection={"entries": [dict(entry, bytes=0 if size is None else None)]})
+        if not validate_instance(wrong, schema):
+            errors.append("fileとdirectoryのサイズ表現を混同した")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(name + ".schema.json")["properties"]["operation"]["enum"]
         for operation in ("作業領域一覧", "作業領域承認", "作業領域失効", "作業領域ツリー", "作業領域読取"):
