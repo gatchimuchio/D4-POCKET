@@ -3,11 +3,14 @@ import 'dart:io';
 
 import '../models/generated_contracts.dart';
 import 'broker_client.dart';
+import 'workspace_client.dart';
 
 const String _snapshotFreshnessParseFailed = 'parse failed';
 
 class ShellCoreClient {
-  const ShellCoreClient._(this.snapshot, this.mode);
+  const ShellCoreClient._(this.snapshot, this.mode, [this.workspaceClient]);
+
+  final WorkspaceClient? workspaceClient;
 
   final ShellSnapshot snapshot;
   final String mode;
@@ -75,6 +78,7 @@ class ShellCoreClient {
           commandResponse: commandResponse,
         ),
         'broker',
+        WorkspaceClient(broker),
       );
     } on Object catch (error) {
       return ShellCoreClient._(

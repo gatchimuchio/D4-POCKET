@@ -65,6 +65,7 @@ REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
     "workspace_inspection_request",
     "workspace_startup",
+    "workspace_inspection_response",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_session",
@@ -3063,6 +3064,30 @@ def test_runtime_catalog_cannot_grant_authority() -> list[str]:
     return []
 
 
+def 作業領域応答の露出境界を検査する() -> list[str]:
+    schema = load_schema("workspace_inspection_response.schema.json")
+    base = load_contract_fixture("workspace_inspection_response.valid.json")
+    errors = validate_instance(base, schema)
+    for visibility, projection in [("none", None), ("hash_only", {"sha256": "sha256:" + "a" * 64}), ("summary", {"説明": "この表示範囲に提供できる承認済み内容はありません"}), ("redacted", {"説明": "この表示範囲に提供できる承認済み内容はありません"})]:
+        value = dict(base, 表示範囲=visibility, projection=projection)
+        errors.extend(validate_instance(value, schema))
+        if not validate_instance(dict(value, projection=base["projection"]), schema):
+            errors.append("制限付き応答に全文を混入できた")
+    for field in ("登録hash", "approval_id", "有効期限", "operation", "要求hash"):
+        wrong = dict(base)
+        del wrong[field]
+        if not validate_instance(wrong, schema):
+            errors.append("応答結合fieldの欠落を受理した")
+    if not validate_instance(dict(base, projection=dict(base["projection"], binary=True)), schema):
+        errors.append("binary本文を受理した")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(name + ".schema.json")["properties"]["operation"]["enum"]
+        for operation in ("作業領域一覧", "作業領域承認", "作業領域失効", "作業領域ツリー", "作業領域読取"):
+            if operation not in operations:
+                errors.append("通常IPCの作業領域操作が欠落")
+    return errors
+
+
 def 作業領域検査要求の分岐を検査する() -> list[str]:
     schema = load_schema("workspace_inspection_request.schema.json")
     samples = {
@@ -3748,6 +3773,7 @@ def main() -> int:
         test_adapter_manifest_authority_escalation_rejected,
         test_runtime_catalog_cannot_grant_authority,
         作業領域検査要求の分岐を検査する,
+        作業領域応答の露出境界を検査する,
         test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
         test_agent_secret_path_read_default_deny,

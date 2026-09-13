@@ -79,6 +79,10 @@ class BrokerClient implements BrokerTransport {
       if (decoded is! Map) {
         throw const BrokerClientException('broker 応答が object ではありません');
       }
+      if (decoded['request_id'] != request['request_id'] ||
+          decoded['operation'] != operation) {
+        throw const BrokerClientException('broker応答が現在の要求と一致しません');
+      }
       return Map<String, Object?>.from(decoded);
     } finally {
       socket.destroy();
@@ -185,6 +189,8 @@ String _rfc3339Seconds(DateTime value) {
   final second = value.second.toString().padLeft(2, '0');
   return '$year-$month-${day}T$hour:$minute:${second}Z';
 }
+
+String brokerPayloadHash(Map<String, Object?>? payload) => _payloadHash(payload);
 
 String brokerPayloadHashForTest(Map<String, Object?>? payload) =>
     _payloadHash(payload);

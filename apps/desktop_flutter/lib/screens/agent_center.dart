@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/shell_core_client.dart';
 import 'shared.dart';
+import 'workspace_inspector.dart';
 
 class AgentCenter extends StatelessWidget {
   const AgentCenter({super.key, required this.client});
@@ -14,6 +15,8 @@ class AgentCenter extends StatelessWidget {
     return ShellPage(
       title: 'エージェントセンター',
       children: [
+        if (client.workspaceClient != null)
+          BorderedPanel(child: WorkspaceInspector(client: client.workspaceClient!)),
         for (final session in sessions)
           BorderedPanel(
             child: Column(

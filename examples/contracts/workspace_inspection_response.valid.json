@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "operation": "作業領域読取",
+  "作業領域ID": "workspace-a",
+  "実行系ID": "runtime-a",
+  "登録hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "approval_id": "approval-a",
+  "有効期限": 2000000000,
+  "表示範囲": "full",
+  "projection": {
+    "path": "file.txt",
+    "bytes": 0,
+    "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "binary": false,
+    "text": ""
+  },
+  "要求hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

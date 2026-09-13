@@ -72,9 +72,18 @@ fn startup_owner_approval_real_ipc_read_and_revocation_are_connected() {
     let approved=cli(&f,&["作業領域承認","workspace-a",hash,"full"]);
     assert!(approved.status.success(),"{}",String::from_utf8_lossy(&approved.stderr));
     assert!(!String::from_utf8_lossy(&approved.stdout).contains(&owner.session_secret));
-    let response=request(&normal,"作業領域読取",selection);
+    let response=request(&normal,"作業領域読取",selection.clone());
     assert_eq!(response["status"],"accepted");assert_eq!(response["evidence_source"],"LIVE_RUNTIME");
     assert_eq!(response["body"]["projection"]["text"],"登録から実読取まで\r\n");
+    let current=request(&normal,"作業領域一覧",json!({}));
+    let current=&current["body"]["作業領域"][0];
+    for field in ["作業領域ID","実行系ID","登録hash","approval_id","有効期限","表示範囲"] {
+        assert_eq!(response["body"][field],current[field],"{field}");
+    }
+    assert_eq!(response["body"]["version"],1);
+    assert_eq!(response["body"]["operation"],"作業領域読取");
+    assert_eq!(response["body"]["要求hash"],sha256_tagged(selection.to_string().as_bytes()));
+
     let tree=request(&normal,"作業領域ツリー",json!({"作業領域ID":"workspace-a","相対path":""}));
     assert_eq!(tree["status"],"accepted");assert_eq!(tree["body"]["projection"]["entries"].as_array().unwrap().len(),1);
     for path in [".env","private/file.txt","../owner.json"] {

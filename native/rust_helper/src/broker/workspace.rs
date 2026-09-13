@@ -111,7 +111,7 @@ impl WorkspaceRegistry {
                 let grant = e.grant.as_ref().filter(|g| now < g.expires);
                 json!({"作業領域ID":id,"実行系ID":e.runtime,"登録hash":e.registration_hash,
                     "承認状態":if grant.is_some(){"approved"}else{"denied"},"有効期限":grant.map(|g|g.expires),
-                    "表示範囲":grant.map(|g|g.visibility.as_str()).unwrap_or("none")})
+                    "表示範囲":grant.map(|g|g.visibility.as_str()).unwrap_or("none"),"approval_id":grant.map(|g|g.id.as_str())})
             }).collect::<Vec<_>>()}));
         }
         if operation == "作業領域承認" {
@@ -161,7 +161,9 @@ impl WorkspaceRegistry {
             }
             _ => return Err("現在の表示範囲が不正"),
         };
-        let body = json!({"作業領域ID":p.作業領域ID,"表示範囲":grant.visibility,"approval_id":grant.id,"projection":projection});
+        let body = json!({"version":1,"operation":operation,"要求hash":digest(payload),
+            "作業領域ID":p.作業領域ID,"実行系ID":entry.runtime,"登録hash":entry.registration_hash,
+            "有効期限":grant.expires,"表示範囲":grant.visibility,"approval_id":grant.id,"projection":projection});
         audit("作業領域の取得projectionを確定", &digest(&body))?;
         if Instant::now() >= grant.deadline {return Err("取得中に読取承認が期限超過");}
         Ok(body)

@@ -1,0 +1,523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/workspace_inspection_response.schema.json",
+  "title": "作業領域検査の取得応答",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "enum": [
+            "作業領域ツリー",
+            "作業領域読取"
+          ]
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "none"
+        },
+        "projection": {
+          "type": "null"
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "enum": [
+            "作業領域ツリー",
+            "作業領域読取"
+          ]
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "hash_only"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "sha256"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "enum": [
+            "作業領域ツリー",
+            "作業領域読取"
+          ]
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "summary"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "説明"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "説明": {
+              "const": "この表示範囲に提供できる承認済み内容はありません"
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "enum": [
+            "作業領域ツリー",
+            "作業領域読取"
+          ]
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "redacted"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "説明"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "説明": {
+              "const": "この表示範囲に提供できる承認済み内容はありません"
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "const": "作業領域ツリー"
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "entries"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "type": "array",
+              "maxItems": 1024,
+              "items": {
+                "type": "object",
+                "required": [
+                  "path",
+                  "kind",
+                  "bytes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "kind": {
+                    "enum": [
+                      "file",
+                      "directory"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "const": "作業領域読取"
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "path",
+            "bytes",
+            "sha256",
+            "binary",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65536
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "binary": {
+              "const": true
+            },
+            "text": {
+              "type": "null"
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "const": "作業領域読取"
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "path",
+            "bytes",
+            "sha256",
+            "binary",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65536
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "binary": {
+              "const": false
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    }
+  ]
+}
