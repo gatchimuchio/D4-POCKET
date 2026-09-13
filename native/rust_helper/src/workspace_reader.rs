@@ -246,6 +246,47 @@ impl WorkspaceReader {
         Ok(entries)
     }
 
+    /// 差分用の存在状態。拒否・競合・linkをfile不在へ変換しない。
+    pub fn read_version(&self, path: &str) -> Result<Option<Vec<u8>>, ReadError> {
+        self.read_version_checked(path, || {})
+    }
+
+    fn read_version_checked(&self, path: &str, missing_observed: impl FnOnce()) -> Result<Option<Vec<u8>>, ReadError> {
+        let parts = self.allowed(path)?;
+        let mut dir = self.root.try_clone().map_err(|_| ReadError::Unavailable)?;
+        for (index, part) in parts.iter().enumerate() {
+            let metadata = match dir.symlink_metadata(part) {
+                Ok(value) => value,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    missing_observed();
+                    let current = self.directory(&parts[..index]).map_err(|_| ReadError::Changed)?;
+                    let original_metadata = dir.dir_metadata().map_err(|_| ReadError::Changed)?;
+                    let current_metadata = current.dir_metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&original_metadata, &current_metadata) {return Err(ReadError::Changed);}
+                    return match current.symlink_metadata(part) {
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                        _ => Err(ReadError::Changed),
+                    };
+                },
+                Err(_) => return Err(ReadError::Unavailable),
+            };
+            if reparse(&metadata) {return Err(ReadError::UnsafeFile);}
+            if index + 1 == parts.len() {
+                if !regular(&metadata) {return Err(ReadError::UnsafeFile);}
+                // 存在確認後の消失も、既存取得器の競合・取得拒否として扱う。
+                return self.read(path).map(Some);
+            }
+            if !metadata.is_dir() {return Err(ReadError::UnsafeFile);}
+            let next = dir.open_dir_nofollow(part).map_err(|_| ReadError::Changed)?;
+            let opened = next.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+            if !opened.is_dir() || reparse(&opened) || cap_fs_ext::MetadataExt::dev(&opened) != self.root_device {
+                return Err(ReadError::UnsafeFile);
+            }
+            dir = next;
+        }
+        Err(ReadError::InvalidPath)
+    }
+
     pub fn read(&self, path: &str) -> Result<Vec<u8>, ReadError> {
         self.read_checked(path, || {})
     }
@@ -323,6 +364,32 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn absence_recheck_rejects_created_file_and_replaced_parent() {
+        let f=Fixture::new();
+        fs::create_dir(f.0.join("parent")).unwrap();
+        let reader=f.reader();
+        assert_eq!(reader.read_version_checked("parent/file", || {
+            fs::write(f.0.join("parent/file"),b"appeared").unwrap();
+        }),Err(ReadError::Changed));
+        fs::remove_file(f.0.join("parent/file")).unwrap();
+        let replaced=reader.read_version_checked("parent/file", || {
+            let rename=fs::rename(f.0.join("parent"),f.0.join("old-parent"));
+            #[cfg(windows)]
+            assert_eq!(rename.unwrap_err().raw_os_error(),Some(32));
+            #[cfg(not(windows))]
+            {
+                rename.unwrap();
+                fs::create_dir(f.0.join("parent")).unwrap();
+            }
+        });
+        #[cfg(windows)]
+        assert_eq!(replaced,Ok(None)); // 開いたdirectoryの改名自体をOSが拒否する。
+        #[cfg(not(windows))]
+        assert_eq!(replaced,Err(ReadError::Changed));
+        assert_eq!(reader.read_version("parent/file"),Ok(None));
     }
 
     #[test]

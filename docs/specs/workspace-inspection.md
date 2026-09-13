@@ -79,3 +79,11 @@ Desktopの製品ShellCoreClientは通常Broker接続を保持し、Agent Center�
 ### ツリーのfileとdirectoryの区別
 
 列挙結果のbytesは、fileでは0以上の整数、directoryではnullとする。directory配下全体のサイズを未計測なのに0として表示しない。SchemaとDart consumerはkindとbytesの組合せを検査し、directoryは「フォルダー」、fileだけはサイズを表示する。実directory・配下tree・配下本文の接続試験を必須とし、fileだけの正常試験でtree navigationの完成を判断しない。
+
+## 差分取得での不在と拒否
+
+内部取得器のread_versionは、存在する通常fileをSome(bytes)、許可済み相対pathのfileまたは祖先directoryが実際に不在と観測できた場合だけNoneとして返す。空fileはSome(empty)であり、削除と同一視しない。secret・不正path・symlink/junction・特殊file・権限拒否・取得競合・上限超過はErrとし、差分生成器へ不在として渡さない。
+
+不在の検査も登録済みhandleからnofollowで進める。途中にlinkや別deviceがあれば拒否する。OSのNotFoundはnofollow metadata照会で判定し、現在の親handle同一性と不在の再照合を通す。確認中のfile出現や親置換はChangedとし、既に存在を観測した対象のopen失敗を削除へ読み替えない。存在するfileは既存の取得前後の同一性検査とbyte上限を通す。走査はfilesystemの原子的snapshotではなく、観測後の変更を永続的に禁止するものではない。
+
+この取得APIは内部経路であり、通常IPCの許可を追加しない。基準点保存と比較操作の現在Permission・Approval・Audit、UIの統合はrelease_blockerとして続く。巨大fileは現時点では上限超過を明示する段階にあり、そのmetadata比較接続も残る。
