@@ -42,19 +42,31 @@ jobs:
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/rust-test.txt
           cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/rust-build.txt
           file native/rust_helper/target/debug/gui_shell_rust_helper | tee evidence/rust-binary.txt
+      - name: 共有UIをMac環境で検証
+        working-directory: packages/gui_shell_ui
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee ../../evidence/shared-pub-get.txt
+          flutter analyze --no-pub 2>&1 | tee ../../evidence/shared-analyze.txt
+          flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/shared-test.txt
       - name: macOS開発appをbuild
         working-directory: apps/desktop_flutter
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get 2>&1 | tee ../../evidence/desktop-pub-get.txt
+          flutter analyze --no-pub 2>&1 | tee ../../evidence/desktop-analyze.txt
+          flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/desktop-test.txt
           flutter build macos --debug 2>&1 | tee ../../evidence/macos-build.txt
       - name: iOS Simulator appをbuild
         working-directory: apps/mobile_flutter
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get 2>&1 | tee ../../evidence/mobile-pub-get.txt
+          flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
+          flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
           flutter build ios --simulator --debug 2>&1 | tee ../../evidence/ios-build.txt
       - name: build成果物と差分を保存
         shell: bash

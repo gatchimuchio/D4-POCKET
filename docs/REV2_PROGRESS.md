@@ -19,6 +19,18 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Apple手動補助へFlutter解析・試験を追加（2026-09-13）
+
+手動workflowはRust試験とapp buildのみで、共有UI・Desktop・MobileのFlutter試験を実行していなかった。各packageの解析と試験を追加し、依存解決・解析・試験のログを対象commitの補助成果物へ保存する。pipefailにより解析・試験の失敗をbuild成功で隠さない。固定toolchain・手動起動限定・read権限・保管期間・追跡差分拒否は保持する。これはdevelopment専用経路であり、製品の権限や外部送信経路を変更しない。
+
+変更前46f384fで `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` は正常終了し、共有18・Desktop33・Mobile29試験を確認した。ログはRepository外のGUI-Shell-extension-c0-baseline.txt。Mac上の実行結果はこの変更をpush後に手動実行して対象commitと結合して確認する。
+
+- item: Mobile native保管・lifecycle・再接続の仮想環境統合検証
+  classification: release_blocker
+  reason: この追加はMac host上のFlutter試験であり、SimulatorやAndroidエミュレータのnative実行証拠ではない。
+  required_action: 実機凍結を維持し、利用可能な仮想環境でnative統合試験を実装・実行する。
+  blocks_release: yes
+
 ## 比較画面の応答照会を左右独立に実行（2026-09-13）
 
 共有Widgetの応答照会が左右直列で、左の通信待機中は右の完了応答を表示できないことを再現した。照会中フラグを左右別に持ち、各側の周期照会を独立させる。同じ側への重複照会を防ぎ、旧要求の遅延応答・失敗を現在表示へ転用しない条件は維持する。変更はUIの表示取得経路で、Rustの権限・Approval・監査・外部送信は変更しない。

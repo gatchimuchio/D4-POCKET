@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "a2bc59589d8e40dbd7b775638619f7ba4dee00c907e6a6c8f50d51794dd3b019"
+      "sha256": "f27dc04c008bb2ae142076829f6b4540290d34346ee4907ac636230fb903e04c"
     },
     {
       "path": ".gitignore",
@@ -142,7 +142,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "57e973c89a21fd444362471b058ccc2f2fa58b3e7030027fc9043b92cc2032ab"
+      "sha256": "c68dd59203ece73c08265739d22eb429a9fec97dfab752cc72560da8361300b9"
     },
     {
       "path": "SECURITY.md",
@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "84262050315299c8a307ada7fb5344b9472799ee6d74acd066a148f5d03ab8d2"
+      "sha256": "20dbc60f478c717b6fdf6b0b34dbf08b65914430959262f30563c2bee5f1b2cd"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
