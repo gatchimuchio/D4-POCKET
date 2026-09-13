@@ -75,3 +75,11 @@ owner CLIは `対話承認操作 --session-file <owner資格file> 端末招待 <
 `apps/mobile_flutter/integration_test/native_store_test.dart` はdevelopment専用で、製品のSecureDeviceStoreを実行する。試験ごとのprefixだけを付け、既存端末IDや実資格を読取・上書きしない。非秘密の試験値だけを保存し、終了時に削除を再読取で確認する。平文fallbackやMethodChannel置換を行わない。
 
 別instanceからの読取・更新・削除、端末IDのcontroller再生成後の一致、資格なし・破損資格の接続拒否を検査する。前景切替はcontroller呼出しによるINTERNAL_STATE検査であり、OSのbackground遷移やprocess再起動の証明ではない。保管APIの実行結果は仮想端末上のLIVE_RUNTIME証拠に限定し、実機Keychain保護、端末lock、媒体消去、実TLS再接続へ昇格しない。残る実機・実TLS・OS lifecycleの検証は上記release_blockerに保持する。
+
+## native保管と実TLSを通すSimulator統合
+
+開発専用の `tooling/minidora_live_check.py --mobile-simulator <UDID>` は、固定参照MINIDORAの二実API・一時Rust broker・iOS Simulatorを接続する。通常の製品起動には追加しない。招待は一時試験資格だけを使用し、host側driverからFlutterの認証付きdebug VM接続へ渡す。秘密をdart-define、ソース、一般設定、log、成果物へ埋め込まない。owner制御資格はhostの既存試験harnessだけが保持し、Mobileへ渡さない。
+
+native安全保管後のcontroller再生成・実TLS再確認、OSによる背景移動と復帰、同じ要求の応答照会、保存資格消失時の通信停止、正常な端末離脱とnative削除を検査する。OS遷移は専用Simulator上で設定appを前景化し、元appへ戻す。MobileHomeの実WidgetsBindingObserverとcontrollerの変化を観測する。実APIの応答は既存の一時owner検証経路で当該試験要求だけを承認する。これはSimulator内のLIVE_RUNTIME証拠であり、実機のlock・OS強制終了・物理Keychain保護・正式配布の証拠ではない。
+
+driverの拡張はintegration_test内だけに登録し、開発デバッグ資格以上の製品権限を付与しない。試験には起動・応答・全体の期限を設ける。失敗時も一時processを停止し、一時資格を除去する。記録は対象commit、試験状態、要求ID、時刻、非秘密の遷移事実に限定する。

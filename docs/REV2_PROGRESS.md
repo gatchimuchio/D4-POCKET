@@ -19,6 +19,20 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## native保管・実TLS・実API・OS復帰の統合試験（2026-09-13）
+
+先行d9f23cdの手動run `34738442843` は、Simulator上のnative安全保管2試験を含め成功した。これを実TLSやOS lifecycleの証拠へ読み替えず、次の統合試験を追加する。
+
+既存minidora_live_checkへMac専用 `--mobile-simulator <UDID>` を追加した。固定3400a3bの実API二実行系と一時Rust brokerを使い、試験招待だけを認証付きFlutter debug VMからintegration_testへ渡す。native保管後のcontroller再生成、証明書不一致の拒否、製品MobileHomeへのOS背景・復帰通知、左右の実応答、保存資格消失時の停止、端末離脱とnative削除・失効後拒否を検査する。追加経路はdevelopment専用で、運用資格・実鍵・製品runtimeを変更しない。試験の失敗をAPI成功へ昇格せず、期限とprocess cleanupを既存harnessへ接続する。
+
+Windows上の `flutter analyze --no-pub` とMobile29試験はPASS。変更後の `python tooling/minidora_live_check.py --reference C:/Users/mzcum/codex-work/MINIDORA-reference --binary C:/Users/mzcum/codex-work/GUI-Shell/native/rust_helper/target/release/gui_shell_rust_helper.exe --dart-client --mobile-client --dart-mobile-client` はPASSし、既存の実API・実TLS・両Dart client・監査chain再読取の回帰なしを確認した。ログはRepository外のGUI-Shell-native-integration-harness-regression.txt。新Simulator経路の実行証拠はpush後の手動runnerで別途確認する。
+
+- item: Simulatorでのnative実TLS統合の実行証拠
+  classification: release_blocker
+  reason: Windows解析・試験はMac上の追加統合経路を実行していない。
+  required_action: 対象commitの手動runで統合経路を実行し、実結果と保管済み成果物を確認する。実機限定事項は延期を維持する。
+  blocks_release: yes
+
 ## Mobile native安全保管の仮想端末試験経路（2026-09-13）
 
 SDK付属integration_testをdevelopment依存に追加し、実SecureDeviceStoreを使う2試験を作成した。書込・別instance読取・更新・削除、端末IDの再読取、資格なし・破損資格の通信停止を検査する。試験キーはprefixで分離し、既存製品資格を読まない。前景切替はcontroller入力でありOS lifecycleではない。手動Apple補助は利用可能なiPhone Simulatorを選択・起動し、試験後に終了する。契約・本番権限・平文fallbackは変更しない。

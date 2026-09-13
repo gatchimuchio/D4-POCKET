@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "561deefe4964f0644039a0ac62a6d5b3bbdfd3bd9b886ccf03e0088296183666"
+      "sha256": "50cc42e949a0f6fecf5a842d4a17846c284eec232325d519f03ffe7ea7e86e64"
     },
     {
       "path": ".gitignore",
@@ -142,7 +142,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d99d724648beea3aa1b4f3d032fe358d27660d3d67e0ee95a72009d1a230deff"
+      "sha256": "07209447e44130067a04a17d213b4b9107a78e8f02c1240437856cb95487d27b"
     },
     {
       "path": "SECURITY.md",
@@ -605,8 +605,16 @@
       "sha256": "a4bb954fc832724d8c6aef689f0d82873af7ae4c6ff630cb19f4e0c7cd837d46"
     },
     {
+      "path": "apps/mobile_flutter/integration_test/device_link_native_test.dart",
+      "sha256": "104c37e4905e7c8d2d17fa5f992164f02a01c15c0b6f951db1e8feab3dba6f58"
+    },
+    {
+      "path": "apps/mobile_flutter/integration_test/native_store.dart",
+      "sha256": "5d14a78a5966d2fc5accd131781ece0db90e326bcaef4e8cc0737ebe8d935ac2"
+    },
+    {
       "path": "apps/mobile_flutter/integration_test/native_store_test.dart",
-      "sha256": "145bb6e8d2595ca0669418d4df06b23bbee2175c313034b0f45dd39817bd7974"
+      "sha256": "3807b0b85f744d069a21983457ce45ecf4775ae4f49602db5555cb553841210c"
     },
     {
       "path": "apps/mobile_flutter/ios/.gitignore",
@@ -818,11 +826,15 @@
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
-      "sha256": "d807424eda75b9381d56af9f497fd17150542b376e4097d6531a16d5d1dc3cd3"
+      "sha256": "23fba8be83b4ba5ff19f0800c518264d1d0a0e2f53c96266608790d3491f8b1a"
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
       "sha256": "d39a3b42c696a891548cbb638eb97836c2bf5a71cd62d826833d7a7986807f4b"
+    },
+    {
+      "path": "apps/mobile_flutter/test_driver/device_link_driver.dart",
+      "sha256": "6b2632d7e5dc6d5a6ed1857b265035f3239f17ad994cc85fdfe7e492ac4f8826"
     },
     {
       "path": "apps/mobile_flutter/tool/device_link_live_client.dart",
@@ -894,7 +906,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "40287b3b2b4b59636513f8338a4ba2fd630301606427a507a882037d4be0d253"
+      "sha256": "8cbcdf66dc7e9e105b692434686e97a2790b37abeb7590644e25ef34f0b74362"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1006,7 +1018,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "f1fe87ed13bd9922b228655c6749ded818a32ff9e734ae44ea860f799ee97693"
+      "sha256": "1964b410f066ae94dfba83c2f707a825b630f0f6ec0d17b8a7256536ebffd1cc"
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",
@@ -2046,7 +2058,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "176c541ace4bcfe232c4aa0658ad07cd792c5067f48f60cd7772416390a2d427"
+      "sha256": "4c983f2f964af22e1910d4cbf3bb77c5a974d6aec89c1a06a2e0b2ccd87da2e0"
     },
     {
       "path": "tooling/packaging_portability_check.py",

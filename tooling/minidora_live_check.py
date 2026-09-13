@@ -45,8 +45,8 @@ def 成功(endpoint, operation, payload):
     return response["body"]
 
 
-def file待機(path, process):
-    end = time.monotonic() + 20
+def file待機(path, process, timeout=20):
+    end = time.monotonic() + timeout
     while time.monotonic() < end:
         if process.poll() is not None:
             raise RuntimeError("検証processが起動中に終了")
@@ -67,7 +67,10 @@ def 終了(process):
         process.wait(timeout=5)
 
 
-def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False):
+def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False, mobile_simulator=None):
+    if mobile_simulator is not None and sys.platform != "darwin":
+        raise RuntimeError("iOS Simulator統合はMac host専用")
+    simulator_result = None
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
         raise RuntimeError("MINIDORA参照commitが固定点と異なる")
@@ -100,7 +103,7 @@ server.serve_forever()
                 owner_file = root / "owner.json"
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file),
-                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client else [])], cwd=root, stdout=log, stderr=log)
+                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client or mobile_simulator else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = file待機(normal_file, broker)
                 owner = file待機(owner_file, broker)
@@ -124,7 +127,6 @@ server.serve_forever()
                     if dart_client:
                         drivers.append(("desktop_flutter", "dialogue_live_client.dart", normal_file, "dart"))
                     if dart_mobile_client:
-                        import uuid
                         invitation_file = root / "mobile-dart-invitation.json"
                         subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file),
                             "端末招待", uuid.uuid4().hex, "127.0.0.1", str(invitation_file)], check=True, stdout=log, stderr=log, timeout=10)
@@ -142,6 +144,33 @@ server.serve_forever()
                         driver.wait(timeout=25)
                         assert driver.returncode == 0, "Dart製品clientの試験失敗"
                         assert json.loads((root / f"{prefix}-result.json").read_text())["result"] == "PASS"
+
+                if mobile_simulator:
+                    flutter = shutil.which("flutter")
+                    if flutter is None:
+                        raise RuntimeError("Flutter executableがない")
+                    invitation_file = root / "simulator-invitation.json"
+                    subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file),
+                        "端末招待", uuid.uuid4().hex, "127.0.0.1", str(invitation_file)],
+                        check=True, stdout=log, stderr=log, timeout=10)
+                    simulator_env = dict(os.environ, GUI_SHELL_TEST_INVITATION_FILE=str(invitation_file),
+                        GUI_SHELL_TEST_ROOT=str(root), GUI_SHELL_TEST_SIMULATOR=mobile_simulator)
+                    driver = subprocess.Popen([flutter, "drive", "--no-pub", "--driver=test_driver/device_link_driver.dart",
+                        "--target=integration_test/device_link_native_test.dart", "-d", mobile_simulator],
+                        cwd=ROOT / "apps/mobile_flutter", env=simulator_env, stdout=log, stderr=log)
+                    processes.append(driver)
+                    ready = file待機(root / "simulator-ready.json", driver, timeout=300)
+                    pending = 成功(owner, "対話承認待ち", {})["要求"]
+                    selected = [v for v in pending if v["要求"]["要求ID"] in ready["requests"]]
+                    assert len(selected) == 2
+                    for item in selected:
+                        成功(owner, "対話承認", {"要求ID": item["要求"]["要求ID"],
+                            "要求hash": item["要求hash"], "表示範囲": "full"})
+                    driver.wait(timeout=60)
+                    assert driver.returncode == 0, "Simulator製品clientの試験失敗"
+                    simulator_result = json.loads((root / "simulator-result.json").read_text(encoding="utf-8"))
+                    assert simulator_result["result"] == "PASS"
+                    assert simulator_result["physical_device_verified"] is False
 
                 def 対話(runtime, scope, message="こんにちは"):
                     session = 成功(normal, "対話開始", {"実行系ID": runtime})["対話セッションID"]
@@ -199,10 +228,16 @@ server.serve_forever()
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",
+                        "mobile_simulator": simulator_result if mobile_simulator else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
                 # ログには秘密資格を記録しない。エラー時も本文一括転送は行わない。
+                if mobile_simulator:
+                    diagnostic = root / "simulator-state.json"
+                    if diagnostic.is_file():
+                        state = json.loads(diagnostic.read_text(encoding="utf-8"))
+                        print(json.dumps({"simulator_last_state": state}, ensure_ascii=False))
                 raise
             finally:
                 for process in reversed(processes):
@@ -215,9 +250,10 @@ def main():
     parser.add_argument("--dart-client", action="store_true")
     parser.add_argument("--mobile-client", action="store_true")
     parser.add_argument("--dart-mobile-client", action="store_true")
+    parser.add_argument("--mobile-simulator", help="手動起動済みiOS SimulatorのUDID。実機には使用しない")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client, args.dart_mobile_client), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client, args.dart_mobile_client, args.mobile_simulator), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
