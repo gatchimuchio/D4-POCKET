@@ -246,3 +246,59 @@ fn large_file_baseline_and_diff_return_only_full_file_metadata() {
     assert_eq!(deleted["body"]["projection"]["diff"]["kind"],"oversized");
     assert!(deleted["body"]["projection"]["diff"]["after"].is_null());
 }
+
+#[test]
+fn whole_workspace_changes_bind_actual_files_current_grant_and_audit() {
+    let mut f=Fixture::new();
+    fs::create_dir(f.root.join("project/src")).unwrap();
+    fs::write(f.root.join("project/src/delete"),b"old").unwrap();
+    fs::write(f.root.join("project/same"),b"same").unwrap();
+    let (normal,owner)=f.start();
+    let list=request(&normal,"作業領域一覧",json!({}));
+    let hash=list["body"]["作業領域"][0]["登録hash"].as_str().unwrap();
+    let capture=json!({"作業領域ID":"workspace-a","登録hash":hash});
+    assert_eq!(request(&owner,"作業領域全体基準点保存",capture.clone())["status"],"rejected");
+    assert!(cli(&f,&["作業領域承認","workspace-a",hash,"full"]).status.success());
+    assert_eq!(request(&normal,"作業領域全体基準点保存",capture.clone())["status"],"rejected");
+    let output=cli(&f,&["作業領域全体基準点保存","workspace-a",hash]);
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let receipt:Value=serde_json::from_slice(&output.stdout).unwrap();
+    let baseline=receipt["projection"]["基準点hash"].clone();
+    assert_eq!(receipt["projection"]["対象数"],3);
+    fs::write(f.root.join("project/本文.txt"),"変更後").unwrap();
+    fs::remove_file(f.root.join("project/src/delete")).unwrap();
+    fs::write(f.root.join("project/src/new"),b"new").unwrap();
+    let selection=json!({"作業領域ID":"workspace-a","相対path":"","基準点hash":baseline});
+    let result=request(&normal,"作業領域変更一覧",selection.clone());
+    assert_eq!(result["status"],"accepted","{result}");assert_eq!(result["evidence_source"],"LIVE_RUNTIME");
+    assert_eq!(result["body"]["projection"]["changes"],json!([
+        {"path":"src/delete","status":"deleted"},{"path":"src/new","status":"added"},{"path":"本文.txt","status":"modified"}]));
+    assert_eq!(result["body"]["projection"]["unchanged"],1);
+    assert_eq!(result["body"]["projection"]["excluded_secrets"],2);
+    let added=request(&normal,"作業領域差分",json!({"作業領域ID":"workspace-a","相対path":"src/new","基準点hash":baseline}));
+    assert_eq!(added["status"],"accepted");assert!(added["body"]["projection"]["diff"]["before"].is_null());
+    let mut wrong=selection.clone();wrong["基準点hash"]=json!("wrong");
+    assert_eq!(request(&normal,"作業領域変更一覧",wrong)["status"],"rejected");
+    fs::hard_link(f.root.join("project/same"),f.root.join("project/alias")).unwrap();
+    assert_eq!(request(&normal,"作業領域変更一覧",selection.clone())["status"],"rejected");
+    fs::remove_file(f.root.join("project/alias")).unwrap();
+    for visibility in ["none","summary","redacted","hash_only"] {
+        assert!(cli(&f,&["作業領域承認","workspace-a",hash,visibility]).status.success());
+        let hidden=request(&normal,"作業領域変更一覧",selection.clone());
+        assert_eq!(hidden["status"],"accepted");assert!(!hidden.to_string().contains("src/new"));
+        assert!(!hidden.to_string().contains("changes"));
+        assert_eq!(request(&owner,"作業領域全体基準点保存",capture.clone())["status"],"rejected");
+    }
+    assert!(cli(&f,&["作業領域失効","workspace-a",hash]).status.success());
+    assert_eq!(request(&normal,"作業領域変更一覧",selection)["status"],"rejected");
+    let schema_data=f.root.join("whole-results.json");
+    fs::write(&schema_data,serde_json::to_vec(&json!([receipt,result["body"],added["body"]])).unwrap()).unwrap();
+    let root=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let script="import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from tooling.schema_check.check_schemas import validate_instance; schema=json.loads((Path(sys.argv[1])/'specs/workspace_inspection_response.schema.json').read_text(encoding='utf-8')); results=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8')); errors=[e for result in results for e in validate_instance(result,schema)]; assert not errors, errors";
+    let validation=Command::new(if cfg!(windows) {"python"} else {"python3"}).args(["-c",script]).arg(root).arg(schema_data).output().unwrap();
+    assert!(validation.status.success(),"{}",String::from_utf8_lossy(&validation.stderr));
+    request(&normal,"shutdown",Value::Null);assert!(f.child.take().unwrap().wait().unwrap().success());
+    let (_,state)=gui_shell_rust_helper::broker::BrokerPersistentStore::open_or_create(f.root.join("store"),"verify").unwrap();
+    let event=state.audit_log.events().iter().find(|e|e.event_id==result["audit_event_id"].as_str().unwrap()).unwrap();
+    assert_eq!(event.payload_hash,sha256_tagged(result["body"].to_string().as_bytes()));
+}

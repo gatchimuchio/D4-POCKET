@@ -59,3 +59,29 @@ fn baseline_capture_audit_failure_and_expiry_never_publish_old_content() {
     assert!(registry.entries["workspace-a"].baseline.is_none());
     drop(registry);std::fs::remove_dir_all(path).unwrap();
 }
+
+#[test]
+fn whole_baseline_handles_empty_scope_bounds_retention_and_drops_failed_capture() {
+    let path=std::env::temp_dir().join(format!("gui-shell-whole-{}",識別子生成().unwrap()));
+    std::fs::create_dir(&path).unwrap();
+    let mut registry=WorkspaceRegistry::default();
+    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],&mut |_,_|Ok(())).unwrap();
+    let hash=registry.entries["workspace-a"].registration_hash.clone();
+    registry.operate("作業領域承認",&json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":"full"}),true,100,&mut |_,_|Ok(())).unwrap();
+    let capture=json!({"作業領域ID":"workspace-a","登録hash":hash});
+    let empty=registry.operate("作業領域全体基準点保存",&capture,true,100,&mut |_,_|Ok(())).unwrap();
+    assert_eq!(empty["projection"]["対象数"],0);
+    let selection=json!({"作業領域ID":"workspace-a","相対path":"","基準点hash":empty["projection"]["基準点hash"]});
+    assert_eq!(registry.operate("作業領域変更一覧",&selection,false,100,&mut |_,_|Ok(())).unwrap()["projection"]["changes"],json!([]));
+    for i in 0..129 {std::fs::write(path.join(format!("file-{i:03}")),vec![b'a';65536]).unwrap();}
+    registry.operate("作業領域全体基準点保存",&capture,true,100,&mut |_,_|Ok(())).unwrap();
+    let baseline=registry.entries["workspace-a"].baseline.as_ref().unwrap();
+    assert_eq!(baseline.files.len(),129);
+    let retained:usize=baseline.files.values().map(|v|v.as_ref().unwrap().content.as_ref().map(|b|b.len()).unwrap_or(0)).sum();
+    assert_eq!(retained,8*1024*1024);
+    assert!(registry.operate("作業領域全体基準点保存",&capture,true,100,&mut |reason,_| {
+        if reason=="指定範囲の基準点を確定" {Err("試験監査障害")} else {Ok(())}
+    }).is_err());
+    assert!(registry.entries["workspace-a"].baseline.is_none());
+    drop(registry);std::fs::remove_dir_all(path).unwrap();
+}

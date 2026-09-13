@@ -13,6 +13,7 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
     }
     let (operation, payload) = match args[2].as_str() {
         "作業領域基準点保存" if (6..=133).contains(&args.len()) => ("作業領域基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4],"相対paths":args[5..]})),
+        "作業領域全体基準点保存" if args.len() == 5 => ("作業領域全体基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4]})),
         "作業領域一覧" if args.len() == 3 => ("作業領域一覧", json!({})),
         "作業領域承認" if args.len() == 6 => ("作業領域承認", json!({"作業領域ID":args[3],"登録hash":args[4],"表示範囲":args[5]})),
         "作業領域失効" if args.len() == 5 => ("作業領域失効", json!({"作業領域ID":args[3],"登録hash":args[4]})),
