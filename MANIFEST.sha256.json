@@ -214,7 +214,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
-      "sha256": "218f4f7165d502be9c517215e16852591de211efcab1fcadef1031a40f72ecfe"
+      "sha256": "c52f7e52c596996f3e04024fbc570afacc7fbd791d78fe9d63d2e9170a107e68"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -450,7 +450,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
-      "sha256": "fa3152c2fccb9717c0623d435e93ed9d95fa2e674b238b75f6955a83a66d51d5"
+      "sha256": "7f7723bced8d6174fb4c3bc41d6914b9b1e71a86ab1bc56f471f87688a691c90"
     },
     {
       "path": "apps/desktop_flutter/test/runtime_dialogue_test.dart",
@@ -1094,7 +1094,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "aae2810f8059c39af143977757a61c264546bb6957ce01d47781a0aa8e621bbc"
+      "sha256": "e4845130c7280db72c8fd58e42e8dc98cb97894206fd24f7058123da2dd0f389"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",

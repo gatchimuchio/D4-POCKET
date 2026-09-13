@@ -16,9 +16,12 @@ class _HistoryScreenState extends State<HistoryScreen>
   HistoryPage? _page;
   Timer? _timer, _refreshTimer;
   final _input = TextEditingController();
+  final _inputFocus = FocusNode();
+  final _expanded = <String>{};
   HistoryEntry? _selected;
   Map<String, Object?>? _created;
   void _clearSelection() {
+    _expanded.clear();
     _selected = null;
     _created = null;
     _input.clear();
@@ -65,6 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     _timer?.cancel();
     _refreshTimer?.cancel();
     _input.dispose();
+    _inputFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -74,6 +78,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     _refreshTimer?.cancel();
     final generation = ++_generation;
     final previousGrant = _page?.grant;
+    final restoreInputFocus = _inputFocus.hasFocus;
     setState(() {
       _page = null;
       _busy = true;
@@ -91,9 +96,21 @@ class _HistoryScreenState extends State<HistoryScreen>
         if (previousGrant != null && !previousGrant.same(page.grant)) {
           _clearSelection();
         }
+        _expanded.retainAll(page.entries.map((e) => e.auditId));
         _page = page;
         _message = '要求ごとの最後の観測です。現在の稼働・実行許可を示しません。';
       });
+      if (restoreInputFocus && _selected != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _active &&
+              generation == _generation &&
+              _page != null &&
+              _selected != null) {
+            _inputFocus.requestFocus();
+          }
+        });
+      }
       _refreshTimer = Timer(const Duration(seconds: 2), () {
         if (mounted && _active && generation == _generation) {
           _load(after: after);
@@ -183,6 +200,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             const Text('新しいSessionを作成します。再実行は元と同じ入力が必要です。分岐は会話内容を復元しません。'),
             TextField(
                 controller: _input,
+                focusNode: _inputFocus,
                 enabled: !_busy,
                 maxLength: 4096,
                 decoration: const InputDecoration(labelText: '新要求の入力')),
@@ -212,6 +230,14 @@ class _HistoryScreenState extends State<HistoryScreen>
                     final r = e.record;
                     return ExpansionTile(
                         key: ValueKey(e.auditId),
+                        initiallyExpanded: _expanded.contains(e.auditId),
+                        onExpansionChanged: (open) {
+                          if (open) {
+                            _expanded.add(e.auditId);
+                          } else {
+                            _expanded.remove(e.auditId);
+                          }
+                        },
                         title: Text('${e.state} ／ ${r.fields['要求ID']}'),
                         subtitle: Text('開始 ${r.time('開始時刻')}'),
                         children: [
