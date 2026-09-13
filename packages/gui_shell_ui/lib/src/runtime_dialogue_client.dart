@@ -88,10 +88,12 @@ class RuntimeDialogueClient {
       return DialogueProgress(state! as String, null);
     }
     if (result is! Map) throw const BrokerClientException('確定応答がありません');
-    return DialogueProgress(
-        state! as String,
-        DialogueResult.parse(
-            Map<String, Object?>.from(result), request, runtime, session));
+    final parsed = DialogueResult.parse(
+        Map<String, Object?>.from(result), request, runtime, session);
+    if (state == '中止' && parsed.text('状態') != '中止') {
+      throw const BrokerClientException('中止進捗と対話結果の状態が一致しません');
+    }
+    return DialogueProgress(state! as String, parsed);
   }
 
   Future<void> cancel(String request) async {

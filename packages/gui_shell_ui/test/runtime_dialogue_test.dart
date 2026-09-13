@@ -33,6 +33,8 @@ class DialogueFixture implements BrokerTransport {
   bool failRight = false;
   bool swap = false;
   String? failOperation;
+  String? progressState;
+  Map<String, Object?>? resultOverride;
   Completer<void>? pollWait;
   @override
   Future<Map<String, Object?>> request(String operation,
@@ -62,10 +64,11 @@ class DialogueFixture implements BrokerTransport {
         final runtime = sessions[session]!;
         body = {
           '要求ID': id,
-          '状態': complete ? '完了' : '承認待ち',
+          '状態': progressState ?? (complete ? '完了' : '承認待ち'),
           '結果': complete
-              ? result(swap ? 'other' : runtime, session, id,
-                  failed: runtime == 'left' ? failLeft : failRight)
+              ? resultOverride ??
+                  result(swap ? 'other' : runtime, session, id,
+                      failed: runtime == 'left' ? failLeft : failRight)
               : null
         };
       case '対話中止':
@@ -85,6 +88,34 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  test('中止進捗に成功本文が混在した応答を拒否する', () async {
+    final f = DialogueFixture()
+      ..complete = true
+      ..progressState = '中止';
+    final client = RuntimeDialogueClient(f);
+    final session = await client.start('left');
+    final request = await client.send(session, '試験入力');
+    await expectLater(client.poll(request, 'left', session),
+        throwsA(isA<BrokerClientException>()));
+    for (final state in ['保留', '失敗']) {
+      f.resultOverride = {
+        ...result('left', session, request, failed: state == '失敗'),
+        '状態': state,
+      };
+      await expectLater(client.poll(request, 'left', session),
+          throwsA(isA<BrokerClientException>()));
+    }
+    f.resultOverride = {
+      ...result('left', session, request, scope: 'none'),
+      '状態': '中止',
+      '失敗分類': '取消',
+      '復旧': '新規セッション',
+    };
+    final cancelled = await client.poll(request, 'left', session);
+    expect(cancelled.state, '中止');
+    expect(cancelled.result!.text('状態'), '中止');
+    expect(cancelled.result!.text('本文'), isEmpty);
+  });
   for (final failure in ['対話開始', '対話終了']) {
     testWidgets('新規切替の$failure失敗で終了済み結果と未終了結果を区別する', (tester) async {
       tester.view.physicalSize = const Size(1400, 1000);

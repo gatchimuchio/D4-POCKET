@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "64ac53bee1c14d40e40f65000c32c4d4ba21124fa165076ee138469505076432"
+      "sha256": "07ad8dcb84ceecac862985907a8fc566643e0a0a6c7212d07d6bccdbae716d77"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1014,7 +1014,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "8070a5d4de028a6585c38e6c2e263c2a43cfd995834776539184fffeb37a1f9a"
+      "sha256": "1dcd8eaf7fb1a18890a204f826ae16bdb2abb4753ba2055520cc615a0c2dd2e6"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1698,7 +1698,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart",
-      "sha256": "d0363117b78c33eab18b75701dff9a8cd0abe7f35ffb8060caecc2549cdf656f"
+      "sha256": "d85ea81c56a595b1b2ca0601dfd8331a03197ca28a255dd2b1b3e2a4104af5a5"
     },
     {
       "path": "packages/gui_shell_ui/pubspec.yaml",
@@ -1706,7 +1706,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_test.dart",
-      "sha256": "88ddf968a05ba9eca11b7e852d3125a00ac13f85eb3a2fe1704b2f501b2b95ac"
+      "sha256": "e3430164f1fb2d8c9272d9c48a1d60b8ee672d4b974231678bdcb0defa3a39e5"
     },
     {
       "path": "packages/runtime_catalog/__init__.py",

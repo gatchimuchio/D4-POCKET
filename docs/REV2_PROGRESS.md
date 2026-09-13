@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 中止進捗と内包結果の状態を照合（2026-09-13）
+
+共有対話clientで、進捗が中止なのに結果が成功で本文を持つ応答を受理することを再現した。Rustの中止処理は中止結果を返すため、clientにも進捗と結果の対応検証を追加した。中止進捗に成功・保留・失敗が混在する3負例を拒否し、正しい中止結果を受理する。Rustの採否・中止処理や表示資格を変更しない。
+
+共有packageの `flutter test --no-pub --reporter expanded` は12件PASS。共有・Desktop・Mobileの `flutter analyze --no-pub`、Schema36/正常36/負例38、conformance150件、日本語基底監査はPASS。変更中の作業ツリーで `python tooling/minidora_live_check.py --reference C:/Users/mzcum/codex-work/MINIDORA-reference --binary C:/Users/mzcum/codex-work/GUI-Shell/native/rust_helper/target/release/gui_shell_rust_helper.exe --dart-client --mobile-client --dart-mobile-client` もPASSした。固定参照3400a3bの実API二実行系、owner CLI承認、通常資格拒否、表示分離、trace、保留、片側失敗、両失敗、監査chain再読取、両製品Dart clientとTLS経路を確認した。ログはRepository外のGUI-Shell-dialogue-cancel-consistency-live.txt。
+
+不正状態の注入はFIXTURE、通常通信の回帰はLIVE_RUNTIMEである。Mobile実機安全保管・OS lifecycleの証拠ではない。非Windows実機・正式配布・運用署名・owner GOは冒頭のrelease_blockerとして延期を保持する。
+
 ## セッション切替の部分失敗と旧結果表示（2026-09-13）
 
 旧セッションの終了成功後に新規開始が失敗すると、sessionだけが空になり旧要求・応答・完了状態が残る不具合を製品Widgetで再現した。旧セッションの終了成功時点で現在表示を未開始へ戻し、旧要求と応答を外す。終了自体が失敗した場合は旧sessionと結果を維持し、終了成功を推定しない。監査記録やbrokerのsession管理は変更しない。
