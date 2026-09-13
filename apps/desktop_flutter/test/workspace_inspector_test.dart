@@ -104,7 +104,8 @@ class TestBroker implements BrokerTransport {
           'excluded_secrets': 1
         };
       }
-      if (visibility == 'full' && operation == '作業領域差分') {
+      if (visibility == 'full' &&
+          (operation == '作業領域差分' || operation == '作業領域復旧プレビュー')) {
         body['projection'] = {
           '基準点hash': baselineHash,
           'diff': {
@@ -126,6 +127,13 @@ class TestBroker implements BrokerTransport {
                 : [],
           }
         };
+      }
+      if (visibility == 'full' && operation == '作業領域復旧プレビュー') {
+        (body['projection'] as Map).addAll(<String, Object>{
+          'action': 'replace',
+          'baseline_content_available': true,
+          'execution_permitted': false
+        });
       }
       mutate?.call(body);
       evidence =
@@ -323,6 +331,13 @@ void main() {
       final newDiff = await client.read(selected, 'new.txt',
           tree: false, baselineHash: wholeHash);
       expect((newDiff.projection!['diff'] as Map)['before'], isNull);
+      final rollback = await client.read(selected, 'new.txt',
+          tree: false, preview: true, baselineHash: wholeHash);
+      expect(rollback.projection!['action'], 'remove');
+      expect(rollback.projection!['execution_permitted'], false);
+      expect((rollback.projection!['diff'] as Map)['after'], isNull);
+      expect(await File('${project.path}/new.txt').readAsString(), '新規');
+
       final revoked = await Process.run(executable, [
         '作業領域制御',
         '--session-file',
@@ -480,6 +495,56 @@ void main() {
         client.read(selected, 'file.txt',
             tree: false, baselineHash: broker.baselineHash),
         throwsA(isA<BrokerClientException>()));
+  });
+
+  test('復旧プレビューの実行許可・候補矛盾・本文保持矛盾を拒否する', () async {
+    for (final mutation in <void Function(Map)>[
+      (p) => p['execution_permitted'] = true,
+      (p) => p['action'] = 'remove',
+      (p) => p['baseline_content_available'] = false,
+    ]) {
+      final broker = TestBroker()
+        ..mutate = (body) {
+          if (body['operation'] == '作業領域復旧プレビュー') {
+            mutation(body['projection'] as Map);
+          }
+        };
+      final client = WorkspaceClient(broker);
+      await expectLater(
+          client.read((await client.list()).single, 'file.txt',
+              tree: false, preview: true, baselineHash: broker.baselineHash),
+          throwsA(isA<BrokerClientException>()));
+    }
+  });
+
+  testWidgets('復旧候補と逆方向ラベルを表示し実行操作を提供しない', (tester) async {
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('基準点の対象file'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('復旧プレビュー'));
+    await tester.tap(find.text('復旧プレビュー'));
+    await tester.pumpAndSettle();
+    expect(find.text('復旧候補: 内容置換'), findsOneWidget);
+    expect(find.text('この画面から復旧は実行できません。'), findsOneWidget);
+    await tester.ensureVisible(find.text('左右比較'));
+    await tester.tap(find.text('左右比較'));
+    await tester.pumpAndSettle();
+    expect(find.text('現在の内容'), findsOneWidget);
+    expect(find.text('復旧先の基準点'), findsOneWidget);
+    expect(
+        broker.operations.where(
+            (v) => v.contains('実行') || v.contains('承認') || v.contains('保存')),
+        isEmpty);
+    await tester.pumpWidget(const SizedBox());
   });
 
   test('変更一覧の未知状態・重複path・別基準点・件数矛盾を拒否する', () async {

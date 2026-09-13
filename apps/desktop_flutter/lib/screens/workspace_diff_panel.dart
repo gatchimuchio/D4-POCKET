@@ -5,10 +5,14 @@ class WorkspaceDiffPanel extends StatelessWidget {
   const WorkspaceDiffPanel(
       {super.key,
       required this.diff,
+      this.reverse = false,
       required this.paired,
       required this.onPairedChanged});
   final Map<String, Object?> diff;
   final bool paired;
+  final bool reverse;
+  String get _beforeLabel => reverse ? '現在の内容' : '基準点';
+  String get _afterLabel => reverse ? '復旧先の基準点' : '取得時点';
   final ValueChanged<bool> onPairedChanged;
   static const _kinds = {
     'unchanged': '変更なし',
@@ -55,7 +59,7 @@ class WorkspaceDiffPanel extends StatelessWidget {
       Text(_kinds[diff['kind']]!),
       for (final side in ['before', 'after'])
         Text(
-            '${side == 'before' ? '基準点' : '取得時点'}: ${diff[side] == null ? 'file不在' : '${(diff[side] as Map)['bytes']} バイト・${(diff[side] as Map)['sha256']}'}'),
+            '${side == 'before' ? _beforeLabel : _afterLabel}: ${diff[side] == null ? 'file不在' : '${(diff[side] as Map)['bytes']} バイト・${(diff[side] as Map)['sha256']}'}'),
       if (diff['kind'] == 'text') ...[
         Wrap(spacing: 8, children: [
           ChoiceChip(
@@ -74,9 +78,9 @@ class WorkspaceDiffPanel extends StatelessWidget {
                   child: SelectableText(diff['unified'] as String,
                       style: const TextStyle(fontFamily: 'monospace'))))
         else ...[
-          const Row(children: [
-            Expanded(child: Text('基準点')),
-            Expanded(child: Text('取得時点'))
+          Row(children: [
+            Expanded(child: Text(_beforeLabel)),
+            Expanded(child: Text(_afterLabel))
           ]),
           SizedBox(
               height: 360,

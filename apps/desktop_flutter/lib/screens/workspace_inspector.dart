@@ -98,7 +98,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       if (!mounted || !_active || generation != _generation) return;
       WorkspaceView? refreshedComparison;
       if (previous != null &&
-          (previous.operation == '作業領域差分' ||
+          (previous.operation == '作業領域復旧プレビュー' ||
+              previous.operation == '作業領域差分' ||
               previous.operation == '作業領域比較範囲' ||
               previous.operation == '作業領域変更一覧') &&
           registrations.any((v) => v.sameGrant(previous.registration))) {
@@ -107,6 +108,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             tree: false,
             scope: previous.operation == '作業領域比較範囲',
             changes: previous.operation == '作業領域変更一覧',
+            preview: previous.operation == '作業領域復旧プレビュー',
             baselineHash: previous.baselineHash);
       }
 
@@ -142,7 +144,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   }
 
   Future<void> _read(WorkspaceRegistration registration, String path, bool tree,
-      {bool scope = false, bool changes = false, String? baselineHash}) async {
+      {bool scope = false,
+      bool changes = false,
+      bool preview = false,
+      String? baselineHash}) async {
     final generation = ++_generation;
     setState(() {
       _diffPaired = false;
@@ -156,6 +161,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           tree: tree,
           scope: scope,
           changes: changes,
+          preview: preview,
           baselineHash: baselineHash);
       if (!mounted || !_active || generation != _generation) return;
       setState(() {
@@ -267,9 +273,30 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                   })),
         ],
         if (view.registration.visibility == 'full' &&
-            view.operation == '作業領域差分') ...[
+            (view.operation == '作業領域差分' ||
+                view.operation == '作業領域復旧プレビュー')) ...[
           Text(view.path),
+          if (view.operation == '作業領域差分')
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _read(view.registration, view.path, false,
+                        preview: true, baselineHash: view.baselineHash),
+                child: const Text('復旧プレビュー')),
+          if (view.operation == '作業領域復旧プレビュー') ...[
+            Text('復旧候補: ${{
+              'none': '変更なし',
+              'remove': 'file削除',
+              'recreate': 'file再作成',
+              'replace': '内容置換'
+            }[projection!['action']]}'),
+            const Text('現在の内容 → 復旧先の基準点。適用には別のRecoveryとApprovalが必要です。'),
+            const Text('この画面から復旧は実行できません。'),
+            if (projection['baseline_content_available'] == false)
+              const Text('比較元の本文を保持していないため、この基準点だけでは本文を復元できません。'),
+          ],
           WorkspaceDiffPanel(
+              reverse: view.operation == '作業領域復旧プレビュー',
               paired: _diffPaired,
               onPairedChanged: (value) => setState(() => _diffPaired = value),
               key: ValueKey('${view.path}:${projection!['基準点hash']}'),

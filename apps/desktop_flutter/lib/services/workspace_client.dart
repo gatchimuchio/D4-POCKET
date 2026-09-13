@@ -130,25 +130,34 @@ class WorkspaceClient {
       {required bool tree,
       bool scope = false,
       bool changes = false,
+      bool preview = false,
       String? baselineHash}) async {
     if (!selected.current(DateTime.now())) {
       _invalid();
     }
-    if ((changes &&
+    if ((preview &&
+            (changes ||
+                scope ||
+                tree ||
+                path.isEmpty ||
+                baselineHash == null)) ||
+        (changes &&
             (scope || tree || path.isNotEmpty || baselineHash == null)) ||
         (scope && (path.isNotEmpty || baselineHash != null)) ||
         (baselineHash != null && !_hash.hasMatch(baselineHash))) {
       _invalid();
     }
-    final operation = changes
-        ? '作業領域変更一覧'
-        : scope
-            ? '作業領域比較範囲'
-            : baselineHash != null
-                ? '作業領域差分'
-                : tree
-                    ? '作業領域ツリー'
-                    : '作業領域読取';
+    final operation = preview
+        ? '作業領域復旧プレビュー'
+        : changes
+            ? '作業領域変更一覧'
+            : scope
+                ? '作業領域比較範囲'
+                : baselineHash != null
+                    ? '作業領域差分'
+                    : tree
+                        ? '作業領域ツリー'
+                        : '作業領域読取';
     final payload = <String, Object?>{
       '作業領域ID': selected.id,
       '相対path': path,
@@ -256,11 +265,38 @@ class WorkspaceClient {
               }
             }
           } else if (baselineHash != null) {
-            _keys(projection, ['基準点hash', 'diff']);
+            _keys(projection, [
+              '基準点hash',
+              'diff',
+              if (preview) ...[
+                'action',
+                'baseline_content_available',
+                'execution_permitted'
+              ]
+            ]);
             if (projection['基準点hash'] != baselineHash) {
               _invalid();
             }
             _validateDiff(projection['diff']);
+            if (preview) {
+              final diff = _map(projection['diff']);
+              final action = diff['kind'] == 'unchanged'
+                  ? 'none'
+                  : diff['after'] == null
+                      ? 'remove'
+                      : diff['before'] == null
+                          ? 'recreate'
+                          : 'replace';
+              if (projection['execution_permitted'] != false ||
+                  projection['baseline_content_available'] is! bool ||
+                  projection['action'] != action ||
+                  (diff['after'] == null &&
+                      projection['baseline_content_available'] != true) ||
+                  (diff['kind'] == 'text' &&
+                      projection['baseline_content_available'] != true)) {
+                _invalid();
+              }
+            }
           } else if (tree) {
             _keys(projection, ['entries']);
             final entries = projection['entries'];

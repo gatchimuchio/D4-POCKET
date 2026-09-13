@@ -149,3 +149,7 @@ Dart consumerは応答操作・要求hash・登録・Approval・基準点を照�
 作業領域復旧プレビューは通常IPCの読取操作とし、作業領域ID・相対path・現在基準点hashを要求する。現在Permission/Approval・secret除外・nofollow取得・監査後の期限確認を既存差分と共有する。fullだけに現在file→比較元の逆方向差分を返す。候補actionはnone/remove/recreate/replaceであり、現在hash/サイズと復旧先hash/サイズは逆方向diffのbefore/afterへ結合する。比較元の本文を保持しているかをbaseline_content_availableで明示する。比較元がfile不在なら復元本文は不要なのでtrueとする。
 
 execution_permittedは常にfalseとする。この応答はRecoveryの実行承認、書込Permission、実行tokenではない。プレビュー自体はworkspace.inspectの現在承認とworkspace.reapproveの失敗復旧経路に属する。実際のrollbackには別のRecovery/Approvalと、適用直前の現在file検査が必要であり、この単位は書込みを実装しない。巨大/binaryは本文を表示せずmetadataのみ。取得拒否・別基準点・未指定範囲を復旧候補として成功させない。
+
+## Desktop復旧プレビュー
+
+差分画面から復旧候補を読み、現在の内容→復旧先の基準点という方向でmetadata・統合差分・左右比較を表示する。候補の種類、比較元本文不足、別途Recovery/Approvalが必要であることを明示し、実行buttonを提供しない。Dart consumerはexecution_permitted=false、候補actionと逆方向diffの存在状態、本文保持状態との整合を検査する。プレビュー表示中も現在承認と基準点を再照合し、失敗・失効・画面非表示で内容を破棄する。
