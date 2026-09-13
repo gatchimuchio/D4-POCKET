@@ -27,6 +27,7 @@ class _Conversation {
   DialogueResult? result;
   bool pending = false;
   bool busy = false;
+  bool polling = false;
 }
 
 class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
@@ -38,7 +39,6 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   String? _connectionError;
   bool _connecting = false;
   bool _compare = false;
-  bool _polling = false;
   bool _sending = false;
   Timer? _timer;
 
@@ -174,35 +174,40 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   }
 
   Future<void> _poll() async {
-    if (_polling || _client == null || !mounted || !widget.active) return;
-    _polling = true;
+    await Future.wait([_pollSide(_left), _pollSide(_right)]);
+  }
+
+  Future<void> _pollSide(_Conversation side) async {
+    final client = _client;
+    if (client == null ||
+        !mounted ||
+        !widget.active ||
+        side.polling ||
+        !side.pending ||
+        side.busy ||
+        side.request == null) {
+      return;
+    }
+    final request = side.request!;
+    side.polling = true;
     try {
-      for (final side in [_left, _right]) {
-        if (!widget.active) return;
-        if (!side.pending || side.busy || side.request == null) continue;
-        final request = side.request!;
-        try {
-          final progress =
-              await _client!.poll(request, side.runtime!, side.session!);
-          if (!mounted) return;
-          if (side.request != request || !side.pending) continue;
-          setState(() {
-            side.state = progress.state;
-            side.result = progress.result;
-            side.error = null;
-            side.pending = progress.result == null;
-          });
-        } catch (_) {
-          if (mounted && side.request == request && side.pending) {
-            setState(() {
-              side.error = '応答を取得できません。接続・監査を確認してください。本文の表示は保留しています。';
-              side.result = null;
-            });
-          }
-        }
+      final progress = await client.poll(request, side.runtime!, side.session!);
+      if (!mounted || side.request != request || !side.pending) return;
+      setState(() {
+        side.state = progress.state;
+        side.result = progress.result;
+        side.error = null;
+        side.pending = progress.result == null;
+      });
+    } catch (_) {
+      if (mounted && side.request == request && side.pending) {
+        setState(() {
+          side.error = '応答を取得できません。接続・監査を確認してください。本文の表示は保留しています。';
+          side.result = null;
+        });
       }
     } finally {
-      _polling = false;
+      side.polling = false;
     }
   }
 

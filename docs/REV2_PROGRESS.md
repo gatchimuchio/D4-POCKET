@@ -19,6 +19,12 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 比較画面の応答照会を左右独立に実行（2026-09-13）
+
+共有Widgetの応答照会が左右直列で、左の通信待機中は右の完了応答を表示できないことを再現した。照会中フラグを左右別に持ち、各側の周期照会を独立させる。同じ側への重複照会を防ぎ、旧要求の遅延応答・失敗を現在表示へ転用しない条件は維持する。変更はUIの表示取得経路で、Rustの権限・Approval・監査・外部送信は変更しない。
+
+左右それぞれを待機させる製品Widget試験で、他側の先行表示、待機中の重複照会なし、待機解除後の両結果表示を確認した。`python tooling/validate_all.py --desktop-platform windows --include-mobile-release` は開発検証17項目PASS。共有18・Desktop33・Mobile29試験、3か所の解析、Schema36/正常36/負例38、conformance150件、Rust63単体・5 IPC・8 checkpoint、厳格日本語監査を含む。ログはRepository外のGUI-Shell-independent-poll-validation.txt。埋込installed証拠は変更前b84bbbdのものであり、この修正後の実機証拠ではない。証拠は通信を遅延させたFIXTUREであり、実機の通信遅延測定ではない。非Windows実機・正式配布・運用署名・owner GOの延期は冒頭のrelease_blockerに保持する。
+
 ## 実行系列挙の重複による選択欄の不整合を拒否（2026-09-13）
 
 共有clientは実行系IDの型・形式・件数だけを検証しており、重複を受理していた。leftを2件返す応答でclientの誤受理とFlutter Dropdownのassertionを別々に再現した。実行系列挙の一意性をclientで検証し、重複応答は既存の接続エラー表示と送信停止へ接続する。重複を黙って除去せず、正常な返却順序と空一覧を保持する。Rustの登録・権限・列挙内容は変更しない。
