@@ -241,6 +241,7 @@ server.serve_forever()
 
                 left, p = 対話("left", "full")
                 right, q = 対話("right", "hash_only")
+                initial_pending = (p, q)
                 a, b = 完了(p), 完了(q)
                 assert left != right and p["要求ID"] != q["要求ID"]
                 assert a["状態"] == b["状態"] == "成功", (a["失敗分類"], b["失敗分類"])
@@ -307,6 +308,17 @@ server.serve_forever()
                 assert len(grouped_ids) == len(set(grouped_ids)) and not grouped["has_more"]
                 grouped_states = {e["record"]["実行記録"]["要求ID"]: e["record"]["状態"] for e in grouped_records}
                 assert all(grouped_states.get(k) == v for k, v in expected_history.items())
+                contextual = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 100, "latest_per_request": True, "include_audit_context": True})
+                context_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
+                assert not validate_instance(contextual, context_schema)
+                contexts = {entry["record"]["実行記録"]["要求ID"]: entry["audit_context"] for entry in contextual["entries"]}
+                for pending in initial_pending:
+                    context = contexts[pending["要求ID"]]
+                    assert context["要求hash"] == pending["要求hash"] == context["承認"]["要求hash"]
+                    assert context["承認能力"] == ["対話送信"] and context["復旧対応"] == "接続再確認"
+                    assert context["現在権限"] is False
+                assert contexts[initial_pending[0]["要求ID"]]["承認"]["内容表示範囲"] == "full"
+                assert contexts[initial_pending[1]["要求ID"]]["承認"]["内容表示範囲"] == "hash_only"
                 access_schema = json.loads((ROOT / "specs/runtime_history_access.schema.json").read_text(encoding="utf-8"))
                 for runtime_id in ["left", "right"]:
                     approved = 成功(owner, "対話履歴承認", {"実行系ID": runtime_id})

@@ -383,6 +383,114 @@
                         }
                       }
                     ]
+                  },
+                  "audit_context": {
+                    "type": "object",
+                    "required": [
+                      "版",
+                      "要求hash",
+                      "作成操作",
+                      "承認",
+                      "承認能力",
+                      "復旧対応",
+                      "現在権限"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "版": {
+                        "const": 1
+                      },
+                      "要求hash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "作成操作": {
+                        "const": "対話送信"
+                      },
+                      "承認": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "監査ID",
+                              "操作",
+                              "要求hash",
+                              "内容表示範囲"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "監査ID": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "操作": {
+                                "const": "対話承認"
+                              },
+                              "要求hash": {
+                                "type": "string",
+                                "pattern": "^sha256:[a-f0-9]{64}$"
+                              },
+                              "内容表示範囲": {
+                                "enum": [
+                                  "none",
+                                  "hash_only",
+                                  "summary",
+                                  "redacted",
+                                  "full"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "承認能力": {
+                        "type": "array",
+                        "maxItems": 1,
+                        "items": {
+                          "const": "対話送信"
+                        }
+                      },
+                      "復旧対応": {
+                        "enum": [
+                          null,
+                          "接続再確認"
+                        ]
+                      },
+                      "現在権限": {
+                        "const": false
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "承認": {
+                            "type": "null"
+                          },
+                          "承認能力": {
+                            "maxItems": 0
+                          },
+                          "復旧対応": {
+                            "type": "null"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "承認": {
+                            "type": "object"
+                          },
+                          "承認能力": {
+                            "minItems": 1
+                          },
+                          "復旧対応": {
+                            "const": "接続再確認"
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }

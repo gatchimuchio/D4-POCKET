@@ -259,6 +259,10 @@
             },
             "latest_per_request": {
               "type": "boolean"
+            },
+            "include_audit_context": {
+              "type": "boolean",
+              "default": false
             }
           }
         }
@@ -377,6 +381,10 @@
                 },
                 "latest_per_request": {
                   "type": "boolean"
+                },
+                "include_audit_context": {
+                  "type": "boolean",
+                  "default": false
                 }
               }
             }

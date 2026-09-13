@@ -294,8 +294,6 @@ class _HistoryScreenState extends State<HistoryScreen>
                         title: Text('${e.state} ／ ${r.fields['要求ID']}'),
                         subtitle: Text('開始 ${r.time('開始時刻')}'),
                         children: [
-                          SelectableText(
-                              'Session: ${r.fields['対話セッションID']}\n終了: ${r.time('終了時刻')}\n失敗分類: ${e.failure ?? 'なし'}\n履歴監査: ${e.auditId}\n作成監査: ${r.audit('作成監査ID')}\n開始監査: ${r.audit('開始監査ID')}\n終了監査: ${r.audit('終了監査ID')}'),
                           TextButton(
                               onPressed: _busy
                                   ? null
@@ -303,7 +301,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                                         _clearSelection();
                                         _selected = e;
                                       }),
-                              child: const Text('再実行・分岐の入力へ'))
+                              child: const Text('再実行・分岐の入力へ')),
+                          SelectableText(
+                              'Session: ${r.fields['対話セッションID']}\n終了: ${r.time('終了時刻')}\n失敗分類: ${e.failure ?? 'なし'}\n履歴監査: ${e.auditId}\n作成監査: ${r.audit('作成監査ID')}\n開始監査: ${r.audit('開始監査ID')}\n終了監査: ${r.audit('終了監査ID')}\n作成操作: 対話送信\n要求hash: ${e.context.requestHash}\n過去承認: ${e.context.approvalId ?? '未記録'}\n承認時の表示範囲: ${e.context.scope ?? '未記録'}\n承認能力: ${e.context.approvalId == null ? '未記録' : '対話送信'}\n復旧対応: ${e.context.approvalId == null ? '未記録' : '接続再確認'}\n過去の承認記録です。現在の権限・能力使用・復旧実施を示しません。')
                         ]);
                   })),
         ]));

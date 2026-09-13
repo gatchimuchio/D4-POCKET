@@ -63,6 +63,20 @@ class Fixture implements BrokerTransport {
           {
             'audit_event_id': 'history-1',
             'event_hash': 'sha256:${'c' * 64}',
+            'audit_context': {
+              '版': 1,
+              '要求hash': 'sha256:${'b' * 64}',
+              '作成操作': '対話送信',
+              '承認': {
+                '監査ID': 'started',
+                '操作': '対話承認',
+                '要求hash': 'sha256:${'b' * 64}',
+                '内容表示範囲': 'full'
+              },
+              '承認能力': ['対話送信'],
+              '復旧対応': '接続再確認',
+              '現在権限': false
+            },
             'record': {
               '版': 1,
               '状態': state,
@@ -95,6 +109,39 @@ class Fixture implements BrokerTransport {
 }
 
 void main() {
+  test('監査文脈は現在権限と異要求の承認を拒否する', () async {
+    final c = HistoryClient(Fixture());
+    final grant = (await c.status())!;
+    final entry = (await c.page(grant)).entries.single;
+    Map<String, Object?> context() => {
+          '版': 1,
+          '要求hash': 'sha256:${'b' * 64}',
+          '作成操作': '対話送信',
+          '承認': {
+            '監査ID': 'started',
+            '操作': '対話承認',
+            '要求hash': 'sha256:${'b' * 64}',
+            '内容表示範囲': 'full'
+          },
+          '承認能力': ['対話送信'],
+          '復旧対応': '接続再確認',
+          '現在権限': false
+        };
+    expect(HistoryAuditContext.parse(context(), entry.record).approvalId,
+        'started');
+    for (final field in ['現在権限', '要求hash', '承認能力', '承認', '復旧対応']) {
+      final bad = context();
+      bad[field] = switch (field) {
+        '現在権限' => true,
+        '要求hash' => 'sha256:${'c' * 64}',
+        '承認能力' => ['shell'],
+        '承認' => null,
+        _ => '任意実行'
+      };
+      expect(() => HistoryAuditContext.parse(bad, entry.record),
+          throwsA(isA<BrokerClientException>()));
+    }
+  });
   test('要求とSession検索は完全一致で応答も照合する', () async {
     final f = Fixture();
     final c = HistoryClient(f);

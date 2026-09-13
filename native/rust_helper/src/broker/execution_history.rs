@@ -12,6 +12,8 @@ pub(crate) struct Query {
     #[serde(default)]
     pub latest_per_request: bool,
     #[serde(default)]
+    pub include_audit_context: bool,
+    #[serde(default)]
     pub filter: std::collections::BTreeMap<String, String>,
 }
 
@@ -204,9 +206,12 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
             more = true;
             break;
         }
-        entries.push(
-            json!({"audit_event_id":event.event_id,"event_hash":event.event_hash,"record":value}),
-        );
+        let mut entry =
+            json!({"audit_event_id":event.event_id,"event_hash":event.event_hash,"record":value});
+        if query.include_audit_context {
+            entry["audit_context"] = audit_context(&events[..index], &entry["record"]["実行記録"])?;
+        }
+        entries.push(entry);
         next = index + 1;
     }
     Ok(
@@ -469,6 +474,107 @@ mod tests {
                     json!([])
                 );
             }
+        }
+    }
+}
+
+fn audit_context(
+    events: &[super::audit::BrokerAuditEvent],
+    record: &Value,
+) -> Result<Value, &'static str> {
+    let find = |key: &str| {
+        events
+            .iter()
+            .find(|e| Some(e.event_id.as_str()) == record[key].as_str())
+            .ok_or("監査文脈の参照が不在")
+    };
+    let created = find("作成監査ID")?;
+    if created.operation != "対話送信" || created.reason != "対話承認待ち作成" {
+        return Err("監査文脈の作成経路が不正");
+    }
+    let mut approval = Value::Null;
+    let mut capabilities = Vec::<&str>::new();
+    let mut recovery = None;
+    if !record["開始監査ID"].is_null() {
+        let start = find("開始監査ID")?;
+        if start.operation != "対話承認" || start.payload_hash != created.payload_hash {
+            return Err("過去承認の要求hashが不一致");
+        }
+        let prefix = format!(
+            "対話送信承認 Capability=対話送信 Permission={}:",
+            record["実行系ID"].as_str().ok_or("実行系が不正")?
+        );
+        let rest = start
+            .reason
+            .strip_prefix(&prefix)
+            .ok_or("過去承認の実行系が不一致")?;
+        let (endpoint, authority) = rest
+            .split_once(" Approval=")
+            .ok_or("過去承認の理由が不正")?;
+        if endpoint.is_empty() || endpoint.len() > 256 || endpoint.chars().any(char::is_whitespace)
+        {
+            return Err("過去承認の接続範囲が不正");
+        }
+        let scope = authority
+            .strip_prefix(&format!("{} 表示範囲=", created.payload_hash))
+            .and_then(|s| s.strip_suffix(" RecoveryAction=接続再確認"))
+            .ok_or("過去承認の対応が不正")?;
+        if !["none", "hash_only", "summary", "redacted", "full"].contains(&scope) {
+            return Err("過去承認の表示範囲が不正");
+        }
+        approval = json!({"監査ID":start.event_id,"操作":start.operation,"要求hash":start.payload_hash,"内容表示範囲":scope});
+        capabilities.push("対話送信");
+        recovery = Some("接続再確認");
+    }
+    Ok(
+        json!({"版":1,"要求hash":created.payload_hash,"作成操作":created.operation,"承認":approval,"承認能力":capabilities,"復旧対応":recovery,"現在権限":false}),
+    )
+}
+
+#[test]
+fn 過去承認文脈は要求と実行系と表示範囲を結合する() {
+    for case in 0..6 {
+        let mut log = BrokerAuditLog::default();
+        let hash = sha256_tagged(b"request");
+        let created = log.append(
+            "a",
+            "対話送信",
+            "recorded",
+            "対話承認待ち作成",
+            "INTERNAL_STATE",
+            &hash,
+        );
+        let record = json!({"実行系ID":"local","作成監査ID":created.event_id,"開始監査ID":null});
+        let pending = audit_context(log.events(), &record).unwrap();
+        assert!(pending["承認"].is_null());
+        assert_eq!(pending["承認能力"], json!([]));
+        let reason = format!("対話送信承認 Capability=対話送信 Permission=local:127.0.0.1:9 Approval={hash} 表示範囲=hash_only RecoveryAction=接続再確認");
+        let reason = match case {
+            1 => reason.replace("local:", "other:"),
+            2 => reason.replace(&hash, &sha256_tagged(b"other")),
+            3 => reason.replace("hash_only", "unknown"),
+            4 => reason.replace("接続再確認", "arbitrary"),
+            _ => reason,
+        };
+        let start = log.append(
+            "a",
+            "対話承認",
+            "recorded",
+            &reason,
+            "INTERNAL_STATE",
+            if case == 5 { "wrong" } else { &hash },
+        );
+        let mut record = record;
+        record["開始監査ID"] = json!(start.event_id);
+        let result = audit_context(log.events(), &record);
+        if case == 0 {
+            let context = result.unwrap();
+            assert_eq!(context["承認"]["要求hash"], hash);
+            assert_eq!(context["承認"]["内容表示範囲"], "hash_only");
+            assert_eq!(context["現在権限"], false);
+            assert!(!context.to_string().contains("127.0.0.1"));
+        } else {
+            assert!(result.is_err(), "case={case}");
         }
     }
 }

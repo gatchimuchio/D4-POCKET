@@ -41,6 +41,7 @@ class HistoryClient {
         'after': after,
         'limit': 50,
         'latest_per_request': true,
+        'include_audit_context': true,
         'filter': {
           '実行系ID': grant.runtime,
           if (state != null) '状態': state,
@@ -72,7 +73,8 @@ class HistoryClient {
     final ids = <String>{};
     final requests = <String>{};
     for (final raw in entries) {
-      final e = _shape(raw, {'audit_event_id', 'event_hash', 'record'});
+      final e = _shape(
+          raw, {'audit_event_id', 'event_hash', 'record', 'audit_context'});
       if (!_text(e['audit_event_id']) ||
           !_hash(e['event_hash']) ||
           !ids.add(e['audit_event_id'] as String)) {
@@ -120,8 +122,13 @@ class HistoryClient {
       if (!valid || (state != null && s != state)) {
         _reject();
       }
-      parsed.add(HistoryEntry(s as String, failure as String?,
-          e['audit_event_id'] as String, e['event_hash'] as String, detail));
+      parsed.add(HistoryEntry(
+          s as String,
+          failure as String?,
+          e['audit_event_id'] as String,
+          e['event_hash'] as String,
+          detail,
+          HistoryAuditContext.parse(e['audit_context'], detail)));
     }
     // 取得中の失効・承認置換を表示前に再照合する。
     final current = await status();
@@ -225,11 +232,53 @@ class HistoryGrant {
 }
 
 class HistoryEntry {
-  const HistoryEntry(
-      this.state, this.failure, this.auditId, this.eventHash, this.record);
+  const HistoryEntry(this.state, this.failure, this.auditId, this.eventHash,
+      this.record, this.context);
   final String state, auditId, eventHash;
   final String? failure;
   final DialogueExecutionRecord record;
+  final HistoryAuditContext context;
+}
+
+class HistoryAuditContext {
+  const HistoryAuditContext(this.requestHash, this.approvalId, this.scope);
+  final String requestHash;
+  final String? approvalId, scope;
+  factory HistoryAuditContext.parse(
+      Object? raw, DialogueExecutionRecord record) {
+    final m =
+        _shape(raw, {'版', '要求hash', '作成操作', '承認', '承認能力', '復旧対応', '現在権限'});
+    if (m['版'] != 1 ||
+        !_hash(m['要求hash']) ||
+        m['作成操作'] != '対話送信' ||
+        m['現在権限'] != false ||
+        m['承認能力'] is! List) {
+      _reject();
+    }
+    final caps = m['承認能力'] as List;
+    if (m['承認'] == null) {
+      if (record.fields['開始監査ID'] != null ||
+          caps.isNotEmpty ||
+          m['復旧対応'] != null) {
+        _reject();
+      }
+      return HistoryAuditContext(m['要求hash'] as String, null, null);
+    }
+    final a = _shape(m['承認'], {'監査ID', '操作', '要求hash', '内容表示範囲'});
+    if (!_text(a['監査ID']) ||
+        a['監査ID'] != record.fields['開始監査ID'] ||
+        a['操作'] != '対話承認' ||
+        a['要求hash'] != m['要求hash'] ||
+        !['none', 'hash_only', 'summary', 'redacted', 'full']
+            .contains(a['内容表示範囲']) ||
+        caps.length != 1 ||
+        caps.single != '対話送信' ||
+        m['復旧対応'] != '接続再確認') {
+      _reject();
+    }
+    return HistoryAuditContext(
+        m['要求hash'] as String, a['監査ID'] as String, a['内容表示範囲'] as String);
+  }
 }
 
 class HistoryPage {

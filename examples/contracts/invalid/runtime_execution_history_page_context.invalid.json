@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "audit_event_id": "history",
+      "event_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "record": {
+        "版": 1,
+        "状態": "承認待ち",
+        "失敗分類": null,
+        "実行記録": {
+          "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "対話セッションID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "実行系ID": "local",
+          "作成時刻": 100,
+          "開始時刻": null,
+          "終了時刻": null,
+          "作成監査ID": "audit-created",
+          "開始監査ID": null,
+          "終了監査ID": null
+        }
+      },
+      "audit_context": {
+        "版": 1,
+        "要求hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "作成操作": "対話送信",
+        "承認": null,
+        "承認能力": [
+          "対話送信"
+        ],
+        "復旧対応": null,
+        "現在権限": false
+      }
+    }
+  ],
+  "next_cursor": 1,
+  "has_more": false,
+  "head_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}
