@@ -25,8 +25,14 @@ class HistoryClient {
   }
 
   Future<HistoryPage> page(HistoryGrant grant,
-      {int after = 0, String? state}) async {
-    if (!grant.current || after < 0) {
+      {int after = 0,
+      String? state,
+      String? requestId,
+      String? sessionId}) async {
+    if (!grant.current ||
+        after < 0 ||
+        (requestId != null && !RuntimeDialogueClient.validId(requestId)) ||
+        (sessionId != null && !RuntimeDialogueClient.validId(sessionId))) {
       _reject();
     }
     final body = await _call('対話履歴閲覧', {
@@ -35,7 +41,12 @@ class HistoryClient {
         'after': after,
         'limit': 50,
         'latest_per_request': true,
-        'filter': {'実行系ID': grant.runtime, if (state != null) '状態': state}
+        'filter': {
+          '実行系ID': grant.runtime,
+          if (state != null) '状態': state,
+          if (requestId != null) '要求ID': requestId,
+          if (sessionId != null) '対話セッションID': sessionId
+        }
       }
     });
     final returned = HistoryGrant.parse(body['grant']);
@@ -76,7 +87,9 @@ class HistoryClient {
         _reject();
       }
       final r = record;
-      if (!requests.add(r['要求ID'] as String)) {
+      if ((requestId != null && r['要求ID'] != requestId) ||
+          (sessionId != null && r['対話セッションID'] != sessionId) ||
+          !requests.add(r['要求ID'] as String)) {
         _reject();
       }
       final detail = DialogueExecutionRecord.parse(

@@ -13,6 +13,14 @@ Future<void> main(List<String> args) async {
   for (var i = 0; i < 32; i++) {
     final page = await client.page(grant, after: after);
     if (count == 0 && page.entries.isNotEmpty) {
+      final first = page.entries.first.record.fields;
+      final filtered = await client.page(grant,
+          requestId: first['要求ID'] as String,
+          sessionId: first['対話セッションID'] as String);
+      if (filtered.entries.length != 1 ||
+          filtered.entries.single.record.fields['要求ID'] != first['要求ID']) {
+        throw StateError('実要求とSessionの検索不一致');
+      }
       final created = await client
           .replay(grant, page.entries.first, '製品clientの分岐確認', branch: true);
       if (created['状態'] != '承認待ち') throw StateError('新要求が承認待ちではない');

@@ -17,6 +17,9 @@ class _HistoryScreenState extends State<HistoryScreen>
   Timer? _timer, _refreshTimer;
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
+  final _requestFilter = TextEditingController();
+  final _sessionFilter = TextEditingController();
+  String? _requestId, _sessionId;
   final _expanded = <String>{};
   HistoryEntry? _selected;
   Map<String, Object?>? _created;
@@ -68,6 +71,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     _timer?.cancel();
     _refreshTimer?.cancel();
     _input.dispose();
+    _requestFilter.dispose();
+    _sessionFilter.dispose();
     _inputFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -90,7 +95,11 @@ class _HistoryScreenState extends State<HistoryScreen>
       if (grant == null) {
         throw const BrokerClientException('ownerの履歴閲覧承認がありません。');
       }
-      final page = await _client!.page(grant, after: after, state: _state);
+      final page = await _client!.page(grant,
+          after: after,
+          state: _state,
+          requestId: _requestId,
+          sessionId: _sessionId);
       if (!mounted || !_active || generation != _generation) return;
       setState(() {
         if (previousGrant != null && !previousGrant.same(page.grant)) {
@@ -174,6 +183,49 @@ class _HistoryScreenState extends State<HistoryScreen>
           Text('実行履歴', style: Theme.of(context).textTheme.headlineSmall),
           Text(_message),
           Wrap(spacing: 12, children: [
+            SizedBox(
+                width: 280,
+                child: TextField(
+                    controller: _requestFilter,
+                    enabled: !_busy,
+                    decoration:
+                        const InputDecoration(labelText: '要求ID（完全一致）'))),
+            SizedBox(
+                width: 280,
+                child: TextField(
+                    controller: _sessionFilter,
+                    enabled: !_busy,
+                    decoration:
+                        const InputDecoration(labelText: 'Session ID（完全一致）'))),
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () {
+                        _requestId = _requestFilter.text.isEmpty
+                            ? null
+                            : _requestFilter.text;
+                        _sessionId = _sessionFilter.text.isEmpty
+                            ? null
+                            : _sessionFilter.text;
+                        _clearSelection();
+                        _load();
+                      },
+                child: const Text('検索')),
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () {
+                        _requestFilter.clear();
+                        _sessionFilter.clear();
+                        _requestId = null;
+                        _sessionId = null;
+                        _state = null;
+                        _clearSelection();
+                        _load();
+                      },
+                child: const Text('検索条件を解除')),
+          ]),
+          Wrap(spacing: 12, children: [
             DropdownButton<String>(
                 value: _state ?? 'すべて',
                 items: ['すべて', '承認待ち', '実行中', '成功', '保留', '失敗', '中止']
@@ -199,6 +251,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             Text('参照要求: ${_selected!.record.fields['要求ID']}'),
             const Text('新しいSessionを作成します。再実行は元と同じ入力が必要です。分岐は会話内容を復元しません。'),
             TextField(
+                key: const ValueKey('history-replay-input'),
                 controller: _input,
                 focusNode: _inputFocus,
                 enabled: !_busy,

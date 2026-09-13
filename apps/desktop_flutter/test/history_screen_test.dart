@@ -7,6 +7,7 @@ import 'package:gui_shell_desktop/screens/history_screen.dart';
 class Fixture implements BrokerTransport {
   bool revoked = false;
   Map<String, Object?>? sent;
+  Map? lastFilter;
   void Function(Map<String, Object?>)? alterReplay;
   bool revokeDuringRead = false;
   String runtime = 'local';
@@ -22,6 +23,7 @@ class Fixture implements BrokerTransport {
     operations.add(op);
     if (op == '対話履歴閲覧') {
       expect((payload!['query'] as Map)['latest_per_request'], true);
+      lastFilter = (payload['query'] as Map)['filter'] as Map;
     }
     if (op == '対話再実行' || op == '対話分岐') {
       sent = payload;
@@ -93,6 +95,41 @@ class Fixture implements BrokerTransport {
 }
 
 void main() {
+  test('要求とSession検索は完全一致で応答も照合する', () async {
+    final f = Fixture();
+    final c = HistoryClient(f);
+    final grant = (await c.status())!;
+    final p = await c.page(grant, requestId: 'd' * 32, sessionId: 'e' * 32);
+    expect(p.entries.length, 1);
+    expect(f.lastFilter,
+        {'実行系ID': 'local', '要求ID': 'd' * 32, '対話セッションID': 'e' * 32});
+    await expectLater(c.page(grant, requestId: 'f' * 32),
+        throwsA(isA<BrokerClientException>()));
+    await expectLater(c.page(grant, sessionId: 'f' * 32),
+        throwsA(isA<BrokerClientException>()));
+    final calls = f.operations.length;
+    await expectLater(c.page(grant, requestId: 'invalid'),
+        throwsA(isA<BrokerClientException>()));
+    expect(f.operations.length, calls);
+  });
+  testWidgets('検索条件は要求とSessionを組み合わせ解除できる', (tester) async {
+    final f = Fixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.widgetWithText(TextField, '要求ID（完全一致）'), 'd' * 32);
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Session ID（完全一致）'), 'e' * 32);
+    await tester.tap(find.text('検索'));
+    await tester.pumpAndSettle();
+    expect(f.lastFilter!['要求ID'], 'd' * 32);
+    expect(f.lastFilter!['対話セッションID'], 'e' * 32);
+    await tester.tap(find.text('検索条件を解除'));
+    await tester.pumpAndSettle();
+    expect(f.lastFilter, {'実行系ID': 'local'});
+    await tester.pumpWidget(const SizedBox());
+  });
   test('再要求clientは参照と新規性と現在承認を検査する', () async {
     final f = Fixture();
     final c = HistoryClient(f);
@@ -135,13 +172,15 @@ void main() {
     expect(find.text('再実行・分岐の入力へ').hitTestable(), findsOneWidget);
     await tester.tap(find.text('再実行・分岐の入力へ'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '変更した入力');
+    await tester.enterText(
+        find.byKey(const ValueKey('history-replay-input')), '変更した入力');
     f.gate = Completer<void>();
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
     f.gate!.complete();
     await tester.pumpAndSettle();
-    final field = tester.widget<TextField>(find.byType(TextField));
+    final field = tester
+        .widget<TextField>(find.byKey(const ValueKey('history-replay-input')));
     expect(field.controller!.text, '変更した入力');
     expect(field.focusNode!.hasFocus, true);
     await tester.tap(find.text('分岐の承認待ち要求を作成'));
@@ -190,11 +229,15 @@ void main() {
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
     await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
     f.gate!.complete();
     await tester.pumpAndSettle();
     expect(find.textContaining('成功 ／'), findsNothing);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(find.textContaining('成功 ／'), findsNothing);

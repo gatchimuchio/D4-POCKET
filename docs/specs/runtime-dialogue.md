@@ -164,3 +164,5 @@ owner CLIは `対話承認操作 --session-file <owner資格file> 履歴承認 <
 生成するのは承認待ち要求までとする。新要求hashによる新しいowner Approvalが必要で、旧Approval/Permissionの転用、異Runtimeへの移し替え、旧Session指定、監査改変は拒否する。新旧要求の対応を新AuditEventに記録し、過去Auditを変更しない。失敗時に作成途中のSessionを隔離し、実行を開始しない。経路はcontrol、Capability=対話送信、Permission=新要求に対する現在承認が必要、Approval=承認待ち、Recovery=新規要求の再確認とする。
 
 Desktop履歴では参照元を選択し、入力を明示して再実行または分岐の承認待ち要求を作る。製品clientは送信前後に現在閲覧承認を確認し、応答の参照元・Runtime・種別・新要求/Session・承認待ち状態を照合する。画面は要求ID/hashを表示するが承認を発行しない。失効・背景化・離脱では選択、入力、結果を破棄する。通信失敗時は要求生成の有無が不明な場合があるため、自動再送せず履歴で確認する。
+
+Desktop履歴の要求ID・Session ID検索は完全一致で、状態とAND結合する。検索時と条件解除時は先頭へ戻り、別ページの再要求選択は破棄する。Runtimeは現在の閲覧承認から固定し、検索入力で変更しない。製品clientはID形式を送信前に検査し、返却各要求のID/Sessionも指定条件と照合する。不正形式や条件外応答を全件表示へ置き換えない。
