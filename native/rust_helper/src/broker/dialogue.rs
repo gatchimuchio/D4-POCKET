@@ -100,6 +100,7 @@ struct 作業 {
     開始時刻: Option<i64>,
     終了時刻: Option<i64>,
     保存済み記録hash: Option<String>,
+    保存済み結果証跡: bool,
     作成監査ID: String,
     開始監査ID: Option<String>,
     終了監査ID: Option<String>,
@@ -315,6 +316,7 @@ impl 対話制御 {
                         開始時刻: None,
                         終了時刻: None,
                         保存済み記録hash: None,
+                        保存済み結果証跡: false,
                         作成監査ID,
                         開始監査ID: None,
                         終了監査ID: None,
@@ -461,6 +463,21 @@ impl 対話制御 {
     fn 記録保存(&mut self, 監査: &mut 監査器<'_>) -> Result<(), 対話失敗> {
         for work in self.作業.values_mut() {
             if work.状態 == "監査失敗" { continue; }
+            if !work.保存済み結果証跡 {
+                if let Some(proof) = 結果証跡(work) {
+                    let encoded = proof.to_string();
+                    if 監査(&format!("対話結果証跡:{encoded}"), &work.要求.要求ID, &sha256_tagged(encoded.as_bytes())).is_err() {
+                        work.取消.store(true, Ordering::SeqCst);
+                        work.状態 = "監査失敗";
+                        work.結果 = Some(Err(対話失敗::監査失敗));
+                        if let Some(session) = self.セッション.get_mut(&work.要求.対話セッションID) {
+                            session.状態 = "中止後隔離".into();
+                        }
+                        return Err(対話失敗::監査失敗);
+                    }
+                    work.保存済み結果証跡 = true;
+                }
+            }
             let (状態, 失敗分類) = match &work.結果 {
                 Some(Ok(v)) => (if v.保留 {"保留"} else {"成功"}, None),
                 Some(Err(e)) => (if *e == 対話失敗::取消 {"中止"} else {"失敗"}, Some(e.分類())),
@@ -613,6 +630,21 @@ fn 結果検査(要求: &対話要求, v: 実行結果) -> Result<実行結果, 
     Ok(v)
 }
 
+fn 結果証跡(work: &作業) -> Option<Value> {
+    let result = work.結果.as_ref()?.as_ref().ok()?;
+    let ended = work.終了監査ID.as_ref()?;
+    if work.表示範囲 == "none" { return None; }
+    let full = work.表示範囲 == "full";
+    let hash = |v: Value| sha256_tagged(v.to_string().as_bytes());
+    Some(json!({"版":1,"要求ID":work.要求.要求ID,"対話セッションID":work.要求.対話セッションID,
+        "実行系ID":work.要求.実行系ID,"要求hash":work.要求hash,"終了監査ID":ended,
+        "表示範囲":work.表示範囲,"応答hash":sha256_tagged(&result.生応答),
+        "能力申告hash":full.then(|| hash(json!(result.能力))),
+        "経路申告hash":full.then(|| hash(json!(result.経路))),
+        "追跡参照hash":full.then(|| hash(json!({"追跡ID":result.追跡ID,"追跡hash":result.追跡hash}))),
+        "証拠種別":"INTERNAL_STATE"}))
+}
+
 fn 表示射影(work: &作業, 結果: &Result<実行結果, 対話失敗>) -> Value {
     let mut body = json!({"要求ID": work.要求.要求ID, "実行系ID": work.要求.実行系ID, "対話セッションID": work.要求.対話セッションID,
         "状態": "成功", "表示範囲": work.表示範囲, "本文": "", "参照": [], "能力": [], "経路": "", "追跡ID": "", "追跡hash": "", "応答hash": "", "失敗分類": "", "復旧": ""});
@@ -743,6 +775,59 @@ mod tests {
         }
         panic!("対話完了の待機期限");
     }
+    #[test]
+    fn 結果証跡は表示範囲を保持し一度だけ保存する() {
+        for (scope, fail) in [("none", false), ("hash_only", false), ("summary", false), ("redacted", false), ("full", false), ("full", true)] {
+            let (mut c, _) = 準備(fail, false, false);
+            let session = 開始(&mut c, "left"); let p = 要求(&mut c, &session);
+            操作(&mut c, "対話承認", 承認(&p, scope), true).unwrap();
+            let mut proofs = Vec::new();
+            let mut finished = false;
+            for _ in 0..200 {
+                let response = c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 101, &mut |reason,_,hash| {
+                    if let Some(body) = reason.strip_prefix("対話結果証跡:") {
+                        assert_eq!(sha256_tagged(body.as_bytes()), hash);
+                        assert!(!body.contains("fixture") && !body.contains("raw-private"));
+                        proofs.push(serde_json::from_str::<Value>(body).unwrap());
+                    }
+                    Ok("proof-audit".into())
+                }).unwrap();
+                if response["状態"] == "完了" { finished = true; break; }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            assert!(finished);
+            c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 102, &mut |reason,_,_| {
+                assert!(!reason.starts_with("対話結果証跡:")); Ok("next-audit".into())
+            }).unwrap();
+            if scope == "none" || fail { assert!(proofs.is_empty()); } else {
+                assert_eq!(proofs.len(), 1); let proof = &proofs[0];
+                assert_eq!(proof["要求hash"], p["要求hash"]);
+                assert_eq!(proof["応答hash"], sha256_tagged(b"raw-private"));
+                assert_eq!(proof["能力申告hash"].is_string(), scope == "full");
+                assert_eq!(proof["経路申告hash"].is_string(), scope == "full");
+                assert_eq!(proof["追跡参照hash"].is_string(), scope == "full");
+            }
+        }
+    }
+    #[test]
+    fn 結果証跡の書込失敗で本文返却と再送を止める() {
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left"); let p = 要求(&mut c, &session);
+        操作(&mut c, "対話承認", 承認(&p, "full"), true).unwrap();
+        let mut rejected = false;
+        for _ in 0..200 {
+            let response = c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 101, &mut |reason,_,_| {
+                if reason.starts_with("対話結果証跡:") { Err(対話失敗::監査失敗) } else { Ok("proof-audit".into()) }
+            });
+            if response == Err(対話失敗::監査失敗) { rejected = true; break; }
+            assert_ne!(response.unwrap()["状態"], "完了");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(rejected);
+        assert_eq!(操作(&mut c, "対話取得", json!({"要求ID":p["要求ID"]}), false), Err(対話失敗::監査失敗));
+        assert!(操作(&mut c, "対話送信", json!({"対話セッションID":session,"入力":"再送しない"}), false).is_err());
+    }
+
     #[test]
     fn 履歴保存は変更時だけ行い書込失敗で採用を止める() {
         let (mut c, _) = 準備(false, false, true);

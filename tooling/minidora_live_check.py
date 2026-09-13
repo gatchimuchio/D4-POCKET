@@ -243,6 +243,7 @@ server.serve_forever()
                 right, q = 対話("right", "hash_only")
                 initial_pending = (p, q)
                 a, b = 完了(p), 完了(q)
+                initial_results = (a, b)
                 assert left != right and p["要求ID"] != q["要求ID"]
                 assert a["状態"] == b["状態"] == "成功", (a["失敗分類"], b["失敗分類"])
                 expected_history = {p["要求ID"]: "成功", q["要求ID"]: "成功"}
@@ -308,6 +309,24 @@ server.serve_forever()
                 assert len(grouped_ids) == len(set(grouped_ids)) and not grouped["has_more"]
                 grouped_states = {e["record"]["実行記録"]["要求ID"]: e["record"]["状態"] for e in grouped_records}
                 assert all(grouped_states.get(k) == v for k, v in expected_history.items())
+                audit_events = [json.loads(line) for line in (root / "store/audit.jsonl").read_text(encoding="utf-8").splitlines()]
+                proof_schema = json.loads((ROOT / "specs/runtime_result_evidence.schema.json").read_text(encoding="utf-8"))
+                for pending, result in zip(initial_pending, initial_results):
+                    found = [e for e in audit_events if e["request_id"] == pending["要求ID"] and e["reason"].startswith("対話結果証跡:")]
+                    assert len(found) == 1
+                    event = found[0]; encoded = event["reason"].split(":", 1)[1]; proof = json.loads(encoded)
+                    assert not validate_instance(proof, proof_schema)
+                    assert event["payload_hash"] == "sha256:" + hashlib.sha256(encoded.encode()).hexdigest()
+                    assert proof["要求hash"] == pending["要求hash"] and proof["応答hash"] == result["応答hash"]
+                    assert any(e["event_id"] == proof["終了監査ID"] and e["request_id"] == pending["要求ID"] and e["reason"] == "対話完了" for e in audit_events[:audit_events.index(event)])
+                    if proof["表示範囲"] == "full":
+                        projections = {"能力申告hash": result["能力"], "経路申告hash": result["経路"],
+                                       "追跡参照hash": {"追跡ID": result["追跡ID"], "追跡hash": result["追跡hash"]}}
+                        for field, projection in projections.items():
+                            canonical = json.dumps(projection, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                            assert proof[field] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+                    else:
+                        assert proof["能力申告hash"] is proof["経路申告hash"] is proof["追跡参照hash"] is None
                 contextual = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 100, "latest_per_request": True, "include_audit_context": True})
                 context_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
                 assert not validate_instance(contextual, context_schema)
@@ -344,7 +363,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
-                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "新承認による実再実行と分岐", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
+                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "結果証跡の要求・応答・完了監査照合", "新承認による実再実行と分岐", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",

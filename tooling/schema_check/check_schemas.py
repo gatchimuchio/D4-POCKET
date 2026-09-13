@@ -9,6 +9,7 @@ INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
     "runtime_replay_response.schema.json",
+    "runtime_result_evidence.schema.json",
     "runtime_history_access.schema.json",
     "runtime_execution_history_page.schema.json",
     "runtime_execution_history.schema.json",

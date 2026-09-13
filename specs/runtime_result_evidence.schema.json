@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_result_evidence.schema.json",
+  "title": "対話結果のhash証跡",
+  "type": "object",
+  "required": [
+    "版",
+    "要求ID",
+    "対話セッションID",
+    "実行系ID",
+    "要求hash",
+    "終了監査ID",
+    "表示範囲",
+    "応答hash",
+    "能力申告hash",
+    "経路申告hash",
+    "追跡参照hash",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "対話セッションID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "実行系ID": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "終了監査ID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "表示範囲": {
+      "enum": [
+        "full",
+        "hash_only",
+        "summary",
+        "redacted"
+      ]
+    },
+    "応答hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "能力申告hash": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "経路申告hash": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "追跡参照hash": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "表示範囲": {
+          "const": "full"
+        },
+        "能力申告hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "経路申告hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "追跡参照hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "properties": {
+        "表示範囲": {
+          "enum": [
+            "hash_only",
+            "summary",
+            "redacted"
+          ]
+        },
+        "能力申告hash": {
+          "type": "null"
+        },
+        "経路申告hash": {
+          "type": "null"
+        },
+        "追跡参照hash": {
+          "type": "null"
+        }
+      }
+    }
+  ]
+}

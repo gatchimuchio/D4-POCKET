@@ -1,0 +1,14 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "対話セッションID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "実行系ID": "local",
+  "要求hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "終了監査ID": "broker-audit-9",
+  "表示範囲": "full",
+  "応答hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "能力申告hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "経路申告hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "追跡参照hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "証拠種別": "INTERNAL_STATE"
+}
