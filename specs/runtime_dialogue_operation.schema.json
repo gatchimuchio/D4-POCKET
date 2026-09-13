@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_operation.schema.json",
   "title": "実行系対話の操作と入力",
-  "description": "通常操作とowner専用操作をRustが分離し、operationごとのpayloadを検証する。対話承認・対話承認待ち・対話履歴一覧はowner専用。構造適合は承認資格ではない。",
+  "description": "通常操作とowner専用操作をRustが分離し、operationごとのpayloadを検証する。対話承認・対話承認待ち・対話履歴一覧はowner専用。構造適合は承認資格ではない。 対話内容保存もowner専用で、全文表示承認とは別の明示的な保存操作。",
   "type": "object",
   "required": [
     "operation",
@@ -27,7 +27,8 @@
         "対話履歴閲覧状態",
         "対話履歴閲覧",
         "対話再実行",
-        "対話分岐"
+        "対話分岐",
+        "対話内容保存"
       ]
     },
     "payload": {
@@ -479,6 +480,31 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話内容保存"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID",
+            "要求hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "要求hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
             }
           }
         }

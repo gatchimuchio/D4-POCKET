@@ -1,0 +1,51 @@
+{
+  "版": 1,
+  "要求": {
+    "要求ID": "11111111111111111111111111111111",
+    "実行系ID": "runtime-a",
+    "対話セッションID": "22222222222222222222222222222222",
+    "入力": "こんにちは"
+  },
+  "要求hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "結果": {
+    "要求ID": "11111111111111111111111111111111",
+    "実行系ID": "runtime-a",
+    "対話セッションID": "22222222222222222222222222222222",
+    "状態": "成功",
+    "表示範囲": "hash_only",
+    "本文": "試験応答",
+    "参照": [],
+    "能力": [],
+    "経路": "",
+    "追跡ID": "",
+    "追跡hash": "",
+    "応答hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "失敗分類": "",
+    "復旧": ""
+  },
+  "実行記録": {
+    "要求ID": "11111111111111111111111111111111",
+    "対話セッションID": "22222222222222222222222222222222",
+    "実行系ID": "runtime-a",
+    "作成時刻": 100,
+    "開始時刻": 101,
+    "終了時刻": 102,
+    "作成監査ID": "audit-created",
+    "開始監査ID": "audit-start",
+    "終了監査ID": "audit-end"
+  },
+  "結果証跡": {
+    "版": 1,
+    "要求ID": "11111111111111111111111111111111",
+    "対話セッションID": "22222222222222222222222222222222",
+    "実行系ID": "runtime-a",
+    "要求hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "終了監査ID": "audit-end",
+    "表示範囲": "full",
+    "応答hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "能力申告hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "経路申告hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "追跡参照hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "証拠種別": "INTERNAL_STATE"
+  }
+}

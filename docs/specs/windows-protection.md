@@ -31,3 +31,15 @@ protected_storeは呼出し側が検証・許可したdirectory handleを受け�
 broker-serverの明示option `--protected-store-dir` で既存の保管directoryを指定する。owner資格fileの設定とWindowsを必須とし、通常IPCからpathを登録できない。既定は未登録。重複optionは拒否する。固定NTFS上の絶対pathをvolumeから各要素nofollowで開き、Broker内部store・通常/owner資格・作業領域設定との重なりを拒否する。登録後の作業領域にも保管先との重なりを許可しない。
 
 既存workspace root検証のpath・filesystem・link・同一性再確認を共有する。受信と検証/拒否を永続監査へ記録し、監査失敗ではIPC公開前に起動を止める。検証成功後にだけdirectory capabilityをBrokerへ保持する。登録は保管内容の読取/更新/削除承認ではない。登録時に保管内容を列挙せず、rootのpath本文を監査へ格納しない。暗号化保存と内容閲覧の承認操作は依然としてrelease_blocker。
+
+
+## 対話内容の明示保存制御
+
+owner制御資格による対話内容保存は、要求IDと要求hashを対象とする一回の保存承認である。Capabilityは対話内容保存、Permissionは現在起動で検証された独立保管先と指定要求、Approvalはこの操作の永続承認監査、RecoveryActionは保管監査再確認とする。通常資格と端末資格は拒否する。送信時のfull承認・metadata閲覧承認から保存権限を継承しない。
+
+現在のBrokerが保持し、full表示を承認済みで、成功または保留の完了監査・結果証跡・実行記録を確定済みの対話だけを保存する。保存直前に要求hashと状態を照合する。暗号化内容はruntime_content_archive Schemaの要求、表示射影結果、実行記録、結果証跡であり、生通信bytesや未投影payloadを追加しない。保存は任意で、送信や取得の副作用にしない。通常の結果返却とは独立しており、保存失敗を過去の実行失敗と読み替えない。
+
+承認監査を永続化してから暗号文をcreate_newで保存・syncし、暗号文hashと終了監査・保存承認監査の参照をruntime_content_receiptとして監査へ確定してからmetadata応答を返す。保存対象平文は64KiB以下で、上限超過・未登録・未完了・別hash・非full・再保存を拒否する。現在権限と内容読取を応答から生成しない。保管失敗または後段監査失敗では保存成功を返さず、既存暗号文は上書き/削除しない。部分fileや監査未確定の暗号文はRecovery対象であり、内容読取/削除と併せてrelease_blocker。非Windowsでは未対応として拒否する。
+
+
+保存操作の使用形は `対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>`。保存済み監査がある要求は暗号文が消失していても再保存を拒否する。保存直前にdisk上の監査chain・anchorを再検証し、現在Brokerの監査logとの一致を要求する。保管fileの消失は新しい保存承認へ暗黙変換しない。

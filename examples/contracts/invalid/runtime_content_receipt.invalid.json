@@ -1,0 +1,12 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "対話セッションID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "実行系ID": "left",
+  "要求hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "終了監査ID": "audit-end",
+  "保存承認監査ID": "audit-save",
+  "暗号文hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "証拠種別": "INTERNAL_STATE",
+  "未許可本文": "保存を許可しない"
+}

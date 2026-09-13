@@ -145,8 +145,11 @@ server.serve_forever()
                     addresses.append(f"127.0.0.1:{file待機(endpoint_file, process)['port']}")
                 normal_file = root / "normal.json"
                 owner_file = root / "owner.json"
+                vault = root / "protected"
+                vault.mkdir()
+                protected_args = ["--protected-store-dir", str(vault)] if os.name == "nt" else []
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
-                    "--session-file", str(normal_file), "--owner-session-file", str(owner_file),
+                    "--session-file", str(normal_file), "--owner-session-file", str(owner_file), *protected_args,
                     "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client or virtual_device else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = file待機(normal_file, broker)
@@ -250,6 +253,31 @@ server.serve_forever()
                 assert a["本文"] and a["追跡ID"] and a["追跡hash"] and a["能力"]
                 assert a["実行系ID"] == "left" and b["実行系ID"] == "right"
                 assert b["本文"] == b["追跡ID"] == "" and b["能力"] == [] and b["応答hash"]
+                # 実APIの完了対象をowner CLIから明示保存する。実資格や運用署名鍵は使用しない。
+                save_select = {"要求ID": p["要求ID"], "要求hash": p["要求hash"]}
+                assert 操作(normal, "対話内容保存", save_select)["status"] == "rejected"
+                if os.name == "nt":
+                    assert list(vault.iterdir()) == []
+                    assert 操作(owner, "対話内容保存", {"要求ID": q["要求ID"], "要求hash": q["要求hash"]})["status"] == "rejected"
+                    assert 操作(owner, "対話内容保存", {**save_select, "要求hash": "sha256:" + "0" * 64})["status"] == "rejected"
+                    saved = subprocess.check_output([str(binary), "対話承認操作", "--session-file", str(owner_file), "内容保存", p["要求ID"], p["要求hash"]], timeout=10)
+                    receipt = json.loads(saved)
+                    receipt_schema = json.loads((ROOT / "specs/runtime_content_receipt.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(receipt, receipt_schema)
+                    cipher = (vault / f"history-{p['要求ID']}.dpapi").read_bytes()
+                    assert receipt["要求ID"] == p["要求ID"] and receipt["要求hash"] == p["要求hash"]
+                    assert receipt["暗号文hash"] == "sha256:" + hashlib.sha256(cipher).hexdigest()
+                    assert a["本文"].encode() not in cipher
+                    assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"
+                    assert (vault / f"history-{p['要求ID']}.dpapi").read_bytes() == cipher
+                    save_events = [json.loads(line) for line in (root / "store/audit.jsonl").read_text(encoding="utf-8").splitlines()]
+                    committed = [e for e in save_events if e["reason"].startswith("対話内容保存記録:")]
+                    assert len(committed) == 1
+                    assert json.loads(committed[0]["reason"].split(":", 1)[1]) == receipt
+                    assert any(e["event_id"] == receipt["保存承認監査ID"] and e["reason"].startswith("対話内容保存承認 ") for e in save_events)
+                    assert any(e["event_id"] == receipt["終了監査ID"] and e["request_id"] == p["要求ID"] for e in save_events)
+                else:
+                    assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"
                 parent_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "filter": {"要求ID": p["要求ID"]}})
                 parent = parent_page["entries"][0]
                 replay_grant = 成功(owner, "対話履歴承認", {"実行系ID": "left"})["grant"]["approval_id"]
@@ -376,6 +404,7 @@ server.serve_forever()
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",
                         "mobile_simulator": simulator_result if mobile_simulator else "未実行",
                         "android_emulator": simulator_result if android_emulator else "未実行",
+                        "protected_content_save": "PASS" if os.name == "nt" else "未対応拒否を確認",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()

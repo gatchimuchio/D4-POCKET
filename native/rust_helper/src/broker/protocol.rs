@@ -201,6 +201,8 @@ pub enum BrokerOperation {
     対話承認,
     #[serde(rename = "対話承認待ち")]
     対話承認待ち,
+    #[serde(rename = "対話内容保存")]
+    対話内容保存,
 
 }
 
@@ -246,6 +248,7 @@ impl BrokerOperation {
             BrokerOperation::対話終了 => "対話終了",
             BrokerOperation::対話承認 => "対話承認",
             BrokerOperation::対話承認待ち => "対話承認待ち",
+            BrokerOperation::対話内容保存 => "対話内容保存",
 
         }
     }
@@ -663,6 +666,7 @@ impl Broker {
             operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
             BrokerOperation::CommandEnvelope => self.suspend_command(
@@ -967,6 +971,69 @@ impl Broker {
             Ok(event) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
             Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認"),
         }
+    }
+
+    fn 対話内容保存処理(&mut self, id: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+        let op = "対話内容保存";
+        if !owner || !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(id, op, "権限拒否", "owner制御資格と永続監査が必要", true, hash);
+        }
+        match self.state_store.persistent_store.as_ref().and_then(|s| s.verified_audit_log().ok()) {
+            Some(log) if log == self.audit_log => (),
+            _ => return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認"),
+        }
+        if self.append_audit(id, op, "received", "対話内容保存要求を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash).is_err() {
+            return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認");
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = payload;
+            self.reject_with_payload_hash(id, op, "保管未対応", "このOSの安全保管は未対応", true, hash)
+        }
+        #[cfg(windows)]
+        {
+            if self.protected_store.is_none() {
+                return self.reject_with_payload_hash(id, op, "保管未登録", "起動制御で保管先を登録してください", true, hash);
+            }
+            let content = match self.対話.保存対象(payload) {
+                Ok(v) => v,
+                Err(e) => return self.reject_with_payload_hash(id, op, e.分類(), e.復旧(), true, hash),
+            };
+            let bytes = content.to_string().into_bytes();
+            if bytes.len() > gui_shell_windows_protection::MAX_PLAINTEXT {
+                return self.reject_with_payload_hash(id, op, "保管上限超過", "保管監査再確認", true, hash);
+            }
+            let target = content["要求"]["要求ID"].as_str().expect("検証済み要求ID");
+            if self.audit_log.events().iter().any(|e| e.operation == op && e.decision == "accepted"
+                && e.reason.strip_prefix("対話内容保存記録:").and_then(|s| serde_json::from_str::<Value>(s).ok())
+                    .is_some_and(|v| v["要求ID"] == target)) {
+                return self.reject_with_payload_hash(id, op, "保存済み", "暗号文の有無によらず再保存せず保管監査再確認", true, hash);
+            }
+            let reason = format!("対話内容保存承認 Capability=対話内容保存 Permission=独立保管先:{target} Approval={hash} RecoveryAction=保管監査再確認");
+            let approval = match self.append_audit(id, op, "recorded", &reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash) {
+                Ok(v) => v.event_id,
+                Err(_) => return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認"),
+            };
+            let cipher_hash = match self.protected_store.as_ref().expect("登録検証済み").create(crate::protected_store::Purpose::History, target, &bytes) {
+                Ok(v) => v,
+                Err(_) => return self.reject_with_payload_hash(id, op, "保管失敗", "既存/部分fileを変更せず保管監査再確認", true, hash),
+            };
+            let body = serde_json::json!({"版":1,"要求ID":target,
+                "対話セッションID":content["要求"]["対話セッションID"],"実行系ID":content["要求"]["実行系ID"],
+                "要求hash":content["要求hash"],"終了監査ID":content["実行記録"]["終了監査ID"],
+                "保存承認監査ID":approval,"暗号文hash":cipher_hash,"証拠種別":"INTERNAL_STATE"});
+            self.対話内容保存確定(id, body)
+        }
+    }
+
+    #[cfg(windows)]
+    fn 対話内容保存確定(&mut self, id: &str, body: Value) -> BrokerResponse {
+            let op = "対話内容保存";
+            let encoded = body.to_string();
+            match self.append_audit(id, op, "accepted", &format!("対話内容保存記録:{encoded}"), EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(encoded.as_bytes())) {
+                Ok(v) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:v.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
+                Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "暗号文を再使用せず保管監査再確認"),
+            }
     }
 
     fn 対話要求処理(&mut self, request_id: &str, operation: BrokerOperation, payload: &Value, owner: bool, payload_hash: &str) -> BrokerResponse {
@@ -1779,7 +1846,7 @@ mod tests {
         broker
     }
 
-    fn temp_store_dir(test_name: &str) -> PathBuf {
+    pub(super) fn temp_store_dir(test_name: &str) -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -1792,7 +1859,7 @@ mod tests {
         path
     }
 
-    fn persistent_test_broker(store_dir: &Path) -> Broker {
+    pub(super) fn persistent_test_broker(store_dir: &Path) -> Broker {
         let mut broker = Broker::new_persistent("session-1", store_dir).unwrap();
         broker.current_epoch_seconds_override =
             Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
@@ -2629,3 +2696,7 @@ mod workspace_tests;
 
 #[path = "replay.rs"]
 mod replay;
+
+#[cfg(all(test, windows))]
+#[path = "../../tests/unit/content_save.rs"]
+mod content_save_tests;

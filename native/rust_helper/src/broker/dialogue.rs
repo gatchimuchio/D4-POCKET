@@ -192,6 +192,26 @@ pub(crate) fn 要求hash(要求: &対話要求) -> String {
 }
 
 impl 対話制御 {
+    /// owner保存制御だけが消費する。本文を通常IPCへ返すAPIではない。
+    #[cfg(any(windows, test))]
+    pub(crate) fn 保存対象(&self, payload: &Value) -> Result<Value, 対話失敗> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct 指定 { 要求ID: String, 要求hash: String }
+        let p: 指定 = 読取(payload)?;
+        let work = self.作業.get(&p.要求ID).ok_or(対話失敗::要求不正)?;
+        if p.要求hash != work.要求hash || work.表示範囲 != "full" {
+            return Err(対話失敗::権限拒否);
+        }
+        if work.状態 != "完了" || !work.保存済み結果証跡 || work.保存済み記録hash.is_none()
+            || work.終了監査ID.is_none() || !matches!(work.結果, Some(Ok(_))) {
+            return Err(対話失敗::要求不正);
+        }
+        Ok(json!({"版":1,"要求":work.要求,"要求hash":work.要求hash,
+            "結果":表示射影(work, work.結果.as_ref().ok_or(対話失敗::要求不正)?),
+            "実行記録":実行記録(work),"結果証跡":結果証跡(work).ok_or(対話失敗::要求不正)?}))
+    }
+
     pub(crate) fn 登録済み(&self, id: &str) -> bool { self.実行系.contains_key(id) }
 
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
@@ -774,6 +794,26 @@ mod tests {
             std::thread::sleep(Duration::from_millis(5));
         }
         panic!("対話完了の待機期限");
+    }
+    #[test]
+    fn 保存対象は全文の完了と確定記録を要求する() {
+        for (scope, fail) in [("none",false),("hash_only",false),("summary",false),("redacted",false),("full",true),("full",false)] {
+            let (mut c, _) = 準備(fail, false, false);
+            let session = 開始(&mut c, "left"); let p = 要求(&mut c, &session);
+            let select = json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"]});
+            assert!(c.保存対象(&select).is_err());
+            操作(&mut c,"対話承認",承認(&p,scope),true).unwrap(); 完了(&mut c,&p);
+            if scope != "full" || fail { assert!(c.保存対象(&select).is_err()); continue; }
+            let content = c.保存対象(&select).unwrap();
+            assert_eq!(content["要求"]["入力"],"こんにちは");
+            assert_eq!(content["結果"]["本文"],"こんにちは");
+            assert!(!content.to_string().contains("raw-private"));
+            assert!(c.保存対象(&json!({"要求ID":p["要求ID"],"要求hash":"wrong"})).is_err());
+            let mut bad=select.clone(); bad["本文"]=json!("注入"); assert!(c.保存対象(&bad).is_err());
+            c.作業.get_mut(p["要求ID"].as_str().unwrap()).unwrap().保存済み結果証跡=false;
+            assert!(c.保存対象(&select).is_err());
+            c.資格隔離(&[session]); assert!(c.保存対象(&select).is_err());
+        }
     }
     #[test]
     fn 結果証跡は表示範囲を保持し一度だけ保存する() {

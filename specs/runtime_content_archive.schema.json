@@ -1,0 +1,410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_content_archive.schema.json",
+  "title": "暗号化する対話内容。IPCへ直接公開しない",
+  "type": "object",
+  "required": [
+    "版",
+    "要求",
+    "要求hash",
+    "結果",
+    "実行記録",
+    "結果証跡"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "要求": {
+      "type": "object",
+      "required": [
+        "要求ID",
+        "実行系ID",
+        "対話セッションID",
+        "入力"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "要求ID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "実行系ID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+        },
+        "対話セッションID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "入力": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      }
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "結果": {
+      "type": "object",
+      "required": [
+        "要求ID",
+        "実行系ID",
+        "対話セッションID",
+        "状態",
+        "表示範囲",
+        "本文",
+        "参照",
+        "能力",
+        "経路",
+        "追跡ID",
+        "追跡hash",
+        "応答hash",
+        "失敗分類",
+        "復旧"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "要求ID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "実行系ID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+        },
+        "対話セッションID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "状態": {
+          "enum": [
+            "成功",
+            "保留"
+          ]
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "本文": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "参照": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "能力": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "経路": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "追跡ID": {
+          "type": "string",
+          "pattern": "^([a-f0-9]{32})?$(?![\\s\\S])"
+        },
+        "追跡hash": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$(?![\\s\\S])"
+        },
+        "応答hash": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$(?![\\s\\S])"
+        },
+        "失敗分類": {
+          "type": "string",
+          "enum": [
+            "",
+            "要求不正",
+            "実行系不在",
+            "権限拒否",
+            "セッション不一致",
+            "通信失敗",
+            "期限超過",
+            "応答不正",
+            "監査失敗",
+            "取消"
+          ]
+        },
+        "復旧": {
+          "type": "string",
+          "enum": [
+            "",
+            "入力修正",
+            "実行系再確認",
+            "権限再確認",
+            "新規セッション",
+            "接続再確認",
+            "監査修復"
+          ]
+        }
+      }
+    },
+    "実行記録": {
+      "type": "object",
+      "required": [
+        "要求ID",
+        "対話セッションID",
+        "実行系ID",
+        "作成時刻",
+        "開始時刻",
+        "終了時刻",
+        "作成監査ID",
+        "開始監査ID",
+        "終了監査ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "要求ID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "対話セッションID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "実行系ID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "作成時刻": {
+          "type": "integer"
+        },
+        "開始時刻": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "終了時刻": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "作成監査ID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "開始監査ID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "終了監査ID": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "開始時刻": {
+              "type": "null"
+            },
+            "開始監査ID": {
+              "type": "null"
+            },
+            "終了時刻": {
+              "type": "null"
+            },
+            "終了監査ID": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "開始時刻": {
+              "type": "null"
+            },
+            "開始監査ID": {
+              "type": "null"
+            },
+            "終了時刻": {
+              "type": "integer"
+            },
+            "終了監査ID": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "properties": {
+            "開始時刻": {
+              "type": "integer"
+            },
+            "開始監査ID": {
+              "type": "string"
+            },
+            "終了時刻": {
+              "type": "null"
+            },
+            "終了監査ID": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "開始時刻": {
+              "type": "integer"
+            },
+            "開始監査ID": {
+              "type": "string"
+            },
+            "終了時刻": {
+              "type": "integer"
+            },
+            "終了監査ID": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "結果証跡": {
+      "type": "object",
+      "required": [
+        "版",
+        "要求ID",
+        "対話セッションID",
+        "実行系ID",
+        "要求hash",
+        "終了監査ID",
+        "表示範囲",
+        "応答hash",
+        "能力申告hash",
+        "経路申告hash",
+        "追跡参照hash",
+        "証拠種別"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "const": 1
+        },
+        "要求ID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "対話セッションID": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "終了監査ID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "応答hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "能力申告hash": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "経路申告hash": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "追跡参照hash": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "証拠種別": {
+          "const": "INTERNAL_STATE"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "表示範囲": {
+              "const": "full"
+            },
+            "能力申告hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "経路申告hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "追跡参照hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "properties": {
+            "表示範囲": {
+              "enum": [
+                "hash_only",
+                "summary",
+                "redacted"
+              ]
+            },
+            "能力申告hash": {
+              "type": "null"
+            },
+            "経路申告hash": {
+              "type": "null"
+            },
+            "追跡参照hash": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
