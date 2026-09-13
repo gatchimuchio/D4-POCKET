@@ -42,6 +42,7 @@ class HistoryClient {
         'limit': 50,
         'latest_per_request': true,
         'include_audit_context': true,
+        'include_result_evidence': true,
         'filter': {
           '実行系ID': grant.runtime,
           if (state != null) '状態': state,
@@ -73,8 +74,13 @@ class HistoryClient {
     final ids = <String>{};
     final requests = <String>{};
     for (final raw in entries) {
-      final e = _shape(
-          raw, {'audit_event_id', 'event_hash', 'record', 'audit_context'});
+      final e = _shape(raw, {
+        'audit_event_id',
+        'event_hash',
+        'record',
+        'audit_context',
+        'result_evidence'
+      });
       if (!_text(e['audit_event_id']) ||
           !_hash(e['event_hash']) ||
           !ids.add(e['audit_event_id'] as String)) {
@@ -122,13 +128,16 @@ class HistoryClient {
       if (!valid || (state != null && s != state)) {
         _reject();
       }
+      final context = HistoryAuditContext.parse(e['audit_context'], detail);
       parsed.add(HistoryEntry(
           s as String,
           failure as String?,
           e['audit_event_id'] as String,
           e['event_hash'] as String,
           detail,
-          HistoryAuditContext.parse(e['audit_context'], detail)));
+          context,
+          HistoryResultEvidence.parse(
+              e['result_evidence'], detail, context, s)));
     }
     // 取得中の失効・承認置換を表示前に再照合する。
     final current = await status();
@@ -233,11 +242,12 @@ class HistoryGrant {
 
 class HistoryEntry {
   const HistoryEntry(this.state, this.failure, this.auditId, this.eventHash,
-      this.record, this.context);
+      this.record, this.context, this.evidence);
   final String state, auditId, eventHash;
   final String? failure;
   final DialogueExecutionRecord record;
   final HistoryAuditContext context;
+  final HistoryResultEvidence? evidence;
 }
 
 class HistoryAuditContext {
@@ -306,3 +316,52 @@ bool _hash(Object? v) =>
     v.length == 71 &&
     RegExp(r'^sha256:[0-9a-f]{64}$').hasMatch(v);
 Never _reject() => throw const BrokerClientException('履歴の現在承認または応答を確認できません');
+
+/// 過去のAdapter申告hash。現在権限と実使用証明は持たない。
+class HistoryResultEvidence {
+  const HistoryResultEvidence(
+      this.responseHash, this.capabilityHash, this.routeHash, this.traceHash);
+  final String responseHash;
+  final String? capabilityHash, routeHash, traceHash;
+  static HistoryResultEvidence? parse(
+      Object? raw,
+      DialogueExecutionRecord record,
+      HistoryAuditContext context,
+      String state) {
+    if (raw == null) return null;
+    final m = _shape(raw, {
+      '版',
+      '要求ID',
+      '対話セッションID',
+      '実行系ID',
+      '要求hash',
+      '終了監査ID',
+      '表示範囲',
+      '応答hash',
+      '能力申告hash',
+      '経路申告hash',
+      '追跡参照hash',
+      '証拠種別'
+    });
+    if (m['版'] != 1 ||
+        m['証拠種別'] != 'INTERNAL_STATE' ||
+        !['成功', '保留'].contains(state) ||
+        m['要求hash'] != context.requestHash ||
+        m['表示範囲'] != context.scope ||
+        !['full', 'hash_only', 'summary', 'redacted'].contains(m['表示範囲']) ||
+        !_hash(m['応答hash'])) {
+      _reject();
+    }
+    for (final key in ['要求ID', '対話セッションID', '実行系ID', '終了監査ID']) {
+      if (m[key] != record.fields[key]) _reject();
+    }
+    for (final key in ['能力申告hash', '経路申告hash', '追跡参照hash']) {
+      if (context.scope == 'full' ? !_hash(m[key]) : m[key] != null) _reject();
+    }
+    return HistoryResultEvidence(
+        m['応答hash'] as String,
+        m['能力申告hash'] as String?,
+        m['経路申告hash'] as String?,
+        m['追跡参照hash'] as String?);
+  }
+}

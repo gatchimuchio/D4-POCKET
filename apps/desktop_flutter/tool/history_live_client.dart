@@ -10,6 +10,7 @@ Future<void> main(List<String> args) async {
   if (grant == null || grant.runtime != args[1]) throw StateError('現在承認が不一致');
   var after = 0;
   var count = 0;
+  var proofs = 0;
   for (var i = 0; i < 32; i++) {
     final page = await client.page(grant, after: after);
     if (count == 0 && page.entries.isNotEmpty) {
@@ -28,9 +29,10 @@ Future<void> main(List<String> args) async {
           .request('対話終了', payload: {'対話セッションID': created['対話セッションID']});
       if (closed['status'] != 'accepted') throw StateError('試験要求の終了未成立');
     }
+    proofs += page.entries.where((e) => e.evidence != null).length;
     count += page.entries.length;
     if (!page.more) {
-      if (count == 0) throw StateError('実履歴がない');
+      if (count == 0 || proofs == 0) throw StateError('実履歴または結果証跡がない');
       return;
     }
     after = page.next;

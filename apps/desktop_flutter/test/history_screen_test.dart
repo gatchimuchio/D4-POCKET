@@ -6,6 +6,7 @@ import 'package:gui_shell_desktop/screens/history_screen.dart';
 
 class Fixture implements BrokerTransport {
   bool revoked = false;
+  bool withProof = false;
   Map<String, Object?>? sent;
   Map? lastFilter;
   void Function(Map<String, Object?>)? alterReplay;
@@ -63,6 +64,22 @@ class Fixture implements BrokerTransport {
           {
             'audit_event_id': 'history-1',
             'event_hash': 'sha256:${'c' * 64}',
+            'result_evidence': withProof
+                ? {
+                    '版': 1,
+                    '要求ID': 'd' * 32,
+                    '対話セッションID': 'e' * 32,
+                    '実行系ID': runtime,
+                    '要求hash': 'sha256:${'b' * 64}',
+                    '終了監査ID': 'ended',
+                    '表示範囲': 'full',
+                    '応答hash': 'sha256:${'f' * 64}',
+                    '能力申告hash': 'sha256:${'a' * 64}',
+                    '経路申告hash': 'sha256:${'a' * 64}',
+                    '追跡参照hash': 'sha256:${'a' * 64}',
+                    '証拠種別': 'INTERNAL_STATE'
+                  }
+                : null,
             'audit_context': {
               '版': 1,
               '要求hash': 'sha256:${'b' * 64}',
@@ -109,6 +126,68 @@ class Fixture implements BrokerTransport {
 }
 
 void main() {
+  testWidgets('結果証跡のhashを表示し失効後は破棄する', (tester) async {
+    final f = Fixture()..withProof = true;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(ExpansionTile));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('応答hash: sha256:${'f' * 64}'), findsOneWidget);
+    expect(find.textContaining('実使用証明ではありません'), findsOneWidget);
+    f.revoked = true;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('応答hash: sha256:${'f' * 64}'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+  test('結果証跡は要求対応と表示範囲とhashを照合する', () async {
+    final c = HistoryClient(Fixture());
+    final e = (await c.page((await c.status())!)).entries.single;
+    Map<String, Object?> proof() => {
+          '版': 1,
+          '要求ID': 'd' * 32,
+          '対話セッションID': 'e' * 32,
+          '実行系ID': 'local',
+          '要求hash': e.context.requestHash,
+          '終了監査ID': 'ended',
+          '表示範囲': 'full',
+          '応答hash': e.context.requestHash,
+          '能力申告hash': e.context.requestHash,
+          '経路申告hash': e.context.requestHash,
+          '追跡参照hash': e.context.requestHash,
+          '証拠種別': 'INTERNAL_STATE'
+        };
+    expect(
+        HistoryResultEvidence.parse(proof(), e.record, e.context, e.state)!
+            .responseHash,
+        e.context.requestHash);
+    expect(HistoryResultEvidence.parse(null, e.record, e.context, e.state),
+        isNull);
+    for (final key in [
+      '要求ID',
+      '対話セッションID',
+      '実行系ID',
+      '要求hash',
+      '終了監査ID',
+      '表示範囲',
+      '応答hash',
+      '能力申告hash',
+      '経路申告hash',
+      '追跡参照hash',
+      '証拠種別',
+      '本文'
+    ]) {
+      final bad = proof();
+      bad[key] = '不一致';
+      expect(
+          () => HistoryResultEvidence.parse(bad, e.record, e.context, e.state),
+          throwsA(isA<BrokerClientException>()));
+    }
+    expect(
+        () => HistoryResultEvidence.parse(proof(), e.record, e.context, '失敗'),
+        throwsA(isA<BrokerClientException>()));
+  });
   test('監査文脈は現在権限と異要求の承認を拒否する', () async {
     final c = HistoryClient(Fixture());
     final grant = (await c.status())!;

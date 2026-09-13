@@ -184,3 +184,5 @@ Desktop履歴の要求ID・Session ID検索は完全一致で、状態とAND結�
 個別hashの正本化は、object keyを辞書順に並べ、配列順を保持した空白なしJSONのUTF-8をSHA-256にかける。経路はJSON文字列、能力はJSON配列、追跡参照は追跡IDと追跡hashの2項目objectとする。生応答hashはJSON再整形前のAdapter結果の生応答bytesを対象とする。
 
 履歴queryのinclude_result_evidenceは省略時false。trueではentryにresult_evidenceを付け、過去承認の要求hash・表示範囲、要求/Session/Runtime、先行する完了監査、証跡eventのhash・形式・一意性を照合する。不整合は拒否し、成功/保留以外および証跡のない過去履歴はnullを返す。返却はhash証跡に限り、現在のRuntime別履歴閲覧承認と監査chain再検証を必要とする。古い履歴の証跡を推測で補完せず、現在権限や実使用能力を生成しない。
+
+Desktop履歴は結果証跡を明示取得し、要求/Session/Runtime/終了監査、過去承認hashと表示範囲、hash形式とnullable条件をclientでも照合する。詳細へ応答・能力申告・経路申告・追跡参照hashを表示する。未記録と非保存を区別し、Adapter申告の記録であって実使用証明ではないことを明示する。現在承認の失効・背景化時には既存履歴と共に破棄する。
