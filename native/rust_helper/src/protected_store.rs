@@ -114,3 +114,10 @@ fn reference(purpose: Purpose, id: &str) -> Result<(String, String), StoreError>
         format!("GUI-Shell:protected:v1:{}:{id}", purpose.label()),
     ))
 }
+
+
+impl std::fmt::Debug for ProtectedStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProtectedStore(非公開)")
+    }
+}

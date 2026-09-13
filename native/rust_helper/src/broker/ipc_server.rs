@@ -21,6 +21,7 @@ pub struct BrokerServerConfig {
     pub minidora_runtimes: Vec<(String, String)>,
     pub mobile_bind: Option<String>,
     pub workspace_config: Option<PathBuf>,
+    pub protected_store_dir: Option<PathBuf>,
 }
 
 impl BrokerServerConfig {
@@ -34,6 +35,7 @@ impl BrokerServerConfig {
             minidora_runtimes: Vec::new(),
             mobile_bind: None,
             workspace_config: None,
+            protected_store_dir: None,
         }
     }
 }
@@ -73,6 +75,13 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     }
     let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
 
+    if let Some(path) = &config.protected_store_dir {
+        let mut protected = vec![config.store_dir.clone(), config.session_file.clone()];
+        protected.extend(config.owner_session_file.iter().cloned());
+        protected.extend(config.workspace_config.iter().cloned());
+        broker.保管先起動登録(path, config.owner_session_file.is_some(), &protected).map_err(BrokerServerError::new)?;
+    }
+
     if let Some(path)=&config.workspace_config {
         broker.作業領域設定監査(path,"received","owner起動設定の読取を受信").map_err(BrokerServerError::new)?;
         let parsed=(|| {
@@ -86,7 +95,8 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
                 return Err(BrokerServerError::new(reason));
             }
         };
-        let protected=[config.store_dir.clone(),config.session_file.clone(),owner_file.clone(),path.clone()];
+        let mut protected=vec![config.store_dir.clone(),config.session_file.clone(),owner_file.clone(),path.clone()];
+        protected.extend(config.protected_store_dir.iter().cloned());
         for workspace in &settings.workspaces {
             broker.作業領域起動登録(workspace,&protected).map_err(BrokerServerError::new)?;
         }

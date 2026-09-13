@@ -33,6 +33,7 @@ fn main() {
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     eprintln!("全体基準点: 作業領域制御 --session-file <owner資格file> 作業領域全体基準点保存 <作業領域ID> <登録hash>");
     eprintln!("基準点: 作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...");
+    eprintln!("保管先登録: broker-server ... --owner-session-file <owner資格file> --protected-store-dir <既存の独立NTFS directory>");
     eprintln!("作業領域登録: broker-server ... --owner-session-file <owner資格file> --workspace-config <起動設定JSON file>");
     std::process::exit(2);
 }
@@ -54,9 +55,15 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut minidora_runtimes = Vec::new();
     let mut mobile_bind = None;
     let mut workspace_config = None;
+    let mut protected_store_dir = None;
 
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--protected-store-dir" => {
+                let Some(value) = args.next() else { eprintln!("保管先directoryの値が必要"); return Some(2); };
+                if protected_store_dir.is_some() { eprintln!("保管先の重複指定を拒否"); return Some(2); }
+                protected_store_dir = Some(PathBuf::from(value));
+            }
             "--workspace-config" => {
                 let Some(value)=args.next() else {eprintln!("作業領域設定fileの値が必要");return Some(2);};
                 if workspace_config.is_some() {eprintln!("作業領域設定fileの重複指定を拒否");return Some(2);}
@@ -137,6 +144,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     config.minidora_runtimes = minidora_runtimes;
     config.mobile_bind = mobile_bind;
     config.workspace_config = workspace_config;
+    config.protected_store_dir = protected_store_dir;
 
     match run_loopback_server(config) {
         Ok(()) => Some(0),

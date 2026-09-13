@@ -140,7 +140,10 @@ fn comparison_parts(path: &Path) -> Vec<String> {
 }
 
 pub(crate) fn open_registered_root(config: &WorkspaceStartup, protected: &[PathBuf]) -> Result<(Dir, &'static str), &'static str> {
-    let path=Path::new(&config.root_path);
+    open_isolated_root(Path::new(&config.root_path), protected)
+}
+
+pub(crate) fn open_isolated_root(path: &Path, protected: &[PathBuf]) -> Result<(Dir, &'static str), &'static str> {
     let (root,filesystem)=open_path(path)?;
     let canonical=std::fs::canonicalize(path).map_err(|_| "rootの正本pathを確認できない")?;
     let root_parts=comparison_parts(&canonical);

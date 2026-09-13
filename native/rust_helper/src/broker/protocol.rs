@@ -449,6 +449,8 @@ pub struct Broker {
     履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
+    #[cfg(windows)]
+    protected_store: Option<crate::protected_store::ProtectedStore>,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
     state_store: BrokerStateStore,
@@ -465,6 +467,8 @@ impl Broker {
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
+            #[cfg(windows)]
+            protected_store: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
@@ -498,6 +502,8 @@ impl Broker {
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
+            #[cfg(windows)]
+            protected_store: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
@@ -715,6 +721,29 @@ impl Broker {
                 &payload_hash,
             ),
         }
+    }
+
+    pub(crate) fn 保管先起動登録(&mut self, path: &Path, owner: bool, protected: &[std::path::PathBuf]) -> Result<(), &'static str> {
+        let hash = sha256_tagged(path.to_string_lossy().as_bytes());
+        self.append_audit("保管先起動", "保管先登録", "received", "owner起動設定の保管先検査を受信", "CONFIG", &hash).map_err(|_| "保管先監査失敗")?;
+        let result = (|| {
+            if !owner { return Err("保管先登録にはowner資格設定が必要"); }
+            #[cfg(not(windows))] {
+                let _ = protected;
+                Err("Windows以外の保管先登録は未対応")
+            }
+            #[cfg(windows)] {
+                if self.protected_store.is_some() { return Err("保管先登録の重複"); }
+                let (root, _) = super::workspace_root::open_isolated_root(path, protected)?;
+                self.append_audit("保管先起動", "保管先登録", "verified", "固定NTFS・link拒否・内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &hash).map_err(|_| "保管先監査失敗")?;
+                self.protected_store = Some(crate::protected_store::ProtectedStore::new(root));
+                Ok(())
+            }
+        })();
+        if let Err(reason) = result {
+            self.append_audit("保管先起動", "保管先登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "保管先拒否監査失敗")?;
+        }
+        result
     }
 
     pub(crate) fn 作業領域設定監査(&mut self, path: &Path, decision: &str, reason: &str) -> Result<(), &'static str> {

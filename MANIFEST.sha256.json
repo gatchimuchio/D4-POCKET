@@ -1069,7 +1069,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "c5e3f74ead661c196c27c388eb7a213d006aa0ee02ef87081dc82360e3396f28"
+      "sha256": "1bf9f90686553d69d7e11051a18555b0823be9fb1076ef894bb8b08542737cd7"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1101,7 +1101,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "34e427d00d728a695888ecc5eab39b470455fc25d0558ebd490e0c1b23453bf8"
+      "sha256": "1c397c8912e713ec05ac40572e01933821d6a54e56cb5a659488d1e6e3c1129f"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1633,7 +1633,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "ccb748e55ea559fc9dc64008cb8499e2ff6bc0416d7f6ea73658e725f35fbeef"
+      "sha256": "1c720964610c46f8188c6d346571eceebb3fb0e2b339b2c513fbca4742e76c1d"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -1645,7 +1645,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "5c9b8367c501323422cfc56bdc2fc47b03f1a0abf6f47db47a2b59c0f1be0f71"
+      "sha256": "5167460d6bf54c2c5c7bfa7381d722af0164bb66751d4607ebe64fb781716c10"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
-      "sha256": "9c35552cad08ba88a82c88eb24c435c300b828de9848e160b7078740a5e34e30"
+      "sha256": "ed341146df8cb4f14fcea9fb0a8aa081344f355425c098ad2d167efb8b079ab7"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
@@ -1693,7 +1693,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "93be2dce5482c64febebde1459cd2e6ef16c55b2d6c384bd1b0b90efd7a7dda9"
+      "sha256": "56b3379ab291abbbafb86e86e870c9746b61f41a1e9d85d4aab010c72e7fc05b"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1709,7 +1709,7 @@
     },
     {
       "path": "native/rust_helper/src/protected_store.rs",
-      "sha256": "359ccfb6d6d5bf27d2d64763b6f2952705419acd7d327c2349da1de86a51b895"
+      "sha256": "e6210904d724e40ebfda0d1fa239304b52770aa6e9da571cb95a2ac8bc2813cd"
     },
     {
       "path": "native/rust_helper/src/update_verification.rs",
@@ -1734,6 +1734,10 @@
     {
       "path": "native/rust_helper/tests/protected_data.rs",
       "sha256": "b1a3489e67906b45a6a48114928363ab6c35c6022db2609f0797e0735ca60ce9"
+    },
+    {
+      "path": "native/rust_helper/tests/protected_startup.rs",
+      "sha256": "0fca611000948020002bd0246435055b30ab8a23bc1ee7ff12a7f0eeb63902ce"
     },
     {
       "path": "native/rust_helper/tests/protected_store.rs",
