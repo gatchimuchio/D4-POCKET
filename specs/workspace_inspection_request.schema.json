@@ -237,6 +237,36 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域比較範囲"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "相対path"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "相対path": {
+              "const": ""
+            }
+          }
+        }
+      }
     }
   ],
   "type": "object"

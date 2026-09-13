@@ -11,6 +11,8 @@ import 'package:gui_shell_desktop/services/workspace_client.dart';
 class TestBroker implements BrokerTransport {
   String visibility = 'full';
   bool folders = false;
+  String baselineHash = "sha256:${'c' * 64}";
+  String diffKind = "text";
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
@@ -86,10 +88,40 @@ class TestBroker implements BrokerTransport {
                 ]
         };
       }
+      if (visibility == 'full' && operation == '作業領域比較範囲') {
+        body['projection'] = {
+          '基準点hash': baselineHash,
+          '相対paths': ['file.txt']
+        };
+      }
+      if (visibility == 'full' && operation == '作業領域差分') {
+        body['projection'] = {
+          '基準点hash': baselineHash,
+          'diff': {
+            'version': 1,
+            'kind': diffKind,
+            'before': {'bytes': 4, 'sha256': 'sha256:${'a' * 64}'},
+            'after': {'bytes': 4, 'sha256': 'sha256:${'b' * 64}'},
+            'unified': diffKind == 'text'
+                ? '--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-前\n+後\n'
+                : null,
+            'rows': diffKind == 'text'
+                ? [
+                    {
+                      'kind': 'changed',
+                      'before': {'number': 1, 'text': '前', 'newline': true},
+                      'after': {'number': 1, 'text': '後', 'newline': true}
+                    }
+                  ]
+                : [],
+          }
+        };
+      }
       mutate?.call(body);
-      evidence = {'full', 'hash_only'}.contains(visibility)
-          ? 'LIVE_RUNTIME'
-          : 'INTERNAL_STATE';
+      evidence =
+          operation != '作業領域比較範囲' && {'full', 'hash_only'}.contains(visibility)
+              ? 'LIVE_RUNTIME'
+              : 'INTERNAL_STATE';
       if (revokeAfterRead) approval = null;
     }
     return {
@@ -214,6 +246,25 @@ void main() {
       final selected = (await client.list()).single;
       final view = await client.read(selected, 'file.txt', tree: false);
       expect(view.projection!['text'], '実接続本文');
+      final saved = await Process.run(executable, [
+        '作業領域制御',
+        '--session-file',
+        owner,
+        '作業領域基準点保存',
+        selected.id,
+        selected.hash,
+        'file.txt'
+      ]);
+      expect(saved.exitCode, 0);
+      final scope = await client.read(selected, '', tree: false, scope: true);
+      expect(scope.projection!['相対paths'], ['file.txt']);
+      final baselineHash = scope.projection!['基準点hash'] as String;
+      await File('${project.path}/file.txt').writeAsString('比較後の本文\n');
+      final diff = await client.read(selected, 'file.txt',
+          tree: false, baselineHash: baselineHash);
+      expect((diff.projection!['diff'] as Map)['kind'], 'text');
+      expect((diff.projection!['diff'] as Map)['unified'], contains('比較後の本文'));
+
       final tree = await client.read(selected, '', tree: true);
       expect((tree.projection!['entries'] as List).length, 2);
       final nested = await client.read(selected, 'folder', tree: true);
@@ -343,6 +394,72 @@ void main() {
     await tester.tap(find.text('作業領域の先頭へ'));
     await tester.pumpAndSettle();
     expect(find.text('folder'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('基準点置換・binary本文混入・行番号不正を拒否する', () async {
+    final broker = TestBroker();
+    final client = WorkspaceClient(broker);
+    final selected = (await client.list()).single;
+    final old = broker.baselineHash;
+    broker.baselineHash = 'sha256:${'d' * 64}';
+    await expectLater(
+        client.read(selected, 'file.txt', tree: false, baselineHash: old),
+        throwsA(isA<BrokerClientException>()));
+    for (final kind in ['binary', 'oversized', 'unchanged']) {
+      broker.diffKind = kind;
+      final view = await client.read(selected, 'file.txt',
+          tree: false, baselineHash: broker.baselineHash);
+      expect((view.projection!['diff'] as Map)['unified'], isNull);
+    }
+    broker.mutate = (v) {
+      if (v['operation'] == '作業領域差分') {
+        ((v['projection'] as Map)['diff'] as Map)['unified'] = '混入本文';
+      }
+    };
+    await expectLater(
+        client.read(selected, 'file.txt',
+            tree: false, baselineHash: broker.baselineHash),
+        throwsA(isA<BrokerClientException>()));
+    broker.diffKind = 'text';
+    broker.mutate = (v) {
+      if (v['operation'] == '作業領域差分') {
+        ((((v['projection'] as Map)['diff'] as Map)['rows'] as List)
+            .first['before'] as Map)['number'] = 2;
+      }
+    };
+    await expectLater(
+        client.read(selected, 'file.txt',
+            tree: false, baselineHash: broker.baselineHash),
+        throwsA(isA<BrokerClientException>()));
+  });
+
+  testWidgets('基準点の対象から統合差分と左右比較を切り替える', (tester) async {
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('基準点の対象file'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('--- a/file'), findsOneWidget);
+    await tester.ensureVisible(find.text('左右比較'));
+    await tester.tap(find.text('左右比較'));
+    await tester.pumpAndSettle();
+    expect(find.text('前'), findsOneWidget);
+    expect(find.text('後'), findsOneWidget);
+    expect(find.text('変更'), findsOneWidget);
+    broker.baselineHash = 'sha256:${'d' * 64}';
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 2200)));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('前'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 

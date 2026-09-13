@@ -27,7 +27,8 @@
           "enum": [
             "作業領域ツリー",
             "作業領域読取",
-            "作業領域差分"
+            "作業領域差分",
+            "作業領域比較範囲"
           ]
         },
         "作業領域ID": {
@@ -85,7 +86,8 @@
           "enum": [
             "作業領域ツリー",
             "作業領域読取",
-            "作業領域差分"
+            "作業領域差分",
+            "作業領域比較範囲"
           ]
         },
         "作業領域ID": {
@@ -153,7 +155,8 @@
           "enum": [
             "作業領域ツリー",
             "作業領域読取",
-            "作業領域差分"
+            "作業領域差分",
+            "作業領域比較範囲"
           ]
         },
         "作業領域ID": {
@@ -220,7 +223,8 @@
           "enum": [
             "作業領域ツリー",
             "作業領域読取",
-            "作業領域差分"
+            "作業領域差分",
+            "作業領域比較範囲"
           ]
         },
         "作業領域ID": {
@@ -897,6 +901,157 @@
                   }
                 }
               ]
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "const": "作業領域比較範囲"
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "基準点hash",
+            "相対paths"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "基準点hash": {
+              "type": "null"
+            },
+            "相対paths": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 0,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          }
+        },
+        "要求hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "operation",
+        "要求hash",
+        "作業領域ID",
+        "実行系ID",
+        "登録hash",
+        "approval_id",
+        "有効期限",
+        "表示範囲",
+        "projection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "operation": {
+          "const": "作業領域比較範囲"
+        },
+        "作業領域ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "実行系ID": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+        },
+        "登録hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approval_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "有効期限": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "表示範囲": {
+          "const": "full"
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "基準点hash",
+            "相対paths"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "基準点hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "相対paths": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
             }
           }
         },

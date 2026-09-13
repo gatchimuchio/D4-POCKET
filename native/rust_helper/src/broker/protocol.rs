@@ -141,6 +141,8 @@ pub enum BrokerOperation {
     作業領域基準点保存,
     #[serde(rename = "作業領域差分")]
     作業領域差分,
+    #[serde(rename = "作業領域比較範囲")]
+    作業領域比較範囲,
     #[serde(rename = "作業領域ツリー")]
     作業領域ツリー,
     #[serde(rename = "作業領域読取")]
@@ -190,6 +192,7 @@ impl BrokerOperation {
             BrokerOperation::作業領域失効 => "作業領域失効",
             BrokerOperation::作業領域基準点保存 => "作業領域基準点保存",
             BrokerOperation::作業領域差分 => "作業領域差分",
+            BrokerOperation::作業領域比較範囲 => "作業領域比較範囲",
             BrokerOperation::作業領域ツリー => "作業領域ツリー",
             BrokerOperation::作業領域読取 => "作業領域読取",
             BrokerOperation::端末招待 => "端末招待",
@@ -618,7 +621,7 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
-            operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
@@ -742,7 +745,7 @@ impl Broker {
                 let evidence = if matches!(operation, "作業領域読取" | "作業領域ツリー" | "作業領域基準点保存" | "作業領域差分") && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only")) {EVIDENCE_SOURCE_LIVE_RUNTIME} else {EVIDENCE_SOURCE_INTERNAL_STATE};
                 match self.append_audit(id, operation, "accepted", "作業領域操作の結果を確定", evidence, &sha256_tagged(body.to_string().as_bytes())) {
                     Ok(event) => {
-                        if matches!(operation, "作業領域読取" | "作業領域ツリー" | "作業領域基準点保存" | "作業領域差分") && !self.作業領域.response_current(&body, self.current_epoch_seconds()) {
+                        if matches!(operation, "作業領域読取" | "作業領域ツリー" | "作業領域基準点保存" | "作業領域差分" | "作業領域比較範囲") && !self.作業領域.response_current(&body, self.current_epoch_seconds()) {
                             self.作業領域 = Default::default();
                             return self.reject_with_payload_hash(id, operation, "作業領域期限超過", "取得後の承認期限を満たさないため再登録が必要", true, hash);
                         }

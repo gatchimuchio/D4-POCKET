@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/workspace_client.dart';
+import 'workspace_diff_panel.dart';
 
 class WorkspaceInspector extends StatefulWidget {
   const WorkspaceInspector({super.key, required this.client});
@@ -94,6 +95,19 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     try {
       final registrations = await widget.client.list();
       if (!mounted || !_active || generation != _generation) return;
+      WorkspaceView? refreshedComparison;
+      if (previous != null &&
+          (previous.operation == '作業領域差分' ||
+              previous.operation == '作業領域比較範囲') &&
+          registrations.any((v) => v.sameGrant(previous.registration))) {
+        refreshedComparison = await widget.client.read(
+            previous.registration, previous.path,
+            tree: false,
+            scope: previous.operation == '作業領域比較範囲',
+            baselineHash: previous.baselineHash);
+      }
+
+      if (!mounted || !_active || generation != _generation) return;
       setState(() {
         _registrations = registrations;
         if (!registrations.any((v) => v.id == _selected)) _selected = null;
@@ -101,7 +115,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             previous.registration.current(DateTime.now()) &&
             _elapsed.elapsedMilliseconds < _viewLimit &&
             registrations.any((v) => v.sameGrant(previous.registration))) {
-          _view = previous;
+          _view = refreshedComparison ?? previous;
         }
         _message = registrations.isEmpty
             ? '登録済み作業領域はありません。'
@@ -124,8 +138,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     }
   }
 
-  Future<void> _read(
-      WorkspaceRegistration registration, String path, bool tree) async {
+  Future<void> _read(WorkspaceRegistration registration, String path, bool tree,
+      {bool scope = false, String? baselineHash}) async {
     final generation = ++_generation;
     setState(() {
       _view = null;
@@ -134,7 +148,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _message = '承認済み範囲を取得中';
     });
     try {
-      final view = await widget.client.read(registration, path, tree: tree);
+      final view = await widget.client.read(registration, path,
+          tree: tree, scope: scope, baselineHash: baselineHash);
       if (!mounted || !_active || generation != _generation) return;
       setState(() {
         _view = view;
@@ -181,6 +196,11 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       if (view != null) ...[
         Text('監査: ${view.auditId}'),
         TextButton(
+            onPressed: _busy
+                ? null
+                : () => _read(view.registration, '', false, scope: true),
+            child: const Text('基準点の対象file')),
+        TextButton(
             onPressed: _busy ? null : () => _read(view.registration, '', true),
             child: const Text('作業領域の先頭へ')),
         if (view.registration.visibility == 'none') const Text('内容は非表示です。'),
@@ -189,6 +209,29 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         if (view.registration.visibility == 'summary' ||
             view.registration.visibility == 'redacted')
           Text(projection!['説明'] as String),
+        if (view.registration.visibility == 'full' &&
+            view.operation == '作業領域比較範囲') ...[
+          if (projection!['基準点hash'] == null)
+            const Text('基準点がありません。所有者の制御操作で保存してください。')
+          else ...[
+            const Text('基準点に指定されたfileです。全workspaceの変更一覧ではありません。'),
+            for (final path in projection['相対paths'] as List)
+              ListTile(
+                  title: Text(path as String),
+                  trailing: const Icon(Icons.compare_arrows),
+                  onTap: _busy
+                      ? null
+                      : () => _read(view.registration, path, false,
+                          baselineHash: projection['基準点hash'] as String)),
+          ],
+        ],
+        if (view.registration.visibility == 'full' &&
+            view.operation == '作業領域差分') ...[
+          Text(view.path),
+          WorkspaceDiffPanel(
+              key: ValueKey('${view.path}:${projection!['基準点hash']}'),
+              diff: Map<String, Object?>.from(projection['diff'] as Map)),
+        ],
         if (view.registration.visibility == 'full' &&
             view.operation == '作業領域ツリー')
           for (final item in projection!['entries'] as List)

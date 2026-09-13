@@ -3099,6 +3099,7 @@ def 作業領域検査要求の分岐を検査する() -> list[str]:
     schema = load_schema("workspace_inspection_request.schema.json")
     samples = {
         "作業領域一覧": {},
+        "作業領域比較範囲": {"作業領域ID":"workspace-a", "相対path":""},
         "作業領域基準点保存": {"作業領域ID":"workspace-a", "登録hash":"sha256:" + "a" * 64, "相対paths":["file.txt"]},
         "作業領域差分": {"作業領域ID":"workspace-a", "相対path":"file.txt", "基準点hash":"sha256:" + "a" * 64},
         "作業領域承認": {"作業領域ID": "workspace-a", "登録hash": "sha256:" + "a" * 64, "表示範囲": "full"},

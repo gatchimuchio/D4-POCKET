@@ -168,6 +168,11 @@ fn owner_checkpoint_and_current_ipc_diff_bind_real_changes_and_revocation() {
     let output=cli(&f,&["作業領域基準点保存","workspace-a",hash,"本文.txt","new.txt"]);
     assert!(output.status.success());let receipt:Value=serde_json::from_slice(&output.stdout).unwrap();
     let baseline=receipt["projection"]["基準点hash"].as_str().unwrap();
+    let scope=request(&normal,"作業領域比較範囲",json!({"作業領域ID":"workspace-a","相対path":""}));
+    assert_eq!(scope["status"],"accepted");assert_eq!(scope["evidence_source"],"INTERNAL_STATE");
+    assert_eq!(scope["body"]["projection"]["基準点hash"],baseline);
+    assert_eq!(scope["body"]["projection"]["相対paths"].as_array().unwrap().len(),2);
+
     let selection=|path:&str|json!({"作業領域ID":"workspace-a","相対path":path,"基準点hash":baseline});
     let unchanged=request(&normal,"作業領域差分",selection("本文.txt"));
     assert_eq!(unchanged["body"]["projection"]["diff"]["kind"],"unchanged");
@@ -186,7 +191,7 @@ fn owner_checkpoint_and_current_ipc_diff_bind_real_changes_and_revocation() {
     assert!(deleted["body"]["projection"]["diff"]["after"].is_null());
     assert!(deleted["body"]["projection"]["diff"]["before"].is_object());
     let schema_data=f.root.join("diff-results.json");
-    fs::write(&schema_data,serde_json::to_vec(&json!([receipt,unchanged["body"],changed["body"],added["body"],deleted["body"]])).unwrap()).unwrap();
+    fs::write(&schema_data,serde_json::to_vec(&json!([receipt,scope["body"],unchanged["body"],changed["body"],added["body"],deleted["body"]])).unwrap()).unwrap();
     let root=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let script="import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from tooling.schema_check.check_schemas import validate_instance; schema=json.loads((Path(sys.argv[1])/'specs/workspace_inspection_response.schema.json').read_text(encoding='utf-8')); results=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8')); errors=[e for result in results for e in validate_instance(result,schema)]; assert not errors, errors";
     let validation=Command::new(if cfg!(windows) {"python"} else {"python3"}).args(["-c",script]).arg(root).arg(schema_data).output().unwrap();

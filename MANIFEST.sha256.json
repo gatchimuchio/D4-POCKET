@@ -249,8 +249,12 @@
       "sha256": "5592ce86bc0604a0d430f5cab219ad00fc3e641fd63fb6a486e4aa08c2153751"
     },
     {
+      "path": "apps/desktop_flutter/lib/screens/workspace_diff_panel.dart",
+      "sha256": "85080f7e2d7c37693814720faa1e683d06d688a95806ad4b384145b26a444011"
+    },
+    {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "356eb9861bfc38973cb6d688b866ccfcecafd96a74609abec4f4c535bbc9d650"
+      "sha256": "d572d994342fd8354b80eede9eab37773844863d05151798b5be0bfa40ee3ac6"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -274,7 +278,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
-      "sha256": "a42533fa723dc8b7be2149e34119d41b367fb8114c2d97e0a31929f97d1952a6"
+      "sha256": "70c25e0049a20b2f3f9bb834af907dccf5069662bc922b348e30b4c8048bc5e7"
     },
     {
       "path": "apps/desktop_flutter/linux/.gitignore",
@@ -450,7 +454,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "477ecdc383096984557e08b67d2b288bb4d6abbe8dec17a2a646816ac6d403bd"
+      "sha256": "e44d8f7397ded00ea38d8fd9d2170931b6850de01ce8591de1bccb6cf1ec384c"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -1050,7 +1054,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "fdaf9dd727a379c0963e89d8638ae9e25a0ee66c8161a7a2753f0fcaf8a4a2ac"
+      "sha256": "6471d825bcd7dd8dcfe1ac2948399c1ac7a869e01b8a41fb3a40e4ef72d4262f"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1078,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "789cb6bd6a3fd8119079a73019875b37cd01a2230b6134f6d37abcdc12a7613f"
+      "sha256": "80b48589962803fa71dd612d5b09894d9d3844d734a05663c104c221fd8ece92"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1546,7 +1550,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "97051a54ae74f9d4dfb9cc36682ee09966ee2af8c45cd96c5705dc568e6f65f8"
+      "sha256": "60a3a187d2f6c0c3caa6b848c3eefe85968857ea8898f1d1d6c20d3024ebb379"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -1554,7 +1558,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "bd714a6348f46bddc6c5b81c319bab3e743f39ab362642c82eba1ed51ef0f08e"
+      "sha256": "63e5a342073fb96511ecb7d4f314bdb21075165260fe1e6d2b636b8c292dda26"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -1642,7 +1646,7 @@
     },
     {
       "path": "native/rust_helper/tests/workspace_startup.rs",
-      "sha256": "5e286d944ee9b3a7aaa559811b863b39fab334977ab349cb00125e1cfbcaaa9b"
+      "sha256": "96d7b14667fba9ca05a7d2c2ccdb83062c5ab2b0a1cce14d38a2f221675f493b"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -2074,11 +2078,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "affcfd6746c7a2d19ed6ee74a83be2545a68edc31e098a1700114f07952d555e"
+      "sha256": "64b1b112abde59ba9067f841ad4a3b3d1752862f39ce31faf25ca89c18736c34"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "76d8eff500936e61eae59ddfc7db0095150fa71498461b594d02954a40d437aa"
+      "sha256": "f47db5152bba46fd9ed91069e7bc77a848a3c73c520613afbc017580fd7b9039"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2126,11 +2130,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "1c517beb9fda93ef267397de427fd1436310435dfc50c389ba03f3d2f04de58a"
+      "sha256": "ecd751dd259e1e60e962951f77dac0990cd82b945ef6d1b8bfd3ab57b5dae994"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "552759b69dc107ce05011955aaece6e0638794d75a30269c3c3827acee30e126"
+      "sha256": "a509719f62d3b9168f4df42b14ae16ae2c9017729858720ca894e7cd91209ac5"
     },
     {
       "path": "specs/workspace_startup.schema.json",
@@ -2154,7 +2158,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1599bc49207fc09288232dff324274b60ae533480814c249305a1fc87765ad46"
+      "sha256": "31459c499d5e753b1005d954bd3c921464377dfa6ce94f77f4c62952759d51aa"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

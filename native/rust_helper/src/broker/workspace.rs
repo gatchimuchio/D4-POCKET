@@ -184,14 +184,15 @@ impl WorkspaceRegistry {
             entry.baseline=Some(Baseline {hash,files});
             return Ok(body);
         }
-        if !matches!(operation, "作業領域ツリー" | "作業領域読取" | "作業領域差分") {return Err("作業領域操作が不正");}
+        if !matches!(operation, "作業領域ツリー" | "作業領域読取" | "作業領域差分" | "作業領域比較範囲") {return Err("作業領域操作が不正");}
         let (p,baseline_hash) = if operation == "作業領域差分" {
             let value:DiffSelection=parse(payload)?;
             (Selection {作業領域ID:value.作業領域ID,相対path:value.相対path},Some(value.基準点hash))
         } else {(parse::<Selection>(payload)?,None)};
         let entry = self.entries.get(&p.作業領域ID).ok_or("作業領域が未登録")?;
         let grant = entry.grant.as_ref().filter(|g| now < g.expires).ok_or("現在の作業領域読取承認が必要")?;
-        entry.reader.validate_relative_path(&p.相対path, operation == "作業領域ツリー").map_err(|_| "相対pathが不正または除外対象")?;
+        if operation == "作業領域比較範囲" && !p.相対path.is_empty() {return Err("比較範囲にpath指定は不要");}
+        entry.reader.validate_relative_path(&p.相対path, matches!(operation, "作業領域ツリー" | "作業領域比較範囲")).map_err(|_| "相対pathが不正または除外対象")?;
         let baseline=if let Some(hash)=baseline_hash.as_ref() {
             let baseline=entry.baseline.as_ref().ok_or("現在登録の基準点が必要")?;
             if hash != &baseline.hash || !baseline.files.contains_key(&p.相対path) {return Err("基準点hashまたは指定範囲が不一致");}
@@ -206,7 +207,9 @@ impl WorkspaceRegistry {
             "none" => Value::Null,
             "summary" | "redacted" => json!({"説明":"この表示範囲に提供できる承認済み内容はありません"}),
             "full" | "hash_only" => {
-                let data = if let Some(baseline)=baseline {
+                let data = if operation == "作業領域比較範囲" {
+                    json!({"基準点hash":entry.baseline.as_ref().map(|v|v.hash.as_str()),"相対paths":entry.baseline.as_ref().map(|v|v.files.keys().collect::<Vec<_>>()).unwrap_or_default()})
+                } else if let Some(baseline)=baseline {
                     let after=entry.reader.read_version(&p.相対path).map_err(|_| "比較fileの取得拒否または上限超過")?;
                     let before=baseline.files[&p.相対path].as_deref();
                     json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate(before,after.as_deref())})

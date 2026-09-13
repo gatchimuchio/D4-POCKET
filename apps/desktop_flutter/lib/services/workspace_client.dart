@@ -81,9 +81,11 @@ class WorkspaceRegistration {
 
 class WorkspaceView {
   WorkspaceView(this.registration, this.operation, this.path, this.projection,
-      this.auditId);
+      this.auditId,
+      [this.baselineHash]);
   final WorkspaceRegistration registration;
   final String operation, path, auditId;
+  final String? baselineHash;
   final Map<String, Object?>? projection;
 }
 
@@ -125,13 +127,27 @@ class WorkspaceClient {
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,
-      {required bool tree}) async {
+      {required bool tree, bool scope = false, String? baselineHash}) async {
     if (!selected.current(DateTime.now())) {
       _invalid();
     }
-    final operation = tree ? '作業領域ツリー' : '作業領域読取';
-    final response =
-        await _request(operation, {'作業領域ID': selected.id, '相対path': path});
+    if ((scope && (path.isNotEmpty || baselineHash != null)) ||
+        (baselineHash != null && !_hash.hasMatch(baselineHash))) {
+      _invalid();
+    }
+    final operation = scope
+        ? '作業領域比較範囲'
+        : baselineHash != null
+            ? '作業領域差分'
+            : tree
+                ? '作業領域ツリー'
+                : '作業領域読取';
+    final payload = <String, Object?>{
+      '作業領域ID': selected.id,
+      '相対path': path,
+      if (baselineHash != null) '基準点hash': baselineHash
+    };
+    final response = await _request(operation, payload);
     final body = _map(response['body']);
     _keys(body, [
       'version',
@@ -147,8 +163,7 @@ class WorkspaceClient {
     ]);
     if (body['version'] != 1 ||
         body['operation'] != operation ||
-        body['要求hash'] !=
-            brokerPayloadHash({'作業領域ID': selected.id, '相対path': path}) ||
+        body['要求hash'] != brokerPayloadHash(payload) ||
         body['作業領域ID'] != selected.id ||
         body['実行系ID'] != selected.runtime ||
         body['登録hash'] != selected.hash ||
@@ -157,8 +172,8 @@ class WorkspaceClient {
         body['表示範囲'] != selected.visibility) {
       _invalid();
     }
-    final live =
-        selected.visibility == 'full' || selected.visibility == 'hash_only';
+    final live = !scope &&
+        (selected.visibility == 'full' || selected.visibility == 'hash_only');
     if (response['evidence_source'] !=
         (live ? 'LIVE_RUNTIME' : 'INTERNAL_STATE')) {
       _invalid();
@@ -184,7 +199,31 @@ class WorkspaceClient {
             _invalid();
           }
         case 'full':
-          if (tree) {
+          if (scope) {
+            _keys(projection, ['基準点hash', '相対paths']);
+            final hash = projection['基準点hash'];
+            final paths = projection['相対paths'];
+            if (paths is! List ||
+                paths.length > 128 ||
+                paths.toSet().length != paths.length ||
+                !paths.every((v) =>
+                    v is String &&
+                    v.isNotEmpty &&
+                    utf8.encode(v).length <= 1024) ||
+                (hash == null
+                    ? paths.isNotEmpty
+                    : hash is! String ||
+                        !_hash.hasMatch(hash) ||
+                        paths.isEmpty)) {
+              _invalid();
+            }
+          } else if (baselineHash != null) {
+            _keys(projection, ['基準点hash', 'diff']);
+            if (projection['基準点hash'] != baselineHash) {
+              _invalid();
+            }
+            _validateDiff(projection['diff']);
+          } else if (tree) {
             _keys(projection, ['entries']);
             final entries = projection['entries'];
             if (entries is! List || entries.length > 1024) {
@@ -242,7 +281,105 @@ class WorkspaceClient {
         !current.any((v) => v.sameGrant(selected))) {
       _invalid();
     }
+    if (baselineHash != null && selected.visibility == 'full') {
+      final currentScope = await read(selected, '', tree: false, scope: true);
+      if (currentScope.projection?['基準点hash'] != baselineHash) {
+        _invalid();
+      }
+    }
     return WorkspaceView(selected, operation, path, projection,
-        response['audit_event_id'] as String);
+        response['audit_event_id'] as String, baselineHash);
+  }
+}
+
+void _validateDiff(Object? raw) {
+  final diff = _map(raw);
+  _keys(diff, ['version', 'kind', 'before', 'after', 'unified', 'rows']);
+  if (diff['version'] != 1 ||
+      !{'text', 'unchanged', 'binary', 'oversized'}.contains(diff['kind'])) {
+    _invalid();
+  }
+  for (final side in ['before', 'after']) {
+    if (diff[side] == null) continue;
+    final version = _map(diff[side]);
+    _keys(version, ['bytes', 'sha256']);
+    if (version['bytes'] is! int ||
+        (version['bytes'] as int) < 0 ||
+        !_hash.hasMatch(_string(version['sha256']))) {
+      _invalid();
+    }
+  }
+  final rows = diff['rows'];
+  if (rows is! List || rows.length > 4000) {
+    _invalid();
+  }
+  if (diff['kind'] != 'text') {
+    if (diff['unified'] != null || rows.isNotEmpty) {
+      _invalid();
+    }
+    return;
+  }
+  final unified = _string(diff['unified']);
+  if (utf8.encode(unified).length > 262144) {
+    _invalid();
+  }
+  final numbers = <String, int>{'before': 0, 'after': 0};
+  var totalBytes = 0;
+  final sizes = <String, int>{'before': 0, 'after': 0};
+  final ended = <String, bool>{'before': false, 'after': false};
+  for (final rawRow in rows) {
+    final row = _map(rawRow);
+    _keys(row, ['kind', 'before', 'after']);
+    if (!{'same', 'added', 'deleted', 'changed'}.contains(row['kind'])) {
+      _invalid();
+    }
+    if ((row['kind'] == 'added' &&
+            (row['before'] != null || row['after'] == null)) ||
+        (row['kind'] == 'deleted' &&
+            (row['before'] == null || row['after'] != null)) ||
+        ({'same', 'changed'}.contains(row['kind']) &&
+            (row['before'] == null || row['after'] == null))) {
+      _invalid();
+    }
+    for (final side in ['before', 'after']) {
+      if (row[side] == null) continue;
+      final line = _map(row[side]);
+      _keys(line, ['number', 'text', 'newline']);
+      if (ended[side]! ||
+          line['number'] != numbers[side]! + 1 ||
+          line['newline'] is! bool) {
+        _invalid();
+      }
+      numbers[side] = line['number'] as int;
+      final text = _string(line['text']);
+      if (text.contains('\n') || text.contains(String.fromCharCode(0))) {
+        _invalid();
+      }
+      sizes[side] = sizes[side]! +
+          utf8.encode(text).length +
+          (line['newline'] == true ? 1 : 0);
+      ended[side] = line['newline'] == false;
+      totalBytes += utf8.encode(text).length;
+      if (totalBytes > 131072) {
+        _invalid();
+      }
+    }
+    if (row['kind'] == 'same' &&
+        ((row['before'] as Map)['text'] != (row['after'] as Map)['text'] ||
+            (row['before'] as Map)['newline'] !=
+                (row['after'] as Map)['newline'])) {
+      _invalid();
+    }
+  }
+  for (final side in ['before', 'after']) {
+    final version = diff[side];
+    if (version == null
+        ? numbers[side] != 0
+        : (version as Map)['bytes'] != sizes[side]) {
+      _invalid();
+    }
+    if (numbers[side]! > 2000 || sizes[side]! > 65536) {
+      _invalid();
+    }
   }
 }
