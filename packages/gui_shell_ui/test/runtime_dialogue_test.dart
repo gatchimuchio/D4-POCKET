@@ -36,6 +36,8 @@ class DialogueFixture implements BrokerTransport {
   String? failOperation;
   String? progressState;
   Map<String, Object?>? resultOverride;
+  bool includeRecord = false;
+  void Function(Map<String, Object?>)? mutateRecord;
   Completer<void>? pollWait;
   @override
   Future<Map<String, Object?>> request(String operation,
@@ -70,6 +72,21 @@ class DialogueFixture implements BrokerTransport {
                       failed: runtime == 'left' ? failLeft : failRight)
               : null
         };
+        if (includeRecord) {
+          final record = <String, Object?>{
+            '要求ID': id,
+            '実行系ID': runtime,
+            '対話セッションID': session,
+            '作成時刻': 100,
+            '開始時刻': complete ? 110 : null,
+            '終了時刻': complete ? 120 : null,
+            '作成監査ID': 'created',
+            '開始監査ID': complete ? 'started' : null,
+            '終了監査ID': complete ? 'finished' : null,
+          };
+          mutateRecord?.call(record);
+          body['実行記録'] = record;
+        }
       case '対話中止':
         body = {'要求ID': p['要求ID'], '状態': '中止'};
       case '対話終了':
@@ -87,6 +104,72 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  test('実行記録の対応・型・時刻と監査の組を検査し旧応答と区別する', () async {
+    final f = DialogueFixture()..complete = true;
+    final client = RuntimeDialogueClient(f);
+    final session = await client.start('left');
+    final request = await client.send(session, '試験');
+    expect((await client.poll(request, 'left', session)).record, isNull);
+    f.includeRecord = true;
+    final record = (await client.poll(request, 'left', session)).record!;
+    expect(record.time('開始時刻'), '1970-01-01T00:01:50.000Z');
+    expect(record.audit('終了監査ID'), 'finished');
+    expect(() => record.fields['開始時刻'] = 0, throwsUnsupportedError);
+    for (final mutate in <void Function(Map<String, Object?>)>[
+      (v) => v['要求ID'] = 'f' * 32,
+      (v) => v['実行系ID'] = 'other',
+      (v) => v['対話セッションID'] = 'f' * 32,
+      (v) => v['開始時刻'] = 110.0,
+      (v) => v['終了時刻'] = 8640000000001,
+      (v) => v['終了時刻'] = -9223372036854775808,
+      (v) => v['開始監査ID'] = null,
+      (v) => v['終了監査ID'] = '',
+      (v) => v['作成監査ID'] = '改行\n混入',
+      (v) => v['作成監査ID'] = 'a' * 257,
+      (v) => v['owner'] = true,
+    ]) {
+      f.mutateRecord = mutate;
+      await expectLater(client.poll(request, 'left', session),
+          throwsA(isA<BrokerClientException>()));
+    }
+    f.mutateRecord = (v) => v['終了時刻'] = 90;
+    expect((await client.poll(request, 'left', session)).record!.fields['終了時刻'],
+        90);
+    expect(() => DialogueExecutionRecord.parse(null, request, 'left', session),
+        throwsA(isA<BrokerClientException>()));
+  });
+
+  testWidgets('実行記録をUTCと監査参照で表示し新規セッションで破棄する', (tester) async {
+    final f = DialogueFixture()..includeRecord = true;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                connect: () async => RuntimeDialogueClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '試験入力');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('実行記録'));
+    await tester.tap(find.text('実行記録'));
+    await tester.pumpAndSettle();
+    expect(find.text('開始: 未記録'), findsOneWidget);
+    f.complete = true;
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('終了: 1970-01-01T00:02:00.000Z'), findsOneWidget);
+    expect(find.text('終了監査: finished'), findsOneWidget);
+    await tester.ensureVisible(find.text('新規セッション'));
+    await tester.tap(find.text('新規セッション'));
+    await tester.pumpAndSettle();
+    expect(find.text('終了監査: finished'), findsNothing);
+    expect(f.calls.where((v) => v == '対話送信').length, 1);
+    expect(f.calls.where((v) => v == '対話承認'), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('重複実行系を選択欄へ渡さず接続エラーを表示する', (tester) async {
     final f = DialogueFixture()..runtimeNames = ['left', 'left'];
     await tester.pumpWidget(MaterialApp(

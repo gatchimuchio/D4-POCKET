@@ -25,6 +25,7 @@ class _Conversation {
   String state = '未開始';
   String? error;
   DialogueResult? result;
+  DialogueExecutionRecord? record;
   bool pending = false;
   bool busy = false;
   bool polling = false;
@@ -91,6 +92,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         side.session = null;
         side.request = null;
         side.result = null;
+        side.record = null;
         side.state = '未開始';
       });
       if (!widget.active) return;
@@ -103,6 +105,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         side.session = session;
         side.request = null;
         side.result = null;
+        side.record = null;
         side.state = '入力待ち';
       });
     } catch (_) {
@@ -123,6 +126,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     setState(() {
       side.busy = true;
       side.result = null;
+      side.record = null;
       side.error = null;
     });
     try {
@@ -196,6 +200,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       setState(() {
         side.state = progress.state;
         side.result = progress.result;
+        side.record = progress.record;
         side.error = null;
         side.pending = progress.result == null;
       });
@@ -204,6 +209,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         setState(() {
           side.error = '応答を取得できません。接続・監査を確認してください。本文の表示は保留しています。';
           side.result = null;
+          side.record = null;
         });
       }
     } finally {
@@ -221,6 +227,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         setState(() {
           side.pending = false;
           side.result = null;
+          side.record = null;
           side.state = '中止';
           side.error = null;
         });
@@ -245,6 +252,7 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         side.session = null;
         side.request = null;
         side.result = null;
+        side.record = null;
         side.state = '未開始';
         side.error = null;
       });
@@ -400,6 +408,22 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
                   SelectableText('セッション: ${side.session}'),
                 if (side.request != null) SelectableText('要求: ${side.request}'),
                 if (side.state == '承認待ち') const Text('ownerの承認操作を待っています。'),
+                if (side.request != null && side.record == null)
+                  const Text('実行記録は未取得です。'),
+                if (side.record != null)
+                  ExpansionTile(
+                    key: ValueKey('execution-record-${side.request}'),
+                    title: const Text('実行記録'),
+                    children: [
+                      const Text('Brokerの観測時刻（UTC）。外部処理の停止証拠ではありません。'),
+                      for (final stage in ['作成', '開始', '終了']) ...[
+                        SelectableText(
+                            '$stage: ${side.record!.time('$stage時刻')}'),
+                        SelectableText(
+                            '$stage監査: ${side.record!.audit('$stage監査ID')}'),
+                      ],
+                    ],
+                  ),
                 if (side.error != null)
                   Text(side.error!,
                       style: TextStyle(

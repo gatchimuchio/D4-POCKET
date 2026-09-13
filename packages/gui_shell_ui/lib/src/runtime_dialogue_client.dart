@@ -84,9 +84,12 @@ class RuntimeDialogueClient {
       throw const BrokerClientException('取得応答の要求対応が不正です');
     }
     final result = body['結果'];
+    final record = body.containsKey('実行記録')
+        ? DialogueExecutionRecord.parse(body['実行記録'], request, runtime, session)
+        : null;
     if (state == '承認待ち' || state == '実行中') {
       if (result != null) throw const BrokerClientException('未確定の本文は表示できません');
-      return DialogueProgress(state! as String, null);
+      return DialogueProgress(state! as String, null, record: record);
     }
     if (result is! Map) throw const BrokerClientException('確定応答がありません');
     final parsed = DialogueResult.parse(
@@ -94,7 +97,7 @@ class RuntimeDialogueClient {
     if (state == '中止' && parsed.text('状態') != '中止') {
       throw const BrokerClientException('中止進捗と対話結果の状態が一致しません');
     }
-    return DialogueProgress(state! as String, parsed);
+    return DialogueProgress(state! as String, parsed, record: record);
   }
 
   Future<void> cancel(String request) async {
@@ -118,9 +121,65 @@ class RuntimeDialogueClient {
 }
 
 class DialogueProgress {
-  const DialogueProgress(this.state, this.result);
+  const DialogueProgress(this.state, this.result, {this.record});
   final String state;
   final DialogueResult? result;
+  final DialogueExecutionRecord? record;
+}
+
+class DialogueExecutionRecord {
+  DialogueExecutionRecord._(this.fields);
+  final Map<String, Object?> fields;
+
+  String time(String key) {
+    final value = fields[key] as int?;
+    return value == null
+        ? '未記録'
+        : DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true)
+            .toIso8601String();
+  }
+
+  String audit(String key) => fields[key] as String? ?? '未記録';
+
+  factory DialogueExecutionRecord.parse(
+      Object? value, String request, String runtime, String session) {
+    const keys = {
+      '要求ID',
+      '実行系ID',
+      '対話セッションID',
+      '作成時刻',
+      '開始時刻',
+      '終了時刻',
+      '作成監査ID',
+      '開始監査ID',
+      '終了監査ID'
+    };
+    void reject() => throw const BrokerClientException('実行記録の構造または要求対応が不正です');
+    if (value is! Map ||
+        value.length != keys.length ||
+        !keys.containsAll(value.keys) ||
+        value['要求ID'] != request ||
+        value['実行系ID'] != runtime ||
+        value['対話セッションID'] != session) {
+      reject();
+    }
+    final fields = Map<String, Object?>.from(value as Map);
+    for (final stage in ['作成', '開始', '終了']) {
+      final time = fields['$stage時刻'];
+      final audit = fields['$stage監査ID'];
+      if (time == null && audit == null && stage != '作成') continue;
+      if (time is! int ||
+          time < -8640000000000 ||
+          time > 8640000000000 ||
+          audit is! String ||
+          audit.isEmpty ||
+          audit.length > 256 ||
+          audit.runes.any((c) => c < 32 || c == 127)) {
+        reject();
+      }
+    }
+    return DialogueExecutionRecord._(Map.unmodifiable(fields));
+  }
 }
 
 class DialogueResult {

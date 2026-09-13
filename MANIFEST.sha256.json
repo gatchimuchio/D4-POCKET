@@ -458,7 +458,7 @@
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
-      "sha256": "2bd2048a22bbccfd89eea3a6a5b3cb1eedffad1df193b60a2efce124864fa708"
+      "sha256": "69b6fa99adc9494ed357ad083b37c05a750da08501b59c0ffd724539c2b71617"
     },
     {
       "path": "apps/desktop_flutter/windows/.gitignore",
@@ -1050,7 +1050,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "8d7cdc8418f9ff066c2c702a55d133a5d6ca9b559b2a53199a5f02c3cebc59cf"
+      "sha256": "a4b810edd277c8e8ec76147ea23bed8f9349190ace822186aa5d0fe8af7432a4"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "9d2ee7ddb0bbe3af73bcb323b7a0a681b52631f68e6e838ba4b1338b9736ed5b"
+      "sha256": "6268c98ecc3ea4275b14472d8a3597b1bf07b5b293d089a7e818d0d9bb1df49b"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1838,11 +1838,11 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
-      "sha256": "921d3078e5f39a9109b63c46da82d256a2d91c56cd862e3b9e839810ca7e2872"
+      "sha256": "e3bb7b1c171cdf2b4f50a1d938f3556f56b7e052641b79ce97f4d97629e24a8e"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue_client.dart",
-      "sha256": "4033a63b5fa8aa9c7f3a3fd85d7e8d5959e3cb8db5c27528dfb0626473f31d98"
+      "sha256": "0a06968eae2da700d9029841d6fb006e437fd4ae0e2631446a74f89f2129ba1f"
     },
     {
       "path": "packages/gui_shell_ui/pubspec.yaml",
@@ -1854,7 +1854,7 @@
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_test.dart",
-      "sha256": "ba37015abce18cca92f9bb59033fed6d3fb1b6f180822bd6ee14e1ac3766508b"
+      "sha256": "782653dae4dac17a3075dc6e5a4aeef89fe44519e512702380113278cfae8eca"
     },
     {
       "path": "packages/runtime_catalog/__init__.py",

@@ -25,9 +25,15 @@ Future<void> main(List<String> args) async {
     if (DateTime.now().isAfter(deadline)) throw StateError('実対話の待機期限');
     for (var index = 0; index < 2; index++) {
       if (results[index] != null) continue;
-      results[index] = (await client.poll(
-              requests[index], index == 0 ? 'left' : 'right', sessions[index]))
-          .result;
+      final progress = await client.poll(
+          requests[index], index == 0 ? 'left' : 'right', sessions[index]);
+      if (progress.record == null) throw StateError('実行記録が返っていない');
+      if (progress.result != null &&
+          (progress.record!.fields['開始時刻'] == null ||
+              progress.record!.fields['終了時刻'] == null)) {
+        throw StateError('実対話の開始・終了記録が確定していない');
+      }
+      results[index] = progress.result;
     }
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
