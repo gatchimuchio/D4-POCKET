@@ -16,6 +16,13 @@ pub struct ComparedFile {
     pub sha256: String,
     pub(crate) content: Option<Vec<u8>>,
 }
+/// 比較対象の探索結果。secret subtreeの内部件数や名前は含めない。
+#[derive(Debug, PartialEq, Eq)]
+pub struct ComparisonInventory {
+    pub files: Vec<String>,
+    pub excluded_secrets: usize,
+}
+pub const MAX_INVENTORY_ENTRIES: usize = 4096;
 const MAX_ENTRIES: usize = 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -255,6 +262,67 @@ impl WorkspaceReader {
         Ok(entries)
     }
 
+    /// 全体比較用。secret以外の省略を許可せず、部分結果を返さない。
+    pub fn comparison_inventory(&self) -> Result<ComparisonInventory, ReadError> {
+        self.inventory_checked(MAX_INVENTORY_ENTRIES, || {})
+    }
+
+    fn inventory_checked(&self, budget: usize, after_walk: impl FnOnce()) -> Result<ComparisonInventory, ReadError> {
+        let root_metadata=self.root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+        let mut pending=vec![(String::new(),root_metadata)];
+        let mut directories=Vec::new();
+        let mut files=Vec::new();
+        let mut excluded_secrets=0;
+        let mut total=0usize;
+        while let Some((path, expected))=pending.pop() {
+            let parts=if path.is_empty() {vec![]} else {self.allowed(&path)?};
+            let dir=self.directory(&parts)?;
+            let before=dir.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+            if !same_file(&expected,&before) || expected.modified().ok().is_none()
+                || expected.modified().ok()!=before.modified().ok() {return Err(ReadError::Changed);}
+            for (count,entry) in dir.entries().map_err(|_| ReadError::Unavailable)?.enumerate() {
+                if count>=MAX_ENTRIES || total>=budget.min(MAX_INVENTORY_ENTRIES) {return Err(ReadError::TooManyEntries);}
+                total+=1;
+                let entry=entry.map_err(|_| ReadError::Unavailable)?;
+                let name=entry.file_name();
+                let name=name.to_str().ok_or(ReadError::InvalidPath)?;
+                let relative=if path.is_empty() {name.to_owned()} else {format!("{path}/{name}")};
+                match self.allowed(&relative) {
+                    Err(ReadError::SecretPath)=>{excluded_secrets+=1;continue;},
+                    Err(error)=>return Err(error),
+                    Ok(_)=>{},
+                }
+                let observed=dir.symlink_metadata(name).map_err(|_| ReadError::Changed)?;
+                if reparse(&observed) || cap_fs_ext::MetadataExt::dev(&observed)!=self.root_device {
+                    return Err(ReadError::UnsafeFile);
+                }
+                if observed.is_dir() {
+                    let child=dir.open_dir_nofollow(name).map_err(|_| ReadError::Changed)?;
+                    let opened=child.dir_metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&observed,&opened) || reparse(&opened) || !opened.is_dir() {return Err(ReadError::Changed);}
+                    pending.push((relative,opened));
+                } else {
+                    if !regular(&observed) {return Err(ReadError::UnsafeFile);}
+                    let file=dir.open_with(name,&read_options()).map_err(|_| ReadError::Changed)?;
+                    let opened=file.metadata().map_err(|_| ReadError::Changed)?;
+                    if !same_file(&observed,&opened) || !regular(&opened) {return Err(ReadError::Changed);}
+                    files.push(relative);
+                }
+            }
+            directories.push((path,before));
+        }
+        after_walk();
+        for (path,before) in directories {
+            let parts=if path.is_empty() {vec![]} else {self.allowed(&path)?};
+            let current=self.directory(&parts).map_err(|_| ReadError::Changed)?;
+            let after=current.dir_metadata().map_err(|_| ReadError::Changed)?;
+            if !same_file(&before,&after) || before.modified().ok().is_none()
+                || before.modified().ok()!=after.modified().ok() {return Err(ReadError::Changed);}
+        }
+        files.sort();
+        Ok(ComparisonInventory {files,excluded_secrets})
+    }
+
     /// 差分用の存在状態。拒否・競合・linkをfile不在へ変換しない。
     pub fn read_version(&self, path: &str) -> Result<Option<Vec<u8>>, ReadError> {
         self.read_version_checked(path, || {})
@@ -396,6 +464,42 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn inventory_recurses_and_excludes_only_declared_secrets() {
+        let f=Fixture::new();let reader=f.reader();
+        fs::create_dir_all(f.0.join("src/deep")).unwrap();
+        fs::create_dir_all(f.0.join("private-data/nested")).unwrap();
+        fs::write(f.0.join("private-data/nested/hidden"),b"secret").unwrap();
+        fs::write(f.0.join(".env"),b"secret").unwrap();
+        fs::write(f.0.join("z"),b"").unwrap();
+        fs::write(f.0.join("src/deep/a"),b"file").unwrap();
+        assert_eq!(reader.comparison_inventory(),Ok(ComparisonInventory {
+            files:vec!["src/deep/a".into(),"z".into()],excluded_secrets:2}));
+        assert_eq!(reader.inventory_checked(5,||{}),Err(ReadError::TooManyEntries));
+        assert_eq!(reader.inventory_checked(6,||{}).unwrap().files.len(),2);
+        fs::hard_link(f.0.join("z"),f.0.join("alias")).unwrap();
+        assert_eq!(reader.comparison_inventory(),Err(ReadError::UnsafeFile));
+    }
+
+    #[test]
+    fn inventory_rejects_directory_mutation_and_never_returns_partial_paths() {
+        let f=Fixture::new();let reader=f.reader();
+        fs::create_dir(f.0.join("nested")).unwrap();
+        fs::write(f.0.join("nested/old"),b"old").unwrap();
+        assert_eq!(reader.inventory_checked(MAX_INVENTORY_ENTRIES,|| {
+            fs::remove_file(f.0.join("nested/old")).unwrap();
+            fs::remove_dir(f.0.join("nested")).unwrap();
+        }),Err(ReadError::Changed));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn inventory_rejects_invalid_names_instead_of_omitting_them() {
+        let f=Fixture::new();let reader=f.reader();
+        fs::write(f.0.join("bad:name"),b"").unwrap();
+        assert_eq!(reader.comparison_inventory(),Err(ReadError::InvalidPath));
     }
 
     #[test]
@@ -551,5 +655,6 @@ mod tests {
             fs::write(f.0.join(format!("file-{i}")), b"").unwrap();
         }
         assert_eq!(reader.list(""), Err(ReadError::TooManyEntries));
+        assert_eq!(reader.comparison_inventory(),Err(ReadError::TooManyEntries));
     }
 }

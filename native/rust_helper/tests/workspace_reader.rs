@@ -48,6 +48,7 @@ fn directory_link_to_outside_is_rejected() {
     assert_eq!(reader.read_version("alias/missing"), Err(ReadError::UnsafeFile));
     assert!(matches!(reader.read_comparison_version("alias/missing",128*1024*1024),Err(ReadError::UnsafeFile)));
     assert!(reader.list("").unwrap().is_empty());
+    assert_eq!(reader.comparison_inventory(),Err(ReadError::UnsafeFile));
     // junction先を削除対象にしない。link自身だけを取り除く。
     #[cfg(windows)]
     fs::remove_dir(f.0.join("alias")).unwrap();
@@ -65,6 +66,7 @@ fn final_symlink_to_secret_and_fifo_are_rejected_without_blocking() {
     std::os::unix::fs::symlink(".env", f.0.join("alias")).unwrap();
     let reader = f.reader();
     assert_eq!(reader.read("alias"), Err(ReadError::UnsafeFile));
+    assert_eq!(reader.comparison_inventory(),Err(ReadError::UnsafeFile));
     assert_eq!(reader.read_version("alias"), Err(ReadError::UnsafeFile));
     std::os::unix::fs::symlink("absent", f.0.join("dangling")).unwrap();
     assert_eq!(reader.read_version("dangling"), Err(ReadError::UnsafeFile));
@@ -74,8 +76,11 @@ fn final_symlink_to_secret_and_fifo_are_rejected_without_blocking() {
         .status()
         .unwrap()
         .success());
+    fs::remove_file(f.0.join("alias")).unwrap();
+    fs::remove_file(f.0.join("dangling")).unwrap();
     let (tx, rx) = mpsc::channel();
     let task = thread::spawn(move || {
+        assert_eq!(reader.comparison_inventory(),Err(ReadError::UnsafeFile));
         tx.send(reader.read("pipe")).unwrap();
     });
     assert_eq!(
