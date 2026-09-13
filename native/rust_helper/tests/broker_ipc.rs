@@ -414,6 +414,34 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     for filter in [json!(null),json!({"状態":"不明"}),json!({"要求ID":""}),json!({"実行系ID":"../outside"}),json!({"owner":true})] {
         assert_ne!(send_request(&owner,&request("対話履歴一覧",json!({"after":0,"limit":1,"filter":filter})))["status"],"accepted");
     }
+    let read_payload = |approval: &Value, runtime: &str| json!({"approval_id":approval,"query":{"after":0,"limit":100,"filter":{"実行系ID":runtime}}});
+    assert_eq!(send_request(&process.endpoint,&request("対話履歴閲覧状態",json!({})))["body"]["grant"],Value::Null);
+    for op in ["対話履歴承認","対話履歴失効"] {
+        assert_ne!(send_request(&process.endpoint,&request(op,json!({"実行系ID":"local"})))["status"],"accepted");
+    }
+    assert_ne!(send_request(&process.endpoint,&request("対話履歴閲覧",read_payload(&json!("a".repeat(32)),"local")))["status"],"accepted");
+    let approval_cli=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作","--session-file"]).arg(&owner_file).args(["履歴承認","local"]).output().unwrap();
+    assert!(approval_cli.status.success());
+    let access:Value=serde_json::from_slice(&approval_cli.stdout).unwrap();
+    let approval=&access["grant"]["approval_id"];
+    let viewed=send_request(&process.endpoint,&request("対話履歴閲覧",read_payload(approval,"local")));
+    assert_eq!(viewed["status"],"accepted");
+    assert_eq!(viewed["body"]["page"]["entries"].as_array().unwrap().len(),3);
+    fs::write(&record_file,serde_json::to_vec(&viewed["body"]).unwrap()).unwrap();
+    let checked=Command::new(if cfg!(windows){"python"}else{"python3"})
+        .args(["-c",&schema_check.replace("runtime_execution_record.schema.json","runtime_history_access.schema.json")])
+        .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")).arg(&record_file).output().unwrap();
+    assert!(checked.status.success(),"{}",String::from_utf8_lossy(&checked.stderr));
+    for invalid in [read_payload(approval,"other"),read_payload(&json!("b".repeat(32)),"local"),json!({"approval_id":approval,"query":{"after":0,"limit":1}})] {
+        assert_ne!(send_request(&process.endpoint,&request("対話履歴閲覧",invalid))["status"],"accepted");
+    }
+    assert_eq!(send_request(&owner,&request("対話履歴失効",json!({})))["status"],"accepted");
+    assert_ne!(send_request(&process.endpoint,&request("対話履歴閲覧",read_payload(approval,"local")))["status"],"accepted");
+    let renewed=send_request(&owner,&request("対話履歴承認",json!({"実行系ID":"local"})));
+    assert_eq!(renewed["status"],"accepted");
+    assert_ne!(renewed["body"]["grant"]["approval_id"],*approval);
+    assert_ne!(send_request(&process.endpoint,&request("対話履歴閲覧",read_payload(approval,"local")))["status"],"accepted");
     drop(process);
     fs::remove_file(&workspace.session_file).unwrap();
     fs::remove_file(&owner_file).unwrap();
@@ -425,6 +453,11 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     let endpoint = wait_for_endpoint(&workspace.session_file).unwrap();
     let restarted = BrokerProcess {child, endpoint};
     wait_for_endpoint(&owner_file).unwrap();
+    let state=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作","--session-file"]).arg(&workspace.session_file).arg("履歴閲覧状態").output().unwrap();
+    assert!(state.status.success());
+    let state:Value=serde_json::from_slice(&state.stdout).unwrap();
+    assert_eq!(state["grant"],Value::Null);
     let cli = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
         .args(["対話承認操作", "--session-file"]).arg(&owner_file)
         .args(["履歴", "0", "100"]).output().unwrap();

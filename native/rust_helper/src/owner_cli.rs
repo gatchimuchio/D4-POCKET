@@ -21,6 +21,9 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         "端末一覧" if args.len() == 3 => ("端末一覧", json!({})),
         "端末招待取消" if args.len() == 4 => ("端末招待取消", json!({"招待ID":args[3]})),
         "端末失効" if args.len() == 4 => ("端末失効", json!({"結合ID":args[3]})),
+        "履歴承認" if args.len()==4 => ("対話履歴承認",json!({"実行系ID":args[3]})),
+        "履歴失効" if args.len()==3 => ("対話履歴失効",json!({})),
+        "履歴閲覧状態" if args.len()==3 => ("対話履歴閲覧状態",json!({})),
         "履歴" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 => {
             let mut filter = serde_json::Map::new();
             for pair in args[5..].chunks_exact(2) {

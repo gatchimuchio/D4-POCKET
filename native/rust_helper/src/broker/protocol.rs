@@ -131,6 +131,14 @@ impl BrokerStateStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
+    #[serde(rename = "対話履歴承認")]
+    対話履歴承認,
+    #[serde(rename = "対話履歴失効")]
+    対話履歴失効,
+    #[serde(rename = "対話履歴閲覧状態")]
+    対話履歴閲覧状態,
+    #[serde(rename = "対話履歴閲覧")]
+    対話履歴閲覧,
     #[serde(rename = "対話履歴一覧")]
     対話履歴一覧,
     #[serde(rename = "作業領域一覧")]
@@ -218,6 +226,10 @@ impl BrokerOperation {
             BrokerOperation::ApprovalEdit => "approval_edit",
             BrokerOperation::ContentProjection => "content_projection",
             BrokerOperation::AuditVerify => "audit_verify",
+            BrokerOperation::対話履歴承認 => "対話履歴承認",
+            BrokerOperation::対話履歴失効 => "対話履歴失効",
+            BrokerOperation::対話履歴閲覧状態 => "対話履歴閲覧状態",
+            BrokerOperation::対話履歴閲覧 => "対話履歴閲覧",
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
@@ -428,6 +440,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
+    履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
     shutdown_requested: bool,
@@ -443,6 +456,7 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             shutdown_requested: false,
@@ -475,6 +489,7 @@ impl Broker {
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             shutdown_requested: false,
@@ -678,6 +693,7 @@ impl Broker {
                 project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+            operation @ (BrokerOperation::対話履歴承認 | BrokerOperation::対話履歴失効 | BrokerOperation::対話履歴閲覧状態 | BrokerOperation::対話履歴閲覧) => self.履歴閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話履歴一覧 => self.履歴要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::AuditVerify => self.accept_body(
                 &request_id,
@@ -861,6 +877,34 @@ impl Broker {
                 Err(_) => {self.端末全停止();self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止")}
             },
             Err(reason) => self.reject_with_payload_hash(id,op,"端末要求拒否",reason,true,&hash),
+        }
+    }
+
+    fn 履歴閲覧処理(&mut self, id: &str, op: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+        let log = match self.state_store.persistent_store.as_ref().ok_or("永続監査が必要")
+            .and_then(|s|s.verified_audit_log().map_err(|_|"監査検証失敗")) {
+            Ok(log) if log==self.audit_log => log,
+            _ => {self.履歴閲覧=Default::default(); return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");}
+        };
+        if self.append_audit(id,op,"received","Capability=dialogue.history.inspect Permission=現在承認照合 Approval=owner発行資格 Recovery=再承認",EVIDENCE_SOURCE_INTERNAL_STATE,hash).is_err() {
+            self.履歴閲覧=Default::default();return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");
+        }
+        let mut access=std::mem::take(&mut self.履歴閲覧);
+        let now=self.current_epoch_seconds();
+        let mut audit_failed=false;
+        let result=access.operate(op,payload,owner,now,&log,&mut |reason,digest|self.append_audit(id,op,"recorded",reason,EVIDENCE_SOURCE_INTERNAL_STATE,digest).map(|_|()).map_err(|_|{audit_failed=true;"監査失敗"}));
+        if audit_failed {return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");}
+        self.履歴閲覧=access;
+        match result {
+            Err(reason)=>self.reject_with_payload_hash(id,op,"権限拒否",reason,true,hash),
+            Ok(body)=>match self.append_audit(id,op,"accepted","履歴metadata閲覧の結果を確定。現在実行権限を生成しない",EVIDENCE_SOURCE_INTERNAL_STATE,&sha256_tagged(body.to_string().as_bytes())) {
+                Err(_)=>{self.履歴閲覧=Default::default();self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認")},
+                Ok(event)=>{
+                    let now=self.current_epoch_seconds();
+                    if !body["grant"].is_null() && !self.履歴閲覧.current(&body,now) {return self.reject_with_payload_hash(id,op,"期限超過","履歴閲覧の承認期限超過",true,hash);}
+                    BrokerResponse{request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+                }
+            }
         }
     }
 

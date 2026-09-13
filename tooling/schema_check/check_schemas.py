@@ -8,6 +8,7 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "runtime_history_access.schema.json",
     "runtime_execution_history_page.schema.json",
     "runtime_execution_history.schema.json",
     "runtime_execution_record.schema.json",

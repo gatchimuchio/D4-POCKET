@@ -285,6 +285,17 @@ server.serve_forever()
                     assert len(selected["entries"]) == 1 and not selected["has_more"]
                     assert selected["entries"][0]["record"]["実行記録"]["要求ID"] == request_id
                     assert selected["entries"][0]["record"]["状態"] == state
+                access_schema = json.loads((ROOT / "specs/runtime_history_access.schema.json").read_text(encoding="utf-8"))
+                for runtime_id in ["left", "right"]:
+                    approved = 成功(owner, "対話履歴承認", {"実行系ID": runtime_id})
+                    selection = {"approval_id": approved["grant"]["approval_id"], "query": {"after": 0, "limit": 100, "filter": {"実行系ID": runtime_id}}}
+                    viewed = 成功(normal, "対話履歴閲覧", selection)
+                    assert not validate_instance(viewed, access_schema)
+                    assert viewed["page"]["entries"] and not viewed["page"]["has_more"]
+                    assert all(e["record"]["実行記録"]["実行系ID"] == runtime_id for e in viewed["page"]["entries"])
+                    成功(owner, "対話履歴失効", {})
+                    denied = 操作(normal, "対話履歴閲覧", selection)
+                    assert denied["status"] != "accepted" and denied.get("body") is None
                 assert 操作(normal, "shutdown", None)["status"] == "accepted"
                 broker.wait(timeout=5)
                 # 再起動は永続監査chainとnonceを読み、整合しなければ起動しない。
@@ -297,7 +308,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
-                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "監査chain再読取"],
+                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",

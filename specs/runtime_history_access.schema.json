@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_history_access.schema.json",
+  "title": "現在承認に束縛した履歴metadata閲覧",
+  "description": "通常IPCの履歴承認状態と閲覧結果。履歴は現在実行権限を生成しない。",
+  "type": "object",
+  "required": [
+    "grant",
+    "page"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "grant": {
+          "type": "null"
+        },
+        "page": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "grant": {
+          "type": "object",
+          "required": [
+            "approval_id",
+            "runtime_id",
+            "expires_at"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "approval_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "runtime_id": {
+              "type": "string",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "expires_at": {
+              "type": "integer"
+            }
+          }
+        },
+        "page": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "grant": {
+          "type": "object",
+          "required": [
+            "approval_id",
+            "runtime_id",
+            "expires_at"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "approval_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "runtime_id": {
+              "type": "string",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "expires_at": {
+              "type": "integer"
+            }
+          }
+        },
+        "page": {
+          "title": "owner専用の過去実行履歴ページ",
+          "type": "object",
+          "required": [
+            "version",
+            "entries",
+            "next_cursor",
+            "has_more",
+            "head_hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "entries": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "required": [
+                  "audit_event_id",
+                  "event_hash",
+                  "record"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "audit_event_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "event_hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+                  },
+                  "record": {
+                    "title": "監査chainに保存する実行履歴",
+                    "description": "過去の観測。現在の権限や稼働状態を生成しない。",
+                    "type": "object",
+                    "required": [
+                      "版",
+                      "状態",
+                      "失敗分類",
+                      "実行記録"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "版": {
+                        "const": 1,
+                        "type": "integer"
+                      },
+                      "状態": {
+                        "enum": [
+                          "承認待ち",
+                          "実行中",
+                          "成功",
+                          "保留",
+                          "失敗",
+                          "中止"
+                        ]
+                      },
+                      "失敗分類": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "実行記録": {
+                        "title": "対話実行の状態遷移記録",
+                        "description": "時刻と永続監査参照。成功・外部停止・新しい権限を保証しない。",
+                        "type": "object",
+                        "required": [
+                          "要求ID",
+                          "対話セッションID",
+                          "実行系ID",
+                          "作成時刻",
+                          "開始時刻",
+                          "終了時刻",
+                          "作成監査ID",
+                          "開始監査ID",
+                          "終了監査ID"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "要求ID": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+                          },
+                          "対話セッションID": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+                          },
+                          "実行系ID": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "作成時刻": {
+                            "type": "integer"
+                          },
+                          "開始時刻": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "終了時刻": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "作成監査ID": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "開始監査ID": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1
+                          },
+                          "終了監査ID": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "minLength": 1
+                          }
+                        },
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "null"
+                              },
+                              "開始監査ID": {
+                                "type": "null"
+                              },
+                              "終了時刻": {
+                                "type": "null"
+                              },
+                              "終了監査ID": {
+                                "type": "null"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "null"
+                              },
+                              "開始監査ID": {
+                                "type": "null"
+                              },
+                              "終了時刻": {
+                                "type": "integer"
+                              },
+                              "終了監査ID": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "integer"
+                              },
+                              "開始監査ID": {
+                                "type": "string"
+                              },
+                              "終了時刻": {
+                                "type": "null"
+                              },
+                              "終了監査ID": {
+                                "type": "null"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "integer"
+                              },
+                              "開始監査ID": {
+                                "type": "string"
+                              },
+                              "終了時刻": {
+                                "type": "integer"
+                              },
+                              "終了監査ID": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "状態": {
+                            "enum": [
+                              "承認待ち"
+                            ]
+                          },
+                          "失敗分類": {
+                            "type": "null"
+                          },
+                          "実行記録": {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "null"
+                              },
+                              "終了時刻": {
+                                "type": "null"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "状態": {
+                            "enum": [
+                              "実行中"
+                            ]
+                          },
+                          "失敗分類": {
+                            "type": "null"
+                          },
+                          "実行記録": {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "integer"
+                              },
+                              "終了時刻": {
+                                "type": "null"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "状態": {
+                            "enum": [
+                              "成功",
+                              "保留"
+                            ]
+                          },
+                          "失敗分類": {
+                            "type": "null"
+                          },
+                          "実行記録": {
+                            "properties": {
+                              "開始時刻": {
+                                "type": "integer"
+                              },
+                              "終了時刻": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "状態": {
+                            "enum": [
+                              "失敗"
+                            ]
+                          },
+                          "失敗分類": {
+                            "enum": [
+                              "要求不正",
+                              "実行系不在",
+                              "権限拒否",
+                              "セッション不一致",
+                              "通信失敗",
+                              "期限超過",
+                              "応答不正",
+                              "監査失敗"
+                            ]
+                          },
+                          "実行記録": {
+                            "properties": {
+                              "終了時刻": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "状態": {
+                            "enum": [
+                              "中止"
+                            ]
+                          },
+                          "失敗分類": {
+                            "const": "取消"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "next_cursor": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "has_more": {
+              "type": "boolean"
+            },
+            "head_hash": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "grant": {},
+    "page": {}
+  }
+}

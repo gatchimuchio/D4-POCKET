@@ -1,3 +1,4 @@
+pub(crate) mod history_access;
 pub(crate) mod execution_history;
 pub mod audit;
 pub(crate) mod workspace;
