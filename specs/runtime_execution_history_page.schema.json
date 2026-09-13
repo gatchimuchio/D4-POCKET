@@ -48,7 +48,8 @@
             "additionalProperties": false,
             "properties": {
               "版": {
-                "const": 1
+                "const": 1,
+                "type": "integer"
               },
               "状態": {
                 "enum": [
@@ -197,7 +198,116 @@
                   }
                 ]
               }
-            }
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "状態": {
+                    "enum": [
+                      "承認待ち"
+                    ]
+                  },
+                  "失敗分類": {
+                    "type": "null"
+                  },
+                  "実行記録": {
+                    "properties": {
+                      "開始時刻": {
+                        "type": "null"
+                      },
+                      "終了時刻": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "状態": {
+                    "enum": [
+                      "実行中"
+                    ]
+                  },
+                  "失敗分類": {
+                    "type": "null"
+                  },
+                  "実行記録": {
+                    "properties": {
+                      "開始時刻": {
+                        "type": "integer"
+                      },
+                      "終了時刻": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "状態": {
+                    "enum": [
+                      "成功",
+                      "保留"
+                    ]
+                  },
+                  "失敗分類": {
+                    "type": "null"
+                  },
+                  "実行記録": {
+                    "properties": {
+                      "開始時刻": {
+                        "type": "integer"
+                      },
+                      "終了時刻": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "状態": {
+                    "enum": [
+                      "失敗"
+                    ]
+                  },
+                  "失敗分類": {
+                    "enum": [
+                      "要求不正",
+                      "実行系不在",
+                      "権限拒否",
+                      "セッション不一致",
+                      "通信失敗",
+                      "期限超過",
+                      "応答不正",
+                      "監査失敗"
+                    ]
+                  },
+                  "実行記録": {
+                    "properties": {
+                      "終了時刻": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "状態": {
+                    "enum": [
+                      "中止"
+                    ]
+                  },
+                  "失敗分類": {
+                    "const": "取消"
+                  }
+                }
+              }
+            ]
           }
         }
       }

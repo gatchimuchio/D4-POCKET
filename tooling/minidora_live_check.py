@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 REFERENCE = "3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8"
 
+from tooling.schema_check.check_schemas import validate_instance
+
 
 def 正本化(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -242,22 +244,41 @@ server.serve_forever()
                 a, b = 完了(p), 完了(q)
                 assert left != right and p["要求ID"] != q["要求ID"]
                 assert a["状態"] == b["状態"] == "成功", (a["失敗分類"], b["失敗分類"])
+                expected_history = {p["要求ID"]: "成功", q["要求ID"]: "成功"}
                 assert a["本文"] and a["追跡ID"] and a["追跡hash"] and a["能力"]
                 assert a["実行系ID"] == "left" and b["実行系ID"] == "right"
                 assert b["本文"] == b["追跡ID"] == "" and b["能力"] == [] and b["応答hash"]
                 # 基礎Core未接続に該当する要求を成功と誤射影しない。
                 _, hold = 対話("left", "full", "存在論的な未知問題を解いて")
                 assert 完了(hold)["状態"] == "保留"
+                expected_history[hold["要求ID"]] = "保留"
                 # 参照実process停止後も、他側の成功・表示資格・sessionを共有しない。
                 終了(processes[1])
                 _, p = 対話("left", "full")
                 _, q = 対話("right", "full")
                 assert 完了(p)["状態"] == "成功"
                 assert 完了(q)["状態"] == "失敗"
+                expected_history.update({p["要求ID"]: "成功", q["要求ID"]: "失敗"})
                 終了(processes[0])
                 _, p = 対話("left", "full")
                 _, q = 対話("right", "full")
                 assert 完了(p)["状態"] == 完了(q)["状態"] == "失敗"
+                expected_history.update({p["要求ID"]: "失敗", q["要求ID"]: "失敗"})
+                history_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
+                cursor, observed_history = 0, {}
+                for _ in range(64):
+                    page = 成功(owner, "対話履歴一覧", {"after": cursor, "limit": 100})
+                    assert not validate_instance(page, history_schema)
+                    for entry in page["entries"]:
+                        record = entry["record"]
+                        observed_history[record["実行記録"]["要求ID"]] = record["状態"]
+                    if not page["has_more"]:
+                        break
+                    assert page["next_cursor"] > cursor
+                    cursor = page["next_cursor"]
+                else:
+                    raise RuntimeError("実履歴ページの取得上限")
+                assert all(observed_history.get(k) == v for k, v in expected_history.items())
                 assert 操作(normal, "shutdown", None)["status"] == "accepted"
                 broker.wait(timeout=5)
                 # 再起動は永続監査chainとnonceを読み、整合しなければ起動しない。
@@ -270,7 +291,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
-                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "監査chain再読取"],
+                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",

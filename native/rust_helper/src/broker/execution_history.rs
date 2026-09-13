@@ -89,6 +89,20 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
         {
             return Err("履歴の要求対応が不正");
         }
+        let started = record["開始時刻"].is_i64();
+        let ended = record["終了時刻"].is_i64();
+        let failed = value["失敗分類"].as_str();
+        let consistent = match value["状態"].as_str() {
+            Some("承認待ち") => !started && !ended && failed.is_none(),
+            Some("実行中") => started && !ended && failed.is_none(),
+            Some("成功" | "保留") => started && ended && failed.is_none(),
+            Some("失敗") => ended && failed.is_some() && failed != Some("取消"),
+            Some("中止") => failed == Some("取消"),
+            _ => false,
+        };
+        if !consistent {
+            return Err("履歴状態と実行記録が矛盾");
+        }
         for key in ["要求ID", "対話セッションID"] {
             let id = record[key].as_str().ok_or("履歴IDが不正")?;
             if id.len() != 32
@@ -153,8 +167,89 @@ mod tests {
     use super::*;
 
     #[test]
+    fn 状態と開始終了と失敗分類の関係を検査する() {
+        let cases = [
+            ("承認待ち", false, false, None, true),
+            ("承認待ち", true, false, None, false),
+            ("実行中", true, false, None, true),
+            ("実行中", true, true, None, false),
+            ("成功", true, true, None, true),
+            ("成功", true, false, None, false),
+            ("成功", true, true, Some("通信失敗"), false),
+            ("保留", true, true, None, true),
+            ("保留", false, false, None, false),
+            ("失敗", false, true, Some("期限超過"), true),
+            ("失敗", true, true, Some("通信失敗"), true),
+            ("失敗", true, true, None, false),
+            ("失敗", true, false, Some("通信失敗"), false),
+            ("失敗", true, true, Some("取消"), false),
+            ("中止", false, false, Some("取消"), true),
+            ("中止", true, true, Some("取消"), true),
+            ("中止", true, true, None, false),
+        ];
+        for (state, started, ended, failure, expected) in cases {
+            let mut log = BrokerAuditLog::default();
+            let request = "a".repeat(32);
+            let created = log.append(
+                &request,
+                "対話送信",
+                "recorded",
+                "対話承認待ち作成",
+                "INTERNAL_STATE",
+                &sha256_tagged(b"input"),
+            );
+            let start = started.then(|| {
+                log.append(
+                    &request,
+                    "対話承認",
+                    "recorded",
+                    "対話送信承認",
+                    "INTERNAL_STATE",
+                    &sha256_tagged(b"input"),
+                )
+                .event_id
+            });
+            let end = ended.then(|| {
+                log.append(
+                    &request,
+                    "対話取得",
+                    "recorded",
+                    "対話完了",
+                    "INTERNAL_STATE",
+                    &sha256_tagged(b"result"),
+                )
+                .event_id
+            });
+            let record = json!({"版":1,"状態":state,"失敗分類":failure,"実行記録":{
+                "要求ID":request,"実行系ID":"local","対話セッションID":"b".repeat(32),"作成時刻":100,
+                "開始時刻":started.then_some(110),"終了時刻":ended.then_some(120),"作成監査ID":created.event_id,"開始監査ID":start,"終了監査ID":end}});
+            let body = record.to_string();
+            log.append(
+                &request,
+                "対話取得",
+                "recorded",
+                &format!("対話実行記録:{body}"),
+                "INTERNAL_STATE",
+                &sha256_tagged(body.as_bytes()),
+            );
+            assert_eq!(
+                page(
+                    &log,
+                    Query {
+                        after: 0,
+                        limit: 100
+                    }
+                )
+                .is_ok(),
+                expected,
+                "{state} 開始={started} 終了={ended} 失敗={failure:?}"
+            );
+        }
+    }
+
+    #[test]
     fn chain内でも不正形式と別要求参照を履歴として返さない() {
-        for case in 0..9 {
+        for case in 0..10 {
             let mut log = BrokerAuditLog::default();
             let request = "a".repeat(32);
             let created = log.append(
@@ -177,6 +272,7 @@ mod tests {
                 }
                 4 => record["実行記録"]["開始監査ID"] = json!(created.event_id),
                 5 => record["版"] = json!(2),
+                9 => record["状態"] = json!("成功"),
                 _ => (),
             }
             let body = if case == 8 {
