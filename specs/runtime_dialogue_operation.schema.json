@@ -254,6 +254,9 @@
                   ]
                 }
               }
+            },
+            "latest_per_request": {
+              "type": "boolean"
             }
           }
         }
@@ -369,6 +372,9 @@
                       ]
                     }
                   }
+                },
+                "latest_per_request": {
+                  "type": "boolean"
                 }
               }
             }

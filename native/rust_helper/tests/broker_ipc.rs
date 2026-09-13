@@ -414,6 +414,13 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     for filter in [json!(null),json!({"状態":"不明"}),json!({"要求ID":""}),json!({"実行系ID":"../outside"}),json!({"owner":true})] {
         assert_ne!(send_request(&owner,&request("対話履歴一覧",json!({"after":0,"limit":1,"filter":filter})))["status"],"accepted");
     }
+    for (filter,count) in [(json!({}),1),(json!({"状態":"承認待ち"}),0),(json!({"状態":"失敗"}),1)] {
+        let grouped=send_request(&owner,&request("対話履歴一覧",json!({"after":0,"limit":100,"filter":filter,"latest_per_request":true})));
+        assert_eq!(grouped["status"],"accepted");
+        let entries=grouped["body"]["entries"].as_array().unwrap();
+        assert_eq!(entries.len(),count);
+        if count>0 {assert_eq!(entries[0]["record"]["状態"],"失敗");}
+    }
     let read_payload = |approval: &Value, runtime: &str| json!({"approval_id":approval,"query":{"after":0,"limit":100,"filter":{"実行系ID":runtime}}});
     assert_eq!(send_request(&process.endpoint,&request("対話履歴閲覧状態",json!({})))["body"]["grant"],Value::Null);
     for op in ["対話履歴承認","対話履歴失効"] {
@@ -469,6 +476,12 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
         .args(["-c", &schema_check.replace("runtime_execution_record.schema.json", "runtime_execution_history_page.schema.json")])
         .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")).arg(&record_file).output().unwrap();
     assert!(checked.status.success(), "{}", String::from_utf8_lossy(&checked.stderr));
+    let grouped=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作","--session-file"]).arg(&owner_file).args(["履歴集約","0","100"]).output().unwrap();
+    assert!(grouped.status.success());
+    let grouped:Value=serde_json::from_slice(&grouped.stdout).unwrap();
+    assert_eq!(grouped["entries"].as_array().unwrap().len(),1);
+    assert_eq!(grouped["entries"][0]["record"]["状態"],"失敗");
     let filtered = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
         .args(["対話承認操作", "--session-file"]).arg(&owner_file)
         .args(["履歴", "0", "1", "状態", "失敗"]).output().unwrap();

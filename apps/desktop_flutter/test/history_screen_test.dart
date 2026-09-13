@@ -18,6 +18,9 @@ class Fixture implements BrokerTransport {
   Future<Map<String, Object?>> request(String op,
       {Map<String, Object?>? payload}) async {
     operations.add(op);
+    if (op == '対話履歴閲覧') {
+      expect((payload!['query'] as Map)['latest_per_request'], true);
+    }
     final isRead = op == '対話履歴閲覧';
     if (isRead && gate != null) await gate!.future;
     final body = <String, Object?>{

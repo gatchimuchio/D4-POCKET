@@ -24,14 +24,14 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         "履歴承認" if args.len()==4 => ("対話履歴承認",json!({"実行系ID":args[3]})),
         "履歴失効" if args.len()==3 => ("対話履歴失効",json!({})),
         "履歴閲覧状態" if args.len()==3 => ("対話履歴閲覧状態",json!({})),
-        "履歴" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 => {
+        "履歴" | "履歴集約" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 => {
             let mut filter = serde_json::Map::new();
             for pair in args[5..].chunks_exact(2) {
                 if filter.insert(pair[0].clone(), json!(pair[1])).is_some() {
                     return Err("履歴検索条件が重複".into());
                 }
             }
-            ("対話履歴一覧", json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?,"filter":filter}))
+            ("対話履歴一覧", json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?,"filter":filter,"latest_per_request":args[2]=="履歴集約"}))
         },
         "一覧" if args.len() == 3 => ("対話承認待ち", json!({})),
         "承認" if args.len() == 6 => (

@@ -34,6 +34,7 @@ class HistoryClient {
       'query': {
         'after': after,
         'limit': 50,
+        'latest_per_request': true,
         'filter': {'実行系ID': grant.runtime, if (state != null) '状態': state}
       }
     });
@@ -58,6 +59,7 @@ class HistoryClient {
     }
     final parsed = <HistoryEntry>[];
     final ids = <String>{};
+    final requests = <String>{};
     for (final raw in entries) {
       final e = _shape(raw, {'audit_event_id', 'event_hash', 'record'});
       if (!_text(e['audit_event_id']) ||
@@ -74,6 +76,9 @@ class HistoryClient {
         _reject();
       }
       final r = record;
+      if (!requests.add(r['要求ID'] as String)) {
+        _reject();
+      }
       final detail = DialogueExecutionRecord.parse(
           r, r['要求ID'] as String, grant.runtime, r['対話セッションID'] as String);
       final s = saved['状態'];

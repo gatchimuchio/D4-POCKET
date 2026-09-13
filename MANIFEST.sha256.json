@@ -214,7 +214,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
-      "sha256": "2d6ebee3498048e4f49253db52615a30aac20e793cebe4cca9e0d97023c56e02"
+      "sha256": "22e5f7330efed142c840b500766c68b023044b70106ded950baa80616cd59a9f"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -450,7 +450,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
-      "sha256": "f7319d5ff9c94c05861370c19a99d1ee79360a8cde52d8381c20749040735f82"
+      "sha256": "4ec97215522c335988160c66e04fc01ce02dfe1a7855e6ba35dbee16304ac1ab"
     },
     {
       "path": "apps/desktop_flutter/test/runtime_dialogue_test.dart",
@@ -1062,7 +1062,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "4cd791dbd109fe98fc2078eec54d8e674894ce204ba9819ac5bdbe602d32d801"
+      "sha256": "e39d0c06682df3012a65f8dad051cb2038bc1f19e355d0e5fad3c1ca159a36fc"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1094,7 +1094,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "c43badd1a56e12cc426a6254607e2a29a0a11909b2e4847e389c3744e55279f0"
+      "sha256": "7e0805e48d9bdce1fe9be96e36dac74364008f564b959e69ea9e877447edfcf9"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1594,7 +1594,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "65ae8c7d1e875cc28cf25a05b9efb87793098a8e304f7d8feeba9199a391d758"
+      "sha256": "6bc2f68e208fce3a8f2a820382f518df0a1e23ddb60679f3e652c2e6b23127da"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -1666,7 +1666,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "3ab081e4eb62f49b9a604020cad916d1494e11f073ef4d96a23f4433f03f5214"
+      "sha256": "8d2942e991cb519b4ece179a899407a9be7eaf2cbdb4cbd32d98996919b1097f"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1686,7 +1686,7 @@
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "3e25a4af0169ae7d0d5917c71c7fb11553fe860ca8fbd02840635755da494941"
+      "sha256": "aaa9699014c95f419278d012c569481e06899a240cb68357313e373e781771d9"
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
@@ -1894,7 +1894,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/history_client.dart",
-      "sha256": "919fb6aaa7d5975c2f4ed8ada44318a86fd04c1a2976ae912bc81b5f74b296ad"
+      "sha256": "4c9cfd175ff8986dbd2e43bbcba626d594a51b8bc8d804ea46300fb5040e7748"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
@@ -2174,7 +2174,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "98c20c991c3e0306a3dbcf93972552490b9be04da7af51a4cb373b7cc58a4c35"
+      "sha256": "266f224b8705de1953d726c3db3780c678f3501e2d244134e18fe16e0f24bdff"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2278,7 +2278,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "51da8c6089af4b83b1e6661303d87fbb94f34c9a04a7b467cc4c2ac5a25d0db8"
+      "sha256": "b0f9aacf5ec9da471ed4a409f4bf02633b56e5693411e6548d64a65ac324991c"
     },
     {
       "path": "tooling/packaging_portability_check.py",

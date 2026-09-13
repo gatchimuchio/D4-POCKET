@@ -10,6 +10,8 @@ pub(crate) struct Query {
     pub after: usize,
     pub limit: usize,
     #[serde(default)]
+    pub latest_per_request: bool,
+    #[serde(default)]
     pub filter: std::collections::BTreeMap<String, String>,
 }
 
@@ -41,6 +43,14 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
         };
         if !valid {
             return Err("履歴検索条件が不正");
+        }
+    }
+    let mut latest = std::collections::HashMap::new();
+    if query.latest_per_request {
+        for (index, event) in events.iter().enumerate() {
+            if event.reason.starts_with("対話実行記録:") {
+                latest.insert(event.request_id.as_str(), index);
+            }
         }
     }
     let mut entries = Vec::new();
@@ -175,6 +185,10 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
                 return Err("履歴監査参照が不一致");
             }
         }
+        if query.latest_per_request && latest.get(event.request_id.as_str()) != Some(&index) {
+            next = index + 1;
+            continue;
+        }
         if !query.filter.iter().all(|(key, expected)| {
             let actual = if key == "状態" {
                 &value["状態"]
@@ -203,6 +217,93 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 要求集約は最後の観測を選んでから検索しページを継続する() {
+        let mut log = BrokerAuditLog::default();
+        let mut created = std::collections::HashMap::new();
+        for (key, finished) in [('a', false), ('b', false), ('a', true), ('b', true)] {
+            let request = key.to_string().repeat(32);
+            let id = created.entry(key).or_insert_with(|| {
+                log.append(
+                    &request,
+                    "対話送信",
+                    "recorded",
+                    "対話承認待ち作成",
+                    "INTERNAL_STATE",
+                    &sha256_tagged(b"input"),
+                )
+                .event_id
+            });
+            let body=json!({"版":1,"状態":if finished{"中止"}else{"承認待ち"},"失敗分類":if finished{Some("取消")}else{None},"実行記録":{
+                "要求ID":request,"実行系ID":"local","対話セッションID":"c".repeat(32),"作成時刻":100,"開始時刻":null,"終了時刻":null,"作成監査ID":id,"開始監査ID":null,"終了監査ID":null}}).to_string();
+            log.append(
+                &request,
+                "対話中止",
+                "recorded",
+                &format!("対話実行記録:{body}"),
+                "INTERNAL_STATE",
+                &sha256_tagged(body.as_bytes()),
+            );
+        }
+        assert_eq!(
+            page(
+                &log,
+                Query {
+                    limit: 100,
+                    ..Default::default()
+                }
+            )
+            .unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            4
+        );
+        let first = page(
+            &log,
+            Query {
+                limit: 1,
+                latest_per_request: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            first["entries"][0]["record"]["実行記録"]["要求ID"],
+            "a".repeat(32)
+        );
+        assert_eq!(first["entries"][0]["record"]["状態"], "中止");
+        assert_eq!(first["has_more"], true);
+        let second = page(
+            &log,
+            Query {
+                after: first["next_cursor"].as_u64().unwrap() as usize,
+                limit: 1,
+                latest_per_request: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            second["entries"][0]["record"]["実行記録"]["要求ID"],
+            "b".repeat(32)
+        );
+        assert_eq!(second["has_more"], false);
+        assert_eq!(
+            page(
+                &log,
+                Query {
+                    limit: 100,
+                    latest_per_request: true,
+                    filter: [("状態".into(), "承認待ち".into())].into(),
+                    ..Default::default()
+                }
+            )
+            .unwrap()["entries"],
+            json!([])
+        );
+    }
 
     #[test]
     fn 状態と開始終了と失敗分類の関係を検査する() {
@@ -342,6 +443,7 @@ mod tests {
                     after: 0,
                     limit: 1,
                     filter: [("状態".into(), "失敗".into())].into(),
+                    ..Default::default()
                 },
             );
             assert_eq!(excluded.is_ok(), case == 0);

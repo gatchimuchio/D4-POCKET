@@ -285,6 +285,12 @@ server.serve_forever()
                     assert len(selected["entries"]) == 1 and not selected["has_more"]
                     assert selected["entries"][0]["record"]["実行記録"]["要求ID"] == request_id
                     assert selected["entries"][0]["record"]["状態"] == state
+                grouped = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 100, "latest_per_request": True})
+                grouped_records = grouped["entries"]
+                grouped_ids = [e["record"]["実行記録"]["要求ID"] for e in grouped_records]
+                assert len(grouped_ids) == len(set(grouped_ids)) and not grouped["has_more"]
+                grouped_states = {e["record"]["実行記録"]["要求ID"]: e["record"]["状態"] for e in grouped_records}
+                assert all(grouped_states.get(k) == v for k, v in expected_history.items())
                 access_schema = json.loads((ROOT / "specs/runtime_history_access.schema.json").read_text(encoding="utf-8"))
                 for runtime_id in ["left", "right"]:
                     approved = 成功(owner, "対話履歴承認", {"実行系ID": runtime_id})

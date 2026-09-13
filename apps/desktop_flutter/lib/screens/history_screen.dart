@@ -73,7 +73,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       if (!mounted || !_active || generation != _generation) return;
       setState(() {
         _page = page;
-        _message = '過去の状態遷移です。現在の稼働・実行許可を示しません。';
+        _message = '要求ごとの最後の観測です。現在の稼働・実行許可を示しません。';
       });
       Future<void>.delayed(const Duration(seconds: 2), () {
         if (mounted && _active && generation == _generation) {
@@ -124,7 +124,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           if (_busy) const LinearProgressIndicator(),
           if (page != null)
             Text(
-                'Runtime: ${page.grant.runtime} ／ ${page.entries.length}件の状態遷移'),
+                'Runtime: ${page.grant.runtime} ／ ${page.entries.length}件の要求'),
           if (page != null && page.entries.isEmpty) const Text('該当する履歴はありません。'),
           Expanded(
               child: ListView.builder(
