@@ -19,6 +19,12 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 実行系列挙の重複による選択欄の不整合を拒否（2026-09-13）
+
+共有clientは実行系IDの型・形式・件数だけを検証しており、重複を受理していた。leftを2件返す応答でclientの誤受理とFlutter Dropdownのassertionを別々に再現した。実行系列挙の一意性をclientで検証し、重複応答は既存の接続エラー表示と送信停止へ接続する。重複を黙って除去せず、正常な返却順序と空一覧を保持する。Rustの登録・権限・列挙内容は変更しない。
+
+共有packageの `flutter test --no-pub --reporter expanded` は16件PASS。隣接・非隣接の重複拒否、正常順序、空一覧、製品Widgetの接続エラーと送信無効を確認した。共有・Desktop・Mobileの `flutter analyze --no-pub` はPASS。証拠は不正応答を注入した製品client／WidgetのFIXTUREである。非Windows実機・正式配布・運用署名・owner GOは冒頭のrelease_blockerとして延期を保持する。
+
 ## 対話結果の参照・能力配列を検証後に固定（2026-09-13）
 
 DialogueResultの外側のMapは変更不可だったが、参照・能力のListは受信元と共有していた。検証後に元の空配列へ要素を追加するとnoneの表示結果にも現れ、公開getterからも配列を変更できることを2試験で再現した。検証通過後に両配列をコピーして変更不可にし、文字列とMapだけでなく結果全体の検証済み内容を固定する。新しい公開内容には再検証を要求し、表示資格の判定を増やさない。

@@ -47,7 +47,8 @@ class RuntimeDialogueClient {
     final items = body['実行系'];
     if (items is! List ||
         items.length > 128 ||
-        items.any((v) => v is! String || !_runtime.hasMatch(v))) {
+        items.any((v) => v is! String || !_runtime.hasMatch(v)) ||
+        items.toSet().length != items.length) {
       throw const BrokerClientException('実行系列挙の形式が不正です');
     }
     return List<String>.unmodifiable(items.cast<String>());

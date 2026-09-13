@@ -27,6 +27,7 @@ class DialogueFixture implements BrokerTransport {
   final sessions = <String, String>{};
   final requests = <String, String>{};
   final inputs = <String>[];
+  List<String> runtimeNames = ['left', 'right'];
   int counter = 0;
   bool complete = false;
   bool failLeft = false;
@@ -45,9 +46,7 @@ class DialogueFixture implements BrokerTransport {
     Map<String, Object?> body;
     switch (operation) {
       case '実行系列挙':
-        body = {
-          '実行系': ['left', 'right']
-        };
+        body = {'実行系': runtimeNames};
       case '対話開始':
         final id = (++counter).toRadixString(16).padLeft(32, '0');
         sessions[id] = p['実行系ID']! as String;
@@ -88,6 +87,42 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  testWidgets('重複実行系を選択欄へ渡さず接続エラーを表示する', (tester) async {
+    final f = DialogueFixture()..runtimeNames = ['left', 'left'];
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                connect: () async => RuntimeDialogueClient(f)))));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('brokerに接続できません'), findsOneWidget);
+    expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('dialogue-send')))
+            .onPressed,
+        isNull);
+    expect(f.calls, ['実行系列挙']);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  test('実行系列挙の重複を拒否し一意な順序と空一覧を保持する', () async {
+    final f = DialogueFixture();
+    final client = RuntimeDialogueClient(f);
+    for (final names in [
+      ['left', 'left'],
+      ['left', 'right', 'left']
+    ]) {
+      f.runtimeNames = names;
+      await expectLater(
+          client.runtimes(), throwsA(isA<BrokerClientException>()));
+    }
+    for (final names in [
+      <String>[],
+      ['right', 'left']
+    ]) {
+      f.runtimeNames = names;
+      expect(await client.runtimes(), names);
+    }
+  });
   test('検証後の元配列の変更を表示結果へ反映しない', () {
     for (final scope in ['none', 'full']) {
       final raw = result('left', 'a' * 32, 'b' * 32, scope: scope);
