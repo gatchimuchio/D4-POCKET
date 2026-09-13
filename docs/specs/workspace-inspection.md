@@ -25,3 +25,13 @@ textは全体を1つのhunkとして統合差分を生成する。固定label a/
   blocks_release: yes
 
 Gitの存在差headerは[Git公式の差分形式](https://git-scm.com/docs/diff-format)に従う外部固定構文である。日本語監査のJBE-008はこの生成器の2つの固定語と行区切りescapeだけを対象とし、説明・診断・file全体を除外しない。
+
+## 登録済み作業領域の読取境界
+
+内部取得器は登録時に開いたdirectory handleを固定点とし、以降はambientな絶対pathで読取を行わない。通常IPCへの接続前に、Brokerのowner登録と現在のPermission・Approval・Audit経路を必須とする。取得器単独は権限を付与せず、UIから直接呼べるAPIではない。
+
+pathはNFC済みの相対pathに限り、空要素、dot、dot-dot、backslash、colon、制御文字、末尾space/dot、Windows予約名とDOS短縮名の迂回に使われるtildeを拒否する。既定secret名とowner指定secret subtreeを大文字小文字の差で迂回できない。指定は最大256件、列挙は1階層1024件までとし、超過時は部分結果を返さない。各directory要素と最終fileをnofollowで開き、link、junction、通常file以外、複数hardlinkを拒否する。読取は片側65,536 bytesを上限とし、上限超過時に部分本文を返さない。読取前後の同一fileのmetadata変更と長さ変化を検出した場合も本文を返さない。同一ユーザーによる内容の偽装やmetadataを戻す改変まで防ぐ証拠にはしない。
+
+標準Rustには全対象OS共通のdirectory handle相対nofollow APIがないため、cap-stdとcap-fs-extの4.0.3をこの取得器のnative依存として採用する。OS別の低水準処理を独自unsafeで実装しない。Unixでは取得直前のFIFO置換による無期限openを防ぐため、libcのO_NONBLOCKを通常fileの読取openへ付加し、open後にもfile種別を確認する。dependencyを追加しただけでは安全性を証明せず、実file・link・hardlink・置換競合で検証する。根拠はcap-fs-extのDirExt::open_dir_nofollowとOpenOptionsFollowExt::followの公開仕様および取得した4.0.3のsourceとする。
+
+内部取得器の検証対象はWindows NTFSとLinuxの開発用filesystem。cap-fs-extのmetadata仕様はWindows ReFSの128-bit file IDについて制約を記載しており、今回のNTFS試験をReFSやnetwork filesystemの同一性保証へ拡張しない。これらのfilesystemとApple上の新依存の実検証はrelease_blockerとして、製品経路への接続前に対象範囲の制限または追加証拠を成立させる。外部参照: [directoryのnofollow](https://docs.rs/cap-fs-ext/latest/cap_fs_ext/trait.DirExt.html)、[cap-stdの公開source](https://github.com/bytecodealliance/cap-std)。

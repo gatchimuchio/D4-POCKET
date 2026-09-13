@@ -21,3 +21,9 @@ rcgen = "0.14.10"
 subtle = "2.6.1"
 
 ring = "0.17.14"
+
+cap-std = "=4.0.3"
+cap-fs-ext = "=4.0.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

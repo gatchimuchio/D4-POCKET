@@ -673,6 +673,12 @@ def iter_c_like_tokens(
             index = end
             continue
         quote = text[index]
+        if not single_quote_strings and quote == "'":
+            # Rustのchar literalだけを飛ばす。'aや'staticというlifetimeは消費しない。
+            character = re.match(r"'(?:[^'\\\r\n]|\\(?:[\\'\"nrt0]|x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]{1,6}\}))'", text[index:])
+            if character:
+                index += character.end()
+                continue
         allowed_quotes = {"'", '"'} if single_quote_strings else {'"'}
         if quote not in allowed_quotes:
             index += 1
@@ -1396,6 +1402,18 @@ def run_self_tests() -> int:
         }
         <= {finding.excerpt for finding in python_findings},
         "Python の append / return / custom raise / assert 診断を検出できない",
+    )
+
+    rust_char_source = """fn f<'a>(s: &'a str) { let quote = '"'; let slash = '/';
+        let escape = '\\n'; let unicode = '\\u{22}';
+        println!("Visible diagnostic after characters");
+        // Visible comment after characters
+    }"""
+    rust_char_findings = scan_c_like_code("native/characters.rs", rust_char_source, ())
+    check(
+        {finding.excerpt for finding in rust_char_findings}
+        == {"Visible diagnostic after characters", "Visible comment after characters"},
+        "Rust charとlifetimeが後続の説明・診断検出を壊した",
     )
 
     powershell_source = (
