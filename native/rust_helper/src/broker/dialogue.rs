@@ -97,6 +97,11 @@ struct 作業 {
     要求: 対話要求,
     要求hash: String,
     作成時刻: i64,
+    開始時刻: Option<i64>,
+    終了時刻: Option<i64>,
+    作成監査ID: String,
+    開始監査ID: Option<String>,
+    終了監査ID: Option<String>,
     状態: &'static str,
     表示範囲: String,
     取消: Arc<AtomicBool>,
@@ -129,7 +134,7 @@ impl Drop for 対話制御 {
     }
 }
 
-type 監査器<'a> = dyn FnMut(&str, &str, &str) -> Result<(), 対話失敗> + 'a;
+type 監査器<'a> = dyn FnMut(&str, &str, &str) -> Result<String, 対話失敗> + 'a;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -298,7 +303,7 @@ impl 対話制御 {
                     入力: 指定.入力,
                 };
                 let hash = 要求hash(&要求);
-                監査("対話承認待ち作成", &要求.要求ID, &hash)?;
+                let 作成監査ID = 監査("対話承認待ち作成", &要求.要求ID, &hash)?;
                 let body = json!({"要求ID": 要求.要求ID, "要求hash": hash, "状態": "承認待ち", "期限": 現在 + 300});
                 self.作業.insert(
                     要求.要求ID.clone(),
@@ -306,6 +311,11 @@ impl 対話制御 {
                         要求,
                         要求hash: hash,
                         作成時刻: 現在,
+                        開始時刻: None,
+                        終了時刻: None,
+                        作成監査ID,
+                        開始監査ID: None,
+                        終了監査ID: None,
                         状態: "承認待ち",
                         表示範囲: "none".into(),
                         取消: Arc::new(AtomicBool::new(false)),
@@ -346,7 +356,8 @@ impl 対話制御 {
                         .ok_or(対話失敗::実行系不在)?,
                 );
                 let 理由 = format!("対話送信承認 Capability=対話送信 Permission={}:{} Approval={} 表示範囲={} RecoveryAction=接続再確認", work.要求.実行系ID, adapter.接続対象(), work.要求hash, 指定.表示範囲);
-                監査(&理由, &work.要求.要求ID, &work.要求hash)?;
+                work.開始監査ID = Some(監査(&理由, &work.要求.要求ID, &work.要求hash)?);
+                work.開始時刻 = Some(現在);
                 work.表示範囲 = 指定.表示範囲;
                 let 要求 = work.要求.clone();
                 let 取消 = Arc::clone(&work.取消);
@@ -374,7 +385,11 @@ impl 対話制御 {
                     {
                         s.状態 = "中止後隔離".into();
                     }
-                    監査("対話worker起動失敗", &work.要求.要求ID, &work.要求hash)?;
+                    work.終了監査ID = Some(監査("対話worker起動失敗", &work.要求.要求ID, &work.要求hash).map_err(|e| {
+                        work.状態 = "監査失敗";
+                        e
+                    })?);
+                    work.終了時刻 = Some(現在);
                     return Err(対話失敗::通信失敗);
                 }
                 work.受信 = Some(受信);
@@ -388,7 +403,7 @@ impl 対話制御 {
                     return Err(対話失敗::監査失敗);
                 }
                 Ok(
-                    json!({"要求ID": 指定.要求ID, "状態": work.状態, "結果": work.結果.as_ref().map(|r| 表示射影(work, r))}),
+                    json!({"要求ID": 指定.要求ID, "状態": work.状態, "結果": work.結果.as_ref().map(|r| 表示射影(work, r)), "実行記録": 実行記録(work)}),
                 )
             }
             "対話中止" => {
@@ -397,13 +412,15 @@ impl 対話制御 {
                 if !matches!(work.状態, "承認待ち" | "実行中") {
                     return Err(対話失敗::要求不正);
                 }
-                監査(
+                let 終了監査ID = 監査(
                     "対話中止 実行系の停止は保証しない",
                     &指定.要求ID,
                     &work.要求hash,
                 )?;
                 work.取消.store(true, Ordering::SeqCst);
                 work.状態 = "中止";
+                work.終了時刻 = Some(現在);
+                work.終了監査ID = Some(終了監査ID);
                 work.結果 = Some(Err(対話失敗::取消));
                 self.セッション
                     .get_mut(&work.要求.対話セッションID)
@@ -450,11 +467,14 @@ impl 対話制御 {
                 {
                     s.状態 = "中止後隔離".into();
                 }
-                if 監査("対話期限超過", &work.要求.要求ID, &work.要求hash).is_err() {
+                let 終了監査 = 監査("対話期限超過", &work.要求.要求ID, &work.要求hash);
+                if 終了監査.is_err() {
                     work.状態 = "監査失敗";
                     work.結果 = Some(Err(対話失敗::監査失敗));
                     return Err(対話失敗::監査失敗);
                 }
+                work.終了時刻 = Some(現在);
+                work.終了監査ID = 終了監査.ok();
             }
             let 完了 = if let Some(受信) = &work.受信 {
                 match 受信.try_recv() {
@@ -497,7 +517,8 @@ impl 対話制御 {
                 } else {
                     "対話完了"
                 };
-                if 監査(種別, &work.要求.要求ID, &hash).is_err() {
+                let 終了監査 = 監査(種別, &work.要求.要求ID, &hash);
+                if 終了監査.is_err() {
                     work.取消.store(true, Ordering::SeqCst);
                     work.状態 = "監査失敗";
                     work.結果 = Some(Err(対話失敗::監査失敗));
@@ -508,6 +529,8 @@ impl 対話制御 {
                     return Err(対話失敗::監査失敗);
                 }
                 if work.結果.is_none() {
+                    work.終了時刻 = Some(現在);
+                    work.終了監査ID = 終了監査.ok();
                     if 結果.is_err() {
                         if let Some(s) = self.セッション.get_mut(&work.要求.対話セッションID)
                         {
@@ -522,6 +545,14 @@ impl 対話制御 {
         self.失効資源解放();
         Ok(())
     }
+}
+
+fn 実行記録(work: &作業) -> Value {
+    json!({"要求ID": work.要求.要求ID, "実行系ID": work.要求.実行系ID,
+        "対話セッションID": work.要求.対話セッションID, "作成時刻": work.作成時刻,
+        "開始時刻": work.開始時刻, "終了時刻": work.終了時刻,
+        "作成監査ID": work.作成監査ID, "開始監査ID": work.開始監査ID,
+        "終了監査ID": work.終了監査ID})
 }
 
 fn 結果検査(要求: &対話要求, v: 実行結果) -> Result<実行結果, 対話失敗> {
@@ -649,7 +680,7 @@ mod tests {
     fn 操作(
         c: &mut 対話制御, op: &str, v: Value, owner: bool
     ) -> Result<Value, 対話失敗> {
-        c.操作(op, &v, owner, 100, &mut |_, _, _| Ok(()))
+        c.操作(op, &v, owner, 100, &mut |_, _, _| Ok("fixture-audit".into()))
     }
     fn 開始(c: &mut 対話制御, id: &str) -> String {
         操作(c, "対話開始", json!({"実行系ID":id}), false).unwrap()["対話セッションID"]
@@ -673,12 +704,54 @@ mod tests {
         for _ in 0..200 {
             let v = 操作(c, "対話取得", json!({"要求ID":p["要求ID"]}), false).unwrap();
             if v["状態"] == "完了" {
+                assert!(v["実行記録"]["終了時刻"].is_i64());
+                assert!(v["実行記録"]["終了監査ID"].is_string());
+                assert_eq!(v["実行記録"]["要求ID"], p["要求ID"]);
                 return v["結果"].clone();
             }
             std::thread::sleep(Duration::from_millis(5));
         }
         panic!("対話完了の待機期限");
     }
+    #[test]
+    fn 実行記録は未実行と終了を区別し遅延応答で上書きしない() {
+        for approve in [false, true] {
+            let (mut c, _) = 準備(false, false, true);
+            let session = 開始(&mut c, "left");
+            let p = 要求(&mut c, &session);
+            let id = p["要求ID"].as_str().unwrap();
+            let before = 実行記録(&c.作業[id]);
+            assert!(before["開始時刻"].is_null());
+            assert!(before["終了監査ID"].is_null());
+            if approve {
+                c.操作("対話承認", &承認(&p, "full"), true, 110,
+                    &mut |_,_,_| Ok("approved-event".into())).unwrap();
+            }
+            c.操作("対話中止", &json!({"要求ID":id}), false, 120,
+                &mut |_,_,_| Ok("cancel-event".into())).unwrap();
+            let record = 実行記録(&c.作業[id]);
+            assert_eq!(record["作成時刻"], 100);
+            assert_eq!(record["開始時刻"], if approve {json!(110)} else {Value::Null});
+            assert_eq!(record["開始監査ID"], if approve {json!("approved-event")} else {Value::Null});
+            assert_eq!(record["終了時刻"], 120);
+            assert_eq!(record["終了監査ID"], "cancel-event");
+            std::thread::sleep(Duration::from_millis(150));
+            c.進捗反映(130, &mut |_,_,_| Ok("late-event".into())).unwrap();
+            assert_eq!(実行記録(&c.作業[id]), record);
+            assert!(!record.to_string().contains("こんにちは"));
+        }
+        let (mut c, count) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let p = 要求(&mut c, &session);
+        let v = c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 400,
+            &mut |_,_,_| Ok("expired-event".into())).unwrap();
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        assert!(v["実行記録"]["開始時刻"].is_null());
+        assert_eq!(v["実行記録"]["終了時刻"], 400);
+        assert_eq!(v["実行記録"]["終了監査ID"], "expired-event");
+        assert_eq!(v["結果"]["失敗分類"], "期限超過");
+    }
+
     #[test]
     fn 失効後の遅延応答は監査してから資源解放する() {
         let (mut c, count) = 準備(false, false, true);
@@ -691,7 +764,7 @@ mod tests {
         assert!(c.作業.values().any(|v|v.受信.is_some()));
         let mut discarded = false;
         for _ in 0..200 {
-            c.進捗反映(100,&mut |reason,_,_|{if reason == "採用終了後応答破棄" {discarded=true;}Ok(())}).unwrap();
+            c.進捗反映(100,&mut |reason,_,_|{if reason == "採用終了後応答破棄" {discarded=true;}Ok("fixture-audit".into())}).unwrap();
             if c.作業.is_empty() {break;}
             std::thread::sleep(Duration::from_millis(5));
         }
@@ -824,7 +897,7 @@ mod tests {
                 &承認(&p, "full"),
                 true,
                 400,
-                &mut |_, _, _| Ok(())
+                &mut |_, _, _| Ok("fixture-audit".into())
             ),
             Err(対話失敗::権限拒否)
         );

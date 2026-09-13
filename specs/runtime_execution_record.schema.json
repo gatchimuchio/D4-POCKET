@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_execution_record.schema.json",
+  "title": "対話実行の状態遷移記録",
+  "description": "時刻と永続監査参照。成功・外部停止・新しい権限を保証しない。",
+  "type": "object",
+  "required": [
+    "要求ID",
+    "対話セッションID",
+    "実行系ID",
+    "作成時刻",
+    "開始時刻",
+    "終了時刻",
+    "作成監査ID",
+    "開始監査ID",
+    "終了監査ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "対話セッションID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "作成時刻": {
+      "type": "integer"
+    },
+    "開始時刻": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "終了時刻": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "作成監査ID": {
+      "type": "string",
+      "minLength": 1
+    },
+    "開始監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "終了監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "開始時刻": {
+          "type": "null"
+        },
+        "開始監査ID": {
+          "type": "null"
+        },
+        "終了時刻": {
+          "type": "null"
+        },
+        "終了監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "開始時刻": {
+          "type": "null"
+        },
+        "開始監査ID": {
+          "type": "null"
+        },
+        "終了時刻": {
+          "type": "integer"
+        },
+        "終了監査ID": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "properties": {
+        "開始時刻": {
+          "type": "integer"
+        },
+        "開始監査ID": {
+          "type": "string"
+        },
+        "終了時刻": {
+          "type": "null"
+        },
+        "終了監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "開始時刻": {
+          "type": "integer"
+        },
+        "開始監査ID": {
+          "type": "string"
+        },
+        "終了時刻": {
+          "type": "integer"
+        },
+        "終了監査ID": {
+          "type": "string"
+        }
+      }
+    }
+  ]
+}

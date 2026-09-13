@@ -1,0 +1,11 @@
+{
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "対話セッションID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "実行系ID": "local",
+  "作成時刻": 100,
+  "開始時刻": null,
+  "終了時刻": null,
+  "作成監査ID": "audit-created",
+  "開始監査ID": null,
+  "終了監査ID": null
+}

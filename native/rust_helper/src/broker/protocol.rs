@@ -876,7 +876,7 @@ impl Broker {
         let now = self.current_epoch_seconds();
         let result = 対話.操作(operation.as_str(), payload, owner, now, &mut |reason, id, hash| {
             let event = self.append_audit(id, operation.as_str(), "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash).map_err(|_| 対話失敗::監査失敗)?;
-            last_event = event.event_id; Ok(())
+            last_event = event.event_id.clone(); Ok(event.event_id)
         });
         self.対話 = 対話;
         match result {
