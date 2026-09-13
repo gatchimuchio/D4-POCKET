@@ -21,6 +21,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   String _message = '登録済み作業領域を確認中';
   bool _busy = false;
   bool _active = true;
+  bool _diffPaired = false;
   int _generation = 0;
   Timer? _timer;
   final _elapsed = Stopwatch()..start();
@@ -144,6 +145,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       {bool scope = false, bool changes = false, String? baselineHash}) async {
     final generation = ++_generation;
     setState(() {
+      _diffPaired = false;
       _view = null;
       _busy = true;
       _selected = registration.id;
@@ -268,6 +270,8 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             view.operation == '作業領域差分') ...[
           Text(view.path),
           WorkspaceDiffPanel(
+              paired: _diffPaired,
+              onPairedChanged: (value) => setState(() => _diffPaired = value),
               key: ValueKey('${view.path}:${projection!['基準点hash']}'),
               diff: Map<String, Object?>.from(projection['diff'] as Map)),
         ],

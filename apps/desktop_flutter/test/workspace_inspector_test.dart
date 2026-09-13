@@ -575,6 +575,21 @@ void main() {
     expect(find.text('前'), findsOneWidget);
     expect(find.text('後'), findsOneWidget);
     expect(find.text('変更'), findsOneWidget);
+    broker.pendingRead = Completer<void>();
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 2200)));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    expect(find.text('前'), findsNothing);
+    broker.pendingRead!.complete();
+    broker.pendingRead = null;
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '左右比較'))
+            .selected,
+        isTrue);
+    expect(find.text('前'), findsOneWidget);
     broker.baselineHash = 'sha256:${'d' * 64}';
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 2200)));

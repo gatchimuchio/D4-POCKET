@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 /// 描画前にWorkspaceClientが現在承認と差分構造を照合する。
-class WorkspaceDiffPanel extends StatefulWidget {
-  const WorkspaceDiffPanel({super.key, required this.diff});
+class WorkspaceDiffPanel extends StatelessWidget {
+  const WorkspaceDiffPanel(
+      {super.key,
+      required this.diff,
+      required this.paired,
+      required this.onPairedChanged});
   final Map<String, Object?> diff;
-  @override
-  State<WorkspaceDiffPanel> createState() => _WorkspaceDiffPanelState();
-}
-
-class _WorkspaceDiffPanelState extends State<WorkspaceDiffPanel> {
-  bool _paired = false;
+  final bool paired;
+  final ValueChanged<bool> onPairedChanged;
   static const _kinds = {
     'unchanged': '変更なし',
     'binary': 'バイナリ差分・本文非表示',
@@ -50,7 +50,6 @@ class _WorkspaceDiffPanelState extends State<WorkspaceDiffPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final diff = widget.diff;
     final rows = diff['rows'] as List;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(_kinds[diff['kind']]!),
@@ -61,14 +60,14 @@ class _WorkspaceDiffPanelState extends State<WorkspaceDiffPanel> {
         Wrap(spacing: 8, children: [
           ChoiceChip(
               label: const Text('統合差分'),
-              selected: !_paired,
-              onSelected: (_) => setState(() => _paired = false)),
+              selected: !paired,
+              onSelected: (_) => onPairedChanged(false)),
           ChoiceChip(
               label: const Text('左右比較'),
-              selected: _paired,
-              onSelected: (_) => setState(() => _paired = true)),
+              selected: paired,
+              onSelected: (_) => onPairedChanged(true)),
         ]),
-        if (!_paired)
+        if (!paired)
           SizedBox(
               height: 360,
               child: SingleChildScrollView(
