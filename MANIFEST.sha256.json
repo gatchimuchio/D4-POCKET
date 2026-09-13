@@ -1054,7 +1054,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "6b3e4ae0c617da7d5ab388fe76831b34e9876ab3bfbcf5268c6ae9dc12dc76ee"
+      "sha256": "d3c4e5900c301ceeff4949709d392287ee5ef2022dfce8cc420e6b3e70f1cf6c"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "1d944b35037a180c2158a4bf02a4c7dda60a419e250239ec4b204d474d1776a2"
+      "sha256": "e88b1fe4bc29023be23b42d08d1fd1d2a37d576cca206ec03708ccdb36d54ead"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1550,7 +1550,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "60a3a187d2f6c0c3caa6b848c3eefe85968857ea8898f1d1d6c20d3024ebb379"
+      "sha256": "a2a64c645879dcc783c8c73c5032a89f32a7ad7406f390c30f830247fc067926"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -1558,7 +1558,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "28a7195f368d16df9ceb684f59d5b701adef584fc94295fc2bdc33577a1bbaf1"
+      "sha256": "6c9e46ca58b075478b39c565fcfb0083bc373e1f08f585ff9d824e4ef61db76e"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -1594,7 +1594,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "02b8c1b116b34cd6254c99e0c4f8068586d78c3ca77cccba6e468ccb780375c9"
+      "sha256": "84dc567dabb8c876a215b849ded2007117fbc6ae1eb7ff716a9dac833808b427"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1602,7 +1602,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "11cbc610dd9c252dfe6c4effd99c48ecaeee9f8c6af89fb622385f83c3256cf8"
+      "sha256": "5fbbbbe8eed45abf6c4cf37f3dffb4f81b981687955df2a33d9a2799342c7c32"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1634,7 +1634,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_registry.rs",
-      "sha256": "d6d2bd9fa481070f0535dd5f8aaefcf338f92824eb94bea8804ec2344e29c4c7"
+      "sha256": "e82b74aadb9587b648e0091082e00935a37bac1a523f00b5e5286b22d83e55b2"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",
@@ -1646,7 +1646,7 @@
     },
     {
       "path": "native/rust_helper/tests/workspace_startup.rs",
-      "sha256": "2579e78e2bf8e7cdf3bc2406dbcfb85bd05c57cb5815934cb95625769c3015ba"
+      "sha256": "1ada202280f5c69e02492862f70e1d44a2943bec4243b7e041598603932dc105"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -2078,11 +2078,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "64b1b112abde59ba9067f841ad4a3b3d1752862f39ce31faf25ca89c18736c34"
+      "sha256": "2e18e9b4d064f0c4675bdde091a8ca9906c5e8300f00924b36f8bbbdafbcc1d7"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "f47db5152bba46fd9ed91069e7bc77a848a3c73c520613afbc017580fd7b9039"
+      "sha256": "ea1a923b266fc8c9ffe07f0a212c5ca7a11b617cf14115e8df17a1ffc6406b0b"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2130,11 +2130,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "ecd751dd259e1e60e962951f77dac0990cd82b945ef6d1b8bfd3ab57b5dae994"
+      "sha256": "b002068afca39c71e7534caa5201d7bc0da713845365cad630c68cd2a86a2a9c"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "a509719f62d3b9168f4df42b14ae16ae2c9017729858720ca894e7cd91209ac5"
+      "sha256": "3fc1b6d8039dd67d632c583b33cd2eba83f19d0c72f8b3b1ea1588f3aa917207"
     },
     {
       "path": "specs/workspace_startup.schema.json",
