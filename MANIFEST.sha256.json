@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "a559b34076df2a2efbd542b183076fc09e2c6303019ff6571b44417696f1d607"
+      "sha256": "d2acdbce6320609c05c82af5f267d1242b1af3fb9b0226de1bebac6d3f2a1b04"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
@@ -146,7 +146,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "dc73e51e6b731bd4dfdf596cd7f22660ecd5bfccbdf8afc91dc79a38f95ae324"
+      "sha256": "6dd065ba0de6ef8ed0df9a3e7498ce246f1f70442d9e395714a6b4594d09e627"
     },
     {
       "path": "SECURITY.md",
@@ -610,7 +610,7 @@
     },
     {
       "path": "apps/mobile_flutter/integration_test/device_link_native_test.dart",
-      "sha256": "104c37e4905e7c8d2d17fa5f992164f02a01c15c0b6f951db1e8feab3dba6f58"
+      "sha256": "b32b7c46c1b97fb913a3aa7b45c2561e8cea242adb2d2b2fa39f405c129e4608"
     },
     {
       "path": "apps/mobile_flutter/integration_test/native_store.dart",
@@ -838,7 +838,7 @@
     },
     {
       "path": "apps/mobile_flutter/test_driver/device_link_driver.dart",
-      "sha256": "6b2632d7e5dc6d5a6ed1857b265035f3239f17ad994cc85fdfe7e492ac4f8826"
+      "sha256": "f2e2e1c952ab9f22504285617a5b1a011d219bafc3388303d7bfe0a2bf59ec22"
     },
     {
       "path": "apps/mobile_flutter/tool/device_link_live_client.dart",
@@ -910,7 +910,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "01cfba16bf773b953916dd69204a21f46c86c88811f925678391d0ce458e65b2"
+      "sha256": "00101f1c7d46f23aa53c457926388bf423dbfbdbda3c1f2a759c6c97f0162a3f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1062,7 +1062,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "2435a548a53ff5703ea79d95c37f0879ded534feedf4dc389aa9c67c22513c73"
+      "sha256": "4f64397e62d391b1efafc53913fa0073dd29b20cb99f85adc2eda4adbd6e0655"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2082,7 +2082,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "e6acb8751dbca806f24b6f7cfec68680b25825f647e9663cd599f15eec788bf0"
+      "sha256": "bb0ef0d52acba1bae8c48772f911e0104394547c5681152230564636ad4f106c"
     },
     {
       "path": "tooling/packaging_portability_check.py",

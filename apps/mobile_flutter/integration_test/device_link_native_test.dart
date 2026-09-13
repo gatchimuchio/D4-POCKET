@@ -32,7 +32,11 @@ void main() {
   testWidgets(
     'Simulatorでnative保管・再接続・実API対話・OS復帰・失効を検証',
     (tester) async {
-      expect(Platform.isIOS, isTrue, reason: 'このdriverのOS遷移操作はiOS専用');
+      expect(
+        Platform.isIOS || Platform.isAndroid,
+        isTrue,
+        reason: 'host driverで対象を確認したMobile仮想端末専用',
+      );
       final raw = await configuration.future.timeout(
         const Duration(seconds: 60),
       );
@@ -158,6 +162,7 @@ void main() {
       );
       binding.reportData = {
         'evidence_source': 'LIVE_RUNTIME',
+        'platform': Platform.isAndroid ? 'android' : 'ios',
         'native_storage': true,
         'controller_recreated': true,
         'os_background_stopped': stoppedInBackground,

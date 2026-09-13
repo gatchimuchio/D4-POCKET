@@ -12,6 +12,34 @@ Future<void> main() async {
   if (invitationFile == null || root == null || simulator == null) {
     throw StateError('試験host設定が不足しています');
   }
+  final platform = Platform.environment['GUI_SHELL_TEST_PLATFORM'] ?? 'ios';
+  final adb = Platform.environment['GUI_SHELL_TEST_ADB'];
+  Future<String> androidCommand(List<String> args) async {
+    final result = await Process.run(adb!, [
+      '-s',
+      simulator,
+      ...args,
+    ]).timeout(const Duration(seconds: 10));
+    if (result.exitCode != 0) throw StateError('仮想端末の操作に失敗');
+    return result.stdout.toString().trim();
+  }
+
+  if (platform == 'android') {
+    if (!Platform.isLinux ||
+        simulator != 'emulator-5554' ||
+        adb == null ||
+        await androidCommand(['shell', 'getprop', 'ro.kernel.qemu']) != '1' ||
+        (await androidCommand([
+              'emu',
+              'avd',
+              'name',
+            ])).split('\n').first.trim() !=
+            'gui_shell_native_test') {
+      throw StateError('専用Android仮想端末を確認できません');
+    }
+  } else if (platform != 'ios' || !Platform.isMacOS) {
+    throw StateError('対応する仮想端末hostではありません');
+  }
   final driver = await FlutterDriver.connect(printCommunication: false);
   if (driver is! VMServiceFlutterDriver) {
     await driver.close();
@@ -55,18 +83,32 @@ Future<void> main() async {
       );
       if (phase == 'background' && !switched) {
         switched = true;
-        for (final bundle in [
-          'com.apple.Preferences',
-          'com.example.guiShellMobile',
-        ]) {
-          final result = await Process.run('xcrun', [
-            'simctl',
-            'launch',
-            simulator,
-            bundle,
-          ]);
-          if (result.exitCode != 0) throw StateError('Simulatorの前景切替に失敗');
+        if (platform == 'android') {
+          await androidCommand(['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
           await Future<void>.delayed(const Duration(seconds: 2));
+          await androidCommand([
+            'shell',
+            'am',
+            'start',
+            '-W',
+            '-n',
+            'com.example.gui_shell_mobile/.MainActivity',
+          ]);
+          await Future<void>.delayed(const Duration(seconds: 2));
+        } else {
+          for (final bundle in [
+            'com.apple.Preferences',
+            'com.example.guiShellMobile',
+          ]) {
+            final result = await Process.run('xcrun', [
+              'simctl',
+              'launch',
+              simulator,
+              bundle,
+            ]);
+            if (result.exitCode != 0) throw StateError('Simulatorの前景切替に失敗');
+            await Future<void>.delayed(const Duration(seconds: 2));
+          }
         }
       }
       if (phase == 'approval') {

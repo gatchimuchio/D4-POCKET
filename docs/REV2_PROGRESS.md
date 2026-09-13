@@ -19,6 +19,20 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Apple実TLS統合の証拠確定とAndroidへの接続（2026-09-13）
+
+fd1b23e/run `34740828826` は手動Mac job全体が成功した。保存したartifactのtar SHA-256は `3f62ce784508b8dcfdd0ecb3bd3fba86b5e287570309ca6f7b6fea9f7f94e9b9` と一致し、追跡差分は空。共有18・Desktop33・Mobile29試験と解析、native保管2試験、macOS/iOS Simulator buildを確認した。実TLS統合結果はnative再読取、controller再生成、OS背景時停止と復帰再接続、二つの実MINIDORA応答、失効後拒否がPASS。Repository外のGUI-Shell-apple-fd1b23e/verified-result.jsonへ対象sourceと範囲を保存した。過去のMac起動期限超過はこのsourceで解消した。physical_device_verified=falseであり、正式配布・実機の保護特性・owner GOは証明しない。
+
+同じdevelopment専用統合をAndroidへ接続する。Linux hostとemulator-5554を固定し、harnessとdriverの双方がro.kernel.qemu=1と専用AVD名gui_shell_native_testを確認してから進む。端末列挙や実機操作は行わない。OSのHome遷移と明示MainActivityの再前景化を使い、製品のlifecycle observerで停止・復帰を観測する。接続先には[公式のhost loopback alias](https://developer.android.com/studio/run/emulator-networking-address)である10.0.2.2を一時招待生成時に指定する。brokerは127.0.0.1へbindしたまま、証明書hash照合・認証・Approval・Auditを通す。製品network境界の変更、平文化、証明書検証の省略はない。接続情報は一時fileと認証付きdebug VMで渡し、成果物へ資格を保存しない。
+
+変更後のMobile `flutter analyze --no-pub` と `flutter test --no-pub --reporter expanded` は29件PASS。Schema36/正常36/負例38、conformance150件、厳格日本語監査、手動workflowの6 stepのbash構文検査がPASS。既存Windows実API・実TLS・両Dart client・監査再読取は同じharnessの全client指定でPASSし、Repository外のGUI-Shell-android-native-harness-regression.txtに保存した。host不一致・実機serial・非仮想属性・異AVD名の拒否4件は呼出を差し替えたFIXTUREとして検証し、実機操作を行っていない。新Android経路の実行証拠とは区別する。
+
+- item: Android仮想端末のnative保管・実TLS・OS復帰の実行結果
+  classification: release_blocker
+  reason: この追加経路はローカル解析だけでは仮想端末で成立したと判断できない。
+  required_action: 対象commitを手動runnerで実行し、専用AVD属性・実結果・対象sourceを照合する。非Windows実機の延期は維持する。
+  blocks_release: yes
+
 ## Android workflowの変数評価位置を修正（2026-09-13）
 
 fd1b23eのAndroid手動dispatchはHTTP422で拒否された。jobのenvでrunner.tempを参照した位置ではrunner contextを使用できず、GitHubのworkflow検査を通らなかった。YAML・bashの構文検査はこのGitHub固有のcontext制約を検証していなかった。ANDROID_AVD_HOMEの値は、実行開始stepでRUNNER_TEMPを使ってGITHUB_ENVへ設定し、後続の作成・起動stepへ同じ値を渡す。起動条件、保存先の境界、AVD存在検査、仮想端末属性確認を変更しない。手動dispatchと実行結果は修正後commitで確認する。未実行のAndroid native保管は上記release_blockerとして保持する。Schema36/正常36/負例38、conformance150件、厳格日本語監査は修正後もPASS。

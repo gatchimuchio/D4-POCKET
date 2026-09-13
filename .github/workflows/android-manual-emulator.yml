@@ -41,6 +41,14 @@ jobs:
           test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/flutter/bin/flutter" --version | tee evidence/flutter.txt
+      - name: 実TLS接続用のRust helperと参照Runtimeを準備
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml 2>&1 | tee evidence/rust-build.txt
+          git clone https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA.git "$RUNNER_TEMP/minidora-reference"
+          git -C "$RUNNER_TEMP/minidora-reference" checkout --detach 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8
       - name: Android仮想端末を準備
         shell: bash
         run: |
@@ -84,6 +92,8 @@ jobs:
           flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
           flutter test integration_test/native_store_test.dart --no-pub -d emulator-5554 --reporter expanded 2>&1 | tee ../../evidence/android-native-store-test.txt
+          cd ../..
+          python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --android-emulator emulator-5554 2>&1 | tee evidence/android-native-live-test.txt
       - name: 追跡差分を検査
         shell: bash
         run: |

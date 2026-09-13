@@ -67,9 +67,26 @@ def 終了(process):
         process.wait(timeout=5)
 
 
-def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False, mobile_simulator=None):
+def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False, mobile_simulator=None, android_emulator=None):
     if mobile_simulator is not None and sys.platform != "darwin":
         raise RuntimeError("iOS Simulator統合はMac host専用")
+    if mobile_simulator and android_emulator:
+        raise RuntimeError("仮想端末を同時指定できません")
+    adb = None
+    if android_emulator:
+        if sys.platform != "linux" or android_emulator != "emulator-5554":
+            raise RuntimeError("Android試験はLinux専用runnerのemulator-5554に限定")
+        sdk = os.environ.get("ANDROID_HOME")
+        adb = str(Path(sdk) / "platform-tools/adb") if sdk else None
+        if not adb or not Path(adb).is_file():
+            raise RuntimeError("Android SDKのADBがない")
+        def device_output(*args):
+            return subprocess.check_output([adb, "-s", android_emulator, *args], text=True, timeout=10).strip()
+        if device_output("shell", "getprop", "ro.kernel.qemu") != "1":
+            raise RuntimeError("仮想端末属性を確認できません")
+        if device_output("emu", "avd", "name").splitlines()[0] != "gui_shell_native_test":
+            raise RuntimeError("専用AVD名と不一致")
+    virtual_device = mobile_simulator or android_emulator
     simulator_result = None
     head = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
     if head != REFERENCE:
@@ -128,7 +145,7 @@ server.serve_forever()
                 owner_file = root / "owner.json"
                 broker = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"),
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file),
-                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client or mobile_simulator else [])], cwd=root, stdout=log, stderr=log)
+                    "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client or virtual_device else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
                 normal = file待機(normal_file, broker)
                 owner = file待機(owner_file, broker)
@@ -170,18 +187,21 @@ server.serve_forever()
                         assert driver.returncode == 0, "Dart製品clientの試験失敗"
                         assert json.loads((root / f"{prefix}-result.json").read_text())["result"] == "PASS"
 
-                if mobile_simulator:
+                if virtual_device:
                     flutter = shutil.which("flutter")
                     if flutter is None:
                         raise RuntimeError("Flutter executableがない")
                     invitation_file = root / "simulator-invitation.json"
                     subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file),
-                        "端末招待", uuid.uuid4().hex, "127.0.0.1", str(invitation_file)],
+                        "端末招待", uuid.uuid4().hex, "10.0.2.2" if android_emulator else "127.0.0.1", str(invitation_file)],
                         check=True, stdout=log, stderr=log, timeout=10)
                     simulator_env = dict(os.environ, GUI_SHELL_TEST_INVITATION_FILE=str(invitation_file),
-                        GUI_SHELL_TEST_ROOT=str(root), GUI_SHELL_TEST_SIMULATOR=mobile_simulator)
+                        GUI_SHELL_TEST_ROOT=str(root), GUI_SHELL_TEST_SIMULATOR=virtual_device,
+                        GUI_SHELL_TEST_PLATFORM="android" if android_emulator else "ios")
+                    if adb:
+                        simulator_env["GUI_SHELL_TEST_ADB"] = adb
                     driver = subprocess.Popen([flutter, "drive", "--no-pub", "--driver=test_driver/device_link_driver.dart",
-                        "--target=integration_test/device_link_native_test.dart", "-d", mobile_simulator],
+                        "--target=integration_test/device_link_native_test.dart", "-d", virtual_device],
                         cwd=ROOT / "apps/mobile_flutter", env=simulator_env, stdout=log, stderr=log)
                     processes.append(driver)
                     ready = file待機(root / "simulator-ready.json", driver, timeout=300)
@@ -255,6 +275,7 @@ server.serve_forever()
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",
                         "mobile_simulator": simulator_result if mobile_simulator else "未実行",
+                        "android_emulator": simulator_result if android_emulator else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
@@ -271,7 +292,7 @@ server.serve_forever()
                     if stack_path.is_file():
                         print(stack_path.read_text(encoding="utf-8")[:8192])
                 # ログには秘密資格を記録しない。エラー時も本文一括転送は行わない。
-                if mobile_simulator:
+                if virtual_device:
                     diagnostic = root / "simulator-state.json"
                     if diagnostic.is_file():
                         state = json.loads(diagnostic.read_text(encoding="utf-8"))
@@ -289,9 +310,10 @@ def main():
     parser.add_argument("--mobile-client", action="store_true")
     parser.add_argument("--dart-mobile-client", action="store_true")
     parser.add_argument("--mobile-simulator", help="手動起動済みiOS SimulatorのUDID。実機には使用しない")
+    parser.add_argument("--android-emulator", choices=["emulator-5554"], help="専用Linux runnerで起動済みの専用AVDだけを使用")
     parser.add_argument("--binary", type=Path, default=ROOT / "native/rust_helper/target/debug" / ("gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"))
     args = parser.parse_args()
-    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client, args.dart_mobile_client, args.mobile_simulator), ensure_ascii=False, indent=2))
+    print(json.dumps(検証(args.reference.resolve(), args.binary.resolve(), args.dart_client, args.mobile_client, args.dart_mobile_client, args.mobile_simulator, args.android_emulator), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
