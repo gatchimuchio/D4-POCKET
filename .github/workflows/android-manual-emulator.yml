@@ -1,0 +1,97 @@
+name: Android仮想端末の手動補助検証
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  android-emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 実行環境と対象を記録
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          {
+            git rev-parse HEAD
+            uname -a
+            free -b
+            df -B1 .
+            ls -l /dev/kvm
+          } | tee evidence/environment.txt
+          test -d "${JAVA_HOME_17_X64:?}"
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          # 隔離runnerの実行利用者だけに仮想端末用KVM accessを限定する。
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          getfacl /dev/kvm > evidence/kvm-access.txt
+      - name: 固定Flutterを導入
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version | tee evidence/flutter.txt
+      - name: Android仮想端末を準備
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          "$sdkmanager" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
+          "$sdkmanager" --list_installed > evidence/sdk-installed.txt
+          "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee evidence/emulator-acceleration.txt
+          printf 'no\n' | "$avdmanager" create avd --name gui_shell_native_test --package 'system-images;android-35;google_apis;x86_64'
+      - name: Androidのnative安全保管を検証
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb="$ANDROID_HOME/platform-tools/adb"
+          "$ANDROID_HOME/emulator/emulator" -avd gui_shell_native_test -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -memory 2048 -cores 2 > evidence/emulator.txt 2>&1 &
+          emulator_pid=$!
+          cleanup() {
+            timeout 10 "$adb" -s emulator-5554 emu kill || true
+            kill "$emulator_pid" 2>/dev/null || true
+            wait "$emulator_pid" || true
+          }
+          trap cleanup EXIT
+          timeout 180 "$adb" -s emulator-5554 wait-for-device
+          deadline=$((SECONDS + 180))
+          while [ "$(timeout 5 "$adb" -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" != 1 ]; do
+            kill -0 "$emulator_pid"
+            test "$SECONDS" -lt "$deadline"
+            sleep 2
+          done
+          test "$("$adb" -s emulator-5554 shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+          "$adb" -s emulator-5554 emu avd name | tee evidence/avd-name.txt
+          grep -Fx gui_shell_native_test evidence/avd-name.txt
+          "$adb" -s emulator-5554 shell getprop ro.build.fingerprint > evidence/android-fingerprint.txt
+          cd apps/mobile_flutter
+          flutter pub get 2>&1 | tee ../../evidence/mobile-pub-get.txt
+          flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
+          flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
+          flutter test integration_test/native_store_test.dart --no-pub -d emulator-5554 --reporter expanded 2>&1 | tee ../../evidence/android-native-store-test.txt
+      - name: 追跡差分を検査
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short > evidence/build-working-tree.txt
+          git diff --binary > evidence/build-migrations.patch
+          git diff --exit-code
+          git diff --cached --exit-code
+      - name: 補助証拠をアップロード
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-emulator-${{ github.sha }}
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error

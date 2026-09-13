@@ -61,6 +61,10 @@
       "sha256": "a96f7ee8d0feacee47f68cbfc27d1e0a2c64eb26a49df9eda3e9dabe3be09197"
     },
     {
+      "path": ".github/workflows/android-manual-emulator.yml",
+      "sha256": "7ade7b26edbb665554d0d62478a1bd3cf19a29b60de54b22142f49d3c72cf89d"
+    },
+    {
       "path": ".github/workflows/apple-manual-build.yml",
       "sha256": "50cc42e949a0f6fecf5a842d4a17846c284eec232325d519f03ffe7ea7e86e64"
     },
@@ -142,7 +146,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "07209447e44130067a04a17d213b4b9107a78e8f02c1240437856cb95487d27b"
+      "sha256": "135cc07d5415d669eae519311cfdf033aaa98dc91c51d62798a90d966382c1ea"
     },
     {
       "path": "SECURITY.md",
@@ -906,7 +910,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "4aa29fd5c178c91c18b3530891e868e05eb528336a9e78bb2f272ab1df4925c6"
+      "sha256": "49aaaf1c919fc7f547524eecfe35bc66b248d2a48ca1c22003a52debd2481291"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

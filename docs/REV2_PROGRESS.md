@@ -19,6 +19,20 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Android仮想端末の手動補助経路（2026-09-13）
+
+Windows SDK managerの一覧にemulator 37.1.11とAPI35 Google APIs x86_64 revision9を確認した。SDK catalogで確認した圧縮imageは1,738,815,903 bytes、Windows emulator候補は459,029,121 bytes。空き容量約2.19GBのhostでは展開余地がなく、ローカル導入を強行しない。中間生成物削除の自動承認拒否を迂回せず、許可された手動補助環境で仮想端末検証を進める。
+
+Ubuntu 24.04 runner上で専用AVDを作成し、Mobile解析・29既存試験とnative安全保管2試験を実行するworkflowを追加する。triggerは手動限定、contentsはread、Flutter/actionは既存と同じ固定点、証拠保管3日。ADB対象を明示作成のemulatorに固定し、qemu属性とAVD名を照合する。KVMの利用者限定権限設定は隔離されたdevelopment hostのための設定であり、製品Permissionへ転用しない。SDK licenseの自動承認は追加せず、既存runnerで不足する場合は失敗として保持する。 ローカルではSchema36/正常36/負例38、conformance150件、厳格日本語監査、5つのrun stepの `bash -n` がPASS。これらはCONFIG・静的検査であり仮想端末の実行証拠ではない。
+
+参考一次資料: [Android Emulatorの加速方式](https://developer.android.com/studio/run/emulator-acceleration)、[Ubuntu 24.04 runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md)。これらの記載を実行証拠にせず、使用toolchainと起動結果はrunごとに記録する。
+
+- item: Android仮想端末のnative保管実行証拠
+  classification: release_blocker
+  reason: workflow追加だけでは仮想端末の起動・native API成功を証明しない。
+  required_action: push後の手動runで実行し、対象commitと結果を照合する。Android実機凍結は維持する。
+  blocks_release: yes
+
 ## Mac上の参照Runtime起動期限超過を診断（2026-09-13）
 
 c5aa1ecの手動run `34739077800` はnative保管2試験がPASSした後、最初のMINIDORA参照APIの起動確認で20秒期限を超過した。Simulator実TLS試験は未到達でありPASSにしない。Windowsの同じ参照・harnessの実接続は成功しているが、Mac環境の根本原因を確定したものではない。
