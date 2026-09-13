@@ -593,6 +593,41 @@ void main() {
     }
   });
 
+  testWidgets('4096件の対象一覧を遅延描画し末尾から差分を開く', (tester) async {
+    final broker = TestBroker()
+      ..mutate = (body) {
+        if (body['operation'] == '作業領域比較範囲') {
+          (body['projection'] as Map)['相対paths'] =
+              List.generate(4096, (i) => 'file-$i');
+        }
+      };
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('基準点の対象file'));
+    await tester.pumpAndSettle();
+    expect(find.text('対象 4096件'), findsOneWidget);
+    expect(find.text('file-0'), findsOneWidget);
+    expect(find.text('file-4095'), findsNothing);
+    expect(find.byType(ListTile).evaluate().length, lessThan(30));
+    final scroll = tester.state<ScrollableState>(find.descendant(
+        of: find.byType(ListView), matching: find.byType(Scrollable)));
+    scroll.position.jumpTo(scroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('file-4095'));
+    await tester.tap(find.text('file-4095'));
+    await tester.pumpAndSettle();
+    expect(find.text('file-4095'), findsOneWidget);
+    expect(find.textContaining('--- a/file'), findsOneWidget);
+    expect(broker.operations.last, '作業領域一覧');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('変更一覧から差分を開き失効時に表示を破棄する', (tester) async {
     final broker = TestBroker();
     await tester.pumpWidget(MaterialApp(

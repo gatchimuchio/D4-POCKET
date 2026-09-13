@@ -235,14 +235,23 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                         changes: true,
                         baselineHash: projection['基準点hash'] as String),
                 child: const Text('全体基準点の変更一覧')),
-            for (final path in projection['相対paths'] as List)
-              ListTile(
-                  title: Text(path as String),
-                  trailing: const Icon(Icons.compare_arrows),
-                  onTap: _busy
-                      ? null
-                      : () => _read(view.registration, path, false,
-                          baselineHash: projection['基準点hash'] as String)),
+            Text('対象 ${(projection['相対paths'] as List).length}件'),
+            SizedBox(
+                height: 320,
+                child: ListView.builder(
+                    itemCount: (projection['相対paths'] as List).length,
+                    itemBuilder: (context, index) {
+                      final path =
+                          (projection['相対paths'] as List)[index] as String;
+                      return ListTile(
+                          title: Text(path),
+                          trailing: const Icon(Icons.compare_arrows),
+                          onTap: _busy
+                              ? null
+                              : () => _read(view.registration, path, false,
+                                  baselineHash:
+                                      projection['基準点hash'] as String));
+                    })),
           ],
         ],
         if (view.registration.visibility == 'full' &&

@@ -254,7 +254,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/workspace_inspector.dart",
-      "sha256": "90ae8c52cfe8df0fb6b6e38058b5450e9dd7f332de8ac948c92cd476b09206d6"
+      "sha256": "7ab557be1b7784e030d0e955f84cea06f666f0bf6c397b60dc0d222a32d32386"
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
@@ -454,7 +454,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "83e15d111d1be87601492f67853995a2ffb0dd9627f39e34fa5df74e642bcc52"
+      "sha256": "92b3da035eb4b6fa0fd425cbc6e884be375486f0eee2f1658623000d88d0d305"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -1054,7 +1054,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "a16ad205d40a1fd5876f2845b67b7da1e43f3c3959b40ab5f62d4c5222fba50c"
+      "sha256": "da7114d6cb23822e5c80ba5645ba9fc7de1c292f48a5ca2c13ffbc1aacd7b581"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "964303d58264c3a85d2e60cf6491bb20998a53bcec5a14ed3b08f7a2abfce5c6"
+      "sha256": "00774ff53b72738b5f9f54af25de4202e1a8c862ed9f8e4a1a11e41ee34739ae"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
