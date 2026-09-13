@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## セッション切替の部分失敗と旧結果表示（2026-09-13）
+
+旧セッションの終了成功後に新規開始が失敗すると、sessionだけが空になり旧要求・応答・完了状態が残る不具合を製品Widgetで再現した。旧セッションの終了成功時点で現在表示を未開始へ戻し、旧要求と応答を外す。終了自体が失敗した場合は旧sessionと結果を維持し、終了成功を推定しない。監査記録やbrokerのsession管理は変更しない。
+
+開始失敗・終了失敗の2試験を追加した。変更前は開始失敗の旧応答消去がFAIL、終了失敗時の保持はPASS。変更後は両方PASSで、その後の手動再試行による新規開始も確認した。共有・Desktop・Mobileの `flutter test --no-pub --reporter expanded` は11・33・29件PASS、3か所の `flutter analyze --no-pub` もPASS。Schema36/正常36/負例38、conformance150件を確認した。
+
+証拠範囲は製品Widgetを実行するFIXTUREである。新しい実機操作・ビルド証拠を今回作ったとは主張しない。非Windows実機・正式配布・運用署名・owner GOは冒頭のrelease_blockerとして延期を保持する。
+
 ## 共有対話画面の遅延失敗を元の要求へ限定（2026-09-13）
 
 応答照会中に中止して新規セッションへ切り替えると、旧要求の遅延通信失敗が新しいセッションのerrorを上書きすることをWidget試験で再現した。成功応答は既に要求IDとpendingを検査していたが、catch側には同じ結合確認がなかった。例外の表示にも現在の要求ID一致と待機中の条件を要求した。経路はDesktop/Mobile共有UIの表示処理で、brokerの採否・取消・監査は変更しない。

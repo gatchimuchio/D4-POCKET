@@ -86,8 +86,14 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     });
     try {
       if (side.session != null) await client.close(side.session!);
-      side.session = null;
-      if (!mounted || !widget.active) return;
+      if (!mounted) return;
+      setState(() {
+        side.session = null;
+        side.request = null;
+        side.result = null;
+        side.state = '未開始';
+      });
+      if (!widget.active) return;
       final session = await client.start(runtime);
       if (!mounted) {
         await client.close(session);

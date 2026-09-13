@@ -32,11 +32,13 @@ class DialogueFixture implements BrokerTransport {
   bool failLeft = false;
   bool failRight = false;
   bool swap = false;
+  String? failOperation;
   Completer<void>? pollWait;
   @override
   Future<Map<String, Object?>> request(String operation,
       {Map<String, Object?>? payload}) async {
     calls.add(operation);
+    if (operation == failOperation) throw const BrokerClientException('試験用失敗');
     final p = payload!;
     Map<String, Object?> body;
     switch (operation) {
@@ -83,6 +85,49 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  for (final failure in ['対話開始', '対話終了']) {
+    testWidgets('新規切替の$failure失敗で終了済み結果と未終了結果を区別する', (tester) async {
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final f = DialogueFixture()..complete = true;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: RuntimeDialogueScreen(
+                  connect: () async => RuntimeDialogueClient(f)))));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '前のセッションの入力');
+      await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('leftの応答'), findsOneWidget);
+      f.failOperation = failure;
+      f.calls.clear();
+      await tester.tap(find.text('新規セッション'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('セッションを開始できません'), findsOneWidget);
+      if (failure == '対話開始') {
+        expect(f.calls, ['対話終了', '対話開始']);
+        expect(find.text('leftの応答'), findsNothing);
+        expect(find.textContaining('要求: '), findsNothing);
+        expect(find.text('状態: 未開始'), findsOneWidget);
+      } else {
+        expect(f.calls, ['対話終了']);
+        expect(find.text('leftの応答'), findsOneWidget);
+        expect(find.textContaining('セッション: '), findsOneWidget);
+      }
+      f.failOperation = null;
+      await tester.tap(find.text('新規セッション'));
+      await tester.pumpAndSettle();
+      expect(find.text('状態: 入力待ち'), findsOneWidget);
+      expect(find.text('leftの応答'), findsNothing);
+      expect(f.inputs, ['前のセッションの入力']);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+  }
   testWidgets('現在待機中の要求の通信失敗は表示する', (tester) async {
     final wait = Completer<void>();
     final f = DialogueFixture()..pollWait = wait;
