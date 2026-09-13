@@ -263,6 +263,9 @@
             "include_audit_context": {
               "type": "boolean",
               "default": false
+            },
+            "include_result_evidence": {
+              "type": "boolean"
             }
           }
         }
@@ -385,6 +388,9 @@
                 "include_audit_context": {
                   "type": "boolean",
                   "default": false
+                },
+                "include_result_evidence": {
+                  "type": "boolean"
                 }
               }
             }

@@ -1062,7 +1062,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "5adeb34c837febca398c848d06b680f2f21c310ea1fc7f59db416c7808383faf"
+      "sha256": "ebe46480e62a31912a993f15272aa837df0f52b1bc3a9b814f82612745cb39a9"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1094,7 +1094,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "81a2671889fc9b74418460c1ea964645f071090c6abe37405200b9eac50da139"
+      "sha256": "0f75a0a7805c19d6a6824b9709fc5fc585cb9439e31732658a5544a5b09fdc8d"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1361,6 +1361,10 @@
       "sha256": "8d8041cc032ab2679f3dd76e328818441696f2f3ef228a39d307f41c9fafea5c"
     },
     {
+      "path": "examples/contracts/invalid/runtime_execution_history_page_result.invalid.json",
+      "sha256": "5e5f008e05c2868d567c449747d97069ccc8b0298b5cb616c65f7afea53fe797"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_execution_history_state.invalid.json",
       "sha256": "20d4f4dd78a2edfc9bef4936d0e248a8a435ca16936e0eb45824f8981f96b9b3"
     },
@@ -1458,7 +1462,7 @@
     },
     {
       "path": "examples/contracts/runtime_execution_history_page.valid.json",
-      "sha256": "044d66357e8634f40457e8a618c8dbee0a702eb47f128eb4ad124f6a97ea8f9d"
+      "sha256": "b9728c5b7c3ccb408e2da2a1fabeaf06a28f90f3d1efcca6191661ec0273e741"
     },
     {
       "path": "examples/contracts/runtime_execution_record.valid.json",
@@ -1614,7 +1618,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "d85d988e867c85f95f6bfafad70433e56b3813b2e0cd45721a556a726106715a"
+      "sha256": "926e3c01bf74e897078be29e788bf3d6c6678ab0a9f5a925ceb46997c2e5af42"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -2198,7 +2202,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "f7dbdc7dd048f2bc7c063c18bb1029153220c1693c61f8e5ff299440094d29c5"
+      "sha256": "78b75b2602a954b28cee7143393dbcdfd266785ef6fbc607064f1b13623a7b03"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2218,7 +2222,7 @@
     },
     {
       "path": "specs/runtime_execution_history_page.schema.json",
-      "sha256": "a51a7802dbc852c1fe977929618230a1aaef6186e283e9b99161276c35982d81"
+      "sha256": "3f213ae623d3804ee24a84e27bc9e6722ce6de99a878d23b48bf20b31891f5d8"
     },
     {
       "path": "specs/runtime_execution_record.schema.json",
@@ -2226,7 +2230,7 @@
     },
     {
       "path": "specs/runtime_history_access.schema.json",
-      "sha256": "8310860e856960fed8952b3d2d83fdcd929e97f2c1e7d47e4da1e856ce8c76f8"
+      "sha256": "74da28c30e3270c0fd007e5000740d3c022db838ab218a2878d0ebd350fa4813"
     },
     {
       "path": "specs/runtime_manifest.schema.json",
@@ -2310,7 +2314,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "bb891802901db7405e78a6a078b9ba183cbbab7d93805a6c65593b87af50dc25"
+      "sha256": "b860c0f09d6a9e98124633bf816c46e62258ed9103e255f725a9345c9ac8c0a9"
     },
     {
       "path": "tooling/packaging_portability_check.py",

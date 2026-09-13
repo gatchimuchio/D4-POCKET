@@ -327,9 +327,12 @@ server.serve_forever()
                             assert proof[field] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
                     else:
                         assert proof["能力申告hash"] is proof["経路申告hash"] is proof["追跡参照hash"] is None
-                contextual = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 100, "latest_per_request": True, "include_audit_context": True})
+                contextual = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 100, "latest_per_request": True, "include_audit_context": True, "include_result_evidence": True})
                 context_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
                 assert not validate_instance(contextual, context_schema)
+                proof_entries = {e["record"]["実行記録"]["要求ID"]: e["result_evidence"] for e in contextual["entries"]}
+                for pending, result in zip(initial_pending, initial_results):
+                    assert proof_entries[pending["要求ID"]]["応答hash"] == result["応答hash"]
                 contexts = {entry["record"]["実行記録"]["要求ID"]: entry["audit_context"] for entry in contextual["entries"]}
                 for pending in initial_pending:
                     context = contexts[pending["要求ID"]]
@@ -341,13 +344,17 @@ server.serve_forever()
                 access_schema = json.loads((ROOT / "specs/runtime_history_access.schema.json").read_text(encoding="utf-8"))
                 for runtime_id in ["left", "right"]:
                     approved = 成功(owner, "対話履歴承認", {"実行系ID": runtime_id})
-                    selection = {"approval_id": approved["grant"]["approval_id"], "query": {"after": 0, "limit": 100, "filter": {"実行系ID": runtime_id}}}
+                    selection = {"approval_id": approved["grant"]["approval_id"], "query": {"after": 0, "limit": 100, "filter": {"実行系ID": runtime_id}, "include_result_evidence": True}}
                     if dart_client:
                         subprocess.run([dart, "run", str(ROOT / "apps/desktop_flutter/tool/history_live_client.dart"), str(normal_file), runtime_id], cwd=ROOT / "apps/desktop_flutter", check=True, stdout=log, stderr=log, timeout=30)
                     viewed = 成功(normal, "対話履歴閲覧", selection)
                     assert not validate_instance(viewed, access_schema)
                     assert viewed["page"]["entries"] and not viewed["page"]["has_more"]
                     assert all(e["record"]["実行記録"]["実行系ID"] == runtime_id for e in viewed["page"]["entries"])
+                    for pending in initial_pending:
+                        if proof_entries[pending["要求ID"]]["実行系ID"] == runtime_id:
+                            actual = [e["result_evidence"] for e in viewed["page"]["entries"] if e["record"]["実行記録"]["要求ID"] == pending["要求ID"] and e["record"]["状態"] == "成功"]
+                            assert actual == [proof_entries[pending["要求ID"]]]
                     成功(owner, "対話履歴失効", {})
                     denied = 操作(normal, "対話履歴閲覧", selection)
                     assert denied["status"] != "accepted" and denied.get("body") is None

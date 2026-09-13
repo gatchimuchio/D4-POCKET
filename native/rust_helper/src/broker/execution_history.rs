@@ -14,6 +14,8 @@ pub(crate) struct Query {
     #[serde(default)]
     pub include_audit_context: bool,
     #[serde(default)]
+    pub include_result_evidence: bool,
+    #[serde(default)]
     pub filter: std::collections::BTreeMap<String, String>,
 }
 
@@ -210,6 +212,9 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
             json!({"audit_event_id":event.event_id,"event_hash":event.event_hash,"record":value});
         if query.include_audit_context {
             entry["audit_context"] = audit_context(&events[..index], &entry["record"]["実行記録"])?;
+        }
+        if query.include_result_evidence {
+            entry["result_evidence"] = result_evidence(&events[..index], &entry["record"])?;
         }
         entries.push(entry);
         next = index + 1;
@@ -576,5 +581,87 @@ fn 過去承認文脈は要求と実行系と表示範囲を結合する() {
         } else {
             assert!(result.is_err(), "case={case}");
         }
+    }
+}
+
+
+fn result_evidence(events: &[super::audit::BrokerAuditEvent], archive: &Value) -> Result<Value, &'static str> {
+    if !matches!(archive["状態"].as_str(), Some("成功" | "保留")) { return Ok(Value::Null); }
+    let record = &archive["実行記録"];
+    let matching: Vec<_> = events.iter().enumerate().filter(|(_, e)|
+        Some(e.request_id.as_str()) == record["要求ID"].as_str() && e.reason.starts_with("対話結果証跡:")).collect();
+    if matching.is_empty() { return Ok(Value::Null); }
+    if matching.len() != 1 { return Err("結果証跡が重複"); }
+    let (index, event) = matching[0];
+    let body = event.reason.strip_prefix("対話結果証跡:").ok_or("結果証跡が不正")?;
+    if body.len() > 16384 || sha256_tagged(body.as_bytes()) != event.payload_hash
+        || event.decision != "recorded" || event.evidence_source != "INTERNAL_STATE"
+        || !["実行系列挙", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了", "対話承認", "対話承認待ち"].contains(&event.operation.as_str()) {
+        return Err("結果証跡の監査が不正");
+    }
+    let proof: Value = super::json_input::read_unique(body).map_err(|_| "結果証跡形式が不正")?;
+    let object = proof.as_object().ok_or("結果証跡形式が不正")?;
+    let keys = ["版", "要求ID", "対話セッションID", "実行系ID", "要求hash", "終了監査ID", "表示範囲", "応答hash", "能力申告hash", "経路申告hash", "追跡参照hash", "証拠種別"];
+    if object.len() != keys.len() || keys.iter().any(|k| !object.contains_key(*k))
+        || proof["版"] != 1 || proof["証拠種別"] != "INTERNAL_STATE" {
+        return Err("結果証跡形式が不正");
+    }
+    for key in ["要求ID", "対話セッションID", "実行系ID", "終了監査ID"] {
+        if proof[key] != record[key] { return Err("結果証跡の要求対応が不一致"); }
+    }
+    let context = audit_context(&events[..index], record)?;
+    let scope = proof["表示範囲"].as_str().ok_or("結果証跡の表示範囲が不正")?;
+    if !["full", "hash_only", "summary", "redacted"].contains(&scope)
+        || proof["要求hash"] != context["要求hash"]
+        || proof["表示範囲"] != context["承認"]["内容表示範囲"] {
+        return Err("結果証跡の過去承認が不一致");
+    }
+    let ended = events[..index].iter().find(|e| Some(e.event_id.as_str()) == proof["終了監査ID"].as_str()).ok_or("結果証跡の終了監査が不在")?;
+    if ended.request_id != event.request_id || ended.reason != "対話完了"
+        || ended.decision != "recorded" || ended.evidence_source != "INTERNAL_STATE"
+        {
+        return Err("結果証跡の終了監査が不一致");
+    }
+    let valid_hash = |v: &Value| v.as_str().and_then(|s| s.strip_prefix("sha256:")).is_some_and(|s| s.len() == 64 && s.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)));
+    if !valid_hash(&proof["要求hash"]) || !valid_hash(&proof["応答hash"]) { return Err("結果証跡hash形式が不正"); }
+    for key in ["能力申告hash", "経路申告hash", "追跡参照hash"] {
+        if if scope == "full" { !valid_hash(&proof[key]) } else { !proof[key].is_null() } {
+            return Err("結果証跡の内容範囲が不正");
+        }
+    }
+    Ok(proof)
+}
+
+
+#[test]
+fn 結果証跡読取は改変と別要求と表示昇格と重複を拒否する() {
+    for case in 0..12 {
+        let mut log = BrokerAuditLog::default();
+        let request = "a".repeat(32); let hash = sha256_tagged(b"request");
+        let created = log.append(&request, "対話送信", "recorded", "対話承認待ち作成", "INTERNAL_STATE", &hash);
+        let scope = if case == 1 { "hash_only" } else { "full" };
+        let start = log.append(&request, "対話承認", "recorded", &format!("対話送信承認 Capability=対話送信 Permission=local:127.0.0.1:9 Approval={hash} 表示範囲={scope} RecoveryAction=接続再確認"), "INTERNAL_STATE", &hash);
+        let end = log.append(&request, "対話取得", "recorded", "対話完了", "INTERNAL_STATE", &sha256_tagged(b"receipt"));
+        let archive = json!({"状態":"成功", "実行記録":{"要求ID":request,"対話セッションID":"b".repeat(32),"実行系ID":"local","作成監査ID":created.event_id,"開始監査ID":start.event_id,"終了監査ID":end.event_id}});
+        assert!(result_evidence(log.events(), &archive).unwrap().is_null());
+        let mut proof = json!({"版":1,"要求ID":request,"対話セッションID":"b".repeat(32),"実行系ID":"local","要求hash":hash,"終了監査ID":end.event_id,"表示範囲":scope,"応答hash":hash,"能力申告hash":hash,"経路申告hash":hash,"追跡参照hash":hash,"証拠種別":"INTERNAL_STATE"});
+        if case == 1 { for k in ["能力申告hash", "経路申告hash", "追跡参照hash"] { proof[k] = Value::Null; } }
+        match case {
+            2 => proof["要求ID"] = json!("c".repeat(32)),
+            3 => proof["対話セッションID"] = json!("c".repeat(32)),
+            4 => proof["実行系ID"] = json!("other"),
+            5 => proof["要求hash"] = json!(sha256_tagged(b"other")),
+            6 => proof["終了監査ID"] = json!(start.event_id),
+            7 => proof["表示範囲"] = json!("hash_only"),
+            8 => proof["応答hash"] = json!("invalid"),
+            9 => proof["本文"] = json!("非公開"),
+            _ => (),
+        }
+        let body = proof.to_string();
+        let payload = if case == 10 { sha256_tagged(b"wrong") } else { sha256_tagged(body.as_bytes()) };
+        log.append(&request, "対話取得", "recorded", &format!("対話結果証跡:{body}"), "INTERNAL_STATE", &payload);
+        if case == 11 { log.append(&request, "対話取得", "recorded", &format!("対話結果証跡:{body}"), "INTERNAL_STATE", &payload); }
+        let result = result_evidence(log.events(), &archive);
+        if case < 2 { assert_eq!(result.unwrap(), proof); } else { assert!(result.is_err(), "case={case}"); }
     }
 }
