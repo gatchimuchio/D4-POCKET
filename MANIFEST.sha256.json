@@ -1069,7 +1069,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "3fa662f9b66874d95eb0a50a877b92be240b62f2791e2b0a11c3fa380b73e6e6"
+      "sha256": "c5e3f74ead661c196c27c388eb7a213d006aa0ee02ef87081dc82360e3396f28"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1101,7 +1101,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "e9a448fe23bba40a96754c354cf916d3238822925e24ecb27ced3c91cbaa886d"
+      "sha256": "34e427d00d728a695888ecc5eab39b470455fc25d0558ebd490e0c1b23453bf8"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1689,7 +1689,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "160d166bde20969eb99d0533f91f13219593a6fb3306f96caef9823d4a202a15"
+      "sha256": "10cbcef492c2046431b667e1036ba9ab33a189344511780fd704c325da146e66"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -1706,6 +1706,10 @@
     {
       "path": "native/rust_helper/src/process.rs",
       "sha256": "34615c193fbc16ced050cedb995bdc1d000b31aff667cd3f8bada1d6cd3bdd6c"
+    },
+    {
+      "path": "native/rust_helper/src/protected_store.rs",
+      "sha256": "359ccfb6d6d5bf27d2d64763b6f2952705419acd7d327c2349da1de86a51b895"
     },
     {
       "path": "native/rust_helper/src/update_verification.rs",
@@ -1730,6 +1734,10 @@
     {
       "path": "native/rust_helper/tests/protected_data.rs",
       "sha256": "b1a3489e67906b45a6a48114928363ab6c35c6022db2609f0797e0735ca60ce9"
+    },
+    {
+      "path": "native/rust_helper/tests/protected_store.rs",
+      "sha256": "036d6e5bb63925150a240b9bddc3501409ac7465480dedc1c7d06affa13c54f3"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",

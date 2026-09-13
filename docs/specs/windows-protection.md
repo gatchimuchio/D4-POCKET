@@ -17,3 +17,10 @@ UI抑止flagを固定し、machine共有flagとpromptを指定しない。外部
 ## 試験と残存境界
 
 Rust helperのWindows integration testから実APIを呼ぶ。合成dataだけを使用し、正常・別用途・改変・切断・同入力の再暗号化・上限を検査する。これはOS接続試験であり保管製品の完成ではない。別ユーザー、別端末、実際の保管/削除、承認失効、監査書込失敗、snapshot漏洩、非Windowsの安全保管はrelease_blocker。非WindowsでDPAPI代替を成功扱いしない。
+
+
+## 不変の暗号文保管
+
+protected_storeは呼出し側が検証・許可したdirectory handleを受け取り、1階層の固定filenameだけを使用する。用途はhistory/credentialのenum、対象IDは32桁の小文字hexに限定し、用途とIDとformat版をDPAPI entropyへ結合する。filenameやhashは権限源ではない。作成はcreate_newだけで既存対象を上書きせず、暗号化後のbytesだけを書きsyncする。保存失敗で残った部分fileは再使用せず、呼出し側のRecovery対象とする。
+
+読取はsymlinkを追わず、reparse point・複数hardlinkを拒否し、通常fileとサイズ上限を確認し、暗号文hashを呼出し側の検証済み監査参照と照合した後に復号する。hash参照を未検証UI dataから信頼してはならない。返却は平文の所有型であり、UI投影や権限の復元を行わない。root handle取得時の許可とlink検証、現在Approval、Audit確定前の公開停止、削除とRecoveryはBrokerの接続単位で必要であり、未接続のrelease_blocker。保管API自体を公開IPCへ追加しない。
