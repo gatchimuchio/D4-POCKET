@@ -309,6 +309,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.chat_bubble),
                                       label: Text('対話'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.history_outlined),
+                                      selectedIcon: Icon(Icons.history),
+                                      label: Text('履歴'),
+                                    ),
                                   ],
                                 ),
                               ),

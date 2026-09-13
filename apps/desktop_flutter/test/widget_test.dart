@@ -32,6 +32,19 @@ void main() {
     );
   }
 
+  testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+    final rail=tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.destinations.length,14);
+    rail.onDestinationSelected!(13);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(),isNull);
+    expect(find.text('先頭から更新'),findsOneWidget);
+    tester.widget<NavigationRail>(find.byType(NavigationRail)).onDestinationSelected!(0);
+    await tester.pumpAndSettle();
+    expect(find.text('先頭から更新'),findsNothing);
+  });
+
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
