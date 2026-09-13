@@ -810,7 +810,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_controller.dart",
-      "sha256": "2086a84bb99ae028e6be907b1a64a0884666586f553b715c6adac7434189f548"
+      "sha256": "785354e0366d584c411eaa05425a99f5811c43ebb7438eaa8d9f5e9b002738c2"
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
@@ -818,7 +818,7 @@
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "380ff3ddb78c7f1359e4efaaded0b0a0fd2e26bc3b40be2ccfd45f6e5ff1a8f5"
+      "sha256": "d39a3b42c696a891548cbb638eb97836c2bf5a71cd62d826833d7a7986807f4b"
     },
     {
       "path": "apps/mobile_flutter/tool/device_link_live_client.dart",
@@ -890,7 +890,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "b3d014d34ed33a7dfad8d4d46d41cb8ea8e65f7c7335b1c2e18de4e06d4a245d"
+      "sha256": "8883ce2a42ec267bf1d8bfe84444027f0f2b220e82717fe7e96eda4f63f617cb"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1002,7 +1002,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "d9ff702cd1aafae97454e24a2bf89e90c815e17ce38523454800ddb4bba24ae7"
+      "sha256": "6b88702200c21040d20660dac1b915f6fb2a1b29682ed7e36d87f579c14168f4"
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",

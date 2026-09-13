@@ -67,6 +67,7 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   bool hasStoredCredential = false;
   bool _resumePending = false;
   bool _disposed = false;
+  int _foregroundGeneration = 0;
   Timer? _expiry;
   String status = '安全保管を確認中';
   final List<String> events = [];
@@ -199,11 +200,28 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   Future<void> _verify() async {
     ready = false;
     if (!foreground || _disposed || _client == null) return;
-    if (credential!.expired) throw const BrokerClientException('期限切れ');
-    _client!.setActive(true);
-    await _client!.request('端末確認');
-    final observed = await RuntimeDialogueClient(_client!).runtimes();
-    if (!foreground || _disposed) return;
+    final generation = _foregroundGeneration;
+    bool currentForeground() =>
+        foreground && !_disposed && generation == _foregroundGeneration;
+    final client = _client!;
+    final current = credential!;
+    final storedId = await _store.read(deviceKey);
+    final stored = await _store.read(credentialKey);
+    if (!currentForeground()) return;
+    if (storedId != deviceId || stored == null)
+      throw const BrokerClientException('安全保管の資格を確認できません');
+    final confirmed = DeviceCredential.parse(
+      stored,
+      invitation: false,
+      deviceId: deviceId!,
+    );
+    if (!mapEquals(confirmed.data, current.data) || current.expired)
+      throw const BrokerClientException('保存資格が現在の結合と一致しません');
+    client.setActive(true);
+    await client.request('端末確認');
+    if (!currentForeground()) return;
+    final observed = await RuntimeDialogueClient(client).runtimes();
+    if (!currentForeground()) return;
     runtimes = observed;
     ready = true;
     _report('Desktopへの端末資格を確認済み');
@@ -228,6 +246,7 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
     if (_disposed) return;
     foreground = value;
     if (!value) {
+      _foregroundGeneration++;
       _stop();
       _report('バックグラウンド中は通信停止');
     } else {

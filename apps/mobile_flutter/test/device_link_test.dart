@@ -33,8 +33,11 @@ class MemoryStore implements DeviceStore {
   bool failDelete = false;
   bool retainOnDelete = false;
   bool failReadAfterDelete = false;
+  Completer<void>? credentialReadWait;
   @override
   Future<String?> read(String key) async {
+    if (key == DeviceLinkController.credentialKey && credentialReadWait != null)
+      await credentialReadWait!.future;
     if (failRead) throw StateError('fixture');
     return values[key];
   }
@@ -87,6 +90,90 @@ class LinkFixture extends DeviceLinkClient {
 }
 
 void main() {
+  for (final failure in [
+    '削除',
+    '破損',
+    '秘密変更',
+    'Host変更',
+    '期限変更',
+    '端末ID変更',
+    '読取障害',
+  ]) {
+    test('復帰時の保存資格の$failureでは通信を再開しない', () async {
+      final saved = data();
+      final store = MemoryStore()
+        ..values[DeviceLinkController.credentialKey] = jsonEncode(saved);
+      final calls = <String>[];
+      final c = DeviceLinkController(
+        store: store,
+        connect: (v) => LinkFixture(v, calls),
+      );
+      addTearDown(c.dispose);
+      await c.initialize();
+      expect(c.ready, isTrue);
+      calls.clear();
+      c.setForeground(false);
+      switch (failure) {
+        case '削除':
+          store.values.remove(DeviceLinkController.credentialKey);
+        case '破損':
+          store.values[DeviceLinkController.credentialKey] = '{}';
+        case '秘密変更':
+          store.values[DeviceLinkController.credentialKey] = jsonEncode({
+            ...saved,
+            '端末秘密': 'f' * 64,
+          });
+        case 'Host変更':
+          store.values[DeviceLinkController.credentialKey] = jsonEncode({
+            ...saved,
+            'HostID': 'f' * 32,
+          });
+        case '期限変更':
+          store.values[DeviceLinkController.credentialKey] = jsonEncode({
+            ...saved,
+            '有効期限': (saved['有効期限'] as int) + 10,
+          });
+        case '端末ID変更':
+          store.values[DeviceLinkController.deviceKey] = 'f' * 32;
+        case '読取障害':
+          store.failRead = true;
+      }
+      c.setForeground(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.ready, isFalse);
+      expect(calls, isEmpty);
+      await expectLater(
+        c.request('対話送信'),
+        throwsA(isA<BrokerClientException>()),
+      );
+    });
+  }
+  test('保存資格の読取中にbackgroundへ移ったら通信しない', () async {
+    final store = MemoryStore()
+      ..values[DeviceLinkController.credentialKey] = jsonEncode(data());
+    final calls = <String>[];
+    final c = DeviceLinkController(
+      store: store,
+      connect: (v) => LinkFixture(v, calls),
+    );
+    addTearDown(c.dispose);
+    await c.initialize();
+    calls.clear();
+    final wait = Completer<void>();
+    store.credentialReadWait = wait;
+    final verifying = c.verify();
+    await Future<void>.delayed(Duration.zero);
+    c.setForeground(false);
+    wait.complete();
+    await verifying;
+    expect(c.ready, isFalse);
+    expect(calls, isEmpty);
+    store.credentialReadWait = null;
+    c.setForeground(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(c.ready, isTrue);
+    expect(calls, ['端末確認', '実行系列挙']);
+  });
   testWidgets('Host照合の明示操作より前に招待を送らない', (tester) async {
     final calls = <String>[];
     final c = DeviceLinkController(

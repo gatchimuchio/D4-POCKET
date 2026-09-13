@@ -19,6 +19,16 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Mobile復帰時の安全保管の再確認（2026-09-13）
+
+仕様が求める復帰時の資格読取に対し、製品controllerはメモリ上の資格だけで端末確認を再開していた。保存資格の削除・破損・秘密変更・Host変更・期限変更・端末ID変更・読取障害の7負例すべてで、変更前に接続再開を再現した。
+
+起動・復帰・手動再確認の共通経路で端末IDと保存資格を再読取し、構造・期限・現在の結合内容の一致を確認してから通信する。保存値から別資格を自動採用せず、不一致や読取障害では停止する。非同期の保管読取・端末確認・実行系列挙の間にbackgroundへ移った結果を後の復帰へ転用しないよう、前面状態の世代を照合する。読取中のbackground移行では通信せず、その後の復帰で再確認できる試験も追加した。
+
+`flutter test --no-pub --reporter expanded` はMobile全29件PASS。Desktop/Mobileの `flutter analyze --no-pub`、`python tooling/schema_check/check_schemas.py`（Schema36/正常36/負例38）、`python tooling/conformance_tests/run_conformance_skeleton.py`（150件）、`python tooling/日本語基底監査.py --strict` はPASS。保管と通信の障害注入はFIXTUREで、製品controllerの復帰制御を検証した範囲である。非Windows実機の安全保管・OS lifecycleは冒頭のrelease_blockerとして延期を保持する。
+
+同じ変更中の作業ツリーからWindows上で `flutter build apk --debug --no-pub` が成功した（Gradle 187.1秒）。生成APKは175742389 byte、SHA-256 `6fe9a83c2ab31a80e47729f0c02daab7a0ba1aa00ef5984b54b052ed8713cc66`。debug buildの成立範囲であり、実機install・起動・正式配布の証拠ではない。artifactはignoreされたbuild領域に保持する。
+
 ## Mobileの解除・保存資格削除の確認（2026-09-13）
 
 Mobileのcontrol経路で、保存APIのdeleteが例外なく戻るだけで削除完了と表示していた。通常解除と端末内だけの削除の両方で、資格残存・削除後の読取障害を注入した4負例が変更前に失敗した。またclient不在でdisconnectを直接呼ぶと、端末離脱を送らずDesktop解除成功と表示する負例も再現した。既存UIはclientを作れない破損資格で通常解除を無効にするが、controller自身にも拒否を置いた。
