@@ -389,13 +389,48 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     for key in ["作成時刻", "開始時刻", "終了時刻"] {
         assert!(record[key].as_i64().is_some());
     }
+    assert_eq!(send_request(&process.endpoint, &request("対話終了", json!({"対話セッションID":s["body"]["対話セッションID"]})))["status"], "accepted");
     drop(process);
     let (_, reopened) = gui_shell_rust_helper::broker::BrokerPersistentStore::open_or_create(&workspace.store_dir, "record-check").unwrap();
+    let history: Vec<Value> = reopened.audit_log.events().iter().filter_map(|e| {
+        e.reason.strip_prefix("対話実行記録:").map(|body| {
+            assert_eq!(e.payload_hash, sha256_tagged(body.as_bytes()));
+            let value: Value = serde_json::from_str(body).unwrap();
+            assert_eq!(value["実行記録"]["要求ID"], e.request_id);
+            value
+        })
+    }).collect();
+    assert_eq!(history.iter().map(|v| v["状態"].as_str().unwrap()).collect::<Vec<_>>(), ["承認待ち", "実行中", "失敗"]);
+    assert_eq!(history.last().unwrap()["実行記録"], record);
+    fs::write(&record_file, serde_json::to_vec(&history).unwrap()).unwrap();
+    let checked = Command::new(if cfg!(windows) {"python"} else {"python3"})
+        .args(["-c", "import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from tooling.schema_check.check_schemas import validate_instance; schema=json.loads((Path(sys.argv[1])/'specs/runtime_execution_history.schema.json').read_text(encoding='utf-8')); records=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8')); errors=[e for r in records for e in validate_instance(r,schema)]; assert not errors,errors"])
+        .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")).arg(&record_file).output().unwrap();
+    assert!(checked.status.success(), "{}", String::from_utf8_lossy(&checked.stderr));
     for (key, reason) in [("作成監査ID", "対話承認待ち作成"), ("開始監査ID", "対話送信承認"), ("終了監査ID", "対話完了")] {
         let event = reopened.audit_log.events().iter().find(|e| Some(e.event_id.as_str()) == record[key].as_str()).unwrap();
         assert_eq!(event.request_id, p["body"]["要求ID"].as_str().unwrap());
         assert!(event.reason.starts_with(reason));
     }
+    let audit_path = workspace.store_dir.join("audit.jsonl");
+    let original = fs::read_to_string(&audit_path).unwrap();
+    assert!(original.contains("対話実行記録:"));
+    let mut changed = false;
+    let tampered: Vec<String> = original.lines().map(|line| {
+        let mut event: Value = serde_json::from_str(line).unwrap();
+        if !changed {
+            if let Some(body) = event["reason"].as_str().unwrap().strip_prefix("対話実行記録:") {
+                let mut value: Value = serde_json::from_str(body).unwrap();
+                value["実行記録"]["作成時刻"] = json!(0);
+                event["reason"] = json!(format!("対話実行記録:{value}"));
+                changed = true;
+            }
+        }
+        event.to_string()
+    }).collect();
+    assert!(changed);
+    fs::write(&audit_path, tampered.join("\n") + "\n").unwrap();
+    assert!(gui_shell_rust_helper::broker::BrokerPersistentStore::open_or_create(&workspace.store_dir, "tamper-check").is_err());
 }
 
 struct Workspace {

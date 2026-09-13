@@ -99,6 +99,7 @@ struct 作業 {
     作成時刻: i64,
     開始時刻: Option<i64>,
     終了時刻: Option<i64>,
+    保存済み記録hash: Option<String>,
     作成監査ID: String,
     開始監査ID: Option<String>,
     終了監査ID: Option<String>,
@@ -251,7 +252,7 @@ impl 対話制御 {
             return Err(対話失敗::権限拒否);
         }
         self.進捗反映(現在, 監査)?;
-        match 操作 {
+        let result = match 操作 {
             "実行系列挙" => {
                 空入力(値)?;
                 Ok(json!({"実行系": self.実行系.keys().collect::<Vec<_>>()}))
@@ -313,6 +314,7 @@ impl 対話制御 {
                         作成時刻: 現在,
                         開始時刻: None,
                         終了時刻: None,
+                        保存済み記録hash: None,
                         作成監査ID,
                         開始監査ID: None,
                         終了監査ID: None,
@@ -451,7 +453,34 @@ impl 対話制御 {
                 Ok(json!({"対話セッションID": 指定.対話セッションID, "状態": "終了"}))
             }
             _ => Err(対話失敗::要求不正),
+        };
+        self.記録保存(監査)?;
+        result
+    }
+
+    fn 記録保存(&mut self, 監査: &mut 監査器<'_>) -> Result<(), 対話失敗> {
+        for work in self.作業.values_mut() {
+            if work.状態 == "監査失敗" { continue; }
+            let (状態, 失敗分類) = match &work.結果 {
+                Some(Ok(v)) => (if v.保留 {"保留"} else {"成功"}, None),
+                Some(Err(e)) => (if *e == 対話失敗::取消 {"中止"} else {"失敗"}, Some(e.分類())),
+                None => (work.状態, None),
+            };
+            let body = json!({"版":1, "状態":状態, "失敗分類":失敗分類, "実行記録":実行記録(work)}).to_string();
+            let hash = sha256_tagged(body.as_bytes());
+            if work.保存済み記録hash.as_ref() == Some(&hash) { continue; }
+            if 監査(&format!("対話実行記録:{body}"), &work.要求.要求ID, &hash).is_err() {
+                work.取消.store(true, Ordering::SeqCst);
+                work.状態 = "監査失敗";
+                work.結果 = Some(Err(対話失敗::監査失敗));
+                if let Some(session) = self.セッション.get_mut(&work.要求.対話セッションID) {
+                    session.状態 = "中止後隔離".into();
+                }
+                return Err(対話失敗::監査失敗);
+            }
+            work.保存済み記録hash = Some(hash);
         }
+        Ok(())
     }
 
     fn 進捗反映(
@@ -542,6 +571,7 @@ impl 対話制御 {
                 }
             }
         }
+        self.記録保存(監査)?;
         self.失効資源解放();
         Ok(())
     }
@@ -713,6 +743,31 @@ mod tests {
         }
         panic!("対話完了の待機期限");
     }
+    #[test]
+    fn 履歴保存は変更時だけ行い書込失敗で採用を止める() {
+        let (mut c, _) = 準備(false, false, true);
+        let session = 開始(&mut c, "left");
+        let mut records = Vec::new();
+        let mut audit = |reason: &str, _: &str, hash: &str| {
+            if let Some(body) = reason.strip_prefix("対話実行記録:") {
+                assert_eq!(sha256_tagged(body.as_bytes()), hash);
+                records.push(serde_json::from_str::<Value>(body).unwrap());
+            }
+            Ok("history-test-event".into())
+        };
+        let p = c.操作("対話送信", &json!({"対話セッションID":session,"入力":"保存しない本文"}), false, 100, &mut audit).unwrap();
+        for _ in 0..3 {
+            c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 101, &mut audit).unwrap();
+        }
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["状態"], "承認待ち");
+        assert!(!records[0].to_string().contains("保存しない本文"));
+        assert_eq!(c.操作("対話承認", &承認(&p, "full"), true, 110,
+            &mut |reason,_,_| if reason.starts_with("対話実行記録:") {Err(対話失敗::監査失敗)} else {Ok("approved-event".into())}), Err(対話失敗::監査失敗));
+        assert_eq!(操作(&mut c, "対話取得", json!({"要求ID":p["要求ID"]}), false), Err(対話失敗::監査失敗));
+        assert!(操作(&mut c, "対話送信", json!({"対話セッションID":session,"入力":"再送しない"}), false).is_err());
+    }
+
     #[test]
     fn 実行記録は未実行と終了を区別し遅延応答で上書きしない() {
         for approve in [false, true] {
