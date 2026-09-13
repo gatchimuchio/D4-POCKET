@@ -19,6 +19,10 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Android workflowの変数評価位置を修正（2026-09-13）
+
+fd1b23eのAndroid手動dispatchはHTTP422で拒否された。jobのenvでrunner.tempを参照した位置ではrunner contextを使用できず、GitHubのworkflow検査を通らなかった。YAML・bashの構文検査はこのGitHub固有のcontext制約を検証していなかった。ANDROID_AVD_HOMEの値は、実行開始stepでRUNNER_TEMPを使ってGITHUB_ENVへ設定し、後続の作成・起動stepへ同じ値を渡す。起動条件、保存先の境界、AVD存在検査、仮想端末属性確認を変更しない。手動dispatchと実行結果は修正後commitで確認する。未実行のAndroid native保管は上記release_blockerとして保持する。Schema36/正常36/負例38、conformance150件、厳格日本語監査は修正後もPASS。
+
 ## 仮想端末検証hostの起動前提を修正（2026-09-13）
 
 Macのcf5c771/run `34739605831` attempt2は、参照のimportが0.096秒以内に終わり、HTTP bind中の `socket.getfqdn` で10秒後も待機していた。stackはPython3.14のHTTPServer.server_bindからの逆引きを示した。attempt1のGitHub DNS取得失敗は別の環境失敗として保持する。Windowsの同じ経路は約0.47秒／0.38秒で起動している。

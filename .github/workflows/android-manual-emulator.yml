@@ -9,8 +9,6 @@ jobs:
   android-emulator:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    env:
-      ANDROID_AVD_HOME: ${{ runner.temp }}/gui-shell-avd
     steps:
       - name: 対象commitを取得
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -30,6 +28,7 @@ jobs:
           } | tee evidence/environment.txt
           test -d "${JAVA_HOME_17_X64:?}"
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "ANDROID_AVD_HOME=$RUNNER_TEMP/gui-shell-avd" >> "$GITHUB_ENV"
           echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
           # 隔離runnerの実行利用者だけに仮想端末用KVM accessを限定する。
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
