@@ -94,6 +94,16 @@ class TestBroker implements BrokerTransport {
           '相対paths': ['file.txt']
         };
       }
+      if (visibility == 'full' && operation == '作業領域変更一覧') {
+        body['projection'] = {
+          '基準点hash': baselineHash,
+          'changes': [
+            {'path': 'file.txt', 'status': 'modified'}
+          ],
+          'unchanged': 2,
+          'excluded_secrets': 1
+        };
+      }
       if (visibility == 'full' && operation == '作業領域差分') {
         body['projection'] = {
           '基準点hash': baselineHash,
@@ -288,6 +298,31 @@ void main() {
       expect(nestedFile.projection!['text'], '配下の本文');
       await expectLater(client.read(selected, '.env', tree: false),
           throwsA(isA<BrokerClientException>()));
+      final whole = await Process.run(executable, [
+        '作業領域制御',
+        '--session-file',
+        owner,
+        '作業領域全体基準点保存',
+        selected.id,
+        selected.hash
+      ]);
+      expect(whole.exitCode, 0);
+      final wholeScope =
+          await client.read(selected, '', tree: false, scope: true);
+      final wholeHash = wholeScope.projection!['基準点hash'] as String;
+      await File('${project.path}/new.txt').writeAsString('新規');
+      await File('${project.path}/file.txt').writeAsString('変更');
+      await File('${project.path}/folder/nested.txt').delete();
+      final changes = await client.read(selected, '',
+          tree: false, changes: true, baselineHash: wholeHash);
+      expect(changes.projection!['changes'], [
+        {'path': 'file.txt', 'status': 'modified'},
+        {'path': 'folder/nested.txt', 'status': 'deleted'},
+        {'path': 'new.txt', 'status': 'added'}
+      ]);
+      final newDiff = await client.read(selected, 'new.txt',
+          tree: false, baselineHash: wholeHash);
+      expect((newDiff.projection!['diff'] as Map)['before'], isNull);
       final revoked = await Process.run(executable, [
         '作業領域制御',
         '--session-file',
@@ -445,6 +480,79 @@ void main() {
         client.read(selected, 'file.txt',
             tree: false, baselineHash: broker.baselineHash),
         throwsA(isA<BrokerClientException>()));
+  });
+
+  test('変更一覧の未知状態・重複path・別基準点・件数矛盾を拒否する', () async {
+    for (final mutation in <void Function(Map)>[
+      (p) => p['基準点hash'] = 'wrong',
+      (p) => p['changes'] = [
+            {'path': 'x', 'status': 'unknown'}
+          ],
+      (p) => p['changes'] = [
+            {'path': 'x', 'status': 'added'},
+            {'path': 'x', 'status': 'deleted'}
+          ],
+      (p) => p['changes'] = [
+            {'path': '../x', 'status': 'added'}
+          ],
+      (p) => p['unchanged'] = 8192,
+      (p) => p['excluded_secrets'] = -1,
+    ]) {
+      final broker = TestBroker()
+        ..mutate = (body) {
+          if (body['operation'] == '作業領域変更一覧') {
+            mutation(body['projection'] as Map);
+          }
+        };
+      final client = WorkspaceClient(broker);
+      await expectLater(
+          client.read((await client.list()).single, '',
+              tree: false, changes: true, baselineHash: broker.baselineHash),
+          throwsA(isA<BrokerClientException>()));
+    }
+  });
+
+  test('全体基準点の空集合と128を超える対象を受理する', () async {
+    for (final count in [0, 129]) {
+      final broker = TestBroker()
+        ..mutate = (body) {
+          if (body['operation'] == '作業領域比較範囲') {
+            (body['projection'] as Map)['相対paths'] =
+                List.generate(count, (i) => 'file-$i');
+          }
+        };
+      final client = WorkspaceClient(broker);
+      final result = await client.read((await client.list()).single, '',
+          tree: false, scope: true);
+      expect((result.projection!['相対paths'] as List).length, count);
+    }
+  });
+
+  testWidgets('変更一覧から差分を開き失効時に表示を破棄する', (tester) async {
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('基準点の対象file'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全体基準点の変更一覧'));
+    await tester.pumpAndSettle();
+    expect(find.text('変更 1件・変更なし 2件・secret除外 1件'), findsOneWidget);
+    await tester.ensureVisible(find.text('file.txt'));
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('--- a/file'), findsOneWidget);
+    broker.approval = null;
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 2200)));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('--- a/file'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('基準点の対象から統合差分と左右比較を切り替える', (tester) async {

@@ -98,12 +98,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       WorkspaceView? refreshedComparison;
       if (previous != null &&
           (previous.operation == '作業領域差分' ||
-              previous.operation == '作業領域比較範囲') &&
+              previous.operation == '作業領域比較範囲' ||
+              previous.operation == '作業領域変更一覧') &&
           registrations.any((v) => v.sameGrant(previous.registration))) {
         refreshedComparison = await widget.client.read(
             previous.registration, previous.path,
             tree: false,
             scope: previous.operation == '作業領域比較範囲',
+            changes: previous.operation == '作業領域変更一覧',
             baselineHash: previous.baselineHash);
       }
 
@@ -139,7 +141,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   }
 
   Future<void> _read(WorkspaceRegistration registration, String path, bool tree,
-      {bool scope = false, String? baselineHash}) async {
+      {bool scope = false, bool changes = false, String? baselineHash}) async {
     final generation = ++_generation;
     setState(() {
       _view = null;
@@ -149,7 +151,10 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     });
     try {
       final view = await widget.client.read(registration, path,
-          tree: tree, scope: scope, baselineHash: baselineHash);
+          tree: tree,
+          scope: scope,
+          changes: changes,
+          baselineHash: baselineHash);
       if (!mounted || !_active || generation != _generation) return;
       setState(() {
         _view = view;
@@ -214,7 +219,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           if (projection!['基準点hash'] == null)
             const Text('基準点がありません。所有者の制御操作で保存してください。')
           else ...[
-            const Text('基準点に指定されたfileです。全workspaceの変更一覧ではありません。'),
+            const Text('基準点に保存されたfileです。全体基準点では変更一覧も取得できます。'),
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _read(view.registration, '', false,
+                        changes: true,
+                        baselineHash: projection['基準点hash'] as String),
+                child: const Text('全体基準点の変更一覧')),
             for (final path in projection['相対paths'] as List)
               ListTile(
                   title: Text(path as String),
@@ -224,6 +236,33 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
                       : () => _read(view.registration, path, false,
                           baselineHash: projection['基準点hash'] as String)),
           ],
+        ],
+        if (view.registration.visibility == 'full' &&
+            view.operation == '作業領域変更一覧') ...[
+          Text(
+              '変更 ${(projection!['changes'] as List).length}件・変更なし ${projection['unchanged']}件・secret除外 ${projection['excluded_secrets']}件'),
+          const Text('取得時点の比較です。secret配下は対象外です。'),
+          SizedBox(
+              height: 320,
+              child: ListView.builder(
+                  itemCount: (projection['changes'] as List).length,
+                  itemBuilder: (context, index) {
+                    final item = (projection['changes'] as List)[index] as Map;
+                    final label = {
+                      'added': '追加',
+                      'modified': '変更',
+                      'deleted': '削除'
+                    }[item['status']]!;
+                    return ListTile(
+                        title: Text(item['path'] as String),
+                        subtitle: Text(label),
+                        trailing: const Icon(Icons.compare_arrows),
+                        onTap: _busy
+                            ? null
+                            : () => _read(view.registration,
+                                item['path'] as String, false,
+                                baselineHash: view.baselineHash));
+                  })),
         ],
         if (view.registration.visibility == 'full' &&
             view.operation == '作業領域差分') ...[

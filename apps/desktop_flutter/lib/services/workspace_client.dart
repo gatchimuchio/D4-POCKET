@@ -127,21 +127,28 @@ class WorkspaceClient {
   }
 
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,
-      {required bool tree, bool scope = false, String? baselineHash}) async {
+      {required bool tree,
+      bool scope = false,
+      bool changes = false,
+      String? baselineHash}) async {
     if (!selected.current(DateTime.now())) {
       _invalid();
     }
-    if ((scope && (path.isNotEmpty || baselineHash != null)) ||
+    if ((changes &&
+            (scope || tree || path.isNotEmpty || baselineHash == null)) ||
+        (scope && (path.isNotEmpty || baselineHash != null)) ||
         (baselineHash != null && !_hash.hasMatch(baselineHash))) {
       _invalid();
     }
-    final operation = scope
-        ? '作業領域比較範囲'
-        : baselineHash != null
-            ? '作業領域差分'
-            : tree
-                ? '作業領域ツリー'
-                : '作業領域読取';
+    final operation = changes
+        ? '作業領域変更一覧'
+        : scope
+            ? '作業領域比較範囲'
+            : baselineHash != null
+                ? '作業領域差分'
+                : tree
+                    ? '作業領域ツリー'
+                    : '作業領域読取';
     final payload = <String, Object?>{
       '作業領域ID': selected.id,
       '相対path': path,
@@ -204,7 +211,7 @@ class WorkspaceClient {
             final hash = projection['基準点hash'];
             final paths = projection['相対paths'];
             if (paths is! List ||
-                paths.length > 128 ||
+                paths.length > 4096 ||
                 paths.toSet().length != paths.length ||
                 !paths.every((v) =>
                     v is String &&
@@ -212,10 +219,41 @@ class WorkspaceClient {
                     utf8.encode(v).length <= 1024) ||
                 (hash == null
                     ? paths.isNotEmpty
-                    : hash is! String ||
-                        !_hash.hasMatch(hash) ||
-                        paths.isEmpty)) {
+                    : hash is! String || !_hash.hasMatch(hash))) {
               _invalid();
+            }
+          } else if (changes) {
+            _keys(projection,
+                ['基準点hash', 'changes', 'unchanged', 'excluded_secrets']);
+            final items = projection['changes'];
+            final unchanged = projection['unchanged'];
+            final excluded = projection['excluded_secrets'];
+            if (projection['基準点hash'] != baselineHash ||
+                items is! List ||
+                items.length > 8192 ||
+                unchanged is! int ||
+                unchanged < 0 ||
+                items.length + unchanged > 8192 ||
+                excluded is! int ||
+                excluded < 0 ||
+                excluded > 4096) {
+              _invalid();
+            }
+            final seen = <String>{};
+            for (final rawItem in items) {
+              final item = _map(rawItem);
+              _keys(item, ['path', 'status']);
+              final itemPath = _string(item['path']);
+              if (itemPath.isEmpty ||
+                  utf8.encode(itemPath).length > 1024 ||
+                  itemPath
+                      .split('/')
+                      .any((v) => v.isEmpty || v == '.' || v == '..') ||
+                  RegExp(r'[\x00-\x1f\x7f\\:]').hasMatch(itemPath) ||
+                  !seen.add(itemPath) ||
+                  !{'added', 'modified', 'deleted'}.contains(item['status'])) {
+                _invalid();
+              }
             }
           } else if (baselineHash != null) {
             _keys(projection, ['基準点hash', 'diff']);
