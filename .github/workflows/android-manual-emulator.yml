@@ -55,14 +55,18 @@ jobs:
           set -euo pipefail
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          "$sdkmanager" --list_installed > evidence/sdk-installed-before.txt
+          # 固定Flutterの要求NDKを照合し、専用runnerの未使用版だけを標準工具で除く。
+          grep -F 'val ndkVersion: String = "28.2.13676358"' "$RUNNER_TEMP/flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt"
+          grep -F 'ndkVersion = flutter.ndkVersion' apps/mobile_flutter/android/app/build.gradle.kts
+          "$sdkmanager" --uninstall "ndk;27.3.13750724" "ndk;29.0.14206865" </dev/null 2>&1 | tee evidence/sdk-unused-ndk-removal.txt
+          test -d "$ANDROID_HOME/ndk/28.2.13676358"
           "$sdkmanager" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
           "$sdkmanager" --list_installed > evidence/sdk-installed.txt
           "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee evidence/emulator-acceleration.txt
           mkdir -p "$ANDROID_AVD_HOME"
           printf 'no\n' | "$avdmanager" create avd --name gui_shell_native_test --path "$ANDROID_AVD_HOME/gui_shell_native_test.avd" --package 'system-images;android-35;google_apis;x86_64'
           test -f "$ANDROID_AVD_HOME/gui_shell_native_test.ini"
-          cp "$ANDROID_AVD_HOME/gui_shell_native_test.avd/config.ini" evidence/avd-config-before.txt
-          python3 -c 'from pathlib import Path; import os; p=Path(os.environ["ANDROID_AVD_HOME"])/"gui_shell_native_test.avd/config.ini"; lines=p.read_text().splitlines(); key="disk.dataPartition.size"; hits=[i for i,v in enumerate(lines) if v.split("=",1)[0].strip()==key]; assert len(hits)==1, "userdata設定が一意でない"; lines[hits[0]]=key+"=2G"; p.write_text("\n".join(lines)+"\n")'
           cp "$ANDROID_AVD_HOME/gui_shell_native_test.avd/config.ini" evidence/avd-config-effective.txt
           df -B1 "$ANDROID_AVD_HOME" > evidence/emulator-disk-before.txt
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee evidence/configured-avds.txt
@@ -77,6 +81,11 @@ jobs:
           cleanup() {
             timeout 10 "$adb" -s emulator-5554 emu kill || true
             kill "$emulator_pid" 2>/dev/null || true
+            for attempt in $(seq 1 10); do
+              if ! kill -0 "$emulator_pid" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            kill -KILL "$emulator_pid" 2>/dev/null || true
             wait "$emulator_pid" || true
           }
           trap cleanup EXIT
@@ -87,10 +96,10 @@ jobs:
             test "$SECONDS" -lt "$deadline"
             sleep 2
           done
-          test "$("$adb" -s emulator-5554 shell getprop ro.kernel.qemu | tr -d '\r')" = 1
-          "$adb" -s emulator-5554 emu avd name | tee evidence/avd-name.txt
+          test "$(timeout 10 "$adb" -s emulator-5554 shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+          timeout 10 "$adb" -s emulator-5554 emu avd name | tr -d '\r' | tee evidence/avd-name.txt
           grep -Fx gui_shell_native_test evidence/avd-name.txt
-          "$adb" -s emulator-5554 shell getprop ro.build.fingerprint > evidence/android-fingerprint.txt
+          timeout 10 "$adb" -s emulator-5554 shell getprop ro.build.fingerprint > evidence/android-fingerprint.txt
           cd apps/mobile_flutter
           flutter pub get 2>&1 | tee ../../evidence/mobile-pub-get.txt
           flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt

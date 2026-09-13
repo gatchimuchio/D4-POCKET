@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Android補助hostの容量と終了待機を修正（2026-09-13）
+
+9a60cdd/run `34742562494` は有効configでuserdata=2Gとなっていたが、emulatorの要求は7372.80MBのままで、空き6986.07MBに対して再び起動前FATALとなった。設定変更が実容量を減らしたとは言えず、2G指定を除去する。元のAPI35 imageに必要な領域を確保する。SDK記録にはNDK27.3・28.2・29.0が同居し、固定Flutter3.44.0のFlutterExtension.ktとapp設定の消費は28.2.13676358である。隔離された手動runnerだけでSDK managerのuninstallにより未使用の27.3.13750724と29.0.14206865を除き、28.2の存在を検査する。対象版以外を計算して削除しない。変更前後のSDK一覧と工具結果、AVD有効設定、空き容量を保存する。ローカルhost・ownerのfile・製品依存を削除せず、必要NDKが変わるときはこの固定照合を再検討する。
+
+先行c86da93/run `34741135813` はcancelledで終了したが、artifactのemulator.txtにboot 61356ms、avd-name.txtに正しいAVD名とOKのCRLF応答が残り、Flutter試験logは存在しなかった。既存grep -Fxは末尾CRを含む値と一致せず、cleanupのwaitには期限がなかった。AVD名は外部consoleの行末CRだけを除去してから完全一致を要求し、ADBの観測にも10秒期限を付ける。cleanupはこのstepが起動したPIDだけへ終了を要求し、10秒後も残る場合はKILLして回収する。boot条件・仮想属性・名前・native試験を省略しない。未成立のAndroid統合はrelease_blockerとして維持する。
+
+Schema37/正常37/負例39、conformance151件、厳格日本語監査、YAML読取とworkflow6 stepのbash構文検査はPASS。隔離fixtureでCRLF応答の正常一致・別名拒否、TERMを無視する自分の子processがcleanupで15秒以内に回収されることを実行確認した。SDK削除はローカルでは実行せず、修正後の手動runnerで結果と容量を確認する。これらの局所検証をAndroid native統合成功へ昇格しない。
+
 ## Android専用AVDのuserdata容量を明示（2026-09-13）
 
 3431173/run `34741774416` はemulator起動前に失敗し、Flutter native試験には未到達だった。artifactのemulator.txtで、専用AVD directoryの空き6987.37MBに対しuserdata作成が7372.80MBを要求したFATALを確認した。KVM・AVD存在・system image検出は成立しており、前回のAVD未検出とは異なる容量不足である。Repository外のGUI-Shell-android-emulator-3431173へ原logを保存した。
