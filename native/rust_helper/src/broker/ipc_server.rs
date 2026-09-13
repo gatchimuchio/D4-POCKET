@@ -20,6 +20,7 @@ pub struct BrokerServerConfig {
     pub owner_session_file: Option<PathBuf>,
     pub minidora_runtimes: Vec<(String, String)>,
     pub mobile_bind: Option<String>,
+    pub workspace_config: Option<PathBuf>,
 }
 
 impl BrokerServerConfig {
@@ -32,6 +33,7 @@ impl BrokerServerConfig {
             owner_session_file: None,
             minidora_runtimes: Vec::new(),
             mobile_bind: None,
+            workspace_config: None,
         }
     }
 }
@@ -70,6 +72,25 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
     }
     let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
+
+    if let Some(path)=&config.workspace_config {
+        broker.作業領域設定監査(path,"received","owner起動設定の読取を受信").map_err(BrokerServerError::new)?;
+        let parsed=(|| {
+            let owner_file=config.owner_session_file.as_ref().ok_or("作業領域登録にはowner資格設定が必要")?;
+            Ok((super::workspace_root::read_config(path)?,owner_file))
+        })();
+        let (settings,owner_file)=match parsed {
+            Ok(value)=>value,
+            Err(reason)=>{
+                broker.作業領域設定監査(path,"rejected",reason).map_err(BrokerServerError::new)?;
+                return Err(BrokerServerError::new(reason));
+            }
+        };
+        let protected=[config.store_dir.clone(),config.session_file.clone(),owner_file.clone(),path.clone()];
+        for workspace in &settings.workspaces {
+            broker.作業領域起動登録(workspace,&protected).map_err(BrokerServerError::new)?;
+        }
+    }
 
     let mobile = if let Some(address) = &config.mobile_bind {
         if owner_secret.is_none() {return Err(BrokerServerError::new("端末連携はowner資格設定が必要"));}

@@ -83,9 +83,11 @@ impl WorkspaceRegistry {
         if !identifier(id) || !identifier(runtime) || self.entries.contains_key(id) || self.entries.len() >= 16 {
             return Err("作業領域の登録指定が不正または上限超過");
         }
+        let identity=root.dir_metadata().map_err(|_| "作業領域のroot識別子を確認できない")?;
         let reader = WorkspaceReader::from_registered_dir(root, secrets).map_err(|_| "作業領域の除外指定が不正")?;
         let nonce = 識別子生成().map_err(|_| "登録識別子を生成できない")?;
-        let registration_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets}));
+        let registration_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets,
+            "root_device":cap_fs_ext::MetadataExt::dev(&identity),"root_file_id":cap_fs_ext::MetadataExt::ino(&identity)}));
         audit("作業領域登録・Permission拒否", &registration_hash)?;
         self.entries.insert(id.into(), RegisteredWorkspace {runtime:runtime.into(),registration_hash,reader,grant:None});
         Ok(())

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/workspace_startup.schema.json",
+  "title": "作業領域の起動設定",
+  "type": "object",
+  "required": [
+    "version",
+    "workspaces"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "workspaces": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "runtime_id",
+          "workspace_id",
+          "root_path",
+          "secret_paths"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "runtime_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+          },
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+          },
+          "root_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "secret_paths": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -36,6 +36,12 @@ pub struct WorkspaceEntry {
 pub struct WorkspaceReader {
     root: Dir,
     secrets: Vec<String>,
+    root_device: u64,
+}
+
+pub(crate) fn validate_root_part(part: &str) -> Result<(), ReadError> {
+    if path_parts(part)?.len()!=1 || secret_part(part) {return Err(ReadError::SecretPath);}
+    Ok(())
 }
 
 fn path_parts(path: &str) -> Result<Vec<&str>, ReadError> {
@@ -134,9 +140,13 @@ impl WorkspaceReader {
             path_parts(secret)?;
             normalized.push(secret.to_lowercase());
         }
+        let metadata=root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
+        if !metadata.is_dir() || reparse(&metadata) {return Err(ReadError::UnsafeFile);}
+        let root_device=cap_fs_ext::MetadataExt::dev(&metadata);
         Ok(Self {
             root,
             secrets: normalized,
+            root_device,
         })
     }
 
@@ -161,7 +171,7 @@ impl WorkspaceReader {
                 .open_dir_nofollow(part)
                 .map_err(|_| ReadError::UnsafeFile)?;
             let metadata = next.dir_metadata().map_err(|_| ReadError::Unavailable)?;
-            if !metadata.is_dir() || reparse(&metadata) {
+            if !metadata.is_dir() || reparse(&metadata) || cap_fs_ext::MetadataExt::dev(&metadata)!=self.root_device {
                 return Err(ReadError::UnsafeFile);
             }
             dir = next;
@@ -203,14 +213,18 @@ impl WorkspaceReader {
             if reparse(&metadata) {
                 continue;
             }
+            if !metadata.is_file() && !metadata.is_dir() {continue;}
             let metadata = if metadata.is_file() {
                 let file = dir
                     .open_with(name, &read_options())
                     .map_err(|_| ReadError::Changed)?;
                 file.metadata().map_err(|_| ReadError::Changed)?
+            } else if metadata.is_dir() {
+                dir.open_dir_nofollow(name).map_err(|_| ReadError::Changed)?.dir_metadata().map_err(|_| ReadError::Changed)?
             } else {
                 metadata
             };
+            if cap_fs_ext::MetadataExt::dev(&metadata)!=self.root_device {continue;}
             let kind = if metadata.is_dir() {
                 EntryKind::Directory
             } else if regular(&metadata) {
@@ -245,7 +259,7 @@ impl WorkspaceReader {
             .open_with(name, &options)
             .map_err(|_| ReadError::UnsafeFile)?;
         let before = file.metadata().map_err(|_| ReadError::Unavailable)?;
-        if !regular(&before) {
+        if !regular(&before) || cap_fs_ext::MetadataExt::dev(&before)!=self.root_device {
             return Err(ReadError::UnsafeFile);
         }
         if before.len() > MAX_BYTES {

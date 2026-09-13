@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "workspaces": [
+    {
+      "runtime_id": "gui_shell_rust_broker",
+      "workspace_id": "workspace-a",
+      "root_path": "C:\\work\\project",
+      "secret_paths": [
+        "private"
+      ],
+      "approval": "full"
+    }
+  ]
+}

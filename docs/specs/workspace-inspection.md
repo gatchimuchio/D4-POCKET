@@ -1,6 +1,6 @@
 # 作業領域インスペクタの契約
 
-対象は総合機能拡張rev1のC1。現在の実装単位は差分生成器であり、インスペクタ全体の完成を意味しない。
+対象は総合機能拡張rev1のC1。内部差分・安全取得・Brokerの読取承認・製品起動登録を実装している。基準点・履歴・UI・巻戻しpreviewは未接続であり、インスペクタ全体の完成を意味しない。
 
 ## 責任と接続
 
@@ -20,7 +20,7 @@ textは全体を1つのhunkとして統合差分を生成する。固定label a/
 
 - item: 作業領域の統治済み取得・履歴・Broker・UI・巻戻しpreview
   classification: release_blocker
-  reason: 差分生成器はC1の内部処理であり、製品IPCとUIはまだ消費していない。secret path・workspace外の実取得拒否やAudit対応も未検証。
+  reason: 取得器は製品IPCへ接続したが、差分生成器の基準点と履歴・UI・復旧previewの消費経路は未接続。
   required_action: Capability・Permission・Approval・Audit・Recoveryへ対応づけた取得経路を実装し、ファイルツリー、変更file、両差分形式、Tool・shell・test・Approval・Audit・rollback候補を実データで表示する。rollbackの実変更はRecoveryと新しいApproval経路を必須とする。
   blocks_release: yes
 
@@ -51,3 +51,15 @@ owner資格でのみ「作業領域承認」「作業領域失効」を受ける
 owner用CLIは `gui_shell_rust_helper 作業領域制御 --session-file <owner資格file> 作業領域一覧`、`作業領域承認 <作業領域ID> <登録hash> <表示範囲>`、`作業領域失効 <作業領域ID> <登録hash>` を提供する。後二者も同じ先頭引数で実行する。通常資格での承認はBrokerが拒否する。現在の製品起動ではrootを自動登録しないため、一覧が空であることを取得器の完成証拠にしない。
 
 不正JSONの拒否監査は、parse後の値ではなく受信したraw要求のSHA-256を記録し、重複fieldを含む拒否対象との結合を失わない。raw本文やowner資格は監査へ保存しない。
+
+## 製品起動時のroot登録
+
+`broker-server --workspace-config <JSON file>` をownerの起動設定として追加する。version=1、workspacesは最大16件、各項目はruntime_id・workspace_id・root_path・secret_pathsを持つ。設定は最大65,536 bytes、通常fileのみ、重複・未知field・不正versionを拒否する。owner-session-fileと永続監査を必須とし、設定の登録は読取承認を発生させない。rootは絶対pathの実directoryに限り、volume全体、secret名、途中のlink/junction、曖昧な相対要素を拒否する。起動後の通常IPCへroot指定を追加しない。
+
+Windowsの初期対応は固定diskのNTFSとする。開いたdrive handleのvolume serialをWin32 GetVolumeInformationのserialと照合し、GetDriveTypeがFIXED、filesystem名がNTFSのときだけ続ける。続く各directoryをnofollowで開き、reparse pointと別volumeを拒否する。ReFS・network・removable・未確定のfilesystemは登録を拒否する。標準Rustにこの安全なvolume照会APIがないため、Windowsだけwinsafe 0.0.29のkernel featureを使用する。独自unsafe、PowerShell runtime、任意process起動を導入しない。実装根拠は取得済み0.0.29 sourceと[公開API](https://docs.rs/winsafe/0.0.29/winsafe/fn.GetVolumeInformation.html)、[Win32仕様](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationw)。
+
+Linuxはdirectory handleのfstatfsでext4系またはtmpfs、macOSはAPFSだけを登録対象とする。Unixでは既存依存と同版のrustix 1.1.4のfs featureを直接使用する。対象外filesystemのsupportはrelease_blockerとして追加実装・実証拠を要する。既存取得器もrootのdevice IDを保持し、配下で別filesystemへ移る読取を拒否する。administratorによる同一deviceのbind mount偽装やvolume serialの意図的衝突を防ぐとは主張しない。
+
+Broker store、通常資格、owner資格、起動設定fileとrootが重なる登録は拒否する。これらをsecret_pathsから省いても読取対象にならない。保護対象の既存親directoryを正本化し、Windowsの大小文字・verbatim prefix差を正規化して比較する。rootは保護対象検査後に再openし、deviceとfile IDの一致を確認してから固定handleを登録する。失敗は内容を含めず監査し、起動を中止する。復旧はroot設定・runtime保管先の再確認と再起動。読取にはその後も別のowner承認を必要とする。
+
+設定file読取段階のAuditは対象file名のhashへ結合し、設定の本文や資格を記録しない。parse後の各登録要素はその正本JSONのhashへ結合する。登録hashには開いたrootのdevice ID・file IDと新しい登録識別子も含め、path文字列だけで登録を同一視しない。

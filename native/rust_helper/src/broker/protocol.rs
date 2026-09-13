@@ -672,6 +672,28 @@ impl Broker {
         }
     }
 
+    pub(crate) fn 作業領域設定監査(&mut self, path: &Path, decision: &str, reason: &str) -> Result<(), &'static str> {
+        self.append_audit("作業領域設定", "作業領域設定読取", decision, reason, "CONFIG", &sha256_tagged(path.to_string_lossy().as_bytes()))
+            .map(|_|()).map_err(|_| "作業領域設定の監査失敗")
+    }
+
+    pub(crate) fn 作業領域起動登録(&mut self, config: &super::workspace_root::WorkspaceStartup, protected: &[std::path::PathBuf]) -> Result<(), &'static str> {
+        let payload=serde_json::to_value(config).map_err(|_| "作業領域設定を正本化できない")?;
+        let hash=sha256_tagged(payload.to_string().as_bytes());
+        self.append_audit("作業領域起動", "作業領域登録", "received", "owner起動設定のroot検査を受信", EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "作業領域設定の監査失敗")?;
+        let result=(|| {
+            if !self.authority_registry.runtime_registered(&config.runtime_id) && !self.対話.登録済み(&config.runtime_id) {return Err("実行系が未登録");}
+            let (root,filesystem)=super::workspace_root::open_registered_root(config,protected)?;
+            self.append_audit("作業領域起動", "作業領域登録", "verified", "rootの対応filesystemと内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &sha256_tagged(format!("{hash}:{filesystem}").as_bytes())).map_err(|_| "root検査の監査失敗")?;
+            self.作業領域登録(&config.runtime_id,&config.workspace_id,root,&config.secret_paths)
+        })();
+        if let Err(reason)=result {
+            self.作業領域=Default::default();
+            self.append_audit("作業領域起動", "作業領域登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "登録拒否の監査失敗")?;
+        }
+        result
+    }
+
     /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
     pub fn 作業領域登録(&mut self, runtime: &str, id: &str, root: cap_std::fs::Dir, secrets: &[String]) -> Result<(), &'static str> {
         if !self.state_store.persistence_ready() {return Err("作業領域登録には永続監査が必要");}

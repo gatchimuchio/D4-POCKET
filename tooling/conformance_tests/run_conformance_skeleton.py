@@ -64,6 +64,7 @@ from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIME
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
     "workspace_inspection_request",
+    "workspace_startup",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_session",
