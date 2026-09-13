@@ -220,6 +220,36 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100
+            },
+            "filter": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "要求ID": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                "対話セッションID": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                "実行系ID": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+                },
+                "状態": {
+                  "type": "string",
+                  "enum": [
+                    "承認待ち",
+                    "実行中",
+                    "成功",
+                    "保留",
+                    "失敗",
+                    "中止"
+                  ]
+                }
+              }
             }
           }
         }

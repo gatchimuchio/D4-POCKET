@@ -1050,7 +1050,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "6178746d37cb4a7aebf3958e470810bbf828a6452a52825824029092fb025872"
+      "sha256": "e513c6f28ebf13cd71d99111944d59fa3b036638711a34e5c049411a923fc772"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "12d3eb6348662dc48b39cabbff7d772f84e680f7af4815f037e63558b823327e"
+      "sha256": "d43f68ef04032237e954f763c6ef458ad05c107a905d1d96bf6d471e7fb95e3b"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1319,6 +1319,10 @@
     {
       "path": "examples/contracts/invalid/runtime_dialogue_operation_authority.invalid.json",
       "sha256": "ba60f03f2c0cbacae4708d5eb417644210aa45031809322dbde43794704c19eb"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_dialogue_operation_filter.invalid.json",
+      "sha256": "ad206456b6a2a4d465d2d53ecdb787360aa51465d98d1202a5aac3c19f86654b"
     },
     {
       "path": "examples/contracts/invalid/runtime_dialogue_request_authority.invalid.json",
@@ -1570,7 +1574,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "c9b04586f9f40147f4659b29c7f121214907b9b445ff3264d3867e1a1d343169"
+      "sha256": "65ae8c7d1e875cc28cf25a05b9efb87793098a8e304f7d8feeba9199a391d758"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
@@ -1638,7 +1642,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "a1621f2977690e634217cc3be992cfb912392e3a641c36779f9672ccf44cbf59"
+      "sha256": "487f103fbd64939910d1f809b8c50d13c419b699a5c5fbea0f0946891294d9ce"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1658,7 +1662,7 @@
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "89c2a7528ad7523ec68f5a148cd3eef43c328bd33c3d4b83307215bb875794b5"
+      "sha256": "e14d5eb63e5b7896f20d39f677962aab5e849dfe15e5dc228d216d81f5d6cbf7"
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
@@ -2138,7 +2142,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "767bc247e33f6ff43087fae88807cf7f9207df5d1971c0242950bd3f8fed277e"
+      "sha256": "1be0a2d7381f3dd6ab2d9850cdd1b555239cd3df0ac8b588a80af730799d7a85"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2238,7 +2242,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "cc649d500f9fd3a9439b6b4fe52556a3e56fec752bc0691698c59a0b97e372c2"
+      "sha256": "f2b8ba211357925aa3f4efaef6a65e9c71a49cef8c00ee9b082058aba8017e4b"
     },
     {
       "path": "tooling/packaging_portability_check.py",

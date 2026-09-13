@@ -405,6 +405,15 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
         if page["body"]["has_more"] == false { break; }
     }
     assert_eq!(states, ["承認待ち", "実行中", "失敗"]);
+    for (filter, count) in [(json!({"状態":"失敗"}),1), (json!({"状態":"成功"}),0), (json!({"要求ID":record["要求ID"],"実行系ID":record["実行系ID"],"対話セッションID":record["対話セッションID"]}),3)] {
+        let response = send_request(&owner, &request("対話履歴一覧", json!({"after":0,"limit":100,"filter":filter})));
+        assert_eq!(response["status"], "accepted");
+        assert_eq!(response["body"]["entries"].as_array().unwrap().len(),count);
+        assert_eq!(response["body"]["has_more"],false);
+    }
+    for filter in [json!(null),json!({"状態":"不明"}),json!({"要求ID":""}),json!({"実行系ID":"../outside"}),json!({"owner":true})] {
+        assert_ne!(send_request(&owner,&request("対話履歴一覧",json!({"after":0,"limit":1,"filter":filter})))["status"],"accepted");
+    }
     drop(process);
     fs::remove_file(&workspace.session_file).unwrap();
     fs::remove_file(&owner_file).unwrap();
@@ -427,6 +436,19 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
         .args(["-c", &schema_check.replace("runtime_execution_record.schema.json", "runtime_execution_history_page.schema.json")])
         .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")).arg(&record_file).output().unwrap();
     assert!(checked.status.success(), "{}", String::from_utf8_lossy(&checked.stderr));
+    let filtered = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作", "--session-file"]).arg(&owner_file)
+        .args(["履歴", "0", "1", "状態", "失敗"]).output().unwrap();
+    assert!(filtered.status.success());
+    let filtered: Value = serde_json::from_slice(&filtered.stdout).unwrap();
+    assert_eq!(filtered["entries"].as_array().unwrap().len(),1);
+    assert_eq!(filtered["entries"][0]["record"]["状態"],"失敗");
+    assert_eq!(filtered["has_more"],false);
+    let duplicate = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作", "--session-file"]).arg(&owner_file)
+        .args(["履歴", "0", "1", "状態", "失敗", "状態", "成功"]).output().unwrap();
+    assert!(!duplicate.status.success());
+    assert!(duplicate.stdout.is_empty());
     let live_audit = workspace.store_dir.join("audit.jsonl");
     let saved_audit = fs::read(&live_audit).unwrap();
     let mut broken_audit = saved_audit.clone();

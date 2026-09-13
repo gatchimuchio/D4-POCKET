@@ -4,17 +4,44 @@ use crate::audit_hash::sha256_tagged;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Query {
     pub after: usize,
     pub limit: usize,
+    #[serde(default)]
+    pub filter: std::collections::BTreeMap<String, String>,
 }
 
 pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static str> {
     let events = log.events();
     if query.limit == 0 || query.limit > 100 || query.after > events.len() {
         return Err("履歴範囲が不正");
+    }
+    for (key, value) in &query.filter {
+        let valid = match key.as_str() {
+            "要求ID" | "対話セッションID" => {
+                value.len() == 32
+                    && value
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            }
+            "実行系ID" => {
+                !value.is_empty()
+                    && value.len() <= 128
+                    && value.as_bytes()[0].is_ascii_alphanumeric()
+                    && value
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+            }
+            "状態" => {
+                ["承認待ち", "実行中", "成功", "保留", "失敗", "中止"].contains(&value.as_str())
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err("履歴検索条件が不正");
+        }
     }
     let mut entries = Vec::new();
     let mut next = query.after;
@@ -24,10 +51,6 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
             next = index + 1;
             continue;
         };
-        if entries.len() == query.limit {
-            more = true;
-            break;
-        }
         if event.decision != "recorded"
             || event.evidence_source != "INTERNAL_STATE"
             || ![
@@ -152,6 +175,21 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
                 return Err("履歴監査参照が不一致");
             }
         }
+        if !query.filter.iter().all(|(key, expected)| {
+            let actual = if key == "状態" {
+                &value["状態"]
+            } else {
+                &record[key]
+            };
+            actual.as_str() == Some(expected.as_str())
+        }) {
+            next = index + 1;
+            continue;
+        }
+        if entries.len() == query.limit {
+            more = true;
+            break;
+        }
         entries.push(
             json!({"audit_event_id":event.event_id,"event_hash":event.event_hash,"record":value}),
         );
@@ -237,7 +275,8 @@ mod tests {
                     &log,
                     Query {
                         after: 0,
-                        limit: 100
+                        limit: 100,
+                        ..Default::default()
                     }
                 )
                 .is_ok(),
@@ -288,15 +327,43 @@ mod tests {
                 "INTERNAL_STATE",
                 &sha256_tagged(if case == 6 { b"wrong" } else { body.as_bytes() }),
             );
-            let result = page(&log, Query { after: 0, limit: 1 });
+            let result = page(
+                &log,
+                Query {
+                    after: 0,
+                    limit: 1,
+                    ..Default::default()
+                },
+            );
             assert_eq!(result.is_ok(), case == 0);
+            let excluded = page(
+                &log,
+                Query {
+                    after: 0,
+                    limit: 1,
+                    filter: [("状態".into(), "失敗".into())].into(),
+                },
+            );
+            assert_eq!(excluded.is_ok(), case == 0);
+            if case == 0 {
+                assert_eq!(excluded.unwrap()["entries"], json!([]));
+            }
+
             if case == 0 {
                 let value = result.unwrap();
                 assert_eq!(value["entries"].as_array().unwrap().len(), 1);
                 assert_eq!(value["next_cursor"], 2);
                 assert_eq!(value["has_more"], false);
                 assert_eq!(
-                    page(&log, Query { after: 2, limit: 1 }).unwrap()["entries"],
+                    page(
+                        &log,
+                        Query {
+                            after: 2,
+                            limit: 1,
+                            ..Default::default()
+                        }
+                    )
+                    .unwrap()["entries"],
                     json!([])
                 );
             }

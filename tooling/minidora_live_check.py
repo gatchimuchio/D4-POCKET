@@ -279,6 +279,12 @@ server.serve_forever()
                 else:
                     raise RuntimeError("実履歴ページの取得上限")
                 assert all(observed_history.get(k) == v for k, v in expected_history.items())
+                for request_id, state in expected_history.items():
+                    selected = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "filter": {"要求ID": request_id, "状態": state}})
+                    assert not validate_instance(selected, history_schema)
+                    assert len(selected["entries"]) == 1 and not selected["has_more"]
+                    assert selected["entries"][0]["record"]["実行記録"]["要求ID"] == request_id
+                    assert selected["entries"][0]["record"]["状態"] == state
                 assert 操作(normal, "shutdown", None)["status"] == "accepted"
                 broker.wait(timeout=5)
                 # 再起動は永続監査chainとnonceを読み、整合しなければ起動しない。
@@ -291,7 +297,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
-                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "監査chain再読取"],
+                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",

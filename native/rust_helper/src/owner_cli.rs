@@ -21,7 +21,15 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         "端末一覧" if args.len() == 3 => ("端末一覧", json!({})),
         "端末招待取消" if args.len() == 4 => ("端末招待取消", json!({"招待ID":args[3]})),
         "端末失効" if args.len() == 4 => ("端末失効", json!({"結合ID":args[3]})),
-        "履歴" if args.len() == 5 => ("対話履歴一覧", json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?})),
+        "履歴" if args.len() >= 5 && args.len() <= 13 && (args.len() - 5) % 2 == 0 => {
+            let mut filter = serde_json::Map::new();
+            for pair in args[5..].chunks_exact(2) {
+                if filter.insert(pair[0].clone(), json!(pair[1])).is_some() {
+                    return Err("履歴検索条件が重複".into());
+                }
+            }
+            ("対話履歴一覧", json!({"after":args[3].parse::<usize>().map_err(|_| "cursorが不正")?,"limit":args[4].parse::<usize>().map_err(|_| "件数が不正")?,"filter":filter}))
+        },
         "一覧" if args.len() == 3 => ("対話承認待ち", json!({})),
         "承認" if args.len() == 6 => (
             "対話承認",

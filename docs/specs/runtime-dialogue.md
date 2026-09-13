@@ -105,6 +105,8 @@ brokerは最大64セッション、128要求、実行中worker8件を保持す�
 
 owner専用の対話履歴一覧は `after`（既読の監査event数、0開始）と `limit`（1〜100）で履歴の状態遷移をページ取得する。owner CLIは `対話承認操作 --session-file <owner資格file> 履歴 <after> <limit>`。Capability=dialogue.history.inspect、Permission=owner-control、Approval=認証されたowner要求、Audit=要求と返却bodyのhash、Recovery=監査修復後の再確認とする。通常資格と端末資格には公開しない。
 
+検索条件 `filter` は省略可能なobjectとし、`要求ID`、`実行系ID`、`対話セッションID`、`状態` の指定値にすべて完全一致する状態遷移を返す。省略と空objectは全件対象。null、未知field、空文字、不正ID・状態を拒否する。検索は入力・応答本文を索引化せず、現在状態への集約や権限付与を行わない。検索対象外も読取区間の履歴検査を通す。cursorは引き続き監査event位置であり、条件を変える場合は0から読み直す。CLIでは `履歴 <after> <limit> [<field> <value> ...]` と指定し、同fieldの重複を拒否する。
+
 読み出す監査はdiskから再読込してchain/anchorを検証し、現在Brokerの監査と一致することを要求する。返却対象の履歴は形式・payload hash・要求ID・遷移監査への参照を照合し、不正なら部分結果を返さない。出力は履歴event ID/hashと保存記録、次cursor、続きの有無、観測したhead hash。cursorは読取位置であり権限ではない。追記中の各ページはそれぞれの取得時点の観測で、全ページを原子的snapshotとはしない。過去の実行中を現在稼働中へ昇格せず、Approval復元・再送は行わない。通常UI向けの期限付き閲覧承認・一覧画面はrelease_blockerとして残る。
 
 記録の永続化は別fileや別の信頼鍵を追加せず、既存AuditEventのreasonへ `対話実行記録:` に続くJSONとして格納する。形式は版=1、状態、失敗分類、実行記録とし、payload_hashはJSON全体のSHA-256へ結合する。入力・応答本文を格納しない。状態遷移時にだけ追加し、変化のないpollでは同じ記録を重複保存しない。既存audit hash・anchor・署名checkpointの検証対象内に残すため、対話終了・再起動で比較元の監査記録を消さない。

@@ -1,0 +1,10 @@
+{
+  "operation": "対話履歴一覧",
+  "payload": {
+    "after": 0,
+    "limit": 1,
+    "filter": {
+      "状態": "未知"
+    }
+  }
+}
