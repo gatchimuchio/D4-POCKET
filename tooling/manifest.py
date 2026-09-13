@@ -31,6 +31,7 @@ GLOB_PATTERNS = [
 ]
 
 EXACT_FILES = [
+    "tooling/windows_dpapi_check.ps1",
     ".gitattributes",
     "AGENTS.md",
     "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",

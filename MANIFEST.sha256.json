@@ -22,6 +22,7 @@
       "docs/**/*.md"
     ],
     "exact_files": [
+      "tooling/windows_dpapi_check.ps1",
       ".gitattributes",
       "AGENTS.md",
       "GUI_Shell_Product_Quality_Integrated_Correction_Ledger_v4_2026-06-05.md",
@@ -1094,7 +1095,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "5c6c793cb25cb182babd0ae1b41b91ee68b0204491c1df499864d7a35beb8915"
+      "sha256": "7f8c387c66bad6f5b0b1b642b5cb6985eb6fc54120a6d9c6876d0f7c2c81af4a"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2306,7 +2307,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "1266d9d4b34fa64f489e960982f305dc3494b9041e9b0725f677bc617f07cc14"
+      "sha256": "ffa4b51d7f7491374fcbb04e2210785aad2a0ff0bb40de33257a28b4b01e113a"
     },
     {
       "path": "tooling/manual_workflow_check.py",
@@ -2347,6 +2348,10 @@
     {
       "path": "tooling/validate_all.py",
       "sha256": "c521086873b12de3861363e91df4520ad199c7bd09f4725b4d9da50791a1d691"
+    },
+    {
+      "path": "tooling/windows_dpapi_check.ps1",
+      "sha256": "eacae4061194bdc04507ed06a37cad70cd5c62f8150948dc036fa6a28e6a2f80"
     },
     {
       "path": "tooling/windows_release_evidence.py",
