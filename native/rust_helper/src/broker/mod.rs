@@ -1,4 +1,6 @@
 pub mod audit;
+pub(crate) mod workspace;
+pub(crate) mod json_input;
 pub mod dialogue;
 pub(crate) mod device_link;
 pub(crate) mod device_transport;

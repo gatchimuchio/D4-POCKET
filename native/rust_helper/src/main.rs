@@ -15,7 +15,7 @@ fn main() {
     if args.first().is_some_and(|v| v == "監査チェックポイント") {
         match checkpoint_cli::run(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
-    if args.first().is_some_and(|v| v == "対話承認操作") {
+    if args.first().is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御")) {
         match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
     if let Some(exit_code) = maybe_run_broker_server() {
@@ -29,6 +29,7 @@ fn main() {
     eprintln!("対話登録: broker-server ... --owner-session-file <owner資格file> --minidora-runtime <ID=127.0.0.1:port>");
     eprintln!("端末経路: broker-server ... --mobile-bind <private IPv4:port>（owner資格必須）");
     eprintln!("owner操作: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>");
+    eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     std::process::exit(2);
 }
 

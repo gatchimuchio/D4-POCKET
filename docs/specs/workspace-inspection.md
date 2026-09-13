@@ -35,3 +35,19 @@ pathはNFC済みの相対pathに限り、空要素、dot、dot-dot、backslash�
 標準Rustには全対象OS共通のdirectory handle相対nofollow APIがないため、cap-stdとcap-fs-extの4.0.3をこの取得器のnative依存として採用する。OS別の低水準処理を独自unsafeで実装しない。Unixでは取得直前のFIFO置換による無期限openを防ぐため、libcのO_NONBLOCKを通常fileの読取openへ付加し、open後にもfile種別を確認する。dependencyを追加しただけでは安全性を証明せず、実file・link・hardlink・置換競合で検証する。根拠はcap-fs-extのDirExt::open_dir_nofollowとOpenOptionsFollowExt::followの公開仕様および取得した4.0.3のsourceとする。
 
 内部取得器の検証対象はWindows NTFSとLinuxの開発用filesystem。cap-fs-extのmetadata仕様はWindows ReFSの128-bit file IDについて制約を記載しており、今回のNTFS試験をReFSやnetwork filesystemの同一性保証へ拡張しない。これらのfilesystemとApple上の新依存の実検証はrelease_blockerとして、製品経路への接続前に対象範囲の制限または追加証拠を成立させる。外部参照: [directoryのnofollow](https://docs.rs/cap-fs-ext/latest/cap_fs_ext/trait.DirExt.html)、[cap-stdの公開source](https://github.com/bytecodealliance/cap-std)。
+
+## C1のBroker読取制御単位
+
+この単位はcontrol経路の登録済みhandleと、runtime経路の読取を接続する。起動制御面のRust呼出しだけが実行系ID・作業領域ID・directory handle・secret除外を登録できる。通常IPCとowner IPCのpayloadにはroot指定を設けない。登録時点のPermissionはdeny。登録済み実行系との一致をBrokerが確認し、登録識別子から生成した登録hashで後の承認対象を固定する。現在のbroker sessionに限定し、再起動後に登録・Approvalを復元しない。
+
+owner資格でのみ「作業領域承認」「作業領域失効」を受ける。承認は作業領域ID・登録hash・表示範囲を厳密に指定し、Brokerが300秒の読取Permissionと新しいApproval IDを発行する。対象能力はworkspace.inspect、操作は列挙・読取だけ。任意command、write、rollback実行を許可しない。期限後・失効後・未承認ではfileを開かない。復旧はownerによる対象再確認と新規承認、監査失敗時は監査修復後の再登録とする。
+
+通常IPCの「作業領域一覧」は登録の識別子・承認状態だけを返す。「作業領域ツリー」「作業領域読取」は現在のPermissionを評価し、永続Auditの受信記録後に取得する。取得後のAudit確定に失敗した場合は内容を返さず、全登録を破棄する。監査本文へpath・file本文・secret指定を記録せず、要求と結果のhashへ結合する。noneはprojection=null、hash_onlyは取得結果のhashだけ、summary/redactedは静的な非内容説明だけ、fullのみ安全取得器の結果を返す。summary/redacted用の承認済み本文は未提供なので全文から推測生成しない。binaryはfullでもsize/hashだけとする。
+
+制御要求の構造はworkspace_inspection_request SchemaとRustの未知field拒否で検証する。権限はSchema適合では生成されず、実owner認証・現在登録・有効期限・永続監査を必要とする。rootを提供する製品起動設定、filesystem対応判定、基準点・履歴・UI・rollback previewは後続のrelease_blocker。今回の実file試験は明示したNTFS/Linux fixtureを登録してBrokerを直接実行する範囲であり、通常製品起動でrootが自動登録されるとは主張しない。
+
+読取期限はwall clockだけに依存せず、単調時計による300秒上限も適用し、取得後と最終Audit後に再確認する。期限切れの許可は破棄し、時計後退を検出した場合も許可を復活させない。通常IPCにも既存の端末経路で検証済みの重複field拒否parserを共用し、payload内を含む全階層で重複を拒否する。従来の通常IPCで後勝ちとなっていた重複JSONも、この変更以降は要求不正となる。
+
+owner用CLIは `gui_shell_rust_helper 作業領域制御 --session-file <owner資格file> 作業領域一覧`、`作業領域承認 <作業領域ID> <登録hash> <表示範囲>`、`作業領域失効 <作業領域ID> <登録hash>` を提供する。後二者も同じ先頭引数で実行する。通常資格での承認はBrokerが拒否する。現在の製品起動ではrootを自動登録しないため、一覧が空であることを取得器の完成証拠にしない。
+
+不正JSONの拒否監査は、parse後の値ではなく受信したraw要求のSHA-256を記録し、重複fieldを含む拒否対象との結合を失わない。raw本文やowner資格は監査へ保存しない。

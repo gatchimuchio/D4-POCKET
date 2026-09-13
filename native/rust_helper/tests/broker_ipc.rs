@@ -14,6 +14,22 @@ struct BrokerProcess {
     endpoint: BrokerEndpoint,
 }
 
+#[test]
+fn workspace_control_is_rejected_over_normal_authenticated_ipc() {
+    let workspace = temp_workspace("workspace-owner-boundary");
+    let process = spawn_broker(&workspace, 64 * 1024);
+    for op in ["作業領域承認", "作業領域失効"] {
+        let payload = serde_json::json!({"作業領域ID":"workspace-a","登録hash":"sha256:".to_string()+&"a".repeat(64),"表示範囲":"full"});
+        let request = serde_json::json!({"request_id":op,"nonce":op,"session_id":process.endpoint.session_id,
+            "operation":op,"issued_at":BrokerRequestEnvelope::current_issued_at(),"metadata":{},
+            "payload_hash":gui_shell_rust_helper::audit_hash::sha256_tagged(payload.to_string().as_bytes()),"payload":payload});
+        let result = send_request(&process.endpoint,&request.to_string());
+        assert_eq!(result["status"],"rejected");
+        assert_eq!(result["error"]["code"],"権限拒否");
+        assert!(result["body"].is_null());
+    }
+}
+
 impl Drop for BrokerProcess {
     fn drop(&mut self) {
         if self.child.try_wait().ok().flatten().is_none() {
@@ -314,6 +330,16 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     let process = BrokerProcess { child, endpoint };
     let owner = wait_for_endpoint(&owner_file).unwrap();
     assert_ne!(process.endpoint.session_secret, owner.session_secret);
+    let workspace_cli=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["作業領域制御","--session-file"]).arg(&owner_file).arg("作業領域一覧").output().unwrap();
+    assert!(workspace_cli.status.success(),"{}",String::from_utf8_lossy(&workspace_cli.stderr));
+    let workspace_list:Value=serde_json::from_slice(&workspace_cli.stdout).unwrap();
+    assert_eq!(workspace_list["作業領域"],json!([]));
+    let unauthorized_cli=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["作業領域制御","--session-file"]).arg(&workspace.session_file)
+        .args(["作業領域承認","workspace-a",&("sha256:".to_string()+&"a".repeat(64)),"full"]).output().unwrap();
+    assert!(!unauthorized_cli.status.success());
+    assert!(String::from_utf8_lossy(&unauthorized_cli.stderr).contains("owner制御資格が必要"));
     let request = |op: &str, payload: Value| {
         let nonce = gui_shell_rust_helper::broker::dialogue::識別子生成().unwrap();
         json!({"request_id": nonce, "nonce":nonce, "session_id":process.endpoint.session_id,

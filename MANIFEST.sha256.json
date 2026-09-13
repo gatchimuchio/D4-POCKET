@@ -910,7 +910,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "9c4b835378fc10a586b6fa94f9000ad1ed87119197565362f7a7d5c3bb56d563"
+      "sha256": "bd08f557ee5f38839211c0f65898e86efe4a411cab086e80504658f8cc27d6a7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1038,7 +1038,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "396783c56249e71d1e581c66628114435a39e1b8a9fc9c6867f1e58458298f46"
+      "sha256": "abc76f7d23600d267204ec5827755b0fee2d34891d6407dbd9be6ac7c95e9ae4"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1066,7 +1066,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "d0be53016391ee779626405897c5b6ad05b76436ea4ea424a095f25cce33dce7"
+      "sha256": "ba6cbf5e840bf553960a29104d7f139dcde1223680782e7ba38199efe734d6ad"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1329,6 +1329,10 @@
       "sha256": "b6515154eb9e3c77250600c86bc1cfb4f39fc3bd5635c7b4f3aece43a2bc01fa"
     },
     {
+      "path": "examples/contracts/invalid/workspace_inspection_request.invalid.json",
+      "sha256": "66ce1f19faa15c92269308f33e8aa07988b63749b9de122fc5baa3e816d0a41f"
+    },
+    {
       "path": "examples/contracts/ipc_request.valid.json",
       "sha256": "1bda4f73e54fd57a0d4bb13122cbc16517a00a0030db3679a0732dfcf9afc613"
     },
@@ -1383,6 +1387,10 @@
     {
       "path": "examples/contracts/workspace_diff.valid.json",
       "sha256": "853b3b874646fdfc531d61c7cdee640d3262dc3472bb70f4336a584a739c369e"
+    },
+    {
+      "path": "examples/contracts/workspace_inspection_request.valid.json",
+      "sha256": "4b3f30689c94c4d8695acde0e2ce68eac6d04e0369def672003a02c4f9760b61"
     },
     {
       "path": "examples/framework_risk/flutter_current.json",
@@ -1482,11 +1490,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
-      "sha256": "be13739be739d0ee69ec370f3f6642d6760df6d7f31da7e2fae0a34dc72e3a2f"
+      "sha256": "2a9ca24e04b4afc81a3fbf7c6e436dc0a793f86a7b9980ddfad8f2c4063a5e69"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
-      "sha256": "6d42a9a1351d2d6cfcac4499c2c68fc978d7f5f9816d502e347d614869eb7df4"
+      "sha256": "1dbcc92a945e05a1154f767d42062371f7a2679bb3d5954a1a616a6c9448ae39"
     },
     {
       "path": "native/rust_helper/src/broker/device_transport.rs",
@@ -1494,23 +1502,31 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "067ec05d2d8c4176643856005ebc0fe4f8977f536c8cba63eb360a013e58f32a"
+      "sha256": "271433819d23dcc2312319161be1b2fea403c8b9788a91a9751cc39ceb0215d7"
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
       "sha256": "a221ee1bcf94de440d9f5d630b5ff1339dcf876b798ce55f8b306eaccbaba82f"
     },
     {
+      "path": "native/rust_helper/src/broker/json_input.rs",
+      "sha256": "11b60d48f37e5e5bcf3606899acd29829975557769a464b4abc66b9b9aff0c4f"
+    },
+    {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "fa8693ddacaae0b9fcfd9406e3b01a03d2070b969bba06ed6826d08a229127b6"
+      "sha256": "b1ce7528a08e406ee075634da157136334ea2cb74bb9acaa5135367663ba569a"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3e2f0e97c3da24682f1a8efc75b64da5c2c319db01fd583105a02a56cdc70cc6"
+      "sha256": "b75d1480db3ecbae7722fc8854f066887cbcdc99e551e28308b8cafd377ee037"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
       "sha256": "560b326bfaf330a737f76e86dc6d210638dd609a6e9f2139c509c3ac7f837ee0"
+    },
+    {
+      "path": "native/rust_helper/src/broker/workspace.rs",
+      "sha256": "2b0b78d4d63fbf184be7121ad6aa642bbdda077992e2a5b12410b89121665357"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
@@ -1542,7 +1558,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "3ed917dbd26e06f2739780c395cec1a17b2303677c94520ae181296f79b65f19"
+      "sha256": "1630010d1a7a449f8f6fd38b2c1c2400d8d196d2ddc6dbb466dc643e95ba6063"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1550,7 +1566,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "ff32ff7b67a6667c599d16eb68318419df19eed05366b3b1f780083e0f085818"
+      "sha256": "4389506c275bb8fc5a9653e6a1f0af471df746f637ed8090d87323c0bb0843bd"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1566,15 +1582,23 @@
     },
     {
       "path": "native/rust_helper/src/workspace_reader.rs",
-      "sha256": "35da45916c665967d00849cbdfd2199372069994c07193e9b379fbc8f1fc2de0"
+      "sha256": "38737fabf0ad831c13e54ac65caa2790c1e90e5d3df01e3bb873715a993724c6"
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
-      "sha256": "45801f3d8fbaa20ec7d2e107a975ac68687b182f7139949e64b01d0cc515516d"
+      "sha256": "2fec9c40148ac32a63cf2598436cfdbb9e1105ddbdef873fdca48a10c14f7b31"
     },
     {
       "path": "native/rust_helper/tests/checkpoint.rs",
       "sha256": "a17f5d87746bebc8ec23d18dcced81fca155877cb77cf3c214db6932573f718c"
+    },
+    {
+      "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
+      "sha256": "d5102531d2dc95d3cceb7f618173011f0056b3f287e8189b45b8784b4fdcfd66"
+    },
+    {
+      "path": "native/rust_helper/tests/unit/workspace_registry.rs",
+      "sha256": "09634456cfcf91563fa375d473ae2b3ddcc3f39a6c3b1a6cd6fa42df7c914e80"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",
@@ -2014,7 +2038,7 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "c3a32ec62ed7d6018b35bc2801e92c41c7a1a84e4bada22c5393a023735fed1b"
+      "sha256": "242a39f12204eebe7367d52771d98fbce5913ee3483f2f133578f2ff09af7659"
     },
     {
       "path": "specs/ipc_response.schema.json",
@@ -2065,6 +2089,10 @@
       "sha256": "5b43c5f1ffe4adb2e7e63ae737d5f4c6d9a5d135f0233d94603e986f7dd1e796"
     },
     {
+      "path": "specs/workspace_inspection_request.schema.json",
+      "sha256": "56a92ae6b7f5b707adf85b7dc78ed506a2eda9b13105fabd285c02a790edf2f0"
+    },
+    {
       "path": "tooling/audit_checkpoint_verifier.py",
       "sha256": "272b860007e5b0405153cc1973dbb4f5c7624e7f72c2e923eff65ee8211eb3ef"
     },
@@ -2082,7 +2110,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ca39aff43ee82cecf37009c12ae7a7955d39c91d0203f5a8ff07a565787b7419"
+      "sha256": "0f6f07920ddf8df4245c8f98adf0a17672c0ff417651fb1b214aec8b15de9b97"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2134,7 +2162,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "402b78c5f29d47d20bc4e70c49a5192dfc935b47dc1c661f988256448e6e8d13"
+      "sha256": "4f6ed3d43235cb0a6e84286b080d6be0b8553ac1061720b61c9c2add40507e2a"
     },
     {
       "path": "tooling/shell_snapshot.py",

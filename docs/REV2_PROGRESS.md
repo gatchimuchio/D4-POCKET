@@ -19,6 +19,12 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Android仮想端末とApple補助結果の確定（2026-09-13）
+
+source `9c4d89efcb5dedf2b5d229dcd9fd4ef0b2b47bc7` の手動Android run `34743675304` とApple run `34743676639` がsuccessで終了し、取得成果物のenvironmentとsourceを照合した。双方とも追跡差分は空、未追跡表示は当該jobのevidence directoryだけである。Androidはnative保管2件とMobile29件・解析がPASS。実TLS統合でnative再読取・controller再生成・OS背景停止と復帰再接続・二つの実MINIDORA応答・失効資格拒否がPASSした。従来のAVD容量不足とCRLF応答による検証未到達はこのsourceで解消した。
+
+AppleはRust74単体・5 IPC・7 checkpoint・2差分・2取得器統合、共有18・Desktop33・Mobile29、native保管2件、実TLS統合とmacOS/iOS Simulator buildがPASS。今回追加したBroker読取制御より前のsourceであり、その新実装のApple証拠へ読み替えない。Apple tar SHA-256は `09d6fb2677ecf68fcbf4e43107522827cc360c03937a245195f818b6dada20f8`、Android成果物各fileのhash集合のSHA-256は `36879e4d1703196033383ae1ef7f41c94ec7a82553a04210a5570ba4af913d6e`。Repository外のGUI-Shell-apple-9c4d89eとGUI-Shell-android-emulator-9c4d89eへ原成果物とverified-result.jsonを保存した。physical_device_verified=falseを維持し、実機・正式署名配布・owner GOはrelease_blockerのままとする。
+
 ## Android補助hostの容量と終了待機を修正（2026-09-13）
 
 9a60cdd/run `34742562494` は有効configでuserdata=2Gとなっていたが、emulatorの要求は7372.80MBのままで、空き6986.07MBに対して再び起動前FATALとなった。設定変更が実容量を減らしたとは言えず、2G指定を除去する。元のAPI35 imageに必要な領域を確保する。SDK記録にはNDK27.3・28.2・29.0が同居し、固定Flutter3.44.0のFlutterExtension.ktとapp設定の消費は28.2.13676358である。隔離された手動runnerだけでSDK managerのuninstallにより未使用の27.3.13750724と29.0.14206865を除き、28.2の存在を検査する。対象版以外を計算して削除しない。変更前後のSDK一覧と工具結果、AVD有効設定、空き容量を保存する。ローカルhost・ownerのfile・製品依存を削除せず、必要NDKが変わるときはこの固定照合を再検討する。

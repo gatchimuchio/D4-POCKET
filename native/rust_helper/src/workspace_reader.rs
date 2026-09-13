@@ -120,6 +120,10 @@ fn read_options() -> OpenOptions {
 }
 
 impl WorkspaceReader {
+    pub(crate) fn validate_relative_path(&self, path: &str, allow_root: bool) -> Result<(), ReadError> {
+        if path.is_empty() && allow_root {return Ok(());}
+        self.allowed(path).map(|_| ())
+    }
     /// dirはowner登録経路が開いたhandle。通常要求からambient pathを開かない。
     pub fn from_registered_dir(root: Dir, secrets: &[String]) -> Result<Self, ReadError> {
         if secrets.len() > 256 {

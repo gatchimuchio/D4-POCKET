@@ -131,6 +131,17 @@ impl BrokerStateStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
+    #[serde(rename = "作業領域一覧")]
+    作業領域一覧,
+    #[serde(rename = "作業領域承認")]
+    作業領域承認,
+    #[serde(rename = "作業領域失効")]
+    作業領域失効,
+    #[serde(rename = "作業領域ツリー")]
+    作業領域ツリー,
+    #[serde(rename = "作業領域読取")]
+    作業領域読取,
+
     #[serde(rename = "端末招待")]
     端末招待,
     #[serde(rename = "端末一覧")]
@@ -170,6 +181,11 @@ pub enum BrokerOperation {
 impl BrokerOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
+            BrokerOperation::作業領域一覧 => "作業領域一覧",
+            BrokerOperation::作業領域承認 => "作業領域承認",
+            BrokerOperation::作業領域失効 => "作業領域失効",
+            BrokerOperation::作業領域ツリー => "作業領域ツリー",
+            BrokerOperation::作業領域読取 => "作業領域読取",
             BrokerOperation::端末招待 => "端末招待",
             BrokerOperation::端末一覧 => "端末一覧",
             BrokerOperation::端末招待取消 => "端末招待取消",
@@ -217,7 +233,7 @@ pub struct BrokerRequestEnvelope {
 
 impl BrokerRequestEnvelope {
     pub fn from_json_str(input: &str) -> Result<Self, serde_json::Error> {
-        let raw: JsonRequestEnvelope = serde_json::from_str(input)?;
+        let raw: JsonRequestEnvelope = super::json_input::read_unique(input)?;
         let metadata_present = raw.metadata.is_some();
         let metadata = raw
             .metadata
@@ -391,6 +407,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
+    作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
     shutdown_requested: bool,
     current_epoch_seconds_override: Option<i64>,
@@ -405,6 +422,7 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
@@ -436,6 +454,7 @@ impl Broker {
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             shutdown_requested: false,
             current_epoch_seconds_override: None,
@@ -454,7 +473,7 @@ impl Broker {
     pub(crate) fn owner要求処理(&mut self, input: &str) -> BrokerResponse {
         match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => self.処理(envelope, true),
-            Err(_) => self.reject("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true),
+            Err(_) => self.reject_with_payload_hash("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true, &sha256_tagged(input.as_bytes())),
         }
     }
 
@@ -593,6 +612,7 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
+            operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
@@ -649,6 +669,61 @@ impl Broker {
                 normalize_inbound_payload(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+        }
+    }
+
+    /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
+    pub fn 作業領域登録(&mut self, runtime: &str, id: &str, root: cap_std::fs::Dir, secrets: &[String]) -> Result<(), &'static str> {
+        if !self.state_store.persistence_ready() {return Err("作業領域登録には永続監査が必要");}
+        if !self.authority_registry.runtime_registered(runtime) && !self.対話.登録済み(runtime) {return Err("実行系が未登録");}
+        let mut registry = std::mem::take(&mut self.作業領域);
+        let mut audit_failed = false;
+        let result = registry.register(runtime, id, root, secrets, &mut |reason, hash| {
+            self.append_audit("作業領域登録", "作業領域登録", "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash)
+                .map(|_|()).map_err(|_| {audit_failed = true; "監査失敗"})
+        });
+        if !audit_failed {self.作業領域 = registry;}
+        result
+    }
+
+    fn 作業領域要求処理(&mut self, id: &str, operation: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+        if !self.state_store.persistence_ready() {
+            self.作業領域 = Default::default();
+            return self.reject_with_payload_hash(id, operation, "broker_persistence_unavailable", "作業領域には永続監査が必要", true, hash);
+        }
+        if matches!(operation, "作業領域承認" | "作業領域失効") && !owner {
+            return self.reject_with_payload_hash(id, operation, "権限拒否", "owner制御資格が必要", true, hash);
+        }
+        if self.append_audit(id, operation, "received", "作業領域操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash).is_err() {
+            self.作業領域 = Default::default();
+            return self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録");
+        }
+        let mut registry = std::mem::take(&mut self.作業領域);
+        let mut audit_failed = false;
+        let now = self.current_epoch_seconds();
+        let result = registry.operate(operation, payload, owner, now, &mut |reason, digest| {
+            self.append_audit(id, operation, "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, digest)
+                .map(|_|()).map_err(|_| {audit_failed = true; "監査失敗"})
+        });
+        if audit_failed {
+            return self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録");
+        }
+        self.作業領域 = registry;
+        match result {
+            Ok(body) => {
+                let evidence = if matches!(operation, "作業領域読取" | "作業領域ツリー") && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only")) {EVIDENCE_SOURCE_LIVE_RUNTIME} else {EVIDENCE_SOURCE_INTERNAL_STATE};
+                match self.append_audit(id, operation, "accepted", "作業領域操作の結果を確定", evidence, &sha256_tagged(body.to_string().as_bytes())) {
+                    Ok(event) => {
+                        if matches!(operation, "作業領域読取" | "作業領域ツリー") && !self.作業領域.response_current(&body, self.current_epoch_seconds()) {
+                            self.作業領域 = Default::default();
+                            return self.reject_with_payload_hash(id, operation, "作業領域期限超過", "取得後の承認期限を満たさないため再登録が必要", true, hash);
+                        }
+                        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:evidence.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+                    },
+                    Err(_) => {self.作業領域 = Default::default();self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録")}
+                }
+            }
+            Err(reason) => self.reject_with_payload_hash(id, operation, "作業領域拒否", reason, true, hash),
         }
     }
 
@@ -774,12 +849,13 @@ impl Broker {
     pub fn handle_json(&mut self, input: &str) -> BrokerResponse {
         match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => self.handle(envelope),
-            Err(_) => self.reject(
+            Err(_) => self.reject_with_payload_hash(
                 "malformed-request",
                 "unknown",
                 "broker_request_malformed",
                 "broker request JSON failed to parse or included unknown fields",
                 true,
+                &sha256_tagged(input.as_bytes()),
             ),
         }
     }
@@ -1132,7 +1208,10 @@ impl Broker {
             evidence_source,
             payload_hash,
         );
-        self.state_store.append_audit_event(&event)?;
+        if let Err(error) = self.state_store.append_audit_event(&event) {
+            self.作業領域 = Default::default();
+            return Err(error);
+        }
         self.audit_log
             .push_verified(event.clone())
             .map_err(BrokerStoreError::TamperedAuditState)?;
@@ -1141,7 +1220,11 @@ impl Broker {
 
     fn record_nonce(&mut self, nonce: &str) -> Result<(), BrokerStoreError> {
         let recorded_at = current_epoch_seconds();
-        if let Some(nonces) = self.state_store.append_replay_nonce(nonce, recorded_at)? {
+        let persisted = match self.state_store.append_replay_nonce(nonce, recorded_at) {
+            Ok(value) => value,
+            Err(error) => {self.作業領域 = Default::default();return Err(error);}
+        };
+        if let Some(nonces) = persisted {
             self.seen_nonces = nonces;
         } else {
             self.seen_nonces.insert(nonce.to_string(), recorded_at);
@@ -2390,3 +2473,7 @@ mod 端末統治試験 {
         assert!(reopened.audit_log.events().iter().any(|event| event.reason == "期限超過で対話を隔離"));
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/workspace_protocol.rs"]
+mod workspace_tests;

@@ -63,6 +63,7 @@ from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIME
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
+    "workspace_inspection_request",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
     "runtime_dialogue_session",
@@ -2479,6 +2480,14 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
     protocol_rs = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
     audit_rs = (RUST_HELPER / "src" / "broker" / "audit.rs").read_text(encoding="utf-8")
     errors = []
+    parser_path = RUST_HELPER / "src" / "broker" / "json_input.rs"
+    if not parser_path.is_file():
+        errors.append("一意JSON parserが存在しない")
+    else:
+        parser_text = parser_path.read_text(encoding="utf-8")
+        for token in ("serde_json::from_str(raw)?", "serde_json::from_value(value.0)", "v.insert(k, x.0).is_some()", "重複field"):
+            if token not in parser_text:
+                errors.append(f"一意JSON parserに必須経路がない: {token}")
     required_protocol_tokens = [
         "BrokerRequestEnvelope",
         "BrokerResponse",
@@ -2487,7 +2496,7 @@ def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
         "from_json_str",
         "handle_json",
         "to_json_string",
-        "serde_json::from_str",
+        "super::json_input::read_unique",
         "broker_request_malformed",
         "broker_payload_hash_invalid",
         "broker_payload_hash_mismatch",
@@ -3051,6 +3060,28 @@ def test_runtime_catalog_cannot_grant_authority() -> list[str]:
     if catalog.can_grant_authority(manifest):
         return ["RuntimeCatalogがmanifestからauthorityを付与した"]
     return []
+
+
+def 作業領域検査要求の分岐を検査する() -> list[str]:
+    schema = load_schema("workspace_inspection_request.schema.json")
+    samples = {
+        "作業領域一覧": {},
+        "作業領域承認": {"作業領域ID": "workspace-a", "登録hash": "sha256:" + "a" * 64, "表示範囲": "full"},
+        "作業領域失効": {"作業領域ID": "workspace-a", "登録hash": "sha256:" + "a" * 64},
+        "作業領域ツリー": {"作業領域ID": "workspace-a", "相対path": ""},
+        "作業領域読取": {"作業領域ID": "workspace-a", "相対path": "file.txt"},
+    }
+    errors = []
+    for operation, payload in samples.items():
+        errors.extend(validate_instance({"operation": operation, "payload": payload}, schema))
+        for forbidden in ("root", "authority", "permission", "approval_id", "表示範囲追加"):
+            if not validate_instance({"operation": operation, "payload": {**payload, forbidden: "full"}}, schema):
+                errors.append("作業領域要求が未知fieldを受理した")
+        if payload and not validate_instance({"operation": operation, "payload": {}}, schema):
+            errors.append("作業領域要求が必須field欠落を受理した")
+    if not validate_instance({"operation": "作業領域読取", "payload": {"作業領域ID": "workspace-a", "相対path": ""}}, schema):
+        errors.append("file読取が空pathを受理した")
+    return errors
 
 
 def test_workspace_diff_content_shape() -> list[str]:
@@ -3715,6 +3746,7 @@ def main() -> int:
         test_runtime_manifest_invalid_fixture_rejected,
         test_adapter_manifest_authority_escalation_rejected,
         test_runtime_catalog_cannot_grant_authority,
+        作業領域検査要求の分岐を検査する,
         test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
         test_agent_secret_path_read_default_deny,

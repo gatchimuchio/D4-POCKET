@@ -185,6 +185,8 @@ fn 要求hash(要求: &対話要求) -> String {
 }
 
 impl 対話制御 {
+    pub(crate) fn 登録済み(&self, id: &str) -> bool { self.実行系.contains_key(id) }
+
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
     pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
         self.失効セッション.extend(sessions.iter().cloned());

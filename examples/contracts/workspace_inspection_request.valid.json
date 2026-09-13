@@ -1,0 +1,7 @@
+{
+  "operation": "作業領域読取",
+  "payload": {
+    "作業領域ID": "workspace-a",
+    "相対path": "src/main.rs"
+  }
+}

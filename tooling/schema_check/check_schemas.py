@@ -8,6 +8,7 @@ EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
 
 REQUIRED = {
+    "workspace_inspection_request.schema.json",
     "workspace_diff.schema.json",
     "audit_checkpoint.schema.json",
     "device_link_control.schema.json",

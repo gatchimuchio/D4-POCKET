@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/workspace_inspection_request.schema.json",
+  "title": "作業領域検査要求",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域一覧"
+        },
+        "payload": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域承認"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "登録hash",
+            "表示範囲"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "登録hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "表示範囲": {
+              "type": "string",
+              "enum": [
+                "none",
+                "hash_only",
+                "summary",
+                "redacted",
+                "full"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域失効"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "登録hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "登録hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域ツリー"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "相対path"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "相対path": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域読取"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "相対path"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "相対path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    }
+  ],
+  "type": "object"
+}

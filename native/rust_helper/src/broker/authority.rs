@@ -30,6 +30,9 @@ pub struct BrokerAuthorityRegistry {
 }
 
 impl BrokerAuthorityRegistry {
+    pub(crate) fn runtime_registered(&self, id: &str) -> bool {
+        self.state["runtimes"].as_array().is_some_and(|items| items.iter().any(|runtime| runtime["runtime_id"] == id))
+    }
     pub fn production_default() -> Self {
         Self {
             state: json!({
