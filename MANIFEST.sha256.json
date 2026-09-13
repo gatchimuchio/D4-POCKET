@@ -182,7 +182,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "987b388d57763165b906f168806e8cb7aac5f5c37c93ec7e422c092107863960"
+      "sha256": "73994bf73cb6ac67168cb7a38bff52abcde84b4c2fccf8f5a49b9e8ee7283d21"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -211,6 +211,10 @@
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
       "sha256": "1c3b237a0a1ae6893c5806c086628fecacfb9e6073657bae01c20f5c99a7b328"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "sha256": "2d6ebee3498048e4f49253db52615a30aac20e793cebe4cca9e0d97023c56e02"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -445,6 +449,10 @@
       "sha256": "6aed4cc35164d973770e91581fdb43956bf707c1aba7768ec28eab38f69434c9"
     },
     {
+      "path": "apps/desktop_flutter/test/history_screen_test.dart",
+      "sha256": "f7319d5ff9c94c05861370c19a99d1ee79360a8cde52d8381c20749040735f82"
+    },
+    {
       "path": "apps/desktop_flutter/test/runtime_dialogue_test.dart",
       "sha256": "82e9a1f4ea29ef16f96a8f627e323f1145f8cda8c9d399295a3989048585f4dd"
     },
@@ -459,6 +467,10 @@
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
       "sha256": "69b6fa99adc9494ed357ad083b37c05a750da08501b59c0ffd724539c2b71617"
+    },
+    {
+      "path": "apps/desktop_flutter/tool/history_live_client.dart",
+      "sha256": "59a4f756f59f35819c5a67767cd483a8bd5552b7232f51762f57b21395371a73"
     },
     {
       "path": "apps/desktop_flutter/windows/.gitignore",
@@ -1050,7 +1062,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "sha256": "0fc10fc66f7ebbf15d58b4c1d3a835624695742bfa72320c2792a188b837c360"
+      "sha256": "4cd791dbd109fe98fc2078eec54d8e674894ce204ba9819ac5bdbe602d32d801"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1082,7 +1094,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "ed9d6adf60f72cfc3e5cbffcce9dc98312b7af27667dfc342f8ea0dd5ba7ed0c"
+      "sha256": "225b63648b7182ace69795df576a85c2e383d292fe3656a8a36d3bad4de14c16"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1866,7 +1878,11 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/gui_shell_ui.dart",
-      "sha256": "33c7f09f31b6d05a281d04d5c4c14336204df75ffc4f70059c7383b4468719fa"
+      "sha256": "7834a11202eddaa9ca1363c06af7555acaa8f5c851172e2094179f4b5f20f5ed"
+    },
+    {
+      "path": "packages/gui_shell_ui/lib/history_client.dart",
+      "sha256": "eedd063de0761a53314e58951a0f5c753d0d65f41e3fd7ced3c124a0e98e0eab"
     },
     {
       "path": "packages/gui_shell_ui/lib/runtime_dialogue_client.dart",
@@ -1875,6 +1891,10 @@
     {
       "path": "packages/gui_shell_ui/lib/src/broker_transport.dart",
       "sha256": "f7775e58004aec642dae0d58545f6e6d35c452c87a216dba35da23f8df9e9729"
+    },
+    {
+      "path": "packages/gui_shell_ui/lib/src/history_client.dart",
+      "sha256": "919fb6aaa7d5975c2f4ed8ada44318a86fd04c1a2976ae912bc81b5f74b296ad"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
@@ -2258,7 +2278,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "5c8a7287fd5fbc994525946c5a4bf91eb63b6bdc0c437bd57ebe531e6920750d"
+      "sha256": "51da8c6089af4b83b1e6661303d87fbb94f34c9a04a7b467cc4c2ac5a25d0db8"
     },
     {
       "path": "tooling/packaging_portability_check.py",

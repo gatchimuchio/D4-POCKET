@@ -289,6 +289,8 @@ server.serve_forever()
                 for runtime_id in ["left", "right"]:
                     approved = 成功(owner, "対話履歴承認", {"実行系ID": runtime_id})
                     selection = {"approval_id": approved["grant"]["approval_id"], "query": {"after": 0, "limit": 100, "filter": {"実行系ID": runtime_id}}}
+                    if dart_client:
+                        subprocess.run([dart, "run", str(ROOT / "apps/desktop_flutter/tool/history_live_client.dart"), str(normal_file), runtime_id], cwd=ROOT / "apps/desktop_flutter", check=True, stdout=log, stderr=log, timeout=30)
                     viewed = 成功(normal, "対話履歴閲覧", selection)
                     assert not validate_instance(viewed, access_schema)
                     assert viewed["page"]["entries"] and not viewed["page"]["has_more"]

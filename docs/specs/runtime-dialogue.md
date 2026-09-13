@@ -139,3 +139,10 @@ owner専用の対話履歴承認は実行系IDを一つ指定し、現在Broker�
 Capability=dialogue.history.inspect、Permission=承認IDに束縛した実行系metadata閲覧、Approval=認証済みownerの明示要求、Audit=要求と返却hash、Recovery=再承認または監査修復後の再確認とする。現在権限、再実行権限、署名済み完全性を履歴から生成しない。
 
 owner CLIは `対話承認操作 --session-file <owner資格file> 履歴承認 <実行系ID>`、`履歴失効`、`履歴閲覧状態` を提供する。通常UIはowner資格fileを読まず、通常IPCの状態確認と閲覧だけを使用する。応答形式は `runtime_history_access.schema.json` とする。
+
+
+### Desktop履歴表示
+
+実行履歴画面は通常IPCの現在承認を読み、承認されたRuntimeの状態遷移を50件ずつ取得する。状態で絞り込み、UTCの開始・終了、Session、失敗分類、監査参照を表示する。共有HistoryClientは応答形式、Runtime/承認ID/期限、時刻と監査の組、状態整合、cursorを検査し、取得後に現在承認を再照合する。独立署名の検証結果や現在の稼働状態とは扱わない。
+
+表示中は2秒ごとに現在承認と履歴を再取得する。再確認中・失敗・背景化・画面離脱では履歴を破棄し、期限は壁時計と単調時計で確認する。失効通知のpushはなく、画面の失効反映には再確認間隔までの遅延がある。owner資格の読取や自己承認buttonは追加しない。Mobile端末の履歴接続と要求単位集約はrelease_blockerとして残る。
