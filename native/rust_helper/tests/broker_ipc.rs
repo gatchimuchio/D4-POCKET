@@ -390,7 +390,55 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
         assert!(record[key].as_i64().is_some());
     }
     assert_eq!(send_request(&process.endpoint, &request("対話終了", json!({"対話セッションID":s["body"]["対話セッションID"]})))["status"], "accepted");
+    assert_eq!(send_request(&process.endpoint, &request("対話履歴一覧", json!({"after":0,"limit":1})))["status"], "rejected");
+    for invalid in [json!({"after":0,"limit":0}), json!({"after":0,"limit":101}), json!({"after":999999,"limit":1}), json!({"after":0,"limit":1,"owner":true})] {
+        assert_ne!(send_request(&owner, &request("対話履歴一覧", invalid))["status"], "accepted");
+    }
+    let mut cursor = 0;
+    let mut states = Vec::new();
+    for _ in 0..4 {
+        let page = send_request(&owner, &request("対話履歴一覧", json!({"after":cursor,"limit":1})));
+        assert_eq!(page["status"], "accepted");
+        assert!(page["body"]["next_cursor"].as_u64().unwrap() > cursor);
+        cursor = page["body"]["next_cursor"].as_u64().unwrap();
+        states.extend(page["body"]["entries"].as_array().unwrap().iter().map(|v|v["record"]["状態"].as_str().unwrap().to_owned()));
+        if page["body"]["has_more"] == false { break; }
+    }
+    assert_eq!(states, ["承認待ち", "実行中", "失敗"]);
     drop(process);
+    fs::remove_file(&workspace.session_file).unwrap();
+    fs::remove_file(&owner_file).unwrap();
+    let child = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["broker-server", "--store-dir"]).arg(&workspace.store_dir)
+        .arg("--session-file").arg(&workspace.session_file)
+        .arg("--owner-session-file").arg(&owner_file)
+        .stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+    let endpoint = wait_for_endpoint(&workspace.session_file).unwrap();
+    let restarted = BrokerProcess {child, endpoint};
+    wait_for_endpoint(&owner_file).unwrap();
+    let cli = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作", "--session-file"]).arg(&owner_file)
+        .args(["履歴", "0", "100"]).output().unwrap();
+    assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
+    let page: Value = serde_json::from_slice(&cli.stdout).unwrap();
+    assert_eq!(page["entries"].as_array().unwrap().len(), 3);
+    fs::write(&record_file, &cli.stdout).unwrap();
+    let checked = Command::new(if cfg!(windows) {"python"} else {"python3"})
+        .args(["-c", &schema_check.replace("runtime_execution_record.schema.json", "runtime_execution_history_page.schema.json")])
+        .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")).arg(&record_file).output().unwrap();
+    assert!(checked.status.success(), "{}", String::from_utf8_lossy(&checked.stderr));
+    let live_audit = workspace.store_dir.join("audit.jsonl");
+    let saved_audit = fs::read(&live_audit).unwrap();
+    let mut broken_audit = saved_audit.clone();
+    broken_audit.extend_from_slice(b"broken\n");
+    fs::write(&live_audit, broken_audit).unwrap();
+    let denied = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["対話承認操作", "--session-file"]).arg(&owner_file)
+        .args(["履歴", "0", "100"]).output().unwrap();
+    assert!(!denied.status.success());
+    assert!(denied.stdout.is_empty());
+    fs::write(&live_audit, saved_audit).unwrap();
+    drop(restarted);
     let (_, reopened) = gui_shell_rust_helper::broker::BrokerPersistentStore::open_or_create(&workspace.store_dir, "record-check").unwrap();
     let history: Vec<Value> = reopened.audit_log.events().iter().filter_map(|e| {
         e.reason.strip_prefix("対話実行記録:").map(|body| {

@@ -83,7 +83,7 @@ ownerの継続指示に基づき、既存外部承認系を前提にしない専
 
 `対話送信` は不変の要求を待ち行列に作るだけで、ネットワークを呼ばない。`対話承認` はowner専用、要求hash一致・作成から300秒以内・未使用・実行系結合・永続監査成功を全て満たす場合だけAdapterを一度呼ぶ。Capabilityは対話送信、Permissionは当該実行系の固定接続先、Approvalは当該要求hashへのowner操作、AuditEventは送信前・完了・取消の記録、RecoveryActionは契約の失敗分類に対応する。結果は非同期に `対話取得` で受け取る。`対話中止` は未送信なら送信を防止し、送信後なら採用を止めてセッションを隔離する。
 
-操作のSchemaは `runtime_dialogue_operation.schema.json`。通常操作は実行系列挙、対話開始、対話送信、対話取得、対話中止、対話終了。owner専用操作は対話承認待ち、対話承認。通常要求のfieldやmetadataからowner roleを選ばせない。起動毎に資格とセッションを更新し、古い資格・nonce・承認を再利用しない。pending要求は再起動で復元せず、再送は操作者が判断する。
+操作のSchemaは `runtime_dialogue_operation.schema.json`。通常操作は実行系列挙、対話開始、対話送信、対話取得、対話中止、対話終了。owner専用操作は対話承認待ち、対話承認、対話履歴一覧。通常要求のfieldやmetadataからowner roleを選ばせない。起動毎に資格とセッションを更新し、古い資格・nonce・承認を再利用しない。pending要求は再起動で復元せず、再送は操作者が判断する。
 
 owner資格はローカルOS利用者の保管責任を伴う。Unixでは0600で生成する。現行Windowsは既存brokerと同じ利用者境界であり、同一利用者の任意processがファイルを読める環境に対する隔離保証や管理者耐性は主張しない。OS保護とinstalled-path証拠は引き続きrelease_blocker。制御資格による認証と、人間本人が操作したことの証明を同一視しない。
 
@@ -100,6 +100,10 @@ brokerは最大64セッション、128要求、実行中worker8件を保持す�
 ### 実行履歴の状態遷移記録
 
 #### 監査chain内の履歴保存
+
+owner専用の対話履歴一覧は `after`（既読の監査event数、0開始）と `limit`（1〜100）で履歴の状態遷移をページ取得する。owner CLIは `対話承認操作 --session-file <owner資格file> 履歴 <after> <limit>`。Capability=dialogue.history.inspect、Permission=owner-control、Approval=認証されたowner要求、Audit=要求と返却bodyのhash、Recovery=監査修復後の再確認とする。通常資格と端末資格には公開しない。
+
+読み出す監査はdiskから再読込してchain/anchorを検証し、現在Brokerの監査と一致することを要求する。返却対象の履歴は形式・payload hash・要求ID・遷移監査への参照を照合し、不正なら部分結果を返さない。出力は履歴event ID/hashと保存記録、次cursor、続きの有無、観測したhead hash。cursorは読取位置であり権限ではない。追記中の各ページはそれぞれの取得時点の観測で、全ページを原子的snapshotとはしない。過去の実行中を現在稼働中へ昇格せず、Approval復元・再送は行わない。通常UI向けの期限付き閲覧承認・一覧画面はrelease_blockerとして残る。
 
 記録の永続化は別fileや別の信頼鍵を追加せず、既存AuditEventのreasonへ `対話実行記録:` に続くJSONとして格納する。形式は版=1、状態、失敗分類、実行記録とし、payload_hashはJSON全体のSHA-256へ結合する。入力・応答本文を格納しない。状態遷移時にだけ追加し、変化のないpollでは同じ記録を重複保存しない。既存audit hash・anchor・署名checkpointの検証対象内に残すため、対話終了・再起動で比較元の監査記録を消さない。
 

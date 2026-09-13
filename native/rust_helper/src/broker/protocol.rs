@@ -131,6 +131,8 @@ impl BrokerStateStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
+    #[serde(rename = "対話履歴一覧")]
+    対話履歴一覧,
     #[serde(rename = "作業領域一覧")]
     作業領域一覧,
     #[serde(rename = "作業領域承認")]
@@ -216,6 +218,7 @@ impl BrokerOperation {
             BrokerOperation::ApprovalEdit => "approval_edit",
             BrokerOperation::ContentProjection => "content_projection",
             BrokerOperation::AuditVerify => "audit_verify",
+            BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
             BrokerOperation::対話開始 => "対話開始",
@@ -675,6 +678,7 @@ impl Broker {
                 project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
+            BrokerOperation::対話履歴一覧 => self.履歴要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::AuditVerify => self.accept_body(
                 &request_id,
                 BrokerOperation::AuditVerify,
@@ -857,6 +861,31 @@ impl Broker {
                 Err(_) => {self.端末全停止();self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止")}
             },
             Err(reason) => self.reject_with_payload_hash(id,op,"端末要求拒否",reason,true,&hash),
+        }
+    }
+
+    fn 履歴要求処理(&mut self, id: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+        let op = "対話履歴一覧";
+        if !owner { return self.reject_with_payload_hash(id, op, "権限拒否", "owner制御資格が必要", true, hash); }
+        let query = match serde_json::from_value::<super::execution_history::Query>(payload.clone()) {
+            Ok(v) => v,
+            Err(_) => return self.reject_with_payload_hash(id, op, "要求不正", "履歴範囲が不正", true, hash),
+        };
+        let log = match self.state_store.persistent_store.as_ref().ok_or("永続監査が必要")
+            .and_then(|s| s.verified_audit_log().map_err(|_| "監査検証に失敗")) {
+            Ok(log) if log == self.audit_log => log,
+            _ => return self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認"),
+        };
+        if self.append_audit(id, op, "received", "Capability=dialogue.history.inspect Permission=owner-control Approval=owner要求 Recovery=監査修復後の再確認", EVIDENCE_SOURCE_INTERNAL_STATE, hash).is_err() {
+            return self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認");
+        }
+        let body = match super::execution_history::page(&log, query) {
+            Ok(body) => body,
+            Err(reason) => return self.reject_with_payload_hash(id, op, "履歴拒否", reason, true, hash),
+        };
+        match self.append_audit(id, op, "accepted", "過去の観測記録を返却。現在権限を生成しない", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(body.to_string().as_bytes())) {
+            Ok(event) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
+            Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認"),
         }
     }
 

@@ -141,6 +141,12 @@ impl BrokerPersistentStore {
         Ok(nonces)
     }
 
+    pub(crate) fn verified_audit_log(&self) -> Result<BrokerAuditLog, BrokerStoreError> {
+        let log = self.load_audit_log()?;
+        self.verify_audit_anchor(&log)?;
+        Ok(log)
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

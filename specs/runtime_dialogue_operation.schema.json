@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_operation.schema.json",
   "title": "実行系対話の操作と入力",
-  "description": "通常操作とowner専用操作をRustが分離し、operationごとのpayloadを検証する。対話承認と対話承認待ちはowner専用。構造適合は承認資格ではない。",
+  "description": "通常操作とowner専用操作をRustが分離し、operationごとのpayloadを検証する。対話承認・対話承認待ち・対話履歴一覧はowner専用。構造適合は承認資格ではない。",
   "type": "object",
   "required": [
     "operation",
@@ -20,7 +20,8 @@
         "対話中止",
         "対話終了",
         "対話承認",
-        "対話承認待ち"
+        "対話承認待ち",
+        "対話履歴一覧"
       ]
     },
     "payload": {
@@ -195,6 +196,32 @@
           "required": [],
           "additionalProperties": false,
           "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話履歴一覧"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "after",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
         }
       }
     }
