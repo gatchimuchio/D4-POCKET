@@ -333,6 +333,43 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域復旧プレビュー"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "相対path",
+            "基準点hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "相対path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "基準点hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
     }
   ],
   "type": "object"

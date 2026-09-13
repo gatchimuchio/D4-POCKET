@@ -240,6 +240,13 @@ fn large_file_baseline_and_diff_return_only_full_file_metadata() {
     assert_eq!(diff["before"]["bytes"],70_000);assert_eq!(diff["after"]["bytes"],70_001);
     assert_eq!(diff["before"]["sha256"],sha256_tagged(&before));assert_eq!(diff["after"]["sha256"],sha256_tagged(&after));
     assert!(!changed.to_string().contains("yyyyyyyy"));
+    let preview=request(&normal,"作業領域復旧プレビュー",selection.clone());
+    assert_eq!(preview["status"],"accepted");
+    assert_eq!(preview["body"]["projection"]["baseline_content_available"],false);
+    assert_eq!(preview["body"]["projection"]["execution_permitted"],false);
+    assert_eq!(preview["body"]["projection"]["diff"]["before"]["sha256"],sha256_tagged(&after));
+    assert_eq!(preview["body"]["projection"]["diff"]["after"]["sha256"],sha256_tagged(&before));
+    assert!(preview["body"]["projection"]["diff"]["unified"].is_null());
     assert_eq!(request(&normal,"作業領域読取",json!({"作業領域ID":"workspace-a","相対path":"large"}))["status"],"rejected");
     fs::remove_file(f.root.join("project/large")).unwrap();
     let deleted=request(&normal,"作業領域差分",selection);
@@ -277,7 +284,25 @@ fn whole_workspace_changes_bind_actual_files_current_grant_and_audit() {
     assert_eq!(result["body"]["projection"]["excluded_secrets"],2);
     let added=request(&normal,"作業領域差分",json!({"作業領域ID":"workspace-a","相対path":"src/new","基準点hash":baseline}));
     assert_eq!(added["status"],"accepted");assert!(added["body"]["projection"]["diff"]["before"].is_null());
+    let mut previews=Vec::new();
+    for (path,action) in [("本文.txt","replace"),("src/delete","recreate"),("src/new","remove"),("same","none")] {
+        let preview=request(&normal,"作業領域復旧プレビュー",json!({"作業領域ID":"workspace-a","相対path":path,"基準点hash":baseline}));
+        assert_eq!(preview["status"],"accepted","{preview}");
+        assert_eq!(preview["body"]["projection"]["action"],action);
+        assert_eq!(preview["body"]["projection"]["execution_permitted"],false);
+        assert_eq!(preview["body"]["projection"]["baseline_content_available"],true);
+        if action=="replace" {
+            assert_eq!(preview["body"]["projection"]["diff"]["before"]["sha256"],sha256_tagged("変更後".as_bytes()));
+            assert!(preview["body"]["projection"]["diff"]["unified"].as_str().unwrap().contains("+登録から実読取まで"));
+        }
+        previews.push(preview["body"].clone());
+    }
+    assert_eq!(fs::read_to_string(f.root.join("project/本文.txt")).unwrap(),"変更後");
+    assert!(!f.root.join("project/src/delete").exists());
+    assert!(f.root.join("project/src/new").exists());
     let mut wrong=selection.clone();wrong["基準点hash"]=json!("wrong");
+    let mut wrong_preview=wrong.clone();wrong_preview["相対path"]=json!("same");
+    assert_eq!(request(&normal,"作業領域復旧プレビュー",wrong_preview)["status"],"rejected");
     assert_eq!(request(&normal,"作業領域変更一覧",wrong)["status"],"rejected");
     fs::hard_link(f.root.join("project/same"),f.root.join("project/alias")).unwrap();
     assert_eq!(request(&normal,"作業領域変更一覧",selection.clone())["status"],"rejected");
@@ -287,12 +312,16 @@ fn whole_workspace_changes_bind_actual_files_current_grant_and_audit() {
         let hidden=request(&normal,"作業領域変更一覧",selection.clone());
         assert_eq!(hidden["status"],"accepted");assert!(!hidden.to_string().contains("src/new"));
         assert!(!hidden.to_string().contains("changes"));
+        let preview=request(&normal,"作業領域復旧プレビュー",json!({"作業領域ID":"workspace-a","相対path":"src/new","基準点hash":baseline}));
+        assert_eq!(preview["status"],"accepted");assert!(!preview.to_string().contains("src/new"));
+        assert!(!preview.to_string().contains("action"));
         assert_eq!(request(&owner,"作業領域全体基準点保存",capture.clone())["status"],"rejected");
     }
     assert!(cli(&f,&["作業領域失効","workspace-a",hash]).status.success());
     assert_eq!(request(&normal,"作業領域変更一覧",selection)["status"],"rejected");
     let schema_data=f.root.join("whole-results.json");
-    fs::write(&schema_data,serde_json::to_vec(&json!([receipt,result["body"],added["body"]])).unwrap()).unwrap();
+    previews.extend([receipt,result["body"].clone(),added["body"].clone()]);
+    fs::write(&schema_data,serde_json::to_vec(&previews).unwrap()).unwrap();
     let root=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let script="import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from tooling.schema_check.check_schemas import validate_instance; schema=json.loads((Path(sys.argv[1])/'specs/workspace_inspection_response.schema.json').read_text(encoding='utf-8')); results=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8')); errors=[e for result in results for e in validate_instance(result,schema)]; assert not errors, errors";
     let validation=Command::new(if cfg!(windows) {"python"} else {"python3"}).args(["-c",script]).arg(root).arg(schema_data).output().unwrap();

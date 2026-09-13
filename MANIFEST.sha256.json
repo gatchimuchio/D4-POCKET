@@ -1054,7 +1054,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "c7bd0f852554cc8e3ea2d9dab776be7d45f428618bd577b07a1882afdb4befc5"
+      "sha256": "4225a93852c2e0e81dc46da80429f0392847e4f38f371f9459994750783e836a"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "f4a36f70388ff4b4835eeba6367e2c95545bdf99c5ad19503d5500bac1f0b72c"
+      "sha256": "34c817558cd19558902b2b7a57d0ea772199569fa3aa3abacc507d382a372eaa"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1550,7 +1550,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "a2a64c645879dcc783c8c73c5032a89f32a7ad7406f390c30f830247fc067926"
+      "sha256": "d0c24123a01a5f9fe2d0c43b2604b04f97e810ed355a1b6f341ad4d9d3a5fab2"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -1558,7 +1558,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "6c9e46ca58b075478b39c565fcfb0083bc373e1f08f585ff9d824e4ef61db76e"
+      "sha256": "689e26e195dda7bf35c2d6415319013aa08cf526b861c1ec77794804a43a890a"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -1646,7 +1646,7 @@
     },
     {
       "path": "native/rust_helper/tests/workspace_startup.rs",
-      "sha256": "1ada202280f5c69e02492862f70e1d44a2943bec4243b7e041598603932dc105"
+      "sha256": "545f126aaffc37f8743e10328d0cd2ac48542a8f4c97dd869224f0953918dde5"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -2078,11 +2078,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "2e18e9b4d064f0c4675bdde091a8ca9906c5e8300f00924b36f8bbbdafbcc1d7"
+      "sha256": "ed5b9f5a7e3648bce4a32c09640a86364c9ffb19d046461845c1aafa3884a91b"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "ea1a923b266fc8c9ffe07f0a212c5ca7a11b617cf14115e8df17a1ffc6406b0b"
+      "sha256": "1aa4743cffe4048496daeb206eb4052ac3567fce019bfafe0984c22d079edf9e"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2130,11 +2130,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "b002068afca39c71e7534caa5201d7bc0da713845365cad630c68cd2a86a2a9c"
+      "sha256": "de12e44b026e4e58966c8acd4d1a75129e5fa91588931cb53ead2d0037f788d8"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "3fc1b6d8039dd67d632c583b33cd2eba83f19d0c72f8b3b1ea1588f3aa917207"
+      "sha256": "e35a9c118587f7f49a095d81fd3b76459050fed48caf93dfae2ab067b0b2e282"
     },
     {
       "path": "specs/workspace_startup.schema.json",

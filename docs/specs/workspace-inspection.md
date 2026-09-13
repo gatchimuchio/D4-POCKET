@@ -143,3 +143,9 @@ Dart consumerは応答操作・要求hash・登録・Approval・基準点を照�
 ## 再照合と差分表示方式の分離
 
 定期再照合では従来どおり本文・pathを画面から除去する。統合差分/左右比較の選択だけをインスペクタのUI状態として保持し、同じ表示の再照合成功後に引き継ぐ。新しい対象取得操作では統合差分へ戻す。表示方式は承認・基準点・本文を所有せず、拒否された内容を復元できない。遅延応答の間に実際に非表示フレームを描画する試験を通し、即時応答だけで継続表示を保証しない。
+
+## rollback候補の事前確認
+
+作業領域復旧プレビューは通常IPCの読取操作とし、作業領域ID・相対path・現在基準点hashを要求する。現在Permission/Approval・secret除外・nofollow取得・監査後の期限確認を既存差分と共有する。fullだけに現在file→比較元の逆方向差分を返す。候補actionはnone/remove/recreate/replaceであり、現在hash/サイズと復旧先hash/サイズは逆方向diffのbefore/afterへ結合する。比較元の本文を保持しているかをbaseline_content_availableで明示する。比較元がfile不在なら復元本文は不要なのでtrueとする。
+
+execution_permittedは常にfalseとする。この応答はRecoveryの実行承認、書込Permission、実行tokenではない。プレビュー自体はworkspace.inspectの現在承認とworkspace.reapproveの失敗復旧経路に属する。実際のrollbackには別のRecovery/Approvalと、適用直前の現在file検査が必要であり、この単位は書込みを実装しない。巨大/binaryは本文を表示せずmetadataのみ。取得拒否・別基準点・未指定範囲を復旧候補として成功させない。

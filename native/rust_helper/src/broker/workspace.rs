@@ -199,8 +199,8 @@ impl WorkspaceRegistry {
             entry.baseline=Some(Baseline {whole,hash,files});
             return Ok(body);
         }
-        if !matches!(operation, "作業領域ツリー" | "作業領域読取" | "作業領域差分" | "作業領域比較範囲" | "作業領域変更一覧") {return Err("作業領域操作が不正");}
-        let (p,baseline_hash) = if matches!(operation,"作業領域差分" | "作業領域変更一覧") {
+        if !matches!(operation, "作業領域ツリー" | "作業領域読取" | "作業領域差分" | "作業領域復旧プレビュー" | "作業領域比較範囲" | "作業領域変更一覧") {return Err("作業領域操作が不正");}
+        let (p,baseline_hash) = if matches!(operation,"作業領域差分" | "作業領域復旧プレビュー" | "作業領域変更一覧") {
             let value:DiffSelection=parse(payload)?;
             (Selection {作業領域ID:value.作業領域ID,相対path:value.相対path},Some(value.基準点hash))
         } else {(parse::<Selection>(payload)?,None)};
@@ -251,7 +251,13 @@ impl WorkspaceRegistry {
                 } else if let Some(baseline)=baseline {
                     let after=entry.reader.read_comparison_version(&p.相対path,crate::workspace_reader::MAX_COMPARISON_BYTES).map_err(|_| "比較fileの取得拒否または上限超過")?;
                     let before=baseline.files.get(&p.相対path).and_then(|v|v.as_ref());
-                    json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate_versions(before,after.as_ref())})
+                    if operation=="作業領域復旧プレビュー" {
+                        let diff=crate::workspace_diff::generate_versions(after.as_ref(),before);
+                        let action=if diff.kind==crate::workspace_diff::DiffKind::Unchanged {"none"}
+                            else if before.is_none() {"remove"} else if after.is_none() {"recreate"} else {"replace"};
+                        json!({"基準点hash":baseline.hash,"diff":diff,"action":action,
+                            "baseline_content_available":before.is_none_or(|v|v.content.is_some()),"execution_permitted":false})
+                    } else {json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate_versions(before,after.as_ref())})}
                 } else if operation == "作業領域ツリー" {
                     let items = entry.reader.list(&p.相対path).map_err(|_| "作業領域を安全に列挙できない")?;
                     json!({"entries":items.into_iter().map(|v|json!({"path":v.path,"kind":match v.kind {EntryKind::File=>"file",EntryKind::Directory=>"directory"},"bytes":v.bytes})).collect::<Vec<_>>()})
