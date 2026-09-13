@@ -31,6 +31,8 @@ class MemoryStore implements DeviceStore {
   bool failWrite = false;
   bool failRead = false;
   bool failDelete = false;
+  bool retainOnDelete = false;
+  bool failReadAfterDelete = false;
   @override
   Future<String?> read(String key) async {
     if (failRead) throw StateError('fixture');
@@ -46,7 +48,8 @@ class MemoryStore implements DeviceStore {
   @override
   Future<void> delete(String key) async {
     if (failDelete) throw StateError('fixture');
-    values.remove(key);
+    if (!retainOnDelete) values.remove(key);
+    if (failReadAfterDelete) failRead = true;
   }
 }
 
@@ -350,6 +353,72 @@ void main() {
     expect(c.credential, isNotNull);
     c.dispose();
   });
+  test('利用可能な資格なしにDesktopの解除成功を表示しない', () async {
+    final store = MemoryStore()
+      ..values[DeviceLinkController.credentialKey] = '{}';
+    final calls = <String>[];
+    final c = DeviceLinkController(
+      store: store,
+      connect: (v) => LinkFixture(v, calls),
+    );
+    await c.initialize();
+    await c.disconnect();
+    expect(calls, isEmpty);
+    expect(c.status, contains('確認できません'));
+    expect(c.hasStoredCredential, isTrue);
+    expect(store.values[DeviceLinkController.credentialKey], '{}');
+    c.dispose();
+  });
+  for (final localOnly in [false, true]) {
+    test('保存資格の不在確認後に解除完了を表示する（localOnly=$localOnly）', () async {
+      final store = MemoryStore()
+        ..values[DeviceLinkController.credentialKey] = jsonEncode(data());
+      final calls = <String>[];
+      final c = DeviceLinkController(
+        store: store,
+        connect: (v) => LinkFixture(v, calls),
+      );
+      await c.initialize();
+      calls.clear();
+      await c.disconnect(localOnly: localOnly);
+      expect(c.status, contains('削除しました'));
+      expect(c.ready, isFalse);
+      expect(c.credential, isNull);
+      expect(c.hasStoredCredential, isFalse);
+      expect(store.values[DeviceLinkController.credentialKey], isNull);
+      expect(calls, localOnly ? isEmpty : ['端末離脱']);
+      c.dispose();
+    });
+    for (final readFailure in [false, true]) {
+      test(
+        '削除後の${readFailure ? '読取失敗' : '資格残存'}を完了にしない（localOnly=$localOnly）',
+        () async {
+          final store = MemoryStore()
+            ..values[DeviceLinkController.credentialKey] = jsonEncode(data());
+          final calls = <String>[];
+          final c = DeviceLinkController(
+            store: store,
+            connect: (v) => LinkFixture(v, calls),
+          );
+          await c.initialize();
+          calls.clear();
+          store.retainOnDelete = !readFailure;
+          store.failReadAfterDelete = readFailure;
+          await c.disconnect(localOnly: localOnly);
+          expect(c.ready, isFalse);
+          expect(c.status, contains('確認できません'));
+          expect(c.credential, isNotNull);
+          expect(c.hasStoredCredential, isTrue);
+          expect(calls, localOnly ? isEmpty : ['端末離脱']);
+          await expectLater(
+            c.request('対話送信'),
+            throwsA(isA<BrokerClientException>()),
+          );
+          c.dispose();
+        },
+      );
+    }
+  }
   testWidgets('未接続を表示し既存6画面と対話・接続先・設定を保持', (tester) async {
     final c = DeviceLinkController(
       store: MemoryStore(),

@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Mobileの解除・保存資格削除の確認（2026-09-13）
+
+Mobileのcontrol経路で、保存APIのdeleteが例外なく戻るだけで削除完了と表示していた。通常解除と端末内だけの削除の両方で、資格残存・削除後の読取障害を注入した4負例が変更前に失敗した。またclient不在でdisconnectを直接呼ぶと、端末離脱を送らずDesktop解除成功と表示する負例も再現した。既存UIはclientを作れない破損資格で通常解除を無効にするが、controller自身にも拒否を置いた。
+
+通常解除には端末離脱の確認を要求し、保存資格はdelete後に同じDeviceStoreから再読取して不在を確認する。失敗時は資格の管理状態を保持して通信を止め、未確認と表示する。通常解除・端末内削除の正常2例と負例5例を追加し、製品controllerを呼ぶMobile試験は全21件PASS。Desktop/Mobileの `flutter analyze --no-pub`、Schema36/正常36/負例38、conformance150件、日本語基底監査もPASS。Mobile試験commandは `flutter test --no-pub --reporter expanded`。
+
+試験の保管・通信は障害を注入するFIXTUREで、productionのDeviceLinkControllerの採否・表示・通信停止を検証した。Rustの失効・監査経路、TLS、保管pluginは変更していない。Android/iOSの実機安全保管の証拠へは昇格しない。実機未検証は冒頭のrelease_blockerに保持し、現在の開発を継続する。
+
 ## 統治変更（2026-09-10）
 
 対象はローカル品質判定と手動補助 Actions の分離。製品 runtime の権限・実行経路は変更しない。自動 CI は禁止を維持し、手動起動条件を構造として検査する。証拠分類は CONFIG / FIXTURE であり、外部実行や branch protection の保証ではない。

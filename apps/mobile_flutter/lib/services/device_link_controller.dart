@@ -244,13 +244,16 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
     busy = true;
     ready = false;
     try {
-      if (!localOnly && _client != null) {
+      if (!localOnly) {
+        if (_client == null) throw const BrokerClientException('失効確認用の資格なし');
         if (!foreground) throw const BrokerClientException('通信停止中');
         _client!.setActive(true);
         await _client!.request('端末離脱');
       }
       _stop();
       await _store.delete(credentialKey);
+      if (await _store.read(credentialKey) != null)
+        throw const BrokerClientException('保存資格の削除未確認');
       hasStoredCredential = false;
       credential = null;
       _client = null;
