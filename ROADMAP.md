@@ -25,6 +25,16 @@ rev2の要求監査では、Mobile実機証拠・Mobile正式配布・Desktop起
 
 ## 完了監査の優先事項
 
+### 現在の開発・検証条件（2026-09-13 owner指示）
+
+現在、実機検証を実行できるOSはWindowsだけである。Windowsでは配置・起動・画面・broker・回帰の実検証を進める。Android実機検証は再開指示まで凍結し、その他の非Windows実機検証も利用不能として保持する。端末接続や実機証拠の提出を繰り返し要求せず、非Windowsは利用可能なbuild・自動試験・仮想環境で開発を継続する。SimulatorやWSLgの結果は実機結果へ昇格しない。
+
+監査アンカーの実運用公開鍵固定とオフライン署名は、正式release直前まで外部条件待ちとする。通常開発でownerに秘密鍵生成・接続・署名を要求しない。実機証拠、実運用署名、正式配布条件、owner GOの未成立は正式releaseの判定に保持し、それだけを開発停止条件にしない。未実装・失敗・回帰が見つかった場合は、利用可能な環境で修正と検証を続ける。
+
+通常の集約検証は `python tooling/validate_all.py --desktop-platform windows --include-mobile-release` を使用する。Linux開発環境ではplatformをlinuxとする。`--strict-release` は正式release判定に使用し、外部条件に変化がない間の開発進捗確認として反復しない。開発検査の失敗は修正対象であり、実機待ちを理由に無視しない。検証条件が変わるまでは、未検証範囲を保持したまま同じ待機報告を繰り返さない。
+
+現時点の実証拠と対象commitは `docs/REV2_PROGRESS.md` 冒頭の現況節を参照する。以下の旧時点の監査項目は当時の要求・課題の記録であり、現在の合否は対象commitに結合した実証拠とrelease consumerで判定する。
+
 ~~~yaml
 - item: Ghost Invariants
   classification: required_for_v1

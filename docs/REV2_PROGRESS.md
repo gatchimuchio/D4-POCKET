@@ -1,6 +1,23 @@
 # rev2 実装進捗と証拠境界
 
-各節は作業時点の履歴である。現在状態は末尾の「現時点の要求監査」を優先し、過去の未実装記述を現在の状態へ読み替えない。
+各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
+
+## 現況：Windows実機を基準とした開発継続（2026-09-13）
+
+owner指示により、現在実機検証できるOSはWindowsだけとする。Android実機は凍結、その他の非Windows実機も未検証として保持する。実装・build・自動試験・利用可能な仮想環境の検証を先に進め、実機の不在だけを開発停止条件にしない。実運用監査署名は正式release直前まで延期する。具体的な運用はROADMAPの「現在の開発・検証条件」を参照する。
+
+次の保存済み結果を今回読み直した。対象sourceは `7d4766d0969a335e57bcba997540851c2e25aa6c` であり、この文書更新後の新commitの実行証拠へ読み替えない。
+
+- Windows: `%LOCALAPPDATA%/GUI-Shell/installed-runs/rev2-7d4766d-20260911/runtime/evidence/validation-result.json` では、provenance分離、installed初回起動、Setup Doctor、brokerの4関門がpassed。実運用署名の関門はfailed。末尾に残る「正式Windows再収集が必要」という履歴項目は、このsourceの通常collectorによる収集で解消した。
+- Apple: Repository外の `GUI-Shell-apple-7d4766d/verified-result.json` では手動run `34560858168`、artifact `10184321688` がpassed。Mac上Rust試験64単体・5 IPC・7 checkpoint、macOS開発appとiOS Simulator appのbuildを確認した記録である。tarのSHA-256は `370851b078b74b266deadce4c4a08ffeba4ba0ef2381a1d84f06768111cb2da9`。実機起動・Keychain・正式配布を証明しない。
+
+これらは保存済み検証結果の確認であり、今回の文書修正で製品を再実行した結果ではない。履歴を消して過去の判断を隠さず、対象sourceと証拠範囲を固定して更新する。
+
+- item: 非Windows実機証拠・Mobile正式配布・実運用監査署名・owner GO
+  classification: release_blocker
+  reason: 実機はWindowsのみ利用可能で、Android実機は凍結中。運用署名は正式release直前まで延期、正式配布条件とowner GOも未成立。利用可能な環境での開発継続を妨げる条件ではない。
+  required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
+  blocks_release: yes
 
 ## 統治変更（2026-09-10）
 
