@@ -90,7 +90,7 @@ Desktopの製品ShellCoreClientは通常Broker接続を保持し、Agent Center�
 
 ## 指定file群の基準点と差分操作
 
-owner制御の「作業領域基準点保存」は、現在のfull読取承認、作業領域ID、登録hash、重複のない相対path群を必要とする。1回最大128file、各fileの既存読取上限65,536 bytesを適用し、1作業領域に1基準点をBrokerのmemoryへ保持する。本文を監査・設定・diskへ複製しない。既存基準点は置換開始時に破棄し、対象すべての取得と監査が成功した場合だけ新しい基準点を確定する。取得中の競合・拒否・上限超過は部分基準点として成功させない。
+owner制御の「作業領域基準点保存」は、現在のfull読取承認、作業領域ID、登録hash、重複のない相対path群を必要とする。1回最大128file、全file合計128 MiBの比較取得上限を適用し、1作業領域に1基準点をBrokerのmemoryへ保持する。fileごとの本文保持は65,536 bytesまでとする。本文を監査・設定・diskへ複製しない。既存基準点は置換開始時に破棄し、対象すべての取得と監査が成功した場合だけ新しい基準点を確定する。取得中の競合・拒否・上限超過は部分基準点として成功させない。
 
 基準点hashはversion、登録hash、生成nonce、作成時刻、指定pathと各fileの存在・byte数・内容hashへ結合する。基準点は指定されたfile群の取得時点の比較元であり、workspace全体の原子的snapshotではない。未指定fileを「変更なし」と報告しない。
 
@@ -98,7 +98,7 @@ owner制御の「作業領域基準点保存」は、現在のfull読取承認�
 
 基準点は権限を所有しない。期限切れでは読取を拒否し、新たなowner承認なしに復活しない。明示的失効、時計後退、監査障害、Broker停止で基準点を破棄する。同じ登録にownerが改めて現在読取を承認した場合は、その現在表示範囲でのみ既存比較元を使用できる。Capabilityはworkspace.inspect、PermissionとApprovalは現在の読取承認、復旧はworkspace.reapprove。基準点保存も取得後の期限と最終監査を必須とする。
 
-この単位は指定範囲の基準点と実IPC差分まで。workspace全体の変更探索、巨大fileのmetadata比較、差分UI、実履歴とrollback previewはrelease_blockerを維持する。
+この単位は指定範囲の基準点と実IPC差分まで。workspace全体の変更探索、128 MiB超のfile比較、全workspace探索、実履歴とrollback previewはrelease_blockerを維持する。
 
 owner CLIは `作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...` とする。返却された基準点hashは差分要求の対象結合であり、監査チェックポイントの署名証拠や新しい権限ではない。
 
@@ -109,3 +109,11 @@ owner CLIは `作業領域制御 --session-file <owner資格file> 作業領域�
 Desktopは基準点の対象fileから差分を要求し、同一登録・現在承認・要求hash・基準点hash、差分の構造を確認してから描画する。統合差分と左右比較を切り替え、binary/oversized/unchangedはmetadataと状態を表示する。比較元の保存はowner制御経路のままとし、画面の操作から承認を自己生成しない。表示中の再確認では現在の基準点も照合し、置換済み比較元を旧基準点として維持しない。
 
 表示する一覧は「基準点の対象file」であり、全workspaceの変更file一覧ではない。全体探索・巨大file比較・履歴・rollback preview・native画面検証はrelease_blockerとして続く。
+
+## 巨大fileの比較metadata
+
+通常の本文読取は65,536 bytes上限を維持する。比較取得は同じnofollow・通常file・単一hardlink・device・取得前後同一性の検査で、最大128 MiBまでstreaming SHA-256を計算する。本文保持は65,536 bytesまでとし、それを超えたfileは全体のbyte数/hashだけを保持する。上限超過、短縮・成長・置換など観測された競合は結果を返さず、部分hashを全fileのhashにしない。
+
+基準点保存は全指定fileの合計取得budgetを128 MiBに制限する。各取得へ残budgetを渡し、超過は部分基準点を確定しない。指定数128とmemory上の本文保持上限も維持する。128 MiBを超えるfileは未取得として拒否する範囲であり、その先の比較supportはrelease_blocker。
+
+比較元か現在fileに本文を保持していない場合、サイズ/hashが一致すればunchanged、異なればoversizedとしてmetadataだけを返す。小さいfile同士は既存の統合差分・左右比較を使用する。巨大fileの追加・削除も存在状態とmetadataで表し、空fileや取得拒否と同一視しない。秘密pathの除外、現在Permission/Approval、監査後の返却境界は変えない。

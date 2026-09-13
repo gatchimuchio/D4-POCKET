@@ -218,3 +218,31 @@ fn owner_checkpoint_and_current_ipc_diff_bind_real_changes_and_revocation() {
     let raw=fs::read_to_string(f.root.join("store/audit.jsonl")).unwrap();
     for content in ["本文.txt","変更された本文","new.txt",&owner.session_secret] {assert!(!raw.contains(content));}
 }
+
+#[test]
+fn large_file_baseline_and_diff_return_only_full_file_metadata() {
+    let mut f=Fixture::new();let (normal,_)=f.start();
+    let listed=request(&normal,"作業領域一覧",json!({}));
+    let hash=listed["body"]["作業領域"][0]["登録hash"].as_str().unwrap();
+    assert!(cli(&f,&["作業領域承認","workspace-a",hash,"full"]).status.success());
+    let before=vec![b'x';70_000];let after=vec![b'y';70_001];
+    fs::write(f.root.join("project/large"),&before).unwrap();
+    let captured=cli(&f,&["作業領域基準点保存","workspace-a",hash,"large"]);
+    assert!(captured.status.success());let receipt:Value=serde_json::from_slice(&captured.stdout).unwrap();
+    let selection=json!({"作業領域ID":"workspace-a","相対path":"large","基準点hash":receipt["projection"]["基準点hash"]});
+    let same=request(&normal,"作業領域差分",selection.clone());
+    assert_eq!(same["body"]["projection"]["diff"]["kind"],"unchanged");
+    fs::write(f.root.join("project/large"),&after).unwrap();
+    let changed=request(&normal,"作業領域差分",selection.clone());
+    assert_eq!(changed["status"],"accepted");
+    let diff=&changed["body"]["projection"]["diff"];
+    assert_eq!(diff["kind"],"oversized");assert!(diff["unified"].is_null());assert_eq!(diff["rows"],json!([]));
+    assert_eq!(diff["before"]["bytes"],70_000);assert_eq!(diff["after"]["bytes"],70_001);
+    assert_eq!(diff["before"]["sha256"],sha256_tagged(&before));assert_eq!(diff["after"]["sha256"],sha256_tagged(&after));
+    assert!(!changed.to_string().contains("yyyyyyyy"));
+    assert_eq!(request(&normal,"作業領域読取",json!({"作業領域ID":"workspace-a","相対path":"large"}))["status"],"rejected");
+    fs::remove_file(f.root.join("project/large")).unwrap();
+    let deleted=request(&normal,"作業領域差分",selection);
+    assert_eq!(deleted["body"]["projection"]["diff"]["kind"],"oversized");
+    assert!(deleted["body"]["projection"]["diff"]["after"].is_null());
+}

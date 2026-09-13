@@ -46,7 +46,10 @@ fn baseline_capture_audit_failure_and_expiry_never_publish_old_content() {
     let binary=registry.operate("作業領域差分",&diff,false,100,&mut |_,_|Ok(())).unwrap();
     assert_eq!(binary["projection"]["diff"]["kind"],"binary");assert!(binary["projection"]["diff"]["unified"].is_null());
     std::fs::write(path.join("file.txt"),vec![b'x';65_537]).unwrap();
-    assert!(registry.operate("作業領域差分",&diff,false,100,&mut |_,_|Ok(())).is_err());
+    let large=registry.operate("作業領域差分",&diff,false,100,&mut |_,_|Ok(())).unwrap();
+    assert_eq!(large["projection"]["diff"]["kind"],"oversized");
+    assert!(large["projection"]["diff"]["unified"].is_null());
+    std::fs::OpenOptions::new().write(true).open(path.join("file.txt")).unwrap().set_len(crate::workspace_reader::MAX_COMPARISON_BYTES+1).unwrap();
     assert!(registry.operate("作業領域基準点保存",&capture,true,100,&mut |_,_|Ok(())).is_err());
     assert!(registry.entries["workspace-a"].baseline.is_none());
     std::fs::write(path.join("file.txt"),b"small").unwrap();

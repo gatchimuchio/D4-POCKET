@@ -36,7 +36,7 @@ struct RegisteredWorkspace {
 }
 struct Baseline {
     hash: String,
-    files: BTreeMap<String, Option<Vec<u8>>>,
+    files: BTreeMap<String, Option<crate::workspace_reader::ComparedFile>>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -168,12 +168,14 @@ impl WorkspaceRegistry {
             entry.baseline=None;
             audit("ownerの現在承認と基準点取得範囲を照合", &digest(payload))?;
             let mut files=BTreeMap::new();
+            let mut remaining=crate::workspace_reader::MAX_COMPARISON_BYTES;
             for path in paths {
                 if Instant::now() >= grant.deadline {return Err("基準点取得中に承認期限超過");}
-                let bytes=entry.reader.read_version(&path).map_err(|_| "基準点fileの取得拒否または上限超過")?;
+                let bytes=entry.reader.read_comparison_version(&path,remaining).map_err(|_| "基準点fileの取得拒否または上限超過")?;
+                remaining-=bytes.as_ref().map(|v|v.bytes as u64).unwrap_or(0);
                 files.insert(path,bytes);
             }
-            let metadata:BTreeMap<_,_>=files.iter().map(|(path,bytes)|(path,bytes.as_ref().map(|v|json!({"bytes":v.len(),"sha256":sha256_tagged(v)})))).collect();
+            let metadata:BTreeMap<_,_>=files.iter().map(|(path,bytes)|(path,bytes.as_ref().map(|v|json!({"bytes":v.bytes,"sha256":v.sha256})))).collect();
             let nonce=識別子生成().map_err(|_| "基準点識別子を生成できない")?;
             let hash=digest(&json!({"version":1,"登録hash":entry.registration_hash,"nonce":nonce,"作成時刻":now,"files":metadata}));
             let body=json!({"version":1,"operation":operation,"要求hash":digest(payload),"作業領域ID":p.作業領域ID,
@@ -210,9 +212,9 @@ impl WorkspaceRegistry {
                 let data = if operation == "作業領域比較範囲" {
                     json!({"基準点hash":entry.baseline.as_ref().map(|v|v.hash.as_str()),"相対paths":entry.baseline.as_ref().map(|v|v.files.keys().collect::<Vec<_>>()).unwrap_or_default()})
                 } else if let Some(baseline)=baseline {
-                    let after=entry.reader.read_version(&p.相対path).map_err(|_| "比較fileの取得拒否または上限超過")?;
-                    let before=baseline.files[&p.相対path].as_deref();
-                    json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate(before,after.as_deref())})
+                    let after=entry.reader.read_comparison_version(&p.相対path,crate::workspace_reader::MAX_COMPARISON_BYTES).map_err(|_| "比較fileの取得拒否または上限超過")?;
+                    let before=baseline.files[&p.相対path].as_ref();
+                    json!({"基準点hash":baseline.hash,"diff":crate::workspace_diff::generate_versions(before,after.as_ref())})
                 } else if operation == "作業領域ツリー" {
                     let items = entry.reader.list(&p.相対path).map_err(|_| "作業領域を安全に列挙できない")?;
                     json!({"entries":items.into_iter().map(|v|json!({"path":v.path,"kind":match v.kind {EntryKind::File=>"file",EntryKind::Directory=>"directory"},"bytes":v.bytes})).collect::<Vec<_>>()})

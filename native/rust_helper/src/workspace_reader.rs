@@ -4,9 +4,18 @@ use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::fs::MetadataExt;
 use cap_std::fs::{Dir, Metadata, OpenOptions};
 use std::io::Read;
+use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 
 const MAX_BYTES: u64 = 65_536;
+pub const MAX_COMPARISON_BYTES: u64 = 128 * 1024 * 1024;
+
+/// 本文を保持しない大fileも、全体取得済みのmetadataを持つ。
+pub struct ComparedFile {
+    pub bytes: usize,
+    pub sha256: String,
+    pub(crate) content: Option<Vec<u8>>,
+}
 const MAX_ENTRIES: usize = 1024;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -252,6 +261,16 @@ impl WorkspaceReader {
     }
 
     fn read_version_checked(&self, path: &str, missing_observed: impl FnOnce()) -> Result<Option<Vec<u8>>, ReadError> {
+        if self.is_missing_checked(path, missing_observed)? {return Ok(None);}
+        self.read(path).map(Some)
+    }
+
+    pub fn read_comparison_version(&self, path: &str, budget: u64) -> Result<Option<ComparedFile>, ReadError> {
+        if self.is_missing_checked(path, || {})? {return Ok(None);}
+        self.read_file_checked(path, budget.min(MAX_COMPARISON_BYTES), || {}).map(Some)
+    }
+
+    fn is_missing_checked(&self, path: &str, missing_observed: impl FnOnce()) -> Result<bool, ReadError> {
         let parts = self.allowed(path)?;
         let mut dir = self.root.try_clone().map_err(|_| ReadError::Unavailable)?;
         for (index, part) in parts.iter().enumerate() {
@@ -264,7 +283,7 @@ impl WorkspaceReader {
                     let current_metadata = current.dir_metadata().map_err(|_| ReadError::Changed)?;
                     if !same_file(&original_metadata, &current_metadata) {return Err(ReadError::Changed);}
                     return match current.symlink_metadata(part) {
-                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
                         _ => Err(ReadError::Changed),
                     };
                 },
@@ -274,7 +293,7 @@ impl WorkspaceReader {
             if index + 1 == parts.len() {
                 if !regular(&metadata) {return Err(ReadError::UnsafeFile);}
                 // 存在確認後の消失も、既存取得器の競合・取得拒否として扱う。
-                return self.read(path).map(Some);
+                return Ok(false);
             }
             if !metadata.is_dir() {return Err(ReadError::UnsafeFile);}
             let next = dir.open_dir_nofollow(part).map_err(|_| ReadError::Changed)?;
@@ -292,6 +311,11 @@ impl WorkspaceReader {
     }
 
     fn read_checked(&self, path: &str, after_open: impl FnOnce()) -> Result<Vec<u8>, ReadError> {
+        let result=self.read_file_checked(path,MAX_BYTES,after_open)?;
+        result.content.ok_or(ReadError::TooLarge(result.bytes as u64))
+    }
+
+    fn read_file_checked(&self, path: &str, limit: u64, after_open: impl FnOnce()) -> Result<ComparedFile, ReadError> {
         let parts = self.allowed(path)?;
         let parent = self.directory(&parts[..parts.len() - 1])?;
         let name = parts[parts.len() - 1];
@@ -303,17 +327,24 @@ impl WorkspaceReader {
         if !regular(&before) || cap_fs_ext::MetadataExt::dev(&before)!=self.root_device {
             return Err(ReadError::UnsafeFile);
         }
-        if before.len() > MAX_BYTES {
+        if before.len() > limit {
             return Err(ReadError::TooLarge(before.len()));
         }
         after_open();
-        let mut bytes = Vec::new();
-        (&mut file)
-            .take(MAX_BYTES + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|_| ReadError::Unavailable)?;
-        if bytes.len() as u64 > MAX_BYTES {
-            return Err(ReadError::TooLarge(bytes.len() as u64));
+        let mut content=Some(Vec::new());
+        let mut count=0u64;
+        let mut hasher=Sha256::new();
+        let mut buffer=[0u8;65_536];
+        let mut limited=(&mut file).take(limit+1);
+        loop {
+            let read=limited.read(&mut buffer).map_err(|_| ReadError::Unavailable)?;
+            if read==0 {break;}
+            count+=read as u64;
+            if count > limit {return Err(ReadError::TooLarge(count));}
+            hasher.update(&buffer[..read]);
+            if count <= MAX_BYTES {
+                if let Some(bytes)=content.as_mut() {bytes.extend_from_slice(&buffer[..read]);}
+            } else {content=None;}
         }
         let after = file.metadata().map_err(|_| ReadError::Unavailable)?;
         let current_parent = self.directory(&parts[..parts.len() - 1])?;
@@ -326,15 +357,16 @@ impl WorkspaceReader {
             || !regular(&current)
             || !same_file(&before, &after)
             || !same_file(&after, &current)
-            || before.len() != bytes.len() as u64
+            || before.len() != count
             || after.len() != before.len()
+            || current.len() != after.len()
             || before.modified().ok().is_none()
             || before.modified().ok() != after.modified().ok()
             || current.modified().ok() != after.modified().ok()
         {
             return Err(ReadError::Changed);
         }
-        Ok(bytes)
+        Ok(ComparedFile {bytes:count as usize,sha256:format!("sha256:{}",hex::encode(hasher.finalize())),content})
     }
 }
 
@@ -364,6 +396,33 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn comparison_hashes_all_bytes_without_retaining_large_content() {
+        let f=Fixture::new();let reader=f.reader();
+        let bytes=vec![b'x';65_537];fs::write(f.0.join("large"),&bytes).unwrap();
+        let value=reader.read_comparison_version("large",MAX_COMPARISON_BYTES).unwrap().unwrap();
+        assert_eq!(value.bytes,bytes.len());assert_eq!(value.sha256,crate::audit_hash::sha256_tagged(&bytes));
+        assert!(value.content.is_none());
+        assert_eq!(reader.read("large"),Err(ReadError::TooLarge(65_537)));
+        assert!(matches!(reader.read_comparison_version("large",65_536),Err(ReadError::TooLarge(65_537))));
+        fs::write(f.0.join("empty"),b"").unwrap();
+        let empty=reader.read_comparison_version("empty",0).unwrap().unwrap();
+        assert_eq!(empty.content,Some(vec![]));assert_eq!(empty.sha256,crate::audit_hash::sha256_tagged(b""));
+        assert!(reader.read_comparison_version("missing",0).unwrap().is_none());
+    }
+
+    #[test]
+    fn comparison_rejects_growth_and_truncation_without_partial_hash() {
+        let f=Fixture::new();let reader=f.reader();
+        fs::write(f.0.join("file"),vec![b'a';65_537]).unwrap();
+        assert!(matches!(reader.read_file_checked("file",MAX_COMPARISON_BYTES, || {
+            fs::write(f.0.join("file"),vec![b'b';65_538]).unwrap();
+        }),Err(ReadError::Changed)));
+        assert!(matches!(reader.read_file_checked("file",MAX_COMPARISON_BYTES, || {
+            fs::write(f.0.join("file"),b"short").unwrap();
+        }),Err(ReadError::Changed)));
     }
 
     #[test]

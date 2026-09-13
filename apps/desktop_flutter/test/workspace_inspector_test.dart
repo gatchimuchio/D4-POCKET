@@ -246,6 +246,8 @@ void main() {
       final selected = (await client.list()).single;
       final view = await client.read(selected, 'file.txt', tree: false);
       expect(view.projection!['text'], '実接続本文');
+      await File('${project.path}/large')
+          .writeAsBytes(List<int>.filled(70000, 120));
       final saved = await Process.run(executable, [
         '作業領域制御',
         '--session-file',
@@ -253,11 +255,12 @@ void main() {
         '作業領域基準点保存',
         selected.id,
         selected.hash,
-        'file.txt'
+        'file.txt',
+        'large'
       ]);
       expect(saved.exitCode, 0);
       final scope = await client.read(selected, '', tree: false, scope: true);
-      expect(scope.projection!['相対paths'], ['file.txt']);
+      expect(scope.projection!['相対paths'], ['file.txt', 'large']);
       final baselineHash = scope.projection!['基準点hash'] as String;
       await File('${project.path}/file.txt').writeAsString('比較後の本文\n');
       final diff = await client.read(selected, 'file.txt',
@@ -265,8 +268,18 @@ void main() {
       expect((diff.projection!['diff'] as Map)['kind'], 'text');
       expect((diff.projection!['diff'] as Map)['unified'], contains('比較後の本文'));
 
+      await File('${project.path}/large')
+          .writeAsBytes(List<int>.filled(70001, 121));
+      final large = await client.read(selected, 'large',
+          tree: false, baselineHash: baselineHash);
+      final largeDiff = large.projection!['diff'] as Map;
+      expect(largeDiff['kind'], 'oversized');
+      expect(largeDiff['unified'], isNull);
+      expect(largeDiff['rows'], isEmpty);
+      expect((largeDiff['before'] as Map)['bytes'], 70000);
+      expect((largeDiff['after'] as Map)['bytes'], 70001);
       final tree = await client.read(selected, '', tree: true);
-      expect((tree.projection!['entries'] as List).length, 2);
+      expect((tree.projection!['entries'] as List).length, 3);
       final nested = await client.read(selected, 'folder', tree: true);
       expect((nested.projection!['entries'] as List).single['path'],
           'folder/nested.txt');

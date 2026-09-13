@@ -103,6 +103,19 @@ fn flush_rows(rows: &mut Vec<DiffRow>, deleted: &mut Vec<DiffLine>, added: &mut 
     }
 }
 
+/// 取得器が全fileを検査した比較版。巨大fileの本文を復元しない。
+pub fn generate_versions(before: Option<&crate::workspace_reader::ComparedFile>, after: Option<&crate::workspace_reader::ComparedFile>) -> WorkspaceDiff {
+    let metadata=|value:Option<&crate::workspace_reader::ComparedFile>|value.map(|v|FileVersion {bytes:v.bytes,sha256:v.sha256.clone()});
+    let left=metadata(before);let right=metadata(after);
+    if left==right {
+        return WorkspaceDiff {version:1,kind:DiffKind::Unchanged,before:left,after:right,unified:None,rows:vec![]};
+    }
+    if before.is_some_and(|v|v.content.is_none()) || after.is_some_and(|v|v.content.is_none()) {
+        return WorkspaceDiff {version:1,kind:DiffKind::Oversized,before:left,after:right,unified:None,rows:vec![]};
+    }
+    generate(before.and_then(|v|v.content.as_deref()),after.and_then(|v|v.content.as_deref()))
+}
+
 /// bytesは取得済みの内部内容。結果をUIへ渡す前に現在の表示範囲を強制する。
 /// Noneはfile不在であり、Some(b"")とは異なる。
 pub fn generate(before: Option<&[u8]>, after: Option<&[u8]>) -> WorkspaceDiff {

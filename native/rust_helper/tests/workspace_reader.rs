@@ -46,6 +46,7 @@ fn directory_link_to_outside_is_rejected() {
     let reader = f.reader();
     assert_eq!(reader.read("alias/file"), Err(ReadError::UnsafeFile));
     assert_eq!(reader.read_version("alias/missing"), Err(ReadError::UnsafeFile));
+    assert!(matches!(reader.read_comparison_version("alias/missing",128*1024*1024),Err(ReadError::UnsafeFile)));
     assert!(reader.list("").unwrap().is_empty());
     // junction先を削除対象にしない。link自身だけを取り除く。
     #[cfg(windows)]
@@ -67,6 +68,7 @@ fn final_symlink_to_secret_and_fifo_are_rejected_without_blocking() {
     assert_eq!(reader.read_version("alias"), Err(ReadError::UnsafeFile));
     std::os::unix::fs::symlink("absent", f.0.join("dangling")).unwrap();
     assert_eq!(reader.read_version("dangling"), Err(ReadError::UnsafeFile));
+    assert!(matches!(reader.read_comparison_version("dangling",128*1024*1024),Err(ReadError::UnsafeFile)));
     assert!(std::process::Command::new("mkfifo")
         .arg(f.0.join("pipe"))
         .status()

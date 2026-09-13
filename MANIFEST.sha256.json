@@ -454,7 +454,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
-      "sha256": "e44d8f7397ded00ea38d8fd9d2170931b6850de01ce8591de1bccb6cf1ec384c"
+      "sha256": "0c5ef6ca5794b9748dd149689240deb4858db8688d91352244f98f79e205c5f8"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -1054,7 +1054,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "6471d825bcd7dd8dcfe1ac2948399c1ac7a869e01b8a41fb3a40e4ef72d4262f"
+      "sha256": "493e2c7999893687a95e93704bdec9880d1b76e3cbda062c01176a9a7ea9d080"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "80b48589962803fa71dd612d5b09894d9d3844d734a05663c104c221fd8ece92"
+      "sha256": "7ed63000fee4f43cb5692891e519fbe4751e5de12e2a4c10cd12ff38f1fae98a"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1558,7 +1558,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "63e5a342073fb96511ecb7d4f314bdb21075165260fe1e6d2b636b8c292dda26"
+      "sha256": "28a7195f368d16df9ceb684f59d5b701adef584fc94295fc2bdc33577a1bbaf1"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -1614,11 +1614,11 @@
     },
     {
       "path": "native/rust_helper/src/workspace_diff.rs",
-      "sha256": "e8865cf2e13ee541809d2924865e023e6a3d306eace750873e546cd195f2bfec"
+      "sha256": "831d6c82ec27df344d69607105c96dc0dabbaf4cb39e553261a3fdbc36e263c5"
     },
     {
       "path": "native/rust_helper/src/workspace_reader.rs",
-      "sha256": "8d2fe747efc5d137b4c4509d270c029e522e6516858a42036739470399280122"
+      "sha256": "f7ff106c20a7b5f96f037b1a51ef681f498ee81964c7142d2f0210bf37db3f10"
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
@@ -1634,7 +1634,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_registry.rs",
-      "sha256": "eaf8b235faeff98c5207ccb62bbd51df54c5d2de13601ad845f8759b4aedecff"
+      "sha256": "d6d2bd9fa481070f0535dd5f8aaefcf338f92824eb94bea8804ec2344e29c4c7"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",
@@ -1642,11 +1642,11 @@
     },
     {
       "path": "native/rust_helper/tests/workspace_reader.rs",
-      "sha256": "5aebc0a6cd2da10645e0643f3d8f097155f924c92cd80f96a2abfd389f361349"
+      "sha256": "0041b8af5f7e4abb1d5358a1ea6c6fd5478d24c4446e0ecb053a7dbffef2501d"
     },
     {
       "path": "native/rust_helper/tests/workspace_startup.rs",
-      "sha256": "96d7b14667fba9ca05a7d2c2ccdb83062c5ab2b0a1cce14d38a2f221675f493b"
+      "sha256": "2579e78e2bf8e7cdf3bc2406dbcfb85bd05c57cb5815934cb95625769c3015ba"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
