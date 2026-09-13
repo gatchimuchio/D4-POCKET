@@ -9,6 +9,8 @@ jobs:
   android-emulator:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      ANDROID_AVD_HOME: ${{ runner.temp }}/gui-shell-avd
     steps:
       - name: 対象commitを取得
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -49,7 +51,11 @@ jobs:
           "$sdkmanager" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
           "$sdkmanager" --list_installed > evidence/sdk-installed.txt
           "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee evidence/emulator-acceleration.txt
-          printf 'no\n' | "$avdmanager" create avd --name gui_shell_native_test --package 'system-images;android-35;google_apis;x86_64'
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | "$avdmanager" create avd --name gui_shell_native_test --path "$ANDROID_AVD_HOME/gui_shell_native_test.avd" --package 'system-images;android-35;google_apis;x86_64'
+          test -f "$ANDROID_AVD_HOME/gui_shell_native_test.ini"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee evidence/configured-avds.txt
+          grep -Fx gui_shell_native_test evidence/configured-avds.txt
       - name: Androidのnative安全保管を検証
         shell: bash
         run: |

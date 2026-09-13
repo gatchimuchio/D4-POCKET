@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "7ade7b26edbb665554d0d62478a1bd3cf19a29b60de54b22142f49d3c72cf89d"
+      "sha256": "804dda1d677342cf10a6f12ad1461478f92e418507f31ada91ebfcd132e3e806"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
@@ -146,7 +146,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "04d6f5091a662f77370b5dfde240e2687ae02d7ad5d3b4e5798ed11e8fac971f"
+      "sha256": "dc73e51e6b731bd4dfdf596cd7f22660ecd5bfccbdf8afc91dc79a38f95ae324"
     },
     {
       "path": "SECURITY.md",
@@ -910,7 +910,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "49aaaf1c919fc7f547524eecfe35bc66b248d2a48ca1c22003a52debd2481291"
+      "sha256": "1e2ea680d40fcf6eef80052d2a2d9e7634b352aac4d7083465d4996b2f3902c1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2082,7 +2082,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "1d65c4c53e2c984489e43c8d5777c6ad6d3037ffacd60a9ab3952946fbb10a45"
+      "sha256": "e6acb8751dbca806f24b6f7cfec68680b25825f647e9663cd599f15eec788bf0"
     },
     {
       "path": "tooling/packaging_portability_check.py",

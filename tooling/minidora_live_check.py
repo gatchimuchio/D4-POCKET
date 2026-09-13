@@ -89,11 +89,21 @@ stack_file=open(sys.argv[1]+".startup-stack.txt","w",encoding="utf-8")
 faulthandler.dump_traceback_later(10,file=stack_file)
 phase("import_http")
 from http.server import ThreadingHTTPServer
+from socketserver import TCPServer
 phase("import_reference")
 from minidora.製品版.api import APIHandler
 from minidora.製品版.製品チャット import 製品ミニドラ
 phase("bind_http")
-server=ThreadingHTTPServer(("127.0.0.1",0),APIHandler)
+# literal loopback専用の開発serverで、表示名の逆引きを実行前提にしない。
+server=ThreadingHTTPServer(("127.0.0.1",0),APIHandler,bind_and_activate=False)
+try:
+    TCPServer.server_bind(server)
+    server.server_name="127.0.0.1"
+    server.server_port=server.server_address[1]
+    server.server_activate()
+except Exception:
+    server.server_close()
+    raise
 phase("initialize_product")
 server.app=製品ミニドラ()
 phase("ready")

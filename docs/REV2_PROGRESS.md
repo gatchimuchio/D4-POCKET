@@ -19,6 +19,22 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 仮想端末検証hostの起動前提を修正（2026-09-13）
+
+Macのcf5c771/run `34739605831` attempt2は、参照のimportが0.096秒以内に終わり、HTTP bind中の `socket.getfqdn` で10秒後も待機していた。stackはPython3.14のHTTPServer.server_bindからの逆引きを示した。attempt1のGitHub DNS取得失敗は別の環境失敗として保持する。Windowsの同じ経路は約0.47秒／0.38秒で起動している。
+
+このharnessはliteralな127.0.0.1だけへbindし、参照のAPIHandler・製品チャットはserver_nameを権限や接続先として利用しない。通常constructorには逆引きを省略する指定がないため、stdlibのbind_and_activate=False、TCPServer.server_bind、server_activateを使用し、表示用server_nameも実bind先の127.0.0.1へ固定する。試験の期限、MINIDORA本体、API/trace、Rust broker、実送信経路は変えない。これは全host共通のdevelopment限定初期化であり、通常製品runtimeへのwrapperではない。DNS名による参照server提供を追加する場合はこの前提を再検討する。
+
+Androidのd952991/run `34739883443` はKVM利用可能とSDK準備を確認したが、emulatorがAVD名を見つけられず終了し、ADB待機が期限切れとなった。標準のANDROID_AVD_HOMEをjob内の専用directoryへ固定し、avdmanagerの作成path、iniの存在、emulatorの列挙を照合してから起動する。起動成功を推定せず、端末属性・AVD名・native試験の既存判定も維持する。環境変数の定義は[Android公式資料](https://developer.android.com/tools/variables)を参照した。 初回の圧縮容量2.20GBはpreview channelのemulator 37.2.8を拾っていたため補正する。安定版37.1.11は441,926,448 bytes、API35 imageとの合計は2,180,742,351 bytes（約2.18GB）。観測時空き容量約2.19GBとほぼ同量で、別途必要な展開領域の余裕がないという判断は保持する。
+
+逆引きを必ず例外にする故障注入で、harness内の実server起動コードを実行し、固定MINIDORAのcapabilities APIがHTTP200を返すことを確認した。証拠はRepository外のGUI-Shell-no-reverse-dns-proof.json。Windowsの実API・実TLS・両Dart client・監査chain再読取もPASSし、GUI-Shell-loopback-bind-regression.txtへ保存した。Schema36/正常36/負例38、conformance150件、日本語監査、Android workflowの5 step構文検査もPASS。
+
+- item: 修正後のMac実TLS統合とAndroid native保管
+  classification: release_blocker
+  reason: 原因に対応した検証環境修正であり、修正後の手動runが成功した証拠はまだない。
+  required_action: ローカル回帰後に両手動runを実行し、対象commitと実結果を確認する。
+  blocks_release: yes
+
 ## Android仮想端末の手動補助経路（2026-09-13）
 
 Windows SDK managerの一覧にemulator 37.1.11とAPI35 Google APIs x86_64 revision9を確認した。SDK catalogで確認した圧縮imageは1,738,815,903 bytes、Windows emulator候補は459,029,121 bytes。空き容量約2.19GBのhostでは展開余地がなく、ローカル導入を強行しない。中間生成物削除の自動承認拒否を迂回せず、許可された手動補助環境で仮想端末検証を進める。
