@@ -225,6 +225,10 @@ class DialogueResult {
         (fields['失敗分類'] == '' || fields['復旧'] == '' || fields['本文'] != '')) {
       reject();
     }
-    return DialogueResult._(Map.unmodifiable(fields));
+    return DialogueResult._(Map.unmodifiable({
+      ...fields,
+      for (final key in ['参照', '能力'])
+        key: List<String>.unmodifiable((fields[key]! as List).cast<String>()),
+    }));
   }
 }

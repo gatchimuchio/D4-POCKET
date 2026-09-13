@@ -19,6 +19,12 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## 対話結果の参照・能力配列を検証後に固定（2026-09-13）
+
+DialogueResultの外側のMapは変更不可だったが、参照・能力のListは受信元と共有していた。検証後に元の空配列へ要素を追加するとnoneの表示結果にも現れ、公開getterからも配列を変更できることを2試験で再現した。検証通過後に両配列をコピーして変更不可にし、文字列とMapだけでなく結果全体の検証済み内容を固定する。新しい公開内容には再検証を要求し、表示資格の判定を増やさない。
+
+共有の `flutter test --no-pub --reporter expanded` は14件PASS。none/fullで元配列の変更が伝播しないこと、getterとfieldsの両経路からの変更が拒否されること、既存の公開参照・能力が保持されることを確認した。共有・Desktop・Mobileの `flutter analyze --no-pub`、Schema36/正常36/負例38、conformance150件もPASS。証拠は製品parserとWidgetを実行するFIXTUREである。broker・TLS・実機保管は変更していない。非Windows実機・正式配布・運用署名・owner GOは冒頭のrelease_blockerとして延期を保持する。
+
 ## 中止進捗と内包結果の状態を照合（2026-09-13）
 
 共有対話clientで、進捗が中止なのに結果が成功で本文を持つ応答を受理することを再現した。Rustの中止処理は中止結果を返すため、clientにも進捗と結果の対応検証を追加した。中止進捗に成功・保留・失敗が混在する3負例を拒否し、正しい中止結果を受理する。Rustの採否・中止処理や表示資格を変更しない。

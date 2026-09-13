@@ -88,6 +88,30 @@ class DialogueFixture implements BrokerTransport {
 }
 
 void main() {
+  test('検証後の元配列の変更を表示結果へ反映しない', () {
+    for (final scope in ['none', 'full']) {
+      final raw = result('left', 'a' * 32, 'b' * 32, scope: scope);
+      final parsed = DialogueResult.parse(raw, 'b' * 32, 'left', 'a' * 32);
+      for (final key in ['参照', '能力']) {
+        (raw[key] as List<String>).add('検証後に追加された未検証内容');
+        expect(parsed.list(key), isEmpty);
+      }
+    }
+  });
+  test('公開済み結果の配列も変更できず検証済み内容を保持する', () {
+    final raw = result('left', 'a' * 32, 'b' * 32)
+      ..['参照'] = ['公開参照']
+      ..['能力'] = ['公開能力'];
+    final parsed = DialogueResult.parse(raw, 'b' * 32, 'left', 'a' * 32);
+    for (final key in ['参照', '能力']) {
+      final original = List<String>.of(parsed.list(key));
+      expect(() => parsed.list(key).clear(), throwsUnsupportedError);
+      expect(() => (parsed.fields[key] as List).add('差替え'),
+          throwsUnsupportedError);
+      (raw[key] as List).clear();
+      expect(parsed.list(key), original);
+    }
+  });
   test('中止進捗に成功本文が混在した応答を拒否する', () async {
     final f = DialogueFixture()
       ..complete = true
