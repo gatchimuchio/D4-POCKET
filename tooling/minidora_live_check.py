@@ -77,13 +77,28 @@ def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobil
     if subprocess.check_output(["git", "-C", str(reference), "status", "--porcelain"], text=True).strip():
         raise RuntimeError("MINIDORA参照に既存差分がある")
     # 参照製品の既存handlerと製品チャットをそのまま使う。基礎Core未接続を隠さない。
-    server_code = '''import json,sys
+    server_code = '''import json,sys,time,faulthandler
 from pathlib import Path
+started=time.monotonic()
+phase_file=Path(sys.argv[1]+".startup.json")
+phases=[]
+def phase(name):
+    phases.append({"phase":name,"elapsed_seconds":round(time.monotonic()-started,3)})
+    phase_file.write_text(json.dumps(phases),encoding="utf-8")
+stack_file=open(sys.argv[1]+".startup-stack.txt","w",encoding="utf-8")
+faulthandler.dump_traceback_later(10,file=stack_file)
+phase("import_http")
 from http.server import ThreadingHTTPServer
+phase("import_reference")
 from minidora.製品版.api import APIHandler
 from minidora.製品版.製品チャット import 製品ミニドラ
+phase("bind_http")
 server=ThreadingHTTPServer(("127.0.0.1",0),APIHandler)
+phase("initialize_product")
 server.app=製品ミニドラ()
+phase("ready")
+faulthandler.cancel_dump_traceback_later()
+stack_file.close()
 Path(sys.argv[1]).write_text(json.dumps({"port":server.server_port}),encoding="utf-8")
 server.serve_forever()
 '''
@@ -224,6 +239,7 @@ server.serve_forever()
                 assert 操作(endpoint, "shutdown", None)["status"] == "accepted"
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
+                        "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
                         "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
@@ -232,6 +248,18 @@ server.serve_forever()
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
+                # 起動前の段階名・経過秒とstackだけを出力する。資格・要求本文・localsを含めない。
+                for index in range(2):
+                    phase_path = root / f"runtime-{index}.json.startup.json"
+                    stack_path = root / f"runtime-{index}.json.startup-stack.txt"
+                    if phase_path.is_file():
+                        try:
+                            print(json.dumps({"runtime_startup": index,
+                                "phases": json.loads(phase_path.read_text(encoding="utf-8"))}, ensure_ascii=False))
+                        except (OSError, json.JSONDecodeError):
+                            print(f"Runtime {index} 起動段階記録は読取未成立")
+                    if stack_path.is_file():
+                        print(stack_path.read_text(encoding="utf-8")[:8192])
                 # ログには秘密資格を記録しない。エラー時も本文一括転送は行わない。
                 if mobile_simulator:
                     diagnostic = root / "simulator-state.json"

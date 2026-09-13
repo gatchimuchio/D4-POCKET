@@ -906,7 +906,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8cbcdf66dc7e9e105b692434686e97a2790b37abeb7590644e25ef34f0b74362"
+      "sha256": "4aa29fd5c178c91c18b3530891e868e05eb528336a9e78bb2f272ab1df4925c6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2058,7 +2058,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "4c983f2f964af22e1910d4cbf3bb77c5a974d6aec89c1a06a2e0b2ccd87da2e0"
+      "sha256": "1d65c4c53e2c984489e43c8d5777c6ad6d3037ffacd60a9ab3952946fbb10a45"
     },
     {
       "path": "tooling/packaging_portability_check.py",

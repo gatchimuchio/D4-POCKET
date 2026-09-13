@@ -19,6 +19,18 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Mac上の参照Runtime起動期限超過を診断（2026-09-13）
+
+c5aa1ecの手動run `34739077800` はnative保管2試験がPASSした後、最初のMINIDORA参照APIの起動確認で20秒期限を超過した。Simulator実TLS試験は未到達でありPASSにしない。Windowsの同じ参照・harnessの実接続は成功しているが、Mac環境の根本原因を確定したものではない。
+
+開発専用server起動コードへ、import、HTTP bind、製品初期化、readyの経過秒記録と10秒時点のstack採取を追加する。期限、参照製品、実API、権限経路を変更せず、待機箇所を観測する。失敗時は段階名・経過秒と起動前stackだけを出力し、資格や要求本文、localsを出力しない。通常製品runtimeには追加しない。Windowsの実API二実行系・両Dart client・実TLS・監査chain再読取は計測追加後もPASS。Schema36/正常36/負例38、conformance150件、厳格日本語監査もPASS。ログはRepository外のGUI-Shell-runtime-startup-diagnostics-regression.txt。
+
+- item: Mac上の参照Runtime起動とSimulator実TLS統合
+  classification: release_blocker
+  reason: 起動期限超過の原因は未確定で、実TLS統合へ到達していない。
+  required_action: 計測結果から原因を特定し、根拠のある修正後に同じ統合試験を再実行する。
+  blocks_release: yes
+
 ## native保管・実TLS・実API・OS復帰の統合試験（2026-09-13）
 
 先行d9f23cdの手動run `34738442843` は、Simulator上のnative安全保管2試験を含め成功した。これを実TLSやOS lifecycleの証拠へ読み替えず、次の統合試験を追加する。
