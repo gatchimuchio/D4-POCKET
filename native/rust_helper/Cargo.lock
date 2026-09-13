@@ -262,6 +262,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "getrandom",
+ "gui_shell_windows_protection",
  "hex",
  "libc",
  "rcgen",
@@ -274,6 +275,13 @@ dependencies = [
  "subtle",
  "unicode-normalization",
  "winsafe",
+]
+
+[[package]]
+name = "gui_shell_windows_protection"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -11,6 +11,8 @@ owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)
 
 追加範囲の未完成はregistryの `comprehensive_extension_rev1_completion` に登録し、既存release consumerへ接続する。これは開発の禁止ではなく完成製品releaseの未成立条件である。owner GO、実機証拠、運用署名、配布条件の既存関門も維持する。
 
+C2の内容履歴はC7のWindows安全保管に依存するため、[Windows保護bytes境界](docs/specs/windows-protection.md)のOS接続を前提単位として先行する。保管・内容閲覧の権限接続を省略せず、この前提単位でC2/C7完成を主張しない。
+
 ## 現行 owner 指示 rev2（2026-09-10）
 
 現行追加工程は、統治規則 → Baseline → 日本語意味正本 → 契約 → Conformance → Shell Core → MINIDORA Adapter → Desktop 実行系操作 → 実行系比較 → Flutter 共通化 → Mobile → 端末連携 → Android → macOS → iOS → Windows 回帰 → Linux 回帰 → 全数監査 → 文書の順とする。各単位はローカルで実装・試験・監査し、完成分を順次 main へ commit / push して remote HEAD を確認する。

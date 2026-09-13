@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "MANIFEST.sha256.json"
 
 GLOB_PATTERNS = [
+    "native/windows_protection/Cargo.toml",
+    "native/windows_protection/src/**/*.rs",
     "packages/shell_core/**/*.py",
     "tooling/**/*.py",
     "schemas/**/*.json",

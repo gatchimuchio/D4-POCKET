@@ -4,6 +4,8 @@
   "self_reference_policy": "MANIFEST.sha256.json\u306f\u81ea\u8eab\u306efile\u4e00\u89a7\u304b\u3089\u9664\u5916\u3059\u308b\u3002",
   "coverage": {
     "glob_patterns": [
+      "native/windows_protection/Cargo.toml",
+      "native/windows_protection/src/**/*.rs",
       "packages/shell_core/**/*.py",
       "tooling/**/*.py",
       "schemas/**/*.json",
@@ -147,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "6dd065ba0de6ef8ed0df9a3e7498ce246f1f70442d9e395714a6b4594d09e627"
+      "sha256": "63e0973d71f19b49b1dcffefb576d614c5e9a778d5ea15b08869b3d1571097ad"
     },
     {
       "path": "SECURITY.md",
@@ -1066,6 +1068,10 @@
       "sha256": "62f6a037ee3bcf9f8d162ec1788a7002cf2c44c8b8db934ecfa6deaf1b70055e"
     },
     {
+      "path": "docs/specs/windows-protection.md",
+      "sha256": "3fa662f9b66874d95eb0a50a877b92be240b62f2791e2b0a11c3fa380b73e6e6"
+    },
+    {
       "path": "docs/specs/workspace-inspection.md",
       "sha256": "da7114d6cb23822e5c80ba5645ba9fc7de1c292f48a5ca2c13ffbc1aacd7b581"
     },
@@ -1095,7 +1101,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "7f8c387c66bad6f5b0b1b642b5cb6985eb6fc54120a6d9c6876d0f7c2c81af4a"
+      "sha256": "e9a448fe23bba40a96754c354cf916d3238822925e24ecb27ced3c91cbaa886d"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1551,11 +1557,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "d6b6c81ffeb9fcb79299e02f5dbdf138c0cb19af79b9e887b264b2d5e63f0351"
+      "sha256": "b800152d048bf977cc446d62ebc69524a1aec0e2ef20a82b5820ba9163db835c"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "3270f0b5d195224ab2db79b8b57d4dab3d1aa956c9b84b770e7ac4ab95e67438"
+      "sha256": "150f9760bfc80eb8bd41735471842b44bded4d102f1f817e69fa7bc61fbf1e49"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -1722,6 +1728,10 @@
       "sha256": "a17f5d87746bebc8ec23d18dcced81fca155877cb77cf3c214db6932573f718c"
     },
     {
+      "path": "native/rust_helper/tests/protected_data.rs",
+      "sha256": "b1a3489e67906b45a6a48114928363ab6c35c6022db2609f0797e0735ca60ce9"
+    },
+    {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
       "sha256": "d5102531d2dc95d3cceb7f618173011f0056b3f287e8189b45b8784b4fdcfd66"
     },
@@ -1744,6 +1754,14 @@
     {
       "path": "native/rust_helper/update_verification/README.md",
       "sha256": "84680701b6130072bd4238bddfa77c002c0e460a07f66a0ab3424784edd0f2cb"
+    },
+    {
+      "path": "native/windows_protection/Cargo.toml",
+      "sha256": "e521a59891327264bb60c61e2fe0f1f962838d9c4faf6f2c83b24a538d6ae560"
+    },
+    {
+      "path": "native/windows_protection/src/lib.rs",
+      "sha256": "59b81e661e3ef405f099efddc907ec440999dc50347aa2481d61b4c3d6e121c1"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/00_WINDOWS_PROOF_INDEX.md",
@@ -2307,7 +2325,7 @@
     },
     {
       "path": "tooling/manifest.py",
-      "sha256": "ffa4b51d7f7491374fcbb04e2210785aad2a0ff0bb40de33257a28b4b01e113a"
+      "sha256": "6aced36372efdb82085207dcf31ca9b91de7478d59bcd27352173acbb6ac7deb"
     },
     {
       "path": "tooling/manual_workflow_check.py",
