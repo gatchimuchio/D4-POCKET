@@ -61,6 +61,10 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           printf 'no\n' | "$avdmanager" create avd --name gui_shell_native_test --path "$ANDROID_AVD_HOME/gui_shell_native_test.avd" --package 'system-images;android-35;google_apis;x86_64'
           test -f "$ANDROID_AVD_HOME/gui_shell_native_test.ini"
+          cp "$ANDROID_AVD_HOME/gui_shell_native_test.avd/config.ini" evidence/avd-config-before.txt
+          python3 -c 'from pathlib import Path; import os; p=Path(os.environ["ANDROID_AVD_HOME"])/"gui_shell_native_test.avd/config.ini"; lines=p.read_text().splitlines(); key="disk.dataPartition.size"; hits=[i for i,v in enumerate(lines) if v.split("=",1)[0].strip()==key]; assert len(hits)==1, "userdata設定が一意でない"; lines[hits[0]]=key+"=2G"; p.write_text("\n".join(lines)+"\n")'
+          cp "$ANDROID_AVD_HOME/gui_shell_native_test.avd/config.ini" evidence/avd-config-effective.txt
+          df -B1 "$ANDROID_AVD_HOME" > evidence/emulator-disk-before.txt
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee evidence/configured-avds.txt
           grep -Fx gui_shell_native_test evidence/configured-avds.txt
       - name: Androidのnative安全保管を検証

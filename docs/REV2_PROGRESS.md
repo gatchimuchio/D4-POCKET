@@ -19,6 +19,14 @@ owner指示により、現在実機検証できるOSはWindowsだけとする。
   required_action: 現在は実装と利用可能な検証を継続する。対象環境の提供またはownerの再開指示後に該当証拠を収集し、正式release時に署名と配布条件を確定してstrict検証後にowner GOを得る。
   blocks_release: yes
 
+## Android専用AVDのuserdata容量を明示（2026-09-13）
+
+3431173/run `34741774416` はemulator起動前に失敗し、Flutter native試験には未到達だった。artifactのemulator.txtで、専用AVD directoryの空き6987.37MBに対しuserdata作成が7372.80MBを要求したFATALを確認した。KVM・AVD存在・system image検出は成立しており、前回のAVD未検出とは異なる容量不足である。Repository外のGUI-Shell-android-emulator-3431173へ原logを保存した。
+
+専用AVDの標準設定disk.dataPartition.sizeを2Gに明示する。[Android公式の仮想端末設定例](https://android.googlesource.com/platform/external/adt-infra/+/refs/heads/emu-master-dev/emu-image/templates/avd/Pixel2.avd/config.ini)にもある通常設定で、製品runtimeの代替実装や容量検査の抑止ではない。この短時間のnative保管・実TLS試験用AVDに限る。作成時設定と有効設定、起動前の空き容量を証拠へ保存し、emulator側の容量検査、boot、仮想属性、実試験の判定は維持する。既存fileやSDKを削除せず、実機凍結にも変更はない。大量data試験を追加するときは容量と取得証拠の範囲を再検討する。2Gでの実起動と試験は修正後の手動runで確認し、未成立の間はAndroid仮想端末統合をrelease_blockerに保持する。
+
+Schema37/正常37/負例39、conformance151件、厳格日本語監査、workflow6 stepのbash構文検査はPASS。設定更新部分は一時fixtureで正常更新・key欠落拒否・重複拒否を実行し、対象key以外が変わらないことと拒否時にfileを変更しないことを確認した。これらはAVD実起動の証拠ではない。
+
 ## Apple実TLS統合の証拠確定とAndroidへの接続（2026-09-13）
 
 fd1b23e/run `34740828826` は手動Mac job全体が成功した。保存したartifactのtar SHA-256は `3f62ce784508b8dcfdd0ecb3bd3fba86b5e287570309ca6f7b6fea9f7f94e9b9` と一致し、追跡差分は空。共有18・Desktop33・Mobile29試験と解析、native保管2試験、macOS/iOS Simulator buildを確認した。実TLS統合結果はnative再読取、controller再生成、OS背景時停止と復帰再接続、二つの実MINIDORA応答、失効後拒否がPASS。Repository外のGUI-Shell-apple-fd1b23e/verified-result.jsonへ対象sourceと範囲を保存した。過去のMac起動期限超過はこのsourceで解消した。physical_device_verified=falseであり、正式配布・実機の保護特性・owner GOは証明しない。

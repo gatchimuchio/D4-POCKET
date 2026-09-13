@@ -62,7 +62,7 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "d2acdbce6320609c05c82af5f267d1242b1af3fb9b0226de1bebac6d3f2a1b04"
+      "sha256": "b77954e50ae1ef8a475692edb84467d7d8682f737980984ee4f52bc77ea66200"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
@@ -910,7 +910,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "00101f1c7d46f23aa53c457926388bf423dbfbdbda3c1f2a759c6c97f0162a3f"
+      "sha256": "87785082373d4c06c5068482a20d5ae1d5fea5896232914635f22af71276cad4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
