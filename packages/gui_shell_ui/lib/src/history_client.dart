@@ -1,7 +1,7 @@
 import 'broker_transport.dart';
 import 'runtime_dialogue_client.dart';
 
-/// 現在承認を読むだけの履歴client。承認発行操作を公開しない。
+/// 現在承認に限定する履歴client。承認発行操作を公開しない。
 class HistoryClient {
   HistoryClient(this.transport);
   final BrokerTransport transport;
@@ -108,7 +108,7 @@ class HistoryClient {
         _reject();
       }
       parsed.add(HistoryEntry(s as String, failure as String?,
-          e['audit_event_id'] as String, detail));
+          e['audit_event_id'] as String, e['event_hash'] as String, detail));
     }
     // 取得中の失効・承認置換を表示前に再照合する。
     final current = await status();
@@ -116,6 +116,64 @@ class HistoryClient {
       _reject();
     }
     return HistoryPage(List.unmodifiable(parsed), next, more, grant);
+  }
+
+  Future<Map<String, Object?>> replay(
+      HistoryGrant grant, HistoryEntry parent, String input,
+      {required bool branch}) async {
+    if (!grant.current ||
+        input.trim().isEmpty ||
+        input.runes.length > 4096 ||
+        parent.record.fields['実行系ID'] != grant.runtime) {
+      _reject();
+    }
+    final before = await status();
+    if (before == null || !grant.same(before) || !grant.current) {
+      _reject();
+    }
+    final op = branch ? '対話分岐' : '対話再実行';
+    final response = await transport.request(op, payload: {
+      'approval_id': grant.id,
+      '実行系ID': grant.runtime,
+      '参照監査ID': parent.auditId,
+      '参照event_hash': parent.eventHash,
+      '入力': input
+    });
+    if (response['operation'] != op ||
+        response['status'] != 'accepted' ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        !_text(response['audit_event_id'])) {
+      _reject();
+    }
+    final body = _shape(response['body'], {
+      '要求ID',
+      '要求hash',
+      '状態',
+      '期限',
+      '対話セッションID',
+      '実行系ID',
+      '参照監査ID',
+      '参照event_hash',
+      '種別'
+    });
+    if (!RuntimeDialogueClient.validId(body['要求ID']) ||
+        !RuntimeDialogueClient.validId(body['対話セッションID']) ||
+        body['要求ID'] == parent.record.fields['要求ID'] ||
+        body['対話セッションID'] == parent.record.fields['対話セッションID'] ||
+        !_hash(body['要求hash']) ||
+        body['状態'] != '承認待ち' ||
+        body['期限'] is! int ||
+        body['実行系ID'] != grant.runtime ||
+        body['種別'] != op ||
+        body['参照監査ID'] != parent.auditId ||
+        body['参照event_hash'] != parent.eventHash) {
+      _reject();
+    }
+    final after = await status();
+    if (after == null || !grant.same(after) || !grant.current) {
+      _reject();
+    }
+    return Map<String, Object?>.unmodifiable(body.cast<String, Object?>());
   }
 }
 
@@ -154,8 +212,9 @@ class HistoryGrant {
 }
 
 class HistoryEntry {
-  const HistoryEntry(this.state, this.failure, this.auditId, this.record);
-  final String state, auditId;
+  const HistoryEntry(
+      this.state, this.failure, this.auditId, this.eventHash, this.record);
+  final String state, auditId, eventHash;
   final String? failure;
   final DialogueExecutionRecord record;
 }
