@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 import '../services/broker_client.dart';
+import 'history_content_dialog.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.client});
@@ -294,6 +295,19 @@ class _HistoryScreenState extends State<HistoryScreen>
                         title: Text('${e.state} ／ ${r.fields['要求ID']}'),
                         subtitle: Text('開始 ${r.time('開始時刻')}'),
                         children: [
+                          if (e.receipt != null) ...[
+                            TextButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => showDialog<void>(
+                                        context: context,
+                                        builder: (_) => HistoryContentDialog(
+                                            client: _client!, entry: e)),
+                                child: const Text('現在承認で保存内容を開く')),
+                            SelectableText(
+                                '保存監査: ${e.receipt!.auditId}\n保存監査hash: ${e.receipt!.eventHash}\n暗号文hash: ${e.receipt!.cipherHash}\n内容閲覧には別途ownerの現在承認が必要です。'),
+                          ] else
+                            const Text('内容の保存記録なし'),
                           TextButton(
                               onPressed: _busy
                                   ? null

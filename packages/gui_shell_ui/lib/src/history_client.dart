@@ -16,6 +16,78 @@ class HistoryClient {
     return _shape(r['body'], {'grant', 'page'});
   }
 
+  Future<Map> _contentCall(String op, Map<String, Object?> payload) async {
+    final r = await transport.request(op, payload: payload);
+    if (r['operation'] != op ||
+        r['status'] != 'accepted' ||
+        r['evidence_source'] != 'INTERNAL_STATE' ||
+        !_text(r['audit_event_id'])) {
+      _reject();
+    }
+    return _shape(r['body'], {'grant', 'content'});
+  }
+
+  Future<HistoryContentGrant?> contentStatus() async {
+    final body = await _contentCall('対話内容閲覧状態', {});
+    if (body['content'] != null) _reject();
+    return body['grant'] == null
+        ? null
+        : HistoryContentGrant.parse(body['grant']);
+  }
+
+  Future<HistoryContent> content(
+      HistoryEntry entry, HistoryContentGrant grant) async {
+    if (!grant.current || !grant.matches(entry)) _reject();
+    final before = await contentStatus();
+    if (before == null || !grant.same(before) || !grant.current) _reject();
+    final body = await _contentCall('対話内容閲覧', {'approval_id': grant.id});
+    final returned = HistoryContentGrant.parse(body['grant']);
+    if (!grant.same(returned) || !grant.current) _reject();
+    final m =
+        _shape(body['content'], {'版', '要求', '要求hash', '結果', '実行記録', '結果証跡'});
+    final request = _shape(m['要求'], {'要求ID', '実行系ID', '対話セッションID', '入力'});
+    final record = _shape(m['実行記録'], entry.record.fields.keys.toSet());
+    if (m['版'] != 1 ||
+        m['要求hash'] != entry.context.requestHash ||
+        request['入力'] is! String ||
+        (request['入力'] as String).isEmpty ||
+        (request['入力'] as String).runes.length > 4096) {
+      _reject();
+    }
+    for (final key in entry.record.fields.keys) {
+      if (record[key] != entry.record.fields[key]) _reject();
+    }
+    for (final key in ['要求ID', '実行系ID', '対話セッションID']) {
+      if (request[key] != entry.record.fields[key]) _reject();
+    }
+    final proof = HistoryResultEvidence.parse(
+        m['結果証跡'], entry.record, entry.context, entry.state);
+    if (proof == null ||
+        entry.evidence == null ||
+        proof.responseHash != entry.evidence!.responseHash ||
+        proof.capabilityHash != entry.evidence!.capabilityHash ||
+        proof.routeHash != entry.evidence!.routeHash ||
+        proof.traceHash != entry.evidence!.traceHash) {
+      _reject();
+    }
+    if (m['結果'] is! Map) _reject();
+    final result = DialogueResult.parse(
+        (m['結果'] as Map).cast<String, Object?>(),
+        request['要求ID'] as String,
+        request['実行系ID'] as String,
+        request['対話セッションID'] as String);
+    if (result.text('表示範囲') != 'full' ||
+        result.text('状態') != entry.state ||
+        result.text('応答hash') != proof.responseHash ||
+        result.text('失敗分類') != '' ||
+        result.text('復旧') != '') {
+      _reject();
+    }
+    final after = await contentStatus();
+    if (after == null || !grant.same(after) || !grant.current) _reject();
+    return HistoryContent(request['入力'] as String, result, grant);
+  }
+
   Future<HistoryGrant?> status() async {
     final body = await _call('対話履歴閲覧状態', {});
     if (body['page'] != null) {
@@ -43,6 +115,7 @@ class HistoryClient {
         'latest_per_request': true,
         'include_audit_context': true,
         'include_result_evidence': true,
+        'include_content_receipt': true,
         'filter': {
           '実行系ID': grant.runtime,
           if (state != null) '状態': state,
@@ -79,7 +152,8 @@ class HistoryClient {
         'event_hash',
         'record',
         'audit_context',
-        'result_evidence'
+        'result_evidence',
+        'content_receipt'
       });
       if (!_text(e['audit_event_id']) ||
           !_hash(e['event_hash']) ||
@@ -136,8 +210,9 @@ class HistoryClient {
           e['event_hash'] as String,
           detail,
           context,
-          HistoryResultEvidence.parse(
-              e['result_evidence'], detail, context, s)));
+          HistoryResultEvidence.parse(e['result_evidence'], detail, context, s),
+          HistoryContentReceipt.parse(
+              e['content_receipt'], detail, context, s)));
     }
     // 取得中の失効・承認置換を表示前に再照合する。
     final current = await status();
@@ -242,12 +317,13 @@ class HistoryGrant {
 
 class HistoryEntry {
   const HistoryEntry(this.state, this.failure, this.auditId, this.eventHash,
-      this.record, this.context, this.evidence);
+      this.record, this.context, this.evidence, this.receipt);
   final String state, auditId, eventHash;
   final String? failure;
   final DialogueExecutionRecord record;
   final HistoryAuditContext context;
   final HistoryResultEvidence? evidence;
+  final HistoryContentReceipt? receipt;
 }
 
 class HistoryAuditContext {
@@ -364,4 +440,100 @@ class HistoryResultEvidence {
         m['経路申告hash'] as String?,
         m['追跡参照hash'] as String?);
   }
+}
+
+class HistoryContentReceipt {
+  const HistoryContentReceipt(this.auditId, this.eventHash, this.cipherHash);
+  final String auditId, eventHash, cipherHash;
+  static HistoryContentReceipt? parse(
+      Object? raw,
+      DialogueExecutionRecord record,
+      HistoryAuditContext context,
+      String state) {
+    if (raw == null) return null;
+    final m = _shape(raw, {'audit_event_id', 'event_hash', 'receipt'});
+    final r = _shape(m['receipt'], {
+      '版',
+      '要求ID',
+      '対話セッションID',
+      '実行系ID',
+      '要求hash',
+      '終了監査ID',
+      '保存承認監査ID',
+      '暗号文hash',
+      '証拠種別'
+    });
+    if (!_text(m['audit_event_id']) ||
+        !_hash(m['event_hash']) ||
+        r['版'] != 1 ||
+        r['証拠種別'] != 'INTERNAL_STATE' ||
+        !['成功', '保留'].contains(state) ||
+        context.scope != 'full' ||
+        r['要求hash'] != context.requestHash ||
+        !_text(r['保存承認監査ID']) ||
+        !_hash(r['暗号文hash'])) {
+      _reject();
+    }
+    for (final key in ['要求ID', '対話セッションID', '実行系ID', '終了監査ID']) {
+      if (r[key] != record.fields[key]) _reject();
+    }
+    return HistoryContentReceipt(m['audit_event_id'] as String,
+        m['event_hash'] as String, r['暗号文hash'] as String);
+  }
+}
+
+class HistoryContentGrant {
+  HistoryContentGrant._(
+      this.id, this.request, this.auditId, this.eventHash, this.expires)
+      : _clock = Stopwatch()..start(),
+        _started = DateTime.now().millisecondsSinceEpoch;
+  final String id, request, auditId, eventHash;
+  final int expires, _started;
+  final Stopwatch _clock;
+  bool get current {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now >= _started &&
+        now < expires * 1000 &&
+        _clock.elapsedMilliseconds < expires * 1000 - _started;
+  }
+
+  bool same(HistoryContentGrant other) =>
+      id == other.id &&
+      request == other.request &&
+      auditId == other.auditId &&
+      eventHash == other.eventHash &&
+      expires == other.expires;
+  bool matches(HistoryEntry e) =>
+      request == e.record.fields['要求ID'] &&
+      auditId == e.receipt?.auditId &&
+      eventHash == e.receipt?.eventHash;
+  factory HistoryContentGrant.parse(Object? raw) {
+    final m = _shape(
+        raw, {'approval_id', '要求ID', '保存監査ID', '保存監査hash', 'expires_at'});
+    final expires = m['expires_at'];
+    if (!RuntimeDialogueClient.validId(m['approval_id']) ||
+        !RuntimeDialogueClient.validId(m['要求ID']) ||
+        !_text(m['保存監査ID']) ||
+        !_hash(m['保存監査hash']) ||
+        expires is! int ||
+        expires < 0 ||
+        expires > 8640000000000) {
+      _reject();
+    }
+    final g = HistoryContentGrant._(
+        m['approval_id'] as String,
+        m['要求ID'] as String,
+        m['保存監査ID'] as String,
+        m['保存監査hash'] as String,
+        expires);
+    if (!g.current || expires * 1000 - g._started > 60000) _reject();
+    return g;
+  }
+}
+
+class HistoryContent {
+  const HistoryContent(this.input, this.result, this.grant);
+  final String input;
+  final DialogueResult result;
+  final HistoryContentGrant grant;
 }

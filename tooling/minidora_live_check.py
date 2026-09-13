@@ -301,6 +301,11 @@ server.serve_forever()
                     assert opened["content"]["要求hash"] == p["要求hash"]
                     assert opened["content"]["実行記録"]["終了監査ID"] == receipt["終了監査ID"]
                     assert current_content["content"] is None
+                    if dart_client:
+                        成功(owner, "対話履歴承認", {"実行系ID": "left"})
+                        subprocess.run([dart, "run", "tool/content_live_client.dart", str(normal_file), p["要求ID"]], cwd=ROOT / "apps/desktop_flutter", check=True, stdout=log, stderr=log, timeout=30)
+                        成功(owner, "対話履歴失効", {})
+
                     成功(owner, "対話内容失効", {})
                     assert 操作(normal, "対話内容閲覧", content_query)["body"] is None
 

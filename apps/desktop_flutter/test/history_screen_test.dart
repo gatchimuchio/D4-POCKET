@@ -7,6 +7,7 @@ import 'package:gui_shell_desktop/screens/history_screen.dart';
 class Fixture implements BrokerTransport {
   bool revoked = false;
   bool withProof = false;
+  bool withContent = false;
   Map<String, Object?>? sent;
   Map? lastFilter;
   void Function(Map<String, Object?>)? alterReplay;
@@ -64,6 +65,23 @@ class Fixture implements BrokerTransport {
           {
             'audit_event_id': 'history-1',
             'event_hash': 'sha256:${'c' * 64}',
+            'content_receipt': withContent
+                ? {
+                    'audit_event_id': 'saved',
+                    'event_hash': 'sha256:${'8' * 64}',
+                    'receipt': {
+                      '版': 1,
+                      '要求ID': 'd' * 32,
+                      '対話セッションID': 'e' * 32,
+                      '実行系ID': runtime,
+                      '要求hash': 'sha256:${'b' * 64}',
+                      '終了監査ID': 'ended',
+                      '保存承認監査ID': 'save-approved',
+                      '暗号文hash': 'sha256:${'9' * 64}',
+                      '証拠種別': 'INTERNAL_STATE'
+                    }
+                  }
+                : null,
             'result_evidence': withProof
                 ? {
                     '版': 1,

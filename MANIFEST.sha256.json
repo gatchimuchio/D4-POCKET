@@ -216,8 +216,12 @@
       "sha256": "1c3b237a0a1ae6893c5806c086628fecacfb9e6073657bae01c20f5c99a7b328"
     },
     {
+      "path": "apps/desktop_flutter/lib/screens/history_content_dialog.dart",
+      "sha256": "2cb3604b6782b580cc835e3418c4d84877c4c6ed727ae9452edd02ca8ef72793"
+    },
+    {
       "path": "apps/desktop_flutter/lib/screens/history_screen.dart",
-      "sha256": "04a77f828a717ce819559db4d988d623792bfb50c706f646c482fd27fde1d9b9"
+      "sha256": "f99f5f4a109dc5503974f3f5e7834edd9d8fc0c19c8031ea8967c0e8cf21bced"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -452,8 +456,12 @@
       "sha256": "6aed4cc35164d973770e91581fdb43956bf707c1aba7768ec28eab38f69434c9"
     },
     {
+      "path": "apps/desktop_flutter/test/history_content_test.dart",
+      "sha256": "97a59a1f1f2507304f32d75e1c750688b798cf35ebde889f0d78fac156aa002c"
+    },
+    {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
-      "sha256": "68931c9c136e98c99fcab1c765a0beed43a0c629cd793625585cafcbfda6f3a9"
+      "sha256": "445a16342967acf206d7ca082202a61d61f6b922516e00c269c87b7567d0aba1"
     },
     {
       "path": "apps/desktop_flutter/test/runtime_dialogue_test.dart",
@@ -466,6 +474,10 @@
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
       "sha256": "92b3da035eb4b6fa0fd425cbc6e884be375486f0eee2f1658623000d88d0d305"
+    },
+    {
+      "path": "apps/desktop_flutter/tool/content_live_client.dart",
+      "sha256": "ae2fd7e8d73f9875e651efb1d9c4c52bc09603a188aefe7575e287c214ecedc3"
     },
     {
       "path": "apps/desktop_flutter/tool/dialogue_live_client.dart",
@@ -1069,7 +1081,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "95a1516ecb2d75902cee767abcd0903b255b83c83778b32de62ec54e2ba4fb4c"
+      "sha256": "6660f7039b29d250665511befd226f983712b1b3a86fd772e9c4b227835ea81e"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1101,7 +1113,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "85b599bba50c3974de4dde17eedf38e61c3c142cb4389284af308651ca8e08a1"
+      "sha256": "a560c9821b986c572832db217fe36aae277edbf525019bfce5a7a71d7d75c102"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1989,7 +2001,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/src/history_client.dart",
-      "sha256": "39331cfc18d11e7d29aa0d29bc5a718637aa4c7b97dc9c8bcdd79dacf53db2da"
+      "sha256": "fb58efd6f5c20e2258c640b1810f8f90237dce6af568c5401128f1d0862e11a8"
     },
     {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
@@ -2393,7 +2405,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "e1db98e145e4e58084423f877f7e566b93060090bfac937801bcc7c6da3f1c48"
+      "sha256": "9855ca3c5a9e750a70efc9336f38a16ec1469655686019e08d12d0b7b9badaf4"
     },
     {
       "path": "tooling/packaging_portability_check.py",
