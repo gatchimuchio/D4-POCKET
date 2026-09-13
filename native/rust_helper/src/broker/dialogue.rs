@@ -181,7 +181,7 @@ pub fn 識別子生成() -> Result<String, 対話失敗> {
     getrandom::getrandom(&mut bytes).map_err(|_| 対話失敗::要求不正)?;
     Ok(hex::encode(bytes))
 }
-fn 要求hash(要求: &対話要求) -> String {
+pub(crate) fn 要求hash(要求: &対話要求) -> String {
     let 値 = serde_json::to_value(要求).expect("対話要求のJSON変換");
     sha256_tagged(
         serde_json::to_string(&値)

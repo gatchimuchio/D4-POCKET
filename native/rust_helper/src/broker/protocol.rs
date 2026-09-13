@@ -139,6 +139,10 @@ pub enum BrokerOperation {
     対話履歴閲覧状態,
     #[serde(rename = "対話履歴閲覧")]
     対話履歴閲覧,
+    #[serde(rename = "対話再実行")]
+    対話再実行,
+    #[serde(rename = "対話分岐")]
+    対話分岐,
     #[serde(rename = "対話履歴一覧")]
     対話履歴一覧,
     #[serde(rename = "作業領域一覧")]
@@ -230,6 +234,8 @@ impl BrokerOperation {
             BrokerOperation::対話履歴失効 => "対話履歴失効",
             BrokerOperation::対話履歴閲覧状態 => "対話履歴閲覧状態",
             BrokerOperation::対話履歴閲覧 => "対話履歴閲覧",
+            BrokerOperation::対話再実行 => "対話再実行",
+            BrokerOperation::対話分岐 => "対話分岐",
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
@@ -694,6 +700,7 @@ impl Broker {
                 &payload_hash,
             ),
             operation @ (BrokerOperation::対話履歴承認 | BrokerOperation::対話履歴失効 | BrokerOperation::対話履歴閲覧状態 | BrokerOperation::対話履歴閲覧) => self.履歴閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::対話再実行 | BrokerOperation::対話分岐) => self.履歴再要求(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             BrokerOperation::対話履歴一覧 => self.履歴要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::AuditVerify => self.accept_body(
                 &request_id,
@@ -2590,3 +2597,6 @@ mod 端末統治試験 {
 #[cfg(test)]
 #[path = "../../tests/unit/workspace_protocol.rs"]
 mod workspace_tests;
+
+#[path = "replay.rs"]
+mod replay;

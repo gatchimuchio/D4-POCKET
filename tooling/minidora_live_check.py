@@ -248,6 +248,22 @@ server.serve_forever()
                 assert a["本文"] and a["追跡ID"] and a["追跡hash"] and a["能力"]
                 assert a["実行系ID"] == "left" and b["実行系ID"] == "right"
                 assert b["本文"] == b["追跡ID"] == "" and b["能力"] == [] and b["応答hash"]
+                parent_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "filter": {"要求ID": p["要求ID"]}})
+                parent = parent_page["entries"][0]
+                replay_grant = 成功(owner, "対話履歴承認", {"実行系ID": "left"})["grant"]["approval_id"]
+                replay_schema = json.loads((ROOT / "specs/runtime_replay_response.schema.json").read_text(encoding="utf-8"))
+                for operation, replay_input in [("対話再実行", "こんにちは"), ("対話分岐", "ありがとう")]:
+                    child = 成功(normal, operation, {"approval_id": replay_grant, "実行系ID": "left", "参照監査ID": parent["audit_event_id"], "参照event_hash": parent["event_hash"], "入力": replay_input})
+                    assert not validate_instance(child, replay_schema)
+                    assert child["要求ID"] != p["要求ID"] and child["対話セッションID"] != left
+                    waiting = 成功(normal, "対話取得", {"要求ID": child["要求ID"]})
+                    assert waiting["状態"] == "承認待ち" and waiting["実行記録"]["開始時刻"] is None
+                    assert 操作(owner, "対話承認", {"要求ID": child["要求ID"], "要求hash": p["要求hash"], "表示範囲": "full"})["status"] != "accepted"
+                    成功(owner, "対話承認", {"要求ID": child["要求ID"], "要求hash": child["要求hash"], "表示範囲": "full"})
+                    child_result = 完了(child)
+                    assert child_result["状態"] == "成功"
+                    expected_history[child["要求ID"]] = "成功"
+                成功(owner, "対話履歴失効", {})
                 # 基礎Core未接続に該当する要求を成功と誤射影しない。
                 _, hold = 対話("left", "full", "存在論的な未知問題を解いて")
                 assert 完了(hold)["状態"] == "保留"
@@ -316,7 +332,7 @@ server.serve_forever()
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
                         "runtime_startup": [json.loads((root / f"runtime-{i}.json.startup.json").read_text(encoding="utf-8")) for i in range(2)],
-                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
+                        "tested": ["実API二実行系", "owner CLI承認", "通常資格拒否", "表示分離", "trace照合", "保留", "片側失敗", "両失敗", "実履歴の状態整合", "実履歴の条件検索", "新承認による実再実行と分岐", "現在承認による通常IPC履歴閲覧と失効", "監査chain再読取"],
                         "dart_product_client": "PASS" if dart_client else "未実行",
                         "mobile_tls_path": "PASS" if mobile_client else "未実行",
                         "mobile_dart_product_client": "PASS" if dart_mobile_client else "未実行",

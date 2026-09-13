@@ -153,3 +153,12 @@ owner CLIは `対話承認操作 --session-file <owner資格file> 履歴承認 <
 履歴queryの省略可能bool `latest_per_request` はfalseを既定とする。trueでは監査読取時点の各要求IDの最後の履歴だけを対象とし、その後にRuntime/Session/状態の検索条件を適用する。したがって最後が失敗した要求は承認待ち検索へ戻らない。選択対象外の過去記録も走査区間の整合検査を通す。既存の全状態遷移取得を削除しない。
 
 並びとcursorは選ばれた最後の履歴eventの位置に従う。ページ間の追記では同じ要求の新しい観測が次ページに現れ得る。全期間の原子的snapshotや現在稼働状態を保証しない。Desktop一覧はこの集約を使用し、最後の観測と表示する。owner CLIの `履歴集約 <after> <limit> [<field> <value> ...]` も同じqueryを使用する。再実行・Approvalの復元を生成しない。
+
+
+### 履歴を参照する再実行・分岐の新規要求
+
+対話再実行と対話分岐は現在の履歴閲覧承認、実行系ID、参照する履歴event ID/hash、操作者が明示した入力を受け取る。監査をdiskから検証して参照と現在承認を照合し、参照元と同じ現在登録Runtimeに新Session・新要求を生成する。古いSessionは復元しない。過去Sessionが終了済みでも履歴参照はできるが、そのSessionへの再送ではない。
+
+再実行では過去の要求ID・Session・Runtimeと指定入力から旧要求hashを再計算し、元の作成監査hashと一致することを要求する。入力本文を履歴に保存しないため、入力を履歴から推測・復元しない。分岐では入力変更を許可するが、過去の会話contextを再構築したとは主張しない。
+
+生成するのは承認待ち要求までとする。新要求hashによる新しいowner Approvalが必要で、旧Approval/Permissionの転用、異Runtimeへの移し替え、旧Session指定、監査改変は拒否する。新旧要求の対応を新AuditEventに記録し、過去Auditを変更しない。失敗時に作成途中のSessionを隔離し、実行を開始しない。経路はcontrol、Capability=対話送信、Permission=新要求に対する現在承認が必要、Approval=承認待ち、Recovery=新規要求の再確認とする。

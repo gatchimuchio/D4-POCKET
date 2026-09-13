@@ -569,3 +569,43 @@ fn temp_workspace(test_name: &str) -> Workspace {
         session_file: root.join("broker_session.json"),
     }
 }
+
+#[test]
+fn 履歴再要求は新セッションと新承認を必要とする() {
+    use gui_shell_rust_helper::audit_hash::sha256_tagged;
+    use serde_json::json;
+    let workspace=temp_workspace("history-replay");
+    let owner_file=workspace.session_file.with_file_name("owner.json");
+    let child=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["broker-server","--store-dir"]).arg(&workspace.store_dir).arg("--session-file").arg(&workspace.session_file)
+        .arg("--owner-session-file").arg(&owner_file).args(["--minidora-runtime","local=127.0.0.1:9"])
+        .stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
+    let endpoint=wait_for_endpoint(&workspace.session_file).unwrap();
+    let process=BrokerProcess{child,endpoint};let owner=wait_for_endpoint(&owner_file).unwrap();
+    let request=|op:&str,payload:Value|{let nonce=gui_shell_rust_helper::broker::dialogue::識別子生成().unwrap();json!({"request_id":nonce,"nonce":nonce,"session_id":process.endpoint.session_id,"operation":op,"payload_hash":sha256_tagged(payload.to_string().as_bytes()),"payload":payload,"metadata":{},"issued_at":BrokerRequestEnvelope::current_issued_at()}).to_string()};
+    let session=send_request(&process.endpoint,&request("対話開始",json!({"実行系ID":"local"})))["body"]["対話セッションID"].clone();
+    let original=send_request(&process.endpoint,&request("対話送信",json!({"対話セッションID":session,"入力":"原入力"})))["body"].clone();
+    assert_eq!(send_request(&process.endpoint,&request("対話終了",json!({"対話セッションID":session})))["status"],"accepted");
+    let history=send_request(&owner,&request("対話履歴一覧",json!({"after":0,"limit":100})));
+    let parent=&history["body"]["entries"][0];
+    let grant=send_request(&owner,&request("対話履歴承認",json!({"実行系ID":"local"})))["body"]["grant"]["approval_id"].clone();
+    let selection=json!({"approval_id":grant,"実行系ID":"local","参照監査ID":parent["audit_event_id"],"参照event_hash":parent["event_hash"],"入力":"原入力"});
+    for key in ["approval_id","参照event_hash","入力","実行系ID"] {
+        let mut bad=selection.clone();bad[key]=json!("invalid");
+        assert_ne!(send_request(&process.endpoint,&request("対話再実行",bad))["status"],"accepted");
+    }
+    let mut stale=selection.clone();stale["対話セッションID"]=session.clone();
+    assert_ne!(send_request(&process.endpoint,&request("対話再実行",stale))["status"],"accepted");
+    for (op,input) in [("対話再実行","原入力"),("対話分岐","変更入力")] {
+        let mut payload=selection.clone();payload["入力"]=json!(input);
+        let response=send_request(&process.endpoint,&request(op,payload));assert_eq!(response["status"],"accepted", "{response}");
+        let body=&response["body"];
+        assert_ne!(body["要求ID"],original["要求ID"]);assert_ne!(body["対話セッションID"],session);assert_eq!(body["状態"],"承認待ち");
+        assert_ne!(send_request(&owner,&request("対話承認",json!({"要求ID":body["要求ID"],"要求hash":original["要求hash"],"表示範囲":"full"})))["status"],"accepted");
+        let progress=send_request(&process.endpoint,&request("対話取得",json!({"要求ID":body["要求ID"]})));
+        assert_eq!(progress["body"]["状態"],"承認待ち");assert_eq!(progress["body"]["実行記録"]["開始時刻"],Value::Null);
+        assert_eq!(send_request(&process.endpoint,&request("対話終了",json!({"対話セッションID":body["対話セッションID"]})))["status"],"accepted");
+    }
+    assert_eq!(send_request(&owner,&request("対話履歴失効",json!({})))["status"],"accepted");
+    assert_ne!(send_request(&process.endpoint,&request("対話分岐",selection))["status"],"accepted");
+}

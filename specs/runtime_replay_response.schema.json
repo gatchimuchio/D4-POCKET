@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_replay_response.schema.json",
+  "title": "履歴参照から生成した新規承認待ち要求",
+  "description": "過去の権限は継承しない。新要求hashに対する新Approvalが必要。",
+  "type": "object",
+  "required": [
+    "要求ID",
+    "要求hash",
+    "状態",
+    "期限",
+    "対話セッションID",
+    "実行系ID",
+    "参照監査ID",
+    "参照event_hash",
+    "種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "状態": {
+      "const": "承認待ち"
+    },
+    "期限": {
+      "type": "integer"
+    },
+    "対話セッションID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "実行系ID": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "参照監査ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "参照event_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "種別": {
+      "enum": [
+        "対話再実行",
+        "対話分岐"
+      ]
+    }
+  }
+}

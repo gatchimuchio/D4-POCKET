@@ -1,0 +1,11 @@
+{
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "状態": "成功",
+  "期限": 300,
+  "対話セッションID": "cccccccccccccccccccccccccccccccc",
+  "実行系ID": "local",
+  "参照監査ID": "audit-1",
+  "参照event_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "種別": "対話再実行"
+}
