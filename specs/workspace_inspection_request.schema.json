@@ -157,6 +157,86 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域差分"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "相対path",
+            "基準点hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "相対path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "基準点hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "operation",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "const": "作業領域基準点保存"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "作業領域ID",
+            "登録hash",
+            "相対paths"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "作業領域ID": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+            },
+            "登録hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "相対paths": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "type": "object"

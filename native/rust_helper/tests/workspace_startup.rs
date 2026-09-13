@@ -151,3 +151,65 @@ fn startup_rejects_procfs_and_reader_rejects_cross_device_directory() {
     let reader=gui_shell_rust_helper::workspace_reader::WorkspaceReader::from_registered_dir(cap_std::fs::Dir::open_ambient_dir("/",cap_std::ambient_authority()).unwrap(),&[]).unwrap();
     assert_eq!(reader.list("proc"),Err(gui_shell_rust_helper::workspace_reader::ReadError::UnsafeFile));
 }
+
+#[test]
+fn owner_checkpoint_and_current_ipc_diff_bind_real_changes_and_revocation() {
+    let mut f=Fixture::new();let (normal,owner)=f.start();
+    let listed=request(&normal,"作業領域一覧",json!({}));
+    let hash=listed["body"]["作業領域"][0]["登録hash"].as_str().unwrap();
+    let capture=json!({"作業領域ID":"workspace-a","登録hash":hash,"相対paths":["本文.txt","new.txt"]});
+    assert_eq!(request(&owner,"作業領域基準点保存",capture.clone())["status"],"rejected");
+    assert!(cli(&f,&["作業領域承認","workspace-a",hash,"full"]).status.success());
+    assert_eq!(request(&normal,"作業領域基準点保存",capture.clone())["status"],"rejected");
+    for paths in [json!([]),json!(["本文.txt","本文.txt"]),json!([".env"]),json!(["../owner.json"])] {
+        let mut invalid=capture.clone();invalid["相対paths"]=paths;
+        assert_eq!(request(&owner,"作業領域基準点保存",invalid)["status"],"rejected");
+    }
+    let output=cli(&f,&["作業領域基準点保存","workspace-a",hash,"本文.txt","new.txt"]);
+    assert!(output.status.success());let receipt:Value=serde_json::from_slice(&output.stdout).unwrap();
+    let baseline=receipt["projection"]["基準点hash"].as_str().unwrap();
+    let selection=|path:&str|json!({"作業領域ID":"workspace-a","相対path":path,"基準点hash":baseline});
+    let unchanged=request(&normal,"作業領域差分",selection("本文.txt"));
+    assert_eq!(unchanged["body"]["projection"]["diff"]["kind"],"unchanged");
+    fs::write(f.root.join("project/本文.txt"),"変更された本文\n").unwrap();
+    fs::write(f.root.join("project/new.txt"),b"").unwrap();
+    let changed=request(&normal,"作業領域差分",selection("本文.txt"));
+    assert_eq!(changed["status"],"accepted");assert_eq!(changed["evidence_source"],"LIVE_RUNTIME");
+    assert_eq!(changed["body"]["projection"]["diff"]["kind"],"text");
+    assert!(changed["body"]["projection"]["diff"]["unified"].as_str().unwrap().contains("変更された本文"));
+    assert!(!changed["body"]["projection"]["diff"]["rows"].as_array().unwrap().is_empty());
+    let added=request(&normal,"作業領域差分",selection("new.txt"));
+    assert!(added["body"]["projection"]["diff"]["before"].is_null());
+    assert_eq!(added["body"]["projection"]["diff"]["after"]["bytes"],0);
+    fs::remove_file(f.root.join("project/本文.txt")).unwrap();
+    let deleted=request(&normal,"作業領域差分",selection("本文.txt"));
+    assert!(deleted["body"]["projection"]["diff"]["after"].is_null());
+    assert!(deleted["body"]["projection"]["diff"]["before"].is_object());
+    let schema_data=f.root.join("diff-results.json");
+    fs::write(&schema_data,serde_json::to_vec(&json!([receipt,unchanged["body"],changed["body"],added["body"],deleted["body"]])).unwrap()).unwrap();
+    let root=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let script="import json,sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from tooling.schema_check.check_schemas import validate_instance; schema=json.loads((Path(sys.argv[1])/'specs/workspace_inspection_response.schema.json').read_text(encoding='utf-8')); results=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8')); errors=[e for result in results for e in validate_instance(result,schema)]; assert not errors, errors";
+    let validation=Command::new(if cfg!(windows) {"python"} else {"python3"}).args(["-c",script]).arg(root).arg(schema_data).output().unwrap();
+    assert!(validation.status.success(),"{}",String::from_utf8_lossy(&validation.stderr));
+    let mut wrong=selection("new.txt");wrong["基準点hash"]=json!(format!("sha256:{}","0".repeat(64)));
+    assert_eq!(request(&normal,"作業領域差分",wrong)["status"],"rejected");
+    assert_eq!(request(&normal,"作業領域差分",selection("unselected.txt"))["status"],"rejected");
+    for visibility in ["none","summary","redacted","hash_only"] {
+        assert!(cli(&f,&["作業領域承認","workspace-a",hash,visibility]).status.success());
+        let hidden=request(&normal,"作業領域差分",selection("new.txt"));
+        assert_eq!(hidden["status"],"accepted");
+        assert!(!hidden.to_string().contains("new.txt"));
+        assert!(!hidden.to_string().contains("unified"));
+        assert_eq!(request(&owner,"作業領域基準点保存",capture.clone())["status"],"rejected");
+    }
+    assert!(cli(&f,&["作業領域失効","workspace-a",hash]).status.success());
+    assert!(cli(&f,&["作業領域承認","workspace-a",hash,"full"]).status.success());
+    assert_eq!(request(&normal,"作業領域差分",selection("new.txt"))["status"],"rejected");
+    assert_eq!(request(&normal,"shutdown",Value::Null)["status"],"accepted");
+    assert!(f.child.take().unwrap().wait().unwrap().success());
+    let (_,state)=gui_shell_rust_helper::broker::BrokerPersistentStore::open_or_create(f.root.join("store"),"verify").unwrap();
+    let event=state.audit_log.events().iter().find(|e|e.event_id==changed["audit_event_id"].as_str().unwrap()).unwrap();
+    assert_eq!(event.payload_hash,sha256_tagged(changed["body"].to_string().as_bytes()));
+    let raw=fs::read_to_string(f.root.join("store/audit.jsonl")).unwrap();
+    for content in ["本文.txt","変更された本文","new.txt",&owner.session_secret] {assert!(!raw.contains(content));}
+}

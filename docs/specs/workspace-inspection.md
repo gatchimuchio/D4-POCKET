@@ -87,3 +87,17 @@ Desktopの製品ShellCoreClientは通常Broker接続を保持し、Agent Center�
 不在の検査も登録済みhandleからnofollowで進める。途中にlinkや別deviceがあれば拒否する。OSのNotFoundはnofollow metadata照会で判定し、現在の親handle同一性と不在の再照合を通す。確認中のfile出現や親置換はChangedとし、既に存在を観測した対象のopen失敗を削除へ読み替えない。存在するfileは既存の取得前後の同一性検査とbyte上限を通す。走査はfilesystemの原子的snapshotではなく、観測後の変更を永続的に禁止するものではない。
 
 この取得APIは内部経路であり、通常IPCの許可を追加しない。基準点保存と比較操作の現在Permission・Approval・Audit、UIの統合はrelease_blockerとして続く。巨大fileは現時点では上限超過を明示する段階にあり、そのmetadata比較接続も残る。
+
+## 指定file群の基準点と差分操作
+
+owner制御の「作業領域基準点保存」は、現在のfull読取承認、作業領域ID、登録hash、重複のない相対path群を必要とする。1回最大128file、各fileの既存読取上限65,536 bytesを適用し、1作業領域に1基準点をBrokerのmemoryへ保持する。本文を監査・設定・diskへ複製しない。既存基準点は置換開始時に破棄し、対象すべての取得と監査が成功した場合だけ新しい基準点を確定する。取得中の競合・拒否・上限超過は部分基準点として成功させない。
+
+基準点hashはversion、登録hash、生成nonce、作成時刻、指定pathと各fileの存在・byte数・内容hashへ結合する。基準点は指定されたfile群の取得時点の比較元であり、workspace全体の原子的snapshotではない。未指定fileを「変更なし」と報告しない。
+
+通常IPCの「作業領域差分」は作業領域ID・相対path・基準点hashを受け、現在のPermission/Approvalと登録範囲を毎回照合する。取得拒否を削除として扱わず、既存差分生成器へ存在を区別したbytesを渡す。現在のfullだけが統合差分と左右比較行を返す。hash_onlyは結果hash、noneはnull、summary/redactedは既存の非内容説明だけとし、none/summary/redactedでは本文を取得しない。
+
+基準点は権限を所有しない。期限切れでは読取を拒否し、新たなowner承認なしに復活しない。明示的失効、時計後退、監査障害、Broker停止で基準点を破棄する。同じ登録にownerが改めて現在読取を承認した場合は、その現在表示範囲でのみ既存比較元を使用できる。Capabilityはworkspace.inspect、PermissionとApprovalは現在の読取承認、復旧はworkspace.reapprove。基準点保存も取得後の期限と最終監査を必須とする。
+
+この単位は指定範囲の基準点と実IPC差分まで。workspace全体の変更探索、巨大fileのmetadata比較、差分UI、実履歴とrollback previewはrelease_blockerを維持する。
+
+owner CLIは `作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...` とする。返却された基準点hashは差分要求の対象結合であり、監査チェックポイントの署名証拠や新しい権限ではない。

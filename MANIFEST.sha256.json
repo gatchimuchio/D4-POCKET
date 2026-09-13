@@ -1050,7 +1050,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "cee10c9d6aa4cfb0f637f30020a56e4b73418b75decd346bd8ec0964b33f3cff"
+      "sha256": "fdaf9dd727a379c0963e89d8638ae9e25a0ee66c8161a7a2753f0fcaf8a4a2ac"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -1078,7 +1078,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "216fc7c047800a2ac2e0c78c1907d61c5cc73b01302796fd792f417bf2a0206a"
+      "sha256": "789cb6bd6a3fd8119079a73019875b37cd01a2230b6134f6d37abcdc12a7613f"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1546,7 +1546,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "4fa171a8f3d8e13243a13c6fa9511ca64472afe1e8a1ec437511f8974da52776"
+      "sha256": "97051a54ae74f9d4dfb9cc36682ee09966ee2af8c45cd96c5705dc568e6f65f8"
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
@@ -1554,7 +1554,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "690ebaff8559c673734a87f784307b9044cd289aaadba8174cc9a6e7cb867c49"
+      "sha256": "bd714a6348f46bddc6c5b81c319bab3e743f39ab362642c82eba1ed51ef0f08e"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -1590,7 +1590,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "16149a4b067e7829e754e8098fb76260ec6f1535997d25b35414e962814294a6"
+      "sha256": "02b8c1b116b34cd6254c99e0c4f8068586d78c3ca77cccba6e468ccb780375c9"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1598,7 +1598,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "4389506c275bb8fc5a9653e6a1f0af471df746f637ed8090d87323c0bb0843bd"
+      "sha256": "11cbc610dd9c252dfe6c4effd99c48ecaeee9f8c6af89fb622385f83c3256cf8"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1630,7 +1630,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_registry.rs",
-      "sha256": "09634456cfcf91563fa375d473ae2b3ddcc3f39a6c3b1a6cd6fa42df7c914e80"
+      "sha256": "eaf8b235faeff98c5207ccb62bbd51df54c5d2de13601ad845f8759b4aedecff"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",
@@ -1642,7 +1642,7 @@
     },
     {
       "path": "native/rust_helper/tests/workspace_startup.rs",
-      "sha256": "b81a6d49428426ad78f41ff7783e4d8e69350754fe8076a079e4307ec9fbe68e"
+      "sha256": "5e286d944ee9b3a7aaa559811b863b39fab334977ab349cb00125e1cfbcaaa9b"
     },
     {
       "path": "native/rust_helper/update_verification/README.md",
@@ -2074,11 +2074,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "242a39f12204eebe7367d52771d98fbce5913ee3483f2f133578f2ff09af7659"
+      "sha256": "affcfd6746c7a2d19ed6ee74a83be2545a68edc31e098a1700114f07952d555e"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "d4e9971c214fd0584f27a5f9875d114b8b7476421ba733f3b247b69580cb932d"
+      "sha256": "76d8eff500936e61eae59ddfc7db0095150fa71498461b594d02954a40d437aa"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2126,11 +2126,11 @@
     },
     {
       "path": "specs/workspace_inspection_request.schema.json",
-      "sha256": "56a92ae6b7f5b707adf85b7dc78ed506a2eda9b13105fabd285c02a790edf2f0"
+      "sha256": "1c517beb9fda93ef267397de427fd1436310435dfc50c389ba03f3d2f04de58a"
     },
     {
       "path": "specs/workspace_inspection_response.schema.json",
-      "sha256": "565386431523401f990f98bca672d69e5904857b6d8927e80e737598b9530c82"
+      "sha256": "552759b69dc107ce05011955aaece6e0638794d75a30269c3c3827acee30e126"
     },
     {
       "path": "specs/workspace_startup.schema.json",
@@ -2154,7 +2154,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "cb87626093459daa792b375fd29bfe1e3183ad4734587e45c1f44587a2f67c3c"
+      "sha256": "1599bc49207fc09288232dff324274b60ae533480814c249305a1fc87765ad46"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
