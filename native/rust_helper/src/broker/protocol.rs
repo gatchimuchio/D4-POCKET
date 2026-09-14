@@ -203,6 +203,8 @@ pub enum BrokerOperation {
     対話承認待ち,
     #[serde(rename = "対話部分保存破棄")]
     対話部分保存破棄,
+    #[serde(rename = "対話部分破棄中断確認")]
+    対話部分破棄中断確認,
     #[serde(rename = "対話削除中断確認")]
     対話削除中断確認,
     #[serde(rename = "対話保管状態")]
@@ -267,6 +269,7 @@ impl BrokerOperation {
             BrokerOperation::対話承認待ち => "対話承認待ち",
             BrokerOperation::対話部分保存破棄 => "対話部分保存破棄",
             BrokerOperation::対話削除中断確認 => "対話削除中断確認",
+            BrokerOperation::対話部分破棄中断確認 => "対話部分破棄中断確認",
             BrokerOperation::対話保管状態 => "対話保管状態",
             BrokerOperation::対話内容削除 => "対話内容削除",
             BrokerOperation::対話内容保存 => "対話内容保存",
@@ -701,6 +704,7 @@ impl Broker {
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::対話部分破棄中断確認 => self.部分破棄中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話保管状態 => self.保管状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -2757,3 +2761,6 @@ mod content_recovery;
 
 #[path = "content_discard.rs"]
 mod content_discard;
+
+#[path = "content_discard_recovery.rs"]
+mod content_discard_recovery;

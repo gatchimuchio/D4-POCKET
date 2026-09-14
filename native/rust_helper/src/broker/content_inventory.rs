@@ -137,7 +137,7 @@ pub(super) fn observe(
     let saved = &entry["content_receipt"];
     let attempt =
         super::super::execution_history::latest_save_attempt(log, &entry["record"], &p.hash)?;
-    let (discard_intent, discard_result) =
+    let (discard_intent, discard_result, discard_reconciled) =
         super::content_discard::markers(log, entry, attempt.as_deref())?;
 
     let mut intent: Option<(String, String, Value)> = None;
@@ -305,6 +305,8 @@ pub(super) fn observe(
             "部分保存破棄承認あり・file残存"
         } else if discard_result.is_some() {
             "部分保存破棄済み・file不在"
+        } else if discard_reconciled.is_some() {
+            "部分破棄中断・復旧照合済み"
         } else {
             "部分保存破棄・結果未確定"
         }
@@ -332,7 +334,7 @@ pub(super) fn observe(
         }
     };
     Ok(
-        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"復旧照合監査ID":reconciled,"保存試行監査ID":attempt,"部分保存破棄承認監査ID":discard_intent,"部分保存破棄結果監査ID":discard_result,"証拠種別":"LIVE_RUNTIME"}),
+        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"復旧照合監査ID":reconciled,"保存試行監査ID":attempt,"部分保存破棄承認監査ID":discard_intent,"部分保存破棄結果監査ID":discard_result,"部分破棄復旧照合監査ID":discard_reconciled,"証拠種別":"LIVE_RUNTIME"}),
     )
 }
 #[cfg(windows)]

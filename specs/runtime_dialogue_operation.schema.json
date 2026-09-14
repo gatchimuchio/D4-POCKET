@@ -36,7 +36,8 @@
         "対話内容削除",
         "対話保管状態",
         "対話削除中断確認",
-        "対話部分保存破棄"
+        "対話部分保存破棄",
+        "対話部分破棄中断確認"
       ]
     },
     "payload": {
@@ -721,6 +722,37 @@
             "暗号文hash": {
               "type": "string",
               "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話部分破棄中断確認"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID",
+            "要求hash",
+            "部分保存破棄承認監査ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "要求hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            },
+            "部分保存破棄承認監査ID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
             }
           }
         }

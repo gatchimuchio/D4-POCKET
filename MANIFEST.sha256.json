@@ -1081,7 +1081,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "c7293de6a27742090f394af9f9de63b7decf63eb095e2ee953dc6bc683d4e142"
+      "sha256": "7b0bf8261a6d79d98d60013c18177f0ec3caa5c19bedd40c40a13011b21c8af0"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1113,7 +1113,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "d1132a6f44ec02f69296496757f6940d4a0e605a9817606be4ad7a62a5bf0f3c"
+      "sha256": "6c3bdd40dfaf748744317fd1982133394e8dad8db4ecea85a85f5a8696846301"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1360,6 +1360,10 @@
       "sha256": "a012eb69c41dd335ff0804b14fafc3447c03cd6be2208ace68af616ab60bccb5"
     },
     {
+      "path": "examples/contracts/invalid/runtime_content_discard_reconciliation.invalid.json",
+      "sha256": "ce88cca562cad0cf3295464d9908266d5edd41d3df752bad2cc307de8ac26227"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_content_receipt.invalid.json",
       "sha256": "3e03698863aa92d96f890e7d21262d54e3f375a6a59f1f2b0218ad340d94e1e2"
     },
@@ -1498,6 +1502,10 @@
     {
       "path": "examples/contracts/runtime_content_discard.valid.json",
       "sha256": "13164a05a9d48ec4a02528c1930d9ab6685287ed1794e64892a8ed8b1304a0c9"
+    },
+    {
+      "path": "examples/contracts/runtime_content_discard_reconciliation.valid.json",
+      "sha256": "b0b5eabbb62241d3c3fd12ed9bc27f8389caa7ffb5002d06b5fe726281b02c6b"
     },
     {
       "path": "examples/contracts/runtime_content_receipt.valid.json",
@@ -1693,11 +1701,15 @@
     },
     {
       "path": "native/rust_helper/src/broker/content_discard.rs",
-      "sha256": "574562d20cbf8e46d88b19cdcb94ae97615ae4696cb58f049ee441b45b51461d"
+      "sha256": "3d9069affb1c544e2f93b2a8186ec64f036f85ac16bbd77bd853c1b1afcf7c68"
+    },
+    {
+      "path": "native/rust_helper/src/broker/content_discard_recovery.rs",
+      "sha256": "08dde4449f6e92fdaa45250ee04e5c3539a37456e7077d66f347422d0a2e508a"
     },
     {
       "path": "native/rust_helper/src/broker/content_inventory.rs",
-      "sha256": "3a8991711d9152b42158236dc870dc2618cdc885d2c93d49956515b6759787c2"
+      "sha256": "2ce5d1dc514c977b45af14018f18936b2b7b71904ee3d4337b23cebf46407da1"
     },
     {
       "path": "native/rust_helper/src/broker/content_recovery.rs",
@@ -1737,7 +1749,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "99b25ee5508998ad8e922289e850c52663d00c80d2519ac8313c4cedd40b9409"
+      "sha256": "67514203a436ed613f99d54bb4b8193eb395b5d38c8f83314bf945031fe1064f"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -1785,7 +1797,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "26912ce5bbddf7fbce1f3c667ea57160bbf4649660b65c51d56a506fbf628bb2"
+      "sha256": "08dff64548e5d6fb2044587c6ed7252308b040c6a4b1c35f45388f2a01495d1e"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1793,7 +1805,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "0b8b13528162dd10b4fca9f56bc6cba556bc1a7d5ebc9b109a74bad029290c39"
+      "sha256": "5baa9e000d516b7bde1b70d77d9843fbc9476ea2906e2c26c637a1773743e477"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1837,7 +1849,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",
-      "sha256": "a1fa8bdad06b11562d7969aae860b6ce714eba9cc4be401e01e5e81eddaea214"
+      "sha256": "d673350ee05a828f646f16022b6200ad79e66a0c519f9898dc546917a9c1ff81"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
@@ -2309,11 +2321,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "99d5e367684797d83b4f82f14024c1d409c681f5b29a9a6ff4712e092a0f0af8"
+      "sha256": "08d33f2cff107c929051bb723344c7ad7ecce64fbadd92f8aa90f9626120911b"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "68fa1d986af01893a72d01c78c0c7a2b98dda1b8157d3fcc424ecc282294cdaa"
+      "sha256": "70bc1780eb21847e2bceaa79fc51948506658d0505cd28650d2cc7e506cba013"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2344,6 +2356,10 @@
       "sha256": "347fc837623ce9c1247bdd22896228d9ba08664a78b4f6d1d5ae5e6d86bdc829"
     },
     {
+      "path": "specs/runtime_content_discard_reconciliation.schema.json",
+      "sha256": "519d8ff851039dc17bf31908451200a0ca6747533b1dde2bf123b803a7632fa0"
+    },
+    {
       "path": "specs/runtime_content_receipt.schema.json",
       "sha256": "809a51bddf6fc1846b3f0208ed6915b91387992865e2be42f16a1cef91827751"
     },
@@ -2353,7 +2369,7 @@
     },
     {
       "path": "specs/runtime_content_state.schema.json",
-      "sha256": "4fe03717c4371d49ac9b43ea0ec6bcd7861fe6999ae0d6f524ed414540ad66f5"
+      "sha256": "2214be1372d47bbcf8510f2a30784986d17292715cb5e9880f9a4149947964d7"
     },
     {
       "path": "specs/runtime_dialogue_comparison.schema.json",
@@ -2361,7 +2377,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "7812e671bea0b984137e7a2d968fa71896e8c394c173fcb0320cffc7e20df6a3"
+      "sha256": "cf2c687f6ff8cbf01c8833cc0d673f0ba6c9f543330648335b7fbc3351748858"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2473,7 +2489,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "3aa17bb0ac83d9e9671b9f0ed085a4263bc2d0dc44b09546c1aee304b40ce519"
+      "sha256": "18eb4064e3e26b6ba93cab98952ac59e5e534f48990c25c3e25f61566abb86f7"
     },
     {
       "path": "tooling/packaging_portability_check.py",
@@ -2493,7 +2509,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "ad8a55129a86c469f0764e842842f3d8af630e87106e0841e83b3ce3e4462849"
+      "sha256": "9d386e4967f410c45b4f12c97ecec276fbb47cd91f703eb4ede26e69b4c430ff"
     },
     {
       "path": "tooling/shell_snapshot.py",

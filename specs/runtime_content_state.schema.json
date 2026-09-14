@@ -52,7 +52,8 @@
         "削除中断・復旧照合済み",
         "部分保存破棄承認あり・file残存",
         "部分保存破棄・結果未確定",
-        "部分保存破棄済み・file不在"
+        "部分保存破棄済み・file不在",
+        "部分破棄中断・復旧照合済み"
       ]
     },
     "file存在": {
@@ -127,6 +128,13 @@
       ],
       "minLength": 1,
       "maxLength": 256
+    },
+    "部分破棄復旧照合監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
     }
   },
   "oneOf": [
@@ -481,6 +489,50 @@
         },
         "部分保存破棄結果監査ID": {
           "type": "string"
+        }
+      }
+    },
+    {
+      "required": [
+        "保存試行監査ID",
+        "部分保存破棄承認監査ID",
+        "部分保存破棄結果監査ID",
+        "部分破棄復旧照合監査ID"
+      ],
+      "properties": {
+        "状態": {
+          "const": "部分破棄中断・復旧照合済み"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "保存試行監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        },
+        "部分保存破棄承認監査ID": {
+          "type": "string"
+        },
+        "部分保存破棄結果監査ID": {
+          "type": "null"
+        },
+        "部分破棄復旧照合監査ID": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }

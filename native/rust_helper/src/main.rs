@@ -33,6 +33,7 @@ fn main() {
     eprintln!("内容承認: 対話承認操作 --session-file <owner資格file> 内容閲覧承認 <要求ID> <保存監査ID> <保存監査hash> | 内容閲覧失効");
     eprintln!("内容削除: 対話承認操作 --session-file <owner資格file> 内容削除 <要求ID> <保存監査ID> <保存監査hash>");
     eprintln!("削除中断確認: 対話承認操作 --session-file <owner資格file> 削除中断確認 <要求ID> <要求hash> <削除承認監査ID>");
+    eprintln!("部分破棄中断確認: 対話承認操作 --session-file <owner資格file> 部分破棄中断確認 <要求ID> <要求hash> <部分保存破棄承認監査ID>");
     eprintln!("部分保存破棄: 対話承認操作 --session-file <owner資格file> 部分保存破棄 <要求ID> <要求hash> <保存試行監査ID> <暗号文hash>");
     eprintln!("保管状態: 対話承認操作 --session-file <owner資格file> 保管状態 <要求ID> <要求hash>");
     eprintln!("内容保存: 対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>");

@@ -347,6 +347,12 @@ server.serve_forever()
                     after_discard = 成功(owner, "対話保管状態", partial_select)
                     assert not validate_instance(after_discard, state_schema)
                     assert after_discard["状態"] == "部分保存破棄済み・file不在"
+                    reconcile = {**partial_select, "部分保存破棄承認監査ID": after_discard["部分保存破棄承認監査ID"]}
+                    assert 操作(normal, "対話部分破棄中断確認", reconcile)["body"] is None
+                    completed_rejection = subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file), "部分破棄中断確認", partial_pending["要求ID"], partial_pending["要求hash"], reconcile["部分保存破棄承認監査ID"]], capture_output=True, timeout=10)
+                    assert completed_rejection.returncode != 0
+                    assert "復旧対象拒否" in completed_rejection.stderr.decode("utf-8")
+                    assert 成功(owner, "対話保管状態", partial_select)["状態"] == "部分保存破棄済み・file不在"
                     assert 操作(owner, "対話内容保存", partial_select)["body"] is None
 
 

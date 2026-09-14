@@ -305,3 +305,37 @@ fn partial_discard_requires_latest_save_attempt_and_current_hash() {
     let denied=b.部分保存破棄確定("partial-result-failure",result);assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
     drop(b);std::fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn partial_discard_interruption_reconciles_current_absence_only() {
+    let root=super::tests::temp_store_dir("partial-recovery");let vault=root.join("vault");std::fs::create_dir(&vault).unwrap();let audit=root.join("audit");
+    let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    let select=prepare(&mut b,false);let target=select["要求ID"].as_str().unwrap();let path=vault.join(format!("history-{target}.dpapi"));
+    std::fs::write(&path,b"partial").unwrap();assert!(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true).body.is_none());
+    let state=|b:&mut Broker|accepted(call(b,BrokerOperation::対話保管状態,select.clone(),true));
+    let current=state(&mut b);
+    let intent=json!({"要求ID":target,"要求hash":select["要求hash"],"保存試行監査ID":current["保存試行監査ID"],"暗号文hash":current["暗号文hash"]});
+    let encoded=intent.to_string();let hash=sha256_tagged(encoded.as_bytes());
+    // 実承認監査とfile削除を行い、結果監査なしの中断状態を構成する。process強制終了証拠ではない。
+    b.append_audit("partial-interrupted","対話部分保存破棄","received","Capability=対話部分保存破棄 Permission=保存試行と暗号文hash一件 Approval=現在owner破棄 RecoveryAction=保管監査再確認","INTERNAL_STATE",&hash).unwrap();
+    let approval=b.append_audit("partial-interrupted","対話部分保存破棄","recorded",&format!("対話部分保存破棄承認:{encoded}"),"INTERNAL_STATE",&hash).unwrap().event_id;
+    let query=json!({"要求ID":target,"要求hash":select["要求hash"],"部分保存破棄承認監査ID":approval});
+    assert!(call(&mut b,BrokerOperation::対話部分破棄中断確認,query.clone(),true).body.is_none());
+    b.protected_store.as_ref().unwrap().prepare_delete(crate::protected_store::Purpose::History,target,current["暗号文hash"].as_str().unwrap()).unwrap().commit().unwrap();
+    drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert_eq!(state(&mut b)["状態"],"部分保存破棄・結果未確定");
+    assert!(call(&mut b,BrokerOperation::対話部分破棄中断確認,query.clone(),false).body.is_none());
+    for key in ["要求ID","要求hash","部分保存破棄承認監査ID","extra"] {let mut wrong=query.clone();wrong[key]=json!("wrong");assert!(call(&mut b,BrokerOperation::対話部分破棄中断確認,wrong,true).body.is_none());}
+    let result=accepted(call(&mut b,BrokerOperation::対話部分破棄中断確認,query.clone(),true));assert_eq!(result["状態"],"部分破棄中断照合済み");
+    assert_eq!(state(&mut b)["状態"],"部分破棄中断・復旧照合済み");assert!(state(&mut b)["部分保存破棄結果監査ID"].is_null());
+    assert!(call(&mut b,BrokerOperation::対話部分破棄中断確認,query.clone(),true).body.is_none());
+    drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert_eq!(state(&mut b)["状態"],"部分破棄中断・復旧照合済み");
+    std::fs::write(&path,b"partial").unwrap();assert_eq!(state(&mut b)["状態"],"部分保存破棄承認あり・file残存");
+    assert!(call(&mut b,BrokerOperation::対話部分破棄中断確認,query,true).body.is_none());
+    assert_eq!(b.audit_events().iter().filter(|e|e.operation=="対話部分保存破棄" && e.decision=="accepted").count(),0);
+    let audit_file=audit.join("audit.jsonl");std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let denied=b.部分破棄中断照合確定("partial-recovery-failure",result);assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
+    drop(b);std::fs::remove_dir_all(root).unwrap();
+}

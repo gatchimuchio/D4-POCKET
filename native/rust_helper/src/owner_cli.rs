@@ -17,6 +17,7 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
 
         "内容削除" if args.len()==6 => ("対話内容削除",json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]})),
         "削除中断確認" if args.len()==6 => ("対話削除中断確認",json!({"要求ID":args[3],"要求hash":args[4],"削除承認監査ID":args[5]})),
+        "部分破棄中断確認" if args.len()==6 => ("対話部分破棄中断確認",json!({"要求ID":args[3],"要求hash":args[4],"部分保存破棄承認監査ID":args[5]})),
         "部分保存破棄" if args.len()==7 => ("対話部分保存破棄",json!({"要求ID":args[3],"要求hash":args[4],"保存試行監査ID":args[5],"暗号文hash":args[6]})),
         "保管状態" if args.len()==5 => ("対話保管状態",json!({"要求ID":args[3],"要求hash":args[4]})),
         "内容保存" if args.len() == 5 => ("対話内容保存", json!({"要求ID":args[3],"要求hash":args[4]})),

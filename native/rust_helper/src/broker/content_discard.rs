@@ -242,13 +242,75 @@ pub(super) fn markers(
     log: &super::super::audit::BrokerAuditLog,
     entry: &Value,
     attempt: Option<&str>,
-) -> Result<(Option<String>, Option<String>), &'static str> {
+) -> Result<(Option<String>, Option<String>, Option<String>), &'static str> {
     let target = &entry["record"]["実行記録"]["要求ID"];
     let mut intent: Option<(String, String, Value)> = None;
     let mut result = None;
+    let mut reconciled = None;
     for (index, e) in log.events().iter().enumerate().filter(|(_, e)| {
-        e.operation == "対話部分保存破棄" && matches!(e.decision.as_str(), "recorded" | "accepted")
+        (e.operation == "対話部分保存破棄" && matches!(e.decision.as_str(), "recorded" | "accepted")) || (e.operation == "対話部分破棄中断確認" && e.decision == "accepted")
     }) {
+        if e.operation == "対話部分破棄中断確認" {
+            let raw = e
+                .reason
+                .strip_prefix("対話部分破棄中断照合記録:")
+                .ok_or("復旧照合の形式が不正")?;
+            let v: Value =
+                super::super::json_input::read_unique(raw).map_err(|_| "復旧照合の形式が不正")?;
+            if e.payload_hash != sha256_tagged(raw.as_bytes())
+                || e.evidence_source != "LIVE_RUNTIME"
+            {
+                return Err("復旧照合のhashが不正");
+            }
+            if v["要求ID"] != *target {
+                continue;
+            }
+            if !exact(
+                &v,
+                &[
+                    "版",
+                    "要求ID",
+                    "要求hash",
+                    "部分保存破棄承認監査ID",
+                    "観測監査head",
+                    "観測時刻",
+                    "状態",
+                    "証拠種別",
+                ],
+            ) || v["版"] != 1
+                || v["要求hash"] != entry["result_evidence"]["要求hash"]
+                || v["状態"] != "部分破棄中断照合済み"
+                || v["証拠種別"] != "LIVE_RUNTIME"
+                || v["観測時刻"].as_u64().is_none()
+                || result.is_some()
+                || reconciled.is_some()
+                || !intent.as_ref().is_some_and(|i| v["部分保存破棄承認監査ID"] == i.0)
+            {
+                return Err("復旧照合と未確定削除の対応が不正");
+            }
+            let before: Vec<_> = log
+                .events()
+                .iter()
+                .take(index)
+                .collect();
+            if !before.iter().any(|e| v["観測監査head"] == e.event_hash) {
+                return Err("復旧観測の監査headが不正");
+            }
+            let request =
+                serde_json::json!({"要求ID":*target,"要求hash":entry["result_evidence"]["要求hash"],"部分保存破棄承認監査ID":v["部分保存破棄承認監査ID"]});
+            let hash = sha256_tagged(request.to_string().as_bytes());
+            if !before.iter().any(|r| {
+                r.operation == e.operation
+                    && r.request_id == e.request_id
+                    && r.decision == "received"
+                    && r.payload_hash == hash
+                    && r.evidence_source == "INTERNAL_STATE"
+            }) {
+                return Err("復旧照合の受信対応が不正");
+            }
+            reconciled = Some(e.event_id.clone());
+            continue;
+        }
         let prefix = if e.decision == "recorded" {
             "対話部分保存破棄承認:"
         } else {
@@ -304,6 +366,7 @@ pub(super) fn markers(
             }
             intent = Some((e.event_id.clone(), e.request_id.clone(), v));
             result = None;
+            reconciled = None;
         } else {
             let previous = intent.as_ref().ok_or("破棄結果に先行承認がない")?;
             if !exact(
@@ -331,7 +394,7 @@ pub(super) fn markers(
             result = Some(e.event_id.clone());
         }
     }
-    Ok((intent.map(|v| v.0), result))
+    Ok((intent.map(|v| v.0), result, reconciled))
 }
 #[cfg(windows)]
 fn exact(v: &Value, keys: &[&str]) -> bool {
