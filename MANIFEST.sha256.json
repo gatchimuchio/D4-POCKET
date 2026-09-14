@@ -1113,7 +1113,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "6c3bdd40dfaf748744317fd1982133394e8dad8db4ecea85a85f5a8696846301"
+      "sha256": "fba5991222226517413ce0c87f5f32937de19f6db9ca025b0b0ab434d6149ad8"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2489,7 +2489,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "18eb4064e3e26b6ba93cab98952ac59e5e534f48990c25c3e25f61566abb86f7"
+      "sha256": "a7a9037feac91f5b28e9074db9c35e14b1cd2557a3d3d1d2abaafd525ec5a16c"
     },
     {
       "path": "tooling/packaging_portability_check.py",

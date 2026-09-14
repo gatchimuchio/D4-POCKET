@@ -347,6 +347,7 @@ server.serve_forever()
                     after_discard = 成功(owner, "対話保管状態", partial_select)
                     assert not validate_instance(after_discard, state_schema)
                     assert after_discard["状態"] == "部分保存破棄済み・file不在"
+                    deletion_audit_id = 成功(owner, "対話保管状態", save_select)["削除結果監査ID"]
                     reconcile = {**partial_select, "部分保存破棄承認監査ID": after_discard["部分保存破棄承認監査ID"]}
                     assert 操作(normal, "対話部分破棄中断確認", reconcile)["body"] is None
                     completed_rejection = subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file), "部分破棄中断確認", partial_pending["要求ID"], partial_pending["要求hash"], reconcile["部分保存破棄承認監査ID"]], capture_output=True, timeout=10)
@@ -466,14 +467,39 @@ server.serve_forever()
                     成功(owner, "対話履歴失効", {})
                     denied = 操作(normal, "対話履歴閲覧", selection)
                     assert denied["status"] != "accepted" and denied.get("body") is None
-                assert 操作(normal, "shutdown", None)["status"] == "accepted"
-                broker.wait(timeout=5)
+                if os.name == "nt":
+                    # この検証が起動した実Brokerだけを強制終了する。削除途中の停止とは区別する。
+                    assert broker.poll() is None
+                    broker.kill()
+                    assert broker.wait(timeout=5) != 0
+                else:
+                    assert 操作(normal, "shutdown", None)["status"] == "accepted"
+                    assert broker.wait(timeout=5) == 0
                 # 再起動は永続監査chainとnonceを読み、整合しなければ起動しない。
-                normal_file.unlink()
-                restart = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"), "--session-file", str(normal_file)], stdout=log, stderr=log)
+                normal_file.unlink(missing_ok=True)
+                owner_file.unlink(missing_ok=True)
+                restart = subprocess.Popen([str(binary), "broker-server", "--store-dir", str(root / "store"), "--session-file", str(normal_file),
+                    "--owner-session-file", str(owner_file), *protected_args], stdout=log, stderr=log)
                 processes.append(restart)
                 endpoint = file待機(normal_file, restart)
+                restarted_owner = file待機(owner_file, restart)
                 assert 操作(endpoint, "health", None)["health"]["persistence_ready"] is True
+                if os.name == "nt":
+                    for selection, expected, marker in [
+                        (save_select, "削除確定・file不在", "削除結果監査ID"),
+                        (partial_select, "部分保存破棄済み・file不在", "部分保存破棄結果監査ID"),
+                    ]:
+                        observed = 成功(restarted_owner, "対話保管状態", selection)
+                        assert not validate_instance(observed, state_schema)
+                        assert observed["状態"] == expected and observed[marker]
+                        assert observed["file存在"] is False
+                        assert observed["暗号文hash"] is None and observed["bytes"] is None
+                        assert 操作(endpoint, "対話保管状態", selection)["body"] is None
+                    # 元の閲覧対象・承認はprocess再起動から復活しない。
+                    assert 操作(endpoint, "対話内容閲覧", content_query)["body"] is None
+                    assert 操作(restarted_owner, "対話内容承認", content_target)["body"] is None
+                    assert 成功(restarted_owner, "対話保管状態", save_select)["削除結果監査ID"] == deletion_audit_id
+                    assert 成功(restarted_owner, "対話保管状態", partial_select)["部分保存破棄結果監査ID"] == after_discard["部分保存破棄結果監査ID"]
                 assert 操作(endpoint, "shutdown", None)["status"] == "accepted"
                 restart.wait(timeout=5)
                 return {"result": "PASS", "evidence_source": "LIVE_RUNTIME", "reference_commit": head,
@@ -486,6 +512,7 @@ server.serve_forever()
                         "android_emulator": simulator_result if android_emulator else "未実行",
                         "protected_content_save": "PASS" if os.name == "nt" else "未対応拒否を確認",
                         "protected_content_delete": "PASS" if os.name == "nt" else "未実行",
+                        "protected_state_after_forced_process_exit": "PASS" if os.name == "nt" else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()
