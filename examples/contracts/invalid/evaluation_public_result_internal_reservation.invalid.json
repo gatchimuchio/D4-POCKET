@@ -1,0 +1,19 @@
+{
+  "評価ExperimentID": "44444444444444444444444444444444",
+  "評価DatasetID": "11111111111111111111111111111111",
+  "評価CaseID": "22222222222222222222222222222222",
+  "実行系ID": "runtime-a",
+  "判定": "中断",
+  "評価器判定一覧": [
+    {
+      "評価器ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "種類": "exact",
+      "判定": "中断",
+      "理由code": "中止"
+    }
+  ],
+  "LatencyMillis": null,
+  "総合hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "評価監査ID": "audit.evaluation.result.1",
+  "実行系隔離予約監査ID": "audit.lifecycle.quarantine.1"
+}

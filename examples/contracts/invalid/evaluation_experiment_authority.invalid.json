@@ -1,0 +1,19 @@
+{
+  "版": 1,
+  "評価ExperimentID": "44444444444444444444444444444444",
+  "評価DatasetID": "11111111111111111111111111111111",
+  "Dataset定義hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "対象Runtime一覧": [
+    "runtime-a",
+    "runtime-b"
+  ],
+  "状態": "完了",
+  "計画Case数": 1,
+  "結果数": 2,
+  "作成時刻UnixMillis": 1726300000000,
+  "開始時刻UnixMillis": 1726300000100,
+  "終了時刻UnixMillis": 1726300000200,
+  "実験監査ID": "audit.evaluation.experiment.1",
+  "証拠種別": "INTERNAL_STATE",
+  "権限ID": "authority-should-not-appear"
+}

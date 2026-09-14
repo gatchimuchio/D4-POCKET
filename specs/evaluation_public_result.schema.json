@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/evaluation_public_result.schema.json",
+  "title": "評価Result通常IPC公開projection",
+  "description": "評価実験状態の通常IPCとFlutterへ返す、本文・応答hash・開始終了監査・C4隔離予約を含まないResult要約。内部のevaluation_result recordとは別contractである。",
+  "type": "object",
+  "required": [
+    "評価ExperimentID",
+    "評価DatasetID",
+    "評価CaseID",
+    "実行系ID",
+    "判定",
+    "評価器判定一覧",
+    "LatencyMillis",
+    "総合hash",
+    "評価監査ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "評価ExperimentID": { "$ref": "#/$defs/id" },
+    "評価DatasetID": { "$ref": "#/$defs/id" },
+    "評価CaseID": { "$ref": "#/$defs/id" },
+    "実行系ID": { "$ref": "#/$defs/runtime_id" },
+    "判定": { "$ref": "#/$defs/determination" },
+    "評価器判定一覧": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/evaluator_result" }
+    },
+    "LatencyMillis": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "総合hash": { "$ref": "#/$defs/hash" },
+    "評価監査ID": { "$ref": "#/$defs/audit_id" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "determination": {
+      "type": "string",
+      "enum": ["成立", "不成立", "評価不能", "中断"]
+    },
+    "evaluator_result": {
+      "type": "object",
+      "required": ["評価器ID", "種類", "判定", "理由code"],
+      "additionalProperties": false,
+      "properties": {
+        "評価器ID": { "$ref": "#/$defs/id" },
+        "種類": {
+          "type": "string",
+          "enum": ["exact", "contains", "regex", "json_schema", "reference_count", "route", "status", "capability", "latency_threshold"]
+        },
+        "判定": { "$ref": "#/$defs/determination" },
+        "理由code": {
+          "type": "string",
+          "enum": ["一致", "不一致", "入力不足", "応答不正", "根拠不足", "閾値超過", "中止", "監査失敗", "評価器不正"]
+        }
+      }
+    }
+  }
+}

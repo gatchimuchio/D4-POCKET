@@ -1,0 +1,12 @@
+{
+  "版": 1,
+  "評価DatasetID": "11111111111111111111111111111111",
+  "Dataset定義hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "評価CaseID": "22222222222222222222222222222222",
+  "評価器ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "種類": "exact",
+  "公開表示名": "完全一致",
+  "定義hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "設定hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "公開範囲": "hash_only"
+}

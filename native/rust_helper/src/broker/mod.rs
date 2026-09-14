@@ -2,6 +2,7 @@
 pub(crate) mod content_access;
 pub(crate) mod history_access;
 pub(crate) mod execution_history;
+pub(crate) mod evaluation_lab;
 pub mod audit;
 pub(crate) mod workspace;
 pub(crate) mod workspace_root;

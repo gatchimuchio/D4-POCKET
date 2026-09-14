@@ -29,6 +29,9 @@ use crate::broker::runtime_registry::{
 };
 use std::sync::Arc;
 
+#[path = "evaluation_control.rs"]
+mod evaluation_control;
+
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
@@ -252,6 +255,16 @@ pub enum BrokerOperation {
     NormalizePayload,
     #[serde(rename = "実行系列挙")]
     実行系列挙,
+    #[serde(rename = "評価Dataset登録")]
+    評価Dataset登録,
+    #[serde(rename = "評価Dataset一覧")]
+    評価Dataset一覧,
+    #[serde(rename = "評価実験開始")]
+    評価実験開始,
+    #[serde(rename = "評価実験状態")]
+    評価実験状態,
+    #[serde(rename = "評価比較")]
+    評価比較,
     #[serde(rename = "実行系資源観測")]
     実行系資源観測,
     #[serde(rename = "実行系ライフサイクル状態")]
@@ -335,6 +348,11 @@ impl BrokerOperation {
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
+            BrokerOperation::評価Dataset登録 => "評価Dataset登録",
+            BrokerOperation::評価Dataset一覧 => "評価Dataset一覧",
+            BrokerOperation::評価実験開始 => "評価実験開始",
+            BrokerOperation::評価実験状態 => "評価実験状態",
+            BrokerOperation::評価比較 => "評価比較",
             BrokerOperation::実行系資源観測 => "実行系資源観測",
             BrokerOperation::実行系ライフサイクル状態 => "実行系ライフサイクル状態",
             BrokerOperation::実行系ライフサイクル承認要求 => "実行系ライフサイクル承認要求",
@@ -560,6 +578,7 @@ pub struct Broker {
     対話: 対話制御,
     資源観測: RuntimeResourceRegistry,
     ライフサイクル: RuntimeLifecycleRegistry,
+    評価: evaluation_control::EvaluationControl,
     履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
@@ -582,6 +601,7 @@ impl Broker {
             対話: 対話制御::default(),
             資源観測: RuntimeResourceRegistry::default(),
             ライフサイクル: RuntimeLifecycleRegistry::default(),
+            評価: Default::default(),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -627,6 +647,7 @@ impl Broker {
             ライフサイクル: RuntimeLifecycleRegistry::with_terminal_quarantines(
                 terminal_quarantines,
             ),
+            評価: Default::default(),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -878,6 +899,8 @@ impl Broker {
             BrokerOperation::実行系ライフサイクル承認要求 => self.実行系ライフサイクル承認要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系ライフサイクル承認 => self.実行系ライフサイクル承認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系ライフサイクル操作 => self.実行系ライフサイクル操作処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),

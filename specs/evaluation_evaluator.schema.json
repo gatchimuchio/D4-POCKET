@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/evaluation_evaluator.schema.json",
+  "title": "評価Evaluator静的hash_only contract",
+  "description": "owner登録payloadから導く評価Evaluatorの静的hash_only contract。これはnormal IPCのruntime API payloadではない。runtimeのevaluation_dataset公開manifestへEvaluator ID、種類、設定hashを埋め込まず、評価設定本文を含めない。",
+  "type": "object",
+  "required": [
+    "版",
+    "評価DatasetID",
+    "Dataset定義hash",
+    "評価CaseID",
+    "評価器ID",
+    "種類",
+    "公開表示名",
+    "定義hash",
+    "設定hash",
+    "公開範囲"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "評価DatasetID": {
+      "$ref": "#/$defs/id"
+    },
+    "Dataset定義hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "評価CaseID": {
+      "$ref": "#/$defs/id"
+    },
+    "評価器ID": {
+      "$ref": "#/$defs/id"
+    },
+    "種類": {
+      "$ref": "#/$defs/kind"
+    },
+    "公開表示名": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "定義hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "設定hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "公開範囲": {
+      "const": "hash_only"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "contains",
+        "regex",
+        "json_schema",
+        "reference_count",
+        "route",
+        "status",
+        "capability",
+        "latency_threshold"
+      ]
+    }
+  }
+}

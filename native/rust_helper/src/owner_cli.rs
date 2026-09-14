@@ -9,6 +9,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
+const MAX_EVALUATION_DATASET_BYTES: u64 = 48 * 1024;
+
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
         return Err("使用法: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲> | 端末招待 <端末ID> <接続先Host> <新規出力file> | 端末一覧 | 端末招待取消 <招待ID> | 端末失効 <結合ID>".into());
@@ -90,6 +92,136 @@ pub fn 実行系ライフサイクル承認(args: &[String]) -> Result<(), Strin
     Ok(())
 }
 
+/// privateな評価Datasetをowner制御としてだけBrokerへ渡す。
+///
+/// 通常UIはこの経路、資格file、private Dataset本文を扱わない。CLI側でも本文や
+/// pathを診断へ出さず、Brokerが返す公開manifestだけを表示する。
+pub fn 評価データセット登録(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
+        return Err("使用法: 評価Dataset登録 --session-file <owner資格file> 登録 <非公開評価データセットJSONファイル>".into());
+    }
+    let payload = 評価データセット読取(&args[3])?;
+    let body = owner操作送信(&args[1], "評価Dataset登録", payload)?;
+    let manifest = 評価データセット公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&manifest).map_err(|_| "評価Dataset公開manifestの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn 評価データセット読取(path: &str) -> Result<Value, String> {
+    let (file, bytes) = 評価データセット通常fileを開く(path)?;
+    if bytes > MAX_EVALUATION_DATASET_BYTES {
+        return Err("評価Dataset定義fileが48KiB上限を超過".into());
+    }
+
+    let mut raw = Vec::with_capacity(bytes as usize);
+    let mut bounded = file.take(MAX_EVALUATION_DATASET_BYTES + 1);
+    bounded
+        .read_to_end(&mut raw)
+        .map_err(|_| "評価Dataset定義fileを読めない")?;
+    if raw.len() as u64 > MAX_EVALUATION_DATASET_BYTES {
+        return Err("評価Dataset定義fileが48KiB上限を超過".into());
+    }
+    let payload: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "評価Dataset定義fileはJSON objectでなければならない")?;
+    if !payload.is_object() {
+        return Err("評価Dataset定義fileはJSON objectでなければならない".into());
+    }
+    Ok(payload)
+}
+
+/// private Datasetの最終要素を、検査対象と同じhandleとして一度だけ開く。
+#[cfg(windows)]
+fn 評価データセット通常fileを開く(path: &str) -> Result<(std::fs::File, u64), String> {
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+
+    const 再解析点を開くフラグ: u32 = 0x0020_0000;
+    const 再解析点属性: u32 = 0x0000_0400;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(再解析点を開くフラグ)
+        .open(path)
+        .map_err(|_| "評価Dataset定義fileを開けない")?;
+    let metadata = file
+        .metadata()
+        .map_err(|_| "評価Dataset定義fileの種別を確認できない")?;
+    if !metadata.file_type().is_file() || metadata.file_attributes() & 再解析点属性 != 0 {
+        return Err("評価Dataset定義fileは通常fileでなければならない".into());
+    }
+    Ok((file, metadata.len()))
+}
+
+/// C5のprivate Dataset保管はWindowsのProtectedStoreに限定する。
+#[cfg(not(windows))]
+fn 評価データセット通常fileを開く(
+    _path: &str,
+) -> Result<(std::fs::File, u64), String> {
+    Err("評価Dataset登録はWindowsの保護保管が利用できる環境に限定される".into())
+}
+
+/// Broker応答からC5の公開manifestだけを選び、private本文が誤って出力されるのを防ぐ。
+fn 評価データセット公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "評価Dataset公開manifestの形式が不正".to_string())?;
+    let required = [
+        "版",
+        "評価DatasetID",
+        "revision",
+        "定義hash",
+        "非公開保管ID",
+        "暗号文hash",
+        "公開表示名",
+        "Case数",
+        "Case一覧",
+        "公開範囲",
+        "作成時刻UnixMillis",
+        "作成監査ID",
+        "証拠種別",
+    ];
+    if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("評価Dataset公開manifestの形式が不正".into());
+    }
+    let cases = object
+        .get("Case一覧")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "評価Dataset公開manifestの形式が不正".to_string())?
+        .iter()
+        .map(|case| {
+            let case = case
+                .as_object()
+                .ok_or_else(|| "評価Dataset公開manifestの形式が不正".to_string())?;
+            if case.len() != 2
+                || !case.contains_key("評価CaseID")
+                || !case.contains_key("定義hash")
+            {
+                return Err("評価Dataset公開manifestの形式が不正".to_string());
+            }
+            Ok(json!({
+                "評価CaseID": case["評価CaseID"],
+                "定義hash": case["定義hash"],
+            }))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!({
+        "版": object["版"],
+        "評価DatasetID": object["評価DatasetID"],
+        "revision": object["revision"],
+        "定義hash": object["定義hash"],
+        "非公開保管ID": object["非公開保管ID"],
+        "暗号文hash": object["暗号文hash"],
+        "公開表示名": object["公開表示名"],
+        "Case数": object["Case数"],
+        "Case一覧": cases,
+        "公開範囲": object["公開範囲"],
+        "作成時刻UnixMillis": object["作成時刻UnixMillis"],
+        "作成監査ID": object["作成監査ID"],
+        "証拠種別": object["証拠種別"],
+    }))
+}
+
 fn owner操作送信(session_file: &str, operation: &str, payload: Value) -> Result<Value, String> {
     let file = std::fs::File::open(session_file).map_err(|_| "owner資格fileを開けない")?;
     let mut raw = Vec::new();
@@ -143,4 +275,131 @@ fn owner操作送信(session_file: &str, operation: &str, payload: Value) -> Res
         return Err(format!("承認操作を拒否: {}", response["error"]));
     }
     Ok(response["body"].clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn test_file(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "gui-shell-owner-cli-{name}-{}",
+            識別子生成().expect("テスト識別子を生成できる")
+        ))
+    }
+
+    fn write_test_file(path: &std::path::Path, bytes: impl AsRef<[u8]>) {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .expect("テスト用評価データセットを作成できる");
+        file.write_all(bytes.as_ref())
+            .expect("テスト用評価データセットへ書き込める");
+        file.sync_all()
+            .expect("テスト用評価データセットを同期できる");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 評価データセット読取は上限内のオブジェクトだけを受理する() {
+        let valid = test_file("valid");
+        write_test_file(&valid, r#"{"版":1,"private":"not-output"}"#);
+        assert!(評価データセット読取(&valid.to_string_lossy())
+            .expect("有効なJSONオブジェクトを読める")
+            .is_object());
+        std::fs::remove_file(&valid).expect("有効な評価データセットを削除できる");
+
+        let scalar = test_file("scalar");
+        write_test_file(&scalar, br#"["private"]"#);
+        let error = 評価データセット読取(&scalar.to_string_lossy()).expect_err("配列形式は拒否される");
+        assert!(!error.contains("private"));
+        let scalar_path = scalar.to_string_lossy();
+        assert!(!error.contains(scalar_path.as_ref()));
+        std::fs::remove_file(&scalar).expect("配列形式の評価データセットを削除できる");
+
+        let oversized = test_file("oversized");
+        write_test_file(
+            &oversized,
+            vec![b'x'; MAX_EVALUATION_DATASET_BYTES as usize + 1],
+        );
+        let error = 評価データセット読取(&oversized.to_string_lossy())
+            .expect_err("上限超過は拒否される");
+        assert!(error.contains("48KiB上限"));
+        let oversized_path = oversized.to_string_lossy();
+        assert!(!error.contains(oversized_path.as_ref()));
+        std::fs::remove_file(&oversized).expect("上限超過の評価データセットを削除できる");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 評価データセット読取は最終要素の再解析点を拒否する() {
+        use std::os::windows::fs::symlink_file;
+
+        const リンク作成特権未保持: i32 = 1314;
+        let target = test_file("再解析点の対象");
+        let link = test_file("再解析点");
+        write_test_file(&target, r#"{"版":1,"private":"not-output"}"#);
+        match symlink_file(&target, &link) {
+            Ok(()) => {}
+            // 1314はWindowsがリンク作成特権の未保持を返す値である。
+            // それ以外の作成失敗は環境不整合として試験を失敗させる。
+            Err(error) if error.raw_os_error() == Some(リンク作成特権未保持) => {
+                std::fs::remove_file(&target).expect("再解析点の対象を削除できる");
+                return;
+            }
+            Err(error) => {
+                let _ = std::fs::remove_file(&target);
+                panic!("テスト用の再解析点を作成できない: {error}");
+            }
+        }
+
+        let error = 評価データセット読取(&link.to_string_lossy())
+            .expect_err("最終要素の再解析点は拒否される");
+        assert!(!error.contains("private"));
+        let target_path = target.to_string_lossy();
+        let link_path = link.to_string_lossy();
+        assert!(!error.contains(target_path.as_ref()));
+        assert!(!error.contains(link_path.as_ref()));
+        std::fs::remove_file(&link).expect("再解析点を削除できる");
+        std::fs::remove_file(&target).expect("再解析点の対象を削除できる");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn 評価データセット読取は非Windows環境で失敗終了する() {
+        let path = test_file("非Windows");
+        write_test_file(&path, r#"{"版":1}"#);
+        let error = 評価データセット読取(&path.to_string_lossy())
+            .expect_err("非Windows環境では保護保管がないため拒否される");
+        assert!(error.contains("Windowsの保護保管"));
+        std::fs::remove_file(&path).expect("非Windows用の評価データセットを削除できる");
+    }
+
+    #[test]
+    fn 評価公開manifest投影は非公開fieldを除外する() {
+        let body = json!({
+            "版": 1,
+            "評価DatasetID": "a".repeat(32),
+            "revision": 1,
+            "定義hash": format!("sha256:{}", "b".repeat(64)),
+            "非公開保管ID": "c".repeat(32),
+            "暗号文hash": format!("sha256:{}", "d".repeat(64)),
+            "公開表示名": "表示名",
+            "Case数": 1,
+            "Case一覧": [{"評価CaseID": "e".repeat(32), "定義hash": format!("sha256:{}", "f".repeat(64))}],
+            "公開範囲": "hash_only",
+            "作成時刻UnixMillis": 1,
+            "作成監査ID": "audit-1",
+            "証拠種別": "INTERNAL_STATE"
+        });
+        assert_eq!(
+            評価データセット公開投影(&body).expect("公開マニフェストを取得できる"),
+            body
+        );
+        let mut unsafe_body = body;
+        unsafe_body["入力"] = json!("private-dataset-sentinel");
+        assert!(評価データセット公開投影(&unsafe_body).is_err());
+    }
 }

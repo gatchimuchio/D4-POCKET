@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/evaluation_dataset.schema.json",
+  "title": "評価Dataset公開manifest",
+  "description": "C5評価Datasetのhash_only公開projection。評価DatasetID内のrevisionは永続監査上で厳密に単調増加し、同じ(ID, revision)を再登録できない。履歴との順序比較は標準JSON Schema単独では表せないためtooling/evaluation_contract_check.pyとBrokerがfail-closedに検査する。raw input、期待本文、Evaluator設定本文を含めない。",
+  "type": "object",
+  "required": [
+    "版",
+    "評価DatasetID",
+    "revision",
+    "定義hash",
+    "非公開保管ID",
+    "暗号文hash",
+    "公開表示名",
+    "Case数",
+    "Case一覧",
+    "公開範囲",
+    "作成時刻UnixMillis",
+    "作成監査ID",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "評価DatasetID": {
+      "$ref": "#/$defs/id"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "同一評価DatasetID内で既存の確定revisionより大きいimmutable revision。"
+    },
+    "定義hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "非公開保管ID": {
+      "$ref": "#/$defs/id"
+    },
+    "暗号文hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "公開表示名": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "Case数": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "Case一覧": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "description": "normal IPCのruntime公開manifestに含めるCase要約。静的なevaluation_case/evaluation_evaluator contractを埋め込まず、CaseIDと定義hashだけを返す。",
+      "items": {
+        "type": "object",
+        "required": [
+          "評価CaseID",
+          "定義hash"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "評価CaseID": {
+            "$ref": "#/$defs/id"
+          },
+          "定義hash": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    },
+    "公開範囲": {
+      "const": "hash_only"
+    },
+    "作成時刻UnixMillis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "作成監査ID": {
+      "$ref": "#/$defs/audit_id"
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    }
+  }
+}

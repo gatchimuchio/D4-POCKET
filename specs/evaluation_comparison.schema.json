@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/evaluation_comparison.schema.json",
+  "title": "評価Comparison安全projection",
+  "description": "一つの評価Experimentに属する複数Runtimeを集計する比較record。実験一覧の全entryは同一の評価ExperimentIDを参照し、Runtimeだけが異なる。各entryの四分類合計は計画Case数と一致し、rootの四分類数はentry合計と一致する。item間のID・集計関係は標準JSON Schema単独では表せないためtooling/evaluation_contract_check.pyとBrokerでfail-closedに検査する。raw内容、権限判断、release判断を含めない。",
+  "type": "object",
+  "required": [
+    "版",
+    "比較ID",
+    "評価DatasetID",
+    "Dataset定義hash",
+    "実験一覧",
+    "計画Case数",
+    "成立数",
+    "不成立数",
+    "評価不能数",
+    "中断数",
+    "比較時刻UnixMillis",
+    "経路差",
+    "参照差",
+    "能力差",
+    "比較監査ID",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "比較ID": {
+      "$ref": "#/$defs/id"
+    },
+    "評価DatasetID": {
+      "$ref": "#/$defs/id"
+    },
+    "Dataset定義hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "実験一覧": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "description": "一つの評価ExperimentのRuntime別集計。全entryの評価ExperimentIDは同一で、実行系IDは相互に異なり、各entryの四分類合計は計画Case数と一致しなければならない。",
+      "items": {
+        "$ref": "#/$defs/experiment_aggregate"
+      }
+    },
+    "計画Case数": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "成立数": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "不成立数": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "評価不能数": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "中断数": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1024
+    },
+    "比較時刻UnixMillis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "経路差": {
+      "$ref": "#/$defs/difference"
+    },
+    "参照差": {
+      "$ref": "#/$defs/difference"
+    },
+    "能力差": {
+      "$ref": "#/$defs/difference"
+    },
+    "比較監査ID": {
+      "$ref": "#/$defs/audit_id"
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "difference": {
+      "type": "string",
+      "enum": [
+        "same",
+        "different",
+        "unknown"
+      ]
+    },
+    "experiment_aggregate": {
+      "type": "object",
+      "required": [
+        "評価ExperimentID",
+        "実行系ID",
+        "Dataset定義hash",
+        "成立数",
+        "不成立数",
+        "評価不能数",
+        "中断数",
+        "平均LatencyMillis"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "評価ExperimentID": {
+          "$ref": "#/$defs/id"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtime_id"
+        },
+        "Dataset定義hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "成立数": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "不成立数": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "評価不能数": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "中断数": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "平均LatencyMillis": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

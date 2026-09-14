@@ -71,6 +71,13 @@ REQUIRED_SCHEMA_NAMES = {
     "runtime_dialogue_session",
     "runtime_dialogue_response",
     "runtime_dialogue_comparison",
+    "evaluation_dataset",
+    "evaluation_case",
+    "evaluation_evaluator",
+    "evaluation_dataset_registration",
+    "evaluation_experiment",
+    "evaluation_result",
+    "evaluation_comparison",
     "runtime_resource_query",
     "runtime_resource_observation",
     "runtime_lifecycle_request",
@@ -3108,6 +3115,352 @@ def 二実行系比較の非混線を検査する() -> list[str]:
     return 不整合
 
 
+def 評価ラボの契約と境界を検査する() -> list[str]:
+    from tooling.evaluation_contract_check import (
+        Dataset改版列検査,
+        公開projection検査,
+        実験検査,
+        公開結果検査,
+        比較検査,
+        登録検査,
+        結果検査,
+    )
+
+    不整合: list[str] = []
+    specification = DOC_SPECS / "evaluation-lab.md"
+    if not specification.exists():
+        return ["C5評価ラボの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C5評価ラボの日本語意味正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/evaluation-lab.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C5評価ラボの日本語意味正本が正本索引へ登録されていない")
+    for token in (
+        "運用観測",
+        "Authority",
+        "Permission",
+        "Approval",
+        "Audit",
+        "release",
+        "security",
+        "LLM-as-judge",
+        "normal IPC",
+        "raw input",
+        "immutable revision",
+        "Dataset改版列検査",
+        "計画監査ID",
+        "異なるExperimentIDを混在",
+        "結果状態=中止",
+        "C6",
+        "scope外",
+    ):
+        if token not in specification_text:
+            不整合.append(f"C5評価ラボ仕様に必須境界がない: {token}")
+    fixtures = {
+        "dataset": load_contract_fixture("evaluation_dataset.valid.json"),
+        "case": load_contract_fixture("evaluation_case.valid.json"),
+        "evaluator": load_contract_fixture("evaluation_evaluator.valid.json"),
+        "registration": load_contract_fixture("evaluation_dataset_registration.valid.json"),
+        "experiment": load_contract_fixture("evaluation_experiment.valid.json"),
+        "result": load_contract_fixture("evaluation_result.valid.json"),
+        "public_result": load_contract_fixture("evaluation_public_result.valid.json"),
+        "comparison": load_contract_fixture("evaluation_comparison.valid.json"),
+    }
+    schemas = {
+        name: load_schema(f"evaluation_{name}.schema.json")
+        for name in (
+            "dataset",
+            "case",
+            "evaluator",
+            "dataset_registration",
+            "experiment",
+            "result",
+            "public_result",
+            "comparison",
+        )
+    }
+    schema_fixture_names = {
+        "dataset": "dataset",
+        "case": "case",
+        "evaluator": "evaluator",
+        "dataset_registration": "registration",
+        "experiment": "experiment",
+        "result": "result",
+        "public_result": "public_result",
+        "comparison": "comparison",
+    }
+    for schema_name, fixture_name in schema_fixture_names.items():
+        failures = validate_instance(fixtures[fixture_name], schemas[schema_name])
+        if failures:
+            不整合.extend(f"{schema_name}のvalid fixtureが拒否された: {failure}" for failure in failures)
+    expected_config_fields = {
+        "exact_config": {"期待本文"},
+        "contains_config": {"期待断片"},
+        "regex_config": {"パターン"},
+        "json_schema_config": {"期待Schema"},
+        "reference_count_config": {"最小数", "最大数"},
+        "route_config": {"期待経路"},
+        "status_config": {"期待状態"},
+        "capability_config": {"必要能力一覧"},
+        "latency_threshold_config": {"最大Millis"},
+    }
+    registration_defs = schemas["dataset_registration"].get("$defs", {})
+    for config_name, expected_fields in expected_config_fields.items():
+        config_schema = registration_defs.get(config_name, {})
+        if config_schema.get("additionalProperties") is not False:
+            不整合.append(f"{config_name}がstrict additionalProperties:falseではない")
+        if set(config_schema.get("properties", {})) != expected_fields:
+            不整合.append(f"{config_name}のprivate設定keyがEvaluator実装と一致しない")
+    runtime_case_summary = (
+        schemas["dataset"]
+        .get("properties", {})
+        .get("Case一覧", {})
+        .get("items", {})
+    )
+    if set(runtime_case_summary.get("properties", {})) != {"評価CaseID", "定義hash"}:
+        不整合.append("normal IPCのDataset Case一覧がCaseIDと定義hashだけに限定されていない")
+    if runtime_case_summary.get("additionalProperties") is not False:
+        不整合.append("normal IPCのDataset Case一覧がstrictではない")
+
+    public_values = (
+        fixtures["dataset"],
+        fixtures["case"],
+        fixtures["evaluator"],
+        fixtures["experiment"],
+        fixtures["result"],
+        fixtures["comparison"],
+    )
+    if 公開projection検査(*public_values):
+        不整合.append("validな公開evaluation projectionにraw field検査の誤検知がある")
+    for index, value in enumerate(public_values):
+        raw = copy.deepcopy(value)
+        raw["本文"] = "公開してはならない値"
+        if not validate_instance(raw, schemas[("dataset", "case", "evaluator", "experiment", "result", "comparison")[index]]):
+            不整合.append(f"公開projection[{index}]がraw本文をschemaで拒否しない")
+        if not 公開projection検査(raw):
+            不整合.append(f"公開projection[{index}]がraw本文を関係検査で拒否しない")
+
+    registration = fixtures["registration"]
+    if 登録検査(registration):
+        不整合.append("validなowner評価Dataset登録が関係検査で拒否された")
+    next_registration = copy.deepcopy(registration)
+    next_registration["revision"] = 2
+    if Dataset改版列検査([registration, next_registration]):
+        不整合.append("同一DatasetIDの増加revision列が関係検査で拒否された")
+    duplicate_registration_revision = copy.deepcopy(registration)
+    if not Dataset改版列検査([registration, duplicate_registration_revision]):
+        不整合.append("同じDatasetID/revisionの再登録が許可された")
+    rollback_registration_revision = copy.deepcopy(registration)
+    rollback_registration_revision["revision"] = 3
+    if not Dataset改版列検査([rollback_registration_revision, registration]):
+        不整合.append("同一DatasetIDのrevision後退が許可された")
+    separate_dataset = copy.deepcopy(registration)
+    separate_dataset["評価DatasetID"] = "3" * 32
+    if Dataset改版列検査([next_registration, separate_dataset]):
+        不整合.append("別DatasetIDの独立したrevision列が関係検査で拒否された")
+    incompatible_config = copy.deepcopy(registration)
+    incompatible_config["非公開CasePayload一覧"][0]["評価器設定"][0]["種類"] = "contains"
+    if not 登録検査(incompatible_config):
+        不整合.append("Evaluator種類とprivate設定の不一致が許可された")
+    invalid_reference_range = copy.deepcopy(registration)
+    reference_config = invalid_reference_range["非公開CasePayload一覧"][0]["評価器設定"][4]["設定"]
+    reference_config["最小数"] = 3
+    reference_config["最大数"] = 2
+    if not 登録検査(invalid_reference_range):
+        不整合.append("reference_countの逆転した上下限が許可された")
+    external_ref = copy.deepcopy(registration)
+    external_ref["非公開CasePayload一覧"][0]["評価器設定"][3]["設定"]["期待Schema"]["$ref"] = "https://example.invalid/schema.json"
+    if not 登録検査(external_ref):
+        不整合.append("json_schemaの外部refが許可された")
+
+    invalid_llm_authority = copy.deepcopy(registration)
+    invalid_llm_authority["評価方式"] = "LLM-as-judge"
+    invalid_llm_authority["評価用途"] = "Authority"
+    if not validate_instance(invalid_llm_authority, schemas["dataset_registration"]):
+        不整合.append("LLM-as-judgeまたはAuthority用途がSchemaで許可された")
+    if not 登録検査(invalid_llm_authority):
+        不整合.append("LLM-as-judgeまたはAuthority用途が関係検査で許可された")
+
+    unknown_evaluator = copy.deepcopy(fixtures["evaluator"])
+    unknown_evaluator["種類"] = "llm_as_judge"
+    if not validate_instance(unknown_evaluator, schemas["evaluator"]):
+        不整合.append("未登録のEvaluator種類がSchemaで許可された")
+
+    experiment = fixtures["experiment"]
+    if 実験検査(experiment):
+        不整合.append("validなExperimentが関係検査で拒否された")
+    missing_plan_audit = copy.deepcopy(experiment)
+    missing_plan_audit.pop("計画監査ID")
+    if not validate_instance(missing_plan_audit, schemas["experiment"]):
+        不整合.append("Experimentの計画監査IDがSchemaで必須ではない")
+    if not 実験検査(missing_plan_audit):
+        不整合.append("Experimentの計画監査ID欠落が関係検査で許可された")
+    duplicate_runtime = copy.deepcopy(experiment)
+    duplicate_runtime["対象Runtime一覧"] = ["runtime-a", "runtime-a"]
+    if not 実験検査(duplicate_runtime):
+        不整合.append("Experimentの同一Runtime重複が許可された")
+    malformed_runtime = copy.deepcopy(experiment)
+    malformed_runtime["対象Runtime一覧"][0] = {}
+    if not 実験検査(malformed_runtime):
+        不整合.append("Experimentのobject実行系IDが関係検査で許可された")
+    incomplete_complete = copy.deepcopy(experiment)
+    incomplete_complete["結果数"] = 1
+    if not 実験検査(incomplete_complete):
+        不整合.append("完了Experimentの不足Result数が許可された")
+    overflow_complete = copy.deepcopy(experiment)
+    overflow_complete["結果数"] = 3
+    if not 実験検査(overflow_complete):
+        不整合.append("完了Experimentの超過Result数が許可された")
+    complete_without_finished_at = copy.deepcopy(experiment)
+    complete_without_finished_at["終了時刻UnixMillis"] = None
+    if not validate_instance(complete_without_finished_at, schemas["experiment"]):
+        不整合.append("完了Experimentの終了時刻nullがSchemaで許可された")
+    if not 実験検査(complete_without_finished_at):
+        不整合.append("完了Experimentの終了時刻nullが関係検査で許可された")
+    complete_without_started_at = copy.deepcopy(experiment)
+    complete_without_started_at["開始時刻UnixMillis"] = None
+    if not validate_instance(complete_without_started_at, schemas["experiment"]):
+        不整合.append("完了Experimentの開始時刻nullがSchemaで許可された")
+    if not 実験検査(complete_without_started_at):
+        不整合.append("完了Experimentの開始時刻nullが関係検査で許可された")
+    reversed_timestamps = copy.deepcopy(experiment)
+    reversed_timestamps["開始時刻UnixMillis"] = 1726300000200
+    reversed_timestamps["終了時刻UnixMillis"] = 1726300000100
+    if not 実験検査(reversed_timestamps):
+        不整合.append("Experimentの終了時刻が開始時刻より前でも関係検査で許可された")
+    two_case_complete = copy.deepcopy(experiment)
+    two_case_complete["計画Case数"] = 2
+    two_case_complete["結果数"] = 4
+    if 実験検査(two_case_complete):
+        不整合.append("Case数2とRuntime数2の完了Experimentが関係検査で拒否された")
+    two_case_incomplete = copy.deepcopy(two_case_complete)
+    two_case_incomplete["結果数"] = 2
+    if not 実験検査(two_case_incomplete):
+        不整合.append("Case数2とRuntime数2の完了Experiment不足Result数が許可された")
+
+    result = fixtures["result"]
+    if 結果検査(result):
+        不整合.append("validなResultが関係検査で拒否された")
+    success_without_response_hash = copy.deepcopy(result)
+    success_without_response_hash["応答hash"] = None
+    if not validate_instance(success_without_response_hash, schemas["result"]):
+        不整合.append("成功Resultが応答hashなしでもSchemaで許可された")
+    if not 結果検査(success_without_response_hash):
+        不整合.append("成功Resultが応答hashなしでも関係検査で許可された")
+    non_success_empty_response_hash = copy.deepcopy(result)
+    non_success_empty_response_hash["結果状態"] = "中止"
+    non_success_empty_response_hash["判定"] = "中断"
+    non_success_empty_response_hash["応答hash"] = ""
+    if not validate_instance(non_success_empty_response_hash, schemas["result"]):
+        不整合.append("非成功Resultが空の応答hashでもSchemaで許可された")
+    if not 結果検査(non_success_empty_response_hash):
+        不整合.append("非成功Resultが空の応答hashでも関係検査で許可された")
+    non_abort_with_quarantine_reservation = copy.deepcopy(result)
+    non_abort_with_quarantine_reservation["実行系隔離予約監査ID"] = "audit.lifecycle.quarantine.1"
+    if not validate_instance(non_abort_with_quarantine_reservation, schemas["result"]):
+        不整合.append("中止以外のResultが実行系隔離予約監査IDを持ってもSchemaで許可された")
+    if not 結果検査(non_abort_with_quarantine_reservation):
+        不整合.append("中止以外のResultが実行系隔離予約監査IDを持っても関係検査で許可された")
+    unstarted_abort = copy.deepcopy(result)
+    unstarted_abort["結果状態"] = "中止"
+    unstarted_abort["判定"] = "中断"
+    unstarted_abort["開始監査ID"] = None
+    unstarted_abort["終了監査ID"] = None
+    unstarted_abort["LatencyMillis"] = None
+    if validate_instance(unstarted_abort, schemas["result"]) or 結果検査(unstarted_abort):
+        不整合.append("未送信中断のnull相関を表せない")
+    abort_with_wrong_determination = copy.deepcopy(result)
+    abort_with_wrong_determination["結果状態"] = "中止"
+    abort_with_wrong_determination["判定"] = "評価不能"
+    if not validate_instance(abort_with_wrong_determination, schemas["result"]):
+        不整合.append("中止結果が中断以外の判定でもSchemaで許可された")
+    if not 結果検査(abort_with_wrong_determination):
+        不整合.append("中止結果が中断以外の判定でも許可された")
+    indeterminate_with_wrong_determination = copy.deepcopy(result)
+    indeterminate_with_wrong_determination["結果状態"] = "評価不能"
+    indeterminate_with_wrong_determination["判定"] = "中断"
+    if not validate_instance(indeterminate_with_wrong_determination, schemas["result"]):
+        不整合.append("評価不能結果が評価不能以外の判定でもSchemaで許可された")
+    if not 結果検査(indeterminate_with_wrong_determination):
+        不整合.append("評価不能結果が評価不能以外の判定でも許可された")
+    for nonfinite in (float("nan"), float("inf")):
+        invalid_latency = copy.deepcopy(result)
+        invalid_latency["LatencyMillis"] = nonfinite
+        if not validate_instance(invalid_latency, schemas["result"]):
+            不整合.append("Resultの非有限LatencyMillisがSchemaで許可された")
+        if not 結果検査(invalid_latency):
+            不整合.append("Resultの非有限LatencyMillisが関係検査で許可された")
+
+    public_result = fixtures["public_result"]
+    if 公開結果検査(public_result):
+        不整合.append("validな公開Resultが関係検査で拒否された")
+    internal_reservation_in_public = copy.deepcopy(public_result)
+    internal_reservation_in_public["実行系隔離予約監査ID"] = "audit.lifecycle.quarantine.1"
+    if not validate_instance(internal_reservation_in_public, schemas["public_result"]):
+        不整合.append("公開Resultへ内部隔離予約監査IDを混入できた")
+    if not 公開結果検査(internal_reservation_in_public):
+        不整合.append("公開Resultへ内部隔離予約監査IDを混入しても関係検査で許可された")
+
+    comparison = fixtures["comparison"]
+    if 比較検査(comparison):
+        不整合.append("validなComparisonが関係検査で拒否された")
+    mixed_experiment_ids = copy.deepcopy(comparison)
+    mixed_experiment_ids["実験一覧"][1]["評価ExperimentID"] = "5" * 32
+    if validate_instance(mixed_experiment_ids, schemas["comparison"]):
+        不整合.append("異なるExperimentIDのComparisonがSchema形状として不正")
+    if not 比較検査(mixed_experiment_ids):
+        不整合.append("異なるExperimentIDを混在したComparisonが許可された")
+    mismatched_dataset = copy.deepcopy(comparison)
+    mismatched_dataset["実験一覧"][1]["Dataset定義hash"] = "sha256:" + "f" * 64
+    if not 比較検査(mismatched_dataset):
+        不整合.append("ComparisonのDataset定義hash不一致が許可された")
+    duplicate_comparison_runtime = copy.deepcopy(comparison)
+    duplicate_comparison_runtime["実験一覧"][1]["実行系ID"] = "runtime-a"
+    if not 比較検査(duplicate_comparison_runtime):
+        不整合.append("Comparisonの同一Runtime重複が許可された")
+    malformed_comparison_runtime = copy.deepcopy(comparison)
+    malformed_comparison_runtime["実験一覧"][0]["実行系ID"] = {}
+    if not 比較検査(malformed_comparison_runtime):
+        不整合.append("Comparisonのobject実行系IDが関係検査で許可された")
+    entry_count_overflow = copy.deepcopy(comparison)
+    entry_count_overflow["実験一覧"][0]["成立数"] = 2
+    entry_count_overflow["実験一覧"][1]["成立数"] = 0
+    if not 比較検査(entry_count_overflow):
+        不整合.append("ComparisonのRuntime entry四分類超過が許可された")
+    entry_count_underflow = copy.deepcopy(comparison)
+    entry_count_underflow["実験一覧"][0]["成立数"] = 0
+    entry_count_underflow["成立数"] = 1
+    if not 比較検査(entry_count_underflow):
+        不整合.append("ComparisonのRuntime entry四分類不足が許可された")
+    two_case_comparison = copy.deepcopy(comparison)
+    two_case_comparison["計画Case数"] = 2
+    two_case_comparison["実験一覧"][0]["成立数"] = 2
+    two_case_comparison["実験一覧"][1]["成立数"] = 2
+    two_case_comparison["成立数"] = 4
+    if 比較検査(two_case_comparison):
+        不整合.append("Case数2のComparisonが関係検査で拒否された")
+    two_case_underflow = copy.deepcopy(two_case_comparison)
+    two_case_underflow["実験一覧"][0]["成立数"] = 1
+    two_case_underflow["成立数"] = 3
+    if not 比較検査(two_case_underflow):
+        不整合.append("Case数2のComparison Runtime entry四分類不足が許可された")
+    root_count_mismatch = copy.deepcopy(comparison)
+    root_count_mismatch["成立数"] = 0
+    if not 比較検査(root_count_mismatch):
+        不整合.append("Comparisonのroot分類数とRuntime entry合計の不一致が許可された")
+    nonfinite_average = copy.deepcopy(comparison)
+    nonfinite_average["実験一覧"][0]["平均LatencyMillis"] = float("nan")
+    if not validate_instance(nonfinite_average, schemas["comparison"]):
+        不整合.append("Comparisonの非有限平均LatencyMillisがSchemaで許可された")
+    if not 比較検査(nonfinite_average):
+        不整合.append("Comparisonの非有限平均LatencyMillisが関係検査で許可された")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -4588,6 +4941,7 @@ def main() -> int:
         実行系ライフサイクルの契約と統治境界を検査する,
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
+        評価ラボの契約と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

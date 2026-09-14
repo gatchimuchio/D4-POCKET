@@ -205,6 +205,23 @@
       "japanese_reference": "規定/00_日本語基底規定.md",
       "authority_effect": "none",
       "review_trigger": "差分形式またはGit consumerを変更するとき"
+    },
+    {
+      "id": "JBE-009",
+      "scopes": [
+        "native/rust_helper/src/broker/evaluation_lab.rs"
+      ],
+      "region": "JSON Schemaの`additionalProperties`固定keywordだけ。周囲の説明と診断は除外しない。",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "additionalProperties"
+      ],
+      "unavoidable_reason_japanese": "owner登録済みJSON Schemaを外部参照なしに解釈するための標準keywordであり、翻訳するとSchema互換性を壊すため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "評価用JSON Schemaの対応keywordまたは対象実装を変更するとき"
     }
   ],
   "frozen_assets": [

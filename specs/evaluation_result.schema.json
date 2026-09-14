@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/evaluation_result.schema.json",
+  "title": "評価Result安全projection",
+  "description": "CaseとRuntimeの対話・監査相関、判定、latency、hashだけを保持する。結果状態が成功なら開始・終了監査IDと応答hashを必須にする。実行系隔離予約監査IDは通常中止ではnull、C4 terminal隔離に起因する中止だけで予約recordを指す。raw応答と秘密情報を含めない。",
+  "type": "object",
+  "required": [
+    "版",
+    "評価ExperimentID",
+    "評価DatasetID",
+    "Dataset定義hash",
+    "評価CaseID",
+    "実行系ID",
+    "対話要求ID",
+    "対話セッションID",
+    "作成監査ID",
+    "開始監査ID",
+    "終了監査ID",
+    "実行系隔離予約監査ID",
+    "評価監査ID",
+    "結果状態",
+    "判定",
+    "評価器判定一覧",
+    "実行時刻UnixMillis",
+    "LatencyMillis",
+    "応答hash",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "評価ExperimentID": {
+      "$ref": "#/$defs/id"
+    },
+    "評価DatasetID": {
+      "$ref": "#/$defs/id"
+    },
+    "Dataset定義hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "評価CaseID": {
+      "$ref": "#/$defs/id"
+    },
+    "実行系ID": {
+      "$ref": "#/$defs/runtime_id"
+    },
+    "対話要求ID": {
+      "$ref": "#/$defs/id"
+    },
+    "対話セッションID": {
+      "$ref": "#/$defs/id"
+    },
+    "作成監査ID": {
+      "$ref": "#/$defs/audit_id"
+    },
+    "開始監査ID": {
+      "$ref": "#/$defs/nullable_audit_id"
+    },
+    "終了監査ID": {
+      "$ref": "#/$defs/nullable_audit_id"
+    },
+    "実行系隔離予約監査ID": {
+      "$ref": "#/$defs/nullable_audit_id"
+    },
+    "評価監査ID": {
+      "$ref": "#/$defs/audit_id"
+    },
+    "結果状態": {
+      "type": "string",
+      "enum": [
+        "成功",
+        "失敗",
+        "中止",
+        "評価不能"
+      ]
+    },
+    "判定": {
+      "$ref": "#/$defs/determination"
+    },
+    "評価器判定一覧": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "評価器ID",
+          "種類",
+          "判定",
+          "理由code"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "評価器ID": {
+            "$ref": "#/$defs/id"
+          },
+          "種類": {
+            "$ref": "#/$defs/kind"
+          },
+          "判定": {
+            "$ref": "#/$defs/determination"
+          },
+          "理由code": {
+            "type": "string",
+            "enum": [
+              "一致",
+              "不一致",
+              "入力不足",
+              "応答不正",
+              "根拠不足",
+              "閾値超過",
+              "中止",
+              "監査失敗",
+              "評価器不正"
+            ]
+          }
+        }
+      }
+    },
+    "実行時刻UnixMillis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "LatencyMillis": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "応答hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "結果状態"
+        ],
+        "properties": {
+          "結果状態": {
+            "const": "成功"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "開始監査ID": {
+            "$ref": "#/$defs/audit_id"
+          },
+          "終了監査ID": {
+            "$ref": "#/$defs/audit_id"
+          },
+          "応答hash": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "結果状態"
+        ],
+        "properties": {
+          "結果状態": {
+            "const": "中止"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "実行系隔離予約監査ID": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "結果状態"
+        ],
+        "properties": {
+          "結果状態": {
+            "const": "中止"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "判定"
+        ],
+        "properties": {
+          "判定": {
+            "const": "中断"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "結果状態"
+        ],
+        "properties": {
+          "結果状態": {
+            "const": "評価不能"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "判定"
+        ],
+        "properties": {
+          "判定": {
+            "const": "評価不能"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "nullable_audit_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "contains",
+        "regex",
+        "json_schema",
+        "reference_count",
+        "route",
+        "status",
+        "capability",
+        "latency_threshold"
+      ]
+    },
+    "determination": {
+      "type": "string",
+      "enum": [
+        "成立",
+        "不成立",
+        "評価不能",
+        "中断"
+      ]
+    }
+  }
+}

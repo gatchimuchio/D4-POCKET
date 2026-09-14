@@ -1,0 +1,21 @@
+{
+  "版": 1,
+  "評価DatasetID": "11111111111111111111111111111111",
+  "revision": 1,
+  "定義hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "非公開保管ID": "99999999999999999999999999999999",
+  "暗号文hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "公開表示名": "基本対話評価",
+  "Case数": 1,
+  "Case一覧": [
+    {
+      "評価CaseID": "22222222222222222222222222222222",
+      "定義hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "公開範囲": "hash_only",
+  "作成時刻UnixMillis": 1726300000000,
+  "作成監査ID": "audit.evaluation.dataset.create.1",
+  "証拠種別": "INTERNAL_STATE",
+  "入力": "公開してはならない値"
+}

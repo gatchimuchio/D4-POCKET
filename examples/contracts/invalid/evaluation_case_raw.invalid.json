@@ -1,0 +1,18 @@
+{
+  "版": 1,
+  "評価DatasetID": "11111111111111111111111111111111",
+  "Dataset定義hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "評価CaseID": "22222222222222222222222222222222",
+  "順序": 1,
+  "公開表示名": "基本Case",
+  "入力hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "定義hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "評価器一覧": [
+    {
+      "評価器ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "定義hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "公開範囲": "hash_only",
+  "期待本文": "公開してはならない値"
+}

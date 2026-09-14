@@ -41,6 +41,14 @@ REQUIRED = {
     "runtime_dialogue_session.schema.json",
     "runtime_dialogue_response.schema.json",
     "runtime_dialogue_comparison.schema.json",
+    "evaluation_dataset.schema.json",
+    "evaluation_case.schema.json",
+    "evaluation_evaluator.schema.json",
+    "evaluation_dataset_registration.schema.json",
+    "evaluation_experiment.schema.json",
+    "evaluation_result.schema.json",
+    "evaluation_public_result.schema.json",
+    "evaluation_comparison.schema.json",
 
     "action_envelope.schema.json",
     "runtime.schema.json",
@@ -147,6 +155,13 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
         return validate_instance(value, target, path, root)
     if "allOf" in schema:
         for branch in schema["allOf"]:
+            errors.extend(validate_instance(value, branch, path, root))
+    conditional = schema.get("if")
+    if isinstance(conditional, dict):
+        condition_matches = not validate_instance(value, conditional, path, root)
+        branch_name = "then" if condition_matches else "else"
+        branch = schema.get(branch_name)
+        if isinstance(branch, dict):
             errors.extend(validate_instance(value, branch, path, root))
     if "oneOf" in schema:
         一致数 = sum(not validate_instance(value, 分岐, path, root) for 分岐 in schema["oneOf"])

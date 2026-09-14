@@ -9,12 +9,14 @@ use std::io::{Read, Write};
 pub enum Purpose {
     History,
     Credential,
+    Evaluation,
 }
 impl Purpose {
     fn label(self) -> &'static str {
         match self {
             Self::History => "history",
             Self::Credential => "credential",
+            Self::Evaluation => "evaluation",
         }
     }
 }

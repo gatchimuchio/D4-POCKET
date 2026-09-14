@@ -1,0 +1,663 @@
+import 'package:flutter/material.dart';
+
+import '../services/evaluation_client.dart';
+import 'shared.dart';
+
+/// C5の通常資格向け評価操作面。
+///
+/// 非公開Dataset payload、期待値、評価器設定、owner操作はこの画面に渡さない。
+class EvaluationLab extends StatefulWidget {
+  const EvaluationLab({
+    super.key,
+    this.client,
+    this.connect = connectEvaluationClient,
+  });
+
+  final EvaluationClient? client;
+  final EvaluationClientConnector connect;
+
+  @override
+  State<EvaluationLab> createState() => _EvaluationLabState();
+}
+
+class _EvaluationLabState extends State<EvaluationLab>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  final _runDatasetId = TextEditingController();
+  final _runRuntimeIds = TextEditingController();
+  final _resultExperimentId = TextEditingController();
+  final _comparisonExperimentId = TextEditingController();
+
+  EvaluationClient? _client;
+  EvaluationDatasetListing? _datasets;
+  EvaluationExperiment? _startedExperiment;
+  EvaluationExperimentStatus? _status;
+  EvaluationComparison? _comparison;
+  bool _busy = false;
+  int _generation = 0;
+  String _datasetMessage = 'Dataset一覧は自動更新しません。更新要求を作成してください。';
+  String _runMessage = 'Dataset IDと1〜8件の実行系IDだけをBrokerへ送ります。';
+  String _resultMessage = '評価Experiment IDを指定して、公開済みの結果projectionだけを更新します。';
+  String _comparisonMessage = '評価Experiment IDを指定して、集計比較だけを更新します。';
+
+  @override
+  void initState() {
+    super.initState();
+    _client = widget.client;
+    _tabs = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(covariant EvaluationLab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client ||
+        oldWidget.connect != widget.connect) {
+      _generation += 1;
+      _client = widget.client;
+      _datasets = null;
+      _startedExperiment = null;
+      _status = null;
+      _comparison = null;
+      _busy = false;
+      _datasetMessage = '接続条件が変わりました。Dataset一覧を更新してください。';
+      _runMessage = '接続条件が変わりました。実験要求を作成し直してください。';
+      _resultMessage = '接続条件が変わりました。結果を更新してください。';
+      _comparisonMessage = '接続条件が変わりました。比較を更新してください。';
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation += 1;
+    _tabs.dispose();
+    _runDatasetId.dispose();
+    _runRuntimeIds.dispose();
+    _resultExperimentId.dispose();
+    _comparisonExperimentId.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShellPage(
+      title: '評価ラボ',
+      children: [
+        const BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('運用観測の境界'),
+              SizedBox(height: 8),
+              Text(
+                '評価ラボは運用観測であり、権限、Permission、Approval、監査、release判定を生成または変更しません。Brokerが既に記録した公開監査IDを表示するだけです。',
+              ),
+              SizedBox(height: 6),
+              Text(
+                '各CaseのRuntime送信には既存のowner対話承認が個別に必要です。実験の実行ボタンは要求を作成するだけで、owner承認を代理しません。',
+              ),
+              SizedBox(height: 6),
+              Text('この画面は本文、期待値、正規表現、JSON Schema、応答内容を表示しません。'),
+            ],
+          ),
+        ),
+        Material(
+          color: Colors.transparent,
+          child: TabBar(
+            controller: _tabs,
+            tabs: const [
+              Tab(text: 'Dataset'),
+              Tab(text: 'Run'),
+              Tab(text: 'Result'),
+              Tab(text: 'Compare'),
+            ],
+          ),
+        ),
+        AnimatedBuilder(
+          animation: _tabs,
+          builder: (context, _) {
+            switch (_tabs.index) {
+              case 0:
+                return _datasetPanel();
+              case 1:
+                return _runPanel();
+              case 2:
+                return _resultPanel();
+              default:
+                return _comparisonPanel();
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _datasetPanel() {
+    final listing = _datasets;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('評価Dataset', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              const Text('公開表示名、ID、revision、定義hash、Case数、Case IDだけを一覧表示します。'),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const ValueKey('evaluation-dataset-refresh'),
+                onPressed: _busy ? null : _refreshDatasets,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Dataset一覧を更新'),
+              ),
+              const SizedBox(height: 8),
+              Text(_datasetMessage),
+              if (_busy) ...[
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
+              ],
+            ],
+          ),
+        ),
+        if (listing != null) ...[
+          const SizedBox(height: 16),
+          Text('一覧監査ID: ${listing.auditId}'),
+          const SizedBox(height: 8),
+          if (listing.datasets.isEmpty)
+            const BorderedPanel(child: Text('公開可能な評価Datasetはありません。'))
+          else
+            for (final dataset in listing.datasets) ...[
+              _DatasetSummaryPanel(
+                dataset: dataset,
+                enabled: !_busy,
+                onUseForRun: () => _useDatasetForRun(dataset.datasetId),
+              ),
+              const SizedBox(height: 12),
+            ],
+        ],
+      ],
+    );
+  }
+
+  Widget _runPanel() {
+    final experiment = _startedExperiment;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('評価実験を要求', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              const Text(
+                '入力できるのは評価Dataset IDとcomma-separatedの実行系ID（1〜8件、重複なし）だけです。',
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 440,
+                child: TextField(
+                  key: const ValueKey('evaluation-run-dataset-id'),
+                  controller: _runDatasetId,
+                  enabled: !_busy,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: 32,
+                  decoration: const InputDecoration(
+                    labelText: '評価Dataset ID',
+                    helperText: '32桁の小文字hex IDだけを指定します。',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: 640,
+                child: TextField(
+                  key: const ValueKey('evaluation-run-runtime-ids'),
+                  controller: _runRuntimeIds,
+                  enabled: !_busy,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: 1031,
+                  decoration: const InputDecoration(
+                    labelText: '実行系ID（comma-separated）',
+                    helperText: '例: runtime-a, runtime-b。PID、接続先、本文は入力できません。',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              FilledButton.icon(
+                key: const ValueKey('evaluation-run-submit'),
+                onPressed: _busy ? null : _startExperiment,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('評価実験を要求'),
+              ),
+              const SizedBox(height: 8),
+              Text(_runMessage),
+              if (_busy) ...[
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
+              ],
+            ],
+          ),
+        ),
+        if (experiment != null) ...[
+          const SizedBox(height: 16),
+          _ExperimentSummaryPanel(experiment: experiment),
+        ],
+      ],
+    );
+  }
+
+  Widget _resultPanel() {
+    final status = _status;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _experimentIdRequestPanel(
+          key: const ValueKey('evaluation-result-experiment-id'),
+          controller: _resultExperimentId,
+          buttonKey: const ValueKey('evaluation-result-refresh'),
+          buttonLabel: 'Resultを更新',
+          message: _resultMessage,
+          onPressed: _busy ? null : _refreshResult,
+        ),
+        if (status != null) ...[
+          const SizedBox(height: 16),
+          _ExperimentSummaryPanel(experiment: status.experiment),
+          const SizedBox(height: 12),
+          Text('結果照会監査ID: ${status.auditId}'),
+          const SizedBox(height: 8),
+          if (status.results.isEmpty)
+            const BorderedPanel(child: Text('公開可能な評価結果はまだありません。'))
+          else
+            for (final result in status.results) ...[
+              _ResultSummaryPanel(result: result),
+              const SizedBox(height: 12),
+            ],
+        ],
+      ],
+    );
+  }
+
+  Widget _comparisonPanel() {
+    final comparison = _comparison;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _experimentIdRequestPanel(
+          key: const ValueKey('evaluation-compare-experiment-id'),
+          controller: _comparisonExperimentId,
+          buttonKey: const ValueKey('evaluation-compare-refresh'),
+          buttonLabel: 'Compareを更新',
+          message: _comparisonMessage,
+          onPressed: _busy ? null : _refreshComparison,
+        ),
+        if (comparison != null) ...[
+          const SizedBox(height: 16),
+          _ComparisonSummaryPanel(comparison: comparison),
+        ],
+      ],
+    );
+  }
+
+  Widget _experimentIdRequestPanel({
+    required Key key,
+    required TextEditingController controller,
+    required Key buttonKey,
+    required String buttonLabel,
+    required String message,
+    required VoidCallback? onPressed,
+  }) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(buttonLabel, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          const Text('評価Experiment IDだけを指定し、本文や個別の対話追跡値は取得しません。'),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 440,
+            child: TextField(
+              key: key,
+              controller: controller,
+              enabled: !_busy,
+              autocorrect: false,
+              enableSuggestions: false,
+              maxLength: 32,
+              decoration: const InputDecoration(
+                labelText: '評価Experiment ID',
+                helperText: '32桁の小文字hex IDだけを指定します。',
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          FilledButton.icon(
+            key: buttonKey,
+            onPressed: onPressed,
+            icon: const Icon(Icons.refresh),
+            label: Text(buttonLabel),
+          ),
+          const SizedBox(height: 8),
+          Text(message),
+          if (_busy) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<EvaluationClient> _clientForRequest() async {
+    return _client ??= widget.client ?? await widget.connect();
+  }
+
+  Future<void> _refreshDatasets() async {
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _datasets = null;
+      _datasetMessage = 'BrokerへDataset一覧を要求しています。';
+    });
+    try {
+      final listing = await (await _clientForRequest()).listDatasets();
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _datasets = listing;
+        _datasetMessage = '公開Dataset一覧を監査ID ${listing.auditId} で確認しました。';
+      });
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _datasetMessage = 'Dataset一覧の監査記録、結合状態、または応答を確認できません。');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _startExperiment() async {
+    final datasetId = _runDatasetId.text.trim();
+    final rawRuntimeIds = _runRuntimeIds.text.split(',');
+    final runtimeIds = rawRuntimeIds.map((value) => value.trim()).toList();
+    if (rawRuntimeIds.any((value) => value.trim().isEmpty) ||
+        !EvaluationClient.validDatasetId(datasetId) ||
+        !EvaluationClient.validRuntimeIds(runtimeIds)) {
+      setState(() {
+        _startedExperiment = null;
+        _runMessage = '評価Dataset IDと、重複しない1〜8件の実行系IDを指定してください。';
+      });
+      return;
+    }
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _startedExperiment = null;
+      _runMessage = 'Brokerへ評価実験の要求を作成しています。owner承認は代理しません。';
+    });
+    try {
+      final experiment = await (await _clientForRequest()).startExperiment(
+        datasetId,
+        runtimeIds,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _startedExperiment = experiment;
+        _resultExperimentId.text = experiment.experimentId;
+        _comparisonExperimentId.text = experiment.experimentId;
+        _runMessage =
+            '評価Experiment ${experiment.experimentId} の要求を作成しました。各Case/Runtimeの送信には既存owner対話承認が個別に必要です。';
+      });
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _runMessage = '評価実験の監査記録、結合状態、または応答を確認できません。');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _refreshResult() async {
+    final experimentId = _resultExperimentId.text.trim();
+    if (!EvaluationClient.validExperimentId(experimentId)) {
+      setState(() {
+        _status = null;
+        _resultMessage = '評価Experiment IDは32桁の小文字hexで指定してください。';
+      });
+      return;
+    }
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _status = null;
+      _resultMessage = 'Brokerへ評価実験状態を要求しています。';
+    });
+    try {
+      final status = await (await _clientForRequest()).experimentStatus(
+        experimentId,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _status = status;
+        _resultMessage = '公開結果projectionを監査ID ${status.auditId} で確認しました。';
+      });
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _resultMessage = '評価実験状態の監査記録、結合状態、または安全な応答を確認できません。');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _refreshComparison() async {
+    final experimentId = _comparisonExperimentId.text.trim();
+    if (!EvaluationClient.validExperimentId(experimentId)) {
+      setState(() {
+        _comparison = null;
+        _comparisonMessage = '評価Experiment IDは32桁の小文字hexで指定してください。';
+      });
+      return;
+    }
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _comparison = null;
+      _comparisonMessage = 'Brokerへ評価比較を要求しています。';
+    });
+    try {
+      final comparison = await (await _clientForRequest()).compare(
+        experimentId,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _comparison = comparison;
+        _comparisonMessage = '集計比較を監査ID ${comparison.auditId} で確認しました。';
+      });
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _comparisonMessage = '評価比較の監査記録、結合状態、または安全な応答を確認できません。');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  void _useDatasetForRun(String datasetId) {
+    setState(() {
+      _runDatasetId.text = datasetId;
+      _tabs.animateTo(1);
+    });
+  }
+}
+
+class _DatasetSummaryPanel extends StatelessWidget {
+  const _DatasetSummaryPanel({
+    required this.dataset,
+    required this.enabled,
+    required this.onUseForRun,
+  });
+
+  final EvaluationDataset dataset;
+  final bool enabled;
+  final VoidCallback onUseForRun;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            dataset.displayName,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          SelectableText(
+            '評価Dataset ID: ${dataset.datasetId}\n'
+            '改訂番号: ${dataset.revision}\n'
+            '定義hash: ${dataset.definitionHash}\n'
+            'Case数: ${dataset.caseCount}\n'
+            '作成時刻UnixMillis: ${dataset.createdAtUnixMillis}\n'
+            '作成監査ID: ${dataset.creationAuditId}',
+          ),
+          const SizedBox(height: 8),
+          const Text('Case一覧（IDと定義hashのみ）'),
+          for (final item in dataset.cases)
+            SelectableText(
+              '評価Case ID: ${item.caseId}\n定義hash: ${item.definitionHash}',
+            ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: enabled ? onUseForRun : null,
+            child: const Text('このDataset IDでRunを作成'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExperimentSummaryPanel extends StatelessWidget {
+  const _ExperimentSummaryPanel({required this.experiment});
+
+  final EvaluationExperiment experiment;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('評価Experiment', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SelectableText(
+            '評価Experiment ID: ${experiment.experimentId}\n'
+            '評価Dataset ID: ${experiment.datasetId}\n'
+            'Dataset定義hash: ${experiment.datasetDefinitionHash}\n'
+            '対象Runtime: ${experiment.runtimeIds.join(', ')}\n'
+            '状態: ${experiment.state}\n'
+            '計画Case数: ${experiment.plannedCaseCount}\n'
+            '結果数: ${experiment.resultCount}\n'
+            '作成時刻UnixMillis: ${experiment.createdAtUnixMillis}\n'
+            '開始時刻UnixMillis: ${experiment.startedAtUnixMillis ?? '未開始'}\n'
+            '終了時刻UnixMillis: ${experiment.finishedAtUnixMillis ?? '未終了'}\n'
+            '計画監査ID: ${experiment.planAuditId}\n'
+            '実験監査ID: ${experiment.auditId}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultSummaryPanel extends StatelessWidget {
+  const _ResultSummaryPanel({required this.result});
+
+  final EvaluationResultSummary result;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('公開評価結果', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SelectableText(
+            '評価Case ID: ${result.caseId}\n'
+            '実行系ID: ${result.runtimeId}\n'
+            '判定: ${result.judgement}\n'
+            '遅延Millis: ${result.latencyMillis ?? '未観測'}\n'
+            '総合hash: ${result.aggregateHash}\n'
+            '評価監査ID: ${result.auditId}',
+          ),
+          const SizedBox(height: 8),
+          const Text('評価器判定（ID、種類、判定、理由codeのみ）'),
+          for (final evaluator in result.evaluators)
+            SelectableText(
+              '評価器ID: ${evaluator.evaluatorId}\n'
+              '種類: ${evaluator.kind}\n'
+              '判定: ${evaluator.judgement}\n'
+              '理由code: ${evaluator.reasonCode}',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComparisonSummaryPanel extends StatelessWidget {
+  const _ComparisonSummaryPanel({required this.comparison});
+
+  final EvaluationComparison comparison;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('評価比較', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SelectableText(
+            '比較ID: ${comparison.comparisonId}\n'
+            '評価Dataset ID: ${comparison.datasetId}\n'
+            'Dataset定義hash: ${comparison.datasetDefinitionHash}\n'
+            '計画Case数: ${comparison.plannedCaseCount}\n'
+            '成立数: ${comparison.passedCount}\n'
+            '不成立数: ${comparison.failedCount}\n'
+            '評価不能数: ${comparison.indeterminateCount}\n'
+            '中断数: ${comparison.interruptedCount}\n'
+            '比較時刻UnixMillis: ${comparison.comparedAtUnixMillis}\n'
+            '経路差: ${comparison.routeDifference}\n'
+            '参照差: ${comparison.referenceDifference}\n'
+            '能力差: ${comparison.capabilityDifference}\n'
+            '比較監査ID: ${comparison.auditId}',
+          ),
+          const SizedBox(height: 8),
+          const Text('実験別の数値集計'),
+          for (final experiment in comparison.experiments)
+            SelectableText(
+              '評価Experiment ID: ${experiment.experimentId}\n'
+              '実行系ID: ${experiment.runtimeId}\n'
+              '成立数: ${experiment.passedCount}\n'
+              '不成立数: ${experiment.failedCount}\n'
+              '評価不能数: ${experiment.indeterminateCount}\n'
+              '中断数: ${experiment.interruptedCount}\n'
+              '平均遅延Millis: ${experiment.averageLatencyMillis ?? '未観測'}',
+            ),
+        ],
+      ),
+    );
+  }
+}

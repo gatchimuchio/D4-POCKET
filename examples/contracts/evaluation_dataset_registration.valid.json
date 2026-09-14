@@ -1,0 +1,94 @@
+{
+  "版": 1,
+  "評価DatasetID": "11111111111111111111111111111111",
+  "revision": 1,
+  "公開表示名": "基本対話評価",
+  "登録者種別": "owner",
+  "登録経路": "owner_control",
+  "評価用途": "運用観測",
+  "評価方式": "決定論",
+  "非公開CasePayload一覧": [
+    {
+      "評価CaseID": "22222222222222222222222222222222",
+      "順序": 1,
+      "公開表示名": "基本Case",
+      "入力": {
+        "内容表示範囲": "full",
+        "本文": "例示入力"
+      },
+      "評価器設定": [
+        {
+          "評価器ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "種類": "exact",
+          "設定": {
+            "期待本文": "例示結果"
+          }
+        },
+        {
+          "評価器ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "種類": "contains",
+          "設定": {
+            "期待断片": "結果"
+          }
+        },
+        {
+          "評価器ID": "cccccccccccccccccccccccccccccccc",
+          "種類": "regex",
+          "設定": {
+            "パターン": "^例示"
+          }
+        },
+        {
+          "評価器ID": "dddddddddddddddddddddddddddddddd",
+          "種類": "json_schema",
+          "設定": {
+            "期待Schema": {
+              "type": "object",
+              "required": [
+                "状態"
+              ]
+            }
+          }
+        },
+        {
+          "評価器ID": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "種類": "reference_count",
+          "設定": {
+            "最小数": 1,
+            "最大数": 2
+          }
+        },
+        {
+          "評価器ID": "ffffffffffffffffffffffffffffffff",
+          "種類": "route",
+          "設定": {
+            "期待経路": "reference-runtime"
+          }
+        },
+        {
+          "評価器ID": "00000000000000000000000000000000",
+          "種類": "status",
+          "設定": {
+            "期待状態": "成功"
+          }
+        },
+        {
+          "評価器ID": "12121212121212121212121212121212",
+          "種類": "capability",
+          "設定": {
+            "必要能力一覧": [
+              "dialogue.send"
+            ]
+          }
+        },
+        {
+          "評価器ID": "34343434343434343434343434343434",
+          "種類": "latency_threshold",
+          "設定": {
+            "最大Millis": 1000
+          }
+        }
+      ]
+    }
+  ]
+}

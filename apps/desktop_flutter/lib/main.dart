@@ -9,6 +9,7 @@ import 'screens/approval_center.dart';
 import 'screens/audit_viewer.dart';
 import 'screens/dashboard.dart';
 import 'screens/evidence_center.dart';
+import 'screens/evaluation_lab.dart';
 import 'screens/agent_center.dart';
 import 'screens/authority_map.dart';
 import 'screens/problems_panel.dart';
@@ -22,12 +23,13 @@ import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
+import 'services/evaluation_client.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
 
 const String kGuiShellProductTitle = 'GUI Shell';
-const double _navigationRailMinScrollableExtent = 760;
+const double _navigationRailMinScrollableExtent = 816;
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
@@ -81,6 +83,8 @@ class GuiShellDesktopApp extends StatelessWidget {
     this.runtimeResourceConnect,
     this.runtimeLifecycleClient,
     this.runtimeLifecycleConnect,
+    this.evaluationClient,
+    this.evaluationConnect,
   });
 
   final ShellCoreClient? client;
@@ -88,6 +92,8 @@ class GuiShellDesktopApp extends StatelessWidget {
   final RuntimeResourceClientConnector? runtimeResourceConnect;
   final RuntimeLifecycleClient? runtimeLifecycleClient;
   final RuntimeLifecycleClientConnector? runtimeLifecycleConnect;
+  final EvaluationClient? evaluationClient;
+  final EvaluationClientConnector? evaluationConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +110,8 @@ class GuiShellDesktopApp extends StatelessWidget {
         runtimeResourceConnect: runtimeResourceConnect,
         runtimeLifecycleClient: runtimeLifecycleClient,
         runtimeLifecycleConnect: runtimeLifecycleConnect,
+        evaluationClient: evaluationClient,
+        evaluationConnect: evaluationConnect,
       ),
     );
   }
@@ -179,6 +187,8 @@ class ShellHomePage extends StatefulWidget {
     this.runtimeResourceConnect,
     this.runtimeLifecycleClient,
     this.runtimeLifecycleConnect,
+    this.evaluationClient,
+    this.evaluationConnect,
   });
 
   final ShellCoreClient client;
@@ -186,6 +196,8 @@ class ShellHomePage extends StatefulWidget {
   final RuntimeResourceClientConnector? runtimeResourceConnect;
   final RuntimeLifecycleClient? runtimeLifecycleClient;
   final RuntimeLifecycleClientConnector? runtimeLifecycleConnect;
+  final EvaluationClient? evaluationClient;
+  final EvaluationClientConnector? evaluationConnect;
 
   @override
   State<ShellHomePage> createState() => _ShellHomePageState();
@@ -229,6 +241,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
         const HistoryScreen()
       else
         const SizedBox.shrink(),
+      EvaluationLab(
+        client: widget.evaluationClient,
+        connect: widget.evaluationConnect ?? connectEvaluationClient,
+      ),
     ];
     final pageEntries = _pageEntries();
 
@@ -358,6 +374,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.history),
                                       label: Text('履歴'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.science_outlined),
+                                      selectedIcon: Icon(Icons.science),
+                                      label: Text('評価ラボ'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -398,6 +419,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ShellPageEntry(11, '設定', Icons.settings_outlined),
       _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline),
       _ShellPageEntry(13, '実行履歴', Icons.history),
+      _ShellPageEntry(14, '評価ラボ', Icons.science_outlined),
     ];
   }
 

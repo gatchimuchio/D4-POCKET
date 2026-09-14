@@ -160,6 +160,10 @@
       "責任": "実行系対話要求・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点"
     },
     {
+      "path": "docs/specs/evaluation-lab.md",
+      "責任": "C5評価ラボのDataset revision、決定論評価、既存対話統治、公開projection、監査相関、比較可能性の日本語意味"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },
