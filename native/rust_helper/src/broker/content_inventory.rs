@@ -135,6 +135,11 @@ pub(super) fn observe(
         return Err("全文結果証跡と要求hashが不一致");
     }
     let saved = &entry["content_receipt"];
+    let attempt =
+        super::super::execution_history::latest_save_attempt(log, &entry["record"], &p.hash)?;
+    let (discard_intent, discard_result) =
+        super::content_discard::markers(log, entry, attempt.as_deref())?;
+
     let mut intent: Option<(String, String, Value)> = None;
     let mut committed: Option<String> = None;
     let mut reconciled: Option<String> = None;
@@ -295,7 +300,15 @@ pub(super) fn observe(
     let file = store
         .inspect(crate::protected_store::Purpose::History, &p.id)
         .map_err(|_| "file観測失敗。欠落と推定しない")?;
-    let state = if intent.is_some() {
+    let state = if discard_intent.is_some() {
+        if file.is_some() {
+            "部分保存破棄承認あり・file残存"
+        } else if discard_result.is_some() {
+            "部分保存破棄済み・file不在"
+        } else {
+            "部分保存破棄・結果未確定"
+        }
+    } else if intent.is_some() {
         if file.is_some() {
             "削除承認あり・file残存"
         } else if committed.is_some() {
@@ -319,7 +332,7 @@ pub(super) fn observe(
         }
     };
     Ok(
-        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"復旧照合監査ID":reconciled,"証拠種別":"LIVE_RUNTIME"}),
+        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"復旧照合監査ID":reconciled,"保存試行監査ID":attempt,"部分保存破棄承認監査ID":discard_intent,"部分保存破棄結果監査ID":discard_result,"証拠種別":"LIVE_RUNTIME"}),
     )
 }
 #[cfg(windows)]

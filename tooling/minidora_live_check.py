@@ -329,6 +329,26 @@ server.serve_forever()
                     assert 操作(owner, "対話内容削除", content_target)["body"] is None
                     assert 操作(normal, "対話内容閲覧", content_query)["body"] is None
 
+                    _, partial_pending = 対話("left", "full")
+                    assert 完了(partial_pending)["状態"] == "成功"
+                    expected_history[partial_pending["要求ID"]] = "成功"
+                    partial_select = {"要求ID": partial_pending["要求ID"], "要求hash": partial_pending["要求hash"]}
+                    partial_path = vault / f"history-{partial_pending['要求ID']}.dpapi"
+                    partial_path.write_bytes(b"synthetic partial ciphertext")
+                    assert 操作(owner, "対話内容保存", partial_select)["body"] is None
+                    partial_state = 成功(owner, "対話保管状態", partial_select)
+                    assert partial_state["状態"] == "保存記録なし・fileあり" and partial_state["保存試行監査ID"]
+                    discard = {**partial_select, "保存試行監査ID": partial_state["保存試行監査ID"], "暗号文hash": partial_state["暗号文hash"]}
+                    assert 操作(normal, "対話部分保存破棄", discard)["body"] is None
+                    discarded = json.loads(subprocess.check_output([str(binary), "対話承認操作", "--session-file", str(owner_file), "部分保存破棄", partial_pending["要求ID"], partial_pending["要求hash"], discard["保存試行監査ID"], discard["暗号文hash"]], timeout=10))
+                    discard_schema = json.loads((ROOT / "specs/runtime_content_discard.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(discarded, discard_schema)
+                    assert not partial_path.exists()
+                    after_discard = 成功(owner, "対話保管状態", partial_select)
+                    assert not validate_instance(after_discard, state_schema)
+                    assert after_discard["状態"] == "部分保存破棄済み・file不在"
+                    assert 操作(owner, "対話内容保存", partial_select)["body"] is None
+
 
                 else:
                     assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"

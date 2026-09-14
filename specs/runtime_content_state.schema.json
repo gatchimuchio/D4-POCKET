@@ -49,7 +49,10 @@
         "削除承認あり・file残存",
         "削除承認あり・file不在・結果未確定",
         "削除確定・file不在",
-        "削除中断・復旧照合済み"
+        "削除中断・復旧照合済み",
+        "部分保存破棄承認あり・file残存",
+        "部分保存破棄・結果未確定",
+        "部分保存破棄済み・file不在"
       ]
     },
     "file存在": {
@@ -100,6 +103,30 @@
         "null"
       ],
       "minLength": 1
+    },
+    "保存試行監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "部分保存破棄承認監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "部分保存破棄結果監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 256
     }
   },
   "oneOf": [
@@ -336,6 +363,126 @@
       "required": [
         "復旧照合監査ID"
       ]
+    },
+    {
+      "required": [
+        "保存試行監査ID",
+        "部分保存破棄承認監査ID",
+        "部分保存破棄結果監査ID"
+      ],
+      "properties": {
+        "状態": {
+          "const": "部分保存破棄承認あり・file残存"
+        },
+        "file存在": {
+          "const": true
+        },
+        "暗号文hash": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "保存試行監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        },
+        "部分保存破棄承認監査ID": {
+          "type": "string"
+        },
+        "部分保存破棄結果監査ID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    {
+      "required": [
+        "保存試行監査ID",
+        "部分保存破棄承認監査ID",
+        "部分保存破棄結果監査ID"
+      ],
+      "properties": {
+        "状態": {
+          "const": "部分保存破棄・結果未確定"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "保存試行監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        },
+        "部分保存破棄承認監査ID": {
+          "type": "string"
+        },
+        "部分保存破棄結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "required": [
+        "保存試行監査ID",
+        "部分保存破棄承認監査ID",
+        "部分保存破棄結果監査ID"
+      ],
+      "properties": {
+        "状態": {
+          "const": "部分保存破棄済み・file不在"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "保存試行監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        },
+        "部分保存破棄承認監査ID": {
+          "type": "string"
+        },
+        "部分保存破棄結果監査ID": {
+          "type": "string"
+        }
+      }
     }
   ]
 }

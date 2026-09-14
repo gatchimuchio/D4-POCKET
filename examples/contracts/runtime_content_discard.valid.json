@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "保存試行監査ID": "broker-audit-17",
+  "暗号文hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "破棄承認監査ID": "broker-audit-23",
+  "状態": "部分保存破棄確認",
+  "証拠種別": "INTERNAL_STATE"
+}

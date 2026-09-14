@@ -1081,7 +1081,7 @@
     },
     {
       "path": "docs/specs/windows-protection.md",
-      "sha256": "eb0e1a2d08fb07188aa20b242fa5f6820a38a933dcea2c5c935c90f920fb01df"
+      "sha256": "c7293de6a27742090f394af9f9de63b7decf63eb095e2ee953dc6bc683d4e142"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -1113,7 +1113,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "56548b231fbcd69f4d0052336ce045e56dc738f35baf4a99f591d150ef8d2ab9"
+      "sha256": "d1132a6f44ec02f69296496757f6940d4a0e605a9817606be4ad7a62a5bf0f3c"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1356,6 +1356,10 @@
       "sha256": "e6b4af35cc493516acfac9d050d1f7ba07e1efc65e46ca9d32f0c36e87a847a2"
     },
     {
+      "path": "examples/contracts/invalid/runtime_content_discard.invalid.json",
+      "sha256": "a012eb69c41dd335ff0804b14fafc3447c03cd6be2208ace68af616ab60bccb5"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_content_receipt.invalid.json",
       "sha256": "3e03698863aa92d96f890e7d21262d54e3f375a6a59f1f2b0218ad340d94e1e2"
     },
@@ -1490,6 +1494,10 @@
     {
       "path": "examples/contracts/runtime_content_deletion.valid.json",
       "sha256": "4cecdd0626750debaec659426c801ce2610ae69dff759d853d68f6653dc46046"
+    },
+    {
+      "path": "examples/contracts/runtime_content_discard.valid.json",
+      "sha256": "13164a05a9d48ec4a02528c1930d9ab6685287ed1794e64892a8ed8b1304a0c9"
     },
     {
       "path": "examples/contracts/runtime_content_receipt.valid.json",
@@ -1684,8 +1692,12 @@
       "sha256": "29fd09bb68ef170de7e886495e9703a7cd284ee7aca3a6d6e41d1b94800445d4"
     },
     {
+      "path": "native/rust_helper/src/broker/content_discard.rs",
+      "sha256": "574562d20cbf8e46d88b19cdcb94ae97615ae4696cb58f049ee441b45b51461d"
+    },
+    {
       "path": "native/rust_helper/src/broker/content_inventory.rs",
-      "sha256": "7088ee75bae8893b1e47db942225f2942bebf176952360ac858a5e2265e4b7ca"
+      "sha256": "3a8991711d9152b42158236dc870dc2618cdc885d2c93d49956515b6759787c2"
     },
     {
       "path": "native/rust_helper/src/broker/content_recovery.rs",
@@ -1705,7 +1717,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
-      "sha256": "77f8a643ef19a9f9e8e517a43367bfe62239b02a5b7be69f92807e1cccdaaef6"
+      "sha256": "49381362935df278cc78202f16a9695546dd887b3d030945ba4e3a16c3700b82"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -1725,7 +1737,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3042d5088f9391e6991117b31261ee75a37f378686b306454700d3cb011cd960"
+      "sha256": "99b25ee5508998ad8e922289e850c52663d00c80d2519ac8313c4cedd40b9409"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -1773,7 +1785,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "c60e26210693743c5cc59e3df1c0c79742aeaa88b6dd1984f2e8defc1b1f8e8c"
+      "sha256": "26912ce5bbddf7fbce1f3c667ea57160bbf4649660b65c51d56a506fbf628bb2"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -1781,7 +1793,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "aefcdcca9e009211b95f649fa9522c71a1fe62833dd70cea75db973336e3d943"
+      "sha256": "0b8b13528162dd10b4fca9f56bc6cba556bc1a7d5ebc9b109a74bad029290c39"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -1825,7 +1837,7 @@
     },
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",
-      "sha256": "64a72439d928651c88cc7b301cc7b7420ed679e1eec2d4b3fda7ca59b8fbe852"
+      "sha256": "a1fa8bdad06b11562d7969aae860b6ce714eba9cc4be401e01e5e81eddaea214"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
@@ -2297,11 +2309,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "d74dc8c0335ab17ba94d7d4bd537e04f16b3e9d642ee6697df7b0e2b80ff47f1"
+      "sha256": "99d5e367684797d83b4f82f14024c1d409c681f5b29a9a6ff4712e092a0f0af8"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "f774ccaad9f2bd7bb8e9d252c986ff15654bf9eb9ae8b0d8ba9536425d32574b"
+      "sha256": "68fa1d986af01893a72d01c78c0c7a2b98dda1b8157d3fcc424ecc282294cdaa"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2328,6 +2340,10 @@
       "sha256": "7e51dcf1487ac33154d8a8343e63ff31d2892ef9bb759f79e11b11d4ee292eae"
     },
     {
+      "path": "specs/runtime_content_discard.schema.json",
+      "sha256": "347fc837623ce9c1247bdd22896228d9ba08664a78b4f6d1d5ae5e6d86bdc829"
+    },
+    {
       "path": "specs/runtime_content_receipt.schema.json",
       "sha256": "809a51bddf6fc1846b3f0208ed6915b91387992865e2be42f16a1cef91827751"
     },
@@ -2337,7 +2353,7 @@
     },
     {
       "path": "specs/runtime_content_state.schema.json",
-      "sha256": "063db9c1085dd320ac3921a16d1fb28db6887b8cb26bb65671ac8cfc19d3970e"
+      "sha256": "4fe03717c4371d49ac9b43ea0ec6bcd7861fe6999ae0d6f524ed414540ad66f5"
     },
     {
       "path": "specs/runtime_dialogue_comparison.schema.json",
@@ -2345,7 +2361,7 @@
     },
     {
       "path": "specs/runtime_dialogue_operation.schema.json",
-      "sha256": "af8acd5fc63f024a51d390da446277480b717d660c3e7277e8698f4c68403dd2"
+      "sha256": "7812e671bea0b984137e7a2d968fa71896e8c394c173fcb0320cffc7e20df6a3"
     },
     {
       "path": "specs/runtime_dialogue_request.schema.json",
@@ -2457,7 +2473,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "b248de8319db2e79da3f08389f16567385a591d11be72b44972474f8f21ba904"
+      "sha256": "3aa17bb0ac83d9e9671b9f0ed085a4263bc2d0dc44b09546c1aee304b40ce519"
     },
     {
       "path": "tooling/packaging_portability_check.py",
@@ -2477,7 +2493,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "dff378b43b1bdd6283d4ef6cb1cc80eef6778b702cb5b85dfa5b69a42cdf10b7"
+      "sha256": "ad8a55129a86c469f0764e842842f3d8af630e87106e0841e83b3ce3e4462849"
     },
     {
       "path": "tooling/shell_snapshot.py",

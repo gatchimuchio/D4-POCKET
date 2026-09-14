@@ -201,6 +201,8 @@ pub enum BrokerOperation {
     対話承認,
     #[serde(rename = "対話承認待ち")]
     対話承認待ち,
+    #[serde(rename = "対話部分保存破棄")]
+    対話部分保存破棄,
     #[serde(rename = "対話削除中断確認")]
     対話削除中断確認,
     #[serde(rename = "対話保管状態")]
@@ -263,6 +265,7 @@ impl BrokerOperation {
             BrokerOperation::対話終了 => "対話終了",
             BrokerOperation::対話承認 => "対話承認",
             BrokerOperation::対話承認待ち => "対話承認待ち",
+            BrokerOperation::対話部分保存破棄 => "対話部分保存破棄",
             BrokerOperation::対話削除中断確認 => "対話削除中断確認",
             BrokerOperation::対話保管状態 => "対話保管状態",
             BrokerOperation::対話内容削除 => "対話内容削除",
@@ -696,6 +699,7 @@ impl Broker {
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話保管状態 => self.保管状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -1037,6 +1041,9 @@ impl Broker {
                 return self.reject_with_payload_hash(id, op, "保管上限超過", "保管監査再確認", true, hash);
             }
             let target = content["要求"]["要求ID"].as_str().expect("検証済み要求ID");
+            if content_discard::blocked(&self.audit_log,target).unwrap_or(true) {
+                return self.reject_with_payload_hash(id,op,"破棄承認済み","同じ要求を再保存せず新要求で確認",true,hash);
+            }
             if self.audit_log.events().iter().any(|e| e.operation == op && e.decision == "accepted"
                 && e.reason.strip_prefix("対話内容保存記録:").and_then(|s| serde_json::from_str::<Value>(s).ok())
                     .is_some_and(|v| v["要求ID"] == target)) {
@@ -2747,3 +2754,6 @@ mod content_inventory;
 
 #[path = "content_recovery.rs"]
 mod content_recovery;
+
+#[path = "content_discard.rs"]
+mod content_discard;

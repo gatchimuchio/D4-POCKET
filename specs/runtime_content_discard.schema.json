@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_content_discard.schema.json",
+  "title": "部分保存候補の現在owner破棄受領記録",
+  "type": "object",
+  "required": [
+    "版",
+    "要求ID",
+    "要求hash",
+    "保存試行監査ID",
+    "暗号文hash",
+    "破棄承認監査ID",
+    "状態",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "保存試行監査ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "暗号文hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "破棄承認監査ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "状態": {
+      "const": "部分保存破棄確認"
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  }
+}

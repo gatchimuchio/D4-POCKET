@@ -270,3 +270,38 @@ fn owner_inventory_distinguishes_actual_missing_partial_tampered_and_deleted_fil
     assert!(call(&mut b,BrokerOperation::対話保管状態,select,true).body.is_none());
     drop(b);std::fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn partial_discard_requires_latest_save_attempt_and_current_hash() {
+    let root=super::tests::temp_store_dir("partial-discard");let vault=root.join("vault");std::fs::create_dir(&vault).unwrap();let audit=root.join("audit");
+    let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    let select=prepare(&mut b,false);let target=select["要求ID"].as_str().unwrap();let path=vault.join(format!("history-{target}.dpapi"));
+    std::fs::write(&path,b"").unwrap();
+    let state=|b:&mut Broker|accepted(call(b,BrokerOperation::対話保管状態,select.clone(),true));
+    assert!(state(&mut b)["保存試行監査ID"].is_null());
+    let mut payload=json!({"要求ID":target,"要求hash":select["要求hash"],"保存試行監査ID":"unknown","暗号文hash":sha256_tagged(b"")});
+    assert!(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),true).body.is_none());assert!(path.exists());
+    assert!(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true).body.is_none());
+    payload["保存試行監査ID"]=state(&mut b)["保存試行監査ID"].clone();assert!(!payload["保存試行監査ID"].is_null());
+    assert!(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),false).body.is_none());
+    for key in ["要求ID","要求hash","保存試行監査ID","暗号文hash","extra"] {
+        let mut wrong=payload.clone();wrong[key]=json!("wrong");assert!(call(&mut b,BrokerOperation::対話部分保存破棄,wrong,true).body.is_none());assert_eq!(std::fs::read(&path).unwrap(),b"");
+    }
+    assert!(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true).body.is_none());
+    assert!(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),true).body.is_none());
+    payload["保存試行監査ID"]=state(&mut b)["保存試行監査ID"].clone();
+    std::fs::write(&path,b"partial").unwrap();assert!(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),true).body.is_none());assert_eq!(std::fs::read(&path).unwrap(),b"partial");
+    payload["暗号文hash"]=state(&mut b)["暗号文hash"].clone();
+    let result=accepted(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),true));assert_eq!(result["状態"],"部分保存破棄確認");assert!(!path.exists());assert_eq!(state(&mut b)["状態"],"部分保存破棄済み・file不在");
+    assert!(call(&mut b,BrokerOperation::対話部分保存破棄,payload.clone(),true).body.is_none());
+    assert_eq!(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true).error.unwrap().code,"破棄承認済み");
+    drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert_eq!(state(&mut b)["状態"],"部分保存破棄済み・file不在");std::fs::write(&path,b"partial").unwrap();assert_eq!(state(&mut b)["状態"],"部分保存破棄承認あり・file残存");
+    // 準備後・承認監査前のI/O障害は、同じproduction関数でfileを保持する。
+    let prepared=b.protected_store.as_ref().unwrap().prepare_delete(crate::protected_store::Purpose::History,target,&sha256_tagged(b"partial")).unwrap();
+    let audit_file=audit.join("audit.jsonl");std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let denied=b.部分保存破棄実行("partial-approval-failure",payload.clone(),prepared,&sha256_tagged(payload.to_string().as_bytes()));assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());assert_eq!(std::fs::read(&path).unwrap(),b"partial");
+    let denied=b.部分保存破棄確定("partial-result-failure",result);assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
+    drop(b);std::fs::remove_dir_all(root).unwrap();
+}

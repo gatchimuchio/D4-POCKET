@@ -769,3 +769,24 @@ fn 保存記録は元の結果と明示承認と先行順序を検査する() {
         } else {assert!(result.is_err(),"case={case}");}
     }
 }
+
+
+#[cfg(windows)]
+pub(crate) fn latest_save_attempt(log:&BrokerAuditLog,archive:&Value,request_hash:&str)->Result<Option<String>,&'static str> {
+    let target=archive["実行記録"]["要求ID"].as_str().ok_or("要求IDが不正")?;
+    let select=json!({"要求ID":target,"要求hash":request_hash});
+    let hash=sha256_tagged(select.to_string().as_bytes());
+    let prefix=format!("対話内容保存承認 Capability=対話内容保存 Permission=独立保管先:{target} Approval=");
+    let expected=format!("{prefix}{hash} RecoveryAction=保管監査再確認");
+    let mut found=None;
+    for (index,e) in log.events().iter().enumerate().filter(|(_,e)|e.operation=="対話内容保存" && e.decision=="recorded" && e.reason.starts_with(&prefix)) {
+        if e.reason!=expected || e.payload_hash!=hash || e.evidence_source!="INTERNAL_STATE" {return Err("保存試行と対象hashが不一致");}
+        let before=&log.events()[..index];
+        let received:Vec<_>=before.iter().filter(|r|r.operation==e.operation && r.request_id==e.request_id && r.decision=="received").collect();
+        if received.len()!=1 || received[0].payload_hash!=hash || received[0].reason!="対話内容保存要求を受信" || received[0].evidence_source!="INTERNAL_STATE" {return Err("保存試行の先行受信が不正");}
+        let proof=result_evidence(before,archive)?;
+        if proof["表示範囲"]!="full" || proof["要求hash"]!=request_hash {return Err("保存試行前の全文結果証跡が不一致");}
+        found=Some(e.event_id.clone());
+    }
+    Ok(found)
+}
