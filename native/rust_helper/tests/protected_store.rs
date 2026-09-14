@@ -58,3 +58,73 @@ fn 暗号文保存と再読取と転用拒否を実fileで確認する() {
     }
     std::fs::remove_dir(&root).unwrap();
 }
+
+#[test]
+fn 削除準備は同一fileを排他保持しcommitだけが削除する() {
+    use sha2::{Digest, Sha256};
+    let mut random = [0u8; 16];
+    getrandom::getrandom(&mut random).unwrap();
+    let root = std::env::temp_dir().join(format!("gui-shell-delete-{}", hex::encode(random)));
+    std::fs::create_dir(&root).unwrap();
+    let store = ProtectedStore::new(Dir::open_ambient_dir(&root, ambient_authority()).unwrap());
+    let id = "c".repeat(32);
+    let hash = store
+        .create(Purpose::History, &id, b"synthetic delete target")
+        .unwrap();
+    let path = root.join(format!("history-{id}.dpapi"));
+    let original = std::fs::read(&path).unwrap();
+    assert!(store
+        .prepare_delete(Purpose::History, "../escape", &hash)
+        .is_err());
+    assert!(store
+        .prepare_delete(Purpose::History, &id, "invalid")
+        .is_err());
+    assert!(store
+        .prepare_delete(Purpose::History, &id, &format!("sha256:{}", "0".repeat(64)))
+        .is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    let alias = root.join("alias");
+    std::fs::hard_link(&path, &alias).unwrap();
+    assert!(store.prepare_delete(Purpose::History, &id, &hash).is_err());
+    std::fs::remove_file(&alias).unwrap();
+    let reader = std::fs::File::open(&path).unwrap();
+    assert!(store.prepare_delete(Purpose::History, &id, &hash).is_err());
+    drop(reader);
+    let prepared = store.prepare_delete(Purpose::History, &id, &hash).unwrap();
+    assert!(std::fs::write(&path, b"replacement").is_err());
+    assert!(std::fs::rename(&path, &alias).is_err());
+    assert!(std::fs::remove_file(&path).is_err());
+    drop(prepared);
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    store
+        .prepare_delete(Purpose::History, &id, &hash)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!path.exists());
+    assert!(store.prepare_delete(Purpose::History, &id, &hash).is_err());
+    // 部分保存の空bytesと復号不能bytesも、明示hashとの一致だけを低位で検査する。
+    for bytes in [&b""[..], &b"partial ciphertext"[..]] {
+        std::fs::write(&path, bytes).unwrap();
+        let partial_hash = format!("sha256:{}", hex::encode(Sha256::digest(bytes)));
+        store
+            .prepare_delete(Purpose::History, &id, &partial_hash)
+            .unwrap()
+            .commit()
+            .unwrap();
+        assert!(!path.exists());
+    }
+    let oversized = vec![0u8; gui_shell_windows_protection::MAX_CIPHERTEXT + 1];
+    std::fs::write(&path, &oversized).unwrap();
+    let large_hash = format!("sha256:{}", hex::encode(Sha256::digest(&oversized)));
+    assert!(store
+        .prepare_delete(Purpose::History, &id, &large_hash)
+        .is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), oversized);
+    std::fs::remove_file(&path).unwrap();
+    std::fs::create_dir(&path).unwrap();
+    assert!(store.prepare_delete(Purpose::History, &id, &hash).is_err());
+    std::fs::remove_dir(&path).unwrap();
+    drop(store);
+    std::fs::remove_dir(&root).unwrap();
+}

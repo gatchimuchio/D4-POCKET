@@ -66,3 +66,14 @@ Capabilityは対話内容閲覧、Permissionは検証済みの一件の保存監
 履歴clientは保存時metadataを検証して表示し、内容を開く明示操作では現在の内容承認を取得して保存監査ID/hashと対象を照合する。本文取得前後に同じ承認を再確認し、応答の実行記録・結果証跡・要求hash・全文表示範囲を履歴の対象と照合する。Flutterは承認操作を発行せず、owner資格fileを取得しない。
 
 内容は独立した閲覧dialog内に限定し、現在承認の短い期限を壁時計・単調時計で監視する。失効確認は2秒間隔で、取得中・再確認中は内容を表示せず、確認失敗・期限・背景化で本文を破棄する。閉じる操作とroute破棄でも表示資源を破棄する。戻ったときの自動復元は行わない。これはUIの表示抑止であり、OS screenshotやprocess memoryの完全消去保証ではない。
+
+
+## 同一handleに限定する削除準備
+
+削除/Recovery経路の低位APIは用途と対象ID、および呼出し側の承認対象となる暗号文SHA-256を受け、登録directory内の固定名をnofollow・共有なし・読取とDELETE accessで開く。通常file、reparse不在、単一hardlink、サイズ上限、実bytesのhashを検査する。削除準備中は同じhandleを保持し、他handleによる変更/rename/deleteをOS共有規則で拒否する。準備objectを破棄しただけでは削除しない。
+
+明示commit時だけ検査済みhandleをSetFileInformationByHandleのFileDispositionInfoで削除予定にし、handleを閉じる。別のpathを再解決して削除しない。削除はfileのunlinkであり媒体の物理消去ではない。部分保存Recoveryのため空fileと復号不能bytesもhash一致時には対象とできるが、任意path、上限超過、hash不一致、複数linkは拒否する。呼出し側は検証済み監査と現在owner承認へ対象を結合し、準備後・commit前に承認監査を永続化する必要がある。
+
+unsafe例外をnative/windows_protection/src/file_delete.rsの単一OS関数呼出しへ限定して追加する。借用されたstd Fileの生存中だけhandleを使い、固定構造体の正しいサイズと有効pointerを渡す。所有権の複製、raw handleからの所有型生成、path操作、承認判断を行わない。既存Rust helperのforbid(unsafe_code)を維持する。既存cap-stdは同一file handleに削除予定を設定するAPIを公開していないため、固定windows-sys bindingのStorage FileSystem featureをこの接続だけに追加する。
+
+一次資料: [Microsoft SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)。この段階では公開IPC/自動rotationへ接続しない。Broker承認・結果監査・部分保存復旧の接続はrelease_blockerとして保持し、低位file試験を製品削除完成としない。

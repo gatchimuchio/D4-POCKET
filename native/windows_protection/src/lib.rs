@@ -1,4 +1,4 @@
-//! Windowsの保護bytes変換だけを担う。Permission、保管、IPC、表示を所有しない。
+//! Windowsの保護bytes変換と検証済みhandleの削除確定を担う。Permission、IPC、表示を所有しない。
 #![cfg(windows)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -124,3 +124,5 @@ fn transform(context: &[u8], data: &[u8], protect: bool) -> Result<Vec<u8>, Erro
     // SAFETY: 成功したDPAPIの所有領域を解放前に複写する。元領域はDropで消去する。
     Ok(unsafe { std::slice::from_raw_parts(output.0.pbData, output.0.cbData as usize) }.to_vec())
 }
+
+pub mod file_delete;

@@ -1,7 +1,7 @@
 //! 検証済みdirectory capability内で不変の暗号文を扱う。承認・監査は呼出し側が担う。
 use crate::audit_hash::sha256_tagged;
 use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
-use cap_std::fs::{Dir, MetadataExt, OpenOptions};
+use cap_std::fs::{Dir, MetadataExt, OpenOptions, OpenOptionsExt};
 use gui_shell_windows_protection::{protect, unprotect, Secret, MAX_CIPHERTEXT};
 use std::io::{Read, Write};
 
@@ -60,6 +60,51 @@ impl ProtectedStore {
         Ok(hash)
     }
 
+    /// 現在承認へ結合したhashの対象を保持する。準備のみでは削除しない。
+    pub fn prepare_delete(
+        &self,
+        purpose: Purpose,
+        id: &str,
+        expected_hash: &str,
+    ) -> Result<PreparedDelete, StoreError> {
+        let (name, _) = reference(purpose, id)?;
+        if !expected_hash
+            .strip_prefix("sha256:")
+            .is_some_and(|s| s.len() == 64 && lower_hex(s))
+        {
+            return Err(StoreError::InvalidReference);
+        }
+        let mut options = OpenOptions::new();
+        // GENERIC_READ | DELETE。共有なしで検査から削除までの差替えを防ぐ。
+        options
+            .access_mode(0x80000000 | 0x00010000)
+            .share_mode(0)
+            .follow(FollowSymlinks::No);
+        let mut file = self
+            .directory
+            .open_with(name, &options)
+            .map_err(|_| StoreError::Io)?;
+        let metadata = file.metadata().map_err(|_| StoreError::Io)?;
+        if !metadata.is_file()
+            || metadata.file_attributes() & 0x400 != 0
+            || cap_fs_ext::MetadataExt::nlink(&metadata) != 1
+            || metadata.len() > MAX_CIPHERTEXT as u64
+        {
+            return Err(StoreError::Changed);
+        }
+        let mut bytes = Vec::new();
+        (&mut file)
+            .take(MAX_CIPHERTEXT as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| StoreError::Io)?;
+        if bytes.len() != metadata.len() as usize || sha256_tagged(&bytes) != expected_hash {
+            return Err(StoreError::Changed);
+        }
+        Ok(PreparedDelete {
+            file: file.into_std(),
+        })
+    }
+
     pub fn read(
         &self,
         purpose: Purpose,
@@ -115,9 +160,21 @@ fn reference(purpose: Purpose, id: &str) -> Result<(String, String), StoreError>
     ))
 }
 
-
 impl std::fmt::Debug for ProtectedStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("ProtectedStore(非公開)")
+    }
+}
+
+/// 検証済みfileを所有する。dropのみでは削除しない。
+pub struct PreparedDelete {
+    file: std::fs::File,
+}
+impl PreparedDelete {
+    /// 承認監査確定後にだけ呼ぶ。媒体の物理消去は保証しない。
+    pub fn commit(self) -> Result<(), StoreError> {
+        gui_shell_windows_protection::file_delete::mark(&self.file).map_err(|_| StoreError::Io)?;
+        drop(self.file);
+        Ok(())
     }
 }
