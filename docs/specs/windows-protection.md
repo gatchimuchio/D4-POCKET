@@ -77,3 +77,12 @@ Capabilityは対話内容閲覧、Permissionは検証済みの一件の保存監
 unsafe例外をnative/windows_protection/src/file_delete.rsの単一OS関数呼出しへ限定して追加する。借用されたstd Fileの生存中だけhandleを使い、固定構造体の正しいサイズと有効pointerを渡す。所有権の複製、raw handleからの所有型生成、path操作、承認判断を行わない。既存Rust helperのforbid(unsafe_code)を維持する。既存cap-stdは同一file handleに削除予定を設定するAPIを公開していないため、固定windows-sys bindingのStorage FileSystem featureをこの接続だけに追加する。
 
 一次資料: [Microsoft SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)。この段階では公開IPC/自動rotationへ接続しない。Broker承認・結果監査・部分保存復旧の接続はrelease_blockerとして保持し、低位file試験を製品削除完成としない。
+
+
+## 保存済み内容のowner削除
+
+対話内容削除はowner制御資格だけが発行するcontrol/Recovery操作で、要求ID・保存監査ID・保存監査hashを指定する。Capabilityは対話内容削除、Permissionは検証済み保存証跡とその暗号文hashの一件、Approvalは現在owner操作の削除承認監査、RecoveryActionは保管監査再確認とする。保存時承認、過去閲覧承認、通常資格、端末資格で代替しない。
+
+disk監査chain/anchorと現在logの一致、保存時の要求・完了・承認証跡を検証する。暗号文を排他保持してhashを照合した後、削除承認を永続監査へ先行記録し、同一handleで削除する。結果監査が確定してから削除metadataを返す。平文を復号/表示しない。削除開始時に現在内容閲覧承認を失効する。削除承認が記録された保存対象は、途中失敗や暗号文の外部復元があっても以後内容閲覧を拒否し、過去保存承認から復活させない。
+
+対象不一致・暗号文改変・link・未登録・監査不全は削除しない。削除後の監査失敗はSUSPENDでbodyを返さず、削除済みと成功確定を区別する。消失済み対象への再試行も成功へ読み替えない。監査履歴は削除せず、保存metadataは過去の事実として残す。媒体の物理消去を主張しない。部分保存/削除途中の状態照合と復旧は引き続きrelease_blockerであり、本操作は保存完了証跡を持つ対象だけに接続する。

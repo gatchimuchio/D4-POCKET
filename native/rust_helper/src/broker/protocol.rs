@@ -201,6 +201,8 @@ pub enum BrokerOperation {
     対話承認,
     #[serde(rename = "対話承認待ち")]
     対話承認待ち,
+    #[serde(rename = "対話内容削除")]
+    対話内容削除,
     #[serde(rename = "対話内容保存")]
     対話内容保存,
     #[serde(rename = "対話内容承認")]
@@ -257,6 +259,7 @@ impl BrokerOperation {
             BrokerOperation::対話終了 => "対話終了",
             BrokerOperation::対話承認 => "対話承認",
             BrokerOperation::対話承認待ち => "対話承認待ち",
+            BrokerOperation::対話内容削除 => "対話内容削除",
             BrokerOperation::対話内容保存 => "対話内容保存",
             BrokerOperation::対話内容承認 => "対話内容承認",
             BrokerOperation::対話内容失効 => "対話内容失効",
@@ -687,6 +690,7 @@ impl Broker {
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
@@ -2726,3 +2730,6 @@ mod content_save_tests;
 
 #[path = "content_control.rs"]
 mod content_control;
+
+#[path = "content_delete.rs"]
+mod content_delete;

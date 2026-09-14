@@ -119,3 +119,81 @@ fn oversized_content_is_rejected_before_save_approval() {
     assert!(!b.audit_log.events().iter().any(|e|e.reason.starts_with("対話内容保存承認 ")));
     drop(b); std::fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn explicit_delete_binds_saved_receipt_and_never_revives_restored_ciphertext() {
+    let root=super::tests::temp_store_dir("content-delete");
+    let vault=root.join("vault");std::fs::create_dir(&vault).unwrap();
+    let audit=root.join("audit");
+    let mut b=super::tests::persistent_test_broker(&audit);
+    b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    let select=prepare(&mut b,false);
+    let receipt=accepted(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true));
+    let saved=b.audit_events().last().unwrap().clone();
+    let target=json!({"要求ID":select["要求ID"],"保存監査ID":saved.event_id,"保存監査hash":saved.event_hash});
+    let path=vault.join(format!("history-{}.dpapi",select["要求ID"].as_str().unwrap()));
+    let cipher=std::fs::read(&path).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話内容削除,target.clone(),false).body.is_none());
+    for key in ["要求ID","保存監査ID","保存監査hash","extra"] {
+        let mut wrong=target.clone();wrong[key]=json!("wrong");
+        assert!(call(&mut b,BrokerOperation::対話内容削除,wrong,true).body.is_none());
+        assert_eq!(std::fs::read(&path).unwrap(),cipher);
+    }
+    std::fs::write(&path,b"tampered").unwrap();
+    assert!(call(&mut b,BrokerOperation::対話内容削除,target.clone(),true).body.is_none());
+    assert_eq!(std::fs::read(&path).unwrap(),b"tampered");
+    std::fs::write(&path,&cipher).unwrap();
+    let grant=accepted(call(&mut b,BrokerOperation::対話内容承認,target.clone(),true));
+    let result=accepted(call(&mut b,BrokerOperation::対話内容削除,target.clone(),true));
+    assert_eq!(result["暗号文hash"],receipt["暗号文hash"]);
+    assert_eq!(result["状態"],"削除確定");
+    assert!(!path.exists());
+    assert!(call(&mut b,BrokerOperation::対話内容閲覧,json!({"approval_id":grant["grant"]["approval_id"]}),false).body.is_none());
+    assert!(call(&mut b,BrokerOperation::対話内容削除,target.clone(),true).body.is_none());
+    let events=b.audit_events();
+    let approval_index=events.iter().position(|e|e.event_id==result["削除承認監査ID"]).unwrap();
+    let committed_index=events.iter().position(|e|e.reason.starts_with("対話内容削除記録:")).unwrap();
+    assert!(approval_index<committed_index);
+    assert_eq!(events[approval_index].decision,"recorded");
+    assert_eq!(b.state_store.persistent_store.as_ref().unwrap().verified_audit_log().unwrap(),b.audit_log);
+    std::fs::write(&path,&cipher).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話内容承認,target.clone(),true).body.is_none());
+    drop(b);
+    let mut b=super::tests::persistent_test_broker(&audit);
+    b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話内容承認,target.clone(),true).body.is_none());
+    assert_eq!(std::fs::read(&path).unwrap(),cipher);
+    // 後段監査の実関数でI/O失敗を発生させ、削除成功の推定を公開しない。
+    let audit_file=audit.join("audit.jsonl");
+    std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let denied=b.内容削除確定("delete-finalization-failure",result);
+    assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
+    assert!(call(&mut b,BrokerOperation::対話内容削除,target,true).body.is_none());
+    assert_eq!(std::fs::read(&path).unwrap(),cipher);
+    drop(b);std::fs::remove_dir_all(root).unwrap();
+}
+
+
+#[test]
+fn delete_approval_audit_failure_drops_prepared_handle_without_deleting() {
+    let root=super::tests::temp_store_dir("delete-approval-failure");
+    let vault=root.join("vault");std::fs::create_dir(&vault).unwrap();
+    let audit=root.join("audit");
+    let mut b=super::tests::persistent_test_broker(&audit);
+    b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    let select=prepare(&mut b,false);
+    let receipt=accepted(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true));
+    let saved=b.audit_events().last().unwrap().clone();
+    let target=select["要求ID"].as_str().unwrap();
+    let cipher_hash=receipt["暗号文hash"].as_str().unwrap();
+    let path=vault.join(format!("history-{target}.dpapi"));
+    let cipher=std::fs::read(&path).unwrap();
+    let prepared=b.protected_store.as_ref().unwrap().prepare_delete(crate::protected_store::Purpose::History,target,cipher_hash).unwrap();
+    let intent=json!({"要求ID":target,"保存監査ID":saved.event_id,"保存監査hash":saved.event_hash,"暗号文hash":cipher_hash});
+    let audit_file=audit.join("audit.jsonl");std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let denied=b.内容削除実行("delete-approval-failure",intent,prepared,&sha256_tagged(b"fixture"));
+    assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
+    assert_eq!(std::fs::read(&path).unwrap(),cipher);
+    drop(b);std::fs::remove_dir_all(root).unwrap();
+}

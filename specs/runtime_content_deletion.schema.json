@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_content_deletion.schema.json",
+  "title": "保存内容削除の監査受領記録",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "版",
+    "要求ID",
+    "保存監査ID",
+    "保存監査hash",
+    "暗号文hash",
+    "削除承認監査ID",
+    "状態",
+    "証拠種別"
+  ],
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "保存監査ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "保存監査hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "暗号文hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "削除承認監査ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "状態": {
+      "const": "削除確定"
+    },
+    "証拠種別": {
+      "const": "INTERNAL_STATE"
+    }
+  }
+}

@@ -70,7 +70,27 @@ impl ContentAccess {
     }
 }
 
+#[cfg(windows)]
+pub(crate) fn deletion_entry(log: &BrokerAuditLog, payload: &Value) -> Result<Value, &'static str> {
+    let target: Target = serde_json::from_value(payload.clone()).map_err(|_| "削除対象形式が不正")?;
+    saved_entry(log, &target)
+}
+
 fn target_entry(log:&BrokerAuditLog,target:&Target)->Result<Value,&'static str> {
+    let entry = saved_entry(log, target)?;
+    for event in log.events().iter().filter(|e|e.operation=="対話内容削除" && e.decision=="recorded") {
+        let raw=event.reason.strip_prefix("対話内容削除承認:").ok_or("削除監査形式が不正")?;
+        let intent:Value=super::json_input::read_unique(raw).map_err(|_|"削除監査形式が不正")?;
+        if !exact(&intent,&["要求ID","保存監査ID","保存監査hash","暗号文hash"])
+            || event.payload_hash!=sha256_tagged(raw.as_bytes()) || event.evidence_source!="INTERNAL_STATE" {
+            return Err("削除監査形式が不正");
+        }
+        if intent["要求ID"]==target.request {return Err("削除承認済み内容は復元しない。保管監査再確認が必要");}
+    }
+    Ok(entry)
+}
+
+fn saved_entry(log:&BrokerAuditLog,target:&Target)->Result<Value,&'static str> {
     if target.audit_id.is_empty() || target.audit_id.len()>256 {return Err("保存監査IDが不正");}
     let result=page(log,Query{after:0,limit:1,latest_per_request:true,include_result_evidence:true,include_content_receipt:true,filter:[("要求ID".into(),target.request.clone())].into(),..Default::default()})?;
     let entry=result["entries"].as_array().and_then(|v|v.first()).ok_or("保存対象が不在")?;

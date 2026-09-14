@@ -307,6 +307,15 @@ server.serve_forever()
                         成功(owner, "対話履歴失効", {})
 
                     成功(owner, "対話内容失効", {})
+                    assert 操作(normal, "対話内容削除", content_target)["body"] is None
+                    deleted = json.loads(subprocess.check_output([str(binary), "対話承認操作", "--session-file", str(owner_file), "内容削除", p["要求ID"], entry_receipt["audit_event_id"], entry_receipt["event_hash"]], timeout=10))
+                    deletion = deleted
+                    deletion_schema = json.loads((ROOT / "specs/runtime_content_deletion.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(deletion, deletion_schema)
+                    assert deletion["暗号文hash"] == receipt["暗号文hash"]
+                    assert not (vault / f"history-{p['要求ID']}.dpapi").exists()
+                    assert 操作(owner, "対話内容承認", content_target)["body"] is None
+                    assert 操作(owner, "対話内容削除", content_target)["body"] is None
                     assert 操作(normal, "対話内容閲覧", content_query)["body"] is None
 
 
@@ -439,6 +448,7 @@ server.serve_forever()
                         "mobile_simulator": simulator_result if mobile_simulator else "未実行",
                         "android_emulator": simulator_result if android_emulator else "未実行",
                         "protected_content_save": "PASS" if os.name == "nt" else "未対応拒否を確認",
+                        "protected_content_delete": "PASS" if os.name == "nt" else "未実行",
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()

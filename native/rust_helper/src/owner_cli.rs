@@ -15,6 +15,7 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         "内容閲覧承認" if args.len()==6 => ("対話内容承認",json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]})),
         "内容閲覧失効" if args.len()==3 => ("対話内容失効",json!({})),
 
+        "内容削除" if args.len()==6 => ("対話内容削除",json!({"要求ID":args[3],"保存監査ID":args[4],"保存監査hash":args[5]})),
         "内容保存" if args.len() == 5 => ("対話内容保存", json!({"要求ID":args[3],"要求hash":args[4]})),
         "作業領域基準点保存" if (6..=133).contains(&args.len()) => ("作業領域基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4],"相対paths":args[5..]})),
         "作業領域全体基準点保存" if args.len() == 5 => ("作業領域全体基準点保存", json!({"作業領域ID":args[3],"登録hash":args[4]})),
