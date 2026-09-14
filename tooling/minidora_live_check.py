@@ -319,6 +319,11 @@ server.serve_forever()
                     assert not validate_instance(observed, state_schema)
                     assert observed["状態"] == "削除確定・file不在" and observed["file存在"] is False
                     assert observed["暗号文hash"] is None and observed["bytes"] is None
+                    recovery_request = {"要求ID": p["要求ID"], "要求hash": p["要求hash"], "削除承認監査ID": deletion["削除承認監査ID"]}
+                    assert 操作(normal, "対話削除中断確認", recovery_request)["body"] is None
+                    completed_recovery = subprocess.run([str(binary), "対話承認操作", "--session-file", str(owner_file), "削除中断確認", p["要求ID"], p["要求hash"], deletion["削除承認監査ID"]], stdout=log, stderr=log, timeout=10)
+                    assert completed_recovery.returncode != 0
+                    assert 成功(owner, "対話保管状態", save_select)["状態"] == "削除確定・file不在"
                     assert not (vault / f"history-{p['要求ID']}.dpapi").exists()
                     assert 操作(owner, "対話内容承認", content_target)["body"] is None
                     assert 操作(owner, "対話内容削除", content_target)["body"] is None

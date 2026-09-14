@@ -92,7 +92,7 @@ impl Broker {
 }
 
 #[cfg(windows)]
-fn observe(
+pub(super) fn observe(
     log: &super::super::audit::BrokerAuditLog,
     store: &crate::protected_store::ProtectedStore,
     payload: &Value,
@@ -137,9 +137,72 @@ fn observe(
     let saved = &entry["content_receipt"];
     let mut intent: Option<(String, String, Value)> = None;
     let mut committed: Option<String> = None;
+    let mut reconciled: Option<String> = None;
     for event in log.events().iter().filter(|e| {
-        e.operation == "対話内容削除" && matches!(e.decision.as_str(), "recorded" | "accepted")
+        (e.operation == "対話内容削除" && matches!(e.decision.as_str(), "recorded" | "accepted"))
+            || (e.operation == "対話削除中断確認" && e.decision == "accepted")
     }) {
+        if event.operation == "対話削除中断確認" {
+            let raw = event
+                .reason
+                .strip_prefix("対話削除中断照合記録:")
+                .ok_or("復旧照合の形式が不正")?;
+            let v: Value =
+                super::super::json_input::read_unique(raw).map_err(|_| "復旧照合の形式が不正")?;
+            if event.payload_hash != sha256_tagged(raw.as_bytes())
+                || event.evidence_source != "LIVE_RUNTIME"
+            {
+                return Err("復旧照合のhashが不正");
+            }
+            if v["要求ID"] != p.id {
+                continue;
+            }
+            if !exact(
+                &v,
+                &[
+                    "版",
+                    "要求ID",
+                    "要求hash",
+                    "削除承認監査ID",
+                    "観測監査head",
+                    "観測時刻",
+                    "状態",
+                    "証拠種別",
+                ],
+            ) || v["版"] != 1
+                || v["要求hash"] != p.hash
+                || v["状態"] != "削除中断照合済み"
+                || v["証拠種別"] != "LIVE_RUNTIME"
+                || v["観測時刻"].as_u64().is_none()
+                || committed.is_some()
+                || reconciled.is_some()
+                || !intent.as_ref().is_some_and(|i| v["削除承認監査ID"] == i.0)
+            {
+                return Err("復旧照合と未確定削除の対応が不正");
+            }
+            let before: Vec<_> = log
+                .events()
+                .iter()
+                .take_while(|e| e.event_id != event.event_id)
+                .collect();
+            if !before.iter().any(|e| v["観測監査head"] == e.event_hash) {
+                return Err("復旧観測の監査headが不正");
+            }
+            let request =
+                json!({"要求ID":p.id,"要求hash":p.hash,"削除承認監査ID":v["削除承認監査ID"]});
+            let hash = sha256_tagged(request.to_string().as_bytes());
+            if !before.iter().any(|e| {
+                e.operation == event.operation
+                    && e.request_id == event.request_id
+                    && e.decision == "received"
+                    && e.payload_hash == hash
+                    && e.evidence_source == "INTERNAL_STATE"
+            }) {
+                return Err("復旧照合の受信対応が不正");
+            }
+            reconciled = Some(event.event_id.clone());
+            continue;
+        }
         let prefix = if event.decision == "recorded" {
             "対話内容削除承認:"
         } else {
@@ -199,6 +262,7 @@ fn observe(
             }
             intent = Some((event.event_id.clone(), event.request_id.clone(), value));
             committed = None;
+            reconciled = None;
         } else {
             if !exact(
                 &value,
@@ -236,6 +300,8 @@ fn observe(
             "削除承認あり・file残存"
         } else if committed.is_some() {
             "削除確定・file不在"
+        } else if reconciled.is_some() {
+            "削除中断・復旧照合済み"
         } else {
             "削除承認あり・file不在・結果未確定"
         }
@@ -253,7 +319,7 @@ fn observe(
         }
     };
     Ok(
-        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"証拠種別":"LIVE_RUNTIME"}),
+        json!({"版":1,"要求ID":p.id,"要求hash":p.hash,"観測監査head":page["head_hash"],"観測時刻":now,"状態":state,"file存在":file.is_some(),"暗号文hash":file.as_ref().map(|v|&v.0),"bytes":file.as_ref().map(|v|v.1),"保存監査ID":saved["audit_event_id"],"削除承認監査ID":intent.as_ref().map(|v|&v.0),"削除結果監査ID":committed,"復旧照合監査ID":reconciled,"証拠種別":"LIVE_RUNTIME"}),
     )
 }
 #[cfg(windows)]

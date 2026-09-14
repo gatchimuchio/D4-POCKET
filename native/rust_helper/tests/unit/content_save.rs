@@ -245,7 +245,27 @@ fn owner_inventory_distinguishes_actual_missing_partial_tampered_and_deleted_fil
     assert_eq!(state(&mut b)["状態"],"削除承認あり・file不在・結果未確定");
     drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
     assert_eq!(state(&mut b)["状態"],"削除承認あり・file不在・結果未確定");
+    let pending=state(&mut b);
+    let recovery=json!({"要求ID":select["要求ID"],"要求hash":select["要求hash"],"削除承認監査ID":pending["削除承認監査ID"]});
+    assert!(call(&mut b,BrokerOperation::対話削除中断確認,recovery.clone(),false).body.is_none());
+    for key in ["要求ID","要求hash","削除承認監査ID","extra"] {
+        let mut wrong=recovery.clone();wrong[key]=json!("wrong");
+        assert!(call(&mut b,BrokerOperation::対話削除中断確認,wrong,true).body.is_none());
+    }
+    std::fs::write(&path,&cipher).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話削除中断確認,recovery.clone(),true).body.is_none());
+    assert_eq!(std::fs::read(&path).unwrap(),cipher);std::fs::remove_file(&path).unwrap();
+    let confirmed=accepted(call(&mut b,BrokerOperation::対話削除中断確認,recovery.clone(),true));
+    assert_eq!(confirmed["状態"],"削除中断照合済み");
+    let current=state(&mut b);assert_eq!(current["状態"],"削除中断・復旧照合済み");assert!(current["削除結果監査ID"].is_null());assert!(!current["復旧照合監査ID"].is_null());
+    assert!(call(&mut b,BrokerOperation::対話削除中断確認,recovery.clone(),true).body.is_none());
+    drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert_eq!(state(&mut b)["状態"],"削除中断・復旧照合済み");
+    std::fs::write(&path,&cipher).unwrap();assert_eq!(state(&mut b)["状態"],"削除承認あり・file残存");
+    assert!(call(&mut b,BrokerOperation::対話内容承認,target.clone(),true).body.is_none());
+    let counts=b.audit_events().iter().filter(|e|e.operation=="対話内容削除" && e.decision=="accepted").count();assert_eq!(counts,1);
     let audit_file=audit.join("audit.jsonl");std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let recovery_denied=b.削除中断照合確定("recovery-finalization-failure",confirmed);assert_eq!(recovery_denied.status,BrokerStatus::Suspended);assert!(recovery_denied.body.is_none());
     let denied=b.保管状態確定("inventory-finalization-failure",normal);assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
     assert!(call(&mut b,BrokerOperation::対話保管状態,select,true).body.is_none());
     drop(b);std::fs::remove_dir_all(root).unwrap();

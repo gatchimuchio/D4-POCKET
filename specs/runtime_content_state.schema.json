@@ -48,7 +48,8 @@
         "保存記録あり・hash不一致",
         "削除承認あり・file残存",
         "削除承認あり・file不在・結果未確定",
-        "削除確定・file不在"
+        "削除確定・file不在",
+        "削除中断・復旧照合済み"
       ]
     },
     "file存在": {
@@ -92,6 +93,13 @@
     },
     "証拠種別": {
       "const": "LIVE_RUNTIME"
+    },
+    "復旧照合監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
     }
   },
   "oneOf": [
@@ -297,6 +305,37 @@
           "type": "string"
         }
       }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "削除中断・復旧照合済み"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "string"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        },
+        "復旧照合監査ID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "復旧照合監査ID"
+      ]
     }
   ]
 }

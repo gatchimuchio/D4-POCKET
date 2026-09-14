@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "削除承認監査ID": "broker-audit-21",
+  "観測監査head": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "観測時刻": 1789000000,
+  "状態": "削除中断照合済み",
+  "証拠種別": "LIVE_RUNTIME"
+}

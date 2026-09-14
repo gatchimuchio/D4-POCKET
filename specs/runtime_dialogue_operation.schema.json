@@ -34,7 +34,8 @@
         "対話内容閲覧状態",
         "対話内容閲覧",
         "対話内容削除",
-        "対話保管状態"
+        "対話保管状態",
+        "対話削除中断確認"
       ]
     },
     "payload": {
@@ -652,6 +653,37 @@
             "要求hash": {
               "type": "string",
               "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話削除中断確認"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID",
+            "要求hash",
+            "削除承認監査ID"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "要求hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            },
+            "削除承認監査ID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
             }
           }
         }
