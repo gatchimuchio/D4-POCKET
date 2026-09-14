@@ -276,6 +276,10 @@
       "sha256": "34941dc95fc0a4680ac84e05e13659d51b2612aa150c0307ceeab10711d48741"
     },
     {
+      "path": "apps/desktop_flutter/lib/services/runtime_resource_client.dart",
+      "sha256": "11f7cb475fc2892f7a1703fccaf17ec63448a3e880617661d89962000e6f0153"
+    },
+    {
       "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
       "sha256": "b3591f9ed23cc53377d577eced58c91c3ca17e1a0682c91d20b888485b833ce0"
     },
@@ -466,6 +470,10 @@
     {
       "path": "apps/desktop_flutter/test/runtime_dialogue_test.dart",
       "sha256": "82e9a1f4ea29ef16f96a8f627e323f1145f8cda8c9d399295a3989048585f4dd"
+    },
+    {
+      "path": "apps/desktop_flutter/test/runtime_resource_test.dart",
+      "sha256": "183a32eee70fe153d817bcfe9c641fce9ae9f77239cf32e25fd75edf7e797082"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1080,6 +1088,10 @@
       "sha256": "c967e45196a190e830bfb6a5a8eec161056da01569b81c949acb98cff5a73ade"
     },
     {
+      "path": "docs/specs/runtime-resource-observation.md",
+      "sha256": "6377ab7eaa67bbef7b62e08ac9e445da31b01e944598ad454f9ede2de2fb8e28"
+    },
+    {
       "path": "docs/specs/windows-protection.md",
       "sha256": "7b0bf8261a6d79d98d60013c18177f0ec3caa5c19bedd40c40a13011b21c8af0"
     },
@@ -1444,6 +1456,14 @@
       "sha256": "6ae86b177419868c8ba1311a4bf66878f9927f925884f49914f5c4482b9b8f81"
     },
     {
+      "path": "examples/contracts/invalid/runtime_resource_observation_unknown_zero.invalid.json",
+      "sha256": "e456791378ec5dbb0c7fea45b2b7b38dfa822565793b7d5f8f85912256639fa2"
+    },
+    {
+      "path": "examples/contracts/invalid/runtime_resource_query_pid.invalid.json",
+      "sha256": "569368297b7dcd1bbc186c3dcb1bd9f28105276193a2ab4e1bb9c13e75b06359"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_result_evidence_visibility.invalid.json",
       "sha256": "723df53f33ac23d38e912626c2e7ffcb17c6d681f1725a3cdae65e730c50e5f4"
     },
@@ -1566,6 +1586,14 @@
     {
       "path": "examples/contracts/runtime_replay_response.valid.json",
       "sha256": "73c9a72e092904423b618305689b2e46d0fd79d8284da13e46da4721f27396cb"
+    },
+    {
+      "path": "examples/contracts/runtime_resource_observation.valid.json",
+      "sha256": "4e08e2985078149a39e7967b1d3166013e22844c583743c1d6353edce8bfd13a"
+    },
+    {
+      "path": "examples/contracts/runtime_resource_query.valid.json",
+      "sha256": "df2fd2cceb9228123815b4cc2b698209ecabb241ec1c873dfc56e626697da2f9"
     },
     {
       "path": "examples/contracts/runtime_result_evidence.valid.json",
@@ -1760,6 +1788,10 @@
       "sha256": "b25c28ed8703d66a912b3a17011ee83f02c6195bfb6211cecded671c396139eb"
     },
     {
+      "path": "native/rust_helper/src/broker/runtime_registry.rs",
+      "sha256": "fa83dd0cc1418e95b7835a2a7f539b8fe2983997d27149df0e22f21707b80b10"
+    },
+    {
       "path": "native/rust_helper/src/broker/store.rs",
       "sha256": "9c7fe452709cf2b9d910a77b8ad46f9404f9e01dbfe1400148705fb3b11cad8d"
     },
@@ -1836,6 +1868,10 @@
       "sha256": "71d6ec4e70c581d7ce3ef331feceb78b7183e2cdabf5514edf1f76743a8fb5a9"
     },
     {
+      "path": "native/rust_helper/tests/canonical_decimal_hash.rs",
+      "sha256": "0abbdbd3271108b144e1d938d72743cfe60b6b673c298a413d0caa33f519453c"
+    },
+    {
       "path": "native/rust_helper/tests/checkpoint.rs",
       "sha256": "a17f5d87746bebc8ec23d18dcced81fca155877cb77cf3c214db6932573f718c"
     },
@@ -1890,6 +1926,22 @@
     {
       "path": "native/windows_protection/src/lib.rs",
       "sha256": "9244d9f7ead4411cd51f01ac984ac8803afc3d55a2c09af3b4d2b1d174975a45"
+    },
+    {
+      "path": "native/windows_runtime_observation/.gitignore",
+      "sha256": "306fd52e74fca6746e12acc750f232de15e71da917756a1270d74c91f5eb7368"
+    },
+    {
+      "path": "native/windows_runtime_observation/Cargo.lock",
+      "sha256": "8aba3e4fefbbc0a89c7a2079d2ba23539afbf7fdae6e8e5bbd2088e508200455"
+    },
+    {
+      "path": "native/windows_runtime_observation/Cargo.toml",
+      "sha256": "d033e89e5d0eb1663fc2e9d1e0a7d342bfc635193899d46f166411eb63c71cc7"
+    },
+    {
+      "path": "native/windows_runtime_observation/src/lib.rs",
+      "sha256": "f39eddc164e1f26569d34529c3c49161ccb6d823d077ae101b943b4a7864cf8e"
     },
     {
       "path": "openai_submission_assets/windows_proof_pack/00_WINDOWS_PROOF_INDEX.md",
@@ -2064,6 +2116,10 @@
       "sha256": "604ff74ff0388084ac55dd7b3ded4f2d266d463b302e7672b45d4bb11d754b3a"
     },
     {
+      "path": "packages/gui_shell_ui/lib/runtime_resource_client.dart",
+      "sha256": "17119294498248b67a6a01974b9bb726a7d936337ff4974b1d32c8c92817376a"
+    },
+    {
       "path": "packages/gui_shell_ui/lib/src/broker_transport.dart",
       "sha256": "f7775e58004aec642dae0d58545f6e6d35c452c87a216dba35da23f8df9e9729"
     },
@@ -2080,6 +2136,10 @@
       "sha256": "0a06968eae2da700d9029841d6fb006e437fd4ae0e2631446a74f89f2129ba1f"
     },
     {
+      "path": "packages/gui_shell_ui/lib/src/runtime_resource_client.dart",
+      "sha256": "f90e92b128757de33d84fa0ed2111d652c4add8efed627703cd97afcfcd3de71"
+    },
+    {
       "path": "packages/gui_shell_ui/pubspec.yaml",
       "sha256": "638fd9fb9be705e9ffd766ef52ead55dd27891190337a10e46ecd6abd3c6ceb2"
     },
@@ -2090,6 +2150,10 @@
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_test.dart",
       "sha256": "782653dae4dac17a3075dc6e5a4aeef89fe44519e512702380113278cfae8eca"
+    },
+    {
+      "path": "packages/gui_shell_ui/test/runtime_resource_client_test.dart",
+      "sha256": "15926d48146fd225c34a44964636ef6bdc5dd107169ade8bf885c9920e1ac91e"
     },
     {
       "path": "packages/runtime_catalog/__init__.py",
@@ -2420,6 +2484,14 @@
       "sha256": "b7a63e9ae89d179fe638b7fb390b85cf32be26061cb21489e3dd8aefd63735d4"
     },
     {
+      "path": "specs/runtime_resource_observation.schema.json",
+      "sha256": "f95eeb4c7d9ccdfb08081c58ae6a751d3ec850f52b25da5b511738f6e7bca87c"
+    },
+    {
+      "path": "specs/runtime_resource_query.schema.json",
+      "sha256": "3edfed5369cf27d8b2b89a6a8b2528ddc8ce4a07e4224e181e2308e27965e8e3"
+    },
+    {
       "path": "specs/runtime_result_evidence.schema.json",
       "sha256": "d38e6baa42d221293c04f24956c7b1e0a302e6109cc61dcbc9500d223a2b7de8"
     },
@@ -2450,6 +2522,10 @@
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
       "sha256": "32a8b2c8aec01bdf2645aee0b6a575543201168e597c1b663278058fb6388ae6"
+    },
+    {
+      "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
+      "sha256": "0a4cf0ef4c1098a5c9c59297dd049ac7ebd340b7a113e84b628c9529d9b2643b"
     },
     {
       "path": "tooling/codegen/README.md",
