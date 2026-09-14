@@ -92,6 +92,9 @@ def type_matches(value, expected_type: str) -> bool:
 
 def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
     errors: list[str] = []
+    if "allOf" in schema:
+        for branch in schema["allOf"]:
+            errors.extend(validate_instance(value, branch, path))
     if "oneOf" in schema:
         一致数 = sum(not validate_instance(value, 分岐, path) for 分岐 in schema["oneOf"])
         if 一致数 != 1:

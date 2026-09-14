@@ -2227,6 +2227,67 @@ def 対話操作の分岐と未知fieldを検査する() -> list[str]:
     return errors
 
 
+def 履歴入力概要のhash_only境界を検査する() -> list[str]:
+    surfaces = [
+        (
+            "runtime_execution_history",
+            load_schema("runtime_execution_history.schema.json"),
+            load_contract_fixture("runtime_execution_history.valid.json"),
+            lambda value: value,
+        ),
+        (
+            "runtime_execution_history_page",
+            load_schema("runtime_execution_history_page.schema.json"),
+            load_contract_fixture("runtime_execution_history_page.valid.json"),
+            lambda value: value["entries"][0]["record"],
+        ),
+    ]
+    access_page = load_contract_fixture("runtime_execution_history_page.valid.json")
+    surfaces.append((
+        "runtime_history_access",
+        load_schema("runtime_history_access.schema.json"),
+        {
+            "grant": {
+                "approval_id": "d" * 32,
+                "runtime_id": "local",
+                "expires_at": 1,
+            },
+            "page": access_page,
+        },
+        lambda value: value["page"]["entries"][0]["record"],
+    ))
+    errors = []
+    for name, schema, valid, record_of in surfaces:
+        errors.extend(validate_instance(valid, schema))
+        legacy = copy.deepcopy(valid)
+        legacy_record = record_of(legacy)
+        legacy_record["版"] = 1
+        legacy_record.pop("入力概要")
+        errors.extend(validate_instance(legacy, schema))
+
+        invalid_cases = {
+            "入力概要欠落": lambda record: record.pop("入力概要"),
+            "表示範囲昇格": lambda record: record["入力概要"].update({"表示範囲": "full"}),
+            "追加metadata": lambda record: record["入力概要"].update({"文字数": 4}),
+            "hash不正": lambda record: record["入力概要"].update({"入力hash": "sha256:invalid"}),
+            "本文混入": lambda record: record["入力概要"].update({"本文": "漏洩"}),
+            "未知版": lambda record: record.update({"版": 3}),
+            "型違い版": lambda record: record.update({"版": "2"}),
+        }
+        for label, alter in invalid_cases.items():
+            candidate = copy.deepcopy(valid)
+            alter(record_of(candidate))
+            if not validate_instance(candidate, schema):
+                errors.append(f"{name}が版2入力概要の{label}を受理した")
+
+        v1_with_summary = copy.deepcopy(legacy)
+        v1_record = record_of(v1_with_summary)
+        v1_record["入力概要"] = copy.deepcopy(record_of(valid)["入力概要"])
+        if not validate_instance(v1_with_summary, schema):
+            errors.append(f"{name}が版1への入力概要追加を受理した")
+    return errors
+
+
 def 対話契約の関係と表示境界を検査する() -> list[str]:
     from tooling.dialogue_contract_check import 要求関係検査, 応答関係検査, 比較関係検査
 
@@ -3774,6 +3835,7 @@ def main() -> int:
         書庫展開で日本語名と内容を保持する,
         対話契約の関係と表示境界を検査する,
         対話操作の分岐と未知fieldを検査する,
+        履歴入力概要のhash_only境界を検査する,
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,

@@ -8,9 +8,11 @@ class Fixture implements BrokerTransport {
   bool revoked = false;
   bool withProof = false;
   bool withContent = false;
+  bool withInputSummary = false;
   Map<String, Object?>? sent;
   Map? lastFilter;
   void Function(Map<String, Object?>)? alterReplay;
+  void Function(Map<String, Object?>)? alterRecord;
   bool revokeDuringRead = false;
   String runtime = 'local';
   String state = '成功';
@@ -19,6 +21,30 @@ class Fixture implements BrokerTransport {
   final expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
   Map<String, Object?> get grant =>
       {'approval_id': 'a' * 32, 'runtime_id': 'local', 'expires_at': expiry};
+
+  Map<String, Object?> historyRecord() {
+    final record = <String, Object?>{
+      '版': withInputSummary ? 2 : 1,
+      '状態': state,
+      '失敗分類': null,
+      '実行記録': {
+        '要求ID': 'd' * 32,
+        '実行系ID': runtime,
+        '対話セッションID': 'e' * 32,
+        '作成時刻': 1,
+        '開始時刻': 2,
+        '終了時刻': 3,
+        '作成監査ID': 'created',
+        '開始監査ID': 'started',
+        '終了監査ID': 'ended'
+      },
+      if (withInputSummary)
+        '入力概要': {'表示範囲': 'hash_only', '入力hash': 'sha256:${'1' * 64}'}
+    };
+    alterRecord?.call(record);
+    return record;
+  }
+
   @override
   Future<Map<String, Object?>> request(String op,
       {Map<String, Object?>? payload}) async {
@@ -112,22 +138,7 @@ class Fixture implements BrokerTransport {
               '復旧対応': '接続再確認',
               '現在権限': false
             },
-            'record': {
-              '版': 1,
-              '状態': state,
-              '失敗分類': null,
-              '実行記録': {
-                '要求ID': 'd' * 32,
-                '実行系ID': runtime,
-                '対話セッションID': 'e' * 32,
-                '作成時刻': 1,
-                '開始時刻': 2,
-                '終了時刻': 3,
-                '作成監査ID': 'created',
-                '開始監査ID': 'started',
-                '終了監査ID': 'ended'
-              }
-            }
+            'record': historyRecord()
           }
         ]
       };
@@ -144,6 +155,48 @@ class Fixture implements BrokerTransport {
 }
 
 void main() {
+  test('入力概要は版2のhash_only metadataだけを受理する', () async {
+    final f = Fixture()..withInputSummary = true;
+    final c = HistoryClient(f);
+    final grant = (await c.status())!;
+    final entry = (await c.page(grant)).entries.single;
+    expect(entry.inputSummary!.hash, 'sha256:${'1' * 64}');
+    for (final alter in <void Function(Map<String, Object?>)>[
+      (v) => v.remove('入力概要'),
+      (v) => (v['入力概要'] as Map)['表示範囲'] = 'full',
+      (v) => v['入力概要'] = {
+            '表示範囲': 'hash_only',
+            '入力hash': 'sha256:${'1' * 64}',
+            '文字数': 4,
+          },
+      (v) => (v['入力概要'] as Map)['入力hash'] = 'sha256:invalid',
+      (v) => v['入力概要'] = {
+            '表示範囲': 'hash_only',
+            '入力hash': 'sha256:${'1' * 64}',
+            '本文': '漏洩',
+          },
+      (v) => v['版'] = 3,
+      (v) => v['版'] = '2',
+    ]) {
+      f.alterRecord = alter;
+      await expectLater(c.page(grant), throwsA(isA<BrokerClientException>()));
+    }
+  });
+
+  testWidgets('履歴詳細にhash_only入力概要を表示する', (tester) async {
+    final f = Fixture()..withInputSummary = true;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(ExpansionTile));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('入力概要: hash_only／sha256:${'1' * 64}'),
+        findsOneWidget);
+    expect(find.textContaining('入力本文は返しません。hashは候補照合に使えますが、本文の正しさ・現在権限は示しません。'),
+        findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('結果証跡のhashを表示し失効後は破棄する', (tester) async {
     final f = Fixture()..withProof = true;
     await tester.pumpWidget(MaterialApp(

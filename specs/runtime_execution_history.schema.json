@@ -13,7 +13,10 @@
   "additionalProperties": false,
   "properties": {
     "版": {
-      "const": 1,
+      "enum": [
+        1,
+        2
+      ],
       "type": "integer"
     },
     "状態": {
@@ -162,8 +165,71 @@
           }
         }
       ]
+    },
+    "入力概要": {
+      "title": "入力本文を含まないhash_only概要",
+      "description": "入力UTF-8 bytesのhashだけ。本文、現在権限、入力内容の正しさを証明しない。",
+      "type": "object",
+      "required": [
+        "表示範囲",
+        "入力hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "表示範囲": {
+          "const": "hash_only"
+        },
+        "入力hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
     }
   },
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "版",
+            "状態",
+            "失敗分類",
+            "実行記録"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "版": {
+              "const": 1
+            },
+            "状態": {},
+            "失敗分類": {},
+            "実行記録": {}
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "版",
+            "状態",
+            "失敗分類",
+            "実行記録",
+            "入力概要"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "版": {
+              "const": 2
+            },
+            "状態": {},
+            "失敗分類": {},
+            "実行記録": {},
+            "入力概要": {}
+          }
+        }
+      ]
+    }
+  ],
   "oneOf": [
     {
       "properties": {

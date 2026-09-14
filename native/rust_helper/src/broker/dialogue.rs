@@ -503,7 +503,8 @@ impl 対話制御 {
                 Some(Err(e)) => (if *e == 対話失敗::取消 {"中止"} else {"失敗"}, Some(e.分類())),
                 None => (work.状態, None),
             };
-            let body = json!({"版":1, "状態":状態, "失敗分類":失敗分類, "実行記録":実行記録(work)}).to_string();
+            let body = json!({"版":2, "状態":状態, "失敗分類":失敗分類,
+                "実行記録":実行記録(work), "入力概要":入力概要(work)}).to_string();
             let hash = sha256_tagged(body.as_bytes());
             if work.保存済み記録hash.as_ref() == Some(&hash) { continue; }
             if 監査(&format!("対話実行記録:{body}"), &work.要求.要求ID, &hash).is_err() {
@@ -620,6 +621,11 @@ fn 実行記録(work: &作業) -> Value {
         "開始時刻": work.開始時刻, "終了時刻": work.終了時刻,
         "作成監査ID": work.作成監査ID, "開始監査ID": work.開始監査ID,
         "終了監査ID": work.終了監査ID})
+}
+
+/// 永続履歴のmetadata用。入力本文を復元・公開する権限や正しさの証拠にはしない。
+fn 入力概要(work: &作業) -> Value {
+    json!({"表示範囲":"hash_only", "入力hash":sha256_tagged(work.要求.入力.as_bytes())})
 }
 
 fn 結果検査(要求: &対話要求, v: 実行結果) -> Result<実行結果, 対話失敗> {
@@ -885,7 +891,10 @@ mod tests {
             c.操作("対話取得", &json!({"要求ID":p["要求ID"]}), false, 101, &mut audit).unwrap();
         }
         assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["版"], 2);
         assert_eq!(records[0]["状態"], "承認待ち");
+        assert_eq!(records[0]["入力概要"], json!({"表示範囲":"hash_only",
+            "入力hash":sha256_tagged("保存しない本文".as_bytes())}));
         assert!(!records[0].to_string().contains("保存しない本文"));
         assert_eq!(c.操作("対話承認", &承認(&p, "full"), true, 110,
             &mut |reason,_,_| if reason.starts_with("対話実行記録:") {Err(対話失敗::監査失敗)} else {Ok("approved-event".into())}), Err(対話失敗::監査失敗));

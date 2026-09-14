@@ -5,7 +5,7 @@
       "audit_event_id": "history",
       "event_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "record": {
-        "版": 1,
+        "版": 2,
         "状態": "承認待ち",
         "失敗分類": null,
         "実行記録": {
@@ -18,6 +18,10 @@
           "作成監査ID": "audit-created",
           "開始監査ID": null,
           "終了監査ID": null
+        },
+        "入力概要": {
+          "表示範囲": "hash_only",
+          "入力hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         }
       },
       "result_evidence": null

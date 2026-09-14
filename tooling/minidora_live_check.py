@@ -242,6 +242,11 @@ server.serve_forever()
                         time.sleep(0.02)
                     raise RuntimeError("対話期限超過")
 
+                input_sentinel = "こんにちは c2-history-input-sentinel-42e891bc-13e5-4e71-9b1e-62c8467a0d3f"
+                expected_input_summary = {
+                    "表示範囲": "hash_only",
+                    "入力hash": "sha256:" + hashlib.sha256(input_sentinel.encode("utf-8")).hexdigest(),
+                }
                 left, p = 対話("left", "full")
                 right, q = 対話("right", "hash_only")
                 initial_pending = (p, q)
@@ -359,6 +364,36 @@ server.serve_forever()
 
                 else:
                     assert 操作(owner, "対話内容保存", save_select)["status"] == "rejected"
+                _, summary_pending = 対話("left", "full", input_sentinel)
+                assert 完了(summary_pending)["状態"] == "成功"
+                expected_history[summary_pending["要求ID"]] = "成功"
+                input_summary_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "filter": {"要求ID": summary_pending["要求ID"]}})
+                summary_history_schema = json.loads((ROOT / "specs/runtime_execution_history_page.schema.json").read_text(encoding="utf-8"))
+                assert not validate_instance(input_summary_page, summary_history_schema)
+                assert len(input_summary_page["entries"]) == 1
+                input_summary_record = input_summary_page["entries"][0]["record"]
+                assert input_summary_record["実行記録"]["要求ID"] == summary_pending["要求ID"]
+                assert input_summary_record["版"] == 2
+                assert input_summary_record["入力概要"] == expected_input_summary
+                assert input_sentinel not in json.dumps(input_summary_page, ensure_ascii=False)
+                summary_grant = 成功(owner, "対話履歴承認", {"実行系ID": "left"})["grant"]["approval_id"]
+                summary_view = 成功(normal, "対話履歴閲覧", {
+                    "approval_id": summary_grant,
+                    "query": {
+                        "after": 0,
+                        "limit": 1,
+                        "latest_per_request": True,
+                        "filter": {"実行系ID": "left", "要求ID": summary_pending["要求ID"]},
+                    },
+                })
+                summary_access_schema = json.loads((ROOT / "specs/runtime_history_access.schema.json").read_text(encoding="utf-8"))
+                assert not validate_instance(summary_view, summary_access_schema)
+                summary_entries = summary_view["page"]["entries"]
+                assert len(summary_entries) == 1
+                assert summary_entries[0]["record"]["実行記録"]["要求ID"] == summary_pending["要求ID"]
+                assert summary_entries[0]["record"]["入力概要"] == expected_input_summary
+                assert input_sentinel not in json.dumps(summary_view, ensure_ascii=False)
+                成功(owner, "対話履歴失効", {})
                 parent_page = 成功(owner, "対話履歴一覧", {"after": 0, "limit": 1, "latest_per_request": True, "filter": {"要求ID": p["要求ID"]}})
                 parent = parent_page["entries"][0]
                 replay_grant = 成功(owner, "対話履歴承認", {"実行系ID": "left"})["grant"]["approval_id"]
@@ -418,7 +453,10 @@ server.serve_forever()
                 assert len(grouped_ids) == len(set(grouped_ids)) and not grouped["has_more"]
                 grouped_states = {e["record"]["実行記録"]["要求ID"]: e["record"]["状態"] for e in grouped_records}
                 assert all(grouped_states.get(k) == v for k, v in expected_history.items())
-                audit_events = [json.loads(line) for line in (root / "store/audit.jsonl").read_text(encoding="utf-8").splitlines()]
+                audit_jsonl = (root / "store/audit.jsonl").read_text(encoding="utf-8")
+                assert input_sentinel not in audit_jsonl
+                audit_events = [json.loads(line) for line in audit_jsonl.splitlines()]
+                assert input_sentinel not in json.dumps(audit_events, ensure_ascii=False)
                 proof_schema = json.loads((ROOT / "specs/runtime_result_evidence.schema.json").read_text(encoding="utf-8"))
                 for pending, result in zip(initial_pending, initial_results):
                     found = [e for e in audit_events if e["request_id"] == pending["要求ID"] and e["reason"].startswith("対話結果証跡:")]

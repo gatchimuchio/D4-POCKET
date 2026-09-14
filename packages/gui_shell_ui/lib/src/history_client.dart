@@ -160,10 +160,17 @@ class HistoryClient {
           !ids.add(e['audit_event_id'] as String)) {
         _reject();
       }
-      final saved = _shape(e['record'], {'版', '状態', '失敗分類', '実行記録'});
+      if (e['record'] is! Map) _reject();
+      final version = (e['record'] as Map)['版'];
+      final saved = _shape(
+          e['record'],
+          switch (version) {
+            1 => {'版', '状態', '失敗分類', '実行記録'},
+            2 => {'版', '状態', '失敗分類', '実行記録', '入力概要'},
+            _ => <String>{}
+          });
       final record = saved['実行記録'];
-      if (saved['版'] != 1 ||
-          record is! Map ||
+      if (record is! Map ||
           !RuntimeDialogueClient.validId(record['要求ID']) ||
           !RuntimeDialogueClient.validId(record['対話セッションID'])) {
         _reject();
@@ -202,6 +209,8 @@ class HistoryClient {
       if (!valid || (state != null && s != state)) {
         _reject();
       }
+      final inputSummary =
+          version == 2 ? HistoryInputSummary.parse(saved['入力概要']) : null;
       final context = HistoryAuditContext.parse(e['audit_context'], detail);
       parsed.add(HistoryEntry(
           s as String,
@@ -209,6 +218,7 @@ class HistoryClient {
           e['audit_event_id'] as String,
           e['event_hash'] as String,
           detail,
+          inputSummary,
           context,
           HistoryResultEvidence.parse(e['result_evidence'], detail, context, s),
           HistoryContentReceipt.parse(
@@ -316,14 +326,37 @@ class HistoryGrant {
 }
 
 class HistoryEntry {
-  const HistoryEntry(this.state, this.failure, this.auditId, this.eventHash,
-      this.record, this.context, this.evidence, this.receipt);
+  const HistoryEntry(
+      this.state,
+      this.failure,
+      this.auditId,
+      this.eventHash,
+      this.record,
+      this.inputSummary,
+      this.context,
+      this.evidence,
+      this.receipt);
   final String state, auditId, eventHash;
   final String? failure;
   final DialogueExecutionRecord record;
+  final HistoryInputSummary? inputSummary;
   final HistoryAuditContext context;
   final HistoryResultEvidence? evidence;
   final HistoryContentReceipt? receipt;
+}
+
+/// 履歴metadataのhash_only入力概要。入力本文や現在権限を主張しない。
+class HistoryInputSummary {
+  const HistoryInputSummary(this.hash);
+  final String hash;
+
+  factory HistoryInputSummary.parse(Object? raw) {
+    final m = _shape(raw, {'表示範囲', '入力hash'});
+    if (m['表示範囲'] != 'hash_only' || !_hash(m['入力hash'])) {
+      _reject();
+    }
+    return HistoryInputSummary(m['入力hash'] as String);
+  }
 }
 
 class HistoryAuditContext {

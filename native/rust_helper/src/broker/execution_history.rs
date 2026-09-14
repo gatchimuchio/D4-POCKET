@@ -87,11 +87,16 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
         }
         let value: Value = super::json_input::read_unique(body).map_err(|_| "履歴形式が不正")?;
         let object = value.as_object().ok_or("履歴形式が不正")?;
-        if object.len() != 4
-            || ["版", "状態", "失敗分類", "実行記録"]
+        let version = value["版"].as_i64();
+        let keys: &[&str] = match version {
+            Some(1) => &["版", "状態", "失敗分類", "実行記録"],
+            Some(2) => &["版", "状態", "失敗分類", "実行記録", "入力概要"],
+            _ => return Err("履歴形式が不正"),
+        };
+        if object.len() != keys.len()
+            || keys
                 .iter()
                 .any(|k| !object.contains_key(*k))
-            || value["版"] != 1
             || !["承認待ち", "実行中", "成功", "保留", "失敗", "中止"]
                 .contains(&value["状態"].as_str().unwrap_or(""))
             || !(value["失敗分類"].is_null()
@@ -109,6 +114,9 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
                 .contains(&value["失敗分類"].as_str().unwrap_or("")))
         {
             return Err("履歴形式が不正");
+        }
+        if version == Some(2) {
+            入力概要検査(&value["入力概要"])?;
         }
         let record = value["実行記録"].as_object().ok_or("実行記録が不正")?;
         let keys = [
@@ -227,6 +235,19 @@ pub(crate) fn page(log: &BrokerAuditLog, query: Query) -> Result<Value, &'static
     Ok(
         json!({"version":1,"entries":entries,"next_cursor":next,"has_more":more,"head_hash":events.last().map(|v| &v.event_hash)}),
     )
+}
+
+fn 入力概要検査(value: &Value) -> Result<(), &'static str> {
+    let summary = value.as_object().ok_or("入力概要が不正")?;
+    let keys = ["表示範囲", "入力hash"];
+    if summary.len() != keys.len() || keys.iter().any(|key| !summary.contains_key(*key))
+        || value["表示範囲"] != "hash_only"
+        || !value["入力hash"].as_str().and_then(|hash| hash.strip_prefix("sha256:")).is_some_and(|hex|
+            hex.len() == 64 && hex.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)))
+    {
+        return Err("入力概要が不正");
+    }
+    Ok(())
 }
 
 fn content_receipt(events: &[super::audit::BrokerAuditEvent], archive: &Value) -> Result<Value, &'static str> {
@@ -534,6 +555,50 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn 版2の入力概要はhash_onlyの構造だけを許可し版1履歴を保持する() {
+        for case in 0..8 {
+            let mut log = BrokerAuditLog::default();
+            let request = "a".repeat(32);
+            let created = log.append(
+                &request,
+                "対話送信",
+                "recorded",
+                "対話承認待ち作成",
+                "INTERNAL_STATE",
+                &sha256_tagged(b"input"),
+            );
+            let mut archive = json!({"版":2,"状態":"承認待ち","失敗分類":null,
+                "実行記録":{"要求ID":request,"実行系ID":"local","対話セッションID":"b".repeat(32),
+                "作成時刻":100,"開始時刻":null,"終了時刻":null,"作成監査ID":created.event_id,
+                "開始監査ID":null,"終了監査ID":null},
+                "入力概要":{"表示範囲":"hash_only","入力hash":sha256_tagged("入力".as_bytes())}});
+            match case {
+                1 => { archive.as_object_mut().unwrap().remove("入力概要"); }
+                2 => archive["入力概要"]["表示範囲"] = json!("full"),
+                3 => archive["入力概要"]["文字数"] = json!(2),
+                4 => archive["入力概要"]["入力hash"] = json!("sha256:invalid"),
+                5 => archive["入力概要"]["本文"] = json!("公開しない"),
+                6 => archive["版"] = json!(3),
+                7 => archive["版"] = json!("2"),
+                _ => (),
+            }
+            let body = archive.to_string();
+            log.append(&request, "対話送信", "recorded", &format!("対話実行記録:{body}"),
+                "INTERNAL_STATE", &sha256_tagged(body.as_bytes()));
+            assert_eq!(page(&log, Query { limit: 1, ..Default::default() }).is_ok(), case == 0, "case={case}");
+        }
+
+        let mut log = BrokerAuditLog::default();
+        let request = "c".repeat(32);
+        let created = log.append(&request, "対話送信", "recorded", "対話承認待ち作成", "INTERNAL_STATE", &sha256_tagged(b"legacy"));
+        let legacy = json!({"版":1,"状態":"承認待ち","失敗分類":null,"実行記録":{
+            "要求ID":request,"実行系ID":"local","対話セッションID":"d".repeat(32),"作成時刻":100,
+            "開始時刻":null,"終了時刻":null,"作成監査ID":created.event_id,"開始監査ID":null,"終了監査ID":null}}).to_string();
+        log.append(&request, "対話送信", "recorded", &format!("対話実行記録:{legacy}"), "INTERNAL_STATE", &sha256_tagged(legacy.as_bytes()));
+        assert_eq!(page(&log, Query { limit: 1, ..Default::default() }).unwrap()["entries"][0]["record"]["版"], 1);
     }
 }
 
