@@ -1,0 +1,49 @@
+{
+  "name": "runtime_resource_observation_decimal",
+  "description": "Rust Brokerが返す実行系資源観測bodyの小数正本化相互運用固定vector。小数はRustのJSON表記を保持する。",
+  "body": {
+    "版": 1,
+    "実行系ID": "local",
+    "観測時刻UnixMillis": 1700000000000,
+    "観測監査ID": "resource-observation-decimal-1",
+    "結合": {
+      "状態": "bound",
+      "根拠": "loopback_tcp_listener_owner_pid",
+      "PID": 4242,
+      "PID作成時刻UnixMillis": 1699999999000,
+      "登録時刻UnixMillis": 1699999998000,
+      "登録監査ID": "resource-registration-1"
+    },
+    "統治": {
+      "能力ID": "runtime.resource.observe",
+      "権限ID": "permission.runtime.resource.observe",
+      "承認状態": "not_required",
+      "復旧ID": "recover-runtime-resource-binding"
+    },
+    "計測": {
+      "稼働時間Millis": {"状態": "measured", "値": 2000, "証拠種別": "LIVE_RUNTIME"},
+      "CPU累積時間Millis": {"状態": "measured", "値": 1250, "証拠種別": "LIVE_RUNTIME"},
+      "CPU利用率Percent": {"状態": "measured", "値": 1e-6, "証拠種別": "LIVE_RUNTIME"},
+      "RAMWorkingSetBytes": {"状態": "measured", "値": 10485760, "証拠種別": "LIVE_RUNTIME"},
+      "RAMPrivateBytes": {"状態": "measured", "値": 8388608, "証拠種別": "LIVE_RUNTIME"},
+      "DiskIOBytes": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "collector未接続"},
+      "NetworkIOBytes": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "collector未接続"},
+      "GPU利用率Percent": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "collector未接続"},
+      "VRAMBytes": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "collector未接続"},
+      "処理中要求数": {"状態": "measured", "値": 0, "証拠種別": "INTERNAL_STATE"},
+      "平均応答Millis": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "高精度応答時計未接続"},
+      "失敗要求数": {"状態": "measured", "値": 1, "証拠種別": "INTERNAL_STATE"}
+    },
+    "短期履歴": [
+      {
+        "観測時刻UnixMillis": 1699999999900,
+        "CPU利用率Percent": {"状態": "measured", "値": 0.5, "証拠種別": "LIVE_RUNTIME"},
+        "RAMWorkingSetBytes": {"状態": "measured", "値": 10485760, "証拠種別": "LIVE_RUNTIME"},
+        "NetworkIOBytes": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "collector未接続"},
+        "平均応答Millis": {"状態": "unknown", "値": null, "証拠種別": "INTERNAL_STATE", "理由": "高精度応答時計未接続"},
+        "エラー率Percent": {"状態": "measured", "値": 33.333333333333336, "証拠種別": "INTERNAL_STATE"}
+      }
+    ]
+  },
+  "expected_rust_payload_hash": "sha256:91cf11108b693bd91be25cd97583e0b20da9fe53a3e5be52b283538ad79a3d1c"
+}

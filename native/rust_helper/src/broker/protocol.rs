@@ -14,7 +14,10 @@ use crate::broker::authority::{
     project_approval_content, verify_audit_chain, BrokerAuthorityRegistry,
 };
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
-use crate::broker::dialogue::{対話制御, 対話失敗, 実行系Adapter};
+use crate::broker::dialogue::{実行系ID妥当, 対話制御, 対話失敗, 実行系Adapter};
+use crate::broker::runtime_registry::{
+    ResourceObservationError, RuntimeResourceRegistry,
+};
 use std::sync::Arc;
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
@@ -23,6 +26,15 @@ const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 const ZERO_PAYLOAD_HASH: &str =
     "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 実行系資源観測指定 {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "実行系ID")]
+    runtime_id: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerPersistenceMode {
@@ -187,6 +199,8 @@ pub enum BrokerOperation {
     NormalizePayload,
     #[serde(rename = "実行系列挙")]
     実行系列挙,
+    #[serde(rename = "実行系資源観測")]
+    実行系資源観測,
     #[serde(rename = "対話開始")]
     対話開始,
     #[serde(rename = "対話送信")]
@@ -260,6 +274,7 @@ impl BrokerOperation {
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
+            BrokerOperation::実行系資源観測 => "実行系資源観測",
             BrokerOperation::対話開始 => "対話開始",
             BrokerOperation::対話送信 => "対話送信",
             BrokerOperation::対話取得 => "対話取得",
@@ -478,6 +493,7 @@ pub struct Broker {
     audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
+    資源観測: RuntimeResourceRegistry,
     履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
@@ -498,6 +514,7 @@ impl Broker {
             audit_log: BrokerAuditLog::default(),
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            資源観測: RuntimeResourceRegistry::default(),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -535,6 +552,7 @@ impl Broker {
             audit_log: persistent_state.audit_log,
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
+            資源観測: RuntimeResourceRegistry::default(),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -553,7 +571,29 @@ impl Broker {
     }
 
     pub fn 実行系登録(&mut self, 名前: &str, adapter: Arc<dyn 実行系Adapter>) -> Result<(), 対話失敗> {
-        self.対話.登録(名前, adapter)
+        let 観測対象 = adapter.観測対象();
+        self.対話.登録(名前, adapter)?;
+        let 登録監査 = match self.append_audit(
+            名前,
+            "実行系資源登録",
+            "recorded",
+            "実行系資源観測はloopback listener所有processへ限定して登録",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(名前.as_bytes()),
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                self.対話.直後登録取消(名前);
+                return Err(対話失敗::監査失敗);
+            }
+        };
+        self.資源観測.register(
+            名前,
+            観測対象,
+            self.current_epoch_millis(),
+            登録監査.event_id,
+        );
+        Ok(())
     }
 
     pub(crate) fn owner要求処理(&mut self, input: &str) -> BrokerResponse {
@@ -700,6 +740,7 @@ impl Broker {
         match envelope.operation.unwrap() {
             operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::実行系資源観測 => self.実行系資源観測要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -1080,6 +1121,117 @@ impl Broker {
             }
     }
 
+    fn 実行系資源観測要求処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::実行系資源観測.as_str();
+        let query: 実行系資源観測指定 = match serde_json::from_value::<実行系資源観測指定>(payload.clone()) {
+            Ok(query) if query.version == 1 && 実行系ID妥当(&query.runtime_id) => query,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation,
+                    "要求不正",
+                    "実行系資源観測は版と実行系IDだけを受け付けます",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let _initial = match self.append_audit(
+            request_id,
+            operation,
+            "received",
+            "Capability=runtime.resource.observe Permission=permission.runtime.resource.observe Approval=not_required Recovery=recover-runtime-resource-binding",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
+        let stats = self.対話.資源統計(&query.runtime_id);
+        let mut observation = match self.資源観測.observe(
+            &query.runtime_id,
+            stats,
+            self.current_epoch_millis(),
+        ) {
+            Ok(observation) => observation,
+            Err(ResourceObservationError::UnknownRuntime) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation,
+                    "実行系不在",
+                    "登録済み実行系だけを資源観測できます",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let observation_audit_id = self.audit_log.next_event_id();
+        let Some(body) = observation.body.as_object_mut() else {
+            self.資源観測.clear();
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_resource_observation_invalid",
+                "実行系資源観測の内部構造を確定できません",
+            );
+        };
+        body.insert(
+            "観測監査ID".to_string(),
+            Value::String(observation_audit_id.clone()),
+        );
+        let observation_hash = canonical_payload_hash(Some(&observation.body));
+        let accepted = match self.append_audit(
+            request_id,
+            operation,
+            "accepted",
+            "実行系資源観測結果を確定。観測値は権限や実行可能性を生成しない",
+            observation.evidence_source,
+            &observation_hash,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
+        if accepted.event_id != observation_audit_id {
+            self.資源観測.clear();
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_resource_observation_audit_mismatch",
+                "実行系資源観測の監査IDを確定できません",
+            );
+        }
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: observation.evidence_source.to_string(),
+            audit_event_id: accepted.event_id,
+            error: None,
+            health: None,
+            body: Some(observation.body),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
     fn 対話要求処理(&mut self, request_id: &str, operation: BrokerOperation, payload: &Value, owner: bool, payload_hash: &str) -> BrokerResponse {
         if !self.state_store.persistence_ready() {
             return self.reject_with_payload_hash(request_id, operation.as_str(), "broker_persistence_unavailable", "対話には永続監査が必要", true, payload_hash);
@@ -1135,6 +1287,10 @@ impl Broker {
     fn current_epoch_seconds(&self) -> i64 {
         self.current_epoch_seconds_override
             .unwrap_or_else(current_epoch_seconds)
+    }
+
+    fn current_epoch_millis(&self) -> i64 {
+        self.current_epoch_seconds().max(0).saturating_mul(1_000)
     }
 
     fn accept_health(&mut self, request_id: &str, payload_hash: &str) -> BrokerResponse {
@@ -1470,13 +1626,18 @@ impl Broker {
         );
         if let Err(error) = self.state_store.append_audit_event(&event) {
             self.作業領域 = Default::default();
+            self.資源観測.clear();
             #[cfg(windows)]
             self.内容閲覧.revoke();
             return Err(error);
         }
-        self.audit_log
-            .push_verified(event.clone())
-            .map_err(BrokerStoreError::TamperedAuditState)?;
+        if let Err(error) = self.audit_log.push_verified(event.clone()) {
+            self.作業領域 = Default::default();
+            self.資源観測.clear();
+            #[cfg(windows)]
+            self.内容閲覧.revoke();
+            return Err(BrokerStoreError::TamperedAuditState(error));
+        }
         Ok(event)
     }
 
@@ -1885,6 +2046,53 @@ mod tests {
         )
     }
 
+    fn resource_request(
+        request_id: &str,
+        session_id: &str,
+        nonce: &str,
+        payload: Value,
+    ) -> BrokerRequestEnvelope {
+        let mut request = BrokerRequestEnvelope::command_envelope_at(
+            request_id,
+            session_id,
+            nonce,
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        request.operation = Some(BrokerOperation::実行系資源観測);
+        request.payload = Some(payload);
+        request.refresh_payload_hash();
+        request
+    }
+
+    #[cfg(windows)]
+    fn resource_broker_with_live_loopback_listener() -> (Broker, std::net::TcpListener) {
+        use std::net::{Ipv4Addr, TcpListener};
+        use std::thread;
+        use std::time::Duration;
+
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = match listener.local_addr().unwrap() {
+            std::net::SocketAddr::V4(address) => address,
+            std::net::SocketAddr::V6(_) => panic!("IPv4 listenerからIPv6 addressが返った"),
+        };
+        let mut visible = false;
+        for _ in 0..50 {
+            match gui_shell_windows_runtime_observation::loopback_tcp_listener_owner_pid(address) {
+                Ok(Some(pid)) if pid == std::process::id() => {
+                    visible = true;
+                    break;
+                }
+                Ok(_) => thread::sleep(Duration::from_millis(10)),
+                Err(error) => panic!("loopback listener所有processの照合に失敗: {error:?}"),
+            }
+        }
+        assert!(visible, "登録前にloopback listener所有processを確認できなかった");
+        let mut broker = Broker::new("resource-session");
+        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        broker.実行系登録("local", Arc::new(adapter)).unwrap();
+        (broker, listener)
+    }
+
     fn persistence_required_broker() -> Broker {
         let mut broker = Broker::new_requiring_persistence("session-1");
         broker.current_epoch_seconds_override =
@@ -1964,6 +2172,247 @@ mod tests {
             .iter()
             .filter_map(|error| error.get("code").and_then(serde_json::Value::as_str))
             .collect()
+    }
+
+    #[test]
+    fn resource_observation_rejects_runtime_id_outside_contract_before_registry_lookup() {
+        let mut broker = Broker::new("resource-id-session");
+        let cases = vec![
+            ("empty", String::new()),
+            ("too-long", "a".repeat(129)),
+            ("leading-dot", ".local".to_string()),
+            ("leading-underscore", "_local".to_string()),
+            ("space", "local runtime".to_string()),
+            ("newline", "local\nnext".to_string()),
+            ("non-ascii", "実行系".to_string()),
+            ("pid-like", "pid:16496".to_string()),
+            ("path", "local/..".to_string()),
+        ];
+        for (index, (name, runtime_id)) in cases.into_iter().enumerate() {
+            let request_id = format!("resource-invalid-id-{index}");
+            let nonce = format!("resource-invalid-id-nonce-{index}");
+            let response = broker.handle(resource_request(
+                &request_id,
+                "resource-id-session",
+                &nonce,
+                json!({"版": 1, "実行系ID": runtime_id}),
+            ));
+            assert_eq!(response.status, BrokerStatus::Rejected, "case: {name}");
+            assert_eq!(response.error.unwrap().code, "要求不正", "case: {name}");
+            assert!(
+                !broker
+                    .audit_events()
+                    .iter()
+                    .any(|event| event.request_id == request_id && event.decision == "received"),
+                "契約外の実行系IDを通常観測として受信記録しない: {name}"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_resource_observation_binds_only_registered_loopback_owner_and_never_substitutes_unknown_metrics() {
+        use std::thread;
+        use std::time::Duration;
+
+        let (mut broker, _listener) = resource_broker_with_live_loopback_listener();
+        let first = broker.handle(resource_request(
+            "resource-first",
+            "resource-session",
+            "resource-nonce-first",
+            json!({"版": 1, "実行系ID": "local"}),
+        ));
+        assert_eq!(first.status, BrokerStatus::Accepted);
+        assert_eq!(first.operation, "実行系資源観測");
+        assert_eq!(first.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
+        let first_body = first.body.unwrap();
+        assert_eq!(first_body["観測監査ID"].as_str(), Some(first.audit_event_id.as_str()));
+        let first_audit = broker.audit_events().last().unwrap();
+        assert_eq!(first_audit.event_id, first.audit_event_id);
+        assert_eq!(
+            first_audit.payload_hash,
+            canonical_payload_hash(Some(&first_body)),
+            "accepted監査eventは観測body全体を結合する"
+        );
+        assert_eq!(first_body["結合"]["状態"], "bound");
+        assert_eq!(first_body["結合"]["PID"].as_u64(), Some(u64::from(std::process::id())));
+        assert_eq!(first_body["統治"]["能力ID"], "runtime.resource.observe");
+        assert_eq!(first_body["計測"]["稼働時間Millis"]["状態"], "measured");
+        assert_eq!(first_body["計測"]["RAMWorkingSetBytes"]["状態"], "measured");
+        assert_eq!(first_body["計測"]["CPU利用率Percent"]["状態"], "unknown");
+        for field in [
+            "DiskIOBytes",
+            "NetworkIOBytes",
+            "GPU利用率Percent",
+            "VRAMBytes",
+            "平均応答Millis",
+        ] {
+            assert_eq!(first_body["計測"][field]["状態"], "unknown");
+            assert!(first_body["計測"][field]["値"].is_null());
+            assert_eq!(first_body["計測"][field]["証拠種別"], "INTERNAL_STATE");
+        }
+
+        thread::sleep(Duration::from_millis(40));
+        let second = broker.handle(resource_request(
+            "resource-second",
+            "resource-session",
+            "resource-nonce-second",
+            json!({"版": 1, "実行系ID": "local"}),
+        ));
+        assert_eq!(second.status, BrokerStatus::Accepted);
+        let second_body = second.body.unwrap();
+        assert_eq!(
+            second_body["計測"]["CPU利用率Percent"]["状態"],
+            "measured",
+            "second CPU observation: {:?}",
+            second_body["計測"]["CPU利用率Percent"],
+        );
+        let cpu_percent = second_body["計測"]["CPU利用率Percent"]["値"]
+            .as_f64()
+            .expect("CPU利用率Percentは有限numberで返す");
+        assert!((0.0..=100.0).contains(&cpu_percent));
+        assert_eq!(second_body["短期履歴"].as_array().unwrap().len(), 2);
+
+        let caller_pid = broker.handle(resource_request(
+            "resource-caller-pid",
+            "resource-session",
+            "resource-nonce-caller-pid",
+            json!({"版": 1, "実行系ID": "local", "PID": std::process::id()}),
+        ));
+        assert_eq!(caller_pid.status, BrokerStatus::Rejected);
+        assert_eq!(caller_pid.error.unwrap().code, "要求不正");
+
+        let unknown_runtime = broker.handle(resource_request(
+            "resource-unknown-runtime",
+            "resource-session",
+            "resource-nonce-unknown-runtime",
+            json!({"版": 1, "実行系ID": "other"}),
+        ));
+        assert_eq!(unknown_runtime.status, BrokerStatus::Rejected);
+        assert_eq!(unknown_runtime.error.unwrap().code, "実行系不在");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_resource_observation_invalidates_when_registered_listener_disappears() {
+        use std::thread;
+        use std::time::Duration;
+
+        let (mut broker, listener) = resource_broker_with_live_loopback_listener();
+        let initial = broker.handle(resource_request(
+            "resource-listener-present",
+            "resource-session",
+            "resource-listener-present-nonce",
+            json!({"版": 1, "実行系ID": "local"}),
+        ));
+        assert_eq!(initial.status, BrokerStatus::Accepted);
+        assert_eq!(initial.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
+        drop(listener);
+
+        let mut invalidated = None;
+        for attempt in 0..50 {
+            let request_id = format!("resource-listener-gone-{attempt}");
+            let nonce = format!("resource-listener-gone-nonce-{attempt}");
+            let response = broker.handle(resource_request(
+                &request_id,
+                "resource-session",
+                &nonce,
+                json!({"版": 1, "実行系ID": "local"}),
+            ));
+            if response
+                .body
+                .as_ref()
+                .is_some_and(|body| body["結合"]["状態"] == "binding_mismatch")
+            {
+                invalidated = Some(response);
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        let invalidated = invalidated.expect("listener消失後に登録済みPIDの値を返し続けた");
+        assert_eq!(invalidated.status, BrokerStatus::Accepted);
+        assert_eq!(invalidated.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let body = invalidated.body.unwrap();
+        assert_eq!(body["結合"]["状態"], "binding_mismatch");
+        assert!(body["結合"]["PID"].is_null());
+        assert!(body["結合"]["PID作成時刻UnixMillis"].is_null());
+        assert_eq!(body["短期履歴"], json!([]));
+        assert!(body["計測"].as_object().unwrap().values().all(|metric| {
+            metric["状態"] == "unknown" && metric["値"].is_null()
+        }));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn resource_observation_audit_failure_suspends_and_clears_registered_binding() {
+        use std::net::{Ipv4Addr, TcpListener};
+
+        let store = temp_store_dir("resource-audit-failure");
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let mut broker = Broker::new_persistent("resource-audit-session", &store).unwrap();
+        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        broker.実行系登録("local", Arc::new(adapter)).unwrap();
+
+        let audit_path = store.join("audit.jsonl");
+        let saved_audit_path = store.join("audit.saved");
+        fs::rename(&audit_path, &saved_audit_path).unwrap();
+        fs::create_dir(&audit_path).unwrap();
+        let failed = broker.handle(resource_request(
+            "resource-audit-failure",
+            "resource-audit-session",
+            "resource-audit-failure-nonce",
+            json!({"版": 1, "実行系ID": "local"}),
+        ));
+        assert_eq!(failed.status, BrokerStatus::Suspended);
+        assert!(failed.body.is_none());
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved_audit_path, &audit_path).unwrap();
+
+        let after_repair = broker.handle(resource_request(
+            "resource-audit-after-repair",
+            "resource-audit-session",
+            "resource-audit-after-repair-nonce",
+            json!({"版": 1, "実行系ID": "local"}),
+        ));
+        assert_eq!(after_repair.status, BrokerStatus::Rejected);
+        assert_eq!(after_repair.error.unwrap().code, "実行系不在");
+        drop(broker);
+        drop(listener);
+        fs::remove_dir_all(store).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn runtime_registration_audit_failure_rolls_back_the_dialogue_adapter() {
+        use std::net::{Ipv4Addr, TcpListener};
+
+        let store = temp_store_dir("runtime-registration-audit-failure");
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let mut broker = Broker::new_persistent("registration-audit-session", &store).unwrap();
+
+        let audit_path = store.join("audit.jsonl");
+        let saved_audit_path = store.join("audit.saved");
+        fs::rename(&audit_path, &saved_audit_path).unwrap();
+        fs::create_dir(&audit_path).unwrap();
+
+        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        assert_eq!(
+            broker.実行系登録("local", Arc::new(adapter)),
+            Err(対話失敗::監査失敗)
+        );
+        assert!(
+            !broker.対話.登録済み("local"),
+            "監査へ記録できない実行系adapterを対話registryへ残さない"
+        );
+
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved_audit_path, &audit_path).unwrap();
+        drop(broker);
+        drop(listener);
+        fs::remove_dir_all(store).unwrap();
     }
 
     #[test]

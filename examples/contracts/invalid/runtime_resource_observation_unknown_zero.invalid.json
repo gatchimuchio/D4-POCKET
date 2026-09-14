@@ -1,0 +1,88 @@
+{
+  "版": 1,
+  "実行系ID": "left",
+  "観測時刻UnixMillis": 1789393500000,
+  "観測監査ID": "resource-observation-42",
+  "結合": {
+    "状態": "bound",
+    "根拠": "loopback_tcp_listener_owner_pid",
+    "PID": 4321,
+    "PID作成時刻UnixMillis": 1789393200000,
+    "登録時刻UnixMillis": 1789393201000,
+    "登録監査ID": "runtime-registration-41"
+  },
+  "統治": {
+    "能力ID": "runtime.resource.observe",
+    "権限ID": "permission.runtime.resource.observe",
+    "承認状態": "not_required",
+    "復旧ID": "recover-runtime-resource-binding"
+  },
+  "計測": {
+    "稼働時間Millis": {
+      "状態": "measured",
+      "値": 300000,
+      "証拠種別": "LIVE_RUNTIME"
+    },
+    "CPU累積時間Millis": {
+      "状態": "measured",
+      "値": 1250,
+      "証拠種別": "LIVE_RUNTIME"
+    },
+    "CPU利用率Percent": {
+      "状態": "measured",
+      "値": 2.5,
+      "証拠種別": "LIVE_RUNTIME"
+    },
+    "RAMWorkingSetBytes": {
+      "状態": "measured",
+      "値": 10485760,
+      "証拠種別": "LIVE_RUNTIME"
+    },
+    "RAMPrivateBytes": {
+      "状態": "measured",
+      "値": 8388608,
+      "証拠種別": "LIVE_RUNTIME"
+    },
+    "DiskIOBytes": {
+      "状態": "unknown",
+      "値": 0,
+      "証拠種別": "INTERNAL_STATE",
+      "理由": "process別Disk I/Oの根拠が未接続"
+    },
+    "NetworkIOBytes": {
+      "状態": "unknown",
+      "値": null,
+      "証拠種別": "INTERNAL_STATE",
+      "理由": "process別Network I/Oの根拠が未接続"
+    },
+    "GPU利用率Percent": {
+      "状態": "unknown",
+      "値": null,
+      "証拠種別": "INTERNAL_STATE",
+      "理由": "GPU観測sourceが未接続"
+    },
+    "VRAMBytes": {
+      "状態": "unknown",
+      "値": null,
+      "証拠種別": "INTERNAL_STATE",
+      "理由": "VRAM観測sourceが未接続"
+    },
+    "処理中要求数": {
+      "状態": "measured",
+      "値": 1,
+      "証拠種別": "INTERNAL_STATE"
+    },
+    "平均応答Millis": {
+      "状態": "unknown",
+      "値": null,
+      "証拠種別": "INTERNAL_STATE",
+      "理由": "対話の応答時間をミリ秒精度で測定していません"
+    },
+    "失敗要求数": {
+      "状態": "measured",
+      "値": 0,
+      "証拠種別": "INTERNAL_STATE"
+    }
+  },
+  "短期履歴": []
+}

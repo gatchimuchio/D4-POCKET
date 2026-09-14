@@ -70,6 +70,10 @@ impl BrokerAuditLog {
         )
     }
 
+    pub fn next_event_id(&self) -> String {
+        format!("broker-audit-{}", self.events.len() + 1)
+    }
+
     pub fn push_verified(&mut self, event: BrokerAuditEvent) -> Result<(), String> {
         let expected = self.build_next(
             &event.request_id,

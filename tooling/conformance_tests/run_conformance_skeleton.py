@@ -41,7 +41,7 @@ from packages.blue_tanuki_adapter.recovery import recovery_candidates
 from packages.agent_runtime import AgentRuntimeContract
 from packages.runtime_catalog import RuntimeCatalog
 from packages.shell_core.audit_chain import chain_event, verify_audit_chain
-from tooling.schema_check.check_schemas import validate_instance
+from tooling.schema_check.check_schemas import parse_json_text, validate_instance
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden, working_tree_eol_errors
@@ -71,6 +71,8 @@ REQUIRED_SCHEMA_NAMES = {
     "runtime_dialogue_session",
     "runtime_dialogue_response",
     "runtime_dialogue_comparison",
+    "runtime_resource_query",
+    "runtime_resource_observation",
 
     "action_envelope",
     "runtime",
@@ -2288,6 +2290,300 @@ def 履歴入力概要のhash_only境界を検査する() -> list[str]:
     return errors
 
 
+def 実行系資源観測の証拠境界を検査する() -> list[str]:
+    query_schema = load_schema("runtime_resource_query.schema.json")
+    observation_schema = load_schema("runtime_resource_observation.schema.json")
+    ipc_request_schema = load_schema("ipc_request.schema.json")
+    ipc_response_schema = load_schema("ipc_response.schema.json")
+    query = load_contract_fixture("runtime_resource_query.valid.json")
+    observation = load_contract_fixture("runtime_resource_observation.valid.json")
+    errors = []
+    errors.extend(validate_instance(query, query_schema))
+    errors.extend(validate_instance(observation, observation_schema))
+
+    for token in ("NaN", "Infinity", "-Infinity", "1e400"):
+        try:
+            parse_json_text('{"値": ' + token + "}")
+        except ValueError:
+            pass
+        else:
+            errors.append(f"JSON readerが非有限数{token}を受理する")
+    for nonfinite in (float("nan"), float("inf"), -float("inf")):
+        candidate = copy.deepcopy(observation)
+        candidate["計測"]["CPU利用率Percent"]["値"] = nonfinite
+        if not validate_instance(candidate, observation_schema):
+            errors.append("C3 schema validatorが非有限CPU利用率を受理する")
+
+    def c3_metric_boundary_errors(candidate: dict) -> list[str]:
+        binding = candidate.get("結合")
+        metrics = candidate.get("計測")
+        history = candidate.get("短期履歴")
+        boundary_errors = []
+        if not isinstance(binding, dict) or not isinstance(metrics, dict) or not isinstance(history, list):
+            return ["C3資源観測の状態境界を評価できない"]
+
+        def metric_is(key: str, state: str, evidence_source: str, source: dict = metrics) -> bool:
+            metric = source.get(key)
+            return (
+                isinstance(metric, dict)
+                and metric.get("状態") == state
+                and metric.get("証拠種別") == evidence_source
+            )
+
+        def metric_source_is(key: str, evidence_source: str, source: dict = metrics) -> bool:
+            metric = source.get(key)
+            return isinstance(metric, dict) and metric.get("証拠種別") == evidence_source
+
+        if binding.get("状態") != "bound":
+            if history:
+                boundary_errors.append("非結合C3観測が短期履歴を返す")
+            for key in (
+                "稼働時間Millis",
+                "CPU累積時間Millis",
+                "CPU利用率Percent",
+                "RAMWorkingSetBytes",
+                "RAMPrivateBytes",
+                "DiskIOBytes",
+                "NetworkIOBytes",
+                "GPU利用率Percent",
+                "VRAMBytes",
+                "処理中要求数",
+                "平均応答Millis",
+                "失敗要求数",
+            ):
+                if not metric_is(key, "unknown", "INTERNAL_STATE"):
+                    boundary_errors.append(f"非結合C3観測の{key}がunknown INTERNAL_STATEでない")
+            return boundary_errors
+
+        for key in ("RAMWorkingSetBytes", "RAMPrivateBytes"):
+            if not metric_is(key, "measured", "LIVE_RUNTIME"):
+                boundary_errors.append(f"結合C3観測の{key}がmeasured LIVE_RUNTIMEでない")
+        for key in ("稼働時間Millis", "CPU累積時間Millis", "CPU利用率Percent"):
+            if not metric_source_is(key, "LIVE_RUNTIME"):
+                boundary_errors.append(f"結合C3観測の{key}がLIVE_RUNTIMEでない")
+        for key in ("DiskIOBytes", "NetworkIOBytes", "GPU利用率Percent", "VRAMBytes", "平均応答Millis"):
+            if not metric_is(key, "unknown", "INTERNAL_STATE"):
+                boundary_errors.append(f"未接続C3 metric {key}がunknown INTERNAL_STATEでない")
+        for key in ("処理中要求数", "失敗要求数"):
+            if not metric_is(key, "measured", "INTERNAL_STATE"):
+                boundary_errors.append(f"Broker集計 {key}がmeasured INTERNAL_STATEでない")
+        for index, sample in enumerate(history):
+            if not isinstance(sample, dict):
+                boundary_errors.append(f"短期履歴{index}がobjectでない")
+                continue
+            if not metric_source_is("CPU利用率Percent", "LIVE_RUNTIME", sample):
+                boundary_errors.append(f"短期履歴{index}のCPU利用率PercentがLIVE_RUNTIMEでない")
+            if not metric_is("RAMWorkingSetBytes", "measured", "LIVE_RUNTIME", sample):
+                boundary_errors.append(f"短期履歴{index}のRAMWorkingSetBytesがmeasured LIVE_RUNTIMEでない")
+            if not metric_is("NetworkIOBytes", "unknown", "INTERNAL_STATE", sample):
+                boundary_errors.append(f"短期履歴{index}のNetworkIOBytesがunknown INTERNAL_STATEでない")
+            if not metric_is("平均応答Millis", "unknown", "INTERNAL_STATE", sample):
+                boundary_errors.append(f"短期履歴{index}の平均応答Millisがunknown INTERNAL_STATEでない")
+            if not metric_source_is("エラー率Percent", "INTERNAL_STATE", sample):
+                boundary_errors.append(f"短期履歴{index}のエラー率PercentがINTERNAL_STATEでない")
+        return boundary_errors
+
+    errors.extend(c3_metric_boundary_errors(observation))
+
+    for label, alter in (
+        ("PID入力", lambda value: value.update({"PID": 4321})),
+        ("接続先入力", lambda value: value.update({"endpoint": "127.0.0.1:8080"})),
+        ("未知版", lambda value: value.update({"版": 2})),
+    ):
+        candidate = copy.deepcopy(query)
+        alter(candidate)
+        if not validate_instance(candidate, query_schema):
+            errors.append(f"実行系資源観測要求が{label}を受理した")
+
+    invalid_metrics = (
+        ("unknownを0へ置換", lambda value: value["計測"]["DiskIOBytes"].update({"値": 0})),
+        ("unknownの理由欠落", lambda value: value["計測"]["DiskIOBytes"].pop("理由")),
+        ("measuredへの理由混入", lambda value: value["計測"]["失敗要求数"].update({"理由": "不要"})),
+        ("CPU百分率上限超過", lambda value: value["計測"]["CPU利用率Percent"].update({"値": 101})),
+    )
+    for label, alter in invalid_metrics:
+        candidate = copy.deepcopy(observation)
+        alter(candidate)
+        if not validate_instance(candidate, observation_schema):
+            errors.append(f"実行系資源観測がmetricの{label}を受理した")
+
+    semantic_metric_mutations = (
+        (
+            "未接続Disk I/Oのmeasured",
+            lambda value: value["計測"].__setitem__(
+                "DiskIOBytes",
+                {"状態": "measured", "値": 1, "証拠種別": "INTERNAL_STATE"},
+            ),
+        ),
+        (
+            "未接続Network I/OのLIVE_RUNTIME",
+            lambda value: value["計測"]["NetworkIOBytes"].update({"証拠種別": "LIVE_RUNTIME"}),
+        ),
+        (
+            "CPUのINTERNAL_STATE",
+            lambda value: value["計測"]["CPU利用率Percent"].update({"証拠種別": "INTERNAL_STATE"}),
+        ),
+        (
+            "要求数のLIVE_RUNTIME",
+            lambda value: value["計測"]["処理中要求数"].update({"証拠種別": "LIVE_RUNTIME"}),
+        ),
+        (
+            "平均応答のmeasured",
+            lambda value: value["計測"].__setitem__(
+                "平均応答Millis",
+                {"状態": "measured", "値": 1, "証拠種別": "INTERNAL_STATE"},
+            ),
+        ),
+        (
+            "履歴Network I/OのLIVE_RUNTIME",
+            lambda value: value["短期履歴"][0]["NetworkIOBytes"].update({"証拠種別": "LIVE_RUNTIME"}),
+        ),
+        (
+            "履歴平均応答のmeasured",
+            lambda value: value["短期履歴"][0].__setitem__(
+                "平均応答Millis",
+                {"状態": "measured", "値": 1, "証拠種別": "INTERNAL_STATE"},
+            ),
+        ),
+    )
+    for label, alter in semantic_metric_mutations:
+        candidate = copy.deepcopy(observation)
+        alter(candidate)
+        if not c3_metric_boundary_errors(candidate):
+            errors.append(f"C3 metric境界が{label}を受理する")
+
+    invalid_binding = copy.deepcopy(observation)
+    invalid_binding["結合"]["PID"] = 0
+    if not validate_instance(invalid_binding, observation_schema):
+        errors.append("結合済み観測がPID=0を受理した")
+    invalid_binding = copy.deepcopy(observation)
+    invalid_binding["結合"]["endpoint"] = "127.0.0.1:8080"
+    if not validate_instance(invalid_binding, observation_schema):
+        errors.append("結合情報が接続先を公開した")
+
+    history_overflow = copy.deepcopy(observation)
+    history_overflow["短期履歴"] = [copy.deepcopy(observation["短期履歴"][0]) for _ in range(61)]
+    if not validate_instance(history_overflow, observation_schema):
+        errors.append("実行系資源観測が短期履歴61件を受理した")
+    invalid_governance = copy.deepcopy(observation)
+    invalid_governance["統治"]["承認状態"] = "approved"
+    if not validate_instance(invalid_governance, observation_schema):
+        errors.append("実行系資源観測が統治fieldの自己変更を受理した")
+
+    def unknown_metric(evidence_source: str) -> dict:
+        return {
+            "状態": "unknown",
+            "値": None,
+            "証拠種別": evidence_source,
+            "理由": "結合を再確認する必要がある",
+        }
+
+    bound_safe_unknown = copy.deepcopy(observation)
+    for name in ("稼働時間Millis", "CPU累積時間Millis", "CPU利用率Percent"):
+        bound_safe_unknown["計測"][name] = unknown_metric("LIVE_RUNTIME")
+    errors.extend(validate_instance(bound_safe_unknown, observation_schema))
+    if c3_metric_boundary_errors(bound_safe_unknown):
+        errors.append("結合済みC3観測が安全なLIVE_RUNTIME unknownを拒否する")
+
+    unavailable = copy.deepcopy(observation)
+    unavailable["結合"] = {
+        "状態": "binding_mismatch",
+        "根拠": "loopback_tcp_listener_owner_pid",
+        "PID": None,
+        "PID作成時刻UnixMillis": None,
+        "登録時刻UnixMillis": observation["結合"]["登録時刻UnixMillis"],
+        "登録監査ID": observation["結合"]["登録監査ID"],
+        "理由": "PID作成時刻が登録時と一致しない",
+    }
+    for name in unavailable["計測"]:
+        unavailable["計測"][name] = unknown_metric("INTERNAL_STATE")
+    unavailable["短期履歴"] = []
+    errors.extend(validate_instance(unavailable, observation_schema))
+    errors.extend(c3_metric_boundary_errors(unavailable))
+    unavailable_with_pid = copy.deepcopy(unavailable)
+    unavailable_with_pid["結合"]["PID"] = 4321
+    if not validate_instance(unavailable_with_pid, observation_schema):
+        errors.append("PID不一致の結合がPIDを返した")
+    unavailable_with_value = copy.deepcopy(unavailable)
+    unavailable_with_value["計測"]["失敗要求数"] = copy.deepcopy(observation["計測"]["失敗要求数"])
+    if not validate_instance(unavailable_with_value, observation_schema):
+        errors.append("PID不一致の結合が実測値を返した")
+    unavailable_with_history = copy.deepcopy(unavailable)
+    unavailable_with_history["短期履歴"] = copy.deepcopy(observation["短期履歴"])
+    if not validate_instance(unavailable_with_history, observation_schema):
+        errors.append("PID不一致の結合が過去短期履歴を返した")
+
+    unavailable_wrong_source = copy.deepcopy(unavailable)
+    unavailable_wrong_source["計測"]["CPU利用率Percent"]["証拠種別"] = "LIVE_RUNTIME"
+    if not c3_metric_boundary_errors(unavailable_wrong_source):
+        errors.append("非結合C3観測がLIVE_RUNTIMEのunknown metricを受理する")
+
+    ipc_request = {
+        "request_id": "resource-observation-request",
+        "operation": "実行系資源観測",
+        "payload_hash": "sha256:" + "0" * 64,
+        "nonce": "resource-observation-nonce",
+        "issued_at": "1789393500000",
+        "metadata": {},
+        "payload": query,
+    }
+    errors.extend(validate_instance(ipc_request, ipc_request_schema))
+
+    def ipc_relation_errors(response: dict) -> list[str]:
+        body = response.get("body")
+        if not isinstance(body, dict):
+            return ["実行系資源観測IPC bodyがobjectでない"]
+        if response.get("audit_event_id") != body.get("観測監査ID"):
+            return ["実行系資源観測IPC監査IDがbodyと一致しない"]
+        binding = body.get("結合")
+        if not isinstance(binding, dict):
+            return ["実行系資源観測IPC bodyに結合がない"]
+        expected_evidence = (
+            "LIVE_RUNTIME"
+            if binding.get("状態") == "bound"
+            else "INTERNAL_STATE"
+        )
+        if response.get("evidence_source") != expected_evidence:
+            return ["実行系資源観測IPC証拠種別が結合状態と一致しない"]
+        return []
+
+    ipc_response = {
+        "request_id": ipc_request["request_id"],
+        "operation": "実行系資源観測",
+        "status": "accepted",
+        "evidence_source": "LIVE_RUNTIME",
+        "audit_event_id": observation["観測監査ID"],
+        "error": None,
+        "health": None,
+        "body": observation,
+        "shutdown_requested": False,
+    }
+    errors.extend(validate_instance(ipc_response, ipc_response_schema))
+    errors.extend(ipc_relation_errors(ipc_response))
+    invalid_audit_response = {**ipc_response, "audit_event_id": "other-audit"}
+    if not ipc_relation_errors(invalid_audit_response):
+        errors.append("実行系資源観測IPCが監査ID不一致を受理した")
+    invalid_evidence_response = {**ipc_response, "evidence_source": "INTERNAL_STATE"}
+    if not ipc_relation_errors(invalid_evidence_response):
+        errors.append("結合済み観測IPCがINTERNAL_STATEを受理した")
+    unavailable_response = {
+        **ipc_response,
+        "body": unavailable,
+        "audit_event_id": unavailable["観測監査ID"],
+        "evidence_source": "INTERNAL_STATE",
+    }
+    errors.extend(validate_instance(unavailable_response, ipc_response_schema))
+    errors.extend(ipc_relation_errors(unavailable_response))
+    invalid_unavailable_evidence = {**unavailable_response, "evidence_source": "LIVE_RUNTIME"}
+    if not ipc_relation_errors(invalid_unavailable_evidence):
+        errors.append("非結合観測IPCがLIVE_RUNTIMEを受理した")
+    for schema_name, schema in (("ipc_request", ipc_request_schema), ("ipc_response", ipc_response_schema)):
+        operations = schema["properties"]["operation"]["enum"]
+        if "実行系資源観測" not in operations:
+            errors.append(f"{schema_name}が実行系資源観測operationを公開していない")
+    return errors
+
+
 def 対話契約の関係と表示境界を検査する() -> list[str]:
     from tooling.dialogue_contract_check import 要求関係検査, 応答関係検査, 比較関係検査
 
@@ -3836,6 +4132,7 @@ def main() -> int:
         対話契約の関係と表示境界を検査する,
         対話操作の分岐と未知fieldを検査する,
         履歴入力概要のhash_only境界を検査する,
+        実行系資源観測の証拠境界を検査する,
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,

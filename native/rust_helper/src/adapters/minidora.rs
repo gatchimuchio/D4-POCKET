@@ -185,6 +185,9 @@ impl 実行系Adapter for MinidoraAdapter {
     fn 接続対象(&self) -> String {
         format!("http://{}", self.接続先)
     }
+    fn 観測対象(&self) -> Option<SocketAddr> {
+        Some(self.接続先)
+    }
     fn 応答(
         &self,
         要求: &対話要求,

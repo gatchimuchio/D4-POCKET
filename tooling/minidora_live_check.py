@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import socket
@@ -21,11 +22,87 @@ REFERENCE = "3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8"
 from tooling.schema_check.check_schemas import validate_instance
 
 
+class RustJsonFloat(float):
+    """Rust Broker応答の有限小数tokenを失わずに保持する。"""
+
+    def __new__(cls, token):
+        value = float.__new__(cls, token)
+        if not math.isfinite(value):
+            raise ValueError("有限でないJSON小数は受け付けない")
+        value.rust_json_token = token
+        return value
+
+
+def 正本JSON読取(raw):
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw, parse_float=RustJsonFloat)
+
+
 def 正本化(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    # `serde_json` がBroker応答へ書いた小数の最短表記を保持する。通常のPython floatへ
+    # 落とすと、例えば Rust の `1e-6` がPython側で `1e-06` となり監査hashが変わる。
+    if isinstance(value, RustJsonFloat):
+        return value.rust_json_token
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(正本化(item) for item in value) + "]"
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise TypeError("JSON objectのkeyはstringでなければならない")
+        return "{" + ",".join(
+            json.dumps(key, ensure_ascii=False, separators=(",", ":")) + ":" + 正本化(value[key])
+            for key in sorted(value)
+        ) + "}"
+    raise TypeError(f"正本化できないJSON値: {type(value).__name__}")
 
 
-def 操作(endpoint, operation, payload):
+def JSON属性生bytes(raw, field):
+    """Rustが返したtop-level JSON属性のUTF-8 bytesを再構成せずに取り出す。"""
+    source = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+    decoder = json.JSONDecoder(parse_float=RustJsonFloat)
+    position = 0
+
+    def 空白後(position):
+        while position < len(source) and source[position].isspace():
+            position += 1
+        return position
+
+    position = 空白後(position)
+    if position >= len(source) or source[position] != "{":
+        raise RuntimeError("Broker応答がJSON objectではない")
+    position = 空白後(position + 1)
+    while position < len(source) and source[position] != "}":
+        key, position = decoder.raw_decode(source, position)
+        if not isinstance(key, str):
+            raise RuntimeError("Broker応答のobject keyがstringではない")
+        position = 空白後(position)
+        if position >= len(source) or source[position] != ":":
+            raise RuntimeError("Broker応答のobject区切りが不正")
+        position = 空白後(position + 1)
+        start = position
+        _, position = decoder.raw_decode(source, position)
+        if key == field:
+            return source[start:position].encode("utf-8")
+        position = 空白後(position)
+        if position >= len(source) or source[position] != ",":
+            raise RuntimeError(f"Broker応答に{field}属性がない")
+        position = 空白後(position + 1)
+    raise RuntimeError(f"Broker応答に{field}属性がない")
+
+
+def 操作生(endpoint, operation, payload):
     nonce = uuid.uuid4().hex
     request = {"request_id": nonce, "nonce": nonce, "session_id": endpoint["session_id"],
                "operation": operation, "payload": payload, "metadata": {},
@@ -37,7 +114,11 @@ def 操作(endpoint, operation, payload):
             raw = reader.readline(4 * 1024 * 1024 + 1)
             if len(raw) > 4 * 1024 * 1024:
                 raise RuntimeError("broker応答上限超過")
-            return json.loads(raw)
+            return raw
+
+
+def 操作(endpoint, operation, payload):
+    return 正本JSON読取(操作生(endpoint, operation, payload))
 
 
 def 成功(endpoint, operation, payload):
@@ -67,6 +148,46 @@ def 終了(process):
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
+
+
+def 小数資源観測正本化相互運用(endpoint):
+    """固定C3観測bodyをRust Brokerへ送り、入出力の小数正本化を相互確認する。"""
+    vector_path = ROOT / "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json"
+    vector = 正本JSON読取(vector_path.read_bytes())
+    body = vector.get("body")
+    expected_hash = vector.get("expected_rust_payload_hash")
+    if not isinstance(body, dict) or not isinstance(expected_hash, str):
+        raise RuntimeError("小数正本化vectorの形式が不正")
+    schema = json.loads((ROOT / "specs/runtime_resource_observation.schema.json").read_text(encoding="utf-8"))
+    errors = validate_instance(body, schema)
+    if errors:
+        raise RuntimeError(f"小数正本化vectorがC3 Schemaに不適合: {errors}")
+    canonical_body = 正本化(body).encode("utf-8")
+    computed_hash = "sha256:" + hashlib.sha256(canonical_body).hexdigest()
+    if computed_hash != expected_hash:
+        raise RuntimeError("小数正本化vectorの固定Rust hashが一致しない")
+
+    raw_response = 操作生(endpoint, "normalize_payload", body)
+    response = 正本JSON読取(raw_response)
+    if response.get("status") != "accepted":
+        raise RuntimeError(f"小数正本化vectorをRust Brokerが拒否: {response.get('error')}")
+    response_body = response.get("body")
+    if not isinstance(response_body, dict):
+        raise RuntimeError("小数正本化vectorのBroker応答bodyが不正")
+    echoed_body = response_body.get("raw_payload")
+    if not isinstance(echoed_body, dict):
+        raise RuntimeError("小数正本化vectorのBroker応答にraw_payloadがない")
+    if 正本化(echoed_body).encode("utf-8") != canonical_body:
+        raise RuntimeError("小数を含むC3観測bodyのRust往復後正本化が一致しない")
+    rust_response_body = JSON属性生bytes(raw_response, "body")
+    if 正本化(response_body).encode("utf-8") != rust_response_body:
+        raise RuntimeError("Rust応答bodyの小数正本化がbyte単位で一致しない")
+    return {
+        "result": "PASS",
+        "vector": vector.get("name"),
+        "payload_hash": expected_hash,
+        "response_body_hash": "sha256:" + hashlib.sha256(rust_response_body).hexdigest(),
+    }
 
 
 def 検証(reference, binary, dart_client=False, mobile_client=False, dart_mobile_client=False, mobile_simulator=None, android_emulator=None):
@@ -156,6 +277,147 @@ server.serve_forever()
                 owner = file待機(owner_file, broker)
                 assert 操作(normal, "対話承認待ち", {})["status"] == "rejected"
                 assert 成功(normal, "実行系列挙", {})["実行系"] == ["left", "right"]
+                decimal_hash_interop = 小数資源観測正本化相互運用(normal)
+
+                # C3はWindowsのBrokerが、--minidora-runtimeで登録したloopback listenerの
+                # 所有processだけを読取専用で観測する経路を確認する。PIDや接続先を通常資格
+                # のIPC入力から与えず、実際に起動したleft側MINIDORA childとの結合を確認する。
+                resource_observation = {
+                    "result": "SKIPPED",
+                    "evidence_source": "未実証",
+                    "reason": "Windows実行系資源観測はWindows host専用のため、このhostでは未実証",
+                }
+                if os.name == "nt":
+                    resource_query = {"版": 1, "実行系ID": "left"}
+                    resource_query_schema = json.loads(
+                        (ROOT / "specs/runtime_resource_query.schema.json").read_text(encoding="utf-8")
+                    )
+                    resource_schema = json.loads(
+                        (ROOT / "specs/runtime_resource_observation.schema.json").read_text(encoding="utf-8")
+                    )
+                    assert not validate_instance(resource_query, resource_query_schema)
+
+                    def measured_metric(metric, source):
+                        assert metric["状態"] == "measured"
+                        assert isinstance(metric["値"], (int, float)) and not isinstance(metric["値"], bool)
+                        assert metric["値"] >= 0
+                        assert metric["証拠種別"] == source
+
+                    def unknown_metric(metric, source):
+                        assert metric["状態"] == "unknown"
+                        assert metric["値"] is None
+                        assert metric["証拠種別"] == source
+                        assert isinstance(metric["理由"], str) and metric["理由"]
+
+                    def resource_audit(response):
+                        body = response["body"]
+                        assert response["operation"] == "実行系資源観測"
+                        assert response["status"] == "accepted"
+                        assert response["evidence_source"] == "LIVE_RUNTIME"
+                        assert isinstance(body, dict)
+                        assert body["観測監査ID"] == response["audit_event_id"]
+                        assert not validate_instance(body, resource_schema)
+                        events = [
+                            json.loads(line)
+                            for line in (root / "store/audit.jsonl").read_text(encoding="utf-8").splitlines()
+                        ]
+                        accepted = [
+                            event
+                            for event in events
+                            if event["event_id"] == response["audit_event_id"]
+                        ]
+                        assert len(accepted) == 1
+                        event = accepted[0]
+                        assert event["request_id"] == response["request_id"]
+                        assert event["operation"] == "実行系資源観測"
+                        assert event["decision"] == "accepted"
+                        assert event["evidence_source"] == "LIVE_RUNTIME"
+                        assert event["payload_hash"] == "sha256:" + hashlib.sha256(
+                            正本化(body).encode("utf-8")
+                        ).hexdigest()
+                        return body
+
+                    first_resource_response = 操作(normal, "実行系資源観測", resource_query)
+                    first_resource = resource_audit(first_resource_response)
+                    assert first_resource["結合"]["状態"] == "bound"
+                    assert first_resource["結合"]["根拠"] == "loopback_tcp_listener_owner_pid"
+                    assert first_resource["結合"]["PID"] == processes[0].pid
+                    assert isinstance(first_resource["結合"]["PID作成時刻UnixMillis"], int)
+                    assert first_resource["統治"] == {
+                        "能力ID": "runtime.resource.observe",
+                        "権限ID": "permission.runtime.resource.observe",
+                        "承認状態": "not_required",
+                        "復旧ID": "recover-runtime-resource-binding",
+                    }
+                    first_metrics = first_resource["計測"]
+                    for field in ["稼働時間Millis", "CPU累積時間Millis", "RAMWorkingSetBytes", "RAMPrivateBytes"]:
+                        measured_metric(first_metrics[field], "LIVE_RUNTIME")
+                    unknown_metric(first_metrics["CPU利用率Percent"], "LIVE_RUNTIME")
+                    for field in ["DiskIOBytes", "NetworkIOBytes", "GPU利用率Percent", "VRAMBytes"]:
+                        unknown_metric(first_metrics[field], "INTERNAL_STATE")
+                    measured_metric(first_metrics["処理中要求数"], "INTERNAL_STATE")
+                    unknown_metric(first_metrics["平均応答Millis"], "INTERNAL_STATE")
+                    assert len(first_resource["短期履歴"]) == 1
+                    assert first_resource["短期履歴"][0]["観測時刻UnixMillis"] == first_resource["観測時刻UnixMillis"]
+
+                    # 初回は差分sourceがないためCPU利用率をunknownに保つ。二回目だけが時差に
+                    # 基づく0..100の測定値になり、履歴は同じPID結合の連続観測として増える。
+                    time.sleep(0.10)
+                    second_resource_response = 操作(normal, "実行系資源観測", resource_query)
+                    second_resource = resource_audit(second_resource_response)
+                    assert second_resource["結合"]["状態"] == "bound"
+                    assert second_resource["結合"]["PID"] == processes[0].pid
+                    second_metrics = second_resource["計測"]
+                    measured_metric(second_metrics["CPU利用率Percent"], "LIVE_RUNTIME")
+                    assert second_metrics["CPU利用率Percent"]["値"] <= 100
+                    for field in ["稼働時間Millis", "RAMWorkingSetBytes", "RAMPrivateBytes"]:
+                        measured_metric(second_metrics[field], "LIVE_RUNTIME")
+                    for field in [
+                        "DiskIOBytes",
+                        "NetworkIOBytes",
+                        "GPU利用率Percent",
+                        "VRAMBytes",
+                        "平均応答Millis",
+                    ]:
+                        unknown_metric(second_metrics[field], "INTERNAL_STATE")
+                    history = second_resource["短期履歴"]
+                    assert len(history) == 2
+                    assert history[0]["観測時刻UnixMillis"] == first_resource["観測時刻UnixMillis"]
+                    assert history[1]["観測時刻UnixMillis"] == second_resource["観測時刻UnixMillis"]
+                    assert history[0]["CPU利用率Percent"] == first_metrics["CPU利用率Percent"]
+                    assert history[1]["CPU利用率Percent"] == second_metrics["CPU利用率Percent"]
+                    assert history[1]["RAMWorkingSetBytes"] == second_metrics["RAMWorkingSetBytes"]
+                    assert history[1]["NetworkIOBytes"] == second_metrics["NetworkIOBytes"]
+                    assert history[1]["平均応答Millis"] == second_metrics["平均応答Millis"]
+
+                    # PID、未信頼source、未登録実行系は、通常資格から資源観測の対象を作れない。
+                    for rejected_payload in [
+                        {"版": 1, "実行系ID": "left", "PID": processes[0].pid},
+                        {"版": 1, "実行系ID": "left", "source": "untrusted"},
+                    ]:
+                        rejected = 操作(normal, "実行系資源観測", rejected_payload)
+                        assert rejected["status"] == "rejected"
+                        assert rejected["body"] is None
+                        assert rejected["error"]["code"] == "要求不正"
+                        assert rejected["evidence_source"] == "INTERNAL_STATE"
+                    unknown_runtime = 操作(normal, "実行系資源観測", {"版": 1, "実行系ID": "unknown"})
+                    assert unknown_runtime["status"] == "rejected"
+                    assert unknown_runtime["body"] is None
+                    assert unknown_runtime["error"]["code"] == "実行系不在"
+                    assert unknown_runtime["evidence_source"] == "INTERNAL_STATE"
+                    resource_observation = {
+                        "result": "PASS",
+                        "evidence_source": "LIVE_RUNTIME",
+                        "bound_pid_matches_minidora_child": True,
+                        "history_samples": len(history),
+                        "unknown_metrics": [
+                            "DiskIOBytes",
+                            "NetworkIOBytes",
+                            "GPU利用率Percent",
+                            "VRAMBytes",
+                            "平均応答Millis",
+                        ],
+                    }
                 if mobile_client:
                     from tooling.device_link_live_check import 検証 as 端末検証
                     assert 端末検証(normal, owner, binary, root) == "PASS"
@@ -551,6 +813,8 @@ server.serve_forever()
                         "protected_content_save": "PASS" if os.name == "nt" else "未対応拒否を確認",
                         "protected_content_delete": "PASS" if os.name == "nt" else "未実行",
                         "protected_state_after_forced_process_exit": "PASS" if os.name == "nt" else "未実行",
+                        "rust_python_decimal_hash_interop": decimal_hash_interop,
+                        "windows_runtime_resource_observation": resource_observation,
                         "scope": "MINIDORA製品チャットの基本会話と保留。基礎Core・外部検索の能力保証ではない。"}
             except Exception:
                 log.flush()

@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "7198bb98a1dcc1e8d320ffc2c59f116f2f9fdc69cb5e9522f5d8cdfe1f7d0551"
+      "sha256": "a7bc54e252448eef24adf08bac8ee1120a4196a771b78acd67eec0cc3e5e729d"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -237,7 +237,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_center.dart",
-      "sha256": "dafe4451738acf5be466046df01f2921463515b3575ab0f94c5fcfa19038ea60"
+      "sha256": "d725facd908b2a2141c381a84aa92e7e7ab4440365709f7a5676c364f5f6cba5"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/runtime_dialogue.dart",
@@ -1113,7 +1113,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "0550164bd5266aa671e15e8fd9dc1cfb2041526163b6e3d6f7f90cddbdb1b599"
+      "sha256": "e5a923d5d88869b41745f4155217c37fcc959cd9d97698c5c12bdceeb3d156c0"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1404,6 +1404,10 @@
       "sha256": "49a473a200f247d2d611940daecf2f4dfe74e6eead120f5ab7900d68996ab1a5"
     },
     {
+      "path": "examples/contracts/invalid/runtime_execution_history_input_summary.invalid.json",
+      "sha256": "53d3c0b17c941477596d5aab22ab22f72f57f50b3f7f41e09395d22ad0cc778a"
+    },
+    {
       "path": "examples/contracts/invalid/runtime_execution_history_page.invalid.json",
       "sha256": "634ced81b4b034a130ea33369751032d3ade2d3b02b7964eecdb24a94a52e098"
     },
@@ -1633,11 +1637,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "b800152d048bf977cc446d62ebc69524a1aec0e2ef20a82b5820ba9163db835c"
+      "sha256": "65d089ef93bfdb0c545fd224e68a82508f08f00dc62a4e9ae9c14343f3b6d028"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "150f9760bfc80eb8bd41735471842b44bded4d102f1f817e69fa7bc61fbf1e49"
+      "sha256": "f645aa37b2afff6dcd3bcf60673e89281a00e10049080359b7902b4391c6d9bf"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -1669,7 +1673,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "c0bbb53c8ab6563c007ec8284273dfc1e147bbc4aa5c73e3ef3e5d15007d9034"
+      "sha256": "cb0f8e6b8cf5cb6ba37c426d03e0b6779ae6b7db800b60f9a9e15f4dfe713daf"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
@@ -1681,7 +1685,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
-      "sha256": "52749b95defdc3b3561cd436760bfc8ac587a2a6fd7fe7dd0c924a6c23a4ddd9"
+      "sha256": "190043332367375266b8cd9b043ca38fc860d1e9a79ecd51351a0ce8d95c4499"
     },
     {
       "path": "native/rust_helper/src/broker/authority.rs",
@@ -1725,7 +1729,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "da04288b1a707a8318b1adad2ba5daf4a8596337dd6679039a191472fdfff6f4"
+      "sha256": "6e5f75ebd4c6e1cf14391bbaaff1da4e9aba1e96a11f03e78de0891637e05c29"
     },
     {
       "path": "native/rust_helper/src/broker/execution_history.rs",
@@ -1745,11 +1749,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "4ddd39bdb45fd4e288a127caf00c00d9b3212200cc7d4dba2df3febde80a7b64"
+      "sha256": "0f6f7b077322831bcde7f07079e759f4a77e913c6c74b172b762ad75b79ee5df"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "67514203a436ed613f99d54bb4b8193eb395b5d38c8f83314bf945031fe1064f"
+      "sha256": "3ed8e91ad2bf8b4c121ebe0f097ed7588a458b8c3579da7ed2826c1d56d4d142"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -2049,7 +2053,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/gui_shell_ui.dart",
-      "sha256": "7834a11202eddaa9ca1363c06af7555acaa8f5c851172e2094179f4b5f20f5ed"
+      "sha256": "7c158874cbedc7a1bcb834481fde2f8fb8a3028e5a8424675828a4f9264dd6ff"
     },
     {
       "path": "packages/gui_shell_ui/lib/history_client.dart",
@@ -2321,11 +2325,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "08d33f2cff107c929051bb723344c7ad7ecce64fbadd92f8aa90f9626120911b"
+      "sha256": "448d7b9f62f6d17f0a652a5b7fc116d6da7436ad3a1ec2b2352223dee90dbe31"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "70bc1780eb21847e2bceaa79fc51948506658d0505cd28650d2cc7e506cba013"
+      "sha256": "272a87ea25f783fbb2e8695e22527e4a55c963dc5fd9c6bcddc8f546b15b75fc"
     },
     {
       "path": "specs/permission.schema.json",
@@ -2457,7 +2461,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6dc66c2069f2bc28ca458b5264a8924d37965aa7588a2de228ae8ea5514a4858"
+      "sha256": "0e8711604c763936f7c169f348eb95cd00428734de85aa9059d48cf95aabc9c1"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2489,7 +2493,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "1831ab4089556ac5acc0af96b42df116bcb022f7a805ba780e7c2a725a810fba"
+      "sha256": "a70cc611603ad0d88915147f0b1d7b894c42313d01cfebb94acd04b6e5db659a"
     },
     {
       "path": "tooling/packaging_portability_check.py",
@@ -2509,7 +2513,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "6b91154fa64027e69254860a6c9abad6996f297754d1d9490fefa6ee7ec9f1dc"
+      "sha256": "e1d911482ad1da319e1168b10bece1d4adaf6fc8a5a2c58110620579f5562b37"
     },
     {
       "path": "tooling/shell_snapshot.py",

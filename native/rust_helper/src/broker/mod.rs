@@ -12,6 +12,7 @@ pub(crate) mod device_transport;
 pub mod authority;
 pub mod ipc_server;
 pub mod protocol;
+pub(crate) mod runtime_registry;
 pub mod store;
 
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};

@@ -6,6 +6,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
 };
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use crate::audit_hash::sha256_tagged;
@@ -73,6 +74,10 @@ pub struct 実行結果 {
 
 pub trait 実行系Adapter: Send + Sync {
     fn 接続対象(&self) -> String;
+    /// OS資源観測のためにBrokerだけが読むloopback接続先。権限や操作対象を生成しない。
+    fn 観測対象(&self) -> Option<SocketAddr> {
+        None
+    }
     fn 応答(
         &self,
         要求: &対話要求,
@@ -80,6 +85,26 @@ pub trait 実行系Adapter: Send + Sync {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗>;
+}
+
+/// Broker内の対話記録から得る統計。OS測定値ではなく、現在processの権限や健全性を示さない。
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct 実行系資源統計 {
+    pub 処理中要求数: u64,
+    pub 完了要求数: u64,
+    pub 失敗要求数: u64,
+}
+
+/// IPCの資源観測契約と起動制御面で共用する実行系IDの境界。
+/// ASCII以外、PIDや接続先を埋め込む区切り文字、空白、制御文字は許可しない。
+pub(crate) fn 実行系ID妥当(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 128
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(byte))
 }
 
 struct 受信結果 {
@@ -214,6 +239,28 @@ impl 対話制御 {
 
     pub(crate) fn 登録済み(&self, id: &str) -> bool { self.実行系.contains_key(id) }
 
+    /// これはin-memory対話記録の射影であり、実行系processからのtelemetryではない。
+    pub(crate) fn 資源統計(&self, 実行系ID: &str) -> 実行系資源統計 {
+        let mut stats = 実行系資源統計::default();
+        for work in self.作業.values().filter(|work| work.要求.実行系ID == 実行系ID) {
+            if work.状態 == "実行中" {
+                stats.処理中要求数 = stats.処理中要求数.saturating_add(1);
+            }
+            let 完了 = matches!(work.結果, Some(_))
+                && !matches!(work.状態, "承認待ち" | "実行中" | "監査失敗");
+            if !完了 {
+                continue;
+            }
+            stats.完了要求数 = stats.完了要求数.saturating_add(1);
+            if matches!(work.結果, Some(Err(error)) if error != 対話失敗::取消) {
+                stats.失敗要求数 = stats.失敗要求数.saturating_add(1);
+            }
+        }
+        // 開始時刻・終了時刻は監査用の秒精度であり、ミリ秒応答時間の実測値ではない。
+        // 高精度の単調時計を記録するまで、この統計に平均応答時間を持たせない。
+        stats
+    }
+
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
     pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
         self.失効セッション.extend(sessions.iter().cloned());
@@ -247,18 +294,17 @@ impl 対話制御 {
         ID: &str,
         adapter: Arc<dyn 実行系Adapter>,
     ) -> Result<(), 対話失敗> {
-        if ID.is_empty()
-            || ID.len() > 128
-            || !ID
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
-            || !ID.as_bytes()[0].is_ascii_alphanumeric()
-            || self.実行系.contains_key(ID)
-        {
+        if !実行系ID妥当(ID) || self.実行系.contains_key(ID) {
             return Err(対話失敗::要求不正);
         }
         self.実行系.insert(ID.to_owned(), adapter);
         Ok(())
+    }
+
+    /// 起動制御面が、直後の登録監査に失敗した新規登録だけを取り消す。
+    /// 対話sessionや作業を持つ実行系の管理操作には使わない。
+    pub(crate) fn 直後登録取消(&mut self, ID: &str) -> bool {
+        self.実行系.remove(ID).is_some()
     }
 
     pub fn 操作(
@@ -801,6 +847,40 @@ mod tests {
         }
         panic!("対話完了の待機期限");
     }
+
+    #[test]
+    fn 実行系IDはIPC契約と同じ境界を使う() {
+        for accepted in ["local", "local-1", "A.b_c-9"] {
+            assert!(実行系ID妥当(accepted), "許可するID: {accepted}");
+        }
+        for rejected in [
+            "",
+            ".local",
+            "_local",
+            "local runtime",
+            "local\nnext",
+            "実行系",
+            "pid:1234",
+            "local/..",
+        ] {
+            assert!(!実行系ID妥当(rejected), "拒否するID: {rejected:?}");
+        }
+        assert!(!実行系ID妥当(&"a".repeat(129)));
+    }
+
+    #[test]
+    fn 資源統計は高精度時計を持たず完了数と失敗数だけを返す() {
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let pending = 要求(&mut c, &session);
+        操作(&mut c, "対話承認", 承認(&pending, "full"), true).unwrap();
+        完了(&mut c, &pending);
+
+        let stats = c.資源統計("left");
+        assert_eq!(stats.完了要求数, 1);
+        assert_eq!(stats.失敗要求数, 0);
+    }
+
     #[test]
     fn 保存対象は全文の完了と確定記録を要求する() {
         for (scope, fail) in [("none",false),("hash_only",false),("summary",false),("redacted",false),("full",true),("full",false)] {

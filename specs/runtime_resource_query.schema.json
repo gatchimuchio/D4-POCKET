@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_resource_query.schema.json",
+  "title": "実行系資源観測要求（RuntimeResourceQuery）",
+  "description": "Brokerが登録済み実行系をread-onlyで観測するための要求。PID、接続先、権限、履歴長は要求から受け付けない。",
+  "type": "object",
+  "required": [
+    "版",
+    "実行系ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "type": "integer",
+      "const": 1
+    },
+    "実行系ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    }
+  }
+}

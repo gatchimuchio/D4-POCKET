@@ -1,0 +1,494 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_resource_observation.schema.json",
+  "title": "実行系資源観測（RuntimeResourceObservation）",
+  "description": "Broker所有のprocess bindingから得るread-only観測。構造適合は実測、現在の稼働、権限、または復旧完了の証拠ではない。",
+  "type": "object",
+  "required": [
+    "版",
+    "実行系ID",
+    "観測時刻UnixMillis",
+    "観測監査ID",
+    "結合",
+    "統治",
+    "計測",
+    "短期履歴"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "type": "integer",
+      "const": 1
+    },
+    "実行系ID": {
+      "$ref": "#/$defs/runtimeId"
+    },
+    "観測時刻UnixMillis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "観測監査ID": {
+      "$ref": "#/$defs/identifier"
+    },
+    "結合": {
+      "$ref": "#/$defs/binding"
+    },
+    "統治": {
+      "$ref": "#/$defs/governance"
+    },
+    "計測": {
+      "type": "object",
+      "required": [
+        "稼働時間Millis",
+        "CPU累積時間Millis",
+        "CPU利用率Percent",
+        "RAMWorkingSetBytes",
+        "RAMPrivateBytes",
+        "DiskIOBytes",
+        "NetworkIOBytes",
+        "GPU利用率Percent",
+        "VRAMBytes",
+        "処理中要求数",
+        "平均応答Millis",
+        "失敗要求数"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "稼働時間Millis": {
+          "$ref": "#/$defs/metric"
+        },
+        "CPU累積時間Millis": {
+          "$ref": "#/$defs/metric"
+        },
+        "CPU利用率Percent": {
+          "$ref": "#/$defs/percentMetric"
+        },
+        "RAMWorkingSetBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "RAMPrivateBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "DiskIOBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "NetworkIOBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "GPU利用率Percent": {
+          "$ref": "#/$defs/percentMetric"
+        },
+        "VRAMBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "処理中要求数": {
+          "$ref": "#/$defs/metric"
+        },
+        "平均応答Millis": {
+          "$ref": "#/$defs/metric"
+        },
+        "失敗要求数": {
+          "$ref": "#/$defs/metric"
+        }
+      }
+    },
+    "短期履歴": {
+      "description": "Broker内の短期read-only履歴。永続監査や現在のauthorityを生成しない。",
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/historySample"
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "結合": {
+          "type": "object",
+          "required": [
+            "状態"
+          ],
+          "properties": {
+            "状態": {
+              "const": "bound"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "結合": {
+          "type": "object",
+          "required": [
+            "状態"
+          ],
+          "properties": {
+            "状態": {
+              "enum": [
+                "unbound",
+                "binding_mismatch",
+                "exited",
+                "unsupported"
+              ]
+            }
+          }
+        },
+        "計測": {
+          "type": "object",
+          "required": [
+            "稼働時間Millis",
+            "CPU累積時間Millis",
+            "CPU利用率Percent",
+            "RAMWorkingSetBytes",
+            "RAMPrivateBytes",
+            "DiskIOBytes",
+            "NetworkIOBytes",
+            "GPU利用率Percent",
+            "VRAMBytes",
+            "処理中要求数",
+            "平均応答Millis",
+            "失敗要求数"
+          ],
+          "properties": {
+            "稼働時間Millis": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "CPU累積時間Millis": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "CPU利用率Percent": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "RAMWorkingSetBytes": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "RAMPrivateBytes": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "DiskIOBytes": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "NetworkIOBytes": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "GPU利用率Percent": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "VRAMBytes": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "処理中要求数": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "平均応答Millis": {
+              "$ref": "#/$defs/unknownMetric"
+            },
+            "失敗要求数": {
+              "$ref": "#/$defs/unknownMetric"
+            }
+          }
+        },
+        "短期履歴": {
+          "const": []
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "runtimeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "metric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "状態",
+            "値",
+            "証拠種別"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "状態": {
+              "const": "measured"
+            },
+            "値": {
+              "type": "number",
+              "minimum": 0
+            },
+            "証拠種別": {
+              "enum": [
+                "LIVE_RUNTIME",
+                "INTERNAL_STATE"
+              ]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/unknownMetric"
+        }
+      ]
+    },
+    "percentMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "状態",
+            "値",
+            "証拠種別"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "状態": {
+              "const": "measured"
+            },
+            "値": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "証拠種別": {
+              "enum": [
+                "LIVE_RUNTIME",
+                "INTERNAL_STATE"
+              ]
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/unknownMetric"
+        }
+      ]
+    },
+    "unknownMetric": {
+      "type": "object",
+      "required": [
+        "状態",
+        "値",
+        "証拠種別",
+        "理由"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "状態": {
+          "const": "unknown"
+        },
+        "値": {
+          "type": "null"
+        },
+        "証拠種別": {
+          "enum": [
+            "LIVE_RUNTIME",
+            "INTERNAL_STATE"
+          ]
+        },
+        "理由": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "binding": {
+      "description": "PIDはBrokerが登録済みloopback listenerの所有者から観測し、作成時刻と組にした場合だけ返す。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/boundBinding"
+        },
+        {
+          "$ref": "#/$defs/unavailableBinding"
+        },
+        {
+          "$ref": "#/$defs/unsupportedBinding"
+        }
+      ]
+    },
+    "boundBinding": {
+      "type": "object",
+      "required": [
+        "状態",
+        "根拠",
+        "PID",
+        "PID作成時刻UnixMillis",
+        "登録時刻UnixMillis",
+        "登録監査ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "状態": {
+          "const": "bound"
+        },
+        "根拠": {
+          "const": "loopback_tcp_listener_owner_pid"
+        },
+        "PID": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "PID作成時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "登録時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "登録監査ID": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "unavailableBinding": {
+      "type": "object",
+      "required": [
+        "状態",
+        "根拠",
+        "PID",
+        "PID作成時刻UnixMillis",
+        "登録時刻UnixMillis",
+        "登録監査ID",
+        "理由"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "状態": {
+          "enum": [
+            "unbound",
+            "binding_mismatch",
+            "exited"
+          ]
+        },
+        "根拠": {
+          "const": "loopback_tcp_listener_owner_pid"
+        },
+        "PID": {
+          "type": "null"
+        },
+        "PID作成時刻UnixMillis": {
+          "type": "null"
+        },
+        "登録時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "登録監査ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "理由": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "unsupportedBinding": {
+      "type": "object",
+      "required": [
+        "状態",
+        "根拠",
+        "PID",
+        "PID作成時刻UnixMillis",
+        "登録時刻UnixMillis",
+        "登録監査ID",
+        "理由"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "状態": {
+          "const": "unsupported"
+        },
+        "根拠": {
+          "const": "unsupported"
+        },
+        "PID": {
+          "type": "null"
+        },
+        "PID作成時刻UnixMillis": {
+          "type": "null"
+        },
+        "登録時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "登録監査ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "理由": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "governance": {
+      "description": "実行時にBrokerが固定するread-only観測の統治対応。UI、Adapter metadata、過去観測から作らない。",
+      "type": "object",
+      "required": [
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "能力ID": {
+          "const": "runtime.resource.observe"
+        },
+        "権限ID": {
+          "const": "permission.runtime.resource.observe"
+        },
+        "承認状態": {
+          "const": "not_required"
+        },
+        "復旧ID": {
+          "const": "recover-runtime-resource-binding"
+        }
+      }
+    },
+    "historySample": {
+      "type": "object",
+      "required": [
+        "観測時刻UnixMillis",
+        "CPU利用率Percent",
+        "RAMWorkingSetBytes",
+        "NetworkIOBytes",
+        "平均応答Millis",
+        "エラー率Percent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "観測時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "CPU利用率Percent": {
+          "$ref": "#/$defs/percentMetric"
+        },
+        "RAMWorkingSetBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "NetworkIOBytes": {
+          "$ref": "#/$defs/metric"
+        },
+        "平均応答Millis": {
+          "$ref": "#/$defs/metric"
+        },
+        "エラー率Percent": {
+          "$ref": "#/$defs/percentMetric"
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import math
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,8 @@ REQUIRED = {
     "runtime_execution_history_page.schema.json",
     "runtime_execution_history.schema.json",
     "runtime_execution_record.schema.json",
+    "runtime_resource_query.schema.json",
+    "runtime_resource_observation.schema.json",
     "workspace_inspection_response.schema.json",
     "workspace_startup.schema.json",
     "workspace_inspection_request.schema.json",
@@ -70,14 +73,39 @@ TYPE_MAP = {
     "array": list,
     "string": str,
     "integer": int,
+    "number": (int, float),
     "boolean": bool,
     "null": type(None),
 }
 
 
+def _reject_nonfinite_json_constant(token: str) -> None:
+    raise ValueError(f"JSONの非有限数は許可しない: {token}")
+
+
+def _assert_finite_json_numbers(value: object, path: str = "$") -> None:
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{path}: JSON数値は有限でなければならない")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _assert_finite_json_numbers(item, f"{path}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _assert_finite_json_numbers(item, f"{path}.{key}")
+
+
+def parse_json_text(text: str) -> object:
+    value = json.loads(text, parse_constant=_reject_nonfinite_json_constant)
+    _assert_finite_json_numbers(value)
+    return value
+
+
 def load_json(path: Path) -> tuple[object | None, str | None]:
     try:
-        return json.loads(path.read_text(encoding="utf-8")), None
+        return parse_json_text(path.read_text(encoding="utf-8")), None
     except Exception as exc:
         return None, str(exc)
 
@@ -85,18 +113,40 @@ def load_json(path: Path) -> tuple[object | None, str | None]:
 def type_matches(value, expected_type: str) -> bool:
     if expected_type == "integer":
         return isinstance(value, int) and not isinstance(value, bool)
+    if expected_type == "number":
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and (not isinstance(value, float) or math.isfinite(value))
+        )
     if expected_type == "boolean":
         return isinstance(value, bool)
     return isinstance(value, TYPE_MAP[expected_type])
 
 
-def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
+def validate_instance(value, schema: dict, path: str = "$", root: dict | None = None) -> list[str]:
     errors: list[str] = []
+    if isinstance(value, float) and not math.isfinite(value):
+        return [f"{path}: JSON数値は有限でなければならない"]
+    if root is None:
+        root = schema
+    reference = schema.get("$ref")
+    if reference is not None:
+        if not isinstance(reference, str) or not reference.startswith("#/"):
+            return [f"{path}: 未対応の$ref {reference!r}"]
+        target: object = root
+        for part in reference[2:].split("/"):
+            if not isinstance(target, dict):
+                return [f"{path}: $ref {reference!r}を解決できない"]
+            target = target.get(part.replace("~1", "/").replace("~0", "~"))
+        if not isinstance(target, dict):
+            return [f"{path}: $ref {reference!r}を解決できない"]
+        return validate_instance(value, target, path, root)
     if "allOf" in schema:
         for branch in schema["allOf"]:
-            errors.extend(validate_instance(value, branch, path))
+            errors.extend(validate_instance(value, branch, path, root))
     if "oneOf" in schema:
-        一致数 = sum(not validate_instance(value, 分岐, path) for 分岐 in schema["oneOf"])
+        一致数 = sum(not validate_instance(value, 分岐, path, root) for 分岐 in schema["oneOf"])
         if 一致数 != 1:
             errors.append(f"{path}: oneOfの一致数が1ではない")
     expected_type = schema.get("type")
@@ -124,7 +174,7 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
         if "pattern" in schema and re.match(schema["pattern"], value) is None:
             errors.append(f"{path}: pattern {schema['pattern']}と一致しない")
 
-    if isinstance(value, int) and not isinstance(value, bool):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:
             errors.append(f"{path}: minimum {schema['minimum']}未満")
 
@@ -139,7 +189,7 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
-                errors.extend(validate_instance(item, item_schema, f"{path}[{index}]"))
+                errors.extend(validate_instance(item, item_schema, f"{path}[{index}]", root))
 
     if isinstance(value, dict):
         required = schema.get("required", [])
@@ -157,9 +207,9 @@ def validate_instance(value, schema: dict, path: str = "$") -> list[str]:
 
         for key, item in value.items():
             if key in properties:
-                errors.extend(validate_instance(item, properties[key], f"{path}.{key}"))
+                errors.extend(validate_instance(item, properties[key], f"{path}.{key}", root))
             elif isinstance(additional, dict):
-                errors.extend(validate_instance(item, additional, f"{path}.{key}"))
+                errors.extend(validate_instance(item, additional, f"{path}.{key}", root))
 
     return errors
 

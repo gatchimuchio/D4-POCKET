@@ -20,6 +20,7 @@ import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
+import 'services/runtime_resource_client.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
@@ -72,9 +73,16 @@ void _installFatalErrorHandlers() {
 }
 
 class GuiShellDesktopApp extends StatelessWidget {
-  const GuiShellDesktopApp({super.key, this.client});
+  const GuiShellDesktopApp({
+    super.key,
+    this.client,
+    this.runtimeResourceClient,
+    this.runtimeResourceConnect,
+  });
 
   final ShellCoreClient? client;
+  final RuntimeResourceClient? runtimeResourceClient;
+  final RuntimeResourceClientConnector? runtimeResourceConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +93,11 @@ class GuiShellDesktopApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       theme: _buildShellTheme(Brightness.light),
       darkTheme: _buildShellTheme(Brightness.dark),
-      home: ShellHomePage(client: client),
+      home: ShellHomePage(
+        client: client,
+        runtimeResourceClient: runtimeResourceClient,
+        runtimeResourceConnect: runtimeResourceConnect,
+      ),
     );
   }
 }
@@ -153,9 +165,16 @@ class GuiShellFatalErrorScreen extends StatelessWidget {
 }
 
 class ShellHomePage extends StatefulWidget {
-  const ShellHomePage({super.key, required this.client});
+  const ShellHomePage({
+    super.key,
+    required this.client,
+    this.runtimeResourceClient,
+    this.runtimeResourceConnect,
+  });
 
   final ShellCoreClient client;
+  final RuntimeResourceClient? runtimeResourceClient;
+  final RuntimeResourceClientConnector? runtimeResourceConnect;
 
   @override
   State<ShellHomePage> createState() => _ShellHomePageState();
@@ -174,7 +193,12 @@ class _ShellHomePageState extends State<ShellHomePage> {
       Dashboard(client: widget.client),
       SetupDoctor(client: widget.client),
       TrustCenter(client: widget.client),
-      RuntimeCenter(client: widget.client),
+      RuntimeCenter(
+        client: widget.client,
+        resourceClient: widget.runtimeResourceClient,
+        connectResource:
+            widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
+      ),
       AuthorityMap(client: widget.client),
       AgentCenter(client: widget.client),
       ApprovalCenter(client: widget.client),
