@@ -313,6 +313,12 @@ server.serve_forever()
                     deletion_schema = json.loads((ROOT / "specs/runtime_content_deletion.schema.json").read_text(encoding="utf-8"))
                     assert not validate_instance(deletion, deletion_schema)
                     assert deletion["暗号文hash"] == receipt["暗号文hash"]
+                    assert 操作(normal, "対話保管状態", save_select)["body"] is None
+                    observed = json.loads(subprocess.check_output([str(binary), "対話承認操作", "--session-file", str(owner_file), "保管状態", p["要求ID"], p["要求hash"]], timeout=10))
+                    state_schema = json.loads((ROOT / "specs/runtime_content_state.schema.json").read_text(encoding="utf-8"))
+                    assert not validate_instance(observed, state_schema)
+                    assert observed["状態"] == "削除確定・file不在" and observed["file存在"] is False
+                    assert observed["暗号文hash"] is None and observed["bytes"] is None
                     assert not (vault / f"history-{p['要求ID']}.dpapi").exists()
                     assert 操作(owner, "対話内容承認", content_target)["body"] is None
                     assert 操作(owner, "対話内容削除", content_target)["body"] is None

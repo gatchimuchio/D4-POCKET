@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_content_state.schema.json",
+  "title": "現在fileと永続監査の保管状態照合",
+  "type": "object",
+  "required": [
+    "版",
+    "要求ID",
+    "要求hash",
+    "観測監査head",
+    "観測時刻",
+    "状態",
+    "file存在",
+    "暗号文hash",
+    "bytes",
+    "保存監査ID",
+    "削除承認監査ID",
+    "削除結果監査ID",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "観測監査head": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "観測時刻": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "状態": {
+      "enum": [
+        "未保存・file不在",
+        "保存記録なし・fileあり",
+        "保存済み・hash一致",
+        "保存記録あり・file欠落",
+        "保存記録あり・hash不一致",
+        "削除承認あり・file残存",
+        "削除承認あり・file不在・結果未確定",
+        "削除確定・file不在"
+      ]
+    },
+    "file存在": {
+      "type": "boolean"
+    },
+    "暗号文hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 131072
+    },
+    "保存監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "削除承認監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "削除結果監査ID": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "証拠種別": {
+      "const": "LIVE_RUNTIME"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "状態": {
+          "const": "未保存・file不在"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "保存記録なし・fileあり"
+        },
+        "file存在": {
+          "const": true
+        },
+        "暗号文hash": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "保存監査ID": {
+          "type": "null"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "保存済み・hash一致"
+        },
+        "file存在": {
+          "const": true
+        },
+        "暗号文hash": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "保存記録あり・file欠落"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "保存記録あり・hash不一致"
+        },
+        "file存在": {
+          "const": true
+        },
+        "暗号文hash": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "null"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "削除承認あり・file残存"
+        },
+        "file存在": {
+          "const": true
+        },
+        "暗号文hash": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "string"
+        },
+        "削除結果監査ID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "削除承認あり・file不在・結果未確定"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "string"
+        },
+        "削除結果監査ID": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "状態": {
+          "const": "削除確定・file不在"
+        },
+        "file存在": {
+          "const": false
+        },
+        "暗号文hash": {
+          "type": "null"
+        },
+        "bytes": {
+          "type": "null"
+        },
+        "保存監査ID": {
+          "type": "string"
+        },
+        "削除承認監査ID": {
+          "type": "string"
+        },
+        "削除結果監査ID": {
+          "type": "string"
+        }
+      }
+    }
+  ]
+}

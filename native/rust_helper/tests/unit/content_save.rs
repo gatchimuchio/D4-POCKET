@@ -197,3 +197,56 @@ fn delete_approval_audit_failure_drops_prepared_handle_without_deleting() {
     assert_eq!(std::fs::read(&path).unwrap(),cipher);
     drop(b);std::fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn owner_inventory_distinguishes_actual_missing_partial_tampered_and_deleted_files() {
+    let root=super::tests::temp_store_dir("content-inventory");
+    let vault=root.join("vault");std::fs::create_dir(&vault).unwrap();
+    let audit=root.join("audit");let mut b=super::tests::persistent_test_broker(&audit);
+    let select=prepare(&mut b,false);
+    assert!(call(&mut b,BrokerOperation::対話保管状態,select.clone(),true).body.is_none());
+    b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話保管状態,select.clone(),false).body.is_none());
+    for key in ["要求ID","要求hash","extra"] {
+        let mut wrong=select.clone();wrong[key]=json!("wrong");
+        assert!(call(&mut b,BrokerOperation::対話保管状態,wrong,true).body.is_none());
+    }
+    let state=|b:&mut Broker|accepted(call(b,BrokerOperation::対話保管状態,select.clone(),true));
+    assert_eq!(state(&mut b)["状態"],"未保存・file不在");
+    let path=vault.join(format!("history-{}.dpapi",select["要求ID"].as_str().unwrap()));
+    std::fs::write(&path,b"").unwrap();
+    let partial=state(&mut b);assert_eq!(partial["状態"],"保存記録なし・fileあり");assert_eq!(partial["bytes"],0);assert_eq!(partial["暗号文hash"],sha256_tagged(b""));
+    std::fs::remove_file(&path).unwrap();
+    accepted(call(&mut b,BrokerOperation::対話内容保存,select.clone(),true));
+    let saved=b.audit_events().last().unwrap().clone();
+    let target=json!({"要求ID":select["要求ID"],"保存監査ID":saved.event_id,"保存監査hash":saved.event_hash});
+    let cipher=std::fs::read(&path).unwrap();
+    let normal=state(&mut b);assert_eq!(normal["状態"],"保存済み・hash一致");assert_eq!(normal["暗号文hash"],sha256_tagged(&cipher));
+    let reader=std::fs::File::open(&path).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話保管状態,select.clone(),true).body.is_none());drop(reader);
+    let alias=vault.join("alias");std::fs::hard_link(&path,&alias).unwrap();
+    assert!(call(&mut b,BrokerOperation::対話保管状態,select.clone(),true).body.is_none());std::fs::remove_file(&alias).unwrap();
+    std::fs::write(&path,b"partial").unwrap();assert_eq!(state(&mut b)["状態"],"保存記録あり・hash不一致");
+    std::fs::remove_file(&path).unwrap();assert_eq!(state(&mut b)["状態"],"保存記録あり・file欠落");
+    std::fs::write(&path,&cipher).unwrap();
+    accepted(call(&mut b,BrokerOperation::対話内容削除,target.clone(),true));
+    let deleted=state(&mut b);assert_eq!(deleted["状態"],"削除確定・file不在");assert!(!deleted["削除結果監査ID"].is_null());
+    std::fs::write(&path,&cipher).unwrap();assert_eq!(state(&mut b)["状態"],"削除承認あり・file残存");
+    assert_eq!(std::fs::read(&path).unwrap(),cipher);
+    // 削除承認を永続化した後、fileを削除して結果監査前で停止した状態を構成する。
+    let request_id="fixture-interrupted-delete";
+    let request_hash=sha256_tagged(target.to_string().as_bytes());
+    b.append_audit(request_id,"対話内容削除","received","試験受信",EVIDENCE_SOURCE_INTERNAL_STATE,&request_hash).unwrap();
+    let intent=json!({"要求ID":select["要求ID"],"保存監査ID":saved.event_id,"保存監査hash":saved.event_hash,"暗号文hash":sha256_tagged(&cipher)});
+    let encoded=intent.to_string();
+    b.append_audit(request_id,"対話内容削除","recorded",&format!("対話内容削除承認:{encoded}"),EVIDENCE_SOURCE_INTERNAL_STATE,&sha256_tagged(encoded.as_bytes())).unwrap();
+    b.protected_store.as_ref().unwrap().prepare_delete(crate::protected_store::Purpose::History,select["要求ID"].as_str().unwrap(),&sha256_tagged(&cipher)).unwrap().commit().unwrap();
+    assert_eq!(state(&mut b)["状態"],"削除承認あり・file不在・結果未確定");
+    drop(b);let mut b=super::tests::persistent_test_broker(&audit);b.保管先起動登録(&vault,true,&[audit.clone()]).unwrap();
+    assert_eq!(state(&mut b)["状態"],"削除承認あり・file不在・結果未確定");
+    let audit_file=audit.join("audit.jsonl");std::fs::remove_file(&audit_file).unwrap();std::fs::create_dir(&audit_file).unwrap();
+    let denied=b.保管状態確定("inventory-finalization-failure",normal);assert_eq!(denied.status,BrokerStatus::Suspended);assert!(denied.body.is_none());
+    assert!(call(&mut b,BrokerOperation::対話保管状態,select,true).body.is_none());
+    drop(b);std::fs::remove_dir_all(root).unwrap();
+}

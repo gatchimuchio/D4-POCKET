@@ -33,7 +33,8 @@
         "対話内容失効",
         "対話内容閲覧状態",
         "対話内容閲覧",
-        "対話内容削除"
+        "対話内容削除",
+        "対話保管状態"
       ]
     },
     "payload": {
@@ -624,6 +625,31 @@
               "maxLength": 256
             },
             "保存監査hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話保管状態"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "要求ID",
+            "要求hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+            },
+            "要求hash": {
               "type": "string",
               "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
             }

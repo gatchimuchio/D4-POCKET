@@ -32,6 +32,7 @@ fn main() {
     eprintln!("過去履歴: 対話承認操作 --session-file <owner資格file> 履歴 <after> <limit:1〜100>");
     eprintln!("内容承認: 対話承認操作 --session-file <owner資格file> 内容閲覧承認 <要求ID> <保存監査ID> <保存監査hash> | 内容閲覧失効");
     eprintln!("内容削除: 対話承認操作 --session-file <owner資格file> 内容削除 <要求ID> <保存監査ID> <保存監査hash>");
+    eprintln!("保管状態: 対話承認操作 --session-file <owner資格file> 保管状態 <要求ID> <要求hash>");
     eprintln!("内容保存: 対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>");
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     eprintln!("全体基準点: 作業領域制御 --session-file <owner資格file> 作業領域全体基準点保存 <作業領域ID> <登録hash>");

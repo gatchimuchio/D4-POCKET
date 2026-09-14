@@ -60,6 +60,34 @@ impl ProtectedStore {
         Ok(hash)
     }
 
+    /// 現在の暗号文metadataだけを観測する。復号・変更・権限生成を行わない。
+    pub fn inspect(&self, purpose: Purpose, id: &str) -> Result<Option<(String, u64)>, StoreError> {
+        let (name, _) = reference(purpose, id)?;
+        let mut options = OpenOptions::new();
+        options.read(true).share_mode(0).follow(FollowSymlinks::No);
+        let file = match self.directory.open_with(name, &options) {
+            Ok(v) => v,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(StoreError::Io),
+        };
+        let m = file.metadata().map_err(|_| StoreError::Io)?;
+        if !m.is_file()
+            || m.file_attributes() & 0x400 != 0
+            || cap_fs_ext::MetadataExt::nlink(&m) != 1
+            || m.len() > MAX_CIPHERTEXT as u64
+        {
+            return Err(StoreError::Changed);
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_CIPHERTEXT as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| StoreError::Io)?;
+        if bytes.len() != m.len() as usize {
+            return Err(StoreError::Changed);
+        }
+        Ok(Some((sha256_tagged(&bytes), m.len())))
+    }
+
     /// 現在承認へ結合したhashの対象を保持する。準備のみでは削除しない。
     pub fn prepare_delete(
         &self,
