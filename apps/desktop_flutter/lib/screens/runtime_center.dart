@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/runtime_lifecycle_client.dart';
 import '../services/runtime_resource_client.dart';
 import '../services/shell_core_client.dart';
 import 'shared.dart';
@@ -14,11 +15,15 @@ class RuntimeCenter extends StatefulWidget {
     required this.client,
     this.resourceClient,
     this.connectResource = connectRuntimeResourceClient,
+    this.lifecycleClient,
+    this.connectLifecycle = connectRuntimeLifecycleClient,
   });
 
   final ShellCoreClient client;
   final RuntimeResourceClient? resourceClient;
   final RuntimeResourceClientConnector connectResource;
+  final RuntimeLifecycleClient? lifecycleClient;
+  final RuntimeLifecycleClientConnector connectLifecycle;
 
   @override
   State<RuntimeCenter> createState() => _RuntimeCenterState();
@@ -30,17 +35,23 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   RuntimeResourceClient? _resourceClient;
   RuntimeResourceObservation? _resourceObservation;
   final _resourceRuntimeId = TextEditingController();
+  RuntimeLifecycleClient? _lifecycleClient;
+  RuntimeLifecycleStatus? _lifecycleStatus;
+  final _lifecycleRuntimeId = TextEditingController();
   late final TabController _tabs;
   bool _resourceBusy = false;
   int _resourceGeneration = 0;
-  String _resourceMessage =
-      '資源は自動更新しません。実行系IDを指定して、監査付きの一回観測を実行してください。';
+  bool _lifecycleBusy = false;
+  int _lifecycleGeneration = 0;
+  String _resourceMessage = '資源は自動更新しません。実行系IDを指定して、監査付きの一回観測を実行してください。';
+  String _lifecycleMessage = 'ライフサイクルは自動実行しません。Brokerへ状態を照会して、Capabilityがある操作だけを表示します。';
 
   @override
   void initState() {
     super.initState();
     _resourceClient = widget.resourceClient;
-    _tabs = TabController(length: 2, vsync: this);
+    _lifecycleClient = widget.lifecycleClient;
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -54,12 +65,22 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _resourceBusy = false;
       _resourceMessage = '接続条件が変わりました。資源を更新して再観測してください。';
     }
+    if (oldWidget.lifecycleClient != widget.lifecycleClient ||
+        oldWidget.connectLifecycle != widget.connectLifecycle) {
+      _lifecycleGeneration++;
+      _lifecycleClient = widget.lifecycleClient;
+      _lifecycleStatus = null;
+      _lifecycleBusy = false;
+      _lifecycleMessage = '接続条件が変わりました。状態を更新して再照会してください。';
+    }
   }
 
   @override
   void dispose() {
     _resourceGeneration++;
+    _lifecycleGeneration++;
     _resourceRuntimeId.dispose();
+    _lifecycleRuntimeId.dispose();
     _tabs.dispose();
     super.dispose();
   }
@@ -78,14 +99,22 @@ class _RuntimeCenterState extends State<RuntimeCenter>
             tabs: const [
               Tab(text: '状態'),
               Tab(text: '資源'),
+              Tab(text: 'ライフサイクル'),
             ],
           ),
         ),
         AnimatedBuilder(
           animation: _tabs,
-          builder: (context, _) => _tabs.index == 0
-              ? _overview(snapshot, selectedRuntime)
-              : _resourcePanel(selectedRuntime),
+          builder: (context, _) {
+            switch (_tabs.index) {
+              case 0:
+                return _overview(snapshot, selectedRuntime);
+              case 1:
+                return _resourcePanel(selectedRuntime);
+              default:
+                return _lifecyclePanel(selectedRuntime);
+            }
+          },
         ),
       ],
     );
@@ -292,6 +321,232 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     }
   }
 
+  Widget _lifecyclePanel(RuntimeRecord? selectedRuntime) {
+    final status = _lifecycleStatus;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '実行系ライフサイクル',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Flutterはprocess kill、PID指定、接続先指定、Capability付与、owner承認を行いません。Brokerが登録済みadapterの状態と統治対応を照会し、Capabilityがある操作だけを表示します。',
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 300,
+                    child: TextField(
+                      key: const ValueKey('runtime-lifecycle-runtime-id'),
+                      controller: _lifecycleRuntimeId,
+                      enabled: !_lifecycleBusy,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: '実行系ID',
+                        helperText: 'PID、接続先、command、argvは入力できません。',
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    key: const ValueKey('runtime-lifecycle-refresh'),
+                    onPressed: _lifecycleBusy ? null : _refreshLifecycle,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('状態を更新'),
+                  ),
+                  if (selectedRuntime != null)
+                    TextButton(
+                      onPressed: _lifecycleBusy
+                          ? null
+                          : () => setState(
+                                () => _lifecycleRuntimeId.text =
+                                    selectedRuntime.runtimeId,
+                              ),
+                      child: const Text('状態タブの選択IDを入力'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(_lifecycleMessage),
+              if (_lifecycleBusy) ...[
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
+              ],
+            ],
+          ),
+        ),
+        if (status != null) ...[
+          const SizedBox(height: 16),
+          if (!status.supported)
+            const BorderedPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ライフサイクルCapabilityなし'),
+                  SizedBox(height: 8),
+                  Text(
+                    'この実行系にはBrokerが登録したライフサイクルCapabilityがありません。操作ボタンは表示しません。',
+                  ),
+                ],
+              ),
+            )
+          else
+            _LifecycleStatusPanel(
+              status: status,
+              busy: _lifecycleBusy,
+              onRequestApproval: _requestLifecycleApproval,
+              onExecute: _executeLifecycle,
+            ),
+        ],
+        const SizedBox(height: 16),
+        const SectionList(
+          title: '承認と隔離の境界',
+          rows: [
+            '承認要求はBrokerへ記録します。owner資格はFlutterへ渡さず、owner CLIが承認します。',
+            '承認済みの操作はpayload hash、期限、現在のPermission、RecoveryAction、現在状態をBrokerが実行直前に再照合します。',
+            '隔離後は通常のライフサイクル操作を表示・実行せず、限定診断の状態照会だけを残します。',
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _refreshLifecycle() async {
+    final runtimeId = _lifecycleRuntimeId.text.trim();
+    if (!RuntimeLifecycleClient.validRuntimeId(runtimeId)) {
+      setState(() {
+        _lifecycleStatus = null;
+        _lifecycleMessage = '実行系IDは英数字、`.`、`_`、`-`だけで指定してください。';
+      });
+      return;
+    }
+    final generation = ++_lifecycleGeneration;
+    setState(() {
+      _lifecycleBusy = true;
+      _lifecycleStatus = null;
+      _lifecycleMessage = 'Brokerへライフサイクル状態を照会しています。';
+    });
+    try {
+      _lifecycleClient ??=
+          widget.lifecycleClient ?? await widget.connectLifecycle();
+      final status = await _lifecycleClient!.status(runtimeId);
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final stateLabel = _lifecycleStateLabel(status.state);
+      final evidenceLabel = _lifecycleEvidenceSourceLabel(status.evidenceSource);
+      setState(() {
+        _lifecycleStatus = status;
+        _lifecycleMessage = status.supported
+            ? '状態 $stateLabel をBrokerの$evidenceLabelで確認しました。'
+            : 'この実行系にはライフサイクルCapabilityがありません。';
+      });
+    } catch (_) {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() {
+          _lifecycleStatus = null;
+          _lifecycleMessage = 'ライフサイクル状態、監査記録、または統治対応を確認できません。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() => _lifecycleBusy = false);
+      }
+    }
+  }
+
+  Future<void> _requestLifecycleApproval(
+    RuntimeLifecycleOperation operation,
+  ) async {
+    final status = _lifecycleStatus;
+    if (status == null || !operation.executable || _lifecycleBusy) return;
+    final generation = ++_lifecycleGeneration;
+    final actionLabel = _lifecycleActionLabel(operation.action);
+    setState(() {
+      _lifecycleBusy = true;
+      _lifecycleMessage = '$actionLabelの承認をBrokerへ要求しています。';
+    });
+    try {
+      _lifecycleClient ??=
+          widget.lifecycleClient ?? await widget.connectLifecycle();
+      final approval = await _lifecycleClient!.requestApproval(
+        status.runtimeId,
+        operation.action,
+      );
+      final refreshed = await _lifecycleClient!.status(status.runtimeId);
+      if (!mounted || generation != _lifecycleGeneration) return;
+      setState(() {
+        _lifecycleStatus = refreshed;
+        _lifecycleMessage =
+            '承認ID ${approval.approvalId} を保留として記録しました。owner CLIで承認後に状態を更新してください。';
+      });
+    } catch (_) {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() {
+          _lifecycleMessage = '承認要求の監査記録または統治対応を確認できません。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() => _lifecycleBusy = false);
+      }
+    }
+  }
+
+  Future<void> _executeLifecycle(RuntimeLifecycleOperation operation) async {
+    final status = _lifecycleStatus;
+    final approval = status?.approvedFor(operation.action);
+    if (status == null ||
+        approval == null ||
+        !operation.executable ||
+        _lifecycleBusy) {
+      return;
+    }
+    final generation = ++_lifecycleGeneration;
+    final actionLabel = _lifecycleActionLabel(operation.action);
+    setState(() {
+      _lifecycleBusy = true;
+      _lifecycleMessage = '$actionLabelをBrokerへ要求しています。';
+    });
+    try {
+      _lifecycleClient ??=
+          widget.lifecycleClient ?? await widget.connectLifecycle();
+      final transition = await _lifecycleClient!.execute(
+        status.runtimeId,
+        operation.action,
+        approval.approvalId,
+      );
+      final refreshed = await _lifecycleClient!.status(status.runtimeId);
+      if (!mounted || generation != _lifecycleGeneration) return;
+      final transitionActionLabel = _lifecycleActionLabel(transition.action);
+      final previousStateLabel = _lifecycleStateLabel(transition.previousState);
+      final nextStateLabel = _lifecycleStateLabel(transition.nextState);
+      setState(() {
+        _lifecycleStatus = refreshed;
+        _lifecycleMessage =
+            '$transitionActionLabel: $previousStateLabel → $nextStateLabel。監査ID ${transition.auditId} を確認しました。';
+      });
+    } catch (_) {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() {
+          _lifecycleMessage = 'ライフサイクル遷移、最終監査、または現在の統治対応を確認できません。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _lifecycleGeneration) {
+        setState(() => _lifecycleBusy = false);
+      }
+    }
+  }
+
   RuntimeRecord? _selectedRuntime(ShellSnapshot snapshot) {
     if (snapshot.runtimes.isEmpty) {
       return null;
@@ -302,6 +557,168 @@ class _RuntimeCenterState extends State<RuntimeCenter>
     );
   }
 }
+
+class _LifecycleStatusPanel extends StatelessWidget {
+  const _LifecycleStatusPanel({
+    required this.status,
+    required this.busy,
+    required this.onRequestApproval,
+    required this.onExecute,
+  });
+
+  final RuntimeLifecycleStatus status;
+  final bool busy;
+  final ValueChanged<RuntimeLifecycleOperation> onRequestApproval;
+  final ValueChanged<RuntimeLifecycleOperation> onExecute;
+
+  @override
+  Widget build(BuildContext context) {
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Broker登録済みライフサイクル',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text('実行系ID: ${status.runtimeId}'),
+          Text('現在状態: ${_lifecycleStateLabel(status.state)}'),
+          Text('証拠: ${_lifecycleEvidenceSourceLabel(status.evidenceSource)}'),
+          const SizedBox(height: 12),
+          for (final operation in status.operations) ...[
+            _LifecycleOperationRow(
+              operation: operation,
+              approval: status.approvedFor(operation.action),
+              busy: busy,
+              onRequestApproval: () => onRequestApproval(operation),
+              onExecute: () => onExecute(operation),
+            ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 8),
+          Text('承認一覧 (${status.approvals.length})'),
+          const SizedBox(height: 4),
+          if (status.approvals.isEmpty)
+            const Text('現在有効な承認はありません。')
+          else
+            for (final approval in status.approvals)
+              _LifecycleApprovalSummary(approval: approval),
+        ],
+      ),
+    );
+  }
+}
+
+class _LifecycleApprovalSummary extends StatelessWidget {
+  const _LifecycleApprovalSummary({required this.approval});
+
+  final RuntimeLifecycleApproval approval;
+
+  @override
+  Widget build(BuildContext context) {
+    final actionLabel = _lifecycleActionLabel(approval.action);
+    final approvalStateLabel = _lifecycleApprovalStateLabel(approval.state);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: SelectableText(
+        '${[actionLabel, approvalStateLabel].join(': ')}\n'
+        '承認ID: ${approval.approvalId}\n'
+        '承認hash: ${approval.approvalHash}\n'
+        '有効期限: ${_formatUnixSeconds(approval.expiresAtUnixSeconds)}',
+      ),
+    );
+  }
+}
+
+class _LifecycleOperationRow extends StatelessWidget {
+  const _LifecycleOperationRow({
+    required this.operation,
+    required this.approval,
+    required this.busy,
+    required this.onRequestApproval,
+    required this.onExecute,
+  });
+
+  final RuntimeLifecycleOperation operation;
+  final RuntimeLifecycleApproval? approval;
+  final bool busy;
+  final VoidCallback onRequestApproval;
+  final VoidCallback onExecute;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _lifecycleActionLabel(operation.action);
+    final control = !operation.executable
+        ? const Text('現在状態では実行できません。')
+        : approval == null
+            ? OutlinedButton(
+                key: ValueKey('runtime-lifecycle-request-${operation.action}'),
+                onPressed: busy ? null : onRequestApproval,
+                child: Text('$label の承認を要求'),
+              )
+            : FilledButton(
+                key: ValueKey('runtime-lifecycle-execute-${operation.action}'),
+                onPressed: busy ? null : onExecute,
+                child: Text(label),
+              );
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            '${operation.capabilityId} → ${operation.permissionId} → '
+            '${operation.recoveryId}',
+          ),
+          const SizedBox(height: 8),
+          control,
+        ],
+      ),
+    );
+  }
+}
+
+String _lifecycleActionLabel(String action) => switch (action) {
+      'start' => '開始',
+      'stop' => '停止',
+      'restart' => '再起動',
+      'pause' => '一時停止',
+      'resume' => '再開',
+      'quarantine' => '隔離',
+      _ => '不明な操作',
+    };
+
+String _lifecycleStateLabel(String state) => switch (state) {
+      'stopped' => '停止中',
+      'ready' => '稼働中',
+      'paused' => '一時停止中',
+      'quarantined' => '隔離済み',
+      'unknown' => '不明',
+      'not_supported' => '未対応',
+      _ => '不明',
+    };
+
+String _lifecycleApprovalStateLabel(String state) => switch (state) {
+      'pending' => '保留',
+      'approved' => '承認済み',
+      _ => '不明',
+    };
+
+String _lifecycleEvidenceSourceLabel(String source) => switch (source) {
+      'LIVE_RUNTIME' => '実稼働観測',
+      'INTERNAL_STATE' => '内部状態',
+      _ => '不明',
+    };
+
+String _formatUnixSeconds(int value) =>
+    DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true)
+        .toLocal()
+        .toIso8601String();
 
 class _RuntimeTable extends StatelessWidget {
   const _RuntimeTable({

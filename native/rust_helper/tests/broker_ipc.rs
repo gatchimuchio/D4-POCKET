@@ -6,7 +6,9 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use gui_shell_rust_helper::broker::{BrokerEndpoint, BrokerRequestEnvelope};
+use gui_shell_rust_helper::broker::{
+    BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope,
+};
 use serde_json::Value;
 
 struct BrokerProcess {
@@ -204,6 +206,403 @@ fn spawn_broker(workspace: &Workspace, max_request_bytes: usize) -> BrokerProces
         panic!("broker endpoint fileが作成されなかった")
     });
     BrokerProcess { child, endpoint }
+}
+
+fn spawn_lifecycle_fixture_broker(workspace: &Workspace) -> (BrokerProcess, BrokerEndpoint, PathBuf) {
+    let binary = env!("CARGO_BIN_EXE_gui_shell_rust_helper");
+    let owner_file = workspace.session_file.with_file_name("lifecycle-owner.json");
+    let _ = fs::remove_file(&workspace.session_file);
+    let _ = fs::remove_file(&owner_file);
+    let mut child = Command::new(binary)
+        .arg("broker-server")
+        .arg("--store-dir")
+        .arg(&workspace.store_dir)
+        .arg("--session-file")
+        .arg(&workspace.session_file)
+        .arg("--owner-session-file")
+        .arg(&owner_file)
+        .arg("--enable-development-lifecycle-fixture")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let endpoint = wait_for_endpoint(&workspace.session_file).unwrap_or_else(|| {
+        let _ = child.kill();
+        panic!("開発用実行系試験子のBroker接続ファイルが作成されなかった")
+    });
+    let owner = wait_for_endpoint(&owner_file).unwrap_or_else(|| {
+        let _ = child.kill();
+        panic!("開発用実行系試験子の所有者資格接続ファイルが作成されなかった")
+    });
+    (BrokerProcess { child, endpoint }, owner, owner_file)
+}
+
+fn terminal_runtime_replacement_is_rejected(workspace: &Workspace, runtime_id: &str) {
+    let _ = fs::remove_file(&workspace.session_file);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .arg("broker-server")
+        .arg("--store-dir")
+        .arg(&workspace.store_dir)
+        .arg("--session-file")
+        .arg(&workspace.session_file)
+        .arg("--minidora-runtime")
+        .arg(format!("{runtime_id}=127.0.0.1:9"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    for _ in 0..100 {
+        if let Some(status) = child.try_wait().unwrap() {
+            assert!(
+                !status.success(),
+                "terminal隔離済み実行系を通常Adapterとして再登録できた"
+            );
+            assert!(
+                !workspace.session_file.exists(),
+                "失敗した再登録が通常IPC接続fileを生成した"
+            );
+            return;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+    panic!("terminal隔離済み実行系を別Adapterとして再登録できた");
+}
+
+fn lifecycle_ipc_request(
+    endpoint: &BrokerEndpoint,
+    operation: &str,
+    payload: Value,
+    tag: &str,
+) -> String {
+    use gui_shell_rust_helper::audit_hash::sha256_tagged;
+    let payload_hash = sha256_tagged(payload.to_string().as_bytes());
+    serde_json::json!({
+        "request_id": format!("lifecycle-{tag}"),
+        "session_id": endpoint.session_id,
+        "operation": operation,
+        "payload": payload,
+        "payload_hash": payload_hash,
+        "nonce": format!("lifecycle-{tag}-nonce"),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {},
+    })
+    .to_string()
+}
+
+fn lifecycle_owner_approve_cli(owner_file: &PathBuf, approval: &Value) -> Value {
+    let output = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+        .args(["実行系ライフサイクル承認", "--session-file"])
+        .arg(owner_file)
+        .arg("承認")
+        .arg(approval["承認ID"].as_str().unwrap())
+        .arg(approval["承認hash"].as_str().unwrap())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn lifecycle_transition(
+    process: &BrokerProcess,
+    owner_file: &PathBuf,
+    action: &str,
+    tag: &str,
+) -> Value {
+    let runtime_id = "development-lifecycle-fixture";
+    let pending = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "実行系ライフサイクル承認要求",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id, "操作": action}),
+            &format!("{tag}-pending"),
+        ),
+    );
+    assert_eq!(pending["status"], "accepted", "{pending}");
+    let approved = lifecycle_owner_approve_cli(owner_file, &pending["body"]);
+    assert_eq!(approved["状態"], "approved");
+    let response = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "実行系ライフサイクル操作",
+            serde_json::json!({
+                "版": 1,
+                "実行系ID": runtime_id,
+                "操作": action,
+                "承認ID": approved["承認ID"],
+            }),
+            &format!("{tag}-execute"),
+        ),
+    );
+    assert_eq!(response["status"], "accepted", "{response}");
+    assert_eq!(response["body"]["統治"]["承認状態"], "consumed");
+    response
+}
+
+#[test]
+fn development_lifecycle_fixture_uses_owner_approval_and_fixed_child_acknowledgements() {
+    let workspace = temp_workspace("development-lifecycle-fixture");
+    let (process, owner, owner_file) = spawn_lifecycle_fixture_broker(&workspace);
+    let runtime_id = "development-lifecycle-fixture";
+    assert_eq!(
+        process.endpoint.credential_role,
+        BrokerCredentialRole::Normal
+    );
+    assert_eq!(owner.credential_role, BrokerCredentialRole::Owner);
+
+    let initial = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "実行系ライフサイクル状態",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+            "initial-status",
+        ),
+    );
+    assert_eq!(initial["status"], "accepted");
+    assert_eq!(initial["body"]["対応"], true);
+    assert_eq!(initial["body"]["状態"], "stopped");
+
+    let owner_status = send_request(
+        &owner,
+        &lifecycle_ipc_request(
+            &owner,
+            "実行系ライフサイクル状態",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+            "owner-status-rejected",
+        ),
+    );
+    assert_eq!(owner_status["status"], "rejected");
+    assert_eq!(
+        owner_status["error"]["code"],
+        "lifecycle_normal_channel_required"
+    );
+
+    let transition = |action: &str, tag: &str| -> Value {
+        let pending = send_request(
+            &process.endpoint,
+            &lifecycle_ipc_request(
+                &process.endpoint,
+                "実行系ライフサイクル承認要求",
+                serde_json::json!({"版": 1, "実行系ID": runtime_id, "操作": action}),
+                &format!("{tag}-pending"),
+            ),
+        );
+        assert_eq!(pending["status"], "accepted", "{pending}");
+        assert_eq!(pending["body"]["状態"], "pending");
+
+        let normal_file_as_owner = Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
+            .args(["実行系ライフサイクル承認", "--session-file"])
+            .arg(&workspace.session_file)
+            .arg("承認")
+            .arg(pending["body"]["承認ID"].as_str().unwrap())
+            .arg(pending["body"]["承認hash"].as_str().unwrap())
+            .output()
+            .unwrap();
+        assert!(!normal_file_as_owner.status.success());
+        assert!(normal_file_as_owner.stdout.is_empty());
+        let pending_after_normal_file = send_request(
+            &process.endpoint,
+            &lifecycle_ipc_request(
+                &process.endpoint,
+                "実行系ライフサイクル状態",
+                serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+                &format!("{tag}-normal-file-rejected-status"),
+            ),
+        );
+        assert_eq!(
+            pending_after_normal_file["body"]["承認一覧"][0]["状態"],
+            "pending"
+        );
+
+        let normal_owner_forgery = send_request(
+            &process.endpoint,
+            &lifecycle_ipc_request(
+                &process.endpoint,
+                "実行系ライフサイクル承認",
+                serde_json::json!({"版": 1, "承認ID": pending["body"]["承認ID"], "承認hash": pending["body"]["承認hash"]}),
+                &format!("{tag}-normal-owner-forgery"),
+            ),
+        );
+        assert_eq!(normal_owner_forgery["status"], "rejected");
+        assert_eq!(
+            normal_owner_forgery["error"]["code"],
+            "lifecycle_owner_approval_required"
+        );
+
+        let approved = lifecycle_owner_approve_cli(&owner_file, &pending["body"]);
+        assert_eq!(approved["状態"], "approved");
+        let response = send_request(
+            &process.endpoint,
+            &lifecycle_ipc_request(
+                &process.endpoint,
+                "実行系ライフサイクル操作",
+                serde_json::json!({
+                    "版": 1,
+                    "実行系ID": runtime_id,
+                    "操作": action,
+                    "承認ID": approved["承認ID"],
+                }),
+                &format!("{tag}-execute"),
+            ),
+        );
+        assert_eq!(response["status"], "accepted", "{response}");
+        assert_eq!(response["evidence_source"], "LIVE_RUNTIME");
+        assert_eq!(response["body"]["統治"]["承認状態"], "consumed");
+        assert_eq!(response["body"]["ライフサイクル監査ID"], response["audit_event_id"]);
+        response
+    };
+
+    for (action, previous, next, tag) in [
+        ("start", "stopped", "ready", "start"),
+        ("pause", "ready", "paused", "pause"),
+        ("resume", "paused", "ready", "resume"),
+        ("restart", "ready", "ready", "restart"),
+        ("stop", "ready", "stopped", "stop"),
+        ("start", "stopped", "ready", "restart-start"),
+        ("quarantine", "ready", "quarantined", "quarantine"),
+    ] {
+        let response = transition(action, tag);
+        assert_eq!(response["body"]["遷移前状態"], previous);
+        assert_eq!(response["body"]["遷移後状態"], next);
+    }
+
+    let quarantined = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "実行系ライフサイクル状態",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+            "quarantined-status",
+        ),
+    );
+    assert_eq!(quarantined["status"], "accepted");
+    assert_eq!(quarantined["body"]["状態"], "quarantined");
+    assert_eq!(quarantined["body"]["操作一覧"], serde_json::json!([]));
+    assert_eq!(quarantined["body"]["承認一覧"], serde_json::json!([]));
+
+    let blocked = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "実行系ライフサイクル承認要求",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id, "操作": "start"}),
+            "quarantined-request",
+        ),
+    );
+    assert_eq!(blocked["status"], "rejected");
+    assert_eq!(blocked["error"]["code"], "lifecycle_invalid_transition");
+
+    let generic = send_request(
+        &process.endpoint,
+        &lifecycle_ipc_request(
+            &process.endpoint,
+            "command_envelope",
+            serde_json::json!({}),
+            "generic-command",
+        ),
+    );
+    assert_eq!(generic["status"], "suspended");
+    assert_eq!(generic["body"]["dispatch_enabled"], false);
+
+    drop(process);
+    fs::remove_file(&workspace.session_file).unwrap();
+    fs::remove_file(&owner_file).unwrap();
+    fs::remove_dir_all(workspace.store_dir.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn lifecycle_quarantine_is_terminal_across_broker_restart() {
+    let workspace = temp_workspace("lifecycle-terminal-quarantine-restart");
+    let runtime_id = "development-lifecycle-fixture";
+    {
+        let (process, _owner, owner_file) = spawn_lifecycle_fixture_broker(&workspace);
+        let started = lifecycle_transition(&process, &owner_file, "start", "terminal-start");
+        assert_eq!(started["body"]["遷移後状態"], "ready");
+        let quarantined = lifecycle_transition(&process, &owner_file, "quarantine", "terminal-quarantine");
+        assert_eq!(quarantined["body"]["遷移後状態"], "quarantined");
+        drop(process);
+        fs::remove_file(&workspace.session_file).unwrap();
+        fs::remove_file(&owner_file).unwrap();
+    }
+
+    {
+        let without_fixture = spawn_broker(&workspace, 64 * 1024);
+        let terminal_status = send_request(
+            &without_fixture.endpoint,
+            &lifecycle_ipc_request(
+                &without_fixture.endpoint,
+                "実行系ライフサイクル状態",
+                serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+                "terminal-no-fixture-status",
+            ),
+        );
+        assert_eq!(terminal_status["status"], "accepted", "{terminal_status}");
+        assert_eq!(terminal_status["body"]["状態"], "quarantined");
+        assert_eq!(terminal_status["body"]["操作一覧"], serde_json::json!([]));
+        assert_eq!(terminal_status["body"]["承認一覧"], serde_json::json!([]));
+
+        let dialogue_start = send_request(
+            &without_fixture.endpoint,
+            &lifecycle_ipc_request(
+                &without_fixture.endpoint,
+                "対話開始",
+                serde_json::json!({"実行系ID": runtime_id}),
+                "terminal-no-fixture-dialogue",
+            ),
+        );
+        assert_eq!(dialogue_start["status"], "rejected");
+        assert_eq!(dialogue_start["error"]["code"], "実行系不在");
+
+        drop(without_fixture);
+        fs::remove_file(&workspace.session_file).unwrap();
+    }
+
+    terminal_runtime_replacement_is_rejected(&workspace, runtime_id);
+
+    let (restarted, _owner, owner_file) = spawn_lifecycle_fixture_broker(&workspace);
+    let status = send_request(
+        &restarted.endpoint,
+        &lifecycle_ipc_request(
+            &restarted.endpoint,
+            "実行系ライフサイクル状態",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id}),
+            "terminal-restarted-status",
+        ),
+    );
+    assert_eq!(status["status"], "accepted", "{status}");
+    assert_eq!(status["body"]["状態"], "quarantined");
+    assert_eq!(status["body"]["操作一覧"], serde_json::json!([]));
+    assert_eq!(status["body"]["承認一覧"], serde_json::json!([]));
+
+    let start_after_restart = send_request(
+        &restarted.endpoint,
+        &lifecycle_ipc_request(
+            &restarted.endpoint,
+            "実行系ライフサイクル承認要求",
+            serde_json::json!({"版": 1, "実行系ID": runtime_id, "操作": "start"}),
+            "terminal-restarted-start",
+        ),
+    );
+    assert_eq!(start_after_restart["status"], "rejected");
+    assert_eq!(
+        start_after_restart["error"]["code"],
+        "lifecycle_invalid_transition"
+    );
+
+    drop(restarted);
+    fs::remove_file(&workspace.session_file).unwrap();
+    fs::remove_file(&owner_file).unwrap();
+    fs::remove_dir_all(workspace.store_dir.parent().unwrap()).unwrap();
 }
 
 fn wait_for_endpoint(path: &PathBuf) -> Option<BrokerEndpoint> {
@@ -472,7 +871,7 @@ fn owner制御資格を通常資格や要求metadataで置換できない() {
     let restarted = BrokerProcess {child, endpoint};
     wait_for_endpoint(&owner_file).unwrap();
     let state=Command::new(env!("CARGO_BIN_EXE_gui_shell_rust_helper"))
-        .args(["対話承認操作","--session-file"]).arg(&workspace.session_file).arg("履歴閲覧状態").output().unwrap();
+        .args(["対話承認操作","--session-file"]).arg(&owner_file).arg("履歴閲覧状態").output().unwrap();
     assert!(state.status.success());
     let state:Value=serde_json::from_slice(&state.stdout).unwrap();
     assert_eq!(state["grant"],Value::Null);

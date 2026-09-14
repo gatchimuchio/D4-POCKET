@@ -13,12 +13,21 @@ pub mod authority;
 pub mod ipc_server;
 pub mod protocol;
 pub(crate) mod runtime_registry;
+pub(crate) mod runtime_lifecycle;
 pub mod store;
 
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};
-pub use ipc_server::{run_loopback_server, BrokerEndpoint, BrokerServerConfig};
+pub use ipc_server::{
+    run_loopback_server, BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig,
+};
 pub use protocol::{
     Broker, BrokerError, BrokerHealth, BrokerMetadata, BrokerOperation, BrokerPersistenceMode,
     BrokerRequestEnvelope, BrokerResponse, BrokerStateStore, BrokerStatus,
 };
 pub use store::{BrokerPersistentState, BrokerPersistentStore, BrokerStoreError};
+
+/// development buildでのみ、固定lifecycle fixture childのstdin/stdout protocolを実行する。
+#[cfg(debug_assertions)]
+pub fn run_development_lifecycle_fixture_child() -> i32 {
+    runtime_lifecycle::run_development_fixture_child()
+}

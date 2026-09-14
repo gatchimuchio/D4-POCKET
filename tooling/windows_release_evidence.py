@@ -34,6 +34,7 @@ REQUIRED_SETUP_CHECKS = {
 REQUIRED_BROKER_TRUE_FIELDS = {
     "helper_exe_exists",
     "session_file_created",
+    "normal_endpoint_credential_role_verified",
     "restricted_loopback_bind",
     "authenticated_ipc_connection",
     "durable_store_ready",
@@ -475,6 +476,10 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("first run で broker endpoint file の作成を確認できなかった")
     if _get(data, "first_run.broker_transport") != "authenticated_loopback_tcp":
         errors.append("first_run.broker_transport は authenticated_loopback_tcp でなければならない")
+    if _get(data, "first_run.broker_endpoint_credential_role") != "normal":
+        errors.append("first_run.broker_endpoint_credential_role は normal でなければならない")
+    if not _is_true(data, "first_run.normal_endpoint_credential_role_verified"):
+        errors.append("first run で broker通常接続資格のroleを確認できなかった")
     if not _is_true(data, "first_run.no_python_runtime_requested"):
         errors.append("first run が no-Python runtime evidence mode を要求しなかった")
     if not _is_true(data, "first_run.python_runtime_path_scrubbed"):
@@ -637,6 +642,8 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
                         errors.append(f"broker の field_provenance.{field}.evidence_class は LIVE_RUNTIME または EXTERNAL_EVIDENCE でなければならない")
         if broker.get("endpoint_host") != "127.0.0.1":
             errors.append("broker の endpoint_host は 127.0.0.1 でなければならない")
+        if broker.get("endpoint_credential_role") != "normal":
+            errors.append("broker の endpoint_credential_role は normal でなければならない")
         if broker.get("replay_error_code") != "broker_replay_detected":
             errors.append("broker の replay_error_code は broker_replay_detected でなければならない")
         if "python_runtime_required_for_authority" in broker:

@@ -45,6 +45,11 @@ if [[ ! -f "$BROKER_SESSION" ]]; then
   exit 1
 fi
 
+if ! grep -Eq '"credential_role"[[:space:]]*:[[:space:]]*"normal"' "$BROKER_SESSION"; then
+  echo "Flutterへ渡すbroker通常接続資格が不正" >&2
+  exit 1
+fi
+
 export GUI_SHELL_BROKER_ENDPOINT_JSON="$BROKER_SESSION"
 cd apps/desktop_flutter
 flutter run -d linux

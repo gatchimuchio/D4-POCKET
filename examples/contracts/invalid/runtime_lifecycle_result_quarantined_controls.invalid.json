@@ -1,0 +1,18 @@
+{
+  "版": 1,
+  "対応": true,
+  "実行系ID": "fixture-runtime",
+  "状態": "quarantined",
+  "証拠種別": "INTERNAL_STATE",
+  "操作一覧": [
+    {
+      "操作": "start",
+      "能力ID": "runtime.lifecycle.start",
+      "権限ID": "permission.runtime.lifecycle.start",
+      "承認必要": true,
+      "復旧ID": "recover-runtime-lifecycle-start",
+      "実行可能": false
+    }
+  ],
+  "承認一覧": []
+}

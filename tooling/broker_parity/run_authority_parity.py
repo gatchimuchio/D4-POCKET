@@ -178,6 +178,38 @@ def base_action() -> dict:
     }
 
 
+def require_normal_broker_endpoint(endpoint: object) -> dict:
+    if not isinstance(endpoint, dict):
+        raise AssertionError("broker通常接続資格がobjectではない")
+    required = {
+        "host",
+        "port",
+        "session_id",
+        "session_secret",
+        "credential_role",
+        "transport",
+        "max_request_bytes",
+    }
+    if set(endpoint) != required:
+        raise AssertionError("broker通常接続資格のfield集合が不正")
+    if (
+        endpoint["credential_role"] != "normal"
+        or endpoint["host"] != "127.0.0.1"
+        or endpoint["transport"] != "authenticated_loopback_tcp"
+        or not isinstance(endpoint["port"], int)
+        or not 1 <= endpoint["port"] <= 65535
+        or not isinstance(endpoint["session_id"], str)
+        or not endpoint["session_id"]
+        or not isinstance(endpoint["session_secret"], str)
+        or len(endpoint["session_secret"]) != 64
+        or any(char not in "0123456789abcdef" for char in endpoint["session_secret"])
+        or not isinstance(endpoint["max_request_bytes"], int)
+        or endpoint["max_request_bytes"] < 1
+    ):
+        raise AssertionError("broker通常接続資格が不正")
+    return endpoint
+
+
 class BrokerClient:
     def __init__(self, process: subprocess.Popen, endpoint: dict):
         self.process = process
@@ -252,7 +284,7 @@ def start_broker(workspace: Path) -> BrokerClient:
         if session_file.exists():
             stderr.close()
             endpoint = json.loads(session_file.read_text(encoding="utf-8"))
-            return BrokerClient(process, endpoint)
+            return BrokerClient(process, require_normal_broker_endpoint(endpoint))
         if process.poll() is not None:
             stderr.close()
             detail = stderr_path.read_text(encoding="utf-8", errors="replace")

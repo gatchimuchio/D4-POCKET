@@ -47,6 +47,13 @@ try {
     throw "Rust broker endpoint ファイルが作成されませんでした: $BrokerSession"
     }
 
+    $Endpoint = Get-Content -Raw -Path $BrokerSession | ConvertFrom-Json
+    if ($Endpoint.credential_role -ne "normal" -or
+        $Endpoint.host -ne "127.0.0.1" -or
+        $Endpoint.transport -ne "authenticated_loopback_tcp") {
+      throw "Flutterへ渡すbroker通常接続資格が不正"
+    }
+
     $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $BrokerSession
     Set-Location (Join-Path $Root "apps\desktop_flutter")
     flutter run -d windows

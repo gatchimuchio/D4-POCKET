@@ -140,6 +140,36 @@ def file待機(path, process, timeout=20):
     raise RuntimeError("起動期限超過")
 
 
+def 接続資格確認(endpoint, expected_role):
+    required = {
+        "host",
+        "port",
+        "session_id",
+        "session_secret",
+        "credential_role",
+        "transport",
+        "max_request_bytes",
+    }
+    if not isinstance(endpoint, dict) or set(endpoint) != required:
+        raise RuntimeError("Broker接続資格のfield集合が不正")
+    if (
+        endpoint["credential_role"] != expected_role
+        or endpoint["host"] != "127.0.0.1"
+        or endpoint["transport"] != "authenticated_loopback_tcp"
+        or not isinstance(endpoint["port"], int)
+        or not 1 <= endpoint["port"] <= 65535
+        or not isinstance(endpoint["session_id"], str)
+        or not endpoint["session_id"]
+        or not isinstance(endpoint["session_secret"], str)
+        or len(endpoint["session_secret"]) != 64
+        or any(char not in "0123456789abcdef" for char in endpoint["session_secret"])
+        or not isinstance(endpoint["max_request_bytes"], int)
+        or endpoint["max_request_bytes"] < 1
+    ):
+        raise RuntimeError(f"Broker {expected_role}接続資格が不正")
+    return endpoint
+
+
 def 終了(process):
     if process.poll() is None:
         process.terminate()
@@ -273,8 +303,8 @@ server.serve_forever()
                     "--session-file", str(normal_file), "--owner-session-file", str(owner_file), *protected_args,
                     "--minidora-runtime", f"left={addresses[0]}", "--minidora-runtime", f"right={addresses[1]}", *(["--mobile-bind", "127.0.0.1:0"] if mobile_client or dart_mobile_client or virtual_device else [])], cwd=root, stdout=log, stderr=log)
                 processes.append(broker)
-                normal = file待機(normal_file, broker)
-                owner = file待機(owner_file, broker)
+                normal = 接続資格確認(file待機(normal_file, broker), "normal")
+                owner = 接続資格確認(file待機(owner_file, broker), "owner")
                 assert 操作(normal, "対話承認待ち", {})["status"] == "rejected"
                 assert 成功(normal, "実行系列挙", {})["実行系"] == ["left", "right"]
                 decimal_hash_interop = 小数資源観測正本化相互運用(normal)

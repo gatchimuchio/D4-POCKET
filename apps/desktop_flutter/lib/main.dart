@@ -21,6 +21,7 @@ import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
 import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
+import 'services/runtime_lifecycle_client.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
@@ -78,11 +79,15 @@ class GuiShellDesktopApp extends StatelessWidget {
     this.client,
     this.runtimeResourceClient,
     this.runtimeResourceConnect,
+    this.runtimeLifecycleClient,
+    this.runtimeLifecycleConnect,
   });
 
   final ShellCoreClient? client;
   final RuntimeResourceClient? runtimeResourceClient;
   final RuntimeResourceClientConnector? runtimeResourceConnect;
+  final RuntimeLifecycleClient? runtimeLifecycleClient;
+  final RuntimeLifecycleClientConnector? runtimeLifecycleConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +102,8 @@ class GuiShellDesktopApp extends StatelessWidget {
         client: client,
         runtimeResourceClient: runtimeResourceClient,
         runtimeResourceConnect: runtimeResourceConnect,
+        runtimeLifecycleClient: runtimeLifecycleClient,
+        runtimeLifecycleConnect: runtimeLifecycleConnect,
       ),
     );
   }
@@ -170,11 +177,15 @@ class ShellHomePage extends StatefulWidget {
     required this.client,
     this.runtimeResourceClient,
     this.runtimeResourceConnect,
+    this.runtimeLifecycleClient,
+    this.runtimeLifecycleConnect,
   });
 
   final ShellCoreClient client;
   final RuntimeResourceClient? runtimeResourceClient;
   final RuntimeResourceClientConnector? runtimeResourceConnect;
+  final RuntimeLifecycleClient? runtimeLifecycleClient;
+  final RuntimeLifecycleClientConnector? runtimeLifecycleConnect;
 
   @override
   State<ShellHomePage> createState() => _ShellHomePageState();
@@ -198,6 +209,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
         resourceClient: widget.runtimeResourceClient,
         connectResource:
             widget.runtimeResourceConnect ?? connectRuntimeResourceClient,
+        lifecycleClient: widget.runtimeLifecycleClient,
+        connectLifecycle:
+            widget.runtimeLifecycleConnect ?? connectRuntimeLifecycleClient,
       ),
       AuthorityMap(client: widget.client),
       AgentCenter(client: widget.client),
@@ -207,8 +221,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
       ProblemsPanel(client: widget.client),
       EvidenceCenter(client: widget.client),
       SettingsScreen(client: widget.client),
-      if (_dialogueVisited) RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo) else const SizedBox.shrink(),
-      if (selectedIndex == 13 && viewMode == _ShellViewMode.ownerUse) const HistoryScreen() else const SizedBox.shrink(),
+      if (_dialogueVisited)
+        RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
+      else
+        const SizedBox.shrink(),
+      if (selectedIndex == 13 && viewMode == _ShellViewMode.ownerUse)
+        const HistoryScreen()
+      else
+        const SizedBox.shrink(),
     ];
     final pageEntries = _pageEntries();
 
@@ -346,11 +366,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
                         ),
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: IndexedStack(index: selectedIndex, children: pages)),
+                      Expanded(
+                          child: IndexedStack(
+                              index: selectedIndex, children: pages)),
                     ],
                   ),
                 ),
-                ShellStatusBar(snapshot: snapshot, dialogueContext: selectedIndex == 12),
+                ShellStatusBar(
+                    snapshot: snapshot, dialogueContext: selectedIndex == 12),
               ],
             ),
           ),

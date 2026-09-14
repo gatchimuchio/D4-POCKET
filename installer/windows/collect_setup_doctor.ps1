@@ -124,12 +124,15 @@ $brokerReady = (
   $null -ne $brokerEvidence -and
   $brokerEvidence.status -eq "passed" -and
   $brokerEvidence.authenticated_ipc_connection -eq $true -and
-  $brokerEvidence.durable_store_ready -eq $true
+  $brokerEvidence.durable_store_ready -eq $true -and
+  $brokerEvidence.endpoint_credential_role -eq "normal" -and
+  $brokerEvidence.normal_endpoint_credential_role_verified -eq $true
 )
 $restrictedBind = (
   $null -ne $brokerEvidence -and
   $brokerEvidence.restricted_loopback_bind -eq $true -and
-  $brokerEvidence.endpoint_host -eq "127.0.0.1"
+  $brokerEvidence.endpoint_host -eq "127.0.0.1" -and
+  $brokerEvidence.endpoint_credential_role -eq "normal"
 )
 
 $checks = @(

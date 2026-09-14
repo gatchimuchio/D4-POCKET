@@ -288,6 +288,8 @@ def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
         "Socket.connect",
         "sessionSecret",
         "session_secret",
+        "credential_role",
+        "json['credential_role'] != 'normal'",
         "GUI_SHELL_BROKER_ENDPOINT_JSON",
         "127.0.0.1",
     ]
@@ -309,7 +311,7 @@ def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
     return _pass(
         "broker_client_uses_authenticated_loopback_ipc",
         "CONFIG",
-        "BrokerClientはbrokerのendpoint/session fieldとSocket.connectを使い、direct bridgeやprocess-start tokenを持たない。",
+        "BrokerClientはnormal roleを厳格に確認したbroker endpoint/session fieldとSocket.connectを使い、direct bridgeやprocess-start tokenを持たない。",
         "request authenticationとendpoint discoveryはbroker testの対象に保つ。",
     )
 

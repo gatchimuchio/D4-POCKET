@@ -12,8 +12,29 @@ use gui_shell_rust_helper::broker::{
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+    if args
+        .first()
+        .is_some_and(|value| value == "development-lifecycle-fixture-child")
+    {
+        #[cfg(debug_assertions)]
+        {
+            if args.len() != 1 {
+                eprintln!("development lifecycle fixture childは引数を受け付けない");
+                std::process::exit(2);
+            }
+            std::process::exit(gui_shell_rust_helper::broker::run_development_lifecycle_fixture_child());
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            eprintln!("release buildは開発用lifecycle fixture childを受け付けない");
+            std::process::exit(2);
+        }
+    }
     if args.first().is_some_and(|v| v == "監査チェックポイント") {
         match checkpoint_cli::run(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
+    if args.first().is_some_and(|v| v == "実行系ライフサイクル承認") {
+        match owner_cli::実行系ライフサイクル承認(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
     if args.first().is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御")) {
         match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
@@ -27,6 +48,7 @@ fn main() {
     eprintln!("使用法: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
     eprintln!("開発専用: gui_shell_rust_helper dev-stdin-smoke");
     eprintln!("対話登録: broker-server ... --owner-session-file <owner資格file> --minidora-runtime <ID=127.0.0.1:port>");
+    eprintln!("C4開発実証: debug broker-server ... --owner-session-file <owner資格file> --enable-development-lifecycle-fixture");
     eprintln!("端末経路: broker-server ... --mobile-bind <private IPv4:port>（owner資格必須）");
     eprintln!("owner操作: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>");
     eprintln!("過去履歴: 対話承認操作 --session-file <owner資格file> 履歴 <after> <limit:1〜100>");
@@ -37,6 +59,7 @@ fn main() {
     eprintln!("部分保存破棄: 対話承認操作 --session-file <owner資格file> 部分保存破棄 <要求ID> <要求hash> <保存試行監査ID> <暗号文hash>");
     eprintln!("保管状態: 対話承認操作 --session-file <owner資格file> 保管状態 <要求ID> <要求hash>");
     eprintln!("内容保存: 対話承認操作 --session-file <owner資格file> 内容保存 <要求ID> <要求hash>");
+    eprintln!("lifecycle owner承認: 実行系ライフサイクル承認 --session-file <owner資格file> 承認 <承認ID> <承認hash>");
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     eprintln!("全体基準点: 作業領域制御 --session-file <owner資格file> 作業領域全体基準点保存 <作業領域ID> <登録hash>");
     eprintln!("基準点: 作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...");
@@ -60,6 +83,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut max_request_bytes: usize = 64 * 1024;
     let mut owner_session_file = None;
     let mut minidora_runtimes = Vec::new();
+    let mut development_lifecycle_fixture_enabled = false;
     let mut mobile_bind = None;
     let mut workspace_config = None;
     let mut protected_store_dir = None;
@@ -88,6 +112,17 @@ fn maybe_run_broker_server() -> Option<i32> {
                 let Some(value) = args.next() else { eprintln!("実行系ID=127.0.0.1:portの値が必要"); return Some(2); };
                 let Some((id, address)) = value.split_once('=') else { eprintln!("実行系登録の形式が不正"); return Some(2); };
                 minidora_runtimes.push((id.to_owned(), address.to_owned()));
+            }
+            "--enable-development-lifecycle-fixture" => {
+                if development_lifecycle_fixture_enabled {
+                    eprintln!("開発用lifecycle fixtureの重複指定を拒否");
+                    return Some(2);
+                }
+                if !cfg!(debug_assertions) {
+                    eprintln!("release buildは開発用lifecycle fixtureを受け付けない");
+                    return Some(2);
+                }
+                development_lifecycle_fixture_enabled = true;
             }
             "--store-dir" => {
                 let Some(value) = args.next() else {
@@ -149,6 +184,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     config.max_request_bytes = max_request_bytes;
     config.owner_session_file = owner_session_file;
     config.minidora_runtimes = minidora_runtimes;
+    config.development_lifecycle_fixture_enabled = development_lifecycle_fixture_enabled;
     config.mobile_bind = mobile_bind;
     config.workspace_config = workspace_config;
     config.protected_store_dir = protected_store_dir;

@@ -19,6 +19,8 @@ pub struct BrokerServerConfig {
     pub max_request_bytes: usize,
     pub owner_session_file: Option<PathBuf>,
     pub minidora_runtimes: Vec<(String, String)>,
+    /// debug buildでしか受理しない、固定childを使うC4開発実証用flag。
+    pub development_lifecycle_fixture_enabled: bool,
     pub mobile_bind: Option<String>,
     pub workspace_config: Option<PathBuf>,
     pub protected_store_dir: Option<PathBuf>,
@@ -33,6 +35,7 @@ impl BrokerServerConfig {
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             owner_session_file: None,
             minidora_runtimes: Vec::new(),
+            development_lifecycle_fixture_enabled: false,
             mobile_bind: None,
             workspace_config: None,
             protected_store_dir: None,
@@ -40,12 +43,21 @@ impl BrokerServerConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrokerCredentialRole {
+    Normal,
+    Owner,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BrokerEndpoint {
     pub host: String,
     pub port: u16,
     pub session_id: String,
     pub session_secret: String,
+    pub credential_role: BrokerCredentialRole,
     pub transport: String,
     pub max_request_bytes: usize,
 }
@@ -72,6 +84,21 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     for (id, address) in &config.minidora_runtimes {
         let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
         broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
+    }
+    if config.development_lifecycle_fixture_enabled {
+        if config.owner_session_file.is_none() {
+            return Err(BrokerServerError::new(
+                "開発用lifecycle fixtureにはowner資格設定が必要",
+            ));
+        }
+        #[cfg(debug_assertions)]
+        broker
+            .開発用ライフサイクル実行系登録()
+            .map_err(BrokerServerError::new)?;
+        #[cfg(not(debug_assertions))]
+        return Err(BrokerServerError::new(
+            "release buildは開発用lifecycle fixtureを受け付けない",
+        ));
     }
     let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
 
@@ -123,6 +150,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         port: local_addr.port(),
         session_id,
         session_secret,
+        credential_role: BrokerCredentialRole::Normal,
         transport: "authenticated_loopback_tcp".to_string(),
         max_request_bytes: config.max_request_bytes,
     };
@@ -137,6 +165,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         }
         let mut control = endpoint.clone();
         control.session_secret = owner_secret.clone().ok_or_else(|| BrokerServerError::new("owner資格がない"))?;
+        control.credential_role = BrokerCredentialRole::Owner;
         write_endpoint_file(path, &control)?;
     }
     write_endpoint_file(&config.session_file, &endpoint)?;

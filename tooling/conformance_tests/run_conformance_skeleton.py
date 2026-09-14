@@ -73,6 +73,8 @@ REQUIRED_SCHEMA_NAMES = {
     "runtime_dialogue_comparison",
     "runtime_resource_query",
     "runtime_resource_observation",
+    "runtime_lifecycle_request",
+    "runtime_lifecycle_result",
 
     "action_envelope",
     "runtime",
@@ -137,6 +139,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
     "ipc_response.schema.json",
     "broker_error.schema.json",
+    "broker_endpoint.schema.json",
     "broker_session.schema.json",
     "broker_health.schema.json",
     "broker_command_envelope.schema.json",
@@ -1369,6 +1372,8 @@ def _valid_windows_installed_evidence() -> dict:
             "broker_endpoint_file": r"C:\ProgramData\GUI-Shell\broker\broker_session.json",
             "broker_endpoint_created": True,
             "broker_transport": "authenticated_loopback_tcp",
+            "broker_endpoint_credential_role": "normal",
+            "normal_endpoint_credential_role_verified": True,
             "no_python_runtime_requested": True,
             "python_runtime_path_scrubbed": True,
             "python_path_entries_removed_count": 2,
@@ -1510,6 +1515,8 @@ def _valid_windows_installed_evidence() -> dict:
             "store_dir": r"C:\ProgramData\GUI-Shell\broker\store",
             "endpoint_host": "127.0.0.1",
             "endpoint_port": 49152,
+            "endpoint_credential_role": "normal",
+            "normal_endpoint_credential_role_verified": True,
             "restricted_loopback_bind": True,
             "authenticated_ipc_connection": True,
             "durable_store_ready": True,
@@ -1521,6 +1528,7 @@ def _valid_windows_installed_evidence() -> dict:
             "field_provenance": {
                 "helper_exe_exists": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE"},
                 "session_file_created": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "normal_endpoint_credential_role_verified": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "restricted_loopback_bind": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "authenticated_ipc_connection": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "durable_store_ready": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
@@ -2581,6 +2589,450 @@ def 実行系資源観測の証拠境界を検査する() -> list[str]:
         operations = schema["properties"]["operation"]["enum"]
         if "実行系資源観測" not in operations:
             errors.append(f"{schema_name}が実行系資源観測operationを公開していない")
+    return errors
+
+
+def 実行系ライフサイクルの契約と統治境界を検査する() -> list[str]:
+    request_schema = load_schema("runtime_lifecycle_request.schema.json")
+    result_schema = load_schema("runtime_lifecycle_result.schema.json")
+    runtime_schema = load_schema("runtime.schema.json")
+    ipc_request_schema = load_schema("ipc_request.schema.json")
+    ipc_response_schema = load_schema("ipc_response.schema.json")
+    command_schema = load_schema("broker_command_envelope.schema.json")
+    request = load_contract_fixture("runtime_lifecycle_request.valid.json")
+    transition = load_contract_fixture("runtime_lifecycle_result.valid.json")
+    errors = []
+
+    errors.extend(validate_instance(request, request_schema))
+    errors.extend(validate_instance(transition, result_schema))
+
+    expected_operations = ("start", "stop", "restart", "pause", "resume", "quarantine")
+    request_shapes = {
+        "実行系ライフサイクル状態": {"版", "実行系ID"},
+        "実行系ライフサイクル承認要求": {"版", "実行系ID", "操作"},
+        "実行系ライフサイクル承認": {"版", "承認ID", "承認hash"},
+        "実行系ライフサイクル操作": {"版", "実行系ID", "操作", "承認ID"},
+    }
+    request_payloads = {
+        "実行系ライフサイクル状態": {"版": 1, "実行系ID": "fixture-runtime"},
+        "実行系ライフサイクル承認要求": {
+            "版": 1,
+            "実行系ID": "fixture-runtime",
+            "操作": "pause",
+        },
+        "実行系ライフサイクル承認": {
+            "版": 1,
+            "承認ID": "lifecycle-approval-42",
+            "承認hash": "sha256:" + "a" * 64,
+        },
+        "実行系ライフサイクル操作": request,
+    }
+    for operation, payload in request_payloads.items():
+        errors.extend(validate_instance(payload, request_schema))
+        if set(payload) != request_shapes[operation]:
+            errors.append(f"{operation}のpayload field集合が固定されていない")
+
+    def lifecycle_request_relation_errors(operation: str, payload: object) -> list[str]:
+        relation_errors = []
+        expected_fields = request_shapes.get(operation)
+        if expected_fields is None:
+            return ["未知のlifecycle IPC operation"]
+        if not isinstance(payload, dict):
+            return ["lifecycle IPC payloadがobjectでない"]
+        if set(payload) != expected_fields:
+            relation_errors.append("lifecycle IPC operationとpayload field集合が一致しない")
+        if validate_instance(payload, request_schema):
+            relation_errors.append("lifecycle IPC payloadがrequest schemaに適合しない")
+        return relation_errors
+
+    for operation, payload in request_payloads.items():
+        errors.extend(
+            f"{operation}: {failure}"
+            for failure in lifecycle_request_relation_errors(operation, payload)
+        )
+    if not lifecycle_request_relation_errors(
+        "実行系ライフサイクル操作",
+        request_payloads["実行系ライフサイクル状態"],
+    ):
+        errors.append("lifecycle IPCが状態payloadを実行操作として受理する")
+
+    for label, field, value in (
+        ("PID", "PID", 4321),
+        ("endpoint", "endpoint", "127.0.0.1:8080"),
+        ("command", "command", "cmd.exe"),
+        ("argv", "argv", ["--unsafe"]),
+        ("env", "env", {"PATH": "unsafe"}),
+        ("Capability ID", "能力ID", "runtime.lifecycle.control"),
+        ("Permission ID", "権限ID", "permission.runtime.lifecycle.pause"),
+        ("Audit ID", "監査ID", "forged-audit"),
+        ("Recovery ID", "復旧ID", "forged-recovery"),
+        ("caller state", "状態", "ready"),
+        ("authority", "authority", "root"),
+        ("metadata", "metadata", {"trust_level": "root"}),
+    ):
+        candidate = copy.deepcopy(request)
+        candidate[field] = value
+        if not validate_instance(candidate, request_schema):
+            errors.append(f"実行系ライフサイクル操作が{label}を受理した")
+
+    for label, candidate in (
+        (
+            "未知操作",
+            {
+                "版": 1,
+                "実行系ID": "fixture-runtime",
+                "操作": "kill",
+            },
+        ),
+        (
+            "未知版",
+            {
+                "版": 2,
+                "実行系ID": "fixture-runtime",
+            },
+        ),
+        (
+            "owner承認の実行系ID注入",
+            {
+                "版": 1,
+                "承認ID": "lifecycle-approval-42",
+                "承認hash": "sha256:" + "a" * 64,
+                "実行系ID": "fixture-runtime",
+            },
+        ),
+    ):
+        if not validate_instance(candidate, request_schema):
+            errors.append(f"実行系ライフサイクル要求が{label}を受理した")
+
+    for status in ("paused", "quarantined"):
+        runtime = load_contract_fixture("runtime.valid.json")
+        runtime["status"] = status
+        errors.extend(validate_instance(runtime, runtime_schema))
+    runtime = load_contract_fixture("runtime.valid.json")
+    runtime["status"] = "unsupported"
+    if not validate_instance(runtime, runtime_schema):
+        errors.append("Runtime schemaがunsupportedを受理した")
+
+    def governance(operation: str, approval_id: str, approval_status: str) -> dict:
+        return {
+            "能力ID": f"runtime.lifecycle.{operation}",
+            "権限ID": f"permission.runtime.lifecycle.{operation}",
+            "承認ID": approval_id,
+            "承認状態": approval_status,
+            "復旧ID": f"recover-runtime-lifecycle-{operation}",
+        }
+
+    executable_in_ready = {"stop", "restart", "pause", "quarantine"}
+    status_result = {
+        "版": 1,
+        "対応": True,
+        "実行系ID": "fixture-runtime",
+        "状態": "ready",
+        "証拠種別": "INTERNAL_STATE",
+        "操作一覧": [
+            {
+                "操作": operation,
+                "能力ID": f"runtime.lifecycle.{operation}",
+                "権限ID": f"permission.runtime.lifecycle.{operation}",
+                "承認必要": True,
+                "復旧ID": f"recover-runtime-lifecycle-{operation}",
+                "実行可能": operation in executable_in_ready,
+            }
+            for operation in expected_operations
+        ],
+        "承認一覧": [
+            {
+                "版": 1,
+                "承認ID": "lifecycle-approval-42",
+                "承認hash": "sha256:" + "a" * 64,
+                "実行系ID": "fixture-runtime",
+                "操作": "pause",
+                "状態": "approved",
+                "有効期限UnixSeconds": 4102444800,
+                "統治": governance("pause", "lifecycle-approval-42", "approved"),
+            }
+        ],
+    }
+    unsupported_result = {
+        "版": 1,
+        "対応": False,
+        "実行系ID": "minidora",
+        "状態": "not_supported",
+        "証拠種別": "INTERNAL_STATE",
+        "操作一覧": [],
+        "承認一覧": [],
+    }
+    quarantined_result = {
+        "版": 1,
+        "対応": True,
+        "実行系ID": "fixture-runtime",
+        "状態": "quarantined",
+        "証拠種別": "LIVE_RUNTIME",
+        "操作一覧": [],
+        "承認一覧": [],
+    }
+    for label, result in (
+        ("対応実行系状態", status_result),
+        ("Capability未宣言状態", unsupported_result),
+        ("隔離状態", quarantined_result),
+    ):
+        failures = validate_instance(result, result_schema)
+        errors.extend(f"{label}: {failure}" for failure in failures)
+
+    def state_result_errors(result: dict) -> list[str]:
+        state_errors = []
+        if result.get("対応") is False:
+            if result.get("状態") != "not_supported":
+                state_errors.append("Capability未宣言状態がnot_supportedでない")
+            if result.get("操作一覧") or result.get("承認一覧"):
+                state_errors.append("Capability未宣言状態が操作または承認を返す")
+        if result.get("状態") == "quarantined":
+            if result.get("操作一覧") or result.get("承認一覧"):
+                state_errors.append("隔離後の通常操作または承認が残る")
+        operations = result.get("操作一覧", [])
+        if result.get("対応") is True and result.get("状態") != "quarantined":
+            names = [item.get("操作") for item in operations if isinstance(item, dict)]
+            if (
+                not names
+                or not set(names).issubset(set(expected_operations))
+                or len(names) != len(set(names))
+            ):
+                state_errors.append("対応実行系のBroker操作一覧がCapability宣言集合になっていない")
+            executable_by_state = {
+                "stopped": {"start", "quarantine"},
+                "ready": {"stop", "restart", "pause", "quarantine"},
+                "paused": {"stop", "resume", "quarantine"},
+                "unknown": set(),
+            }
+            allowed = executable_by_state.get(result.get("状態"), set())
+            for item in operations:
+                if not isinstance(item, dict):
+                    state_errors.append("操作一覧の要素がobjectでない")
+                    continue
+                operation = item.get("操作")
+                if (
+                    item.get("能力ID") != f"runtime.lifecycle.{operation}"
+                    or item.get("権限ID") != f"permission.runtime.lifecycle.{operation}"
+                    or item.get("承認必要") is not True
+                    or item.get("復旧ID") != f"recover-runtime-lifecycle-{operation}"
+                ):
+                    state_errors.append("操作一覧にBroker生成統治対応がない")
+                if item.get("実行可能") is True and operation not in allowed:
+                    state_errors.append("現在状態から不可能な操作を実行可能としている")
+            for approval in result.get("承認一覧", []):
+                if not isinstance(approval, dict):
+                    state_errors.append("承認一覧の要素がobjectでない")
+                    continue
+                approval_governance = approval.get("統治")
+                if (
+                    approval.get("実行系ID") != result.get("実行系ID")
+                    or approval.get("操作") not in names
+                    or not isinstance(approval_governance, dict)
+                    or approval_governance.get("承認ID") != approval.get("承認ID")
+                    or approval_governance.get("承認状態") != approval.get("状態")
+                ):
+                    state_errors.append("承認一覧が状態表示のRuntime、操作、統治対応と一致しない")
+        return state_errors
+
+    errors.extend(state_result_errors(status_result))
+    errors.extend(state_result_errors(unsupported_result))
+    errors.extend(state_result_errors(quarantined_result))
+    invalid_unsupported = copy.deepcopy(unsupported_result)
+    invalid_unsupported["操作一覧"] = [copy.deepcopy(status_result["操作一覧"][0])]
+    if not validate_instance(invalid_unsupported, result_schema):
+        errors.append("Capability未宣言状態が通常操作を返す")
+    invalid_quarantine = copy.deepcopy(quarantined_result)
+    invalid_quarantine["承認一覧"] = copy.deepcopy(status_result["承認一覧"])
+    if not validate_instance(invalid_quarantine, result_schema):
+        errors.append("隔離状態が通常承認を返す")
+    invalid_operable = copy.deepcopy(status_result)
+    invalid_operable["操作一覧"][0]["実行可能"] = True
+    if not state_result_errors(invalid_operable):
+        errors.append("現在状態から不可能な操作を実行可能にできる")
+    invalid_state_pid = copy.deepcopy(status_result)
+    invalid_state_pid["PID"] = 4321
+    if not validate_instance(invalid_state_pid, result_schema):
+        errors.append("ライフサイクル状態結果がPIDを公開する")
+
+    approval_result = {
+        "版": 1,
+        "承認ID": "lifecycle-approval-42",
+        "承認hash": "sha256:" + "a" * 64,
+        "実行系ID": "fixture-runtime",
+        "操作": "pause",
+        "状態": "pending",
+        "有効期限UnixSeconds": 4102444800,
+        "統治": governance("pause", "lifecycle-approval-42", "pending"),
+    }
+    approved_result = copy.deepcopy(approval_result)
+    approved_result["状態"] = "approved"
+    approved_result["統治"]["承認状態"] = "approved"
+    for label, result in (("承認要求", approval_result), ("owner承認", approved_result)):
+        failures = validate_instance(result, result_schema)
+        errors.extend(f"{label}: {failure}" for failure in failures)
+        if (
+            result["状態"] != result["統治"]["承認状態"]
+            or result["承認ID"] != result["統治"]["承認ID"]
+        ):
+            errors.append(f"{label}の承認状態が統治対応と一致しない")
+
+    expected_transitions = {
+        "start": (("stopped", "ready"),),
+        "stop": (("ready", "stopped"), ("paused", "stopped")),
+        "restart": (("ready", "ready"),),
+        "pause": (("ready", "paused"),),
+        "resume": (("paused", "ready"),),
+        "quarantine": (
+            ("stopped", "quarantined"),
+            ("ready", "quarantined"),
+            ("paused", "quarantined"),
+        ),
+    }
+
+    def transition_errors(result: dict) -> list[str]:
+        transition_errors = []
+        if "ライフサイクル監査ID" not in result:
+            return ["遷移結果にライフサイクル監査IDがない"]
+        operation = result.get("操作")
+        expected = expected_transitions.get(operation)
+        if expected is None:
+            transition_errors.append("未知のlifecycle操作が遷移結果にある")
+        elif (result.get("遷移前状態"), result.get("遷移後状態")) not in expected:
+            transition_errors.append("操作とライフサイクル状態遷移が一致しない")
+        if result.get("証拠種別") != "LIVE_RUNTIME":
+            transition_errors.append("成功遷移がLIVE_RUNTIMEでない")
+        governance_value = result.get("統治")
+        if (
+            not isinstance(governance_value, dict)
+            or governance_value.get("能力ID") != f"runtime.lifecycle.{operation}"
+            or governance_value.get("権限ID") != f"permission.runtime.lifecycle.{operation}"
+            or governance_value.get("復旧ID") != f"recover-runtime-lifecycle-{operation}"
+            or governance_value.get("承認状態") != "consumed"
+        ):
+            transition_errors.append("成功遷移に消費済みの統治対応がない")
+        return transition_errors
+
+    for operation, transitions in expected_transitions.items():
+        before, after = transitions[0]
+        result = copy.deepcopy(transition)
+        result["操作"] = operation
+        result["遷移前状態"] = before
+        result["遷移後状態"] = after
+        result["統治"] = governance(operation, "lifecycle-approval-42", "consumed")
+        result["ライフサイクル監査ID"] = f"lifecycle-transition-{operation}"
+        failures = validate_instance(result, result_schema)
+        errors.extend(f"{operation}遷移: {failure}" for failure in failures)
+        errors.extend(f"{operation}遷移: {failure}" for failure in transition_errors(result))
+
+    invalid_transition = copy.deepcopy(transition)
+    invalid_transition["操作"] = "start"
+    invalid_transition["遷移前状態"] = "ready"
+    invalid_transition["遷移後状態"] = "ready"
+    invalid_transition["統治"] = governance("start", "lifecycle-approval-42", "consumed")
+    if not transition_errors(invalid_transition):
+        errors.append("不正なlifecycle状態遷移を受理する")
+    invalid_transition = copy.deepcopy(transition)
+    invalid_transition["統治"]["承認状態"] = "pending"
+    if not validate_instance(invalid_transition, result_schema) or not transition_errors(invalid_transition):
+        errors.append("未承認lifecycle遷移を受理する")
+
+    ipc_request = {
+        "request_id": "lifecycle-request-42",
+        "session_id": "current-session",
+        "operation": "実行系ライフサイクル操作",
+        "payload_hash": "sha256:" + "0" * 64,
+        "nonce": "lifecycle-nonce-42",
+        "issued_at": "1789393500000",
+        "metadata": {},
+        "payload": request,
+    }
+    ipc_response = {
+        "request_id": ipc_request["request_id"],
+        "operation": "実行系ライフサイクル操作",
+        "status": "accepted",
+        "evidence_source": "LIVE_RUNTIME",
+        "audit_event_id": transition["ライフサイクル監査ID"],
+        "error": None,
+        "health": None,
+        "body": transition,
+        "shutdown_requested": False,
+    }
+    errors.extend(validate_instance(ipc_request, ipc_request_schema))
+    errors.extend(validate_instance(ipc_response, ipc_response_schema))
+
+    def ipc_relation_errors(request_value: dict, response_value: dict) -> list[str]:
+        relation_errors = []
+        if request_value.get("request_id") != response_value.get("request_id"):
+            relation_errors.append("lifecycle IPCのrequest_idが一致しない")
+        if request_value.get("operation") != response_value.get("operation"):
+            relation_errors.append("lifecycle IPCのoperationが一致しない")
+        if response_value.get("operation") == "実行系ライフサイクル操作":
+            body = response_value.get("body")
+            if not isinstance(body, dict) or "ライフサイクル監査ID" not in body:
+                relation_errors.append("lifecycle操作成功応答に遷移結果がない")
+                return relation_errors
+            payload = request_value.get("payload")
+            if not isinstance(payload, dict):
+                relation_errors.append("lifecycle操作要求payloadがobjectでない")
+                return relation_errors
+            if body.get("実行系ID") != payload.get("実行系ID") or body.get("操作") != payload.get("操作"):
+                relation_errors.append("lifecycle操作結果が要求Runtimeまたは操作と一致しない")
+            if response_value.get("audit_event_id") != body.get("ライフサイクル監査ID"):
+                relation_errors.append("lifecycle操作IPC監査IDが遷移結果と一致しない")
+            if response_value.get("evidence_source") != body.get("証拠種別"):
+                relation_errors.append("lifecycle操作IPC証拠種別が遷移結果と一致しない")
+        return relation_errors
+
+    errors.extend(ipc_relation_errors(ipc_request, ipc_response))
+    invalid_ipc_response = copy.deepcopy(ipc_response)
+    invalid_ipc_response["audit_event_id"] = "different-audit"
+    if not ipc_relation_errors(ipc_request, invalid_ipc_response):
+        errors.append("lifecycle操作IPCが監査ID不一致を受理する")
+    invalid_ipc_response = copy.deepcopy(ipc_response)
+    invalid_ipc_response["evidence_source"] = "INTERNAL_STATE"
+    if not ipc_relation_errors(ipc_request, invalid_ipc_response):
+        errors.append("lifecycle操作IPCが成功遷移の証拠種別不一致を受理する")
+
+    for schema_name, schema in (
+        ("ipc_request", ipc_request_schema),
+        ("ipc_response", ipc_response_schema),
+    ):
+        operations = schema["properties"]["operation"]["enum"]
+        missing = sorted(set(request_shapes) - set(operations))
+        if missing:
+            errors.append(f"{schema_name}がlifecycle operationを公開していない: {', '.join(missing)}")
+
+    if command_schema["properties"]["dispatch_enabled"].get("const") is not False:
+        errors.append("C4がgeneric command dispatchを有効化している")
+
+    for path in (
+        ROOT / "examples" / "adapter" / "blue_tanuki_reference_adapter.json",
+        CONTRACT_EXAMPLES / "adapter.valid.json",
+    ):
+        adapter = json.loads(path.read_text(encoding="utf-8"))
+        capabilities = adapter.get("declared_capabilities", [])
+        if any("lifecycle" in capability.lower() for capability in capabilities if isinstance(capability, str)):
+            errors.append(f"{path.name}がC4のためにlifecycle Capabilityを追加している")
+    minidora_source = (RUST_HELPER / "src" / "adapters" / "minidora.rs").read_text(encoding="utf-8")
+    if "RuntimeLifecycle" in minidora_source or "実行系ライフサイクル" in minidora_source:
+        errors.append("MINIDORA Adapterがlifecycle Capabilityまたは制御経路を実装している")
+
+    lifecycle_doc = DOC_SPECS / "runtime-lifecycle.md"
+    if not lifecycle_doc.exists():
+        errors.append("実行系ライフサイクルの仕様文書がない")
+    else:
+        text = lifecycle_doc.read_text(encoding="utf-8")
+        for token in (
+            "実行系ライフサイクル状態",
+            "実行系ライフサイクル承認要求",
+            "実行系ライフサイクル承認",
+            "実行系ライフサイクル操作",
+            "quarantined",
+            "MINIDORA",
+            "generic dispatch",
+        ):
+            if token not in text:
+                errors.append(f"実行系ライフサイクル仕様に必須境界がない: {token}")
     return errors
 
 
@@ -4133,6 +4585,7 @@ def main() -> int:
         対話操作の分岐と未知fieldを検査する,
         履歴入力概要のhash_only境界を検査する,
         実行系資源観測の証拠境界を検査する,
+        実行系ライフサイクルの契約と統治境界を検査する,
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         test_manifest_integrity_tooling_exists,

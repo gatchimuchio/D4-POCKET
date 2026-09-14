@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_lifecycle_result.schema.json",
+  "title": "実行系ライフサイクル結果（RuntimeLifecycleResult）",
+  "description": "Broker が生成する実行系ライフサイクル状態、承認、成功遷移の結果。構造適合は Runtime の起動、停止、権限、承認、監査完全性を単独では証明しない。",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "対応",
+        "実行系ID",
+        "状態",
+        "証拠種別",
+        "操作一覧",
+        "承認一覧"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "対応": {
+          "const": false
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "状態": {
+          "const": "not_supported"
+        },
+        "証拠種別": {
+          "const": "INTERNAL_STATE"
+        },
+        "操作一覧": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "承認一覧": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "対応",
+        "実行系ID",
+        "状態",
+        "証拠種別",
+        "操作一覧",
+        "承認一覧"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "対応": {
+          "const": true
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "状態": {
+          "enum": [
+            "stopped",
+            "ready",
+            "paused",
+            "unknown"
+          ]
+        },
+        "証拠種別": {
+          "$ref": "#/$defs/evidence"
+        },
+        "操作一覧": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/operationProjection"
+          }
+        },
+        "承認一覧": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/approvalProjection"
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "対応",
+        "実行系ID",
+        "状態",
+        "証拠種別",
+        "操作一覧",
+        "承認一覧"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "対応": {
+          "const": true
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "状態": {
+          "const": "quarantined"
+        },
+        "証拠種別": {
+          "$ref": "#/$defs/evidence"
+        },
+        "操作一覧": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "承認一覧": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    },
+    {
+      "$ref": "#/$defs/approvalProjection"
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "実行系ID",
+        "操作",
+        "遷移前状態",
+        "遷移後状態",
+        "観測時刻UnixMillis",
+        "証拠種別",
+        "統治",
+        "ライフサイクル監査ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "操作": {
+          "$ref": "#/$defs/operation"
+        },
+        "遷移前状態": {
+          "$ref": "#/$defs/lifecycleState"
+        },
+        "遷移後状態": {
+          "$ref": "#/$defs/lifecycleState"
+        },
+        "観測時刻UnixMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "証拠種別": {
+          "const": "LIVE_RUNTIME"
+        },
+        "統治": {
+          "$ref": "#/$defs/consumedGovernance"
+        },
+        "ライフサイクル監査ID": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "runtimeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "start",
+        "stop",
+        "restart",
+        "pause",
+        "resume",
+        "quarantine"
+      ]
+    },
+    "lifecycleState": {
+      "type": "string",
+      "enum": [
+        "stopped",
+        "ready",
+        "paused",
+        "quarantined",
+        "unknown"
+      ]
+    },
+    "evidence": {
+      "type": "string",
+      "enum": [
+        "LIVE_RUNTIME",
+        "INTERNAL_STATE"
+      ]
+    },
+    "governance": {
+      "type": "object",
+      "required": [
+        "能力ID",
+        "権限ID",
+        "承認ID",
+        "承認状態",
+        "復旧ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "能力ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "権限ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "承認ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "承認状態": {
+          "enum": [
+            "pending",
+            "approved",
+            "consumed"
+          ]
+        },
+        "復旧ID": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "approvalGovernance": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/governance"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "承認状態": {
+              "enum": [
+                "pending",
+                "approved"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "consumedGovernance": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/governance"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "承認状態": {
+              "const": "consumed"
+            }
+          }
+        }
+      ]
+    },
+    "operationProjection": {
+      "type": "object",
+      "required": [
+        "操作",
+        "能力ID",
+        "権限ID",
+        "承認必要",
+        "復旧ID",
+        "実行可能"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "操作": {
+          "$ref": "#/$defs/operation"
+        },
+        "能力ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "権限ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "承認必要": {
+          "const": true
+        },
+        "復旧ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "実行可能": {
+          "type": "boolean"
+        }
+      }
+    },
+    "approvalProjection": {
+      "type": "object",
+      "required": [
+        "版",
+        "承認ID",
+        "承認hash",
+        "実行系ID",
+        "操作",
+        "状態",
+        "有効期限UnixSeconds",
+        "統治"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "承認ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "承認hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "操作": {
+          "$ref": "#/$defs/operation"
+        },
+        "状態": {
+          "enum": [
+            "pending",
+            "approved"
+          ]
+        },
+        "有効期限UnixSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "統治": {
+          "$ref": "#/$defs/approvalGovernance"
+        }
+      }
+    }
+  }
+}

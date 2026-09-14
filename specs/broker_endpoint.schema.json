@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/broker_endpoint.schema.json",
+  "title": "ブローカー接続資格（BrokerEndpoint）",
+  "type": "object",
+  "required": [
+    "host",
+    "port",
+    "session_id",
+    "session_secret",
+    "credential_role",
+    "transport",
+    "max_request_bytes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "host": {
+      "type": "string",
+      "const": "127.0.0.1"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_secret": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "credential_role": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "owner"
+      ]
+    },
+    "transport": {
+      "type": "string",
+      "const": "authenticated_loopback_tcp"
+    },
+    "max_request_bytes": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

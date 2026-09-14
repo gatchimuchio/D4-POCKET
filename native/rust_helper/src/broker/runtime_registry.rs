@@ -93,6 +93,11 @@ impl RuntimeResourceRegistry {
         self.entries.clear();
     }
 
+    /// terminal lifecycle隔離後に通常資源観測を継続させない。
+    pub(crate) fn unregister(&mut self, runtime_id: &str) {
+        self.entries.remove(runtime_id);
+    }
+
     pub(crate) fn observe(
         &mut self,
         runtime_id: &str,

@@ -39,7 +39,9 @@
         "ready",
         "degraded",
         "failed",
-        "stopped"
+        "stopped",
+        "paused",
+        "quarantined"
       ]
     },
     "adapter_id": {

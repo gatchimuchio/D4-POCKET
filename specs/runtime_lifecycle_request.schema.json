@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_lifecycle_request.schema.json",
+  "title": "実行系ライフサイクル要求（RuntimeLifecycleRequest）",
+  "description": "実行系ライフサイクルの通常 IPC と owner 専用承認 IPC の操作固有 payload。Broker は統治対応を自ら解決し、呼出し側の PID、接続先、command、権限、状態、authority を受け入れない。",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "実行系ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "実行系ID",
+        "操作"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "操作": {
+          "$ref": "#/$defs/operation"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "承認ID",
+        "承認hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "承認ID": {
+          "$ref": "#/$defs/identifier"
+        },
+        "承認hash": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "版",
+        "実行系ID",
+        "操作",
+        "承認ID"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "版": {
+          "$ref": "#/$defs/version"
+        },
+        "実行系ID": {
+          "$ref": "#/$defs/runtimeId"
+        },
+        "操作": {
+          "$ref": "#/$defs/operation"
+        },
+        "承認ID": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "runtimeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "start",
+        "stop",
+        "restart",
+        "pause",
+        "resume",
+        "quarantine"
+      ]
+    }
+  }
+}

@@ -99,9 +99,26 @@ function Wait-BrokerEndpoint {
   throw "Rust broker endpoint ファイルが作成されませんでした: $Path"
 }
 
+function Assert-NormalBrokerEndpoint {
+  param($Endpoint)
+
+  if ($null -eq $Endpoint -or
+      [string]$Endpoint.credential_role -ne "normal" -or
+      [string]$Endpoint.host -ne "127.0.0.1" -or
+      [string]$Endpoint.transport -ne "authenticated_loopback_tcp" -or
+      [int]$Endpoint.port -lt 1 -or
+      [int]$Endpoint.port -gt 65535 -or
+      [string]::IsNullOrEmpty([string]$Endpoint.session_id) -or
+      -not ([string]$Endpoint.session_secret -match '^[a-f0-9]{64}$') -or
+      [int]$Endpoint.max_request_bytes -lt 1) {
+    throw "broker通常接続資格が不正"
+  }
+}
+
 function Invoke-BrokerRequest {
   param($Endpoint, $Request)
 
+  Assert-NormalBrokerEndpoint -Endpoint $Endpoint
   $client = [System.Net.Sockets.TcpClient]::new()
   $client.Connect([string]$Endpoint.host, [int]$Endpoint.port)
   try {
@@ -156,12 +173,14 @@ $health = $null
 $replay = $null
 $freshAfterRestart = $null
 $crashFailClosed = $false
+$normalEndpointCredentialRoleVerified = $false
 $replayNonce = "windows-installed-replay-nonce-$([guid]::NewGuid().ToString('N'))"
 $freshNonce = "windows-installed-fresh-nonce-$([guid]::NewGuid().ToString('N'))"
 
 try {
   $broker = Start-Broker -HelperPath $helper.Path
   $endpoint = Wait-BrokerEndpoint -Path $SessionFile -Process $broker
+  Assert-NormalBrokerEndpoint -Endpoint $endpoint
   $healthRequest = New-BrokerRequest `
     -RequestId "windows-installed-health-1" `
     -Operation "health" `
@@ -182,6 +201,11 @@ try {
   }
   $restartBroker = Start-Broker -HelperPath $helper.Path
   $restartEndpoint = Wait-BrokerEndpoint -Path $SessionFile -Process $restartBroker
+  Assert-NormalBrokerEndpoint -Endpoint $restartEndpoint
+  $normalEndpointCredentialRoleVerified = (
+    $endpoint.credential_role -eq "normal" -and
+    $restartEndpoint.credential_role -eq "normal"
+  )
   $replay = Invoke-BrokerRequest -Endpoint $restartEndpoint -Request $healthRequest
   if ($replay.status -ne "rejected" -or $replay.error.code -ne "broker_replay_detected") {
     $errors.Add("broker restart 後に再使用した nonce が拒否されませんでした")
@@ -220,7 +244,7 @@ $result = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_broker_smoke.ps1"
-    collector_version = "2"
+    collector_version = "3"
     synthetic = $false
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 -BrokerHelperExe `"$($helper.Path)`""
   }
@@ -231,6 +255,8 @@ $result = [ordered]@{
   store_dir = $StoreDir
   endpoint_host = $endpoint.host
   endpoint_port = $endpoint.port
+  endpoint_credential_role = $(if ($null -ne $endpoint) { $endpoint.credential_role } else { $null })
+  normal_endpoint_credential_role_verified = $normalEndpointCredentialRoleVerified
   restricted_loopback_bind = ($endpoint.host -eq "127.0.0.1" -and $restartEndpoint.host -eq "127.0.0.1")
   authenticated_ipc_connection = ($health.status -eq "accepted")
   durable_store_ready = ($health.health.persistence_ready -eq $true)
@@ -242,6 +268,7 @@ $result = [ordered]@{
   field_provenance = [ordered]@{
     helper_exe_exists = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE" }
     session_file_created = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    normal_endpoint_credential_role_verified = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     restricted_loopback_bind = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     authenticated_ipc_connection = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     durable_store_ready = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }

@@ -15,6 +15,15 @@ use crate::broker::authority::{
 };
 use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::broker::dialogue::{実行系ID妥当, 対話制御, 対話失敗, 実行系Adapter};
+use crate::broker::runtime_lifecycle::{
+    LifecycleAction, LifecycleError, RuntimeLifecycleRegistry,
+};
+#[cfg(test)]
+use crate::broker::runtime_lifecycle::LifecycleAdapter;
+#[cfg(debug_assertions)]
+use crate::broker::runtime_lifecycle::{
+    development_fixture_adapter, DEVELOPMENT_LIFECYCLE_RUNTIME_ID,
+};
 use crate::broker::runtime_registry::{
     ResourceObservationError, RuntimeResourceRegistry,
 };
@@ -34,6 +43,50 @@ struct 実行系資源観測指定 {
     version: u8,
     #[serde(rename = "実行系ID")]
     runtime_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 実行系ライフサイクル状態指定 {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "実行系ID")]
+    runtime_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 実行系ライフサイクル承認要求指定 {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "実行系ID")]
+    runtime_id: String,
+    #[serde(rename = "操作")]
+    action: LifecycleAction,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 実行系ライフサイクル承認指定 {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "承認ID")]
+    approval_id: String,
+    #[serde(rename = "承認hash")]
+    approval_hash: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 実行系ライフサイクル操作指定 {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "実行系ID")]
+    runtime_id: String,
+    #[serde(rename = "操作")]
+    action: LifecycleAction,
+    #[serde(rename = "承認ID")]
+    approval_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,6 +254,14 @@ pub enum BrokerOperation {
     実行系列挙,
     #[serde(rename = "実行系資源観測")]
     実行系資源観測,
+    #[serde(rename = "実行系ライフサイクル状態")]
+    実行系ライフサイクル状態,
+    #[serde(rename = "実行系ライフサイクル承認要求")]
+    実行系ライフサイクル承認要求,
+    #[serde(rename = "実行系ライフサイクル承認")]
+    実行系ライフサイクル承認,
+    #[serde(rename = "実行系ライフサイクル操作")]
+    実行系ライフサイクル操作,
     #[serde(rename = "対話開始")]
     対話開始,
     #[serde(rename = "対話送信")]
@@ -275,6 +336,10 @@ impl BrokerOperation {
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
             BrokerOperation::実行系資源観測 => "実行系資源観測",
+            BrokerOperation::実行系ライフサイクル状態 => "実行系ライフサイクル状態",
+            BrokerOperation::実行系ライフサイクル承認要求 => "実行系ライフサイクル承認要求",
+            BrokerOperation::実行系ライフサイクル承認 => "実行系ライフサイクル承認",
+            BrokerOperation::実行系ライフサイクル操作 => "実行系ライフサイクル操作",
             BrokerOperation::対話開始 => "対話開始",
             BrokerOperation::対話送信 => "対話送信",
             BrokerOperation::対話取得 => "対話取得",
@@ -494,6 +559,7 @@ pub struct Broker {
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
     資源観測: RuntimeResourceRegistry,
+    ライフサイクル: RuntimeLifecycleRegistry,
     履歴閲覧: super::history_access::HistoryAccess,
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
@@ -515,6 +581,7 @@ impl Broker {
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
             資源観測: RuntimeResourceRegistry::default(),
+            ライフサイクル: RuntimeLifecycleRegistry::default(),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -546,6 +613,10 @@ impl Broker {
     ) -> Result<Self, BrokerStoreError> {
         let (persistent_store, persistent_state) =
             BrokerPersistentStore::open_or_create(store_root, session_id)?;
+        let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
+            persistent_state.audit_log.events(),
+        )
+        .map_err(|error| BrokerStoreError::TamperedAuditState(error.message))?;
         Ok(Self {
             session_id: session_id.to_string(),
             seen_nonces: persistent_state.seen_nonces,
@@ -553,6 +624,9 @@ impl Broker {
             authority_registry: BrokerAuthorityRegistry::production_default(),
             対話: 対話制御::default(),
             資源観測: RuntimeResourceRegistry::default(),
+            ライフサイクル: RuntimeLifecycleRegistry::with_terminal_quarantines(
+                terminal_quarantines,
+            ),
             履歴閲覧: Default::default(),
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
@@ -571,6 +645,9 @@ impl Broker {
     }
 
     pub fn 実行系登録(&mut self, 名前: &str, adapter: Arc<dyn 実行系Adapter>) -> Result<(), 対話失敗> {
+        if self.ライフサイクル.is_terminally_quarantined(名前) {
+            return Err(対話失敗::隔離済み);
+        }
         let 観測対象 = adapter.観測対象();
         self.対話.登録(名前, adapter)?;
         let 登録監査 = match self.append_audit(
@@ -594,6 +671,62 @@ impl Broker {
             登録監査.event_id,
         );
         Ok(())
+    }
+
+    /// debug buildで明示opt-inされた固定fixtureだけを登録する。
+    /// MINIDORAや通常の対話Adapterへlifecycle capabilityを付与しない。
+    #[cfg(debug_assertions)]
+    pub(crate) fn 開発用ライフサイクル実行系登録(&mut self) -> Result<(), String> {
+        let adapter = development_fixture_adapter().map_err(|error| error.message)?;
+        self.ライフサイクル
+            .register_trusted(DEVELOPMENT_LIFECYCLE_RUNTIME_ID, Arc::new(adapter))
+            .map_err(|error| error.message)?;
+        let registration_hash = sha256_tagged(DEVELOPMENT_LIFECYCLE_RUNTIME_ID.as_bytes());
+        if let Err(error) = self.append_audit(
+            DEVELOPMENT_LIFECYCLE_RUNTIME_ID,
+            "実行系ライフサイクル登録",
+            "recorded",
+            "development固定fixtureだけをBroker所有lifecycle adapterとして登録",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &registration_hash,
+        ) {
+            self.ライフサイクル
+                .unregister_and_fail_closed(DEVELOPMENT_LIFECYCLE_RUNTIME_ID);
+            return Err(error.message());
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn ライフサイクル試験登録(
+        &mut self,
+        runtime_id: &str,
+        adapter: Arc<dyn LifecycleAdapter>,
+    ) -> Result<(), LifecycleError> {
+        self.ライフサイクル.register_trusted(runtime_id, adapter)
+    }
+
+    #[cfg(test)]
+    fn ライフサイクル試験permission設定(
+        &mut self,
+        runtime_id: &str,
+        action: LifecycleAction,
+        granted: bool,
+    ) {
+        self.ライフサイクル
+            .set_permission_for_test(runtime_id, action, granted);
+    }
+
+    #[cfg(test)]
+    fn ライフサイクル試験復旧削除(&mut self, runtime_id: &str, action: LifecycleAction) {
+        self.ライフサイクル
+            .remove_recovery_for_test(runtime_id, action);
+    }
+
+    #[cfg(test)]
+    fn ライフサイクル試験能力削除(&mut self, runtime_id: &str, action: LifecycleAction) {
+        self.ライフサイクル
+            .remove_capability_for_test(runtime_id, action);
     }
 
     pub(crate) fn owner要求処理(&mut self, input: &str) -> BrokerResponse {
@@ -741,6 +874,10 @@ impl Broker {
             operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系資源観測 => self.実行系資源観測要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
+            BrokerOperation::実行系ライフサイクル状態 => self.実行系ライフサイクル状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::実行系ライフサイクル承認要求 => self.実行系ライフサイクル承認要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::実行系ライフサイクル承認 => self.実行系ライフサイクル承認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::実行系ライフサイクル操作 => self.実行系ライフサイクル操作処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -842,6 +979,7 @@ impl Broker {
         let hash=sha256_tagged(payload.to_string().as_bytes());
         self.append_audit("作業領域起動", "作業領域登録", "received", "owner起動設定のroot検査を受信", EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "作業領域設定の監査失敗")?;
         let result=(|| {
+            if self.ライフサイクル.is_terminally_quarantined(&config.runtime_id) {return Err("実行系はterminal隔離中");}
             if !self.authority_registry.runtime_registered(&config.runtime_id) && !self.対話.登録済み(&config.runtime_id) {return Err("実行系が未登録");}
             let (root,filesystem)=super::workspace_root::open_registered_root(config,protected)?;
             self.append_audit("作業領域起動", "作業領域登録", "verified", "rootの対応filesystemと内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &sha256_tagged(format!("{hash}:{filesystem}").as_bytes())).map_err(|_| "root検査の監査失敗")?;
@@ -857,6 +995,7 @@ impl Broker {
     /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
     pub fn 作業領域登録(&mut self, runtime: &str, id: &str, root: cap_std::fs::Dir, secrets: &[String]) -> Result<(), &'static str> {
         if !self.state_store.persistence_ready() {return Err("作業領域登録には永続監査が必要");}
+        if self.ライフサイクル.is_terminally_quarantined(runtime) {return Err("実行系はterminal隔離中");}
         if !self.authority_registry.runtime_registered(runtime) && !self.対話.登録済み(runtime) {return Err("実行系が未登録");}
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
@@ -1119,6 +1258,348 @@ impl Broker {
                 Ok(v) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:v.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
                 Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "暗号文を再使用せず保管監査再確認"),
             }
+    }
+
+    fn 実行系ライフサイクル状態処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::実行系ライフサイクル状態;
+        if owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "lifecycle_normal_channel_required",
+                "lifecycle状態照会は通常資格経路だけが実行できる",
+                true,
+                payload_hash,
+            );
+        }
+        let query: 実行系ライフサイクル状態指定 = match serde_json::from_value::<実行系ライフサイクル状態指定>(payload.clone()) {
+            Ok(query) if query.version == 1 && 実行系ID妥当(&query.runtime_id) => query,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_request_invalid",
+                    "実行系ライフサイクル状態は版と実行系IDだけを受け付ける",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let body = match self
+            .ライフサイクル
+            .status_body(&query.runtime_id, self.current_epoch_seconds())
+        {
+            Some(body) => body,
+            None if self.対話.登録済み(&query.runtime_id) => {
+                RuntimeLifecycleRegistry::unsupported_status_body(&query.runtime_id)
+            }
+            None => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_runtime_unknown",
+                    "登録済み実行系だけをlifecycle状態照会できる",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let response = self.accept_body_with_evidence(
+            request_id,
+            operation,
+            body,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        if response.status == BrokerStatus::Suspended {
+            self.ライフサイクル.fail_closed();
+        }
+        response
+    }
+
+    fn 実行系ライフサイクル承認要求処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::実行系ライフサイクル承認要求;
+        if owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "lifecycle_normal_channel_required",
+                "lifecycle承認要求は通常資格経路だけが作成できる",
+                true,
+                payload_hash,
+            );
+        }
+        let request: 実行系ライフサイクル承認要求指定 = match serde_json::from_value::<実行系ライフサイクル承認要求指定>(payload.clone()) {
+            Ok(request) if request.version == 1 && 実行系ID妥当(&request.runtime_id) => request,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_request_invalid",
+                    "実行系ライフサイクル承認要求は版、実行系ID、閉じた操作だけを受け付ける",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let body = match self.ライフサイクル.request_approval(
+            &request.runtime_id,
+            request.action,
+            self.current_epoch_seconds(),
+        ) {
+            Ok(body) => body,
+            Err(error) => return self.lifecycle_reject(request_id, operation, error, payload_hash),
+        };
+        let response = self.accept_body_with_evidence(
+            request_id,
+            operation,
+            body,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        if response.status == BrokerStatus::Suspended {
+            self.ライフサイクル.fail_closed();
+        }
+        response
+    }
+
+    fn 実行系ライフサイクル承認処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::実行系ライフサイクル承認;
+        if !owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "lifecycle_owner_approval_required",
+                "lifecycle承認はowner資格経路だけが実行できる",
+                true,
+                payload_hash,
+            );
+        }
+        let request: 実行系ライフサイクル承認指定 = match serde_json::from_value::<実行系ライフサイクル承認指定>(payload.clone()) {
+            Ok(request)
+                if request.version == 1
+                    && lifecycle_identifier_valid(&request.approval_id)
+                    && is_tagged_sha256(&request.approval_hash) => request,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_request_invalid",
+                    "実行系ライフサイクル承認は版、承認ID、canonical承認hashだけを受け付ける",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let body = match self.ライフサイクル.approve(
+            &request.approval_id,
+            &request.approval_hash,
+            self.current_epoch_seconds(),
+        ) {
+            Ok(body) => body,
+            Err(error) => return self.lifecycle_reject(request_id, operation, error, payload_hash),
+        };
+        let response = self.accept_body_with_evidence(
+            request_id,
+            operation,
+            body,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        if response.status == BrokerStatus::Suspended {
+            self.ライフサイクル.fail_closed();
+        }
+        response
+    }
+
+    fn 実行系ライフサイクル操作処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::実行系ライフサイクル操作;
+        if owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "lifecycle_normal_channel_required",
+                "lifecycle操作はowner承認後の通常資格経路だけが要求できる",
+                true,
+                payload_hash,
+            );
+        }
+        let request: 実行系ライフサイクル操作指定 = match serde_json::from_value::<実行系ライフサイクル操作指定>(payload.clone()) {
+            Ok(request)
+                if request.version == 1
+                    && 実行系ID妥当(&request.runtime_id)
+                    && lifecycle_identifier_valid(&request.approval_id) => request,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_request_invalid",
+                    "実行系ライフサイクル操作は版、実行系ID、閉じた操作、承認IDだけを受け付ける",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        if let Err(error) = self.ライフサイクル.preflight_execution(
+            &request.runtime_id,
+            request.action,
+            &request.approval_id,
+            payload_hash,
+            self.current_epoch_seconds(),
+        ) {
+            return self.lifecycle_reject(request_id, operation, error, payload_hash);
+        }
+        let pre_audit_reason = if request.action == LifecycleAction::Quarantine {
+            RuntimeLifecycleRegistry::quarantine_reservation_reason(&request.runtime_id)
+        } else {
+            format!(
+                "lifecycle実行直前再照合 Capability=runtime.lifecycle.{} Permission=permission.runtime.lifecycle.{} Approval={} Recovery=recover-runtime-lifecycle-{}",
+                request.action.as_str(),
+                request.action.as_str(),
+                request.approval_id,
+                request.action.as_str(),
+            )
+        };
+        if let Err(error) = self.append_audit(
+            request_id,
+            operation.as_str(),
+            "received",
+            &pre_audit_reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        ) {
+            self.ライフサイクル.fail_closed();
+            return self.audit_store_failed_response(
+                request_id,
+                operation.as_str(),
+                "broker_audit_append_failed",
+                &error.message(),
+            );
+        }
+        if request.action == LifecycleAction::Quarantine {
+            self.ライフサイクル
+                .mark_terminal_quarantine(&request.runtime_id);
+            self.対話.実行系隔離(&request.runtime_id);
+            self.資源観測.unregister(&request.runtime_id);
+            self.作業領域.remove_runtime(&request.runtime_id);
+        }
+        let transition = match self.ライフサイクル.execute(
+            &request.runtime_id,
+            request.action,
+            &request.approval_id,
+            payload_hash,
+            self.current_epoch_seconds(),
+            self.current_epoch_millis(),
+        ) {
+            Ok(transition) => transition,
+            Err(error) => return self.lifecycle_reject(request_id, operation, error, payload_hash),
+        };
+        let lifecycle_audit_id = self.audit_log.next_event_id();
+        let body = serde_json::json!({
+            "版": 1,
+            "実行系ID": transition.runtime_id,
+            "操作": transition.action.as_str(),
+            "遷移前状態": transition.previous_state.as_str(),
+            "遷移後状態": transition.next_state.as_str(),
+            "観測時刻UnixMillis": transition.observed_at_epoch_millis,
+            "証拠種別": EVIDENCE_SOURCE_LIVE_RUNTIME,
+            "統治": {
+                "能力ID": format!("runtime.lifecycle.{}", transition.action.as_str()),
+                "権限ID": format!("permission.runtime.lifecycle.{}", transition.action.as_str()),
+                "承認ID": transition.approval_id,
+                "承認状態": "consumed",
+                "復旧ID": format!("recover-runtime-lifecycle-{}", transition.action.as_str()),
+            },
+            "ライフサイクル監査ID": lifecycle_audit_id,
+        });
+        let final_hash = canonical_payload_hash(Some(&body));
+        let final_reason = format!(
+            "lifecycle遷移確定 Capability=runtime.lifecycle.{} Permission=permission.runtime.lifecycle.{} Approval={} Recovery=recover-runtime-lifecycle-{}",
+            transition.action.as_str(),
+            transition.action.as_str(),
+            transition.approval_id,
+            transition.action.as_str(),
+        );
+        let audit_event = match self.append_audit(
+            request_id,
+            operation.as_str(),
+            "accepted",
+            &final_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &final_hash,
+        ) {
+            Ok(event) if event.event_id == lifecycle_audit_id => event,
+            Ok(_) => {
+                self.ライフサイクル.fail_closed();
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation.as_str(),
+                    "lifecycle_audit_id_mismatch",
+                    "lifecycle最終監査IDを確定できない",
+                );
+            }
+            Err(error) => {
+                self.ライフサイクル.fail_closed();
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation.as_str(),
+                    "broker_audit_append_failed",
+                    &error.message(),
+                )
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.as_str().to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
+    fn lifecycle_reject(
+        &mut self,
+        request_id: &str,
+        operation: BrokerOperation,
+        error: LifecycleError,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        self.reject_with_payload_hash(
+            request_id,
+            operation.as_str(),
+            error.code,
+            &error.message,
+            true,
+            payload_hash,
+        )
     }
 
     fn 実行系資源観測要求処理(
@@ -1627,6 +2108,7 @@ impl Broker {
         if let Err(error) = self.state_store.append_audit_event(&event) {
             self.作業領域 = Default::default();
             self.資源観測.clear();
+            self.ライフサイクル.fail_closed();
             #[cfg(windows)]
             self.内容閲覧.revoke();
             return Err(error);
@@ -1634,6 +2116,7 @@ impl Broker {
         if let Err(error) = self.audit_log.push_verified(event.clone()) {
             self.作業領域 = Default::default();
             self.資源観測.clear();
+            self.ライフサイクル.fail_closed();
             #[cfg(windows)]
             self.内容閲覧.revoke();
             return Err(BrokerStoreError::TamperedAuditState(error));
@@ -1645,7 +2128,11 @@ impl Broker {
         let recorded_at = current_epoch_seconds();
         let persisted = match self.state_store.append_replay_nonce(nonce, recorded_at) {
             Ok(value) => value,
-            Err(error) => {self.作業領域 = Default::default();return Err(error);}
+            Err(error) => {
+                self.作業領域 = Default::default();
+                self.ライフサイクル.fail_closed();
+                return Err(error);
+            }
         };
         if let Some(nonces) = persisted {
             self.seen_nonces = nonces;
@@ -1791,6 +2278,17 @@ fn is_tagged_sha256(value: &str) -> bool {
             .iter()
             .skip(7)
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+/// approval IDは外部targetや統治情報を埋め込めないASCII識別子に限る。
+fn lifecycle_identifier_valid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 255
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(byte))
 }
 
 fn canonical_payload_hash(payload: Option<&Value>) -> String {
@@ -2413,6 +2911,665 @@ mod tests {
         drop(broker);
         drop(listener);
         fs::remove_dir_all(store).unwrap();
+    }
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct LifecycleTestAdapter {
+        calls: Arc<AtomicUsize>,
+        fail_closed_calls: Arc<AtomicUsize>,
+        sabotage_audit_path: Option<PathBuf>,
+        fail_action: Option<LifecycleAction>,
+        actions: &'static [LifecycleAction],
+    }
+
+    impl LifecycleAdapter for LifecycleTestAdapter {
+        fn supported_actions(&self) -> &'static [LifecycleAction] {
+            self.actions
+        }
+
+        fn transition(
+            &self,
+            action: LifecycleAction,
+        ) -> Result<crate::broker::runtime_lifecycle::LifecycleAdapterResult, crate::broker::runtime_lifecycle::LifecycleAdapterFailure> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.fail_action == Some(action) {
+                return Err(crate::broker::runtime_lifecycle::LifecycleAdapterFailure::new(
+                    "ライフサイクル試験Adapterの失敗",
+                ));
+            }
+            if let Some(audit_path) = &self.sabotage_audit_path {
+                let saved = audit_path.with_extension("saved");
+                fs::rename(audit_path, &saved).expect("final監査前にaudit logを退避できる");
+                fs::create_dir(audit_path).expect("final監査経路をdirectoryへ置換できる");
+            }
+            let next_state = match action {
+                LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume => crate::broker::runtime_lifecycle::LifecycleState::Ready,
+                LifecycleAction::Stop => crate::broker::runtime_lifecycle::LifecycleState::Stopped,
+                LifecycleAction::Pause => crate::broker::runtime_lifecycle::LifecycleState::Paused,
+                LifecycleAction::Quarantine => crate::broker::runtime_lifecycle::LifecycleState::Quarantined,
+            };
+            Ok(crate::broker::runtime_lifecycle::LifecycleAdapterResult {
+                next_state,
+                acknowledgement: "test-lifecycle-ack",
+            })
+        }
+
+        fn fail_closed(&self) {
+            self.fail_closed_calls.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn lifecycle_request(
+        operation: BrokerOperation,
+        request_id: &str,
+        nonce: &str,
+        issued_at: &str,
+        payload: Value,
+    ) -> BrokerRequestEnvelope {
+        let mut request = BrokerRequestEnvelope::command_envelope_at(
+            request_id,
+            "session-1",
+            nonce,
+            issued_at,
+        );
+        request.operation = Some(operation);
+        request.payload = Some(payload);
+        request.refresh_payload_hash();
+        request
+    }
+
+    fn lifecycle_test_broker(
+        sabotage_audit_path: Option<PathBuf>,
+    ) -> (Broker, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+        let mut broker = test_broker();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let fail_closed_calls = Arc::new(AtomicUsize::new(0));
+        broker
+            .ライフサイクル試験登録(
+                "fixture",
+                Arc::new(LifecycleTestAdapter {
+                    calls: Arc::clone(&calls),
+                    fail_closed_calls: Arc::clone(&fail_closed_calls),
+                    sabotage_audit_path,
+                    fail_action: None,
+                    actions: &LifecycleAction::ALL,
+                }),
+            )
+            .unwrap();
+        (broker, calls, fail_closed_calls)
+    }
+
+    fn lifecycle_pending(broker: &mut Broker, action: &str, nonce: &str) -> Value {
+        let response = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            &format!("pending-{nonce}"),
+            nonce,
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": action}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Accepted, "{response:?}");
+        let body = response.body.unwrap();
+        assert_eq!(body["状態"], "pending");
+        body
+    }
+
+    fn lifecycle_owner_approve(broker: &mut Broker, approval: &Value, nonce: &str) -> Value {
+        let response = broker.処理(
+            lifecycle_request(
+                BrokerOperation::実行系ライフサイクル承認,
+                &format!("owner-{nonce}"),
+                &format!("owner-{nonce}"),
+                "2026-06-01T00:00:00Z",
+                json!({
+                    "版": 1,
+                    "承認ID": approval["承認ID"],
+                    "承認hash": approval["承認hash"],
+                }),
+            ),
+            true,
+        );
+        assert_eq!(response.status, BrokerStatus::Accepted, "{response:?}");
+        let body = response.body.unwrap();
+        assert_eq!(body["状態"], "approved");
+        body
+    }
+
+    fn lifecycle_execute(broker: &mut Broker, action: &str, approval: &Value, nonce: &str) -> BrokerResponse {
+        broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル操作,
+            &format!("execute-{nonce}"),
+            nonce,
+            "2026-06-01T00:00:00Z",
+            json!({
+                "版": 1,
+                "実行系ID": "fixture",
+                "操作": action,
+                "承認ID": approval["承認ID"],
+            }),
+        ))
+    }
+
+    #[test]
+    fn lifecycle_requires_owner_approval_revalidates_replay_and_quarantines() {
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        let unknown = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "unknown-runtime",
+            "unknown-runtime-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "unknown", "操作": "start"}),
+        ));
+        assert_eq!(unknown.status, BrokerStatus::Rejected);
+        assert_eq!(unknown.error.unwrap().code, "lifecycle_runtime_unknown");
+
+        let owner_status = broker.処理(
+            lifecycle_request(
+                BrokerOperation::実行系ライフサイクル状態,
+                "owner-status",
+                "owner-status-nonce",
+                "2026-06-01T00:00:00Z",
+                json!({"版": 1, "実行系ID": "fixture"}),
+            ),
+            true,
+        );
+        assert_eq!(owner_status.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner_status.error.unwrap().code,
+            "lifecycle_normal_channel_required"
+        );
+
+        let missing = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル操作,
+            "missing-approval",
+            "missing-approval-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start", "承認ID": "missing"}),
+        ));
+        assert_eq!(missing.status, BrokerStatus::Rejected);
+        assert_eq!(missing.error.unwrap().code, "lifecycle_approval_missing");
+
+        let pending = lifecycle_pending(&mut broker, "start", "start-pending");
+        let normal_approval = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認,
+            "normal-owner-forgery",
+            "normal-owner-forgery-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "承認ID": pending["承認ID"], "承認hash": pending["承認hash"]}),
+        ));
+        assert_eq!(normal_approval.status, BrokerStatus::Rejected);
+        assert_eq!(normal_approval.error.unwrap().code, "lifecycle_owner_approval_required");
+
+        let stale = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル操作,
+            "stale-execute",
+            "stale-execute-nonce",
+            "2000-01-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start", "承認ID": pending["承認ID"]}),
+        ));
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.unwrap().code, "broker_issued_at_invalid");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let approved = lifecycle_owner_approve(&mut broker, &pending, "start-approval");
+        let executed = lifecycle_execute(&mut broker, "start", &approved, "start-execute");
+        assert_eq!(executed.status, BrokerStatus::Accepted, "{executed:?}");
+        let transition = executed.body.unwrap();
+        assert_eq!(transition["遷移前状態"], "stopped");
+        assert_eq!(transition["遷移後状態"], "ready");
+        assert_eq!(transition["統治"]["承認状態"], "consumed");
+        assert_eq!(transition["ライフサイクル監査ID"], executed.audit_event_id);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let replay = lifecycle_execute(&mut broker, "start", &approved, "start-execute");
+        assert_eq!(replay.status, BrokerStatus::Rejected);
+        assert_eq!(replay.error.unwrap().code, "broker_replay_detected");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let quarantine_pending = lifecycle_pending(&mut broker, "quarantine", "quarantine-pending");
+        let quarantine_approved = lifecycle_owner_approve(&mut broker, &quarantine_pending, "quarantine-approval");
+        let quarantined = lifecycle_execute(&mut broker, "quarantine", &quarantine_approved, "quarantine-execute");
+        assert_eq!(quarantined.status, BrokerStatus::Accepted, "{quarantined:?}");
+        let status = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル状態,
+            "quarantine-status",
+            "quarantine-status-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture"}),
+        ));
+        assert_eq!(status.status, BrokerStatus::Accepted);
+        let status = status.body.unwrap();
+        assert_eq!(status["状態"], "quarantined");
+        assert_eq!(status["操作一覧"], json!([]));
+        assert_eq!(status["承認一覧"], json!([]));
+        let blocked = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "quarantine-blocked",
+            "quarantine-blocked-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
+        ));
+        assert_eq!(blocked.status, BrokerStatus::Rejected);
+        assert_eq!(blocked.error.unwrap().code, "lifecycle_invalid_transition");
+    }
+
+    #[test]
+    fn lifecycle_protocol_rejects_caller_control_fields_and_current_governance_failures() {
+        for (index, (field, value)) in [
+            ("PID", json!(1234)),
+            ("endpoint", json!("127.0.0.1:1")),
+            ("command", json!("cmd.exe")),
+            ("argv", json!(["/c", "whoami"])),
+            ("env", json!({"X":"Y"})),
+            ("state", json!("ready")),
+            ("authority", json!("owner")),
+            ("metadata", json!({"authority":"owner"})),
+            ("統治ID", json!("caller-controlled")),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (mut broker, calls, _) = lifecycle_test_broker(None);
+            let mut payload = json!({"版": 1, "実行系ID": "fixture", "操作": "start"});
+            payload
+                .as_object_mut()
+                .unwrap()
+                .insert(field.to_string(), value);
+            let response = broker.handle(lifecycle_request(
+                BrokerOperation::実行系ライフサイクル承認要求,
+                &format!("caller-field-{index}"),
+                &format!("caller-field-nonce-{index}"),
+                "2026-06-01T00:00:00Z",
+                payload,
+            ));
+            assert_eq!(response.status, BrokerStatus::Rejected);
+            assert_eq!(response.error.unwrap().code, "lifecycle_request_invalid");
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+        }
+
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        let invalid_transition = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "invalid-transition",
+            "invalid-transition-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "pause"}),
+        ));
+        assert_eq!(invalid_transition.status, BrokerStatus::Rejected);
+        assert_eq!(invalid_transition.error.unwrap().code, "lifecycle_invalid_transition");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.ライフサイクル試験能力削除("fixture", LifecycleAction::Start);
+        let response = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "capability-missing",
+            "capability-missing-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "lifecycle_capability_missing");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.ライフサイクル試験permission設定("fixture", LifecycleAction::Start, false);
+        let response = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "permission-denied",
+            "permission-denied-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "lifecycle_permission_denied");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.ライフサイクル試験復旧削除("fixture", LifecycleAction::Start);
+        let response = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "recovery-missing",
+            "recovery-missing-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "lifecycle_recovery_missing");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        let pending = lifecycle_pending(&mut broker, "start", "stale-session-pending");
+        let approved = lifecycle_owner_approve(&mut broker, &pending, "stale-session-approval");
+        let mut stale_session = lifecycle_request(
+            BrokerOperation::実行系ライフサイクル操作,
+            "stale-session-execute",
+            "stale-session-execute-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start", "承認ID": approved["承認ID"]}),
+        );
+        stale_session.session_id = Some("stale-session".to_string());
+        let response = broker.handle(stale_session);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "broker_stale_session");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn lifecycle_quarantine_reservation_closes_dialogue_resource_and_workspace_before_adapter_result() {
+        let store = temp_store_dir("lifecycle-terminal-runtime-closure");
+        let workspace_root = store.join("workspace");
+        fs::create_dir_all(&workspace_root).unwrap();
+        let mut broker = persistent_test_broker(&store);
+        let dialogue_adapter = crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap();
+        broker
+            .実行系登録("fixture", Arc::new(dialogue_adapter))
+            .unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let fail_closed_calls = Arc::new(AtomicUsize::new(0));
+        broker
+            .ライフサイクル試験登録(
+                "fixture",
+                Arc::new(LifecycleTestAdapter {
+                    calls: Arc::clone(&calls),
+                    fail_closed_calls: Arc::clone(&fail_closed_calls),
+                    sabotage_audit_path: None,
+                    fail_action: Some(LifecycleAction::Quarantine),
+                    actions: &LifecycleAction::ALL,
+                }),
+            )
+            .unwrap();
+        broker
+            .作業領域登録(
+                "fixture",
+                "fixture-workspace",
+                cap_std::fs::Dir::open_ambient_dir(
+                    &workspace_root,
+                    cap_std::ambient_authority(),
+                )
+                .unwrap(),
+                &[],
+            )
+            .unwrap();
+
+        let dialogue_start = broker.handle(lifecycle_request(
+            BrokerOperation::対話開始,
+            "terminal-dialogue-start",
+            "terminal-dialogue-start-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"実行系ID": "fixture"}),
+        ));
+        assert_eq!(dialogue_start.status, BrokerStatus::Accepted);
+        let session_id = dialogue_start.body.unwrap()["対話セッションID"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let started_pending = lifecycle_pending(&mut broker, "start", "terminal-start-pending");
+        let started_approval = lifecycle_owner_approve(&mut broker, &started_pending, "terminal-start-approval");
+        let started = lifecycle_execute(&mut broker, "start", &started_approval, "terminal-start-execute");
+        assert_eq!(started.status, BrokerStatus::Accepted);
+
+        let quarantine_pending = lifecycle_pending(&mut broker, "quarantine", "terminal-failing-pending");
+        let quarantine_approval = lifecycle_owner_approve(
+            &mut broker,
+            &quarantine_pending,
+            "terminal-failing-approval",
+        );
+        let quarantine = lifecycle_execute(
+            &mut broker,
+            "quarantine",
+            &quarantine_approval,
+            "terminal-failing-execute",
+        );
+        assert_eq!(quarantine.status, BrokerStatus::Rejected);
+        assert_eq!(quarantine.error.unwrap().code, "lifecycle_adapter_failed");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(fail_closed_calls.load(Ordering::SeqCst) >= 1);
+
+        let terminal_status = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル状態,
+            "terminal-status-after-adapter-failure",
+            "terminal-status-after-adapter-failure-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture"}),
+        ));
+        assert_eq!(terminal_status.status, BrokerStatus::Accepted);
+        let terminal_status = terminal_status.body.unwrap();
+        assert_eq!(terminal_status["状態"], "quarantined");
+        assert_eq!(terminal_status["操作一覧"], json!([]));
+        assert_eq!(terminal_status["承認一覧"], json!([]));
+
+        let listed = broker.handle(lifecycle_request(
+            BrokerOperation::実行系列挙,
+            "terminal-runtime-list",
+            "terminal-runtime-list-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({}),
+        ));
+        assert_eq!(listed.status, BrokerStatus::Accepted);
+        assert_eq!(listed.body.unwrap()["実行系"], json!([]));
+
+        let old_session_send = broker.handle(lifecycle_request(
+            BrokerOperation::対話送信,
+            "terminal-old-session-send",
+            "terminal-old-session-send-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"対話セッションID": session_id, "入力": "隔離後送信"}),
+        ));
+        assert_eq!(old_session_send.status, BrokerStatus::Rejected);
+        assert_eq!(old_session_send.error.unwrap().code, "セッション不一致");
+
+        let mut resource_request = resource_request(
+            "terminal-resource-observation",
+            "session-1",
+            "terminal-resource-observation-nonce",
+            json!({"版": 1, "実行系ID": "fixture"}),
+        );
+        resource_request.issued_at = Some("2026-06-01T00:00:00Z".to_string());
+        let resource = broker.handle(resource_request);
+        assert_eq!(resource.status, BrokerStatus::Rejected);
+        assert_eq!(resource.error.unwrap().code, "実行系不在");
+
+        let workspaces = broker.handle(lifecycle_request(
+            BrokerOperation::作業領域一覧,
+            "terminal-workspace-list",
+            "terminal-workspace-list-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({}),
+        ));
+        assert_eq!(workspaces.status, BrokerStatus::Accepted);
+        assert_eq!(workspaces.body.unwrap()["作業領域"], json!([]));
+        assert_eq!(
+            broker.実行系登録(
+                "fixture",
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+            ),
+            Err(対話失敗::隔離済み)
+        );
+        assert_eq!(
+            broker.作業領域登録(
+                "fixture",
+                "fixture-workspace-replacement",
+                cap_std::fs::Dir::open_ambient_dir(
+                    &workspace_root,
+                    cap_std::ambient_authority(),
+                )
+                .unwrap(),
+                &[],
+            ),
+            Err("実行系はterminal隔離中")
+        );
+        assert_eq!(
+            broker.作業領域起動登録(
+                &super::super::workspace_root::WorkspaceStartup {
+                    runtime_id: "fixture".to_string(),
+                    workspace_id: "fixture-workspace-startup".to_string(),
+                    root_path: workspace_root.to_string_lossy().to_string(),
+                    secret_paths: vec![],
+                },
+                &[],
+            ),
+            Err("実行系はterminal隔離中")
+        );
+
+        drop(broker);
+        let mut restarted = persistent_test_broker(&store);
+        let restarted_status = restarted.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル状態,
+            "terminal-status-after-restart",
+            "terminal-status-after-restart-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture"}),
+        ));
+        assert_eq!(restarted_status.status, BrokerStatus::Accepted);
+        assert_eq!(restarted_status.body.unwrap()["状態"], "quarantined");
+        assert_eq!(
+            restarted.実行系登録(
+                "fixture",
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+            ),
+            Err(対話失敗::隔離済み)
+        );
+        drop(restarted);
+        fs::remove_dir_all(store).unwrap();
+    }
+
+    #[test]
+    fn minidora_dialogue_adapter_is_reported_without_lifecycle_capability() {
+        let mut broker = test_broker();
+        let minidora = crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap();
+        broker.実行系登録("minidora", Arc::new(minidora)).unwrap();
+        let status = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル状態,
+            "minidora-lifecycle-status",
+            "minidora-lifecycle-status-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "minidora"}),
+        ));
+        assert_eq!(status.status, BrokerStatus::Accepted);
+        let body = status.body.unwrap();
+        assert_eq!(body["対応"], false);
+        assert_eq!(body["状態"], "not_supported");
+        assert_eq!(body["操作一覧"], json!([]));
+        assert_eq!(body["承認一覧"], json!([]));
+        let request = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "minidora-lifecycle-request",
+            "minidora-lifecycle-request-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "minidora", "操作": "start"}),
+        ));
+        assert_eq!(request.status, BrokerStatus::Rejected);
+        assert_eq!(request.error.unwrap().code, "lifecycle_runtime_unknown");
+    }
+
+    #[test]
+    fn lifecycle_audit_failure_never_leaves_approval_or_successful_transition_usable() {
+        let fixed_now = parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap();
+
+        let store = temp_store_dir("lifecycle-request-audit-failure");
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+        );
+        broker.current_epoch_seconds_override = Some(fixed_now);
+        let audit_path = store.join("audit.jsonl");
+        let saved = audit_path.with_extension("saved");
+        fs::rename(&audit_path, &saved).unwrap();
+        fs::create_dir(&audit_path).unwrap();
+        let request_failure = broker.handle(lifecycle_request(
+            BrokerOperation::実行系ライフサイクル承認要求,
+            "request-audit-failure",
+            "request-audit-failure-nonce",
+            "2026-06-01T00:00:00Z",
+            json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
+        ));
+        assert_eq!(request_failure.status, BrokerStatus::Suspended);
+        let after_request_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        assert_eq!(after_request_failure["状態"], "unknown");
+        assert_eq!(after_request_failure["承認一覧"], json!([]));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved, &audit_path).unwrap();
+        drop(broker);
+        fs::remove_dir_all(&store).unwrap();
+
+        let store = temp_store_dir("lifecycle-owner-approval-audit-failure");
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+        );
+        broker.current_epoch_seconds_override = Some(fixed_now);
+        let pending = lifecycle_pending(&mut broker, "start", "owner-audit-pending");
+        let audit_path = store.join("audit.jsonl");
+        let saved = audit_path.with_extension("saved");
+        fs::rename(&audit_path, &saved).unwrap();
+        fs::create_dir(&audit_path).unwrap();
+        let owner_failure = broker.処理(
+            lifecycle_request(
+                BrokerOperation::実行系ライフサイクル承認,
+                "owner-audit-failure",
+                "owner-audit-failure-nonce",
+                "2026-06-01T00:00:00Z",
+                json!({"版": 1, "承認ID": pending["承認ID"], "承認hash": pending["承認hash"]}),
+            ),
+            true,
+        );
+        assert_eq!(owner_failure.status, BrokerStatus::Suspended);
+        let after_owner_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        assert_eq!(after_owner_failure["状態"], "unknown");
+        assert_eq!(after_owner_failure["承認一覧"], json!([]));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved, &audit_path).unwrap();
+        drop(broker);
+        fs::remove_dir_all(&store).unwrap();
+
+        let store = temp_store_dir("lifecycle-pre-action-audit-failure");
+        let (mut broker, calls, _) = lifecycle_test_broker(None);
+        broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+        );
+        broker.current_epoch_seconds_override = Some(fixed_now);
+        let pending = lifecycle_pending(&mut broker, "start", "pre-action-pending");
+        let approved = lifecycle_owner_approve(&mut broker, &pending, "pre-action-approval");
+        let audit_path = store.join("audit.jsonl");
+        let saved = audit_path.with_extension("saved");
+        fs::rename(&audit_path, &saved).unwrap();
+        fs::create_dir(&audit_path).unwrap();
+        let pre_action_failure = lifecycle_execute(&mut broker, "start", &approved, "pre-action-execute");
+        assert_eq!(pre_action_failure.status, BrokerStatus::Suspended);
+        let after_pre_action_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        assert_eq!(after_pre_action_failure["状態"], "unknown");
+        assert_eq!(after_pre_action_failure["承認一覧"], json!([]));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved, &audit_path).unwrap();
+        drop(broker);
+        fs::remove_dir_all(&store).unwrap();
+
+        let store = temp_store_dir("lifecycle-final-audit-failure");
+        let audit_path = store.join("audit.jsonl");
+        let (mut broker, calls, fail_closed) = lifecycle_test_broker(Some(audit_path.clone()));
+        broker.state_store = BrokerStateStore::durable_file_store(
+            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+        );
+        broker.current_epoch_seconds_override = Some(fixed_now);
+        let pending = lifecycle_pending(&mut broker, "start", "final-pending");
+        let approved = lifecycle_owner_approve(&mut broker, &pending, "final-approval");
+        let final_failure = lifecycle_execute(&mut broker, "start", &approved, "final-execute");
+        assert_eq!(final_failure.status, BrokerStatus::Suspended);
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "最終監査前に一回だけadapterが実行される");
+        assert!(fail_closed.load(Ordering::SeqCst) >= 1, "最終監査障害でadapterをfail-closedする");
+        let after_final_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        assert_eq!(after_final_failure["状態"], "unknown");
+        assert_eq!(after_final_failure["承認一覧"], json!([]));
+        let saved = audit_path.with_extension("saved");
+        fs::remove_dir(&audit_path).unwrap();
+        fs::rename(&saved, &audit_path).unwrap();
+        drop(broker);
+        fs::remove_dir_all(&store).unwrap();
     }
 
     #[test]

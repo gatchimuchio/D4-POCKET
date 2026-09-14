@@ -183,6 +183,7 @@ void main() {
         'port': server.port,
         'session_id': 'test-session',
         'session_secret': 'a' * 64,
+        'credential_role': 'normal',
         'transport': 'authenticated_loopback_tcp',
         'max_request_bytes': 65536
       }));

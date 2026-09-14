@@ -24,6 +24,7 @@ pub enum 対話失敗 {
     応答不正,
     監査失敗,
     取消,
+    隔離済み,
 }
 impl 対話失敗 {
     pub fn 分類(self) -> &'static str {
@@ -37,6 +38,7 @@ impl 対話失敗 {
             Self::応答不正 => "応答不正",
             Self::監査失敗 => "監査失敗",
             Self::取消 => "取消",
+            Self::隔離済み => "実行系隔離済み",
         }
     }
     pub fn 復旧(self) -> &'static str {
@@ -47,6 +49,7 @@ impl 対話失敗 {
             Self::監査失敗 => "監査修復",
             Self::セッション不一致 | Self::取消 | Self::期限超過 => "新規セッション",
             Self::通信失敗 | Self::応答不正 => "接続再確認",
+            Self::隔離済み => "RecoveryActionによる隔離判断を確認",
         }
     }
 }
@@ -305,6 +308,20 @@ impl 対話制御 {
     /// 対話sessionや作業を持つ実行系の管理操作には使わない。
     pub(crate) fn 直後登録取消(&mut self, ID: &str) -> bool {
         self.実行系.remove(ID).is_some()
+    }
+
+    /// terminal lifecycle隔離の後に、同じ実行系へ通常対話を再接続・再実行させない。
+    /// 既存sessionと進行中要求も資格隔離と同じfail-closed処理で停止する。
+    pub(crate) fn 実行系隔離(&mut self, 実行系ID: &str) {
+        let sessions = self
+            .セッション
+            .iter()
+            .filter_map(|(session_id, session)| {
+                (session.実行系ID == 実行系ID).then(|| session_id.clone())
+            })
+            .collect::<Vec<_>>();
+        self.資格隔離(&sessions);
+        self.実行系.remove(実行系ID);
     }
 
     pub fn 操作(

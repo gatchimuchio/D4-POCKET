@@ -199,6 +199,22 @@ function Get-EvidenceValue {
   return $property.Value
 }
 
+function Assert-NormalBrokerEndpoint {
+  param($Endpoint)
+
+  if ($null -eq $Endpoint -or
+      [string]$Endpoint.credential_role -ne "normal" -or
+      [string]$Endpoint.host -ne "127.0.0.1" -or
+      [string]$Endpoint.transport -ne "authenticated_loopback_tcp" -or
+      [int]$Endpoint.port -lt 1 -or
+      [int]$Endpoint.port -gt 65535 -or
+      [string]::IsNullOrEmpty([string]$Endpoint.session_id) -or
+      -not ([string]$Endpoint.session_secret -match '^[a-f0-9]{64}$') -or
+      [int]$Endpoint.max_request_bytes -lt 1) {
+    throw "broker通常接続資格が不正"
+  }
+}
+
 function Start-SmokeBroker {
   param(
     [string]$HelperExe,
@@ -226,10 +242,12 @@ function Start-SmokeBroker {
   ) -WindowStyle Hidden -PassThru
   for ($index = 0; $index -lt 100; $index += 1) {
     if (Test-Path $SessionFile) {
+      $endpoint = Get-Content -Raw -Path $SessionFile | ConvertFrom-Json
+      Assert-NormalBrokerEndpoint -Endpoint $endpoint
       return [ordered]@{
         process = $process
         session_file = $SessionFile
-        endpoint = Get-Content -Raw -Path $SessionFile | ConvertFrom-Json
+        endpoint = $endpoint
       }
     }
     $process.Refresh()
@@ -1018,6 +1036,8 @@ $evidence = [ordered]@{
     broker_endpoint_file = $brokerEndpointFile
     broker_endpoint_created = $(if ($null -ne $brokerEndpointFile) { Test-Path $brokerEndpointFile } else { $false })
     broker_transport = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.transport } else { $null })
+    broker_endpoint_credential_role = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.credential_role } else { $null })
+    normal_endpoint_credential_role_verified = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.credential_role -eq "normal" } else { $false })
     no_python_runtime_requested = [bool]$NoPythonRuntime
     python_runtime_path_scrubbed = $pythonRuntimePathScrubbed
     python_path_entries_removed_count = $pythonPathEntriesRemovedCount

@@ -1,0 +1,17 @@
+{
+  "版": 1,
+  "実行系ID": "fixture-runtime",
+  "操作": "pause",
+  "遷移前状態": "ready",
+  "遷移後状態": "paused",
+  "観測時刻UnixMillis": 1789393500000,
+  "証拠種別": "LIVE_RUNTIME",
+  "統治": {
+    "能力ID": "runtime.lifecycle.pause",
+    "権限ID": "permission.runtime.lifecycle.pause",
+    "承認ID": "lifecycle-approval-42",
+    "承認状態": "consumed",
+    "復旧ID": "recover-runtime-lifecycle-pause"
+  },
+  "ライフサイクル監査ID": "lifecycle-transition-42"
+}

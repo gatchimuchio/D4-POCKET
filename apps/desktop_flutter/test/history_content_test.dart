@@ -149,13 +149,13 @@ void main() {
     final f = ContentFixture();
     final c = HistoryClient(f);
     final e = await entry(c);
-    f.contentExpiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2;
+    f.contentExpiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 5;
     await tester.pumpWidget(
         MaterialApp(home: HistoryContentDialog(client: c, entry: e)));
     await tester.pumpAndSettle();
     expect(find.text('保存された応答'), findsOneWidget);
     await tester
-        .runAsync(() => Future<void>.delayed(const Duration(seconds: 2)));
+        .runAsync(() => Future<void>.delayed(const Duration(seconds: 5)));
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('保存された応答'), findsNothing);
     await tester.pumpWidget(const SizedBox());

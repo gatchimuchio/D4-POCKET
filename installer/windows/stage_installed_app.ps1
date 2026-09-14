@@ -150,6 +150,13 @@ try {
     throw "Rust broker endpoint ファイルが作成されませんでした: $SessionFile"
   }
 
+  $Endpoint = Get-Content -Raw -Path $SessionFile | ConvertFrom-Json
+  if ($Endpoint.credential_role -ne "normal" -or
+      $Endpoint.host -ne "127.0.0.1" -or
+      $Endpoint.transport -ne "authenticated_loopback_tcp") {
+    throw "Flutterへ渡すbroker通常接続資格が不正"
+  }
+
   $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $SessionFile
   $env:GUI_SHELL_BROKER_RUNTIME_DIR = $RuntimeDir
   $App = Start-Process -FilePath $AppExe -PassThru

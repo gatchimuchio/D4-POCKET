@@ -1,7 +1,9 @@
 //! owner自身が端末から明示実行する制御面。通常UIはこの資格fileを読まない。
 use gui_shell_rust_helper::audit_hash::sha256_tagged;
 use gui_shell_rust_helper::broker::dialogue::識別子生成;
-use gui_shell_rust_helper::broker::{BrokerEndpoint, BrokerRequestEnvelope};
+use gui_shell_rust_helper::broker::{
+    BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope,
+};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
@@ -49,7 +51,47 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
         ),
         _ => return Err("承認操作または引数が不正".into()),
     };
-    let file = std::fs::File::open(&args[1]).map_err(|_| "owner資格fileを開けない")?;
+    let body = owner操作送信(&args[1], operation, payload)?;
+    if operation == "端末招待" {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut output = options.open(&args[5]).map_err(|_| "招待fileを新規作成できない。既存fileは上書きしない")?;
+        let data = serde_json::to_vec_pretty(&body).map_err(|_|"招待の保存形式不正")?;
+        output.write_all(&data).map_err(|_|"招待保存失敗")?;
+        output.sync_all().map_err(|_|"招待保存の確定失敗")?;
+        println!("端末招待を指定fileへ保存した。秘密を含むため対面で渡し、結合後に削除する。");
+        return Ok(());
+    }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&body).map_err(|_| "結果の表示に失敗")?
+    );
+    Ok(())
+}
+
+/// ownerだけがCLIから明示実行するC4承認。通常Flutterはこの資格fileを読まない。
+pub fn 実行系ライフサイクル承認(args: &[String]) -> Result<(), String> {
+    if args.len() != 5 || args[0] != "--session-file" || args[2] != "承認" {
+        return Err("使用法: 実行系ライフサイクル承認 --session-file <owner資格file> 承認 <承認ID> <承認hash>".into());
+    }
+    let body = owner操作送信(
+        &args[1],
+        "実行系ライフサイクル承認",
+        json!({"版": 1, "承認ID": args[3], "承認hash": args[4]}),
+    )?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&body).map_err(|_| "結果の表示に失敗")?
+    );
+    Ok(())
+}
+
+fn owner操作送信(session_file: &str, operation: &str, payload: Value) -> Result<Value, String> {
+    let file = std::fs::File::open(session_file).map_err(|_| "owner資格fileを開けない")?;
     let mut raw = Vec::new();
     file.take(8193)
         .read_to_end(&mut raw)
@@ -59,7 +101,8 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
     }
     let endpoint: BrokerEndpoint =
         serde_json::from_slice(&raw).map_err(|_| "owner資格fileの形式が不正")?;
-    if endpoint.host != "127.0.0.1"
+    if endpoint.credential_role != BrokerCredentialRole::Owner
+        || endpoint.host != "127.0.0.1"
         || endpoint.port == 0
         || endpoint.transport != "authenticated_loopback_tcp"
         || endpoint.session_secret.len() != 64
@@ -68,7 +111,7 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
             .bytes()
             .all(|b| b.is_ascii_hexdigit())
     {
-        return Err("owner接続先が不正".into());
+        return Err("owner制御資格が必要: owner接続先が不正".into());
     }
     let request = json!({"request_id": 識別子生成().map_err(|_| "乱数生成失敗")?, "session_id": endpoint.session_id,
         "operation": operation, "payload": payload, "payload_hash": sha256_tagged(payload.to_string().as_bytes()),
@@ -99,23 +142,5 @@ pub fn 実行(args: &[String]) -> Result<(), String> {
     if response["status"] != "accepted" {
         return Err(format!("承認操作を拒否: {}", response["error"]));
     }
-    if operation == "端末招待" {
-        let mut options = std::fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)] {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut output = options.open(&args[5]).map_err(|_| "招待fileを新規作成できない。既存fileは上書きしない")?;
-        let data = serde_json::to_vec_pretty(&response["body"]).map_err(|_|"招待の保存形式不正")?;
-        output.write_all(&data).map_err(|_|"招待保存失敗")?;
-        output.sync_all().map_err(|_|"招待保存の確定失敗")?;
-        println!("端末招待を指定fileへ保存した。秘密を含むため対面で渡し、結合後に削除する。");
-        return Ok(());
-    }
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&response["body"]).map_err(|_| "結果の表示に失敗")?
-    );
-    Ok(())
+    Ok(response["body"].clone())
 }

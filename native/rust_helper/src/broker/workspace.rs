@@ -92,6 +92,11 @@ fn digest(value: &Value) -> String {
 }
 
 impl WorkspaceRegistry {
+    /// terminal lifecycle隔離後に、同じ実行系へ結合した作業領域root、承認、基準点を残さない。
+    pub(crate) fn remove_runtime(&mut self, runtime: &str) {
+        self.entries.retain(|_, entry| entry.runtime != runtime);
+    }
+
     pub(crate) fn response_current(&self, body: &Value, now: i64) -> bool {
         if self.last_now.is_some_and(|last| now < last) {return false;}
         body["作業領域ID"].as_str().and_then(|id| self.entries.get(id))
