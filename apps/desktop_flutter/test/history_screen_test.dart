@@ -331,6 +331,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(f.sent!['入力'], '変更した入力');
     expect(find.textContaining('新要求は承認待ちです。'), findsOneWidget);
+    expect(find.textContaining('新Session: ${'1' * 32}'), findsOneWidget);
+    expect(find.textContaining('作成種別: 対話分岐'), findsOneWidget);
+    expect(find.textContaining('参照元監査: history-1'), findsOneWidget);
+    expect(find.textContaining('参照元監査hash: sha256:${'c' * 64}'), findsOneWidget);
     expect(f.operations.contains('対話承認'), false);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pumpAndSettle();

@@ -272,7 +272,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           ],
           if (page != null && _created != null)
             SelectableText(
-                '新要求は承認待ちです。別途owner承認が必要です。\n要求ID: ${_created!['要求ID']}\n要求hash: ${_created!['要求hash']}'),
+                '新要求は承認待ちです。別途owner承認が必要です。\n要求ID: ${_created!['要求ID']}\n要求hash: ${_created!['要求hash']}\n新Session: ${_created!['対話セッションID']}\nRuntime: ${_created!['実行系ID']}\n作成種別: ${_created!['種別']}\n参照元監査: ${_created!['参照監査ID']}\n参照元監査hash: ${_created!['参照event_hash']}'),
           if (page != null)
             Text('Runtime: ${page.grant.runtime} ／ ${page.entries.length}件の要求'),
           if (page != null && page.entries.isEmpty) const Text('該当する履歴はありません。'),
