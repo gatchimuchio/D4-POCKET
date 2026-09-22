@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -16,8 +17,20 @@ struct BrokerProcess {
     endpoint: BrokerEndpoint,
 }
 
+// Windows loopback broker tests start child processes and owner CLI clients.
+// Parallel harness execution can reset an unrelated test's socket, so keep
+// this integration suite deterministic without changing product concurrency.
+static BROKER_IPC_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+fn broker_ipc_test_guard() -> MutexGuard<'static, ()> {
+    BROKER_IPC_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[test]
 fn workspace_control_is_rejected_over_normal_authenticated_ipc() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("workspace-owner-boundary");
     let process = spawn_broker(&workspace, 64 * 1024);
     for op in ["作業領域承認", "作業領域失効"] {
@@ -51,6 +64,7 @@ impl Drop for BrokerProcess {
 
 #[test]
 fn broker_process_launch_connect_and_shutdown() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("launch-connect-shutdown");
     let mut process = spawn_broker(&workspace, 64 * 1024);
     let response = send_request(&process.endpoint, &health_request("request-1", "nonce-1"));
@@ -82,6 +96,7 @@ fn broker_process_launch_connect_and_shutdown() {
 
 #[test]
 fn broker_ipc_rejects_unauthenticated_malformed_oversized_and_stale_requests() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("negative-ipc");
     let process = spawn_broker(&workspace, 512);
 
@@ -139,6 +154,7 @@ fn broker_ipc_rejects_unauthenticated_malformed_oversized_and_stale_requests() {
 
 #[test]
 fn broker_ipc_rejects_replay_after_process_restart() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("restart-replay");
     {
         let process = spawn_broker(&workspace, 64 * 1024);
@@ -159,6 +175,7 @@ fn broker_ipc_rejects_replay_after_process_restart() {
 
 #[test]
 fn broker_ipc_rejects_payload_hash_mismatch() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("payload-hash-mismatch");
     let process = spawn_broker(&workspace, 64 * 1024);
 
@@ -350,6 +367,7 @@ fn lifecycle_transition(
 
 #[test]
 fn development_lifecycle_fixture_uses_owner_approval_and_fixed_child_acknowledgements() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("development-lifecycle-fixture");
     let (process, owner, owner_file) = spawn_lifecycle_fixture_broker(&workspace);
     let runtime_id = "development-lifecycle-fixture";
@@ -522,6 +540,7 @@ fn development_lifecycle_fixture_uses_owner_approval_and_fixed_child_acknowledge
 
 #[test]
 fn lifecycle_quarantine_is_terminal_across_broker_restart() {
+    let _test_guard = broker_ipc_test_guard();
     let workspace = temp_workspace("lifecycle-terminal-quarantine-restart");
     let runtime_id = "development-lifecycle-fixture";
     {
@@ -634,6 +653,11 @@ fn send_raw_without_request_newline(
     stream.write_all(secret.as_bytes()).unwrap();
     stream.write_all(b"\n").unwrap();
     stream.write_all(request.as_bytes()).unwrap();
+    // This case intentionally omits the request newline. Unix uses a
+    // write-half shutdown to delimit the malformed frame; Windows must keep
+    // the write side open because Winsock can turn the server response into
+    // EOF/10053 after that shutdown.
+    #[cfg(not(windows))]
     stream.shutdown(std::net::Shutdown::Write).unwrap();
     let mut reader = BufReader::new(stream);
     let mut response = String::new();
@@ -651,6 +675,9 @@ fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::
     stream.write_all(b"\n")?;
     stream.write_all(request.as_bytes())?;
     stream.write_all(b"\n")?;
+    // The production protocol is newline-delimited; Windows keeps the socket
+    // full-duplex until the response is received.
+    #[cfg(not(windows))]
     stream.shutdown(std::net::Shutdown::Write)?;
     let mut reader = BufReader::new(stream);
     let mut response = String::new();
@@ -715,6 +742,7 @@ fn null_payload_hash_hex() -> &'static str {
 
 #[test]
 fn owner制御資格を通常資格や要求metadataで置換できない() {
+    let _test_guard = broker_ipc_test_guard();
     use gui_shell_rust_helper::audit_hash::sha256_tagged;
     use serde_json::json;
     use sha2::{Digest, Sha256};
@@ -1005,6 +1033,7 @@ fn temp_workspace(test_name: &str) -> Workspace {
 
 #[test]
 fn 履歴再要求は新セッションと新承認を必要とする() {
+    let _test_guard = broker_ipc_test_guard();
     use gui_shell_rust_helper::audit_hash::sha256_tagged;
     use serde_json::json;
     let workspace=temp_workspace("history-replay");

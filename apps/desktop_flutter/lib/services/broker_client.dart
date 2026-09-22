@@ -84,7 +84,7 @@ class BrokerClient implements BrokerTransport {
       }
       return Map<String, Object?>.from(decoded);
     } finally {
-      socket.destroy();
+      await socket.close();
     }
   }
 

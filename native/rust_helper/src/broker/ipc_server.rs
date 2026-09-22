@@ -1,6 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -183,7 +183,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
 }
 
 fn handle_stream(
-    mut stream: TcpStream,
+    stream: TcpStream,
     session_secret: &str,
     owner_secret: Option<&str>,
     broker: &mut Broker,
@@ -201,10 +201,7 @@ fn handle_stream(
             BrokerServerError::new(format!("IPC write timeoutの設定に失敗: {error}"))
         })?;
 
-    let mut reader =
-        BufReader::new(stream.try_clone().map_err(|error| {
-            BrokerServerError::new(format!("IPC streamのcloneに失敗: {error}"))
-        })?);
+    let mut reader = BufReader::new(stream);
 
     let auth_line = match read_limited_line(&mut reader, AUTH_LINE_MAX_BYTES) {
         Ok(Some(line)) => line,
@@ -214,7 +211,7 @@ fn handle_stream(
                 "broker IPC auth line is missing",
                 true,
             );
-            write_response(&mut stream, &response)?;
+            write_response(reader.get_mut(), &response)?;
             return Ok(false);
         }
         Err(IpcLineError::Oversized) => {
@@ -223,7 +220,7 @@ fn handle_stream(
                 "broker IPC auth line exceeds the configured request limit",
                 true,
             );
-            write_response(&mut stream, &response)?;
+            write_response(reader.get_mut(), &response)?;
             return Ok(false);
         }
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
@@ -236,7 +233,7 @@ fn handle_stream(
             "broker IPC authentication failed",
             true,
         );
-        write_response(&mut stream, &response)?;
+        write_response(reader.get_mut(), &response)?;
         return Ok(false);
     }
 
@@ -248,7 +245,7 @@ fn handle_stream(
                 "broker IPC request envelope is missing",
                 true,
             );
-            write_response(&mut stream, &response)?;
+            write_response(reader.get_mut(), &response)?;
             return Ok(false);
         }
         Err(IpcLineError::Oversized) => {
@@ -257,7 +254,7 @@ fn handle_stream(
                 "broker IPC request exceeds the configured request limit",
                 true,
             );
-            write_response(&mut stream, &response)?;
+            write_response(reader.get_mut(), &response)?;
             return Ok(false);
         }
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
@@ -265,7 +262,7 @@ fn handle_stream(
 
     let response = if owner { broker.owner要求処理(&request_json) } else { broker.handle_json(&request_json) };
     let shutdown = response.shutdown_requested;
-    write_response(&mut stream, &response)?;
+    write_response(reader.get_mut(), &response)?;
     Ok(shutdown)
 }
 
@@ -318,6 +315,7 @@ fn write_response(
     stream
         .write_all(encoded.as_bytes())
         .and_then(|_| stream.write_all(b"\n"))
+        .and_then(|_| stream.shutdown(Shutdown::Both))
         .map_err(|error| {
         BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
         })
