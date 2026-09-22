@@ -70,8 +70,7 @@ class BrokerClient implements BrokerTransport {
       timeout: const Duration(seconds: 5),
     );
     try {
-      socket.write('${_endpoint.sessionSecret}\n');
-      socket.write('${jsonEncode(request)}\n');
+      socket.write('${_endpoint.sessionSecret}\n${jsonEncode(request)}\n');
       await socket.flush();
       final responseLine = await _readResponseLine(socket);
       final decoded = jsonDecode(utf8.decode(responseLine));
@@ -84,7 +83,7 @@ class BrokerClient implements BrokerTransport {
       }
       return Map<String, Object?>.from(decoded);
     } finally {
-      await socket.close();
+      socket.destroy();
     }
   }
 

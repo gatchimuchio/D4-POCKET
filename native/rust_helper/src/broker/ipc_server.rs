@@ -1,6 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -312,12 +312,12 @@ fn write_response(
     let encoded = response.to_json_string().map_err(|error| {
         BrokerServerError::new(format!("broker responseのencodeに失敗: {error}"))
     })?;
+    let mut frame = encoded.into_bytes();
+    frame.push(b'\n');
     stream
-        .write_all(encoded.as_bytes())
-        .and_then(|_| stream.write_all(b"\n"))
-        .and_then(|_| stream.shutdown(Shutdown::Both))
+        .write_all(&frame)
         .map_err(|error| {
-        BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
+            BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
         })
 }
 

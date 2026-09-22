@@ -650,9 +650,8 @@ fn send_raw_without_request_newline(
     request: &str,
 ) -> Value {
     let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port)).unwrap();
-    stream.write_all(secret.as_bytes()).unwrap();
-    stream.write_all(b"\n").unwrap();
-    stream.write_all(request.as_bytes()).unwrap();
+    let frame = format!("{}\n{}", secret, request);
+    stream.write_all(frame.as_bytes()).unwrap();
     // This case intentionally omits the request newline. Unix uses a
     // write-half shutdown to delimit the malformed frame; Windows must keep
     // the write side open because Winsock can turn the server response into
@@ -671,10 +670,8 @@ fn abandon_connection_before_auth(endpoint: &BrokerEndpoint) {
 
 fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::io::Result<Value> {
     let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))?;
-    stream.write_all(secret.as_bytes())?;
-    stream.write_all(b"\n")?;
-    stream.write_all(request.as_bytes())?;
-    stream.write_all(b"\n")?;
+    let frame = format!("{}\n{}\n", secret, request);
+    stream.write_all(frame.as_bytes())?;
     // The production protocol is newline-delimited; Windows keeps the socket
     // full-duplex until the response is received.
     #[cfg(not(windows))]

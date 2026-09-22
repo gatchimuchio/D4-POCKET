@@ -53,7 +53,8 @@ fn request(endpoint:&BrokerEndpoint,operation:&str,payload:Value) -> Value {
     let request=json!({"request_id":id,"nonce":id,"session_id":endpoint.session_id,"issued_at":BrokerRequestEnvelope::current_issued_at(),"operation":operation,"metadata":{},"payload_hash":sha256_tagged(payload.to_string().as_bytes()),"payload":payload});
     let mut stream=TcpStream::connect((endpoint.host.as_str(),endpoint.port)).unwrap();
     stream.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
-    writeln!(stream,"{}\n{}",endpoint.session_secret,request).unwrap();
+    let frame=format!("{}\n{}\n",endpoint.session_secret,request);
+    stream.write_all(frame.as_bytes()).unwrap();
     let mut line=String::new();BufReader::new(stream).read_line(&mut line).unwrap();serde_json::from_str(&line).unwrap()
 }
 fn cli(f:&Fixture,args:&[&str]) -> std::process::Output {

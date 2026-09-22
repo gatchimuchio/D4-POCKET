@@ -259,7 +259,9 @@ fn owner操作送信(session_file: &str, operation: &str, payload: Value) -> Res
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .map_err(|_| "送信期限を設定できない")?;
-    writeln!(stream, "{}\n{}", endpoint.session_secret, request)
+    let frame = format!("{}\n{}\n", endpoint.session_secret, request);
+    stream
+        .write_all(frame.as_bytes())
         .map_err(|_| "承認操作を送信できない")?;
     let mut line = String::new();
     BufReader::new(stream)
