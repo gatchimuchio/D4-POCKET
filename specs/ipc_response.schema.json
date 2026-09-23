@@ -31,6 +31,7 @@
         "content_projection",
         "audit_verify",
         "normalize_payload",
+        "ホスト能力",
         "実行系列挙",
         "実行系資源観測",
         "実行系ライフサイクル状態",

@@ -17,6 +17,7 @@ import 'screens/recovery_center.dart';
 import 'screens/runtime_center.dart';
 import 'screens/runtime_dialogue.dart';
 import 'screens/history_screen.dart';
+import 'screens/host_capability_center.dart';
 import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
@@ -28,7 +29,8 @@ import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
 
-const String kGuiShellProductTitle = 'GUI Shell';
+const String kD4PocketProductTitle = 'D4 Pocket';
+const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
 const double _navigationRailMinScrollableExtent = 816;
 
 Future<void> main() async {
@@ -245,6 +247,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         client: widget.evaluationClient,
         connect: widget.evaluationConnect ?? connectEvaluationClient,
       ),
+      HostCapabilityCenter(client: widget.client),
     ];
     final pageEntries = _pageEntries();
 
@@ -379,6 +382,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.science),
                                       label: Text('評価ラボ'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.public_outlined),
+                                      selectedIcon: Icon(Icons.public),
+                                      label: Text('ホスト能力'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -420,6 +428,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline),
       _ShellPageEntry(13, '実行履歴', Icons.history),
       _ShellPageEntry(14, '評価ラボ', Icons.science_outlined),
+      _ShellPageEntry(15, 'ホスト能力', Icons.public_outlined),
     ];
   }
 

@@ -70,6 +70,7 @@ REQUIRED = {
     "agent_task.schema.json",
     "agent_tool_call.schema.json",
     "agent_diff.schema.json",
+    "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",
     "broker_error.schema.json",

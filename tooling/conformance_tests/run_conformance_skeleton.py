@@ -3520,6 +3520,15 @@ def test_packaging_portability_utf8_governance_allowlist_is_exact() -> list[str]
             + "; ".join(allowlisted_errors)
         )
 
+    rev1_document_errors = portable_path_errors(
+        [ROOT / "docs" / "総合機能拡張_rev1" / "実装仕様書.md"]
+    )
+    if rev1_document_errors:
+        errors.append(
+            "rev1日本語文書pathが正本資料のallowlistから外れている: "
+            + "; ".join(rev1_document_errors)
+        )
+
     unregistered_errors = portable_path_errors([ROOT / "規定" / "未登録規定.md"])
     if not unregistered_errors:
         errors.append("未登録の非ASCII pathが許可された")
@@ -4257,6 +4266,24 @@ def 作業領域応答の露出境界を検査する() -> list[str]:
     return errors
 
 
+def test_host_capability_is_observation_not_authority() -> list[str]:
+    schema = load_schema("host_capability.schema.json")
+    valid = load_contract_fixture("host_capability.valid.json")
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"host capabilityの正常fixtureが不正: {errors}"]
+    invalid = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "host_capability_authority.invalid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if not validate_instance(invalid, schema):
+        return ["host capabilityがPermissionをauthorityとして受け入れた"]
+    if any("Permission" in item or "Approval" in item for item in valid["能力"]):
+        return ["host capabilityの正常fixtureにauthority fieldが混入している"]
+    return []
+
+
 def 作業領域検査要求の分岐を検査する() -> list[str]:
     schema = load_schema("workspace_inspection_request.schema.json")
     samples = {
@@ -4948,6 +4975,7 @@ def main() -> int:
         test_runtime_manifest_invalid_fixture_rejected,
         test_adapter_manifest_authority_escalation_rejected,
         test_runtime_catalog_cannot_grant_authority,
+        test_host_capability_is_observation_not_authority,
         作業領域検査要求の分岐を検査する,
         作業領域応答の露出境界を検査する,
         test_workspace_diff_content_shape,

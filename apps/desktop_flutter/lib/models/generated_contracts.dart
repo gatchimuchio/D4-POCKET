@@ -1,3 +1,55 @@
+class HostCapabilityItemRecord {
+  const HostCapabilityItemRecord({
+    required this.capabilityId,
+    required this.status,
+    required this.evidenceSource,
+    required this.reason,
+  });
+
+  final String capabilityId;
+  final String status;
+  final String evidenceSource;
+  final String reason;
+
+  factory HostCapabilityItemRecord.fromJson(Map<String, Object?> json) {
+    return HostCapabilityItemRecord(
+      capabilityId: json['capability_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'unavailable',
+      evidenceSource: json['evidence_source'] as String? ?? 'unknown',
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+}
+
+class HostCapabilityRecord {
+  const HostCapabilityRecord({
+    required this.hostId,
+    required this.displayName,
+    required this.platform,
+    required this.status,
+    required this.capabilities,
+  });
+
+  final String hostId;
+  final String displayName;
+  final String platform;
+  final String status;
+  final List<HostCapabilityItemRecord> capabilities;
+
+  factory HostCapabilityRecord.fromJson(Map<String, Object?> json) {
+    return HostCapabilityRecord(
+      hostId: json['host_id'] as String? ?? '',
+      displayName: json['display_name'] as String? ?? '',
+      platform: json['platform'] as String? ?? 'unknown',
+      status: json['status'] as String? ?? 'unavailable',
+      capabilities: _records(
+        json['capabilities'],
+        HostCapabilityItemRecord.fromJson,
+      ),
+    );
+  }
+}
+
 class RuntimeRecord {
   const RuntimeRecord({
     required this.runtimeId,
@@ -665,6 +717,7 @@ class ShellSnapshot {
     required this.releaseBlockerCount,
     required this.evidenceSummary,
     required this.recoveryPlaybook,
+    this.hostCapabilities = const [],
     this.snapshotSource = 'fallback',
     this.snapshotPath = '',
     this.snapshotGeneratedAt = '',
@@ -696,6 +749,7 @@ class ShellSnapshot {
   final int releaseBlockerCount;
   final EvidenceSummaryRecord evidenceSummary;
   final List<RecoveryPlaybookRecord> recoveryPlaybook;
+  final List<HostCapabilityRecord> hostCapabilities;
   final String snapshotSource;
   final String snapshotPath;
   final String snapshotGeneratedAt;
@@ -761,6 +815,8 @@ class ShellSnapshot {
           Map<String, Object?>.from(json['evidence_summary'] as Map? ?? {})),
       recoveryPlaybook:
           _records(json['recovery_playbook'], RecoveryPlaybookRecord.fromJson),
+      hostCapabilities:
+          _records(json['host_capabilities'], HostCapabilityRecord.fromJson),
       snapshotSource: json['snapshot_source'] as String? ?? 'local',
       snapshotPath: json['snapshot_path'] as String? ?? '',
       snapshotGeneratedAt: json['snapshot_generated_at'] as String? ??
@@ -775,6 +831,7 @@ class ShellSnapshot {
     OperationStatusRecord? operationStatus,
     List<ProblemRecord>? problems,
     List<EvidenceRecord>? evidence,
+    List<HostCapabilityRecord>? hostCapabilities,
     String? snapshotSource,
     String? snapshotPath,
     String? snapshotGeneratedAt,
@@ -807,6 +864,7 @@ class ShellSnapshot {
       releaseBlockerCount: releaseBlockerCount,
       evidenceSummary: evidenceSummary,
       recoveryPlaybook: recoveryPlaybook,
+      hostCapabilities: hostCapabilities ?? this.hostCapabilities,
       snapshotSource: snapshotSource ?? this.snapshotSource,
       snapshotPath: snapshotPath ?? this.snapshotPath,
       snapshotGeneratedAt: snapshotGeneratedAt ?? this.snapshotGeneratedAt,

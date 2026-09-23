@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "ホストID": "gui-shell-local-windows",
+  "表示名": "ローカル Windows",
+  "プラットフォーム": "windows",
+  "状態": "ready",
+  "能力": [
+    {
+      "能力ID": "filesystem",
+      "状態": "ready",
+      "証拠種別": "LIVE_RUNTIME",
+      "理由": "観測済み",
+      "Permission": "filesystem.write"
+    }
+  ]
+}

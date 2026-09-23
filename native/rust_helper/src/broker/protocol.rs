@@ -244,6 +244,8 @@ pub enum BrokerOperation {
     端末招待取消,
     #[serde(rename = "端末失効")]
     端末失効,
+    #[serde(rename = "ホスト能力")]
+    ホスト能力,
     Health,
     Shutdown,
     CommandEnvelope,
@@ -331,6 +333,7 @@ impl BrokerOperation {
             BrokerOperation::端末一覧 => "端末一覧",
             BrokerOperation::端末招待取消 => "端末招待取消",
             BrokerOperation::端末失効 => "端末失効",
+            BrokerOperation::ホスト能力 => "ホスト能力",
             BrokerOperation::Health => "health",
             BrokerOperation::Shutdown => "shutdown",
             BrokerOperation::CommandEnvelope => "command_envelope",
@@ -894,6 +897,7 @@ impl Broker {
         match envelope.operation.unwrap() {
             operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::ホスト能力 => self.ホスト能力処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             BrokerOperation::実行系資源観測 => self.実行系資源観測要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             BrokerOperation::実行系ライフサイクル状態 => self.実行系ライフサイクル状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系ライフサイクル承認要求 => self.実行系ライフサイクル承認要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -1827,6 +1831,31 @@ impl Broker {
             body: None,
             shutdown_requested: false,
         }
+    }
+
+    fn ホスト能力処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        if !payload.is_null() {
+            return self.reject_with_payload_hash(
+                request_id,
+                BrokerOperation::ホスト能力.as_str(),
+                "host_capability_request_invalid",
+                "ホスト能力照会はpayloadを受け付けない",
+                true,
+                payload_hash,
+            );
+        }
+        self.accept_body_with_evidence(
+            request_id,
+            BrokerOperation::ホスト能力,
+            super::host_capability::current(),
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        )
     }
 
     fn suspend_health(&mut self, request_id: &str, payload_hash: &str) -> BrokerResponse {

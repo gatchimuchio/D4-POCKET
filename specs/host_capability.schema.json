@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/host_capability.schema.json",
+  "title": "ホスト能力（Host Capability）",
+  "type": "object",
+  "required": ["版", "ホストID", "表示名", "プラットフォーム", "状態", "能力"],
+  "additionalProperties": false,
+  "properties": {
+    "版": {"type": "integer", "const": 1},
+    "ホストID": {"type": "string", "minLength": 1},
+    "表示名": {"type": "string", "minLength": 1},
+    "プラットフォーム": {
+      "type": "string",
+      "enum": ["windows", "macos", "linux", "android", "ios", "unknown"]
+    },
+    "状態": {
+      "type": "string",
+      "enum": ["ready", "degraded", "unavailable", "suspended", "failed"]
+    },
+    "能力": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["能力ID", "状態", "証拠種別", "理由"],
+        "additionalProperties": false,
+        "properties": {
+          "能力ID": {"type": "string", "minLength": 1},
+          "状態": {
+            "type": "string",
+            "enum": ["ready", "degraded", "unavailable", "suspended", "failed"]
+          },
+          "証拠種別": {
+            "type": "string",
+            "enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME", "EXTERNAL_EVIDENCE", "FIXTURE"]
+          },
+          "理由": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

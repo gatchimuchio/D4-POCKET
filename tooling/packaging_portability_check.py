@@ -24,13 +24,17 @@ UTF8_GOVERNANCE_PATH_ALLOWLIST = frozenset(
         "tooling/日本語基底監査.py",
     }
 )
+UTF8_GOVERNANCE_PATH_PREFIXES = ("docs/総合機能拡張_rev1/",)
 
 
 def portable_path_errors(paths: list[Path]) -> list[str]:
     errors: list[str] = []
     for path in paths:
         rel = relative(path)
-        allowlisted_utf8_path = rel in UTF8_GOVERNANCE_PATH_ALLOWLIST
+        allowlisted_utf8_path = (
+            rel in UTF8_GOVERNANCE_PATH_ALLOWLIST
+            or any(rel.startswith(prefix) for prefix in UTF8_GOVERNANCE_PATH_PREFIXES)
+        )
         try:
             rel.encode("ascii")
         except UnicodeEncodeError:

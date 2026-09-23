@@ -5,6 +5,12 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
+## 現行D4 Pocket統合単位（2026-09-23）
+
+rev2 Phase 2のHost Capabilityを、既存のGUI-Shell契約とRust Broker経路へ接続した。`specs/host_capability.schema.json`を正本とし、`ホスト能力`の認証付きIPC、payload拒否、証拠種別の明示、D4 Pocketデスクトップの読み取り専用操作面を実装・検証する。Host Capabilityは観測結果であり、Permission・Approval・runtime trustを生成しない。
+
+この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

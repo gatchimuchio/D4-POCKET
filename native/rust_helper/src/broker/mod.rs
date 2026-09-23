@@ -15,6 +15,7 @@ pub mod ipc_server;
 pub mod protocol;
 pub(crate) mod runtime_registry;
 pub(crate) mod runtime_lifecycle;
+pub(crate) mod host_capability;
 pub mod store;
 
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};

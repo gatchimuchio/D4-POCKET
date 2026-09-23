@@ -24,6 +24,11 @@ class ShellCoreClient {
         'health',
         bodyKey: 'health',
       );
+      final hostCapabilityResponse = await broker.request('ホスト能力');
+      final hostCapability = _acceptedResponseBodyMap(
+        hostCapabilityResponse,
+        'ホスト能力',
+      );
 
       final normalizeResponse = await broker.request(
         'normalize_payload',
@@ -70,6 +75,8 @@ class ShellCoreClient {
         _brokerSnapshot(
           healthResponse: healthResponse,
           health: health,
+          hostCapabilityResponse: hostCapabilityResponse,
+          hostCapability: hostCapability,
           normalizeResponse: normalizeResponse,
           projectionResponse: projectionResponse,
           projection: projection,
@@ -164,6 +171,31 @@ Map<String, Object?> _acceptedResponseBodyMap(
   return Map<String, Object?>.from(body);
 }
 
+Map<String, Object?> _hostCapabilitySnapshotJson(
+  Map<String, Object?> body,
+) {
+  final capabilities = body['能力'];
+  if (capabilities is! List) {
+    throw const BrokerClientException('ホスト能力応答に能力配列がありません');
+  }
+  return {
+    'host_id': body['ホストID']?.toString() ?? '',
+    'display_name': body['表示名']?.toString() ?? '',
+    'platform': body['プラットフォーム']?.toString() ?? 'unknown',
+    'status': body['状態']?.toString() ?? 'unavailable',
+    'capabilities': [
+      for (final item in capabilities)
+        if (item is Map)
+          {
+            'capability_id': item['能力ID']?.toString() ?? '',
+            'status': item['状態']?.toString() ?? 'unavailable',
+            'evidence_source': item['証拠種別']?.toString() ?? 'unknown',
+            'reason': item['理由']?.toString() ?? '',
+          },
+    ],
+  };
+}
+
 void _requireAccepted(Map<String, Object?> response, String operation) {
   if (response['status'] != 'accepted') {
     final error = response['error'];
@@ -179,6 +211,8 @@ void _requireAccepted(Map<String, Object?> response, String operation) {
 ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> healthResponse,
   required Map<String, Object?> health,
+  required Map<String, Object?> hostCapabilityResponse,
+  required Map<String, Object?> hostCapability,
   required Map<String, Object?> normalizeResponse,
   required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
@@ -278,6 +312,7 @@ ShellSnapshot _brokerSnapshot({
   }
   final auditEvents = [
     _auditJson(healthResponse, 'broker.health', 'accepted'),
+    _auditJson(hostCapabilityResponse, 'broker.host_capability', 'accepted'),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
     _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
     _auditJson(
@@ -320,6 +355,7 @@ ShellSnapshot _brokerSnapshot({
             '状態=$healthStatus 永続化準備=$persistenceReady 切替え=$cutoverStatus',
       },
     ],
+    'host_capabilities': [_hostCapabilitySnapshotJson(hostCapability)],
     'agent_sessions': [],
     'permissions': [],
     'pending_approvals': [],
@@ -1186,6 +1222,22 @@ const _mockSnapshot = ShellSnapshot(
       safeToIgnoreForPhaseB: false,
       requiredAction: '概要、状態、問題、証拠、復旧の各画面を利用可能に保ってください。',
       blocksCompletedProductRelease: false,
+    ),
+  ],
+  hostCapabilities: [
+    HostCapabilityRecord(
+      hostId: 'gui-shell-local-windows',
+      displayName: 'ローカル Windows',
+      platform: 'windows',
+      status: 'degraded',
+      capabilities: [
+        HostCapabilityItemRecord(
+          capabilityId: 'filesystem',
+          status: 'ready',
+          evidenceSource: 'LIVE_RUNTIME',
+          reason: 'Brokerの永続保管先を観測できる',
+        ),
+      ],
     ),
   ],
   snapshotSource: 'mock',

@@ -17,9 +17,9 @@ struct BrokerProcess {
     endpoint: BrokerEndpoint,
 }
 
-// Windows loopback broker tests start child processes and owner CLI clients.
-// Parallel harness execution can reset an unrelated test's socket, so keep
-// this integration suite deterministic without changing product concurrency.
+// Windowsのloopback Broker試験は子processとowner CLI clientを起動する。
+// 並列harnessが別試験のsocketをresetし得るため、製品の並列性を変えずに
+// この統合試験だけを決定論的に実行する。
 static BROKER_IPC_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn broker_ipc_test_guard() -> MutexGuard<'static, ()> {
@@ -74,6 +74,27 @@ fn broker_process_launch_connect_and_shutdown() {
         response["health"]["audit_persistence"],
         "durable_file_store"
     );
+    let host_capability = send_request(
+        &process.endpoint,
+        &host_capability_request(
+            &process.endpoint.session_id,
+            "host-capability-1",
+            "host-capability-nonce-1",
+        ),
+    );
+    assert_eq!(host_capability["status"], "accepted");
+    assert_eq!(host_capability["body"]["版"], 1);
+    assert!(host_capability["body"]["能力"].as_array().unwrap().len() >= 1);
+
+    let forged_payload = host_capability_request_with_payload(
+        &process.endpoint.session_id,
+        "host-capability-forged-payload-1",
+        "host-capability-forged-payload-nonce-1",
+        serde_json::json!({"Permission": "filesystem.write"}),
+    );
+    let forged = send_request(&process.endpoint, &forged_payload);
+    assert_eq!(forged["status"], "rejected");
+    assert_eq!(forged["error"]["code"], "host_capability_request_invalid");
 
     let shutdown = send_request(
         &process.endpoint,
@@ -652,10 +673,9 @@ fn send_raw_without_request_newline(
     let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port)).unwrap();
     let frame = format!("{}\n{}", secret, request);
     stream.write_all(frame.as_bytes()).unwrap();
-    // This case intentionally omits the request newline. Unix uses a
-    // write-half shutdown to delimit the malformed frame; Windows must keep
-    // the write side open because Winsock can turn the server response into
-    // EOF/10053 after that shutdown.
+    // このcaseは意図的にrequest末尾の改行を省略する。Unixはwrite側の
+    // shutdownでmalformed frameの終端を示すが、Windowsはshutdown後に
+    // Winsockがserver responseをEOF/10053へ変換し得るためwrite側を開く。
     #[cfg(not(windows))]
     stream.shutdown(std::net::Shutdown::Write).unwrap();
     let mut reader = BufReader::new(stream);
@@ -672,8 +692,8 @@ fn try_send_raw(endpoint: &BrokerEndpoint, secret: &str, request: &str) -> std::
     let mut stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))?;
     let frame = format!("{}\n{}\n", secret, request);
     stream.write_all(frame.as_bytes())?;
-    // The production protocol is newline-delimited; Windows keeps the socket
-    // full-duplex until the response is received.
+    // production protocolは改行区切りであり、Windowsはresponseを受け取る
+    // までsocketをfull-duplexのまま保持する。
     #[cfg(not(windows))]
     stream.shutdown(std::net::Shutdown::Write)?;
     let mut reader = BufReader::new(stream);
@@ -715,6 +735,37 @@ fn shutdown_request(session_id: &str) -> String {
         session_id,
         BrokerRequestEnvelope::current_issued_at()
     )
+}
+
+fn host_capability_request(session_id: &str, request_id: &str, nonce: &str) -> String {
+    format!(
+        "{{\"request_id\":\"{}\",\"session_id\":\"{}\",\"operation\":\"ホスト能力\",\"payload_hash\":\"sha256:{}\",\"nonce\":\"{}\",\"issued_at\":\"{}\",\"metadata\":{{\"client\":\"desktop_flutter\"}}}}",
+        request_id,
+        session_id,
+        null_payload_hash_hex(),
+        nonce,
+        BrokerRequestEnvelope::current_issued_at()
+    )
+}
+
+fn host_capability_request_with_payload(
+    session_id: &str,
+    request_id: &str,
+    nonce: &str,
+    payload: Value,
+) -> String {
+    let payload_hash = gui_shell_rust_helper::audit_hash::sha256_tagged(payload.to_string().as_bytes());
+    serde_json::json!({
+        "request_id": request_id,
+        "session_id": session_id,
+        "operation": "ホスト能力",
+        "payload_hash": payload_hash,
+        "nonce": nonce,
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "desktop_flutter"},
+        "payload": payload,
+    })
+    .to_string()
 }
 
 fn normalize_payload_request(

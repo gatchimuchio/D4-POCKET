@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 2: Host Capabilityの契約接続（2026-09-23）
+
+D4 Pocketのブランド表面を追加し、rev2 Phase 2のHost Capabilityを、Schema → Rust Broker → 認証付きIPC → Flutter読み取り専用操作面まで接続した。既存のGUI-Shell技術契約、Shell Coreの権限境界、rev1の進捗履歴は変更していない。
+
+- Contract: `specs/host_capability.schema.json`、valid example、`Permission`混入のnegative fixtureを追加した。能力の状態と証拠種別（`CONFIG`、`INTERNAL_STATE`、`LIVE_RUNTIME`、`EXTERNAL_EVIDENCE`、`FIXTURE`）を分離し、Host Capability自身にPermission／Approval fieldを許可しない。
+- Rust production path: Broker operation `ホスト能力`を既存の認証付きIPCへ追加した。payloadはnullだけを受け付け、非null payloadを拒否する。Brokerが観測できる範囲だけを返し、観測結果から権限を生成しない。
+- Desktop product path: `ShellCoreClient.product()`がhealth後にHost Capabilityを取得し、`D4 Pocket ホスト能力`の読み取り専用画面へ投影する。UIはRust Brokerを呼び出すが、Permission、Approval、filesystem、process、network、credentialを直接扱わない。
+- Evidence: Schema 68件／valid example 68件／negative fixture 83件、Conformance 158 checks、Host Capability unit test、Rust全test 204件（Broker IPC 9件を含む）、Desktop analyze／全76 tests、共有UI analyze／39 tests、Mobile analyze／29 testsがこの作業単位でPASSした。`Permission`混入と不正payloadの拒否も実行した。Python-only集約検証、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertions、日本語基底監査もPASSした。
+
+この節でrev2全体の完成を主張しない。Agent Adapter／Launcher／Dashboard／Compare／Handoff、Provider／Model、MCP／A2A、Multi-host、Compose／Preview／Export／Pruning、長時間運用、Windows installed productの全数証拠は後続作業または既存release gateに残る。既存のrelease_blockerをpost_v1_scopeへ読み替えない。
+
 ## 現況：Windows実機を基準とした開発継続（2026-09-13）
 
 owner指示により、現在実機検証できるOSはWindowsだけとする。Android実機は凍結、その他の非Windows実機も未検証として保持する。実装・build・自動試験・利用可能な仮想環境の検証を先に進め、実機の不在だけを開発停止条件にしない。実運用監査署名は正式release直前まで延期する。具体的な運用はROADMAPの「現在の開発・検証条件」を参照する。

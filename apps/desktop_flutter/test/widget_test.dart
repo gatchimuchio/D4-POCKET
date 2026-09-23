@@ -35,7 +35,7 @@ void main() {
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail=tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length,15);
+    expect(rail.destinations.length,16);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
     expect(tester.takeException(),isNull);
@@ -49,12 +49,24 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 15);
+    expect(rail.destinations.length, 16);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
     expect(find.text('運用観測の境界'), findsOneWidget);
     expect(find.text('Dataset'), findsOneWidget);
+  });
+
+  testWidgets('ホスト能力をNavigationRailから開ける', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(15);
+    await tester.pumpAndSettle();
+
+    expect(find.text('D4 Pocket ホスト能力'), findsOneWidget);
+    expect(find.text('filesystem'), findsOneWidget);
+    expect(find.textContaining('PermissionやApprovalは生成しません'), findsOneWidget);
   });
 
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {
@@ -336,6 +348,7 @@ void main() {
   test('製品クライアントがブローカー経由の権限スナップショットを描画する', () async {
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -390,6 +403,7 @@ void main() {
     );
     expect(transport.operations, [
       'health',
+      'ホスト能力',
       'normalize_payload',
       'content_projection',
       'approval_edit',
@@ -437,6 +451,7 @@ void main() {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
         _brokerHealthResponse(),
+        _brokerHostCapabilityResponse(),
         _brokerRejectedResponse(
           'normalize_payload',
           'broker_stale_session',
@@ -786,6 +801,24 @@ Map<String, Object?> _brokerAcceptedBody(
     'body': body,
     'shutdown_requested': false,
   };
+}
+
+Map<String, Object?> _brokerHostCapabilityResponse() {
+  return _brokerAcceptedBody('ホスト能力', {
+    '版': 1,
+    'ホストID': 'gui-shell-local-windows',
+    '表示名': 'ローカル Windows',
+    'プラットフォーム': 'windows',
+    '状態': 'degraded',
+    '能力': [
+      {
+        '能力ID': 'filesystem',
+        '状態': 'ready',
+        '証拠種別': 'LIVE_RUNTIME',
+        '理由': 'Brokerの永続保管先を観測できる',
+      },
+    ],
+  });
 }
 
 Map<String, Object?> _brokerCommandSuspendedResponse() {

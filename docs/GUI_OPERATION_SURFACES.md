@@ -1,6 +1,6 @@
 # GUI操作面
 
-状態基準日: 2026-05-26
+状態基準日: 2026-09-23
 
 GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの操作パターンを取り込む。Flutterは状態と操作者の意図を表す操作面を描画し、Shell Coreは引き続き権限境界を担う。
 
@@ -54,6 +54,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   status: implemented
   evidence: 常時表示のstatus barはruntime status、trust status、pending approval、audit chain status、network exposure、およびrelease blocker countを描画する。
   authority_boundary: status barは読み取り専用である。
+
+- item: D4 Pocket Host Capability
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: D4 Pocketのデスクトップ操作面はRust Brokerの認証済み「ホスト能力」応答を読み取り、platform、host、能力状態、証拠種別、理由を表示する。能力状態はunknown／unavailableを0へ変換しない。
+  authority_boundary: Host Capabilityは観測結果であり、Permission、Approval、Capability grant、runtime trustを生成しない。画面は読み取り専用である。
 
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1

@@ -2,7 +2,7 @@
 
 <h1>
   <br>
-  🐚 GUI&nbsp;Shell ／ 汎用 Runtime 操作基盤
+  🐚 D4 Pocket ／ GUI&nbsp;Shell 汎用 Runtime 操作基盤
 </h1>
 
 <h3>PC を第一対象とする AI Runtime / Agent Operation Shell</h3>
@@ -14,8 +14,8 @@
   <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20in%20progress-orange.svg">
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
-  <img alt="Schemas" src="https://img.shields.io/badge/schemas-35%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-148%20checks-success.svg">
+  <img alt="Schemas" src="https://img.shields.io/badge/schemas-68%20validated-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-158%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -48,10 +48,10 @@
 <a id="what-this-is"></a>
 ## 🎯 これは何か
 
-GUI Shell は通常の app template ではなく、BLUE-TANUKI 専用 GUI でもない。
+D4 PocketはGUI Shellを技術基盤とする製品表面であり、GUI Shellは通常の app templateでもBLUE-TANUKI専用 GUIでもない。
 
 - 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
-- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。26 schema のそれぞれに valid example と negative fixture がある。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行検査対象には68 schema、valid example、negative fixtureがある。
 - 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
 - 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 

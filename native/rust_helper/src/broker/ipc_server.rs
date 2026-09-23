@@ -206,8 +206,8 @@ fn handle_stream(
     let auth_line = match read_limited_line(&mut reader, AUTH_LINE_MAX_BYTES) {
         Ok(Some(line)) => line,
         Ok(None) => {
-            // The peer closed before sending credentials. There is no live
-            // channel on which a rejection response could be delivered.
+            // 相手が資格情報を送る前に接続を閉じた。拒否応答を届ける
+            // 有効な通信路がないため、応答を返さず終了する。
             return Ok(false);
         }
         Err(IpcLineError::Oversized) => {

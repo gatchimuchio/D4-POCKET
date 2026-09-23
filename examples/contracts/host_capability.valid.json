@@ -1,0 +1,27 @@
+{
+  "版": 1,
+  "ホストID": "gui-shell-local-windows",
+  "表示名": "ローカル Windows",
+  "プラットフォーム": "windows",
+  "状態": "degraded",
+  "能力": [
+    {
+      "能力ID": "filesystem",
+      "状態": "ready",
+      "証拠種別": "LIVE_RUNTIME",
+      "理由": "Brokerの永続保管先を現在の実行系から観測できる"
+    },
+    {
+      "能力ID": "secure_storage",
+      "状態": "ready",
+      "証拠種別": "CONFIG",
+      "理由": "Windows安全保管境界が選択可能である"
+    },
+    {
+      "能力ID": "native_notification",
+      "状態": "unavailable",
+      "証拠種別": "CONFIG",
+      "理由": "このBroker経路ではWindows通知接続をまだ提供していない"
+    }
+  ]
+}
