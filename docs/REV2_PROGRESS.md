@@ -12,6 +12,16 @@ C13の`観測一覧`を再利用する読み取り専用Trace InspectorをDeskto
 - 検証: Desktop NavigationRail／追跡情報画面を含む全83 Flutter試験、Flutter analyze、Schema 92件／正常例92件／負例109件、Conformance 169 checks、厳格日本語監査、manifest検査を実行し、PASSした。`python tooling/validate_all.py --python-only --desktop-platform windows`も開発モードでPASSした。
 - 未成立分類: Runtime／Adapter／Tool／外部通信のproduction trace、OpenTelemetry export、外部collector、long-term trace、8時間運用、Windows installed product証拠は`release_blocker`。C14はBroker内部観測の閲覧範囲だけを主張する。
 
+## D4 Pocket C15: A2A外部概念射影契約（2026-09-23）
+
+A2AのAgent Card、Task、Message、Artifact、Streamを、実接続なしのboundedな`metadata_only`契約へ射影した。C15はSchema、valid／negative fixture、Conformance、正本文書だけを追加し、外部Agentへの接続やTask実行経路は追加していない。
+
+- Contract path: A2A外部概念 → `a2a_contract.schema.json` → Schema／fixture／Conformance。`protocol_version`、Agent Cardのinterface／capability／skill／authentication metadata、Task状態、Message／Artifactのpart kind・件数・hash、Stream状態を固定した。
+- Authority boundary: Agent CardはTrustではなく、TaskはApprovalではなく、MessageはPermissionではなく、ArtifactはAuthorityではなく、StreamはCapability grantではない。全概念へ`authority_strip=true`を要求し、`権限生成=なし`、`公開範囲=metadata_only`、認証実値・endpoint実値・raw content非保持を検証する。
+- Evidence boundary: valid fixtureは`FIXTURE`であり、実Agent、実endpoint、実認証、実Task、実Streamの証拠ではない。Trustはoperator review待ち、Capability diffの追加・変更・削除はoperator review必須とする。
+- Validation: Schema 93件／正常例93件／負例112件、Conformance 170 checks、厳格日本語監査、manifest検査を実行する。Rust／Flutterは変更していないため、この単位では未実行とする。
+- 未成立分類: Agent Card discovery、A2A binding、外部Agent登録、credential注入、Task／Message送信、Artifact本文、Stream購読、timeout、取消、再接続、quarantine、複数Agent比較、Handoffは`release_blocker`。C15契約だけでA2A接続や製品完成を主張しない。
+
 ## D4 Pocket C13: 観測センター（2026-09-23）
 
 BrokerのAudit確定処理を、Auditとは別の内部観測としてboundedなSpan、Trace、Metricへ射影し、Desktop観測センターへ接続した。観測はsession内memoryに限定し、caller登録、外部export、権限生成を持たない。

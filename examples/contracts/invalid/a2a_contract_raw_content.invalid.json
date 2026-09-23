@@ -1,0 +1,30 @@
+{
+  "版": 1,
+  "契約種別": "A2A外部概念射影",
+  "protocol_version": "1.0",
+  "Agent Card": {},
+  "Task": [],
+  "Message": [
+    {
+      "message_id": "a2a-message-1",
+      "task_id": null,
+      "context_id": null,
+      "role": "user",
+      "part_kinds": ["text"],
+      "part_count": 1,
+      "parts_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "content_visibility": "summary",
+      "status": "received",
+      "authority_strip": true,
+      "raw_content": "secret raw text"
+    }
+  ],
+  "Artifact": [],
+  "Stream": [],
+  "Trust": {},
+  "Capability diff": {},
+  "権限生成": "なし",
+  "authority_strip": true,
+  "公開範囲": "metadata_only",
+  "証拠種別": "FIXTURE"
+}

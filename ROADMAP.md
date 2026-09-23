@@ -29,6 +29,8 @@ C13では、`docs/specs/observability-center.md`を正本とする観測セン�
 
 C14では、`docs/specs/trace-inspector.md`を正本とする読み取り専用のTrace InspectorをDesktopへ接続した。C13の`観測一覧`を再利用し、Broker内部で実測されたSpanについて開始・終了・所要時間・状態・親Span・エラー分類をbounded waterfall表示する。Runtime、Adapter、Tool、外部通信は実測経路が未接続のため画面上で未成立として明示する。Trace表示はPermission、Approval、Authority、Capability、Credentialを生成せず、OpenTelemetry export、外部collector、Runtime全体の実測、installed product証拠、8時間運用は`release_blocker`として保持する。
 
+C15では、`docs/specs/a2a-contract.md`を正本とするA2A外部概念射影契約を追加した。Agent Card、Task、Message、Artifact、Streamをboundedな`metadata_only` projectionへ固定し、各概念へ`authority_strip=true`を要求する。Agent Card、Trust、Capability diff、認証schemeは説明情報であり、Permission、Approval、Authority、Credential実値、接続、実行を生成しない。A2Aの実物interface確認、Agent Card discovery、Task送信、Message／Artifact本文、Stream購読はC16以降へ分離し、未成立を`release_blocker`として保持する。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

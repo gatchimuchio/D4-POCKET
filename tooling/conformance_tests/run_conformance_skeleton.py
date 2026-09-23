@@ -79,6 +79,7 @@ REQUIRED_SCHEMA_NAMES = {
     "regression_case_registration",
     "regression_case_receipt",
     "mcp_contract",
+    "a2a_contract",
     "mcp_connection",
     "mcp_connection_receipt",
     "mcp_connection_list",
@@ -309,6 +310,7 @@ def test_required_docs_exist() -> list[str]:
         "authority-strip-conformance.md",
         "content-exposure-policy.md",
         "approval-visibility-boundary.md",
+        "a2a-contract.md",
         "runtime-catalog.md",
     }
     existing = {path.name for path in DOC_SPECS.glob("*.md")}
@@ -3849,6 +3851,100 @@ def MCP外部概念射影の契約と境界を検査する() -> list[str]:
     return 不整合
 
 
+def A2A外部概念射影の契約と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "a2a-contract.md"
+    if not specification.exists():
+        return ["C15 A2A外部概念射影の日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    required_tokens = (
+        "Agent Card",
+        "Task",
+        "Message",
+        "Artifact",
+        "Stream",
+        "Agent Card ≠ Trust",
+        "A2A Task ≠ Approval",
+        "Message ≠ Permission",
+        "Artifact ≠ Authority",
+        "Stream ≠ Capability grant",
+        "authority_strip=true",
+        "権限生成=なし",
+        "metadata_only",
+        "FIXTURE",
+        "release_blocker",
+    )
+    for token in required_tokens:
+        if token not in specification_text:
+            不整合.append(f"C15 A2A契約の日本語意味正本に必須境界がない: {token}")
+
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C15 A2A契約の日本語意味正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/a2a-contract.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C15 A2A契約の日本語意味正本が正本索引へ登録されていない")
+
+    schema = load_schema("a2a_contract.schema.json")
+    valid = load_contract_fixture("a2a_contract.valid.json")
+    failures = validate_instance(valid, schema)
+    if failures:
+        不整合.extend(f"C15 valid fixtureが拒否された: {failure}" for failure in failures)
+    if valid.get("権限生成") != "なし" or valid.get("authority_strip") is not True:
+        不整合.append("C15 valid fixtureが権限非生成またはauthority_strip=trueではない")
+    if valid.get("公開範囲") != "metadata_only" or valid.get("証拠種別") != "FIXTURE":
+        不整合.append("C15 valid fixtureの公開範囲または証拠種別が境界外である")
+    if valid.get("Trust", {}).get("state") == "verified":
+        不整合.append("C15 Agent Cardがoperator review前にverified Trustを主張している")
+    if valid.get("Trust", {}).get("requires_operator_review") is not True:
+        不整合.append("C15 Trustにoperator review要求がない")
+    card = valid.get("Agent Card", {})
+    if "endpoint" in card or "endpoint_url" in card:
+        不整合.append("C15 Agent Cardがendpoint実値を保持している")
+    authentication = card.get("authentication", {})
+    if authentication.get("secret_value_present") is not False:
+        不整合.append("C15 Agent Cardが秘密値の存在を許可している")
+    for concept in ("Task", "Message", "Artifact", "Stream"):
+        records = valid.get(concept, [])
+        if not isinstance(records, list):
+            不整合.append(f"C15 {concept}がbounded arrayではない")
+            continue
+        for record in records:
+            if record.get("authority_strip") is not True:
+                不整合.append(f"C15 {concept}にauthority_strip=trueがない")
+
+    candidates = []
+    authority_candidate = copy.deepcopy(valid)
+    authority_candidate["権限生成"] = "filesystem.write"
+    candidates.append(("権限生成", authority_candidate))
+    raw_candidate = copy.deepcopy(valid)
+    raw_candidate["Message"][0]["raw_content"] = "secret raw content"
+    candidates.append(("raw_content", raw_candidate))
+    secret_candidate = copy.deepcopy(valid)
+    secret_candidate["Agent Card"]["authentication"]["secret_value_present"] = True
+    candidates.append(("secret_value_present", secret_candidate))
+    for name, candidate in candidates:
+        if not validate_instance(candidate, schema):
+            不整合.append(f"C15 {name}混入をschemaが受理している")
+
+    invalid_names = (
+        "a2a_contract_authority_escalation.invalid.json",
+        "a2a_contract_raw_content.invalid.json",
+        "a2a_contract_secret.invalid.json",
+    )
+    for name in invalid_names:
+        try:
+            invalid = load_contract_fixture(f"invalid/{name}")
+        except (OSError, json.JSONDecodeError) as exc:
+            不整合.append(f"C15 {name}を読めない: {exc}")
+            continue
+        if not validate_instance(invalid, schema):
+            不整合.append(f"C15 {name}を受理している")
+    return 不整合
+
+
 def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     不整合: list[str] = []
     specification = DOC_SPECS / "mcp-connection-center.md"
@@ -5528,6 +5624,7 @@ def main() -> int:
         回帰Caseの契約と境界を検査する,
         資格情報保管庫の契約と境界を検査する,
         MCP外部概念射影の契約と境界を検査する,
+        A2A外部概念射影の契約と境界を検査する,
         MCP接続センターの統治経路と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,

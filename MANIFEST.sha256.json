@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "cff41cb6d1a102c480bc45c19460a380a462919c8700416e5b079b519c042e27"
+      "sha256": "dfe48bc5ff03ed2186323a286010658f5dd374497202031af53166600fbab546"
     },
     {
       "path": "SECURITY.md",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "12e2f577000fd145b7b5c74ec9f4804e6e93fb0e4ea4c1a19e9e45f028798615"
+      "sha256": "0fccd375474c2e33b569513d00e18ab576643c02e7b8c5d920330903654d8beb"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1114,6 +1114,10 @@
     {
       "path": "docs/source/gui_shell_design_report_v0_3_1_phase0_lock.md",
       "sha256": "4ffe5044eba54e281aaecd41ffe5b64b51e75e33d0dbec18c6d7cbf9df7e123e"
+    },
+    {
+      "path": "docs/specs/a2a-contract.md",
+      "sha256": "69673d8a33e1a14718513aa1b40051aed89eb464978ea8a46b4d1ed428c43251"
     },
     {
       "path": "docs/specs/adapter-conformance.md",
@@ -1237,7 +1241,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "440f7cbd3a3b7d14d581df24dc429fe45d9d2f4f0686ff378d2ab88f717c6737"
+      "sha256": "e1bbdfde4f2dc9804e9e951405f0d9b02278372ec0a8975881349ac599bd122b"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1246,6 +1250,10 @@
     {
       "path": "examples/contracts/README.md",
       "sha256": "b6ca335a611fd9971239fe64da946fe11cf2b7640f1521b5e8bd65404bda2d2d"
+    },
+    {
+      "path": "examples/contracts/a2a_contract.valid.json",
+      "sha256": "f0121bf4bf8a37e1a67597f51053dbf2453a0a6798d7922c194205e091634772"
     },
     {
       "path": "examples/contracts/action_envelope.valid.json",
@@ -1398,6 +1406,18 @@
     {
       "path": "examples/contracts/host_capability.valid.json",
       "sha256": "84120f242edb0b7e477c0daaffb024b80540b103ed4b1fe46b97558ac5d21865"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_contract_authority_escalation.invalid.json",
+      "sha256": "c25706fa803715fdbbb0ab97620c4214a4065e3c9c3a9605f12c0b899505167e"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_contract_raw_content.invalid.json",
+      "sha256": "807e5ae3cc3481b91b14122b17d57d142845d881828a286b4bc1f19a493289e8"
+    },
+    {
+      "path": "examples/contracts/invalid/a2a_contract_secret.invalid.json",
+      "sha256": "9de710126d46349476c56a892cfacd22c6975583169282d94be89b959b5ad554"
     },
     {
       "path": "examples/contracts/invalid/action_envelope_missing_relation.invalid.json",
@@ -2808,6 +2828,10 @@
       "sha256": "423bd50fbdf88093850f6286612cf333bc7167f802058ab0705b7232d086376b"
     },
     {
+      "path": "specs/a2a_contract.schema.json",
+      "sha256": "6a5daf6f110fa5a6420a23b564f7dfbbee84f99736fcd4aa151d1c0383e98277"
+    },
+    {
       "path": "specs/action_envelope.schema.json",
       "sha256": "7092feeee1306ae7153a52a6b1e6b15793242ae892d6b79f1d7ec3067141632f"
     },
@@ -3201,7 +3225,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "900def0886629f0559c0fa8828c6610f6b0a37d52900faedbe00024651ff22db"
+      "sha256": "51fa8bbce493d0d1328fa94daa2030d97a0efe1ab29853d3bf3fe234cb514277"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3257,7 +3281,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "d7544b73e28f8510003cb0357cf866ef16773bd6bdb701ff3b2c75a70ebeda30"
+      "sha256": "8b613960fe7f91c043382a90014f35210797ee776cb092c759f749b23252e106"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -3293,7 +3317,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "5aafff320eca0459232ed7aaeee082863ac0b93bc31ae399432b0e85d100d2b9"
+      "sha256": "08637e73464978a73d10181e7e83ebf072228fad244ff8f44c73fb5dcb291021"
     }
   ]
 }

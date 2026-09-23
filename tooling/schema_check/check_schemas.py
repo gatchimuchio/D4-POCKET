@@ -51,6 +51,7 @@ REQUIRED = {
     "credential_receipt.schema.json",
     "credential_list.schema.json",
     "mcp_contract.schema.json",
+    "a2a_contract.schema.json",
     "mcp_connection.schema.json",
     "mcp_connection_receipt.schema.json",
     "mcp_connection_list.schema.json",
