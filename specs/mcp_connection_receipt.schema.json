@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_connection_receipt.schema.json",
+  "title": "MCP接続receipt（McpConnectionReceipt）",
+  "description": "検証済みMCP metadataとBroker統治結果だけを返す。Tool実行権、Credential実値、raw descriptionは返さない。",
+  "type": "object",
+  "required": [
+    "版", "契約種別", "Server", "Transport", "Tool", "Resource", "Prompt", "Credential ref",
+    "Trust", "Capability diff", "権限生成", "公開範囲", "証拠種別", "接続状態", "能力ID",
+    "権限ID", "承認状態", "復旧ID", "接続監査ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "契約種別": { "const": "MCP外部概念射影" },
+    "Server": { "type": "object" },
+    "Transport": { "type": "object" },
+    "Tool": { "type": "array", "maxItems": 256 },
+    "Resource": { "type": "array", "maxItems": 256 },
+    "Prompt": { "type": "array", "maxItems": 256 },
+    "Credential ref": { "type": "object" },
+    "Trust": { "type": "object" },
+    "Capability diff": { "type": "object" },
+    "権限生成": { "const": "なし" },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "接続状態": { "const": "connected" },
+    "能力ID": { "const": "mcp.connection.connect" },
+    "権限ID": { "const": "permission.mcp.connection.connect" },
+    "承認状態": { "const": "owner_control_approved" },
+    "復旧ID": { "const": "recover-mcp-connection" },
+    "接続監査ID": { "type": "string", "minLength": 1 }
+  }
+}

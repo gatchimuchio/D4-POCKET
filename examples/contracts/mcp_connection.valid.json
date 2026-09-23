@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "操作": "接続",
+  "ServerID": "mcp-fixture",
+  "実行file": "C:\\Program Files\\D4 Pocket\\mcp-fixture.exe",
+  "引数": ["--stdio"],
+  "workspace": "C:\\Users\\Public\\D4PocketWorkspace",
+  "Transport": "stdio",
+  "Credential ref": {
+    "credential_id": "11111111111111111111111111111111",
+    "purpose": "mcp_transport",
+    "target": "mcp-fixture",
+    "required": false,
+    "status": "missing"
+  }
+}

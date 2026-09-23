@@ -1,0 +1,39 @@
+{
+  "版": 1,
+  "契約種別": "MCP外部概念射影",
+  "Server": {
+    "server_id": "mcp-fixture",
+    "表示名": "fixture",
+    "origin": "live_runtime",
+    "version": "2026-07-28",
+    "metadata_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "discovered"
+  },
+  "Transport": {
+    "kind": "stdio",
+    "status": {"status": "supported", "reason": "wireを検証済み"},
+    "接続先hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reason": "接続先実値を射影しない"
+  },
+  "Tool": [],
+  "Resource": [],
+  "Prompt": [],
+  "Credential ref": {
+    "credential_id": "11111111111111111111111111111111",
+    "purpose": "mcp_transport",
+    "target": "mcp-fixture",
+    "required": false,
+    "status": "missing"
+  },
+  "Trust": {"state": "unverified", "evidence_source": "LIVE_RUNTIME", "reason": "metadataはTrustではない"},
+  "Capability diff": {"status": "no_change", "added": [], "removed": [], "changed": [], "requires_operator_review": false, "evidence_source": "LIVE_RUNTIME"},
+  "権限生成": "なし",
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "接続状態": "connected",
+  "能力ID": "mcp.connection.connect",
+  "権限ID": "permission.mcp.connection.connect",
+  "承認状態": "owner_control_approved",
+  "復旧ID": "recover-mcp-connection",
+  "接続監査ID": "audit-mcp-connection-1"
+}

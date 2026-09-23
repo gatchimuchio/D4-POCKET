@@ -85,11 +85,11 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: owner controlの`資格情報登録`は新規資格情報をWindows ProtectedStoreのCredential purposeへDPAPI保管し、`資格情報一覧`は通常IPCへmetadata_onlyのreceiptだけを返す。同じIDの再登録、channel違反、保管欠落・改変はBrokerで拒否する。
   authority_boundary: 資格情報ID、metadata、暗号文hashはAuthority、Permission、Approvalを生成しない。秘密値はFlutter、snapshot、Audit、error、log、trace、CLI出力へ投影しない。秘密値の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、GUI管理面は未成立として扱う。
 
-- item: D4 Pocket MCP Contract（C8 current scope）
+- item: D4 Pocket MCP Connection Center（C9 current scope）
   classification: required_for_v1
-  status: contract_only
-  evidence: MCP Server、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffを`mcp_contract.schema.json`へ射影し、正常／権限混入／秘密値混入／Approval混入のfixtureをConformanceで検査する。
-  authority_boundary: MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。discovery、connect、consent、Tool実行、timeout、disconnect、quarantineは未成立として扱う。
+  status: implemented_for_current_scope
+  evidence: C8のMCP外部概念射影契約をRust Brokerのowner専用`MCP接続`へ接続した。stdio child processへ現行`server/discover`を試行し、legacy `initialize`へfallbackしてTool／Resource／Prompt catalogを検証し、通常IPCの`MCP接続一覧`へmetadata-only receiptを返す。
+  authority_boundary: MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。Credential実値注入、Tool実行、Streamable HTTP、OAuth、consent、disconnect、quarantineは未成立として扱う。
 
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1

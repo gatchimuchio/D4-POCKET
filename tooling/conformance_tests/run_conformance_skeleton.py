@@ -79,6 +79,9 @@ REQUIRED_SCHEMA_NAMES = {
     "regression_case_registration",
     "regression_case_receipt",
     "mcp_contract",
+    "mcp_connection",
+    "mcp_connection_receipt",
+    "mcp_connection_list",
     "evaluation_experiment",
     "evaluation_result",
     "evaluation_comparison",
@@ -147,6 +150,7 @@ BROKER_REQUIRED_SOURCES = {
     "protocol.rs",
     "audit.rs",
     "regression_case.rs",
+    "mcp_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -3697,6 +3701,87 @@ def MCP外部概念射影の契約と境界を検査する() -> list[str]:
     return 不整合
 
 
+def MCP接続センターの統治経路と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "mcp-connection-center.md"
+    if not specification.exists():
+        return ["C9 MCP接続センターの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    required_tokens = (
+        "server/discover",
+        "initialize",
+        "stdio",
+        "owner control",
+        "metadata_only",
+        "Credential実値",
+        "Tool実行",
+        "MCP接続一覧",
+        "mcp_server_unavailable",
+        "mcp_timeout",
+        "release_blocker",
+    )
+    for token in required_tokens:
+        if token not in specification_text:
+            不整合.append(f"C9 MCP接続センター正本に必須境界がない: {token}")
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C9 MCP接続センター正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/mcp-connection-center.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C9 MCP接続センター正本が正本索引へ登録されていない")
+
+    for name in ("mcp_connection", "mcp_connection_receipt", "mcp_connection_list"):
+        schema = load_schema(name + ".schema.json")
+        valid = load_contract_fixture(name + ".valid.json")
+        failures = validate_instance(valid, schema)
+        if failures:
+            不整合.extend(f"C9 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    invalid_names = (
+        "mcp_connection_unknown_authority.invalid.json",
+        "mcp_connection_receipt_full_content.invalid.json",
+        "mcp_connection_list_wrong_evidence.invalid.json",
+    )
+    for name in invalid_names:
+        invalid = load_contract_fixture("invalid/" + name)
+        schema_name = "mcp_connection" if name.startswith("mcp_connection_unknown") else (
+            "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else "mcp_connection_list"
+        )
+        if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
+            不整合.append(f"C9 {name}を受理している")
+
+    receipt = load_contract_fixture("mcp_connection_receipt.valid.json")
+    if receipt.get("権限生成") != "なし" or receipt.get("公開範囲") != "metadata_only":
+        不整合.append("C9 receiptが権限非生成またはmetadata_onlyではない")
+    if receipt.get("承認状態") != "owner_control_approved" or receipt.get("接続状態") != "connected":
+        不整合.append("C9 receiptのBroker統治状態が固定されていない")
+    encoded_receipt = json.dumps(receipt, ensure_ascii=False)
+    if any(token in encoded_receipt for token in ("secret_value", "credential_value", "password", "token")):
+        不整合.append("C9 receiptへCredential実値が混入している")
+
+    rust_mcp = (RUST_HELPER / "src" / "mcp.rs").read_text(encoding="utf-8")
+    rust_stdio = (RUST_HELPER / "src" / "adapters" / "mcp_stdio.rs").read_text(encoding="utf-8")
+    rust_center = (RUST_HELPER / "src" / "broker" / "mcp_center.rs").read_text(encoding="utf-8")
+    for token, source in (
+        ("server/discover", rust_mcp + rust_stdio),
+        ("mcp_metadata_authority_injection", rust_mcp),
+        ("mcp_list_pagination_unhandled", rust_mcp),
+        ("validate_tool_call", rust_mcp),
+        ("env_clear", rust_stdio),
+        ("mcp_timeout", rust_stdio),
+        ("McpProtocolEra::Legacy", rust_stdio),
+        ("mcp_owner_required", rust_center),
+        ("mcp_normal_channel_required", rust_center),
+        ("mcp_credential_unavailable", rust_center),
+        ("append_audit", rust_center),
+        ("metadata_only", rust_center),
+    ):
+        if token not in source:
+            不整合.append(f"C9実装に統治境界tokenがない: {token}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5291,6 +5376,7 @@ def main() -> int:
         回帰Caseの契約と境界を検査する,
         資格情報保管庫の契約と境界を検査する,
         MCP外部概念射影の契約と境界を検査する,
+        MCP接続センターの統治経路と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

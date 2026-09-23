@@ -13,6 +13,7 @@ use std::time::Duration;
 
 const MAX_EVALUATION_DATASET_BYTES: u64 = 48 * 1024;
 const MAX_CREDENTIAL_REGISTRATION_BYTES: u64 = 64 * 1024;
+const MAX_MCP_CONNECTION_BYTES: u64 = 64 * 1024;
 
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
@@ -145,6 +146,68 @@ pub fn 資格情報登録(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// ownerが明示したMCP接続設定だけをBrokerへ渡す。実行file、workspace、Credential実値はCLI出力へ戻さない。
+pub fn MCP接続(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "接続" {
+        return Err("使用法: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>".into());
+    }
+    let payload = MCP接続設定読取(&args[3])?;
+    let body = owner操作送信(&args[1], "MCP接続", payload)?;
+    let receipt = MCP接続公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "MCP接続公開receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn MCP接続公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "MCP接続公開receiptの形式が不正".to_string())?;
+    let encoded = serde_json::to_string(body).map_err(|_| "MCP接続公開receiptを検査できない")?;
+    for forbidden in [
+        "実行file", "workspace", "secret", "secret_value", "token", "password", "credential_value",
+        "permission_id", "approval_id", "authority",
+    ] {
+        if encoded.contains(forbidden) {
+            return Err("MCP接続公開receiptへ実行設定・権限・秘密値が混入している".into());
+        }
+    }
+    let required = [
+        "版",
+        "契約種別",
+        "Server",
+        "Transport",
+        "Tool",
+        "Resource",
+        "Prompt",
+        "Credential ref",
+        "Trust",
+        "Capability diff",
+        "権限生成",
+        "公開範囲",
+        "証拠種別",
+        "接続状態",
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID",
+        "接続監査ID",
+    ];
+    for required in required {
+        if !object.contains_key(required) {
+            return Err("MCP接続公開receiptの形式が不正".into());
+        }
+    }
+    if object.get("公開範囲").and_then(Value::as_str) != Some("metadata_only")
+        || object.get("権限生成").and_then(Value::as_str) != Some("なし")
+    {
+        return Err("MCP接続公開receiptの公開境界が不正".into());
+    }
+    Ok(body.clone())
+}
+
 fn 資格情報公開投影(body: &Value) -> Result<Value, String> {
     let object = body
         .as_object()
@@ -183,6 +246,57 @@ fn 資格情報登録読取(path: &str) -> Result<Value, String> {
         return Err("資格情報登録fileはJSON objectでなければならない".into());
     }
     Ok(payload)
+}
+
+fn MCP接続設定読取(path: &str) -> Result<Value, String> {
+    let file = std::fs::File::open(path).map_err(|_| "MCP接続設定fileを開けない")?;
+    let size = file
+        .metadata()
+        .map_err(|_| "MCP接続設定fileの大きさを確認できない")?
+        .len();
+    if size > MAX_MCP_CONNECTION_BYTES {
+        return Err("MCP接続設定fileが64KiB上限を超過".into());
+    }
+    let mut raw = Vec::with_capacity(size as usize);
+    file.take(MAX_MCP_CONNECTION_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| "MCP接続設定fileを読めない")?;
+    if raw.len() as u64 > MAX_MCP_CONNECTION_BYTES {
+        return Err("MCP接続設定fileが64KiB上限を超過".into());
+    }
+    let payload: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "MCP接続設定fileのJSON形式が不正")?;
+    if !payload.is_object() {
+        return Err("MCP接続設定fileはJSON objectでなければならない".into());
+    }
+    if MCP接続設定に禁止fieldがある(&payload) {
+        return Err("MCP接続設定fileへ秘密値または権限fieldを含められない".into());
+    }
+    Ok(payload)
+}
+
+fn MCP接続設定に禁止fieldがある(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "authority"
+                        | "authority_id"
+                        | "permission_id"
+                        | "approval_id"
+                        | "capability_grant"
+                        | "secret"
+                        | "secret_value"
+                        | "token"
+                        | "password"
+                        | "credential_value"
+                )
+            }) || object.values().any(MCP接続設定に禁止fieldがある)
+        }
+        Value::Array(values) => values.iter().any(MCP接続設定に禁止fieldがある),
+        _ => false,
+    }
 }
 
 fn 回帰Case公開投影(body: &Value) -> Result<Value, String> {
@@ -551,5 +665,18 @@ mod tests {
         let mut unsafe_body = body;
         unsafe_body["秘密値"] = json!("表示してはならない");
         assert!(資格情報公開投影(&unsafe_body).is_err());
+    }
+
+    #[test]
+    fn MCP接続設定は秘密値と権限fieldを送信前に拒否する() {
+        assert!(!MCP接続設定に禁止fieldがある(&json!({
+            "Credential ref": {"required": false, "status": "missing"}
+        })));
+        assert!(MCP接続設定に禁止fieldがある(&json!({
+            "Credential ref": {"required": false, "status": "missing", "secret_value": "not-output"}
+        })));
+        assert!(MCP接続設定に禁止fieldがある(&json!({
+            "nested": [{"permission_id": "permission.injected"}]
+        })));
     }
 }

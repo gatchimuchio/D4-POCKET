@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4596086b7f9925ee9f6748d125160e0785be8f87b7470fe79659c2f31acf4611"
+      "sha256": "c3542145b855bc0eed6fe9b05bd90aabc5fc6e0eaa066e0f8cfa74b03110b6c6"
     },
     {
       "path": "SECURITY.md",
@@ -949,7 +949,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "3fbcbf2e29c7191bf6233b82333488f8bdc3a5e96ee0a19e1b726b84187a9ea7"
+      "sha256": "352370b20f4dbd52cbab7b18b2eadf1fad383ab35705149a204dfe4712e9e81a"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "bc28241c923cc37f3217ad378bab335e1c53974ffe43013d5ff4bc04433f24b7"
+      "sha256": "41956c2e779e34ff624b89f8fd1a46cf1dcaf3ce3d9747b22bf60a00c72f3dc3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1112,6 +1112,10 @@
       "sha256": "fe8fb02986f6cc64ecf6084a07b1a70808a7d51c58fb2d3e7be9358136f9c31a"
     },
     {
+      "path": "docs/specs/mcp-connection-center.md",
+      "sha256": "2c11459ea0aca8749dff989a8bf7a195a4ed5033a652192f604025c9ca3b92a4"
+    },
+    {
       "path": "docs/specs/mcp-contract.md",
       "sha256": "32f184bf7b79eebe67e9177b75d100888cf8965aa9aaff144d7752639cb710bd"
     },
@@ -1169,7 +1173,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "edf5c8666d3beb015c39540ca489126bbd056205dc8a61f461732f7145e10983"
+      "sha256": "f72458cce1b0db0bbe2d62a011bfe1ed5a4c63638f3ac78977e64815765a7358"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1520,6 +1524,18 @@
       "sha256": "93754e3aa24f2a09c261578ffe2a91fe85485412bf79877d6fc29f23436137b1"
     },
     {
+      "path": "examples/contracts/invalid/mcp_connection_list_wrong_evidence.invalid.json",
+      "sha256": "e1301f27979703ea367f58a01eeafc45d209b79dfce8c4730e8360b0dfcb2b62"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_connection_receipt_full_content.invalid.json",
+      "sha256": "966a0db0dc541b08c3412de42b0f66eb678da6e14bd81693ca0957b94c0768be"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_connection_unknown_authority.invalid.json",
+      "sha256": "4a18f36fa39fc9945750a4af13e42733705744b6b1b90cba163e7979d427d54b"
+    },
+    {
       "path": "examples/contracts/invalid/mcp_contract_authority.invalid.json",
       "sha256": "0d87ef208a103d5f2754b53278c14dac564415c2f07ad323e38cd93ac5088e90"
     },
@@ -1710,6 +1726,18 @@
     {
       "path": "examples/contracts/llm_bounded_extension.valid.json",
       "sha256": "5ffd41b39164d193e66182250f594c01b0ebf50a990c6bfe34bbb1d0aa44dcfa"
+    },
+    {
+      "path": "examples/contracts/mcp_connection.valid.json",
+      "sha256": "a334d2bd74ddfad5481376bc8218b25fbd203dd506c45fb5af64801cf1ed1ed6"
+    },
+    {
+      "path": "examples/contracts/mcp_connection_list.valid.json",
+      "sha256": "876157cdbece59bdad8a7093feda5fd4a3885bce376c16ed167428e5b74a6ab4"
+    },
+    {
+      "path": "examples/contracts/mcp_connection_receipt.valid.json",
+      "sha256": "4ed68a3eca917f442ef67cbefba1d8d9975665bf3c79b5b63392743d3980582a"
     },
     {
       "path": "examples/contracts/mcp_contract.valid.json",
@@ -1936,12 +1964,16 @@
       "sha256": "3155a9f2b0cb62a427987974b1f8c3f9822ff8dd22b6f2d6587330f3c47f9ec9"
     },
     {
+      "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
+      "sha256": "8aa7cad4310c3459b22f5035d165e13babd6107b6d667f42128ef55bfc9d6232"
+    },
+    {
       "path": "native/rust_helper/src/adapters/minidora.rs",
       "sha256": "cb0f8e6b8cf5cb6ba37c426d03e0b6779ae6b7db800b60f9a9e15f4dfe713daf"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
-      "sha256": "4236991451bed56c59f11d8d61b67d271a187d91e17c2ac9409b0e492412508e"
+      "sha256": "e1ba6778965ff4844ce8b926071a892621a0606a8ffdb00e07a72363b2a0f892"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -2028,12 +2060,16 @@
       "sha256": "11b60d48f37e5e5bcf3606899acd29829975557769a464b4abc66b9b9aff0c4f"
     },
     {
+      "path": "native/rust_helper/src/broker/mcp_center.rs",
+      "sha256": "b8c499f171648e3dfeb4b39528ccb6d6e82a806e116e624d3b087df171c92428"
+    },
+    {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "0905edb4286eb302ff9dfb3d2c55447679b8cf256261c6daef36b2b4fc3895d7"
+      "sha256": "db87827b37e16f33d8117fd2fe644b6b59e443dd93d593a40387bb85fa882e66"
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "27efc78ea4aa34aed8773129e50bf0c365c49a21f558292f886b78cf732ae09b"
+      "sha256": "ecee029aaba7c38b00b9916a88b67225073f4d447d4b917518db5d3472572d4e"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2089,11 +2125,15 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "10cbcef492c2046431b667e1036ba9ab33a189344511780fd704c325da146e66"
+      "sha256": "ad7b3a2b4cba010cc51c63271eeb759986eb82f0dc292c4ef0064e60b7ba83b4"
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "87bf3a308ccb290b7c45e15e85f9dd149a2d749b556e1199fbcb1302030af747"
+      "sha256": "9e3bdd162c2a0c60d49040d08f133fc99dbb274595e5b26481ab61aceaee763d"
+    },
+    {
+      "path": "native/rust_helper/src/mcp.rs",
+      "sha256": "5c4008c463b612530c7f4485a9cc94981dc58bd4d81bb7f6c8b687428079567c"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -2101,7 +2141,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "2df73201b99bfc795947c8da8f2e20e2e156c599ba4d0996f56fb9795053d16e"
+      "sha256": "974ded4e4eb84f151b8d27a28b49c8709d1c76c5b068b497822a5693bb78b42a"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -2729,11 +2769,23 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "a7985a59fcf3ec8cb79dd2067fc5f77c478b2eab9b4cef3bcf567b82b37599b9"
+      "sha256": "1f1dbb2b347e017cb8000eb223836c0fe2f927ea13aeaf46aa965cdae21586da"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "578152ced7da9ca2c1fa9eb8935edeecbaec4394a93ae474e53ff4200c28fab4"
+      "sha256": "dd5262d929cb4e41e6bc5492f81b722a532783fa0e779d568b8d47da56e269dd"
+    },
+    {
+      "path": "specs/mcp_connection.schema.json",
+      "sha256": "604c8a0e925f6f976a0ce96f50685f1dea9c9b4101bf732f9a62ccb271cba64c"
+    },
+    {
+      "path": "specs/mcp_connection_list.schema.json",
+      "sha256": "c0bc717dfb2a4c23c7764be5210fd0413de2dd29cccf1f49771bacf9c6219f9f"
+    },
+    {
+      "path": "specs/mcp_connection_receipt.schema.json",
+      "sha256": "00a3740d11f88204a6c65d1582b1e86afc91661c5e2c757844851b07a7849175"
     },
     {
       "path": "specs/mcp_contract.schema.json",
@@ -2901,7 +2953,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6bfdfd5126cdfbfffadddc6fe23a4a0ca6a4383e680dca0beaee7f6847a92fc7"
+      "sha256": "75a1dd1a9f3cf90cb7079a2de16cb02a4983848c86bc8ce9bf105f42555f2f95"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2957,7 +3009,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "46018f5475065dba3971fecc3f878a9092d2003e20bf696ecd0fd46c80d34636"
+      "sha256": "99116fbcc7b6ae333fa5335c6de4fb04dfaee19676533ebecf545f9073da0da3"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -2993,7 +3045,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "f40c40efa447068403f07b3bc68d9fcc187aa435d9ac8ebc6931f399baef7a16"
+      "sha256": "2c1b7a8f0c549c1818f3a5c5b8c14c41b951badb27ee16c00885a0683ccfd7cf"
     }
   ]
 }

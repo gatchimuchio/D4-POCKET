@@ -29,6 +29,15 @@ MCP実接続に先行して、外部metadataをGUI-Shellの境界付き契約へ
 - Validation: `python tooling/schema_check/check_schemas.py` はSchema 75件／正常例75件／負例92件、`python tooling/conformance_tests/run_conformance_skeleton.py` はConformance 164 checks、`python tooling/日本語基底監査.py --strict`、`python tooling/validate_all.py --python-only --desktop-platform windows`、manifest、packaging portability、release gateがPASSした。Flutter／Rustの実装変更はないためFlutter解析とRust試験は未実行とした。
 - 未成立分類: MCP discovery、connect、authentication、consent、Tool／Resource／Promptの実取得、Broker経由Tool実行、timeout、server unavailable、disconnect、quarantine、実MCP Test Harnessは`release_blocker`。契約射影だけでMCP接続または製品releaseを主張しない。
 
+## D4 Pocket C9: MCP stdio接続センター（2026-09-23）
+
+C8の契約をRust Brokerのowner control接続経路へ結合した。`MCP接続`はownerが指定した絶対executable、workspace、引数、stdio transport、Credential refだけを受け付け、Rust process boundaryから現行`server/discover`を試行する。旧`initialize`／`notifications/initialized`はlegacy protocolとして明示fallbackする。discovery後はcapabilityに従ってTool／Resource／Prompt一覧を取得し、Schema検証済みmetadata-only receiptへ射影する。
+
+- Production path: owner control → `MCP接続` → Rust Broker → MCP stdio child → discovery／list →永続Audit付きreceipt。`MCP接続一覧`は通常IPC専用であり、接続processが終了・timeout・不整合となった場合は一覧を返さない。
+- Authority boundary: MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。Credential実値注入とTool実行は未接続であり、必須Credentialを要求するServerは`mcp_credential_unavailable`で拒否する。
+- Validation boundary: malformed JSON-RPC、response id mismatch、unknown tool、authority／secret field、重複metadata、未処理pagination、timeout、Server終了をRust unit test／Conformanceへ接続した。Rust processの実MCP Test Harness、Tool実行、Streamable HTTP、OAuth、consent、disconnect、quarantineは未成立として扱う。
+- 未成立分類: Tool／Resource／Prompt実取得を用いた実Broker運用、Tool execution、Credential injection、Streamable HTTP、OAuth、consent、disconnect、quarantine、実MCP Test Harness、Windows installed product証拠は`release_blocker`。C9 stdio catalog接続だけでMCP全体またはD4 Pocket正式releaseを主張しない。
+
 ## D4 Pocket C6: 対話結果からの回帰Case owner登録（2026-09-23）
 
 C5の評価Datasetと混ぜず、完了済み通常対話をownerが明示的に回帰Caseへ登録する独立Contractを追加した。Rust Brokerは要求ID/hash、`表示範囲=full`、永続結果証跡、終了監査ID、結果状態を現在の対話制御で再照合する。元の対話入力・応答本文は自動コピーせず、ownerのredacted定義を`ProtectedStore::Purpose::Regression`へ暗号化し、CLIにはhash-only receiptだけを返す。

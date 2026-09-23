@@ -17,7 +17,7 @@ Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（
 
 続くC7の現行単位では、`docs/specs/credential-vault.md`を正本とするowner専用の新規資格情報登録と、通常IPCの検証付きmetadata一覧を接続した。秘密値は`ProtectedStore::Purpose::Credential`のWindows DPAPIへ保管し、資格情報からAuthority、Permission、Approvalを生成しない。秘密値の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、Recovery、GUI管理面は未接続のrelease_blockerとして保持する。
 
-続くC8では、`docs/specs/mcp-contract.md`を正本とするMCP外部概念射影契約を追加した。Server、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffをmetadata_onlyとしてSchema／fixture／Conformanceへ接続し、MCP metadataからAuthority、Permission、Approvalを生成しない。MCP discovery、connect、consent、Tool実行、timeout、disconnect、quarantineはC9のBroker経路まで未接続である。
+続くC8では、`docs/specs/mcp-contract.md`を正本とするMCP外部概念射影契約を追加した。Server、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffをmetadata_onlyとしてSchema／fixture／Conformanceへ接続し、MCP metadataからAuthority、Permission、Approvalを生成しない。C9では`docs/specs/mcp-connection-center.md`を正本として、owner controlからstdio Serverのdiscovery／catalog取得と通常IPCのmetadata一覧をRust Brokerへ接続した。Tool実行、Credential実値注入、Streamable HTTP、OAuth、consent、disconnect、quarantineは未接続のrelease_blockerである。
 
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 

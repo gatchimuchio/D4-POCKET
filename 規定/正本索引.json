@@ -176,6 +176,10 @@
       "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diff射影と権限非生成境界"
     },
     {
+      "path": "docs/specs/mcp-connection-center.md",
+      "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

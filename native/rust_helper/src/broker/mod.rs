@@ -15,6 +15,7 @@ pub(crate) mod device_transport;
 pub mod authority;
 pub mod ipc_server;
 pub mod protocol;
+pub(crate) mod mcp_center;
 pub(crate) mod runtime_registry;
 pub(crate) mod runtime_lifecycle;
 pub(crate) mod host_capability;
