@@ -249,6 +249,25 @@ void main() {
     expect(find.text('問題一覧'), findsWidgets);
   });
 
+  testWidgets('コマンドパレットがC21の新機能別コマンドを表示する', (WidgetTester tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'MCP接続');
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && widget.data == 'MCP接続',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('MCP接続の設定面を開く'), findsOneWidget);
+  });
+
   testWidgets('問題一覧が段階Bを失敗扱いにせずリリース遮断要因を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

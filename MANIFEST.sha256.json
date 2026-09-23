@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "a2ad82457290c6798c4da265e777bfd2865ba638039ef5ab59f49a6efc27dc04"
+      "sha256": "895de278b031e9a14b5a3304577eaedb9bf15c9b2746d8a31feef7859f97aa7b"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -553,7 +553,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "a2ade54eaa51af603087f7435a5169a5e647285d0a788e645a2aaef3dcfb282d"
+      "sha256": "575e8da39636e756c5295986b5952ce1b020e3ecb1bb13b5b652650cdbd0fd67"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1013,7 +1013,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "791d29b215009010efca7cbe741e36e44b255962d84d5d2ed36315411b1842cd"
+      "sha256": "cfed9e269d7caed61116bff8c51bbd7b1ab8afb59bc048c13bd967486da74217"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1166,6 +1166,10 @@
     {
       "path": "docs/specs/authority-strip-conformance.md",
       "sha256": "c61c54e187b10419910fd892fbe5e3017212831ed222f853e2852f951dc4bfd2"
+    },
+    {
+      "path": "docs/specs/command-palette-surface.md",
+      "sha256": "42d802ebd63829634069ffa4fb71a3eeb60fac5d1d39e2b808bf76673c9b9aa5"
     },
     {
       "path": "docs/specs/content-exposure-policy.md",
@@ -3469,7 +3473,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "352b1e36b0dd1f73a63d8c9c650cf0d1db2b00e148f58233b339d00a90aa8d53"
+      "sha256": "7411212a41bae26bba51fb93fb6378df1bbdd51e1322419c7f8d21c0d8fbc18c"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3561,7 +3565,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "a4dc11512745d847890bdfb44e5d7fd6039fc7207692da2fcb5197621dd00590"
+      "sha256": "411427ce2734a3c43a99637f118d5bd2915f27d77af97250f18d43ff17bf2a45"
     }
   ]
 }

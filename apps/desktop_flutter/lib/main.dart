@@ -582,6 +582,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
           icon: page.icon,
           keywords: page.label,
         ),
+      ..._featureCommandEntries(),
       for (final mode in _ShellViewMode.values)
         _CommandEntry(
           title: '表示モードを切り替え: ${mode.label}',
@@ -643,6 +644,88 @@ class _ShellHomePageState extends State<ShellHomePage> {
           keywords:
               '${setting.group} ${setting.effectiveValue} ${setting.authorityRelated ? 'authority' : ''} ${setting.dangerous ? 'dangerous' : ''}',
         ),
+    ];
+  }
+
+  List<_CommandEntry> _featureCommandEntries() {
+    return const [
+      _CommandEntry(
+        title: 'Runtimeを開く',
+        subtitle: '実行系センターへ移動',
+        pageIndex: 3,
+        icon: Icons.hub_outlined,
+        keywords: 'Runtime 実行系',
+      ),
+      _CommandEntry(
+        title: 'Agentを開く',
+        subtitle: 'エージェントセンターへ移動',
+        pageIndex: 5,
+        icon: Icons.smart_toy_outlined,
+        keywords: 'Agent エージェント',
+      ),
+      _CommandEntry(
+        title: '履歴検索',
+        subtitle: '実行履歴の検索画面を開く',
+        pageIndex: 13,
+        icon: Icons.history,
+        keywords: '履歴 実行履歴 検索',
+      ),
+      _CommandEntry(
+        title: '評価実行',
+        subtitle: '評価ラボを開く。実行はBrokerとowner承認の統治経路を使う',
+        pageIndex: 14,
+        icon: Icons.science_outlined,
+        keywords: '評価 評価ラボ Experiment Dataset',
+      ),
+      _CommandEntry(
+        title: 'MCP接続',
+        subtitle: 'MCP接続の設定面を開く',
+        pageIndex: 11,
+        icon: Icons.extension_outlined,
+        keywords: 'MCP 接続 道具 資源 提示',
+      ),
+      _CommandEntry(
+        title: '通知表示',
+        subtitle: '通知センターを開く',
+        pageIndex: 16,
+        icon: Icons.notifications_none,
+        keywords: '通知 通知センター',
+      ),
+      _CommandEntry(
+        title: '資源監視',
+        subtitle: '実行系センターの資源観測面を開く',
+        pageIndex: 3,
+        icon: Icons.memory_outlined,
+        keywords: '資源 CPU RAM 観測 実行系',
+      ),
+      _CommandEntry(
+        title: '資格情報',
+        subtitle: '資格情報の設定面を開く',
+        pageIndex: 11,
+        icon: Icons.key_outlined,
+        keywords: '資格情報 Credential 秘密',
+      ),
+      _CommandEntry(
+        title: '更新確認',
+        subtitle: '更新センターを開く',
+        pageIndex: 11,
+        icon: Icons.system_update_outlined,
+        keywords: '更新 Update 署名',
+      ),
+      _CommandEntry(
+        title: 'Host切替',
+        subtitle: 'Host操作面を開く。切替はBrokerの表示コンテキスト操作で行う',
+        pageIndex: 19,
+        icon: Icons.swap_horiz_outlined,
+        keywords: 'Host 切替 接続状態 Trust',
+      ),
+      _CommandEntry(
+        title: '全Runtime停止要求を確認',
+        subtitle: '実行系センターを開き、Brokerの承認境界を確認する',
+        pageIndex: 3,
+        icon: Icons.stop_circle_outlined,
+        keywords: '全Runtime停止要求 停止 承認 Broker',
+      ),
     ];
   }
 }

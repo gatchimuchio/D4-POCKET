@@ -1,6 +1,6 @@
 # GUI操作面
 
-状態基準日: 2026-09-23
+状態基準日: 2026-09-24
 
 GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの操作パターンを取り込む。Flutterは状態と操作者の意図を表す操作面を描画し、Shell Coreは引き続き権限境界を担う。
 
@@ -42,6 +42,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   status: implemented
   evidence: Settings画面は検索filter、source/default/current/effective value、modified/dangerous/authority flag、reset/export語彙、およびcommand palette語彙を含む。
   authority_boundary: setting mutationはShell Coreが制御する操作として表現する。
+
+- item: D4 Pocket Command Palette（C21 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Ctrl+K／Ctrl+PのパレットへRuntime、Agent、履歴検索、評価実行、MCP接続、通知表示、資源監視、資格情報、更新確認、Host切替、全Runtime停止要求の確認を明示登録し、選択時は対応画面だけを開く。
+  authority_boundary: パレットは検索と画面遷移だけを行い、Broker IPC、owner承認、Permission、Approval、Authority、Credential、Runtime実行へ直接到達しない。各画面の実操作は既存の統治経路に従う。
 
 - item: Problems Panel and Evidence Center
   classification: required_for_v1

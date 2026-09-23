@@ -4432,6 +4432,42 @@ def Windows常駐トレイ操作面の統治境界を検査する() -> list[str]
     return 不整合
 
 
+def コマンドパレット拡張の統治境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "command-palette-surface.md"
+    if not specification.exists():
+        return ["C21コマンドパレットの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    start = main.find("List<_CommandEntry> _featureCommandEntries()")
+    end = main.find("\n  }\n}", start)
+    if start == -1 or end == -1:
+        return ["C21コマンドパレットの新機能登録実装がない"]
+    feature_commands = main[start:end]
+    for token in (
+        "Runtimeを開く",
+        "Agentを開く",
+        "履歴検索",
+        "評価実行",
+        "MCP接続",
+        "通知表示",
+        "資源監視",
+        "資格情報",
+        "更新確認",
+        "Host切替",
+        "全Runtime停止要求を確認",
+    ):
+        if token not in feature_commands or token not in specification_text:
+            不整合.append(f"C21コマンドパレットに必須コマンドがない: {token}")
+    for forbidden in ("brokerTransport", "transport.request", "BrokerClient", "requestAllRuntimeStop"):
+        if forbidden in feature_commands:
+            不整合.append(f"C21コマンドパレットが直接権限経路へ到達している: {forbidden}")
+    for token in ("Ctrl+K", "Ctrl+P", "最大30件", "画面遷移だけ"):
+        if token not in specification_text:
+            不整合.append(f"C21コマンドパレット正本にbounded／keyboard境界がない: {token}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -6048,6 +6084,7 @@ def main() -> int:
         Host操作面の観測境界とHost間非混線を検査する,
         Adapter管理操作の統治境界を検査する,
         Windows常駐トレイ操作面の統治境界を検査する,
+        コマンドパレット拡張の統治境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
