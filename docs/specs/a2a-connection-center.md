@@ -25,7 +25,15 @@ owner control
 
 接続要求の受信・Agent Card取得・受理・通常一覧返却は永続Auditを要求する。同じAgentIDの再接続は拒否し、一覧は64件、応答bodyは1MiB、headerは16KiB、接続・読取期限はboundedとする。接続先URIの実値はreceipt、Audit reason、CLI表示へ投影しない。
 
-接続receiptの一覧は現在のBroker session memoryに保持する。永続Auditは再起動後も検証対象になるが、A2A接続registry自体の再起動後復元は未接続であり、release_blockerとして扱う。
+接続receiptの一覧はBroker session memoryへ展開し、`a2a_connections.json`へbounded metadataとして永続化する。永続Auditと接続stateは再起動時にstrict検証する。復元後はlive connectionではなく、再承認が必要な内部状態として扱う。
+
+## C16補完: 再起動後の接続metadata復元
+
+Brokerの永続storeへ`a2a_connections.json`を追加し、接続receiptのbounded metadataだけをatomic writeする。起動時は版、件数、receiptの固定field、Agent Cardのidentity、endpoint hash、credential ref、秘密値非保持を再検証し、malformedまたは未知fieldはBroker起動をfail-closedにする。
+
+復元は外部Agentへの再接続やTask実行を意味しない。復元されたreceiptは`接続状態=restored_pending_review`、`証拠種別=INTERNAL_STATE`、`承認状態=owner_reapproval_required`へ降格する。過去のowner承認、履歴、metadataから現在のApproval、Permission、Authorityを生成しない。URI実値、credential実値、raw contentはstate fileへ保存しない。
+
+現時点の復元は接続registryの表示状態を復元する単位であり、TLS再接続、再検証、quarantine、disconnect、Task送信を実行しない。これらは別のrelease_blockerである。
 
 ## Authorityと内容露出
 

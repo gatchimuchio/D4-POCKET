@@ -11,6 +11,7 @@ use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
 
 const REPLAY_NONCE_RETENTION_SECONDS: i64 = 24 * 60 * 60;
 const MAX_REPLAY_NONCE_RECORDS: usize = 100_000;
+const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerStoreError {
@@ -23,6 +24,7 @@ pub enum BrokerStoreError {
     MalformedUpdateState(String),
     MalformedUpdateTrust(String),
     MalformedNotificationState(String),
+    MalformedA2aState(String),
 }
 
 impl BrokerStoreError {
@@ -36,7 +38,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedProfileState(message)
             | BrokerStoreError::MalformedUpdateState(message)
             | BrokerStoreError::MalformedUpdateTrust(message)
-            | BrokerStoreError::MalformedNotificationState(message) => message.clone(),
+            | BrokerStoreError::MalformedNotificationState(message)
+            | BrokerStoreError::MalformedA2aState(message) => message.clone(),
         }
     }
 }
@@ -59,6 +62,7 @@ pub struct BrokerPersistentStore {
     update_path: PathBuf,
     update_trust_path: PathBuf,
     notification_path: PathBuf,
+    a2a_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -103,6 +107,7 @@ impl BrokerPersistentStore {
             update_path: root.join("updates.json"),
             update_trust_path: root.join("update_trust.json"),
             notification_path: root.join("notifications.json"),
+            a2a_path: root.join("a2a_connections.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
@@ -111,6 +116,7 @@ impl BrokerPersistentStore {
         store.ensure_profile_file_exists()?;
         store.ensure_update_files_exist()?;
         store.ensure_notification_file_exists()?;
+        store.ensure_a2a_file_exists()?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
@@ -258,6 +264,50 @@ impl BrokerPersistentStore {
         })
     }
 
+    pub fn load_a2a_state(&self) -> Result<Value, BrokerStoreError> {
+        let metadata = fs::metadata(&self.a2a_path).map_err(|error| {
+            BrokerStoreError::MalformedA2aState(format!(
+                "broker A2A connection stateのmetadata読取りに失敗: {error}"
+            ))
+        })?;
+        if metadata.len() > MAX_A2A_STATE_BYTES as u64 {
+            return Err(BrokerStoreError::MalformedA2aState(
+                "broker A2A connection stateがbounded上限を超過".to_string(),
+            ));
+        }
+        let raw = fs::read_to_string(&self.a2a_path).map_err(|error| {
+            BrokerStoreError::MalformedA2aState(format!(
+                "broker A2A connection stateの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedA2aState(
+                "broker A2A connection stateが空である".to_string(),
+            ));
+        }
+        crate::broker::json_input::read_unique(&raw).map_err(|error| {
+            BrokerStoreError::MalformedA2aState(format!(
+                "broker A2A connection stateがmalformed: {error}"
+            ))
+        })
+    }
+
+    pub fn write_a2a_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
+        let serialized = serde_json::to_string_pretty(state).map_err(|error| {
+            BrokerStoreError::MalformedA2aState(format!(
+                "broker A2A connection stateのserializeに失敗: {error}"
+            ))
+        })?;
+        if serialized.len() > MAX_A2A_STATE_BYTES {
+            return Err(BrokerStoreError::MalformedA2aState(
+                "broker A2A connection stateがbounded上限を超過".to_string(),
+            ));
+        }
+        atomic_write(&self.a2a_path, serialized.as_bytes()).map_err(|error| {
+            BrokerStoreError::Io(format!("broker A2A connection stateの書込みに失敗: {error}"))
+        })
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
         let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
@@ -337,6 +387,13 @@ impl BrokerPersistentStore {
             return Ok(());
         }
         self.write_notification_state(&serde_json::json!({"版": 1, "states": []}))
+    }
+
+    fn ensure_a2a_file_exists(&self) -> Result<(), BrokerStoreError> {
+        if self.a2a_path.exists() {
+            return Ok(());
+        }
+        self.write_a2a_state(&serde_json::json!({"版": 1, "connections": []}))
     }
 
     fn ensure_file_exists(&self, path: &Path) -> Result<(), BrokerStoreError> {

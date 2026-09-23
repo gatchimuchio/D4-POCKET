@@ -5,15 +5,535 @@
 #![allow(non_snake_case)]
 
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
+use super::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::a2a::{fetch_agent_card, A2aError};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 const OP_CONNECT: &str = "A2A接続";
 const OP_LIST: &str = "A2A接続一覧";
 const VERSION: u64 = 1;
 const PROTOCOL_VERSION: &str = "1.0";
 const MAX_CONNECTIONS: usize = 64;
+
+pub(super) fn load_persistent_connections(
+    store: &BrokerPersistentStore,
+) -> Result<BTreeMap<String, Value>, BrokerStoreError> {
+    let state = store.load_a2a_state()?;
+    decode_state(&state).map_err(BrokerStoreError::MalformedA2aState)
+}
+
+fn decode_state(state: &Value) -> Result<BTreeMap<String, Value>, String> {
+    let object = state
+        .as_object()
+        .ok_or_else(|| "A2A接続stateはobjectでなければならない".to_string())?;
+    if object.keys().any(|key| key != "版" && key != "connections") {
+        return Err("A2A接続stateに未知fieldがある".to_string());
+    }
+    if object.get("版") != Some(&Value::from(VERSION)) {
+        return Err("A2A接続stateの版が不正".to_string());
+    }
+    let values = object
+        .get("connections")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "A2A接続stateのconnectionsがarrayではない".to_string())?;
+    if values.len() > MAX_CONNECTIONS {
+        return Err("A2A接続stateの件数上限を超過".to_string());
+    }
+    let mut result = BTreeMap::new();
+    for value in values {
+        let agent_id = validate_persisted_receipt(value)?;
+        let mut restored = value.clone();
+        let restored_object = restored
+            .as_object_mut()
+            .ok_or_else(|| "A2A接続receiptがobjectではない".to_string())?;
+        restored_object.insert(
+            "接続状態".to_string(),
+            Value::String("restored_pending_review".to_string()),
+        );
+        restored_object.insert(
+            "証拠種別".to_string(),
+            Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()),
+        );
+        restored_object.insert(
+            "承認状態".to_string(),
+            Value::String("owner_reapproval_required".to_string()),
+        );
+        if result.insert(agent_id, restored).is_some() {
+            return Err("A2A接続stateに重複AgentIDがある".to_string());
+        }
+    }
+    Ok(result)
+}
+
+fn state_value(connections: &BTreeMap<String, Value>) -> Value {
+    json!({
+        "版": VERSION,
+        "connections": connections.values().cloned().collect::<Vec<_>>(),
+    })
+}
+
+fn persist(broker: &Broker) -> Result<(), String> {
+    broker
+        .state_store
+        .write_a2a_state(&state_value(&broker.a2a_connections))
+        .map_err(|error| error.message())
+}
+
+fn validate_persisted_receipt(value: &Value) -> Result<String, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| "A2A接続receiptはobjectでなければならない".to_string())?;
+    const KEYS: [&str; 21] = [
+        "版",
+        "契約種別",
+        "protocol_version",
+        "AgentID",
+        "Agent Card",
+        "Task",
+        "Message",
+        "Artifact",
+        "Stream",
+        "Trust",
+        "Capability diff",
+        "権限生成",
+        "authority_strip",
+        "公開範囲",
+        "証拠種別",
+        "接続状態",
+        "能力ID",
+        "権限ID",
+        "承認状態",
+        "復旧ID",
+        "接続監査ID",
+    ];
+    if object.len() != KEYS.len() || object.keys().any(|key| !KEYS.contains(&key.as_str())) {
+        return Err("A2A接続receiptに未知または欠落fieldがある".to_string());
+    }
+    if object.get("版") != Some(&Value::from(VERSION))
+        || object.get("契約種別") != Some(&Value::from("A2A外部概念射影"))
+        || object.get("protocol_version") != Some(&Value::from(PROTOCOL_VERSION))
+        || object.get("権限生成") != Some(&Value::from("なし"))
+        || object.get("authority_strip") != Some(&Value::Bool(true))
+        || object.get("公開範囲") != Some(&Value::from("metadata_only"))
+        || object.get("能力ID") != Some(&Value::from("a2a.connection.connect"))
+        || object.get("権限ID") != Some(&Value::from("permission.a2a.connection.connect"))
+        || object.get("復旧ID") != Some(&Value::from("recover-a2a-connection"))
+    {
+        return Err("A2A接続receiptの固定fieldが不正".to_string());
+    }
+    let agent_id = object
+        .get("AgentID")
+        .and_then(Value::as_str)
+        .filter(|value| valid_agent_id(value))
+        .ok_or_else(|| "A2A接続receiptのAgentIDが不正".to_string())?
+        .to_string();
+    let evidence = object
+        .get("証拠種別")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "A2A接続receiptの証拠種別が不正".to_string())?;
+    let connection_state = object
+        .get("接続状態")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "A2A接続receiptの接続状態が不正".to_string())?;
+    let approval = object
+        .get("承認状態")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "A2A接続receiptの承認状態が不正".to_string())?;
+    if !matches!(
+        (evidence, connection_state, approval),
+        ("LIVE_RUNTIME", "connected", "owner_control_approved")
+            | (
+                "INTERNAL_STATE",
+                "restored_pending_review",
+                "owner_reapproval_required"
+            )
+    ) {
+        return Err("A2A接続receiptの証拠・状態・承認の組合せが不正".to_string());
+    }
+    let trust = object
+        .get("Trust")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A Trustがobjectではない".to_string())?;
+    if trust.len() != 4
+        || trust.keys().any(|key| {
+            ![
+                "state",
+                "evidence_source",
+                "reason",
+                "requires_operator_review",
+            ]
+            .contains(&key.as_str())
+        })
+        || trust.get("state") != Some(&Value::from("pending_review"))
+        || trust.get("evidence_source") != Some(&Value::from("LIVE_RUNTIME"))
+        || trust.get("requires_operator_review") != Some(&Value::Bool(true))
+        || trust
+            .get("reason")
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.is_empty() || value.chars().count() > 512)
+    {
+        return Err("A2A Trustのmetadataが不正".to_string());
+    }
+    let capability_diff = object
+        .get("Capability diff")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A Capability diffがobjectではない".to_string())?;
+    if capability_diff.len() != 6
+        || capability_diff.keys().any(|key| {
+            ![
+                "status",
+                "added",
+                "removed",
+                "changed",
+                "requires_operator_review",
+                "evidence_source",
+            ]
+            .contains(&key.as_str())
+        })
+        || capability_diff.get("status") != Some(&Value::from("not_evaluated"))
+        || capability_diff.get("requires_operator_review") != Some(&Value::Bool(true))
+        || capability_diff.get("evidence_source") != Some(&Value::from("LIVE_RUNTIME"))
+    {
+        return Err("A2A Capability diffのmetadataが不正".to_string());
+    }
+    for field in ["added", "removed", "changed"] {
+        let values = capability_diff
+            .get(field)
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("A2A Capability diffの{field}がarrayではない"))?;
+        if values.len() > 128
+            || values
+                .iter()
+                .any(|value| value.as_str().is_none_or(|item| !valid_agent_id(item)))
+        {
+            return Err(format!("A2A Capability diffの{field}が不正"));
+        }
+    }
+    validate_card(object.get("Agent Card"), &agent_id)?;
+    for key in ["Task", "Message", "Artifact", "Stream"] {
+        let array = object
+            .get(key)
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("A2A接続receiptの{key}がarrayではない"))?;
+        let max = match key {
+            "Task" => 128,
+            "Message" | "Artifact" => 256,
+            _ => 128,
+        };
+        if array.len() > max {
+            return Err(format!("A2A接続receiptの{key}件数上限を超過"));
+        }
+    }
+    for stream in object["Stream"]
+        .as_array()
+        .expect("A2A Streamは先にarray検証済み")
+    {
+        let stream = stream
+            .as_object()
+            .ok_or_else(|| "A2A Streamがobjectではない".to_string())?;
+        if stream.len() != 7
+            || stream.keys().any(|key| {
+                ![
+                    "stream_id",
+                    "task_id",
+                    "mode",
+                    "status",
+                    "event_types",
+                    "resumable",
+                    "authority_strip",
+                ]
+                .contains(&key.as_str())
+            })
+            || stream
+                .get("stream_id")
+                .and_then(Value::as_str)
+                .is_none_or(|value| !valid_agent_id(value))
+            || stream
+                .get("task_id")
+                .and_then(Value::as_str)
+                .is_none_or(|value| !valid_agent_id(value))
+            || stream.get("resumable").and_then(Value::as_bool).is_none()
+            || stream.get("authority_strip") != Some(&Value::Bool(true))
+        {
+            return Err("A2A Streamのmetadataが不正".to_string());
+        }
+        let status = stream
+            .get("status")
+            .and_then(Value::as_object)
+            .ok_or_else(|| "A2A Stream statusがobjectではない".to_string())?;
+        if status.len() != 2
+            || status
+                .keys()
+                .any(|key| !["status", "reason"].contains(&key.as_str()))
+            || status.get("status").and_then(Value::as_str).is_none()
+            || status.get("reason").and_then(Value::as_str).is_none()
+        {
+            return Err("A2A Stream statusのmetadataが不正".to_string());
+        }
+        let event_types = stream
+            .get("event_types")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "A2A Stream event_typesがarrayではない".to_string())?;
+        if event_types.len() > 16
+            || event_types
+                .iter()
+                .any(|value| value.as_str().is_none_or(|item| item.is_empty()))
+        {
+            return Err("A2A Stream event_typesのmetadataが不正".to_string());
+        }
+    }
+    if !object["Task"].as_array().is_some_and(Vec::is_empty)
+        || !object["Message"].as_array().is_some_and(Vec::is_empty)
+        || !object["Artifact"].as_array().is_some_and(Vec::is_empty)
+    {
+        return Err("C16のA2A接続receiptへTask、Message、Artifactを保存できない".to_string());
+    }
+    reject_sensitive_keys(value)?;
+    let audit_id = object
+        .get("接続監査ID")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 256)
+        .ok_or_else(|| "A2A接続receiptの接続監査IDが不正".to_string())?;
+    if audit_id.contains("http://") || audit_id.contains("https://") {
+        return Err("A2A接続receiptの接続監査IDへendpointを含められない".to_string());
+    }
+    Ok(agent_id)
+}
+
+fn validate_card(value: Option<&Value>, agent_id: &str) -> Result<(), String> {
+    let card = value
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A接続receiptのAgent Cardがobjectではない".to_string())?;
+    const KEYS: [&str; 11] = [
+        "agent_id",
+        "display_name",
+        "description_summary",
+        "version",
+        "endpoint_hash",
+        "supported_interfaces",
+        "capabilities",
+        "skills",
+        "authentication",
+        "origin",
+        "status",
+    ];
+    if card.keys().any(|key| !KEYS.contains(&key.as_str())) || card.len() != KEYS.len() {
+        return Err("A2A Agent Cardに未知または欠落fieldがある".to_string());
+    }
+    if card.get("agent_id").and_then(Value::as_str) != Some(agent_id)
+        || card.get("origin") != Some(&Value::from("live_runtime"))
+        || card.get("status") != Some(&Value::from("discovered"))
+        || !card
+            .get("endpoint_hash")
+            .and_then(Value::as_str)
+            .is_some_and(valid_hash)
+    {
+        return Err("A2A Agent Cardのidentityまたはendpoint hashが不正".to_string());
+    }
+    for field in ["display_name", "description_summary", "version"] {
+        let valid = card
+            .get(field)
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty() && value.chars().count() <= 1024);
+        if !valid {
+            return Err(format!("A2A Agent Cardの{field}が不正"));
+        }
+    }
+    let interfaces = card
+        .get("supported_interfaces")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "A2A Agent Cardのinterfacesが不正".to_string())?;
+    if interfaces.is_empty() || interfaces.len() > 8 {
+        return Err("A2A Agent Cardのinterfaces件数が不正".to_string());
+    }
+    for interface in interfaces {
+        let object = interface
+            .as_object()
+            .ok_or_else(|| "A2A interfaceがobjectではない".to_string())?;
+        if object.len() != 4
+            || object
+                .keys()
+                .any(|key| !["binding", "transport", "status", "reason"].contains(&key.as_str()))
+            || object.get("binding").and_then(Value::as_str).is_none()
+            || object.get("transport").and_then(Value::as_str).is_none()
+            || object.get("status").and_then(Value::as_str).is_none()
+            || object.get("reason").and_then(Value::as_str).is_none()
+        {
+            return Err("A2A interfaceのmetadataが不正".to_string());
+        }
+    }
+    let capabilities = card
+        .get("capabilities")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A capabilitiesがobjectではない".to_string())?;
+    if capabilities.len() != 4
+        || capabilities.keys().any(|key| {
+            ![
+                "streaming",
+                "push_notifications",
+                "state_transition_history",
+                "extended_agent_card",
+            ]
+            .contains(&key.as_str())
+        })
+        || capabilities.values().any(|value| !value.is_boolean())
+    {
+        return Err("A2A capabilitiesのmetadataが不正".to_string());
+    }
+    let skills = card
+        .get("skills")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "A2A skillsがarrayではない".to_string())?;
+    if skills.len() > 128 {
+        return Err("A2A skills件数の上限を超過".to_string());
+    }
+    for skill in skills {
+        let skill = skill
+            .as_object()
+            .ok_or_else(|| "A2A skillがobjectではない".to_string())?;
+        if skill.len() != 6
+            || skill.keys().any(|key| {
+                ![
+                    "skill_id",
+                    "name",
+                    "description_summary",
+                    "tags",
+                    "input_modes",
+                    "output_modes",
+                ]
+                .contains(&key.as_str())
+            })
+        {
+            return Err("A2A skillのmetadataが不正".to_string());
+        }
+        for field in ["skill_id", "name", "description_summary"] {
+            if skill
+                .get(field)
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.is_empty() || value.chars().count() > 1024)
+            {
+                return Err(format!("A2A skillの{field}が不正"));
+            }
+        }
+        for field in ["tags", "input_modes", "output_modes"] {
+            let values = skill
+                .get(field)
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("A2A skillの{field}がarrayではない"))?;
+            if values.len() > 32
+                || values.iter().any(|value| {
+                    value
+                        .as_str()
+                        .is_none_or(|item| item.is_empty() || item.chars().count() > 1024)
+                })
+            {
+                return Err(format!("A2A skillの{field}が不正"));
+            }
+        }
+    }
+    let authentication = card
+        .get("authentication")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A authenticationがobjectではない".to_string())?;
+    if authentication.len() != 3
+        || authentication.keys().any(|key| {
+            !["schemes", "credential_ref", "secret_value_present"].contains(&key.as_str())
+        })
+        || authentication.get("secret_value_present") != Some(&Value::Bool(false))
+    {
+        return Err("A2A authenticationのmetadataが不正".to_string());
+    }
+    let schemes = authentication
+        .get("schemes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "A2A authentication schemesがarrayではない".to_string())?;
+    if schemes.len() > 16
+        || schemes.iter().any(|value| {
+            value
+                .as_str()
+                .is_none_or(|scheme| scheme.is_empty() || scheme.chars().count() > 128)
+        })
+    {
+        return Err("A2A authentication schemesのmetadataが不正".to_string());
+    }
+    let credential = authentication
+        .get("credential_ref")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "A2A credential refがobjectではない".to_string())?;
+    if credential.keys().any(|key| {
+        !["credential_id", "purpose", "target", "required", "status"].contains(&key.as_str())
+    }) || credential.len() != 5
+        || credential.get("required") != Some(&Value::Bool(false))
+        || credential.get("status") != Some(&Value::from("missing"))
+        || credential
+            .get("credential_id")
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.len() != 32 || !value.chars().all(|c| c.is_ascii_hexdigit()))
+    {
+        return Err("A2A credential refのmetadataが不正".to_string());
+    }
+    for field in ["purpose", "target"] {
+        if credential
+            .get(field)
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.is_empty() || value.chars().count() > 256)
+        {
+            return Err(format!("A2A credential refの{field}が不正"));
+        }
+    }
+    Ok(())
+}
+
+fn reject_sensitive_keys(value: &Value) -> Result<(), String> {
+    const FORBIDDEN: [&str; 15] = [
+        "endpoint",
+        "endpoint_uri",
+        "uri",
+        "secret",
+        "secret_value",
+        "token",
+        "password",
+        "credential_value",
+        "raw_content",
+        "payload",
+        "body",
+        "authority",
+        "authority_context",
+        "permission",
+        "approval",
+    ];
+    match value {
+        Value::Object(object) => {
+            if object.keys().any(|key| FORBIDDEN.contains(&key.as_str())) {
+                return Err(
+                    "A2A接続stateへendpointまたは秘密・raw contentを保存できない".to_string(),
+                );
+            }
+            for child in object.values() {
+                reject_sensitive_keys(child)?;
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                reject_sensitive_keys(child)?;
+            }
+        }
+        Value::String(string) if string.contains("://") => {
+            return Err("A2A接続stateへURI実値を保存できない".to_string())
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn valid_hash(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64 && hex.chars().all(|character| character.is_ascii_hexdigit())
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -181,7 +701,16 @@ pub(super) fn connect(
         );
     broker
         .a2a_connections
-        .insert(request.agent_id, receipt.clone());
+        .insert(request.agent_id.clone(), receipt.clone());
+    if let Err(reason) = persist(broker) {
+        broker.a2a_connections.remove(&request.agent_id);
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_CONNECT,
+            "a2a_persistence_failed",
+            &reason,
+        );
+    }
     BrokerResponse {
         request_id: request_id.to_string(),
         operation: OP_CONNECT.to_string(),
@@ -463,6 +992,45 @@ mod tests {
             "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         );
         assert_eq!(owner_list.status, BrokerStatus::Rejected);
+        drop(broker);
+        let mut restarted =
+            Broker::new_persistent("a2a-center-restarted", &store).expect("再起動後の永続Broker");
+        assert_eq!(restarted.a2a_connections.len(), 1);
+        let restored = list(
+            &mut restarted,
+            "a2a-restarted-list-test",
+            &json!({"版": VERSION}),
+            false,
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        );
+        assert_eq!(restored.status, BrokerStatus::Accepted);
+        let restored_receipt = &restored.body.as_ref().unwrap()["A2A接続一覧"][0];
+        assert_eq!(restored_receipt["接続状態"], "restored_pending_review");
+        assert_eq!(restored_receipt["承認状態"], "owner_reapproval_required");
+        assert_eq!(restored_receipt["証拠種別"], EVIDENCE_SOURCE_INTERNAL_STATE);
+        let persisted = restarted
+            .state_store
+            .load_a2a_state()
+            .expect("A2A接続state読取")
+            .expect("永続storeのA2A接続state");
+        assert!(!persisted.to_string().contains("http://127.0.0.1"));
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn malformedなA2A接続stateは再起動時にfail_closedになる() {
+        let store =
+            std::env::temp_dir().join(format!("gui-shell-a2a-malformed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&store);
+        let broker = Broker::new_persistent("a2a-malformed-test", &store).expect("永続Broker");
+        broker
+            .state_store
+            .write_a2a_state(&json!({"版": 1, "connections": [{}]}))
+            .expect("malformed state書込試験");
+        drop(broker);
+        let error = Broker::new_persistent("a2a-malformed-restart", &store)
+            .expect_err("malformed stateを拒否");
+        assert!(matches!(error, BrokerStoreError::MalformedA2aState(_)));
         let _ = std::fs::remove_dir_all(store);
     }
 }

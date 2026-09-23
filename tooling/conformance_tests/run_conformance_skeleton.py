@@ -4116,6 +4116,7 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     rust_center = (RUST_HELPER / "src" / "broker" / "a2a_center.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    store = (RUST_HELPER / "src" / "broker" / "store.rs").read_text(encoding="utf-8")
     ipc_request = (SPECS / "ipc_request.schema.json").read_text(encoding="utf-8")
     ipc_response = (SPECS / "ipc_response.schema.json").read_text(encoding="utf-8")
     for token, source in (
@@ -4133,6 +4134,11 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
         ("A2A接続設定に禁止fieldがある", owner_cli),
         ("A2A接続", protocol + ipc_request + ipc_response),
         ("A2A接続一覧", protocol + ipc_request + ipc_response),
+        ("restored_pending_review", rust_center),
+        ("owner_reapproval_required", rust_center),
+        ("load_persistent_connections", rust_center + protocol),
+        ("a2a_connections.json", store),
+        ("MalformedA2aState", store + rust_center),
     ):
         if token not in source:
             不整合.append(f"C16実装に統治境界tokenがない: {token}")

@@ -242,6 +242,20 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    pub fn load_a2a_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            return store.load_a2a_state().map(Some);
+        }
+        Ok(None)
+    }
+
+    pub fn write_a2a_state(&self, state: &serde_json::Value) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.write_a2a_state(state)?;
+        }
+        Ok(())
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_update_trust();
@@ -788,6 +802,8 @@ impl Broker {
         let update_trust = super::update_center::load_persistent_trust(&persistent_store)?;
         let notification_states =
             super::notification_center::load_persistent_states(&persistent_store)?;
+        let a2a_connections =
+            super::a2a_center::load_persistent_connections(&persistent_store)?;
         let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
             persistent_state.audit_log.events(),
         )
@@ -807,7 +823,7 @@ impl Broker {
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             mcp_connections: BTreeMap::new(),
-            a2a_connections: BTreeMap::new(),
+            a2a_connections,
             profiles,
             updates,
             update_trust,

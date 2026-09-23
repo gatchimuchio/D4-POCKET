@@ -12,6 +12,15 @@ C15のA2A外部概念契約を、owner controlから実Agent Cardを取得する
 - Validation: Schema 96件／正常例96件／負例115件、Conformance 171 checks、Rust全試験247件（lib 205、owner CLI 7、IPC 9、canonical hash 1、checkpoint 8、protected data 2、protected startup 1、protected store 3、workspace diff 2、workspace reader 2、workspace startup 7）、厳格日本語監査をこの単位で実行しPASSした。Desktop専用接続画面、HTTPS実接続、実A2A Test Harnessは未検証または未接続として別分類する。
 - 未成立分類: HTTPS TLS、公開endpoint discovery、認証実行、Task／Message送信、Artifact本文、Stream購読、cancel、再接続、quarantine、複数Agent比較、Handoff、Desktop接続画面、Windows installed product証拠、長時間運用・障害注入は`release_blocker`。C16初期経路だけでA2A製品機能全体または正式releaseを主張しない。
 
+## D4 Pocket C16補完: A2A接続metadataの再起動復元（2026-09-24）
+
+C16のsession memoryだったA2A接続registryを、Broker永続storeの`a2a_connections.json`へbounded・atomicに保存し、再起動時にstrict再検証して復元する経路を追加した。URI実値、credential実値、raw content、未知field、重複AgentID、上限超過は保存または起動時復元しない。
+
+- Production path: `A2A接続` → Agent Cardのmetadata-only receipt → Rust Brokerの永続state → Broker再起動 → strict state検証 → 通常IPCの`A2A接続一覧`。
+- Safety boundary: 復元receiptは`接続状態=restored_pending_review`、`証拠種別=INTERNAL_STATE`、`承認状態=owner_reapproval_required`へ降格する。過去のowner承認を再利用せず、復元stateからPermission、Approval、Authority、credential実値を生成しない。
+- Validation: 再起動を模したRust Broker再open試験で1件のreceipt復元、状態降格、state file内のendpoint実値非保持、malformed stateのfail-closedを確認した。最終Rust試験は248件（lib 206、owner CLI 7、IPC 9、canonical hash 1、checkpoint 8、protected data 2、protected startup 1、protected store 3、workspace diff 2、workspace reader 2、workspace startup 7）で全件PASSした。
+- 未成立分類: TLS再接続、Agent Card再検証、disconnect、quarantine、Task／Message送信、Artifact本文、Stream購読、複数Agent比較、Desktop接続画面、実A2A Test Harnessは`release_blocker`。復元は表示registryの再構成であり、外部Agentとのlive connection復旧ではない。
+
 ## D4 Pocket C14: 追跡情報閲覧（2026-09-23）
 
 C13の`観測一覧`を再利用する読み取り専用Trace InspectorをDesktopへ接続した。Broker内部で実測されたSpanを、開始・終了・所要時間・状態・親Span・関連Audit・エラー分類のbounded waterfallとして表示する。

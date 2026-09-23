@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "e9ac9d60fb3ca3307d81b03661edda2b07432659afc92a234019ec1e62e8843c"
+      "sha256": "eb3384b6802facc705b10193a56d4bf861bd1472dd51bf8f1769316dbeb3117f"
     },
     {
       "path": "SECURITY.md",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "c90ce24df340f609d283718c22167795aeac9ac3cb84591932fad98ba0207a47"
+      "sha256": "7bb9bd4ce5a4345387b11a098016c6602a54db7748d2a8b24cce574895193e88"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1117,7 +1117,7 @@
     },
     {
       "path": "docs/specs/a2a-connection-center.md",
-      "sha256": "1a0e6fa714794267ffafe4773b98612d4ae5e9a93c65ff29f426af7f37ff22e7"
+      "sha256": "67e43a936c1545153851746ebe59bae6bd0788c0a23ccb2c2b6b08ea76ebefee"
     },
     {
       "path": "docs/specs/a2a-contract.md",
@@ -1245,7 +1245,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "7fb8ed2578e47cfc9420120d3c3e848a3285c7b21c28ecd89af4b06b19594d86"
+      "sha256": "fe89963670fc53106b3fc3c5560c21a6dc9daededd575e347fa94a461d382d8f"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2209,7 +2209,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "8ba7da1c1b4203d172e5769aee0ebef16619709a2163e9a35436cb1c7a3be151"
+      "sha256": "884c22f1552cfac830a643bb3f7340ad342a820c1ab88f3a33af9146ef922cb5"
     },
     {
       "path": "native/rust_helper/src/broker/audit.rs",
@@ -2313,7 +2313,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "9909b94b727c532f92bbc1ba83201f7b8eabbd745ceb2f533dc153ee12540e56"
+      "sha256": "37968c3fa3c879403f74b615ae7afeade122957121e66d94e2a19ac99f74f323"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2333,7 +2333,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "8fb257c764a724a56b4466d9a555446f862ee4b0013d881ab7734eb17079c75c"
+      "sha256": "4ce0a35f680984f75bb2eb015e8038202ded5740acd46143f8ce3f29417e6a0a"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -2869,11 +2869,11 @@
     },
     {
       "path": "specs/a2a_connection_list.schema.json",
-      "sha256": "e67a9ec52a69f563977bc0130532f16c90431857b3bf2953f1a3c2a81beb6642"
+      "sha256": "9fecca3846ebf3156254a6828afc22a76b79b117dd2562686de980f28ac21441"
     },
     {
       "path": "specs/a2a_connection_receipt.schema.json",
-      "sha256": "2fd2495aa810899d97cb5ccbf5a7f7a8e1b8b6a4bdeaeff73cc68c4076014ec0"
+      "sha256": "863c584af02455e92e0d310a366371c9cc2fb6337e9ee235cdedfaa88852a423"
     },
     {
       "path": "specs/a2a_contract.schema.json",
@@ -3273,7 +3273,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f16a197322b9ca5083fed43f236ebeab17a5431bedef27142de90c9aefc6aca4"
+      "sha256": "2fc35011518769535de3a8fb4dc20db6bd182bf98d6a1d77a14b54ceb093a7da"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
