@@ -237,6 +237,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_center.dart",
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
+    "lib/services/global_search_index.dart",
     "lib/services/windows_tray_client.dart",
     "windows/runner/tray_controller.cpp",
     "windows/runner/tray_controller.h",
@@ -4468,6 +4469,73 @@ def コマンドパレット拡張の統治境界を検査する() -> list[str]:
     return 不整合
 
 
+def グローバル検索の統治境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "global-search-surface.md"
+    index = DESKTOP_FLUTTER / "lib" / "services" / "global_search_index.dart"
+    main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    if not specification.exists() or not index.exists():
+        return ["C22グローバル検索の正本または実装がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    index_text = index.read_text(encoding="utf-8")
+    required = (
+        ("Runtime", "実行系"),
+        ("Agent", "エージェント"),
+        ("Session", "対話セッション"),
+        ("Permission", "権限"),
+        ("Approval", "承認"),
+        ("Audit", "監査"),
+        ("Recovery", "復旧"),
+        ("Problem", "問題"),
+        ("Evidence", "証拠"),
+        ("MCP", "MCP"),
+        ("A2A", "A2A"),
+        ("Host", "接続先"),
+        ("Adapter", "アダプター"),
+        ("Profile", "プロファイル"),
+        ("Evaluation", "評価"),
+        ("Notification", "通知"),
+    )
+    for token, japanese in required:
+        if (
+            token not in specification_text
+            and japanese not in specification_text
+        ) or (token not in index_text and japanese not in index_text):
+            不整合.append(f"C22グローバル検索に検索対象がない: {token}")
+    for token in (
+        "GlobalSearchIndex.maxQueryLength",
+        "GlobalSearchIndex.maxResults",
+        "Ctrl+Shift+F",
+        "検索結果は表示専用",
+    ):
+        if (
+            token not in specification_text
+            and token not in main
+            and token not in index_text
+        ):
+            不整合.append(f"C22グローバル検索のbounded／keyboard境界がない: {token}")
+    for forbidden in (
+        "BrokerClient",
+        "transport.request",
+        "ShellCoreClient.product",
+        "Clipboard.setData",
+        "Process.run",
+        "Process.start",
+    ):
+        if forbidden in index_text:
+            不整合.append(f"C22グローバル検索が権限・外部作用へ到達している: {forbidden}")
+    start = main.find("Future<void> _openGlobalSearch")
+    end = main.find("\n  List<_CommandEntry> _commandEntries", start)
+    if start == -1 or end == -1:
+        不整合.append("C22グローバル検索の画面遷移経路がない")
+    else:
+        navigation = main[start:end]
+        for forbidden in ("BrokerClient", "transport.request", "Clipboard.setData", "Process."):
+            if forbidden in navigation:
+                不整合.append(f"C22グローバル検索の選択操作が直接作用を持つ: {forbidden}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -6085,6 +6153,7 @@ def main() -> int:
         Adapter管理操作の統治境界を検査する,
         Windows常駐トレイ操作面の統治境界を検査する,
         コマンドパレット拡張の統治境界を検査する,
+        グローバル検索の統治境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

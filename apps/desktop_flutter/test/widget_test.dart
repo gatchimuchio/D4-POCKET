@@ -268,6 +268,26 @@ void main() {
     expect(find.text('MCP接続の設定面を開く'), findsOneWidget);
   });
 
+  testWidgets('全体検索がCtrl+Shift+Fで開き画面遷移だけを行う', (WidgetTester tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shift);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+    await tester.pumpAndSettle();
+
+    expect(find.text('全体検索'), findsWidgets);
+    expect(find.textContaining('検索結果は表示専用'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'MCP');
+    await tester.pumpAndSettle();
+    expect(find.text('MCP接続'), findsOneWidget);
+    await tester.tap(find.text('MCP接続'));
+    await tester.pumpAndSettle();
+    expect(find.text('設定'), findsWidgets);
+  });
+
   testWidgets('問題一覧が段階Bを失敗扱いにせずリリース遮断要因を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

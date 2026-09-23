@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C22: 全体検索（2026-09-24）
+
+既存の操作面を横断する読み取り専用の全体検索を追加した。`Ctrl+Shift+F`と画面上の全体検索ボタンから開き、現在の`ShellSnapshot`に含まれるbounded metadataと、MCP／A2A／評価／通知などのsurface entryを検索する。検索結果の選択は対象画面への移動だけであり、検索から権限作用へ到達しない。
+
+- Production path: Desktopの全体検索 → `GlobalSearchIndex` → Snapshotの表示用metadata → 対象画面へのGUI navigation。indexは512件、検索語は128文字、結果は30件にboundedする。
+- Authority boundary: Agent／Runtime／Session／Approval／Audit／MCP／A2A等のmetadata、History、Profile、TelemetryはAuthority、Permission、Approval、Credentialを生成・再利用しない。FlutterのindexはBroker IPC、filesystem、process、network、credential、Clipboardへ直接到達しない。
+- Content boundary: 対話本文、Approval payload、Audit raw payload、Credential実値、秘密値、未許可のfull content、任意pathをindexへ登録しない。Broker由来と確認できないsnapshotは証拠範囲を`不明`と表示する。
+- 未成立分類: 実Runtime・Agent・MCP・A2A・Hostの全surfaceから取得したinstalled productでの横断検索実機evidence、clean installed artifactとの結合、owner GOは`release_blocker`。外部surfaceのlive再取得、全文検索、本文検索、検索結果からの操作実行を提供しないことは`known_limitation`。
+
 ## D4 Pocket C20: Windows常駐トレイ（2026-09-24）
 
 Windows native trayを、表示と操作入口に限定したWin32実装として追加した。トレイからD4 Pocketの前面化、実行系状態、保留承認件数、重大通知件数、全Runtime停止要求、終了を操作できる。表示射影はBroker由来値だけを採用し、取得不能値を0へ変換しない。

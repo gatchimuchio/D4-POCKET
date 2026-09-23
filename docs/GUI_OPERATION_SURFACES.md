@@ -49,6 +49,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: Ctrl+K／Ctrl+PのパレットへRuntime、Agent、履歴検索、評価実行、MCP接続、通知表示、資源監視、資格情報、更新確認、Host切替、全Runtime停止要求の確認を明示登録し、選択時は対応画面だけを開く。
   authority_boundary: パレットは検索と画面遷移だけを行い、Broker IPC、owner承認、Permission、Approval、Authority、Credential、Runtime実行へ直接到達しない。各画面の実操作は既存の統治経路に従う。
 
+- item: D4 Pocket 全体検索（C22 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Ctrl+Shift+Fまたは全体検索ボタンから、Runtime、Agent、Session、Permission、Approval、Audit、Recovery、Problem、Evidence、MCP、A2A、Host、Adapter、Profile、Evaluation、Notificationのbounded表示用metadataとsurface entryを横断検索できる。indexは512件、queryは128文字、結果は30件へ制限する。
+  authority_boundary: 全体検索は読み取り専用であり、対話本文、Approval payload、Audit raw payload、Credential実値、秘密値を検索対象にしない。検索結果の選択は画面遷移だけで、Broker IPC、filesystem、process、network、credential、Clipboard、Permission、Approval、Authorityへ直接到達しない。
+
 - item: Problems Panel and Evidence Center
   classification: required_for_v1
   status: implemented

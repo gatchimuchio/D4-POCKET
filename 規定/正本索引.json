@@ -204,6 +204,10 @@
       "責任": "C21コマンドパレットの新機能別登録、keyboard-first画面遷移、Broker操作・承認・権限非到達境界"
     },
     {
+      "path": "docs/specs/global-search-surface.md",
+      "責任": "C22全体検索のbounded読み取り専用index、対象surface、内容露出、権限非生成、live取得未成立境界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

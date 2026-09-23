@@ -29,6 +29,7 @@ import 'screens/trust_center.dart';
 import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
 import 'services/evaluation_client.dart';
+import 'services/global_search_index.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
@@ -326,12 +327,23 @@ class _ShellHomePageState extends State<ShellHomePage> {
             _OpenCommandPaletteIntent(),
         SingleActivator(LogicalKeyboardKey.keyP, control: true):
             _OpenCommandPaletteIntent(),
+        SingleActivator(
+          LogicalKeyboardKey.keyF,
+          control: true,
+          shift: true,
+        ): _OpenGlobalSearchIntent(),
       },
       child: Actions(
         actions: {
           _OpenCommandPaletteIntent: CallbackAction<_OpenCommandPaletteIntent>(
             onInvoke: (_) {
               _openCommandPalette(context, snapshot, pageEntries);
+              return null;
+            },
+          ),
+          _OpenGlobalSearchIntent: CallbackAction<_OpenGlobalSearchIntent>(
+            onInvoke: (_) {
+              _openGlobalSearch(context, snapshot);
               return null;
             },
           ),
@@ -347,6 +359,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
                   onViewModeChanged: (mode) => setState(() => viewMode = mode),
                   onOpenCommandPalette: () =>
                       _openCommandPalette(context, snapshot, pageEntries),
+                  onOpenGlobalSearch: () =>
+                      _openGlobalSearch(context, snapshot),
                 ),
                 PhaseBanner(snapshot: snapshot),
                 Expanded(
@@ -569,6 +583,18 @@ class _ShellHomePageState extends State<ShellHomePage> {
     });
   }
 
+  Future<void> _openGlobalSearch(
+    BuildContext context,
+    ShellSnapshot snapshot,
+  ) async {
+    final selected = await showDialog<GlobalSearchResult>(
+      context: context,
+      builder: (context) => _GlobalSearchDialog(snapshot: snapshot),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => selectedIndex = selected.pageIndex);
+  }
+
   List<_CommandEntry> _commandEntries(
     ShellSnapshot snapshot,
     List<_ShellPageEntry> pageEntries,
@@ -734,6 +760,10 @@ class _OpenCommandPaletteIntent extends Intent {
   const _OpenCommandPaletteIntent();
 }
 
+class _OpenGlobalSearchIntent extends Intent {
+  const _OpenGlobalSearchIntent();
+}
+
 class _ShellPageEntry {
   const _ShellPageEntry(this.index, this.label, this.icon);
 
@@ -776,12 +806,14 @@ class _TopCommandBar extends StatelessWidget {
     required this.viewMode,
     required this.onViewModeChanged,
     required this.onOpenCommandPalette,
+    required this.onOpenGlobalSearch,
   });
 
   final String selectedLabel;
   final _ShellViewMode viewMode;
   final ValueChanged<_ShellViewMode> onViewModeChanged;
   final VoidCallback onOpenCommandPalette;
+  final VoidCallback onOpenGlobalSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -815,6 +847,20 @@ class _TopCommandBar extends StatelessWidget {
                             onPressed: onOpenCommandPalette,
                             icon: const Icon(Icons.search),
                             label: const Text('コマンドパレット'),
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: '全体検索を開く（Ctrl+Shift+F）',
+                    child: compact
+                        ? IconButton(
+                            onPressed: onOpenGlobalSearch,
+                            icon: const Icon(Icons.manage_search),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: onOpenGlobalSearch,
+                            icon: const Icon(Icons.manage_search),
+                            label: const Text('全体検索'),
                           ),
                   ),
                   const SizedBox(width: 8),
@@ -964,6 +1010,83 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                 ? null
                                 : const Icon(Icons.copy, size: 18),
                             onTap: () => Navigator.of(context).pop(entry),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlobalSearchDialog extends StatefulWidget {
+  const _GlobalSearchDialog({required this.snapshot});
+
+  final ShellSnapshot snapshot;
+
+  @override
+  State<_GlobalSearchDialog> createState() => _GlobalSearchDialogState();
+}
+
+class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final results = GlobalSearchIndex.search(
+      widget.snapshot,
+      _controller.text,
+    );
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 820, maxHeight: 680),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                maxLength: GlobalSearchIndex.maxQueryLength,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.manage_search),
+                  labelText: '全体検索',
+                  helperText:
+                      'Runtime、Agent、Session、Auditなどを横断検索します。検索結果は表示専用です。',
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  if (results.isNotEmpty) {
+                    Navigator.of(context).pop(results.first);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: results.isEmpty
+                    ? const Center(child: Text('一致する検索結果はありません'))
+                    : ListView.builder(
+                        itemCount: results.length,
+                        itemBuilder: (context, index) {
+                          final result = results[index];
+                          return ListTile(
+                            leading: const Icon(Icons.label_outline),
+                            title: Text(result.title),
+                            subtitle: Text(
+                              '${result.category} / ${result.detail} / 証拠: ${result.evidenceSource}',
+                            ),
+                            onTap: () => Navigator.of(context).pop(result),
                           );
                         },
                       ),

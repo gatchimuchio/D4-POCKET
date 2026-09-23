@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "654bad1f7858bf0867c983a590b675b49655429522da0829f03a28378e4c72ef"
+      "sha256": "43946dc45c4e106827c1d3384b12ade33f51d6956569c9ba75f0d5d7ea0709c2"
     },
     {
       "path": "SECURITY.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "895de278b031e9a14b5a3304577eaedb9bf15c9b2746d8a31feef7859f97aa7b"
+      "sha256": "354aa76edbf3e50d49deb16964ab01115aac291007a0917aaea27fc3ad1c91ed"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -298,6 +298,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
       "sha256": "24d1e51e5ff3a275183efdf6d9a72f768857826dd812def406b362741e608e8c"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
+      "sha256": "aac2889475bb605a509873037be420428270f19400f3df2daf4412c106543348"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -516,6 +520,10 @@
       "sha256": "7f1c329fde4df7236cb7db6cb1b38c5683d298394394569972b33891309d083c"
     },
     {
+      "path": "apps/desktop_flutter/test/global_search_index_test.dart",
+      "sha256": "eff91aafc581c9115a5361378c7d95f5a65acbfafb0dfd205bc8a7887ed3263d"
+    },
+    {
       "path": "apps/desktop_flutter/test/history_content_test.dart",
       "sha256": "bec139286b96d3fe5e6d135e9df756427bb19bd29c78177108a4645cb655bbb6"
     },
@@ -553,7 +561,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "575e8da39636e756c5295986b5952ce1b020e3ecb1bb13b5b652650cdbd0fd67"
+      "sha256": "29f3fe2158c7061414f059ea1eecd89ad25b2f245881b449a3df5d0af895d974"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1013,7 +1021,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "cfed9e269d7caed61116bff8c51bbd7b1ab8afb59bc048c13bd967486da74217"
+      "sha256": "d364a21f0f3f5e188a71077d0e04326c0c041fa31051e0d0d557c710c1290539"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1049,7 +1057,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "16e4bf910b55b5bc77e7d969bff8c08a85cc255ada1cdc1aaaefabeafde23a2c"
+      "sha256": "075344e89d6295c3befff4cf9bd03fcf7aaa108a7ab6cc818f290d82875cdf63"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1188,6 +1196,10 @@
       "sha256": "99bcee362c942112f38bb03522d2d19f7085be281992a349e721919874dc40ec"
     },
     {
+      "path": "docs/specs/global-search-surface.md",
+      "sha256": "1de65d9dbc84b1c49aeb1f06e6deda1b48792204ab19149a427f04162c9179aa"
+    },
+    {
       "path": "docs/specs/gui-shell-spec-v1.md",
       "sha256": "fe8fb02986f6cc64ecf6084a07b1a70808a7d51c58fb2d3e7be9358136f9c31a"
     },
@@ -1285,7 +1297,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "9dc39a40daaeea2e22b9949470dd359daeaea2843fb18306559d9ba1443b0fc7"
+      "sha256": "13274981f9ae1727918ee5c6f175adb705e6a52741036741ef20568ad085f256"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3473,7 +3485,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "7411212a41bae26bba51fb93fb6378df1bbdd51e1322419c7f8d21c0d8fbc18c"
+      "sha256": "f5e06a34aec797796f22d4ff27239bd15ad6d36e11b92bf0f0e80928dbcb614c"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3565,7 +3577,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "411427ce2734a3c43a99637f118d5bd2915f27d77af97250f18d43ff17bf2a45"
+      "sha256": "63a6963ce8d639a821b3a9bf62f4ef5c9cbd45d483420f5260a9ea7f01a5c392"
     }
   ]
 }
