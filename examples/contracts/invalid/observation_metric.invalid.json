@@ -1,0 +1,11 @@
+{
+  "版": 1,
+  "MetricID": "broker.audit_finalize.duration_ms_avg",
+  "名称": "Audit確定所要時間平均",
+  "値": null,
+  "単位": "ms",
+  "種別": "gauge",
+  "観測件数": 1,
+  "状態": "unknown_state",
+  "証拠種別": "INTERNAL_STATE"
+}

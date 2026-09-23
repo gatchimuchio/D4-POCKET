@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -359,6 +359,8 @@ pub enum BrokerOperation {
     通知破棄,
     #[serde(rename = "通知全既読")]
     通知全既読,
+    #[serde(rename = "観測一覧")]
+    観測一覧,
     #[serde(rename = "評価Dataset一覧")]
     評価Dataset一覧,
     #[serde(rename = "評価実験開始")]
@@ -475,6 +477,7 @@ impl BrokerOperation {
             BrokerOperation::通知既読 => "通知既読",
             BrokerOperation::通知破棄 => "通知破棄",
             BrokerOperation::通知全既読 => "通知全既読",
+            BrokerOperation::観測一覧 => "観測一覧",
             BrokerOperation::評価Dataset一覧 => "評価Dataset一覧",
             BrokerOperation::評価実験開始 => "評価実験開始",
             BrokerOperation::評価実験状態 => "評価実験状態",
@@ -714,6 +717,7 @@ pub struct Broker {
     pub(super) update_trust: Option<super::update_center::UpdateTrust>,
     pub(super) notification_states:
         BTreeMap<String, super::notification_center::NotificationState>,
+    pub(super) observations: super::observation_center::ObservationCenter,
     #[cfg(windows)]
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
     #[cfg(windows)]
@@ -742,6 +746,7 @@ impl Broker {
             updates: BTreeMap::new(),
             update_trust: None,
             notification_states: BTreeMap::new(),
+            observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
             #[cfg(windows)]
@@ -798,6 +803,7 @@ impl Broker {
             updates,
             update_trust,
             notification_states,
+            observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
             protected_store: None,
             #[cfg(windows)]
@@ -1062,6 +1068,7 @@ impl Broker {
             operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
+            BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -2307,6 +2314,8 @@ impl Broker {
         evidence_source: &str,
         payload_hash: &str,
     ) -> Result<BrokerAuditEvent, BrokerStoreError> {
+        let observation_started = Instant::now();
+        let observation_started_at = self.current_epoch_millis();
         let event = self.audit_log.build_next(
             request_id,
             operation,
@@ -2331,6 +2340,11 @@ impl Broker {
             self.内容閲覧.revoke();
             return Err(BrokerStoreError::TamperedAuditState(error));
         }
+        self.observations.record_completed_span(
+            &event,
+            observation_started_at,
+            observation_started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+        );
         Ok(event)
     }
 

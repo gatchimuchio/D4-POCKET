@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/observation_list.schema.json",
+  "title": "観測一覧（ObservationList）",
+  "type": "object",
+  "required": ["版", "Span一覧", "Trace一覧", "Metric一覧", "件数", "証拠種別", "観測範囲", "Auditとの責任分離", "OpenTelemetry export", "権限生成"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "Span一覧": { "type": "array", "maxItems": 256, "items": { "type": "object" } },
+    "Trace一覧": { "type": "array", "maxItems": 256, "items": { "type": "object" } },
+    "Metric一覧": { "type": "array", "maxItems": 16, "items": { "type": "object" } },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "観測範囲": { "const": "broker_audit_finalization" },
+    "Auditとの責任分離": { "const": "Audit=責任・安全・証拠; Observation=性能・挙動・運用状態" },
+    "OpenTelemetry export": { "const": "unsupported" },
+    "権限生成": { "const": "なし" }
+  }
+}

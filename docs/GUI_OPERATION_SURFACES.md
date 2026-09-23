@@ -109,6 +109,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: Rust Brokerはcaller登録ではなく監査eventのsource／decision／event hashからsummary通知を生成し、通常IPCの一覧・既読・破棄・全既読をDesktop通知画面へ返す。通知件数と監査走査をboundedにし、表示状態をhash結合して永続化する。
   authority_boundary: 通知はINTERNAL_STATEのnavigation-only表示であり、reason、payload、metadata、秘密値、Permission、Approval、Authorityを公開・生成しない。通知の開く操作はGUI navigationだけである。Windows native toastとinstalled product実証は未成立として扱う。
 
+- item: D4 Pocket 観測センター（C13 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Rust BrokerはAudit確定処理の実測durationをboundedなSpan、Trace、Metricへ内部射影し、通常IPCの観測一覧とDesktop観測画面へ返す。保持1024Span、返却256Span／256Trace／16Metricで、TraceID filterと測定不能値のunknown境界を持つ。
+  authority_boundary: 観測はINTERNAL_STATEの運用表示であり、Auditのreason、payload hash、metadata、秘密値を公開せず、Permission、Approval、Authority、Capabilityを生成しない。OpenTelemetry export、C14 Trace Inspector、Runtime全体の実測、installed product証拠は未成立として扱う。
+
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented

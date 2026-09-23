@@ -1,0 +1,12 @@
+{
+  "版": 1,
+  "Span一覧": [],
+  "Trace一覧": [],
+  "Metric一覧": [],
+  "件数": 0,
+  "証拠種別": "INTERNAL_STATE",
+  "観測範囲": "broker_audit_finalization",
+  "Auditとの責任分離": "Audit=責任・安全・証拠; Observation=性能・挙動・運用状態",
+  "OpenTelemetry export": "unsupported",
+  "権限生成": "なし"
+}

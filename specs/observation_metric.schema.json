@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/observation_metric.schema.json",
+  "title": "観測Metric（ObservationMetric）",
+  "type": "object",
+  "required": ["版", "MetricID", "名称", "値", "単位", "種別", "観測件数", "状態", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "MetricID": { "type": "string", "pattern": "^broker\\.[a-z0-9_.-]+$" },
+    "名称": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "値": { "type": ["number", "null"] },
+    "単位": { "enum": ["count", "ms"] },
+    "種別": { "enum": ["counter", "gauge"] },
+    "観測件数": { "type": "integer", "minimum": 0, "maximum": 1024 },
+    "状態": { "enum": ["observed", "unknown"] },
+    "証拠種別": { "const": "INTERNAL_STATE" }
+  }
+}

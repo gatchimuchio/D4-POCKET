@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C13: 観測センター（2026-09-23）
+
+BrokerのAudit確定処理を、Auditとは別の内部観測としてboundedなSpan、Trace、Metricへ射影し、Desktop観測センターへ接続した。観測はsession内memoryに限定し、caller登録、外部export、権限生成を持たない。
+
+- Production path: Desktop観測センター → 通常認証済みBroker IPC → Rust Observation Center → Brokerが確定したAudit eventの処理時間。`観測一覧`の上限とTraceID filterを接続した。
+- Authority boundary: 応答は`INTERNAL_STATE`に固定し、Auditのreason、payload hash、metadata、credential、raw contentを返さない。観測からPermission、Approval、Authority、Capabilityを生成しない。
+- Bounded behavior: Broker保持1024Span、IPC返却256Span／256Trace／16Metric。測定不能なdurationは0ではなく`unknown`として扱い、OpenTelemetry exportは`unsupported`である。
+- Validation: 観測Schema 4件、正常／負例fixture、Rust内部観測・bounded・Metric・Broker経路試験、Desktop client／NavigationRail／全Flutter試験を接続した。
+- 未成立分類: C14 Trace Inspectorのwaterfall、親子Span、OpenTelemetry export、外部collector、Runtime全体の実測、Windows installed productでの観測証拠、8時間運用は`release_blocker`。本単位はBroker Audit確定処理の内部観測だけを主張する。
+
 ## D4 Pocket C12: 通知センター（2026-09-23）
 
 監査eventから通知summaryを限定射影するRust Notification Centerを追加し、既読・破棄状態をBroker所有の`notifications.json`へhash結合して保存する。通知をcallerが登録する操作はなく、通知操作自身も通知sourceへ射影しない。

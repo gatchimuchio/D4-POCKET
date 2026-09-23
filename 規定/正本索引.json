@@ -192,6 +192,10 @@
       "責任": "C12 監査event由来の通知summary、bounded一覧、hash結合の既読・破棄状態、navigation-only境界"
     },
     {
+      "path": "docs/specs/observability-center.md",
+      "責任": "C13 Audit確定処理の内部Span・Trace・Metric、bounded観測一覧、INTERNAL_STATE、Audit責任分離、OpenTelemetry未対応境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

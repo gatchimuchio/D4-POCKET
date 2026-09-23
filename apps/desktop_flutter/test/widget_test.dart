@@ -34,22 +34,24 @@ void main() {
 
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
-    final rail=tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length,17);
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.destinations.length, 18);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
-    expect(tester.takeException(),isNull);
-    expect(find.text('先頭から更新'),findsOneWidget);
-    tester.widget<NavigationRail>(find.byType(NavigationRail)).onDestinationSelected!(0);
+    expect(tester.takeException(), isNull);
+    expect(find.text('先頭から更新'), findsOneWidget);
+    tester
+        .widget<NavigationRail>(find.byType(NavigationRail))
+        .onDestinationSelected!(0);
     await tester.pumpAndSettle();
-    expect(find.text('先頭から更新'),findsNothing);
+    expect(find.text('先頭から更新'), findsNothing);
   });
 
   testWidgets('評価ラボをNavigationRailから開ける', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 17);
+    expect(rail.destinations.length, 18);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
@@ -77,6 +79,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('通知センター'), findsWidgets);
+    expect(find.textContaining('Broker接続がないため'), findsOneWidget);
+  });
+
+  testWidgets('観測センターをNavigationRailから開ける', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(17);
+    await tester.pumpAndSettle();
+
+    expect(find.text('観測センター'), findsWidgets);
     expect(find.textContaining('Broker接続がないため'), findsOneWidget);
   });
 

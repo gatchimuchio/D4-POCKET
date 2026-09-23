@@ -19,6 +19,7 @@ pub(crate) mod mcp_center;
 pub(crate) mod profile_center;
 pub(crate) mod update_center;
 pub(crate) mod notification_center;
+pub(crate) mod observation_center;
 pub(crate) mod runtime_registry;
 pub(crate) mod runtime_lifecycle;
 pub(crate) mod host_capability;

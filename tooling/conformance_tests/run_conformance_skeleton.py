@@ -110,6 +110,10 @@ REQUIRED_SCHEMA_NAMES = {
     "notification",
     "notification_list",
     "notification_action",
+    "observation_span",
+    "observation_trace",
+    "observation_metric",
+    "observation_list",
     "content_exposure",
     "framework_risk_profile",
     "runtime_manifest",
@@ -164,6 +168,7 @@ BROKER_REQUIRED_SOURCES = {
     "profile_center.rs",
     "update_center.rs",
     "notification_center.rs",
+    "observation_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -183,6 +188,10 @@ BROKER_REQUIRED_SCHEMAS = {
     "notification.schema.json",
     "notification_list.schema.json",
     "notification_action.schema.json",
+    "observation_span.schema.json",
+    "observation_trace.schema.json",
+    "observation_metric.schema.json",
+    "observation_list.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -201,6 +210,8 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/services/profile_client.dart",
     "lib/services/update_client.dart",
     "lib/services/surface_semantics_export.dart",
+    "lib/services/observation_client.dart",
+    "lib/screens/observability_center.dart",
     "lib/models/generated_contracts.dart",
 }
 MOBILE_FLUTTER_REQUIRED_FILES = {
@@ -752,6 +763,45 @@ def test_notification_center_contract_and_navigation_boundary() -> list[str]:
         errors.append("通知登録というcaller由来の生成経路を追加してはならない")
     if '"操作": "navigation_only"' not in source:
         errors.append("通知Broker応答がnavigation_onlyを明示していない")
+    return errors
+
+
+def test_observation_center_contract_and_audit_separation() -> list[str]:
+    errors = []
+    span = load_contract_fixture("observation_span.valid.json")
+    trace = load_contract_fixture("observation_trace.valid.json")
+    metric = load_contract_fixture("observation_metric.valid.json")
+    listing = load_contract_fixture("observation_list.valid.json")
+    for name, value in (
+        ("observation_span", span),
+        ("observation_trace", trace),
+        ("observation_metric", metric),
+        ("observation_list", listing),
+    ):
+        errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    if listing["証拠種別"] != "INTERNAL_STATE":
+        errors.append("観測一覧が内部状態の証拠範囲を宣言していない")
+    if listing["権限生成"] != "なし":
+        errors.append("観測一覧が権限を生成しないことを宣言していない")
+    if listing["OpenTelemetry export"] != "unsupported":
+        errors.append("観測一覧が未対応のOpenTelemetry exportを実行可能と宣言した")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        if "観測一覧" not in operations:
+            errors.append(f"{name}に観測一覧操作がない")
+    source = (RUST_HELPER / "src" / "broker" / "observation_center.rs").read_text(encoding="utf-8")
+    if '"reason"' in source or '"payload_hash"' in source:
+        errors.append("観測応答へ監査内容の生フィールドを投影している")
+    if '"証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE' not in source:
+        errors.append("観測応答の証拠種別が内部状態に固定されていない")
+    if '"権限生成": "なし"' not in source:
+        errors.append("観測応答が権限非生成を明示していない")
+    if '"OpenTelemetry export": "unsupported"' not in source:
+        errors.append("OpenTelemetry exportの未対応境界がない")
+    if '"観測登録"' in source:
+        errors.append("caller由来の観測登録経路を追加してはならない")
+    if "MAX_SPANS: usize = 1024" not in source or "MAX_RESPONSE_SPANS: usize = 256" not in source:
+        errors.append("観測保持または応答のbounded上限が宣言されていない")
     return errors
 
 
@@ -5345,6 +5395,7 @@ def main() -> int:
         test_update_policy_unsigned_rejection_uses_taxonomy,
         test_update_center_contract_and_execution_boundary,
         test_notification_center_contract_and_navigation_boundary,
+        test_observation_center_contract_and_audit_separation,
         test_shell_contracts_load_required_schemas,
         test_shell_core_ignores_adapter_metadata_permissions,
         test_shell_core_non_authority_sources_do_not_grant_authority,

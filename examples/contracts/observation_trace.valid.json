@@ -1,0 +1,9 @@
+{
+  "版": 1,
+  "TraceID": "observation-trace-1",
+  "SpanID一覧": ["observation-span-1"],
+  "件数": 1,
+  "証拠種別": "INTERNAL_STATE",
+  "生成源": "broker_audit_finalization",
+  "親TraceID": null
+}

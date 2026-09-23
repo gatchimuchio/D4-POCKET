@@ -1,0 +1,15 @@
+{
+  "版": 1,
+  "SpanID": "observation-span-1",
+  "TraceID": "observation-trace-1",
+  "親SpanID": null,
+  "対象": "Broker",
+  "操作": "観測一覧",
+  "開始EpochMillis": 1780000000000,
+  "終了EpochMillis": 1780000000002,
+  "所要Millis": 2,
+  "状態": "accepted",
+  "エラー分類": null,
+  "関連監査ID": "broker-audit-1",
+  "証拠種別": "LIVE_RUNTIME"
+}

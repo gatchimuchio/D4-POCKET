@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/observation_span.schema.json",
+  "title": "観測Span（ObservationSpan）",
+  "type": "object",
+  "required": ["版", "SpanID", "TraceID", "親SpanID", "対象", "操作", "開始EpochMillis", "終了EpochMillis", "所要Millis", "状態", "エラー分類", "関連監査ID", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "SpanID": { "type": "string", "pattern": "^observation-span-[1-9][0-9]*$" },
+    "TraceID": { "type": "string", "pattern": "^observation-trace-[1-9][0-9]*$" },
+    "親SpanID": { "type": ["string", "null"], "maxLength": 128 },
+    "対象": { "const": "Broker" },
+    "操作": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "開始EpochMillis": { "type": "integer", "minimum": 0 },
+    "終了EpochMillis": { "type": "integer", "minimum": 0 },
+    "所要Millis": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "状態": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+    "エラー分類": { "type": ["string", "null"], "maxLength": 128 },
+    "関連監査ID": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "証拠種別": { "const": "INTERNAL_STATE" }
+  }
+}
