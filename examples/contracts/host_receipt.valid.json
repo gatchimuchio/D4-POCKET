@@ -1,0 +1,31 @@
+{
+  "版": 1,
+  "Host ID": "host-windows-dev",
+  "表示名": "開発Host",
+  "Platform": "windows",
+  "接続状態": "pending_review",
+  "Trust": {
+    "state": "pending_review",
+    "evidence_source": "INTERNAL_STATE",
+    "requires_operator_review": true
+  },
+  "証明書/identity": {
+    "種別": "certificate_hash",
+    "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "Runtime summary": {
+    "runtime_count": 0,
+    "agent_count": 0,
+    "evidence_source": "INTERNAL_STATE"
+  },
+  "最終接続": null,
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "能力ID": "host.registry.register",
+  "権限ID": "permission.host.registry.register",
+  "承認状態": "owner_control_approved",
+  "復旧ID": "recover-host-registration",
+  "登録監査ID": "audit-host-registration-1"
+}

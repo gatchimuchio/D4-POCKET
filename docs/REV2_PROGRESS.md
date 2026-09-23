@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C17: 複数Host registry（2026-09-24）
+
+C17のHost metadata registryをRust Security Brokerへ接続した。owner controlだけがHostを登録し、通常認証済みIPCだけがHost一覧を参照する。Host ID、表示名、Platform、接続状態、Trust、証明書／identity hash、Runtime summary、最終接続をboundedなmetadata-only receiptへ射影し、`hosts.json`へatomicに永続化する。登録時のTrustと接続状態は`pending_review`に固定し、Host metadataからPermission、Approval、Authority、Credentialを生成しない。
+
+- Production path: owner control → `Host登録` → Rust Host registry → hash-only identity／bounded summary → `hosts.json`。通常認証済みIPCの`Host一覧`はBroker内部registryを`INTERNAL_STATE` metadata-onlyとして返す。
+- Boundary: 通常IPCからの登録、owner controlからの一覧、未知field、重複Host ID、identity実値、`permission_id`／`approval_id`／`authority`、connected／verifiedの自己申告、state fileのmalformed／重複field／上限超過を拒否する。Host Aのmetadata・承認・PermissionをHost Bへ共有しない。
+- Validation: Schema 99件／正常例99件／負例118件、Conformance 172 checks、Rust全試験251件（lib 209、owner CLI 7、IPC 9、canonical hash 1、checkpoint 8、protected data 2、protected startup 1、protected store 3、workspace diff 2、workspace reader 2、workspace startup 7）、厳格日本語監査、manifest、packaging portability、Windows開発集約検証をPASSした。集約検証はdevelopment modeであり、既存のWindows installed証拠5件を`release_blocker`として保持する。
+- 未成立分類: Host切替、HostごとのRuntime／Agent一覧、live接続再確認、Device Linkの実認証・失効・quarantine、Host間Workspace隔離、複数Agent比較／Handoff、Desktop Host操作面、installed product証拠、長時間運用・障害注入は`release_blocker`。C17だけで複数Host製品機能全体または正式releaseを主張しない。
+
 ## D4 Pocket C16: A2A接続センター初期経路（2026-09-23）
 
 C15のA2A外部概念契約を、owner controlから実Agent Cardを取得するRust Security Broker経路へ接続した。現行単位はloopback HTTPだけを許可し、Agent Cardのbounded検証と`LIVE_RUNTIME` metadata-only receipt、通常IPCの接続一覧を成立させる。外部Agentの宣言からTrust、Permission、Approval、Authorityを生成しない。

@@ -184,6 +184,10 @@
       "責任": "C16 A2A Agent Cardのowner接続、loopback HTTP取得、metadata-only receipt、通常一覧、HTTPS・credential・Task実行未接続境界"
     },
     {
+      "path": "docs/specs/host-registry.md",
+      "責任": "C17 Host registryのowner登録、通常一覧、identity hash、bounded永続化、Host間Authority非共有境界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

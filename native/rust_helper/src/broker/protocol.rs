@@ -256,6 +256,20 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    pub fn load_host_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            return store.load_host_state().map(Some);
+        }
+        Ok(None)
+    }
+
+    pub fn write_host_state(&self, state: &serde_json::Value) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.write_host_state(state)?;
+        }
+        Ok(())
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_update_trust();
@@ -341,6 +355,10 @@ pub enum BrokerOperation {
     A2A接続,
     #[serde(rename = "A2A接続一覧")]
     A2A接続一覧,
+    #[serde(rename = "Host登録")]
+    Host登録,
+    #[serde(rename = "Host一覧")]
+    Host一覧,
     #[serde(rename = "プロファイル作成")]
     プロファイル作成,
     #[serde(rename = "プロファイル複製")]
@@ -479,6 +497,8 @@ impl BrokerOperation {
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
+            BrokerOperation::Host登録 => "Host登録",
+            BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::プロファイル作成 => "プロファイル作成",
             BrokerOperation::プロファイル複製 => "プロファイル複製",
             BrokerOperation::プロファイル適用要求 => "プロファイル適用要求",
@@ -733,6 +753,7 @@ pub struct Broker {
     端末: Option<super::device_link::端末制御>,
     pub(super) mcp_connections: BTreeMap<String, super::mcp_center::McpConnectionEntry>,
     pub(super) a2a_connections: BTreeMap<String, Value>,
+    pub(super) hosts: BTreeMap<String, Value>,
     pub(super) profiles: BTreeMap<String, Value>,
     pub(super) updates: BTreeMap<String, Value>,
     pub(super) update_trust: Option<super::update_center::UpdateTrust>,
@@ -764,6 +785,7 @@ impl Broker {
             端末: None,
             mcp_connections: BTreeMap::new(),
             a2a_connections: BTreeMap::new(),
+            hosts: BTreeMap::new(),
             profiles: BTreeMap::new(),
             updates: BTreeMap::new(),
             update_trust: None,
@@ -804,6 +826,7 @@ impl Broker {
             super::notification_center::load_persistent_states(&persistent_store)?;
         let a2a_connections =
             super::a2a_center::load_persistent_connections(&persistent_store)?;
+        let hosts = super::host_center::load_persistent_hosts(&persistent_store)?;
         let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
             persistent_state.audit_log.events(),
         )
@@ -824,6 +847,7 @@ impl Broker {
             端末: None,
             mcp_connections: BTreeMap::new(),
             a2a_connections,
+            hosts,
             profiles,
             updates,
             update_trust,
@@ -1092,6 +1116,8 @@ impl Broker {
             BrokerOperation::MCP接続一覧 => super::mcp_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続 => super::a2a_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続一覧 => super::a2a_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::Host登録 => super::host_center::register(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::Host一覧 => super::host_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/host_registration.schema.json",
+  "title": "Host登録要求（HostRegistration）",
+  "description": "owner controlが明示したHost metadataだけを登録する。identity実値、接続権限、Approvalは受け付けない。",
+  "type": "object",
+  "required": ["版", "操作", "Host ID", "表示名", "Platform", "接続状態", "Trust", "証明書/identity", "Runtime summary", "最終接続"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "登録" },
+    "Host ID": { "$ref": "#/$defs/id" },
+    "表示名": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "Platform": { "enum": ["windows", "linux", "macos", "android", "ios", "unknown"] },
+    "接続状態": { "const": "pending_review" },
+    "Trust": { "const": "pending_review" },
+    "証明書/identity": { "$ref": "#/$defs/identity" },
+    "Runtime summary": { "$ref": "#/$defs/runtime_summary" },
+    "最終接続": { "type": "null" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["種別", "hash"],
+      "additionalProperties": false,
+      "properties": {
+        "種別": { "enum": ["certificate_hash", "identity_hash"] },
+        "hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "runtime_summary": {
+      "type": "object",
+      "required": ["runtime_count", "agent_count", "evidence_source"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_count": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "agent_count": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "evidence_source": { "const": "INTERNAL_STATE" }
+      }
+    }
+  }
+}

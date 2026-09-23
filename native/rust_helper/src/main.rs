@@ -51,6 +51,9 @@ fn main() {
     if args.first().is_some_and(|v| v == "A2A接続") {
         match owner_cli::A2A接続(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
+    if args.first().is_some_and(|v| v == "Host登録") {
+        match owner_cli::Host登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if args.first().is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御")) {
         match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
@@ -81,6 +84,7 @@ fn main() {
     eprintln!("資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>");
     eprintln!("MCP接続: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>");
     eprintln!("A2A接続: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>");
+    eprintln!("Host登録: Host登録 --session-file <owner資格file> 登録 <Host登録JSONファイル>");
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     eprintln!("全体基準点: 作業領域制御 --session-file <owner資格file> 作業領域全体基準点保存 <作業領域ID> <登録hash>");
     eprintln!("基準点: 作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...");

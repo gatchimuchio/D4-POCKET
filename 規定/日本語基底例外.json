@@ -270,6 +270,28 @@
       "japanese_reference": "規定/00_日本語基底規定.md",
       "authority_effect": "none",
       "review_trigger": "A2A protocol、HTTP接続、Schema、Broker境界、または正本文書を変更するとき"
+    },
+    {
+      "id": "JBE-011",
+      "scopes": [
+        "native/rust_helper/src/broker/host_center.rs",
+        "native/rust_helper/src/owner_cli.rs"
+      ],
+      "region": "Host registryの公開Contract field名と固定診断値だけ。周囲の意味説明とAuthority境界は除外しない。",
+      "category": "固有名・固定表記",
+      "handling": "lexical_only",
+      "integrity": "review_on_change",
+      "terms": [
+        "Host ID",
+        "Platform",
+        "Trust",
+        "Runtime summary",
+        "evidence_source"
+      ],
+      "unavoidable_reason_japanese": "Host registryのSchema、IPC、永続stateと同一のfield名を保持し、Hostごとのmetadataを外部consumerと機械的に照合する必要があるため。",
+      "japanese_reference": "規定/00_日本語基底規定.md",
+      "authority_effect": "none",
+      "review_trigger": "Host registryのSchema、IPC、永続state、または公開fieldを変更するとき"
     }
   ],
   "frozen_assets": [

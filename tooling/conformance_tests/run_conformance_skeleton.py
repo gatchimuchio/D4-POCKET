@@ -86,6 +86,9 @@ REQUIRED_SCHEMA_NAMES = {
     "a2a_connection",
     "a2a_connection_receipt",
     "a2a_connection_list",
+    "host_registration",
+    "host_receipt",
+    "host_list",
     "profile",
     "profile_receipt",
     "profile_list",
@@ -170,6 +173,7 @@ BROKER_REQUIRED_SOURCES = {
     "regression_case.rs",
     "mcp_center.rs",
     "a2a_center.rs",
+    "host_center.rs",
     "profile_center.rs",
     "update_center.rs",
     "notification_center.rs",
@@ -200,6 +204,9 @@ BROKER_REQUIRED_SCHEMAS = {
     "a2a_connection.schema.json",
     "a2a_connection_receipt.schema.json",
     "a2a_connection_list.schema.json",
+    "host_registration.schema.json",
+    "host_receipt.schema.json",
+    "host_list.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -4145,6 +4152,91 @@ def A2A接続センターの統治経路と境界を検査する() -> list[str]:
     return 不整合
 
 
+def 複数Host_registryの統治経路と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "host-registry.md"
+    if not specification.exists():
+        return ["C17 Host registryの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    required_tokens = (
+        "Host登録",
+        "Host一覧",
+        "owner control",
+        "通常認証済みIPC",
+        "metadata-only",
+        "pending_review",
+        "INTERNAL_STATE",
+        "identity",
+        "Permission",
+        "Approval",
+        "Authority",
+        "Host切替",
+        "release_blocker",
+    )
+    for token in required_tokens:
+        if token not in specification_text:
+            不整合.append(f"C17 Host registry正本に必須境界がない: {token}")
+
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C17 Host registry正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/host-registry.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C17 Host registry正本が正本索引へ登録されていない")
+
+    for name in ("host_registration", "host_receipt", "host_list"):
+        schema = load_schema(name + ".schema.json")
+        valid = load_contract_fixture(name + ".valid.json")
+        failures = validate_instance(valid, schema)
+        if failures:
+            不整合.extend(f"C17 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    invalid_names = (
+        "host_registration_authority.invalid.json",
+        "host_receipt_verified.invalid.json",
+        "host_list_wrong_evidence.invalid.json",
+    )
+    invalid_schema_names = {
+        invalid_names[0]: "host_registration",
+        invalid_names[1]: "host_receipt",
+        invalid_names[2]: "host_list",
+    }
+    for name in invalid_names:
+        try:
+            invalid = load_contract_fixture("invalid/" + name)
+        except (OSError, json.JSONDecodeError) as exc:
+            不整合.append(f"C17 {name}を読めない: {exc}")
+            continue
+        if not validate_instance(invalid, load_schema(invalid_schema_names[name] + ".schema.json")):
+            不整合.append(f"C17 {name}を受理している")
+
+    center = (RUST_HELPER / "src" / "broker" / "host_center.rs").read_text(encoding="utf-8")
+    owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    store = (RUST_HELPER / "src" / "broker" / "store.rs").read_text(encoding="utf-8")
+    ipc_request = (SPECS / "ipc_request.schema.json").read_text(encoding="utf-8")
+    ipc_response = (SPECS / "ipc_response.schema.json").read_text(encoding="utf-8")
+    for token, source in (
+        ("host_owner_required", center),
+        ("host_normal_channel_required", center),
+        ("pending_review", center),
+        ("metadata_only", center),
+        ("authority_strip", center),
+        ("host.registry.register", center),
+        ("load_persistent_hosts", center + protocol),
+        ("hosts.json", store),
+        ("MalformedHostState", store + center),
+        ("Host登録", protocol + ipc_request + ipc_response),
+        ("Host一覧", protocol + ipc_request + ipc_response),
+        ("Host登録公開投影", owner_cli),
+        ("Host登録設定に禁止fieldがある", owner_cli),
+    ):
+        if token not in source:
+            不整合.append(f"C17 Host registry実装に統治境界tokenがない: {token}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5746,6 +5838,7 @@ def main() -> int:
         A2A外部概念射影の契約と境界を検査する,
         MCP接続センターの統治経路と境界を検査する,
         A2A接続センターの統治経路と境界を検査する,
+        複数Host_registryの統治経路と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

@@ -15,6 +15,7 @@ const MAX_EVALUATION_DATASET_BYTES: u64 = 48 * 1024;
 const MAX_CREDENTIAL_REGISTRATION_BYTES: u64 = 64 * 1024;
 const MAX_MCP_CONNECTION_BYTES: u64 = 64 * 1024;
 const MAX_A2A_CONNECTION_BYTES: u64 = 64 * 1024;
+const MAX_HOST_REGISTRATION_BYTES: u64 = 64 * 1024;
 
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
@@ -176,6 +177,73 @@ pub fn A2A接続(args: &[String]) -> Result<(), String> {
         serde_json::to_string_pretty(&receipt).map_err(|_| "A2A接続公開receiptの表示に失敗")?
     );
     Ok(())
+}
+
+/// ownerが明示したHost metadataだけをBrokerへ渡す。identity実値・権限・秘密値は表示しない。
+pub fn Host登録(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
+        return Err("使用法: Host登録 --session-file <owner資格file> 登録 <Host登録JSONファイル>".into());
+    }
+    let payload = Host登録設定読取(&args[3])?;
+    let body = owner操作送信(&args[1], "Host登録", payload)?;
+    let receipt = Host登録公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "Host登録receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn Host登録公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "Host登録receiptの形式が不正".to_string())?;
+    if Host登録公開receiptに禁止fieldがある(body) {
+        return Err("Host登録receiptへidentity実値・権限・秘密値が混入している".into());
+    }
+    let required = [
+        "版", "Host ID", "表示名", "Platform", "接続状態", "Trust", "証明書/identity",
+        "Runtime summary", "最終接続", "公開範囲", "証拠種別", "権限生成", "authority_strip",
+        "能力ID", "権限ID", "承認状態", "復旧ID", "登録監査ID",
+    ];
+    if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("Host登録receiptの形式が不正".into());
+    }
+    if object.get("権限生成").and_then(Value::as_str) != Some("なし")
+        || object.get("authority_strip").and_then(Value::as_bool) != Some(true)
+        || object.get("公開範囲").and_then(Value::as_str) != Some("metadata_only")
+        || object.get("接続状態").and_then(Value::as_str) != Some("pending_review")
+    {
+        return Err("Host登録receiptのAuthority境界が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn Host登録公開receiptに禁止fieldがある(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "authority"
+                        | "authority_id"
+                        | "permission_id"
+                        | "approval_id"
+                        | "capability_grant"
+                        | "secret"
+                        | "secret_value"
+                        | "token"
+                        | "password"
+                        | "credential_value"
+                        | "certificate"
+                        | "private_key"
+                        | "identity_value"
+                )
+            }) || object.values().any(Host登録公開receiptに禁止fieldがある)
+        }
+        Value::Array(values) => values.iter().any(Host登録公開receiptに禁止fieldがある),
+        _ => false,
+    }
 }
 
 fn A2A接続公開投影(body: &Value) -> Result<Value, String> {
@@ -418,6 +486,60 @@ fn A2A接続設定に禁止fieldがある(value: &Value) -> bool {
             }) || object.values().any(A2A接続設定に禁止fieldがある)
         }
         Value::Array(values) => values.iter().any(A2A接続設定に禁止fieldがある),
+        _ => false,
+    }
+}
+
+fn Host登録設定読取(path: &str) -> Result<Value, String> {
+    let file = std::fs::File::open(path).map_err(|_| "Host登録設定fileを開けない")?;
+    let size = file
+        .metadata()
+        .map_err(|_| "Host登録設定fileの大きさを確認できない")?
+        .len();
+    if size > MAX_HOST_REGISTRATION_BYTES {
+        return Err("Host登録設定fileが64KiB上限を超過".into());
+    }
+    let mut raw = Vec::with_capacity(size as usize);
+    file.take(MAX_HOST_REGISTRATION_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| "Host登録設定fileを読めない")?;
+    if raw.len() as u64 > MAX_HOST_REGISTRATION_BYTES {
+        return Err("Host登録設定fileが64KiB上限を超過".into());
+    }
+    let payload: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "Host登録設定fileのJSON形式が不正")?;
+    if !payload.is_object() {
+        return Err("Host登録設定fileはJSON objectでなければならない".into());
+    }
+    if Host登録設定に禁止fieldがある(&payload) {
+        return Err("Host登録設定fileへidentity実値・権限・秘密値を含められない".into());
+    }
+    Ok(payload)
+}
+
+fn Host登録設定に禁止fieldがある(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "authority"
+                        | "authority_id"
+                        | "permission_id"
+                        | "approval_id"
+                        | "capability_grant"
+                        | "secret"
+                        | "secret_value"
+                        | "token"
+                        | "password"
+                        | "credential_value"
+                        | "certificate"
+                        | "private_key"
+                        | "identity_value"
+                )
+            }) || object.values().any(Host登録設定に禁止fieldがある)
+        }
+        Value::Array(values) => values.iter().any(Host登録設定に禁止fieldがある),
         _ => false,
     }
 }

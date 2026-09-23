@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "操作": "登録",
+  "Host ID": "host-windows-dev",
+  "表示名": "開発Host",
+  "Platform": "windows",
+  "接続状態": "pending_review",
+  "Trust": "pending_review",
+  "証明書/identity": {
+    "種別": "certificate_hash",
+    "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "Runtime summary": { "runtime_count": 0, "agent_count": 0, "evidence_source": "INTERNAL_STATE" },
+  "最終接続": null,
+  "permission_id": "permission.other-host"
+}
