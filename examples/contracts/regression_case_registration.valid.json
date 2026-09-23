@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "公開表示名": "Codex基本対話回帰",
+  "入力方式": "owner_explicit_redacted",
+  "入力": {
+    "内容表示範囲": "full",
+    "本文": "作業状態を要約してください"
+  },
+  "必要条件": ["結果に状態が含まれる"],
+  "禁止条件": ["秘密値を出力しない"],
+  "期待状態": "成功",
+  "必要参照": ["reference-runtime"],
+  "期待経路": "codex-cli"
+}

@@ -52,7 +52,7 @@ Comparisonは同一DatasetIDかつ同一Dataset定義hashを参照する一つ�
 
 Flutterは公開projectionの表示、対象Runtimeの選択、実験の開始・進行・比較表示だけを担い、ownerのprivate Dataset登録、Evaluator実行、Authority判定、Permission、Approval、Audit、release/security判断を所有しない。C5は通常IPCの`評価Dataset一覧`、`評価実験開始`、`評価実験状態`、`評価比較`と、owner controlの`評価Dataset登録`を接続する。Rust/Brokerは各Case/Runtimeを既存の対話承認経路へ接続するが、Flutterや評価器へ権限を移さない。
 
-C6の対話からRegression Caseを自動または手動登録する機構は本scope外である。対話履歴、cache、previous state、LLM出力、Adapter metadataからCaseを生成・昇格することは、このC5 contractでは許可しない。将来C6で必要になる場合は、owner登録、private storage、Audit、review、別revision生成を持つ独立したcontractとして定義する。
+C6の対話からRegression Caseを自動または手動登録する機構は、このC5 contractのscope外である。対話履歴、cache、previous state、LLM出力、Adapter metadataからCaseを生成・昇格することはC5では許可しない。C6は`docs/specs/regression-case.md`のowner登録、private storage、Audit、結果証跡照合を持つ独立contractとして扱い、C5 Dataset revisionへ自動追加しない。
 
 ## 6. Contractと検査
 

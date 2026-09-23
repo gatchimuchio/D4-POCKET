@@ -157,11 +157,15 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "責任": "実行系対話要求・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点"
+      "責任": "実行系対話要求・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点。C6回帰Caseは独立contractへ接続"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
       "責任": "C5評価ラボのDataset revision、決定論評価、既存対話統治、公開projection、監査相関、比較可能性の日本語意味"
+    },
+    {
+      "path": "docs/specs/regression-case.md",
+      "責任": "C6回帰Caseのowner登録、対話結果証跡結合、private保管、公開receipt、C5との独立境界"
     },
     {
       "path": "docs/specs/device-link.md",

@@ -76,6 +76,8 @@ REQUIRED_SCHEMA_NAMES = {
     "evaluation_case",
     "evaluation_evaluator",
     "evaluation_dataset_registration",
+    "regression_case_registration",
+    "regression_case_receipt",
     "evaluation_experiment",
     "evaluation_result",
     "evaluation_comparison",
@@ -143,6 +145,7 @@ BROKER_REQUIRED_SOURCES = {
     "mod.rs",
     "protocol.rs",
     "audit.rs",
+    "regression_case.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -3463,6 +3466,88 @@ def 評価ラボの契約と境界を検査する() -> list[str]:
     return 不整合
 
 
+def 回帰Caseの契約と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "regression-case.md"
+    if not specification.exists():
+        return ["C6回帰Caseの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C6回帰Caseの日本語意味正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/regression-case.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C6回帰Caseの日本語意味正本が正本索引へ登録されていない")
+    for token in (
+        "owner",
+        "private",
+        "ProtectedStore::Purpose::Regression",
+        "hash_only",
+        "要求hash",
+        "結果証跡",
+        "終了監査ID",
+        "秘密",
+        "C5",
+        "Approval",
+        "Audit",
+        "RecoveryAction",
+        "normal IPC",
+        "自動コピー",
+    ):
+        if token not in specification_text:
+            不整合.append(f"C6回帰Case仕様に必須境界がない: {token}")
+
+    registration = load_contract_fixture("regression_case_registration.valid.json")
+    receipt = load_contract_fixture("regression_case_receipt.valid.json")
+    registration_schema = load_schema("regression_case_registration.schema.json")
+    receipt_schema = load_schema("regression_case_receipt.schema.json")
+    for name, value, schema in (
+        ("registration", registration, registration_schema),
+        ("receipt", receipt, receipt_schema),
+    ):
+        failures = validate_instance(value, schema)
+        if failures:
+            不整合.extend(f"C6 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+
+    if any(key in registration for key in ("permission_id", "approval_id", "authority", "credential")):
+        不整合.append("C6登録payloadへ権限fieldが混入している")
+    if any(key in receipt for key in ("入力", "本文", "必要条件", "禁止条件", "必要参照", "期待経路")):
+        不整合.append("C6公開receiptへprivate本文が混入している")
+
+    auto_copy = copy.deepcopy(registration)
+    auto_copy["入力方式"] = "auto_from_dialogue"
+    if not validate_instance(auto_copy, registration_schema):
+        不整合.append("C6が対話自動コピー方式をschemaで拒否しない")
+    authority = copy.deepcopy(registration)
+    authority["approval_id"] = "owner-injected"
+    if not validate_instance(authority, registration_schema):
+        不整合.append("C6登録payloadのapproval_id混入を拒否しない")
+    raw_receipt = copy.deepcopy(receipt)
+    raw_receipt["入力"] = {"本文": "公開してはならない"}
+    if not validate_instance(raw_receipt, receipt_schema):
+        不整合.append("C6公開receiptのraw入力混入を拒否しない")
+
+    rust = (RUST_HELPER / "src" / "broker" / "regression_case.rs").read_text(encoding="utf-8")
+    dialogue = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
+    protected = (RUST_HELPER / "src" / "protected_store.rs").read_text(encoding="utf-8")
+    for token, source in (
+        ("Purpose::Regression", rust),
+        ("回帰Case情報", rust + dialogue),
+        ("保存済み結果証跡", rust + dialogue),
+        ("終了監査ID", rust + dialogue),
+        ("hash_only", rust),
+        ("秘密候補入力", rust),
+        ("Regression", protected),
+    ):
+        if token not in source:
+            不整合.append(f"C6実装に統治境界tokenがない: {token}")
+    if "Purpose::Evaluation" in rust:
+        不整合.append("C6がC5 Evaluation purposeへ混入している")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5054,6 +5139,7 @@ def main() -> int:
         端末契約の構造と禁止操作を検査する,
         二実行系比較の非混線を検査する,
         評価ラボの契約と境界を検査する,
+        回帰Caseの契約と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

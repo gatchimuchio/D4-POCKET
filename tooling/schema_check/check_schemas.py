@@ -45,6 +45,8 @@ REQUIRED = {
     "evaluation_case.schema.json",
     "evaluation_evaluator.schema.json",
     "evaluation_dataset_registration.schema.json",
+    "regression_case_registration.schema.json",
+    "regression_case_receipt.schema.json",
     "evaluation_experiment.schema.json",
     "evaluation_result.schema.json",
     "evaluation_public_result.schema.json",

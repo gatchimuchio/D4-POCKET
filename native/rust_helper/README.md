@@ -42,6 +42,7 @@ cargo build --manifest-path native/rust_helper/Cargo.toml
 native/rust_helper/target/debug/gui_shell_rust_helper.exe broker-server --store-dir C:/local/gui-shell/store --session-file C:/local/gui-shell/ui.json --owner-session-file C:/local/gui-shell/owner.json --minidora-runtime local=127.0.0.1:8080
 native/rust_helper/target/debug/gui_shell_rust_helper.exe 対話承認操作 --session-file C:/local/gui-shell/owner.json 一覧
 native/rust_helper/target/debug/gui_shell_rust_helper.exe 対話承認操作 --session-file C:/local/gui-shell/owner.json 承認 <要求ID> <要求hash> full
+native/rust_helper/target/debug/gui_shell_rust_helper.exe 回帰Case登録 --session-file C:/local/gui-shell/owner.json 登録 C:/local/gui-shell/regression-case.json
 ```
 
 資格fileの親directoryはownerが事前に用意する。資格fileをGitへ追加しない。MINIDORAは別processで起動し、GUI Shellが勝手に起動・変更・配布しない。複数登録は `--minidora-runtime` を実行系ごとに指定する。登録だけでは通信しない。
@@ -62,5 +63,9 @@ native/rust_helper/target/debug/gui_shell_rust_helper.exe broker-server `
 Codexの応答はJSONLの `thread.started`、`item.completed` の `agent_message`、`turn.completed` を検証してから、既存の `実行系挙`、`対話開始`、`対話送信`、`対話取得`、`対話中止`、`対話終了` とowner承認・監査経路へ接続する。`turn.failed`、不正JSON、出力上限超過、取消、期限超過は成功へ昇格しない。この登録はCodexの実物interfaceと読み取り専用のAgent Launcher基盤を提供するが、write-capable Agent、MCP、複数Agent比較、Handoff、製品releaseを成立させない。
 
 `--codex-runtime` の値は `ID=絶対executable path=絶対workspace path` であり、executable path内の `=` は未対応である（workspace pathの残りは3番目のfieldとして扱う）。Claude、Gemini、その他Vendorの実装は、実物interfaceを確認するまで追加しない。
+
+### C6 回帰Caseのowner登録
+
+`回帰Case登録` はowner資格fileからだけ実行し、`specs/regression_case_registration.schema.json`に従うJSON fileを受け取る。Brokerは完了済み通常対話の要求ID/hash、全文表示承認、結果証跡、終了監査IDを再照合する。元の対話入力・応答本文を自動コピーせず、ownerが`owner_explicit_redacted`として明示した定義だけを`ProtectedStore::Purpose::Regression`へ暗号化する。CLI出力は`regression_case_receipt.schema.json`のhash-only receiptに限定され、private本文・条件・参照・期待経路を表示しない。
 
 開発検証は `cargo test --manifest-path native/rust_helper/Cargo.toml`。実物参照版との統合は `python tooling/minidora_live_check.py --reference <MINIDORA参照clone>`。このPythonは試験用process管理であり、製品依存ではない。固定commitとclean状態を検査し、基本会話・保留・失敗分離・資格拒否・監査chain再読取を実行する。外部検索や基礎Coreの能力を保証する試験ではない。

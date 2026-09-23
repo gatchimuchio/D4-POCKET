@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_registration.schema.json",
+  "title": "回帰Case owner登録payload",
+  "description": "完了済み対話の要求ID/hashとBroker内結果証跡をowner control経路で照合し、ownerが明示したサニタイズ済み回帰定義だけをprivate保管する。元の対話入力・応答本文は自動コピーせず、payloadの固定fieldは権限を生成しない。",
+  "type": "object",
+  "required": [
+    "版",
+    "要求ID",
+    "要求hash",
+    "公開表示名",
+    "入力方式",
+    "入力",
+    "必要条件",
+    "禁止条件",
+    "期待状態",
+    "必要参照",
+    "期待経路"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "要求ID": { "$ref": "#/$defs/id" },
+    "要求hash": { "$ref": "#/$defs/hash" },
+    "公開表示名": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "入力方式": { "const": "owner_explicit_redacted" },
+    "入力": {
+      "type": "object",
+      "required": ["内容表示範囲", "本文"],
+      "additionalProperties": false,
+      "properties": {
+        "内容表示範囲": { "const": "full" },
+        "本文": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "必要条件": { "$ref": "#/$defs/condition_list" },
+    "禁止条件": { "$ref": "#/$defs/condition_list" },
+    "期待状態": { "type": "string", "enum": ["成功", "保留"] },
+    "必要参照": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+    },
+    "期待経路": { "type": "string", "minLength": 1, "maxLength": 256 }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "condition_list": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    }
+  }
+}

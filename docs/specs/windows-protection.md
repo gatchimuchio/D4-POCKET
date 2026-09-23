@@ -1,6 +1,6 @@
 # Windows保護bytes境界
 
-C2内容履歴とC7資格保管が共有するOS接続の前提単位。WindowsのDPAPI CurrentUserだけを使い、用途contextを追加entropyへ結合する。保管file・Permission・Approval・Audit・Recovery・IPC・UIを所有せず、呼出しだけでそれらの権限を発生させない。製品の保管/閲覧接続は未完了のrelease_blocker。
+C2内容履歴、C5評価Dataset、C6回帰Case、C7資格保管が共有するOS接続の前提単位。WindowsのDPAPI CurrentUserだけを使い、用途contextを追加entropyへ結合する。保管file・Permission・Approval・Audit・Recovery・IPC・UIを所有せず、呼出しだけでそれらの権限を発生させない。製品の保管/閲覧接続は未完了のrelease_blocker。
 
 平文は1～65536bytes、暗号文は1～131072bytes、用途は1～1024bytes。用途には呼出し側がGUI-Shell用途・対象識別子・版を正本化して与える。外部入力だけから用途を決定してはならない。入力と出力の長さ、成功時null、OS失敗を検査する。エラーは分類とOS数値だけで、内容を出力しない。独自暗号は使わない。
 
@@ -21,7 +21,7 @@ Rust helperのWindows integration testから実APIを呼ぶ。合成dataだけ�
 
 ## 不変の暗号文保管
 
-protected_storeは呼出し側が検証・許可したdirectory handleを受け取り、1階層の固定filenameだけを使用する。用途はhistory/credentialのenum、対象IDは32桁の小文字hexに限定し、用途とIDとformat版をDPAPI entropyへ結合する。filenameやhashは権限源ではない。作成はcreate_newだけで既存対象を上書きせず、暗号化後のbytesだけを書きsyncする。保存失敗で残った部分fileは再使用せず、呼出し側のRecovery対象とする。
+protected_storeは呼出し側が検証・許可したdirectory handleを受け取り、1階層の固定filenameだけを使用する。用途はhistory/credential/evaluation/regressionのenum、対象IDは32桁の小文字hexに限定し、用途とIDとformat版をDPAPI entropyへ結合する。filenameやhashは権限源ではない。作成はcreate_newだけで既存対象を上書きせず、暗号化後のbytesだけを書きsyncする。保存失敗で残った部分fileは再使用せず、呼出し側のRecovery対象とする。
 
 読取はsymlinkを追わず、reparse point・複数hardlinkを拒否し、通常fileとサイズ上限を確認し、暗号文hashを呼出し側の検証済み監査参照と照合した後に復号する。hash参照を未検証UI dataから信頼してはならない。返却は平文の所有型であり、UI投影や権限の復元を行わない。root handle取得時の許可とlink検証、現在Approval、Audit確定前の公開停止、削除とRecoveryはBrokerの接続単位で必要であり、未接続のrelease_blocker。保管API自体を公開IPCへ追加しない。
 

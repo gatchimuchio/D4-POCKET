@@ -36,6 +36,9 @@ fn 暗号文保存と再読取と目的間転用拒否を実fileで確認する(
     let evaluation = root.join(format!("evaluation-{id}.dpapi"));
     std::fs::copy(&source, &evaluation).unwrap();
     assert!(store.read(Purpose::Evaluation, &id, &hash).is_err());
+    let regression = root.join(format!("regression-{id}.dpapi"));
+    std::fs::copy(&source, &regression).unwrap();
+    assert!(store.read(Purpose::Regression, &id, &hash).is_err());
     let alias = root.join("alias");
     std::fs::hard_link(&source, &alias).unwrap();
     assert!(store.read(Purpose::History, &id, &hash).is_err());
@@ -56,14 +59,14 @@ fn 暗号文保存と再読取と目的間転用拒否を実fileで確認する(
     std::fs::write(&source, b"corrupt").unwrap();
     assert!(store.read(Purpose::History, &id, &hash).is_err());
     drop(store);
-    for path in [&source, &copied, &different, &evaluation] {
+    for path in [&source, &copied, &different, &evaluation, &regression] {
         std::fs::remove_file(path).unwrap();
     }
     std::fs::remove_dir(&root).unwrap();
 }
 
 #[test]
-fn evaluationは固有の暗号文とentropyを使い全目的間の転用を拒否する() {
+fn 全private用途は固有の暗号文とentropyを使い目的間の転用を拒否する() {
     let mut random = [0u8; 16];
     getrandom::getrandom(&mut random).unwrap();
     let root = std::env::temp_dir().join(format!("gui-shell-evaluation-{}", hex::encode(random)));
@@ -74,6 +77,7 @@ fn evaluationは固有の暗号文とentropyを使い全目的間の転用を拒
         (Purpose::History, "history", "a".repeat(32)),
         (Purpose::Credential, "credential", "b".repeat(32)),
         (Purpose::Evaluation, "evaluation", "c".repeat(32)),
+        (Purpose::Regression, "regression", "d".repeat(32)),
     ];
     let mut hashes = Vec::with_capacity(sources.len());
 
@@ -100,6 +104,12 @@ fn evaluationは固有の暗号文とentropyを使い全目的間の転用を拒
         "40000000000000000000000000000000",
         "50000000000000000000000000000000",
         "60000000000000000000000000000000",
+        "70000000000000000000000000000000",
+        "80000000000000000000000000000000",
+        "90000000000000000000000000000000",
+        "a00000000000000000000000000000",
+        "b00000000000000000000000000000",
+        "c00000000000000000000000000000",
     ];
     let mut copy_index = 0;
     for (source_index, (_, source_prefix, source_id)) in sources.iter().enumerate() {

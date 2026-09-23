@@ -83,7 +83,7 @@ ownerの継続指示に基づき、既存外部承認系を前提にしない専
 
 `対話送信` は不変の要求を待ち行列に作るだけで、ネットワークを呼ばない。`対話承認` はowner専用、要求hash一致・作成から300秒以内・未使用・実行系結合・永続監査成功を全て満たす場合だけAdapterを一度呼ぶ。Capabilityは対話送信、Permissionは当該実行系の固定接続先、Approvalは当該要求hashへのowner操作、AuditEventは送信前・完了・取消の記録、RecoveryActionは契約の失敗分類に対応する。結果は非同期に `対話取得` で受け取る。`対話中止` は未送信なら送信を防止し、送信後なら採用を止めてセッションを隔離する。
 
-操作のSchemaは `runtime_dialogue_operation.schema.json`。通常操作は実行系列挙、対話開始、対話送信、対話取得、対話中止、対話終了。owner専用操作は対話承認待ち、対話承認、対話履歴一覧。通常要求のfieldやmetadataからowner roleを選ばせない。起動毎に資格とセッションを更新し、古い資格・nonce・承認を再利用しない。pending要求は再起動で復元せず、再送は操作者が判断する。
+操作のSchemaは `runtime_dialogue_operation.schema.json`。通常操作は実行系列挙、対話開始、対話送信、対話取得、対話中止、対話終了。owner専用操作は対話承認待ち、対話承認、対話履歴一覧。通常要求のfieldやmetadataからowner roleを選ばせない。起動毎に資格とセッションを更新し、古い資格・nonce・承認を再利用しない。pending要求は再起動で復元せず、再送は操作者が判断する。完了済み対話の回帰Case登録はこの対話操作Schemaへ追加せず、`docs/specs/regression-case.md`の独立owner contractで要求ID/hash、結果証跡、private保管を再照合する。
 
 owner資格はローカルOS利用者の保管責任を伴う。Unixでは0600で生成する。現行Windowsは既存brokerと同じ利用者境界であり、同一利用者の任意processがファイルを読める環境に対する隔離保証や管理者耐性は主張しない。OS保護とinstalled-path証拠は引き続きrelease_blocker。制御資格による認証と、人間本人が操作したことの証明を同一視しない。
 

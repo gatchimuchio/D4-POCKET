@@ -10,6 +10,7 @@ pub enum Purpose {
     History,
     Credential,
     Evaluation,
+    Regression,
 }
 impl Purpose {
     fn label(self) -> &'static str {
@@ -17,6 +18,7 @@ impl Purpose {
             Self::History => "history",
             Self::Credential => "credential",
             Self::Evaluation => "evaluation",
+            Self::Regression => "regression",
         }
     }
 }

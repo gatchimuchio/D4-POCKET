@@ -13,6 +13,8 @@ rev2 Phase 2のHost Capabilityを、既存のGUI-Shell契約とRust Broker経路
 
 Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`をBroker登録時にも確認するRust Adapterを追加した。ownerが絶対executableとworkspaceを明示した場合だけ、既存の実行系対話・owner承認経路から固定read-only JSONL実行を行い、Windowsの実Broker通常IPCで`codex`実行系列挙まで確認した。Broker command dispatchは停止中のままであり、任意command、write-capable Agent、MCP、複数Agent比較、Handoffは追加していない。Claude／Gemini等の未導入Agentは存在を推測しない。これはAgent Launcher基盤の現行限定実装であり、製品releaseや全Agent機能の完成を意味しない。
 
+続くC6単位では、`docs/specs/regression-case.md`を正本とするowner専用の`回帰Case登録`を追加する。Brokerは完了済み通常対話の要求ID/hash、全文表示、結果証跡、終了監査を照合し、owner明示のredacted定義をC5と別purposeのWindows ProtectedStoreへ保存する。元の対話本文の自動コピー、normal IPCへのraw本文返却、C5 Datasetへの自動importは行わない。GUI登録面、Case一覧、削除Recovery、Windows実機owner登録証拠は後続作業としてrelease_blockerに保持する。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

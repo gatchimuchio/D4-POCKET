@@ -180,6 +180,18 @@ pub(crate) struct 評価対話進捗 {
     pub 単調応答Millis: Option<u64>,
 }
 
+/// C6が対話制御から受け取る、結果本文を含まない内部射影。
+/// 要求hash、結果証跡、終了監査の相関だけをBroker内の独立登録経路へ渡す。
+pub(crate) struct 回帰Case情報 {
+    pub 要求ID: String,
+    pub 要求hash: String,
+    pub 実行系ID: String,
+    pub 対話セッションID: String,
+    pub 結果状態: String,
+    pub 応答hash: String,
+    pub 終了監査ID: String,
+}
+
 #[derive(Default)]
 pub struct 対話制御 {
     実行系: BTreeMap<String, Arc<dyn 実行系Adapter>>,
@@ -285,6 +297,41 @@ impl 対話制御 {
         Ok(json!({"版":1,"要求":work.要求,"要求hash":work.要求hash,
             "結果":表示射影(work, work.結果.as_ref().ok_or(対話失敗::要求不正)?),
             "実行記録":実行記録(work),"結果証跡":結果証跡(work).ok_or(対話失敗::要求不正)?}))
+    }
+
+    /// C6のowner登録だけが消費する。元の入力・応答本文を返さず、現在の
+    /// request/hashと永続化済み結果証跡の一致だけを証明する。
+    pub(crate) fn 回帰Case情報(
+        &self,
+        request_id: &str,
+        request_hash: &str,
+    ) -> Result<回帰Case情報, 対話失敗> {
+        let work = self.作業.get(request_id).ok_or(対話失敗::要求不正)?;
+        if work.評価隔離
+            || work.要求hash != request_hash
+            || work.状態 != "完了"
+            || work.表示範囲 != "full"
+            || !work.保存済み結果証跡
+            || work.終了監査ID.is_none()
+        {
+            return Err(対話失敗::権限拒否);
+        }
+        let result = work
+            .結果
+            .as_ref()
+            .ok_or(対話失敗::要求不正)?
+            .as_ref()
+            .map_err(|_| 対話失敗::要求不正)?;
+        let 結果状態 = if result.保留 { "保留" } else { "成功" };
+        Ok(回帰Case情報 {
+            要求ID: work.要求.要求ID.clone(),
+            要求hash: work.要求hash.clone(),
+            実行系ID: work.要求.実行系ID.clone(),
+            対話セッションID: work.要求.対話セッションID.clone(),
+            結果状態: 結果状態.to_string(),
+            応答hash: sha256_tagged(&result.生応答),
+            終了監査ID: work.終了監査ID.clone().ok_or(対話失敗::要求不正)?,
+        })
     }
 
     pub(crate) fn 登録済み(&self, id: &str) -> bool {
@@ -1436,6 +1483,32 @@ mod tests {
             c.資格隔離(&[session]);
             assert!(c.保存対象(&select).is_err());
         }
+    }
+
+    #[test]
+    fn 回帰Case情報は完了した全文結果のhashと監査だけを返す() {
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let pending = 要求(&mut c, &session);
+        assert!(c
+            .回帰Case情報(pending["要求ID"].as_str().unwrap(), pending["要求hash"].as_str().unwrap())
+            .is_err());
+        操作(&mut c, "対話承認", 承認(&pending, "full"), true).unwrap();
+        完了(&mut c, &pending);
+        let source = c
+            .回帰Case情報(
+                pending["要求ID"].as_str().unwrap(),
+                pending["要求hash"].as_str().unwrap(),
+            )
+            .unwrap();
+        assert_eq!(source.要求ID, pending["要求ID"].as_str().unwrap());
+        assert_eq!(source.要求hash, pending["要求hash"].as_str().unwrap());
+        assert_eq!(source.結果状態, "成功");
+        assert!(source.応答hash.starts_with("sha256:"));
+        assert!(!source.終了監査ID.is_empty());
+        assert!(c
+            .回帰Case情報(pending["要求ID"].as_str().unwrap(), &format!("{}x", pending["要求hash"]))
+            .is_err());
     }
     #[test]
     fn 結果証跡は表示範囲を保持し一度だけ保存する() {

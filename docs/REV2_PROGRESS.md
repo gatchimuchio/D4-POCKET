@@ -11,6 +11,15 @@ Windowsで確認した実物Codex CLIを、Rust Brokerの明示起動設定か�
 - Evidence boundary: Codex CLIのread-only JSONL応答`READY`は、独立したephemeral／read-only smokeで実物interfaceを確認したもの。Broker登録と実行系列挙はLIVE_RUNTIMEの実Broker証拠である。静的conformanceはsource boundaryを検査するが、write-capable Agent、MCP、複数Agent比較、Handoff、長時間運用、installed productを証明しない。
 - 未成立分類: write-capable Agent execution、実taskのProduct UI完結、MCP／A2A、複数Agent比較／Handoff、Usage／Cost、Claude／Gemini接続は`release_blocker`。Codex Adapterのread-only限定、`--codex-runtime` executable path内の`=`未対応、未導入Vendorは`known_limitation`として保持する。
 
+## D4 Pocket C6: 対話結果からの回帰Case owner登録（2026-09-23）
+
+C5の評価Datasetと混ぜず、完了済み通常対話をownerが明示的に回帰Caseへ登録する独立Contractを追加した。Rust Brokerは要求ID/hash、`表示範囲=full`、永続結果証跡、終了監査ID、結果状態を現在の対話制御で再照合する。元の対話入力・応答本文は自動コピーせず、ownerのredacted定義を`ProtectedStore::Purpose::Regression`へ暗号化し、CLIにはhash-only receiptだけを返す。
+
+- Contract: `regression_case_registration.schema.json`、`regression_case_receipt.schema.json`、正常例、権限field混入とraw receipt混入の負例、`docs/specs/regression-case.md`を追加した。C5の`Purpose::Evaluation`とは保管purposeを分離した。
+- Production path: `回帰Case登録`はowner資格経路からBrokerへ入り、現行対話証跡と明示定義を結合してAudit確定する。通常IPC、履歴、Profile、MCP metadata、Agent metadataは登録資格または権限を生成しない。
+- Validation: `python tooling/schema_check/check_schemas.py` はSchema 71件／正常例71件／負例86件、`python tooling/conformance_tests/run_conformance_skeleton.py` はConformance 162 checks、`python tooling/日本語基底監査.py --strict`、Rust全試験（lib 173件、main 4件、統合35件、合計212件）、`python tooling/validate_all.py --python-only --desktop-platform windows`、manifest、release gate、packaging portabilityをPASSした。Windows ProtectedStoreのRegression purpose分離試験もPASSした。Flutter解析・UI試験はFlutter変更がないため未実行であり、Windows installed productの実機証拠は別のrelease blockerとして保持する。
+- 未成立分類: GUIのprivate登録画面、Case一覧、削除Recovery、C5 Dataset revisionへの明示import、Windows実機でのowner登録証拠は`release_blocker`。known marker拒否は秘密不存在の証明ではなく、owner redaction責任を置き換えないため`known_limitation`として保持する。
+
 ## D4 Pocket Phase 4前提: Codex CLI実物interface probe（2026-09-23）
 
 Phase 4 Agent Launcherの前提確認として、Windowsで実際にPATHへ存在するCodex CLIのinterfaceをdevelopment-only probeから読み取り専用で確認した。`codex --version`は`codex-cli 0.155.0-alpha.16`、`codex exec --help`は`exec`、`resume`、`fork`、`review`等のsurfaceを返した。probeはversion/help以外を呼ばず、prompt、credential、workspace変更、task実行、process dispatchを行わない。

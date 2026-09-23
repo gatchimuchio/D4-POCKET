@@ -1,4 +1,6 @@
 //! owner自身が端末から明示実行する制御面。通常UIはこの資格fileを読まない。
+#![allow(non_snake_case)]
+
 use gui_shell_rust_helper::audit_hash::sha256_tagged;
 use gui_shell_rust_helper::broker::dialogue::識別子生成;
 use gui_shell_rust_helper::broker::{
@@ -108,6 +110,42 @@ pub fn 評価データセット登録(args: &[String]) -> Result<(), String> {
         serde_json::to_string_pretty(&manifest).map_err(|_| "評価Dataset公開manifestの表示に失敗")?
     );
     Ok(())
+}
+
+/// ownerが明示したredacted定義だけをC6の独立Broker経路へ渡す。
+/// Brokerの公開receipt以外（入力本文・条件・参照）は表示しない。
+pub fn 回帰Case登録(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
+        return Err("使用法: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>".into());
+    }
+    let payload = 評価データセット読取(&args[3])?;
+    let body = owner操作送信(&args[1], "回帰Case登録", payload)?;
+    let receipt = 回帰Case公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "回帰Case公開receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn 回帰Case公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "回帰Case公開receiptの形式が不正".to_string())?;
+    let forbidden = ["入力", "必要条件", "禁止条件", "必要参照", "期待経路", "本文"];
+    if forbidden.iter().any(|key| object.contains_key(*key)) {
+        return Err("回帰Case公開receiptにprivate本文が含まれている".into());
+    }
+    let required = [
+        "版", "回帰CaseID", "定義hash", "非公開保管ID", "暗号文hash", "公開表示名",
+        "要求ID", "要求hash", "実行系ID", "結果状態", "応答hash", "終了監査ID",
+        "公開範囲", "必要条件数", "禁止条件数", "必要参照数", "作成時刻UnixMillis",
+        "作成監査ID", "証拠種別",
+    ];
+    if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("回帰Case公開receiptの形式が不正".into());
+    }
+    Ok(body.clone())
 }
 
 fn 評価データセット読取(path: &str) -> Result<Value, String> {
@@ -403,5 +441,34 @@ mod tests {
         let mut unsafe_body = body;
         unsafe_body["入力"] = json!("private-dataset-sentinel");
         assert!(評価データセット公開投影(&unsafe_body).is_err());
+    }
+
+    #[test]
+    fn 回帰Case公開receiptはprivate本文を除外する() {
+        let body = json!({
+            "版": 1,
+            "回帰CaseID": "a".repeat(32),
+            "定義hash": format!("sha256:{}", "b".repeat(64)),
+            "非公開保管ID": "a".repeat(32),
+            "暗号文hash": format!("sha256:{}", "c".repeat(64)),
+            "公開表示名": "表示名",
+            "要求ID": "d".repeat(32),
+            "要求hash": format!("sha256:{}", "e".repeat(64)),
+            "実行系ID": "codex",
+            "結果状態": "成功",
+            "応答hash": format!("sha256:{}", "f".repeat(64)),
+            "終了監査ID": "audit-end",
+            "公開範囲": "hash_only",
+            "必要条件数": 0,
+            "禁止条件数": 0,
+            "必要参照数": 0,
+            "作成時刻UnixMillis": 1,
+            "作成監査ID": "audit-create",
+            "証拠種別": "INTERNAL_STATE"
+        });
+        assert_eq!(回帰Case公開投影(&body).expect("公開receiptを取得できる"), body);
+        let mut unsafe_body = body;
+        unsafe_body["入力"] = json!("private-regression-sentinel");
+        assert!(回帰Case公開投影(&unsafe_body).is_err());
     }
 }

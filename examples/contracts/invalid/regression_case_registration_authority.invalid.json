@@ -1,0 +1,14 @@
+{
+  "版": 1,
+  "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "公開表示名": "不正",
+  "入力方式": "owner_explicit_redacted",
+  "入力": { "内容表示範囲": "full", "本文": "安全な入力" },
+  "必要条件": [],
+  "禁止条件": [],
+  "期待状態": "成功",
+  "必要参照": [],
+  "期待経路": "codex-cli",
+  "permission_id": "permission.regression.register"
+}

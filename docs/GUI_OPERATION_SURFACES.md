@@ -73,6 +73,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。
   authority_boundary: Flutterはexecutable、workspace、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。実taskのwrite実行、MCP、複数Agent比較、Handoff、Claude／Gemini接続は未成立として扱う。
 
+- item: D4 Pocket Regression Case registration（C6 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: owner controlの`回帰Case登録`は、完了済み通常対話の要求ID/hash、表示範囲、永続結果証跡、終了監査IDをRust Broker内で再照合し、owner明示のredacted定義をWindows ProtectedStoreのRegression purposeへ暗号化して保存する。公開receiptはhash-onlyで、入力本文・条件・参照・期待経路を返さない。
+  authority_boundary: 登録payloadの入力方式、履歴、Profile、MCP metadata、Agent metadataは権限源ではない。元の対話本文を自動コピーせず、Known marker拒否は秘密不存在の証明ではない。Flutterのprivate登録画面、Case一覧、削除Recovery、C5への自動import、Windows実機登録証拠は未成立として扱う。
+
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
