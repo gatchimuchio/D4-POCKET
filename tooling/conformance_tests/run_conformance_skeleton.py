@@ -78,6 +78,7 @@ REQUIRED_SCHEMA_NAMES = {
     "evaluation_dataset_registration",
     "regression_case_registration",
     "regression_case_receipt",
+    "mcp_contract",
     "evaluation_experiment",
     "evaluation_result",
     "evaluation_comparison",
@@ -3628,6 +3629,74 @@ def 資格情報保管庫の契約と境界を検査する() -> list[str]:
     return 不整合
 
 
+def MCP外部概念射影の契約と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "mcp-contract.md"
+    if not specification.exists():
+        return ["C8 MCP外部概念射影の日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    required_tokens = (
+        "Server",
+        "Tool",
+        "Resource",
+        "Prompt",
+        "Transport",
+        "Credential ref",
+        "Trust",
+        "Capability diff",
+        "MCP metadata ≠ Authority",
+        "Tool description ≠ Permission",
+        "Trust ≠ Approval",
+        "Capability diff ≠ Permission grant",
+        "Credential ref ≠ Credential value",
+        "権限生成",
+        "metadata_only",
+        "release_blocker",
+    )
+    for token in required_tokens:
+        if token not in specification_text:
+            不整合.append(f"C8 MCP契約の日本語意味正本に必須境界がない: {token}")
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C8 MCP契約の日本語意味正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/mcp-contract.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C8 MCP契約の日本語意味正本が正本索引へ登録されていない")
+
+    schema = load_schema("mcp_contract.schema.json")
+    valid = load_contract_fixture("mcp_contract.valid.json")
+    failures = validate_instance(valid, schema)
+    if failures:
+        不整合.extend(f"C8 valid fixtureが拒否された: {failure}" for failure in failures)
+    if valid.get("権限生成") != "なし" or valid.get("公開範囲") != "metadata_only":
+        不整合.append("C8 valid fixtureがmetadata_onlyかつ権限生成なしではない")
+    if valid.get("Trust", {}).get("state") == "verified":
+        不整合.append("C8 valid fixtureがMCP metadataからverified Trustを主張している")
+    capability_diff = valid.get("Capability diff", {})
+    if capability_diff.get("status") in {"added", "changed", "removed"} and not capability_diff.get("requires_operator_review"):
+        不整合.append("C8 Capability diffの追加・変更・削除にoperator reviewが必要")
+    credential = valid.get("Credential ref", {})
+    if any(key in credential for key in ("secret", "secret_value", "token", "password", "credential_value")):
+        不整合.append("C8 Credential refへ実値が混入している")
+
+    invalid_names = (
+        "mcp_contract_tool_permission.invalid.json",
+        "mcp_contract_credential_secret.invalid.json",
+        "mcp_contract_authority.invalid.json",
+    )
+    for name in invalid_names:
+        try:
+            invalid = load_contract_fixture(f"invalid/{name}")
+        except (OSError, json.JSONDecodeError) as exc:
+            不整合.append(f"C8 {name}を読めない: {exc}")
+            continue
+        if not validate_instance(invalid, schema):
+            不整合.append(f"C8 {name}を受理している")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5221,6 +5290,7 @@ def main() -> int:
         評価ラボの契約と境界を検査する,
         回帰Caseの契約と境界を検査する,
         資格情報保管庫の契約と境界を検査する,
+        MCP外部概念射影の契約と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

@@ -1,0 +1,53 @@
+{
+  "版": 1,
+  "契約種別": "MCP外部概念射影",
+  "Server": {
+    "server_id": "mcp-example-server",
+    "表示名": "Example MCP Server",
+    "origin": "server_metadata",
+    "version": "2025-06-18",
+    "metadata_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "discovered"
+  },
+  "Transport": {
+    "kind": "stdio",
+    "status": { "status": "supported", "reason": "契約上のstdio射影を検査済み" },
+    "接続先hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reason": "接続先実値を契約へ保存しない"
+  },
+  "Tool": [
+    {
+      "tool_id": "tool-read-example",
+      "name": "read_example",
+      "description_summary": "Exampleの読み取り専用Tool",
+      "input_schema_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "risk": "read_only",
+      "status": { "status": "supported", "reason": "metadata射影のみ確認" }
+    }
+  ],
+  "Resource": [],
+  "Prompt": [],
+  "Credential ref": {
+    "credential_id": "11111111111111111111111111111111",
+    "purpose": "mcp_transport",
+    "target": "example-mcp-server",
+    "required": true,
+    "status": "missing"
+  },
+  "Trust": {
+    "state": "unverified",
+    "evidence_source": "LIVE_RUNTIME",
+    "reason": "Server metadataだけでは信頼を確定しない"
+  },
+  "Capability diff": {
+    "status": "added",
+    "added": ["tool.read_example"],
+    "removed": [],
+    "changed": [],
+    "requires_operator_review": true,
+    "evidence_source": "LIVE_RUNTIME"
+  },
+  "権限生成": "なし",
+  "公開範囲": "metadata_only",
+  "証拠種別": "LIVE_RUNTIME"
+}

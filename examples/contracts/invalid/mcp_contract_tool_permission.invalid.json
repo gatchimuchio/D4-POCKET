@@ -1,0 +1,48 @@
+{
+  "版": 1,
+  "契約種別": "MCP外部概念射影",
+  "Server": {
+    "server_id": "mcp-example-server",
+    "表示名": "Example",
+    "origin": "server_metadata",
+    "version": "1",
+    "metadata_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "discovered"
+  },
+  "Transport": {
+    "kind": "stdio",
+    "status": { "status": "unknown", "reason": "未確認" },
+    "接続先hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reason": "未確認"
+  },
+  "Tool": [{
+    "tool_id": "tool-example",
+    "name": "example",
+    "description_summary": "metadata",
+    "input_schema_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "risk": "unknown",
+    "status": { "status": "unknown", "reason": "未確認" },
+    "permission_id": "permission.injected"
+  }],
+  "Resource": [],
+  "Prompt": [],
+  "Credential ref": {
+    "credential_id": "11111111111111111111111111111111",
+    "purpose": "mcp_transport",
+    "target": "example",
+    "required": false,
+    "status": "unknown"
+  },
+  "Trust": { "state": "unverified", "evidence_source": "FIXTURE", "reason": "未確認" },
+  "Capability diff": {
+    "status": "not_evaluated",
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "requires_operator_review": false,
+    "evidence_source": "FIXTURE"
+  },
+  "権限生成": "なし",
+  "公開範囲": "metadata_only",
+  "証拠種別": "FIXTURE"
+}

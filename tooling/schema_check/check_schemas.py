@@ -50,6 +50,7 @@ REQUIRED = {
     "credential_registration.schema.json",
     "credential_receipt.schema.json",
     "credential_list.schema.json",
+    "mcp_contract.schema.json",
     "evaluation_experiment.schema.json",
     "evaluation_result.schema.json",
     "evaluation_public_result.schema.json",

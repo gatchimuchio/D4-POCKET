@@ -172,6 +172,10 @@
       "責任": "C7資格情報保管庫のowner登録、Windows DPAPI保管、公開metadata、秘密値非投影、未接続操作の境界"
     },
     {
+      "path": "docs/specs/mcp-contract.md",
+      "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diff射影と権限非生成境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

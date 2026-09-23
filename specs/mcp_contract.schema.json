@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_contract.schema.json",
+  "title": "MCP外部概念射影契約",
+  "description": "MCP Serverの外部metadataを観測可能な契約へ射影する。Server、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffを表すが、metadataからAuthority、Permission、Approvalを生成しない。",
+  "type": "object",
+  "required": [
+    "版",
+    "契約種別",
+    "Server",
+    "Transport",
+    "Tool",
+    "Resource",
+    "Prompt",
+    "Credential ref",
+    "Trust",
+    "Capability diff",
+    "権限生成",
+    "公開範囲",
+    "証拠種別"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "契約種別": { "const": "MCP外部概念射影" },
+    "Server": { "$ref": "#/$defs/server" },
+    "Transport": { "$ref": "#/$defs/transport" },
+    "Tool": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/tool" }
+    },
+    "Resource": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "Prompt": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/prompt" }
+    },
+    "Credential ref": { "$ref": "#/$defs/credential_ref" },
+    "Trust": { "$ref": "#/$defs/trust" },
+    "Capability diff": { "$ref": "#/$defs/capability_diff" },
+    "権限生成": { "const": "なし" },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "$ref": "#/$defs/evidence_source" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1024
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME", "EXTERNAL_EVIDENCE", "FIXTURE"]
+    },
+    "support": {
+      "type": "object",
+      "required": ["status", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["supported", "unsupported", "unknown"] },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "server": {
+      "type": "object",
+      "required": ["server_id", "表示名", "origin", "version", "metadata_hash", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "server_id": { "$ref": "#/$defs/id" },
+        "表示名": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "origin": { "type": "string", "enum": ["server_metadata", "owner_configuration", "live_runtime"] },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "metadata_hash": { "$ref": "#/$defs/hash" },
+        "status": { "type": "string", "enum": ["discovered", "unavailable", "unknown", "quarantined"] }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "required": ["kind", "status", "接続先hash", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["stdio", "streamable_http", "oauth"] },
+        "status": { "$ref": "#/$defs/support" },
+        "接続先hash": { "$ref": "#/$defs/hash" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "required": ["tool_id", "name", "description_summary", "input_schema_hash", "risk", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "tool_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "description_summary": { "$ref": "#/$defs/summary" },
+        "input_schema_hash": { "$ref": "#/$defs/hash" },
+        "risk": { "type": "string", "enum": ["read_only", "mutating", "destructive", "unknown"] },
+        "status": { "$ref": "#/$defs/support" }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["resource_id", "name", "uri_template_hash", "mime_type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "resource_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "uri_template_hash": { "$ref": "#/$defs/hash" },
+        "mime_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "$ref": "#/$defs/support" }
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "required": ["prompt_id", "name", "description_summary", "argument_schema_hash", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "prompt_id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "description_summary": { "$ref": "#/$defs/summary" },
+        "argument_schema_hash": { "$ref": "#/$defs/hash" },
+        "status": { "$ref": "#/$defs/support" }
+      }
+    },
+    "credential_ref": {
+      "type": "object",
+      "required": ["credential_id", "purpose", "target", "required", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "credential_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "purpose": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "target": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "required": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["configured", "missing", "revoked", "unknown"] }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "required": ["state", "evidence_source", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string", "enum": ["unverified", "pending_review", "verified", "quarantined", "rejected"] },
+        "evidence_source": { "$ref": "#/$defs/evidence_source" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "capability_diff": {
+      "type": "object",
+      "required": ["status", "added", "removed", "changed", "requires_operator_review", "evidence_source"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["not_evaluated", "no_change", "added", "removed", "changed", "unknown"] },
+        "added": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/id" } },
+        "removed": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/id" } },
+        "changed": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/id" } },
+        "requires_operator_review": { "type": "boolean" },
+        "evidence_source": { "$ref": "#/$defs/evidence_source" }
+      }
+    }
+  }
+}

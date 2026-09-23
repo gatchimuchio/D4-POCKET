@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "cabafbe9a066c44dda9447943356d4e1128654ee8df8c11dcd3ec5a32787dc4a"
+      "sha256": "da89b5a5bef3662b86340ca5fc62f813e88ef867351295daa49a3c8355b2b6f5"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "2fcf42212baf1b43988fba9f9e91c4d5f59901ff69a6f5ea08be72afad9e561d"
+      "sha256": "4596086b7f9925ee9f6748d125160e0785be8f87b7470fe79659c2f31acf4611"
     },
     {
       "path": "SECURITY.md",
@@ -949,7 +949,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "3633bd158acd59c66cad749c44a7ac7858032d275f238034f293a69fb423ed00"
+      "sha256": "3fbcbf2e29c7191bf6233b82333488f8bdc3a5e96ee0a19e1b726b84187a9ea7"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "58bf40ae048335e4be53eaebc14109b00201393f89fc2340f68a3cdd3930bd71"
+      "sha256": "bc28241c923cc37f3217ad378bab335e1c53974ffe43013d5ff4bc04433f24b7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1110,6 +1110,10 @@
     {
       "path": "docs/specs/gui-shell-spec-v1.md",
       "sha256": "fe8fb02986f6cc64ecf6084a07b1a70808a7d51c58fb2d3e7be9358136f9c31a"
+    },
+    {
+      "path": "docs/specs/mcp-contract.md",
+      "sha256": "32f184bf7b79eebe67e9177b75d100888cf8965aa9aaff144d7752639cb710bd"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -1516,6 +1520,18 @@
       "sha256": "93754e3aa24f2a09c261578ffe2a91fe85485412bf79877d6fc29f23436137b1"
     },
     {
+      "path": "examples/contracts/invalid/mcp_contract_authority.invalid.json",
+      "sha256": "0d87ef208a103d5f2754b53278c14dac564415c2f07ad323e38cd93ac5088e90"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_contract_credential_secret.invalid.json",
+      "sha256": "402bd05a20c25b500b88d13d567229594dae9a63e08eee4261c88e68ba994999"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_contract_tool_permission.invalid.json",
+      "sha256": "678c63d1c27e28d507d368810ed528384530b83d214134bcfc0464da108a41e3"
+    },
+    {
       "path": "examples/contracts/invalid/permission_bad_source.invalid.json",
       "sha256": "917b38dda1fccfaf531a92f05498ff1f2c51f381c8dda4f34da9dec63450558e"
     },
@@ -1694,6 +1710,10 @@
     {
       "path": "examples/contracts/llm_bounded_extension.valid.json",
       "sha256": "5ffd41b39164d193e66182250f594c01b0ebf50a990c6bfe34bbb1d0aa44dcfa"
+    },
+    {
+      "path": "examples/contracts/mcp_contract.valid.json",
+      "sha256": "87e81e161da530d6df8dc1bad85b055c8daa4c41d1a95d01211e45b2d9a6019c"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -2716,6 +2736,10 @@
       "sha256": "578152ced7da9ca2c1fa9eb8935edeecbaec4394a93ae474e53ff4200c28fab4"
     },
     {
+      "path": "specs/mcp_contract.schema.json",
+      "sha256": "dc3595755e55d0b230de515890348520278e447efc62efaf1f9d3cf390bee657"
+    },
+    {
       "path": "specs/permission.schema.json",
       "sha256": "fe3981fa95455ce4cf3162aca594a28a6622fac7d8da3f0a0d969c66763901bd"
     },
@@ -2877,7 +2901,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1ed7f9e2ce5277de65e3006cb6022c92152e8a6c3c924d3d74c90b4ad0fe814d"
+      "sha256": "6bfdfd5126cdfbfffadddc6fe23a4a0ca6a4383e680dca0beaee7f6847a92fc7"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2933,7 +2957,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "1288bdf510a3421e81f2ba0f6999ff74b451c5a87695603fafb6ccca6490fdf4"
+      "sha256": "46018f5475065dba3971fecc3f878a9092d2003e20bf696ecd0fd46c80d34636"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -2969,7 +2993,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "0fccedd31d111d724a0427553b00e40fb56a241f48071dcd9adbb8563ad8d55c"
+      "sha256": "f40c40efa447068403f07b3bc68d9fcc187aa435d9ac8ebc6931f399baef7a16"
     }
   ]
 }

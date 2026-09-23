@@ -20,6 +20,15 @@ C7の最初の完結単位として、owner controlから新規資格情報をWi
 - Validation: `python tooling/schema_check/check_schemas.py` はSchema 74件／正常例74件／負例89件、`python tooling/conformance_tests/run_conformance_skeleton.py` はConformance 163 checks、`python tooling/日本語基底監査.py --strict`、`python tooling/validate_all.py --python-only --desktop-platform windows`、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertionsがPASSした。C7専用Rust試験は3件、Rust全試験はlib 176件、main 5件、統合35件、合計216件がPASSした。今回のC7専用試験ではowner/normal channel、秘密値非投影、暗号文欠落時の部分一覧拒否を確認した。なお、未stage状態ではpackaging対象が追跡file一覧に限定されるため、C7新規fileをstageした状態でpackaging portabilityを実行した。
 - 未成立分類: 資格情報の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、Recovery操作、GUI管理面、Windows実機owner登録証拠、非Windows安全保管は`release_blocker`。登録と一覧だけで資格情報保管庫全体または製品releaseを主張しない。
 
+## D4 Pocket C8: MCP外部概念射影契約（2026-09-23）
+
+MCP実接続に先行して、外部metadataをGUI-Shellの境界付き契約へ射影した。`Server`、`Tool`、`Resource`、`Prompt`、`Transport`、`Credential ref`、`Trust`、`Capability diff`を`metadata_only`として表し、MCP metadataからAuthority、Permission、Approvalを生成しない。C8では外部Serverの発見・接続・Tool実行を開始していない。
+
+- Contract: `mcp_contract.schema.json`、正常fixture、ToolへのPermission混入、Credential refへの秘密値混入、Authority／Approval混入の負例、`docs/specs/mcp-contract.md`を追加した。Transportの接続先はhashのみ、Credential refはIDと用途・対象・必要性・状態だけを持つ。
+- Conformance: 外部概念の必須射影、`権限生成=なし`、`公開範囲=metadata_only`、Trust未確定、Capability diffのoperator review要求、秘密値／権限fieldの拒否を検査する。
+- Validation: `python tooling/schema_check/check_schemas.py` はSchema 75件／正常例75件／負例92件、`python tooling/conformance_tests/run_conformance_skeleton.py` はConformance 164 checks、`python tooling/日本語基底監査.py --strict`、`python tooling/validate_all.py --python-only --desktop-platform windows`、manifest、packaging portability、release gateがPASSした。Flutter／Rustの実装変更はないためFlutter解析とRust試験は未実行とした。
+- 未成立分類: MCP discovery、connect、authentication、consent、Tool／Resource／Promptの実取得、Broker経由Tool実行、timeout、server unavailable、disconnect、quarantine、実MCP Test Harnessは`release_blocker`。契約射影だけでMCP接続または製品releaseを主張しない。
+
 ## D4 Pocket C6: 対話結果からの回帰Case owner登録（2026-09-23）
 
 C5の評価Datasetと混ぜず、完了済み通常対話をownerが明示的に回帰Caseへ登録する独立Contractを追加した。Rust Brokerは要求ID/hash、`表示範囲=full`、永続結果証跡、終了監査ID、結果状態を現在の対話制御で再照合する。元の対話入力・応答本文は自動コピーせず、ownerのredacted定義を`ProtectedStore::Purpose::Regression`へ暗号化し、CLIにはhash-only receiptだけを返す。
