@@ -3,6 +3,8 @@ pub(crate) mod content_access;
 pub(crate) mod history_access;
 pub(crate) mod execution_history;
 pub(crate) mod evaluation_lab;
+#[cfg(windows)]
+pub(crate) mod credential_vault;
 pub mod audit;
 pub(crate) mod workspace;
 pub(crate) mod workspace_root;

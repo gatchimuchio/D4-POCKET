@@ -11,6 +11,15 @@ Windowsで確認した実物Codex CLIを、Rust Brokerの明示起動設定か�
 - Evidence boundary: Codex CLIのread-only JSONL応答`READY`は、独立したephemeral／read-only smokeで実物interfaceを確認したもの。Broker登録と実行系列挙はLIVE_RUNTIMEの実Broker証拠である。静的conformanceはsource boundaryを検査するが、write-capable Agent、MCP、複数Agent比較、Handoff、長時間運用、installed productを証明しない。
 - 未成立分類: write-capable Agent execution、実taskのProduct UI完結、MCP／A2A、複数Agent比較／Handoff、Usage／Cost、Claude／Gemini接続は`release_blocker`。Codex Adapterのread-only限定、`--codex-runtime` executable path内の`=`未対応、未導入Vendorは`known_limitation`として保持する。
 
+## D4 Pocket C7: 資格情報保管庫のowner登録と公開metadata（2026-09-23）
+
+C7の最初の完結単位として、owner controlから新規資格情報をWindows ProtectedStoreの`Purpose::Credential`へDPAPI保管し、通常IPCへ検証済みmetadata一覧を返すContractとBroker経路を接続した。同じ資格情報IDの再登録、normal IPCからの追加、owner channelからの一覧、保管先未登録、暗号文欠落・改変はfail-closedで拒否する。
+
+- Contract: `credential_registration.schema.json`、`credential_receipt.schema.json`、`credential_list.schema.json`、正常例、権限field混入・秘密値混入・件数負値の負例、`docs/specs/credential-vault.md`を追加した。秘密値は登録payloadからDPAPIへ渡すだけで、receipt、一覧、Audit reason、CLI出力へ投影しない。
+- Production path: `資格情報登録`はowner資格経路だけ、`資格情報一覧`は通常資格経路だけを受け付ける。Flutter、Adapter metadata、Profile、History、MCP metadata、A2A Agent Cardは資格情報の権限源にも登録経路にもならない。資格情報のRuntime／Tool／MCP／A2A注入はまだ接続していない。
+- Validation: `python tooling/schema_check/check_schemas.py` はSchema 74件／正常例74件／負例89件、`python tooling/conformance_tests/run_conformance_skeleton.py` はConformance 163 checks、`python tooling/日本語基底監査.py --strict`、`python tooling/validate_all.py --python-only --desktop-platform windows`、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertionsがPASSした。C7専用Rust試験は3件、Rust全試験はlib 176件、main 5件、統合35件、合計216件がPASSした。今回のC7専用試験ではowner/normal channel、秘密値非投影、暗号文欠落時の部分一覧拒否を確認した。なお、未stage状態ではpackaging対象が追跡file一覧に限定されるため、C7新規fileをstageした状態でpackaging portabilityを実行した。
+- 未成立分類: 資格情報の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、Recovery操作、GUI管理面、Windows実機owner登録証拠、非Windows安全保管は`release_blocker`。登録と一覧だけで資格情報保管庫全体または製品releaseを主張しない。
+
 ## D4 Pocket C6: 対話結果からの回帰Case owner登録（2026-09-23）
 
 C5の評価Datasetと混ぜず、完了済み通常対話をownerが明示的に回帰Caseへ登録する独立Contractを追加した。Rust Brokerは要求ID/hash、`表示範囲=full`、永続結果証跡、終了監査ID、結果状態を現在の対話制御で再照合する。元の対話入力・応答本文は自動コピーせず、ownerのredacted定義を`ProtectedStore::Purpose::Regression`へ暗号化し、CLIにはhash-only receiptだけを返す。

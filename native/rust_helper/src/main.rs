@@ -42,6 +42,9 @@ fn main() {
     if args.first().is_some_and(|v| v == "回帰Case登録") {
         match owner_cli::回帰Case登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
+    if args.first().is_some_and(|v| v == "資格情報登録") {
+        match owner_cli::資格情報登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if args.first().is_some_and(|v| matches!(v.as_str(), "対話承認操作" | "作業領域制御")) {
         match owner_cli::実行(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
@@ -69,6 +72,7 @@ fn main() {
     eprintln!("lifecycle owner承認: 実行系ライフサイクル承認 --session-file <owner資格file> 承認 <承認ID> <承認hash>");
     eprintln!("評価Dataset登録: 評価Dataset登録 --session-file <owner資格file> 登録 <非公開評価データセットJSONファイル>");
     eprintln!("回帰Case登録: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>");
+    eprintln!("資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>");
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");
     eprintln!("全体基準点: 作業領域制御 --session-file <owner資格file> 作業領域全体基準点保存 <作業領域ID> <登録hash>");
     eprintln!("基準点: 作業領域制御 --session-file <owner資格file> 作業領域基準点保存 <作業領域ID> <登録hash> <相対path> ...");

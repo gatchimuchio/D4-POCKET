@@ -35,7 +35,7 @@ mod evaluation_control;
 mod regression_case;
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
-const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
+pub(super) const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
 const ZERO_PAYLOAD_HASH: &str =
@@ -263,6 +263,10 @@ pub enum BrokerOperation {
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
     回帰Case登録,
+    #[serde(rename = "資格情報登録")]
+    資格情報登録,
+    #[serde(rename = "資格情報一覧")]
+    資格情報一覧,
     #[serde(rename = "評価Dataset一覧")]
     評価Dataset一覧,
     #[serde(rename = "評価実験開始")]
@@ -357,6 +361,8 @@ impl BrokerOperation {
             BrokerOperation::実行系列挙 => "実行系列挙",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
+            BrokerOperation::資格情報登録 => "資格情報登録",
+            BrokerOperation::資格情報一覧 => "資格情報一覧",
             BrokerOperation::評価Dataset一覧 => "評価Dataset一覧",
             BrokerOperation::評価実験開始 => "評価実験開始",
             BrokerOperation::評価実験状態 => "評価実験状態",
@@ -581,7 +587,7 @@ impl BrokerResponse {
 pub struct Broker {
     session_id: String,
     seen_nonces: HashMap<String, i64>,
-    audit_log: BrokerAuditLog,
+    pub(super) audit_log: BrokerAuditLog,
     authority_registry: BrokerAuthorityRegistry,
     対話: 対話制御,
     資源観測: RuntimeResourceRegistry,
@@ -591,12 +597,12 @@ pub struct Broker {
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
     #[cfg(windows)]
-    protected_store: Option<crate::protected_store::ProtectedStore>,
+    pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
     #[cfg(windows)]
     内容閲覧: super::content_access::ContentAccess,
-    shutdown_requested: bool,
-    current_epoch_seconds_override: Option<i64>,
-    state_store: BrokerStateStore,
+    pub(super) shutdown_requested: bool,
+    pub(super) current_epoch_seconds_override: Option<i64>,
+    pub(super) state_store: BrokerStateStore,
 }
 
 impl Broker {
@@ -765,7 +771,7 @@ impl Broker {
         }
     }
 
-    fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
+    pub(super) fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
             .request_id
@@ -910,6 +916,14 @@ impl Broker {
             BrokerOperation::実行系ライフサイクル操作 => self.実行系ライフサイクル操作処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::回帰Case登録 => self.回帰Case登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            #[cfg(windows)]
+            BrokerOperation::資格情報登録 => self.資格情報登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            #[cfg(not(windows))]
+            BrokerOperation::資格情報登録 => self.reject_with_payload_hash(&request_id, "資格情報登録", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
+            #[cfg(windows)]
+            BrokerOperation::資格情報一覧 => self.資格情報一覧処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            #[cfg(not(windows))]
+            BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(&request_id, "資格情報一覧", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -1803,7 +1817,7 @@ impl Broker {
             .unwrap_or_else(current_epoch_seconds)
     }
 
-    fn current_epoch_millis(&self) -> i64 {
+    pub(super) fn current_epoch_millis(&self) -> i64 {
         self.current_epoch_seconds().max(0).saturating_mul(1_000)
     }
 
@@ -2106,7 +2120,7 @@ impl Broker {
         )
     }
 
-    fn reject_with_payload_hash(
+    pub(super) fn reject_with_payload_hash(
         &mut self,
         request_id: &str,
         operation: &str,
@@ -2146,7 +2160,7 @@ impl Broker {
         }
     }
 
-    fn append_audit(
+    pub(super) fn append_audit(
         &mut self,
         request_id: &str,
         operation: &str,
@@ -2200,7 +2214,7 @@ impl Broker {
         Ok(())
     }
 
-    fn audit_store_failed_response(
+    pub(super) fn audit_store_failed_response(
         &self,
         request_id: &str,
         operation: &str,
@@ -2349,7 +2363,7 @@ fn lifecycle_identifier_valid(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(byte))
 }
 
-fn canonical_payload_hash(payload: Option<&Value>) -> String {
+pub(super) fn canonical_payload_hash(payload: Option<&Value>) -> String {
     let encoded =
         serde_json::to_vec(payload.unwrap_or(&Value::Null)).unwrap_or_else(|_| b"null".to_vec());
     sha256_tagged(&encoded)

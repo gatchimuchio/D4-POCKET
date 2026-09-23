@@ -12,6 +12,7 @@ use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
 const MAX_EVALUATION_DATASET_BYTES: u64 = 48 * 1024;
+const MAX_CREDENTIAL_REGISTRATION_BYTES: u64 = 64 * 1024;
 
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
@@ -126,6 +127,62 @@ pub fn 回帰Case登録(args: &[String]) -> Result<(), String> {
         serde_json::to_string_pretty(&receipt).map_err(|_| "回帰Case公開receiptの表示に失敗")?
     );
     Ok(())
+}
+
+/// privateな資格情報登録payloadをowner制御としてだけBrokerへ渡す。
+/// Broker応答のmetadataだけを表示し、秘密値を端末出力へ戻さない。
+pub fn 資格情報登録(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "登録" {
+        return Err("使用法: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>".into());
+    }
+    let payload = 資格情報登録読取(&args[3])?;
+    let body = owner操作送信(&args[1], "資格情報登録", payload)?;
+    let receipt = 資格情報公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "資格情報公開receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn 資格情報公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "資格情報公開receiptの形式が不正".to_string())?;
+    let forbidden = ["秘密値", "secret", "token", "password", "credential_value"];
+    if forbidden.iter().any(|key| object.contains_key(*key)) {
+        return Err("資格情報公開receiptへ秘密値が混入している".into());
+    }
+    let required = [
+        "版", "資格情報ID", "用途", "接続対象", "種類", "保管方式", "状態",
+        "作成時刻UnixMillis", "最終使用時刻UnixMillis", "失効時刻UnixMillis", "暗号文hash",
+        "作成監査ID", "公開範囲", "証拠種別",
+    ];
+    if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("資格情報公開receiptの形式が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn 資格情報登録読取(path: &str) -> Result<Value, String> {
+    let (file, bytes) = 評価データセット通常fileを開く(path)?;
+    if bytes > MAX_CREDENTIAL_REGISTRATION_BYTES {
+        return Err("資格情報登録fileが64KiB上限を超過".into());
+    }
+    let mut raw = Vec::with_capacity(bytes as usize);
+    let mut bounded = file.take(MAX_CREDENTIAL_REGISTRATION_BYTES + 1);
+    bounded
+        .read_to_end(&mut raw)
+        .map_err(|_| "資格情報登録fileを読めない")?;
+    if raw.len() as u64 > MAX_CREDENTIAL_REGISTRATION_BYTES {
+        return Err("資格情報登録fileが64KiB上限を超過".into());
+    }
+    let payload: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "資格情報登録fileのJSON形式が不正")?;
+    if !payload.is_object() {
+        return Err("資格情報登録fileはJSON objectでなければならない".into());
+    }
+    Ok(payload)
 }
 
 fn 回帰Case公開投影(body: &Value) -> Result<Value, String> {
@@ -470,5 +527,29 @@ mod tests {
         let mut unsafe_body = body;
         unsafe_body["入力"] = json!("private-regression-sentinel");
         assert!(回帰Case公開投影(&unsafe_body).is_err());
+    }
+
+    #[test]
+    fn 資格情報公開receiptは秘密値を除外する() {
+        let body = json!({
+            "版": 1,
+            "資格情報ID": "a".repeat(32),
+            "用途": "試験用",
+            "接続対象": "試験実行系",
+            "種類": "custom",
+            "保管方式": "windows_dpapi",
+            "状態": "有効",
+            "作成時刻UnixMillis": 1,
+            "最終使用時刻UnixMillis": null,
+            "失効時刻UnixMillis": null,
+            "暗号文hash": format!("sha256:{}", "b".repeat(64)),
+            "作成監査ID": "audit-1",
+            "公開範囲": "metadata_only",
+            "証拠種別": "INTERNAL_STATE"
+        });
+        assert_eq!(資格情報公開投影(&body).expect("公開資格情報を取得できる"), body);
+        let mut unsafe_body = body;
+        unsafe_body["秘密値"] = json!("表示してはならない");
+        assert!(資格情報公開投影(&unsafe_body).is_err());
     }
 }

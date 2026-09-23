@@ -168,6 +168,10 @@
       "責任": "C6回帰Caseのowner登録、対話結果証跡結合、private保管、公開receipt、C5との独立境界"
     },
     {
+      "path": "docs/specs/credential-vault.md",
+      "責任": "C7資格情報保管庫のowner登録、Windows DPAPI保管、公開metadata、秘密値非投影、未接続操作の境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

@@ -3548,6 +3548,86 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
     return 不整合
 
 
+def 資格情報保管庫の契約と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "credential-vault.md"
+    if not specification.exists():
+        return ["C7資格情報保管庫の日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C7資格情報保管庫の日本語意味正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/credential-vault.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C7資格情報保管庫の日本語意味正本が正本索引へ登録されていない")
+    for token in (
+        "owner control",
+        "ProtectedStore / DPAPI",
+        "Purpose::Credential",
+        "秘密値",
+        "metadata_only",
+        "normal IPC",
+        "Capability",
+        "Permission",
+        "Approval",
+        "Audit",
+        "Recovery",
+        "更新",
+        "失効",
+        "削除",
+        "接続先変更",
+        "release_blocker",
+    ):
+        if token not in specification_text:
+            不整合.append(f"C7資格情報保管庫仕様に必須境界がない: {token}")
+
+    registration = load_contract_fixture("credential_registration.valid.json")
+    receipt = load_contract_fixture("credential_receipt.valid.json")
+    listing = load_contract_fixture("credential_list.valid.json")
+    registration_schema = load_schema("credential_registration.schema.json")
+    receipt_schema = load_schema("credential_receipt.schema.json")
+    list_schema = load_schema("credential_list.schema.json")
+    for name, value, schema in (
+        ("registration", registration, registration_schema),
+        ("receipt", receipt, receipt_schema),
+        ("list", listing, list_schema),
+    ):
+        failures = validate_instance(value, schema)
+        if failures:
+            不整合.extend(f"C7 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    if any(key in registration for key in ("permission_id", "approval_id", "authority", "capability_id")):
+        不整合.append("C7登録payloadへ権限fieldが混入している")
+    if any(key in receipt for key in ("秘密値", "secret", "token", "password", "credential_value")):
+        不整合.append("C7公開receiptへ秘密値が混入している")
+    if not validate_instance({**registration, "permission_id": "injected"}, registration_schema):
+        不整合.append("C7登録payloadの権限field混入を拒否しない")
+    if not validate_instance({**receipt, "秘密値": "must-not-be-projected"}, receipt_schema):
+        不整合.append("C7公開receiptの秘密値混入を拒否しない")
+    if listing.get("件数") != len(listing.get("資格情報一覧", [])):
+        不整合.append("C7一覧valid fixtureの件数関係が不正")
+
+    rust = (RUST_HELPER / "src" / "broker" / "credential_vault.rs").read_text(encoding="utf-8")
+    owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
+    for token, source in (
+        ("Purpose::Credential", rust),
+        ("credential_owner_required", rust),
+        ("credential_normal_channel_required", rust),
+        ("metadata_only", rust),
+        ("秘密値", rust + owner_cli),
+        ("新規資格情報暗号文を破棄", rust),
+        ("credential_storage_missing", rust),
+        ("credential_storage_changed", rust),
+        ("資格情報公開receiptへ秘密値が混入している", owner_cli),
+    ):
+        if token not in source:
+            不整合.append(f"C7実装に統治境界tokenがない: {token}")
+    if 'println!("{}", registration.secret' in rust:
+        不整合.append("C7が秘密値を直接表示している")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5140,6 +5220,7 @@ def main() -> int:
         二実行系比較の非混線を検査する,
         評価ラボの契約と境界を検査する,
         回帰Caseの契約と境界を検査する,
+        資格情報保管庫の契約と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,
