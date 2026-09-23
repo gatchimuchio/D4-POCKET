@@ -1,6 +1,20 @@
 # 互換性対応表
 
-## rev2の現在証拠（2026-09-10）
+## C31現行互換性要約（2026-09-24）
+
+現行の開発検証対象はWindows host上のRust Broker、共有／Desktop／Mobile Flutter、Schema、Conformance、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrixである。Schema 108件、正常example 108件、negative fixture 129件、Conformance 179件、厳格日本語監査、manifest検査はPASSしている。
+
+| 領域 | 現行成立範囲 | 未成立・分類 |
+| --- | --- | --- |
+| Windows開発環境 | Rust／Flutterの解析・試験、debug build、local Broker／fixture検証 | installed-pathのprovenance、first-run、Setup Doctor、Broker、Audit anchor外部改変証拠は`release_blocker`（aggregate_of=windows_evidence_provenance_isolation,windows_installer_first_run_smoke,windows_setup_doctor_smoke,windows_broker_installed_smoke,audit_anchor_external_tamper_evidence_proof） |
+| モバイル | 9画面、Device Link projection、contract／失効／背景遷移fixture、Android debug APK／AAB | 実端末、native secure storage、TLS実接続、Windows installed連携、正式署名・配布は`release_blocker`（aggregate_of=rev2_mobile_device_evidence,rev2_mobile_distribution） |
+| 外部Runtime／Agent／MCP／A2A | metadata／contract／loopbackまたはfixtureのbounded検証 | 外部接続、実task、Tool実行、credential注入、複数Agent比較、handoffは`release_blocker`（registry_id=comprehensive_extension_rev1_completion） |
+| 長時間・障害・性能 | C27、C29、C30のlocal検証とC28の短時間smoke | C28の8時間実測、installed product負荷、外部サービス負荷は`release_blocker`（registry_id=comprehensive_extension_rev1_completion） |
+| 非Windows platform | 文書・一部補助build／過去の補助結果を証拠範囲付きで保持 | 現行commitの実機・正式配布・Mac hostの総合証拠は`known_limitation`または`release_blocker`（aggregate_of=rev2_mobile_device_evidence,comprehensive_extension_rev1_completion） |
+
+開発検証のPASSは互換性の全面保証、installed productのrelease proof、owner GOを意味しない。過去のrunはそのsource commitに結合した履歴として扱い、現行commitの証拠へ読み替えない。
+
+## rev2開始時の証拠面（履歴）
 
 以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
 

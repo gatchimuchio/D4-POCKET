@@ -4,6 +4,14 @@
 
 GUI Shell は control plane である。セキュリティ判断は Flutter widget ではなく、schema、conformance、Shell Core、Adapter Contract、および範囲を限定した Native Helper の各面で行わなければならない。
 
+## C31現況と検証境界（2026-09-24）
+
+C30のlocal回帰matrixで、Trust、Authority、Permission、Approval、Audit、Recovery、Evidence、Runtime、Agent、Dialogue、Compare、Device Linkに対応する既存のRust／Broker／Flutter／fixture検証を再実行した。RustとBrokerの試験は権限境界と負例を検証するが、installed productや外部サービスの安全性を証明しない。C30のAgent probeはCodex CLIのversion/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを実行しない。
+
+失敗注入はC29でRuntime停止相当、Broker停止、MCP／A2A timeout、Credential unavailable、書込不能simulation、Audit失敗、malformed stateを確認した。これはlocalhost fixture、temporary store、実Brokerの開発検証であり、外部Runtime／MCP／A2Aや物理ディスク容量枯渇の証拠へ昇格しない。C28の8時間実測は未成立のままである。
+
+残存分類: Windows installed-pathのprovenance／first-run／Setup Doctor／Broker／Audit anchor外部改変証拠、外部Runtime／Agent、実端末、正式署名、owner GO、正式releaseは`release_blocker`。MobileのMCP live一覧をDesktop owner管理面へ限定すること、およびfixtureだけのprojectionは`known_limitation`として扱う。
+
 ## 権限規則
 
 - sensitive action は default deny とする。

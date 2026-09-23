@@ -4,6 +4,17 @@
 
 GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの操作パターンを取り込む。Flutterは状態と操作者の意図を表す操作面を描画し、Shell Coreは引き続き権限境界を担う。
 
+## C31 現行文書境界（2026-09-24）
+
+現行Desktop操作面は、C20のWindowsトレイ、C21のCommand Palette、C22の全体検索、C23のNavigation論理グループ、C19のAdapter管理、C18のHost操作面を含む。C24のMobile投影は既存Brokerの読み取り専用handlerへ限定し、Desktopと同じauthorityを持たない。
+
+- production path: Flutter操作面 → 既存の認証済みBroker IPCまたは表示専用Snapshot → bounded projection。
+- authority boundary: UIの選択、検索、グループ、通知、Host、Adapter metadata、Mobile projectionはPermission、Approval、Authority、Credentialを生成しない。
+- content boundary: 対話本文、Approval payload、Audit raw reason、Credential実値は通常の表示投影へ出さない。全文表示は`content_visibility=full`だけに限定する。
+- evidence boundary: C30のlocal回帰matrixは各面のcontract・fixture・Broker試験を示すが、Windows installed product、外部Runtime／Agent、実端末の操作証拠ではない。
+
+未接続の実作用（外部artifactのdownload／install、任意Agent task、Tool実行、実停止、実端末連携）は、要求receiptや画面表示を完了扱いにせず、各文書の`release_blocker`または`known_limitation`として保持する。
+
 ## 実装済み操作面
 
 ~~~yaml

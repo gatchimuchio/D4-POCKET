@@ -1,6 +1,15 @@
 # Mobile 状態
 
-## 現行rev2の対象
+## C31現況（2026-09-24）
+
+Mobileは既存の9画面を保持し、C24で通知summary、Runtime lifecycle状態、資源概要、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataを既存Rust Brokerの読み取り専用経路へ投影する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。取得不能な資源値は`unknown`のままとし、MCP live一覧はDesktop owner管理面の境界上、未観測として表示する。
+
+Windows hostではMobile Flutterの解析と試験、Android debug APK／AABのbuildを確認している。C30のDevice Link行はcontract・失効・背景遷移fixtureでPASSしたが、実端末、native secure storage、TLS実接続、Windows installed productからのMobile連携、正式署名・配布は証明していない。
+
+- `release_blocker`: Android／iOS実機、native安全保管、OS lifecycle、Windows installed productとのMobile連携、正式識別子・署名・配布、owner GO、正式release。
+- `known_limitation`: Mobileはowner操作とMCP live一覧を持たず、Device Link／比較のlocal fixtureは実端末・外部Runtimeの証拠ではない。
+
+## rev2開始時の対象（履歴）
 
 2026-09-10のowner rev2によりMobile正式project・端末連携・Android/iOS検証は現行作業の対象になった。以前のDesktop v1.0境界を理由に、この要求をpost_v1_scopeへ退避しない。完成製品releaseは未成立である。
 

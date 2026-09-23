@@ -97,11 +97,11 @@
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
-      "sha256": "e65b047721747b0f9f9099ed443a1cab2bf0599b60138fd0fa59fc61c898d490"
+      "sha256": "44d0a115b93fbdce8800ad50277d2c53e28759fdff7a9e92dec5851cc48d6642"
     },
     {
       "path": "CONFIG.md",
-      "sha256": "a7d8af9e5f8b202a64a61bcb923654639206431e2ec0dde2a77f9265ce215f4d"
+      "sha256": "e143f160f587dd4d271f80f8d44fb09e4b2af5441f0ee5617667a44bdb8f7473"
     },
     {
       "path": "CONFORMANCE_REPORT.md",
@@ -129,7 +129,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "b67e306f5b6f71a7407150c6865e2ca96a8e6acc02b3632c07231800342edf9a"
+      "sha256": "120b8e9c05a2c32cc61921b17f114dfb02b3f443c03d64863055d456e788a8d8"
     },
     {
       "path": "NOTICE",
@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "da89b5a5bef3662b86340ca5fc62f813e88ef867351295daa49a3c8355b2b6f5"
+      "sha256": "de93510d43789c42fec2084f656ddd3447ce09d7e6fa6f7945f9d895ed2c3149"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,11 +149,11 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ea7136e39e94d04a72fd639d38ee7968caf6510a9e3d36cb139a9bf1cafdcee3"
+      "sha256": "29dc86cef78545ac66534265f7359f63707ef897b0ef7095689f42f74c3f977c"
     },
     {
       "path": "SECURITY.md",
-      "sha256": "02350db6496464f6d48247719c4604ea001dfa1f80117f37a90ddd4f4231eb6e"
+      "sha256": "8ba0067e83b99eb79d1250ded01e0e95026560d1a962c9e80518812e2c5334eb"
     },
     {
       "path": "SECURITY_REVIEW.md",
@@ -1045,7 +1045,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "b295617125e82583caa7636e02161c5258577f7f547d78e1a631d94bc0df37d4"
+      "sha256": "8bc68e5f1e07fcaa7c0d58f7c6c459b3c7cf3136253db242f8f61b8ab5a2edf6"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1081,7 +1081,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "012c983c0e274d7adcce82c275398c8ff9b46760da92bed34611deb4294dc4d4"
+      "sha256": "c876503883720d31526cfed6258c1445e80de5d9be4fa80f70bbc4828bbf0a61"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1345,7 +1345,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "c3552aec3b545ef44f3bb2da8d3010ac8754dd68b303129d495080bce86582fa"
+      "sha256": "0287a70fea155431039672e6a39b68dd2aae93a1a2568e2671be1c8bef961fb9"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",

@@ -2,11 +2,21 @@
 
 この文書は、Phase 0 / Phase 1 の設定リファレンスである。設定だけで権限を与えることなく、意図された設定面を説明する。
 
+## C31現行設定境界（2026-09-24）
+
+現行の設定面は、Runtime／Adapter、Operation Profile、Credential metadata、MCP／A2A metadata、Host、Update、通知、Mobile projectionの要求を、Schema検証済みのBroker経路へ渡すための宣言・表示面である。設定、Profile、metadata、履歴、UI stateはPermission、Approval、Authority、Credential実値を生成しない。
+
+秘密値はFlutter、snapshot、Audit、error、log、trace、test artifactへ出さない。外部download、install、process、Tool実行、任意Agent task、実停止、実端末連携を設定の存在や要求receiptだけで完了扱いにしない。取得不能な資源値は0へ置換せず`unknown`として扱う。
+
+C30の検証範囲はlocal Broker／Rust／Flutter／fixtureであり、Windows installed product、外部Runtime／Agent、実端末の設定実証ではない。未取得のinstalled-path証拠、正式署名、owner GO、正式releaseは`release_blocker`である。
+
 ## 検証コマンド
 
 ```bash
 python tooling/schema_check/check_schemas.py
 python tooling/conformance_tests/run_conformance_skeleton.py
+python tooling/日本語基底監査.py --strict
+python tooling/manifest.py --check
 ```
 
 必要な場合:
