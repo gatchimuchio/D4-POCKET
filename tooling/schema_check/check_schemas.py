@@ -65,6 +65,7 @@ REQUIRED = {
     "runtime_manifest.schema.json",
     "adapter_manifest.schema.json",
     "agent_runtime.schema.json",
+    "agent_adapter.schema.json",
     "agent_session.schema.json",
     "agent_workspace.schema.json",
     "agent_task.schema.json",

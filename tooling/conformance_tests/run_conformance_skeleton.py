@@ -38,7 +38,7 @@ from packages.blue_tanuki_adapter.adapter import BlueTanukiAdapter
 from packages.blue_tanuki_adapter.approvals import normalize_approval, projected_approval
 from packages.blue_tanuki_adapter.authority_trace import metadata_attempts_authority
 from packages.blue_tanuki_adapter.recovery import recovery_candidates
-from packages.agent_runtime import AgentRuntimeContract
+from packages.agent_runtime import AgentAdapterContract, AgentRuntimeContract
 from packages.runtime_catalog import RuntimeCatalog
 from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from tooling.schema_check.check_schemas import parse_json_text, validate_instance
@@ -98,6 +98,7 @@ REQUIRED_SCHEMA_NAMES = {
     "runtime_manifest",
     "adapter_manifest",
     "agent_runtime",
+    "agent_adapter",
     "agent_session",
     "agent_workspace",
     "agent_task",
@@ -4413,6 +4414,31 @@ def test_agent_auto_permission_is_advisory_only() -> list[str]:
     return []
 
 
+def test_agent_adapter_is_declaration_only_and_unsupported_is_explicit() -> list[str]:
+    adapter = load_contract_fixture("agent_adapter.valid.json")
+    contract = AgentAdapterContract(adapter)
+    schema = load_schema("agent_adapter.schema.json")
+    if validate_instance(adapter, schema):
+        return ["agent adapterの正常fixtureがSchemaに適合しない"]
+    if not contract.is_declaration_only():
+        return ["agent adapterの宣言へauthority fieldが混入した"]
+    if not contract.unsupported_features_are_explicit():
+        return ["agent adapterのunsupported／unknownに理由がない"]
+
+    forged = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "agent_adapter_authority.invalid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if not validate_instance(forged, schema):
+        return ["agent adapterへpermission_idを混入したfixtureが拒否されない"]
+    incomplete = copy.deepcopy(adapter)
+    incomplete["tool_support"] = {"status": "unsupported", "reason": ""}
+    if contract.unsupported_features_are_explicit(incomplete):
+        return ["agent adapterの空reasonをunsupportedとして受理した"]
+    return []
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -4986,6 +5012,7 @@ def main() -> int:
         test_agent_git_push_requires_explicit_approval,
         test_agent_generated_diff_must_be_auditable,
         test_agent_auto_permission_is_advisory_only,
+        test_agent_adapter_is_declaration_only_and_unsupported_is_explicit,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

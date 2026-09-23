@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 3: Agent Adapter契約のSchema接続（2026-09-23）
+
+Agent Adapter契約を追加した。`specs/agent_adapter.schema.json`はAgent identity、Provider、Version、Model、capability宣言、Workspace要件、Tool／MCP／Session／Cancellation／Usage／Cost対応、認証方式、Host要件を定義する。対応状態は`supported`、`unsupported`、`unknown`と理由を必須にし、認証は参照方式だけを許可してsecret実値を持たせない。
+
+- Contract: valid exampleと`permission_id`混入のnegative fixtureを追加した。`additionalProperties=false`と認証の`secret_value_present=false`で、Agent Adapter宣言をPermission／Approval／trustへ昇格させない。
+- Conformance: Agent Adapterが宣言専用であり、unsupported／unknownに理由があり、空理由が拒否されることを検査する。Schema 69件／valid example 69件／negative fixture 84件、Conformance 159 checksへ更新した。
+- Production boundary: 今回は契約と開発時conformanceまでで、Vendor CLI／APIのLauncherは接続していない。実物interfaceを確認するまでunsupportedとし、認証値・process起動・network接続を推測で追加しない。
+
+この節でAgent実行、複数Agent比較、Handoff、MCP接続、Provider／Model接続の完成を主張しない。これらはPhase 4以降の実物interface確認とBroker統治経路の検証対象であり、未成立範囲は既存のrelease_blocker分類を保持する。
+
 ## D4 Pocket Phase 2: Host Capabilityの契約接続（2026-09-23）
 
 D4 Pocketのブランド表面を追加し、rev2 Phase 2のHost Capabilityを、Schema → Rust Broker → 認証付きIPC → Flutter読み取り専用操作面まで接続した。既存のGUI-Shell技術契約、Shell Coreの権限境界、rev1の進捗履歴は変更していない。

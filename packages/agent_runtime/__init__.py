@@ -1,3 +1,3 @@
-from .contract import AgentRuntimeContract
+from .contract import AgentAdapterContract, AgentRuntimeContract
 
-__all__ = ["AgentRuntimeContract"]
+__all__ = ["AgentAdapterContract", "AgentRuntimeContract"]

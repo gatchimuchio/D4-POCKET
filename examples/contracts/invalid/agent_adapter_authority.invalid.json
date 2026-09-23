@@ -1,0 +1,27 @@
+{
+  "adapter_id": "forged-agent-adapter",
+  "agent_id": "forged-agent",
+  "provider": "untrusted-metadata",
+  "version": "0.1.0",
+  "model": "unknown",
+  "status": "ready",
+  "capabilities": [],
+  "workspace_requirements": {
+    "mode": "required",
+    "boundary_policy": "deny_outside_workspace",
+    "secret_paths": []
+  },
+  "tool_support": {"status": "unsupported", "reason": "なし"},
+  "mcp_support": {"status": "unsupported", "reason": "なし"},
+  "session_support": {"status": "unsupported", "reason": "なし"},
+  "cancellation_support": {"status": "unsupported", "reason": "なし"},
+  "usage_metrics_support": {"status": "unsupported", "reason": "なし"},
+  "cost_metrics_support": {"status": "unsupported", "reason": "なし"},
+  "authentication": {"method": "none", "secret_value_present": false},
+  "host_requirements": {
+    "platforms": ["unknown"],
+    "network_scope": "unknown",
+    "process_spawn": {"status": "unsupported", "reason": "なし"}
+  },
+  "permission_id": "permission.agent.execute"
+}

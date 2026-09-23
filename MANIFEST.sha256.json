@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "d69a1dba7b997398a3608fe53d5e6dc548de6a79f12341708aedfe1754fd2d97"
+      "sha256": "7288ae24d0cc1c0d81c0d483b4bc3a476a13ef954bf1a0e8e3c454bd20217ab6"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4b4d85d28f91c834871a3d1de6f3ce12357b483e01759884132a4635f780c3ba"
+      "sha256": "4248a5c38304cd4f7e8bd326860b27d443713616377fb823fc3e0fd445c33190"
     },
     {
       "path": "SECURITY.md",
@@ -949,7 +949,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "e77a429dcd64bee8234a99daec63ef3f4a89d339e1ca09d272ea042a89d492bc"
+      "sha256": "80315e35357e942b95017e0d8a1f5663b8c4e5d5a6c4c8a31161282c86fc8dc2"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "ca9b7e366ea819e8f63bc0b5557e62e85ba6cdbf273639436a7169d6dbc84ab8"
+      "sha256": "0b8c27817fac7cc107b0cdc48b0849cd4dfe7e5994b7c15f9ddae5ed94d678ac"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1180,6 +1180,10 @@
       "sha256": "120a408d3ddd3dd148dd10f798e4563afc1bd3c272aa29e8e29afa3149822234"
     },
     {
+      "path": "examples/contracts/agent_adapter.valid.json",
+      "sha256": "46c3405c6da54b91acff56f3104ea29dcddec22ca5d43fa13f2afb6235663b8a"
+    },
+    {
       "path": "examples/contracts/agent_diff.valid.json",
       "sha256": "ed55b93c57409db14320b3cfff7581f0ca7ac5554dc04a206ceaee9f08a60907"
     },
@@ -1314,6 +1318,10 @@
     {
       "path": "examples/contracts/invalid/adapter_manifest_authority_escalation.invalid.json",
       "sha256": "36afa1ab45f890e4b75fafe6e1af14bec5c4ec4b86090767344d4093d7246f5f"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_adapter_authority.invalid.json",
+      "sha256": "bcd35e064cdcd4f04e45368d97cd387bbacf0c1ba32bc55d85a18095653b0aa1"
     },
     {
       "path": "examples/contracts/invalid/agent_diff_missing_rollback.invalid.json",
@@ -2213,11 +2221,11 @@
     },
     {
       "path": "packages/agent_runtime/__init__.py",
-      "sha256": "b26cbf3f484fa432db58477edd35988c357ef1d99a9e22af8bc768af543fedc6"
+      "sha256": "1ddf8af459b1890cc249c7849c1b377eab81ee754b7bb56015e05b2d3697cb8e"
     },
     {
       "path": "packages/agent_runtime/contract.py",
-      "sha256": "e94f316275be076a2323d5bf5d0f24e3c4d38416b2b32d55ccfa088751cbe99a"
+      "sha256": "ad6de6ba2fa211a74206dc1b7afc073f11f86685ca57adcac9be9f6a93004e6a"
     },
     {
       "path": "packages/blue_tanuki_adapter/README.md",
@@ -2498,6 +2506,10 @@
     {
       "path": "specs/adapter_manifest.schema.json",
       "sha256": "0c83310c2713242bc3a607f532f2790f86d4755ec37c2c53d51a987559e4561e"
+    },
+    {
+      "path": "specs/agent_adapter.schema.json",
+      "sha256": "4159c834293de09776f969378b66545d45cf7c6cf81fff221fb4f1ebc6dcccec"
     },
     {
       "path": "specs/agent_diff.schema.json",
@@ -2781,7 +2793,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "7e971f07e341179c29279b00d0667a1ade3125a27f5c90ab72f627466ced8bff"
+      "sha256": "b5ba4941e4035317f9696b6f13a2bb302cc6fa8c4d1a3b663a62c775c27a75de"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -2837,7 +2849,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "574107719071807c51ff24153c80bdaf48012c109c3a7cc5eba742eceffa0996"
+      "sha256": "17ff4b376878a45686776e617e2b495abb8bf4179e6c09d5fdb60e7cd8a76d76"
     },
     {
       "path": "tooling/shell_snapshot.py",

@@ -1,0 +1,34 @@
+{
+  "adapter_id": "example-local-agent-adapter",
+  "agent_id": "example-local-agent",
+  "provider": "local-development",
+  "version": "0.1.0",
+  "model": "unconfigured",
+  "status": "unsupported",
+  "capabilities": [
+    {
+      "capability_id": "text_generation",
+      "support": {
+        "status": "unsupported",
+        "reason": "実物Agent接続を確認していないため未対応として扱う"
+      }
+    }
+  ],
+  "workspace_requirements": {
+    "mode": "required",
+    "boundary_policy": "deny_outside_workspace",
+    "secret_paths": [".env", ".ssh", "secrets/"]
+  },
+  "tool_support": {"status": "unsupported", "reason": "実物tool interface未確認"},
+  "mcp_support": {"status": "unsupported", "reason": "MCP接続未設定"},
+  "session_support": {"status": "supported", "reason": "契約上のsession境界を保持する"},
+  "cancellation_support": {"status": "unknown", "reason": "実物Agentの取消方法未確認"},
+  "usage_metrics_support": {"status": "unknown", "reason": "取得可能な実測値未確認"},
+  "cost_metrics_support": {"status": "unsupported", "reason": "cost provider未接続"},
+  "authentication": {"method": "unsupported", "secret_value_present": false},
+  "host_requirements": {
+    "platforms": ["windows"],
+    "network_scope": "unsupported",
+    "process_spawn": {"status": "unsupported", "reason": "Launcher未接続"}
+  }
+}
