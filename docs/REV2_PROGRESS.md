@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C18: Host操作面（2026-09-24）
+
+C17のHost registryをDesktopのHost操作面へ接続した。`ShellCoreClient.product()`は通常認証済みBroker IPCの`Host一覧`を取得し、Host metadataをSnapshotへ投影する。DesktopはHost一覧、接続状態、Trust、Runtime／Agent summary、Host切替を表示する。
+
+- Production path: `Host一覧` → Rust Brokerのbounded metadata-only receipt → Desktop Snapshot → Host操作面。`Host切替`は通常IPCでregistryのHost IDを再照合し、Audit確定後に表示コンテキストのreceiptを返す。
+- Authority boundary: Host切替は`権限生成=なし`、`authority_strip=true`、`承認状態=not_reused`に固定する。Host AのPermission、Approval、AuthorityをHost Bへ再利用しない。Host registryのRuntime／Agent件数は`INTERNAL_STATE` summaryであり、個別live一覧の証拠ではない。
+- Observation boundary: 選択Hostが現在のBroker観測Hostと一致するときだけ現行SnapshotのRuntime／Agentを表示する。それ以外はsummaryと`未観測`だけを表示し、remoteの個別状態を推測しない。
+- Validation target: Host切替の未知Host、未知field、owner channel、Host間非混線をRust unit test、Schema、Conformance、Desktop widget surfaceへ接続する。
+- 未成立分類: live Host再接続、Trust検証、Host別remote Runtime／Agent discovery、Host間Workspace隔離、Device Link実認証、Desktop installed evidenceは`release_blocker`。C18だけでHostの実接続や正式releaseを主張しない。
+
 ## D4 Pocket C17: 複数Host registry（2026-09-24）
 
 C17のHost metadata registryをRust Security Brokerへ接続した。owner controlだけがHostを登録し、通常認証済みIPCだけがHost一覧を参照する。Host ID、表示名、Platform、接続状態、Trust、証明書／identity hash、Runtime summary、最終接続をboundedなmetadata-only receiptへ射影し、`hosts.json`へatomicに永続化する。登録時のTrustと接続状態は`pending_review`に固定し、Host metadataからPermission、Approval、Authority、Credentialを生成しない。

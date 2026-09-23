@@ -35,6 +35,11 @@ class ShellCoreClient {
         hostCapabilityResponse,
         'ホスト能力',
       );
+      final hostListResponse = await broker.request(
+        'Host一覧',
+        payload: {'版': 1},
+      );
+      final hostList = _acceptedResponseBodyMap(hostListResponse, 'Host一覧');
 
       final normalizeResponse = await broker.request(
         'normalize_payload',
@@ -83,6 +88,8 @@ class ShellCoreClient {
           health: health,
           hostCapabilityResponse: hostCapabilityResponse,
           hostCapability: hostCapability,
+          hostListResponse: hostListResponse,
+          hostList: hostList,
           normalizeResponse: normalizeResponse,
           projectionResponse: projectionResponse,
           projection: projection,
@@ -163,6 +170,47 @@ class ShellCoreClient {
   }
 
   ShellSnapshot getSnapshot() => snapshot;
+
+  Future<HostSelectionRecord> selectHost(String hostId) async {
+    HostRegistryRecord? host;
+    for (final item in snapshot.hosts) {
+      if (item.hostId == hostId) {
+        host = item;
+        break;
+      }
+    }
+    if (host == null) {
+      throw BrokerClientException('未登録Hostへ切り替えできません: $hostId');
+    }
+    final transport = brokerTransport;
+    if (transport == null) {
+      return HostSelectionRecord(
+        hostId: host.hostId,
+        connectionState: host.connectionState,
+        trustState: host.trustState,
+        evidenceSource: 'INTERNAL_STATE',
+        authorityGenerated: 'なし',
+        authorityStrip: true,
+        approvalState: 'not_reused',
+        auditId: 'local-selection-not-audited',
+      );
+    }
+    final response = await transport.request(
+      'Host切替',
+      payload: {'版': 1, 'Host ID': hostId},
+    );
+    final body = _acceptedResponseBodyMap(response, 'Host切替');
+    return HostSelectionRecord(
+      hostId: body['選択Host ID']?.toString() ?? hostId,
+      connectionState: body['接続状態']?.toString() ?? 'unknown',
+      trustState: body['Trust']?.toString() ?? 'unknown',
+      evidenceSource: body['証拠種別']?.toString() ?? 'unknown',
+      authorityGenerated: body['権限生成']?.toString() ?? '不明',
+      authorityStrip: body['authority_strip'] == true,
+      approvalState: body['承認状態']?.toString() ?? 'unknown',
+      auditId: body['監査ID']?.toString() ?? response['audit_event_id']?.toString() ?? '',
+    );
+  }
 }
 
 Map<String, Object?> _acceptedResponseBodyMap(
@@ -203,6 +251,46 @@ Map<String, Object?> _hostCapabilitySnapshotJson(
   };
 }
 
+List<Map<String, Object?>> _hostRegistrySnapshotJson(
+  Map<String, Object?> body,
+) {
+  final hosts = body['Host一覧'];
+  if (hosts is! List) {
+    throw const BrokerClientException('Host一覧応答にHost配列がありません');
+  }
+  return [
+    for (final item in hosts)
+      if (item is Map) _hostRegistryRecordSnapshotJson(item),
+  ];
+}
+
+Map<String, Object?> _hostRegistryRecordSnapshotJson(Map item) {
+  final raw = Map<String, Object?>.from(item);
+  final trust = Map<String, Object?>.from(raw['Trust'] as Map? ?? const {});
+  final summary = Map<String, Object?>.from(
+    raw['Runtime summary'] as Map? ?? const {},
+  );
+  return {
+    'host_id': raw['Host ID']?.toString() ?? '',
+    'display_name': raw['表示名']?.toString() ?? '',
+    'platform': raw['Platform']?.toString() ?? 'unknown',
+    'connection_state': raw['接続状態']?.toString() ?? 'unknown',
+    'trust_state': trust['state']?.toString() ?? 'unknown',
+    'runtime_summary': {
+      'runtime_count': summary['runtime_count'] is int
+          ? summary['runtime_count']
+          : 0,
+      'agent_count': summary['agent_count'] is int
+          ? summary['agent_count']
+          : 0,
+    },
+    'evidence_source': raw['証拠種別']?.toString() ?? 'unknown',
+    'visibility': raw['公開範囲']?.toString() ?? 'none',
+    'authority_strip': raw['authority_strip'] == true,
+    'last_connection': raw['最終接続'],
+  };
+}
+
 void _requireAccepted(Map<String, Object?> response, String operation) {
   if (response['status'] != 'accepted') {
     final error = response['error'];
@@ -220,6 +308,8 @@ ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> health,
   required Map<String, Object?> hostCapabilityResponse,
   required Map<String, Object?> hostCapability,
+  required Map<String, Object?> hostListResponse,
+  required Map<String, Object?> hostList,
   required Map<String, Object?> normalizeResponse,
   required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
@@ -320,6 +410,7 @@ ShellSnapshot _brokerSnapshot({
   final auditEvents = [
     _auditJson(healthResponse, 'broker.health', 'accepted'),
     _auditJson(hostCapabilityResponse, 'broker.host_capability', 'accepted'),
+    _auditJson(hostListResponse, 'broker.host_list', 'accepted'),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
     _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
     _auditJson(
@@ -363,6 +454,7 @@ ShellSnapshot _brokerSnapshot({
       },
     ],
     'host_capabilities': [_hostCapabilitySnapshotJson(hostCapability)],
+    'hosts': _hostRegistrySnapshotJson(hostList),
     'agent_sessions': [],
     'permissions': [],
     'pending_approvals': [],
@@ -1229,6 +1321,20 @@ const _mockSnapshot = ShellSnapshot(
       safeToIgnoreForPhaseB: false,
       requiredAction: '概要、状態、問題、証拠、復旧の各画面を利用可能に保ってください。',
       blocksCompletedProductRelease: false,
+    ),
+  ],
+  hosts: [
+    HostRegistryRecord(
+      hostId: 'gui-shell-local-windows',
+      displayName: 'ローカル Windows',
+      platform: 'windows',
+      connectionState: 'pending_review',
+      trustState: 'pending_review',
+      runtimeCount: 1,
+      agentCount: 1,
+      evidenceSource: 'INTERNAL_STATE',
+      visibility: 'metadata_only',
+      authorityStrip: true,
     ),
   ],
   hostCapabilities: [

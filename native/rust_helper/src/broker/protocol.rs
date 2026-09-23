@@ -359,6 +359,8 @@ pub enum BrokerOperation {
     Host登録,
     #[serde(rename = "Host一覧")]
     Host一覧,
+    #[serde(rename = "Host切替")]
+    Host切替,
     #[serde(rename = "プロファイル作成")]
     プロファイル作成,
     #[serde(rename = "プロファイル複製")]
@@ -499,6 +501,7 @@ impl BrokerOperation {
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
+            BrokerOperation::Host切替 => "Host切替",
             BrokerOperation::プロファイル作成 => "プロファイル作成",
             BrokerOperation::プロファイル複製 => "プロファイル複製",
             BrokerOperation::プロファイル適用要求 => "プロファイル適用要求",
@@ -1118,6 +1121,7 @@ impl Broker {
             BrokerOperation::A2A接続一覧 => super::a2a_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Host登録 => super::host_center::register(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Host一覧 => super::host_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::Host切替 => super::host_center::switch(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),

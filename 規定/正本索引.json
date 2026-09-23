@@ -188,6 +188,10 @@
       "責任": "C17 Host registryのowner登録、通常一覧、identity hash、bounded永続化、Host間Authority非共有境界"
     },
     {
+      "path": "docs/specs/host-operation-surface.md",
+      "責任": "C18 Host一覧、Host切替、Host別Runtime／Agent観測境界、Host間Permission・Approval・Authority非再利用"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

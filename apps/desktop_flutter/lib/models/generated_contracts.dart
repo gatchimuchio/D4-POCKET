@@ -50,6 +50,75 @@ class HostCapabilityRecord {
   }
 }
 
+class HostRegistryRecord {
+  const HostRegistryRecord({
+    required this.hostId,
+    required this.displayName,
+    required this.platform,
+    required this.connectionState,
+    required this.trustState,
+    required this.runtimeCount,
+    required this.agentCount,
+    required this.evidenceSource,
+    required this.visibility,
+    required this.authorityStrip,
+    this.lastConnection,
+  });
+
+  final String hostId;
+  final String displayName;
+  final String platform;
+  final String connectionState;
+  final String trustState;
+  final int runtimeCount;
+  final int agentCount;
+  final String evidenceSource;
+  final String visibility;
+  final bool authorityStrip;
+  final String? lastConnection;
+
+  factory HostRegistryRecord.fromJson(Map<String, Object?> json) {
+    final summary = Map<String, Object?>.from(
+      json['runtime_summary'] as Map? ?? const {},
+    );
+    return HostRegistryRecord(
+      hostId: json['host_id'] as String? ?? '',
+      displayName: json['display_name'] as String? ?? '',
+      platform: json['platform'] as String? ?? 'unknown',
+      connectionState: json['connection_state'] as String? ?? 'unknown',
+      trustState: json['trust_state'] as String? ?? 'unknown',
+      runtimeCount: summary['runtime_count'] as int? ?? 0,
+      agentCount: summary['agent_count'] as int? ?? 0,
+      evidenceSource: json['evidence_source'] as String? ?? 'unknown',
+      visibility: json['visibility'] as String? ?? 'none',
+      authorityStrip: json['authority_strip'] as bool? ?? false,
+      lastConnection: json['last_connection'] as String?,
+    );
+  }
+}
+
+class HostSelectionRecord {
+  const HostSelectionRecord({
+    required this.hostId,
+    required this.connectionState,
+    required this.trustState,
+    required this.evidenceSource,
+    required this.authorityGenerated,
+    required this.authorityStrip,
+    required this.approvalState,
+    required this.auditId,
+  });
+
+  final String hostId;
+  final String connectionState;
+  final String trustState;
+  final String evidenceSource;
+  final String authorityGenerated;
+  final bool authorityStrip;
+  final String approvalState;
+  final String auditId;
+}
+
 class RuntimeRecord {
   const RuntimeRecord({
     required this.runtimeId,
@@ -717,6 +786,7 @@ class ShellSnapshot {
     required this.releaseBlockerCount,
     required this.evidenceSummary,
     required this.recoveryPlaybook,
+    this.hosts = const [],
     this.hostCapabilities = const [],
     this.snapshotSource = 'fallback',
     this.snapshotPath = '',
@@ -749,6 +819,7 @@ class ShellSnapshot {
   final int releaseBlockerCount;
   final EvidenceSummaryRecord evidenceSummary;
   final List<RecoveryPlaybookRecord> recoveryPlaybook;
+  final List<HostRegistryRecord> hosts;
   final List<HostCapabilityRecord> hostCapabilities;
   final String snapshotSource;
   final String snapshotPath;
@@ -815,6 +886,7 @@ class ShellSnapshot {
           Map<String, Object?>.from(json['evidence_summary'] as Map? ?? {})),
       recoveryPlaybook:
           _records(json['recovery_playbook'], RecoveryPlaybookRecord.fromJson),
+      hosts: _records(json['hosts'], HostRegistryRecord.fromJson),
       hostCapabilities:
           _records(json['host_capabilities'], HostCapabilityRecord.fromJson),
       snapshotSource: json['snapshot_source'] as String? ?? 'local',
@@ -831,6 +903,7 @@ class ShellSnapshot {
     OperationStatusRecord? operationStatus,
     List<ProblemRecord>? problems,
     List<EvidenceRecord>? evidence,
+    List<HostRegistryRecord>? hosts,
     List<HostCapabilityRecord>? hostCapabilities,
     String? snapshotSource,
     String? snapshotPath,
@@ -864,6 +937,7 @@ class ShellSnapshot {
       releaseBlockerCount: releaseBlockerCount,
       evidenceSummary: evidenceSummary,
       recoveryPlaybook: recoveryPlaybook,
+      hosts: hosts ?? this.hosts,
       hostCapabilities: hostCapabilities ?? this.hostCapabilities,
       snapshotSource: snapshotSource ?? this.snapshotSource,
       snapshotPath: snapshotPath ?? this.snapshotPath,

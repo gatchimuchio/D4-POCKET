@@ -5,7 +5,7 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行D4 Pocket統合単位（2026-09-23）
+## 現行D4 Pocket統合単位（2026-09-24）
 
 rev2 Phase 2のHost Capabilityを、既存のGUI-Shell契約とRust Broker経路へ接続した。`specs/host_capability.schema.json`を正本とし、`ホスト能力`の認証付きIPC、payload拒否、証拠種別の明示、D4 Pocketデスクトップの読み取り専用操作面を実装・検証する。Host Capabilityは観測結果であり、Permission・Approval・runtime trustを生成しない。
 
@@ -33,6 +33,7 @@ C14では、`docs/specs/trace-inspector.md`を正本とする読み取り専用�
 C16の現行単位では、`docs/specs/a2a-connection-center.md`を正本とするowner専用のA2A Agent Card取得、Rust Security Broker統治、loopback HTTPのbounded検証、`LIVE_RUNTIME` metadata-only receipt、通常IPCの接続一覧を追加する。Agent Cardの宣言はTrust、Permission、Approval、Authorityを生成せず、Credential refへ実値を注入しない。C16補完では接続receiptのmetadataをBroker永続storeへ保存し、再起動後は`INTERNAL_STATE`・再承認要求の状態へ降格して一覧へ復元する。HTTPS、TLS再接続、公開endpoint discovery、Task／Message送信、Artifact本文、Stream購読、quarantine、複数Agent比較、Desktop専用接続画面、実A2A Test Harnessは未接続の`release_blocker`として保持する。
 
 C17の現行単位では、`docs/specs/host-registry.md`を正本とするHost registryをRust Security Brokerへ接続した。`Host登録`はowner controlだけ、`Host一覧`は通常認証済みIPCだけを受け付ける。Host ID、Platform、Trust、接続状態、certificate／identity hash、Runtime／Agent summaryをmetadata-only receiptへ射影し、`hosts.json`へbounded・atomicに保存する。登録時は`pending_review`へ固定し、Host metadataからPermission、Approval、Authority、Credentialを生成しない。Host切替、Runtime／Agent一覧、Device Link実認証、Desktop Host操作面、Host間Workspace隔離は未接続の`release_blocker`として保持する。
+C18の現行単位では、`docs/specs/host-operation-surface.md`を正本として`Host一覧`をDesktop Snapshotへ接続し、通常IPCの`Host切替`をBroker監査付きの表示コンテキスト操作として追加した。Host AのPermission、Approval、AuthorityはHost Bへ再利用せず、選択Hostと現在Broker観測Hostが一致しない場合のRuntime／Agent個別一覧は`未観測`とする。live Host再接続、Trust検証、remote Runtime／Agent discovery、Host間Workspace隔離は引き続き`release_blocker`である。
 
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 

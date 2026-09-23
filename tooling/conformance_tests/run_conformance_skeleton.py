@@ -4186,7 +4186,7 @@ def 複数Host_registryの統治経路と境界を検査する() -> list[str]:
         if not any(item.get("path") == "docs/specs/host-registry.md" for item in current_sources if isinstance(item, dict)):
             不整合.append("C17 Host registry正本が正本索引へ登録されていない")
 
-    for name in ("host_registration", "host_receipt", "host_list"):
+    for name in ("host_registration", "host_receipt", "host_list", "host_switch", "host_switch_receipt"):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
         failures = validate_instance(valid, schema)
@@ -4196,11 +4196,15 @@ def 複数Host_registryの統治経路と境界を検査する() -> list[str]:
         "host_registration_authority.invalid.json",
         "host_receipt_verified.invalid.json",
         "host_list_wrong_evidence.invalid.json",
+        "host_switch_authority.invalid.json",
+        "host_switch_receipt_authority.invalid.json",
     )
     invalid_schema_names = {
         invalid_names[0]: "host_registration",
         invalid_names[1]: "host_receipt",
         invalid_names[2]: "host_list",
+        invalid_names[3]: "host_switch",
+        invalid_names[4]: "host_switch_receipt",
     }
     for name in invalid_names:
         try:
@@ -4229,11 +4233,50 @@ def 複数Host_registryの統治経路と境界を検査する() -> list[str]:
         ("MalformedHostState", store + center),
         ("Host登録", protocol + ipc_request + ipc_response),
         ("Host一覧", protocol + ipc_request + ipc_response),
+        ("Host切替", protocol + ipc_request + ipc_response),
+        ("not_reused", center),
+        ("再利用禁止", center),
         ("Host登録公開投影", owner_cli),
         ("Host登録設定に禁止fieldがある", owner_cli),
     ):
         if token not in source:
             不整合.append(f"C17 Host registry実装に統治境界tokenがない: {token}")
+    return 不整合
+
+
+def Host操作面の観測境界とHost間非混線を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "host-operation-surface.md"
+    if not specification.exists():
+        return ["C18 Host操作面の日本語意味正本がない"]
+    text = specification.read_text(encoding="utf-8")
+    for token in (
+        "Host一覧",
+        "Host切替",
+        "Runtime／Agent",
+        "未観測",
+        "Permission",
+        "Approval",
+        "Authority",
+        "release_blocker",
+    ):
+        if token not in text:
+            不整合.append(f"C18 Host操作面正本に必須境界がない: {token}")
+
+    center = (RUST_HELPER / "src" / "broker" / "host_center.rs").read_text(encoding="utf-8")
+    desktop = (DESKTOP_FLUTTER / "lib" / "screens" / "host_operation_center.dart").read_text(encoding="utf-8")
+    shell_core = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
+    for token, source in (
+        ("Host切替", center + desktop + shell_core),
+        ("not_reused", center + desktop + shell_core),
+        ("authority_strip", center + desktop + shell_core),
+        ("Runtime一覧", desktop),
+        ("Agent一覧", desktop),
+        ("未観測", desktop),
+        ("Host一覧", shell_core),
+    ):
+        if token not in source:
+            不整合.append(f"C18 Host操作面実装に統治境界tokenがない: {token}")
     return 不整合
 
 
@@ -5839,6 +5882,7 @@ def main() -> int:
         MCP接続センターの統治経路と境界を検査する,
         A2A接続センターの統治経路と境界を検査する,
         複数Host_registryの統治経路と境界を検査する,
+        Host操作面の観測境界とHost間非混線を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

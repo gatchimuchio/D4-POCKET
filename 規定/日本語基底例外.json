@@ -275,7 +275,8 @@
       "id": "JBE-011",
       "scopes": [
         "native/rust_helper/src/broker/host_center.rs",
-        "native/rust_helper/src/owner_cli.rs"
+        "native/rust_helper/src/owner_cli.rs",
+        "apps/desktop_flutter/lib/services/shell_core_client.dart"
       ],
       "region": "Host registryの公開Contract field名と固定診断値だけ。周囲の意味説明とAuthority境界は除外しない。",
       "category": "固有名・固定表記",

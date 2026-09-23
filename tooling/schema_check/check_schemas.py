@@ -61,6 +61,8 @@ REQUIRED = {
     "host_registration.schema.json",
     "host_receipt.schema.json",
     "host_list.schema.json",
+    "host_switch.schema.json",
+    "host_switch_receipt.schema.json",
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",

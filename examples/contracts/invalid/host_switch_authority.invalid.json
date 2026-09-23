@@ -1,0 +1,6 @@
+{
+  "版": 1,
+  "操作": "Host切替",
+  "Host ID": "host-windows-dev",
+  "permission_id": "permission.host-a"
+}

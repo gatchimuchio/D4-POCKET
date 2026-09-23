@@ -35,7 +35,7 @@ void main() {
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 19);
+    expect(rail.destinations.length, 20);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -51,7 +51,7 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 19);
+    expect(rail.destinations.length, 20);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
@@ -106,6 +106,21 @@ void main() {
       find.textContaining('Permission、Approval、Authority'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Host操作面でHost切替と観測境界を表示する', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(19);
+    await tester.pumpAndSettle();
+
+    expect(find.text('D4 Pocket Host操作面'), findsOneWidget);
+    expect(find.text('Host一覧'), findsOneWidget);
+    expect(find.text('Runtime一覧'), findsOneWidget);
+    expect(find.text('Agent一覧'), findsOneWidget);
+    expect(find.text('現在のHost'), findsOneWidget);
+    expect(find.textContaining('Permission、Approval、Authority'), findsWidgets);
   });
 
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {
@@ -388,6 +403,7 @@ void main() {
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -443,6 +459,7 @@ void main() {
     expect(transport.operations, [
       'health',
       'ホスト能力',
+      'Host一覧',
       'normalize_payload',
       'content_projection',
       'approval_edit',
@@ -471,6 +488,30 @@ void main() {
     );
   });
 
+  test('Host切替clientはBroker監査receiptだけを受け付ける', () async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {
+        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
+      }),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerHostSwitchResponse(),
+    ]);
+
+    final client = await ShellCoreClient.product(transport: transport);
+    final receipt = await client.selectHost('gui-shell-local-windows');
+
+    expect(receipt.hostId, 'gui-shell-local-windows');
+    expect(receipt.approvalState, 'not_reused');
+    expect(receipt.authorityGenerated, 'なし');
+    expect(receipt.authorityStrip, isTrue);
+    expect(transport.operations.last, 'Host切替');
+  });
+
   test('認証拒否時に製品クライアントが閉鎖側へ失敗する', () async {
     final client = await ShellCoreClient.product(
       transport: _FakeBrokerTransport([
@@ -491,6 +532,7 @@ void main() {
       transport: _FakeBrokerTransport([
         _brokerHealthResponse(),
         _brokerHostCapabilityResponse(),
+        _brokerHostListResponse(),
         _brokerRejectedResponse(
           'normalize_payload',
           'broker_stale_session',
@@ -860,6 +902,48 @@ Map<String, Object?> _brokerHostCapabilityResponse() {
   });
 }
 
+Map<String, Object?> _brokerHostListResponse() {
+  return _brokerAcceptedBody('Host一覧', {
+    '版': 1,
+    'Host一覧': [
+      {
+        '版': 1,
+        'Host ID': 'gui-shell-local-windows',
+        '表示名': 'ローカル Windows',
+        'Platform': 'windows',
+        '接続状態': 'pending_review',
+        'Trust': {
+          'state': 'pending_review',
+          'evidence_source': 'INTERNAL_STATE',
+          'requires_operator_review': true,
+        },
+        '証明書/identity': {
+          '種別': 'certificate_hash',
+          'hash': 'sha256:${List.filled(64, 'a').join()}',
+        },
+        'Runtime summary': {
+          'runtime_count': 1,
+          'agent_count': 1,
+          'evidence_source': 'INTERNAL_STATE',
+        },
+        '最終接続': null,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '能力ID': 'host.registry.register',
+        '権限ID': 'permission.host.registry.register',
+        '承認状態': 'owner_control_approved',
+        '復旧ID': 'recover-host-registration',
+        '登録監査ID': 'audit-host-1',
+      },
+    ],
+    '件数': 1,
+    '公開範囲': 'metadata_only',
+    '証拠種別': 'INTERNAL_STATE',
+  });
+}
+
 Map<String, Object?> _brokerCommandSuspendedResponse() {
   return {
     'request_id': 'test-command-envelope',
@@ -881,6 +965,23 @@ Map<String, Object?> _brokerCommandSuspendedResponse() {
     },
     'shutdown_requested': false,
   };
+}
+
+Map<String, Object?> _brokerHostSwitchResponse() {
+  return _brokerAcceptedBody('Host切替', {
+    '版': 1,
+    '操作': 'Host切替',
+    '選択Host ID': 'gui-shell-local-windows',
+    '接続状態': 'pending_review',
+    'Trust': 'pending_review',
+    '公開範囲': 'metadata_only',
+    '証拠種別': 'INTERNAL_STATE',
+    '権限生成': 'なし',
+    'authority_strip': true,
+    '承認状態': 'not_reused',
+    '再利用禁止': ['Permission', 'Approval', 'Authority'],
+    '監査ID': 'audit-host-switch-1',
+  });
 }
 
 Map<String, Object?> _brokerRejectedResponse(

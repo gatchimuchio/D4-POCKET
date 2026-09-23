@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/host_switch_receipt.schema.json",
+  "title": "Host切替receipt（HostSwitchReceipt）",
+  "description": "Host切替の監査済み表示コンテキスト。Authorityを持ち越さず、Host Aの承認・PermissionをHost Bで再利用しない。",
+  "type": "object",
+  "required": ["版", "操作", "選択Host ID", "接続状態", "Trust", "公開範囲", "証拠種別", "権限生成", "authority_strip", "承認状態", "再利用禁止", "監査ID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "Host切替" },
+    "選択Host ID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "接続状態": { "const": "pending_review" },
+    "Trust": { "const": "pending_review" },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "権限生成": { "const": "なし" },
+    "authority_strip": { "const": true },
+    "承認状態": { "const": "not_reused" },
+    "再利用禁止": {
+      "type": "array",
+      "const": ["Permission", "Approval", "Authority"],
+      "items": { "enum": ["Permission", "Approval", "Authority"] },
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true
+    },
+    "監査ID": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }
+}

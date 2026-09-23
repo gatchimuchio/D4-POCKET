@@ -1,4 +1,4 @@
-//! C17 複数Hostのmetadata registryをBrokerへ接続する。
+//! C17/C18 複数Hostのmetadata registryと操作面をBrokerへ接続する。
 //!
 //! Host登録はowner controlだけが行い、通常IPCはmetadata一覧だけを参照する。
 //! Host identity、Trust、Runtime summaryは観測または構成metadataであり、
@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 
 const OP_REGISTER: &str = "Host登録";
 const OP_LIST: &str = "Host一覧";
+const OP_SWITCH: &str = "Host切替";
 const VERSION: u64 = 1;
 const MAX_HOSTS: usize = 64;
 const MAX_RUNTIME_COUNT: u64 = 256;
@@ -56,6 +57,15 @@ struct RuntimeSummary {
     runtime_count: u64,
     agent_count: u64,
     evidence_source: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostSwitchRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "Host ID")]
+    host_id: String,
 }
 
 pub(super) fn load_persistent_hosts(
@@ -122,6 +132,15 @@ fn parse_request(payload: &Value) -> Result<HostRegistrationRequest, String> {
         || !valid_runtime_summary(&request.runtime_summary)
     {
         return Err("Host登録payloadの値またはTrust境界が不正".to_string());
+    }
+    Ok(request)
+}
+
+fn parse_switch_request(payload: &Value) -> Result<HostSwitchRequest, String> {
+    let request: HostSwitchRequest = serde_json::from_value(payload.clone())
+        .map_err(|_| "Host切替payloadの構造が不正".to_string())?;
+    if request.version != VERSION || !valid_host_id(&request.host_id) {
+        return Err("Host切替payloadのHost IDまたは版が不正".to_string());
     }
     Ok(request)
 }
@@ -567,6 +586,126 @@ pub(super) fn list(
     }
 }
 
+pub(super) fn switch(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SWITCH,
+            "host_normal_channel_required",
+            "Host切替は通常IPCだけが実行できる",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_switch_request(payload) {
+        Ok(request) => request,
+        Err(message) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_SWITCH,
+                "host_switch_invalid",
+                &message,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let Some(receipt) = broker.hosts.get(&request.host_id) else {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SWITCH,
+            "host_not_registered",
+            "未登録Hostへ切り替えできない",
+            true,
+            payload_hash,
+        );
+    };
+    if receipt.get("接続状態") != Some(&Value::from("pending_review"))
+        || receipt.get("公開範囲") != Some(&Value::from("metadata_only"))
+        || receipt.get("証拠種別") != Some(&Value::from(EVIDENCE_SOURCE_INTERNAL_STATE))
+    {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_SWITCH,
+            "host_switch_state_invalid",
+            "Host registryの切替対象状態が不正",
+            true,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_SWITCH,
+            "received",
+            "Host切替要求を受信。既存HostのPermission、Approval、Authorityは持ち越さない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_SWITCH,
+            "host_audit_append_failed",
+            "Host切替の受信Auditを確定できない",
+        );
+    }
+    let body = json!({
+        "版": VERSION,
+        "操作": OP_SWITCH,
+        "選択Host ID": request.host_id,
+        "接続状態": "pending_review",
+        "Trust": "pending_review",
+        "公開範囲": "metadata_only",
+        "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        "権限生成": "なし",
+        "authority_strip": true,
+        "承認状態": "not_reused",
+        "再利用禁止": ["Permission", "Approval", "Authority"],
+    });
+    let event = match broker.append_audit(
+        request_id,
+        OP_SWITCH,
+        "accepted",
+        "Host表示コンテキストを切替。Host間のPermission、Approval、Authorityを再利用しない",
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        &super::protocol::canonical_payload_hash(Some(&body)),
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_SWITCH,
+                "host_audit_append_failed",
+                "Host切替の結果Auditを確定できない",
+            )
+        }
+    };
+    let mut receipt = body;
+    receipt
+        .as_object_mut()
+        .expect("Host切替receiptはobject")
+        .insert("監査ID".to_string(), Value::String(event.event_id.clone()));
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_SWITCH.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+        audit_event_id: event.event_id,
+        error: None,
+        health: None,
+        body: Some(receipt),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,6 +733,71 @@ mod tests {
         let mut live = valid_payload("host-live");
         live["接続状態"] = Value::String("connected".to_string());
         assert!(parse_request(&live).is_err());
+    }
+
+    #[test]
+    fn Host切替は未知Hostとauthority持込を拒否する() {
+        let store = std::env::temp_dir().join(format!(
+            "gui-shell-host-switch-negative-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&store);
+        let mut broker = Broker::new_persistent("host-switch-negative", &store).expect("永続Broker");
+        let unknown = switch(
+            &mut broker,
+            "host-switch-unknown",
+            &json!({"版": 1, "Host ID": "host-unknown"}),
+            false,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        assert_eq!(unknown.status, BrokerStatus::Rejected);
+        let mut authority = json!({"版": 1, "Host ID": "host-unknown"});
+        authority["approval_id"] = Value::String("approval-host-a".to_string());
+        assert!(parse_switch_request(&authority).is_err());
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn Host切替はHost間で承認とPermissionを再利用しない() {
+        let store = std::env::temp_dir().join(format!(
+            "gui-shell-host-switch-positive-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&store);
+        let mut broker = Broker::new_persistent("host-switch-positive", &store).expect("永続Broker");
+        for (request_id, host_id) in [("host-register-a", "host-a"), ("host-register-b", "host-b")] {
+            let response = register(
+                &mut broker,
+                request_id,
+                &valid_payload(host_id),
+                true,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            );
+            assert_eq!(response.status, BrokerStatus::Accepted);
+        }
+        let first = switch(
+            &mut broker,
+            "host-switch-a",
+            &json!({"版": 1, "Host ID": "host-a"}),
+            false,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        let second = switch(
+            &mut broker,
+            "host-switch-b",
+            &json!({"版": 1, "Host ID": "host-b"}),
+            false,
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        );
+        for response in [first, second] {
+            assert_eq!(response.status, BrokerStatus::Accepted);
+            let body = response.body.expect("切替receipt");
+            assert_eq!(body["権限生成"], "なし");
+            assert_eq!(body["authority_strip"], true);
+            assert_eq!(body["承認状態"], "not_reused");
+            assert_eq!(body["再利用禁止"], json!(["Permission", "Approval", "Authority"]));
+        }
+        let _ = std::fs::remove_dir_all(store);
     }
 
     #[test]

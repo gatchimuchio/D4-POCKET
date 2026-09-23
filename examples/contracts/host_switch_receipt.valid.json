@@ -1,0 +1,14 @@
+{
+  "版": 1,
+  "操作": "Host切替",
+  "選択Host ID": "host-windows-dev",
+  "接続状態": "pending_review",
+  "Trust": "pending_review",
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "権限生成": "なし",
+  "authority_strip": true,
+  "承認状態": "not_reused",
+  "再利用禁止": ["Permission", "Approval", "Authority"],
+  "監査ID": "audit-host-switch-1"
+}
