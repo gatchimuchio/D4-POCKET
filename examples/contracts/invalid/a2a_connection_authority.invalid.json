@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "操作": "接続",
+  "AgentID": "remote-agent-example",
+  "Agent Card URI": "http://127.0.0.1:9080/.well-known/agent-card.json",
+  "protocol_version": "1.0",
+  "Transport": "http",
+  "Credential ref": {
+    "credential_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "purpose": "A2A接続",
+    "target": "remote-agent-example",
+    "required": false,
+    "status": "missing"
+  },
+  "authority": "owner"
+}

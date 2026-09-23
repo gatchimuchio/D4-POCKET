@@ -14,6 +14,7 @@ use std::time::Duration;
 const MAX_EVALUATION_DATASET_BYTES: u64 = 48 * 1024;
 const MAX_CREDENTIAL_REGISTRATION_BYTES: u64 = 64 * 1024;
 const MAX_MCP_CONNECTION_BYTES: u64 = 64 * 1024;
+const MAX_A2A_CONNECTION_BYTES: u64 = 64 * 1024;
 
 pub fn 実行(args: &[String]) -> Result<(), String> {
     if args.len() < 3 || args[0] != "--session-file" {
@@ -161,6 +162,74 @@ pub fn MCP接続(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// ownerが明示したA2A Agent Card接続設定だけをBrokerへ渡す。
+/// Agent Card URI、Credential実値、外部Agentのraw contentはCLI出力へ戻さない。
+pub fn A2A接続(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "接続" {
+        return Err("使用法: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>".into());
+    }
+    let payload = A2A接続設定読取(&args[3])?;
+    let body = owner操作送信(&args[1], "A2A接続", payload)?;
+    let receipt = A2A接続公開投影(&body)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "A2A接続公開receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+fn A2A接続公開投影(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "A2A接続公開receiptの形式が不正".to_string())?;
+    if A2A公開receiptに禁止fieldがある(body) {
+        return Err("A2A接続公開receiptへ接続先実値・権限・秘密値・raw contentが混入している".into());
+    }
+    let required = [
+        "版", "契約種別", "AgentID", "Agent Card", "Task", "Message", "Artifact", "Stream",
+        "Trust", "Capability diff", "権限生成", "authority_strip", "公開範囲", "証拠種別",
+        "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID", "接続監査ID",
+    ];
+    if required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("A2A接続公開receiptの形式が不正".into());
+    }
+    if object.get("権限生成").and_then(Value::as_str) != Some("なし")
+        || object.get("authority_strip").and_then(Value::as_bool) != Some(true)
+        || object.get("公開範囲").and_then(Value::as_str) != Some("metadata_only")
+    {
+        return Err("A2A接続公開receiptのAuthority境界が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn A2A公開receiptに禁止fieldがある(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "Agent Card URI"
+                        | "endpoint"
+                        | "uri"
+                        | "secret"
+                        | "secret_value"
+                        | "token"
+                        | "password"
+                        | "credential_value"
+                        | "Task本文"
+                        | "Message本文"
+                        | "Artifact本文"
+                        | "permission_id"
+                        | "approval_id"
+                        | "authority"
+                )
+            }) || object.values().any(A2A公開receiptに禁止fieldがある)
+        }
+        Value::Array(values) => values.iter().any(A2A公開receiptに禁止fieldがある),
+        _ => false,
+    }
+}
+
 fn MCP接続公開投影(body: &Value) -> Result<Value, String> {
     let object = body
         .as_object()
@@ -295,6 +364,60 @@ fn MCP接続設定に禁止fieldがある(value: &Value) -> bool {
             }) || object.values().any(MCP接続設定に禁止fieldがある)
         }
         Value::Array(values) => values.iter().any(MCP接続設定に禁止fieldがある),
+        _ => false,
+    }
+}
+
+fn A2A接続設定読取(path: &str) -> Result<Value, String> {
+    let file = std::fs::File::open(path).map_err(|_| "A2A接続設定fileを開けない")?;
+    let size = file
+        .metadata()
+        .map_err(|_| "A2A接続設定fileの大きさを確認できない")?
+        .len();
+    if size > MAX_A2A_CONNECTION_BYTES {
+        return Err("A2A接続設定fileが64KiB上限を超過".into());
+    }
+    let mut raw = Vec::with_capacity(size as usize);
+    file.take(MAX_A2A_CONNECTION_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| "A2A接続設定fileを読めない")?;
+    if raw.len() as u64 > MAX_A2A_CONNECTION_BYTES {
+        return Err("A2A接続設定fileが64KiB上限を超過".into());
+    }
+    let payload: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "A2A接続設定fileのJSON形式が不正")?;
+    if !payload.is_object() {
+        return Err("A2A接続設定fileはJSON objectでなければならない".into());
+    }
+    if A2A接続設定に禁止fieldがある(&payload) {
+        return Err("A2A接続設定fileへ秘密値・権限・raw contentを含められない".into());
+    }
+    Ok(payload)
+}
+
+fn A2A接続設定に禁止fieldがある(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.as_str(),
+                    "authority"
+                        | "authority_id"
+                        | "permission_id"
+                        | "approval_id"
+                        | "capability_grant"
+                        | "secret"
+                        | "secret_value"
+                        | "token"
+                        | "password"
+                        | "credential_value"
+                        | "Task本文"
+                        | "Message本文"
+                        | "Artifact本文"
+                )
+            }) || object.values().any(A2A接続設定に禁止fieldがある)
+        }
+        Value::Array(values) => values.iter().any(A2A接続設定に禁止fieldがある),
         _ => false,
     }
 }
@@ -678,5 +801,38 @@ mod tests {
         assert!(MCP接続設定に禁止fieldがある(&json!({
             "nested": [{"permission_id": "permission.injected"}]
         })));
+    }
+
+    #[test]
+    fn A2A接続公開receiptはendpointとAuthorityを除外する() {
+        let body = json!({
+            "版": 1,
+            "契約種別": "A2A外部概念射影",
+            "AgentID": "remote-agent-example",
+            "Agent Card": {},
+            "Task": [],
+            "Message": [],
+            "Artifact": [],
+            "Stream": [],
+            "Trust": {},
+            "Capability diff": {},
+            "権限生成": "なし",
+            "authority_strip": true,
+            "公開範囲": "metadata_only",
+            "証拠種別": "LIVE_RUNTIME",
+            "接続状態": "connected",
+            "能力ID": "a2a.connection.connect",
+            "権限ID": "permission.a2a.connection.connect",
+            "承認状態": "owner_control_approved",
+            "復旧ID": "recover-a2a-connection",
+            "接続監査ID": "audit-a2a-1"
+        });
+        assert_eq!(A2A接続公開投影(&body).expect("A2A公開receipt"), body);
+        let mut endpoint = body.clone();
+        endpoint["Agent Card"]["endpoint"] = json!("接続先実値");
+        assert!(A2A接続公開投影(&endpoint).is_err());
+        let mut authority = body;
+        authority["authority"] = json!("owner");
+        assert!(A2A接続公開投影(&authority).is_err());
     }
 }

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/a2a_connection_list.schema.json",
+  "title": "A2A接続一覧（A2aConnectionList）",
+  "description": "通常IPCから参照するA2A接続receiptのbounded metadata一覧。",
+  "type": "object",
+  "required": ["版", "A2A接続一覧", "件数", "公開範囲", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "A2A接続一覧": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/receipt" }
+    },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 64 },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "required": ["版", "契約種別", "AgentID", "Agent Card", "Task", "Message", "Artifact", "Stream", "Trust", "Capability diff", "権限生成", "authority_strip", "公開範囲", "証拠種別", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID", "接続監査ID"],
+      "additionalProperties": false,
+      "properties": {
+        "版": { "const": 1 },
+        "契約種別": { "const": "A2A外部概念射影" },
+        "AgentID": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "Agent Card": { "type": "object", "additionalProperties": false },
+        "Task": { "type": "array", "maxItems": 128, "items": { "type": "object", "additionalProperties": false } },
+        "Message": { "type": "array", "maxItems": 256, "items": { "type": "object", "additionalProperties": false } },
+        "Artifact": { "type": "array", "maxItems": 256, "items": { "type": "object", "additionalProperties": false } },
+        "Stream": { "type": "array", "maxItems": 128, "items": { "type": "object", "additionalProperties": false } },
+        "Trust": { "type": "object", "additionalProperties": false },
+        "Capability diff": { "type": "object", "additionalProperties": false },
+        "権限生成": { "const": "なし" },
+        "authority_strip": { "const": true },
+        "公開範囲": { "const": "metadata_only" },
+        "証拠種別": { "const": "LIVE_RUNTIME" },
+        "接続状態": { "const": "connected" },
+        "能力ID": { "const": "a2a.connection.connect" },
+        "権限ID": { "const": "permission.a2a.connection.connect" },
+        "承認状態": { "const": "owner_control_approved" },
+        "復旧ID": { "const": "recover-a2a-connection" },
+        "接続監査ID": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    }
+  }
+}

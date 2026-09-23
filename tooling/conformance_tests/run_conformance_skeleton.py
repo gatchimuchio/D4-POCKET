@@ -83,6 +83,9 @@ REQUIRED_SCHEMA_NAMES = {
     "mcp_connection",
     "mcp_connection_receipt",
     "mcp_connection_list",
+    "a2a_connection",
+    "a2a_connection_receipt",
+    "a2a_connection_list",
     "profile",
     "profile_receipt",
     "profile_list",
@@ -166,6 +169,7 @@ BROKER_REQUIRED_SOURCES = {
     "audit.rs",
     "regression_case.rs",
     "mcp_center.rs",
+    "a2a_center.rs",
     "profile_center.rs",
     "update_center.rs",
     "notification_center.rs",
@@ -193,6 +197,9 @@ BROKER_REQUIRED_SCHEMAS = {
     "observation_trace.schema.json",
     "observation_metric.schema.json",
     "observation_list.schema.json",
+    "a2a_connection.schema.json",
+    "a2a_connection_receipt.schema.json",
+    "a2a_connection_list.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -311,6 +318,7 @@ def test_required_docs_exist() -> list[str]:
         "content-exposure-policy.md",
         "approval-visibility-boundary.md",
         "a2a-contract.md",
+        "a2a-connection-center.md",
         "runtime-catalog.md",
     }
     existing = {path.name for path in DOC_SPECS.glob("*.md")}
@@ -4026,6 +4034,111 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     return 不整合
 
 
+def A2A接続センターの統治経路と境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "a2a-connection-center.md"
+    if not specification.exists():
+        return ["C16 A2A接続センターの日本語意味正本がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    required_tokens = (
+        "A2A接続",
+        "A2A接続一覧",
+        "Agent Card",
+        "metadata_only",
+        "LIVE_RUNTIME",
+        "INTERNAL_STATE",
+        "owner control",
+        "通常認証済みIPC",
+        "HTTPS",
+        "Task送信",
+        "Credential実値",
+        "release_blocker",
+    )
+    for token in required_tokens:
+        if token not in specification_text:
+            不整合.append(f"C16 A2A接続センター正本に必須境界がない: {token}")
+
+    try:
+        canonical_index = json.loads((ROOT / "規定" / "正本索引.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        不整合.append("C16 A2A接続センター正本索引を読めない")
+    else:
+        current_sources = canonical_index.get("現行正本", [])
+        if not any(item.get("path") == "docs/specs/a2a-connection-center.md" for item in current_sources if isinstance(item, dict)):
+            不整合.append("C16 A2A接続センター正本が正本索引へ登録されていない")
+
+    for name in ("a2a_connection", "a2a_connection_receipt", "a2a_connection_list"):
+        schema = load_schema(name + ".schema.json")
+        valid = load_contract_fixture(name + ".valid.json")
+        failures = validate_instance(valid, schema)
+        if failures:
+            不整合.extend(f"C16 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+
+    invalid_names = (
+        "a2a_connection_authority.invalid.json",
+        "a2a_connection_receipt_raw_endpoint.invalid.json",
+        "a2a_connection_list_wrong_evidence.invalid.json",
+    )
+    invalid_schema_names = {
+        invalid_names[0]: "a2a_connection",
+        invalid_names[1]: "a2a_connection_receipt",
+        invalid_names[2]: "a2a_connection_list",
+    }
+    for name in invalid_names:
+        try:
+            invalid = load_contract_fixture("invalid/" + name)
+        except (OSError, json.JSONDecodeError) as exc:
+            不整合.append(f"C16 {name}を読めない: {exc}")
+            continue
+        if not validate_instance(invalid, load_schema(invalid_schema_names[name] + ".schema.json")):
+            不整合.append(f"C16 {name}を受理している")
+
+    request = load_contract_fixture("a2a_connection.valid.json")
+    if request.get("Transport") != "http" or request.get("Credential ref", {}).get("required") is not False:
+        不整合.append("C16接続要求が現行loopback HTTP／credential ref境界ではない")
+    receipt = load_contract_fixture("a2a_connection_receipt.valid.json")
+    if (
+        receipt.get("権限生成") != "なし"
+        or receipt.get("authority_strip") is not True
+        or receipt.get("公開範囲") != "metadata_only"
+        or receipt.get("証拠種別") != "LIVE_RUNTIME"
+        or receipt.get("Trust", {}).get("requires_operator_review") is not True
+    ):
+        不整合.append("C16 receiptのAuthority、公開範囲、証拠種別、Trust境界が不正")
+    card = receipt.get("Agent Card", {})
+    if "endpoint" in card or "uri" in card or "Agent Card URI" in card:
+        不整合.append("C16 receiptがAgent Card endpoint実値を保持している")
+    authentication = card.get("authentication", {})
+    if authentication.get("secret_value_present") is not False:
+        不整合.append("C16 receiptがcredential実値の存在を許可している")
+
+    rust_a2a = (RUST_HELPER / "src" / "a2a.rs").read_text(encoding="utf-8")
+    rust_center = (RUST_HELPER / "src" / "broker" / "a2a_center.rs").read_text(encoding="utf-8")
+    owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    ipc_request = (SPECS / "ipc_request.schema.json").read_text(encoding="utf-8")
+    ipc_response = (SPECS / "ipc_response.schema.json").read_text(encoding="utf-8")
+    for token, source in (
+        ("a2a_https_unavailable", rust_a2a),
+        ("a2a_http_non_loopback", rust_a2a),
+        ("Content-Length", rust_a2a),
+        ("secret_value_present", rust_a2a),
+        ("supportedInterfaces", rust_a2a),
+        ("a2a_owner_required", rust_center),
+        ("a2a_normal_channel_required", rust_center),
+        ("recover-a2a-connection", rust_center),
+        ("metadata_only", rust_center),
+        ("Task本文", rust_center),
+        ("A2A接続公開投影", owner_cli),
+        ("A2A接続設定に禁止fieldがある", owner_cli),
+        ("A2A接続", protocol + ipc_request + ipc_response),
+        ("A2A接続一覧", protocol + ipc_request + ipc_response),
+    ):
+        if token not in source:
+            不整合.append(f"C16実装に統治境界tokenがない: {token}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5626,6 +5739,7 @@ def main() -> int:
         MCP外部概念射影の契約と境界を検査する,
         A2A外部概念射影の契約と境界を検査する,
         MCP接続センターの統治経路と境界を検査する,
+        A2A接続センターの統治経路と境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

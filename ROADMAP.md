@@ -29,7 +29,8 @@ C13では、`docs/specs/observability-center.md`を正本とする観測セン�
 
 C14では、`docs/specs/trace-inspector.md`を正本とする読み取り専用のTrace InspectorをDesktopへ接続した。C13の`観測一覧`を再利用し、Broker内部で実測されたSpanについて開始・終了・所要時間・状態・親Span・エラー分類をbounded waterfall表示する。Runtime、Adapter、Tool、外部通信は実測経路が未接続のため画面上で未成立として明示する。Trace表示はPermission、Approval、Authority、Capability、Credentialを生成せず、OpenTelemetry export、外部collector、Runtime全体の実測、installed product証拠、8時間運用は`release_blocker`として保持する。
 
-C15では、`docs/specs/a2a-contract.md`を正本とするA2A外部概念射影契約を追加した。Agent Card、Task、Message、Artifact、Streamをboundedな`metadata_only` projectionへ固定し、各概念へ`authority_strip=true`を要求する。Agent Card、Trust、Capability diff、認証schemeは説明情報であり、Permission、Approval、Authority、Credential実値、接続、実行を生成しない。A2Aの実物interface確認、Agent Card discovery、Task送信、Message／Artifact本文、Stream購読はC16以降へ分離し、未成立を`release_blocker`として保持する。
+
+C16の現行単位では、`docs/specs/a2a-connection-center.md`を正本とするowner専用のA2A Agent Card取得、Rust Security Broker統治、loopback HTTPのbounded検証、`LIVE_RUNTIME` metadata-only receipt、通常IPCの接続一覧を追加する。Agent Cardの宣言はTrust、Permission、Approval、Authorityを生成せず、Credential refへ実値を注入しない。HTTPS、公開endpoint discovery、Task／Message送信、Artifact本文、Stream購読、quarantine、複数Agent比較、Desktop専用接続画面、実A2A Test Harnessは未接続の`release_blocker`として保持する。
 
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 

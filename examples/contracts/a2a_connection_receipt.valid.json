@@ -1,0 +1,64 @@
+{
+  "版": 1,
+  "契約種別": "A2A外部概念射影",
+  "protocol_version": "1.0",
+  "AgentID": "remote-agent-example",
+  "Agent Card": {
+    "agent_id": "remote-agent-example",
+    "display_name": "外部Agent例",
+    "description_summary": "外部Agentの宣言情報",
+    "version": "1.0.0",
+    "endpoint_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "supported_interfaces": [
+      { "binding": "jsonrpc", "transport": "http", "status": "supported", "reason": "Agent Cardのinterface宣言を確認" }
+    ],
+    "capabilities": {
+      "streaming": false,
+      "push_notifications": false,
+      "state_transition_history": false,
+      "extended_agent_card": false
+    },
+    "skills": [],
+    "authentication": {
+      "schemes": [],
+      "credential_ref": {
+        "credential_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "purpose": "A2A接続",
+        "target": "remote-agent-example",
+        "required": false,
+        "status": "missing"
+      },
+      "secret_value_present": false
+    },
+    "origin": "live_runtime",
+    "status": "discovered"
+  },
+  "Task": [],
+  "Message": [],
+  "Artifact": [],
+  "Stream": [],
+  "Trust": {
+    "state": "pending_review",
+    "evidence_source": "LIVE_RUNTIME",
+    "reason": "Agent Cardは宣言情報であり、owner review前のTrustを生成しない",
+    "requires_operator_review": true
+  },
+  "Capability diff": {
+    "status": "not_evaluated",
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "requires_operator_review": true,
+    "evidence_source": "LIVE_RUNTIME"
+  },
+  "権限生成": "なし",
+  "authority_strip": true,
+  "公開範囲": "metadata_only",
+  "証拠種別": "LIVE_RUNTIME",
+  "接続状態": "connected",
+  "能力ID": "a2a.connection.connect",
+  "権限ID": "permission.a2a.connection.connect",
+  "承認状態": "owner_control_approved",
+  "復旧ID": "recover-a2a-connection",
+  "接続監査ID": "audit-a2a-connection-1"
+}

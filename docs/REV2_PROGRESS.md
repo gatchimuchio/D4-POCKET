@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C16: A2A接続センター初期経路（2026-09-23）
+
+C15のA2A外部概念契約を、owner controlから実Agent Cardを取得するRust Security Broker経路へ接続した。現行単位はloopback HTTPだけを許可し、Agent Cardのbounded検証と`LIVE_RUNTIME` metadata-only receipt、通常IPCの接続一覧を成立させる。外部Agentの宣言からTrust、Permission、Approval、Authorityを生成しない。
+
+- Production path: owner CLI／control → `A2A接続` → Rust A2A接続センター → loopback HTTP Agent Card → Agent Card検証 → receipt。通常認証済みIPCの`A2A接続一覧`はBroker内部接続状態を`INTERNAL_STATE`として返す。
+- Boundary: HTTPS、非loopback HTTP、redirect、Transfer-Encoding、Content-Encoding、重複Content-Length、巨大header／body、credential実値、Agent Card endpoint実値、Task／Message／Artifact raw contentは拒否または非投影。Trustは`pending_review`、Capability diffは`not_evaluated`、`authority_strip=true`、`権限生成=なし`、`公開範囲=metadata_only`に固定する。
+- Bounded behavior: Agent Card body 1MiB、header 16KiB、URI 2048 bytes、接続一覧64件、接続・読取期限bounded。同一AgentIDの再接続、ownerからの一覧、通常IPCからの接続要求を拒否する。
+- Validation: Schema 96件／正常例96件／負例115件、Conformance 171 checks、Rust全試験247件（lib 205、owner CLI 7、IPC 9、canonical hash 1、checkpoint 8、protected data 2、protected startup 1、protected store 3、workspace diff 2、workspace reader 2、workspace startup 7）、厳格日本語監査をこの単位で実行しPASSした。Desktop専用接続画面、HTTPS実接続、実A2A Test Harnessは未検証または未接続として別分類する。
+- 未成立分類: HTTPS TLS、公開endpoint discovery、認証実行、Task／Message送信、Artifact本文、Stream購読、cancel、再接続、quarantine、複数Agent比較、Handoff、Desktop接続画面、Windows installed product証拠、長時間運用・障害注入は`release_blocker`。C16初期経路だけでA2A製品機能全体または正式releaseを主張しない。
+
 ## D4 Pocket C14: 追跡情報閲覧（2026-09-23）
 
 C13の`観測一覧`を再利用する読み取り専用Trace InspectorをDesktopへ接続した。Broker内部で実測されたSpanを、開始・終了・所要時間・状態・親Span・関連Audit・エラー分類のbounded waterfallとして表示する。

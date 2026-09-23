@@ -16,6 +16,7 @@ pub mod network;
 pub mod process;
 pub mod update_verification;
 pub(crate) mod mcp;
+pub(crate) mod a2a;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
