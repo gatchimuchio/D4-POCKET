@@ -20,6 +20,7 @@ import 'screens/history_screen.dart';
 import 'screens/host_capability_center.dart';
 import 'screens/notifications.dart';
 import 'screens/observability_center.dart';
+import 'screens/trace_inspector.dart';
 import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
@@ -33,7 +34,7 @@ import 'services/surface_semantics_export.dart';
 
 const String kD4PocketProductTitle = 'D4 Pocket';
 const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
-const double _navigationRailMinScrollableExtent = 840;
+const double _navigationRailMinScrollableExtent = 864;
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
@@ -255,6 +256,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         onNavigate: _navigateFromNotification,
       ),
       ObservabilityCenter(client: widget.client),
+      TraceInspector(client: widget.client),
     ];
     final pageEntries = _pageEntries();
 
@@ -404,6 +406,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.insights),
                                       label: Text('観測'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.timeline_outlined),
+                                      selectedIcon: Icon(Icons.timeline),
+                                      label: Text('追跡'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -448,6 +455,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ShellPageEntry(15, 'ホスト能力', Icons.public_outlined),
       _ShellPageEntry(16, '通知センター', Icons.notifications_none),
       _ShellPageEntry(17, '観測センター', Icons.insights_outlined),
+      _ShellPageEntry(18, '追跡情報', Icons.timeline_outlined),
     ];
   }
 

@@ -35,7 +35,7 @@ void main() {
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 18);
+    expect(rail.destinations.length, 19);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -51,7 +51,7 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 18);
+    expect(rail.destinations.length, 19);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
@@ -91,6 +91,21 @@ void main() {
 
     expect(find.text('観測センター'), findsWidgets);
     expect(find.textContaining('Broker接続がないため'), findsOneWidget);
+  });
+
+  testWidgets('Trace InspectorをNavigationRailから開ける', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(18);
+    await tester.pumpAndSettle();
+
+    expect(find.text('追跡情報'), findsWidgets);
+    expect(find.textContaining('Broker接続がないため'), findsOneWidget);
+    expect(
+      find.textContaining('Permission、Approval、Authority'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {

@@ -115,6 +115,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: Rust BrokerはAudit確定処理の実測durationをboundedなSpan、Trace、Metricへ内部射影し、通常IPCの観測一覧とDesktop観測画面へ返す。保持1024Span、返却256Span／256Trace／16Metricで、TraceID filterと測定不能値のunknown境界を持つ。
   authority_boundary: 観測はINTERNAL_STATEの運用表示であり、Auditのreason、payload hash、metadata、秘密値を公開せず、Permission、Approval、Authority、Capabilityを生成しない。OpenTelemetry export、C14 Trace Inspector、Runtime全体の実測、installed product証拠は未成立として扱う。
 
+- item: D4 Pocket Trace Inspector（C14 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: C13の通常認証済み`観測一覧`を読み取り、Broker内部Spanの開始・終了・所要時間・状態・親Span・関連Audit・エラー分類をbounded waterfallで表示する。TraceID filter、更新、Broker接続なしのfail-closed表示を持つ。
+  authority_boundary: 現在の実測対象はBrokerだけであり、Runtime、Adapter、Tool、外部通信を実測済みとして表示しない。Trace表示はINTERNAL_STATEに限定し、Auditのreason、payload、metadata、秘密値を公開せず、Permission、Approval、Authority、Capability、Credentialを生成しない。OpenTelemetry export、Runtime全体の実測、installed product証拠は未成立として扱う。
+
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented

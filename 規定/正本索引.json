@@ -196,6 +196,10 @@
       "責任": "C13 Audit確定処理の内部Span・Trace・Metric、bounded観測一覧、INTERNAL_STATE、Audit責任分離、OpenTelemetry未対応境界"
     },
     {
+      "path": "docs/specs/trace-inspector.md",
+      "責任": "C14 Broker内部Spanの読み取り専用waterfall、TraceID filter、所要時間・親Span・エラー分類、実測対象と権限非生成の境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C14: 追跡情報閲覧（2026-09-23）
+
+C13の`観測一覧`を再利用する読み取り専用Trace InspectorをDesktopへ接続した。Broker内部で実測されたSpanを、開始・終了・所要時間・状態・親Span・関連Audit・エラー分類のbounded waterfallとして表示する。
+
+- Production path: Desktop Trace Inspector → 通常認証済みBroker IPC → Rust Observation Center → `観測一覧`。TraceID filter、手動更新、Broker接続なしのfail-closed表示を接続した。
+- Evidence boundary: 現在の実測対象はBrokerだけである。Runtime、Adapter、Tool、外部通信はproduction観測経路が接続されるまで実測済みと表示しない。表示は`INTERNAL_STATE`であり、Auditのreason、payload、metadata、秘密値を表示しない。
+- Authority boundary: Trace表示からPermission、Approval、Authority、Capability、Credentialを生成しない。Traceは監視表示であり、承認・実行・権限判断の経路ではない。
+- 検証: Desktop NavigationRail／追跡情報画面を含む全83 Flutter試験、Flutter analyze、Schema 92件／正常例92件／負例109件、Conformance 169 checks、厳格日本語監査、manifest検査を実行し、PASSした。`python tooling/validate_all.py --python-only --desktop-platform windows`も開発モードでPASSした。
+- 未成立分類: Runtime／Adapter／Tool／外部通信のproduction trace、OpenTelemetry export、外部collector、long-term trace、8時間運用、Windows installed product証拠は`release_blocker`。C14はBroker内部観測の閲覧範囲だけを主張する。
+
 ## D4 Pocket C13: 観測センター（2026-09-23）
 
 BrokerのAudit確定処理を、Auditとは別の内部観測としてboundedなSpan、Trace、Metricへ射影し、Desktop観測センターへ接続した。観測はsession内memoryに限定し、caller登録、外部export、権限生成を持たない。

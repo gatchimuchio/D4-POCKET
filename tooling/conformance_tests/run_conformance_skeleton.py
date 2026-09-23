@@ -212,6 +212,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/services/surface_semantics_export.dart",
     "lib/services/observation_client.dart",
     "lib/screens/observability_center.dart",
+    "lib/screens/trace_inspector.dart",
     "lib/models/generated_contracts.dart",
 }
 MOBILE_FLUTTER_REQUIRED_FILES = {
@@ -802,6 +803,28 @@ def test_observation_center_contract_and_audit_separation() -> list[str]:
         errors.append("caller由来の観測登録経路を追加してはならない")
     if "MAX_SPANS: usize = 1024" not in source or "MAX_RESPONSE_SPANS: usize = 256" not in source:
         errors.append("観測保持または応答のbounded上限が宣言されていない")
+    return errors
+
+
+def test_trace_inspector_surface_and_evidence_boundary() -> list[str]:
+    errors = []
+    source = (DESKTOP_FLUTTER / "lib" / "screens" / "trace_inspector.dart").read_text(
+        encoding="utf-8"
+    )
+    for term in (
+        "処理時間 waterfall",
+        "開始EpochMillis",
+        "終了EpochMillis",
+        "所要Millis",
+        "親SpanID",
+        "エラー分類",
+        "現在の実測対象: Broker",
+        "Runtime、Adapter、Tool、外部通信",
+        "snapshotをTraceの根拠にはしません",
+        "Permission、Approval、Authority、Capability、Credential",
+    ):
+        if term not in source:
+            errors.append(f"Trace Inspectorに必要な境界または表示項目がない: {term}")
     return errors
 
 
@@ -5396,6 +5419,7 @@ def main() -> int:
         test_update_center_contract_and_execution_boundary,
         test_notification_center_contract_and_navigation_boundary,
         test_observation_center_contract_and_audit_separation,
+        test_trace_inspector_surface_and_evidence_boundary,
         test_shell_contracts_load_required_schemas,
         test_shell_core_ignores_adapter_metadata_permissions,
         test_shell_core_non_authority_sources_do_not_grant_authority,
