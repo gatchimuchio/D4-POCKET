@@ -25,6 +25,9 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  tray_controller_ = std::make_unique<TrayController>(
+      GetHandle(), flutter_controller_->engine()->messenger());
+  tray_controller_->Initialize();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +43,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  tray_controller_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -59,6 +63,17 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     if (result) {
       return *result;
     }
+  }
+
+  if (tray_controller_ &&
+      tray_controller_->HandleMessage(message, wparam, lparam)) {
+    return 0;
+  }
+
+  if (message == WM_CLOSE && tray_controller_ &&
+      !tray_controller_->ExitRequested()) {
+    ShowWindow(hwnd, SW_HIDE);
+    return 0;
   }
 
   switch (message) {

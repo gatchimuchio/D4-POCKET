@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "要求種別": "全Runtime停止要求",
+  "対象": [],
+  "承認状態": "owner_reapproval_required",
+  "停止実行済み": false,
+  "証拠種別": "INTERNAL_STATE",
+  "権限生成": "owner",
+  "復旧ID": "recover-runtime-stop-request"
+}

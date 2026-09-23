@@ -142,6 +142,9 @@ REQUIRED_SCHEMA_NAMES = {
     "adapter_management_request",
     "adapter_management_receipt",
     "adapter_management_list",
+    "tray_stop_request",
+    "tray_stop_response",
+    "windows_tray_projection",
 }
 
 VISIBILITY_VALUES = ["none", "hash_only", "summary", "redacted", "full"]
@@ -216,6 +219,9 @@ BROKER_REQUIRED_SCHEMAS = {
     "adapter_management_request.schema.json",
     "adapter_management_receipt.schema.json",
     "adapter_management_list.schema.json",
+    "tray_stop_request.schema.json",
+    "tray_stop_response.schema.json",
+    "windows_tray_projection.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -231,6 +237,9 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_center.dart",
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
+    "lib/services/windows_tray_client.dart",
+    "windows/runner/tray_controller.cpp",
+    "windows/runner/tray_controller.h",
     "lib/services/profile_client.dart",
     "lib/services/update_client.dart",
     "lib/services/surface_semantics_export.dart",
@@ -4367,6 +4376,62 @@ def Adapter管理操作の統治境界を検査する() -> list[str]:
     return 不整合
 
 
+def Windows常駐トレイ操作面の統治境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "windows-tray-surface.md"
+    if not specification.exists():
+        return ["C20 Windows常駐トレイの日本語意味正本がない"]
+    text = specification.read_text(encoding="utf-8")
+    for token in (
+        "全Runtime停止要求",
+        "owner_reapproval_required",
+        "停止実行済み=false",
+        "権限生成=なし",
+        "Broker IPC",
+        "直接kill",
+        "release_blocker",
+    ):
+        if token not in text:
+            不整合.append(f"C20 Windows常駐トレイ正本に必須境界がない: {token}")
+
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    lifecycle = (RUST_HELPER / "src" / "broker" / "runtime_lifecycle.rs").read_text(encoding="utf-8")
+    tray_client = (DESKTOP_FLUTTER / "lib" / "services" / "windows_tray_client.dart").read_text(encoding="utf-8")
+    shell_client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
+    main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    native = (DESKTOP_FLUTTER / "windows" / "runner" / "tray_controller.cpp").read_text(encoding="utf-8")
+    for token, source in (
+        ("全Runtime停止要求", protocol + lifecycle + shell_client),
+        ("all_stop_request_body", lifecycle + protocol),
+        ("owner_reapproval_required", lifecycle + shell_client + tray_client),
+        ("停止実行済み", lifecycle + shell_client),
+        ("gui_shell/tray", tray_client + native),
+        ("stop_request", main + tray_client + native),
+        ("Shell_NotifyIconW", native),
+        ("NIM_ADD", native),
+        ("NIM_DELETE", native),
+        ("PostMessageW", native),
+    ):
+        if token not in source:
+            不整合.append(f"C20 Windows常駐トレイ実装に統治境界tokenがない: {token}")
+
+    for name in ("tray_stop_request", "tray_stop_response", "windows_tray_projection"):
+        schema = load_schema(name + ".schema.json")
+        valid = load_contract_fixture(name + ".valid.json")
+        failures = validate_instance(valid, schema)
+        if failures:
+            不整合.extend(f"C20 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    for file_name, schema_name in (
+        ("tray_stop_request_unknown_field.invalid.json", "tray_stop_request"),
+        ("tray_stop_response_authority.invalid.json", "tray_stop_response"),
+        ("windows_tray_projection_zero_unknown.invalid.json", "windows_tray_projection"),
+    ):
+        invalid = load_contract_fixture("invalid/" + file_name)
+        if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
+            不整合.append(f"C20 {file_name}を受理している")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -4699,7 +4764,6 @@ def test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge() -> 
         "Process.killPid",
         "dart:ffi",
         "flutter_rust_bridge",
-        "MethodChannel(",
     ]
     errors = []
     for path in sorted((DESKTOP_FLUTTER / "lib").rglob("*.dart")):
@@ -4707,6 +4771,18 @@ def test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge() -> 
         for token in forbidden:
             if token in text:
                 errors.append(f"{path.relative_to(ROOT)} が禁止されたruntime bridge tokenを含む: {token}")
+        if "MethodChannel(" in text:
+            allowed_tray = (
+                path == DESKTOP_FLUTTER / "lib" / "services" / "windows_tray_client.dart"
+                and "MethodChannel('gui_shell/tray')" in text
+                and "requestAllRuntimeStop" not in text
+                and "Process.run" not in text
+                and "Process.start" not in text
+                and "dart:ffi" not in text
+                and "flutter_rust_bridge" not in text
+            )
+            if not allowed_tray:
+                errors.append(f"{path.relative_to(ROOT)} が許可外のMethodChannel(を含む")
     return errors
 
 
@@ -5971,6 +6047,7 @@ def main() -> int:
         複数Host_registryの統治経路と境界を検査する,
         Host操作面の観測境界とHost間非混線を検査する,
         Adapter管理操作の統治境界を検査する,
+        Windows常駐トレイ操作面の統治境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

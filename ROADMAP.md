@@ -37,6 +37,8 @@ C18の現行単位では、`docs/specs/host-operation-surface.md`を正本とし
 
 C19の現行単位では、`docs/specs/adapter-management-surface.md`を正本としてRuntime CenterのAdapter catalogをRust Brokerへ接続した。`アダプター一覧`は通常IPCのmetadata-only projection、導入・検証・有効化・無効化・隔離・更新・削除はowner controlのbounded state transitionとし、署名検査はBroker所有Ed25519 trustに限定する。通常IPCの変更要求はowner再承認待ちで停止し、隔離済みRuntime IDは登録、lifecycle、資源観測、対話から再利用しない。外部artifactの実download・filesystem導入・process管理・実削除、Windows installed product evidenceは`release_blocker`である。
 
+C20の現行単位では、`docs/specs/windows-tray-surface.md`を正本としてWindows常駐トレイの表示・操作入口を追加した。Win32トレイはウィンドウ前面化、Broker由来の実行系状態・保留承認件数・重大通知件数のbounded表示、終了入口だけを担い、取得不能値を0へ変換しない。全Runtime停止はFlutterから通常認証済みBroker IPCへ`全Runtime停止要求`を送り、Brokerがlifecycle対象を列挙したowner再承認待ちreceiptを返す。直接kill、owner承認生成、実停止、権限生成は行わない。`release_blocker`はWindows installed productでのトレイ実機証拠と、owner再承認後の実lifecycle停止統合である。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

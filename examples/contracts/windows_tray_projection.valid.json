@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "runtime_status": "ready",
+  "pending_approval_count": 0,
+  "critical_notification_count": "不明",
+  "evidence_source": "INTERNAL_STATE",
+  "stop_request_supported": true
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/tray_stop_request.schema.json",
+  "title": "常駐トレイ全Runtime停止要求（TrayStopRequest）",
+  "type": "object",
+  "required": ["版"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 }
+  }
+}

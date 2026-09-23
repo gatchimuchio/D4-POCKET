@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5e841aa7b49793562bd714f59e5612edb33bc9adfc1f198899aa0c0229922312"
+      "sha256": "654bad1f7858bf0867c983a590b675b49655429522da0829f03a28378e4c72ef"
     },
     {
       "path": "SECURITY.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "0981c03aebc6f8aa29e217eef5a906d706dcb7fda996e44e3bb355195f2a51dc"
+      "sha256": "a2ad82457290c6798c4da265e777bfd2865ba638039ef5ab59f49a6efc27dc04"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -329,7 +329,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "9551a84b36bf8d3cae929f4d83376ffb31ce5847fb7cbbce78a0aab75ca62dc6"
+      "sha256": "05b27b9dc1bff937fb175d2ea8e5fcb426ebbe1a33c06cb763997c0d7ebebcbc"
     },
     {
       "path": "apps/desktop_flutter/lib/services/surface_semantics_export.dart",
@@ -338,6 +338,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
       "sha256": "2417abedead564f4c2bcb144fc7ef48e6f658ed00d09a5d6085654648a7d5ab9"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
+      "sha256": "bd5efc66552ed2d760861adac0ffc8e71bfcc09edc0d8370979eec0317b4abcc"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -552,6 +556,10 @@
       "sha256": "a2ade54eaa51af603087f7435a5169a5e647285d0a788e645a2aaef3dcfb282d"
     },
     {
+      "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
+      "sha256": "0a73122e03973a27d630dd092c8a271fb9ca3918021df5df5794e9a1e923a15e"
+    },
+    {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
       "sha256": "966160b93ddb3ed3a4b5a9e524e04d0183417987803add253cc988ef8d272624"
     },
@@ -593,7 +601,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/CMakeLists.txt",
-      "sha256": "34119ec122e36940235ef4bc245fcfb43b6960ed443e28af1a8d833a81209b9e"
+      "sha256": "9d09505167ee02f40b7f4071293a478ac031c8833d9f6c86a14a0320823860e8"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/Runner.rc",
@@ -601,11 +609,11 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/flutter_window.cpp",
-      "sha256": "dd185884c0b5301d400b58f12ebb36b1c8b326531597e531b40e44a6eeb0e943"
+      "sha256": "02c23992bf575dbb2d83fd89f6993e14990210dc8ee025f80fe0688bd93d6e64"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/flutter_window.h",
-      "sha256": "38e0fcd3a0b83895852ec295cb70d90179c0dcd40d58f065eb5232a4ecd84898"
+      "sha256": "8434ebf5aa17b11df187b61d3312c015ade8642b585cd25ca00bf5ad25959336"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/main.cpp",
@@ -622,6 +630,14 @@
     {
       "path": "apps/desktop_flutter/windows/runner/runner.exe.manifest",
       "sha256": "825d243e9fa1542619909c1b72d09b3ed7c1f3b225bb8367c125835e5dc3f8aa"
+    },
+    {
+      "path": "apps/desktop_flutter/windows/runner/tray_controller.cpp",
+      "sha256": "0c6cb03c97dbed44bd359b55f3d83ae7b744839f23887d544adb94cd3ef6a35f"
+    },
+    {
+      "path": "apps/desktop_flutter/windows/runner/tray_controller.h",
+      "sha256": "b0d1a9f7e62c47087b13ecb2b18ed0301c9db083b893afa00fa0aa66bcf60efd"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/utils.cpp",
@@ -1033,7 +1049,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "7e1c6d0dc2f73d93a7ccc5fd0888960381c8a0cd2bc543c328c6171efd79f62f"
+      "sha256": "16e4bf910b55b5bc77e7d969bff8c08a85cc255ada1cdc1aaaefabeafde23a2c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1232,6 +1248,10 @@
       "sha256": "27e2605298e8785ca44aeda01043e81cbcb3767d6b33d248397306e68256085b"
     },
     {
+      "path": "docs/specs/windows-tray-surface.md",
+      "sha256": "2f63943128f967fa355e755aa1312e652ed31fd0bd7d06aa1813fa143af7a3aa"
+    },
+    {
       "path": "docs/specs/workspace-inspection.md",
       "sha256": "da7114d6cb23822e5c80ba5645ba9fc7de1c292f48a5ca2c13ffbc1aacd7b581"
     },
@@ -1261,7 +1281,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "ddf4708392f42f4557551b819abf8438fba6e1d8a86fd5948f29f1a2f106eb96"
+      "sha256": "9dc39a40daaeea2e22b9949470dd359daeaea2843fb18306559d9ba1443b0fc7"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1944,6 +1964,14 @@
       "sha256": "723df53f33ac23d38e912626c2e7ffcb17c6d681f1725a3cdae65e730c50e5f4"
     },
     {
+      "path": "examples/contracts/invalid/tray_stop_request_unknown_field.invalid.json",
+      "sha256": "37c9e29a7975fbe7981e37b8edc659c338cb9c2a108bca3965d205fcef67b583"
+    },
+    {
+      "path": "examples/contracts/invalid/tray_stop_response_authority.invalid.json",
+      "sha256": "7221bdcc70730e41d1fa04b6fe2d4daaa3826d89c8d8a7194d09c0b6a8b9cb7b"
+    },
+    {
       "path": "examples/contracts/invalid/update_candidate.invalid.json",
       "sha256": "93d0e6b69cbc6f9248c351935a1be4088790cfeb2d68dabb1c5022e2d9497007"
     },
@@ -1962,6 +1990,10 @@
     {
       "path": "examples/contracts/invalid/update_unsafe_policy.invalid.json",
       "sha256": "a229f7d4bea7ceaae89cb89e61a5ec0dacd03c303854f1570c2fb1b3d9697644"
+    },
+    {
+      "path": "examples/contracts/invalid/windows_tray_projection_zero_unknown.invalid.json",
+      "sha256": "8284d86b5d4ef0b4d8988faf4fc83e2805cd8783b543c6e5ce4ed3ad746c4ed2"
     },
     {
       "path": "examples/contracts/invalid/workspace_diff_binary_content.invalid.json",
@@ -2164,6 +2196,14 @@
       "sha256": "1ff5bf1aa6cc9558e7d2df386e9d29c672ee6a1c7c85fcb1bf4e961a051fee2f"
     },
     {
+      "path": "examples/contracts/tray_stop_request.valid.json",
+      "sha256": "829b29f47e722d35d5661557ac041b75f14c4d2da55afe37486071ea0d8ec06f"
+    },
+    {
+      "path": "examples/contracts/tray_stop_response.valid.json",
+      "sha256": "fcd45a9787fb38af0d256cf5fb9fc4858c6a3c5c143918a2728dbff20ca24af8"
+    },
+    {
       "path": "examples/contracts/update.valid.json",
       "sha256": "473ff0ab36fc36a6a03f62522a1af8ee42629b34f5d223ee8c10228b9e700c1b"
     },
@@ -2182,6 +2222,10 @@
     {
       "path": "examples/contracts/update_trust.valid.json",
       "sha256": "d35795ed5ca163c61ed98970bf1efe896beab8688cb9c0b349384c6710e01273"
+    },
+    {
+      "path": "examples/contracts/windows_tray_projection.valid.json",
+      "sha256": "43d745a000400d4faca40c6dfab149d462693ef01a7ffb7a211971d70c085f20"
     },
     {
       "path": "examples/contracts/workspace_diff.valid.json",
@@ -2417,7 +2461,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "cefcdaa33a3454df3cadba1491adfd00b75c1849f5ebdfaa3c27d57edea38974"
+      "sha256": "a4ad836d1ac27d05cb06d1c0bc4fb38c6de9d5d911fa31e901ceecff72631b24"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2429,7 +2473,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/runtime_lifecycle.rs",
-      "sha256": "7e608603fd8fac844a26a4d31d0430c34b2c70cf3f69f6a50414bddf9c8d7080"
+      "sha256": "2097770623c34ec5082067b75bf1d01066d7acaf1dc6f88ed34ea24f9eb1c804"
     },
     {
       "path": "native/rust_helper/src/broker/runtime_registry.rs",
@@ -3173,11 +3217,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "d6c8ff04917d248a40c680cde6a94a908b20431c8d07e6428dcb4fa8ec75b286"
+      "sha256": "688484d4e15cf398cb7e9a8ae621644b4bdca8a301a9b4b943f34dad92a53e9e"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "d77d2ae33c3c65c715e324906eb91b473139a1485c0ed01523663ed85713823b"
+      "sha256": "76579186f2d657fa64e2fd910fc3677c64788617e91423430d4ddf47d5852b8c"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -3352,6 +3396,14 @@
       "sha256": "d38e6baa42d221293c04f24956c7b1e0a302e6109cc61dcbc9500d223a2b7de8"
     },
     {
+      "path": "specs/tray_stop_request.schema.json",
+      "sha256": "2e876f8c07f35752214ec9227929d0b1b816c2c9ab52e58fce80f70f8994b6a3"
+    },
+    {
+      "path": "specs/tray_stop_response.schema.json",
+      "sha256": "19e3cc7686d9ab357ff4448f36c5f6655267bec69dab6a0e77cbad16de60df33"
+    },
+    {
       "path": "specs/update.schema.json",
       "sha256": "b1fce1fb95b26840af05284f71d28ac61577c32a8bf03f883d097d7b8db9dbf0"
     },
@@ -3370,6 +3422,10 @@
     {
       "path": "specs/update_trust.schema.json",
       "sha256": "b6ff8c7369689ed2b40a890e20eeda1b15f320202f2301b5c7266bbb9b6a6d2c"
+    },
+    {
+      "path": "specs/windows_tray_projection.schema.json",
+      "sha256": "bf418db843be8b941ce1aa6798569ef9c6e58399b7b5d7eed878d7e50afabf53"
     },
     {
       "path": "specs/workspace_diff.schema.json",
@@ -3413,7 +3469,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "7198114a810c5073eb19c4dc9f3ac861030f81cace623596b6e1a7a21049801b"
+      "sha256": "352b1e36b0dd1f73a63d8c9c650cf0d1db2b00e148f58233b339d00a90aa8d53"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3461,7 +3517,7 @@
     },
     {
       "path": "tooling/release_runtime_assertions.py",
-      "sha256": "51ff351f4c33f8a5279e357f35d93c036d43dc4cc3ae5fa75ae6812dbcb5d822"
+      "sha256": "bc0d830ca503edbe1651cb706d073970323accaa9abf831ce98e56467b582e5f"
     },
     {
       "path": "tooling/release_smoke.py",
@@ -3469,7 +3525,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "3b28048e5068d6049ae46d49bd183d93ed5255f3c499c2252bb519e5d2c49526"
+      "sha256": "9cb080dc2e6cfe6f8fbac0ef23fdf122736b581b7a50273fca4ec7791c5f8ea1"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -3505,7 +3561,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "2a9fc8d197b178c28fc039a512861ba4da5b3fe998a41efd3133efa8021b3b46"
+      "sha256": "a4dc11512745d847890bdfb44e5d7fd6039fc7207692da2fcb5197621dd00590"
     }
   ]
 }

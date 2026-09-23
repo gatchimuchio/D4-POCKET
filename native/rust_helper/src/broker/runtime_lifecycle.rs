@@ -442,6 +442,36 @@ impl RuntimeLifecycleRegistry {
         })
     }
 
+    /// トレイの緊急操作面へ、Brokerが保持する実行系の停止要求状態だけを射影する。
+    /// ここではAdapterを呼び出さず、owner承認を生成せず、直接停止もしない。
+    pub(crate) fn all_stop_request_body(&mut self, now_epoch_seconds: i64) -> Value {
+        self.expire(now_epoch_seconds);
+        let targets = self
+            .runtimes
+            .iter()
+            .map(|(runtime_id, runtime)| {
+                json!({
+                    "実行系ID": runtime_id,
+                    "状態": runtime.state.as_str(),
+                    "承認必要": true,
+                    "停止実行済み": false,
+                    "再承認状態": "owner_reapproval_required",
+                    "復旧ID": "recover-runtime-stop-request",
+                })
+            })
+            .collect::<Vec<_>>();
+        json!({
+            "版": 1,
+            "要求種別": "全Runtime停止要求",
+            "対象": targets,
+            "承認状態": "owner_reapproval_required",
+            "停止実行済み": false,
+            "証拠種別": "INTERNAL_STATE",
+            "権限生成": "なし",
+            "復旧ID": "recover-runtime-stop-request",
+        })
+    }
+
     pub(crate) fn request_approval(
         &mut self,
         runtime_id: &str,
@@ -1363,6 +1393,23 @@ mod tests {
                 .code,
             "lifecycle_capability_missing"
         );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn all_stop_request_is_bounded_and_does_not_call_adapter() {
+        let (mut registry, calls) = new_registry();
+        let body = registry.all_stop_request_body(100);
+        assert_eq!(body["要求種別"], "全Runtime停止要求");
+        assert_eq!(body["承認状態"], "owner_reapproval_required");
+        assert_eq!(body["停止実行済み"], false);
+        assert_eq!(body["権限生成"], "なし");
+        assert_eq!(body["証拠種別"], "INTERNAL_STATE");
+        let targets = body["対象"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0]["実行系ID"], "fixture");
+        assert_eq!(targets[0]["承認必要"], true);
+        assert_eq!(targets[0]["停止実行済み"], false);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 

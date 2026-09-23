@@ -94,6 +94,13 @@ struct 実行系ライフサイクル操作指定 {
     approval_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 全Runtime停止要求指定 {
+    #[serde(rename = "版")]
+    version: u8,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerPersistenceMode {
     InMemorySkeleton,
@@ -447,6 +454,8 @@ pub enum BrokerOperation {
     実行系ライフサイクル承認,
     #[serde(rename = "実行系ライフサイクル操作")]
     実行系ライフサイクル操作,
+    #[serde(rename = "全Runtime停止要求")]
+    全Runtime停止要求,
     #[serde(rename = "対話開始")]
     対話開始,
     #[serde(rename = "対話送信")]
@@ -568,6 +577,7 @@ impl BrokerOperation {
             BrokerOperation::実行系ライフサイクル承認要求 => "実行系ライフサイクル承認要求",
             BrokerOperation::実行系ライフサイクル承認 => "実行系ライフサイクル承認",
             BrokerOperation::実行系ライフサイクル操作 => "実行系ライフサイクル操作",
+            BrokerOperation::全Runtime停止要求 => "全Runtime停止要求",
             BrokerOperation::対話開始 => "対話開始",
             BrokerOperation::対話送信 => "対話送信",
             BrokerOperation::対話取得 => "対話取得",
@@ -1149,6 +1159,7 @@ impl Broker {
             BrokerOperation::実行系ライフサイクル承認要求 => self.実行系ライフサイクル承認要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系ライフサイクル承認 => self.実行系ライフサイクル承認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::実行系ライフサイクル操作 => self.実行系ライフサイクル操作処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::全Runtime停止要求 => self.全Runtime停止要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::回帰Case登録 => self.回帰Case登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             #[cfg(windows)]
@@ -1673,6 +1684,41 @@ impl Broker {
             self.ライフサイクル.fail_closed();
         }
         response
+    }
+
+    #[allow(non_snake_case)]
+    fn 全Runtime停止要求処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::全Runtime停止要求;
+        let request: 全Runtime停止要求指定 =
+            match serde_json::from_value::<全Runtime停止要求指定>(payload.clone()) {
+                Ok(request) if request.version == 1 => request,
+                _ => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation.as_str(),
+                        "tray_stop_request_invalid",
+                        "全Runtime停止要求は版だけを受け付ける",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+        let _ = request;
+        let body = self
+            .ライフサイクル
+            .all_stop_request_body(self.current_epoch_seconds());
+        self.accept_body_with_evidence(
+            request_id,
+            operation,
+            body,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
     }
 
     fn 実行系ライフサイクル承認処理(
@@ -3005,6 +3051,38 @@ mod tests {
             "recovery_action": {"recovery_id": "recover-command-dispatch"},
             "adapter_metadata": {"client": "test"}
         })
+    }
+
+    #[test]
+    fn tray_stop_request_is_broker_receipt_and_rejects_unknown_fields() {
+        let mut broker = test_broker();
+        let mut request = BrokerRequestEnvelope::command_envelope(
+            "tray-stop-request",
+            "session-1",
+            "tray-stop-request-nonce",
+        );
+        request.operation = Some(BrokerOperation::全Runtime停止要求);
+        request.payload = Some(json!({"版": 1}));
+        request.refresh_payload_hash();
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        assert_eq!(response.operation, "全Runtime停止要求");
+        let body = response.body.unwrap();
+        assert_eq!(body["停止実行済み"], false);
+        assert_eq!(body["承認状態"], "owner_reapproval_required");
+        assert_eq!(body["権限生成"], "なし");
+
+        let mut malformed = BrokerRequestEnvelope::command_envelope(
+            "tray-stop-request-invalid",
+            "session-1",
+            "tray-stop-request-invalid-nonce",
+        );
+        malformed.operation = Some(BrokerOperation::全Runtime停止要求);
+        malformed.payload = Some(json!({"版": 1, "authority": "owner"}));
+        malformed.refresh_payload_hash();
+        let rejected = broker.handle(malformed);
+        assert_eq!(rejected.status, BrokerStatus::Rejected);
+        assert_eq!(rejected.error.unwrap().code, "tray_stop_request_invalid");
     }
 
     fn authority_error_codes(body: &serde_json::Value) -> Vec<&str> {

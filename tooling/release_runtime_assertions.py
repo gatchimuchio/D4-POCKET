@@ -79,6 +79,20 @@ def _desktop_lib_files() -> list[Path]:
     return list((DESKTOP_FLUTTER / "lib").rglob("*.dart"))
 
 
+def _is_bounded_windows_tray_channel(path: Path, text: str) -> bool:
+    """表示専用として固定したWindowsトレイチャネルだけを許可する。"""
+    expected = DESKTOP_FLUTTER / "lib" / "services" / "windows_tray_client.dart"
+    return (
+        path == expected
+        and "MethodChannel('gui_shell/tray')" in text
+        and "requestAllRuntimeStop" not in text
+        and "Process.run" not in text
+        and "Process.start" not in text
+        and "dart:ffi" not in text
+        and "flutter_rust_bridge" not in text
+    )
+
+
 def assert_flutter_product_entry_uses_broker() -> RuntimeAssertion:
     main = _read("apps/desktop_flutter/lib/main.dart")
     if "await ShellCoreClient.product()" not in main:
@@ -263,9 +277,13 @@ def assert_launch_scripts_start_broker_without_python_snapshot() -> RuntimeAsser
 
 
 def assert_no_ffi_or_direct_bridge_authority_path() -> RuntimeAssertion:
-    dart_forbidden = ["dart:ffi", "flutter_rust_bridge", "MethodChannel("]
+    dart_forbidden = ["dart:ffi", "flutter_rust_bridge"]
     rust_forbidden = ['extern "C"', "#[no_mangle]", "cxx::bridge"]
     findings = _scan_files(_desktop_lib_files(), dart_forbidden)
+    for path in _desktop_lib_files():
+        text = path.read_text(encoding="utf-8")
+        if "MethodChannel(" in text and not _is_bounded_windows_tray_channel(path, text):
+            findings.append(f"{path.relative_to(ROOT).as_posix()} が許可外のMethodChannel(を含む")
     findings.extend(_scan_files(list((ROOT / "native" / "rust_helper" / "src").rglob("*.rs")), rust_forbidden))
     if findings:
         return _fail(
@@ -277,8 +295,8 @@ def assert_no_ffi_or_direct_bridge_authority_path() -> RuntimeAssertion:
     return _pass(
         "no_ffi_authority_path",
         "CONFIG",
-        "Flutter/Rust authority surfaceのscanでDart FFI、flutter_rust_bridge、MethodChannel、Rust FFI export tokenは検出されなかった。",
-        "authority-sensitiveなFlutter-Rust通信はindependent-process IPC上に保つ。",
+        "Flutter/Rust authority surfaceのscanでDart FFI、flutter_rust_bridge、許可外MethodChannel、Rust FFI export tokenは検出されなかった。Windowsトレイの固定MethodChannelは表示と操作通知だけに限定される。",
+        "authority-sensitiveなFlutter-Rust通信はindependent-process IPC上に保ち、トレイチャネルは権限経路にしない。",
     )
 
 

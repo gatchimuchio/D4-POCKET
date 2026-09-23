@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C20: Windows常駐トレイ（2026-09-24）
+
+Windows native trayを、表示と操作入口に限定したWin32実装として追加した。トレイからD4 Pocketの前面化、実行系状態、保留承認件数、重大通知件数、全Runtime停止要求、終了を操作できる。表示射影はBroker由来値だけを採用し、取得不能値を0へ変換しない。
+
+- Production path: Windows Win32 tray → Flutterの固定`gui_shell/tray`表示チャネル → Snapshot／通常Broker IPC。停止要求は`全Runtime停止要求`としてRust Brokerへ渡し、lifecycle registryの対象をboundedに列挙したreceiptを返す。
+- Authority boundary: Win32 trayとFlutterのトレイチャネルはAuthority、Permission、Approval、Credential、Runtime操作を所有しない。停止receiptは`停止実行済み=false`、`承認状態=owner_reapproval_required`、`権限生成=なし`に固定し、直接killとowner承認生成を行わない。
+- Validation: C20 Schema 3件、正常例3件、負例3件、Conformance 175 checks、厳格日本語監査、release runtime assertion、Rust全試験（lib 218、owner CLI 7、IPC 9、canonical hash 1、checkpoint 8、protected data 2、protected startup 1、protected store 3、workspace diff 2、workspace reader 2、workspace startup 7）、Desktop Flutter解析・86試験、Windows debug buildを実行しPASSした。
+- 未成立分類: Windows installed productでのトレイアイコン・前面化・常駐・終了・Broker停止要求の実機evidence、owner再承認後の全Runtime実停止lifecycle統合、正式releaseは`release_blocker`。Windows以外のnative tray未提供は`known_limitation`。
+
 ## D4 Pocket C19: Adapter管理操作（2026-09-24）
 
 Runtime CenterのAdapter catalogをRust Brokerのbounded管理経路へ接続した。`アダプター一覧`は通常IPCのmetadata-only projection、導入・検証・有効化・無効化・隔離・更新・削除はowner controlだけが状態を変更する。通常IPCの変更要求は`owner_reapproval_required`のsuspendedとして監査し、状態を変更しない。

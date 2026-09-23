@@ -300,6 +300,50 @@ class ShellCoreClient {
           : body['承認状態']?.toString() ?? response.toString(),
     );
   }
+
+  Future<TrayStopResult> requestAllRuntimeStop() async {
+    final transport = brokerTransport;
+    if (transport == null) {
+      return const TrayStopResult(
+        status: 'suspended',
+        stopPerformed: false,
+        approvalState: 'owner_reapproval_required',
+        targetCount: 0,
+        auditId: '',
+        recoveryId: 'recover-runtime-stop-request',
+        message: 'Broker接続がないため全Runtime停止要求を停止しました。',
+      );
+    }
+    final response = await transport.request(
+      '全Runtime停止要求',
+      payload: {'版': 1},
+    );
+    final body = _acceptedResponseBodyMap(response, '全Runtime停止要求');
+    final stopPerformed = body['停止実行済み'] == true;
+    if (stopPerformed || body['承認状態'] != 'owner_reapproval_required') {
+      throw const BrokerClientException(
+        '全Runtime停止要求の応答が停止完了または承認境界を保持していません',
+      );
+    }
+    final targets = body['対象'];
+    if (targets is! List || targets.length > 256) {
+      throw const BrokerClientException(
+        '全Runtime停止要求の対象件数が上限を超えているか不正です',
+      );
+    }
+    return TrayStopResult(
+      status: response['status']?.toString() ?? 'unknown',
+      stopPerformed: false,
+      approvalState: body['承認状態']?.toString() ?? 'unknown',
+      targetCount: targets.length,
+      auditId: response['audit_event_id']?.toString() ?? '',
+      recoveryId:
+          body['復旧ID']?.toString() ?? 'recover-runtime-stop-request',
+      message: response['error'] is Map
+          ? (response['error'] as Map)['message']?.toString() ?? response.toString()
+          : '全Runtime停止要求をBrokerへ渡しました。owner再承認後に個別lifecycleを評価します。',
+    );
+  }
 }
 
 class AdapterManagementResult {
@@ -319,6 +363,26 @@ class AdapterManagementResult {
   final String adapterId;
   final String managementState;
   final String verificationState;
+  final String auditId;
+  final String recoveryId;
+  final String message;
+}
+
+class TrayStopResult {
+  const TrayStopResult({
+    required this.status,
+    required this.stopPerformed,
+    required this.approvalState,
+    required this.targetCount,
+    required this.auditId,
+    required this.recoveryId,
+    required this.message,
+  });
+
+  final String status;
+  final bool stopPerformed;
+  final String approvalState;
+  final int targetCount;
   final String auditId;
   final String recoveryId;
   final String message;

@@ -196,6 +196,10 @@
       "責任": "C19 Adapter導入・検証・有効化・無効化・隔離・更新・削除のBroker統治、metadata-only、署名検査、外部artifact未接続境界"
     },
     {
+      "path": "docs/specs/windows-tray-surface.md",
+      "責任": "C20 Windows常駐トレイの表示射影、Broker停止要求、native trayとFlutterの非権限境界、実停止未接続境界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

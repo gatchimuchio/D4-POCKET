@@ -32,6 +32,7 @@ import 'services/evaluation_client.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/surface_semantics_export.dart';
+import 'services/windows_tray_client.dart';
 
 const String kD4PocketProductTitle = 'D4 Pocket';
 const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
@@ -213,6 +214,63 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
   bool _dialogueVisited = false;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
+  late final WindowsTrayClient _trayClient;
+  Timer? _trayRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _trayClient = WindowsTrayClient();
+    unawaited(_initializeWindowsTray());
+  }
+
+  @override
+  void dispose() {
+    _trayRefreshTimer?.cancel();
+    unawaited(_trayClient.dispose());
+    super.dispose();
+  }
+
+  Future<void> _initializeWindowsTray() async {
+    await _trayClient.start(onAction: _handleWindowsTrayAction);
+    if (!mounted) return;
+    await _publishWindowsTrayProjection();
+    _trayRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      unawaited(_publishWindowsTrayProjection());
+    });
+  }
+
+  Future<void> _publishWindowsTrayProjection() async {
+    final projection = await WindowsTrayProjection.fromSnapshot(
+      widget.client.getSnapshot(),
+      widget.client.brokerTransport,
+    );
+    if (mounted) {
+      await _trayClient.publish(projection);
+    }
+  }
+
+  Future<void> _handleWindowsTrayAction(String action) async {
+    if (action == 'open') {
+      if (mounted) setState(() => selectedIndex = 0);
+      return;
+    }
+    if (action != 'stop_request') return;
+    try {
+      final result = await widget.client.requestAllRuntimeStop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message)),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('全Runtime停止要求を送信できません: $error')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

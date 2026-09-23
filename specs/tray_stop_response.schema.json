@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/tray_stop_response.schema.json",
+  "title": "常駐トレイ全Runtime停止要求receipt（TrayStopResponse）",
+  "type": "object",
+  "required": ["版", "要求種別", "対象", "承認状態", "停止実行済み", "証拠種別", "権限生成", "復旧ID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "要求種別": { "const": "全Runtime停止要求" },
+    "対象": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "required": ["実行系ID", "状態", "承認必要", "停止実行済み", "再承認状態", "復旧ID"],
+        "additionalProperties": false,
+        "properties": {
+          "実行系ID": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+          "状態": { "enum": ["stopped", "ready", "paused", "quarantined", "unknown"] },
+          "承認必要": { "const": true },
+          "停止実行済み": { "const": false },
+          "再承認状態": { "const": "owner_reapproval_required" },
+          "復旧ID": { "const": "recover-runtime-stop-request" }
+        }
+      }
+    },
+    "承認状態": { "const": "owner_reapproval_required" },
+    "停止実行済み": { "const": false },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "権限生成": { "const": "なし" },
+    "復旧ID": { "const": "recover-runtime-stop-request" }
+  }
+}
