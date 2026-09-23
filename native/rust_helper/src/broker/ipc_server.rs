@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -206,12 +206,8 @@ fn handle_stream(
     let auth_line = match read_limited_line(&mut reader, AUTH_LINE_MAX_BYTES) {
         Ok(Some(line)) => line,
         Ok(None) => {
-            let response = broker.reject_ipc(
-                "broker_ipc_malformed",
-                "broker IPC auth line is missing",
-                true,
-            );
-            write_response(reader.get_mut(), &response)?;
+            // The peer closed before sending credentials. There is no live
+            // channel on which a rejection response could be delivered.
             return Ok(false);
         }
         Err(IpcLineError::Oversized) => {
@@ -221,6 +217,7 @@ fn handle_stream(
                 true,
             );
             write_response(reader.get_mut(), &response)?;
+            drain_after_response(&mut reader)?;
             return Ok(false);
         }
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
@@ -234,6 +231,7 @@ fn handle_stream(
             true,
         );
         write_response(reader.get_mut(), &response)?;
+        drain_after_response(&mut reader)?;
         return Ok(false);
     }
 
@@ -246,6 +244,7 @@ fn handle_stream(
                 true,
             );
             write_response(reader.get_mut(), &response)?;
+            drain_after_response(&mut reader)?;
             return Ok(false);
         }
         Err(IpcLineError::Oversized) => {
@@ -255,6 +254,7 @@ fn handle_stream(
                 true,
             );
             write_response(reader.get_mut(), &response)?;
+            drain_after_response(&mut reader)?;
             return Ok(false);
         }
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
@@ -263,7 +263,33 @@ fn handle_stream(
     let response = if owner { broker.owner要求処理(&request_json) } else { broker.handle_json(&request_json) };
     let shutdown = response.shutdown_requested;
     write_response(reader.get_mut(), &response)?;
+    drain_after_response(&mut reader)?;
     Ok(shutdown)
+}
+
+fn drain_after_response(reader: &mut BufReader<TcpStream>) -> Result<(), BrokerServerError> {
+    // 応答を読んだpeerのcloseを短時間待ち、Windowsの未読受信data付きcloseによるRSTを避ける。
+    reader
+        .get_mut()
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .map_err(|error| BrokerServerError::new(format!("IPC切断待機の設定に失敗: {error}")))?;
+    let mut buffer = [0u8; 1024];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => return Ok(()),
+            Ok(_) => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                ) => return Ok(()),
+            Err(error) => {
+                return Err(BrokerServerError::new(format!(
+                    "IPC切断待機中の読取りに失敗: {error}"
+                )))
+            }
+        }
+    }
 }
 
 fn read_limited_line(
@@ -318,7 +344,11 @@ fn write_response(
         .write_all(&frame)
         .map_err(|error| {
             BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
-        })
+        })?;
+    stream
+        .flush()
+        .map_err(|error| BrokerServerError::new(format!("broker responseのflushに失敗: {error}")))?;
+    Ok(())
 }
 
 fn write_endpoint_file(path: &PathBuf, endpoint: &BrokerEndpoint) -> Result<(), BrokerServerError> {
