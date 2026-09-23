@@ -82,6 +82,9 @@ REQUIRED_SCHEMA_NAMES = {
     "mcp_connection",
     "mcp_connection_receipt",
     "mcp_connection_list",
+    "profile",
+    "profile_receipt",
+    "profile_list",
     "evaluation_experiment",
     "evaluation_result",
     "evaluation_comparison",
@@ -151,6 +154,7 @@ BROKER_REQUIRED_SOURCES = {
     "audit.rs",
     "regression_case.rs",
     "mcp_center.rs",
+    "profile_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -160,6 +164,9 @@ BROKER_REQUIRED_SCHEMAS = {
     "broker_session.schema.json",
     "broker_health.schema.json",
     "broker_command_envelope.schema.json",
+    "profile.schema.json",
+    "profile_receipt.schema.json",
+    "profile_list.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -175,6 +182,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_center.dart",
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
+    "lib/services/profile_client.dart",
     "lib/services/surface_semantics_export.dart",
     "lib/models/generated_contracts.dart",
 }

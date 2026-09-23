@@ -19,6 +19,8 @@ Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（
 
 続くC8では、`docs/specs/mcp-contract.md`を正本とするMCP外部概念射影契約を追加した。Server、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diffをmetadata_onlyとしてSchema／fixture／Conformanceへ接続し、MCP metadataからAuthority、Permission、Approvalを生成しない。C9では`docs/specs/mcp-connection-center.md`を正本として、owner controlからstdio Serverのdiscovery／catalog取得と通常IPCのmetadata一覧をRust Brokerへ接続した。Tool実行、Credential実値注入、Streamable HTTP、OAuth、consent、disconnect、quarantineは未接続のrelease_blockerである。
 
+C10では、`docs/specs/operation-profile.md`を正本とする運用プロファイルを追加した。ProfileはRuntime、Adapter、要求Capability、Content Exposure、network exposure、resource limit、UI preferenceだけを保持し、Rust Brokerが永続化・再検証・監査を行う。Profile適用は要求の記録に限定し、ProfileからPermission、Approval、Authority、Credentialを生成しない。Desktop設定画面から一覧、作成、適用要求、export、削除をBroker経由で操作できる。import契約はBrokerに接続済みだが、専用ファイル選択UIは追加していない。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::audit_hash::hmac_sha256_tagged;
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
@@ -18,6 +19,7 @@ pub enum BrokerStoreError {
     TamperedAuditState(String),
     MalformedReplayState(String),
     MalformedSessionState(String),
+    MalformedProfileState(String),
 }
 
 impl BrokerStoreError {
@@ -27,7 +29,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedAuditState(message)
             | BrokerStoreError::TamperedAuditState(message)
             | BrokerStoreError::MalformedReplayState(message)
-            | BrokerStoreError::MalformedSessionState(message) => message.clone(),
+            | BrokerStoreError::MalformedSessionState(message)
+            | BrokerStoreError::MalformedProfileState(message) => message.clone(),
         }
     }
 }
@@ -46,6 +49,7 @@ pub struct BrokerPersistentStore {
     audit_anchor_key_path: PathBuf,
     replay_path: PathBuf,
     session_path: PathBuf,
+    profile_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -86,11 +90,13 @@ impl BrokerPersistentStore {
             audit_anchor_key_path: root.join("audit_anchor.key"),
             replay_path: root.join("replay_nonces.jsonl"),
             session_path: root.join("session.json"),
+            profile_path: root.join("profiles.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
         store.ensure_file_exists(&store.audit_path)?;
         store.ensure_file_exists(&store.replay_path)?;
+        store.ensure_profile_file_exists()?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
@@ -149,6 +155,42 @@ impl BrokerPersistentStore {
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    pub fn load_profile_state(&self) -> Result<Value, BrokerStoreError> {
+        let raw = fs::read_to_string(&self.profile_path).map_err(|error| {
+            BrokerStoreError::MalformedProfileState(format!(
+                "broker profile stateの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedProfileState(
+                "broker profile stateが空である".to_string(),
+            ));
+        }
+        serde_json::from_str(&raw).map_err(|error| {
+            BrokerStoreError::MalformedProfileState(format!(
+                "broker profile stateがmalformed: {error}"
+            ))
+        })
+    }
+
+    pub fn write_profile_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
+        let serialized = serde_json::to_string_pretty(state).map_err(|error| {
+            BrokerStoreError::MalformedProfileState(format!(
+                "broker profile stateのserializeに失敗: {error}"
+            ))
+        })?;
+        atomic_write(&self.profile_path, serialized.as_bytes()).map_err(|error| {
+            BrokerStoreError::Io(format!("broker profile stateの書込みに失敗: {error}"))
+        })
+    }
+
+    fn ensure_profile_file_exists(&self) -> Result<(), BrokerStoreError> {
+        if self.profile_path.exists() {
+            return Ok(());
+        }
+        self.write_profile_state(&serde_json::json!({"版": 1, "profiles": []}))
     }
 
     fn ensure_file_exists(&self, path: &Path) -> Result<(), BrokerStoreError> {

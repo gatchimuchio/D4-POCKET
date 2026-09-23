@@ -1,0 +1,12 @@
+{
+  "版": 1,
+  "操作": "プロファイル作成",
+  "ProfileID": "default.local",
+  "Profile": null,
+  "状態": "created",
+  "profile_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "権限生成": "あり",
+  "公開範囲": "configuration_only",
+  "証拠種別": "INTERNAL_STATE",
+  "復旧ID": "recover-profile-state"
+}

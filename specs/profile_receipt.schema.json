@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/profile_receipt.schema.json",
+  "title": "運用プロファイルreceipt（ProfileReceipt）",
+  "description": "Profile操作の監査済み結果。適用要求はPermissionを生成しない。",
+  "type": "object",
+  "required": ["版", "操作", "ProfileID", "Profile", "状態", "profile_hash", "権限生成", "公開範囲", "証拠種別", "復旧ID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "enum": ["プロファイル作成", "プロファイル複製", "プロファイル適用要求", "プロファイル削除", "プロファイルexport", "プロファイルimport"] },
+    "ProfileID": { "type": "string", "minLength": 0, "maxLength": 64 },
+    "Profile": { "type": ["object", "null"] },
+    "状態": { "enum": ["created", "copied", "apply_requested", "deleted", "exported", "imported"] },
+    "profile_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "権限生成": { "const": "なし" },
+    "公開範囲": { "const": "configuration_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "復旧ID": { "const": "recover-profile-state" }
+  }
+}

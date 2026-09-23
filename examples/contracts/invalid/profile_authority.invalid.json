@@ -1,0 +1,13 @@
+{
+  "版": 1,
+  "ProfileID": "default.local",
+  "表示名": "標準ローカル実行",
+  "Runtime": "runtime.local",
+  "Adapter": "adapter.local",
+  "要求Capability": [],
+  "Content Exposure": {"visibility": "redacted"},
+  "network exposure": "loopback",
+  "resource limit": {"cpu_millis": 1000, "memory_bytes": 1073741824, "max_processes": 2, "max_output_bytes": 1048576},
+  "UI preference": {"theme": "system", "density": "comfortable", "locale": "ja-JP"},
+  "Permission": "granted"
+}

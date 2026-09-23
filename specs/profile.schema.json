@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/profile.schema.json",
+  "title": "運用プロファイル（Profile）",
+  "description": "再利用可能な要求設定。Permission、Approval、Authority、Credential実値を含まない。",
+  "type": "object",
+  "required": ["版", "ProfileID", "表示名", "Runtime", "Adapter", "要求Capability", "Content Exposure", "network exposure", "resource limit", "UI preference"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "ProfileID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+    "表示名": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "Runtime": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "Adapter": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "要求Capability": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+    "Content Exposure": {
+      "type": "object",
+      "required": ["visibility"],
+      "additionalProperties": false,
+      "properties": { "visibility": { "enum": ["none", "hash_only", "summary", "redacted", "full"] } }
+    },
+    "network exposure": { "enum": ["none", "loopback", "outbound"] },
+    "resource limit": {
+      "type": "object",
+      "required": ["cpu_millis", "memory_bytes", "max_processes", "max_output_bytes"],
+      "additionalProperties": false,
+      "properties": {
+        "cpu_millis": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "memory_bytes": { "type": "integer", "minimum": 0, "maximum": 1099511627776 },
+        "max_processes": { "type": "integer", "minimum": 0, "maximum": 4096 },
+        "max_output_bytes": { "type": "integer", "minimum": 0, "maximum": 17179869184 }
+      }
+    },
+    "UI preference": {
+      "type": "object",
+      "required": ["theme", "density", "locale"],
+      "additionalProperties": false,
+      "properties": {
+        "theme": { "enum": ["system", "light", "dark"] },
+        "density": { "enum": ["compact", "comfortable"] },
+        "locale": { "type": "string", "minLength": 1, "maxLength": 16 }
+      }
+    }
+  }
+}

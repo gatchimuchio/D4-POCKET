@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/profile_list.schema.json",
+  "title": "運用プロファイル一覧（ProfileList）",
+  "type": "object",
+  "required": ["版", "Profiles", "件数", "公開範囲", "権限生成", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "Profiles": { "type": "array", "maxItems": 128, "items": { "type": "object" } },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 128 },
+    "公開範囲": { "const": "configuration_only" },
+    "権限生成": { "const": "なし" },
+    "証拠種別": { "const": "INTERNAL_STATE" }
+  }
+}

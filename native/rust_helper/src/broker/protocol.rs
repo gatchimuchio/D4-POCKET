@@ -196,6 +196,20 @@ impl BrokerStateStore {
         }
         Ok(None)
     }
+
+    pub fn load_profile_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            return store.load_profile_state().map(Some);
+        }
+        Ok(None)
+    }
+
+    pub fn write_profile_state(&self, state: &serde_json::Value) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.write_profile_state(state)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -271,6 +285,20 @@ pub enum BrokerOperation {
     MCP接続,
     #[serde(rename = "MCP接続一覧")]
     MCP接続一覧,
+    #[serde(rename = "プロファイル作成")]
+    プロファイル作成,
+    #[serde(rename = "プロファイル複製")]
+    プロファイル複製,
+    #[serde(rename = "プロファイル適用要求")]
+    プロファイル適用要求,
+    #[serde(rename = "プロファイル削除")]
+    プロファイル削除,
+    #[serde(rename = "プロファイルexport")]
+    プロファイルexport,
+    #[serde(rename = "プロファイルimport")]
+    プロファイルimport,
+    #[serde(rename = "プロファイル一覧")]
+    プロファイル一覧,
     #[serde(rename = "評価Dataset一覧")]
     評価Dataset一覧,
     #[serde(rename = "評価実験開始")]
@@ -369,6 +397,13 @@ impl BrokerOperation {
             BrokerOperation::資格情報一覧 => "資格情報一覧",
             BrokerOperation::MCP接続 => "MCP接続",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
+            BrokerOperation::プロファイル作成 => "プロファイル作成",
+            BrokerOperation::プロファイル複製 => "プロファイル複製",
+            BrokerOperation::プロファイル適用要求 => "プロファイル適用要求",
+            BrokerOperation::プロファイル削除 => "プロファイル削除",
+            BrokerOperation::プロファイルexport => "プロファイルexport",
+            BrokerOperation::プロファイルimport => "プロファイルimport",
+            BrokerOperation::プロファイル一覧 => "プロファイル一覧",
             BrokerOperation::評価Dataset一覧 => "評価Dataset一覧",
             BrokerOperation::評価実験開始 => "評価実験開始",
             BrokerOperation::評価実験状態 => "評価実験状態",
@@ -603,6 +638,7 @@ pub struct Broker {
     作業領域: super::workspace::WorkspaceRegistry,
     端末: Option<super::device_link::端末制御>,
     pub(super) mcp_connections: BTreeMap<String, super::mcp_center::McpConnectionEntry>,
+    pub(super) profiles: BTreeMap<String, Value>,
     #[cfg(windows)]
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
     #[cfg(windows)]
@@ -627,6 +663,7 @@ impl Broker {
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             mcp_connections: BTreeMap::new(),
+            profiles: BTreeMap::new(),
             #[cfg(windows)]
             protected_store: None,
             #[cfg(windows)]
@@ -655,6 +692,7 @@ impl Broker {
     ) -> Result<Self, BrokerStoreError> {
         let (persistent_store, persistent_state) =
             BrokerPersistentStore::open_or_create(store_root, session_id)?;
+        let profiles = super::profile_center::load_persistent_profiles(&persistent_store)?;
         let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
             persistent_state.audit_log.events(),
         )
@@ -674,6 +712,7 @@ impl Broker {
             作業領域: super::workspace::WorkspaceRegistry::default(),
             端末: None,
             mcp_connections: BTreeMap::new(),
+            profiles,
             #[cfg(windows)]
             protected_store: None,
             #[cfg(windows)]
@@ -935,6 +974,7 @@ impl Broker {
             BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(&request_id, "資格情報一覧", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
             BrokerOperation::MCP接続 => super::mcp_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::MCP接続一覧 => super::mcp_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),

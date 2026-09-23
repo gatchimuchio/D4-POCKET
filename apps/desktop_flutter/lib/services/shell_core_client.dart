@@ -8,9 +8,15 @@ import 'workspace_client.dart';
 const String _snapshotFreshnessParseFailed = 'parse failed';
 
 class ShellCoreClient {
-  const ShellCoreClient._(this.snapshot, this.mode, [this.workspaceClient]);
+  const ShellCoreClient._(
+    this.snapshot,
+    this.mode, [
+    this.workspaceClient,
+    this.brokerTransport,
+  ]);
 
   final WorkspaceClient? workspaceClient;
+  final BrokerTransport? brokerTransport;
 
   final ShellSnapshot snapshot;
   final String mode;
@@ -86,6 +92,7 @@ class ShellCoreClient {
         ),
         'broker',
         WorkspaceClient(broker),
+        broker,
       );
     } on Object catch (error) {
       return ShellCoreClient._(

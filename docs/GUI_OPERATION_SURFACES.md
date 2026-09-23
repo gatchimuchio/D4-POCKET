@@ -91,6 +91,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: C8のMCP外部概念射影契約をRust Brokerのowner専用`MCP接続`へ接続した。stdio child processへ現行`server/discover`を試行し、legacy `initialize`へfallbackしてTool／Resource／Prompt catalogを検証し、通常IPCの`MCP接続一覧`へmetadata-only receiptを返す。
   authority_boundary: MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。Credential実値注入、Tool実行、Streamable HTTP、OAuth、consent、disconnect、quarantineは未成立として扱う。
 
+- item: D4 Pocket 運用プロファイル（C10 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: 設定画面からProfile一覧、作成、適用要求、export、削除を通常Broker IPCへ接続し、Rust BrokerがSchema検証済みProfileを永続化する。import契約もBroker経路に接続している。
+  authority_boundary: Profileは再利用可能な要求設定だけであり、Permission、Approval、Authority、Credentialを生成しない。適用要求はhash照合とAudit記録に限定し、Runtime操作へ到達しない。
+
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented

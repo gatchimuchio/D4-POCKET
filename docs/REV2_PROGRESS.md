@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C10: 運用プロファイル（2026-09-23）
+
+運用プロファイルをSchema-firstで定義し、Rust Brokerの永続状態と通常認証済みIPCへ接続した。ProfileはRuntime、Adapter、要求Capability、Content Exposure、network exposure、resource limit、UI preferenceだけを保持する。`プロファイル適用要求`はProfile hashを照合して適用意図をAuditへ記録するだけで、Permission、Approval、Authority registry、Runtime操作を変更しない。
+
+- Production path: Desktop設定画面 → 通常Broker IPC → Rust Profile Center → `profiles.json`のatomic write／起動時再検証。作成、複製、適用要求、削除、export、import、一覧を実装した。
+- Authority boundary: Profileは要求configurationであり、権限源ではない。Schemaの追加field拒否とBrokerの`deny_unknown_fields`でPermission、Approval、Authority、Credential実値、Audit identityの混入を拒否する。
+- Validation: Profileの正常／負例、作成・適用要求・再起動後再読込・禁止field拒否をRust試験へ追加した。Schema／Conformance／日本語基底監査／Desktop Flutter解析を実行する。
+- 未成立分類: 専用ファイル選択UI、ProfileからRuntimeへ実設定を反映する操作、ProfileのPermission・Credential・MCP・A2A接続は`release_blocker`。現在のC10は要求設定の保存・監査・表示までであり、Profile適用による権限作用を主張しない。
+
 ## D4 Pocket Phase 4: Codex AdapterのBroker登録とread-only Launcher基盤（2026-09-23）
 
 Windowsで確認した実物Codex CLIを、Rust Brokerの明示起動設定から既存の実行系対話経路へ接続した。`--codex-runtime <ID=絶対executable path=絶対workspace path>` はowner起動時だけ受け付け、Adapterの登録時にexecutable／workspaceの絶対path、通常file／directory、secret pathでないこと、`codex --version`、`codex exec --help`を確認する。IPCから任意の実行path、argv、environment、workspaceを受け取る経路は追加していない。
