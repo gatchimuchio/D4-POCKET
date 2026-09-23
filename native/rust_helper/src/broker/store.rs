@@ -22,6 +22,7 @@ pub enum BrokerStoreError {
     MalformedProfileState(String),
     MalformedUpdateState(String),
     MalformedUpdateTrust(String),
+    MalformedNotificationState(String),
 }
 
 impl BrokerStoreError {
@@ -34,7 +35,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedSessionState(message)
             | BrokerStoreError::MalformedProfileState(message)
             | BrokerStoreError::MalformedUpdateState(message)
-            | BrokerStoreError::MalformedUpdateTrust(message) => message.clone(),
+            | BrokerStoreError::MalformedUpdateTrust(message)
+            | BrokerStoreError::MalformedNotificationState(message) => message.clone(),
         }
     }
 }
@@ -56,6 +58,7 @@ pub struct BrokerPersistentStore {
     profile_path: PathBuf,
     update_path: PathBuf,
     update_trust_path: PathBuf,
+    notification_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -99,6 +102,7 @@ impl BrokerPersistentStore {
             profile_path: root.join("profiles.json"),
             update_path: root.join("updates.json"),
             update_trust_path: root.join("update_trust.json"),
+            notification_path: root.join("notifications.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
@@ -106,6 +110,7 @@ impl BrokerPersistentStore {
         store.ensure_file_exists(&store.replay_path)?;
         store.ensure_profile_file_exists()?;
         store.ensure_update_files_exist()?;
+        store.ensure_notification_file_exists()?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
@@ -224,6 +229,35 @@ impl BrokerPersistentStore {
         })
     }
 
+    pub fn load_notification_state(&self) -> Result<Value, BrokerStoreError> {
+        let raw = fs::read_to_string(&self.notification_path).map_err(|error| {
+            BrokerStoreError::MalformedNotificationState(format!(
+                "broker notification stateの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedNotificationState(
+                "broker notification stateが空である".to_string(),
+            ));
+        }
+        serde_json::from_str(&raw).map_err(|error| {
+            BrokerStoreError::MalformedNotificationState(format!(
+                "broker notification stateがmalformed: {error}"
+            ))
+        })
+    }
+
+    pub fn write_notification_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
+        let serialized = serde_json::to_string_pretty(state).map_err(|error| {
+            BrokerStoreError::MalformedNotificationState(format!(
+                "broker notification stateのserializeに失敗: {error}"
+            ))
+        })?;
+        atomic_write(&self.notification_path, serialized.as_bytes()).map_err(|error| {
+            BrokerStoreError::Io(format!("broker notification stateの書込みに失敗: {error}"))
+        })
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
         let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
@@ -296,6 +330,13 @@ impl BrokerPersistentStore {
             })?;
         }
         Ok(())
+    }
+
+    fn ensure_notification_file_exists(&self) -> Result<(), BrokerStoreError> {
+        if self.notification_path.exists() {
+            return Ok(());
+        }
+        self.write_notification_state(&serde_json::json!({"版": 1, "states": []}))
     }
 
     fn ensure_file_exists(&self, path: &Path) -> Result<(), BrokerStoreError> {

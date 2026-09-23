@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "fca1d3f6d5a66325764c63b2be14306ef45d5551bcc625e2fa05e0d0af12089e"
+      "sha256": "110716403c46f57225d944ca12a7ac407f2336a6291fe72c585748f4d8a3193f"
     },
     {
       "path": "SECURITY.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "332cc1385eaf830f05a53fe64b50c200a071e8764baadcf8c8875ea1fd24b211"
+      "sha256": "fd83064ee34819f586ad4e4e86f46c765cba997b3dbc8f5c1780483dc1ed576f"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -230,6 +230,10 @@
     {
       "path": "apps/desktop_flutter/lib/screens/host_capability_center.dart",
       "sha256": "fadb250c04be0232b61e70288e3f20ecd1e3a86a902a45e41a98ac5d862b19d1"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/screens/notifications.dart",
+      "sha256": "4a7642799aaa896a58f06052da1dc2cf8fda4b5fcc412ab76aca660818d35e38"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/permission_center.dart",
@@ -282,6 +286,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
       "sha256": "24d1e51e5ff3a275183efdf6d9a72f768857826dd812def406b362741e608e8c"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/notification_client.dart",
+      "sha256": "f91e5039a573d5fdf95c6824744f5ae3451b542ad29e3484e0ed6e390447ad4c"
     },
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
@@ -496,6 +504,10 @@
       "sha256": "9fb6e1d750a57ebbbd079d743b2468a6154d4292eae098c4eb573fad129e4d98"
     },
     {
+      "path": "apps/desktop_flutter/test/notification_client_test.dart",
+      "sha256": "cc405952908228b058b0abc6ec92676ee27625ebcd0896868ba8ad3533df8230"
+    },
+    {
       "path": "apps/desktop_flutter/test/profile_client_test.dart",
       "sha256": "423c40854fd5f11c80ddcdecc7bc8f636c4feb7e890a6c2b06e4aec5435f2468"
     },
@@ -517,7 +529,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "9fd488a1ea2599b6b6769fd9ca675781861fa838f75c402d06de70727690d924"
+      "sha256": "38ba4f1349d05fa24ae72fdcd0776826a1c070ce5518d2309e68e2a6da864b6b"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -965,7 +977,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "741a6a41bea315e79727a3c1f4306e70f5f610b1203cf2ebacd864d1a30da438"
+      "sha256": "8002820ab4b6a23d64d2ebeba06468cdb5b5ff255acb2f37d1333e1d9425c098"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1001,7 +1013,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "536248aa548c61da9e309082e5bd92b8c572f875980427eba974779559bf327e"
+      "sha256": "7c624e40b9f9d1273a37c1e076cffb9f5c3b15a438806a665e9f80fd8a3f0811"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1136,6 +1148,10 @@
       "sha256": "32f184bf7b79eebe67e9177b75d100888cf8965aa9aaff144d7752639cb710bd"
     },
     {
+      "path": "docs/specs/notification-center.md",
+      "sha256": "f8f6b648c0f44463523d85c5beee36de6595194a19f4ae1065b6ab4476af3cbe"
+    },
+    {
       "path": "docs/specs/operation-profile.md",
       "sha256": "6066c5f690d657d4de2607504ace379e67c259cbc18147a89d6e9ccc87d65d5b"
     },
@@ -1197,7 +1213,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "14f46682814a8c3ac699ccc2533157bc166470d3c161422a859177ea73763ea0"
+      "sha256": "3d35832b45eb455ea56ebc582607eba09fd6e58d602d5524814bf0fb3d74245f"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -1572,6 +1588,18 @@
       "sha256": "678c63d1c27e28d507d368810ed528384530b83d214134bcfc0464da108a41e3"
     },
     {
+      "path": "examples/contracts/invalid/notification.invalid.json",
+      "sha256": "efb01c00306f1d4eb7a1ec69ae65db1218add8c0d4e5aa4b36d53dc790ebc132"
+    },
+    {
+      "path": "examples/contracts/invalid/notification_action.invalid.json",
+      "sha256": "c8ba11847fc40a0882198d79e8c8bc5812bb23ed90c3a7b79dee2605da92d4ca"
+    },
+    {
+      "path": "examples/contracts/invalid/notification_list.invalid.json",
+      "sha256": "c39551b4c25981d19cf23046bd6ae9d8c44015e5f7ccb75b457b982d3c55ab37"
+    },
+    {
       "path": "examples/contracts/invalid/permission_bad_source.invalid.json",
       "sha256": "917b38dda1fccfaf531a92f05498ff1f2c51f381c8dda4f34da9dec63450558e"
     },
@@ -1794,6 +1822,18 @@
     {
       "path": "examples/contracts/mcp_contract.valid.json",
       "sha256": "87e81e161da530d6df8dc1bad85b055c8daa4c41d1a95d01211e45b2d9a6019c"
+    },
+    {
+      "path": "examples/contracts/notification.valid.json",
+      "sha256": "b6c8eb08fa705edc3150fd70cbde21b6fff4ea3613af31957bd74d600df242a8"
+    },
+    {
+      "path": "examples/contracts/notification_action.valid.json",
+      "sha256": "27770fcdd2b7ea127ead9c43d6ed1df2113d0ef5d41e6a31857ce9ebef30d11d"
+    },
+    {
+      "path": "examples/contracts/notification_list.valid.json",
+      "sha256": "2003ead96287412d702c929ad65220ca0850e8f35107f5144313ad935ce9c515"
     },
     {
       "path": "examples/contracts/permission.valid.json",
@@ -2145,7 +2185,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "8c40274125377d45ee2009d59530b4033663dd057c86bcf07d6c820118296f56"
+      "sha256": "4fa8b6b6309f0ffee313bcb89cdccf83de39288e98b709a502d2ee41f3d396b3"
+    },
+    {
+      "path": "native/rust_helper/src/broker/notification_center.rs",
+      "sha256": "e80c3ba56409dee65e6903fafc6617bc3ec7e54e2774c962ad3486b64fe59390"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -2153,7 +2197,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "b003365b61eae0d08134a382811256540c8ecd628ac0e2ae1593990aead4dd9d"
+      "sha256": "5335799f6e8a44bea1c78153c24cada9844cf4cad524a9dafe720846f45f5f8f"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2173,7 +2217,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "8e9311cbe8b952a89fc4604a4c5cf66cfbb990f927b13ab653b7d76576e37d29"
+      "sha256": "8fb257c764a724a56b4466d9a555446f862ee4b0013d881ab7734eb17079c75c"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
@@ -2857,11 +2901,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "bb1008fda65b9648d1b03395219270f424e0bf05f9f8ebd9a2c7892a09e61d7d"
+      "sha256": "e065a2579c0f669ecdb343f410d8216b2947f9deade660ac8d423babb346605a"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "83a98c9c11dfd5ab3975737677759daca342b77b80585aca3dafaf5572bbeafb"
+      "sha256": "bba5056e7398f6efc8cac225cd961cc00df78b716e099dd52ee5a7f4cdedc5f7"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -2878,6 +2922,18 @@
     {
       "path": "specs/mcp_contract.schema.json",
       "sha256": "dc3595755e55d0b230de515890348520278e447efc62efaf1f9d3cf390bee657"
+    },
+    {
+      "path": "specs/notification.schema.json",
+      "sha256": "41316e370d342b9aeb84b495de7c06d885682509ea14a1c27a67365f3a0c02e0"
+    },
+    {
+      "path": "specs/notification_action.schema.json",
+      "sha256": "c8c1af0459a510e5be981718ffab76564b295f6e7928a3c29c3f0ed2b8152106"
+    },
+    {
+      "path": "specs/notification_list.schema.json",
+      "sha256": "175b4466c931d87c0ffca21e43904782307af7429b25c8788357ffec12596a17"
     },
     {
       "path": "specs/permission.schema.json",
@@ -3069,7 +3125,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "57e998ab6351845ef15b16f557fe9e3009020b9b8efe8b85646de6851b41b6ad"
+      "sha256": "bd7b0b3e3e263e60f80c8581eed134abbda71834e01843d780fa45fec1150d88"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3125,7 +3181,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "dd4e1e9f093d44399a02529cce092e3f3e9a37690ae5f1022ffe7746aacf03ec"
+      "sha256": "ec603ecc15afdbd1a61222983fd3d6b3286f9242566eb45716df8f0ede5fb435"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -3161,7 +3217,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "f9db0be5cd90f9fa731a2dd766ecc559a659c9d65e97f394ac40ebd56ad7c5d6"
+      "sha256": "de295dc633d81d247b405b1b0e84b4e4d3f64d193212c7e8b766cbe445517514"
     }
   ]
 }

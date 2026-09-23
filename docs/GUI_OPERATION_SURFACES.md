@@ -103,6 +103,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: 通常Broker IPCから更新候補の一覧、Broker所有Ed25519 trustによる署名検査、署名済み候補の永続化、延期、download／適用／rollback要求をRust Update Centerへ接続し、Desktop設定画面へ表示した。
   authority_boundary: 更新候補の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。未署名・未信頼候補は保存せず、download、install、process、rollbackの外部実行はsuspendedのままとする。信頼設定未構成とWindows installed product証拠は未成立として扱う。
 
+- item: D4 Pocket 通知センター（C12 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Rust Brokerはcaller登録ではなく監査eventのsource／decision／event hashからsummary通知を生成し、通常IPCの一覧・既読・破棄・全既読をDesktop通知画面へ返す。通知件数と監査走査をboundedにし、表示状態をhash結合して永続化する。
+  authority_boundary: 通知はINTERNAL_STATEのnavigation-only表示であり、reason、payload、metadata、秘密値、Permission、Approval、Authorityを公開・生成しない。通知の開く操作はGUI navigationだけである。Windows native toastとinstalled product実証は未成立として扱う。
+
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented

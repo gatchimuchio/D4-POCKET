@@ -18,6 +18,7 @@ import 'screens/runtime_center.dart';
 import 'screens/runtime_dialogue.dart';
 import 'screens/history_screen.dart';
 import 'screens/host_capability_center.dart';
+import 'screens/notifications.dart';
 import 'screens/settings.dart';
 import 'screens/shared.dart';
 import 'screens/setup_doctor.dart';
@@ -248,6 +249,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
         connect: widget.evaluationConnect ?? connectEvaluationClient,
       ),
       HostCapabilityCenter(client: widget.client),
+      NotificationsScreen(
+        client: widget.client,
+        onNavigate: _navigateFromNotification,
+      ),
     ];
     final pageEntries = _pageEntries();
 
@@ -387,6 +392,11 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                       selectedIcon: Icon(Icons.public),
                                       label: Text('ホスト能力'),
                                     ),
+                                    NavigationRailDestination(
+                                      icon: Icon(Icons.notifications_none),
+                                      selectedIcon: Icon(Icons.notifications),
+                                      label: Text('通知'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -429,7 +439,24 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ShellPageEntry(13, '実行履歴', Icons.history),
       _ShellPageEntry(14, '評価ラボ', Icons.science_outlined),
       _ShellPageEntry(15, 'ホスト能力', Icons.public_outlined),
+      _ShellPageEntry(16, '通知センター', Icons.notifications_none),
     ];
+  }
+
+  void _navigateFromNotification(String target) {
+    final index = switch (target) {
+      'approval' => 6,
+      'runtime' => 3,
+      'audit' => 7,
+      'recovery' => 8,
+      'device' => 3,
+      'agent' => 5,
+      'settings' => 11,
+      'evaluation' => 14,
+      _ => 0,
+    };
+    if (!mounted) return;
+    setState(() => selectedIndex = index);
   }
 
   Future<void> _openCommandPalette(

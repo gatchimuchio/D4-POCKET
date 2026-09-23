@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/notification.schema.json",
+  "title": "通知summary（Notification）",
+  "type": "object",
+  "required": ["版", "通知ID", "source", "severity", "タイトル", "概要", "作成順", "関連監査ID", "関連監査hash", "遷移先", "状態", "通知hash", "表示範囲", "権限生成"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "通知ID": { "type": "string", "pattern": "^notification-broker-audit-[1-9][0-9]*$" },
+    "source": { "enum": ["Runtime", "Approval", "Audit", "Recovery", "Device", "MCP", "A2A", "Update", "Evaluation"] },
+    "severity": { "enum": ["info", "warning", "error", "critical"] },
+    "タイトル": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "概要": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "作成順": { "type": "integer", "minimum": 1 },
+    "関連監査ID": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "関連監査hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "遷移先": { "enum": ["dashboard", "approval", "runtime", "audit", "recovery", "device", "agent", "settings", "evaluation"] },
+    "状態": { "enum": ["unread", "read"] },
+    "通知hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "表示範囲": { "const": "summary" },
+    "権限生成": { "const": "なし" }
+  }
+}

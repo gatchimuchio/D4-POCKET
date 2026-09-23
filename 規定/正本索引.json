@@ -188,6 +188,10 @@
       "責任": "C11 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、延期、実行要求のsuspended境界"
     },
     {
+      "path": "docs/specs/notification-center.md",
+      "責任": "C12 監査event由来の通知summary、bounded一覧、hash結合の既読・破棄状態、navigation-only境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

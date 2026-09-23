@@ -35,7 +35,7 @@ void main() {
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail=tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length,16);
+    expect(rail.destinations.length,17);
     rail.onDestinationSelected!(13);
     await tester.pumpAndSettle();
     expect(tester.takeException(),isNull);
@@ -49,7 +49,7 @@ void main() {
     await tester.pumpWidget(const GuiShellDesktopApp());
 
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.destinations.length, 16);
+    expect(rail.destinations.length, 17);
     rail.onDestinationSelected!(14);
     await tester.pumpAndSettle();
 
@@ -67,6 +67,17 @@ void main() {
     expect(find.text('D4 Pocket ホスト能力'), findsOneWidget);
     expect(find.text('filesystem'), findsOneWidget);
     expect(find.textContaining('PermissionやApprovalは生成しません'), findsOneWidget);
+  });
+
+  testWidgets('通知センターをNavigationRailから開ける', (tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    rail.onDestinationSelected!(16);
+    await tester.pumpAndSettle();
+
+    expect(find.text('通知センター'), findsWidgets);
+    expect(find.textContaining('Broker接続がないため'), findsOneWidget);
   });
 
   testWidgets('GUI Shellデスクトップアプリの簡易試験', (WidgetTester tester) async {

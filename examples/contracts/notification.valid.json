@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "通知ID": "notification-broker-audit-1",
+  "source": "Update",
+  "severity": "warning",
+  "タイトル": "Updateの状態更新",
+  "概要": "Update操作が拒否されました。監査ビューアーで確認してください。",
+  "作成順": 1,
+  "関連監査ID": "broker-audit-1",
+  "関連監査hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "遷移先": "settings",
+  "状態": "unread",
+  "通知hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "表示範囲": "summary",
+  "権限生成": "なし"
+}

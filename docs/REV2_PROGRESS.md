@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C12: 通知センター（2026-09-23）
+
+監査eventから通知summaryを限定射影するRust Notification Centerを追加し、既読・破棄状態をBroker所有の`notifications.json`へhash結合して保存する。通知をcallerが登録する操作はなく、通知操作自身も通知sourceへ射影しない。
+
+- Production path: Desktop通知画面 → 通常認証済みBroker IPC → Rust Notification Center → 監査event／表示状態。`通知一覧`、`通知既読`、`通知破棄`、`通知全既読`を接続した。
+- Authority boundary: 通知は`INTERNAL_STATE`のsummaryであり、Permission、Approval、Authority、Capability、Credentialを生成しない。理由、payload、metadata、秘密値を返さず、開く操作は画面navigationだけである。
+- Bounded behavior: 監査走査は4096件、通知返却は256件、表示状態はhash付き4096件まで。malformed state、未知field、重複ID、stale hashはfail-closedとする。
+- Validation: 通知Schema 3件、正常／負例fixture、Rust 4単体試験、Desktop通知画面／NavigationRail、Schema／Conformanceを接続する。
+- 未成立分類: Windows native toast投影、Windows installed productでの通知実証、8時間運用、全通知sourceの実Runtime証拠は`release_blocker`。本単位はin-app通知センターの完成範囲だけを主張する。
+
 ## D4 Pocket C11: 更新センター（2026-09-23）
 
 更新候補のSchema、Rust Broker署名検査、永続一覧、延期、download／適用／rollback要求、Desktop設定画面を接続した。候補metadataから署名対象byteを再構成し、Broker所有のEd25519公開鍵とfingerprintを使う。候補側の公開鍵、Profile、MCP metadata、履歴、UI stateは信頼源にならない。信頼設定未構成または署名不正の候補は保存しない。

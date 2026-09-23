@@ -107,6 +107,9 @@ REQUIRED_SCHEMA_NAMES = {
     "update_receipt",
     "update_list",
     "update_trust",
+    "notification",
+    "notification_list",
+    "notification_action",
     "content_exposure",
     "framework_risk_profile",
     "runtime_manifest",
@@ -160,6 +163,7 @@ BROKER_REQUIRED_SOURCES = {
     "mcp_center.rs",
     "profile_center.rs",
     "update_center.rs",
+    "notification_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -176,6 +180,9 @@ BROKER_REQUIRED_SCHEMAS = {
     "update_receipt.schema.json",
     "update_list.schema.json",
     "update_trust.schema.json",
+    "notification.schema.json",
+    "notification_list.schema.json",
+    "notification_action.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -715,6 +722,36 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         for operation in ("更新一覧", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
             if operation not in operations:
                 errors.append(f"{name}に更新操作がない: {operation}")
+    return errors
+
+
+def test_notification_center_contract_and_navigation_boundary() -> list[str]:
+    errors = []
+    notification = load_contract_fixture("notification.valid.json")
+    listing = load_contract_fixture("notification_list.valid.json")
+    action = load_contract_fixture("notification_action.valid.json")
+    for name, value in (
+        ("notification", notification),
+        ("notification_list", listing),
+        ("notification_action", action),
+    ):
+        errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    if listing["操作"] != "navigation_only" or listing["権限生成"] != "なし":
+        errors.append("通知一覧がnavigation-only境界を宣言していない")
+    if notification["表示範囲"] != "summary":
+        errors.append("通知summaryがsummary表示範囲ではない")
+    if "payload" in notification or "reason" in notification:
+        errors.append("通知summaryへ監査reasonまたはraw payloadが露出している")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        for operation in ("通知一覧", "通知既読", "通知破棄", "通知全既読"):
+            if operation not in operations:
+                errors.append(f"{name}に通知操作がない: {operation}")
+    source = (RUST_HELPER / "src" / "broker" / "notification_center.rs").read_text(encoding="utf-8")
+    if 'const OP_REGISTER: &str = "通知登録"' in source or '"通知登録"' in source:
+        errors.append("通知登録というcaller由来の生成経路を追加してはならない")
+    if '"操作": "navigation_only"' not in source:
+        errors.append("通知Broker応答がnavigation_onlyを明示していない")
     return errors
 
 
@@ -5307,6 +5344,7 @@ def main() -> int:
         test_update_fixture_requires_signature,
         test_update_policy_unsigned_rejection_uses_taxonomy,
         test_update_center_contract_and_execution_boundary,
+        test_notification_center_contract_and_navigation_boundary,
         test_shell_contracts_load_required_schemas,
         test_shell_core_ignores_adapter_metadata_permissions,
         test_shell_core_non_authority_sources_do_not_grant_authority,

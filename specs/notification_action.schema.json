@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/notification_action.schema.json",
+  "title": "通知状態操作（NotificationAction）",
+  "type": "object",
+  "required": ["版", "通知ID", "通知hash"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "通知ID": { "type": "string", "pattern": "^notification-broker-audit-[1-9][0-9]*$" },
+    "通知hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

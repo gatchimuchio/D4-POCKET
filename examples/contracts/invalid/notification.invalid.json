@@ -1,0 +1,16 @@
+{
+  "版": 1,
+  "通知ID": "notification-broker-audit-1",
+  "source": "Update",
+  "severity": "info",
+  "タイトル": "通知",
+  "概要": "全文payloadを表示してはいけない",
+  "作成順": 1,
+  "関連監査ID": "broker-audit-1",
+  "関連監査hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "遷移先": "settings",
+  "状態": "unread",
+  "通知hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "表示範囲": "full",
+  "権限生成": "なし"
+}

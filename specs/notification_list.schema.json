@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/notification_list.schema.json",
+  "title": "通知一覧（NotificationList）",
+  "type": "object",
+  "required": ["版", "通知一覧", "件数", "未読件数", "重大件数", "証拠種別", "表示範囲", "権限生成", "操作"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "通知一覧": { "type": "array", "maxItems": 256, "items": { "type": "object" } },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "未読件数": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "重大件数": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "表示範囲": { "const": "summary" },
+    "権限生成": { "const": "なし" },
+    "操作": { "const": "navigation_only" }
+  }
+}
