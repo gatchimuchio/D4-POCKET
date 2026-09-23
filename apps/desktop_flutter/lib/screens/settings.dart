@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/generated_contracts.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
+import '../services/update_client.dart';
 import 'shared.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -23,13 +24,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _dangerousOnly = false;
   bool _phaseReleaseOnly = false;
   late final ProfileClient? _profileClient;
+  late final UpdateClient? _updateClient;
   Future<List<Map<String, Object?>>>? _profilesFuture;
+  Future<Map<String, Object?>>? _updatesFuture;
   final TextEditingController _profileIdController =
       TextEditingController(text: 'default.local');
   final TextEditingController _profileNameController =
       TextEditingController(text: '標準ローカル実行');
   String? _profileMessage;
   String? _exportedProfile;
+  String? _updateMessage;
 
   @override
   void dispose() {
@@ -45,7 +49,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileClient = widget.client.brokerTransport == null
         ? null
         : ProfileClient(widget.client.brokerTransport!);
+    _updateClient = widget.client.brokerTransport == null
+        ? null
+        : UpdateClient(widget.client.brokerTransport!);
     _refreshProfiles();
+    _refreshUpdates();
   }
 
   @override
@@ -113,6 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         _profilePanel(),
+        _updatePanel(),
         if (filtered.isEmpty)
           const EmptyStatePanel(
             title: '一致する設定なし',
@@ -215,6 +224,146 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
     );
+  }
+
+  Widget _updatePanel() {
+    final client = _updateClient;
+    if (client == null) {
+      return const BorderedPanel(
+        child: Text('更新センター: Broker接続がないため操作できません。snapshotは更新権限の根拠ではありません。'),
+      );
+    }
+    return BorderedPanel(
+      child: FutureBuilder<Map<String, Object?>>(
+        future: _updatesFuture,
+        builder: (context, snapshot) {
+          final body = snapshot.data ?? const <String, Object?>{};
+          final updates = body['更新一覧'] is List
+              ? (body['更新一覧']! as List)
+                  .whereType<Map>()
+                  .map((value) => Map<String, Object?>.from(value))
+                  .toList()
+              : const <Map<String, Object?>>[];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。署名検査前の候補は保存せず、download・適用・rollbackは現在suspendedです。',
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _refreshUpdates,
+                icon: const Icon(Icons.refresh),
+                label: const Text('更新一覧を確認'),
+              ),
+              if (_updateMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(_updateMessage!),
+              ],
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const LinearProgressIndicator()
+              else if (snapshot.hasError)
+                Text('更新一覧を取得できません: ${snapshot.error}')
+              else if (updates.isEmpty)
+                const Text('署名検査済みの更新候補はありません。')
+              else
+                for (final update in updates) _updateRow(client, update),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _updateRow(UpdateClient client, Map<String, Object?> update) {
+    final updateId = update['更新ID']?.toString() ?? '';
+    final candidateHash = update['候補hash']?.toString() ?? '';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text('${update['提供版'] ?? ''} ($updateId)'),
+      subtitle: Text(
+        'channel=${update['channel']} / 署名=${update['署名状態']} / rollback=${update['rollback可能']}',
+      ),
+      trailing: Wrap(
+        spacing: 4,
+        children: [
+          TextButton(
+            onPressed: () => _runUpdateRequest(
+              () => client.requestDownload(
+                updateId: updateId,
+                candidateHash: candidateHash,
+              ),
+              'download要求を記録しました（実行はsuspended）。',
+            ),
+            child: const Text('download要求'),
+          ),
+          TextButton(
+            onPressed: () => _runUpdateRequest(
+              () => client.requestApply(
+                updateId: updateId,
+                candidateHash: candidateHash,
+              ),
+              '適用要求を記録しました（実行はsuspended）。',
+            ),
+            child: const Text('適用要求'),
+          ),
+          TextButton(
+            onPressed: () => _runUpdateRequest(
+              () => client.defer(
+                updateId: updateId,
+                candidateHash: candidateHash,
+                deferredUntil: DateTime.now()
+                    .toUtc()
+                    .add(const Duration(days: 1))
+                    .toIso8601String(),
+              ),
+              '更新を延期しました。',
+            ),
+            child: const Text('延期'),
+          ),
+          if (update['rollback可能'] == true)
+            TextButton(
+              onPressed: () => _runUpdateRequest(
+                () => client.requestRollback(
+                  updateId: updateId,
+                  candidateHash: candidateHash,
+                ),
+                'rollback要求を記録しました（実行はsuspended）。',
+              ),
+              child: const Text('rollback要求'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _refreshUpdates() {
+    final client = _updateClient;
+    if (client == null) return;
+    setState(() {
+      _updatesFuture = client.list();
+    });
+  }
+
+  Future<void> _runUpdateRequest(
+    Future<Map<String, Object?>> Function() request,
+    String success,
+  ) async {
+    try {
+      final body = await request();
+      final state = body['実行状態']?.toString();
+      _setUpdateMessage(state == 'suspended' ? '$success Brokerは実行を保留しました。' : success);
+    } catch (error) {
+      _setUpdateMessage('更新操作失敗: $error');
+    }
+    _refreshUpdates();
+  }
+
+  void _setUpdateMessage(String message) {
+    if (!mounted) return;
+    setState(() => _updateMessage = message);
   }
 
   Widget _profileRow(ProfileClient client, Map<String, Object?> profile) {

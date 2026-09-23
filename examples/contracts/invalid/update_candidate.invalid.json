@@ -1,0 +1,12 @@
+{
+  "版": 1,
+  "更新ID": "update-1",
+  "現行版": "1.0.0",
+  "提供版": "1.1.0",
+  "channel": "stable",
+  "内容概要": "署名検査対象の安全更新",
+  "署名対象": "7b2276657273696f6e223a317d",
+  "署名": "aa",
+  "署名者fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rollback可能": true
+}

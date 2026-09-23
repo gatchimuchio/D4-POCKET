@@ -20,6 +20,8 @@ pub enum BrokerStoreError {
     MalformedReplayState(String),
     MalformedSessionState(String),
     MalformedProfileState(String),
+    MalformedUpdateState(String),
+    MalformedUpdateTrust(String),
 }
 
 impl BrokerStoreError {
@@ -30,7 +32,9 @@ impl BrokerStoreError {
             | BrokerStoreError::TamperedAuditState(message)
             | BrokerStoreError::MalformedReplayState(message)
             | BrokerStoreError::MalformedSessionState(message)
-            | BrokerStoreError::MalformedProfileState(message) => message.clone(),
+            | BrokerStoreError::MalformedProfileState(message)
+            | BrokerStoreError::MalformedUpdateState(message)
+            | BrokerStoreError::MalformedUpdateTrust(message) => message.clone(),
         }
     }
 }
@@ -50,6 +54,8 @@ pub struct BrokerPersistentStore {
     replay_path: PathBuf,
     session_path: PathBuf,
     profile_path: PathBuf,
+    update_path: PathBuf,
+    update_trust_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -91,12 +97,15 @@ impl BrokerPersistentStore {
             replay_path: root.join("replay_nonces.jsonl"),
             session_path: root.join("session.json"),
             profile_path: root.join("profiles.json"),
+            update_path: root.join("updates.json"),
+            update_trust_path: root.join("update_trust.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
         store.ensure_file_exists(&store.audit_path)?;
         store.ensure_file_exists(&store.replay_path)?;
         store.ensure_profile_file_exists()?;
+        store.ensure_update_files_exist()?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
@@ -186,11 +195,107 @@ impl BrokerPersistentStore {
         })
     }
 
+    pub fn load_update_state(&self) -> Result<Value, BrokerStoreError> {
+        let raw = fs::read_to_string(&self.update_path).map_err(|error| {
+            BrokerStoreError::MalformedUpdateState(format!(
+                "broker update stateの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedUpdateState(
+                "broker update stateが空である".to_string(),
+            ));
+        }
+        serde_json::from_str(&raw).map_err(|error| {
+            BrokerStoreError::MalformedUpdateState(format!(
+                "broker update stateがmalformed: {error}"
+            ))
+        })
+    }
+
+    pub fn write_update_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
+        let serialized = serde_json::to_string_pretty(state).map_err(|error| {
+            BrokerStoreError::MalformedUpdateState(format!(
+                "broker update stateのserializeに失敗: {error}"
+            ))
+        })?;
+        atomic_write(&self.update_path, serialized.as_bytes()).map_err(|error| {
+            BrokerStoreError::Io(format!("broker update stateの書込みに失敗: {error}"))
+        })
+    }
+
+    pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
+        let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
+            BrokerStoreError::MalformedUpdateTrust(format!(
+                "broker update trustの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustが空である".to_string(),
+            ));
+        }
+        let value: Value = serde_json::from_str(&raw).map_err(|error| {
+            BrokerStoreError::MalformedUpdateTrust(format!(
+                "broker update trustがmalformed: {error}"
+            ))
+        })?;
+        let object = value.as_object().ok_or_else(|| {
+            BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustはobjectでなければならない".to_string(),
+            )
+        })?;
+        let expected_keys = [
+            "版",
+            "algorithm",
+            "public_key_der_hex",
+            "public_key_fingerprint",
+        ];
+        if object.keys().any(|key| !expected_keys.contains(&key.as_str()))
+            || expected_keys.iter().any(|key| !object.contains_key(*key))
+        {
+            return Err(BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustに未知または欠落fieldがある".to_string(),
+            ));
+        }
+        if object.get("public_key_der_hex") == Some(&Value::Null)
+            && object.get("public_key_fingerprint") == Some(&Value::Null)
+            && object.get("版") == Some(&Value::from(1))
+            && object.get("algorithm") == Some(&Value::from("Ed25519"))
+        {
+            return Ok(None);
+        }
+        Ok(Some(value))
+    }
+
     fn ensure_profile_file_exists(&self) -> Result<(), BrokerStoreError> {
         if self.profile_path.exists() {
             return Ok(());
         }
         self.write_profile_state(&serde_json::json!({"版": 1, "profiles": []}))
+    }
+
+    fn ensure_update_files_exist(&self) -> Result<(), BrokerStoreError> {
+        if !self.update_path.exists() {
+            self.write_update_state(&serde_json::json!({"版": 1, "updates": []}))?;
+        }
+        if !self.update_trust_path.exists() {
+            let trust = serde_json::json!({
+                "版": 1,
+                "algorithm": "Ed25519",
+                "public_key_der_hex": null,
+                "public_key_fingerprint": null
+            });
+            let serialized = serde_json::to_string_pretty(&trust).map_err(|error| {
+                BrokerStoreError::MalformedUpdateTrust(format!(
+                    "broker update trustの初期化serializeに失敗: {error}"
+                ))
+            })?;
+            atomic_write(&self.update_trust_path, serialized.as_bytes()).map_err(|error| {
+                BrokerStoreError::Io(format!("broker update trustの初期化に失敗: {error}"))
+            })?;
+        }
+        Ok(())
     }
 
     fn ensure_file_exists(&self, path: &Path) -> Result<(), BrokerStoreError> {

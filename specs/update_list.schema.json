@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/update_list.schema.json",
+  "title": "更新一覧（UpdateList）",
+  "type": "object",
+  "required": ["版", "更新一覧", "件数", "署名信頼設定", "download実行", "適用実行", "rollback実行", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "更新一覧": { "type": "array", "maxItems": 64, "items": { "$ref": "update_receipt.schema.json" } },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 64 },
+    "署名信頼設定": { "enum": ["configured", "unconfigured"] },
+    "download実行": { "const": "suspended" },
+    "適用実行": { "const": "suspended" },
+    "rollback実行": { "const": "suspended" },
+    "証拠種別": { "const": "INTERNAL_STATE" }
+  }
+}

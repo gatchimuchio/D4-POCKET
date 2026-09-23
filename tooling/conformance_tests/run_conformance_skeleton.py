@@ -103,6 +103,10 @@ REQUIRED_SCHEMA_NAMES = {
     "recovery",
     "diagnostic",
     "update",
+    "update_candidate",
+    "update_receipt",
+    "update_list",
+    "update_trust",
     "content_exposure",
     "framework_risk_profile",
     "runtime_manifest",
@@ -155,6 +159,7 @@ BROKER_REQUIRED_SOURCES = {
     "regression_case.rs",
     "mcp_center.rs",
     "profile_center.rs",
+    "update_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -167,6 +172,10 @@ BROKER_REQUIRED_SCHEMAS = {
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",
+    "update_candidate.schema.json",
+    "update_receipt.schema.json",
+    "update_list.schema.json",
+    "update_trust.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -183,6 +192,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
     "lib/services/profile_client.dart",
+    "lib/services/update_client.dart",
     "lib/services/surface_semantics_export.dart",
     "lib/models/generated_contracts.dart",
 }
@@ -686,6 +696,26 @@ def test_update_policy_unsigned_rejection_uses_taxonomy() -> list[str]:
             return ["UpdatePolicyStoreのunsigned拒否がupdate_signature_required taxonomyを使っていない"]
         return []
     return ["UpdatePolicyStoreがunsigned update policyを受け入れた"]
+
+
+def test_update_center_contract_and_execution_boundary() -> list[str]:
+    errors = []
+    candidate = load_contract_fixture("update_candidate.valid.json")
+    receipt = load_contract_fixture("update_receipt.valid.json")
+    listing = load_contract_fixture("update_list.valid.json")
+    trust = load_contract_fixture("update_trust.valid.json")
+    for name, value in (("update_candidate", candidate), ("update_receipt", receipt), ("update_list", listing), ("update_trust", trust)):
+        errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    if validate_instance({**candidate, "public_key_der_hex": "00"}, load_schema("update_candidate.schema.json")) == []:
+        errors.append("更新候補へBroker外部公開鍵を混入できた")
+    if listing["download実行"] != "suspended" or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
+        errors.append("更新実行経路がsuspendedではない")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        for operation in ("更新一覧", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
+            if operation not in operations:
+                errors.append(f"{name}に更新操作がない: {operation}")
+    return errors
 
 
 def test_shell_contracts_load_required_schemas() -> list[str]:
@@ -5276,6 +5306,7 @@ def main() -> int:
         test_framework_risk_profile_exists,
         test_update_fixture_requires_signature,
         test_update_policy_unsigned_rejection_uses_taxonomy,
+        test_update_center_contract_and_execution_boundary,
         test_shell_contracts_load_required_schemas,
         test_shell_core_ignores_adapter_metadata_permissions,
         test_shell_core_non_authority_sources_do_not_grant_authority,

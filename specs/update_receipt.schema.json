@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/update_receipt.schema.json",
+  "title": "更新receipt（UpdateReceipt）",
+  "type": "object",
+  "required": ["版", "更新ID", "現行版", "提供版", "channel", "内容概要", "署名対象", "署名", "署名者fingerprint", "rollback可能", "署名状態", "候補hash", "延期期限"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "更新ID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "現行版": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "提供版": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "channel": { "enum": ["stable", "beta", "nightly"] },
+    "内容概要": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "署名対象": { "type": "string", "pattern": "^[a-f0-9]{2,131072}$" },
+    "署名": { "type": "string", "pattern": "^[a-f0-9]{128}$" },
+    "署名者fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "rollback可能": { "type": "boolean" },
+    "署名状態": { "const": "verified" },
+    "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "延期期限": { "type": ["string", "null"] }
+  }
+}

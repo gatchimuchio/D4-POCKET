@@ -184,6 +184,10 @@
       "責任": "C10 運用プロファイルの要求設定、永続化、適用要求、export/import、権限非生成境界"
     },
     {
+      "path": "docs/specs/update-center.md",
+      "責任": "C11 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、延期、実行要求のsuspended境界"
+    },
+    {
       "path": "docs/specs/device-link.md",
       "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
     },

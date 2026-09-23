@@ -21,6 +21,8 @@ Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（
 
 C10では、`docs/specs/operation-profile.md`を正本とする運用プロファイルを追加した。ProfileはRuntime、Adapter、要求Capability、Content Exposure、network exposure、resource limit、UI preferenceだけを保持し、Rust Brokerが永続化・再検証・監査を行う。Profile適用は要求の記録に限定し、ProfileからPermission、Approval、Authority、Credentialを生成しない。Desktop設定画面から一覧、作成、適用要求、export、削除をBroker経由で操作できる。import契約はBrokerに接続済みだが、専用ファイル選択UIは追加していない。
 
+C11では、`docs/specs/update-center.md`を正本とする更新センターを追加した。更新候補の正本化、Broker所有Ed25519 trustによる署名検査、署名済み候補の永続化、一覧、延期、download／適用／rollback要求のAuditをRust BrokerとDesktop設定画面へ接続した。外部download、install、process、rollbackの実行はsuspendedのままであり、要求receiptを実行完了へ昇格しない。信頼設定未構成、Windows installed productの更新証拠、owner GOは正式releaseのrelease_blockerとして保持する。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

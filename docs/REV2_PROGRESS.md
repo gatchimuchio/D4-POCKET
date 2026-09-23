@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C11: 更新センター（2026-09-23）
+
+更新候補のSchema、Rust Broker署名検査、永続一覧、延期、download／適用／rollback要求、Desktop設定画面を接続した。候補metadataから署名対象byteを再構成し、Broker所有のEd25519公開鍵とfingerprintを使う。候補側の公開鍵、Profile、MCP metadata、履歴、UI stateは信頼源にならない。信頼設定未構成または署名不正の候補は保存しない。
+
+- Production path: Desktop設定画面 → 通常Broker IPC → Rust Update Center → `updates.json`／Audit。`更新一覧`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`を接続した。
+- Authority boundary: 更新署名の信頼はBroker所有設定だけから成立する。署名済み候補もPermission、Approval、Authority、Credential、外部process実行権限を生成しない。candidate hashのstale照合を行う。
+- Execution boundary: download、install、process、rollbackの外部実行はsuspendedである。要求receiptを実行完了と報告しない。
+- Validation: UpdateCandidate／Receipt／ListのSchema、negative fixture、Ed25519検証、信頼設定未構成、候補hash、永続化、実行要求suspended、Desktop UpdateClientを検証する。
+- 未成立分類: 外部download、install、process、rollback適用、owner公開鍵の本番provisioning、Windows installed productの更新実証は`release_blocker`。C11のBroker要求受付と署名検査だけで更新製品機能または正式releaseを主張しない。
+
 ## D4 Pocket C10: 運用プロファイル（2026-09-23）
 
 運用プロファイルをSchema-firstで定義し、Rust Brokerの永続状態と通常認証済みIPCへ接続した。ProfileはRuntime、Adapter、要求Capability、Content Exposure、network exposure、resource limit、UI preferenceだけを保持する。`プロファイル適用要求`はProfile hashを照合して適用意図をAuditへ記録するだけで、Permission、Approval、Authority registry、Runtime操作を変更しない。
