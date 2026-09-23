@@ -7,6 +7,8 @@
 
 ## 現行D4 Pocket統合単位（2026-09-24）
 
+C24ではdocs/specs/mobile-surface.mdを正本として、Mobileの既存9画面を保持しながら資源概要、履歴、MCP状態を追加した。通知summary、Runtime lifecycle状態、資源観測、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataだけを、Device Linkから既存Rust Brokerの読み取り専用handlerへ接続する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。Mobile実機、TLS実接続、Windows installed product証拠、長時間運用、障害注入、owner GO、正式releaseはrelease_blockerとして保持する。
+
 rev2のHost操作面とC19 Adapter管理操作を、既存のGUI-Shell契約とRust Broker経路へ接続した。`docs/specs/host-operation-surface.md`と`docs/specs/adapter-management-surface.md`を正本とし、Hostの表示コンテキスト操作、Adapter metadata一覧、owner限定のAdapter状態管理、署名検査、隔離再利用拒否を実装・検証する。Host metadataとAdapter metadataはPermission・Approval・Authority・Credentialを生成しない。Adapter導入・更新・削除は現時点ではBroker catalogのmetadata操作に限定し、外部artifactのdownload、filesystem操作、process起動を完了扱いにしない。
 
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。

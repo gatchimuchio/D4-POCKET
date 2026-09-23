@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C24: Mobile対応（2026-09-24）
+
+Desktopの既存Broker契約から、Mobileへ必要な状態確認と復旧導線を選択的に投影した。MobileのNavigationは既存9画面を保持したまま、資源概要、履歴、MCP状態を追加した。端末TLS経路は、Runtime lifecycle状態、資源観測、通知summary、停止receipt、現在owner承認に結合した履歴metadataだけを既存Rust Broker handlerへ渡す。
+
+- Production path: Mobile Flutter → Device Link TLS → Desktop Rust Broker → 既存読み取り専用handler → bounded projection。Mobile専用の権限判定、owner操作、別bridge、別監査storeは追加していない。
+- Authority boundary: MobileはApprovalを発行・編集・延長・失効せず、MCP接続・Tool実行・Credential参照・実停止を行わない。停止画面はowner再承認待ちreceiptだけを表示し、資源のunknownを0へ変換しない。
+- Content boundary: 通知はsummary、履歴は現在承認のmetadataだけで、対話本文・Approval payload・Audit raw reason・Credential実値を投影しない。Host表示は既存保存資格のmetadataに閉じる。
+- Validation target: Mobile flutter analyze、flutter test、Rust端末統治試験、C24 Conformance、Schema、厳格日本語監査を実行する。
+- 未成立分類: Mobile実機・Android/iOS安全保管・TLS実接続、Windows installed productでのMobile連携、長時間運用・障害注入、owner GO、C0-C34全数完成、正式releaseはrelease_blocker。MCP live一覧をMobileへ出さないことはowner専用管理面を守るknown_limitation。
+
 ## D4 Pocket C23: Desktop UX統合（2026-09-24）
 
 既存20画面を削除せず、Desktop Navigationを`運用`、`安全`、`開発`、`設定`、`すべて`の論理グループへ整理した。グループ選択はFlutterの表示状態だけを変更し、別グループの画面へ移動した場合は対象グループへ切り替える。画面本体と既存のBroker、owner control、Approval、Audit、Recovery経路は置き換えていない。

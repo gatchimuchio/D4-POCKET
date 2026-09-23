@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bb22857541ce740d9580be7e6299eedb6b83347ba8deaa0141d888aa9a2f135a"
+      "sha256": "cc8299b116a167bb91a4f8c31fadfbcc457a0b55668c088cb9371ea81900b454"
     },
     {
       "path": "SECURITY.md",
@@ -933,7 +933,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "0adc9067f3fd23a442d3ae187a63b943e5314267a78e158d6678fa2d94176d39"
+      "sha256": "e950f8d4754db4b21e3482ff2924195d91ed422324e1d0d7e4d0607a68a49900"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/approval_review.dart",
@@ -945,7 +945,15 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/emergency_stop.dart",
-      "sha256": "c4553848ce7c4ab0a854ac7d41d23e24d2fb6c4e9ab54209a546c0728b879005"
+      "sha256": "69bb36f917222a3d8a51ebf38c1ea1a98fcd7aaa52097ed3902e7b4fa6f04a17"
+    },
+    {
+      "path": "apps/mobile_flutter/lib/screens/history.dart",
+      "sha256": "01f3b8a1360e63f8f62d95cbba7b54fb6659dfccec1f018ec9ab8074178c9dee"
+    },
+    {
+      "path": "apps/mobile_flutter/lib/screens/mcp_status.dart",
+      "sha256": "fab88231f5c7281d97190c441d607902cf06c9a510f6da9366c368f691725a36"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/mobile_dashboard.dart",
@@ -953,15 +961,19 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/notifications.dart",
-      "sha256": "8987714bb64cc6eea4781673aba58826b72ae6b9ab6db5c509351899eb68475b"
+      "sha256": "2d4704ac83cf118b47f90879d3aad1281d8e2e6390545f38ba190eb29be65d42"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/recovery_instruction.dart",
       "sha256": "97d58d79df3423a3abb588d0435e7e3cdb86b1e1cd49f89e64f0698a9ae40864"
     },
     {
+      "path": "apps/mobile_flutter/lib/screens/resource_overview.dart",
+      "sha256": "7e044fa7004fa8b9a5dac4e86e5ed301821560e1887fd369aa913f861d3f3040"
+    },
+    {
       "path": "apps/mobile_flutter/lib/screens/runtime_status.dart",
-      "sha256": "6956348f3e61d1d551b31ce62ed18a2dcad4dd9f8a83f3f59804be71d998fdba"
+      "sha256": "4ee2d4554536fe334a84c5db311651b0a8178002f4f08d412d09a3e709b72bf5"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/shared.dart",
@@ -969,11 +981,15 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_client.dart",
-      "sha256": "fea6f78c4b045942e9f6c5f479c5191cdad0078fa568dd3edb1d9f7ea47c7afb"
+      "sha256": "2e58e5575397d54485e4dacdba8d5af4788183aa84ada98476ed578a73a0afc2"
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_controller.dart",
       "sha256": "785354e0366d584c411eaa05425a99f5811c43ebb7438eaa8d9f5e9b002738c2"
+    },
+    {
+      "path": "apps/mobile_flutter/lib/services/mobile_projection_client.dart",
+      "sha256": "6d140dedf0d1acd3d0d1fb45ec23e7dd4c941e5d8ba236910362a5c3f82e939e"
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
@@ -982,6 +998,10 @@
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
       "sha256": "d39a3b42c696a891548cbb638eb97836c2bf5a71cd62d826833d7a7986807f4b"
+    },
+    {
+      "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
+      "sha256": "09349a59c0ef8f92e92a80135814e3fdb3bf389a5f2006c244881c1df87b54ba"
     },
     {
       "path": "apps/mobile_flutter/test_driver/device_link_driver.dart",
@@ -1021,7 +1041,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "b8b62fa3896b2735d102def1b46fb04097470d89f2f0fe04783452832ada8c90"
+      "sha256": "b295617125e82583caa7636e02161c5258577f7f547d78e1a631d94bc0df37d4"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1057,7 +1077,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "53be5d86e9909c45a124f7d9ca797a12f4c023669467639f3375c7acb97a3ead"
+      "sha256": "012c983c0e274d7adcce82c275398c8ff9b46760da92bed34611deb4294dc4d4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1224,6 +1244,10 @@
       "sha256": "32f184bf7b79eebe67e9177b75d100888cf8965aa9aaff144d7752639cb710bd"
     },
     {
+      "path": "docs/specs/mobile-surface.md",
+      "sha256": "7bb1c9229fcc236862023dd825846b7b38dcd9ff552244b84a849749e556dce7"
+    },
+    {
       "path": "docs/specs/notification-center.md",
       "sha256": "f8f6b648c0f44463523d85c5beee36de6595194a19f4ae1065b6ab4476af3cbe"
     },
@@ -1301,7 +1325,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "1cd03292e6d3b1e98a72550123cfe7286cbb574d1ff2705ccdf9de8d94fb4ff6"
+      "sha256": "3ed65c04f655980e360a95695242165495d3306e4100399a0fcdd803fa25366c"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2417,7 +2441,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
-      "sha256": "1dbcc92a945e05a1154f767d42062371f7a2679bb3d5954a1a616a6c9448ae39"
+      "sha256": "1aeb8eee906aed6e7421e4cf87ab17a2dd9cfc3029b2520ff6b084bdef24a577"
     },
     {
       "path": "native/rust_helper/src/broker/device_transport.rs",
@@ -2481,7 +2505,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "a4ad836d1ac27d05cb06d1c0bc4fb38c6de9d5d911fa31e901ceecff72631b24"
+      "sha256": "153bf18185fef5a33cb4917641f92681610e70cba597075ba1f83c06c79df7c0"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3489,7 +3513,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "32dbda4e67f9101f86efef08d8f0a9d25ddd7989ebddd498eae5ed4797c7ee1d"
+      "sha256": "2e5132bf70ddcbaa13255dc7ef0cea00b34634b516d81b32d29635eccda052bc"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3581,7 +3605,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "cafb041f9af0b85d191e7286ab639756485fadf6d6627e1095165cceedc9a70a"
+      "sha256": "494e10e5b3c4dbeff08fbd1125d9b21302093a7c6fd3495236573a76401e7653"
     }
   ]
 }

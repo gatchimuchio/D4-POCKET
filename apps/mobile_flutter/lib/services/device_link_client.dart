@@ -210,6 +210,12 @@ class DeviceLinkClient implements BrokerTransport {
       '対話取得',
       '対話中止',
       '対話終了',
+      '実行系ライフサイクル状態',
+      '実行系資源観測',
+      '通知一覧',
+      '全Runtime停止要求',
+      '対話履歴閲覧状態',
+      '対話履歴閲覧',
     };
     if (credential.invitation
         ? operation != '端末結合'

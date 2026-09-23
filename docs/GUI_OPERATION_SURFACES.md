@@ -151,6 +151,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: python3 tooling/evidence_bundle.py --checkは、bundleがWindows installed-path blockerを保持し、tooling/release_runtime_assertions.py --checkを埋め込み、release readinessを主張しないことを検証する。
   authority_boundary: evidence exportは読み取り専用かつ非権限的である。
 
+- item: D4 Pocket Mobile projection（C24 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Mobileは既存Device Link TLSから、Runtime lifecycle状態、資源観測、通知summary、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataを既存Rust Brokerへ要求する。資源概要はunknownを0へ変換せず、MCPはowner専用Desktop管理面として未観測を表示する。
+  authority_boundary: MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。対話本文、Approval payload、Audit raw reason、Credential実値を投影せず、既存Broker handler以外のbridgeを追加しない。Mobile実機、TLS実接続、Android/iOS安全保管、Windows installed product証拠、長時間運用、障害注入は未成立として扱う。
+
 - item: Release runtime assertions
   classification: required_for_v1
   status: implemented

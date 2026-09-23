@@ -212,6 +212,10 @@
       "責任": "C23 Desktopの運用・安全・開発・設定グループ、既存20画面保持、Navigation表示整理、権限非生成境界"
     },
     {
+      "path": "docs/specs/mobile-surface.md",
+      "責任": "C24 Mobileの通知、Runtime状態、資源概要、履歴metadata、Host、MCP、停止receipt、Recoveryの選択的投影と権限非生成境界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

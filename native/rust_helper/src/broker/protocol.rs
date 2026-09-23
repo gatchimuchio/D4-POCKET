@@ -1389,7 +1389,7 @@ impl Broker {
             Ok((body, sessions)) => {
                 self.対話.資格隔離(&sessions);
                 match self.append_audit(request_id, operation, "accepted", "端末制御結果を確定", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(body.to_string().as_bytes())) {
-                    Ok(done) => self.端末成功応答(request_id, operation, body, done.event_id),
+                    Ok(done) => self.端末成功応答(request_id, operation, body, done.event_id, EVIDENCE_SOURCE_INTERNAL_STATE),
                     Err(_) => {self.端末全停止();self.audit_store_failed_response(request_id,operation,"監査失敗","端末経路を停止")}
                 }
             }
@@ -1397,8 +1397,8 @@ impl Broker {
         }
     }
 
-    fn 端末成功応答(&self, id: &str, operation: &str, body: Value, audit_id: String) -> BrokerResponse {
-        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:audit_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+    fn 端末成功応答(&self, id: &str, operation: &str, body: Value, audit_id: String, evidence_source: &str) -> BrokerResponse {
+        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:evidence_source.into(),audit_event_id:audit_id,error:None,health:None,body:Some(body),shutdown_requested:false}
     }
 
     pub(crate) fn 端末要求処理(&mut self, raw: &str) -> BrokerResponse {
@@ -1420,26 +1420,36 @@ impl Broker {
         };
         let now = self.current_epoch_seconds();
         let result = if op == "端末結合" {
-            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.結合する(&r,now))
+            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.結合する(&r,now)).map(|body| (body, EVIDENCE_SOURCE_LIVE_RUNTIME.to_string()))
         } else {
             self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.認証する(&r,now)).and_then(|()|{
-                if op == "端末確認" {return Ok(serde_json::json!({"状態":"接続中"}));}
+                if op == "端末確認" {return Ok((serde_json::json!({"状態":"接続中"}), EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));}
                 if op == "端末離脱" {
                     let sessions = self.端末.as_mut().ok_or("端末経路が未設定")?.失効(&r.資格ID)?;
                     self.対話.資格隔離(&sessions);
-                    return Ok(serde_json::json!({"状態":"失効"}));
+                    return Ok((serde_json::json!({"状態":"失効"}), EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));
                 }
-                let operation: BrokerOperation = serde_json::from_value(Value::String(op.into())).map_err(|_|"操作不正")?;
-                let response = self.対話要求処理(id, operation, &r.内容, false, &hash);
+                let response = match op {
+                    "実行系資源観測" => self.実行系資源観測要求処理(id, &r.内容, &hash),
+                    "実行系ライフサイクル状態" => self.実行系ライフサイクル状態処理(id, &r.内容, false, &hash),
+                    "全Runtime停止要求" => self.全Runtime停止要求処理(id, &r.内容, &hash),
+                    "通知一覧" => super::notification_center::dispatch(self, BrokerOperation::通知一覧, &r.内容, id, &hash),
+                    "対話履歴閲覧状態" | "対話履歴閲覧" => self.履歴閲覧処理(id, op, &r.内容, false, &hash),
+                    _ => {
+                        let operation: BrokerOperation = serde_json::from_value(Value::String(op.into())).map_err(|_|"操作不正")?;
+                        self.対話要求処理(id, operation, &r.内容, false, &hash)
+                    }
+                };
                 if response.status != BrokerStatus::Accepted {return Err("対話操作拒否");}
                 let body = response.body.ok_or("対話応答不正")?;
+                let evidence_source = response.evidence_source;
                 self.端末.as_mut().ok_or("端末経路が未設定")?.所有記録(&r.資格ID,op,&body)?;
-                Ok(body)
+                Ok((body, evidence_source))
             })
         };
         match result {
-            Ok(body) => match self.append_audit(id,op,"accepted","端末要求結果を確定",EVIDENCE_SOURCE_LIVE_RUNTIME,&sha256_tagged(body.to_string().as_bytes())) {
-                Ok(done) => self.端末成功応答(id,op,body,done.event_id),
+            Ok((body, evidence_source)) => match self.append_audit(id,op,"accepted","端末要求結果を確定",&evidence_source,&sha256_tagged(body.to_string().as_bytes())) {
+                Ok(done) => self.端末成功応答(id,op,body,done.event_id,&evidence_source),
                 Err(_) => {self.端末全停止();self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止")}
             },
             Err(reason) => self.reject_with_payload_hash(id,op,"端末要求拒否",reason,true,&hash),
@@ -4761,6 +4771,28 @@ mod 端末統治試験 {
         assert_ne!(制御(&mut e.broker,"対話承認",json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})).status,BrokerStatus::Accepted);
         let (_, reopened) = BrokerPersistentStore::open_or_create(&e.path, "audit-check").unwrap();
         assert!(reopened.audit_log.events().iter().any(|event| event.reason == "期限超過で対話を隔離"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する(){
+        let mut e=環境生成();
+        let invitation=制御(&mut e.broker,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
+        let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
+        for (operation,payload) in [
+            ("実行系ライフサイクル状態",json!({"版":1,"実行系ID":"local"})),
+            ("実行系資源観測",json!({"版":1,"実行系ID":"local"})),
+            ("通知一覧",json!({"版":1,"未読のみ":false,"上限":64})),
+            ("全Runtime停止要求",json!({"版":1})),
+            ("対話履歴閲覧状態",json!({})),
+        ] {
+            let response=通信(&mut e.broker,&credential,operation,payload);
+            assert_eq!(response.status,BrokerStatus::Accepted,"{operation}");
+            assert_eq!(response.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE,"{operation} evidence source");
+        }
+        assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
+        assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);
+        assert_eq!(通信(&mut e.broker,&credential,"MCP接続一覧",json!({"版":1})).status,BrokerStatus::Rejected);
     }
 }
 

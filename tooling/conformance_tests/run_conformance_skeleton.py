@@ -4585,6 +4585,77 @@ def Desktop_UX統合の表示境界を検査する() -> list[str]:
     return 不整合
 
 
+def Mobile投影の統治境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "mobile-surface.md"
+    main = MOBILE_FLUTTER / "lib" / "main.dart"
+    projection = MOBILE_FLUTTER / "lib" / "services" / "mobile_projection_client.dart"
+    link = MOBILE_FLUTTER / "lib" / "services" / "device_link_client.dart"
+    device_link = RUST_HELPER / "src" / "broker" / "device_link.rs"
+    protocol = RUST_HELPER / "src" / "broker" / "protocol.rs"
+    required_files = (
+        specification,
+        main,
+        projection,
+        MOBILE_FLUTTER / "lib" / "screens" / "resource_overview.dart",
+        MOBILE_FLUTTER / "lib" / "screens" / "history.dart",
+        MOBILE_FLUTTER / "lib" / "screens" / "mcp_status.dart",
+    )
+    if any(not path.exists() for path in required_files):
+        return ["C24 Mobile投影の正本または実装がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    main_text = main.read_text(encoding="utf-8")
+    projection_text = projection.read_text(encoding="utf-8")
+    link_text = link.read_text(encoding="utf-8")
+    device_link_text = device_link.read_text(encoding="utf-8")
+    protocol_text = protocol.read_text(encoding="utf-8")
+    for token in (
+        "通知",
+        "Approval",
+        "Runtime状態",
+        "資源概要",
+        "履歴",
+        "Host",
+        "MCP",
+        "緊急停止要求",
+        "Recovery",
+        "未観測",
+        "unknown",
+    ):
+        if token not in specification_text:
+            不整合.append(f"C24正本にMobile対象境界がない: {token}")
+    for token in ("資源", "履歴", "MCP", "ResourceOverview", "MobileHistory", "MobileMcpStatus"):
+        if token not in main_text:
+            不整合.append(f"C24 Mobile実装に投影surfaceがない: {token}")
+    for token in ("通知一覧", "全Runtime停止要求", "INTERNAL_STATE", "権限生成", "owner_reapproval_required"):
+        if token not in projection_text:
+            不整合.append(f"C24 Mobile投影clientの境界がない: {token}")
+    for token in (
+        "実行系ライフサイクル状態",
+        "実行系資源観測",
+        "通知一覧",
+        "全Runtime停止要求",
+        "対話履歴閲覧状態",
+        "対話履歴閲覧",
+    ):
+        if token not in link_text or token not in device_link_text or token not in protocol_text:
+            不整合.append(f"C24 Device Linkの読み取り操作が接続されていない: {token}")
+    for forbidden in (
+        "対話履歴承認",
+        "対話内容閲覧",
+        "MCP接続",
+        "資格情報一覧",
+        "Process.start",
+        "Process.run",
+    ):
+        if forbidden in projection_text:
+            不整合.append(f"C24 Mobile投影clientが禁止操作へ到達している: {forbidden}")
+    for forbidden in ("端末秘密", "招待秘密", "Credential実値", "payload_hash"):
+        if forbidden in projection_text:
+            不整合.append(f"C24 Mobile投影clientが秘密またはauthority値を扱っている: {forbidden}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -6204,6 +6275,7 @@ def main() -> int:
         コマンドパレット拡張の統治境界を検査する,
         グローバル検索の統治境界を検査する,
         Desktop_UX統合の表示境界を検査する,
+        Mobile投影の統治境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

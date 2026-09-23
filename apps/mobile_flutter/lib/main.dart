@@ -7,7 +7,10 @@ import 'screens/emergency_stop.dart';
 import 'screens/mobile_dashboard.dart';
 import 'screens/notifications.dart';
 import 'screens/recovery_instruction.dart';
+import 'screens/resource_overview.dart';
 import 'screens/runtime_status.dart';
+import 'screens/history.dart';
+import 'screens/mcp_status.dart';
 import 'services/device_link_controller.dart';
 
 void main() {
@@ -51,6 +54,9 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
     '対話',
     '接続先',
     '設定',
+    '資源',
+    '履歴',
+    'MCP',
   ];
   static const _icons = [
     Icons.dashboard_outlined,
@@ -62,6 +68,9 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
     Icons.chat_outlined,
     Icons.link,
     Icons.settings_outlined,
+    Icons.memory_outlined,
+    Icons.history_outlined,
+    Icons.extension_outlined,
   ];
   @override
   void initState() {
@@ -92,8 +101,16 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
       final pages = <Widget>[
         MobileDashboard(status: c.status),
         const ApprovalReview(),
-        MobileNotifications(events: c.events),
-        RuntimeStatus(runtimes: c.runtimes, connected: c.ready),
+        MobileNotifications(
+          events: c.events,
+          controller: c,
+          connected: c.ready && c.foreground,
+        ),
+        RuntimeStatus(
+          controller: c,
+          runtimes: c.runtimes,
+          connected: c.ready && c.foreground,
+        ),
         EmergencyStop(controller: c),
         const RecoveryInstruction(),
         if (_dialogueVisited)
@@ -106,6 +123,13 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
           const SizedBox.shrink(),
         DeviceConnection(controller: c),
         DeviceSettings(controller: c),
+        ResourceOverview(
+          controller: c,
+          runtimes: c.runtimes,
+          connected: c.ready && c.foreground,
+        ),
+        MobileHistory(controller: c, connected: c.ready && c.foreground),
+        const MobileMcpStatus(),
       ];
       return Scaffold(
         appBar: AppBar(
