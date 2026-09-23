@@ -19,6 +19,8 @@ pub struct BrokerServerConfig {
     pub max_request_bytes: usize,
     pub owner_session_file: Option<PathBuf>,
     pub minidora_runtimes: Vec<(String, String)>,
+    /// ownerが明示した絶対executableとworkspaceだけをCodex Adapterへ登録する。
+    pub codex_runtimes: Vec<(String, PathBuf, PathBuf)>,
     /// debug buildでしか受理しない、固定childを使うC4開発実証用flag。
     pub development_lifecycle_fixture_enabled: bool,
     pub mobile_bind: Option<String>,
@@ -35,6 +37,7 @@ impl BrokerServerConfig {
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             owner_session_file: None,
             minidora_runtimes: Vec::new(),
+            codex_runtimes: Vec::new(),
             development_lifecycle_fixture_enabled: false,
             mobile_bind: None,
             workspace_config: None,
@@ -84,6 +87,13 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     for (id, address) in &config.minidora_runtimes {
         let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
         broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
+    }
+    for (id, executable, workspace) in &config.codex_runtimes {
+        let adapter = crate::adapters::codex_cli::CodexCliAdapter::new(executable, workspace)
+            .map_err(BrokerServerError::new)?;
+        broker
+            .実行系登録(id, std::sync::Arc::new(adapter))
+            .map_err(|_| BrokerServerError::new("Codex実行系登録が不正または重複"))?;
     }
     if config.development_lifecycle_fixture_enabled {
         if config.owner_session_file.is_none() {

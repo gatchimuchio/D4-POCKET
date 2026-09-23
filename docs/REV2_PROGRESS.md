@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 4: Codex AdapterのBroker登録とread-only Launcher基盤（2026-09-23）
+
+Windowsで確認した実物Codex CLIを、Rust Brokerの明示起動設定から既存の実行系対話経路へ接続した。`--codex-runtime <ID=絶対executable path=絶対workspace path>` はowner起動時だけ受け付け、Adapterの登録時にexecutable／workspaceの絶対path、通常file／directory、secret pathでないこと、`codex --version`、`codex exec --help`を確認する。IPCから任意の実行path、argv、environment、workspaceを受け取る経路は追加していない。
+
+- Production path: `実行系挙`で登録されたCodexを既存の `対話開始`、owner承認付きの`対話送信`、`対話取得`、`対話中止`、`対話終了`から利用する。汎用`command_envelope` dispatchは引き続き停止中で、Flutterはprocess／filesystem／credential／networkを直接実行しない。
+- Runtime boundary: 実行は固定された `codex exec --json --ephemeral --ignore-user-config --sandbox read-only --color never --cd <workspace> -` に限定し、環境変数はallowlistだけを渡す。JSONLのthread、agent message、turn完了を検証し、失敗event、不正応答、出力上限超過、取消、期限超過を成功へ昇格しない。Broker起動と認証付き通常IPCによる`codex`実行系列挙をWindowsで実行確認した。
+- Evidence boundary: Codex CLIのread-only JSONL応答`READY`は、独立したephemeral／read-only smokeで実物interfaceを確認したもの。Broker登録と実行系列挙はLIVE_RUNTIMEの実Broker証拠である。静的conformanceはsource boundaryを検査するが、write-capable Agent、MCP、複数Agent比較、Handoff、長時間運用、installed productを証明しない。
+- 未成立分類: write-capable Agent execution、実taskのProduct UI完結、MCP／A2A、複数Agent比較／Handoff、Usage／Cost、Claude／Gemini接続は`release_blocker`。Codex Adapterのread-only限定、`--codex-runtime` executable path内の`=`未対応、未導入Vendorは`known_limitation`として保持する。
+
 ## D4 Pocket Phase 4前提: Codex CLI実物interface probe（2026-09-23）
 
 Phase 4 Agent Launcherの前提確認として、Windowsで実際にPATHへ存在するCodex CLIのinterfaceをdevelopment-only probeから読み取り専用で確認した。`codex --version`は`codex-cli 0.155.0-alpha.16`、`codex exec --help`は`exec`、`resume`、`fork`、`review`等のsurfaceを返した。probeはversion/help以外を呼ばず、prompt、credential、workspace変更、task実行、process dispatchを行わない。

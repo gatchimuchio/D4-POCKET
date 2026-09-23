@@ -11,7 +11,7 @@ rev2 Phase 2のHost Capabilityを、既存のGUI-Shell契約とRust Broker経路
 
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 
-Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`だけを呼ぶdevelopment-only probeでinterfaceを確認した。probeはprompt、credential、workspace変更、task実行を行わない。現在のBroker command dispatchは停止中のため、実行状態は`degraded`、task実行・取消・MCP・metrics・cost・認証は`unknown`または`unsupported`として表現する。Claude／Gemini等の未導入Agentは存在を推測しない。Agent Launcherのproduction path、実task実行、Approval／Audit／Recovery接続は未完成である。
+Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`をBroker登録時にも確認するRust Adapterを追加した。ownerが絶対executableとworkspaceを明示した場合だけ、既存の実行系対話・owner承認経路から固定read-only JSONL実行を行い、Windowsの実Broker通常IPCで`codex`実行系列挙まで確認した。Broker command dispatchは停止中のままであり、任意command、write-capable Agent、MCP、複数Agent比較、Handoffは追加していない。Claude／Gemini等の未導入Agentは存在を推測しない。これはAgent Launcher基盤の現行限定実装であり、製品releaseや全Agent機能の完成を意味しない。
 
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 

@@ -51,6 +51,7 @@ fn main() {
     eprintln!("使用法: gui_shell_rust_helper broker-server --store-dir <path> --session-file <path> [--port <port>] [--max-request-bytes <bytes>]");
     eprintln!("開発専用: gui_shell_rust_helper dev-stdin-smoke");
     eprintln!("対話登録: broker-server ... --owner-session-file <owner資格file> --minidora-runtime <ID=127.0.0.1:port>");
+    eprintln!("Codex Agent登録: broker-server ... --codex-runtime <ID=絶対executable path=絶対workspace path>");
     eprintln!("C4開発実証: debug broker-server ... --owner-session-file <owner資格file> --enable-development-lifecycle-fixture");
     eprintln!("端末経路: broker-server ... --mobile-bind <private IPv4:port>（owner資格必須）");
     eprintln!("owner操作: 対話承認操作 --session-file <owner資格file> 一覧 | 承認 <要求ID> <要求hash> <表示範囲>");
@@ -87,6 +88,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     let mut max_request_bytes: usize = 64 * 1024;
     let mut owner_session_file = None;
     let mut minidora_runtimes = Vec::new();
+    let mut codex_runtimes = Vec::new();
     let mut development_lifecycle_fixture_enabled = false;
     let mut mobile_bind = None;
     let mut workspace_config = None;
@@ -116,6 +118,14 @@ fn maybe_run_broker_server() -> Option<i32> {
                 let Some(value) = args.next() else { eprintln!("実行系ID=127.0.0.1:portの値が必要"); return Some(2); };
                 let Some((id, address)) = value.split_once('=') else { eprintln!("実行系登録の形式が不正"); return Some(2); };
                 minidora_runtimes.push((id.to_owned(), address.to_owned()));
+            }
+            "--codex-runtime" => {
+                let Some(value) = args.next() else { eprintln!("Codex実行系の値が必要"); return Some(2); };
+                let mut fields = value.splitn(3, '=');
+                let Some(id) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex実行系IDが空です"); return Some(2); };
+                let Some(executable) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex executable pathが必要です"); return Some(2); };
+                let Some(workspace) = fields.next().filter(|v| !v.is_empty()) else { eprintln!("Codex workspace pathが必要です"); return Some(2); };
+                codex_runtimes.push((id.to_owned(), PathBuf::from(executable), PathBuf::from(workspace)));
             }
             "--enable-development-lifecycle-fixture" => {
                 if development_lifecycle_fixture_enabled {
@@ -188,6 +198,7 @@ fn maybe_run_broker_server() -> Option<i32> {
     config.max_request_bytes = max_request_bytes;
     config.owner_session_file = owner_session_file;
     config.minidora_runtimes = minidora_runtimes;
+    config.codex_runtimes = codex_runtimes;
     config.development_lifecycle_fixture_enabled = development_lifecycle_fixture_enabled;
     config.mobile_bind = mobile_bind;
     config.workspace_config = workspace_config;

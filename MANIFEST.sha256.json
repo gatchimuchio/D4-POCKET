@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "3f4dbf803edb9404c0b9769cf4333eb3ab3759957bee6e0b01ae90fd8a0b5462"
+      "sha256": "63bcdcf3cd832c0645207c15a7f9f6a090eaef5ff1a6fa4d9466505a6ca71492"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7106c67f9dba86c3e856b591bb981a04dbef40d63f440491cfb57d54f0804572"
+      "sha256": "a5b1c01063a9b44e82eefca05b170af962b00379fd10ecf791e8539984128890"
     },
     {
       "path": "SECURITY.md",
@@ -949,7 +949,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "80315e35357e942b95017e0d8a1f5663b8c4e5d5a6c4c8a31161282c86fc8dc2"
+      "sha256": "0e9370bf15aaa187a3dc85160ccc9cfb049fb0d7747a8ef9f30cccb26211907c"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "7d94a2b037a5c6f818c40cf93ae4f0248b47db6971692588b853e3492f65486b"
+      "sha256": "4d1ae6ac6ceba9d4f0893963398c4b40dd678a4b5b16a73307b0f4a067980309"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1837,7 +1837,7 @@
     },
     {
       "path": "native/rust_helper/README.md",
-      "sha256": "65745a86665a3fd9f826fe257d4847acf23252f72eb2e3e9f291450a79676e08"
+      "sha256": "6dfb13e7583f60ec0a259573f994553a3b78f985b484bfa397fdf52ad960a78e"
     },
     {
       "path": "native/rust_helper/audit_hash/README.md",
@@ -1864,12 +1864,16 @@
       "sha256": "ed212c85f9264d2efa4860a578db689c732f43b452ecffff324e3404a3c11cfc"
     },
     {
+      "path": "native/rust_helper/src/adapters/codex_cli.rs",
+      "sha256": "3155a9f2b0cb62a427987974b1f8c3f9822ff8dd22b6f2d6587330f3c47f9ec9"
+    },
+    {
       "path": "native/rust_helper/src/adapters/minidora.rs",
       "sha256": "cb0f8e6b8cf5cb6ba37c426d03e0b6779ae6b7db800b60f9a9e15f4dfe713daf"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
-      "sha256": "18772b22482582bd3e10c26163e00ca38e01747342d3018e63967a28d9351ad2"
+      "sha256": "4236991451bed56c59f11d8d61b67d271a187d91e17c2ac9409b0e492412508e"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -1945,7 +1949,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "08da8d33f4fd04648c07f815562b06c02d3efd4ca14faa15d64059f681972f15"
+      "sha256": "52b6496129d9bd823f5291eb55522c12606042c3932a9fef60abfdec0c97693a"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2013,7 +2017,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "441349a5791379b2c8d6d1cfa20ce3fa501675b0d9d20a9cf235537901eb41ad"
+      "sha256": "cabfd890dccf837a1b13b9e38c495d2717b1bb7c457d5b3927e3557fed1e00c8"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -2797,7 +2801,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "9d4d6a4d56d0c8629ba57bd21aa2207fee326c3df25047eb945fad397467edb4"
+      "sha256": "912b0617bc9955dc1bdeae33a659257cbfe35b56f9555f54817cb27ec3fd2c7b"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

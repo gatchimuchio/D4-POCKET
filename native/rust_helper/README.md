@@ -35,7 +35,7 @@ Rust helper は、明示的な IPC または FFI 境界を通じて呼び出せ�
 
 ## 実行系対話の起動と承認
 
-`src/broker/dialogue.rs` が要求、セッション、承認、取消、表示射影を所有する。`src/adapters/minidora.rs` は登録先のMINIDORA APIだけを呼ぶ。`src/owner_cli.rs` はownerの明示的な制御操作であり、通常Flutterへ資格を渡さない。
+`src/broker/dialogue.rs` が要求、セッション、承認、取消、表示射影を所有する。`src/adapters/minidora.rs` は登録先のMINIDORA APIだけを呼び、`src/adapters/codex_cli.rs` はownerが起動時に明示した実物Codex CLIだけを固定read-only実行へ射影する。`src/owner_cli.rs` はownerの明示的な制御操作であり、通常Flutterへ資格を渡さない。
 
 ```powershell
 cargo build --manifest-path native/rust_helper/Cargo.toml
@@ -45,5 +45,22 @@ native/rust_helper/target/debug/gui_shell_rust_helper.exe 対話承認操作 --s
 ```
 
 資格fileの親directoryはownerが事前に用意する。資格fileをGitへ追加しない。MINIDORAは別processで起動し、GUI Shellが勝手に起動・変更・配布しない。複数登録は `--minidora-runtime` を実行系ごとに指定する。登録だけでは通信しない。
+
+### 実物Codex CLIの限定登録
+
+Windows上で実際に確認できたCodex CLIだけを、ownerの起動引数から次の形式で登録できる。
+
+```powershell
+native/rust_helper/target/debug/gui_shell_rust_helper.exe broker-server `
+  --store-dir C:/local/gui-shell/store `
+  --session-file C:/local/gui-shell/ui.json `
+  --codex-runtime codex=C:/absolute/path/to/codex.exe=C:/absolute/path/to/workspace
+```
+
+登録時にexecutableとworkspaceを実在する絶対pathとして検査し、`codex --version`と`codex exec --help`を実際に確認する。実行時は固定した `codex exec --json --ephemeral --ignore-user-config --sandbox read-only --color never --cd <workspace> -` だけを使い、任意のargv、環境変数、workspace、process操作をIPCから受け取らない。環境変数は安全なallowlistだけを子processへ渡し、credential実値やsecret pathを応答・監査へ射影しない。
+
+Codexの応答はJSONLの `thread.started`、`item.completed` の `agent_message`、`turn.completed` を検証してから、既存の `実行系挙`、`対話開始`、`対話送信`、`対話取得`、`対話中止`、`対話終了` とowner承認・監査経路へ接続する。`turn.failed`、不正JSON、出力上限超過、取消、期限超過は成功へ昇格しない。この登録はCodexの実物interfaceと読み取り専用のAgent Launcher基盤を提供するが、write-capable Agent、MCP、複数Agent比較、Handoff、製品releaseを成立させない。
+
+`--codex-runtime` の値は `ID=絶対executable path=絶対workspace path` であり、executable path内の `=` は未対応である（workspace pathの残りは3番目のfieldとして扱う）。Claude、Gemini、その他Vendorの実装は、実物interfaceを確認するまで追加しない。
 
 開発検証は `cargo test --manifest-path native/rust_helper/Cargo.toml`。実物参照版との統合は `python tooling/minidora_live_check.py --reference <MINIDORA参照clone>`。このPythonは試験用process管理であり、製品依存ではない。固定commitとclean状態を検査し、基本会話・保留・失敗分離・資格拒否・監査chain再読取を実行する。外部検索や基礎Coreの能力を保証する試験ではない。

@@ -3603,6 +3603,48 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
     return errors
 
 
+def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
+    adapter_path = RUST_HELPER / "src" / "adapters" / "codex_cli.rs"
+    broker_path = RUST_HELPER / "src" / "broker" / "ipc_server.rs"
+    if not adapter_path.is_file():
+        return ["Codex CLI Adapter sourceが存在しない"]
+    adapter = adapter_path.read_text(encoding="utf-8")
+    broker = broker_path.read_text(encoding="utf-8")
+    required = [
+        "--json",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "env_clear",
+        "SAFE_ENVIRONMENT",
+        "MAX_OUTPUT_BYTES",
+        "turn.completed",
+        "turn.failed",
+        "AtomicBool",
+        "kill",
+        "secret_component",
+    ]
+    errors = [
+        f"Codex Adapterに安全境界tokenがない: {token}"
+        for token in required
+        if token not in adapter
+    ]
+    forbidden = [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--worktree",
+        "--add-dir",
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "command_envelope",
+    ]
+    for token in forbidden:
+        if token in adapter:
+            errors.append(f"Codex Adapterに禁止された実行境界tokenがある: {token}")
+    if "codex_runtimes" not in broker or "CodexCliAdapter" not in broker:
+        errors.append("Codex AdapterがBrokerの明示登録経路へ接続されていない")
+    return errors
+
+
 def test_broker_ipc_contract_schemas_exist() -> list[str]:
     existing = {path.name for path in SPECS.glob("*.schema.json")}
     errors = []
@@ -4967,6 +5009,7 @@ def main() -> int:
         test_rust_helper_required_sources_exist,
         test_rust_helper_contract_shape_exists,
         test_rust_helper_does_not_expose_hidden_authority_paths,
+        test_codex_cli_adapter_is_broker_governed_and_bounded,
         test_broker_ipc_contract_schemas_exist,
         test_broker_boundary_docs_exist,
         test_rust_broker_skeleton_exists,

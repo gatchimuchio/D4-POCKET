@@ -15,7 +15,7 @@
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
   <img alt="Schemas" src="https://img.shields.io/badge/schemas-69%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-160%20checks-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-161%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
