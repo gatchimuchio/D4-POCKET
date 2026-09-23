@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "cc8299b116a167bb91a4f8c31fadfbcc457a0b55668c088cb9371ea81900b454"
+      "sha256": "13ce9bd3f66af37e6189c0a72c2da95e31dbb549b72bdde48057c8f247ba775d"
     },
     {
       "path": "SECURITY.md",
@@ -514,6 +514,10 @@
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
       "sha256": "ab234bd7b5502da5f641ee05a6d4beee9546bcace0d4eef0b5beeacd2eb9a9fa"
+    },
+    {
+      "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
+      "sha256": "d913157fcdb3b3ec75de58876a883113d537fcf7f7f8e3eba94b328690f833ff"
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
@@ -1260,6 +1264,10 @@
       "sha256": "6066c5f690d657d4de2607504ace379e67c259cbc18147a89d6e9ccc87d65d5b"
     },
     {
+      "path": "docs/specs/performance-validation.md",
+      "sha256": "93f9fab305dcd0dfab2e3d03bef2811c195f829ce8520c4a1050ba69ea479a01"
+    },
+    {
       "path": "docs/specs/regression-case.md",
       "sha256": "8e339a3ef0383740835cb9a8ad24e6b458831feb9109ebb9aca78ce69bfad50b"
     },
@@ -1325,7 +1333,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "4bff92154929c0b598d09284db54f7b1f56eeb885f130e7465d76a6f68a9ffe3"
+      "sha256": "c32f50957fe329a1d543c488d590d6cf91b083978f7933c312f9379370e3a446"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3497,7 +3505,7 @@
     },
     {
       "path": "tooling/broker_parity/run_authority_parity.py",
-      "sha256": "425d7e6b71af544dd555a2c7f2ae8b0972f89886f24a8bef5e0fe334dbd1a280"
+      "sha256": "960816772d5369f875016aa34c892bd202b28f37ba899bf935185248a780911d"
     },
     {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
@@ -3556,6 +3564,10 @@
       "sha256": "70000388a76fb3399b6c95d8a64828312187b1374b6052c32c5d3dedaf8caff4"
     },
     {
+      "path": "tooling/performance_validation.py",
+      "sha256": "81208812c636f72ad8e0ea9b4682af311359228b27794768e4d9eea2ea4f45e6"
+    },
+    {
       "path": "tooling/release_gate_check.py",
       "sha256": "a9a064e9fbeb42879ca8412fc0a261deea5987e15b7c079247c48f5b6009a6cf"
     },
@@ -3581,7 +3593,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "c521086873b12de3861363e91df4520ad199c7bd09f4725b4d9da50791a1d691"
+      "sha256": "464ab8b7889b4d4d8f2245ae72d2c2012645c6c9a2370aa0ed800697fdfa727b"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -3605,7 +3617,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "494e10e5b3c4dbeff08fbd1125d9b21302093a7c6fd3495236573a76401e7653"
+      "sha256": "b894b0536508205440f0db7c14b246b126e495ffe3e334622ce03908ccd8f31d"
     }
   ]
 }

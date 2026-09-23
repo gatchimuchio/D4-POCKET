@@ -13,6 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from tooling.windows_release_evidence import validate_windows_release_evidence
 
 
@@ -108,6 +111,16 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
     ]
     if python_only:
         return steps
+    steps.append(
+        ValidationStep(
+            "c27_performance_validation",
+            python_step("tooling/performance_validation.py"),
+            ROOT,
+            "flutter",
+            in_release_scope=False,
+            post_v1_reason="C27の開発用性能・ハング監視。実installed製品の性能証拠は別のWindows実機検証で扱う",
+        )
+    )
     steps.extend([
         ValidationStep(
             "broker_authority_parity",
@@ -115,7 +128,12 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             ROOT,
             "cargo",
         ),
-        ValidationStep("rust_helper_cargo_test", ["cargo", "test"], ROOT / "native" / "rust_helper", "cargo"),
+        ValidationStep(
+            "rust_helper_cargo_test",
+            ["cargo", "test", "--locked", "--", "--test-threads=1"],
+            ROOT / "native" / "rust_helper",
+            "cargo",
+        ),
         ValidationStep("shared_flutter_analyze", ["flutter", "analyze"], ROOT / "packages" / "gui_shell_ui", "flutter"),
         ValidationStep("shared_flutter_test", ["flutter", "test"], ROOT / "packages" / "gui_shell_ui", "flutter"),
         ValidationStep("desktop_flutter_analyze", ["flutter", "analyze"], ROOT / "apps" / "desktop_flutter", "flutter"),
@@ -315,6 +333,8 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
             cwd=step.cwd,
             check=False,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

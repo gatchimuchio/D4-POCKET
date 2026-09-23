@@ -216,6 +216,10 @@
       "責任": "C24 Mobileの通知、Runtime状態、資源概要、履歴metadata、Host、MCP、停止receipt、Recoveryの選択的投影と権限非生成境界"
     },
     {
+      "path": "docs/specs/performance-validation.md",
+      "責任": "C27の開発用性能・ハング監視、測定対象、証拠分類、実installed製品性能との非同一性"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

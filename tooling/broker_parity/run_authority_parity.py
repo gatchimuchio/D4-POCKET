@@ -238,7 +238,6 @@ class BrokerClient:
         with socket.create_connection((self.endpoint["host"], self.endpoint["port"]), timeout=5) as sock:
             sock.sendall(self.endpoint["session_secret"].encode("utf-8") + b"\n")
             sock.sendall(json.dumps(request, separators=(",", ":")).encode("utf-8") + b"\n")
-            sock.shutdown(socket.SHUT_WR)
             raw = sock.makefile("r", encoding="utf-8").readline()
         return json.loads(raw)
 
@@ -263,19 +262,31 @@ def start_broker(workspace: Path) -> BrokerClient:
     session_file = workspace / "broker_session.json"
     stderr_path = workspace / "broker.stderr"
     stderr = stderr_path.open("wb")
+    helper_root = ROOT / "native" / "rust_helper"
+    helper_binary = helper_root / "target" / "debug" / (
+        "gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"
+    )
+    build = subprocess.run(
+        ["cargo", "build", "--locked", "--quiet"],
+        cwd=helper_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if build.returncode != 0 or not helper_binary.exists():
+        stderr.close()
+        detail = build.stderr.decode("utf-8", errors="replace")
+        raise AssertionError(f"Rust helper buildが失敗: {build.returncode}: {detail}")
     process = subprocess.Popen(
         [
-            "cargo",
-            "run",
-            "--quiet",
-            "--",
+            str(helper_binary),
             "broker-server",
             "--store-dir",
             str(store_dir),
             "--session-file",
             str(session_file),
         ],
-        cwd=ROOT / "native" / "rust_helper",
+        cwd=helper_root,
         stdout=subprocess.DEVNULL,
         stderr=stderr,
     )
