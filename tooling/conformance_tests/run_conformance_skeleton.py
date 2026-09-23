@@ -4536,6 +4536,55 @@ def グローバル検索の統治境界を検査する() -> list[str]:
     return 不整合
 
 
+def Desktop_UX統合の表示境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "desktop-ux-integration.md"
+    main_path = DESKTOP_FLUTTER / "lib" / "main.dart"
+    if not specification.exists() or not main_path.exists():
+        return ["C23 Desktop UX統合の正本または実装がない"]
+    specification_text = specification.read_text(encoding="utf-8")
+    main = main_path.read_text(encoding="utf-8")
+    for token in (
+        "運用",
+        "安全",
+        "開発",
+        "設定",
+        "すべて",
+        "NavigationRail",
+    ):
+        if token not in specification_text or token not in main:
+            不整合.append(f"C23 Desktop UX統合の境界tokenがない: {token}")
+    for token in (
+        "_ShellNavigationGroup",
+        "navigationGroup",
+        "操作グループ選択",
+    ):
+        if token not in main:
+            不整合.append(f"C23 Desktop UX統合の実装tokenがない: {token}")
+    page_indices = {
+        int(index)
+        for index in re.findall(r"_ShellPageEntry\(\s*(\d+)\s*,", main)
+    }
+    if page_indices != set(range(20)):
+        不整合.append(
+            "C23 Desktop UX統合が既存20画面のindexを保持していない: "
+            f"{sorted(page_indices)}"
+        )
+    for forbidden in (
+        "BrokerClient",
+        "transport.request",
+        "Process.run",
+        "Process.start",
+        "Clipboard.setData",
+    ):
+        start = main.find("class _ShellNavigationGroup")
+        end = main.find("class _ShellViewMode", start)
+        navigation_group_section = main[start:end]
+        if forbidden in navigation_group_section:
+            不整合.append(f"C23 Desktop UX統合が直接作用へ到達している: {forbidden}")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -6154,6 +6203,7 @@ def main() -> int:
         Windows常駐トレイ操作面の統治境界を検査する,
         コマンドパレット拡張の統治境界を検査する,
         グローバル検索の統治境界を検査する,
+        Desktop_UX統合の表示境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

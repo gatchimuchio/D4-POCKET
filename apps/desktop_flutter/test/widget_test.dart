@@ -288,6 +288,27 @@ void main() {
     expect(find.text('設定'), findsWidgets);
   });
 
+  testWidgets('Desktop UX統合が既存画面を論理グループで絞り込む', (WidgetTester tester) async {
+    await tester.pumpWidget(const GuiShellDesktopApp());
+
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.destinations.length, 20);
+    expect(find.text('すべて'), findsOneWidget);
+
+    await tester.tap(find.text('すべて'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('安全').last);
+    await tester.pumpAndSettle();
+
+    final safetyRail = tester.widget<NavigationRail>(
+      find.byType(NavigationRail),
+    );
+    expect(safetyRail.destinations.length, 7);
+    expect(safetyRail.selectedIndex, 0);
+    expect(find.text('信頼センター'), findsWidgets);
+    expect(find.text('安全'), findsOneWidget);
+  });
+
   testWidgets('問題一覧が段階Bを失敗扱いにせずリリース遮断要因を表示する', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(

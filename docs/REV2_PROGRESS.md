@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C23: Desktop UX統合（2026-09-24）
+
+既存20画面を削除せず、Desktop Navigationを`運用`、`安全`、`開発`、`設定`、`すべて`の論理グループへ整理した。グループ選択はFlutterの表示状態だけを変更し、別グループの画面へ移動した場合は対象グループへ切り替える。画面本体と既存のBroker、owner control、Approval、Audit、Recovery経路は置き換えていない。
+
+- Production path: 操作者の操作グループ選択 → Flutter `NavigationRail`の表示対象絞り込み → 既存画面の選択。全体表示では既存20画面を現在の順序で表示する。
+- Authority boundary: グループ名と選択状態はUI状態であり、Authority、Permission、Approval、Credential、Broker IPC、filesystem、process、networkを生成・実行しない。
+- Validation: Desktop Flutter全93試験、`flutter analyze`、`flutter build windows --debug`、Conformance 178 checks、厳格日本語監査、Schema検査を実行しPASSした。Rustは変更していないため今回のRust全試験は未実行。
+- 未成立分類: Windows installed productでの4グループ実画面操作evidence、C0-C34全数完成、正式release、owner GOは`release_blocker`。Mobile Navigationへの投影はC24の対象で`known_limitation`。
+
 ## D4 Pocket C22: 全体検索（2026-09-24）
 
 既存の操作面を横断する読み取り専用の全体検索を追加した。`Ctrl+Shift+F`と画面上の全体検索ボタンから開き、現在の`ShellSnapshot`に含まれるbounded metadataと、MCP／A2A／評価／通知などのsurface entryを検索する。検索結果の選択は対象画面への移動だけであり、検索から権限作用へ到達しない。

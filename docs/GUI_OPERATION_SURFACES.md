@@ -55,6 +55,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: Ctrl+Shift+Fまたは全体検索ボタンから、Runtime、Agent、Session、Permission、Approval、Audit、Recovery、Problem、Evidence、MCP、A2A、Host、Adapter、Profile、Evaluation、Notificationのbounded表示用metadataとsurface entryを横断検索できる。indexは512件、queryは128文字、結果は30件へ制限する。
   authority_boundary: 全体検索は読み取り専用であり、対話本文、Approval payload、Audit raw payload、Credential実値、秘密値を検索対象にしない。検索結果の選択は画面遷移だけで、Broker IPC、filesystem、process、network、credential、Clipboard、Permission、Approval、Authorityへ直接到達しない。
 
+- item: D4 Pocket Desktop UX統合（C23 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Desktop Navigationは既存20画面を保持したまま、運用、安全、開発、設定、すべての論理グループでNavigationRailを絞り込める。別グループの画面へ移動すると対象グループへ表示を切り替える。
+  authority_boundary: グループ選択はFlutterの表示状態だけを変更し、画面の権限、Broker IPC、owner承認、Permission、Approval、Authority、Credential、Runtime実行へ直接到達しない。画面本体と既存統治経路は削除・置換しない。
+
 - item: Problems Panel and Evidence Center
   classification: required_for_v1
   status: implemented

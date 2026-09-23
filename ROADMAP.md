@@ -41,6 +41,8 @@ C20の現行単位では、`docs/specs/windows-tray-surface.md`を正本とし�
 
 C21の現行単位では、`docs/specs/command-palette-surface.md`を正本として既存コマンドパレットへRuntime、Agent、履歴、評価、MCP、通知、資源、資格情報、更新、Host、停止要求確認の画面遷移を登録した。C22では`docs/specs/global-search-surface.md`を正本として、Ctrl+Shift+Fの全体検索とboundedな表示用indexを追加する。検索結果は画面遷移だけを行い、検索metadata、History、Profile、MCP、A2A、Agent Card、TelemetryからPermission、Approval、Authority、Credentialを生成・再利用しない。実Runtimeのlive横断取得、本文検索、検索結果からの操作、Windows installed product evidenceは`release_blocker`または`known_limitation`として保持する。
 
+C23では`docs/specs/desktop-ux-integration.md`を正本として、既存20画面を削除せず、Desktop Navigationを運用・安全・開発・設定・すべての論理グループへ整理する。グループ選択はUI表示状態に閉じ、別グループへの画面遷移を妨げず、Permission、Approval、Authority、Credential、Broker IPCを生成・変更しない。Mobileへの投影はC24の対象とし、Windows installed productでの実画面証拠とowner GOは引き続き`release_blocker`である。
+
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 
 owner添付の[実装指示書](docs/総合機能拡張_rev1/実装指示書.md)・[工程表](docs/総合機能拡張_rev1/工程表.md)・[実装仕様書](docs/総合機能拡張_rev1/実装仕様書.md)全体を実装対象へ追加する。先行rev2でWindowsから実行可能な検証を進め、その後C0からC34を順に実装する。外部条件待ちは該当するrelease証拠だけに限定し、他工程の開発停止条件にしない。追加要求の受領記録、工程状態、基準検証、証拠境界は[総合拡張の進捗](docs/総合機能拡張_rev1/進捗.md)に置く。C1以降の新機能・性能・8時間運用・障害注入・全数監査を先行rev2の試験数で代替しない。

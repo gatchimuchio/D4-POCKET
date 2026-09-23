@@ -215,6 +215,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
   int selectedIndex = 0;
   bool _dialogueVisited = false;
   _ShellViewMode viewMode = _ShellViewMode.ownerUse;
+  _ShellNavigationGroup navigationGroup = _ShellNavigationGroup.all;
   late final WindowsTrayClient _trayClient;
   Timer? _trayRefreshTimer;
 
@@ -253,7 +254,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
   Future<void> _handleWindowsTrayAction(String action) async {
     if (action == 'open') {
-      if (mounted) setState(() => selectedIndex = 0);
+      if (mounted) _selectPage(0);
       return;
     }
     if (action != 'stop_request') return;
@@ -320,6 +321,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
       HostOperationCenter(client: widget.client),
     ];
     final pageEntries = _pageEntries();
+    final visiblePageEntries = pageEntries
+        .where((page) => navigationGroup.includes(page.group))
+        .toList(growable: false);
 
     return Shortcuts(
       shortcuts: const {
@@ -356,7 +360,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
                 _TopCommandBar(
                   selectedLabel: pageEntries[selectedIndex].label,
                   viewMode: viewMode,
+                  navigationGroup: navigationGroup,
                   onViewModeChanged: (mode) => setState(() => viewMode = mode),
+                  onNavigationGroupChanged: _setNavigationGroup,
                   onOpenCommandPalette: () =>
                       _openCommandPalette(context, snapshot, pageEntries),
                   onOpenGlobalSearch: () =>
@@ -381,116 +387,150 @@ class _ShellHomePageState extends State<ShellHomePage> {
                               child: SizedBox(
                                 height: railHeight,
                                 child: NavigationRail(
-                                  selectedIndex: selectedIndex,
-                                  onDestinationSelected: (index) =>
-                                      setState(() => selectedIndex = index),
+                                  selectedIndex: visiblePageEntries.indexWhere(
+                                    (page) => page.index == selectedIndex,
+                                  ),
+                                  onDestinationSelected: (index) => _selectPage(
+                                      visiblePageEntries[index].index),
                                   labelType: NavigationRailLabelType.selected,
-                                  destinations: const [
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.dashboard_outlined),
-                                      selectedIcon: Icon(Icons.dashboard),
-                                      label: Text('概要'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.build_circle_outlined),
-                                      selectedIcon: Icon(Icons.build_circle),
-                                      label: Text('診断'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.verified_user_outlined),
-                                      selectedIcon: Icon(Icons.verified_user),
-                                      label: Text('信頼'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.hub_outlined),
-                                      selectedIcon: Icon(Icons.hub),
-                                      label: Text('実行系'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.account_tree_outlined),
-                                      selectedIcon: Icon(Icons.account_tree),
-                                      label: Text('権限'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.smart_toy_outlined),
-                                      selectedIcon: Icon(Icons.smart_toy),
-                                      label: Text('エージェント'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.fact_check_outlined),
-                                      selectedIcon: Icon(Icons.fact_check),
-                                      label: Text('承認'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.receipt_long_outlined),
-                                      selectedIcon: Icon(Icons.receipt_long),
-                                      label: Text('監査'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(
-                                        Icons.health_and_safety_outlined,
-                                      ),
-                                      selectedIcon: Icon(
-                                        Icons.health_and_safety,
-                                      ),
-                                      label: Text('復旧'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.report_problem_outlined),
-                                      selectedIcon: Icon(Icons.report_problem),
-                                      label: Text('問題'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.inventory_2_outlined),
-                                      selectedIcon: Icon(Icons.inventory_2),
-                                      label: Text('証拠'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.settings_outlined),
-                                      selectedIcon: Icon(Icons.settings),
-                                      label: Text('設定'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.chat_bubble_outline),
-                                      selectedIcon: Icon(Icons.chat_bubble),
-                                      label: Text('対話'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.history_outlined),
-                                      selectedIcon: Icon(Icons.history),
-                                      label: Text('履歴'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.science_outlined),
-                                      selectedIcon: Icon(Icons.science),
-                                      label: Text('評価ラボ'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.public_outlined),
-                                      selectedIcon: Icon(Icons.public),
-                                      label: Text('ホスト能力'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.notifications_none),
-                                      selectedIcon: Icon(Icons.notifications),
-                                      label: Text('通知'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.insights_outlined),
-                                      selectedIcon: Icon(Icons.insights),
-                                      label: Text('観測'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.timeline_outlined),
-                                      selectedIcon: Icon(Icons.timeline),
-                                      label: Text('追跡'),
-                                    ),
-                                    NavigationRailDestination(
-                                      icon: Icon(Icons.swap_horiz_outlined),
-                                      selectedIcon: Icon(Icons.swap_horiz),
-                                      label: Text('Host操作'),
-                                    ),
-                                  ],
+                                  destinations: navigationGroup ==
+                                          _ShellNavigationGroup.all
+                                      ? const [
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.dashboard_outlined),
+                                            selectedIcon: Icon(Icons.dashboard),
+                                            label: Text('概要'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.build_circle_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.build_circle),
+                                            label: Text('診断'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.verified_user_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.verified_user),
+                                            label: Text('信頼'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.hub_outlined),
+                                            selectedIcon: Icon(Icons.hub),
+                                            label: Text('実行系'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.account_tree_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.account_tree),
+                                            label: Text('権限'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.smart_toy_outlined),
+                                            selectedIcon: Icon(Icons.smart_toy),
+                                            label: Text('エージェント'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.fact_check_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.fact_check),
+                                            label: Text('承認'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.receipt_long_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.receipt_long),
+                                            label: Text('監査'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                              Icons.health_and_safety_outlined,
+                                            ),
+                                            selectedIcon: Icon(
+                                              Icons.health_and_safety,
+                                            ),
+                                            label: Text('復旧'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.report_problem_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.report_problem),
+                                            label: Text('問題'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(
+                                                Icons.inventory_2_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.inventory_2),
+                                            label: Text('証拠'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.settings_outlined),
+                                            selectedIcon: Icon(Icons.settings),
+                                            label: Text('設定'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.chat_bubble_outline),
+                                            selectedIcon:
+                                                Icon(Icons.chat_bubble),
+                                            label: Text('対話'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.history_outlined),
+                                            selectedIcon: Icon(Icons.history),
+                                            label: Text('履歴'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.science_outlined),
+                                            selectedIcon: Icon(Icons.science),
+                                            label: Text('評価ラボ'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.public_outlined),
+                                            selectedIcon: Icon(Icons.public),
+                                            label: Text('ホスト能力'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.notifications_none),
+                                            selectedIcon:
+                                                Icon(Icons.notifications),
+                                            label: Text('通知'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.insights_outlined),
+                                            selectedIcon: Icon(Icons.insights),
+                                            label: Text('観測'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon: Icon(Icons.timeline_outlined),
+                                            selectedIcon: Icon(Icons.timeline),
+                                            label: Text('追跡'),
+                                          ),
+                                          NavigationRailDestination(
+                                            icon:
+                                                Icon(Icons.swap_horiz_outlined),
+                                            selectedIcon:
+                                                Icon(Icons.swap_horiz),
+                                            label: Text('Host操作'),
+                                          ),
+                                        ]
+                                      : [
+                                          for (final page in visiblePageEntries)
+                                            NavigationRailDestination(
+                                              icon: Icon(page.icon),
+                                              selectedIcon: Icon(page.icon),
+                                              label: Text(page.label),
+                                            ),
+                                        ],
                                 ),
                               ),
                             );
@@ -516,26 +556,46 @@ class _ShellHomePageState extends State<ShellHomePage> {
 
   List<_ShellPageEntry> _pageEntries() {
     return const [
-      _ShellPageEntry(0, '概要', Icons.dashboard_outlined),
-      _ShellPageEntry(1, '環境診断', Icons.build_circle_outlined),
-      _ShellPageEntry(2, '信頼センター', Icons.verified_user_outlined),
-      _ShellPageEntry(3, '実行系センター', Icons.hub_outlined),
-      _ShellPageEntry(4, '権限対応図', Icons.account_tree_outlined),
-      _ShellPageEntry(5, 'エージェントセンター', Icons.smart_toy_outlined),
-      _ShellPageEntry(6, '承認センター', Icons.fact_check_outlined),
-      _ShellPageEntry(7, '監査ビューアー', Icons.receipt_long_outlined),
-      _ShellPageEntry(8, '復旧手順', Icons.health_and_safety_outlined),
-      _ShellPageEntry(9, '問題一覧', Icons.report_problem_outlined),
-      _ShellPageEntry(10, '証拠センター', Icons.inventory_2_outlined),
-      _ShellPageEntry(11, '設定', Icons.settings_outlined),
-      _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline),
-      _ShellPageEntry(13, '実行履歴', Icons.history),
-      _ShellPageEntry(14, '評価ラボ', Icons.science_outlined),
-      _ShellPageEntry(15, 'ホスト能力', Icons.public_outlined),
-      _ShellPageEntry(16, '通知センター', Icons.notifications_none),
-      _ShellPageEntry(17, '観測センター', Icons.insights_outlined),
-      _ShellPageEntry(18, '追跡情報', Icons.timeline_outlined),
-      _ShellPageEntry(19, 'Host操作面', Icons.swap_horiz_outlined),
+      _ShellPageEntry(
+          0, '概要', Icons.dashboard_outlined, _ShellNavigationGroup.operation),
+      _ShellPageEntry(1, '環境診断', Icons.build_circle_outlined,
+          _ShellNavigationGroup.development),
+      _ShellPageEntry(2, '信頼センター', Icons.verified_user_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(
+          3, '実行系センター', Icons.hub_outlined, _ShellNavigationGroup.operation),
+      _ShellPageEntry(4, '権限対応図', Icons.account_tree_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(5, 'エージェントセンター', Icons.smart_toy_outlined,
+          _ShellNavigationGroup.operation),
+      _ShellPageEntry(
+          6, '承認センター', Icons.fact_check_outlined, _ShellNavigationGroup.safety),
+      _ShellPageEntry(7, '監査ビューアー', Icons.receipt_long_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(8, '復旧手順', Icons.health_and_safety_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(9, '問題一覧', Icons.report_problem_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(10, '証拠センター', Icons.inventory_2_outlined,
+          _ShellNavigationGroup.safety),
+      _ShellPageEntry(
+          11, '設定', Icons.settings_outlined, _ShellNavigationGroup.settings),
+      _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline,
+          _ShellNavigationGroup.operation),
+      _ShellPageEntry(
+          13, '実行履歴', Icons.history, _ShellNavigationGroup.operation),
+      _ShellPageEntry(
+          14, '評価ラボ', Icons.science_outlined, _ShellNavigationGroup.operation),
+      _ShellPageEntry(
+          15, 'ホスト能力', Icons.public_outlined, _ShellNavigationGroup.operation),
+      _ShellPageEntry(16, '通知センター', Icons.notifications_none,
+          _ShellNavigationGroup.operation),
+      _ShellPageEntry(17, '観測センター', Icons.insights_outlined,
+          _ShellNavigationGroup.operation),
+      _ShellPageEntry(18, '追跡情報', Icons.timeline_outlined,
+          _ShellNavigationGroup.development),
+      _ShellPageEntry(19, 'Host操作面', Icons.swap_horiz_outlined,
+          _ShellNavigationGroup.operation),
     ];
   }
 
@@ -552,7 +612,33 @@ class _ShellHomePageState extends State<ShellHomePage> {
       _ => 0,
     };
     if (!mounted) return;
-    setState(() => selectedIndex = index);
+    _selectPage(index);
+  }
+
+  void _setNavigationGroup(_ShellNavigationGroup group) {
+    final pageEntries = _pageEntries()
+        .where((page) => group.includes(page.group))
+        .toList(growable: false);
+    if (pageEntries.isEmpty) return;
+    final currentPageIsVisible = pageEntries.any(
+      (page) => page.index == selectedIndex,
+    );
+    setState(() {
+      navigationGroup = group;
+      if (!currentPageIsVisible) {
+        selectedIndex = pageEntries.first.index;
+      }
+    });
+  }
+
+  void _selectPage(int index) {
+    final page = _pageEntries().firstWhere((entry) => entry.index == index);
+    setState(() {
+      selectedIndex = index;
+      if (!navigationGroup.includes(page.group)) {
+        navigationGroup = page.group;
+      }
+    });
   }
 
   Future<void> _openCommandPalette(
@@ -575,8 +661,8 @@ class _ShellHomePageState extends State<ShellHomePage> {
         return;
       }
     }
+    _selectPage(selected.pageIndex);
     setState(() {
-      selectedIndex = selected.pageIndex;
       if (selected.viewMode != null) {
         viewMode = selected.viewMode!;
       }
@@ -592,7 +678,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
       builder: (context) => _GlobalSearchDialog(snapshot: snapshot),
     );
     if (selected == null || !mounted) return;
-    setState(() => selectedIndex = selected.pageIndex);
+    _selectPage(selected.pageIndex);
   }
 
   List<_CommandEntry> _commandEntries(
@@ -764,12 +850,35 @@ class _OpenGlobalSearchIntent extends Intent {
   const _OpenGlobalSearchIntent();
 }
 
+enum _ShellNavigationGroup {
+  all,
+  operation,
+  safety,
+  development,
+  settings;
+
+  String get label {
+    return switch (this) {
+      _ShellNavigationGroup.all => 'すべて',
+      _ShellNavigationGroup.operation => '運用',
+      _ShellNavigationGroup.safety => '安全',
+      _ShellNavigationGroup.development => '開発',
+      _ShellNavigationGroup.settings => '設定',
+    };
+  }
+
+  bool includes(_ShellNavigationGroup pageGroup) {
+    return this == _ShellNavigationGroup.all || this == pageGroup;
+  }
+}
+
 class _ShellPageEntry {
-  const _ShellPageEntry(this.index, this.label, this.icon);
+  const _ShellPageEntry(this.index, this.label, this.icon, this.group);
 
   final int index;
   final String label;
   final IconData icon;
+  final _ShellNavigationGroup group;
 }
 
 class _CommandEntry {
@@ -804,14 +913,18 @@ class _TopCommandBar extends StatelessWidget {
   const _TopCommandBar({
     required this.selectedLabel,
     required this.viewMode,
+    required this.navigationGroup,
     required this.onViewModeChanged,
+    required this.onNavigationGroupChanged,
     required this.onOpenCommandPalette,
     required this.onOpenGlobalSearch,
   });
 
   final String selectedLabel;
   final _ShellViewMode viewMode;
+  final _ShellNavigationGroup navigationGroup;
   final ValueChanged<_ShellViewMode> onViewModeChanged;
+  final ValueChanged<_ShellNavigationGroup> onNavigationGroupChanged;
   final VoidCallback onOpenCommandPalette;
   final VoidCallback onOpenGlobalSearch;
 
@@ -862,6 +975,24 @@ class _TopCommandBar extends StatelessWidget {
                             icon: const Icon(Icons.manage_search),
                             label: const Text('全体検索'),
                           ),
+                  ),
+                  const SizedBox(width: 8),
+                  Semantics(
+                    label: '操作グループ選択',
+                    child: DropdownButton<_ShellNavigationGroup>(
+                      value: navigationGroup,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        for (final group in _ShellNavigationGroup.values)
+                          DropdownMenuItem<_ShellNavigationGroup>(
+                            value: group,
+                            child: Text(group.label),
+                          ),
+                      ],
+                      onChanged: (group) {
+                        if (group != null) onNavigationGroupChanged(group);
+                      },
+                    ),
                   ),
                   const SizedBox(width: 8),
                   if (compact)
