@@ -6,7 +6,7 @@
 
 ## 検証器
 
-`tooling/long_run_validation.py` は、毎回一時directoryへ実Brokerを起動し、通常IPCとowner control IPCを分離して実行する。RuntimeはMINIDORA公開APIと同じHTTP境界を持つlocalhost fixtureであり、製品Runtimeや秘密値を使用しない。
+`tooling/long_run_validation.py` は、毎回一時directoryへ実Brokerを起動し、通常IPCとowner control IPCを分離して実行する。RuntimeはMINIDORA公開APIと同じHTTP境界を持つlocalhost fixtureであり、製品Runtimeや秘密値を使用しない。fixtureは再起動時の残留handlerを避けるため直列HTTP serverとして動作し、停止時に要求処理の完了を待つ。
 
 1. 反復対話を開始し、owner承認、結果取得、終了、履歴の`limit=100` bounded読取を行う。
 2. Runtime相当としてHTTP fixtureを停止・再起動し、Brokerを保持した再接続を確認する。

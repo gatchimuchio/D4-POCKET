@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c16f398f296ae5bb6d637f7beec2f552a69dd90aea5a4aa3e6e314489ad21e2b"
+      "sha256": "c0fc1f202b65c072f9513e59a9adfab444d4e1b98e7c00cac732a51d5b948488"
     },
     {
       "path": "SECURITY.md",
@@ -1224,6 +1224,10 @@
       "sha256": "99bcee362c942112f38bb03522d2d19f7085be281992a349e721919874dc40ec"
     },
     {
+      "path": "docs/specs/failure-injection-validation.md",
+      "sha256": "fa192564b359e9b2af1060649775d7b3f40de59bc91b2da2b216d49dc5b8cc5d"
+    },
+    {
       "path": "docs/specs/global-search-surface.md",
       "sha256": "1de65d9dbc84b1c49aeb1f06e6deda1b48792204ab19149a427f04162c9179aa"
     },
@@ -1241,7 +1245,7 @@
     },
     {
       "path": "docs/specs/long-run-validation.md",
-      "sha256": "32f9728432cd7bb10d9729fc7256c16b454f016dafab1a8f7cd3512c6d3254f8"
+      "sha256": "d93a3373c9deb81b4f152abdef458cfd46b98844008826b25b159114ac39f39f"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -1337,7 +1341,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "8e24614f4809e5174717c4c453aaed4056c0a5c2fa905ff0a16d0f2afbdbff09"
+      "sha256": "cce62bf3bf114c7cd91293fcd708f671d18655670ced4be511e73b1769262c4f"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3552,8 +3556,12 @@
       "sha256": "de48f55521adda17ff16f729037c6944f247d12478a43080e4ba059a2e27244d"
     },
     {
+      "path": "tooling/failure_injection_validation.py",
+      "sha256": "33b580da247bc5a1f0d92d93a654a649ffd7afb519b01fde650bebe1174f7cb1"
+    },
+    {
       "path": "tooling/long_run_validation.py",
-      "sha256": "17d61cb8eb69f1ae1c14d44ec7383d4e1496ce31a657f2979b141a1918be900f"
+      "sha256": "91a60ad55f0d86cfd80d83be76f9d97391ada6c178f19f542c1f1c1892a67fca"
     },
     {
       "path": "tooling/manifest.py",
@@ -3601,7 +3609,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "b87150d4b7f7ea22cad9a486d891618388fafd99a172a1d980bca0e303403739"
+      "sha256": "de7642396e7aa53abe0aadd30052fc7fa7ef7d94a98c7fd0d55bd04e6ad00d52"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -3625,7 +3633,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "fff2517ade3f8d48171497d8bf1082b1c5c18296a8c6f775d76443b3541638b0"
+      "sha256": "ce99c26eb0fdf19d5c62204d47c2b4f81782f9b7af129fd775a2f829850b4cf3"
     }
   ]
 }

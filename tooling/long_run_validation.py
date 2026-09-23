@@ -134,11 +134,31 @@ def process_rss_bytes(pid: int) -> int | None:
 class RuntimeState:
     def __init__(self) -> None:
         self.lock = threading.Lock()
+        self.active_condition = threading.Condition(self.lock)
+        self.active_requests = 0
         self.request_count = 0
         self.http_request_count = 0
         self.http_paths: dict[str, int] = {}
         self.http_results: list[dict[str, Any]] = []
         self.traces: dict[str, dict[str, Any]] = {}
+
+    def begin_http(self) -> None:
+        with self.active_condition:
+            self.active_requests += 1
+
+    def end_http(self) -> None:
+        with self.active_condition:
+            self.active_requests = max(0, self.active_requests - 1)
+            self.active_condition.notify_all()
+
+    def wait_for_quiet(self, timeout: float = 5.0) -> None:
+        deadline = time.monotonic() + timeout
+        with self.active_condition:
+            while self.active_requests:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError("Runtime fixtureのhandlerが終了しない")
+                self.active_condition.wait(timeout=remaining)
 
     def next_trace(self, session_id: str, message: str) -> tuple[str, str]:
         with self.lock:
@@ -164,15 +184,27 @@ class RuntimeState:
                 del self.http_results[:-32]
 
 
-class ReusableHTTPServer(http.server.ThreadingHTTPServer):
+class ReusableHTTPServer(http.server.HTTPServer):
     allow_reuse_address = True
-    daemon_threads = True
     runtime_state: RuntimeState
 
 
 class RuntimeHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server: ReusableHTTPServer
+
+    def setup(self) -> None:
+        super().setup()
+        self._tracked = True
+        self.server.runtime_state.begin_http()
+
+    def finish(self) -> None:
+        try:
+            super().finish()
+        finally:
+            if getattr(self, "_tracked", False):
+                self._tracked = False
+                self.server.runtime_state.end_http()
 
     def _state(self) -> RuntimeState:
         return self.server.runtime_state
@@ -270,6 +302,7 @@ class RuntimeServer:
         server.server_close()
         if thread is not None:
             thread.join(timeout=5)
+        self.state.wait_for_quiet()
 
     def probe(self) -> None:
         if self.port is None:

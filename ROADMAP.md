@@ -15,6 +15,8 @@ C27では`docs/specs/performance-validation.md`を正本として、開発用sna
 
 C28では`docs/specs/long-run-validation.md`を正本として、実Broker IPCによる対話反復、localhost Runtime fixtureの再起動、開発用lifecycle fixtureの再起動、Broker再起動、接続断・再接続、bounded履歴読取、Broker working set／永続store観測を検証する。通常検証には30秒smokeを接続し、8時間実測は`--duration-hours 8`の明示実行だけを証拠とする。C28の短時間smokeは実装済みだが、8時間、installed product、外部Runtime／Agent負荷、正式releaseは未成立である。
 
+C29では`docs/specs/failure-injection-validation.md`を正本として、Runtime停止相当、Broker process停止、MCP／A2A timeout、Credential unavailable、store書込不能simulation、Audit書込失敗、malformed stateを実Broker経路へ注入し、fail-closedを確認する。通常検証にはC29 smokeを接続する。fixtureとtemporary storeの結果はinstalled製品・外部サービスの障害耐性証拠へ昇格させない。
+
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 
 Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`をBroker登録時にも確認するRust Adapterを追加した。ownerが絶対executableとworkspaceを明示した場合だけ、既存の実行系対話・owner承認経路から固定read-only JSONL実行を行い、Windowsの実Broker通常IPCで`codex`実行系列挙まで確認した。Broker command dispatchは停止中のままであり、任意command、write-capable Agent、MCP、複数Agent比較、Handoffは追加していない。Claude／Gemini等の未導入Agentは存在を推測しない。これはAgent Launcher基盤の現行限定実装であり、製品releaseや全Agent機能の完成を意味しない。

@@ -137,6 +137,16 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             post_v1_reason="C28の短時間開発smoke。8時間の実測とinstalled製品証拠は別に収集する",
         )
     )
+    steps.append(
+        ValidationStep(
+            "c29_failure_injection_smoke",
+            python_step("tooling/failure_injection_validation.py"),
+            ROOT,
+            "cargo",
+            in_release_scope=False,
+            post_v1_reason="C29の開発用障害注入。installed製品・外部サービスの障害証拠は別に収集する",
+        )
+    )
     steps.extend([
         ValidationStep(
             "broker_authority_parity",
