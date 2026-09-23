@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "13ce9bd3f66af37e6189c0a72c2da95e31dbb549b72bdde48057c8f247ba775d"
+      "sha256": "c16f398f296ae5bb6d637f7beec2f552a69dd90aea5a4aa3e6e314489ad21e2b"
     },
     {
       "path": "SECURITY.md",
@@ -1240,6 +1240,10 @@
       "sha256": "79415b64217ef82d50ac61700cdbe93703349acf3aeb57d42263039305a38d99"
     },
     {
+      "path": "docs/specs/long-run-validation.md",
+      "sha256": "32f9728432cd7bb10d9729fc7256c16b454f016dafab1a8f7cd3512c6d3254f8"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "sha256": "2c11459ea0aca8749dff989a8bf7a195a4ed5033a652192f604025c9ca3b92a4"
     },
@@ -1333,7 +1337,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "c32f50957fe329a1d543c488d590d6cf91b083978f7933c312f9379370e3a446"
+      "sha256": "8e24614f4809e5174717c4c453aaed4056c0a5c2fa905ff0a16d0f2afbdbff09"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3548,6 +3552,10 @@
       "sha256": "de48f55521adda17ff16f729037c6944f247d12478a43080e4ba059a2e27244d"
     },
     {
+      "path": "tooling/long_run_validation.py",
+      "sha256": "17d61cb8eb69f1ae1c14d44ec7383d4e1496ce31a657f2979b141a1918be900f"
+    },
+    {
       "path": "tooling/manifest.py",
       "sha256": "6aced36372efdb82085207dcf31ca9b91de7478d59bcd27352173acbb6ac7deb"
     },
@@ -3593,7 +3601,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "464ab8b7889b4d4d8f2245ae72d2c2012645c6c9a2370aa0ed800697fdfa727b"
+      "sha256": "b87150d4b7f7ea22cad9a486d891618388fafd99a172a1d980bca0e303403739"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -3617,7 +3625,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "b894b0536508205440f0db7c14b246b126e495ffe3e334622ce03908ccd8f31d"
+      "sha256": "fff2517ade3f8d48171497d8bf1082b1c5c18296a8c6f775d76443b3541638b0"
     }
   ]
 }

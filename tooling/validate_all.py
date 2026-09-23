@@ -121,6 +121,22 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             post_v1_reason="C27の開発用性能・ハング監視。実installed製品の性能証拠は別のWindows実機検証で扱う",
         )
     )
+    steps.append(
+        ValidationStep(
+            "c28_long_run_smoke",
+            python_step(
+                "tooling/long_run_validation.py",
+                "--duration-seconds",
+                "30",
+                "--interval-seconds",
+                "1",
+            ),
+            ROOT,
+            "cargo",
+            in_release_scope=False,
+            post_v1_reason="C28の短時間開発smoke。8時間の実測とinstalled製品証拠は別に収集する",
+        )
+    )
     steps.extend([
         ValidationStep(
             "broker_authority_parity",

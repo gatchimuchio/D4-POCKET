@@ -220,6 +220,10 @@
       "責任": "C27の開発用性能・ハング監視、測定対象、証拠分類、実installed製品性能との非同一性"
     },
     {
+      "path": "docs/specs/long-run-validation.md",
+      "責任": "C28の長時間運用検証、対話反復、Runtime・Broker再起動、接続断・再接続、資源観測、8時間証拠の限界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },
