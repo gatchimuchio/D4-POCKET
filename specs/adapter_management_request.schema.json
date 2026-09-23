@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/adapter_management_request.schema.json",
+  "title": "アダプター管理要求（AdapterManagementRequest）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "版": {},
+    "操作": {},
+    "Adapter ID": {},
+    "Adapter hash": {},
+    "Manifest": {}
+  },
+  "oneOf": [
+    {
+      "required": ["版", "操作", "Adapter ID", "Adapter hash"],
+      "properties": {
+        "版": { "const": 1 },
+        "操作": { "enum": ["検証", "有効化", "無効化", "隔離", "削除"] },
+        "Adapter ID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+        "Adapter hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "required": ["版", "操作", "Manifest"],
+      "properties": {
+        "版": { "const": 1 },
+        "操作": { "enum": ["導入", "更新"] },
+        "Manifest": { "$ref": "adapter_management_manifest.schema.json" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

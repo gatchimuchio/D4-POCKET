@@ -1,0 +1,19 @@
+{
+  "版": 1,
+  "Adapter ID": "invalid_adapter",
+  "Runtime ID": "invalid_runtime",
+  "発行者": "fixture",
+  "source": "owner_manifest",
+  "version": "1.0.0",
+  "transport": "mock",
+  "Content Exposure": "redacted",
+  "要求Capability": [],
+  "許可差分": [],
+  "既知の危険": [],
+  "互換性": "compatible",
+  "authority_strip": false,
+  "signed_manifest": true,
+  "署名対象": "7b",
+  "署名": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "署名者fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

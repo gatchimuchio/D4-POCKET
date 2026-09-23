@@ -63,6 +63,10 @@ REQUIRED = {
     "host_list.schema.json",
     "host_switch.schema.json",
     "host_switch_receipt.schema.json",
+    "adapter_management_manifest.schema.json",
+    "adapter_management_request.schema.json",
+    "adapter_management_receipt.schema.json",
+    "adapter_management_list.schema.json",
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",
@@ -177,8 +181,17 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
         root = schema
     reference = schema.get("$ref")
     if reference is not None:
-        if not isinstance(reference, str) or not reference.startswith("#/"):
+        if not isinstance(reference, str):
             return [f"{path}: 未対応の$ref {reference!r}"]
+        if not reference.startswith("#/"):
+            external = Path(reference)
+            if external.name != reference or external.is_absolute() or ".." in external.parts:
+                return [f"{path}: 外部$ref pathが不正 {reference!r}"]
+            external_path = SPECS / external
+            external_schema, error = load_json(external_path)
+            if error or not isinstance(external_schema, dict):
+                return [f"{path}: 外部$ref {reference!r}を解決できない"]
+            return validate_instance(value, external_schema, path)
         target: object = root
         for part in reference[2:].split("/"):
             if not isinstance(target, dict):

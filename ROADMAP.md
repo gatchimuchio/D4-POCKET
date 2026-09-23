@@ -7,7 +7,7 @@
 
 ## 現行D4 Pocket統合単位（2026-09-24）
 
-rev2 Phase 2のHost Capabilityを、既存のGUI-Shell契約とRust Broker経路へ接続した。`specs/host_capability.schema.json`を正本とし、`ホスト能力`の認証付きIPC、payload拒否、証拠種別の明示、D4 Pocketデスクトップの読み取り専用操作面を実装・検証する。Host Capabilityは観測結果であり、Permission・Approval・runtime trustを生成しない。
+rev2のHost操作面とC19 Adapter管理操作を、既存のGUI-Shell契約とRust Broker経路へ接続した。`docs/specs/host-operation-surface.md`と`docs/specs/adapter-management-surface.md`を正本とし、Hostの表示コンテキスト操作、Adapter metadata一覧、owner限定のAdapter状態管理、署名検査、隔離再利用拒否を実装・検証する。Host metadataとAdapter metadataはPermission・Approval・Authority・Credentialを生成しない。Adapter導入・更新・削除は現時点ではBroker catalogのmetadata操作に限定し、外部artifactのdownload、filesystem操作、process起動を完了扱いにしない。
 
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 
@@ -34,6 +34,8 @@ C16の現行単位では、`docs/specs/a2a-connection-center.md`を正本とす�
 
 C17の現行単位では、`docs/specs/host-registry.md`を正本とするHost registryをRust Security Brokerへ接続した。`Host登録`はowner controlだけ、`Host一覧`は通常認証済みIPCだけを受け付ける。Host ID、Platform、Trust、接続状態、certificate／identity hash、Runtime／Agent summaryをmetadata-only receiptへ射影し、`hosts.json`へbounded・atomicに保存する。登録時は`pending_review`へ固定し、Host metadataからPermission、Approval、Authority、Credentialを生成しない。Host切替、Runtime／Agent一覧、Device Link実認証、Desktop Host操作面、Host間Workspace隔離は未接続の`release_blocker`として保持する。
 C18の現行単位では、`docs/specs/host-operation-surface.md`を正本として`Host一覧`をDesktop Snapshotへ接続し、通常IPCの`Host切替`をBroker監査付きの表示コンテキスト操作として追加した。Host AのPermission、Approval、AuthorityはHost Bへ再利用せず、選択Hostと現在Broker観測Hostが一致しない場合のRuntime／Agent個別一覧は`未観測`とする。live Host再接続、Trust検証、remote Runtime／Agent discovery、Host間Workspace隔離は引き続き`release_blocker`である。
+
+C19の現行単位では、`docs/specs/adapter-management-surface.md`を正本としてRuntime CenterのAdapter catalogをRust Brokerへ接続した。`アダプター一覧`は通常IPCのmetadata-only projection、導入・検証・有効化・無効化・隔離・更新・削除はowner controlのbounded state transitionとし、署名検査はBroker所有Ed25519 trustに限定する。通常IPCの変更要求はowner再承認待ちで停止し、隔離済みRuntime IDは登録、lifecycle、資源観測、対話から再利用しない。外部artifactの実download・filesystem導入・process管理・実削除、Windows installed product evidenceは`release_blocker`である。
 
 ## 現行追加指示：総合機能拡張 rev1（2026-09-13）
 

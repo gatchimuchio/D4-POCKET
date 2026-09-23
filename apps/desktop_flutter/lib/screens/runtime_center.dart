@@ -43,8 +43,11 @@ class _RuntimeCenterState extends State<RuntimeCenter>
   int _resourceGeneration = 0;
   bool _lifecycleBusy = false;
   int _lifecycleGeneration = 0;
+  final Map<String, String> _adapterMessages = <String, String>{};
+  final Set<String> _adapterBusy = <String>{};
   String _resourceMessage = '資源は自動更新しません。実行系IDを指定して、監査付きの一回観測を実行してください。';
-  String _lifecycleMessage = 'ライフサイクルは自動実行しません。Brokerへ状態を照会して、Capabilityがある操作だけを表示します。';
+  String _lifecycleMessage =
+      'ライフサイクルは自動実行しません。Brokerへ状態を照会して、Capabilityがある操作だけを表示します。';
 
   @override
   void initState() {
@@ -165,22 +168,34 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         for (final adapter in snapshot.adapterCatalog)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: SectionList(
-              title: 'アダプター台帳: ${adapter.adapterId}',
-              rows: [
-                '実行系: ${adapter.runtimeId}',
-                '発行者: ${adapter.publisher}',
-                '版: ${adapter.version}',
-                '署名: ${adapter.signature}',
-                'ハッシュ: ${adapter.hash}',
-                '信頼: ${adapter.trustStatus}',
-                '要求能力: ${adapter.requestedCapabilities.join(', ')}',
-                '付与能力: ${adapter.grantedCapabilities.join(', ')}',
-                '拒否能力: ${adapter.deniedCapabilities.join(', ')}',
-                '既知の危険: ${adapter.knownRisks.join(', ')}',
-              ],
-            ),
+            child: _adapterManagementPanel(adapter),
           ),
+        if (snapshot.adapterCatalog.isEmpty)
+          const EmptyStatePanel(
+            title: 'Adapter catalogなし',
+            meaning:
+                'Brokerからmetadata-onlyのAdapter一覧を取得できましたが、登録済みAdapterはありません。',
+            phaseBBlocked: false,
+            nextAction: 'owner Manifest経路を用意してから導入操作を行ってください。',
+          ),
+        for (final adapter in snapshot.adapterCatalog)
+          if (adapter.managementState == 'unknown') const SizedBox.shrink(),
+        const SizedBox(height: 4),
+        const SectionList(
+          title: 'Adapter管理境界 / アダプター管理操作',
+          rows: [
+            'FlutterはAdapterの権限・署名・承認を決定しません。操作はBrokerへ渡し、receiptとAuditだけを表示します。',
+            'アダプター導入・更新・削除は現行単位ではcatalog metadata操作です。外部filesystem・process作用は未接続です。',
+          ],
+        ),
+        for (final adapter in snapshot.adapterCatalog)
+          if (_adapterMessages.containsKey(adapter.adapterId))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '${adapter.adapterId}: ${_adapterMessages[adapter.adapterId]}',
+              ),
+            ),
         for (final diff in snapshot.permissionDiffs)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -211,6 +226,82 @@ class _RuntimeCenterState extends State<RuntimeCenter>
         ),
       ],
     );
+  }
+
+  Widget _adapterManagementPanel(AdapterCatalogRecord adapter) {
+    final busy = _adapterBusy.contains(adapter.adapterId);
+    final message = _adapterMessages[adapter.adapterId];
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Adapter管理 / アダプター台帳: ${adapter.adapterId}',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text('Runtime: ${adapter.runtimeId} / 発行者: ${adapter.publisher}'),
+          Text(
+              '出所（source）: ${adapter.source} / 接続方式（transport）: ${adapter.transport} / 版（version）: ${adapter.version}'),
+          Text(
+              '署名: ${adapter.signatureStatus} / 検証: ${adapter.verificationStatus} / 管理: ${adapter.managementState} / 有効: ${adapter.activeState}'),
+          Text(
+              '内容露出（Content Exposure）: ${adapter.contentExposure} / 互換性: ${adapter.compatibility}'),
+          Text('要求Capability: ${adapter.requestedCapabilities.join(', ')}'),
+          Text('許可差分: ${adapter.permissionDiff.join(', ')}'),
+          Text('既知の危険: ${adapter.knownRisks.join(', ')}'),
+          Text('hash: ${adapter.hash} / 証拠: ${adapter.evidenceSource}'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final operation in const ['検証', '有効化', '無効化', '隔離', '削除'])
+                OutlinedButton(
+                  key: ValueKey('adapter-${adapter.adapterId}-$operation'),
+                  onPressed:
+                      busy ? null : () => _manageAdapter(adapter, operation),
+                  child: Text('アダプター$operation'),
+                ),
+              const OutlinedButton(
+                onPressed: null,
+                child: Text('アダプター導入（Manifest待ち）'),
+              ),
+              const OutlinedButton(
+                onPressed: null,
+                child: Text('アダプター更新（Manifest待ち）'),
+              ),
+            ],
+          ),
+          if (busy) const LinearProgressIndicator(),
+          if (message != null) ...[
+            const SizedBox(height: 8),
+            Text(message),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _manageAdapter(
+    AdapterCatalogRecord adapter,
+    String operation,
+  ) async {
+    setState(() => _adapterBusy.add(adapter.adapterId));
+    try {
+      final result =
+          await widget.client.manageAdapter(adapter.adapterId, operation);
+      if (!mounted) return;
+      setState(() {
+        _adapterMessages[adapter.adapterId] =
+            '${result.status} / ${result.message} / 監査（Audit）=${result.auditId} / 復旧（Recovery）=${result.recoveryId}';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _adapterMessages[adapter.adapterId] = '操作失敗: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _adapterBusy.remove(adapter.adapterId));
+      }
+    }
   }
 
   Widget _resourcePanel(RuntimeRecord? selectedRuntime) {
@@ -298,7 +389,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       _resourceMessage = 'Brokerへ資源観測を要求しています。';
     });
     try {
-      _resourceClient ??= widget.resourceClient ?? await widget.connectResource();
+      _resourceClient ??=
+          widget.resourceClient ?? await widget.connectResource();
       final observation = await _resourceClient!.observe(runtimeId);
       if (!mounted || generation != _resourceGeneration) {
         return;
@@ -442,7 +534,8 @@ class _RuntimeCenterState extends State<RuntimeCenter>
       final status = await _lifecycleClient!.status(runtimeId);
       if (!mounted || generation != _lifecycleGeneration) return;
       final stateLabel = _lifecycleStateLabel(status.state);
-      final evidenceLabel = _lifecycleEvidenceSourceLabel(status.evidenceSource);
+      final evidenceLabel =
+          _lifecycleEvidenceSourceLabel(status.evidenceSource);
       setState(() {
         _lifecycleStatus = status;
         _lifecycleMessage = status.supported
@@ -855,8 +948,7 @@ class _ResourceObservationPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('最新のBroker資源観測',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('最新のBroker資源観測', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SelectableText(
             '実行系ID: ${observation.runtimeId}\n'
@@ -868,7 +960,8 @@ class _ResourceObservationPanel extends StatelessWidget {
           Text('根拠: ${binding.basis}'),
           if (binding.pid != null) Text('PID: ${binding.pid}'),
           if (binding.processCreationAtUnixMillis != null)
-            Text('PID作成時刻: ${_formatUnixMillis(binding.processCreationAtUnixMillis!)}'),
+            Text(
+                'PID作成時刻: ${_formatUnixMillis(binding.processCreationAtUnixMillis!)}'),
           Text('登録時刻: ${_formatUnixMillis(binding.registeredAtUnixMillis)}'),
           Text('登録監査ID: ${binding.registrationAuditId}'),
           if (binding.reason != null) Text('結合できない理由: ${binding.reason}'),
@@ -961,15 +1054,15 @@ class _ResourceHistorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('短期履歴', style: Theme.of(context).textTheme.titleSmall),
-        Text('保存点: ${history.length} ／ 直近: ${_formatUnixMillis(latest.observedAtUnixMillis)}'),
+        Text(
+            '保存点: ${history.length} ／ 直近: ${_formatUnixMillis(latest.observedAtUnixMillis)}'),
         const SizedBox(height: 8),
         _HistorySparkline(
           title: 'CPU利用率の短期履歴',
           color: Colors.teal,
           unit: '%',
           values: [
-            for (final sample in history)
-              sample.metric('CPU利用率Percent').value,
+            for (final sample in history) sample.metric('CPU利用率Percent').value,
           ],
         ),
         const SizedBox(height: 8),
@@ -1020,8 +1113,10 @@ class _HistorySparkline extends StatelessWidget {
         child: Text('$title: 測定値がありません。unknownを線や数値0として描画しません。'),
       );
     }
-    final minimum = measured.reduce((left, right) => left < right ? left : right);
-    final maximum = measured.reduce((left, right) => left > right ? left : right);
+    final minimum =
+        measured.reduce((left, right) => left < right ? left : right);
+    final maximum =
+        measured.reduce((left, right) => left > right ? left : right);
     return BorderedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

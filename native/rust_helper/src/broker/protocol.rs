@@ -270,6 +270,20 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    pub fn load_adapter_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            return store.load_adapter_state().map(Some);
+        }
+        Ok(None)
+    }
+
+    pub fn write_adapter_state(&self, state: &serde_json::Value) -> Result<(), BrokerStoreError> {
+        if let Some(store) = &self.persistent_store {
+            store.write_adapter_state(state)?;
+        }
+        Ok(())
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_update_trust();
@@ -361,6 +375,22 @@ pub enum BrokerOperation {
     Host一覧,
     #[serde(rename = "Host切替")]
     Host切替,
+    #[serde(rename = "アダプター一覧")]
+    アダプター一覧,
+    #[serde(rename = "アダプター導入")]
+    アダプター導入,
+    #[serde(rename = "アダプター検証")]
+    アダプター検証,
+    #[serde(rename = "アダプター有効化")]
+    アダプター有効化,
+    #[serde(rename = "アダプター無効化")]
+    アダプター無効化,
+    #[serde(rename = "アダプター隔離")]
+    アダプター隔離,
+    #[serde(rename = "アダプター更新")]
+    アダプター更新,
+    #[serde(rename = "アダプター削除")]
+    アダプター削除,
     #[serde(rename = "プロファイル作成")]
     プロファイル作成,
     #[serde(rename = "プロファイル複製")]
@@ -502,6 +532,14 @@ impl BrokerOperation {
             BrokerOperation::Host登録 => "Host登録",
             BrokerOperation::Host一覧 => "Host一覧",
             BrokerOperation::Host切替 => "Host切替",
+            BrokerOperation::アダプター一覧 => "アダプター一覧",
+            BrokerOperation::アダプター導入 => "アダプター導入",
+            BrokerOperation::アダプター検証 => "アダプター検証",
+            BrokerOperation::アダプター有効化 => "アダプター有効化",
+            BrokerOperation::アダプター無効化 => "アダプター無効化",
+            BrokerOperation::アダプター隔離 => "アダプター隔離",
+            BrokerOperation::アダプター更新 => "アダプター更新",
+            BrokerOperation::アダプター削除 => "アダプター削除",
             BrokerOperation::プロファイル作成 => "プロファイル作成",
             BrokerOperation::プロファイル複製 => "プロファイル複製",
             BrokerOperation::プロファイル適用要求 => "プロファイル適用要求",
@@ -757,6 +795,7 @@ pub struct Broker {
     pub(super) mcp_connections: BTreeMap<String, super::mcp_center::McpConnectionEntry>,
     pub(super) a2a_connections: BTreeMap<String, Value>,
     pub(super) hosts: BTreeMap<String, Value>,
+    pub(super) adapters: BTreeMap<String, Value>,
     pub(super) profiles: BTreeMap<String, Value>,
     pub(super) updates: BTreeMap<String, Value>,
     pub(super) update_trust: Option<super::update_center::UpdateTrust>,
@@ -789,6 +828,7 @@ impl Broker {
             mcp_connections: BTreeMap::new(),
             a2a_connections: BTreeMap::new(),
             hosts: BTreeMap::new(),
+            adapters: BTreeMap::new(),
             profiles: BTreeMap::new(),
             updates: BTreeMap::new(),
             update_trust: None,
@@ -830,6 +870,7 @@ impl Broker {
         let a2a_connections =
             super::a2a_center::load_persistent_connections(&persistent_store)?;
         let hosts = super::host_center::load_persistent_hosts(&persistent_store)?;
+        let adapters = super::adapter_center::load_persistent_adapters(&persistent_store)?;
         let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
             persistent_state.audit_log.events(),
         )
@@ -851,6 +892,7 @@ impl Broker {
             mcp_connections: BTreeMap::new(),
             a2a_connections,
             hosts,
+            adapters,
             profiles,
             updates,
             update_trust,
@@ -871,7 +913,9 @@ impl Broker {
     }
 
     pub fn 実行系登録(&mut self, 名前: &str, adapter: Arc<dyn 実行系Adapter>) -> Result<(), 対話失敗> {
-        if self.ライフサイクル.is_terminally_quarantined(名前) {
+        if self.ライフサイクル.is_terminally_quarantined(名前)
+            || super::adapter_center::runtime_is_quarantined(self, 名前)
+        {
             return Err(対話失敗::隔離済み);
         }
         let 観測対象 = adapter.観測対象();
@@ -1122,6 +1166,7 @@ impl Broker {
             BrokerOperation::Host登録 => super::host_center::register(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Host一覧 => super::host_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Host切替 => super::host_center::switch(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::アダプター一覧 | BrokerOperation::アダプター導入 | BrokerOperation::アダプター検証 | BrokerOperation::アダプター有効化 | BrokerOperation::アダプター無効化 | BrokerOperation::アダプター隔離 | BrokerOperation::アダプター更新 | BrokerOperation::アダプター削除) => super::adapter_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
@@ -1540,6 +1585,9 @@ impl Broker {
                 )
             }
         };
+        if super::adapter_center::runtime_is_quarantined(self, &query.runtime_id) {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle状態照会を拒否しました", true, payload_hash);
+        }
         let body = match self
             .ライフサイクル
             .status_body(&query.runtime_id, self.current_epoch_seconds())
@@ -1603,6 +1651,9 @@ impl Broker {
                 )
             }
         };
+        if super::adapter_center::runtime_is_quarantined(self, &request.runtime_id) {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle承認要求を拒否しました", true, payload_hash);
+        }
         let body = match self.ライフサイクル.request_approval(
             &request.runtime_id,
             request.action,
@@ -1658,6 +1709,9 @@ impl Broker {
                 )
             }
         };
+        if self.ライフサイクル.approval_runtime_id(&request.approval_id).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle承認を拒否しました", true, payload_hash);
+        }
         let body = match self.ライフサイクル.approve(
             &request.approval_id,
             &request.approval_hash,
@@ -1713,6 +1767,9 @@ impl Broker {
                 )
             }
         };
+        if super::adapter_center::runtime_is_quarantined(self, &request.runtime_id) {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle操作を拒否しました", true, payload_hash);
+        }
         if let Err(error) = self.ライフサイクル.preflight_execution(
             &request.runtime_id,
             request.action,
@@ -1871,6 +1928,9 @@ impl Broker {
                 )
             }
         };
+        if super::adapter_center::runtime_is_quarantined(self, &query.runtime_id) {
+            return self.reject_with_payload_hash(request_id, operation, "adapter_quarantined", "隔離済みAdapterの資源観測を拒否しました", true, payload_hash);
+        }
         let _initial = match self.append_audit(
             request_id,
             operation,
@@ -1968,6 +2028,9 @@ impl Broker {
         }
         if matches!(operation, BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) && !owner {
             return self.reject_with_payload_hash(request_id, operation.as_str(), "権限拒否", "owner制御資格が必要", true, payload_hash);
+        }
+        if payload.get("実行系ID").and_then(Value::as_str).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
+            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterの対話操作を拒否しました", true, payload_hash);
         }
         let initial = self.append_audit(request_id, operation.as_str(), "received", "対話操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash);
         let mut last_event = match initial {

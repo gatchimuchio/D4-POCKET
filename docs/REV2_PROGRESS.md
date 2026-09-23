@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C19: Adapter管理操作（2026-09-24）
+
+Runtime CenterのAdapter catalogをRust Brokerのbounded管理経路へ接続した。`アダプター一覧`は通常IPCのmetadata-only projection、導入・検証・有効化・無効化・隔離・更新・削除はowner controlだけが状態を変更する。通常IPCの変更要求は`owner_reapproval_required`のsuspendedとして監査し、状態を変更しない。
+
+- Production path: Desktop Runtime Center → `アダプター一覧`／Adapter管理要求 → Rust Adapter Center → `adapters.json` → metadata-only receipt。導入・更新はManifestをcatalogへ登録するだけで、外部download、filesystem、processは実行しない。
+- Authority boundary: 署名はBroker所有Ed25519 trustとManifest正本byteで検証し、未検証Adapterは有効化できない。Adapter metadata、署名、hash、過去状態からPermission、Approval、Authority、Credentialを生成しない。
+- Quarantine boundary: 隔離済みRuntime IDを実行系登録、lifecycle、資源観測、対話で再利用しない。削除はcatalog recordだけを除去し、外部artifactの実削除を主張しない。
+- Validation target: Adapter管理Schema、正常／負例fixture、Rust state transition／signature path／restart state、Conformance、Desktop Runtime Centerを接続する。
+- 未成立分類: 外部artifactの実download・filesystem導入・process起動・実削除、Windows installed productのAdapter管理実証は`release_blocker`。C19だけでAdapter製品機能全体または正式releaseを主張しない。
+
 ## D4 Pocket C18: Host操作面（2026-09-24）
 
 C17のHost registryをDesktopのHost操作面へ接続した。`ShellCoreClient.product()`は通常認証済みBroker IPCの`Host一覧`を取得し、Host metadataをSnapshotへ投影する。DesktopはHost一覧、接続状態、Trust、Runtime／Agent summary、Host切替を表示する。

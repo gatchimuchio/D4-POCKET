@@ -404,6 +404,7 @@ void main() {
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -460,6 +461,7 @@ void main() {
       'health',
       'ホスト能力',
       'Host一覧',
+      'アダプター一覧',
       'normalize_payload',
       'content_projection',
       'approval_edit',
@@ -493,6 +495,7 @@ void main() {
       _brokerHealthResponse(),
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -533,6 +536,7 @@ void main() {
         _brokerHealthResponse(),
         _brokerHostCapabilityResponse(),
         _brokerHostListResponse(),
+        _brokerAdapterListResponse(),
         _brokerRejectedResponse(
           'normalize_payload',
           'broker_stale_session',
@@ -543,6 +547,30 @@ void main() {
 
     expect(client.mode, 'broker_unavailable');
     expect(client.getSnapshot().operationStatus.trustStatus, 'blocked');
+  });
+
+  test('Adapter管理の通常IPC要求はowner再承認待ちを表示し、状態を成功扱いしない', () async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {
+        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
+      }),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAdapterSuspendedResponse(),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    final result = await client.manageAdapter('mock_local_llm_adapter', '検証');
+
+    expect(result.status, 'suspended');
+    expect(result.message, contains('owner_reapproval_required'));
+    expect(result.managementState, 'installed');
+    expect(result.recoveryId, 'recover-adapter-management');
+    expect(transport.operations.last, 'アダプター検証');
   });
 
   test('不正なブローカー応答で製品クライアントが閉鎖側へ失敗する', () async {
@@ -944,6 +972,46 @@ Map<String, Object?> _brokerHostListResponse() {
   });
 }
 
+Map<String, Object?> _brokerAdapterListResponse() {
+  return _brokerAcceptedBody('アダプター一覧', {
+    '版': 1,
+    'Adapter一覧': [
+      {
+        '版': 1,
+        'Adapter ID': 'mock_local_llm_adapter',
+        'Runtime ID': 'mock_local_llm',
+        '発行者': 'GUI-Shell開発fixture',
+        'source': 'owner_manifest',
+        'version': '1.0.0',
+        'transport': 'mock',
+        'Content Exposure': 'redacted',
+        '要求Capability': ['runtime.read', 'model.chat'],
+        '許可差分': ['content_visibility:summary->redacted'],
+        '既知の危険': ['fixture only'],
+        '互換性': 'compatible',
+        'hash': 'sha256:${List.filled(64, '1').join()}',
+        '署名状態': 'unconfigured',
+        '検証状態': 'pending_review',
+        '管理状態': 'installed',
+        '有効状態': 'inactive',
+        '更新可能': false,
+        '公開範囲': 'metadata_only',
+        '証拠種別': 'INTERNAL_STATE',
+        '権限生成': 'なし',
+        'authority_strip': true,
+        '最終検証': null,
+        '監査ID': 'audit-adapter-management-1',
+        '復旧ID': 'recover-adapter-management',
+      },
+    ],
+    '件数': 1,
+    '公開範囲': 'metadata_only',
+    '証拠種別': 'INTERNAL_STATE',
+    '権限生成': 'なし',
+    'authority_strip': true,
+  });
+}
+
 Map<String, Object?> _brokerCommandSuspendedResponse() {
   return {
     'request_id': 'test-command-envelope',
@@ -962,6 +1030,31 @@ Map<String, Object?> _brokerCommandSuspendedResponse() {
     'body': {
       'dispatch_enabled': false,
       'eligibility': {'allowed': true, 'errors': []},
+    },
+    'shutdown_requested': false,
+  };
+}
+
+Map<String, Object?> _brokerAdapterSuspendedResponse() {
+  return {
+    'request_id': 'test-adapter-management',
+    'operation': 'アダプター検証',
+    'status': 'suspended',
+    'evidence_source': 'INTERNAL_STATE',
+    'audit_event_id': 'audit-adapter-management-suspended',
+    'error': null,
+    'health': null,
+    'body': {
+      '版': 1,
+      '操作': '検証',
+      'Adapter ID': 'mock_local_llm_adapter',
+      '実行状態': 'suspended',
+      '承認状態': 'owner_reapproval_required',
+      '権限生成': 'なし',
+      'authority_strip': true,
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+      '復旧ID': 'recover-adapter-management',
     },
     'shutdown_requested': false,
   };

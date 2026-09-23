@@ -40,6 +40,14 @@ class ShellCoreClient {
         payload: {'版': 1},
       );
       final hostList = _acceptedResponseBodyMap(hostListResponse, 'Host一覧');
+      final adapterListResponse = await broker.request(
+        'アダプター一覧',
+        payload: {'版': 1},
+      );
+      final adapterList = _acceptedResponseBodyMap(
+        adapterListResponse,
+        'アダプター一覧',
+      );
 
       final normalizeResponse = await broker.request(
         'normalize_payload',
@@ -90,6 +98,8 @@ class ShellCoreClient {
           hostCapability: hostCapability,
           hostListResponse: hostListResponse,
           hostList: hostList,
+          adapterListResponse: adapterListResponse,
+          adapterList: adapterList,
           normalizeResponse: normalizeResponse,
           projectionResponse: projectionResponse,
           projection: projection,
@@ -208,9 +218,110 @@ class ShellCoreClient {
       authorityGenerated: body['権限生成']?.toString() ?? '不明',
       authorityStrip: body['authority_strip'] == true,
       approvalState: body['承認状態']?.toString() ?? 'unknown',
-      auditId: body['監査ID']?.toString() ?? response['audit_event_id']?.toString() ?? '',
+      auditId: body['監査ID']?.toString() ??
+          response['audit_event_id']?.toString() ??
+          '',
     );
   }
+
+  Future<AdapterManagementResult> manageAdapter(
+    String adapterId,
+    String operation,
+  ) async {
+    final adapter = snapshot.adapterCatalog.where(
+      (item) => item.adapterId == adapterId,
+    );
+    if (adapter.isEmpty) {
+      throw BrokerClientException('未登録Adapterへ操作できません: $adapterId');
+    }
+    if (operation == '導入' || operation == '更新') {
+      return const AdapterManagementResult(
+        status: 'suspended',
+        operation: 'アダプター管理',
+        adapterId: '',
+        managementState: 'owner_manifest_required',
+        verificationState: 'unknown',
+        auditId: 'not-audited',
+        recoveryId: 'recover-adapter-management',
+        message: '導入・更新はBrokerへowner Manifestを提示できる経路が必要です。',
+      );
+    }
+    final transport = brokerTransport;
+    if (transport == null) {
+      return AdapterManagementResult(
+        status: 'suspended',
+        operation: operation,
+        adapterId: adapterId,
+        managementState: adapter.first.managementState,
+        verificationState: adapter.first.verificationStatus,
+        auditId: 'not-audited',
+        recoveryId: 'recover-adapter-management',
+        message: 'Broker接続がないためAdapter操作を停止しました。',
+      );
+    }
+    const operations = <String, String>{
+      '検証': 'アダプター検証',
+      '有効化': 'アダプター有効化',
+      '無効化': 'アダプター無効化',
+      '隔離': 'アダプター隔離',
+      '削除': 'アダプター削除',
+    };
+    final brokerOperation = operations[operation];
+    if (brokerOperation == null) {
+      throw BrokerClientException('未対応のAdapter操作です: $operation');
+    }
+    final response = await transport.request(
+      brokerOperation,
+      payload: {
+        '版': 1,
+        '操作': operation,
+        'Adapter ID': adapter.first.adapterId,
+        'Adapter hash': adapter.first.hash,
+      },
+    );
+    final body = response['body'] is Map
+        ? Map<String, Object?>.from(response['body'] as Map)
+        : const <String, Object?>{};
+    final error = response['error'];
+    return AdapterManagementResult(
+      status: response['status']?.toString() ?? 'unknown',
+      operation: response['operation']?.toString() ?? brokerOperation,
+      adapterId: body['Adapter ID']?.toString() ?? adapterId,
+      managementState:
+          body['管理状態']?.toString() ?? adapter.first.managementState,
+      verificationState:
+          body['検証状態']?.toString() ?? adapter.first.verificationStatus,
+      auditId: response['audit_event_id']?.toString() ??
+          body['監査ID']?.toString() ??
+          '',
+      recoveryId: body['復旧ID']?.toString() ?? 'recover-adapter-management',
+      message: error is Map
+          ? error['message']?.toString() ?? response.toString()
+          : body['承認状態']?.toString() ?? response.toString(),
+    );
+  }
+}
+
+class AdapterManagementResult {
+  const AdapterManagementResult({
+    required this.status,
+    required this.operation,
+    required this.adapterId,
+    required this.managementState,
+    required this.verificationState,
+    required this.auditId,
+    required this.recoveryId,
+    required this.message,
+  });
+
+  final String status;
+  final String operation;
+  final String adapterId;
+  final String managementState;
+  final String verificationState;
+  final String auditId;
+  final String recoveryId;
+  final String message;
 }
 
 Map<String, Object?> _acceptedResponseBodyMap(
@@ -264,6 +375,63 @@ List<Map<String, Object?>> _hostRegistrySnapshotJson(
   ];
 }
 
+List<Map<String, Object?>> _adapterCatalogSnapshotJson(
+  Map<String, Object?> body,
+) {
+  final adapters = body['Adapter一覧'];
+  if (adapters is! List) {
+    throw const BrokerClientException('アダプター一覧応答にAdapter配列がありません');
+  }
+  return [
+    for (final item in adapters)
+      if (item is Map) _adapterCatalogRecordSnapshotJson(item),
+  ];
+}
+
+const _adapterIdSnapshotKey = 'adapter_id';
+const _runtimeIdSnapshotKey = 'runtime_id';
+const _adapterIdInputKey = 'Adapter ID';
+const _runtimeIdInputKey = 'Runtime ID';
+
+Map<String, Object?> _adapterCatalogRecordSnapshotJson(Map item) {
+  final raw = Map<String, Object?>.from(item);
+  return {
+    _adapterIdSnapshotKey: raw[_adapterIdInputKey]?.toString() ?? '',
+    _runtimeIdSnapshotKey: raw[_runtimeIdInputKey]?.toString() ?? '',
+    'publisher': raw['発行者']?.toString() ?? '',
+    'version': raw['version']?.toString() ?? '',
+    'signature': raw['署名状態']?.toString() ?? 'unknown',
+    'hash': raw['hash']?.toString() ?? '',
+    'requested_capabilities': raw['要求Capability'] is List
+        ? List<Object?>.from(raw['要求Capability'] as List)
+        : const <Object?>[],
+    'granted_capabilities': const <Object?>[],
+    'denied_capabilities': const <Object?>[],
+    'trust_status': raw['署名状態']?.toString() ?? 'unknown',
+    'last_verified': raw['最終検証']?.toString() ?? '',
+    'update_available': raw['更新可能'] == true,
+    'known_risks': raw['既知の危険'] is List
+        ? List<Object?>.from(raw['既知の危険'] as List)
+        : const <Object?>[],
+    'source': raw['source']?.toString() ?? 'unknown',
+    'transport': raw['transport']?.toString() ?? 'unknown',
+    'content_exposure': raw['Content Exposure']?.toString() ?? 'unknown',
+    'permission_diff': raw['許可差分'] is List
+        ? List<Object?>.from(raw['許可差分'] as List)
+        : const <Object?>[],
+    'compatibility': raw['互換性']?.toString() ?? 'unknown',
+    'signature_status': raw['署名状態']?.toString() ?? 'unknown',
+    'verification_status': raw['検証状態']?.toString() ?? 'unknown',
+    'management_state': raw['管理状態']?.toString() ?? 'unknown',
+    'active_state': raw['有効状態']?.toString() ?? 'unknown',
+    'evidence_source': raw['証拠種別']?.toString() ?? 'unknown',
+    'visibility': raw['公開範囲']?.toString() ?? 'none',
+    'authority_strip': raw['authority_strip'] == true,
+    'audit_id': raw['監査ID']?.toString() ?? '',
+    'recovery_id': raw['復旧ID']?.toString() ?? '',
+  };
+}
+
 Map<String, Object?> _hostRegistryRecordSnapshotJson(Map item) {
   final raw = Map<String, Object?>.from(item);
   final trust = Map<String, Object?>.from(raw['Trust'] as Map? ?? const {});
@@ -277,12 +445,9 @@ Map<String, Object?> _hostRegistryRecordSnapshotJson(Map item) {
     'connection_state': raw['接続状態']?.toString() ?? 'unknown',
     'trust_state': trust['state']?.toString() ?? 'unknown',
     'runtime_summary': {
-      'runtime_count': summary['runtime_count'] is int
-          ? summary['runtime_count']
-          : 0,
-      'agent_count': summary['agent_count'] is int
-          ? summary['agent_count']
-          : 0,
+      'runtime_count':
+          summary['runtime_count'] is int ? summary['runtime_count'] : 0,
+      'agent_count': summary['agent_count'] is int ? summary['agent_count'] : 0,
     },
     'evidence_source': raw['証拠種別']?.toString() ?? 'unknown',
     'visibility': raw['公開範囲']?.toString() ?? 'none',
@@ -310,6 +475,8 @@ ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> hostCapability,
   required Map<String, Object?> hostListResponse,
   required Map<String, Object?> hostList,
+  required Map<String, Object?> adapterListResponse,
+  required Map<String, Object?> adapterList,
   required Map<String, Object?> normalizeResponse,
   required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
@@ -411,6 +578,7 @@ ShellSnapshot _brokerSnapshot({
     _auditJson(healthResponse, 'broker.health', 'accepted'),
     _auditJson(hostCapabilityResponse, 'broker.host_capability', 'accepted'),
     _auditJson(hostListResponse, 'broker.host_list', 'accepted'),
+    _auditJson(adapterListResponse, 'broker.adapter_list', 'accepted'),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
     _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
     _auditJson(
@@ -540,7 +708,7 @@ ShellSnapshot _brokerSnapshot({
       },
     ],
     'authority_map': [],
-    'adapter_catalog': [],
+    'adapter_catalog': _adapterCatalogSnapshotJson(adapterList),
     'permission_diffs': [],
     'problems': problems,
     'evidence': [

@@ -18,6 +18,7 @@ pub mod protocol;
 pub(crate) mod mcp_center;
 pub(crate) mod a2a_center;
 pub(crate) mod host_center;
+pub(crate) mod adapter_center;
 pub(crate) mod profile_center;
 pub(crate) mod update_center;
 pub(crate) mod notification_center;

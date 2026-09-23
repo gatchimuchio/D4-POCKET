@@ -399,6 +399,20 @@ class AdapterCatalogRecord {
     required this.lastVerified,
     required this.updateAvailable,
     required this.knownRisks,
+    this.source = 'unknown',
+    this.transport = 'unknown',
+    this.contentExposure = 'unknown',
+    this.permissionDiff = const [],
+    this.compatibility = 'unknown',
+    this.signatureStatus = 'unknown',
+    this.verificationStatus = 'unknown',
+    this.managementState = 'unknown',
+    this.activeState = 'unknown',
+    this.evidenceSource = 'unknown',
+    this.visibility = 'none',
+    this.authorityStrip = false,
+    this.auditId = '',
+    this.recoveryId = '',
   });
 
   final String adapterId;
@@ -414,6 +428,20 @@ class AdapterCatalogRecord {
   final String lastVerified;
   final bool updateAvailable;
   final List<String> knownRisks;
+  final String source;
+  final String transport;
+  final String contentExposure;
+  final List<String> permissionDiff;
+  final String compatibility;
+  final String signatureStatus;
+  final String verificationStatus;
+  final String managementState;
+  final String activeState;
+  final String evidenceSource;
+  final String visibility;
+  final bool authorityStrip;
+  final String auditId;
+  final String recoveryId;
 
   factory AdapterCatalogRecord.fromJson(Map<String, Object?> json) {
     return AdapterCatalogRecord(
@@ -430,6 +458,20 @@ class AdapterCatalogRecord {
       lastVerified: json['last_verified'] as String? ?? '',
       updateAvailable: json['update_available'] as bool? ?? false,
       knownRisks: _stringList(json['known_risks']),
+      source: json['source'] as String? ?? 'unknown',
+      transport: json['transport'] as String? ?? 'unknown',
+      contentExposure: json['content_exposure'] as String? ?? 'unknown',
+      permissionDiff: _stringList(json['permission_diff']),
+      compatibility: json['compatibility'] as String? ?? 'unknown',
+      signatureStatus: json['signature_status'] as String? ?? 'unknown',
+      verificationStatus: json['verification_status'] as String? ?? 'unknown',
+      managementState: json['management_state'] as String? ?? 'unknown',
+      activeState: json['active_state'] as String? ?? 'unknown',
+      evidenceSource: json['evidence_source'] as String? ?? 'unknown',
+      visibility: json['visibility'] as String? ?? 'none',
+      authorityStrip: json['authority_strip'] == true,
+      auditId: json['audit_id'] as String? ?? '',
+      recoveryId: json['recovery_id'] as String? ?? '',
     );
   }
 }

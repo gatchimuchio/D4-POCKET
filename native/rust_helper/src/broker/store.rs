@@ -13,6 +13,7 @@ const REPLAY_NONCE_RETENTION_SECONDS: i64 = 24 * 60 * 60;
 const MAX_REPLAY_NONCE_RECORDS: usize = 100_000;
 const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerStoreError {
@@ -27,6 +28,7 @@ pub enum BrokerStoreError {
     MalformedNotificationState(String),
     MalformedA2aState(String),
     MalformedHostState(String),
+    MalformedAdapterState(String),
 }
 
 impl BrokerStoreError {
@@ -42,7 +44,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedUpdateTrust(message)
             | BrokerStoreError::MalformedNotificationState(message)
             | BrokerStoreError::MalformedA2aState(message)
-            | BrokerStoreError::MalformedHostState(message) => message.clone(),
+            | BrokerStoreError::MalformedHostState(message)
+            | BrokerStoreError::MalformedAdapterState(message) => message.clone(),
         }
     }
 }
@@ -67,6 +70,7 @@ pub struct BrokerPersistentStore {
     notification_path: PathBuf,
     a2a_path: PathBuf,
     host_path: PathBuf,
+    adapter_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -113,6 +117,7 @@ impl BrokerPersistentStore {
             notification_path: root.join("notifications.json"),
             a2a_path: root.join("a2a_connections.json"),
             host_path: root.join("hosts.json"),
+            adapter_path: root.join("adapters.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
@@ -123,6 +128,7 @@ impl BrokerPersistentStore {
         store.ensure_notification_file_exists()?;
         store.ensure_a2a_file_exists()?;
         store.ensure_host_file_exists()?;
+        store.ensure_adapter_file_exists()?;
         let audit_log = store.load_audit_log()?;
         store.verify_audit_anchor(&audit_log)?;
         let seen_nonces = store.load_replay_nonces(current_epoch_seconds())?;
@@ -358,6 +364,50 @@ impl BrokerPersistentStore {
         })
     }
 
+    pub fn load_adapter_state(&self) -> Result<Value, BrokerStoreError> {
+        let metadata = fs::metadata(&self.adapter_path).map_err(|error| {
+            BrokerStoreError::MalformedAdapterState(format!(
+                "broker Adapter stateのmetadata読取りに失敗: {error}"
+            ))
+        })?;
+        if metadata.len() > MAX_ADAPTER_STATE_BYTES as u64 {
+            return Err(BrokerStoreError::MalformedAdapterState(
+                "broker Adapter stateがbounded上限を超過".to_string(),
+            ));
+        }
+        let raw = fs::read_to_string(&self.adapter_path).map_err(|error| {
+            BrokerStoreError::MalformedAdapterState(format!(
+                "broker Adapter stateの読取りに失敗: {error}"
+            ))
+        })?;
+        if raw.trim().is_empty() {
+            return Err(BrokerStoreError::MalformedAdapterState(
+                "broker Adapter stateが空である".to_string(),
+            ));
+        }
+        crate::broker::json_input::read_unique(&raw).map_err(|error| {
+            BrokerStoreError::MalformedAdapterState(format!(
+                "broker Adapter stateがmalformed: {error}"
+            ))
+        })
+    }
+
+    pub fn write_adapter_state(&self, state: &Value) -> Result<(), BrokerStoreError> {
+        let serialized = serde_json::to_string_pretty(state).map_err(|error| {
+            BrokerStoreError::MalformedAdapterState(format!(
+                "broker Adapter stateのserializeに失敗: {error}"
+            ))
+        })?;
+        if serialized.len() > MAX_ADAPTER_STATE_BYTES {
+            return Err(BrokerStoreError::MalformedAdapterState(
+                "broker Adapter stateがbounded上限を超過".to_string(),
+            ));
+        }
+        atomic_write(&self.adapter_path, serialized.as_bytes()).map_err(|error| {
+            BrokerStoreError::Io(format!("broker Adapter stateの書込みに失敗: {error}"))
+        })
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
         let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
@@ -451,6 +501,13 @@ impl BrokerPersistentStore {
             return Ok(());
         }
         self.write_host_state(&serde_json::json!({"版": 1, "hosts": []}))
+    }
+
+    fn ensure_adapter_file_exists(&self) -> Result<(), BrokerStoreError> {
+        if self.adapter_path.exists() {
+            return Ok(());
+        }
+        self.write_adapter_state(&serde_json::json!({"版": 1, "adapters": []}))
     }
 
     fn ensure_file_exists(&self, path: &Path) -> Result<(), BrokerStoreError> {

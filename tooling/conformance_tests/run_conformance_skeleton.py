@@ -138,6 +138,10 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_session",
     "broker_health",
     "broker_command_envelope",
+    "adapter_management_manifest",
+    "adapter_management_request",
+    "adapter_management_receipt",
+    "adapter_management_list",
 }
 
 VISIBILITY_VALUES = ["none", "hash_only", "summary", "redacted", "full"]
@@ -176,6 +180,7 @@ BROKER_REQUIRED_SOURCES = {
     "host_center.rs",
     "profile_center.rs",
     "update_center.rs",
+    "adapter_center.rs",
     "notification_center.rs",
     "observation_center.rs",
 }
@@ -207,6 +212,10 @@ BROKER_REQUIRED_SCHEMAS = {
     "host_registration.schema.json",
     "host_receipt.schema.json",
     "host_list.schema.json",
+    "adapter_management_manifest.schema.json",
+    "adapter_management_request.schema.json",
+    "adapter_management_receipt.schema.json",
+    "adapter_management_list.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -4280,6 +4289,84 @@ def Host操作面の観測境界とHost間非混線を検査する() -> list[str
     return 不整合
 
 
+def Adapter管理操作の統治境界を検査する() -> list[str]:
+    不整合: list[str] = []
+    specification = DOC_SPECS / "adapter-management-surface.md"
+    if not specification.exists():
+        return ["C19 Adapter管理操作の日本語意味正本がない"]
+    text = specification.read_text(encoding="utf-8")
+    for token in (
+        "アダプター導入",
+        "アダプター検証",
+        "アダプター有効化",
+        "アダプター無効化",
+        "アダプター隔離",
+        "アダプター更新",
+        "アダプター削除",
+        "owner_reapproval_required",
+        "metadata_only",
+        "filesystem",
+        "process",
+        "authority_strip",
+        "Ed25519",
+        "release_blocker",
+    ):
+        if token not in text:
+            不整合.append(f"C19 Adapter管理操作正本に必須境界がない: {token}")
+
+    center = (RUST_HELPER / "src" / "broker" / "adapter_center.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    store = (RUST_HELPER / "src" / "broker" / "store.rs").read_text(encoding="utf-8")
+    desktop = (DESKTOP_FLUTTER / "lib" / "screens" / "runtime_center.dart").read_text(encoding="utf-8")
+    client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
+    for token, source in (
+        ("owner_reapproval_required", center + desktop + client),
+        ("runtime_is_quarantined", center + protocol),
+        ("adapter_quarantined", protocol),
+        ("authority_strip", center + desktop + client),
+        ("metadata_only", center + desktop + client),
+        ("adapters.json", store),
+        ("MalformedAdapterState", store + center),
+        ("アダプター一覧", center + protocol + desktop + client),
+        ("アダプター隔離", center + protocol + desktop + client),
+        ("アダプター削除", center + protocol + desktop + client),
+    ):
+        if token not in source:
+            不整合.append(f"C19 Adapter管理操作実装に統治境界tokenがない: {token}")
+
+    for name in (
+        "adapter_management_request",
+        "adapter_management_receipt",
+    ):
+        schema = load_schema(name + ".schema.json")
+        valid = load_contract_fixture(name + ".valid.json")
+        failures = validate_instance(valid, schema)
+        if failures:
+            不整合.extend(f"C19 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    list_schema = load_schema("adapter_management_list.schema.json")
+    receipt = load_contract_fixture("adapter_management_receipt.valid.json")
+    list_fixture = {
+        "版": 1,
+        "Adapter一覧": [receipt],
+        "件数": 1,
+        "公開範囲": "metadata_only",
+        "証拠種別": "INTERNAL_STATE",
+        "権限生成": "なし",
+        "authority_strip": True,
+    }
+    failures = validate_instance(list_fixture, list_schema)
+    if failures:
+        不整合.extend(f"C19 adapter_management_list fixtureが拒否された: {failure}" for failure in failures)
+    for file_name, schema_name in (
+        ("adapter_management_authority.invalid.json", "adapter_management_request"),
+        ("adapter_management_unknown_field.invalid.json", "adapter_management_request"),
+    ):
+        invalid = load_contract_fixture("invalid/" + file_name)
+        if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
+            不整合.append(f"C19 {file_name}を受理している")
+    return 不整合
+
+
 def 書庫展開で日本語名と内容を保持する() -> list[str]:
     import hashlib
     import os
@@ -5883,6 +5970,7 @@ def main() -> int:
         A2A接続センターの統治経路と境界を検査する,
         複数Host_registryの統治経路と境界を検査する,
         Host操作面の観測境界とHost間非混線を検査する,
+        Adapter管理操作の統治境界を検査する,
         test_manifest_integrity_tooling_exists,
         test_manifest_rejects_working_tree_eol_mismatch,
         test_claim_documents_do_not_contain_stale_phase_or_check_counts,

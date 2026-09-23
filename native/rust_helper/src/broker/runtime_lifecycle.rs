@@ -557,6 +557,12 @@ impl RuntimeLifecycleRegistry {
         Ok(approval_projection(stored, &governance))
     }
 
+    pub(crate) fn approval_runtime_id(&self, approval_id: &str) -> Option<&str> {
+        self.approvals
+            .get(approval_id)
+            .map(|approval| approval.runtime_id.as_str())
+    }
+
     /// pre-audit前の確認。実action直前にも`execute`で同じ条件を再確認する。
     pub(crate) fn preflight_execution(
         &mut self,

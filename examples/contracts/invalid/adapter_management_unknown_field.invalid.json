@@ -1,0 +1,7 @@
+{
+  "版": 1,
+  "操作": "検証",
+  "Adapter ID": "mock_local_llm_adapter",
+  "Adapter hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "authority": "owner"
+}

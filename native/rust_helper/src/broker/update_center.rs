@@ -70,10 +70,10 @@ pub(super) struct UpdateRecord {
 #[serde(deny_unknown_fields)]
 pub(super) struct UpdateTrust {
     #[serde(rename = "版")]
-    version: u64,
-    algorithm: String,
-    public_key_der_hex: String,
-    public_key_fingerprint: String,
+    pub(super) version: u64,
+    pub(super) algorithm: String,
+    pub(super) public_key_der_hex: String,
+    pub(super) public_key_fingerprint: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -629,6 +629,37 @@ fn validate_trust(trust: &UpdateTrust) -> Result<(), String> {
         return Err("更新署名信頼設定が不正".to_string());
     }
     Ok(())
+}
+
+pub(super) fn verify_bytes_with_trust(
+    trust: Option<&UpdateTrust>,
+    update_id: &str,
+    signed_bytes_hex: &str,
+    signature_hex: &str,
+    signer_fingerprint: &str,
+) -> Result<(), &'static str> {
+    let Some(trust) = trust else {
+        return Err("broker所有の署名信頼設定が未構成");
+    };
+    let public_key_der = hex::decode(&trust.public_key_der_hex)
+        .map_err(|_| "broker所有の署名公開鍵が不正")?;
+    let signed_bytes = hex::decode(signed_bytes_hex).map_err(|_| "署名対象hexが不正")?;
+    let signature = hex::decode(signature_hex).map_err(|_| "署名hexが不正")?;
+    let result = verify_signed_update_signature(
+        &SignedUpdateCandidate {
+            update_id: update_id.to_string(),
+            signed_bytes,
+            signature: Some(signature),
+            signer_fingerprint: signer_fingerprint.to_string(),
+        },
+        &public_key_der,
+        &trust.public_key_fingerprint,
+    );
+    if result.ok {
+        Ok(())
+    } else {
+        Err("Adapter署名の検証に失敗")
+    }
 }
 
 fn accepted(

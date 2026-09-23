@@ -1,0 +1,37 @@
+{
+  "版": 1,
+  "Adapter一覧": [
+    {
+      "版": 1,
+      "Adapter ID": "mock_local_llm_adapter",
+      "Runtime ID": "mock_local_llm",
+      "発行者": "GUI-Shell開発fixture",
+      "source": "owner_manifest",
+      "version": "1.0.0",
+      "transport": "mock",
+      "Content Exposure": "redacted",
+      "要求Capability": ["runtime.read", "model.chat"],
+      "許可差分": ["content_visibility:summary->redacted"],
+      "既知の危険": ["fixture only"],
+      "互換性": "compatible",
+      "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "署名状態": "unconfigured",
+      "検証状態": "pending_review",
+      "管理状態": "installed",
+      "有効状態": "inactive",
+      "更新可能": false,
+      "公開範囲": "metadata_only",
+      "証拠種別": "INTERNAL_STATE",
+      "権限生成": "なし",
+      "authority_strip": true,
+      "最終検証": null,
+      "監査ID": "audit-adapter-management-1",
+      "復旧ID": "recover-adapter-management"
+    }
+  ],
+  "件数": 1,
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "権限生成": "なし",
+  "authority_strip": true
+}

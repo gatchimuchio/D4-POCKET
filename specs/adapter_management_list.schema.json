@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/adapter_management_list.schema.json",
+  "title": "アダプター管理一覧（AdapterManagementList）",
+  "type": "object",
+  "required": ["版", "Adapter一覧", "件数", "公開範囲", "証拠種別", "権限生成", "authority_strip"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "Adapter一覧": { "type": "array", "maxItems": 64, "items": { "$ref": "adapter_management_receipt.schema.json" } },
+    "件数": { "type": "integer", "minimum": 0, "maximum": 64 },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "INTERNAL_STATE" },
+    "権限生成": { "const": "なし" },
+    "authority_strip": { "const": true }
+  }
+}
