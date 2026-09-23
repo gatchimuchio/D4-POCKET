@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c0fc1f202b65c072f9513e59a9adfab444d4e1b98e7c00cac732a51d5b948488"
+      "sha256": "ea7136e39e94d04a72fd639d38ee7968caf6510a9e3d36cb139a9bf1cafdcee3"
     },
     {
       "path": "SECURITY.md",
@@ -1228,6 +1228,10 @@
       "sha256": "fa192564b359e9b2af1060649775d7b3f40de59bc91b2da2b216d49dc5b8cc5d"
     },
     {
+      "path": "docs/specs/full-regression-validation.md",
+      "sha256": "f5e0444520c10fd95f3dbbcba2d0815054f0456542be20947737586452ac42f0"
+    },
+    {
       "path": "docs/specs/global-search-surface.md",
       "sha256": "1de65d9dbc84b1c49aeb1f06e6deda1b48792204ab19149a427f04162c9179aa"
     },
@@ -1341,7 +1345,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "cce62bf3bf114c7cd91293fcd708f671d18655670ced4be511e73b1769262c4f"
+      "sha256": "c3552aec3b545ef44f3bb2da8d3010ac8754dd68b303129d495080bce86582fa"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3560,6 +3564,10 @@
       "sha256": "33b580da247bc5a1f0d92d93a654a649ffd7afb519b01fde650bebe1174f7cb1"
     },
     {
+      "path": "tooling/full_regression_validation.py",
+      "sha256": "347f088559b348fd15c1c63ef46531fc65ce5e5a6e082469da965525b2939045"
+    },
+    {
       "path": "tooling/long_run_validation.py",
       "sha256": "91a60ad55f0d86cfd80d83be76f9d97391ada6c178f19f542c1f1c1892a67fca"
     },
@@ -3609,7 +3617,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "de7642396e7aa53abe0aadd30052fc7fa7ef7d94a98c7fd0d55bd04e6ad00d52"
+      "sha256": "dd4f1e1a78b5dbe44d833734d9e9981e4226b19e2c5bc5c4f0c34b01ed0daab8"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -3633,7 +3641,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "ce99c26eb0fdf19d5c62204d47c2b4f81782f9b7af129fd775a2f829850b4cf3"
+      "sha256": "b86bda40d77b320958ea2af996fcf2baf969e6b284ea18670483201b18424c4e"
     }
   ]
 }
