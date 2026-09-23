@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 4前提: Codex CLI実物interface probe（2026-09-23）
+
+Phase 4 Agent Launcherの前提確認として、Windowsで実際にPATHへ存在するCodex CLIのinterfaceをdevelopment-only probeから読み取り専用で確認した。`codex --version`は`codex-cli 0.155.0-alpha.16`、`codex exec --help`は`exec`、`resume`、`fork`、`review`等のsurfaceを返した。probeはversion/help以外を呼ばず、prompt、credential、workspace変更、task実行、process dispatchを行わない。
+
+- Adapter evidence: version/helpの観測は`LIVE_RUNTIME`として記録し、Codex Adapterは`degraded`とする。Brokerのcommand dispatchが停止中のため、task executionは`unknown`、process spawnは`unsupported`である。help表示だけではsession操作の実動作を証明しないため、session control/session supportも`unknown`とする。
+- Boundary: Claude、Gemini、その他のCLI/APIはこのWindows環境で未導入のため、存在・対応を推測しない。probeは秘密値を環境から子processへ渡さず、Adapter recordにも実値を保持しない。
+- 未成立: Agent Launcherのproduction path、実task実行、Cancellation、Tool／MCP、Usage／Cost、Provider／Model接続、複数Agent比較、Handoffは未完成である。BrokerのApproval／Audit／Recovery統治を迂回する実行経路は追加していない。
+
+この節はCodex CLIのinterface観測を証明するが、D4 PocketのAgent実行または完成製品releaseを証明しない。既存のrelease_blocker分類を保持する。
+
 ## D4 Pocket Phase 3: Agent Adapter契約のSchema接続（2026-09-23）
 
 Agent Adapter契約を追加した。`specs/agent_adapter.schema.json`はAgent identity、Provider、Version、Model、capability宣言、Workspace要件、Tool／MCP／Session／Cancellation／Usage／Cost対応、認証方式、Host要件を定義する。対応状態は`supported`、`unsupported`、`unknown`と理由を必須にし、認証は参照方式だけを許可してsecret実値を持たせない。

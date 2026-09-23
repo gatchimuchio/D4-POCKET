@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "7288ae24d0cc1c0d81c0d483b4bc3a476a13ef954bf1a0e8e3c454bd20217ab6"
+      "sha256": "3f4dbf803edb9404c0b9769cf4333eb3ab3759957bee6e0b01ae90fd8a0b5462"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4248a5c38304cd4f7e8bd326860b27d443713616377fb823fc3e0fd445c33190"
+      "sha256": "7106c67f9dba86c3e856b591bb981a04dbef40d63f440491cfb57d54f0804572"
     },
     {
       "path": "SECURITY.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "0b8c27817fac7cc107b0cdc48b0849cd4dfe7e5994b7c15f9ddae5ed94d678ac"
+      "sha256": "7d94a2b037a5c6f818c40cf93ae4f0248b47db6971692588b853e3492f65486b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2509,7 +2509,7 @@
     },
     {
       "path": "specs/agent_adapter.schema.json",
-      "sha256": "4159c834293de09776f969378b66545d45cf7c6cf81fff221fb4f1ebc6dcccec"
+      "sha256": "b3b745a76993433367186331d43fb1f01b67158cd60d2935cf16b3bee5919ed1"
     },
     {
       "path": "specs/agent_diff.schema.json",
@@ -2772,6 +2772,10 @@
       "sha256": "a60142341103be8e13dee4353332d3ba4cf2799cb3c803dce120b1ec048e7859"
     },
     {
+      "path": "tooling/agent_adapter_probe.py",
+      "sha256": "6a44662d537bfe730d1fab8ea8379accdf788484de3374dadafde4a0531e04be"
+    },
+    {
       "path": "tooling/audit_checkpoint_verifier.py",
       "sha256": "272b860007e5b0405153cc1973dbb4f5c7624e7f72c2e923eff65ee8211eb3ef"
     },
@@ -2793,7 +2797,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b5ba4941e4035317f9696b6f13a2bb302cc6fa8c4d1a3b663a62c775c27a75de"
+      "sha256": "9d4d6a4d56d0c8629ba57bd21aa2207fee326c3df25047eb945fad397467edb4"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

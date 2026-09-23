@@ -39,6 +39,7 @@ from packages.blue_tanuki_adapter.approvals import normalize_approval, projected
 from packages.blue_tanuki_adapter.authority_trace import metadata_attempts_authority
 from packages.blue_tanuki_adapter.recovery import recovery_candidates
 from packages.agent_runtime import AgentAdapterContract, AgentRuntimeContract
+from tooling.agent_adapter_probe import build_adapter_record
 from packages.runtime_catalog import RuntimeCatalog
 from packages.shell_core.audit_chain import chain_event, verify_audit_chain
 from tooling.schema_check.check_schemas import parse_json_text, validate_instance
@@ -4439,6 +4440,21 @@ def test_agent_adapter_is_declaration_only_and_unsupported_is_explicit() -> list
     return []
 
 
+def test_agent_adapter_probe_is_read_only_and_fail_closed() -> list[str]:
+    adapter = build_adapter_record("codex", "0.155.0-alpha.16", True, True)
+    schema = load_schema("agent_adapter.schema.json")
+    if validate_instance(adapter, schema):
+        return ["Agent CLI probeのfixture結果がAgent Adapter Schemaに適合しない"]
+    if adapter["status"] != "degraded" or adapter["evidence_source"] != "LIVE_RUNTIME":
+        return ["interface確認済みAgentをBroker dispatch停止中のdegradedとして表現しなかった"]
+    if adapter["authentication"]["secret_value_present"] is not False:
+        return ["Agent CLI probeがsecret実値の存在を許可した"]
+    unavailable = build_adapter_record(None, "unknown", False, False)
+    if unavailable["status"] != "unavailable" or unavailable["evidence_source"] != "CONFIG":
+        return ["未導入Agent CLIを利用可能として扱った"]
+    return []
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -5013,6 +5029,7 @@ def main() -> int:
         test_agent_generated_diff_must_be_auditable,
         test_agent_auto_permission_is_advisory_only,
         test_agent_adapter_is_declaration_only_and_unsupported_is_explicit,
+        test_agent_adapter_probe_is_read_only_and_fail_closed,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

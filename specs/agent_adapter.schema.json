@@ -82,7 +82,12 @@
         "network_scope": {"type": "string", "enum": ["loopback_only", "outbound_allowed", "unsupported", "unknown"]},
         "process_spawn": {"$ref": "#/$defs/support"}
       }
-    }
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME", "EXTERNAL_EVIDENCE", "FIXTURE"]
+    },
+    "evidence_reason": {"type": "string", "minLength": 1}
   },
   "$defs": {
     "support": {
