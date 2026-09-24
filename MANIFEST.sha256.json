@@ -269,7 +269,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
-      "sha256": "c68fc2a0107c79010c0f04d11bb721964d43ff26ec0428db4dde2b5c9fe44b2e"
+      "sha256": "1cc65a0dd835073196dabf1e7068fe4e8bc9be4571ca257d5141d5721989d3d3"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/shared.dart",
@@ -601,7 +601,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "b3c1ca56a7f4a5473af97f57c5333760d35a2729cd60f0efda1baaace4a57220"
+      "sha256": "1d14b7613d10f0b0cfe1829279ea4d2676dea1cc94bcb6684363f85bf950644d"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1129,11 +1129,11 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "9a710a842295d2e9372baedbf6f16120b3109d1960a9d2fae913272835da28e6"
+      "sha256": "26df214f7683d5e55505173d9ffa1f1fe9b04e88ed5b3ab5cb6469505990e6dc"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
-      "sha256": "a708cefce1e2e33d4ede1553617322930da616f4add3b6436283b13ec85c1cbc"
+      "sha256": "fae33223287f7190bfa87036fa63102dd9a4ee15b48fceb20a4ff6ff197cb5eb"
     },
     {
       "path": "docs/STRATEGY.md",
@@ -3845,7 +3845,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "bdfc44c55813a333cc8a843c9d2bdb95af7bcac223708f08bdd7d938289f4d5d"
+      "sha256": "9a3069bf3a9d2fad484f1df34ac924cc20d73eec1ff366bd2fc93ee9015193ab"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

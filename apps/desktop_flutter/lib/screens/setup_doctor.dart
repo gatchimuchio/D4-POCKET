@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../services/shell_core_client.dart';
@@ -24,17 +22,13 @@ class SetupDoctor extends StatelessWidget {
           ],
         ),
         SectionList(
-          title: '環境スナップショット',
+          title: '実行状態',
           rows: [
-            'os: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
-            'dart: ${Platform.version.split('\n').first}',
-            'WSL／ネイティブの判定補助: ${Platform.environment.containsKey('WSL_DISTRO_NAME') ? 'wsl' : 'native-or-container'}',
-            'Flutterツールチェーン: PATHから取得',
-            'Python: tooling/*.pyの検証に必要',
-            'Rust helper: validate_all内のcargo testで検証',
+            '取得元: ${snapshot.snapshotSource}',
+            '鮮度: ${snapshot.snapshotFreshness}',
             'ネットワーク公開範囲: ${snapshot.networkExposure}',
             '監査鎖状態: ${snapshot.auditChainStatus}',
-            '設定／スナップショット参照: ${snapshot.snapshotPath}',
+            'release claim: ${snapshot.operationStatus.releaseState}',
           ],
         ),
         SectionList(
@@ -51,7 +45,7 @@ class SetupDoctor extends StatelessWidget {
             for (final evidence in snapshot.evidence.where(
               (item) => item.kind == 'installed-path',
             ))
-              '${evidence.evidenceId}: ${evidence.status} ${evidence.path}',
+              '${evidence.evidenceId}: ${evidence.status}',
           ],
         ),
         SectionList(

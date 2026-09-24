@@ -660,9 +660,14 @@ void main() {
       ),
     );
 
-    expect(find.text('環境スナップショット'), findsOneWidget);
+    expect(find.text('実行状態'), findsOneWidget);
     expect(find.textContaining('ネットワーク公開範囲:'), findsOneWidget);
-    expect(find.textContaining('設定／スナップショット参照:'), findsOneWidget);
+    expect(find.textContaining('監査鎖状態:'), findsOneWidget);
+    expect(find.textContaining('取得元:'), findsOneWidget);
+    expect(find.textContaining('鮮度:'), findsOneWidget);
+    expect(find.textContaining('Flutterツールチェーン'), findsNothing);
+    expect(find.textContaining('Python: tooling/'), findsNothing);
+    expect(find.textContaining('Rust helper: validate_all'), findsNothing);
   });
 
   test('ローカル診断クライアントは明示注入された値を非権限表示する', () {
@@ -824,6 +829,9 @@ void main() {
 
   testWidgets('環境診断UIがローカル診断データを表示する', (WidgetTester tester) async {
     final snapshot = ShellSnapshot.fromJson({
+      'snapshot_source': 'broker',
+      'snapshot_path': r'C:\Users\ohira\AppData\Local\private\snapshot.json',
+      'snapshot_freshness': 'verified',
       'runtimes': [
         {
           'runtime_id': 'runtime-ui-json',
@@ -863,6 +871,8 @@ void main() {
 
     expect(find.textContaining('local.ui: pass'), findsOneWidget);
     expect(find.textContaining('runtime-ui-json: ready'), findsOneWidget);
+    expect(find.textContaining(r'C:\Users\ohira\AppData\Local\private'),
+        findsNothing);
   });
 
   testWidgets('承認センターが非表示の完全内容を公開しない', (WidgetTester tester) async {

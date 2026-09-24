@@ -6895,6 +6895,31 @@ def test_setup_doctor_public_bind_warning_exists() -> list[str]:
     return []
 
 
+def test_desktop_setup_doctor_ui_does_not_require_development_toolchains() -> list[str]:
+    source = (DESKTOP_FLUTTER / "lib" / "screens" / "setup_doctor.dart").read_text(encoding="utf-8")
+    errors = []
+    for token in (
+        "dart:io",
+        "Platform.",
+        "Flutterツールチェーン",
+        "Python: tooling/",
+        "Rust helper: validate_all",
+        "snapshot.snapshotPath",
+        "evidence.path",
+    ):
+        if token in source:
+            errors.append(f"製品Setup Doctor UIに開発環境依存または生path表示が残る: {token}")
+    for token in (
+        "snapshot.snapshotSource",
+        "snapshot.snapshotFreshness",
+        "snapshot.networkExposure",
+        "snapshot.auditChainStatus",
+    ):
+        if token not in source:
+            errors.append(f"製品Setup Doctor UIにBroker snapshot診断項目がない: {token}")
+    return errors
+
+
 def test_broker_parity_startup_timeout_allows_local_cold_build() -> list[str]:
     if DEFAULT_BROKER_START_TIMEOUT_SECONDS < 60.0:
         return ["broker parityのstartup timeoutがlocal cold Rust buildに対して短すぎる"]
@@ -7124,6 +7149,7 @@ def main() -> int:
         test_platform_hardening_configuration_exists,
         手動補助の起動境界を検査する,
         test_setup_doctor_public_bind_warning_exists,
+        test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
         test_desktop_agent_center_required_surface_exists,

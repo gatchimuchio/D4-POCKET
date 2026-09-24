@@ -1105,3 +1105,21 @@ Flutter起動後にSemanticsのbuild登録表をJSON fileへ書き出す経路�
 - `python -X utf8 tooling/日本語基底監査.py --strict`：FAIL。既存baselineの3 files／19 findings（`docs/specs/windows-desktop-launcher.md` 1、`native/rust_helper/src/broker/ipc_server.rs` 12、`native/rust_helper/src/desktop_launcher.rs` 6）と一致し、この変更由来の追加findingはない。
 
 この単位の試験は静的境界・widget表示・buildまでで、Windows installed productの起動、外部UIAutomation treeの正式収集、release readinessを新たに証明しない。
+
+
+## 製品Setup Doctorから開発toolchainと生path表示を除去（2026-09-25）
+
+通常利用者向けのSetup DoctorがFlutter／Dart、Python、Rust helperの開発検証手段を必要条件のように表示していたため、Broker snapshotの取得元・鮮度・network exposure・audit chainと既存診断checkを中心にした製品情報へ整理した。snapshot/config/auditの生pathは画面要約へ出さず、開発toolchainの確認は開発者向け検証文書とCLIへ分離する。AuthorityやBroker operationの意味は変更しない。
+
+検証結果:
+
+- Desktop `flutter analyze`：成功、指摘0件。
+- Desktop `flutter test --reporter compact`：成功、104件すべて通過。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：成功、193件すべて通過。
+- Windows `flutter build windows --release`：成功、`build/windows/x64/runner/Release/gui_shell_desktop.exe`を生成。
+- `python tooling/schema_check/check_schemas.py`：成功、Schema122件・正常例122件・拒否例147件。
+- `python tooling/release_runtime_assertions.py --check`：成功、検査12件。証拠範囲はCONFIG／FIXTURE。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：FAIL。既存3 files／19 findingsと一致し、本単位の追加findingは解消済み。
+- `MANIFEST.sha256.json`：975件を再生成し、検査成功（いずれも終了値0）。`git diff --check`成功。
+
+本単位は製品版環境診断の表示面だけを変更する。製品証拠の書出しと初回設定・監査保存先の入出力責任に残る正式配布阻害条件は解消しない。
