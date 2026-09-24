@@ -1301,7 +1301,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "590e149b1edc52f4b7f0d2879d76a2c15707767ca6ad5daa78324c5e5b0b5206"
+      "sha256": "ef433d63bd04c1140aa8065e81145ae5386adff4d38cf99cc289b7058afca77f"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
-      "sha256": "de1987b5dd45dc2f04dc31a13aebe1137760676be7f997fb859392c6066a44ed"
+      "sha256": "501e48ae0ed8ea60713248da451910f31420c3e87f18d31fc687fee56e795268"
     },
     {
       "path": "examples/contracts/gui_shell_module_catalog.valid.json",
@@ -3769,7 +3769,7 @@
     },
     {
       "path": "tooling/build_module_pruned_windows.py",
-      "sha256": "98ee083d587ab66f49f1153f2cad4acbe311563cf44672260a81dad50bc19917"
+      "sha256": "2b7ade932a466c38bb6a3352002b0395ce47f7346f4448fb8f8480456cc7e66e"
     },
     {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
@@ -3785,7 +3785,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "354adad2de2874ed5243f7d68596e444ec6da1f9ab20adb271fee589563bd576"
+      "sha256": "286d25727e466760703ebf15126d34fa14f7750656b02da5ef7b6a69280d3c05"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

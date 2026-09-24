@@ -67,6 +67,7 @@ from tooling.build_module_pruned_windows import (
     EXPECTED_OPTIONAL_IDS,
     EXPECTED_REQUIRED_IDS,
     _validate_catalog,
+    _flutter_candidates,
     dart_defines,
     resolve_module_plan,
 )
@@ -6232,6 +6233,10 @@ def test_gui_shell_module_build_is_untrusted_ui_only_selection() -> list[str]:
     evidence = load_contract_fixture("gui_shell_module_build_evidence.valid.json")
     schema = load_schema("gui_shell_module_build_evidence.schema.json")
     errors = validate_instance(evidence, schema)
+    if _flutter_candidates("win32") != ("flutter.bat", "flutter.cmd", "flutter.exe"):
+        errors.append("WindowsのFlutter実行fileをPATH上の実体から解決しない")
+    if _flutter_candidates("linux") != ("flutter",):
+        errors.append("非WindowsのFlutter executable名が未対応である")
     artifact_paths = [item.get("path") for item in evidence.get("artifact_files", [])]
     if len(artifact_paths) != len(set(artifact_paths)):
         errors.append("Module build証拠のartifact pathが重複している")

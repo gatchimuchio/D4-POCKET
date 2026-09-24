@@ -26,6 +26,8 @@ Machine-readable `unprunable_core_ids`はSecurity Broker、Cryptography、Audit 
 
 `tooling/build_module_pruned_windows.py`はDeveloperが明示実行するbuild／release補助経路であり、Flutterや通常Runtimeから呼び出さない。現行Desktop画面のcompile-time defineへ任意Module選択を射影し、Windows Flutter release buildとartifact file hashを記録する。defineの既定値はすべて有効とし、通常の開発build互換を保つ。
 
+WindowsではFlutterの実行物がPATH上の`flutter.bat`等になるため、toolはPATH解決結果を直接子processへ渡す。PowerShell上での裸の`flutter`解決とPython子processからの実行可能file解決は同一ではない。最初の実行では裸の名前が`WinError 2`で失敗した。既存のWindows検証と同じく`flutter.bat`／`flutter.cmd`／`flutter.exe`を順に探索し、見つかった実物を呼ぶ。独自shell wrapperやenvironment bypassは追加しない。
+
 入力Receipt JSONは現行Schemaへ照合するが、署名・origin・Owner操作の真正性は検証しない。入力から得るのは画面選択だけで、build toolはAuthority、Permission、Approval、Credential、Auditを付与・継承せず、`authority_verified=false`と`selection_input_trust=unverified_receipt_json_selection_only`を証拠に記録する。選択は権限でもOwner承認でもない。
 
 この経路はDesktop Flutter UIだけをbuildする。Rust Broker、安全Core、第三者依存、Installer、app identity、初期Audit store、Runtime設定を新規製品として構成せず、独立製品や配布可能Exportとして扱わない。`binary_pruning_verified=false`を固定し、実除去の比較確認前はModule pruning完了を主張しない。

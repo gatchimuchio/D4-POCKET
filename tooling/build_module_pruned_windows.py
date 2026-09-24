@@ -347,9 +347,26 @@ def _git_value(*arguments: str) -> str:
     return completed.stdout.strip()
 
 
-def _flutter_versions() -> dict[str, str]:
+def _flutter_candidates(platform_name: str) -> tuple[str, ...]:
+    return (
+        ("flutter.bat", "flutter.cmd", "flutter.exe")
+        if platform_name == "win32"
+        else ("flutter",)
+    )
+
+
+def _flutter_executable() -> str:
+    candidates = _flutter_candidates(sys.platform)
+    for candidate in candidates:
+        resolved = shutil.which(candidate)
+        if resolved is not None:
+            return resolved
+    raise ValueError("Flutter executableがPATH上にない")
+
+
+def _flutter_versions(executable: str) -> dict[str, str]:
     completed = subprocess.run(
-        ["flutter", "--version", "--machine"],
+        [executable, "--version", "--machine"],
         cwd=FLUTTER_PROJECT,
         check=True,
         text=True,
@@ -418,9 +435,10 @@ def _write_build(receipt_path: Path, artifact_dir: Path) -> dict[str, Any]:
     catalog = _load_catalog()
     plan = resolve_module_plan(receipt, catalog)
     define_map = dart_defines(plan, catalog)
-    versions = _flutter_versions()
+    flutter_executable = _flutter_executable()
+    versions = _flutter_versions(flutter_executable)
     command = [
-        "flutter",
+        flutter_executable,
         "--suppress-analytics",
         "build",
         "windows",

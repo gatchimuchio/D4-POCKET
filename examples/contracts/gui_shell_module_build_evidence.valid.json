@@ -61,7 +61,7 @@
     "GUI_SHELL_MODULE_HOST_OPERATIONS": false
   },
   "build_command": [
-    "flutter",
+    "flutter.bat",
     "--suppress-analytics",
     "build",
     "windows",
