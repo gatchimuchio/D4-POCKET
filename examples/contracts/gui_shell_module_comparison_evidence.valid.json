@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "evidence_type": "development_module_build_comparison",
+  "evidence_source": "INTERNAL_STATE",
+  "product_artifact_claimed": false,
+  "standalone_app_claimed": false,
+  "selection_input_trust": "unverified_receipt_json_selection_only",
+  "authority_verified": false,
+  "source_commit": "0000000000000000000000000000000000000000",
+  "source_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "worktree_clean": true,
+  "target_platform": "windows",
+  "build_mode": "release",
+  "build_scope": "desktop_flutter_ui_only",
+  "same_source_commit": true,
+  "same_toolchain": true,
+  "toolchain": {
+    "flutter": "3.44.0",
+    "dart": "3.12.0",
+    "framework_revision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42"
+  },
+  "catalog_version": 1,
+  "selection_mode": "explicit_optional",
+  "requested_optional_module_ids": ["shell.trace_inspector"],
+  "included_module_ids": [
+    "core.security_broker",
+    "core.cryptography",
+    "core.audit_finality",
+    "core.credentials",
+    "core.os_controls",
+    "core.permission_enforcement",
+    "core.approval_enforcement",
+    "core.content_exposure",
+    "shell.dashboard",
+    "shell.runtime_operation",
+    "shell.agent_operation",
+    "shell.authority",
+    "shell.approval",
+    "shell.audit",
+    "shell.recovery",
+    "shell.problems",
+    "shell.evidence",
+    "shell.settings",
+    "shell.observability",
+    "shell.trace_inspector"
+  ],
+  "excluded_optional_module_ids": [
+    "shell.setup_doctor",
+    "shell.history",
+    "shell.evaluation_lab",
+    "shell.host_capabilities",
+    "shell.notifications",
+    "shell.host_operations"
+  ],
+  "baseline_selection": "all_optional_default_enabled",
+  "baseline": {
+    "label": "baseline",
+    "dart_define_arguments": {},
+    "effective_dart_defines": {
+      "GUI_SHELL_MODULE_SETUP_DOCTOR": true,
+      "GUI_SHELL_MODULE_HISTORY": true,
+      "GUI_SHELL_MODULE_EVALUATION_LAB": true,
+      "GUI_SHELL_MODULE_HOST_CAPABILITIES": true,
+      "GUI_SHELL_MODULE_NOTIFICATIONS": true,
+      "GUI_SHELL_MODULE_OBSERVABILITY": true,
+      "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+      "GUI_SHELL_MODULE_HOST_OPERATIONS": true
+    },
+    "build_command": [
+      "C:\\tools\\flutter\\bin\\flutter.bat",
+      "--suppress-analytics",
+      "build",
+      "windows",
+      "--release",
+      "--no-pub",
+      "--analyze-size",
+      "--code-size-directory=C:\\evidence\\baseline\\size-analysis-inputs"
+    ],
+    "build_duration_ms": 10000,
+    "artifact_root": "baseline/app",
+    "artifact_files": [
+      {
+        "path": "gui_shell_desktop.exe",
+        "size_bytes": 100,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "path": "data/app.so",
+        "size_bytes": 1000,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ],
+    "artifact_total_bytes": 1100,
+    "artifact_tree_sha256": "57180631c4591f1e1a88a4a68ed7f96e11b47f436d797e47ebb9a1ae4870cf0c",
+    "size_analysis_report": {
+      "path": "baseline/analysis/report.json",
+      "size_bytes": 123,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "size_analysis_inputs": [
+      {
+        "path": "baseline/analysis/inputs/snapshot.windows-x64.json",
+        "size_bytes": 456,
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      {
+        "path": "baseline/analysis/inputs/trace.windows-x64.json",
+        "size_bytes": 789,
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    ]
+  },
+  "selected": {
+    "label": "selected",
+    "dart_define_arguments": {
+      "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+      "GUI_SHELL_MODULE_HISTORY": false,
+      "GUI_SHELL_MODULE_EVALUATION_LAB": false,
+      "GUI_SHELL_MODULE_HOST_CAPABILITIES": false,
+      "GUI_SHELL_MODULE_NOTIFICATIONS": false,
+      "GUI_SHELL_MODULE_OBSERVABILITY": true,
+      "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+      "GUI_SHELL_MODULE_HOST_OPERATIONS": false
+    },
+    "effective_dart_defines": {
+      "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+      "GUI_SHELL_MODULE_HISTORY": false,
+      "GUI_SHELL_MODULE_EVALUATION_LAB": false,
+      "GUI_SHELL_MODULE_HOST_CAPABILITIES": false,
+      "GUI_SHELL_MODULE_NOTIFICATIONS": false,
+      "GUI_SHELL_MODULE_OBSERVABILITY": true,
+      "GUI_SHELL_MODULE_TRACE_INSPECTOR": true,
+      "GUI_SHELL_MODULE_HOST_OPERATIONS": false
+    },
+    "build_command": [
+      "C:\\tools\\flutter\\bin\\flutter.bat",
+      "--suppress-analytics",
+      "build",
+      "windows",
+      "--release",
+      "--no-pub",
+      "--analyze-size",
+      "--code-size-directory=C:\\evidence\\selected\\size-analysis-inputs",
+      "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false",
+      "--dart-define=GUI_SHELL_MODULE_HISTORY=false",
+      "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false",
+      "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false",
+      "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false",
+      "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=true",
+      "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true",
+      "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false"
+    ],
+    "build_duration_ms": 10000,
+    "artifact_root": "selected/app",
+    "artifact_files": [
+      {
+        "path": "gui_shell_desktop.exe",
+        "size_bytes": 100,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "path": "data/app.so",
+        "size_bytes": 700,
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    ],
+    "artifact_total_bytes": 800,
+    "artifact_tree_sha256": "8602a93703c9268885f2913c670a358770bc67550cc29136a24af6eec07bc7c8",
+    "size_analysis_report": {
+      "path": "selected/analysis/report.json",
+      "size_bytes": 123,
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "size_analysis_inputs": [
+      {
+        "path": "selected/analysis/inputs/snapshot.windows-x64.json",
+        "size_bytes": 456,
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      {
+        "path": "selected/analysis/inputs/trace.windows-x64.json",
+        "size_bytes": 789,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "comparison": {
+    "baseline_total_bytes": 1100,
+    "selected_total_bytes": 800,
+    "total_bytes_reduced": 300,
+    "baseline_app_code_bytes": 1000,
+    "selected_app_code_bytes": 700,
+    "app_code_bytes_reduced": 300,
+    "baseline_app_code_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "selected_app_code_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "changed_artifact_paths": ["data/app.so"],
+    "non_aot_changed_artifact_paths": [],
+    "non_aot_artifacts_identical": true
+  },
+  "binary_pruning_verified": false,
+  "semantic_pruning_status": "not_verified_by_size_delta_alone",
+  "cold_start_status": "not_measured",
+  "resource_comparison_status": "not_measured",
+  "signed": false
+}

@@ -71,6 +71,11 @@ from tooling.build_module_pruned_windows import (
     dart_defines,
     resolve_module_plan,
 )
+from tooling.compare_module_builds_windows import (
+    all_optional_defines,
+    comparison_summary,
+    validate_comparison_evidence,
+)
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
@@ -154,6 +159,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_export_receipt",
     "gui_shell_module_catalog",
     "gui_shell_module_build_evidence",
+    "gui_shell_module_comparison_evidence",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -6317,6 +6323,55 @@ def test_gui_shell_module_build_is_untrusted_ui_only_selection() -> list[str]:
     return errors
 
 
+def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> list[str]:
+    evidence = load_contract_fixture("gui_shell_module_comparison_evidence.valid.json")
+    schema = load_schema("gui_shell_module_comparison_evidence.schema.json")
+    receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    catalog = _validate_catalog(
+        json.loads((SPECS / "gui_shell_module_catalog.json").read_text(encoding="utf-8"))
+    )
+    errors = validate_comparison_evidence(
+        evidence, schema, receipt=receipt, catalog=catalog
+    )
+    if evidence.get("baseline_selection") != "all_optional_default_enabled":
+        errors.append("all-enabled baselineの選択条件が固定されていない")
+    if evidence.get("binary_pruning_verified") is not False:
+        errors.append("size deltaだけでbinary／semantic pruningを完了扱いしている")
+    if evidence.get("cold_start_status") != "not_measured" or evidence.get(
+        "resource_comparison_status"
+    ) != "not_measured":
+        errors.append("build比較が未測定のstartup／resource値を主張している")
+    if evidence.get("baseline", {}).get("effective_dart_defines") != all_optional_defines():
+        errors.append("baselineの有効defineが全任意Module有効状態ではない")
+    if evidence.get("comparison") != comparison_summary(
+        evidence["baseline"]["artifact_files"], evidence["selected"]["artifact_files"]
+    ):
+        errors.append("比較summaryがartifact recordから再計算できない")
+    desktop_ignore = (DESKTOP_FLUTTER / ".gitignore").read_text(encoding="utf-8")
+    if ".flutter-devtools/" not in desktop_ignore:
+        errors.append("Flutter size-analysisの生成directoryがRepository状態から分離されていない")
+
+    bad_claim = copy.deepcopy(evidence)
+    bad_claim["binary_pruning_verified"] = True
+    if not validate_comparison_evidence(bad_claim, schema, receipt=receipt, catalog=catalog):
+        errors.append("byte差分だけでbinary pruning完了を主張できる")
+
+    bad_define = copy.deepcopy(evidence)
+    bad_define["selected"]["build_command"] = [
+        item
+        for item in bad_define["selected"]["build_command"]
+        if item != "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true"
+    ]
+    if not validate_comparison_evidence(bad_define, schema, receipt=receipt, catalog=catalog):
+        errors.append("記録済みModule defineと実build commandの不一致を受け入れた")
+
+    bad_summary = copy.deepcopy(evidence)
+    bad_summary["comparison"]["total_bytes_reduced"] += 1
+    if not validate_comparison_evidence(bad_summary, schema, receipt=receipt, catalog=catalog):
+        errors.append("artifact byte数と矛盾する比較結果を受け入れた")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6921,6 +6976,7 @@ def main() -> int:
         test_gui_shell_edit_proposal_is_owner_review_only,
         test_gui_shell_export_is_new_identity_and_non_inheriting,
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
+        test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

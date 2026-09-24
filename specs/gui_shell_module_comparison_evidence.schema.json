@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_module_comparison_evidence.schema.json",
+  "title": "開発用GUI Shell画面Module比較build証拠",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "evidence_type",
+    "evidence_source",
+    "product_artifact_claimed",
+    "standalone_app_claimed",
+    "selection_input_trust",
+    "authority_verified",
+    "source_commit",
+    "source_receipt_sha256",
+    "worktree_clean",
+    "target_platform",
+    "build_mode",
+    "build_scope",
+    "same_source_commit",
+    "same_toolchain",
+    "toolchain",
+    "catalog_version",
+    "selection_mode",
+    "requested_optional_module_ids",
+    "included_module_ids",
+    "excluded_optional_module_ids",
+    "baseline_selection",
+    "baseline",
+    "selected",
+    "comparison",
+    "binary_pruning_verified",
+    "semantic_pruning_status",
+    "cold_start_status",
+    "resource_comparison_status",
+    "signed"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "evidence_type": { "const": "development_module_build_comparison" },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "product_artifact_claimed": { "const": false },
+    "standalone_app_claimed": { "const": false },
+    "selection_input_trust": { "const": "unverified_receipt_json_selection_only" },
+    "authority_verified": { "const": false },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "worktree_clean": { "const": true },
+    "target_platform": { "const": "windows" },
+    "build_mode": { "const": "release" },
+    "build_scope": { "const": "desktop_flutter_ui_only" },
+    "same_source_commit": { "const": true },
+    "same_toolchain": { "const": true },
+    "toolchain": {
+      "type": "object",
+      "required": ["flutter", "dart", "framework_revision"],
+      "additionalProperties": false,
+      "properties": {
+        "flutter": { "type": "string", "minLength": 1 },
+        "dart": { "type": "string", "minLength": 1 },
+        "framework_revision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "catalog_version": { "const": 1 },
+    "selection_mode": { "enum": ["all_optional", "explicit_optional"] },
+    "requested_optional_module_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/optional_module_id" }
+    },
+    "included_module_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/module_id" }
+    },
+    "excluded_optional_module_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/optional_module_id" }
+    },
+    "baseline_selection": { "const": "all_optional_default_enabled" },
+    "baseline": {
+      "allOf": [
+        { "$ref": "#/$defs/build_run" },
+        {
+          "properties": {
+            "label": { "const": "baseline" },
+            "artifact_root": { "const": "baseline/app" },
+            "dart_define_arguments": { "const": {} },
+            "effective_dart_defines": { "$ref": "#/$defs/all_enabled_defines" },
+            "build_command": { "not": { "contains": { "pattern": "^--dart-define=" } } }
+          }
+        }
+      ]
+    },
+    "selected": {
+      "allOf": [
+        { "$ref": "#/$defs/build_run" },
+        {
+          "properties": {
+            "label": { "const": "selected" },
+            "artifact_root": { "const": "selected/app" },
+            "build_command": {
+              "contains": { "pattern": "^--dart-define=GUI_SHELL_MODULE_" }
+            }
+          }
+        }
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_total_bytes",
+        "selected_total_bytes",
+        "total_bytes_reduced",
+        "baseline_app_code_bytes",
+        "selected_app_code_bytes",
+        "app_code_bytes_reduced",
+        "baseline_app_code_sha256",
+        "selected_app_code_sha256",
+        "changed_artifact_paths",
+        "non_aot_changed_artifact_paths",
+        "non_aot_artifacts_identical"
+      ],
+      "properties": {
+        "baseline_total_bytes": { "type": "integer", "minimum": 1 },
+        "selected_total_bytes": { "type": "integer", "minimum": 1 },
+        "total_bytes_reduced": { "type": "integer" },
+        "baseline_app_code_bytes": { "type": "integer", "minimum": 1 },
+        "selected_app_code_bytes": { "type": "integer", "minimum": 1 },
+        "app_code_bytes_reduced": { "type": "integer" },
+        "baseline_app_code_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "selected_app_code_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "changed_artifact_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relative_artifact_path" }
+        },
+        "non_aot_changed_artifact_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relative_artifact_path" }
+        },
+        "non_aot_artifacts_identical": { "type": "boolean" }
+      }
+    },
+    "binary_pruning_verified": { "const": false },
+    "semantic_pruning_status": { "const": "not_verified_by_size_delta_alone" },
+    "cold_start_status": { "const": "not_measured" },
+    "resource_comparison_status": { "const": "not_measured" },
+    "signed": { "const": false }
+  },
+  "$defs": {
+    "optional_module_id": {
+      "enum": [
+        "shell.setup_doctor",
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ]
+    },
+    "module_id": {
+      "enum": [
+        "core.security_broker",
+        "core.cryptography",
+        "core.audit_finality",
+        "core.credentials",
+        "core.os_controls",
+        "core.permission_enforcement",
+        "core.approval_enforcement",
+        "core.content_exposure",
+        "shell.dashboard",
+        "shell.runtime_operation",
+        "shell.agent_operation",
+        "shell.authority",
+        "shell.approval",
+        "shell.audit",
+        "shell.recovery",
+        "shell.problems",
+        "shell.evidence",
+        "shell.settings",
+        "shell.setup_doctor",
+        "shell.history",
+        "shell.evaluation_lab",
+        "shell.host_capabilities",
+        "shell.notifications",
+        "shell.observability",
+        "shell.trace_inspector",
+        "shell.host_operations"
+      ]
+    },
+    "define_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GUI_SHELL_MODULE_SETUP_DOCTOR": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HISTORY": { "type": "boolean" },
+        "GUI_SHELL_MODULE_EVALUATION_LAB": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HOST_CAPABILITIES": { "type": "boolean" },
+        "GUI_SHELL_MODULE_NOTIFICATIONS": { "type": "boolean" },
+        "GUI_SHELL_MODULE_OBSERVABILITY": { "type": "boolean" },
+        "GUI_SHELL_MODULE_TRACE_INSPECTOR": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HOST_OPERATIONS": { "type": "boolean" }
+      }
+    },
+    "all_enabled_defines": {
+      "type": "object",
+      "required": [
+        "GUI_SHELL_MODULE_SETUP_DOCTOR",
+        "GUI_SHELL_MODULE_HISTORY",
+        "GUI_SHELL_MODULE_EVALUATION_LAB",
+        "GUI_SHELL_MODULE_HOST_CAPABILITIES",
+        "GUI_SHELL_MODULE_NOTIFICATIONS",
+        "GUI_SHELL_MODULE_OBSERVABILITY",
+        "GUI_SHELL_MODULE_TRACE_INSPECTOR",
+        "GUI_SHELL_MODULE_HOST_OPERATIONS"
+      ],
+      "properties": {
+        "GUI_SHELL_MODULE_SETUP_DOCTOR": { "const": true },
+        "GUI_SHELL_MODULE_HISTORY": { "const": true },
+        "GUI_SHELL_MODULE_EVALUATION_LAB": { "const": true },
+        "GUI_SHELL_MODULE_HOST_CAPABILITIES": { "const": true },
+        "GUI_SHELL_MODULE_NOTIFICATIONS": { "const": true },
+        "GUI_SHELL_MODULE_OBSERVABILITY": { "const": true },
+        "GUI_SHELL_MODULE_TRACE_INSPECTOR": { "const": true },
+        "GUI_SHELL_MODULE_HOST_OPERATIONS": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "relative_artifact_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "artifact_file": {
+      "type": "object",
+      "required": ["path", "size_bytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_artifact_path" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "analysis_file": {
+      "type": "object",
+      "required": ["path", "size_bytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_artifact_path" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "build_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "dart_define_arguments",
+        "effective_dart_defines",
+        "build_command",
+        "build_duration_ms",
+        "artifact_root",
+        "artifact_files",
+        "artifact_total_bytes",
+        "artifact_tree_sha256",
+        "size_analysis_report",
+        "size_analysis_inputs"
+      ],
+      "properties": {
+        "label": { "enum": ["baseline", "selected"] },
+        "dart_define_arguments": { "$ref": "#/$defs/define_map" },
+        "effective_dart_defines": {
+          "type": "object",
+          "required": [
+            "GUI_SHELL_MODULE_SETUP_DOCTOR",
+            "GUI_SHELL_MODULE_HISTORY",
+            "GUI_SHELL_MODULE_EVALUATION_LAB",
+            "GUI_SHELL_MODULE_HOST_CAPABILITIES",
+            "GUI_SHELL_MODULE_NOTIFICATIONS",
+            "GUI_SHELL_MODULE_OBSERVABILITY",
+            "GUI_SHELL_MODULE_TRACE_INSPECTOR",
+            "GUI_SHELL_MODULE_HOST_OPERATIONS"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "GUI_SHELL_MODULE_SETUP_DOCTOR": { "type": "boolean" },
+            "GUI_SHELL_MODULE_HISTORY": { "type": "boolean" },
+            "GUI_SHELL_MODULE_EVALUATION_LAB": { "type": "boolean" },
+            "GUI_SHELL_MODULE_HOST_CAPABILITIES": { "type": "boolean" },
+            "GUI_SHELL_MODULE_NOTIFICATIONS": { "type": "boolean" },
+            "GUI_SHELL_MODULE_OBSERVABILITY": { "type": "boolean" },
+            "GUI_SHELL_MODULE_TRACE_INSPECTOR": { "type": "boolean" },
+            "GUI_SHELL_MODULE_HOST_OPERATIONS": { "type": "boolean" }
+          }
+        },
+        "build_command": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "build_duration_ms": { "type": "integer", "minimum": 0 },
+        "artifact_root": { "$ref": "#/$defs/relative_artifact_path" },
+        "artifact_files": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/artifact_file" }
+        },
+        "artifact_total_bytes": { "type": "integer", "minimum": 1 },
+        "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size_analysis_report": { "$ref": "#/$defs/analysis_file" },
+        "size_analysis_inputs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/analysis_file" }
+        }
+      }
+    }
+  }
+}

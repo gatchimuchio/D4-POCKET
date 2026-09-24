@@ -32,12 +32,31 @@ WindowsではFlutterの実行物がPATH上の`flutter.bat`等になるため、t
 
 この経路はDesktop Flutter UIだけをbuildする。Rust Broker、安全Core、第三者依存、Installer、app identity、初期Audit store、Runtime設定を新規製品として構成せず、独立製品や配布可能Exportとして扱わない。`binary_pruning_verified=false`を固定し、実除去の比較確認前はModule pruning完了を主張しない。
 
+## Developer専用の同一commit AOT比較
+
+`tooling/compare_module_builds_windows.py`は、cleanなcommit済みWindows worktreeで、次の二つのDesktop Flutter Release UI buildを順に実行する。
+
+1. baseline: 任意画面defineを一切渡さず、Flutter側の既定値により全任意画面を有効にする。
+2. 選択build: Receiptから解決したModulePlanの任意画面defineを全件渡し、選択外を無効にする。
+
+両buildは同じsource commit、Flutter executable、Flutter／Dart版、Windows Release、`--no-pub`、`--analyze-size`の共通条件で実行する。各buildのcode-size入力directoryを分離し、artifact全fileのSHA-256・size・tree hashに加え、Flutter size-analysis report、snapshot、precompiler traceを採取する。証拠生成前後でworktreeとHEADを確認し、toolchain versionの変化も拒否する。実行例:
+
+```powershell
+python tooling/compare_module_builds_windows.py `
+  --receipt examples/contracts/gui_shell_export_receipt.valid.json `
+  --artifact-dir C:\Users\<user>\AppData\Local\GUI-Shell\developer-module-builds\comparison-<commit>
+```
+
+出力先はRepository外の未作成directoryに限る。`specs/gui_shell_module_comparison_evidence.schema.json`が比較条件と非権限・非製品の主張境界を固定し、ConformanceがReceiptとのModulePlan一致、baselineの全有効、define command、共通build条件、artifact size/hash差分の内部整合を検査する。
+
+この比較は`INTERNAL_STATE`の開発証拠である。`data/app.so`のsize/hash差やFlutter解析reportの存在だけでは、どの画面意味が最終binaryから消えたか、Rust／third-party Moduleが除去されたか、独立製品が成立したかを証明しない。`binary_pruning_verified=false`を維持する。Cold startupと実行時resourceも、このbuild比較では測らない。測定できるbuild所要時間を製品startup性能へ読み替えない。
+
 ## 未成立範囲
 
 - 開発者専用の`Manifest`選択をFlutter画面のコンパイル時定義へ反映する経路と、`commit` `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`に結び付くWindows向けAOT画面生成および各ファイルの`hash`証拠は成立した。詳細は`docs/REV2_PROGRESS.md`に記録し、独立製品やOwner操作を主張しない。
 - Flutter以外のRust／第三者Module除去は未接続であり、安全基盤を別Moduleへ分割した主張をしない。
 - 現行Desktop Export UIは通常Broker資格を使うが、Export操作はOwner資格を要求するため、GUIからのOwner操作経路が未成立。
-- baseline／選択artifactを同一条件でhash結合した比較、実binary除去確認、差分サイズ、cold startup、resource比較は未測定。
+- 同一commit／toolchainの比較toolとContractは追加済みだが、baseline／選択artifactの実比較とsize-analysis証拠は未採取。実binary・意味上の除去、cold startup、実行時resource比較は未成立。
 - Installer、署名、実起動、配布は別工程として扱う。
 
 上記は開発自体を止めない`development_blocker`ではなく、該当製品成果とreleaseを止める`release_blocker`である。未成立を隠してPhase 33やreleaseを完了扱いしない。
