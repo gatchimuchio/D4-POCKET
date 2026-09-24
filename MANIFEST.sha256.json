@@ -3797,11 +3797,11 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "ee492fd9f1dc6757532a0326f98b864e96d3fb315d0e3ff049c99b6ef45c6455"
+      "sha256": "819bac9d952d4bf93fc0d6ed95600b544c8452a16698b77771a3cfef5c61580f"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f0c6e09264d07539ae89ce68554f496a0d6e579ba867419e3a2e9592352a8724"
+      "sha256": "09325a6980cffaee6ac1abbbc73942e6144b5dc22aa52f72f7d03d1d022ad3e6"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",

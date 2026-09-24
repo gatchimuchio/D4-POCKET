@@ -41,6 +41,16 @@ APP_CODE_PATH = "data/app.so"
 APP_EXECUTABLE = "gui_shell_desktop.exe"
 
 
+def _safe_console_text(value: str, encoding: str | None = None) -> str:
+    """現在のWindows console code pageで表せないtool出力をescapeして保持する。"""
+    active_encoding = encoding or getattr(sys.stdout, "encoding", None) or "utf-8"
+    return value.encode(active_encoding, errors="backslashreplace").decode(active_encoding)
+
+
+def _console_write(value: str) -> None:
+    sys.stdout.write(_safe_console_text(value))
+
+
 def all_optional_defines() -> dict[str, bool]:
     """Flutterの既定動作と同じ、全任意画面を含む基準buildを表す。"""
     return {
@@ -317,7 +327,7 @@ def _run_build(
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     if completed.stdout:
-        print(completed.stdout, end="")
+        _console_write(completed.stdout)
     if completed.returncode != 0:
         raise subprocess.CalledProcessError(completed.returncode, command)
 
@@ -505,9 +515,11 @@ def main() -> int:
     try:
         evidence = _comparison_evidence(receipt_path, output_dir)
     except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
-        print(f"Module比較buildを停止した: {exc}", file=sys.stderr)
+        message = f"Module比較buildを停止した: {exc}\n"
+        encoding = getattr(sys.stderr, "encoding", None) or "utf-8"
+        sys.stderr.write(message.encode(encoding, errors="backslashreplace").decode(encoding))
         return 1
-    print(json.dumps({
+    _console_write(json.dumps({
         "comparison_evidence": str(output_dir.resolve() / "comparison_evidence.json"),
         "source_commit": evidence["source_commit"],
         "baseline_bytes": evidence["comparison"]["baseline_total_bytes"],
@@ -517,7 +529,7 @@ def main() -> int:
         "binary_pruning_verified": False,
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
-    }, ensure_ascii=False))
+    }, ensure_ascii=False) + "\n")
     return 0
 
 

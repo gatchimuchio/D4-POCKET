@@ -72,6 +72,7 @@ from tooling.build_module_pruned_windows import (
     resolve_module_plan,
 )
 from tooling.compare_module_builds_windows import (
+    _safe_console_text,
     all_optional_defines,
     comparison_summary,
     validate_comparison_evidence,
@@ -6350,6 +6351,10 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     desktop_ignore = (DESKTOP_FLUTTER / ".gitignore").read_text(encoding="utf-8")
     if ".flutter-devtools/" not in desktop_ignore:
         errors.append("Flutter size-analysisの生成directoryがRepository状態から分離されていない")
+    try:
+        _safe_console_text("░", "cp932").encode("cp932")
+    except (LookupError, UnicodeEncodeError):
+        errors.append("比較buildのWindows consoleで未対応文字を安全に出力できない")
 
     bad_claim = copy.deepcopy(evidence)
     bad_claim["binary_pruning_verified"] = True
