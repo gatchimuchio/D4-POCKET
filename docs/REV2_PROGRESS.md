@@ -255,6 +255,15 @@ D4 Pocketのブランド表面を追加し、rev2 Phase 2のHost Capabilityを�
 
 この節でrev2全体の完成を主張しない。Agent Adapter／Launcher／Dashboard／Compare／Handoff、Provider／Model、MCP／A2A、Multi-host、Compose／Preview／Export／Pruning、長時間運用、Windows installed productの全数証拠は後続作業または既存release gateに残る。既存のrelease_blockerをpost_v1_scopeへ読み替えない。
 
+## D4 Pocket 第4段階 エージェント接続表示盤（2026-09-24）
+
+起動時に実物Codex CLIのversion／help interfaceを確認済みのAdapterだけを、Rust Brokerの認証済み`Agent一覧`からmetadata-onlyでDesktopへ投影する経路を追加した。既存の`実行系列挙`とAgent Adapterを混同せず、通常Runtime AdapterはAgent権限へ昇格させない。
+
+- Production path: owner起動設定 → Rust `CodexCliAdapter::new` → version／help probe → `Agent一覧` → 認証済みDesktop IPC → Agent CenterのProvider／Model／状態／証拠種別／能力表示。
+- Evidence boundary: interface確認は`LIVE_RUNTIME`だが、Codex Adapter状態は`degraded`で固定し、task execution、session control、Tool、MCP、Cancellation、Usage、Cost、process spawnはunknownまたはunsupportedとする。Credential実値、executable path、Workspace pathはAgent一覧receiptへ返さない。
+- Validation: Rust全試験でAgent metadataのread-only、秘密値非保持、process spawn停止を確認し、Desktop Agent Centerは認証Broker応答が返すAgent Adapter一覧だけを描画する。
+- 未成立分類: write-capable Agent execution、Agentの選択・実task・取消、Claude／Gemini接続、複数Agentの実比較、実Handoff、MCP／A2Aは`release_blocker`。Agent Adapter Dashboardのmetadata表示だけでAgent製品機能の完成を主張しない。
+
 ## 現況：Windows実機を基準とした開発継続（2026-09-13）
 
 owner指示により、現在実機検証できるOSはWindowsだけとする。Android実機は凍結、その他の非Windows実機も未検証として保持する。実装・build・自動試験・利用可能な仮想環境の検証を先に進め、実機の不在だけを開発停止条件にしない。実運用監査署名は正式release直前まで延期する。具体的な運用はROADMAPの「現在の開発・検証条件」を参照する。

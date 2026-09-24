@@ -465,6 +465,7 @@ void main() {
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -487,6 +488,7 @@ void main() {
     expect(snapshot.permissions, isEmpty);
     expect(snapshot.pendingApprovals, isEmpty);
     expect(snapshot.authorityMap, isEmpty);
+    expect(snapshot.agentAdapters.single.agentId, 'codex');
     expect(
       snapshot.evidence.any(
         (record) =>
@@ -522,6 +524,7 @@ void main() {
       'ホスト能力',
       'Host一覧',
       'アダプター一覧',
+      'Agent一覧',
       'normalize_payload',
       'content_projection',
       'approval_edit',
@@ -556,6 +559,7 @@ void main() {
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -597,6 +601,7 @@ void main() {
         _brokerHostCapabilityResponse(),
         _brokerHostListResponse(),
         _brokerAdapterListResponse(),
+        _brokerAgentAdapterListResponse(),
         _brokerRejectedResponse(
           'normalize_payload',
           'broker_stale_session',
@@ -615,6 +620,7 @@ void main() {
       _brokerHostCapabilityResponse(),
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -1069,6 +1075,74 @@ Map<String, Object?> _brokerAdapterListResponse() {
     '証拠種別': 'INTERNAL_STATE',
     '権限生成': 'なし',
     'authority_strip': true,
+  });
+}
+
+Map<String, Object?> _brokerAgentAdapterListResponse() {
+  return _brokerAcceptedBody('Agent一覧', {
+    '版': 1,
+    'Agent': [
+      {
+        'adapter_id': 'codex-cli',
+        'agent_id': 'codex',
+        'provider': 'OpenAI',
+        'version': '0.1.0',
+        'model': 'unknown',
+        'status': 'degraded',
+        'capabilities': [
+          {
+            'capability_id': 'task_execution',
+            'support': {
+              'status': 'unknown',
+              'reason': 'read-only interfaceだけを確認した',
+            },
+          },
+        ],
+        'workspace_requirements': {
+          'mode': 'required',
+          'boundary_policy': 'deny_outside_workspace',
+          'secret_paths': ['.env', '.ssh', 'secrets/'],
+        },
+        'tool_support': {
+          'status': 'unknown',
+          'reason': '実taskを確認していない',
+        },
+        'mcp_support': {
+          'status': 'unknown',
+          'reason': 'MCP接続を確認していない',
+        },
+        'session_support': {
+          'status': 'unknown',
+          'reason': 'session操作を確認していない',
+        },
+        'cancellation_support': {
+          'status': 'unknown',
+          'reason': '取消経路を確認していない',
+        },
+        'usage_metrics_support': {
+          'status': 'unknown',
+          'reason': 'metricsを取得していない',
+        },
+        'cost_metrics_support': {
+          'status': 'unknown',
+          'reason': 'cost情報を取得していない',
+        },
+        'authentication': {
+          'method': 'unknown',
+          'secret_value_present': false,
+        },
+        'host_requirements': {
+          'platforms': ['windows'],
+          'network_scope': 'unknown',
+          'process_spawn': {
+            'status': 'unsupported',
+            'reason': '汎用command dispatchは停止中',
+          },
+        },
+        'evidence_source': 'LIVE_RUNTIME',
+        'evidence_reason': '起動時のinterface確認だけを証拠とする',
+      },
+    ],
   });
 }
 

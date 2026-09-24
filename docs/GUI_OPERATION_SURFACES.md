@@ -93,8 +93,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: Agent Adapter contract
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: Agent Adapter Schemaはidentity、provider、version、model、capability宣言、workspace、tool／MCP／session／cancellation／metrics、認証方式、Host要件を検査し、未対応機能の理由を要求する。
-  authority_boundary: Adapter宣言は対応状況の説明であり、Permission、Approval、trust、credential実値を生成しない。実物interface未確認のLauncherはunsupportedとして扱う。
+  evidence: Agent Adapter Schemaはidentity、provider、version、model、capability宣言、workspace、tool／MCP／session／cancellation／metrics、認証方式、Host要件を検査し、未対応機能の理由を要求する。Rust Brokerの認証済み`Agent一覧`は、起動時に実物interfaceを確認したread-only Codex Adapterのmetadata-only投影をDesktopへ返す。
+  authority_boundary: Adapter宣言は対応状況の説明であり、Permission、Approval、trust、credential実値を生成しない。DesktopのAgent Adapter状態は`LIVE_RUNTIME`のinterface確認範囲だけを表示し、実task/write dispatch、任意executable、Workspace、CredentialをUIから受け付けない。実物interface未確認のLauncherはunsupportedとして扱う。
 
 - item: D4 Pocket Agent Launcher（Codex current scope）
   classification: required_for_v1

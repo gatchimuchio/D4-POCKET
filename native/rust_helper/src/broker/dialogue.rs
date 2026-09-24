@@ -77,6 +77,11 @@ pub struct 実行結果 {
 
 pub trait 実行系Adapter: Send + Sync {
     fn 接続対象(&self) -> String;
+    /// Agent Adapterとして表示できる宣言だけを返す。Noneは通常Runtimeであり、
+    /// Runtime metadataをAgent authorityへ昇格させない。
+    fn agent_metadata(&self) -> Option<Value> {
+        None
+    }
     /// OS資源観測のためにBrokerだけが読むloopback接続先。権限や操作対象を生成しない。
     fn 観測対象(&self) -> Option<SocketAddr> {
         None
@@ -541,6 +546,16 @@ impl 対話制御 {
             "実行系列挙" => {
                 空入力(値)?;
                 Ok(json!({"実行系": self.実行系.keys().collect::<Vec<_>>()}))
+            }
+            "Agent一覧" => {
+                空入力(値)?;
+                Ok(json!({
+                    "Agent": self
+                        .実行系
+                        .values()
+                        .filter_map(|adapter| adapter.agent_metadata())
+                        .collect::<Vec<_>>()
+                }))
             }
             "対話開始" => {
                 let 指定: 実行系指定 = 読取(値)?;

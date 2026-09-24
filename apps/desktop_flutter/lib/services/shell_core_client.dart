@@ -48,6 +48,14 @@ class ShellCoreClient {
         adapterListResponse,
         'アダプター一覧',
       );
+      final agentAdapterListResponse = await broker.request(
+        'Agent一覧',
+        payload: {'版': 1},
+      );
+      final agentAdapterList = _acceptedResponseBodyMap(
+        agentAdapterListResponse,
+        'Agent一覧',
+      );
 
       final normalizeResponse = await broker.request(
         'normalize_payload',
@@ -100,6 +108,8 @@ class ShellCoreClient {
           hostList: hostList,
           adapterListResponse: adapterListResponse,
           adapterList: adapterList,
+          agentAdapterListResponse: agentAdapterListResponse,
+          agentAdapterList: agentAdapterList,
           normalizeResponse: normalizeResponse,
           projectionResponse: projectionResponse,
           projection: projection,
@@ -337,10 +347,10 @@ class ShellCoreClient {
       approvalState: body['承認状態']?.toString() ?? 'unknown',
       targetCount: targets.length,
       auditId: response['audit_event_id']?.toString() ?? '',
-      recoveryId:
-          body['復旧ID']?.toString() ?? 'recover-runtime-stop-request',
+      recoveryId: body['復旧ID']?.toString() ?? 'recover-runtime-stop-request',
       message: response['error'] is Map
-          ? (response['error'] as Map)['message']?.toString() ?? response.toString()
+          ? (response['error'] as Map)['message']?.toString() ??
+              response.toString()
           : '全Runtime停止要求をBrokerへ渡しました。owner再承認後に個別lifecycleを評価します。',
     );
   }
@@ -452,6 +462,19 @@ List<Map<String, Object?>> _adapterCatalogSnapshotJson(
   ];
 }
 
+List<Map<String, Object?>> _agentAdapterSnapshotJson(
+  Map<String, Object?> body,
+) {
+  final agents = body['Agent'];
+  if (agents is! List) {
+    throw const BrokerClientException('Agent一覧応答にAgent配列がありません');
+  }
+  return [
+    for (final item in agents)
+      if (item is Map) Map<String, Object?>.from(item),
+  ];
+}
+
 const _adapterIdSnapshotKey = 'adapter_id';
 const _runtimeIdSnapshotKey = 'runtime_id';
 const _adapterIdInputKey = 'Adapter ID';
@@ -541,6 +564,8 @@ ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> hostList,
   required Map<String, Object?> adapterListResponse,
   required Map<String, Object?> adapterList,
+  required Map<String, Object?> agentAdapterListResponse,
+  required Map<String, Object?> agentAdapterList,
   required Map<String, Object?> normalizeResponse,
   required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
@@ -643,6 +668,8 @@ ShellSnapshot _brokerSnapshot({
     _auditJson(hostCapabilityResponse, 'broker.host_capability', 'accepted'),
     _auditJson(hostListResponse, 'broker.host_list', 'accepted'),
     _auditJson(adapterListResponse, 'broker.adapter_list', 'accepted'),
+    _auditJson(
+        agentAdapterListResponse, 'broker.agent_adapter_list', 'accepted'),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
     _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
     _auditJson(
@@ -688,6 +715,7 @@ ShellSnapshot _brokerSnapshot({
     'host_capabilities': [_hostCapabilitySnapshotJson(hostCapability)],
     'hosts': _hostRegistrySnapshotJson(hostList),
     'agent_sessions': [],
+    'agent_adapters': _agentAdapterSnapshotJson(agentAdapterList),
     'permissions': [],
     'pending_approvals': [],
     'audit_events': auditEvents,

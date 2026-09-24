@@ -297,6 +297,83 @@ class AgentSessionRecord {
   }
 }
 
+class AgentCapabilitySupportRecord {
+  const AgentCapabilitySupportRecord({
+    required this.capabilityId,
+    required this.status,
+    required this.reason,
+  });
+
+  final String capabilityId;
+  final String status;
+  final String reason;
+
+  factory AgentCapabilitySupportRecord.fromJson(Map<String, Object?> json) {
+    final support = Map<String, Object?>.from(json['support'] as Map? ?? {});
+    return AgentCapabilitySupportRecord(
+      capabilityId: json['capability_id'] as String? ?? '',
+      status: support['status'] as String? ?? 'unknown',
+      reason: support['reason'] as String? ?? '',
+    );
+  }
+}
+
+class AgentAdapterRecord {
+  const AgentAdapterRecord({
+    required this.adapterId,
+    required this.agentId,
+    required this.provider,
+    required this.version,
+    required this.model,
+    required this.status,
+    required this.capabilities,
+    required this.evidenceSource,
+    required this.evidenceReason,
+    this.workspaceBoundary = 'unknown',
+    this.processSpawnStatus = 'unknown',
+    this.authenticationMethod = 'unknown',
+  });
+
+  final String adapterId;
+  final String agentId;
+  final String provider;
+  final String version;
+  final String model;
+  final String status;
+  final List<AgentCapabilitySupportRecord> capabilities;
+  final String evidenceSource;
+  final String evidenceReason;
+  final String workspaceBoundary;
+  final String processSpawnStatus;
+  final String authenticationMethod;
+
+  factory AgentAdapterRecord.fromJson(Map<String, Object?> json) {
+    final workspace =
+        Map<String, Object?>.from(json['workspace_requirements'] as Map? ?? {});
+    final host =
+        Map<String, Object?>.from(json['host_requirements'] as Map? ?? {});
+    final processSpawn =
+        Map<String, Object?>.from(host['process_spawn'] as Map? ?? {});
+    final authentication =
+        Map<String, Object?>.from(json['authentication'] as Map? ?? {});
+    return AgentAdapterRecord(
+      adapterId: json['adapter_id'] as String? ?? '',
+      agentId: json['agent_id'] as String? ?? '',
+      provider: json['provider'] as String? ?? '',
+      version: json['version'] as String? ?? 'unknown',
+      model: json['model'] as String? ?? 'unknown',
+      status: json['status'] as String? ?? 'unknown',
+      capabilities:
+          _records(json['capabilities'], AgentCapabilitySupportRecord.fromJson),
+      evidenceSource: json['evidence_source'] as String? ?? 'unknown',
+      evidenceReason: json['evidence_reason'] as String? ?? '',
+      workspaceBoundary: workspace['boundary_policy'] as String? ?? 'unknown',
+      processSpawnStatus: processSpawn['status'] as String? ?? 'unknown',
+      authenticationMethod: authentication['method'] as String? ?? 'unknown',
+    );
+  }
+}
+
 class SetupDoctorCheckRecord {
   const SetupDoctorCheckRecord({
     required this.checkId,
@@ -830,6 +907,7 @@ class ShellSnapshot {
     required this.recoveryPlaybook,
     this.hosts = const [],
     this.hostCapabilities = const [],
+    this.agentAdapters = const [],
     this.snapshotSource = 'fallback',
     this.snapshotPath = '',
     this.snapshotGeneratedAt = '',
@@ -863,6 +941,7 @@ class ShellSnapshot {
   final List<RecoveryPlaybookRecord> recoveryPlaybook;
   final List<HostRegistryRecord> hosts;
   final List<HostCapabilityRecord> hostCapabilities;
+  final List<AgentAdapterRecord> agentAdapters;
   final String snapshotSource;
   final String snapshotPath;
   final String snapshotGeneratedAt;
@@ -931,6 +1010,8 @@ class ShellSnapshot {
       hosts: _records(json['hosts'], HostRegistryRecord.fromJson),
       hostCapabilities:
           _records(json['host_capabilities'], HostCapabilityRecord.fromJson),
+      agentAdapters:
+          _records(json['agent_adapters'], AgentAdapterRecord.fromJson),
       snapshotSource: json['snapshot_source'] as String? ?? 'local',
       snapshotPath: json['snapshot_path'] as String? ?? '',
       snapshotGeneratedAt: json['snapshot_generated_at'] as String? ??
@@ -947,6 +1028,7 @@ class ShellSnapshot {
     List<EvidenceRecord>? evidence,
     List<HostRegistryRecord>? hosts,
     List<HostCapabilityRecord>? hostCapabilities,
+    List<AgentAdapterRecord>? agentAdapters,
     String? snapshotSource,
     String? snapshotPath,
     String? snapshotGeneratedAt,
@@ -981,6 +1063,7 @@ class ShellSnapshot {
       recoveryPlaybook: recoveryPlaybook,
       hosts: hosts ?? this.hosts,
       hostCapabilities: hostCapabilities ?? this.hostCapabilities,
+      agentAdapters: agentAdapters ?? this.agentAdapters,
       snapshotSource: snapshotSource ?? this.snapshotSource,
       snapshotPath: snapshotPath ?? this.snapshotPath,
       snapshotGeneratedAt: snapshotGeneratedAt ?? this.snapshotGeneratedAt,

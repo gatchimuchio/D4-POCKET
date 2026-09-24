@@ -7,7 +7,7 @@
 
 use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::{実行系Adapter, 実行結果, 対話失敗, 対話要求};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::env;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -37,6 +37,7 @@ const SAFE_ENVIRONMENT: &[&str] = &[
 pub struct CodexCliAdapter {
     executable: PathBuf,
     workspace: PathBuf,
+    version: String,
 }
 
 impl CodexCliAdapter {
@@ -49,7 +50,8 @@ impl CodexCliAdapter {
         }
 
         let version = run_probe(&executable, &workspace, &["--version"])?;
-        if !version.success || !String::from_utf8_lossy(&version.stdout).contains("codex-cli") {
+        let version_output = String::from_utf8_lossy(&version.stdout);
+        if !version.success || !version_output.contains("codex-cli") {
             return Err("Codex CLIのversion interfaceを確認できない".into());
         }
         let help = run_probe(&executable, &workspace, &["exec", "--help"])?;
@@ -60,6 +62,11 @@ impl CodexCliAdapter {
         Ok(Self {
             executable,
             workspace,
+            version: version_output
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("unknown")
+                .to_string(),
         })
     }
 
@@ -68,6 +75,7 @@ impl CodexCliAdapter {
         Self {
             executable,
             workspace,
+            version: "test".into(),
         }
     }
 }
@@ -75,6 +83,40 @@ impl CodexCliAdapter {
 impl 実行系Adapter for CodexCliAdapter {
     fn 接続対象(&self) -> String {
         "codex-cli://broker-governed-read-only".into()
+    }
+
+    fn agent_metadata(&self) -> Option<Value> {
+        Some(json!({
+            "adapter_id": "codex-cli",
+            "agent_id": "codex",
+            "provider": "OpenAI",
+            "version": self.version,
+            "model": "unknown",
+            "status": "degraded",
+            "capabilities": [
+                {"capability_id": "task_execution", "support": {"status": "unknown", "reason": "read-only interfaceだけを確認し、実taskは実行していない"}},
+                {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
+            ],
+            "workspace_requirements": {
+                "mode": "required",
+                "boundary_policy": "deny_outside_workspace",
+                "secret_paths": [".env", ".ssh", "secrets/"]
+            },
+            "tool_support": {"status": "unknown", "reason": "実taskを実行してtool経路を確認していない"},
+            "mcp_support": {"status": "unknown", "reason": "MCP接続を確認していない"},
+            "session_support": {"status": "unknown", "reason": "session操作の実動作を確認していない"},
+            "cancellation_support": {"status": "unknown", "reason": "取消経路の実動作を確認していない"},
+            "usage_metrics_support": {"status": "unknown", "reason": "実taskのmetricsを取得していない"},
+            "cost_metrics_support": {"status": "unknown", "reason": "cost情報を取得していない"},
+            "authentication": {"method": "unknown", "secret_value_present": false},
+            "host_requirements": {
+                "platforms": [host_platform()],
+                "network_scope": "unknown",
+                "process_spawn": {"status": "unsupported", "reason": "汎用command dispatchはBrokerで停止中"}
+            },
+            "evidence_source": "LIVE_RUNTIME",
+            "evidence_reason": "起動時にversion/help interfaceを実物確認したが、write-capable task経路は未接続"
+        }))
     }
 
     fn 応答(
@@ -142,6 +184,22 @@ impl 実行系Adapter for CodexCliAdapter {
             保留: false,
             生応答: stdout,
         })
+    }
+}
+
+fn host_platform() -> &'static str {
+    if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "ios") {
+        "ios"
+    } else {
+        "unknown"
     }
 }
 
@@ -397,6 +455,22 @@ mod tests {
         assert!(!args.iter().any(|arg| arg.contains("dangerously")));
         let worktree_flag = format!("{}{}", "--", "worktree");
         assert!(!args.iter().any(|arg| arg == &worktree_flag));
+    }
+
+    #[test]
+    fn Agent一覧の投影はread_only状態と秘密値非保持を表す() {
+        let adapter = CodexCliAdapter::for_test(
+            PathBuf::from("C:\\codex.exe"),
+            PathBuf::from("C:\\workspace"),
+        );
+        let metadata = adapter.agent_metadata().expect("CodexはAgent Adapterとして投影する");
+        assert_eq!(metadata["agent_id"], "codex");
+        assert_eq!(metadata["status"], "degraded");
+        assert_eq!(metadata["evidence_source"], "LIVE_RUNTIME");
+        assert_eq!(metadata["authentication"]["secret_value_present"], false);
+        assert_eq!(metadata["host_requirements"]["process_spawn"]["status"], "unsupported");
+        assert!(metadata.get("executable").is_none());
+        assert!(metadata.get("workspace").is_none());
     }
 
     #[test]

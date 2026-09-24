@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/generated_contracts.dart';
 import '../services/shell_core_client.dart';
 import '../services/agent_coordination.dart';
 import 'shared.dart';
@@ -12,7 +13,9 @@ class AgentCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sessions = client.getSnapshot().agentSessions;
+    final snapshot = client.getSnapshot();
+    final adapters = snapshot.agentAdapters;
+    final sessions = snapshot.agentSessions;
     final comparison = AgentComparisonProjection.fromSessions(sessions);
     return ShellPage(
       title: 'エージェントセンター',
@@ -20,6 +23,26 @@ class AgentCenter extends StatelessWidget {
         if (client.workspaceClient != null)
           BorderedPanel(
               child: WorkspaceInspector(client: client.workspaceClient!)),
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Agent Adapter状態',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (adapters.isEmpty)
+                const SectionList(
+                  title: '状態',
+                  rows: ['Agent Adapterの実物登録はありません。unknownを利用可能へ昇格しません。'],
+                )
+              else
+                for (final adapter in adapters)
+                  _AgentAdapterPanel(adapter: adapter),
+            ],
+          ),
+        ),
         BorderedPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,6 +104,50 @@ class AgentCenter extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AgentAdapterPanel extends StatelessWidget {
+  const _AgentAdapterPanel({required this.adapter});
+
+  final AgentAdapterRecord adapter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${adapter.agentId} (${adapter.adapterId})'),
+          SectionList(
+            title: 'プロバイダー / モデル',
+            rows: ['${adapter.provider} / ${adapter.model}'],
+          ),
+          SectionList(title: '状態', rows: [adapter.status]),
+          SectionList(title: 'バージョン', rows: [adapter.version]),
+          SectionList(title: '証拠種別', rows: [adapter.evidenceSource]),
+          SectionList(title: '理由', rows: [adapter.evidenceReason]),
+          SectionList(
+            title: '能力',
+            rows: adapter.capabilities.isEmpty
+                ? ['unknown']
+                : [
+                    for (final capability in adapter.capabilities)
+                      '${capability.capabilityId}: ${capability.status}',
+                  ],
+          ),
+          SectionList(
+            title: '境界',
+            rows: [
+              '作業領域: ${adapter.workspaceBoundary}',
+              'プロセス起動: ${adapter.processSpawnStatus}',
+              '認証方式: ${adapter.authenticationMethod}',
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

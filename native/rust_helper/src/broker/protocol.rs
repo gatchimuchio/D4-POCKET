@@ -360,6 +360,8 @@ pub enum BrokerOperation {
     NormalizePayload,
     #[serde(rename = "実行系列挙")]
     実行系列挙,
+    #[serde(rename = "Agent一覧")]
+    Agent一覧,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -530,6 +532,7 @@ impl BrokerOperation {
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
+            BrokerOperation::Agent一覧 => "Agent一覧",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::資格情報登録 => "資格情報登録",
@@ -1183,7 +1186,7 @@ impl Broker {
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::Agent一覧 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
