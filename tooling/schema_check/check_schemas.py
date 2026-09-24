@@ -110,6 +110,8 @@ REQUIRED = {
     "agent_task.schema.json",
     "agent_tool_call.schema.json",
     "agent_diff.schema.json",
+    "agent_comparison.schema.json",
+    "agent_handoff.schema.json",
     "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",

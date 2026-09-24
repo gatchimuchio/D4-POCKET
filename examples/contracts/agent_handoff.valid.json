@@ -1,0 +1,19 @@
+{
+  "handoff_id": "handoff.agent.1",
+  "source_session_id": "agent-session-a",
+  "source_agent_runtime_id": "codex",
+  "target_agent_runtime_id": "claude",
+  "source_workspace_id": "workspace-a",
+  "target_workspace_id": "workspace-b",
+  "task_summary": "文書を更新する",
+  "diff_summary": "2 files changed",
+  "test_status": "適合検査に合格",
+  "public_execution_summary": "公開可能な差分概要と試験状態だけを再評価へ渡す",
+  "authority_reassessment_required": true,
+  "permission_reused": false,
+  "approval_reused": false,
+  "credential_included": false,
+  "hidden_context_included": false,
+  "evidence_class": "INTERNAL_STATE",
+  "audit_event_id": "audit.handoff.receipt"
+}

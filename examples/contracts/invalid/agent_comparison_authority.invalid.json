@@ -1,0 +1,11 @@
+{
+  "comparison_id": "comparison.agent.invalid",
+  "task_summary": "比較",
+  "entries": [],
+  "workspace_isolation": "passed",
+  "authority_reused": true,
+  "approval_reused": false,
+  "credential_included": false,
+  "evidence_class": "INTERNAL_STATE",
+  "audit_event_id": "audit.invalid"
+}

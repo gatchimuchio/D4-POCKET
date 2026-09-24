@@ -132,6 +132,8 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_task",
     "agent_tool_call",
     "agent_diff",
+    "agent_comparison",
+    "agent_handoff",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -237,6 +239,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_center.dart",
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
+    "lib/services/agent_coordination.dart",
     "lib/services/global_search_index.dart",
     "lib/services/windows_tray_client.dart",
     "windows/runner/tray_controller.cpp",
@@ -5742,6 +5745,109 @@ def test_agent_adapter_probe_is_read_only_and_fail_closed() -> list[str]:
     return []
 
 
+def agent_comparison_projection_errors(record: dict) -> list[str]:
+    errors: list[str] = []
+    entries = record.get("entries")
+    if not isinstance(entries, list) or len(entries) < 2:
+        errors.append("agent comparisonは二つ以上のentryを必要とする")
+        return errors
+    session_ids = [entry.get("session_id") for entry in entries]
+    workspace_ids = [entry.get("workspace_id") for entry in entries]
+    if len(set(session_ids)) != len(session_ids):
+        errors.append("agent comparisonは同じsessionを重複して比較してはならない")
+    if len(set(workspace_ids)) != len(workspace_ids):
+        errors.append("agent comparisonは同一Workspaceを比較へ混在させてはならない")
+    if record.get("workspace_isolation") != "passed":
+        errors.append("agent comparisonのWorkspace隔離はpassedでなければならない")
+    if record.get("authority_reused") is not False:
+        errors.append("agent comparisonはAuthorityを再利用してはならない")
+    if record.get("approval_reused") is not False:
+        errors.append("agent comparisonはApprovalを再利用してはならない")
+    if record.get("credential_included") is not False:
+        errors.append("agent comparisonはCredentialを含めてはならない")
+    for entry in entries:
+        for metric_name in ("duration_ms", "token_count", "cost", "resource"):
+            metric = entry.get(metric_name, {})
+            if metric.get("status") != "known" and metric.get("value") is not None:
+                errors.append(f"agent comparisonの{metric_name} unknown値を0等へ補完してはならない")
+    return errors
+
+
+def test_agent_comparison_projection_is_isolated_and_non_authoritative() -> list[str]:
+    comparison = load_contract_fixture("agent_comparison.valid.json")
+    schema = load_schema("agent_comparison.schema.json")
+    if validate_instance(comparison, schema):
+        return ["agent comparisonの正常fixtureがSchemaに適合しない"]
+    errors = agent_comparison_projection_errors(comparison)
+    if errors:
+        return errors
+
+    same_workspace = copy.deepcopy(comparison)
+    same_workspace["entries"][1]["workspace_id"] = same_workspace["entries"][0]["workspace_id"]
+    if not agent_comparison_projection_errors(same_workspace):
+        return ["agent comparisonが同一Workspaceのentryを受け入れた"]
+
+    unknown_metric = copy.deepcopy(comparison)
+    unknown_metric["entries"][0]["token_count"] = {"status": "unknown", "value": 0}
+    if not agent_comparison_projection_errors(unknown_metric):
+        return ["agent comparisonが取得不能なmetricを0として受け入れた"]
+
+    authority = copy.deepcopy(comparison)
+    authority["authority_reused"] = True
+    if not agent_comparison_projection_errors(authority):
+        return ["agent comparisonがAuthority再利用を受け入れた"]
+    if not validate_instance(
+        load_contract_fixture("invalid/agent_comparison_authority.invalid.json"), schema
+    ):
+        return ["agent comparisonのAuthority混入negativeが拒否されない"]
+    return []
+
+
+def agent_handoff_projection_errors(record: dict) -> list[str]:
+    errors: list[str] = []
+    if record.get("source_agent_runtime_id") == record.get("target_agent_runtime_id"):
+        errors.append("agent handoffは同一AgentへのAuthority付き再利用を表してはならない")
+    if record.get("authority_reassessment_required") is not True:
+        errors.append("agent handoffはtarget条件でのAuthority再評価を必須にしなければならない")
+    for key in (
+        "permission_reused",
+        "approval_reused",
+        "credential_included",
+        "hidden_context_included",
+    ):
+        if record.get(key) is not False:
+            errors.append(f"agent handoffは{key}をfalseで固定しなければならない")
+    summary = record.get("public_execution_summary", "")
+    if any(marker in summary.lower() for marker in ("secret=", "password=", "credential-value")):
+        errors.append("agent handoffの公開実行概要へ秘密値を含めてはならない")
+    return errors
+
+
+def test_agent_handoff_projection_requires_reassessment_and_redaction() -> list[str]:
+    handoff = load_contract_fixture("agent_handoff.valid.json")
+    schema = load_schema("agent_handoff.schema.json")
+    if validate_instance(handoff, schema):
+        return ["agent handoffの正常fixtureがSchemaに適合しない"]
+    errors = agent_handoff_projection_errors(handoff)
+    if errors:
+        return errors
+
+    same_agent = copy.deepcopy(handoff)
+    same_agent["target_agent_runtime_id"] = same_agent["source_agent_runtime_id"]
+    if not agent_handoff_projection_errors(same_agent):
+        return ["agent handoffが同一AgentをAuthority付きで受け入れた"]
+
+    secret_summary = copy.deepcopy(handoff)
+    secret_summary["public_execution_summary"] = "secret=credential-value"
+    if not agent_handoff_projection_errors(secret_summary):
+        return ["agent handoffが公開概要の秘密値を受け入れた"]
+    if not validate_instance(
+        load_contract_fixture("invalid/agent_handoff_authority.invalid.json"), schema
+    ):
+        return ["agent handoffのAuthority・秘密値混入negativeが拒否されない"]
+    return []
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6339,6 +6445,8 @@ def main() -> int:
         test_agent_auto_permission_is_advisory_only,
         test_agent_adapter_is_declaration_only_and_unsupported_is_explicit,
         test_agent_adapter_probe_is_read_only_and_fail_closed,
+        test_agent_comparison_projection_is_isolated_and_non_authoritative,
+        test_agent_handoff_projection_requires_reassessment_and_redaction,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

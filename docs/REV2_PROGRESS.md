@@ -225,6 +225,15 @@ Phase 4 Agent Launcherの前提確認として、Windowsで実際にPATHへ存�
 
 この節はCodex CLIのinterface観測を証明するが、D4 PocketのAgent実行または完成製品releaseを証明しない。既存のrelease_blocker分類を保持する。
 
+## D4 Pocket Phase 4 bounded projection: Agent比較・Handoff境界（2026-09-24）
+
+実Agentの起動・書込・外部接続を推測せず、複数Agent比較とHandoffで公開できる情報のContract、conformance、Desktop投影を追加した。既存のCodex Adapter read-only経路、Rust Broker経路、rev1進捗を変更していない。
+
+- Contract: `specs/agent_comparison.schema.json`は異なるWorkspaceの2〜8セッション、公開結果概要、bounded metric、`unknown`値を定義する。`specs/agent_handoff.schema.json`はTask／差分／試験／公開実行概要だけを渡し、Authority、Permission、Approval、Credential、hidden contextを固定拒否する。
+- Conformance: 同一Workspace、同一セッション重複、Authority／Approval再利用、取得不能値の0補完、同一Agent Handoff、公開概要の秘密値をfail-closedで検査する。証拠種別は`INTERNAL_STATE`であり、実Agent比較・実Handoffの証拠ではない。
+- Desktop path: Agent Centerへ、snapshotから比較可否と公開Handoff概要を読み取る表示を追加した。FlutterからAgent起動、process、filesystem、network、credential、権限付与へ到達する経路は追加していない。
+- 未成立分類: 実Agentの独立Workspace起動、実結果の比較、target AgentへのHandoff・再評価・取消・失敗隔離・Recoveryは`release_blocker`。既存のwrite-capable Agent、MCP／A2A、Provider／Model、Claude／Gemini未接続の分類は変更しない。
+
 ## D4 Pocket Phase 3: Agent Adapter契約のSchema接続（2026-09-23）
 
 Agent Adapter契約を追加した。`specs/agent_adapter.schema.json`はAgent identity、Provider、Version、Model、capability宣言、Workspace要件、Tool／MCP／Session／Cancellation／Usage／Cost対応、認証方式、Host要件を定義する。対応状態は`supported`、`unsupported`、`unknown`と理由を必須にし、認証は参照方式だけを許可してsecret実値を持たせない。

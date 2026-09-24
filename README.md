@@ -270,12 +270,12 @@ python3 tooling/validate_all.py --strict-release --desktop-platform=windows
 ## 📂 リポジトリ構成
 
 ~~~
-specs/                       # gate を担う26の Contract schema
+specs/                       # gate を担う Contract schema
   runtime · runtime_manifest · adapter · adapter_manifest
   capability · permission · approval · audit · recovery
   content_exposure · diagnostic · update · framework_risk_profile
   agent_runtime · agent_session · agent_task · agent_tool_call
-  agent_workspace · agent_diff
+  agent_workspace · agent_diff · agent_comparison · agent_handoff
   broker_command_envelope · broker_session · broker_health · broker_error
   ipc_request · ipc_response
 

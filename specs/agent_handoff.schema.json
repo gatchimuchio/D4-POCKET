@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_handoff.schema.json",
+  "title": "エージェント引き継ぎ投影（AgentHandoff）",
+  "description": "Agent変更時に再評価へ渡せる公開実行概要だけを表すboundedな投影。Authority、Permission、Approval、Credential、hidden contextは引き継がない。",
+  "type": "object",
+  "required": [
+    "handoff_id",
+    "source_session_id",
+    "source_agent_runtime_id",
+    "target_agent_runtime_id",
+    "source_workspace_id",
+    "target_workspace_id",
+    "task_summary",
+    "diff_summary",
+    "test_status",
+    "public_execution_summary",
+    "authority_reassessment_required",
+    "permission_reused",
+    "approval_reused",
+    "credential_included",
+    "hidden_context_included",
+    "evidence_class",
+    "audit_event_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "handoff_id": {"$ref": "#/$defs/id"},
+    "source_session_id": {"$ref": "#/$defs/id"},
+    "source_agent_runtime_id": {"$ref": "#/$defs/id"},
+    "target_agent_runtime_id": {"$ref": "#/$defs/id"},
+    "source_workspace_id": {"$ref": "#/$defs/id"},
+    "target_workspace_id": {"$ref": "#/$defs/id"},
+    "task_summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "diff_summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "test_status": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "public_execution_summary": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "authority_reassessment_required": {"const": true},
+    "permission_reused": {"const": false},
+    "approval_reused": {"const": false},
+    "credential_included": {"const": false},
+    "hidden_context_included": {"const": false},
+    "evidence_class": {"const": "INTERNAL_STATE"},
+    "audit_event_id": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    }
+  }
+}

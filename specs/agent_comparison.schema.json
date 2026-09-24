@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_comparison.schema.json",
+  "title": "エージェント比較投影（AgentComparison）",
+  "description": "複数Agentの独立Workspaceにおける、秘密値とAuthorityを含まないboundedな比較投影。実Agentの起動・比較実行そのものを表さない。",
+  "type": "object",
+  "required": [
+    "comparison_id",
+    "task_summary",
+    "entries",
+    "workspace_isolation",
+    "authority_reused",
+    "approval_reused",
+    "credential_included",
+    "evidence_class",
+    "audit_event_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "comparison_id": {"$ref": "#/$defs/id"},
+    "task_summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "entries": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/entry"}
+    },
+    "workspace_isolation": {"const": "passed"},
+    "authority_reused": {"const": false},
+    "approval_reused": {"const": false},
+    "credential_included": {"const": false},
+    "evidence_class": {"const": "INTERNAL_STATE"},
+    "audit_event_id": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "bounded_metric": {
+      "type": "object",
+      "required": ["status", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["known", "unknown", "not_applicable", "failed"]
+        },
+        "value": {
+          "type": ["integer", "number", "string", "null"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "known"}}},
+          "then": {"properties": {"value": {"type": ["integer", "number", "string"]}}}
+        },
+        {
+          "if": {"properties": {"status": {"enum": ["unknown", "not_applicable", "failed"]}}},
+          "then": {"properties": {"value": {"const": null}}}
+        }
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "agent_runtime_id",
+        "workspace_id",
+        "completion_status",
+        "failure_status",
+        "output_summary",
+        "diff_summary",
+        "test_status",
+        "changed_file_count",
+        "tool_count",
+        "duration_ms",
+        "token_count",
+        "cost",
+        "resource",
+        "approval_summary",
+        "audit_event_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {"$ref": "#/$defs/id"},
+        "agent_runtime_id": {"$ref": "#/$defs/id"},
+        "workspace_id": {"$ref": "#/$defs/id"},
+        "completion_status": {
+          "type": "string",
+          "enum": ["pending", "running", "blocked", "completed", "failed"]
+        },
+        "failure_status": {
+          "type": "string",
+          "enum": ["none", "failed", "unknown"]
+        },
+        "output_summary": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "diff_summary": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "test_status": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "changed_file_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "tool_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "duration_ms": {"$ref": "#/$defs/bounded_metric"},
+        "token_count": {"$ref": "#/$defs/bounded_metric"},
+        "cost": {"$ref": "#/$defs/bounded_metric"},
+        "resource": {"$ref": "#/$defs/bounded_metric"},
+        "approval_summary": {
+          "type": "string",
+          "enum": ["none", "pending", "approved", "rejected", "unknown"]
+        },
+        "audit_event_id": {"$ref": "#/$defs/id"}
+      }
+    }
+  }
+}

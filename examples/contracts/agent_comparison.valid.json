@@ -1,0 +1,48 @@
+{
+  "comparison_id": "comparison.agent.1",
+  "task_summary": "同一Taskの公開結果を比較する",
+  "entries": [
+    {
+      "session_id": "agent-session-a",
+      "agent_runtime_id": "codex",
+      "workspace_id": "workspace-a",
+      "completion_status": "completed",
+      "failure_status": "none",
+      "output_summary": "変更候補を生成した",
+      "diff_summary": "2 files changed",
+      "test_status": "適合検査に合格",
+      "changed_file_count": 2,
+      "tool_count": 3,
+      "duration_ms": {"status": "known", "value": 1200},
+      "token_count": {"status": "unknown", "value": null},
+      "cost": {"status": "not_applicable", "value": null},
+      "resource": {"status": "unknown", "value": null},
+      "approval_summary": "pending",
+      "audit_event_id": "audit.comparison.a"
+    },
+    {
+      "session_id": "agent-session-b",
+      "agent_runtime_id": "claude",
+      "workspace_id": "workspace-b",
+      "completion_status": "completed",
+      "failure_status": "none",
+      "output_summary": "別Workspaceで結果を生成した",
+      "diff_summary": "1 file changed",
+      "test_status": "未確認",
+      "changed_file_count": 1,
+      "tool_count": 2,
+      "duration_ms": {"status": "unknown", "value": null},
+      "token_count": {"status": "unknown", "value": null},
+      "cost": {"status": "unknown", "value": null},
+      "resource": {"status": "unknown", "value": null},
+      "approval_summary": "unknown",
+      "audit_event_id": "audit.comparison.b"
+    }
+  ],
+  "workspace_isolation": "passed",
+  "authority_reused": false,
+  "approval_reused": false,
+  "credential_included": false,
+  "evidence_class": "INTERNAL_STATE",
+  "audit_event_id": "audit.comparison.receipt"
+}
