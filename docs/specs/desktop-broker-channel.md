@@ -62,3 +62,11 @@ Windows Runnerは`gui_shell/broker` MethodChannelを受け、要求JSON文字列
 component testではnamed-pipeの同一PID許可・別PID拒否、Brokerを実起動したnormal認証relay、session ID注入・malformed・oversizeのBroker拒否とAuditを確認する。FlutterはMethodChannelの要求形状、資格field不在、不一致応答拒否をfixtureで確認する。これらは各component境界の証拠であり、clean packaged launcher → Flutter Runner → pipe → Brokerの一連を通す`LIVE_RUNTIME`証拠ではない。
 
 本契約のproduction適合と`rev2_flutter_broker_channel_boundary`の解除は、分離配置したWindows製品起動で通常往復と永続Auditを確認し、Owner専用操作拒否、credential/authority/session field拒否、別process・別起動pipe拒否、stale/replay、Broker停止・pipe障害時のfail-closed/no-fallbackを実行証拠へ結合するまで保留する。別のFlutter filesystem/network/process surfaceも本契約の対象外であり、独立blockerを維持する。
+
+## 8. Setup Doctorのfilesystem境界と証拠
+
+Flutter/DartはSetup Doctorを含め、filesystem、process、networkへ直接到達しない。UIはBrokerが返した診断projectionを表示するだけであり、環境変数で渡されたpathの読取り・書込み、初期設定生成、監査directory probe、machine-readable release evidenceの保存を行わない。
+
+Windowsのinstalled smoke collectorは、Setup Doctor product exportが実在しない限り、実行file・設定JSON・監査directory・Broker smokeを独立に観測した外部evidenceとして記録する。collectorがcheckを組み立てた結果をproduct-generatedまたはSetup DoctorのLIVE_RUNTIME証拠へ昇格させない。現行strict release validatorが要求するproduct evidenceを満たした扱いにもせず、正式Setup Doctor blockerを維持する。
+
+初回設定の生成とBroker診断の機械可読な取得は別contractとして実装する。filesystem作用はRust Brokerまたは明示されたinstaller責任へ割り当て、Capability、Permission、Approval、AuditEvent、failure時RecoveryAction、path制約、negative testを先に定義する。これらが実装・接続・LIVE_RUNTIME検証されるまでは、未生成の設定や未観測の製品機能を成功扱いしない。

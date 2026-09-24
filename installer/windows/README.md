@@ -29,7 +29,7 @@ staged manifestの`launcher_runtime`は起動器が使う`%LOCALAPPDATA%\GUI-She
 
 `collect_broker_smoke.ps1`は認証IPC、`127.0.0.1`限定bind、`credential_role=normal`、永続store準備、Broker restart後のreplay拒否、crash時のfail-closedを検証する。これはBroker単体のLIVE_RUNTIME証拠であり、Desktop起動器、installed product、正式releaseを証明しない。No-Python／no-FFI値は非正式なstatic declarationに限る。
 
-`collect_setup_doctor.ps1`は外部installer／config／Broker確認だけに使い、正式な製品証拠として扱わない。`collect_installed_smoke.ps1`は現状、`GUI_SHELL_BROKER_ENDPOINT_JSON`を与えてFlutter executableを直接起動し、`GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON`で環境診断出力を要求する。`-NoPythonRuntime`は対象PATHを無効化する。正式な初回起動証拠へは、Rust起動器の利用、実画面、製品Setup Doctor、設定、監査、field provenanceを接続する必要がある。
+`collect_setup_doctor.ps1`は外部installer／config／Broker確認だけを行い、正式な製品証拠として扱わない。`collect_installed_smoke.ps1`もこの外部probeを証拠へ格納するだけで、Flutterへ診断出力や設定生成を要求しない。`-NoPythonRuntime`は対象PATHを無効化する。正式な初回起動証拠へは、Rust起動器の利用、実画面、Broker統治された製品Setup Doctor、初回設定、監査、field provenanceを接続する必要がある。
 
 ## 監査アンカー収集器の証拠範囲
 

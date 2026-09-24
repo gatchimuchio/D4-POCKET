@@ -1123,3 +1123,25 @@ Flutter起動後にSemanticsのbuild登録表をJSON fileへ書き出す経路�
 - `MANIFEST.sha256.json`：975件を再生成し、検査成功（いずれも終了値0）。`git diff --check`成功。
 
 本単位は製品版環境診断の表示面だけを変更する。製品証拠の書出しと初回設定・監査保存先の入出力責任に残る正式配布阻害条件は解消しない。
+
+
+## Setup DoctorのFlutter直接filesystemと自己申告証拠を撤去（2026-09-25）
+
+現行mainの再読で、Flutter起動時にcollector注入環境変数があれば、Dartが設定JSONを新規作成し、監査directoryへ固定名probeを書いて削除し、product-generatedと自己申告する診断JSONを保存していたことを確認した。通常起動ではこの環境変数がなく、初回設定生成も実行されなかった。したがって、従来のhelper testは実製品の通常動作や正式証拠を示していなかった。
+
+FlutterのSetup Doctor file操作・export helper・mainからの呼出しを削除した。表示面は従来どおりBroker snapshotを読むだけとする。installed smokeはWindows外部collectorの観測結果を明確な`EXTERNAL_EVIDENCE`として記録し、製品生成・正式release入力へ偽装しない。正式Setup Doctor validatorは変更せず、この外部probeを引き続きrejectする。設定または監査directoryが存在しない場合にcollectorが作成して成功扱いする挙動を除き、probe名をGUID化し`CreateNew`で作ることで固定名fileを上書きしない。さらに、起動前から存在するconfigを初回起動生成と誤認しないよう、起動前状態を記録し、正式evidence validatorにその不存在を要求する。外部Setup Doctor collectorのconfig checkも、存在・parse成功だけでは生成合格にせずwarningに留める。非権限・recoveryの性質は維持する。
+
+検証結果:
+
+- Desktop `flutter analyze`：成功、指摘0件。
+- Mobile `flutter analyze`：成功、指摘0件。
+- Desktop全test：`flutter test --concurrency=1 --reporter compact`で102件すべて成功。既定並列実行では既存の実Broker統合testが終了時の10秒上限に一度到達したが、同testの単独再実行と直列全testは成功した。
+- `flutter build windows --release --no-pub`：成功。これはinstalled Windows実行の証明ではない。
+- `python tooling/schema_check/check_schemas.py`：Schema 122件、正常例122件、拒否例147件すべて成功。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：195件すべて成功。起動前config既存の負例と外部probeの未観測生成判定を含む。
+- Windows PowerShell parser：変更したcollector 2本の構文parse成功。collectorのisolated installed product実行は未実施。
+- `python tooling/release_runtime_assertions.py --check`：12件すべて成功。証拠範囲はCONFIG／FIXTURE。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：FAIL。既存baselineの3 files／19 findings（Windows launcher仕様1、Rust IPC 12、Rust desktop launcher 6）と一致し、新規findingはない。
+- `MANIFEST.sha256.json`：tracked削除をindexへ反映後、974件で再生成し、`--check`も成功。
+
+この単位はFlutter内Setup Doctor filesystem境界と誤った証拠生成経路を閉じた。初回設定の正式生成、Broker統治された機械可読Setup Doctor、Rust起動器を通すclean installed Windows run、negative/failure経路は未成立であり、`rev2_flutter_broker_channel_boundary`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`を`release_blocker`のまま維持する。変更はその代替証明ではない。

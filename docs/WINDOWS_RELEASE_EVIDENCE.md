@@ -13,11 +13,11 @@ Windows優先のリリース検証では、分離され、機械可読なイン�
   required_action: completed product releaseを主張する前に、現行のisolated evidence contractを用いてnative Windows evidenceを再収集する。
   blocks_release: yes
 
-- item: native Windows Setup Doctor product export not recollected
+- item: native Windows Setup Doctor product evidence unresolved
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: installer/windows/collect_setup_doctor.ps1はexternal_installer_config_broker_probeに分類されたままであり、formal Setup Doctor product evidenceを満たしてはならない。installed Flutter appはGUI_SHELL_SETUP_DOCTOR_EXPORT_JSONに対応したが、isolated staged runからのnative Windows evidenceは再収集・検証されていない。
-  required_action: native Windows上でcollect_installed_smoke.ps1を実行し、installed appにSetup Doctor product exportを書き出させた後、python tooling\windows_release_evidence.pyを通す。
+  reason: Flutterがcollector注入環境変数を使って直接生成していた診断JSONは、実際の通常製品経路ではなくfilesystem境界にも違反していたため撤去した。現行collect_setup_doctor.ps1は設定・監査・Brokerを外部観測するだけであり、正式product evidenceとして受理してはならない。
+  required_action: 初回設定とBroker診断結果をRust Brokerまたは明示されたinstaller責任へ移し、productが返すmachine-readable診断contractと外部installed-run測定を分離して実装・LIVE_RUNTIME検証する。その後strict validatorで確認する。
   blocks_release: yes
 ~~~
 
@@ -57,7 +57,7 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 - `first_run.visible_surfaces`: `directly_measured`、`LIVE_RUNTIME`
 - `first_run.config_audit`: `directly_measured`、`LIVE_RUNTIME`
 - `first_run.installer_authority_boundary`: `static_assertion`、`CONFIG`
-- `setup_doctor`: `product_export`、`LIVE_RUNTIME`
+- formal gateの要求: `product_export`、`LIVE_RUNTIME`（現行の外部probeは`external_probe`、`EXTERNAL_EVIDENCE`であり不適合）
 - `broker.ipc_restart_crash`: `directly_measured`、`LIVE_RUNTIME`
 - `release_runtime_assertions`: `static_assertion`、`CONFIG` / `FIXTURE`
 
@@ -86,7 +86,7 @@ python tooling\release_runtime_assertions.py --json > release_evidence\release_r
 powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smoke.ps1 `
   -InstalledExe $Manifest.app_exe `
   -InstalledManifestJson (Join-Path $Manifest.install_root "installed_manifest.json") `
-  -SetupDoctorJson (Join-Path $Manifest.evidence_dir "setup_doctor_product_export.json") `
+  -SetupDoctorJson (Join-Path $Manifest.evidence_dir "setup_doctor_external_probe.json") `
   -ConfigPath $Manifest.config_path `
   -AuditDir $Manifest.audit_dir `
   -VisibleSurfacesOutputPath (Join-Path $Manifest.evidence_dir "visible_surfaces.json") `

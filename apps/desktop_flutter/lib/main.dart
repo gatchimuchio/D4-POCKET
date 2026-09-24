@@ -30,7 +30,6 @@ import 'services/runtime_resource_client.dart';
 import 'services/runtime_lifecycle_client.dart';
 import 'services/evaluation_client.dart';
 import 'services/global_search_index.dart';
-import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
 import 'services/windows_tray_client.dart';
 
@@ -65,7 +64,6 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
       _installFatalErrorHandlers();
       final client = await ShellCoreClient.product();
-      await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
       runApp(GuiShellDesktopApp(client: client));
     },
     (error, stack) {

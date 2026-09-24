@@ -1621,6 +1621,7 @@ def _valid_windows_installed_evidence() -> dict:
             "status": "passed",
             "command": r".\gui_shell_desktop.exe",
             "launched_from_installed_path": True,
+            "config_existed_before_launch": False,
             "process_id": 1234,
             "process_running_after_launch": True,
             "main_window_handle": 100,
@@ -1924,6 +1925,19 @@ def test_windows_release_evidence_validator_rejects_authority_and_missing_instal
     return errors
 
 
+def test_windows_release_evidence_validator_rejects_preexisting_first_run_config() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    bad["first_run"]["config_existed_before_launch"] = True
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+        return ["Windows first-run validatorが起動前から存在するconfigを初回生成として受け入れた"]
+    return []
+
+
 def test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence() -> list[str]:
     bad = _valid_windows_installed_evidence()
     bad["setup_doctor"]["formal_product_evidence"] = False
@@ -2143,66 +2157,60 @@ def test_windows_release_evidence_validator_rejects_aggregate_surface_root_match
     return []
 
 
-def test_installed_app_setup_doctor_product_export_contract_exists() -> list[str]:
+def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
     export = DESKTOP_FLUTTER / "lib" / "services" / "setup_doctor_export.dart"
     main = DESKTOP_FLUTTER / "lib" / "main.dart"
     collector = INSTALLER / "windows" / "collect_installed_smoke.ps1"
-    if not export.exists():
-        return ["installed appのSetup Doctor product export helperが存在しない"]
-    export_text = export.read_text(encoding="utf-8")
+    external_probe = INSTALLER / "windows" / "collect_setup_doctor.ps1"
     main_text = main.read_text(encoding="utf-8")
     collector_text = collector.read_text(encoding="utf-8")
-    required_export_tokens = [
-        "GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON",
-        "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON",
-        "installed_app_machine_readable_export",
-        "'formal_product_evidence': true",
-        "'product_generated': true",
-        "'collector_derives_checks': false",
-        "'synthetic': false",
-        "'installer_grants_authority': false",
-        "'installer_silently_approves_permissions': false",
-        "gui_shell_desktop_installed_first_run",
-        "_ensureInstalledFirstRunConfig",
-    ]
-    required_checks = [
-        "windows.installed_app_path",
-        "windows.artifact_hash",
-        "first_run.config_created",
-        "first_run.audit_dir_writable",
-        "setup_doctor.ran_from_installed_app_path",
-        "setup_doctor.runtime_connection",
-        "setup_doctor.authority_boundary",
-        "setup_doctor.network_public_bind",
-        "setup_doctor.recovery_instruction",
-        "setup_doctor.audit_storage",
-    ]
-    errors = [
-        f"Setup Doctorのproduct exportにtokenがない: {token}"
-        for token in required_export_tokens
-        if token not in export_text
-    ]
-    errors.extend(
-        f"Setup Doctorのproduct exportに必須check idがない: {check_id}"
-        for check_id in required_checks
-        if check_id not in export_text
-    )
-    if "writeSetupDoctorProductExportIfRequested(client.getSnapshot())" not in main_text:
-        errors.append("desktop mainがinstalled-appのSetup Doctor product export helperを呼び出していない")
-    for token in [
-        "GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON",
-        "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON",
-        "インストール済み app が環境診断の製品出力を書き出しませんでした",
-        "setup_doctor_context",
-    ]:
-        if token not in collector_text:
-            errors.append(f"installed smoke collectorにproduct export tokenがない: {token}")
-    external_probe_text = (INSTALLER / "windows" / "collect_setup_doctor.ps1").read_text(encoding="utf-8")
+    errors = []
+    if export.exists():
+        errors.append("Flutter内Setup Doctor filesystem export helperが残っている")
+    for path in (DESKTOP_FLUTTER / "lib").rglob("*.dart"):
+        source = path.read_text(encoding="utf-8")
+        if "dart:io" in source:
+            errors.append(f"Flutter production sourceにdart:ioが残っている: {path.relative_to(ROOT)}")
+    if "setup_doctor_export" in main_text or "writeSetupDoctorProductExportIfRequested" in main_text:
+        errors.append("desktop mainがFlutter Setup Doctor filesystem exportを呼び出している")
+    for token in ("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON", "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON", "setup_doctor_context"):
+        if token in collector_text:
+            errors.append(f"installed smoke collectorがFlutter Setup Doctor export経路を使っている: {token}")
+    if "collect_setup_doctor.ps1" not in collector_text:
+        errors.append("installed smoke collectorが独立したSetup Doctor観測を実行していない")
+    if "configExistedBeforeLaunch" not in collector_text or "!$configExistedBeforeLaunch" not in collector_text:
+        errors.append("installed smoke collectorが起動前config存在を除外せず初回生成と扱う")
+    external_probe_text = external_probe.read_text(encoding="utf-8")
     if (
-        "formal_product_evidence" in external_probe_text
-        and "formal_product_evidence = $false" not in external_probe_text
+        "formal_product_evidence = $false" not in external_probe_text
+        or "product_generated = $false" not in external_probe_text
+        or "collector_derives_checks = $true" not in external_probe_text
+        or "synthetic = $false" not in external_probe_text
+        or "setup_doctor.ran_from_installed_app_path" not in external_probe_text
     ):
-        errors.append("外部Setup Doctor probeが明確に非正式ではなくなった")
+        errors.append("独立Setup Doctor probeの外部由来・非製品生成provenanceが明確でない")
+    if '-Status "warning" `' not in external_probe_text or "アプリ自身が生成する環境診断の製品出力は観測していません" not in external_probe_text:
+        errors.append("外部probeが観測していないproduct Setup Doctorを合格扱いする")
+    first_run_config_check = external_probe_text.split('-CheckId "first_run.config_created"', 1)
+    if len(first_run_config_check) != 2 or '-Status "warning"' not in first_run_config_check[1].split("  New-DoctorCheck", 1)[0]:
+        errors.append("外部probeが起動中の生成を観測していないconfigを初回生成合格として扱う")
+    if "formal_release_input = ((Get-EvidenceValue -Object $setupDoctor -Name \"formal_product_evidence\") -eq $true)" not in collector_text:
+        errors.append("非製品生成Setup Doctor probeがformal release inputとして扱われる")
+    return errors
+
+
+def test_setup_doctor_filesystem_probe_is_bounded_and_non_destructive() -> list[str]:
+    external_probe = (INSTALLER / "windows" / "collect_setup_doctor.ps1").read_text(encoding="utf-8")
+    installed_smoke = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "[System.IO.FileMode]::CreateNew" not in external_probe or "[guid]::NewGuid()" not in external_probe:
+        errors.append("Setup Doctor external probeが衝突しないexclusive temporary fileを使わない")
+    if "[System.IO.FileMode]::CreateNew" not in installed_smoke or "[guid]::NewGuid()" not in installed_smoke:
+        errors.append("installed smoke audit probeが衝突しないexclusive temporary fileを使わない")
+    if "New-Item -ItemType Directory -Force -Path $Path" in external_probe:
+        errors.append("Setup Doctor external probeが未存在のaudit directoryを作って成功を捏造する")
+    if '".gui-shell-setup-doctor-probe"' in external_probe or '".gui-shell-write-probe"' in installed_smoke:
+        errors.append("audit probeが固定名fileを上書きまたは削除する可能性がある")
     return errors
 
 
@@ -7029,6 +7037,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_missing_provenance,
         test_windows_release_evidence_validator_preserves_audit_anchor_external_blocker,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
+        test_windows_release_evidence_validator_rejects_preexisting_first_run_config,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
@@ -7038,7 +7047,8 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_screenshot_surface_source,
         test_windows_release_evidence_validator_rejects_flutter_build_registry_as_visibility,
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
-        test_installed_app_setup_doctor_product_export_contract_exists,
+        test_flutter_setup_doctor_has_no_filesystem_export_path,
+        test_setup_doctor_filesystem_probe_is_bounded_and_non_destructive,
         test_windows_stage_installer_powershell_boolean_grouping,
         test_windows_stage_uses_terminal_free_native_launcher,
         test_windows_installed_smoke_preserves_trap_failure,

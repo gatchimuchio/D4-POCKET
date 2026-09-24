@@ -49,8 +49,6 @@ $brokerEndpointFile = $null
 $brokerMediatedLaunch = $false
 $previousBrokerEndpointEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_ENDPOINT_JSON", "Process")
 $previousBrokerRuntimeDirEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_RUNTIME_DIR", "Process")
-$previousSetupDoctorExportEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON", "Process")
-$previousSetupDoctorContextEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON", "Process")
 $previousPathEnv = [Environment]::GetEnvironmentVariable("Path", "Process")
 $pythonRuntimePathScrubbed = $false
 $pythonPathEntriesRemovedCount = 0
@@ -115,40 +113,6 @@ function Resolve-InputOrOutputPath {
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
   }
   return $fullPath
-}
-
-function Write-SetupDoctorProductContext {
-  param(
-    [string]$Path,
-    [string]$InstalledAppPath,
-    [string]$AppArtifactSha256,
-    [string]$ConfigPathValue,
-    [string]$AuditDirValue,
-    [bool]$BrokerMediated,
-    [string]$BrokerEndpointFileValue,
-    $BrokerEndpointValue
-  )
-
-  $endpointHost = $null
-  if ($null -ne $BrokerEndpointValue) {
-    $endpointHost = Get-EvidenceValue -Object $BrokerEndpointValue -Name "host"
-    if ($null -eq $endpointHost) {
-      $endpointHost = Get-EvidenceValue -Object $BrokerEndpointValue -Name "endpoint_host"
-    }
-  }
-  $context = [ordered]@{
-    context_kind = "installed_app_setup_doctor_context"
-    context_version = 1
-    installed_app_path = $InstalledAppPath
-    installed_app_path_confirmed = $true
-    app_artifact_sha256 = $AppArtifactSha256
-    config_path = [System.IO.Path]::GetFullPath($ConfigPathValue)
-    audit_dir = [System.IO.Path]::GetFullPath($AuditDirValue)
-    broker_mediated_launch = $BrokerMediated
-    broker_endpoint_file = $BrokerEndpointFileValue
-    restricted_loopback_bind = ($endpointHost -eq "127.0.0.1")
-  }
-  Write-JsonEvidence -Value $context -Path $Path -Depth 8
 }
 
 function New-EvidenceFileRecord {
@@ -289,16 +253,6 @@ function Restore-SmokeEnvironment {
     Remove-Item Env:\GUI_SHELL_BROKER_RUNTIME_DIR -ErrorAction SilentlyContinue
   } else {
     $env:GUI_SHELL_BROKER_RUNTIME_DIR = $previousBrokerRuntimeDirEnv
-  }
-  if ($null -eq $previousSetupDoctorExportEnv) {
-    Remove-Item Env:\GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON -ErrorAction SilentlyContinue
-  } else {
-    $env:GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON = $previousSetupDoctorExportEnv
-  }
-  if ($null -eq $previousSetupDoctorContextEnv) {
-    Remove-Item Env:\GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON -ErrorAction SilentlyContinue
-  } else {
-    $env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $previousSetupDoctorContextEnv
   }
   if ($null -eq $previousPathEnv) {
     Remove-Item Env:\Path -ErrorAction SilentlyContinue
@@ -807,18 +761,7 @@ if ($BrokerHelperExe -ne "") {
 }
 
 $setupDoctorPath = Resolve-InputOrOutputPath -Path $SetupDoctorJson
-$setupDoctorContextPath = Join-Path (Split-Path -Parent $setupDoctorPath) "setup_doctor_context.json"
-Write-SetupDoctorProductContext `
-  -Path $setupDoctorContextPath `
-  -InstalledAppPath $exe.Path `
-  -AppArtifactSha256 "sha256:$hash" `
-  -ConfigPathValue $ConfigPath `
-  -AuditDirValue $AuditDir `
-  -BrokerMediated $brokerMediatedLaunch `
-  -BrokerEndpointFileValue $brokerEndpointFile `
-  -BrokerEndpointValue $brokerEndpoint
-$env:GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON = $setupDoctorPath
-$env:GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON = $setupDoctorContextPath
+$configExistedBeforeLaunch = Test-Path -LiteralPath $ConfigPath -PathType Leaf
 
 $process = $null
 try {
@@ -832,15 +775,25 @@ try {
   Restore-SmokeEnvironment
 }
 
-if (!(Test-Path $setupDoctorPath)) {
-  throw "インストール済み app が環境診断の製品出力を書き出しませんでした: $setupDoctorPath"
-}
-$setupDoctor = Read-Utf8Json -Path $setupDoctorPath
 $installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
 $installedManifest = $null
 if ($null -ne $installedManifestPath) {
   $installedManifest = Read-Utf8Json -Path $installedManifestPath
 }
+$setupDoctorArgs = @{
+  InstalledExe = $exe.Path
+  OutputPath = $setupDoctorPath
+  ConfigPath = $ConfigPath
+  AuditDir = $AuditDir
+}
+if ($BrokerEvidenceJson -ne "") {
+  $setupDoctorArgs.BrokerEvidenceJson = $BrokerEvidenceJson
+}
+if ($null -ne $installedManifestPath) {
+  $setupDoctorArgs.InstalledManifestJson = $installedManifestPath
+}
+& (Join-Path $PSScriptRoot "collect_setup_doctor.ps1") @setupDoctorArgs
+$setupDoctor = Read-Utf8Json -Path $setupDoctorPath
 if ($VisibleSurfacesJson -ne "") {
   $visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
   $visibleSurfaceEvidence = Read-Utf8Json -Path $visibleSurfacesPath.Path
@@ -880,8 +833,7 @@ foreach ($record in @(
     (New-EvidenceFileRecord -Kind "runtime_assertions" -Path $RuntimeAssertionsJson),
     (New-EvidenceFileRecord -Kind "audit_anchor_external_tamper_evidence" -Path $AuditAnchorEvidenceJson),
     (New-EvidenceFileRecord -Kind "screenshot_supporting_material" -Path $ScreenshotPath),
-    (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath),
-    (New-EvidenceFileRecord -Kind "setup_doctor_context" -Path $setupDoctorContextPath)
+    (New-EvidenceFileRecord -Kind "installed_manifest" -Path $installedManifestPath)
   )) {
   if ($null -ne $record) {
     $evidenceBundleFiles.Add($record)
@@ -918,18 +870,51 @@ $auditWriteProbe = [ordered]@{
   probe_path = $null
 }
 if ($null -ne $resolvedAuditDir) {
-  $probePath = Join-Path $resolvedAuditDir ".gui-shell-write-probe"
+  $probePath = Join-Path $resolvedAuditDir (".gui-shell-write-probe-" + [guid]::NewGuid().ToString("N"))
   $auditWriteProbe.attempted = $true
   $auditWriteProbe.probe_path = $probePath
-  Set-Content -Encoding UTF8 -Path $probePath -Value "ok"
-  $auditWriteProbe.write = Test-Path $probePath
-  $auditWriteProbe.read = ((Get-Content -Raw -Path $probePath).Trim() -eq "ok")
-  Remove-Item -Force -Path $probePath
-  $auditWriteProbe.delete = !(Test-Path $probePath)
+  $probeStream = $null
+  $probeCreated = $false
+  try {
+    $probeStream = [System.IO.File]::Open(
+      $probePath,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::ReadWrite,
+      [System.IO.FileShare]::None
+    )
+    $probeCreated = $true
+    $probeBytes = [System.Text.Encoding]::UTF8.GetBytes("ok")
+    $probeStream.Write($probeBytes, 0, $probeBytes.Length)
+    $probeStream.Flush()
+    $auditWriteProbe.write = $true
+    $probeStream.Position = 0
+    $probeBuffer = New-Object byte[] $probeBytes.Length
+    $probeReadCount = $probeStream.Read($probeBuffer, 0, $probeBuffer.Length)
+    $auditWriteProbe.read = ($probeReadCount -eq $probeBytes.Length -and [System.Text.Encoding]::UTF8.GetString($probeBuffer) -eq "ok")
+    $probeStream.Dispose()
+    $probeStream = $null
+    Remove-Item -LiteralPath $probePath -ErrorAction Stop
+    $probeCreated = $false
+    $auditWriteProbe.delete = !(Test-Path -LiteralPath $probePath)
+  } catch {
+    $auditWriteProbe.write = $false
+  } finally {
+    if ($null -ne $probeStream) {
+      $probeStream.Dispose()
+    }
+    if ($probeCreated -and (Test-Path -LiteralPath $probePath)) {
+      try {
+        Remove-Item -LiteralPath $probePath -ErrorAction Stop
+        $auditWriteProbe.delete = !(Test-Path -LiteralPath $probePath)
+      } catch {
+        $auditWriteProbe.delete = $false
+      }
+    }
+  }
 }
 
 $firstWindowVisible = (!$process.HasExited -and $mainWindowHandle -ne 0)
-$configCreated = ($null -ne $resolvedConfigPath -and $configJsonValid)
+$configCreated = (!$configExistedBeforeLaunch -and $null -ne $resolvedConfigPath -and $configJsonValid)
 $auditDirWritable = (
   $auditWriteProbe.attempted -and
   $auditWriteProbe.write -and
@@ -1011,11 +996,11 @@ $evidence = [ordered]@{
     setup_doctor = [ordered]@{
       source_type = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "product_export" } else { "external_probe" })
       evidence_class = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "LIVE_RUNTIME" } else { "EXTERNAL_EVIDENCE" })
-      formal_release_input = $true
+      formal_release_input = ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true)
     }
     "broker.ipc_restart_crash" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     release_runtime_assertions = [ordered]@{ source_type = "static_assertion"; evidence_class = @("CONFIG", "FIXTURE"); formal_release_input = $true }
-    unsupported_claims = @()
+    unsupported_claims = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { @() } else { @("formal_setup_doctor_product_export") })
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
@@ -1061,6 +1046,7 @@ $evidence = [ordered]@{
       diagnostic_tree = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "diagnostic_tree"
     }
     config_path = $(if ($null -ne $resolvedConfigPath) { $resolvedConfigPath.Path } else { $ConfigPath })
+    config_existed_before_launch = $configExistedBeforeLaunch
     config_created = $configCreated
     config_json_valid = $configJsonValid
     audit_dir = $(if ($null -ne $resolvedAuditDir) { $resolvedAuditDir.Path } else { $AuditDir })

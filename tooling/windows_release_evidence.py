@@ -511,6 +511,8 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.extend(_validate_surface_match_evidence(surface_evidence))
     if not _is_true(data, "first_run.config_created"):
         errors.append("first-run config の作成を確認できなかった")
+    if not _is_false(data, "first_run.config_existed_before_launch"):
+        errors.append("first-run config は起動前に存在してはならず、その後の生成を確認する必要がある")
     if not _is_true(data, "first_run.config_json_valid"):
         errors.append("first-run config JSON の妥当性を確認できなかった")
     if not _get(data, "first_run.config_path"):

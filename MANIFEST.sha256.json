@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "26540e0e8af031dd8262087574e40071ba5af2d1a8c25ec9fc2c4cad67f95b88"
+      "sha256": "a2855a15aa88fc8d9e92eddaf7200eaf72f45ab91dff5b24270fcdbc38ecbbd3"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -342,10 +342,6 @@
     {
       "path": "apps/desktop_flutter/lib/services/runtime_resource_client.dart",
       "sha256": "11f7cb475fc2892f7a1703fccaf17ec63448a3e880617661d89962000e6f0153"
-    },
-    {
-      "path": "apps/desktop_flutter/lib/services/setup_doctor_export.dart",
-      "sha256": "b3591f9ed23cc53377d577eced58c91c3ca17e1a0682c91d20b888485b833ce0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
@@ -601,7 +597,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "1d14b7613d10f0b0cfe1829279ea4d2676dea1cc94bcb6684363f85bf950644d"
+      "sha256": "49357158f2aad1fd4a1545343ea35074ac80316987f4d8f4d8907a7d46128337"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1129,7 +1125,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "26df214f7683d5e55505173d9ffa1f1fe9b04e88ed5b3ab5cb6469505990e6dc"
+      "sha256": "75d17d614ec4b8296efd24f71185b60a9da30709f83b3a8b96bd2e2b382ad562"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1141,7 +1137,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "5a7e6b424e182d35c1917480f56869c1021267d9c45c2df84585f1cb53620781"
+      "sha256": "3e3ab6dc67875cf5fcb60eb35115cc75c01fa99c067a297db2a3ac11a6fa28f6"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -1177,7 +1173,7 @@
     },
     {
       "path": "docs/implementation/RUNTIME_OWNERSHIP_AUDIT.md",
-      "sha256": "b5f3997c87b51fd5bcfc3b9d567b24ef8fd998252fba0df6ede42f2ce608a355"
+      "sha256": "1398d8a52788f9a199b50d7ac3a3d80f21412d3c64001acca9d612bdd8b2c1fa"
     },
     {
       "path": "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
@@ -1265,7 +1261,7 @@
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
-      "sha256": "eb20aa9cb3ce53b7164ab4258cb6bef9c7b32e3f10b82593a617d48cc6488674"
+      "sha256": "79c105b7a9b0d1b07fe10b779d46edb87a856d72571cb669974d3f0f55dbcc0a"
     },
     {
       "path": "docs/specs/desktop-ux-integration.md",
@@ -2545,7 +2541,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "b25b72548a903de40c9f2690fcc76ef48366ac4b84a7e146949fa63a318f04d0"
+      "sha256": "6b2d3f896038ec89e96e78e93850bed297452d38f7f8b6f444077274cabeb807"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -2557,11 +2553,11 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "07817b8cb781616e86ef8a1a0532da795bbdd338caf2e12f5c98676ec0532f4c"
+      "sha256": "1a44d0d6456bf109cc397398807946f079148a6b61b8ad8e881b1fb38efc16d0"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
-      "sha256": "68725b9876ea532defdd950fe8986b3663cd7c88b76883209f0386fbca234553"
+      "sha256": "ef62c9776d431a6ba7d1e03c3be88da5688ec01f02d3c94a876d13b0775674d5"
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
@@ -3305,7 +3301,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "78a6f50ed213ebb9c76d198fc73980df2e443894a1713f2f714a9666fd92471d"
+      "sha256": "e6228a48a1154fdfc3cd2cc04ae8bbfd67dac0e6f7b98512041c71ce775fd460"
     },
     {
       "path": "requirements-dev.txt",
@@ -3845,7 +3841,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "9a3069bf3a9d2fad484f1df34ac924cc20d73eec1ff366bd2fc93ee9015193ab"
+      "sha256": "0c49437a6c89b0da1edfadfb8add95eb8901cf419c9637bc4f682a351d36930d"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3941,7 +3937,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "cb8a583ec9d82be433ac30ee407e5305a6d423180c1b9869511268388b7b3977"
+      "sha256": "2957de59368afbf94fa5d09498f776b7a3114fd316a24d3b6ff513a6829973fe"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

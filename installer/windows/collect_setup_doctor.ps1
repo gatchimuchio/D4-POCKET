@@ -38,8 +38,11 @@ function Test-JsonFile {
   param([string]$Path)
 
   try {
-    $resolved = Resolve-Path $Path -ErrorAction Stop
-    Get-Content -Raw -Path $resolved.Path | ConvertFrom-Json | Out-Null
+    $resolved = Resolve-Path -LiteralPath $Path -ErrorAction Stop
+    $parsed = [System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    if ($null -eq $parsed -or $parsed -isnot [pscustomobject]) {
+      throw "設定JSONのrootはobjectでなければなりません。"
+    }
     return [ordered]@{
       ok = $true
       path = $resolved.Path
@@ -56,17 +59,47 @@ function Test-JsonFile {
 function Test-AuditWrite {
   param([string]$Path)
 
+  $probe = $null
+  $stream = $null
+  $probeCreated = $false
   try {
-    $directory = New-Item -ItemType Directory -Force -Path $Path
-    $probe = Join-Path $directory.FullName ".gui-shell-setup-doctor-probe"
-    Set-Content -Encoding UTF8 -Path $probe -Value "ok"
-    $readOk = ((Get-Content -Raw -Path $probe).Trim() -eq "ok")
-    Remove-Item -Force -Path $probe
+    $directory = Get-Item -LiteralPath (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path -ErrorAction Stop
+    if (!$directory.PSIsContainer) {
+      throw "Audit pathは既存directoryではありません。"
+    }
+    $probe = Join-Path $directory.FullName (".gui-shell-setup-doctor-probe-" + [guid]::NewGuid().ToString("N"))
+    $stream = [System.IO.File]::Open(
+      $probe,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::ReadWrite,
+      [System.IO.FileShare]::None
+    )
+    $probeCreated = $true
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes("ok")
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush()
+    $stream.Position = 0
+    $readBuffer = New-Object byte[] $bytes.Length
+    $readCount = $stream.Read($readBuffer, 0, $readBuffer.Length)
+    $readOk = ($readCount -eq $bytes.Length -and [System.Text.Encoding]::UTF8.GetString($readBuffer) -eq "ok")
+    $stream.Dispose()
+    $stream = $null
+    Remove-Item -LiteralPath $probe -ErrorAction Stop
+    $probeCreated = $false
     return [ordered]@{
       ok = $readOk -and !(Test-Path $probe)
       path = $directory.FullName
     }
   } catch {
+    if ($null -ne $stream) {
+      $stream.Dispose()
+    }
+    if ($probeCreated -and $null -ne $probe -and (Test-Path -LiteralPath $probe)) {
+      try {
+        Remove-Item -LiteralPath $probe -ErrorAction Stop
+      } catch {
+      }
+    }
     return [ordered]@{
       ok = $false
       path = $Path
@@ -148,9 +181,9 @@ $checks = @(
     -RecoveryInstruction "記録された hash が意図した release candidate と異なる場合は、Windows artifact を rebuild して再び stage してください。"
   New-DoctorCheck `
     -CheckId "first_run.config_created" `
-    -Status $(if ($configProbe.ok) { "pass" } else { "warning" }) `
-    -Message $(if ($configProbe.ok) { "Config JSON を解析できました: $($configProbe.path)" } else { "Config JSON が無効です: $ConfigPath" }) `
-    -RecoveryInstruction "installed app を一度起動し、記録された config path を JSON として解析できることを検証してください。"
+    -Status "warning" `
+    -Message $(if ($configProbe.ok) { "設定JSONは存在して解析できますが、外部collectorは初回起動中の生成を観測していません: $($configProbe.path)" } else { "設定JSONが存在しないか、objectとして解析できません: $ConfigPath" }) `
+    -RecoveryInstruction "設定JSONの事前状態と初回起動後の変化を分離Windows実行で記録し、生成元と監査証拠を確認してください。"
   New-DoctorCheck `
     -CheckId "first_run.audit_dir_writable" `
     -Status $(if ($auditProbe.ok) { "pass" } else { "warning" }) `
@@ -158,9 +191,9 @@ $checks = @(
     -RecoveryInstruction "installed app に書込み可能な local audit directory を付与し、installed smoke を再実行してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.ran_from_installed_app_path" `
-    -Status "pass" `
-    -Message "Setup Doctor evidence を installed executable path に対して収集しました。" `
-    -RecoveryInstruction "development build path ではなく installed GUI-Shell executable に対してこの collector を実行してください。"
+    -Status "warning" `
+    -Message "インストール済み実行ファイルのpathは外部測定しましたが、アプリ自身が生成する環境診断の製品出力は観測していません。" `
+    -RecoveryInstruction "Flutterから直接ファイル操作を行わず、Rust Brokerの権限・監査経路へ環境診断要求を接続し、インストール済みWindows実行で機械可読出力を実測してください。"
   New-DoctorCheck `
     -CheckId "setup_doctor.runtime_connection" `
     -Status $(if ($brokerReady) { "pass" } else { "warning" }) `
@@ -201,8 +234,8 @@ $report = [ordered]@{
     source_kind = "external_installer_config_broker_probe"
     product_generated = $false
     collector_derives_checks = $true
-    synthetic = $true
-    command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_setup_doctor.ps1 -InstalledExe `"$($exe.Path)`""
+    synthetic = $false
+    command = "& `"$PSScriptRoot\collect_setup_doctor.ps1`" -InstalledExe `"$($exe.Path)`" -OutputPath `"$OutputPath`" -ConfigPath `"$ConfigPath`" -AuditDir `"$AuditDir`""
   }
   installed_manifest_path = $(if ($null -ne $installedManifestPath) { $installedManifestPath.Path } else { $null })
   installed_manifest_sha256 = $(if ($null -ne $installedManifestPath) { Get-TaggedSha256 -Path $installedManifestPath.Path } else { $null })

@@ -125,8 +125,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。ShellCoreClient.local()のsnapshot file/environment読込と内部Semantics registryの非正式file出力はFlutterから除去した。一方、clean committed productのformal smoke、全negative/failure経路、正常終了は未確認であり、Setup Doctor export/config/audit probe等の別Flutter filesystem/network/process surfaceも未解決。",
-      "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。Flutter内の別filesystem/network/process surfaceも独立契約・移譲・負例試験へ接続する。"
+      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、Broker/installerへ移譲された初回設定生成と正式Setup Doctor product evidenceは未成立。",
+      "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。初回設定生成とSetup Doctor product evidenceをBroker/installerの明示contractへ移譲し、negative testとLIVE_RUNTIME証拠で接続する。"
     },
     {
       "name": "rev2_export_owner_ui_authority_path",
