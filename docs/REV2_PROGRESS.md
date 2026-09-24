@@ -2,14 +2,26 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C33: Windows最大到達点（2026-09-24）
+
+Windowsで実行可能な範囲を最大化するため、release build、Rust helper release build、Broker smoke、installed smokeの証拠収集経路を整備した。`installer/windows/collect_broker_smoke.ps1`はWindows Rust testのfull-duplex応答を維持して読み取り、`collect_installed_smoke.ps1`はUTF-8の製品JSONを明示的に読み取る。UI surface収集は親要素と同じRaw UI Automation treeを再帰走査する。いずれも、証拠collectorの責務であり、Flutterへ権限経路を追加しない。
+
+- Validation: `flutter build windows --release`、`cargo build --release --locked`、`python tooling/conformance_tests/run_conformance_skeleton.py`（182 checks）、`python tooling/validate_all.py --python-only --desktop-platform windows`（exit 0）はPASS。`python tooling/windows_release_evidence.py --evidence C:\Users\ohira\AppData\Local\GUI-Shell\installed-runs\c33-2c8ad7d\runtime\evidence\windows_installed_smoke.json`は、正式Windows証拠が未成立のためexit 1となった。
+- Clean isolated run: source commitは`2c8ad7ddd033ef97d90989341450b37f84a87d76`、source worktreeはclean。Broker smokeはcollector v4で`passed`となり、認証IPC、永続store、replay拒否、再起動後health、crash fail-closedを確認した。installed smoke自体はexit 0だが、`installed_status=failed`、`visible_surfaces=[]`、`visible_complete=false`、`setup_doctor_status=warning`、`setup_doctor_path=false`である。
+- Evidence boundary: Windows UI Automationの正式collectorはroot／Flutter viewの2要素だけを観測し、個別surfaceを証明できない。Computer Useで個別semantic surfaceを補助観測できても、正式collectorのLIVE_RUNTIME／EXTERNAL_EVIDENCEを代替しない。Setup Doctorは製品プロセスのresolved executableがCodexホストのLocalCache配下となり、installed contextの厳密なpath一致を満たさない。path比較を緩めて成功扱いにはしない。
+- `release_blocker`: `windows_evidence_provenance_isolation`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`audit_anchor_external_tamper_evidence_proof`、C28の8時間実測、外部Runtime／Agent／MCP／A2A、実端末、正式署名・配布、owner GO、正式release。
+- `known_limitation`: Broker installed smokeの個別sub-gateはPASSしたが、総合installed evidenceの成立へは昇格させない。UI AutomationのFlutter surface取得限界とCodexホストの実行path virtualizationは、現環境で観測した制約である。
+
+この単位はWindows最大到達点の開発候補であり、製品releaseやC34正式release前作業の完了を意味しない。
+
 ## D4 Pocket C31: 文書更新（2026-09-24）
 
 README、ROADMAP、GUI操作面、SECURITY、CONFIG、MOBILE_STATUS、COMPATIBILITY_MATRIX、および本書を、C24〜C30の現行実装・検証範囲へ更新した。更新の目的は、製品の未検証範囲を隠さず、各面のproduction path、Authority境界、Content Exposure境界、証拠class、残存分類を同じ状態へそろえることである。過去の文書記録に含まれる旧Schema／Conformance件数、旧platform証拠、旧工程状態は履歴として保持し、現行commitのPASSへ読み替えない。
 
-- 現行基準: Schema 108件、正常example 108件、negative fixture 129件、Conformance 179件、厳格日本語監査、manifest検査はPASS。
+- 現行基準: Schema 108件、正常example 108件、negative fixture 129件、Conformance 182件、厳格日本語監査、manifest検査はPASS。
 - 現行回帰: C27性能smoke、C28 30秒運用smoke、C29障害注入8件、C30回帰matrixはPASS。C28の8時間実測は途中で通常対話通信失敗となり、PASSへ昇格していない。
 - 証拠境界: C30 Agent probeはCodex CLI version/help interfaceだけ、Compare／Device Linkはfixture、Runtime／Dialogueはlocalhost fixtureを含む開発経路であり、installed product、外部Runtime／Agent、実端末を証明しない。
-- `release_blocker`: Windows installed-path証拠（provenance、first-run、Setup Doctor、Broker、Audit anchor外部改変）、8時間実測、外部Runtime／Agent／MCP／A2A、実端末、正式署名・配布、C32〜C34、owner GO、正式release。
+- `release_blocker`: Windows installed productの総合証拠（provenance、first-run、Setup Doctor、Audit anchor外部改変）、8時間実測、外部Runtime／Agent／MCP／A2A、実端末、正式署名・配布、C32〜C34、owner GO、正式release。Broker installed smokeの個別sub-gateはC33でPASSしたが、総合evidenceの成立条件は満たしていない。
 - `known_limitation`: MobileのMCP live一覧非提供、fixtureだけの比較／Device Link、外部接続未成立、実測不能値の`unknown`表示。
 
 検証入口: `python tooling/full_regression_validation.py` および `python tooling/validate_all.py --desktop-platform windows --include-mobile-release`。いずれも開発検証であり、正式releaseの許可ではない。

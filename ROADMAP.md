@@ -19,9 +19,11 @@ C29では`docs/specs/failure-injection-validation.md`を正本として、Runtim
 
 C30では`docs/specs/full-regression-validation.md`を正本として、Trust、Authority、Permission、Approval、Audit、Recovery、Evidence、Runtime、Agent、Dialogue、Compare、Device Linkを既存のRust／Broker／Flutter／fixture検証へ対応付ける。回帰matrixはlocal validationの範囲を報告し、未導入Agent、実端末、外部Runtime、installed productをPASSへ昇格させない。
 
-C31ではREADME、GUI操作面、SECURITY、CONFIG、MOBILE_STATUS、COMPATIBILITY_MATRIX、REV2_PROGRESSを、C24〜C30の現行実装・検証範囲へ更新した。文書更新は機能実装やrelease evidenceの代替ではなく、各文書にproduction path、authority境界、証拠範囲、残存分類を明示するための監査単位である。現行の基準値はSchema 108件、Conformance 179件であり、C30 matrixはPASSしたが、C28の8時間実測、Windows installed product、外部Runtime／Agent、実端末、owner GO、正式releaseは未成立である。
+C31ではREADME、GUI操作面、SECURITY、CONFIG、MOBILE_STATUS、COMPATIBILITY_MATRIX、REV2_PROGRESSを、C24〜C30の現行実装・検証範囲へ更新した。文書更新は機能実装やrelease evidenceの代替ではなく、各文書にproduction path、authority境界、証拠範囲、残存分類を明示するための監査単位である。現行の基準値はSchema 108件、Conformance 182件であり、C30 matrixはPASSしたが、C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent、実端末、owner GO、正式releaseは未成立である。
 
 C32では`docs/specs/final-development-audit.json`を正本データとして、C0〜C31を意味正本、Contract、Code、Production path、Test、Negative、Recovery、Audit、UI、Evidenceへ対応付ける監査器を追加した。監査器は参照pathと工程番号を検査するが、対応表の成立を機能完成・release readinessへ昇格させない。C32の未監査範囲はC33 Windows最大到達点、C34正式release前作業、およびWindows installed／外部Runtime／Agent／実端末証拠である。
+
+C33ではWindows最大到達点に向け、Windows release build、Rust helper release build、Broker smoke collector、installed smoke collectorのWindows固有検証を整備した。`flutter build windows --release`、`cargo build --release --locked`、およびclean isolated run `c33-2c8ad7d`のBroker smokeはPASSした。Broker smokeは認証IPC、永続store、replay拒否、再起動後health、crash fail-closedを実測した。一方、installed productの総合validatorは、Raw UI Automationでroot／Flutter view以外のsurfaceを取得できないこと、Setup DoctorがCodexホストのLocalCache実行パスとinstalled contextを一致させられないこと、外部Audit anchorが未提供であることから失敗した。これらをComputer Useの補助観測やBroker単体PASSで代替せず、Windows installed productの総合evidenceと正式releaseは未成立のまま保持する。
 
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 

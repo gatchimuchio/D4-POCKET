@@ -15,7 +15,7 @@
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
   <img alt="Schemas" src="https://img.shields.io/badge/schemas-108%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-179%20checks-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-182%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -307,9 +307,9 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ### 2026-09-24 の現況
 
-D4 Pocket統合rev2は、C30のlocal回帰matrixまで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrixは開発環境でPASSしている。C28の8時間実測、Windows installed-path証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
+D4 Pocket統合rev2は、C33のWindows最大到達点に向けた開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
 
-現行の基準検査はSchema 108件、Conformance 179件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
+現行の基準検査はSchema 108件、Conformance 182件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
 
 この repository は **v1.0 product completion に向けた作業中であり、product release をまだ主張していない。** 機械判定上の状態は `not yet a completed product release` である。
 
@@ -334,7 +334,8 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 誇張せずに述べた現在の事実:
 
 - ✅ **Phase A/B は owner-use の範囲で完了している。** owner は desktop shell を日常の local operation に使え、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。
-- ✅ development slice として **schema + conformance が通過**している（108 schema、179 check）。
+- ✅ development slice として **schema + conformance が通過**している（108 schema、182 check）。
+- 🧪 C33ではWindows release buildと、clean isolated runにおけるRust Broker smoke（認証IPC、永続store、replay拒否、再起動後health、crash fail-closed）がPASSした。ただしinstalled productの総合evidence validatorは、UI Automation surface不足、Setup Doctorのinstalled path不一致、外部Audit anchorが未取得のため失敗しており、Windows正式証拠は成立していない。
 - ✅ **LLM が読む基盤は definition-locked** であり、範囲を限定した Reference Extension が一つ、cross-agent reproduction report が一つある。
 - ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。
 - 🧪 **公開 proof pack の境界。** 公開 Windows proof pack には、実測 Windows installed-path evidence に由来する redacted review copy が含まれる。これらは canonical release evidence ではなく、この公開 repository 上の完成製品 release blocker を解消しない。

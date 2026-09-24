@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "de93510d43789c42fec2084f656ddd3447ce09d7e6fa6f7945f9d895ed2c3149"
+      "sha256": "4961bc0de7d164fa7bbfdcc039075240ba3a7c1ef00d936389c3ed1ee55314eb"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "00177f7694ecde09a7838f9484af97e1dc91e0df73b388d04ff6912d614d5b18"
+      "sha256": "ae53f17dc3ab84b8b4f797dc19b218adaf8faab61e16ba37abdd5de64c9ecac8"
     },
     {
       "path": "SECURITY.md",
@@ -1081,7 +1081,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "c876503883720d31526cfed6258c1445e80de5d9be4fa80f70bbc4828bbf0a61"
+      "sha256": "1b4b91df7639409b7a53f5ec72ba3256ac265200c6d46a923559b6a7296fa91c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1353,7 +1353,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "208e5fa52ac5eeade234c77e823ec709962e939034395b8dfc0b65119894d2b9"
+      "sha256": "ee2655757d81c3a8ed4e88797424481aac8e4665528e14c978a13907da2e1357"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
