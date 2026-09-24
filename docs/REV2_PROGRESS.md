@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket 第35工程追記: モバイル端末連携のOS接続契約（2026-09-25）
+
+現行Mobile production sourceを再確認し、招待JSON、端末資格、flutter_secure_storage呼出し、SecureSocket TLS／networkをDartが直接扱うrev2境界違反を確認した。nativeへの移譲前提を日本語意味正本へ明記し、Flutterからの固定channel requestをmobile_device_link_channel_request Schemaとして定義した。pair要求に引数を認めず、既存Device Link operation以外、Owner操作、authority／permission／approval／audit、招待・資格field、および再帰payload中のcredential／secret等のfield名を拒否する。channelはnative OS保管・TLS transportの境界であり、既存Desktop Rust Brokerを迂回する権限経路ではない。
+
+Schema検査器がこれまで意味評価していなかったJSON Schema anyOf、not、propertyNames、containsを評価するよう修正し、それぞれの正常・否定をConformanceへ追加した。以前はcontainsを黙って無視していたため、Module比較Schema内のbaseline Dart define禁止条件が正しく評価されていなかった。Schema 124件／正常例124件／negative fixture 150件、Conformance 197 checks、厳格日本語監査（負債0 files／0 findings）がPASSした。git diff --checkもPASSした。
+
+ここで得た証拠は設定値と試験用例に基づく構造確認だけである。現在はDart側に招待・端末資格・通信・安全保管の直接処理が残っており、AndroidとiOSのOS標準実装、OSの安全保管領域、Flutter境界で秘密を渡さない処理、実際のRustブローカー接続、OSによる背景移行・再起動時の実行証拠は成立していない。実装と実測を後続単位へ残し、Mobileの現行境界・実機証拠・正式配布に関するrelease blockerを維持する。
+
 ## D4 Pocket Phase35追補: 日本語監査とWindows Rust全target試験の再確認（2026-09-25）
 
 直前のWindows環境では日本語基底監査が3 files／19 findingsで失敗し、Rust統合test executable 3件もOS policyに拒否された記録がある。これらの旧FAILは当時の履歴として保持する。現在の修正では、Rust試験用失敗説明18箇所とWindows launcher仕様の英語混在1箇所だけを日本語化し、公開識別子・Broker挙動・Protocol・authority判定は変えていない。`python -X utf8 tooling/日本語基底監査.py --strict`は負債0 files／0 findingsでPASSした。

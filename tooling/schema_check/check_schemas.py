@@ -37,6 +37,7 @@ REQUIRED = {
     "device_link_invitation.schema.json",
     "device_link_credential.schema.json",
     "device_link_request.schema.json",
+    "mobile_device_link_channel_request.schema.json",
     "mobile_agent_list.schema.json",
     "runtime_dialogue_operation.schema.json",
     "runtime_dialogue_request.schema.json",
@@ -222,6 +223,13 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
     if "allOf" in schema:
         for branch in schema["allOf"]:
             errors.extend(validate_instance(value, branch, path, root))
+    if "anyOf" in schema:
+        if not any(not validate_instance(value, branch, path, root) for branch in schema["anyOf"]):
+            errors.append(f"{path}: anyOfの一致がない")
+    if "not" in schema:
+        branch = schema["not"]
+        if isinstance(branch, dict) and not validate_instance(value, branch, path, root):
+            errors.append(f"{path}: notで拒否された値")
     conditional = schema.get("if")
     if isinstance(conditional, dict):
         condition_matches = not validate_instance(value, conditional, path, root)
@@ -274,6 +282,16 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
                 errors.extend(validate_instance(item, item_schema, f"{path}[{index}]", root))
+        contains_schema = schema.get("contains")
+        if isinstance(contains_schema, dict):
+            matching = sum(
+                not validate_instance(item, contains_schema, f"{path}[{index}]", root)
+                for index, item in enumerate(value)
+            )
+            minimum = schema.get("minContains", 1)
+            maximum = schema.get("maxContains")
+            if matching < minimum or (maximum is not None and matching > maximum):
+                errors.append(f"{path}: containsの一致数が範囲外")
 
     if isinstance(value, dict):
         required = schema.get("required", [])
@@ -283,6 +301,10 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
 
         properties = schema.get("properties", {})
         additional = schema.get("additionalProperties", True)
+        property_names = schema.get("propertyNames")
+        if isinstance(property_names, dict):
+            for key in value:
+                errors.extend(validate_instance(key, property_names, f"{path}.<key:{key}>", root))
 
         if additional is False:
             for key in value:

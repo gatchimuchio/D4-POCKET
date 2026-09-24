@@ -1,5 +1,12 @@
 # Mobile 状態
 
+## D4 Pocket rev2 最新境界確認（2026-09-25）
+
+現行sourceの確認で、MobileのDartが招待JSON TextField、資格object、flutter_secure_storage API、SecureSocket TLS／networkを直接扱っている。これはD4 Pocket rev2で明示されたFlutter UI境界に未適合である。mobile_device_link_channel_requestの日本語意味正本、Schema、正常／拒否fixture、Conformanceは追加したが、native transport・保管へのproduction移行はまだ成立していない。過去のDart client → TLS → Rust Broker実行は現行境界の適合証拠として扱わない。
+
+- release_blocker: rev2_mobile_flutter_native_device_link_boundary。Android／iOS native招待UI、OS安全保管、TLS／network移行、秘密非通過・既存Broker到達のproduction検証が未完了。
+- Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。native fixture／host testは実機証拠へ昇格しない。
+
 ## C31現況（2026-09-24）
 
 Mobileは既存の9画面を保持し、C24で通知summary、Runtime lifecycle状態、資源概要、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataを既存Rust Brokerの読み取り専用経路へ投影する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。取得不能な資源値は`unknown`のままとし、MCP live一覧はDesktop owner管理面の境界上、未観測として表示する。

@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mobile_device_link_channel_request.schema.json",
+  "title": "Mobile Flutterからnative Device Link transportへの要求",
+  "description": "招待・資格・secretはこのchannelを通過しない。権限源は既存Desktop Rust Brokerであり、native adapterはOS保管とTLS transportだけを担う。",
+  "type": "object",
+  "required": [
+    "version",
+    "method"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "read_state",
+        "pair",
+        "broker_request",
+        "disconnect",
+        "local_delete",
+        "set_foreground"
+      ]
+    },
+    "broker_operation": {
+      "type": "string",
+      "enum": [
+        "実行系列挙",
+        "Agent一覧",
+        "対話開始",
+        "対話送信",
+        "対話取得",
+        "対話中止",
+        "対話終了",
+        "実行系ライフサイクル状態",
+        "実行系資源観測",
+        "通知一覧",
+        "全Runtime停止要求",
+        "対話履歴閲覧状態",
+        "対話履歴閲覧"
+      ]
+    },
+    "payload": {
+      "$ref": "#/$defs/safe_object"
+    },
+    "foreground": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "safe_value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/safe_value"
+          }
+        },
+        {
+          "$ref": "#/$defs/safe_object"
+        }
+      ]
+    },
+    "safe_object": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "anyOf": [
+            {
+              "enum": [
+                "招待秘密",
+                "端末秘密",
+                "資格秘密",
+                "端末資格",
+                "owner",
+                "Owner",
+                "authority",
+                "Authority",
+                "permission",
+                "Permission",
+                "approval",
+                "Approval",
+                "audit",
+                "Audit"
+              ]
+            },
+            {
+              "pattern": "[\\s\\S]*[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][\\s\\S]*"
+            },
+            {
+              "pattern": "[\\s\\S]*[sS][eE][cC][rR][eE][tT][\\s\\S]*"
+            },
+            {
+              "pattern": "[\\s\\S]*[tT][oO][kK][eE][nN][\\s\\S]*"
+            },
+            {
+              "pattern": "[\\s\\S]*[pP][rR][iI][vV][aA][tT][eE][\\s\\S]*"
+            },
+            {
+              "pattern": "[\\s\\S]*[pP][aA][sS][sS][wW][oO][rR][dD][\\s\\S]*"
+            },
+            {
+              "pattern": "[\\s\\S]*[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN][\\s\\S]*"
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/safe_value"
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "read_state"
+        }
+      },
+      "required": [
+        "version",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "pair"
+        }
+      },
+      "required": [
+        "version",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "broker_request"
+        },
+        "broker_operation": {
+          "enum": [
+            "実行系列挙",
+            "Agent一覧",
+            "対話開始",
+            "対話送信",
+            "対話取得",
+            "対話中止",
+            "対話終了",
+            "実行系ライフサイクル状態",
+            "実行系資源観測",
+            "通知一覧",
+            "全Runtime停止要求",
+            "対話履歴閲覧状態",
+            "対話履歴閲覧"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/safe_object"
+        }
+      },
+      "required": [
+        "version",
+        "method",
+        "broker_operation",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "disconnect"
+        }
+      },
+      "required": [
+        "version",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "local_delete"
+        }
+      },
+      "required": [
+        "version",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "method": {
+          "const": "set_foreground"
+        },
+        "foreground": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "method",
+        "foreground"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

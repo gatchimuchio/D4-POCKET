@@ -189,17 +189,18 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   reason: release claim の promotion には owner approval が必要である。
   required_action: 明示的な owner GO を取得する。
   blocks_release: yes
+
+- item: D4 Pocket rev2 MobileのDevice LinkがFlutter禁止境界に未適合
+  classification: release_blocker
+  registry_id: rev2_mobile_flutter_native_device_link_boundary
+  reason: 現行Dart経路が招待、端末資格、SecureSocket TLS／network、安全保管を直接扱う。native channel契約は追加済みだが、Android／iOS production移行は未実装。
+  required_action: native招待UI、OS保管、TLS transportを実装し、秘密非通過・既存Rust Broker到達・否定経路を検証する。実機凍結、実機証拠、正式配布の各gateも別途維持する。
+  blocks_release: yes
 ~~~
 
 ## v1 後の範囲
 
 ~~~yaml
-- item: Mobile の full release
-  classification: post_v1_scope
-  reason: owner が明示的に mobile を含めない限り、v1.0 の scope は Windows-first PC desktop である。
-  required_action: v1.0 後に完了するか、owner instruction によって scope を更新する。
-  blocks_release: no
-
 - item: multi-user mode
   classification: post_v1_scope
   reason: v1.0 は single-user である。

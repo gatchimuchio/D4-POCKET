@@ -157,6 +157,16 @@
       "blocks_release": true,
       "reason": "2026-09-25のWindows実行でcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1が完遂し、library 244件、helper binary 7件、integration 35件（broker_ipc 9件を含む）が成功した。以前のOS policy拒否は履歴として維持する。",
       "required_action": "現行Windows環境での追加対応はない。今後同じ実行policy拒否を観測した場合は、未実行を成功へ昇格せず、この項目を再評価する。"
+    },
+    {
+      "name": "rev2_mobile_flutter_native_device_link_boundary",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "現行Mobile製品のDevice LinkはDartが招待JSON入力、資格object、安全保管API、SecureSocket TLS／networkを直接扱う。これはD4 Pocket rev2のFlutter UI境界に適合しない。今回成立したのはnative channel要求Schema・fixture・静的Conformanceまでで、Android／iOS native transport・保管へのproduction移行は未実装。",
+      "required_action": "招待入力・接続先確認・TLS pin検証・OS安全保管をAndroid／iOS native側へ移し、秘密をDart・platform channel・表示・error／log／traceへ通さない。既存Device Link TLSから同じDesktop Rust Brokerへ接続し、allowlist・拒否・失効・background停止・資格漏えいの実経路試験を実施する。"
     }
   ]
 }

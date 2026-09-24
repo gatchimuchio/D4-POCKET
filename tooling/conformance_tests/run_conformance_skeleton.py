@@ -168,6 +168,7 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_health",
     "broker_command_envelope",
     "desktop_broker_channel_request",
+    "mobile_device_link_channel_request",
     "adapter_management_manifest",
     "adapter_management_request",
     "adapter_management_receipt",
@@ -2552,6 +2553,68 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
             errors.append("端末経路が禁止操作を受理: " + operation)
     if not validate_instance({**sample, "操作": "対話取得", "内容": {"対話セッションID": "a" * 32}}, schema):
         errors.append("端末要求が操作と内容の不一致を受理")
+    return errors
+
+
+def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list[str]:
+    schema = load_schema("mobile_device_link_channel_request.schema.json")
+    sample = load_contract_fixture("mobile_device_link_channel_request.valid.json")
+    errors = validate_instance(sample, schema)
+    valid = [
+        {"version": 1, "method": "read_state"},
+        {"version": 1, "method": "pair"},
+        {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {}},
+        {"version": 1, "method": "disconnect"},
+        {"version": 1, "method": "local_delete"},
+        {"version": 1, "method": "set_foreground", "foreground": False},
+    ]
+    for candidate in valid:
+        if validate_instance(candidate, schema):
+            errors.append("Mobile native channelの許可requestを拒否: " + candidate["method"])
+    invalid = [
+        {**sample, "招待秘密": "e" * 64},
+        {"version": 1, "method": "pair", "invitation": {"招待ID": "d" * 32}},
+        {"version": 1, "method": "broker_request", "broker_operation": "端末招待", "payload": {}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"端末秘密": "e" * 64}}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"credential": {"value": "e" * 64}}}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"authority": "owner"}}},
+        {"version": 1, "method": "pair", "authority": "owner"},
+        {"version": 1, "method": "unknown"},
+    ]
+    for candidate in invalid:
+        if not validate_instance(candidate, schema):
+            errors.append("Mobile native channelが招待・資格・権限または禁止operationを受理")
+    return errors
+
+
+def test_schema_validator_supports_composition_keywords() -> list[str]:
+    errors = []
+    any_of = {"anyOf": [{"type": "string"}, {"type": "integer"}]}
+    if validate_instance("ok", any_of) or validate_instance(3, any_of):
+        errors.append("schema validatorのanyOfが適合値を拒否した")
+    if not validate_instance(True, any_of):
+        errors.append("schema validatorのanyOfが型不一致を拒否しなかった")
+
+    not_schema = {"not": {"enum": ["forbidden"]}}
+    if validate_instance("allowed", not_schema):
+        errors.append("schema validatorのnotが許可値を拒否した")
+    if not validate_instance("forbidden", not_schema):
+        errors.append("schema validatorのnotが禁止値を拒否しなかった")
+
+    property_names = {
+        "type": "object",
+        "propertyNames": {"not": {"enum": ["secret"]}},
+    }
+    if validate_instance({"ordinary": 1}, property_names):
+        errors.append("schema validatorのpropertyNamesが通常fieldを拒否した")
+    if not validate_instance({"secret": 1}, property_names):
+        errors.append("schema validatorのpropertyNamesが禁止fieldを拒否しなかった")
+
+    contains = {"type": "array", "contains": {"pattern": "^--dart-define="}}
+    if validate_instance(["flutter", "--dart-define=GUI_SHELL_MODULE_TEST=false"], contains):
+        errors.append("schema validatorのcontainsが一致要素を拒否した")
+    if not validate_instance(["flutter", "build", "windows"], contains):
+        errors.append("schema validatorのcontainsが不一致配列を拒否しなかった")
     return errors
 
 
@@ -7114,6 +7177,8 @@ def main() -> int:
         実行系資源観測の証拠境界を検査する,
         実行系ライフサイクルの契約と統治境界を検査する,
         端末契約の構造と禁止操作を検査する,
+        Mobile_native_Device_Link_channelを秘密非通過に制限する,
+        test_schema_validator_supports_composition_keywords,
         二実行系比較の非混線を検査する,
         評価ラボの契約と境界を検査する,
         回帰Caseの契約と境界を検査する,

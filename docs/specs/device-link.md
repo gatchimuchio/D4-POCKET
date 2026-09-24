@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: Rustの暗号化端末経路とowner制御、Mobile製品client・安全保管・lifecycleの接続を実装。Dart製品TLSから実MINIDORAへの接続を検証。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
+状態: Rustの暗号化端末経路とowner制御、既存Mobile client・保管・lifecycleの接続は実装済み。現行Dart製品経路は資格とTLS/networkをFlutter側で扱うため、D4 Pocket rev2のFlutter禁止境界には未適合であり、native transport／保管への移行が必要。過去のDart TLS実行証拠を現在の適合証拠へ読み替えない。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
 
 ## 対象と責任
 
@@ -49,6 +49,16 @@ Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限
 通常の解除では有効なclientから端末離脱の応答を確認し、client不在を解除成功にしない。保存資格の削除後は同じ保管経路で再読取し、不在を確認してから端末内の削除完了を表示する。資格が残る場合や再読取に失敗した場合は通信停止を維持し、削除未確認として再操作を案内する。これは保管APIを通した観測であり、媒体上の物理消去や別processによる後続の再書込み防止を証明しない。
 
 既存の概要・確認・通知・実行系・停止・復旧画面は維持する。接続前の固定preview値を実Runtime状態として表示せず、未接続を明示する。未実装の承認や停止操作を成功表示しない。
+
+## D4 Pocket rev2のFlutter／native境界
+
+Flutterは接続状態と許可済みprojectionだけを表示する。招待JSONをDart TextFieldへ入力しない。native側が招待入力・Host／HostID／証明書hashの確認・結合確認を行い、成功時はnative側で招待秘密を破棄して結合資格をOS安全保管へ保存する。Flutterには端末IDと資格を含まない接続状態projectionだけを返す。
+
+Flutterからnativeへのchannel要求は、版、固定method名、必要な場合の既存Device Link operationとその業務payloadだけから成る。pairing要求は引数なしであり、招待・資格・secret・token・session credentialをchannel越しに渡さない。nativeの通常要求経路は既存Device Link TLSの宛先へ接続し、既存Rust Brokerの資格検査・nonce・allowlist・所有関係・Audit・Approval・Recoveryへ必ず到達する。native側に権限判断、Owner操作、任意host／URL、任意commandを追加しない。
+
+AndroidはOS Keystore保護のnative暗号化保管、iOSはThisDeviceOnly Keychain保管を使う。OS保管が利用できない場合はfail-closedとし、Dart保管・平文保存・backup復元へfallbackしない。TLS証明書hashと有効期間、有限timeout、bounded frame、background中のsocket停止、要求一回限りの扱いを既存契約から弱めない。native応答はoperationごとに検証し、資格field／資格実値を再帰的に除去または拒否してからFlutterへ渡す。例外・system log・test artifactにも秘密値を含めない。
+
+このchannelはMobile製品内のnative transport／保管境界であり、Rust Brokerを迂回する別bridgeではない。Schema・fixture・静的conformanceは契約形状の証拠に限る。実Device Link、Android/iOS OS保管、TLS、background停止のLIVE_RUNTIME証拠とは区別する。
 
 ## 受入試験と残存境界
 

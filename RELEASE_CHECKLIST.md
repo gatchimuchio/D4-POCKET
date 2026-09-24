@@ -26,6 +26,13 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 ## リリース阻害項目（release blocker）
 
 ~~~yaml
+- item: D4 Pocket rev2 Mobile Device Link Flutter境界が未成立
+  classification: release_blocker
+  registry_id: rev2_mobile_flutter_native_device_link_boundary
+  reason: 現行Dart経路が招待・資格・TLS／network・安全保管を直接扱う。Schema／fixture／Conformanceだけではnative production経路の成立を証明しない。
+  required_action: Android／iOS native招待UI、OS安全保管、TLS pinning／bounded transportを実装し、秘密非通過、既存Rust Broker接続、拒否・失効・background停止のproduction試験を通す。
+  blocks_release: yes
+
 - item: language policy runtime convergence gate
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_broker_installed_smoke

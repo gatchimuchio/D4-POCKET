@@ -77,7 +77,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "7c25f92703d7f8af9ce9938d7f2f4a72de47c0d2179ab204d3a84d2e8ef7b935"
+      "sha256": "3b13fca0a1c4ff38dd137787b1a6df1db84af032281b986d1292c241fe9030a3"
     },
     {
       "path": "AUDIT.md",
@@ -93,7 +93,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "63f54d343a7978c9e743c2d99c22493c5ef30393f5349c7dffc3c2431a009289"
+      "sha256": "6f11e3af898d6c5fc8fe604a4841cec02c77f237d814a597b0468b52ce6e9cda"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -129,7 +129,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "120b8e9c05a2c32cc61921b17f114dfb02b3f443c03d64863055d456e788a8d8"
+      "sha256": "0f3c5d5a3c800bcbac100bdfd0037707de2326dba9b480cbbf6f25cfce7d89d4"
     },
     {
       "path": "NOTICE",
@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "b9d133a5ea6611dcb796e565d6d565decf2a1796154fbec76bfdc4c0452ed370"
+      "sha256": "bc6f844f296fb6852eabf14bcb65675e6617919503a2c51e743230268bb87fd1"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bb8b431adeec31bf0b291338c718b7be734c88836a582c7b963d5b2873becc56"
+      "sha256": "1c2e15501748da9fc42f229c9f354b72ee2bfc4980f9ee0791a41946e97283ab"
     },
     {
       "path": "SECURITY.md",
@@ -1129,7 +1129,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8ded65344f55bc82be54c6e468f26ebdd7924a443bfafb1ea214fa4e2d25f293"
+      "sha256": "8fb11d7feb33b2602172aabd198afca47ae2957b794e65a93b58d16be0bf6ae4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1273,7 +1273,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "1964b410f066ae94dfba83c2f707a825b630f0f6ec0d17b8a7256536ebffd1cc"
+      "sha256": "68e9f48836bb50eef8276c24af61083d510182b139a8908e7e0f543528a18125"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
@@ -2064,6 +2064,10 @@
       "sha256": "2e63d3c296f7ec1242bcb8494c2c0f1fa11359912f284c14f6e2cb996284c572"
     },
     {
+      "path": "examples/contracts/invalid/mobile_device_link_channel_request_secret.invalid.json",
+      "sha256": "a007fe6f6daf839e68382755f8c1c4e4c236ac9f1c2370cdc21cc8ceff0bf5bc"
+    },
+    {
       "path": "examples/contracts/invalid/notification.invalid.json",
       "sha256": "efb01c00306f1d4eb7a1ec69ae65db1218add8c0d4e5aa4b36d53dc790ebc132"
     },
@@ -2330,6 +2334,10 @@
     {
       "path": "examples/contracts/mobile_agent_list.valid.json",
       "sha256": "ee0b85fdd5dbc2dd011e6558acdb430e4a9e441d9b89c6e1d2d722418dd6935b"
+    },
+    {
+      "path": "examples/contracts/mobile_device_link_channel_request.valid.json",
+      "sha256": "deda362488ed90a9ef08c460417995b406119676cba812290689689ac95dd058"
     },
     {
       "path": "examples/contracts/notification.valid.json",
@@ -3317,7 +3325,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "53e7f66aebd0777bd88b3df4d72af6dc71fb440ce12e345b6859469ba1e73e48"
+      "sha256": "83eeea66007a1e3cdfaa2df7b9b82e0cf88df1de184295ed121d9bc20e179271"
     },
     {
       "path": "requirements-dev.txt",
@@ -3624,6 +3632,10 @@
       "sha256": "7603acd626bfcb6c3bda91b19551fd207f187953277600be67db3c26198b4589"
     },
     {
+      "path": "specs/mobile_device_link_channel_request.schema.json",
+      "sha256": "227926be27ddae7b9e7b6d8f45e7a3c7a29234bf73b1356e99e39b7b8ba1630a"
+    },
+    {
       "path": "specs/notification.schema.json",
       "sha256": "41316e370d342b9aeb84b495de7c06d885682509ea14a1c27a67365f3a0c02e0"
     },
@@ -3861,7 +3873,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c0052adae76307751c4aa3662621893b702329fac0426325f377bf2a1ec795d7"
+      "sha256": "708418b0b20e77ad8d3aa36fe611d95508bbffaef08fae650e034d06df6723f7"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3937,7 +3949,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "2f5861ca72e0bea20d9ac71673fe1aab2d90285d8d7eeb327d7280c0f3866ebe"
+      "sha256": "1ed3b0c3c6adcc3a35d14473b57de8bb3fe04586902268f073ebeae772515ba8"
     },
     {
       "path": "tooling/shell_snapshot.py",

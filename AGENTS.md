@@ -275,6 +275,8 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 ### 13. 構造制約
 
 - UI frameworkはFlutter
+- MobileのFlutterは表示・操作者入力・非秘密のBroker要求だけを担い、Device Linkの招待・資格・秘密保管・TLS/network接続を直接扱わない。招待入力・接続先確認はAndroid/iOS native UI内で完結させ、招待・資格の実値をDart、platform-channel引数／戻り値、snapshot、error、log、traceへ渡さない
+- Mobile native platform adapterはOS安全保管と、既存Device Link TLSからDesktop Rust Brokerへのtransportだけを担う。Permission、Approval、Audit、Recovery、Agent trustの判定を行わず、既存Rust Brokerを迂回する別Authority経路、平文fallback、自動再送を作らない。platform channelはこの境界付きMobile transportの接続口に限り、新たな権限経路として扱わない
 - Native helperはRust
 - Contract: JSON Schema
 - 実装言語・安全境界方針: `docs/LANGUAGE_POLICY.md`
