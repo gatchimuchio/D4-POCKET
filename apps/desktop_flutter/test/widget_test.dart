@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/main.dart';
+import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/screens/approval_center.dart';
 import 'package:gui_shell_desktop/screens/authority_map.dart';
 import 'package:gui_shell_desktop/screens/audit_viewer.dart';
@@ -665,56 +666,62 @@ void main() {
 
     expect(find.text('環境スナップショット'), findsOneWidget);
     expect(find.textContaining('ネットワーク公開範囲:'), findsOneWidget);
-    expect(find.textContaining('設定／スナップショットのパス:'), findsOneWidget);
+    expect(find.textContaining('設定／スナップショット参照:'), findsOneWidget);
   });
 
-  test('ローカルクライアントが構造化スナップショットを読む', () {
-    final tempDir = Directory.systemTemp.createTempSync('gui-shell-test-');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
-    final snapshotFile = File('${tempDir.path}/shell_snapshot.json');
-    snapshotFile.writeAsStringSync(
-      jsonEncode({
-        'runtimes': [
-          {
-            'runtime_id': 'runtime-from-json',
-            'name': 'Runtime From Json',
-            'status': 'ready',
-            'adapter_id': 'adapter-from-json',
-            'diagnostic_summary': 'loaded from local snapshot',
-          },
-        ],
-        'agent_sessions': [],
-        'permissions': [],
-        'pending_approvals': [],
-        'audit_events': [],
-        'recovery_actions': [],
-        'invariant_flags': {
-          'flutter_imported_by_shell_core': true,
-          'blue_tanuki_imported_by_shell_core': false,
+  test('ローカル診断クライアントは明示注入された値を非権限表示する', () {
+    final suppliedSnapshot = ShellSnapshot.fromJson({
+      'phase_status': {'completed_product_release_claimed': true},
+      'operation_status': {'release_state': 'release_ready'},
+      'snapshot_source': 'broker',
+      'snapshot_path': r'C:\private\snapshot.json',
+      'snapshot_generated_at': '2026-09-24T00:00:00Z',
+      'snapshot_freshness': 'verified',
+      'runtimes': [
+        {
+          'runtime_id': 'runtime-from-json',
+          'name': 'Runtime From Json',
+          'status': 'ready',
+          'adapter_id': 'adapter-from-json',
+          'diagnostic_summary': 'loaded from local snapshot',
         },
-        'setup_doctor_status': 'pass',
-        'installer_grants_authority': false,
-        'installer_silently_approves_permissions': false,
-        'setup_doctor_checks': [
-          {
-            'check_id': 'local.json',
-            'status': 'pass',
-            'message': 'Loaded local diagnostic JSON',
-            'recovery_instruction': null,
-            'grants_authority': false,
-          },
-        ],
-      }),
-    );
+      ],
+      'agent_sessions': [],
+      'permissions': [],
+      'pending_approvals': [],
+      'audit_events': [],
+      'recovery_actions': [],
+      'invariant_flags': {
+        'flutter_imported_by_shell_core': true,
+        'blue_tanuki_imported_by_shell_core': false,
+      },
+      'setup_doctor_status': 'pass',
+      'installer_grants_authority': false,
+      'installer_silently_approves_permissions': false,
+      'setup_doctor_checks': [
+        {
+          'check_id': 'local.json',
+          'status': 'pass',
+          'message': 'Loaded local diagnostic JSON',
+          'recovery_instruction': null,
+          'grants_authority': false,
+        },
+      ],
+    });
 
-    final client = ShellCoreClient.local(snapshotPath: snapshotFile.path);
+    final client = ShellCoreClient.local(snapshot: suppliedSnapshot);
     final snapshot = client.getSnapshot();
 
     expect(client.mode, 'local');
+    expect(client.brokerTransport, isNull);
     expect(snapshot.runtimes.single.runtimeId, 'runtime-from-json');
     expect(snapshot.setupDoctorChecks.single.checkId, 'local.json');
     expect(snapshot.invariantFlags['flutter_imported_by_shell_core'], isTrue);
-    expect(snapshot.snapshotSource, 'local');
+    expect(snapshot.snapshotSource, 'in_memory_diagnostic');
+    expect(snapshot.snapshotPath, 'メモリ内診断値');
+    expect(snapshot.snapshotGeneratedAt, 'unknown');
+    expect(snapshot.snapshotFreshness, 'unknown');
+    expect(snapshot.phaseStatus.completedProductReleaseClaimed, isFalse);
     expect(snapshot.operationStatus.releaseState, 'not claimed');
   });
 
@@ -804,88 +811,56 @@ void main() {
     expect(configCheck['status'], 'pass');
   });
 
-  test('ローカルスナップショットの代替処理がリリース準備完了を主張しない', () {
-    final tempDir = Directory.systemTemp.createTempSync('gui-shell-missing-');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
-    final missingPath = '${tempDir.path}/missing_snapshot.json';
-
-    final snapshot = ShellCoreClient.local(
-      snapshotPath: missingPath,
-    ).getSnapshot();
+  test('診断値の未注入時はfallbackとなりリリース準備完了を主張しない', () {
+    final snapshot = ShellCoreClient.local().getSnapshot();
 
     expect(snapshot.snapshotSource, 'fallback');
-    expect(snapshot.snapshotFreshness, 'missing');
+    expect(snapshot.snapshotFreshness, 'unknown');
     expect(snapshot.operationStatus.releaseState, 'not claimed');
+    expect(snapshot.phaseStatus.completedProductReleaseClaimed, isFalse);
     expect(
       snapshot.problems.any(
-        (problem) => problem.problemId == 'local-snapshot-missing',
-      ),
-      isTrue,
-    );
-  });
-
-  test('ローカルスナップショットの解析失敗が安全に代替処理へ移る', () {
-    final tempDir = Directory.systemTemp.createTempSync('gui-shell-bad-json-');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
-    final snapshotFile = File('${tempDir.path}/bad_snapshot.json')
-      ..writeAsStringSync('{bad json');
-
-    final snapshot = ShellCoreClient.local(
-      snapshotPath: snapshotFile.path,
-    ).getSnapshot();
-
-    expect(snapshot.snapshotSource, 'fallback');
-    expect(snapshot.snapshotFreshness, 'parse failed');
-    expect(snapshotAgeLabel(snapshot), '解析失敗');
-    expect(snapshot.operationStatus.releaseState, 'not claimed');
-    expect(
-      snapshot.problems.any(
-        (problem) => problem.problemId == 'local-snapshot-parse-failed',
+        (problem) => problem.problemId == 'local-snapshot-not-injected',
       ),
       isTrue,
     );
   });
 
   testWidgets('環境診断UIがローカル診断データを表示する', (WidgetTester tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('gui-shell-ui-test-');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
-    final snapshotFile = File('${tempDir.path}/shell_snapshot.json');
-    snapshotFile.writeAsStringSync(
-      jsonEncode({
-        'runtimes': [
-          {
-            'runtime_id': 'runtime-ui-json',
-            'name': 'Runtime UI Json',
-            'status': 'ready',
-            'adapter_id': 'adapter-ui-json',
-            'diagnostic_summary': 'loaded from local snapshot',
-          },
-        ],
-        'agent_sessions': [],
-        'permissions': [],
-        'pending_approvals': [],
-        'audit_events': [],
-        'recovery_actions': [],
-        'invariant_flags': {},
-        'setup_doctor_status': 'pass',
-        'installer_grants_authority': false,
-        'installer_silently_approves_permissions': false,
-        'setup_doctor_checks': [
-          {
-            'check_id': 'local.ui',
-            'status': 'pass',
-            'message': 'UI loaded local diagnostic JSON',
-            'recovery_instruction': null,
-            'grants_authority': false,
-          },
-        ],
-      }),
-    );
+    final snapshot = ShellSnapshot.fromJson({
+      'runtimes': [
+        {
+          'runtime_id': 'runtime-ui-json',
+          'name': 'Runtime UI Json',
+          'status': 'ready',
+          'adapter_id': 'adapter-ui-json',
+          'diagnostic_summary': 'loaded from local snapshot',
+        },
+      ],
+      'agent_sessions': [],
+      'permissions': [],
+      'pending_approvals': [],
+      'audit_events': [],
+      'recovery_actions': [],
+      'invariant_flags': {},
+      'setup_doctor_status': 'pass',
+      'installer_grants_authority': false,
+      'installer_silently_approves_permissions': false,
+      'setup_doctor_checks': [
+        {
+          'check_id': 'local.ui',
+          'status': 'pass',
+          'message': 'UI loaded local diagnostic JSON',
+          'recovery_instruction': null,
+          'grants_authority': false,
+        },
+      ],
+    });
 
     await tester.pumpWidget(
       MaterialApp(
         home: SetupDoctor(
-          client: ShellCoreClient.local(snapshotPath: snapshotFile.path),
+          client: ShellCoreClient.local(snapshot: snapshot),
         ),
       ),
     );

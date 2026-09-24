@@ -731,6 +731,19 @@ class PhaseStatusRecord {
           json['completed_product_release_claimed'] as bool? ?? false,
     );
   }
+
+  PhaseStatusRecord copyWith({bool? completedProductReleaseClaimed}) {
+    return PhaseStatusRecord(
+      phaseAStatus: phaseAStatus,
+      phaseBStatus: phaseBStatus,
+      phaseCStatus: phaseCStatus,
+      phaseDStatus: phaseDStatus,
+      phaseEStatus: phaseEStatus,
+      phaseFStatus: phaseFStatus,
+      completedProductReleaseClaimed:
+          completedProductReleaseClaimed ?? this.completedProductReleaseClaimed,
+    );
+  }
 }
 
 class OperationStatusRecord {
@@ -1023,6 +1036,7 @@ class ShellSnapshot {
   }
 
   ShellSnapshot copyWith({
+    PhaseStatusRecord? phaseStatus,
     OperationStatusRecord? operationStatus,
     List<ProblemRecord>? problems,
     List<EvidenceRecord>? evidence,
@@ -1035,7 +1049,7 @@ class ShellSnapshot {
     String? snapshotFreshness,
   }) {
     return ShellSnapshot(
-      phaseStatus: phaseStatus,
+      phaseStatus: phaseStatus ?? this.phaseStatus,
       operationStatus: operationStatus ?? this.operationStatus,
       runtimes: runtimes,
       agentSessions: agentSessions,

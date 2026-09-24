@@ -111,3 +111,7 @@ Flutter product path 上の broker health / content projection / approval の pr
 
 F. Python を除去せずに runtime 非依存へ格下げできる範囲と、Rust へ移植が必要な範囲はどこか。
 schema validation、conformance、release evidence、migration parity oracle は Python のまま残せる。authority key normalization、permission eligibility、approval protected-field enforcement、content visibility projection、audit verification、recovery classification、command-envelope eligibility は Rust broker parity path に移植済みで、Flutter product client からも broker response として取得する。product path に Python authority process startup がないことと no-FFI/direct-bridge assertion は `tooling/release_runtime_assertions.py --check` で固定済みである。process/credential/update gated execution、installed no-Python-runtime proof、Windows installed-path proof は未実装である。
+
+## 2026-09-25 更新：local診断snapshot境界
+
+本監査の2026-06-03時点の観測履歴は保持する。現行コードでは`ShellCoreClient.local()`の環境変数・filesystem読込を除去し、明示注入されたメモリ内`ShellSnapshot`だけを診断表示に使う。入力出所と鮮度はunknown、release claimは抑止する。製品状態は引き続きBroker経路である。

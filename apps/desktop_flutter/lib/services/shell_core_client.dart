@@ -1,11 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 
 import '../models/generated_contracts.dart';
 import 'broker_client.dart';
 import 'workspace_client.dart';
-
-const String _snapshotFreshnessParseFailed = 'parse failed';
 
 class ShellCoreClient {
   const ShellCoreClient._(
@@ -129,57 +126,22 @@ class ShellCoreClient {
     }
   }
 
-  factory ShellCoreClient.local({String? snapshotPath}) {
-    final paths = snapshotPath == null
-        ? _candidateSnapshotPaths()
-        : <String>[snapshotPath];
-    for (final resolvedPath in paths) {
-      final file = File(resolvedPath);
-      if (!file.existsSync()) {
-        continue;
-      }
-      try {
-        final json =
-            jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
-        final snapshot = ShellSnapshot.fromJson(json).copyWith(
-          snapshotSource: json['snapshot_source'] as String? ?? 'local',
-          snapshotPath: resolvedPath,
-          snapshotGeneratedAt: json['snapshot_generated_at'] as String? ??
-              json['generated_at'] as String? ??
-              json['snapshot_freshness'] as String? ??
-              file.lastModifiedSync().toIso8601String(),
-          snapshotFreshness: json['snapshot_freshness'] as String? ??
-              file.lastModifiedSync().toIso8601String(),
-        );
-        return ShellCoreClient._(snapshot, 'local');
-      } on Object {
-        return ShellCoreClient._(
-          _snapshotWithLocalIssue(
-            problemId: 'local-snapshot-parse-failed',
-            item: 'ローカルスナップショットの解析失敗',
-            classification: 'required_for_v1',
-            severity: 'warning',
-            message: '所有者操作用ローカルスナップショットを解析できませんでした。',
-            target: resolvedPath,
-            requiredAction: 'ローカル確認モードを使う前に、開発診断スナップショットを更新してください。',
-            source: 'fallback',
-            freshness: _snapshotFreshnessParseFailed,
-          ),
-          'local',
-        );
-      }
+  factory ShellCoreClient.local({ShellSnapshot? snapshot}) {
+    if (snapshot == null) {
+      return const ShellCoreClient._(_localFallbackSnapshot, 'local');
     }
     return ShellCoreClient._(
-      _snapshotWithLocalIssue(
-        problemId: 'local-snapshot-missing',
-        item: 'ローカルスナップショットなし',
-        classification: 'known_limitation',
-        severity: 'info',
-        message: '所有者操作用ローカルスナップショットファイルがありません。',
-        target: paths.first,
-        requiredAction: 'ローカル確認モードを使う前に、開発診断スナップショットを作成してください。',
-        source: 'fallback',
-        freshness: 'missing',
+      snapshot.copyWith(
+        phaseStatus: snapshot.phaseStatus.copyWith(
+          completedProductReleaseClaimed: false,
+        ),
+        operationStatus: snapshot.operationStatus.copyWith(
+          releaseState: 'not claimed',
+        ),
+        snapshotSource: 'in_memory_diagnostic',
+        snapshotPath: 'メモリ内診断値',
+        snapshotGeneratedAt: 'unknown',
+        snapshotFreshness: 'unknown',
       ),
       'local',
     );
@@ -1129,61 +1091,6 @@ Map<String, Object?> _problemToRecoveryPlaybookJson(
   };
 }
 
-List<String> _candidateSnapshotPaths() {
-  final explicit = Platform.environment['GUI_SHELL_SNAPSHOT_JSON'];
-  if (explicit != null && explicit.isNotEmpty) {
-    return [explicit];
-  }
-  final paths = <String>[];
-  if (Platform.isWindows) {
-    final localAppData = Platform.environment['LOCALAPPDATA'];
-    if (localAppData != null && localAppData.isNotEmpty) {
-      paths.add('$localAppData\\GUI-Shell\\shell_snapshot.json');
-    }
-  }
-  paths.add('.gui_shell/shell_snapshot.json');
-  paths.add('.gui-shell/shell_snapshot.json');
-  return paths;
-}
-
-ShellSnapshot _snapshotWithLocalIssue({
-  required String problemId,
-  required String item,
-  required String classification,
-  required String severity,
-  required String message,
-  required String target,
-  required String requiredAction,
-  required String source,
-  required String freshness,
-}) {
-  final problem = ProblemRecord(
-    problemId: problemId,
-    severity: severity,
-    category: 'local_snapshot',
-    message: message,
-    target: target,
-    recoveryId: 'recover-local-snapshot',
-    item: item,
-    classification: classification,
-    reason: message,
-    requiredAction: requiredAction,
-    blocksRelease: false,
-  );
-  final problems = [problem, ..._localFallbackSnapshot.problems];
-  return _localFallbackSnapshot.copyWith(
-    problems: problems,
-    operationStatus: _localFallbackSnapshot.operationStatus.copyWith(
-      problemsCount: problems.length,
-      releaseState: 'not claimed',
-    ),
-    snapshotSource: source,
-    snapshotPath: target,
-    snapshotGeneratedAt: freshness,
-    snapshotFreshness: freshness,
-  );
-}
-
 const _mockSnapshot = ShellSnapshot(
   phaseStatus: PhaseStatusRecord(
     phaseAStatus: 'complete',
@@ -1678,9 +1585,8 @@ const _localFallbackSnapshot = ShellSnapshot(
     SetupDoctorCheckRecord(
       checkId: 'local.snapshot',
       status: 'warning',
-      message: 'ローカルShell Coreスナップショットファイルが見つかりません',
-      recoveryInstruction:
-          '開発診断スナップショットを更新するか、ローカル確認用にGUI_SHELL_SNAPSHOT_JSONを設定してください。',
+      message: 'メモリ内診断スナップショットが注入されていません',
+      recoveryInstruction: '診断データを明示的に渡すか、製品操作ではBroker経路を使用してください。',
       grantsAuthority: false,
     ),
   ],
@@ -1688,7 +1594,7 @@ const _localFallbackSnapshot = ShellSnapshot(
     TrustRecord(
       scope: 'workspace_trust',
       state: 'unknown',
-      source: 'ローカルスナップショットなし',
+      source: '診断データ未注入',
       expiresAt: null,
       blockedOperations: ['agent.execute'],
     ),
@@ -1705,16 +1611,16 @@ const _localFallbackSnapshot = ShellSnapshot(
   permissionDiffs: [],
   problems: [
     ProblemRecord(
-      problemId: 'local-snapshot-missing',
+      problemId: 'local-snapshot-not-injected',
       severity: 'warning',
-      category: 'missing_evidence',
-      message: 'ローカルShell Coreスナップショットファイルがありません。',
-      target: '.gui_shell/shell_snapshot.json',
+      category: 'missing_diagnostic_input',
+      message: 'メモリ内Shell Core診断スナップショットが渡されていません。',
+      target: 'メモリ内診断値',
       recoveryId: 'recover-local-snapshot',
       item: '代替スナップショット使用中',
       classification: 'known_limitation',
-      reason: 'ローカルスナップショットを利用できないため、安全な代替値を使用しています。',
-      requiredAction: 'ローカル確認用の開発診断スナップショットを更新してください。',
+      reason: '明示注入された診断データがないため、安全な代替値を使用しています。',
+      requiredAction: '表示専用の診断が必要な場合だけShellSnapshotを明示的に渡してください。',
       blocksRelease: false,
     ),
   ],
@@ -1723,7 +1629,7 @@ const _localFallbackSnapshot = ShellSnapshot(
       evidenceId: 'local-shell-snapshot',
       kind: 'snapshot',
       status: 'missing',
-      path: '.gui_shell/shell_snapshot.json',
+      path: 'メモリ内診断値',
       hash: '',
       exportable: false,
     ),
@@ -1732,10 +1638,10 @@ const _localFallbackSnapshot = ShellSnapshot(
     SettingRecord(
       key: 'snapshot.path',
       group: 'local',
-      defaultValue: '.gui_shell/shell_snapshot.json',
-      currentValue: '.gui_shell/shell_snapshot.json',
-      effectiveValue: '.gui_shell/shell_snapshot.json',
-      source: 'GUI_SHELL_SNAPSHOT_JSON',
+      defaultValue: 'メモリ内診断値',
+      currentValue: '未注入',
+      effectiveValue: '未注入',
+      source: '診断クライアント初期値',
       modified: false,
       dangerous: false,
       authorityRelated: false,
@@ -1770,12 +1676,11 @@ const _localFallbackSnapshot = ShellSnapshot(
   ),
   recoveryPlaybook: [
     RecoveryPlaybookRecord(
-      item: 'ローカルShell Coreスナップショットなし',
+      item: 'メモリ内診断スナップショット未注入',
       severity: 'owner-use',
       classification: 'required_for_v1',
       safeToIgnoreForPhaseB: false,
-      requiredAction:
-          '開発診断スナップショットを更新するか、ローカル確認用にGUI_SHELL_SNAPSHOT_JSONを設定してください。',
+      requiredAction: '表示専用の診断が必要な場合だけShellSnapshotを明示的に渡してください。',
       blocksCompletedProductRelease: false,
     ),
     RecoveryPlaybookRecord(
@@ -1788,7 +1693,7 @@ const _localFallbackSnapshot = ShellSnapshot(
     ),
   ],
   snapshotSource: 'fallback',
-  snapshotPath: '.gui_shell/shell_snapshot.json',
-  snapshotGeneratedAt: 'missing',
-  snapshotFreshness: 'missing',
+  snapshotPath: 'メモリ内診断値（未注入）',
+  snapshotGeneratedAt: 'unknown',
+  snapshotFreshness: 'unknown',
 );

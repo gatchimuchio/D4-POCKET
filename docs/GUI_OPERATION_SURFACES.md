@@ -177,8 +177,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: Shell snapshot generator migration oracle
   classification: required_for_v1
   status: implemented
-  evidence: python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.jsonは、development / inspection modeだけでShellCoreClient.local()が利用するlocal diagnostic JSONを生成する。製品のmain.dartはShellCoreClient.product()とbroker IPCを使用する。
-  authority_boundary: snapshot生成は所有者用のmigration / development evidenceとしてShell CoreおよびSetup Doctorの状態を記録する。権限を付与せず、installed product runtimeの依存関係として残してはならない。
+  evidence: python3 tooling/shell_snapshot.py --write .gui_shell/shell_snapshot.jsonは開発・移行検証用JSONを生成する。Flutterはこのfileを読み込まない。ShellCoreClient.local()は明示注入されたメモリ内ShellSnapshotだけを表示し、製品のmain.dartはShellCoreClient.product()とBroker IPCを使用する。
+  authority_boundary: 生成JSONは外部の開発・移行検証資料であり、Flutterへの暗黙入力や権限源にしない。明示注入値も出所・鮮度unknown、release claim抑止の表示専用データとして扱う。installed product runtimeの依存関係にPython生成物を残してはならない。
 
 - item: Evidence bundle export
   classification: required_for_v1

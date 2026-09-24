@@ -77,7 +77,7 @@ GUI-Shell は、三つの完了定義を分離して使用する。
 - item: Flutter local Shell Core client
   classification: required_for_v1
   status: implemented
-  evidence: ShellCoreClient.local() は GUI_SHELL_SNAPSHOT_JSON、Windows の %LOCALAPPDATA%\GUI-Shell\shell_snapshot.json、または local development 用 .gui_shell/shell_snapshot.json から structured local snapshot JSON を読み込む。ShellCoreClient.mock() は test／demo 用として分離したままである。
+  evidence: ShellCoreClient.local() は明示注入されたShellSnapshotだけを表示用に受け取り、未注入時は診断fallbackを返す。Flutter側の環境変数・filesystem読込はなく、入力の出所・鮮度はunknown、release claimは常に抑止する。製品状態はShellCoreClient.product()経由のBroker応答を使う。
   blocks_release: no
 
 - item: GUI operation surfaces

@@ -1065,3 +1065,30 @@ clean source 53182cd4cab77e025c61913357cf527270f4dd11をrev2-53182cd-20260911へ
   reason: 現行collectorの個別surface実測は成功したが、上記は変更中の診断専用runであり、現行clean commitからの正式統合runは別に必要。
   required_action: commit後に分離配置して同collectorを通常モードで実行し、署名を除く各関門の実結果を確認する。
   blocks_release: yes
+
+
+## Flutter診断snapshot経路から直接filesystem読込を除去（2026-09-25）
+
+`ShellCoreClient.local()`が環境変数、`LOCALAPPDATA`、相対pathを探索してJSONを同期読込していた。現行製品entryは`ShellCoreClient.product()`だが、この診断経路もFlutterのfilesystem境界に反するため、path探索・file readを削除した。local clientは呼出側から明示注入された型付き`ShellSnapshot`だけを表示し、未注入時は固定fallbackを使う。snapshot source/pathをメモリ診断値へ固定し、鮮度をunknown、完了release claimをfalse、release stateを`not claimed`へ強制する。`SetupDoctor`の表示も実pathを前提としない「snapshot参照」へ変更した。製品状態は引き続きBroker経由であり、この変更はBroker権限・実測の証拠ではない。
+
+local clientの正常注入、release claim偽装入力の抑止、未注入fallback、Setup Doctor表示をDesktop testで検証した。JSON Schemaは変更していない。Python snapshot generatorは開発・移行検証資料として残すが、Flutterからは読まない。過去のrev1／rev2進捗記述は履歴として書き換えず、現行説明とmappingだけを更新した。
+
+検証結果:
+
+- `dart format lib/models/generated_contracts.dart lib/screens/setup_doctor.dart lib/services/shell_core_client.dart test/widget_test.dart`：整形完了。
+- `flutter analyze`（`apps/desktop_flutter`）：Desktopの静的解析完了。
+- `flutter test --reporter compact`（`apps/desktop_flutter`）：104件すべて成功。
+- `flutter analyze`（`apps/mobile_flutter`）：Mobileの静的解析完了。
+- `flutter build windows --release`（`apps/desktop_flutter`）：Windows向け製品構成の生成完了。インストール済み製品の起動実証ではない。
+- `python tooling/schema_check/check_schemas.py`：Schema 122件、正常例122件、拒否例147件すべて適合。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：適合検査192件すべて成功。
+- `python tooling/release_runtime_assertions.py --check`：検査12件すべて成功。証拠区分はCONFIG／FIXTUREのみ。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: FAIL。既存baselineの3 files／19 findings（`docs/specs/windows-desktop-launcher.md` 1、`native/rust_helper/src/broker/ipc_server.rs` 12、`native/rust_helper/src/desktop_launcher.rs` 6）であり、この変更の新規findingは確認されなかった。
+
+今回確認したのは静的境界、model projection、test/buildの範囲であり、live runtime、installed Windows実行、正式release証拠ではない。既存の`release_blockers.registry.json`項目`rev2_flutter_broker_channel_boundary`は継続する。Setup Doctor exportおよびsurface semantics exportには別のFlutter filesystem利用が残り、別単位で監査・移行する。
+
+- item: `rev2_flutter_broker_channel_boundary`に残るSetup Doctor／surface semantics exportのfilesystem責務
+  classification: release_blocker
+  reason: 今回のlocal snapshot経路以外にFlutterからのfile read/writeが残っており、Rust Brokerへの責務集約を満たしていない。
+  required_action: 各exportの必要性と責務を調査し、既存Broker経路に権限・監査・復旧境界を追加した上でFlutterの直接file accessを除去する。診断用途をなくす変更は先に機能要求と照合する。
+  blocks_release: yes

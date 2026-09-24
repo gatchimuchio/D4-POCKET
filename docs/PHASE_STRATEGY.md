@@ -29,7 +29,7 @@ GUI-Shell は、owner-use の進捗と completed product の release readiness �
 - item: B-2 local snapshot / local runtime wiring
   classification: required_for_v1
   status: complete
-  evidence: ShellCoreClient.local() は development／diagnostic inspection 用として利用可能なままで、GUI_SHELL_SNAPSHOT_JSON、%LOCALAPPDATA%\GUI-Shell\shell_snapshot.json、または .gui_shell/shell_snapshot.json を読み込む。parse／missing failure は release claim を行わず安全に fallback する。
+  evidence: ShellCoreClient.local() は明示注入されたShellSnapshotだけを表示用に受け取り、未注入時は安全なfallbackを返す。Flutterからの環境変数・filesystem読込は行わず、入力の出所・鮮度はunknown、release claimは抑止する。ファイル生成物をFlutterへ取り込む経路は本機能に含めず、製品状態はBroker経由とする。
   blocks_release: no
 
 - item: B-3 owner launch flow

@@ -34,7 +34,7 @@ class SetupDoctor extends StatelessWidget {
             'Rust helper: validate_all内のcargo testで検証',
             'ネットワーク公開範囲: ${snapshot.networkExposure}',
             '監査鎖状態: ${snapshot.auditChainStatus}',
-            '設定／スナップショットのパス: ${snapshot.snapshotPath}',
+            '設定／スナップショット参照: ${snapshot.snapshotPath}',
           ],
         ),
         SectionList(

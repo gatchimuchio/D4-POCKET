@@ -5315,10 +5315,25 @@ def test_desktop_flutter_keeps_authority_in_shell_core_client() -> list[str]:
     client = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
     if "full_payload_projected_without_full_visibility': false" not in client:
         errors.append("desktop Flutterのmock clientがShell Coreのinvariant statusを公開していない")
-    if "factory ShellCoreClient.local() => ShellCoreClient.mock()" in client:
-        errors.append("desktop Flutterのlocal clientが依然としてdirect mock aliasである")
-    if "ShellSnapshot.fromJson" not in client:
-        errors.append("desktop Flutterのlocal clientが構造化snapshot JSONをloadしない")
+    if "ShellSnapshot? snapshot" not in client:
+        errors.append("desktop Flutterのlocal clientが明示注入されたsnapshotを受け取らない")
+    forbidden_local_io = [
+        "dart:io",
+        "File(",
+        "Directory(",
+        "Platform.environment",
+        "readAsString",
+        "existsSync(",
+        "LOCALAPPDATA",
+        "GUI_SHELL_SNAPSHOT_JSON",
+    ]
+    for token in forbidden_local_io:
+        if token in client:
+            errors.append(f"desktop Flutterのlocal clientが直接I/O参照を含む: {token}")
+    if "completedProductReleaseClaimed: false" not in client:
+        errors.append("desktop Flutterのlocal clientが注入データのrelease claimを抑止しない")
+    if "releaseState: 'not claimed'" not in client:
+        errors.append("desktop Flutterのlocal clientが注入データのrelease stateを抑止しない")
     return errors
 
 
