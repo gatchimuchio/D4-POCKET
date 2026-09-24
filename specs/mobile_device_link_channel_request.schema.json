@@ -43,9 +43,7 @@
         "対話履歴閲覧"
       ]
     },
-    "payload": {
-      "$ref": "#/$defs/safe_object"
-    },
+    "payload": {},
     "foreground": {
       "type": "boolean"
     }
@@ -97,6 +95,9 @@
               ]
             },
             {
+              "pattern": "[oO][wW][nN][eE][rR]|[aA][uU][tT][hH][oO][rR][iI][tT][yY]|[pP][eE][rR][mM][iI][sS][sS][iI][oO][nN]|[aA][pP][pP][rR][oO][vV][aA][lL]|[aA][uU][dD][iI][tT]"
+            },
+            {
               "pattern": "[\\s\\S]*[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL][\\s\\S]*"
             },
             {
@@ -119,6 +120,41 @@
       },
       "additionalProperties": {
         "$ref": "#/$defs/safe_value"
+      }
+    },
+    "history_payload": {
+      "type": "object",
+      "required": ["approval_id", "query"],
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+        },
+        "query": { "$ref": "#/$defs/history_query" }
+      }
+    },
+    "history_query": {
+      "type": "object",
+      "required": ["after", "limit"],
+      "additionalProperties": false,
+      "properties": {
+        "after": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "latest_per_request": { "type": "boolean" },
+        "include_audit_context": { "type": "boolean" },
+        "include_result_evidence": { "type": "boolean" },
+        "include_content_receipt": { "type": "boolean" },
+        "filter": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "要求ID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+            "対話セッションID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+            "実行系ID": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])" },
+            "状態": { "type": "string", "enum": ["承認待ち", "実行中", "成功", "保留", "失敗", "中止"] }
+          }
+        }
       }
     }
   },
@@ -174,13 +210,27 @@
             "実行系資源観測",
             "通知一覧",
             "全Runtime停止要求",
-            "対話履歴閲覧状態",
-            "対話履歴閲覧"
+            "対話履歴閲覧状態"
           ]
         },
         "payload": {
           "$ref": "#/$defs/safe_object"
         }
+      },
+      "required": [
+        "version",
+        "method",
+        "broker_operation",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": { "const": 1 },
+        "method": { "const": "broker_request" },
+        "broker_operation": { "const": "対話履歴閲覧" },
+        "payload": { "$ref": "#/$defs/history_payload" }
       },
       "required": [
         "version",

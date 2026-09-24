@@ -2592,13 +2592,19 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "read_state"},
         {"version": 1, "method": "pair"},
         {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "latest_per_request": True, "include_audit_context": True, "include_result_evidence": True, "include_content_receipt": True, "filter": {"実行系ID": "local"}}}},
         {"version": 1, "method": "disconnect"},
         {"version": 1, "method": "local_delete"},
         {"version": 1, "method": "set_foreground", "foreground": False},
     ]
     for candidate in valid:
         if validate_instance(candidate, schema):
-            errors.append("Mobile native channelの許可requestを拒否: " + candidate["method"])
+            errors.append(
+                "Mobile native channelの許可requestを拒否: "
+                + candidate["method"]
+                + "/"
+                + str(candidate.get("broker_operation"))
+            )
     invalid = [
         {**sample, "招待秘密": "e" * 64},
         {"version": 1, "method": "pair", "invitation": {"招待ID": "d" * 32}},
@@ -2606,12 +2612,20 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"端末秘密": "e" * 64}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"credential": {"value": "e" * 64}}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"authority": "owner"}}},
+        {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {"approval_id": "a" * 32}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "owner": True}}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "filter": {"authority": "owner"}}}},
         {"version": 1, "method": "pair", "authority": "owner"},
         {"version": 1, "method": "unknown"},
     ]
     for candidate in invalid:
         if not validate_instance(candidate, schema):
-            errors.append("Mobile native channelが招待・資格・権限または禁止operationを受理")
+            errors.append(
+                "Mobile native channelが招待・資格・権限または禁止operationを受理: "
+                + str(candidate.get("method"))
+                + "/"
+                + str(candidate.get("broker_operation"))
+            )
     return errors
 
 

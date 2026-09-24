@@ -56,6 +56,8 @@ Flutterは接続状態と許可済みprojectionだけを表示する。招待JSO
 
 Flutterからnativeへのchannel要求は、版、固定method名、必要な場合の既存Device Link operationとその業務payloadだけから成る。pairing要求は引数なしであり、招待・資格・secret・token・session credentialをchannel越しに渡さない。nativeの通常要求経路は既存Device Link TLSの宛先へ接続し、既存Rust Brokerの資格検査・nonce・allowlist・所有関係・Audit・Approval・Recoveryへ必ず到達する。native側に権限判断、Owner操作、任意host／URL、任意commandを追加しない。
 
+履歴閲覧時だけ、現在のowner承認状態を照合するための`approval_id`参照と閉じた履歴queryをnative channel経由でBrokerへ渡せる。これはApproval本文・token・発行操作ではなく、native側は権限や承認有効性を解釈しない。許可はRust Brokerが保持する現在のowner grant、期限、実行系範囲の照合だけで決まる。他操作のpayloadでは`approval_id`を含む権限・監査fieldを引き続き拒否する。
+
 AndroidはOS Keystore保護のnative暗号化保管、iOSはThisDeviceOnly Keychain保管を使う。OS保管が利用できない場合はfail-closedとし、Dart保管・平文保存・backup復元へfallbackしない。TLS証明書hashと有効期間、有限timeout、bounded frame、background中のsocket停止、要求一回限りの扱いを既存契約から弱めない。native応答はoperationごとに検証し、資格field／資格実値を再帰的に除去または拒否してからFlutterへ渡す。例外・system log・test artifactにも秘密値を含めない。
 
 このchannelはMobile製品内のnative transport／保管境界であり、Rust Brokerを迂回する別bridgeではない。Schema・fixture・静的conformanceは契約形状の証拠に限る。実Device Link、Android/iOS OS保管、TLS、background停止のLIVE_RUNTIME証拠とは区別する。

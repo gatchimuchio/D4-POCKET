@@ -2,6 +2,12 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase35追補: 履歴閲覧grant参照の限定例外（2026-09-25）
+
+既存Mobile `HistoryClient`が、ownerによる事前承認後に`approval_id`と閉じたqueryを`対話履歴閲覧`で提示することを現行sourceから確認した。直前のnative Channel Schemaは権限関連keyを一律拒否していたため、正規のread-only履歴閲覧まで構造上利用不能だった。`approval_id`を`対話履歴閲覧`のみに限定した操作別payloadへ移し、他operationのauthority／approval／audit keyは引き続き拒否する。native adapterは値を権限として評価せず、現在有効なgrant、期限、実行系scopeの最終照合をRust Brokerだけが行う。
+
+正例には現行HistoryClientの全query flagと実行系filterを用い、Agent一覧へのapproval_id混入、履歴queryのowner／authority field、未知query fieldを否定例として追加した。Schema 124／正常例124／negative fixture 150、Conformance 197 checks、strict日本語監査0 files／0 findingsがPASS。これは契約整合性であり、native transportや履歴製品経路のruntime証拠ではない。
+
 ## D4 Pocket 第35工程追記: モバイル端末連携のOS接続契約（2026-09-25）
 
 現行Mobile production sourceを再確認し、招待JSON、端末資格、flutter_secure_storage呼出し、SecureSocket TLS／networkをDartが直接扱うrev2境界違反を確認した。nativeへの移譲前提を日本語意味正本へ明記し、Flutterからの固定channel requestをmobile_device_link_channel_request Schemaとして定義した。pair要求に引数を認めず、既存Device Link operation以外、Owner操作、authority／permission／approval／audit、招待・資格field、および再帰payload中のcredential／secret等のfield名を拒否する。channelはnative OS保管・TLS transportの境界であり、既存Desktop Rust Brokerを迂回する権限経路ではない。

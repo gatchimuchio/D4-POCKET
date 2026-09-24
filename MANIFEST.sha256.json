@@ -1129,7 +1129,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8fb11d7feb33b2602172aabd198afca47ae2957b794e65a93b58d16be0bf6ae4"
+      "sha256": "725ffc99851764e0234a8e1733608e6937637307d5b130d1e1274c74268819a8"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1273,7 +1273,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "f3cbc0f8613c946d34f7c8ec60d889f026bfd111e057cc17ab55b8a513e2aad3"
+      "sha256": "d3711c010fe656d6533065e51a1d741182cd8d75322e3c866dc6cad72bf8c0e9"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
@@ -3633,7 +3633,7 @@
     },
     {
       "path": "specs/mobile_device_link_channel_request.schema.json",
-      "sha256": "227926be27ddae7b9e7b6d8f45e7a3c7a29234bf73b1356e99e39b7b8ba1630a"
+      "sha256": "61dc4f663abf6cb881855a72710730989512eca965430b60f1ad899e8f456670"
     },
     {
       "path": "specs/notification.schema.json",
@@ -3873,7 +3873,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "543df5c7591dec78aedee66094347326d4672d48d0ef5744bef5ef45e4e8ded3"
+      "sha256": "9e3095e2f4edbf84dec7d5a86cb02c8dcdc65904666ca0599b9372231269a169"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
