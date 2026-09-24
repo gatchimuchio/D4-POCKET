@@ -52,11 +52,18 @@
         "端末確認",
         "端末離脱",
         "実行系列挙",
+        "Agent一覧",
+        "実行系ライフサイクル状態",
+        "実行系資源観測",
+        "通知一覧",
+        "全Runtime停止要求",
         "対話開始",
         "対話送信",
         "対話取得",
         "対話中止",
-        "対話終了"
+        "対話終了",
+        "対話履歴閲覧状態",
+        "対話履歴閲覧"
       ]
     },
     "内容": {
@@ -223,6 +230,126 @@
           }
         }
       }
+    },
+    {
+      "properties": {
+        "操作": { "const": "Agent一覧" },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "実行系ライフサイクル状態" },
+        "内容": {
+          "type": "object",
+          "required": ["版", "実行系ID"],
+          "additionalProperties": false,
+          "properties": {
+            "版": { "type": "integer", "const": 1 },
+            "実行系ID": { "$ref": "#/$defs/runtime_id" }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "実行系資源観測" },
+        "内容": {
+          "type": "object",
+          "required": ["版", "実行系ID"],
+          "additionalProperties": false,
+          "properties": {
+            "版": { "type": "integer", "const": 1 },
+            "実行系ID": { "$ref": "#/$defs/runtime_id" }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "通知一覧" },
+        "内容": {
+          "type": "object",
+          "required": ["版"],
+          "additionalProperties": false,
+          "properties": {
+            "版": { "type": "integer", "const": 1 },
+            "未読のみ": { "type": "boolean" },
+            "上限": { "type": "integer", "minimum": 1, "maximum": 256 }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "全Runtime停止要求" },
+        "内容": {
+          "type": "object",
+          "required": ["版"],
+          "additionalProperties": false,
+          "properties": { "版": { "type": "integer", "const": 1 } }
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "対話履歴閲覧状態" },
+        "内容": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "対話履歴閲覧" },
+        "内容": {
+          "type": "object",
+          "required": ["approval_id", "query"],
+          "additionalProperties": false,
+          "properties": {
+            "approval_id": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+            "query": {
+              "type": "object",
+              "required": ["after", "limit"],
+              "additionalProperties": false,
+              "properties": {
+                "after": { "type": "integer", "minimum": 0 },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                "latest_per_request": { "type": "boolean" },
+                "include_audit_context": { "type": "boolean" },
+                "include_result_evidence": { "type": "boolean" },
+                "include_content_receipt": { "type": "boolean" },
+                "filter": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "要求ID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+                    "対話セッションID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+                    "実行系ID": { "$ref": "#/$defs/runtime_id" },
+                    "状態": { "type": "string", "enum": ["承認待ち", "実行中", "成功", "保留", "失敗", "中止"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
-  ]
+  ],
+  "$defs": {
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+    }
+  }
 }

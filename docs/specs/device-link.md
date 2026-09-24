@@ -60,6 +60,10 @@ AndroidはOS Keystore保護のnative暗号化保管、iOSはThisDeviceOnly Keych
 
 このchannelはMobile製品内のnative transport／保管境界であり、Rust Brokerを迂回する別bridgeではない。Schema・fixture・静的conformanceは契約形状の証拠に限る。実Device Link、Android/iOS OS保管、TLS、background停止のLIVE_RUNTIME証拠とは区別する。
 
+端末wire要求の操作集合はRust `device_link.rs`の通常資格allowlistと一致させる。招待資格では空payloadの`端末結合`だけを使い、結合資格では空payloadの`端末確認`、`端末離脱`、`実行系列挙`、`Agent一覧`、`対話履歴閲覧状態`を許可する。`対話開始`は`実行系ID`、`対話送信`は`対話セッションID`と`入力`、`対話取得`／`対話中止`は`要求ID`、`対話終了`は`対話セッションID`を受け取る。Runtime状態・資源観測は`版`と`実行系ID`、通知一覧は`版`と任意の`未読のみ`／`上限`、全Runtime停止要求は`版`だけを受け取る。履歴閲覧は`approval_id`とbounded `query`を受け取り、既存のowner承認が現在有効な範囲だけを閲覧する。owner専用の端末管理・承認操作はこの集合に含めない。
+
+`specs/device_link_request.schema.json`は、要求全体と操作別payloadを閉じたSchemaとして表す。ConformanceはSchemaの操作集合とRust通常資格allowlistの差分、各操作の正例、未知field・owner昇格・不一致payload・範囲外値の拒否を検査する。Schema適合はRustでの資格、所有関係、現在のApproval、Audit成立を代替しない。
+
 ## 受入試験と残存境界
 
 Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を検査する。Rustの実経路では正常結合、再接続、招待取消、端末失効、期限切れ、不正資格、nonce再使用、Host不一致、他端末の所有物操作、owner昇格、監査障害を検査する。TLS実接続、異なる証明書拒否、Mobile安全保管、MINIDORA実対話、lifecycleは別のLIVE_RUNTIME証拠を必要とする。

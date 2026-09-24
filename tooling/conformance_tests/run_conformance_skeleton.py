@@ -2541,9 +2541,26 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
                     errors.append("端末契約がport境界を受理")
     schema = load_schema("device_link_request.schema.json")
     sample = load_contract_fixture("device_link_request.valid.json")
+    rust_source = (RUST_HELPER / "src" / "broker" / "device_link.rs").read_text(encoding="utf-8")
+    allowlist = re.search(r"pub\(crate\) const 許可操作: &\[&str\] = &\[(.*?)\];", rust_source, re.S)
+    schema_operations = schema.get("properties", {}).get("操作", {}).get("enum", [])
+    if allowlist is None:
+        errors.append("Rust Device Link通常資格allowlistを抽出できない")
+    else:
+        rust_operations = re.findall(r'"([^"\\]+)"', allowlist.group(1))
+        schema_runtime_operations = set(schema_operations) - {"端末結合"}
+        if len(rust_operations) != len(set(rust_operations)) or set(rust_operations) != schema_runtime_operations:
+            errors.append("Device Link Schemaの通常操作集合がRust Broker allowlistと一致しない")
     operations = {"端末結合": {}, "端末確認": {}, "端末離脱": {}, "実行系列挙": {},
+                  "Agent一覧": {},
+                  "実行系ライフサイクル状態": {"版": 1, "実行系ID": "local"},
+                  "実行系資源観測": {"版": 1, "実行系ID": "local"},
+                  "通知一覧": {"版": 1, "未読のみ": False, "上限": 64},
+                  "全Runtime停止要求": {"版": 1},
                   "対話開始": {"実行系ID": "local"}, "対話送信": {"対話セッションID": "a" * 32, "入力": "こんにちは"},
-                  "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32}, "対話終了": {"対話セッションID": "a" * 32}}
+                  "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32}, "対話終了": {"対話セッションID": "a" * 32},
+                  "対話履歴閲覧状態": {},
+                  "対話履歴閲覧": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 20, "filter": {"実行系ID": "local"}}}}
     for operation, payload in operations.items():
         errors.extend(validate_instance({**sample, "操作": operation, "内容": payload}, schema))
         if not validate_instance({**sample, "操作": operation, "内容": {**payload, "owner": True}}, schema):
@@ -2553,6 +2570,17 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
             errors.append("端末経路が禁止操作を受理: " + operation)
     if not validate_instance({**sample, "操作": "対話取得", "内容": {"対話セッションID": "a" * 32}}, schema):
         errors.append("端末要求が操作と内容の不一致を受理")
+    invalid_payloads = (
+        ("実行系ライフサイクル状態", {"版": 2, "実行系ID": "local"}),
+        ("実行系資源観測", {"版": 1, "実行系ID": "../runtime"}),
+        ("通知一覧", {"版": 1, "上限": 257}),
+        ("全Runtime停止要求", {"版": 1, "owner": True}),
+        ("対話履歴閲覧状態", {"approval_id": "a" * 32}),
+        ("対話履歴閲覧", {"approval_id": "a" * 32, "query": {"after": 0, "limit": 20, "filter": {"owner": "true"}}}),
+    )
+    for operation, payload in invalid_payloads:
+        if not validate_instance({**sample, "操作": operation, "内容": payload}, schema):
+            errors.append("端末操作が境界外payloadを受理: " + operation)
     return errors
 
 

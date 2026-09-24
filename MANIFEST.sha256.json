@@ -1273,7 +1273,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "68e9f48836bb50eef8276c24af61083d510182b139a8908e7e0f543528a18125"
+      "sha256": "f3cbc0f8613c946d34f7c8ec60d889f026bfd111e057cc17ab55b8a513e2aad3"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
@@ -3489,7 +3489,7 @@
     },
     {
       "path": "specs/device_link_request.schema.json",
-      "sha256": "8be62bdbfd8dcb904774b1832b96a13f588d9b6d62d956c38eb7ea545437905a"
+      "sha256": "0a568f7ad5d5569d689dc00005ac3d4e076a67c6dd1017bb0b168a0127c78133"
     },
     {
       "path": "specs/diagnostic.schema.json",
@@ -3873,7 +3873,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "708418b0b20e77ad8d3aa36fe611d95508bbffaef08fae650e034d06df6723f7"
+      "sha256": "543df5c7591dec78aedee66094347326d4672d48d0ef5744bef5ef45e4e8ded3"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
