@@ -102,6 +102,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。
   authority_boundary: Flutterはexecutable、workspace、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。実taskのwrite実行、MCP、実Agentの複数比較、実Handoff、Claude／Gemini接続は未成立として扱う。Desktop Agent Centerの比較・Handoff表示はsnapshotのbounded projectionだけを扱い、同一Workspaceをfail-closedで拒否する。
 
+- item: D4 Pocket GUI Shell Compose（Phase 29 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: 認証済みBrokerの`GUI Shell構成`へRuntime、Agent、Tool、MCP、Theme、Capability、Settingsを渡し、Manifest-onlyの構成Receiptを返す。Brokerが構造、重複、表示範囲、継承禁止を再検証し、Desktop設定画面はManifest結果を表示する。
+  authority_boundary: 構成のCapability requirementはPermissionではない。Authority、Permission、Approval、Credential、Audit chainは継承せず、build、独立App identity、filesystem、process、network、credential実値の経路を持たない。Windows Export、Preview／rollback、Module Pruning、Distributionは未成立の`release_blocker`として保持する。
+
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope

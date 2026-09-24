@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket 第5段階 GUI Shell構成（2026-09-24）
+
+GUI Shell構成のManifest-only経路を追加した。実行基盤、エージェント、ツール、MCP接続、表示テーマ、機能要件、設定を選択要求へまとめ、Rust Brokerが構造・重複・継承禁止を再検証して`GUI Shell構成`Receiptを返す。Desktop設定面は認証済みBrokerへ接続し、結果Manifestを表示する。
+
+- Contract: `specs/gui_shell_compose.schema.json`と`specs/gui_shell_compose_receipt.schema.json`を追加し、`manifest_only`、`not_started`、`not_generated`、権限非生成、Authority Strip、継承値`none`を固定した。
+- Production path: Desktop Settings → `ComposeClient` → 認証済みRust Broker `GUI Shell構成` → 構成Manifestの再検証 → `INTERNAL_STATE` AuditEvent付きReceipt。ビルド、独立アプリ識別子、資格情報、Permission、Approval、Audit chainは実行・継承しない。
+- Negative boundary: 未知field、Permission継承、重複選択、不正locale、ReceiptのPermission生成を拒否する。Capability requirementは要求説明に留まり、権限を生成しない。
+- 未成立分類: Windows Export、独立アプリ識別子／監査ストア／設定／実行基盤Manifestの生成、Preview／rollback、Module Pruning、Distributionは`release_blocker`。ComposeのManifest表示だけで独立アプリ完成を主張しない。
+
 ## D4 Pocket C33: Windows最大到達点（2026-09-24）
 
 Windowsで実行可能な範囲を最大化するため、release build、Rust helper release build、Broker smoke、installed smokeの証拠収集経路を整備した。`installer/windows/collect_broker_smoke.ps1`はWindows Rust testのfull-duplex応答を維持して読み取り、`collect_installed_smoke.ps1`はUTF-8の製品JSONを明示的に読み取る。UI surface収集は親要素と同じRaw UI Automation treeを再帰走査する。いずれも、証拠collectorの責務であり、Flutterへ権限経路を追加しない。

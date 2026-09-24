@@ -134,6 +134,8 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_diff",
     "agent_comparison",
     "agent_handoff",
+    "gui_shell_compose",
+    "gui_shell_compose_receipt",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -188,6 +190,7 @@ BROKER_REQUIRED_SOURCES = {
     "adapter_center.rs",
     "notification_center.rs",
     "observation_center.rs",
+    "compose_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -224,6 +227,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "tray_stop_request.schema.json",
     "tray_stop_response.schema.json",
     "windows_tray_projection.schema.json",
+    "gui_shell_compose.schema.json",
+    "gui_shell_compose_receipt.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -240,6 +245,7 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/screens/settings.dart",
     "lib/services/shell_core_client.dart",
     "lib/services/agent_coordination.dart",
+    "lib/services/compose_client.dart",
     "lib/services/global_search_index.dart",
     "lib/services/windows_tray_client.dart",
     "windows/runner/tray_controller.cpp",
@@ -5848,6 +5854,61 @@ def test_agent_handoff_projection_requires_reassessment_and_redaction() -> list[
     return []
 
 
+def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
+    compose = load_contract_fixture("gui_shell_compose.valid.json")
+    receipt = load_contract_fixture("gui_shell_compose_receipt.valid.json")
+    compose_schema = load_schema("gui_shell_compose.schema.json")
+    receipt_schema = load_schema("gui_shell_compose_receipt.schema.json")
+    errors = []
+    errors.extend(validate_instance(compose, compose_schema))
+    errors.extend(validate_instance(receipt, receipt_schema))
+    if compose.get("output_mode") != "manifest_only":
+        errors.append("GUI Shell構成がManifest-onlyではない")
+    policy = compose.get("inheritance_policy", {})
+    if any(
+        policy.get(key) != "none"
+        for key in ("authority", "permission", "approval", "credential", "audit_chain")
+    ):
+        errors.append("GUI Shell構成が権限・資格・監査chainを継承可能にしている")
+    if (
+        receipt.get("permission_generated") is not False
+        or receipt.get("app_identity_status") != "not_generated"
+    ):
+        errors.append("GUI Shell構成receiptがPermission生成またはApp identity生成を主張している")
+    invalid_compose = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_compose_authority.invalid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    invalid_receipt = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_compose_receipt_authority.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid_compose, compose_schema):
+        errors.append("GUI Shell構成が権限継承fieldを受け入れた")
+    if not validate_instance(invalid_receipt, receipt_schema):
+        errors.append("GUI Shell構成receiptがPermission生成を受け入れた")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        if "GUI Shell構成" not in operations:
+            errors.append(f"{name}にGUI Shell構成操作がない")
+    source = (RUST_HELPER / "src" / "broker" / "compose_center.rs").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        "manifest_only",
+        "not_started",
+        "not_generated",
+        "permission_generated",
+        "authority_strip",
+    ):
+        if token not in source:
+            errors.append(f"GUI Shell構成Broker経路に境界tokenがない: {token}")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6447,6 +6508,7 @@ def main() -> int:
         test_agent_adapter_probe_is_read_only_and_fail_closed,
         test_agent_comparison_projection_is_isolated_and_non_authoritative,
         test_agent_handoff_projection_requires_reassessment_and_redaction,
+        test_gui_shell_compose_is_manifest_only_and_non_inheriting,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

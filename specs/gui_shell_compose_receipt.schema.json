@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_compose_receipt.schema.json",
+  "title": "GUI Shell構成Receipt（GuiShellComposeReceipt）",
+  "type": "object",
+  "required": [
+    "version",
+    "operation",
+    "status",
+    "compose_manifest",
+    "build_status",
+    "app_identity_status",
+    "permission_generated",
+    "authority_strip",
+    "inheritance_policy",
+    "evidence_source",
+    "audit_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "operation": {"type": "string", "const": "GUI Shell構成"},
+    "status": {"type": "string", "const": "accepted"},
+    "compose_manifest": {
+      "type": "object",
+      "required": [
+        "version",
+        "compose_id",
+        "display_name",
+        "runtime_ids",
+        "agent_ids",
+        "tool_ids",
+        "mcp_connection_ids",
+        "theme",
+        "capability_requirements",
+        "settings",
+        "inheritance_policy",
+        "output_mode"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"type": "integer", "const": 1},
+        "compose_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$", "minLength": 1, "maxLength": 64},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "runtime_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "agent_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "tool_ids": {"type": "array", "uniqueItems": true, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "mcp_connection_ids": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "theme": {
+          "type": "object",
+          "required": ["theme_id", "mode"],
+          "additionalProperties": false,
+          "properties": {
+            "theme_id": {"type": "string", "minLength": 1, "maxLength": 64},
+            "mode": {"type": "string", "enum": ["system", "light", "dark"]}
+          }
+        },
+        "capability_requirements": {"type": "array", "uniqueItems": true, "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "settings": {
+          "type": "object",
+          "required": ["locale", "density", "content_visibility"],
+          "additionalProperties": false,
+          "properties": {
+            "locale": {"type": "string", "pattern": "^[A-Za-z]{2}-[A-Za-z]{2}$"},
+            "density": {"type": "string", "enum": ["compact", "comfortable"]},
+            "content_visibility": {"type": "string", "enum": ["none", "hash_only", "summary", "redacted", "full"]}
+          }
+        },
+        "inheritance_policy": {
+          "type": "object",
+          "required": ["authority", "permission", "approval", "credential", "audit_chain"],
+          "additionalProperties": false,
+          "properties": {
+            "authority": {"const": "none"},
+            "permission": {"const": "none"},
+            "approval": {"const": "none"},
+            "credential": {"const": "none"},
+            "audit_chain": {"const": "none"}
+          }
+        },
+        "output_mode": {"type": "string", "const": "manifest_only"}
+      }
+    },
+    "build_status": {"type": "string", "const": "not_started"},
+    "app_identity_status": {"type": "string", "const": "not_generated"},
+    "permission_generated": {"type": "boolean", "const": false},
+    "authority_strip": {"type": "boolean", "const": true},
+    "inheritance_policy": {
+      "type": "object",
+      "required": ["authority", "permission", "approval", "credential", "audit_chain"],
+      "additionalProperties": false,
+      "properties": {
+        "authority": {"const": "none"},
+        "permission": {"const": "none"},
+        "approval": {"const": "none"},
+        "credential": {"const": "none"},
+        "audit_chain": {"const": "none"}
+      }
+    },
+    "evidence_source": {"type": "string", "const": "INTERNAL_STATE"},
+    "audit_id": {"type": "string", "minLength": 1}
+  }
+}

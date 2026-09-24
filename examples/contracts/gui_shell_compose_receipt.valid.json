@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "operation": "GUI Shell構成",
+  "status": "accepted",
+  "compose_manifest": {
+    "version": 1,
+    "compose_id": "d4-pocket-local",
+    "display_name": "D4 Pocket ローカル構成",
+    "runtime_ids": ["gui_shell_rust_broker"],
+    "agent_ids": ["codex"],
+    "tool_ids": [],
+    "mcp_connection_ids": [],
+    "theme": {"theme_id": "d4-pocket", "mode": "system"},
+    "capability_requirements": ["runtime.read", "agent.metadata"],
+    "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
+    "inheritance_policy": {
+      "authority": "none",
+      "permission": "none",
+      "approval": "none",
+      "credential": "none",
+      "audit_chain": "none"
+    },
+    "output_mode": "manifest_only"
+  },
+  "build_status": "not_started",
+  "app_identity_status": "not_generated",
+  "permission_generated": false,
+  "authority_strip": true,
+  "inheritance_policy": {
+    "authority": "none",
+    "permission": "none",
+    "approval": "none",
+    "credential": "none",
+    "audit_chain": "none"
+  },
+  "evidence_source": "INTERNAL_STATE",
+  "audit_id": "audit-compose-1"
+}

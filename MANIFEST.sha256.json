@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8c15af31fccc508ae4d13990e386e7644fa658912ae3b49a2c56f51b8316c34c"
+      "sha256": "3c1918d8ffd8b9ecacb295a926b332b581ca0f8ee0b2efbda6918fe2bdb3993c"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ae53f17dc3ab84b8b4f797dc19b218adaf8faab61e16ba37abdd5de64c9ecac8"
+      "sha256": "33c40e8ea6a8aafebef6f9ea8319f234d3c25522165b88033d1a40706b2d3127"
     },
     {
       "path": "SECURITY.md",
@@ -265,7 +265,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "e69a66b9c4ef21a5e2e444df4238318356d893218263675b9faf77f5c4d3adec"
+      "sha256": "29fa863ec613adec959d9ffa64907017dde3f7c7736f71c8411b882ff30d91ed"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -298,6 +298,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
       "sha256": "a75aa696f2c7d5ff92b165f0c66c5beb25d18e7bb20d9e2f8bf0127fd9f72f99"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/compose_client.dart",
+      "sha256": "d93b52dbdc68875a48ac130af92ce9611e09d7901a98deb17a7edd215635e262"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -526,6 +530,10 @@
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
       "sha256": "d913157fcdb3b3ec75de58876a883113d537fcf7f7f8e3eba94b328690f833ff"
+    },
+    {
+      "path": "apps/desktop_flutter/test/compose_client_test.dart",
+      "sha256": "2e7427b739477ece8d041c09b82befa7fea3ac7a6983886c797296dfc6776902"
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
@@ -1053,7 +1061,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "0710f48201b71527826d9632a69a8913103fe9af2eff874891ed63690a5bbf2a"
+      "sha256": "30b3f189d567af8478126ce18acf0de1086002cc3f086858fa78acec31158933"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1089,7 +1097,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "84bec8e9a0343396c446605c5eb9f1e6632c1b495fe91bf90f8199eb73d75a24"
+      "sha256": "bcd04730f1e926c3eef215e7b16d2743bafda46676ed8dced33c408e7d16f1a9"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1254,6 +1262,10 @@
     {
       "path": "docs/specs/global-search-surface.md",
       "sha256": "1de65d9dbc84b1c49aeb1f06e6deda1b48792204ab19149a427f04162c9179aa"
+    },
+    {
+      "path": "docs/specs/gui-shell-compose.md",
+      "sha256": "963bc25c0124137be63c00075ffa4f99aeadad81f9a7ce5cb57a14456d54b492"
     },
     {
       "path": "docs/specs/gui-shell-spec-v1.md",
@@ -1564,6 +1576,14 @@
       "sha256": "b7f79de1f4418831d0ba72b0d16439443b2cd723a46b4e7d42e058731a6ffccb"
     },
     {
+      "path": "examples/contracts/gui_shell_compose.valid.json",
+      "sha256": "5934152a64d469f9c2f9fe1c092d710454a329060bebda4c9f02ef4c7a056bb3"
+    },
+    {
+      "path": "examples/contracts/gui_shell_compose_receipt.valid.json",
+      "sha256": "35ccc5558e36e96f88b6d0bd315a4ebbc2de6935d06a752a4bfa56f8189d74ec"
+    },
+    {
       "path": "examples/contracts/host_capability.valid.json",
       "sha256": "84120f242edb0b7e477c0daaffb024b80540b103ed4b1fe46b97558ac5d21865"
     },
@@ -1818,6 +1838,14 @@
     {
       "path": "examples/contracts/invalid/framework_risk_profile_bad_interval.invalid.json",
       "sha256": "64bb53c0f351f38efe83c16ae4f04bc72e9c709c88f059f6f130535941689fa3"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_compose_authority.invalid.json",
+      "sha256": "9766a14d5291eb712a88add9315247fe97535cff9fff577f7f02c95eb02133f7"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_compose_receipt_authority.invalid.json",
+      "sha256": "90356dba116e1cb25f757768c1801f2bad98f3ca55e925a2f2bc5b9a58a03ddb"
     },
     {
       "path": "examples/contracts/invalid/host_capability_authority.invalid.json",
@@ -2464,6 +2492,10 @@
       "sha256": "2a9ca24e04b4afc81a3fbf7c6e436dc0a793f86a7b9980ddfad8f2c4063a5e69"
     },
     {
+      "path": "native/rust_helper/src/broker/compose_center.rs",
+      "sha256": "c693de2d138fb692ceff842ed33697cf678eb881df11f166bbdd7ccba16757a0"
+    },
+    {
       "path": "native/rust_helper/src/broker/content_access.rs",
       "sha256": "5099ca70b886e1f3a538825600c03fcb1548c094ef4aa00b6c7fca82c09dca2e"
     },
@@ -2545,7 +2577,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "8fa199e2a90b2c70554fc9d45bbe824a149aa70f54fa701690ba0b91a24ad614"
+      "sha256": "25588b818381ed8c1e0cf75d4c64d56c6d93d057c09a7b4dd683bc04ef69b1c4"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -2561,7 +2593,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "6d8719793f4aefce657d73eb46250459218f1f425d57fd8995e986f529d529b7"
+      "sha256": "94a9029c83c62c8da913f8464ad62c714e995fed3096aa24b3f2d83877b214be"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3300,6 +3332,14 @@
       "sha256": "95c7dfa683d24c9fbe0b68d2203be98321418e3a70fc7ac7ec57629d416ca25c"
     },
     {
+      "path": "specs/gui_shell_compose.schema.json",
+      "sha256": "92cdfc03a17225a24fa92d8723caea72080aa593c57b9691269351d539be4547"
+    },
+    {
+      "path": "specs/gui_shell_compose_receipt.schema.json",
+      "sha256": "d6fff6cdcddfd383297d9e277e31d277a5aafaebee689a3b3baf865687ce1d7b"
+    },
+    {
       "path": "specs/host_capability.schema.json",
       "sha256": "0e5ae0411f251cb1a2ad59e178936d9a3d88dfe9feefc9b59d8c1cf0dca3d205"
     },
@@ -3325,11 +3365,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "688484d4e15cf398cb7e9a8ae621644b4bdca8a301a9b4b943f34dad92a53e9e"
+      "sha256": "e323dc071bed6469f39367302a128513d1a2f2d5388bbe23147dc81fbf60d6e1"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "76579186f2d657fa64e2fd910fc3677c64788617e91423430d4ddf47d5852b8c"
+      "sha256": "dd1246a21644653e123a47417fc024fe9a7def6c5911aaf6a14b0dd12bb58d2e"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -3577,7 +3617,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a0e749b6e572cb1194e7a98acdfd5c91d44354d924fcd094d8f188c0124510fb"
+      "sha256": "f5d67e29214258d8e5992a149493358790c961c5a11c5722ffaeb578a097b660"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3653,7 +3693,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "bb05e2c13f406b3925d23162be5a28875d2e9256e16a16ff133407c525da09ce"
+      "sha256": "b783b6b0fdfd2395136f1c94fdd8bf202a6763a4a758b87387819cd3ada1a1ab"
     },
     {
       "path": "tooling/shell_snapshot.py",

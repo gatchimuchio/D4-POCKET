@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/compose_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
@@ -24,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _dangerousOnly = false;
   bool _phaseReleaseOnly = false;
   late final ProfileClient? _profileClient;
+  late final ComposeClient? _composeClient;
   late final UpdateClient? _updateClient;
   Future<List<Map<String, Object?>>>? _profilesFuture;
   Future<Map<String, Object?>>? _updatesFuture;
@@ -33,13 +35,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController(text: '標準ローカル実行');
   String? _profileMessage;
   String? _exportedProfile;
+  String? _composeMessage;
+  String? _composedManifest;
   String? _updateMessage;
+  final TextEditingController _composeIdController =
+      TextEditingController(text: 'd4-pocket-local');
+  final TextEditingController _composeNameController =
+      TextEditingController(text: 'D4 Pocket ローカル構成');
 
   @override
   void dispose() {
     _searchController.dispose();
     _profileIdController.dispose();
     _profileNameController.dispose();
+    _composeIdController.dispose();
+    _composeNameController.dispose();
     super.dispose();
   }
 
@@ -49,6 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileClient = widget.client.brokerTransport == null
         ? null
         : ProfileClient(widget.client.brokerTransport!);
+    _composeClient = widget.client.brokerTransport == null
+        ? null
+        : ComposeClient(widget.client.brokerTransport!);
     _updateClient = widget.client.brokerTransport == null
         ? null
         : UpdateClient(widget.client.brokerTransport!);
@@ -121,6 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         _profilePanel(),
+        _composePanel(),
         _updatePanel(),
         if (filtered.isEmpty)
           const EmptyStatePanel(
@@ -145,6 +159,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
       ],
     );
+  }
+
+  Widget _composePanel() {
+    final client = _composeClient;
+    if (client == null) {
+      return const BorderedPanel(
+        child: Text(
+            'GUI Shell構成: Broker接続がないためManifestを生成できません。local snapshotは構成権限の根拠ではありません。'),
+      );
+    }
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('GUI Shell構成', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text(
+            'Runtime、Agent、Tool、MCP、Theme、Capability、SettingsをManifestへまとめます。build、独立App identity、Credential、Permission、Approval、Audit chainは生成・継承しません。',
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 180,
+                child: TextField(
+                  controller: _composeIdController,
+                  decoration: const InputDecoration(labelText: '構成識別子'),
+                ),
+              ),
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  controller: _composeNameController,
+                  decoration: const InputDecoration(labelText: '構成表示名'),
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _runCompose(client),
+                icon: const Icon(Icons.account_tree_outlined),
+                label: const Text('構成Manifest作成'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const SectionList(
+            title: '選択内容',
+            rows: [
+              '実行基盤: gui_shell_rust_broker',
+              '接続エージェント: codex（実物interface確認済み、縮退状態）',
+              'ツール／MCP接続: なし',
+              '表示テーマ: d4-pocket / system',
+              '機能要件: runtime.read、agent.metadata',
+              '設定: ja-JP、comfortable、summary',
+              '継承禁止: Authority、Permission、Approval、Credential、Audit chainはすべてなし',
+            ],
+          ),
+          if (_composeMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(_composeMessage!),
+          ],
+          if (_composedManifest != null) ...[
+            const SizedBox(height: 8),
+            SelectableText(_composedManifest!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runCompose(ComposeClient client) async {
+    try {
+      final receipt = await client.compose({
+        'version': 1,
+        'compose_id': _composeIdController.text.trim(),
+        'display_name': _composeNameController.text.trim(),
+        'runtime_ids': ['gui_shell_rust_broker'],
+        'agent_ids': ['codex'],
+        'tool_ids': const <String>[],
+        'mcp_connection_ids': const <String>[],
+        'theme': {'theme_id': 'd4-pocket', 'mode': 'system'},
+        'capability_requirements': ['runtime.read', 'agent.metadata'],
+        'settings': {
+          'locale': 'ja-JP',
+          'density': 'comfortable',
+          'content_visibility': 'summary',
+        },
+        'inheritance_policy': {
+          'authority': 'none',
+          'permission': 'none',
+          'approval': 'none',
+          'credential': 'none',
+          'audit_chain': 'none',
+        },
+        'output_mode': 'manifest_only',
+      });
+      final manifest = receipt['compose_manifest'];
+      _composedManifest = manifest is Map
+          ? composeJson(Map<String, Object?>.from(manifest))
+          : null;
+      _setComposeMessage('Manifestだけを作成しました。buildとApp identity生成は未実行です。');
+    } catch (error) {
+      _setComposeMessage('GUI Shell構成に失敗しました: $error');
+    }
+  }
+
+  void _setComposeMessage(String message) {
+    if (mounted) setState(() => _composeMessage = message);
   }
 
   Widget _profilePanel() {
@@ -354,7 +477,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final body = await request();
       final state = body['実行状態']?.toString();
-      _setUpdateMessage(state == 'suspended' ? '$success Brokerは実行を保留しました。' : success);
+      _setUpdateMessage(
+          state == 'suspended' ? '$success Brokerは実行を保留しました。' : success);
     } catch (error) {
       _setUpdateMessage('更新操作失敗: $error');
     }
