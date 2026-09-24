@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C33a: Desktop Semantics初期化（2026-09-24）
+
+Desktop製品起動時にFlutterの`SemanticsHandle`を保持し、製品のSemantics tree収集を明示的に有効化した。これはUI表示層のアクセシビリティ初期化であり、Authority、Permission、Approval、Audit、Broker経路を変更しない。
+
+- Validation: `flutter analyze --no-pub`、`flutter test --no-pub`（95件）、`flutter build windows --release`、Schema 108件、Conformance 182件、厳格日本語監査、manifest、`python tooling/validate_all.py --python-only --desktop-platform windows`をPASSした。
+- Evidence boundary: Windowsの実COM／UI Automation取得ではFlutterの個別surfaceがなお取得できず、今回のSemantics初期化だけではinstalled productのsurface evidenceを成立させなかった。ウィンドウ枠とFlutter viewの観測を個別surfaceの証拠へ昇格しない。
+- `release_blocker`: `windows_evidence_provenance_isolation`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`windows_broker_installed_smoke`、`audit_anchor_external_tamper_evidence_proof`、C28の8時間実測、外部Runtime／Agent／MCP／A2A、実端末、正式署名・配布、owner GO、正式release。
+
 ## D4 Pocket C33: Windows最大到達点（2026-09-24）
 
 Windowsで実行可能な範囲を最大化するため、release build、Rust helper release build、Broker smoke、installed smokeの証拠収集経路を整備した。`installer/windows/collect_broker_smoke.ps1`はWindows Rust testのfull-duplex応答を維持して読み取り、`collect_installed_smoke.ps1`はUTF-8の製品JSONを明示的に読み取る。UI surface収集は親要素と同じRaw UI Automation treeを再帰走査する。いずれも、証拠collectorの責務であり、Flutterへ権限経路を追加しない。

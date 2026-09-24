@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import 'models/generated_contracts.dart';
@@ -38,11 +39,15 @@ import 'services/windows_tray_client.dart';
 const String kD4PocketProductTitle = 'D4 Pocket';
 const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
 const double _navigationRailMinScrollableExtent = 960;
+SemanticsHandle? _productSemanticsHandle;
 
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      // Windows UI AutomationはSemantics収集を要求するまでFlutter treeを公開しない。
+      // 製品起動中はSemanticsHandleを保持し、正式なaccessibility treeへ接続する。
+      _productSemanticsHandle ??= SemanticsBinding.instance.ensureSemantics();
       _installFatalErrorHandlers();
       final client = await ShellCoreClient.product();
       await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
