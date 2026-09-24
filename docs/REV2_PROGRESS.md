@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 34追補: clean commitからのWindows staged実起動（2026-09-24）
+
+commit `1674c3b05f58fb7c2e53ffb2ee67089c46ce4432`のclean sourceからWindows Releaseを再buildし、Developer staging root `C:\Users\ohira\AppData\Local\Temp\D4Pocket-PostCommit-1674c3b-20260924`の`gui_shell_desktop_launcher.exe`で起動した。manifestは`source_worktree_clean=true`、source commit一致を記録する。artifact SHA-256はFlutter app `fcbdc9aac97b64f680eef1709ba4d90f8475f23833a293f83d16fec2582daa45`、Broker `52126f7b53e8cdf708db43a31842ad060f101895de49c21fdf45872210475c3c`、起動器 `1c21080ac0bb8da61c60114700f50853d3eb179064682b1ffb8d02f632f7f508`。
+
+- Windows画面観測: titleは`D4 Pocket`。Accessibility treeと実画面は`snapshot_source=broker`、`broker_session=restricted (authenticated_loopback_tcp)`、Audit `durable_file_store`、不変条件`ok`、Runtime `suspend`、release `not claimed`を表示した。実測Auditの起動event `broker-audit-66`は`LIVE_RUNTIME`。製品command dispatchは引き続き停止し、通常資格から権限を昇格していない。
+- 限界: 起動器runtimeは`C:\Users\ohira\AppData\Local\GUI-Shell\broker\desktop`の既存per-user Storeであり、manifestも`isolated=false`、`evidence_class=CONFIG`、`formal_runtime_proof=false`。別Windows user profileではなく、official installed smoke collectorも通していない。従ってこれはclean-sourceのmanual staged `LIVE_RUNTIME`観測に限り、正式installed product／初回起動gateを満たさない。
+- 終了: 通常tray `終了`経路は未検証。今回の検査processは実画面確認後も実行中で、終了eventは未観測。この状態を正常終了・lifecycle完了へ読み替えない。
+- release_blocker: collector起動器経由化、分離Windows profileでの実runtimeと終了Audit、Flutter内Dart file／credential／socket除去、formal Installer／Uninstaller／identity／signing／update／rollback、その他registryの既存blockerを維持する。
+
 ## D4 Pocket Phase 34追補: Windows staged Desktop起動器（2026-09-24）
 
 staged Windows配置の標準entry pointとして、Windows GUI subsystemのRust起動器を追加する。起動器は既存Brokerを同一process内の管理threadで起動し、固定配置を検証したFlutter executableへ既存normal Broker endpoint pathとruntime directoryだけを渡す。session secretをcommand line／environmentへ複製せず、FlutterにOwner資格を渡さず、子process終了後はBrokerへprocess内部停止を通知する。durable storeは保持し、endpointは起動時byteと停止後byteが一致する場合だけ消去する。
