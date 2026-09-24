@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
 import 'screens/approval_review.dart';
+import 'screens/agent_status.dart';
 import 'screens/device_connection.dart';
 import 'screens/emergency_stop.dart';
 import 'screens/mobile_dashboard.dart';
@@ -46,6 +47,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
   bool _dialogueVisited = false;
   static const _names = [
     '概要',
+    'Agent',
     '確認',
     '通知',
     '実行系',
@@ -60,6 +62,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
   ];
   static const _icons = [
     Icons.dashboard_outlined,
+    Icons.smart_toy_outlined,
     Icons.fact_check_outlined,
     Icons.notifications_outlined,
     Icons.hub_outlined,
@@ -100,6 +103,11 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
       final c = _controller;
       final pages = <Widget>[
         MobileDashboard(status: c.status),
+        MobileAgentStatus(
+          controller: c,
+          connected: c.ready && c.foreground,
+          active: _selected == 1,
+        ),
         const ApprovalReview(),
         MobileNotifications(
           events: c.events,
@@ -117,7 +125,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
           RuntimeDialogueScreen(
             key: ValueKey(c.credential?.id),
             connect: () async => c.dialogue,
-            active: c.ready && c.foreground && _selected == 6,
+            active: c.ready && c.foreground && _selected == 7,
           )
         else
           const SizedBox.shrink(),
@@ -146,7 +154,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
           onDestinationSelected: (index) {
             setState(() {
               _selected = index;
-              _dialogueVisited |= index == 6;
+              _dialogueVisited |= index == 7;
             });
             Navigator.pop(context);
           },

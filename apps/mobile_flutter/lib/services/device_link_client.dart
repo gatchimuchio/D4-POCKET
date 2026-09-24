@@ -205,6 +205,7 @@ class DeviceLinkClient implements BrokerTransport {
       '端末確認',
       '端末離脱',
       '実行系列挙',
+      'Agent一覧',
       '対話開始',
       '対話送信',
       '対話取得',

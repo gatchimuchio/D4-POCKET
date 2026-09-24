@@ -1,4 +1,5 @@
 from pathlib import Path
+from copy import deepcopy
 import json
 import math
 import re
@@ -36,6 +37,7 @@ REQUIRED = {
     "device_link_invitation.schema.json",
     "device_link_credential.schema.json",
     "device_link_request.schema.json",
+    "mobile_agent_list.schema.json",
     "runtime_dialogue_operation.schema.json",
     "runtime_dialogue_request.schema.json",
     "runtime_dialogue_session.schema.json",
@@ -346,6 +348,29 @@ def main() -> int:
             continue
         for failure in validate_instance(example, schema):
             errors.append(f"{example_path}: {failure}")
+
+    mobile_agent_schema_name = "mobile_agent_list.schema.json"
+    mobile_agent_example, mobile_agent_example_error = load_json(
+        valid_example_path(mobile_agent_schema_name)
+    )
+    mobile_agent_schema = schemas.get(mobile_agent_schema_name)
+    if (
+        mobile_agent_schema
+        and mobile_agent_example_error is None
+        and isinstance(mobile_agent_example, dict)
+        and isinstance(mobile_agent_example.get("Agent"), list)
+        and mobile_agent_example["Agent"]
+        and isinstance(mobile_agent_example["Agent"][0], dict)
+    ):
+        mobile_agent = mobile_agent_example["Agent"][0]
+        oversized_list = {"Agent": [deepcopy(mobile_agent) for _ in range(65)]}
+        if not validate_instance(oversized_list, mobile_agent_schema):
+            errors.append("mobile_agent_list.schema.json: maxItems 64の超過を拒否しない")
+
+        oversized_field = deepcopy(mobile_agent_example)
+        oversized_field["Agent"][0]["version"] = "v" * 257
+        if not validate_instance(oversized_field, mobile_agent_schema):
+            errors.append("agent_adapter.schema.json: maxLength 256の超過を拒否しない")
 
     invalid_count = 0
     invalid_schema_names: set[str] = set()

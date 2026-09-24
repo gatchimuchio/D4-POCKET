@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mobile_agent_list.schema.json",
+  "title": "Mobile Agent一覧投影契約",
+  "type": "object",
+  "required": ["Agent"],
+  "additionalProperties": false,
+  "properties": {
+    "Agent": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "agent_adapter.schema.json" }
+    }
+  }
+}

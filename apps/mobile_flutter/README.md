@@ -5,6 +5,8 @@
 owner rev2指示によりAndroid/iOSの正式projectを追加した。Flutter共通表示層は `../../packages/gui_shell_ui` を使用する。
 概要・確認・通知・実行系・停止・復旧を維持し、対話・接続先・設定を追加した。接続前は未接続を表示する。実行系一覧はDesktopの登録観測であり稼働保証ではない。対話はMobile → TLS → Desktop Rust → Core → Adapter → Runtimeだけを通る。
 
+Agent画面は既存Device Link経由でAgent Adapter metadataを読み取り、状態と宣言Capabilityを表示する。Agent起動、Permission、Approval、Credential、Tool実行は扱わず、`ready`表示も実task成功を意味しない。
+
 接続先画面の端末IDをDesktop ownerへ渡し、owner CLIで招待を新規fileへ発行する。安全な対面手段で受け取った招待JSONを入力し、Hostと証明書hashを照合して結合する。資格はAndroidの安全保管／iOS Keychainへ書き、再読取で保存を確認する。保管エラー時は平文へfallbackしない。招待秘密・本文を永続保存しない。OSのbackupとdevice transferからapp dataを除外する。
 
 画面復帰時は端末確認後に同じ保留要求を照会する。background中の通信と自動再送は行わない。Host変更は旧結合解除と新しい招待を必要とする。設定の通常解除はDesktop失効を先に確認し、通信不能時の端末内だけの削除とは区別する。

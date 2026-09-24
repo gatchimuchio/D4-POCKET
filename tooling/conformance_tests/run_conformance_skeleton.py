@@ -4738,6 +4738,7 @@ def Mobile投影の統治境界を検査する() -> list[str]:
         specification,
         main,
         projection,
+        MOBILE_FLUTTER / "lib" / "screens" / "agent_status.dart",
         MOBILE_FLUTTER / "lib" / "screens" / "resource_overview.dart",
         MOBILE_FLUTTER / "lib" / "screens" / "history.dart",
         MOBILE_FLUTTER / "lib" / "screens" / "mcp_status.dart",
@@ -4752,6 +4753,7 @@ def Mobile投影の統治境界を検査する() -> list[str]:
     protocol_text = protocol.read_text(encoding="utf-8")
     for token in (
         "通知",
+        "Agent状態",
         "Approval",
         "Runtime状態",
         "資源概要",
@@ -4765,13 +4767,14 @@ def Mobile投影の統治境界を検査する() -> list[str]:
     ):
         if token not in specification_text:
             不整合.append(f"C24正本にMobile対象境界がない: {token}")
-    for token in ("資源", "履歴", "MCP", "ResourceOverview", "MobileHistory", "MobileMcpStatus"):
+    for token in ("Agent", "資源", "履歴", "MCP", "MobileAgentStatus", "ResourceOverview", "MobileHistory", "MobileMcpStatus"):
         if token not in main_text:
             不整合.append(f"C24 Mobile実装に投影surfaceがない: {token}")
-    for token in ("通知一覧", "全Runtime停止要求", "INTERNAL_STATE", "権限生成", "owner_reapproval_required"):
+    for token in ("Agent一覧", "secret_value_present", "通知一覧", "全Runtime停止要求", "INTERNAL_STATE", "権限生成", "owner_reapproval_required"):
         if token not in projection_text:
             不整合.append(f"C24 Mobile投影clientの境界がない: {token}")
     for token in (
+        "Agent一覧",
         "実行系ライフサイクル状態",
         "実行系資源観測",
         "通知一覧",
@@ -4781,6 +4784,10 @@ def Mobile投影の統治境界を検査する() -> list[str]:
     ):
         if token not in link_text or token not in device_link_text or token not in protocol_text:
             不整合.append(f"C24 Device Linkの読み取り操作が接続されていない: {token}")
+    agent_screen = (MOBILE_FLUTTER / "lib" / "screens" / "agent_status.dart").read_text(encoding="utf-8")
+    for token in ("実taskの実行可否", "Permission", "Approval", "Trust", "未観測"):
+        if token not in agent_screen:
+            不整合.append(f"D4 Mobile Agent statusがmetadata境界を示さない: {token}")
     for forbidden in (
         "対話履歴承認",
         "対話内容閲覧",

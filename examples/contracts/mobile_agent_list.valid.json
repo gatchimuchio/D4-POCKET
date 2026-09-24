@@ -1,0 +1,40 @@
+{
+  "Agent": [
+    {
+      "adapter_id": "codex-cli",
+      "agent_id": "codex",
+      "provider": "OpenAI",
+      "version": "1.0.0",
+      "model": "unknown",
+      "status": "degraded",
+      "capabilities": [
+        {
+          "capability_id": "task_execution",
+          "support": {
+            "status": "unknown",
+            "reason": "実task実行は未確認"
+          }
+        }
+      ],
+      "workspace_requirements": {
+        "mode": "required",
+        "boundary_policy": "deny_outside_workspace",
+        "secret_paths": [".env", ".ssh", "secrets/"]
+      },
+      "tool_support": {"status": "unknown", "reason": "実動作未確認"},
+      "mcp_support": {"status": "unknown", "reason": "接続未確認"},
+      "session_support": {"status": "unknown", "reason": "実動作未確認"},
+      "cancellation_support": {"status": "unknown", "reason": "実動作未確認"},
+      "usage_metrics_support": {"status": "unknown", "reason": "実測未確認"},
+      "cost_metrics_support": {"status": "unknown", "reason": "実測未確認"},
+      "authentication": {"method": "unknown", "secret_value_present": false},
+      "host_requirements": {
+        "platforms": ["windows"],
+        "network_scope": "unknown",
+        "process_spawn": {"status": "unsupported", "reason": "Brokerで停止中"}
+      },
+      "evidence_source": "LIVE_RUNTIME",
+      "evidence_reason": "起動時interfaceを確認したが実taskは未確認"
+    }
+  ]
+}

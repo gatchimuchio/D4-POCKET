@@ -19,13 +19,122 @@ class _Transport implements BrokerTransport {
 }
 
 Map<String, Object?> _response(String operation, Map<String, Object?> body) => {
-      'operation': operation,
-      'status': 'accepted',
-      'audit_event_id': 'audit-1',
-      'body': body,
-    };
+  'operation': operation,
+  'status': 'accepted',
+  'audit_event_id': 'audit-1',
+  'body': body,
+};
+
+Map<String, Object?> _agentMetadata({
+  Map<String, Object?>? authentication,
+  Map<String, Object?>? extra,
+}) => {
+  'adapter_id': 'codex-cli',
+  'agent_id': 'codex',
+  'provider': 'OpenAI',
+  'version': '1.0.0',
+  'model': 'unknown',
+  'status': 'degraded',
+  'capabilities': [
+    {
+      'capability_id': 'task_execution',
+      'support': {'status': 'unknown', 'reason': '実task未確認'},
+    },
+  ],
+  'workspace_requirements': {
+    'mode': 'required',
+    'boundary_policy': 'deny_outside_workspace',
+    'secret_paths': ['.env', '.ssh'],
+  },
+  'tool_support': {'status': 'unknown', 'reason': '実動作未確認'},
+  'mcp_support': {'status': 'unknown', 'reason': '接続未確認'},
+  'session_support': {'status': 'unknown', 'reason': '実動作未確認'},
+  'cancellation_support': {'status': 'unknown', 'reason': '実動作未確認'},
+  'usage_metrics_support': {'status': 'unknown', 'reason': '実測未確認'},
+  'cost_metrics_support': {'status': 'unknown', 'reason': '実測未確認'},
+  'authentication':
+      authentication ?? {'method': 'unknown', 'secret_value_present': false},
+  'host_requirements': {
+    'platforms': ['windows'],
+    'network_scope': 'unknown',
+    'process_spawn': {'status': 'unsupported', 'reason': 'Brokerで停止中'},
+  },
+  'evidence_source': 'LIVE_RUNTIME',
+  'evidence_reason': '起動時interface確認のみ',
+  ...?extra,
+};
 
 void main() {
+  test('Agent一覧はBroker metadataを限定投影し実行・権限を推定しない', () async {
+    final transport = _Transport({
+      'Agent一覧': {
+        ..._response('Agent一覧', {
+          'Agent': [_agentMetadata()],
+        }),
+        'evidence_source': 'INTERNAL_STATE',
+      },
+    });
+
+    final result = await MobileProjectionClient(transport).agents();
+
+    expect(result.items.single.agentId, 'codex');
+    expect(result.items.single.status, 'degraded');
+    expect(result.items.single.capabilities.single.status, 'unknown');
+    expect(result.auditId, 'audit-1');
+    expect(transport.calls, ['Agent一覧']);
+  });
+
+  test('Agent metadataの権限fieldと秘密値を拒否する', () async {
+    for (final agent in [
+      _agentMetadata(extra: {'permission': 'granted'}),
+      _agentMetadata(
+        authentication: {'method': 'unknown', 'secret_value_present': true},
+      ),
+    ]) {
+      final transport = _Transport({
+        'Agent一覧': {
+          ..._response('Agent一覧', {
+            'Agent': [agent],
+          }),
+          'evidence_source': 'INTERNAL_STATE',
+        },
+      });
+      await expectLater(
+        MobileProjectionClient(transport).agents(),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+  });
+
+  test('Agent一覧の証拠種別と重複IDを拒否する', () async {
+    final invalidResponses = [
+      {
+        ..._response('Agent一覧', {
+          'Agent': [_agentMetadata()],
+        }),
+        'evidence_source': 'FIXTURE',
+      },
+      {
+        ..._response('Agent一覧', {
+          'Agent': [_agentMetadata(), _agentMetadata()],
+        }),
+        'evidence_source': 'INTERNAL_STATE',
+      },
+      {
+        ..._response('Agent一覧', {
+          'Agent': List.generate(65, (_) => _agentMetadata()),
+        }),
+        'evidence_source': 'INTERNAL_STATE',
+      },
+    ];
+    for (final response in invalidResponses) {
+      await expectLater(
+        MobileProjectionClient(_Transport({'Agent一覧': response})).agents(),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
+  });
+
   test('通知はsummaryと件数を検証して本文を受け取らない', () async {
     final transport = _Transport({
       '通知一覧': _response('通知一覧', {

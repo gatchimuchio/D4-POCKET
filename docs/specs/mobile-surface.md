@@ -10,7 +10,7 @@ Desktopの既存Broker契約から、外出先で必要な状態確認と復旧�
 
 Mobile Flutter → Device Link TLS → Desktop Rust Broker → 既存の読み取り専用Broker handler → メタデータ / 資源観測 / ライフサイクル投影 → Mobile表示
 
-端末経路で追加した操作は次に限る。
+既存C24実装が端末経路へ追加した操作は次に限る。
 
 - 実行系ライフサイクル状態
 - 実行系資源観測
@@ -35,10 +35,19 @@ Mobile Flutter → Device Link TLS → Desktop Rust Broker → 既存の読み�
 | 緊急停止要求 | Brokerのowner再承認待ち停止受付記録表示 | 実停止、kill、owner承認生成を行わない |
 | Recovery（復旧） | 資格再確認、失効確認、再結合の既存導線 | 自動再送、秘密値復元、過去Approval再利用を行わない |
 
+## D4 Pocket rev2 Phase 35追加: Agent状態
+
+MobileのAgent状態画面は、選択されたときにだけDevice Link TLS上の既存`Agent一覧` Broker handlerを読み取り専用で呼び出し、常駐pollingしない。Brokerが返すAgentAdapter metadataは`specs/mobile_agent_list.schema.json`および`specs/agent_adapter.schema.json`で検証し、Agent ID、provider、version、model、状態、Capabilityの識別子と対応状態だけを表示する。拒否応答、未知field、重複Agent ID、資格実値の存在、permission等の追加metadataは拒否し、理由文字列、Workspace path／secret path、Credential referenceは画面へ投影しない。
+
+表示はBrokerが保持するAdapter metadataの観測であり、実task実行可能性、Trust、Permission、Approval、Credential、MCP／Tool接続を表さない。`ready`も実task成功の証拠ではない。MobileからAgentを起動、選択、変更、比較、承認する操作は追加しない。Agent一覧なし・応答不正・未接続は未観測のまま表示する。
+
+Device Linkの許可操作へ`Agent一覧`を追加するが、owner操作・対話承認・任意commandは許可しない。Brokerの既存認証、TLS証明書照合、nonce、監査、通常Agent metadata投影を再利用し、Mobile専用のbridgeやauthority判定を作らない。
+
 ## セキュリティ・内容境界
 
 - Runtime Capability ≠ Permission、Agent request ≠ Approval、MCP metadata ≠ Authorityを維持する。
 - Mobileの画面状態、履歴、通知、resource observation、Host metadata、MCP metadataはAuthorityの入力にしない。
+- Agent／Adapter metadataは表示専用であり、Agent request ≠ Approvalを維持する。
 - Credential実値、対話本文、Approval payload、Audit raw reason、秘密値をMobile表示・event・error・test artifactへ投影しない。
 - Mobileが未接続、Broker拒否、承認期限切れ、観測不能の場合は未接続、未観測、不明として停止する。
 - 通信がbackgroundへ移った場合は既存Device Link controllerが通信を停止し、復帰時は資格確認だけを再実行する。

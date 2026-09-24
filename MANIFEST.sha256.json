@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "fb6d499f22bc5ecbd94808de03bdbb440fe9711dbf6ae7054fdcd3b4a1ec77f8"
+      "sha256": "bb8b431adeec31bf0b291338c718b7be734c88836a582c7b963d5b2873becc56"
     },
     {
       "path": "SECURITY.md",
@@ -717,7 +717,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "7b3ee2a3e2488b7c17a8fa06a5383850750e3678905894b222c3928cd44e9359"
+      "sha256": "9c5ac62a04af067d0e2d40865f9aaffb1063cff20ed93bd2828ca8e9fec0d32d"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -977,7 +977,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "e950f8d4754db4b21e3482ff2924195d91ed422324e1d0d7e4d0607a68a49900"
+      "sha256": "5b72c50f016d16aedbd5e4f22db2afc70d46c6fd0a063ad364c9ec29d17dc768"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/approval_review.dart",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_client.dart",
-      "sha256": "2e58e5575397d54485e4dacdba8d5af4788183aa84ada98476ed578a73a0afc2"
+      "sha256": "b9a06fe58165967dad40c1f23b1b260c276aa7afddf315d002f085c1799fb0b4"
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_controller.dart",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/mobile_projection_client.dart",
-      "sha256": "6d140dedf0d1acd3d0d1fb45ec23e7dd4c941e5d8ba236910362a5c3f82e939e"
+      "sha256": "4d0a70ce21b6f94886521f179865262c547d25e5277462baffe611462f18a6f3"
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
@@ -1041,11 +1041,11 @@
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "d39a3b42c696a891548cbb638eb97836c2bf5a71cd62d826833d7a7986807f4b"
+      "sha256": "1ddbb271657e9cb0366df07957f7534d05b9361a355d19c3d215767397bae706"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
-      "sha256": "09349a59c0ef8f92e92a80135814e3fdb3bf389a5f2006c244881c1df87b54ba"
+      "sha256": "c3165abae3a804100fbb7b307941a0c23cb9adf2781e296a3db4fe2bb91ff606"
     },
     {
       "path": "apps/mobile_flutter/test_driver/device_link_driver.dart",
@@ -1089,7 +1089,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "a8392cc1206915364a6948ad6a0adcfbd774219cf51dbadb14dc8c2a824639e5"
+      "sha256": "a4d8bbc4daf35710c322b12610b1bc1327a2f3ab6764fbb070dde5e2a823f5e9"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "75d17d614ec4b8296efd24f71185b60a9da30709f83b3a8b96bd2e2b382ad562"
+      "sha256": "6ebf04809d03f208485cfa63fbfbdabb557439811a956276c4b14e580b8c9d1b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1341,7 +1341,7 @@
     },
     {
       "path": "docs/specs/mobile-surface.md",
-      "sha256": "7bb1c9229fcc236862023dd825846b7b38dcd9ff552244b84a849749e556dce7"
+      "sha256": "d8698a0e1f13569b8e2ae236625707c489eff180d8c075417f85066dca4d920b"
     },
     {
       "path": "docs/specs/notification-center.md",
@@ -2685,7 +2685,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
-      "sha256": "1aeb8eee906aed6e7421e4cf87ab17a2dd9cfc3029b2520ff6b084bdef24a577"
+      "sha256": "eef448620c818a82f1a43b7c4ff9d9a7bfd97d84bc71c1fcb1450c1d254de6c9"
     },
     {
       "path": "native/rust_helper/src/broker/device_transport.rs",
@@ -2753,7 +2753,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "3283863c43096c33bcf1666fe6f158bd47975b359710ebd0e75122e902b1bfe3"
+      "sha256": "a2737eb0bd0db1a16224818a4dd961614ab94ff7308f89620b62ee4c383ab1d9"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3361,7 +3361,7 @@
     },
     {
       "path": "specs/agent_adapter.schema.json",
-      "sha256": "b3b745a76993433367186331d43fb1f01b67158cd60d2935cf16b3bee5919ed1"
+      "sha256": "d9041fa89aae83987d4cc99c7ee0d11c36007dc18b6bf01af65963ef81af1dfa"
     },
     {
       "path": "specs/agent_comparison.schema.json",
@@ -3841,7 +3841,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0c49437a6c89b0da1edfadfb8add95eb8901cf419c9637bc4f682a351d36930d"
+      "sha256": "c0052adae76307751c4aa3662621893b702329fac0426325f377bf2a1ec795d7"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3917,7 +3917,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "598c54dad8c460081cf6cde50b411715f34dd66c9cb193c7c8f98b4e52c82a65"
+      "sha256": "2f5861ca72e0bea20d9ac71673fe1aab2d90285d8d7eeb327d7280c0f3866ebe"
     },
     {
       "path": "tooling/shell_snapshot.py",

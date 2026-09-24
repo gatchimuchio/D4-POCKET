@@ -26,6 +26,40 @@ DeviceCredential parse(Map<String, Object?> value, {bool invitation = false}) =>
       deviceId: 'b' * 32,
     );
 
+Map<String, Object?> agentMetadata() => {
+  'adapter_id': 'codex-cli',
+  'agent_id': 'codex',
+  'provider': 'OpenAI',
+  'version': '1.0.0',
+  'model': 'unknown',
+  'status': 'degraded',
+  'capabilities': [
+    {
+      'capability_id': 'task_execution',
+      'support': {'status': 'unknown', 'reason': '実task未確認'},
+    },
+  ],
+  'workspace_requirements': {
+    'mode': 'required',
+    'boundary_policy': 'deny_outside_workspace',
+    'secret_paths': ['.env'],
+  },
+  'tool_support': {'status': 'unknown', 'reason': '未確認'},
+  'mcp_support': {'status': 'unknown', 'reason': '未確認'},
+  'session_support': {'status': 'unknown', 'reason': '未確認'},
+  'cancellation_support': {'status': 'unknown', 'reason': '未確認'},
+  'usage_metrics_support': {'status': 'unknown', 'reason': '未確認'},
+  'cost_metrics_support': {'status': 'unknown', 'reason': '未確認'},
+  'authentication': {'method': 'unknown', 'secret_value_present': false},
+  'host_requirements': {
+    'platforms': ['windows'],
+    'network_scope': 'unknown',
+    'process_spawn': {'status': 'unsupported', 'reason': '未対応'},
+  },
+  'evidence_source': 'LIVE_RUNTIME',
+  'evidence_reason': 'interface確認のみ',
+};
+
 class MemoryStore implements DeviceStore {
   final values = <String, String>{DeviceLinkController.deviceKey: 'b' * 32};
   bool failWrite = false;
@@ -74,11 +108,16 @@ class LinkFixture extends DeviceLinkClient {
       'operation': operation,
       'audit_event_id': 'fixture',
       'status': 'accepted',
-      'body': operation == '実行系列挙'
-          ? {
-              '実行系': ['left', 'right'],
-            }
-          : {'状態': '接続中'},
+      'evidence_source': 'INTERNAL_STATE',
+      'body': switch (operation) {
+        '実行系列挙' => {
+          '実行系': ['left', 'right'],
+        },
+        'Agent一覧' => {
+          'Agent': [agentMetadata()],
+        },
+        _ => {'状態': '接続中'},
+      },
     };
   }
 
@@ -519,6 +558,7 @@ void main() {
     await tester.pumpAndSettle();
     for (final name in [
       '概要',
+      'Agent',
       '確認',
       '通知',
       '実行系',
@@ -536,6 +576,35 @@ void main() {
         findsOneWidget,
       );
     }
+    await tester.pumpWidget(const SizedBox.shrink());
+    c.dispose();
+  });
+  testWidgets('Agent状態はmetadataだけを表示し実行可能性を主張しない', (tester) async {
+    final calls = <String>[];
+    final store = MemoryStore()
+      ..values[DeviceLinkController.credentialKey] = jsonEncode(data());
+    final c = DeviceLinkController(
+      store: store,
+      connect: (v) => LinkFixture(v, calls),
+    );
+    await tester.pumpWidget(GuiShellMobileApp(controller: c));
+    await tester.pumpAndSettle();
+    expect(calls, isNot(contains('Agent一覧')));
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationDrawer),
+        matching: find.text('Agent'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, contains('Agent一覧'));
+    expect(find.text('codex'), findsOneWidget);
+    expect(find.text('一部制限あり'), findsOneWidget);
+    expect(find.textContaining('実taskの実行可否'), findsOneWidget);
+    expect(find.text('準備完了'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     c.dispose();
   });

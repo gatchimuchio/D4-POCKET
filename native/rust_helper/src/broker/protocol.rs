@@ -4799,6 +4799,7 @@ mod 端末統治試験 {
         let invitation=制御(&mut e.broker,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
         let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
         for (operation,payload) in [
+            ("Agent一覧",json!({})),
             ("実行系ライフサイクル状態",json!({"版":1,"実行系ID":"local"})),
             ("実行系資源観測",json!({"版":1,"実行系ID":"local"})),
             ("通知一覧",json!({"版":1,"未読のみ":false,"上限":64})),
@@ -4809,7 +4810,12 @@ mod 端末統治試験 {
             assert_eq!(response.status,BrokerStatus::Accepted,"{operation}");
             assert_eq!(response.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE,"{operation} evidence source");
         }
+        let agent_list=通信(&mut e.broker,&credential,"Agent一覧",json!({}));
+        let agent_body=agent_list.body.as_ref().expect("Agent一覧projection");
+        assert_eq!(agent_body.as_object().map(serde_json::Map::len),Some(1));
+        assert!(agent_body.get("Agent").is_some_and(Value::is_array));
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
+        assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"MCP接続一覧",json!({"版":1})).status,BrokerStatus::Rejected);
     }

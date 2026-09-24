@@ -1145,3 +1145,25 @@ FlutterのSetup Doctor file操作・export helper・mainからの呼出しを削
 - `MANIFEST.sha256.json`：tracked削除をindexへ反映後、974件で再生成し、`--check`も成功。
 
 この単位はFlutter内Setup Doctor filesystem境界と誤った証拠生成経路を閉じた。初回設定の正式生成、Broker統治された機械可読Setup Doctor、Rust起動器を通すclean installed Windows run、negative/failure経路は未成立であり、`rev2_flutter_broker_channel_boundary`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`を`release_blocker`のまま維持する。変更はその代替証明ではない。
+
+
+## D4 Pocket rev2 Phase35: Mobile Agent状態metadata投影（2026-09-25）
+
+現行main、Phase35仕様、C24 Mobile正本、Agent Adapter contract、既存Rust Broker／Device Link実装を再確認した。Brokerにはread-only `Agent一覧`操作が既にあり、Agent Adapter metadataを返していたが、Mobile側の許可操作・投影画面がなく、Phase35のAgent状態 surfaceへ接続されていなかった。
+
+既存Broker handlerをそのまま使い、TLS Device Linkのread-only allowlistへ`Agent一覧`を追加した。MobileはAgent画面を選択したときだけ一度取得し、常駐pollingしない。新Schemaで一覧とAgent Adapter metadataを閉じ、共通Agent Adapter Schemaにも256文字・64要素・8 platformの上限を加えた。Mobile clientで証拠種別、件数、field集合、状態enum、Agent ID／Capability ID重複、Workspace・credential・Host metadataを検証する。画面modelにはAgent ID、provider、version、model、Broker報告状態、Capability IDと対応状態だけを残す。理由文字列、secret path、資格情報、任意fieldを表示へ持ち込まず、未知・不正・拒否応答は未観測または取得失敗として扱う。`ready`も実task実行可否、Trust、Permission、Approvalの証拠とはしない。Agent起動、編集、比較、権限操作、新bridgeは追加していない。
+
+検証結果:
+
+- `flutter analyze`（`apps/mobile_flutter`）：成功、指摘0件。
+- `flutter test --concurrency=1 --reporter compact`（`apps/mobile_flutter`）：成功、36件すべて通過。Agent metadataの正常投影、権限field／秘密値、証拠種別、重複ID、65件超過の拒否、および画面選択前に要求しないことを含む。
+- `flutter build apk --debug`（`apps/mobile_flutter`）：成功、`build/app/outputs/flutter-apk/app-debug.apk`を生成。Android SDKからSDK XML v4をv3までのtoolが読んだという互換性warningが出たが、debug buildは完了した。実機install／起動の証拠ではない。
+- `dart format --output=none --set-exit-if-changed ...`：成功、対象6 fileに差分なし。`git diff --check`も成功。
+- `python tooling/schema_check/check_schemas.py`：Schema123件、正常例123件、拒否例149件すべて成功。Agent一覧について65件と257文字の動的負例も拒否した。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：195件すべて成功。
+- `python tooling/release_runtime_assertions.py --check`：12件成功。証拠範囲はCONFIG／FIXTUREに限り、live product healthの証明ではない。
+- `cargo test --locked --lib -- --test-threads=1`（`native/rust_helper`）：244件すべて成功。全targetの`cargo test --locked -- --test-threads=1`はlibrary 244件とhelper binary 7件が通過した後、`tests/broker_ipc.exe`をWindows Application ControlがOS error 4551で起動前拒否し、完遂できなかった。policy回避は行っていない。`windows_rust_integration_test_execution_policy`は既存`release_blocker`のまま。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：既存baselineの3 files／19 findingsと一致（Windows launcher仕様1、Rust IPC 12、Rust desktop launcher 6）。この監査時点で本単位由来の追加findingはなかった。
+- Android実機接続・install・起動は実施していない。既存指示による凍結を維持し、`rev2_mobile_device_evidence`を`release_blocker`のまま保持する。
+
+本単位はPhase35のAgent metadata表示面と既存read-only経路接続の部分成果であり、Phase35全体、Agent実task実行、Mobileの実機・配布、Windows installed product、rev1総合完成を成立させない。既存release blockerの状態は変更していない。
