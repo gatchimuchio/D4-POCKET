@@ -129,9 +129,14 @@ function Invoke-BrokerRequest {
     $writer.WriteLine([string]$Endpoint.session_secret)
     $writer.WriteLine(($Request | ConvertTo-Json -Compress -Depth 10))
     $writer.Flush()
-    $client.Client.Shutdown([System.Net.Sockets.SocketShutdown]::Send)
     $reader = [System.IO.StreamReader]::new($stream, $encoding)
-    $raw = $reader.ReadToEnd().Trim()
+    # WindowsのBroker IPCは応答を返すまでfull-duplexで維持する。
+    # 送信側を先にShutdown(Send)すると、Rust側のdrain_after_responseが
+    # Windows WinsockのRST/EOFとして扱い、応答フレームが空になる。
+    $raw = $reader.ReadLine()
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+      throw "broker IPC responseが空でした"
+    }
     return $raw | ConvertFrom-Json
   } finally {
     $client.Close()
@@ -244,7 +249,7 @@ $result = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_broker_smoke.ps1"
-    collector_version = "3"
+    collector_version = "4"
     synthetic = $false
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 -BrokerHelperExe `"$($helper.Path)`""
   }

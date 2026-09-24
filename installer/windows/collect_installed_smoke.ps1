@@ -72,6 +72,16 @@ function Write-JsonEvidence {
   [System.IO.File]::WriteAllText($Path, ($json + [Environment]::NewLine), $encoding)
 }
 
+function Read-Utf8Json {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $resolved = Resolve-Path $Path
+  return [System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+}
+
 function Get-TaggedSha256 {
   param([string]$Path)
 
@@ -242,7 +252,7 @@ function Start-SmokeBroker {
   ) -WindowStyle Hidden -PassThru
   for ($index = 0; $index -lt 100; $index += 1) {
     if (Test-Path $SessionFile) {
-      $endpoint = Get-Content -Raw -Path $SessionFile | ConvertFrom-Json
+      $endpoint = Read-Utf8Json -Path $SessionFile
       Assert-NormalBrokerEndpoint -Endpoint $endpoint
       return [ordered]@{
         process = $process
@@ -823,15 +833,15 @@ try {
 if (!(Test-Path $setupDoctorPath)) {
   throw "インストール済み app が環境診断の製品出力を書き出しませんでした: $setupDoctorPath"
 }
-$setupDoctor = Get-Content -Raw -Path $setupDoctorPath | ConvertFrom-Json
+$setupDoctor = Read-Utf8Json -Path $setupDoctorPath
 $installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
 $installedManifest = $null
 if ($null -ne $installedManifestPath) {
-  $installedManifest = Get-Content -Raw -Path $installedManifestPath | ConvertFrom-Json
+  $installedManifest = Read-Utf8Json -Path $installedManifestPath
 }
 if ($VisibleSurfacesJson -ne "") {
   $visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
-  $visibleSurfaceEvidence = Get-Content -Raw -Path $visibleSurfacesPath.Path | ConvertFrom-Json
+  $visibleSurfaceEvidence = Read-Utf8Json -Path $visibleSurfacesPath.Path
 } else {
   if ($VisibleSurfacesOutputPath -eq "") {
     $outputDirectory = Split-Path -Parent $OutputPath
@@ -848,23 +858,23 @@ if ($VisibleSurfacesJson -ne "") {
     (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "surface_match_requirements_met") -ne $true -and
     (Test-Path $surfaceSemanticsPath)
   ) {
-    $visibleSurfaceEvidence = Get-Content -Raw -Path $surfaceSemanticsPath | ConvertFrom-Json
+    $visibleSurfaceEvidence = Read-Utf8Json -Path $surfaceSemanticsPath
   }
 }
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
-  $brokerEvidence = Get-Content -Raw -Path $brokerEvidencePath | ConvertFrom-Json
+  $brokerEvidence = Read-Utf8Json -Path $brokerEvidencePath.Path
 }
 $runtimeAssertions = $null
 if ($RuntimeAssertionsJson -ne "") {
   $runtimeAssertionsPath = Resolve-Path $RuntimeAssertionsJson
-  $runtimeAssertions = Get-Content -Raw -Path $runtimeAssertionsPath | ConvertFrom-Json
+  $runtimeAssertions = Read-Utf8Json -Path $runtimeAssertionsPath.Path
 }
 $auditAnchorEvidence = $null
 if ($AuditAnchorEvidenceJson -ne "") {
   $auditAnchorEvidencePath = Resolve-Path $AuditAnchorEvidenceJson
-  $auditAnchorEvidence = Get-Content -Raw -Path $auditAnchorEvidencePath | ConvertFrom-Json
+  $auditAnchorEvidence = Read-Utf8Json -Path $auditAnchorEvidencePath.Path
 }
 $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
@@ -896,7 +906,7 @@ $resolvedConfigPath = Resolve-Path $ConfigPath -ErrorAction SilentlyContinue
 $configJsonValid = $false
 if ($null -ne $resolvedConfigPath) {
   try {
-    Get-Content -Raw -Path $resolvedConfigPath | ConvertFrom-Json | Out-Null
+    Read-Utf8Json -Path $resolvedConfigPath.Path | Out-Null
     $configJsonValid = $true
   } catch {
     $configJsonValid = $false
@@ -1013,7 +1023,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "8"
+    collector_version = "9"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }

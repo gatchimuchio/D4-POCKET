@@ -2170,6 +2170,30 @@ def test_windows_installed_smoke_preserves_trap_failure() -> list[str]:
     return errors
 
 
+def test_windows_broker_smoke_keeps_full_duplex_response() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_broker_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "Shutdown([System.Net.Sockets.SocketShutdown]::Send)" in text:
+        errors.append("collect_broker_smoke.ps1がWindows応答前に送信側socketをshutdownしている")
+    if "$raw = $reader.ReadLine()" not in text:
+        errors.append("collect_broker_smoke.ps1がBrokerの改行区切り応答を1フレームとして読んでいない")
+    if 'collector_version = "4"' not in text:
+        errors.append("collect_broker_smoke.ps1のcollector versionがWindows full-duplex修正を反映していない")
+    return errors
+
+
+def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    if "function Read-Utf8Json" not in text:
+        errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
+    if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
+        errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
+    if 'collector_version = "9"' not in text:
+        errors.append("collect_installed_smoke.ps1のcollector versionがUTF-8修正を反映していない")
+    return errors
+
+
 def test_windows_installed_smoke_automation_names_are_materialized() -> list[str]:
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
@@ -6209,6 +6233,8 @@ def main() -> int:
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,
         test_windows_installed_smoke_preserves_trap_failure,
+        test_windows_broker_smoke_keeps_full_duplex_response,
+        test_windows_installed_smoke_reads_json_as_utf8,
         test_windows_installed_smoke_automation_names_are_materialized,
         test_windows_installed_smoke_uia_properties_are_stringified,
         test_windows_audit_anchor_proof_collector_is_connected,

@@ -2345,11 +2345,11 @@
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
-      "sha256": "ec067fc709ebb903dc6e266c905947ec63a6e519e58d4c295999ec1e47cd6645"
+      "sha256": "a573f98646d1a1bb8d9632b5db7e216e3f241e3666e649f3b54421005285e869"
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "c7493e10692437aafd764860afffa29da7c36a7cfcba1d7e5202d66a5b87b62b"
+      "sha256": "7af2f69569c91c7319f8f383a8129dac0da2bb63f2464fa02fb058b38bf793aa"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -3541,7 +3541,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2e5132bf70ddcbaa13255dc7ef0cea00b34634b516d81b32d29635eccda052bc"
+      "sha256": "bf2a9d2f86742feff927041215ba1eac869e1a0735919695dd7572fa2181a6b3"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
