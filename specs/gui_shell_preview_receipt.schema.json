@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_preview_receipt.schema.json",
+  "title": "GUI Shell構成Preview応答",
+  "type": "object",
+  "required": ["version", "operation", "status", "current_manifest", "candidate_manifest", "build_target", "preview_mode", "diff", "permission_requirements", "version_preview", "build_status", "export_status", "authority_strip", "inheritance_policy", "evidence_source", "audit_id"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "operation": { "const": "GUI Shell構成Preview" },
+    "status": { "const": "accepted" },
+    "current_manifest": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object", "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"], "additionalProperties": false,
+          "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": {}, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
+        }
+      ]
+    },
+    "candidate_manifest": {
+      "type": "object", "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"], "additionalProperties": false,
+      "properties": { "version": {}, "compose_id": {}, "display_name": {}, "runtime_ids": {}, "agent_ids": {}, "tool_ids": {}, "mcp_connection_ids": {}, "theme": {}, "capability_requirements": {}, "settings": {}, "inheritance_policy": {}, "output_mode": {} }
+    },
+    "build_target": { "enum": ["windows", "desktop", "mobile"] },
+    "preview_mode": { "const": "version_rollback" },
+    "diff": {
+      "type": "object", "required": ["runtime_added", "runtime_removed", "agent_added", "agent_removed", "tool_added", "tool_removed", "mcp_added", "mcp_removed", "capability_added", "capability_removed", "changed_fields"], "additionalProperties": false,
+      "properties": {
+        "runtime_added": { "type": "array", "maxItems": 32, "items": { "type": "string" } }, "runtime_removed": { "type": "array", "maxItems": 32, "items": { "type": "string" } },
+        "agent_added": { "type": "array", "maxItems": 32, "items": { "type": "string" } }, "agent_removed": { "type": "array", "maxItems": 32, "items": { "type": "string" } },
+        "tool_added": { "type": "array", "maxItems": 64, "items": { "type": "string" } }, "tool_removed": { "type": "array", "maxItems": 64, "items": { "type": "string" } },
+        "mcp_added": { "type": "array", "maxItems": 32, "items": { "type": "string" } }, "mcp_removed": { "type": "array", "maxItems": 32, "items": { "type": "string" } },
+        "capability_added": { "type": "array", "maxItems": 64, "items": { "type": "string" } }, "capability_removed": { "type": "array", "maxItems": 64, "items": { "type": "string" } },
+        "changed_fields": { "type": "array", "maxItems": 32, "items": { "type": "string" } }
+      }
+    },
+    "permission_requirements": {
+      "type": "array", "maxItems": 64,
+      "items": { "type": "object", "required": ["capability", "permission_status", "approval_status"], "additionalProperties": false, "properties": { "capability": { "type": "string" }, "permission_status": { "const": "not_generated" }, "approval_status": { "const": "not_requested" } } }
+    },
+    "version_preview": {
+      "type": "object", "required": ["current_version", "candidate_version", "rollback_available", "rollback_status", "rollback_reason"], "additionalProperties": false,
+      "properties": { "current_version": { "type": ["integer", "null"] }, "candidate_version": { "const": 1 }, "rollback_available": { "const": false }, "rollback_status": { "const": "not_executable" }, "rollback_reason": { "type": "string", "minLength": 1 } }
+    },
+    "build_status": { "const": "not_started" },
+    "export_status": { "const": "not_started" },
+    "authority_strip": { "const": true },
+    "inheritance_policy": {
+      "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false,
+      "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } }
+    },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "audit_id": { "type": "string", "minLength": 1 }
+  }
+}

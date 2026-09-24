@@ -108,6 +108,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: 認証済みBrokerの`GUI Shell構成`へRuntime、Agent、Tool、MCP、Theme、Capability、Settingsを渡し、Manifest-onlyの構成Receiptを返す。Brokerが構造、重複、表示範囲、継承禁止を再検証し、Desktop設定画面はManifest結果を表示する。
   authority_boundary: 構成のCapability requirementはPermissionではない。Authority、Permission、Approval、Credential、Audit chainは継承せず、build、独立App identity、filesystem、process、network、credential実値の経路を持たない。Windows Export、Preview／rollback、Module Pruning、Distributionは未成立の`release_blocker`として保持する。
 
+- item: D4 Pocket GUI Shell構成Preview（Phase 30 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: 認証済みBrokerの`GUI Shell構成Preview`へ現在Manifestと候補Manifest、対象platformを渡し、構成差分、Capability requirement、版rollbackの可否をPreview Receiptへ射影する。Desktop設定画面は構成Preview結果を表示する。
+  authority_boundary: Previewは読み取り専用であり、Permission、Approval、Authority、Credential、Audit chainを生成・継承しない。`rollback_available=false`、build／Exportは未開始に固定し、Previewを実rollback、実build、独立App生成へ昇格させない。Windows Export、Module Pruning、Distributionは未成立の`release_blocker`として保持する。
+
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope

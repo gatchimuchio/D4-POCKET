@@ -15,6 +15,24 @@ class ComposeClient {
     );
     return _acceptedBody(response, 'GUI Shell構成');
   }
+
+  Future<Map<String, Object?>> preview({
+    required Map<String, Object?>? currentManifest,
+    required Map<String, Object?> candidateManifest,
+    String buildTarget = 'windows',
+  }) async {
+    final response = await _transport.request(
+      'GUI Shell構成Preview',
+      payload: {
+        'version': 1,
+        'current_manifest': currentManifest,
+        'candidate_manifest': candidateManifest,
+        'build_target': buildTarget,
+        'preview_mode': 'version_rollback',
+      },
+    );
+    return _acceptedBody(response, 'GUI Shell構成Preview');
+  }
 }
 
 String composeJson(Map<String, Object?> value) =>

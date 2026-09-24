@@ -114,6 +114,8 @@ REQUIRED = {
     "agent_handoff.schema.json",
     "gui_shell_compose.schema.json",
     "gui_shell_compose_receipt.schema.json",
+    "gui_shell_preview.schema.json",
+    "gui_shell_preview_receipt.schema.json",
     "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",

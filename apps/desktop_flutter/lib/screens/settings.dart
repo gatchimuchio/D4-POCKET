@@ -37,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _exportedProfile;
   String? _composeMessage;
   String? _composedManifest;
+  String? _previewJson;
   String? _updateMessage;
   final TextEditingController _composeIdController =
       TextEditingController(text: 'd4-pocket-local');
@@ -202,6 +203,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: const Icon(Icons.account_tree_outlined),
                 label: const Text('構成Manifest作成'),
               ),
+              OutlinedButton.icon(
+                onPressed: () => _runPreview(client),
+                icon: const Icon(Icons.preview_outlined),
+                label: const Text('構成Preview'),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -225,14 +231,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             SelectableText(_composedManifest!),
           ],
+          if (_previewJson != null) ...[
+            const SizedBox(height: 8),
+            const Text('構成Preview結果'),
+            SelectableText(_previewJson!),
+          ],
         ],
       ),
     );
   }
 
-  Future<void> _runCompose(ComposeClient client) async {
-    try {
-      final receipt = await client.compose({
+  Map<String, Object?> _composeManifest() => {
         'version': 1,
         'compose_id': _composeIdController.text.trim(),
         'display_name': _composeNameController.text.trim(),
@@ -255,7 +264,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'audit_chain': 'none',
         },
         'output_mode': 'manifest_only',
-      });
+      };
+
+  Future<void> _runCompose(ComposeClient client) async {
+    try {
+      final receipt = await client.compose(_composeManifest());
       final manifest = receipt['compose_manifest'];
       _composedManifest = manifest is Map
           ? composeJson(Map<String, Object?>.from(manifest))
@@ -263,6 +276,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _setComposeMessage('Manifestだけを作成しました。buildとApp identity生成は未実行です。');
     } catch (error) {
       _setComposeMessage('GUI Shell構成に失敗しました: $error');
+    }
+  }
+
+  Future<void> _runPreview(ComposeClient client) async {
+    try {
+      final receipt = await client.preview(
+        currentManifest: null,
+        candidateManifest: _composeManifest(),
+      );
+      _previewJson = composeJson(receipt);
+      _setComposeMessage(
+          '構成、機能要件、差分、版rollbackをPreviewしました。build、Export、rollbackは未実行です。');
+      if (mounted) setState(() {});
+    } catch (error) {
+      _setComposeMessage('GUI Shell構成Previewに失敗しました: $error');
     }
   }
 

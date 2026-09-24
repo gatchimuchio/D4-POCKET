@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_preview.schema.json",
+  "title": "GUI Shell構成Preview要求",
+  "type": "object",
+  "required": ["version", "current_manifest", "candidate_manifest", "build_target", "preview_mode"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "current_manifest": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"],
+          "additionalProperties": false,
+          "properties": {
+            "version": { "const": 1 },
+            "compose_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "runtime_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "agent_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "tool_ids": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "mcp_connection_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "theme": {
+              "type": "object", "required": ["theme_id", "mode"], "additionalProperties": false,
+              "properties": { "theme_id": { "type": "string", "minLength": 1, "maxLength": 64 }, "mode": { "enum": ["system", "light", "dark"] } }
+            },
+            "capability_requirements": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+            "settings": {
+              "type": "object", "required": ["locale", "density", "content_visibility"], "additionalProperties": false,
+              "properties": { "locale": { "type": "string", "pattern": "^[A-Za-z]{2}-[A-Za-z]{2}$" }, "density": { "enum": ["compact", "comfortable"] }, "content_visibility": { "enum": ["none", "hash_only", "summary", "redacted", "full"] } }
+            },
+            "inheritance_policy": {
+              "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false,
+              "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } }
+            },
+            "output_mode": { "const": "manifest_only" }
+          }
+        }
+      ]
+    },
+    "candidate_manifest": {
+      "type": "object",
+      "required": ["version", "compose_id", "display_name", "runtime_ids", "agent_ids", "tool_ids", "mcp_connection_ids", "theme", "capability_requirements", "settings", "inheritance_policy", "output_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": 1 },
+        "compose_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "runtime_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "agent_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "tool_ids": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "mcp_connection_ids": { "type": "array", "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "theme": {
+          "type": "object", "required": ["theme_id", "mode"], "additionalProperties": false,
+          "properties": { "theme_id": { "type": "string", "minLength": 1, "maxLength": 64 }, "mode": { "enum": ["system", "light", "dark"] } }
+        },
+        "capability_requirements": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "settings": {
+          "type": "object", "required": ["locale", "density", "content_visibility"], "additionalProperties": false,
+          "properties": { "locale": { "type": "string", "pattern": "^[A-Za-z]{2}-[A-Za-z]{2}$" }, "density": { "enum": ["compact", "comfortable"] }, "content_visibility": { "enum": ["none", "hash_only", "summary", "redacted", "full"] } }
+        },
+        "inheritance_policy": {
+          "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false,
+          "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } }
+        },
+        "output_mode": { "const": "manifest_only" }
+      }
+    },
+    "build_target": { "enum": ["windows", "desktop", "mobile"] },
+    "preview_mode": { "const": "version_rollback" }
+  }
+}

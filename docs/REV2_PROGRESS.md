@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket 第6段階 構成Preview（2026-09-24）
+
+GUI Shell構成のPreview経路を追加した。現在Manifestと候補Manifestを認証済みRust Brokerへ渡し、実行基盤・エージェント・ツール・MCP接続・機能要件の差分、対象platform、版rollbackの可否を決定論的に返す。Desktop設定画面はPreview結果を表示する。
+
+- Contract: `specs/gui_shell_preview.schema.json`と`specs/gui_shell_preview_receipt.schema.json`を追加し、`version_rollback`、差分配列、機能要件の`not_generated`／`not_requested`、`rollback_available=false`を固定した。
+- Production path: Desktop Settings → `ComposeClient` → 認証済みRust Broker `GUI Shell構成Preview` → Manifest再検証・差分計算 → `INTERNAL_STATE` AuditEvent付きPreview Receipt。build、Export、rollbackは実行しない。
+- Negative boundary: Permission継承、未知field、不正対象platform、候補Manifestの不正値を拒否する。Capability requirementは説明へ留まり、PermissionまたはApprovalを生成しない。
+- 未成立分類: Windows Export、独立アプリ識別子／監査ストア／設定／実行基盤Manifestの生成、Module Pruning、Distributionは`release_blocker`。Preview表示だけでbuild、Export、rollback、独立アプリ完成を主張しない。
+
 ## D4 Pocket 第5段階 GUI Shell構成（2026-09-24）
 
 GUI Shell構成のManifest-only経路を追加した。実行基盤、エージェント、ツール、MCP接続、表示テーマ、機能要件、設定を選択要求へまとめ、Rust Brokerが構造・重複・継承禁止を再検証して`GUI Shell構成`Receiptを返す。Desktop設定面は認証済みBrokerへ接続し、結果Manifestを表示する。

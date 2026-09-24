@@ -36,6 +36,27 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
   });
+
+  test('GUI Shell構成Previewは差分とrollback非実行状態を返す', () async {
+    final transport = _FakeComposeTransport({
+      'status': 'accepted',
+      'body': {
+        'preview_mode': 'version_rollback',
+        'diff': {
+          'changed_fields': ['initial_configuration']
+        },
+        'version_preview': {'rollback_available': false},
+      },
+    });
+    final receipt = await ComposeClient(transport).preview(
+      currentManifest: null,
+      candidateManifest: const {'version': 1, 'compose_id': 'd4-pocket-local'},
+    );
+
+    expect(transport.operation, 'GUI Shell構成Preview');
+    expect(transport.payload?['preview_mode'], 'version_rollback');
+    expect(receipt['version_preview'], isA<Map>());
+  });
 }
 
 class _FakeComposeTransport implements BrokerTransport {

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "operation": "GUI Shell構成Preview",
+  "status": "accepted",
+  "current_manifest": null,
+  "candidate_manifest": {"version": 1, "compose_id": "d4-pocket-local", "display_name": "D4 Pocket ローカル構成", "runtime_ids": ["gui_shell_rust_broker"], "agent_ids": ["codex"], "tool_ids": [], "mcp_connection_ids": [], "theme": {"theme_id": "d4-pocket", "mode": "system"}, "capability_requirements": ["runtime.read", "agent.metadata"], "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"}, "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"}, "output_mode": "manifest_only"},
+  "build_target": "windows",
+  "preview_mode": "version_rollback",
+  "diff": {"runtime_added": ["gui_shell_rust_broker"], "runtime_removed": [], "agent_added": ["codex"], "agent_removed": [], "tool_added": [], "tool_removed": [], "mcp_added": [], "mcp_removed": [], "capability_added": ["agent.metadata", "runtime.read"], "capability_removed": [], "changed_fields": ["initial_configuration"]},
+  "permission_requirements": [{"capability": "runtime.read", "permission_status": "not_generated", "approval_status": "not_requested"}, {"capability": "agent.metadata", "permission_status": "not_generated", "approval_status": "not_requested"}],
+  "version_preview": {"current_version": null, "candidate_version": 1, "rollback_available": false, "rollback_status": "not_executable", "rollback_reason": "Previewはrollback要求を実行しない"},
+  "build_status": "not_started",
+  "export_status": "not_started",
+  "authority_strip": true,
+  "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
+  "evidence_source": "INTERNAL_STATE",
+  "audit_id": "audit-preview-example"
+}

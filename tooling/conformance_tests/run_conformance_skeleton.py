@@ -136,6 +136,8 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_handoff",
     "gui_shell_compose",
     "gui_shell_compose_receipt",
+    "gui_shell_preview",
+    "gui_shell_preview_receipt",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -229,6 +231,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "windows_tray_projection.schema.json",
     "gui_shell_compose.schema.json",
     "gui_shell_compose_receipt.schema.json",
+    "gui_shell_preview.schema.json",
+    "gui_shell_preview_receipt.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -5909,6 +5913,54 @@ def test_gui_shell_compose_is_manifest_only_and_non_inheriting() -> list[str]:
     return errors
 
 
+def test_gui_shell_preview_is_read_only_and_non_rollback() -> list[str]:
+    request = load_contract_fixture("gui_shell_preview.valid.json")
+    receipt = load_contract_fixture("gui_shell_preview_receipt.valid.json")
+    request_schema = load_schema("gui_shell_preview.schema.json")
+    receipt_schema = load_schema("gui_shell_preview_receipt.schema.json")
+    errors = []
+    errors.extend(validate_instance(request, request_schema))
+    errors.extend(validate_instance(receipt, receipt_schema))
+    if request.get("preview_mode") != "version_rollback":
+        errors.append("GUI Shell Previewの版・rollbackモードが固定されていない")
+    if receipt.get("build_status") != "not_started" or receipt.get("export_status") != "not_started":
+        errors.append("GUI Shell PreviewがbuildまたはExportを完了扱いにした")
+    if receipt.get("version_preview", {}).get("rollback_available") is not False:
+        errors.append("GUI Shell Previewがrollback実行可能性を生成した")
+    if any(
+        item.get("permission_status") != "not_generated"
+        or item.get("approval_status") != "not_requested"
+        for item in receipt.get("permission_requirements", [])
+    ):
+        errors.append("GUI Shell PreviewがCapability requirementからPermissionまたはApprovalを生成した")
+    invalid = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_preview_authority.invalid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if not validate_instance(invalid, request_schema):
+        errors.append("GUI Shell PreviewがPermission継承を受け入れた")
+    invalid_receipt = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_preview_receipt_authority.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid_receipt, receipt_schema):
+        errors.append("GUI Shell Preview ReceiptがAuthority strip無効化を受け入れた")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        if "GUI Shell構成Preview" not in operations:
+            errors.append(f"{name}にGUI Shell構成Preview操作がない")
+    source = (RUST_HELPER / "src" / "broker" / "compose_center.rs").read_text(
+        encoding="utf-8"
+    )
+    for token in ("pub(super) fn preview", "not_executable", "permission_status"):
+        if token not in source:
+            errors.append(f"GUI Shell Preview Broker経路に境界tokenがない: {token}")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6509,6 +6561,7 @@ def main() -> int:
         test_agent_comparison_projection_is_isolated_and_non_authoritative,
         test_agent_handoff_projection_requires_reassessment_and_redaction,
         test_gui_shell_compose_is_manifest_only_and_non_inheriting,
+        test_gui_shell_preview_is_read_only_and_non_rollback,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,
