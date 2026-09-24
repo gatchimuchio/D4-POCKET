@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 33追補: Windows同一commit AOT比較とsurface node実証（2026-09-24）
+
+commit `aa3f2eac4f829d230a782fbd5f5cf7fc58d79c6c`をsourceとして、all-enabled baselineとReceipt選択buildを同じWindows Flutter toolchain／Release条件で実行した。比較tool自身がAOT reportからCatalogのsurface library一覧を読み取り、新Schemaへ記録した。保存evidence・両report・両artifact・snapshot・precompiler traceをread-backし、Schema／Receipt対応とsize・SHA-256・tree hashを照合した。
+
+- 実行command: `python tooling/compare_module_builds_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --artifact-dir C:\Users\ohira\AppData\Local\GUI-Shell\developer-module-builds\comparison-aotnodes-aa3f2ea`。出力はRepository外のCodex LocalCacheへ転送され、evidenceは`C:\Users\ohira\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\GUI-Shell\developer-module-builds\comparison-aotnodes-aa3f2ea\comparison_evidence.json`。
+- 対象環境: Flutter `3.44.0`、Dart `3.12.0`、framework revision `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`。Baselineは8任意画面全有効、選択buildはObservabilityとTrace Inspectorを選び、Setup Doctor、History、Evaluation Lab、Host Capabilities、Notifications、Host Operationsを無効化した。Receipt SHA-256 `066280fc3dc4a2edc5d03ddcd53ba266f0a74425cbb8a46da8138bdd3c78e24c`。
+- Artifact: baseline `30,892,494 bytes`、tree SHA-256 `2fae275940157070320bd72fc782e06cb6ec2d59a331ed2b3113186d4458ce98`。選択build `30,663,118 bytes`、tree SHA-256 `8182ece8cfb5c989052642a977d1d5119a9124029d209dc4851645443828e1d2`。減少は`229,376 bytes`（224 KiB）で、差分artifactは`data/app.so`だけ。baseline `data/app.so`: `6,816,656 bytes`, SHA-256 `bb165b36298e462b6d0545354dfd2e0f45f30d44ab727b3e97fa53999dd2e747`; selected: `6,587,280 bytes`, SHA-256 `bb327951056422bfb15dcf1a2a17731aaf2c60ba1187db68fe8c7d28a213e6b8`。それ以外のartifact fileは同一hash・size。
+- AOT report: baseline report SHA-256 `6e7bbb538145f67bb32d1d2894a2d3d4c80e6dee85929a4fd61d8a2a5fcd3bd4`; selected report SHA-256 `108d524db7560265428c2f4d8786d71b308569d3bc0a4ca12f785d52b784174e`。baseline reportにはCatalogの8 surface library全件が存在し、選択reportにはObservabilityとTrace Inspectorの2件だけが存在することを抽出・照合した。size-analysis snapshot／traceと全artifact fileもevidenceに記録されたsize・SHA-256へ一致した。
+- Build経過時間はbaseline `52,143 ms`、選択`51,278 ms`。これはbuild所要であって製品起動速度ではない。`binary_pruning_verified=false`、standalone／product claim false、cold startupとresourceは`not_measured`のまま。
+- 検証: tool exit 0。保存JSONのSchema・Receipt・ModulePlan一致、AOT reportからのsurface再抽出、report／snapshot／trace／artifactの実size・SHA-256・tree hashを独立read-backして一致確認。比較tool実装commitの集約validationもPASS（Schema 121、Conformance 190、strict日本語監査findings 0、manifest、packaging、release gate、smoke、runtime assertion、C32監査。development mode、`release_ready=false`）。
+- 未成立分類: `release_blocker` `rev2_module_pruning_binary_and_measurement`は継続する。Flutter compiler reportのlibrary node不在は、このUI AOT reportにおけるnode境界の証拠であり、共有symbolや画面意味全体の不在、製品binary内の安全Core保持、runtime挙動、Rust／third-party pruningを証明しない。独立製品Export、hash結合された製品cold startup／resource計測も未成立。
+
 ## D4 Pocket Phase 33追補: AOT surface証拠の機械検査（2026-09-24）
 
 Windows比較toolを拡張し、Flutter size-analysis reportのDart AOT treeからCatalog記載surface library nodeを抽出するようにした。baselineは全Catalog surface、選択buildは選択Moduleに対応するsurfaceのみを記録し、ConformanceがReceipt／Catalog／defineと一致しない残存・欠落を拒否する。選択外library残存と選択済library欠落のnegative testを追加した。`binary_pruning_verified=false`は維持し、AOT report nodeの一致を実行時・独立製品の証拠へ昇格させない。

@@ -126,7 +126,7 @@
       "classification": "release_blocker",
       "blocks_release": true,
       "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較は実施済みであり、6つの選択外Dart surface library nodeはFlutter AOT report上で不在、選択した2 nodeは存在し、全artifact差は224 KiBである。ただしこれはINTERNAL_STATEのDesktop Flutter UI証拠で、最終製品の意味上の除去、安全Core保持、Rust／third-party除去、独立Exportを証明しない。cold startupと実行時resourceも未測定である。",
-      "required_action": "Catalog surface library inventoryを含むSchema適合の比較evidenceを同一commit・toolchainのWindows buildから生成・監査する。別途、hash固定した独立製品artifactで必須安全Core保持と除外対象の実挙動をnegative／regression試験し、cold startup・resourceを測定する。Flutter UI比較をRust／third-party pruningや製品完成へ読み替えない。"
+      "required_action": "独立製品Export経路成立後、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象の実挙動をpositive／negative／回帰試験し、製品cold startupとbounded resourceを測定する。Flutter UI比較・AOT report node差・artifact size差だけではrelease gateを閉じない。"
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
