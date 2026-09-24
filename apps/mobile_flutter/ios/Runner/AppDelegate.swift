@@ -3,6 +3,8 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private var deviceLinkService: DeviceLinkNativeService?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -12,5 +14,13 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let service = DeviceLinkNativeService()
+    deviceLinkService = service
+    service.install(messenger: engineBridge.applicationRegistrar.messenger())
+  }
+
+  override func applicationWillTerminate(_ application: UIApplication) {
+    deviceLinkService?.close()
+    deviceLinkService = nil
   }
 }

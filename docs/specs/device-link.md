@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: Rustの暗号化端末経路とowner制御は実装済み。Android native Device Linkへの移行は進行中であり、iOS native handlerは未実装。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
+状態: Rustの暗号化端末経路とowner制御は実装済み。Android Kotlin native移行はsource・unit test・package buildまで成立したが、OS実動作は未確認。iOS native handlerとSimulator XCTest sourceを追加し、Apple toolchainによるcompile／testは未確認。どちらもnativeから同じRust Brokerへ到達するLIVE_RUNTIME試験、実機の安全保管・lifecycle証拠は未成立である。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験・native unit test・Simulator buildは実機証拠とは区別する。
 
 ## 対象と責任
 

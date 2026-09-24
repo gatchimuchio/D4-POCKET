@@ -1219,3 +1219,42 @@ Android Kotlin経路にnative招待dialog、Host／HostID／証明書hashの操�
 - `flutter devices`：Windows／Chrome／Edgeのみ。Android device/emulatorは検出されない。Android実機検証凍結を維持しinstall／起動／結合／TLS接続は行っていない。
 
 この単位でAndroid sourceのcompileとdebug package生成は成立したが、Android Keystoreの実OS動作、TLSから実Rust Brokerへのnative接続、結合・失効・OS背景遷移は未検証。iOS native handlerは未実装である。iOS compileはWindowsでは行えない。秘密をDart／debug VM／log／artifactへ渡さないplatform live-test harnessも未成立である。加えて現行`local_delete`はDesktop Rust BrokerのAuditEventを生成しないため、回復監査の閉包も未成立と明記した。`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`を`release_blocker`のまま保持し、Android実機凍結と正式配布識別子／署名blockerも変更しない。
+
+
+## D4 Pocket rev2 Mobile: iOS Device Link native経路の追加（2026-09-25）
+
+現行iOS Runner、Rust `device_transport`／`device_link`／Broker応答、Flutter MethodChannel契約を照合し、iOS側にnative実装がないGapを埋めた。Flutter implicit engineのapplication messengerへ固定channel handlerを登録し、招待入力と接続先照合をUIKit native画面に置いた。iOS native層で重複JSON key、招待期限・端末ID・Host・証明書hashを検査し、ThisDeviceOnly・非同期なしのKeychain itemへ保存後に再読取する。Network.framework TLS clientはRust側の一要求一改行frame、4MiB応答上限、5秒期限、証明書DER hash固定、TLS resumption/ticket無効化、background時cancelに合わせた。通常Broker要求は既存TLSからRust Brokerへ送り、応答nonce・operation・status・Audit ID・evidence class・資格漏えいを検査してからFlutterへ限定projectionする。新しい権限経路は追加していない。
+
+Runner XCTestを追加し、重複／escape重複JSON key、招待binding・expiry・IP範囲、履歴grant referenceのoperation scope、Simulator KeychainのThisDeviceOnly属性・write/readback/deleteを検査する。Apple補助workflowは`workflow_dispatch`のみのまま、iPhone Simulator XCTestを実行しsummaryを保存するよう拡張した。Flutter／native sourceのtracked差分だけでなく未追跡source生成も検出する。これはApple補助runであり、CI gateではない。
+
+検証結果:
+
+- `python tooling/schema_check/check_schemas.py`：成功、Schema124件・正常例124件・拒否例150件。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：成功、197件。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：成功、新規負債0件。
+- `flutter analyze --no-pub`（Mobile）：成功、指摘0件。
+- `flutter test --no-pub --reporter expanded`（Mobile）：成功、13件。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：成功、library244・helper binary7・全integration35件を含む全286件。
+- `python -X utf8 tooling/manifest.py --write`／`--check`、`python tooling/release_gate_check.py`、`python tooling/packaging_portability_check.py`：成功。
+- Windows hostに`swift`／`xcodebuild`はなく、Xcode compileとSimulator XCTestは未実行。Apple workflowも現時点では未dispatch。Swift sourceのcompileを成功扱いしない。
+- 実端末からnative TLSをDesktop Rust Brokerへ接続するplatform-native LIVE_RUNTIME harnessは未実装・未検証。Android実機検証凍結は維持する。
+
+残存項目:
+
+- item: iOS native compile／XCTestおよびiOS実機のKeychain・TLS・lifecycle証拠
+  classification: release_blocker
+  reason: WindowsではApple toolchainを実行できず、追加sourceは未compile。Simulator XCTestも未実行であり、physical deviceや実運用を証明しない。
+  required_action: 手動Apple workflowを現行commitで実行し、compile／XCTest失敗を修正する。別途iOS実機のnative実通信を検証する。
+  blocks_release: yes
+- item: native Device Linkの実接続試験経路と`local_delete`回復監査
+  classification: release_blocker
+  reason: secretをFlutter／debug VM／log／artifactへ出さずに実Rust Brokerへ接続するplatform LIVE_RUNTIME harnessはなく、通信不能時のlocal_deleteにもBroker AuditEventがない。
+  required_action: native境界を保持する実接続harnessを追加し、local_deleteを監査済みBroker操作または安全境界を維持する明示的な回復監査契約へ接続する。
+  blocks_release: yes
+- item: Android実機検証
+  classification: release_blocker
+  reason: 2026-09-11のowner凍結指示が継続中であり、未実施を合格へ読み替えない。
+  required_action: 凍結解除のowner指示後にのみ実機検証を再開する。
+  blocks_release: yes
+
+この実装単位もD4 Pocket完成、Mobile実機安全性、正式配布、owner GOを成立させない。`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`を未解決release blockerとして維持する。

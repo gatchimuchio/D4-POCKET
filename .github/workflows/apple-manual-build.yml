@@ -68,16 +68,35 @@ jobs:
           flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
           flutter build ios --simulator --debug 2>&1 | tee ../../evidence/ios-build.txt
+      - name: iOS native Device Link unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available | tee evidence/ios-simulator-devices.txt
+          simulator_id="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([A-Fa-f0-9-]{36})\).*/\1/p' | head -n 1)"
+          test -n "$simulator_id"
+          printf '%s\n' "$simulator_id" > evidence/ios-simulator-selected.txt
+          xcodebuild test \
+            -project apps/mobile_flutter/ios/Runner.xcodeproj \
+            -scheme Runner \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            -derivedDataPath "$RUNNER_TEMP/gui-shell-ios-native-tests" \
+            -resultBundlePath "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee evidence/ios-native-test.txt
+          xcrun xcresulttool get test-results summary \
+            --path "$RUNNER_TEMP/gui-shell-ios-native-tests.xcresult" \
+            | tee evidence/ios-native-test-summary.json
       - name: build成果物と差分を保存
         shell: bash
         run: |
           set -euo pipefail
-          git status --short > evidence/build-working-tree.txt
-          git diff --binary > evidence/build-migrations.patch
+          git status --short --untracked-files=all -- apps native > evidence/build-working-tree.txt
+          git diff --binary -- apps native > evidence/build-migrations.patch
           tar -czf evidence/apple-builds.tar.gz apps/desktop_flutter/build/macos/Build/Products/Debug/*.app apps/mobile_flutter/build/ios/iphonesimulator/*.app native/rust_helper/target/debug/gui_shell_rust_helper
           shasum -a 256 evidence/apple-builds.tar.gz > evidence/artifact-sha256.txt
-          git diff --exit-code
-          git diff --cached --exit-code
+          git diff --exit-code -- apps native
+          git diff --cached --exit-code -- apps native
+          test -z "$(git status --porcelain --untracked-files=all -- apps native)"
       - name: 補助証拠をアップロード
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -12,6 +12,11 @@
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
+		D4A000000000000000000001 /* DeviceLinkStrictJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B000000000000000000001 /* DeviceLinkStrictJSON.swift */; };
+		D4A000000000000000000002 /* DeviceLinkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B000000000000000000002 /* DeviceLinkModels.swift */; };
+		D4A000000000000000000003 /* DeviceLinkNativeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B000000000000000000003 /* DeviceLinkNativeStore.swift */; };
+		D4A000000000000000000004 /* DeviceLinkTLSClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B000000000000000000004 /* DeviceLinkTLSClient.swift */; };
+		D4A000000000000000000005 /* DeviceLinkNativeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B000000000000000000005 /* DeviceLinkNativeService.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -59,6 +64,11 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D4B000000000000000000001 /* DeviceLinkStrictJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLinkStrictJSON.swift; sourceTree = "<group>"; };
+		D4B000000000000000000002 /* DeviceLinkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLinkModels.swift; sourceTree = "<group>"; };
+		D4B000000000000000000003 /* DeviceLinkNativeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLinkNativeStore.swift; sourceTree = "<group>"; };
+		D4B000000000000000000004 /* DeviceLinkTLSClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLinkTLSClient.swift; sourceTree = "<group>"; };
+		D4B000000000000000000005 /* DeviceLinkNativeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLinkNativeService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +133,11 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
+				D4B000000000000000000001 /* DeviceLinkStrictJSON.swift */,
+				D4B000000000000000000002 /* DeviceLinkModels.swift */,
+				D4B000000000000000000003 /* DeviceLinkNativeStore.swift */,
+				D4B000000000000000000004 /* DeviceLinkTLSClient.swift */,
+				D4B000000000000000000005 /* DeviceLinkNativeService.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -284,6 +299,11 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+				D4A000000000000000000001 /* DeviceLinkStrictJSON.swift in Sources */,
+				D4A000000000000000000002 /* DeviceLinkModels.swift in Sources */,
+				D4A000000000000000000003 /* DeviceLinkNativeStore.swift in Sources */,
+				D4A000000000000000000004 /* DeviceLinkTLSClient.swift in Sources */,
+				D4A000000000000000000005 /* DeviceLinkNativeService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
