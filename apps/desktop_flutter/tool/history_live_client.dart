@@ -1,10 +1,10 @@
-// 開発専用。owner承認は外側の隔離試験が行い、製品clientは閲覧と新規承認待ち要求までを行う。
+// 開発専用の旧TCP Broker試験fixture。製品Flutter経路からは使用しない。
 import 'package:gui_shell_ui/history_client.dart';
-import 'package:gui_shell_desktop/services/broker_client.dart';
+import '../test/support/test_broker_tcp_transport.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length != 2) throw ArgumentError('通常資格fileとRuntimeが必要');
-  final transport = await BrokerClient.connect(sessionFile: args[0]);
+  final transport = await TestBrokerTcpTransport.connect(args[0]);
   final client = HistoryClient(transport);
   final grant = await client.status();
   if (grant == null || grant.runtime != args[1]) throw StateError('現在承認が不一致');

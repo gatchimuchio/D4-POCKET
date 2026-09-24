@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/workspace_inspector.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/workspace_client.dart';
+import 'support/test_broker_tcp_transport.dart';
 
 class TestBroker implements BrokerTransport {
   String visibility = 'full';
@@ -187,12 +188,16 @@ void main() {
         'transport': 'authenticated_loopback_tcp',
         'max_request_bytes': 65536
       }));
-      final client = await BrokerClient.connect(sessionFile: endpoint.path);
+      final client = await TestBrokerTcpTransport.connect(endpoint.path);
       await expectLater(
-          client.request('health'), throwsA(isA<BrokerClientException>()));
+        client.request('health'),
+        throwsA(isA<TestBrokerTransportException>()),
+      );
       wrongId = false;
       await expectLater(
-          client.request('health'), throwsA(isA<BrokerClientException>()));
+        client.request('health'),
+        throwsA(isA<TestBrokerTransportException>()),
+      );
     } finally {
       await accepted.cancel();
       await server.close();
@@ -247,7 +252,7 @@ void main() {
         if (DateTime.now().isAfter(deadline)) fail('試験Broker起動期限超過');
         await Future<void>.delayed(const Duration(milliseconds: 30));
       }
-      final transport = await BrokerClient.connect(sessionFile: normal);
+      final transport = await TestBrokerTcpTransport.connect(normal);
       final client = WorkspaceClient(transport);
       final denied = (await client.list()).single;
       await expectLater(client.read(denied, 'file.txt', tree: false),

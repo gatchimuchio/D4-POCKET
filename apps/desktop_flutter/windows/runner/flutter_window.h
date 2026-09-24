@@ -8,6 +8,7 @@
 
 #include "win32_window.h"
 #include "tray_controller.h"
+#include "broker_pipe_controller.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -30,6 +31,7 @@ class FlutterWindow : public Win32Window {
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<TrayController> tray_controller_;
+  std::unique_ptr<BrokerPipeController> broker_pipe_controller_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

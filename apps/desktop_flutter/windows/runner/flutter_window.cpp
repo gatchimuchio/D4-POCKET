@@ -28,6 +28,9 @@ bool FlutterWindow::OnCreate() {
   tray_controller_ = std::make_unique<TrayController>(
       GetHandle(), flutter_controller_->engine()->messenger());
   tray_controller_->Initialize();
+  broker_pipe_controller_ = std::make_unique<BrokerPipeController>(
+      GetHandle(), flutter_controller_->engine()->messenger());
+  broker_pipe_controller_->Initialize();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -43,6 +46,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  broker_pipe_controller_ = nullptr;
   tray_controller_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -55,6 +59,10 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (broker_pipe_controller_ &&
+      broker_pipe_controller_->HandleMessage(message, lparam)) {
+    return 0;
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

@@ -271,6 +271,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "getrandom",
+ "gui_shell_windows_broker_channel",
  "gui_shell_windows_protection",
  "gui_shell_windows_runtime_observation",
  "hex",
@@ -286,6 +287,14 @@ dependencies = [
  "subtle",
  "unicode-normalization",
  "winsafe",
+ "zeroize",
+]
+
+[[package]]
+name = "gui_shell_windows_broker_channel"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

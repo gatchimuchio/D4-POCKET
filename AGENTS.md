@@ -288,6 +288,7 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 - TypeScript / NodeをGUI-Shell core runtimeにしてはならない。external SDK、Adapter sample、protocol client sample、bridge exampleの範囲に限定する
 - PythonをGUI-Shell runtime dependencyにしてはならない。dev-only tooling、Schema generation、migration helper、local validation、release evidence validation、一時validation scriptの範囲に限定する
 - Authority-sensitiveなFlutter-Rust接続は、独立process IPCを優先する。FFI / direct bridgeは、authority、signature、approval token、external command dispatch、audit finalizationの境界外でのみ許可する
+- Windows Desktop Broker要求に限り、Flutterの`MethodChannel('gui_shell/broker')`からWindows Runnerへ要求JSON文字列だけを渡し、Rust起動器が生成した名前付きpipeで同じ起動器のFlutter child PIDを照合してから既存認証Brokerへrelayする経路を許可する。このMethodChannelとRunnerは権限判断・資格保持・endpoint探索を行わず、新しいAuthority経路ではない。Dart direct Socket/file/credential access、Runnerによる認可、PID照合なしのpipe接続、既存Brokerを迂回するfallbackは禁止する
 - オーナーが明示要求しない限り、GUI Shellの利便性のためにBLUE-TANUKI実装を変更してはならない
 
 ### 14. 境界の意味

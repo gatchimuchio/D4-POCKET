@@ -8,6 +8,32 @@
 
 この変更時点で成立したのは設計契約の`CONFIG`とnegative fixtureの`FIXTURE`範囲だけである。`python tooling/schema_check/check_schemas.py`はSchema122・正常example122・負例147、`python tooling/conformance_tests/run_conformance_skeleton.py`は192件でPASSし、`git diff --check`もPASSした。`python -X utf8 tooling/日本語基底監査.py --strict`は既存の`docs/specs/windows-desktop-launcher.md`、`native/rust_helper/src/broker/ipc_server.rs`、`native/rust_helper/src/desktop_launcher.rs`の3 files / 19 findingsでFAILし、新規channel文書・Schemaのfindingはなかった。Rust named-pipe server、Runner MethodChannel client、Flutter direct socket/file removal、pipeのPID/malformed/replay否定実行、clean Windows LIVE_RUNTIME実証は未成立であり、`rev2_flutter_broker_channel_boundary`を`release_blocker`のまま保持する。Flutter内Setup Doctor、local snapshot、export等の別filesystem/network/process使用はこのchannel契約の対象外で、別途監査を要する。
 
+## D4 Pocket Phase 34追補: Flutter–Broker channel実装（2026-09-24、component証拠）
+
+上記契約をproduction sourceへ接続した。Flutter BrokerClientからendpoint file読取、session secret保持、直接TCP Socketを除去し、`gui_shell/broker` MethodChannelへ要求JSONだけを渡す。Windows Runnerはrequest stringをbound・非同期でnamed pipeへ送り、response lineを返す。Rust起動器は起動ごとのpipe、remote拒否、Flutter child PID照合、normal資格relayを所有し、operation authority・Approval・Audit・Recoveryは既存Brokerに残す。Owner資格経路は追加していない。Dart payload hashと応答request ID/operation照合を維持した。
+
+Negative / failure coverageとして、pipe componentで別PID接続拒否、relayがsession IDの偽装・malformed JSON・oversizeを既存Brokerへ送り、同じBrokerの拒否応答・Auditを確認する。Dart MethodChannel fixtureではsession/credential/role fieldを送らないことと応答binding不一致拒否を確認する。既存Flutterの実Broker TCP integration testはproduction clientから分離して`test/support`の明示的test-only transportへ移した。
+
+検証: `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --bins --target x86_64-pc-windows-msvc` PASS、`cargo build --release --locked --manifest-path native/rust_helper/Cargo.toml --bins --target x86_64-pc-windows-msvc` PASS、`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`は244/244 PASS。別途並行実行した最初の全Rust試験は既存A2A loopback fixture 1件が接続失敗したが、同test単独は1/1 PASS、全体逐次再実行は244/244 PASS。named-pipe crate Windows testsは2/2 PASS。`flutter analyze --no-pub` PASS、Desktop Flutter全testは105件PASS、`flutter build windows --release` PASS。Schemaは122・正常example122・negative fixture147、conformanceは192件PASS、release runtime assertionsはfailure 0でPASS（証拠classはCONFIG/FIXTURE）。
+
+追加のWindows実起動はDeveloper scratch限定で実施した。Run IDは`broker-pipe-1669148061d44b56b7de09f8c6fccf0a`、stage rootは`C:\Users\ohira\AppData\Local\Temp\D4PocketBrokerPipe-1669148061d44b56b7de09f8c6fccf0a\stage`。manifestのsource commitは`14387cc7cbeb3e29d15d72d1d29c8743477e4841`、`source_worktree_clean=false`、宣言上のlauncher runtimeは`per_user / isolated=false`。実際の起動ではProcess環境の`LOCALAPPDATA`を同runの`...\localappdata`へ一時overrideし、runtime store fileが同scratch内に生成されたことを別途確認した。app/broker/launcher SHA-256は`683676fee10cf51a98bbf9c22eabd20838f125f21fa49bec3646266d3a55afb3` / `30afbe8823da991944e30d3925ffeba165a16cb8136eeed4d463fe772ef98696` / `c39f67d703e0c3b7bb57e67dd37875acb6e76797e45724cdf66cca14e59b221a`。stage画面の実画面/UIAはtitle `D4 Pocket`、snapshot source `broker`を示し、runtime storeの永続`audit.jsonl` 16 records中にDesktop起動`recorded / LIVE_RUNTIME`と`health / accepted / LIVE_RUNTIME`を確認した。対象はこの変更を含むdirty worktreeからのmanual stageで、正式release collector、clean commitからのstage、通常tray終了操作は未実施。この実測はRunner→Rust pipe→既存Brokerの通常health往復・永続Auditという限定的`LIVE_RUNTIME`証拠だが、負例全体やrelease smokeを証明しない。
+
+`python -X utf8 tooling/日本語基底監査.py --strict`は既存負債の`docs/specs/windows-desktop-launcher.md`、`native/rust_helper/src/broker/ipc_server.rs`、`native/rust_helper/src/desktop_launcher.rs`の3 files / 19 findingsでFAIL。今回の追加行によるfinding増加はない。対象の`desktop_launcher.rs`と`windows_broker_channel` crateは個別`rustfmt --check` PASS。`cargo fmt --manifest-path native/rust_helper/Cargo.toml -- --check`は他moduleを含む既存複数箇所のformat driftを列挙してFAILしたため、対象外fileの一括formatは行っていない。
+
+以上により、normal health transportのWindows実行経路は限定実測したが、`rev2_flutter_broker_channel_boundary`は解除しない。Owner-only/credential/authority/session拒否、別process・別起動pipe、stale/replay、Broker停止・pipe障害時no-fallback、clean committed productのrelease smokeと正常終了は未証明である。別途Setup Doctor、snapshot、export等に残るFlutter filesystem/network/process経路も未解決である。
+
+- item: Windows product Runner→pipe→Broker end-to-end実測
+  classification: release_blocker
+  reason: dirty worktreeのDeveloper scratchでRunner→pipe→Broker health往復とLIVE_RUNTIME永続Auditは確認したが、clean committed productの正式smoke、Owner-only/authority/credential/session拒否、別process・別起動pipe、stale/replay、Broker停止時no-fallback、通常tray終了は未確認。
+  required_action: clean commitから分離配置したWindows productをformal collectorで起動し、health/Auditと列挙済みnegative・failure経路・正常終了を証拠bundleへ結合する。別Flutter filesystem/network/process surfaceは独立契約と負例試験へ接続する。
+  blocks_release: yes
+
+- item: Flutter内Broker以外のfilesystem/network/process surface
+  classification: release_blocker
+  reason: BrokerClientの直接アクセスは除去したが、Setup Doctor、snapshot、export等の独立surfaceは本作業で移譲していない。
+  required_action: production Dart sourceの全surfaceを列挙し、権限依存作用をRust Brokerへ移すか、UI-only projectionとして契約・実行境界を検証する。
+  blocks_release: yes
+
 ## D4 Pocket Phase 34追補: clean commitからのWindows staged実起動（2026-09-24）
 
 commit `1674c3b05f58fb7c2e53ffb2ee67089c46ce4432`のclean sourceからWindows Releaseを再buildし、Developer staging root `C:\Users\ohira\AppData\Local\Temp\D4Pocket-PostCommit-1674c3b-20260924`の`gui_shell_desktop_launcher.exe`で起動した。manifestは`source_worktree_clean=true`、source commit一致を記録する。artifact SHA-256はFlutter app `fcbdc9aac97b64f680eef1709ba4d90f8475f23833a293f83d16fec2582daa45`、Broker `52126f7b53e8cdf708db43a31842ad060f101895de49c21fdf45872210475c3c`、起動器 `1c21080ac0bb8da61c60114700f50853d3eb179064682b1ffb8d02f632f7f508`。

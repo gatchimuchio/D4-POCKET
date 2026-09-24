@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 native/rust_helper/target/
+native/windows_broker_channel/target/
 apps/desktop_flutter/.dart_tool/
 apps/desktop_flutter/build/
 apps/mobile_flutter/.dart_tool/

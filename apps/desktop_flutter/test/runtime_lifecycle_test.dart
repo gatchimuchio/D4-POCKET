@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/runtime_center.dart';
-import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_ui/runtime_lifecycle_client.dart';
+import 'support/test_broker_tcp_transport.dart';
 
 class _LifecycleFixture implements BrokerTransport {
   _LifecycleFixture({required this.supported});
@@ -166,24 +166,11 @@ void main() {
       await _waitForFiles([File(normal), File(owner)]);
 
       await expectLater(
-        BrokerClient.connect(sessionFile: owner),
-        throwsA(isA<BrokerClientException>()),
+        TestBrokerTcpTransport.connect(owner),
+        throwsA(isA<TestBrokerTransportException>()),
       );
-      for (final environmentName in [
-        'GUI_SHELL_BROKER_ENDPOINT_JSON',
-        'GUI_SHELL_BROKER_SESSION_JSON',
-      ]) {
-        final resolved = BrokerClient.resolveSessionFile(
-          environment: {environmentName: owner},
-        );
-        expect(resolved, owner);
-        await expectLater(
-          BrokerClient.connect(sessionFile: resolved),
-          throwsA(isA<BrokerClientException>()),
-        );
-      }
 
-      final transport = await BrokerClient.connect(sessionFile: normal);
+      final transport = await TestBrokerTcpTransport.connect(normal);
       final client = RuntimeLifecycleClient(transport);
       final initial = await client.status('development-lifecycle-fixture');
       expect(initial.state, 'stopped');

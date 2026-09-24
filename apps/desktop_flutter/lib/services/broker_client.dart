@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
+
+import 'package:flutter/services.dart';
 
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerTransport, BrokerClientException;
@@ -10,40 +10,13 @@ export 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerTransport, BrokerClientException;
 
 class BrokerClient implements BrokerTransport {
-  BrokerClient._(this._endpoint);
+  BrokerClient._(this._channel);
 
-  final BrokerEndpoint _endpoint;
+  final MethodChannel _channel;
   int _counter = 0;
 
-  static Future<BrokerClient> connect({String? sessionFile}) async {
-    final resolvedSession = resolveSessionFile(
-      sessionFile: sessionFile,
-      environment: Platform.environment,
-    );
-    if (resolvedSession == null || resolvedSession.isEmpty) {
-      throw const BrokerClientException('broker endpoint ファイルが設定されていません');
-    }
-    final file = File(resolvedSession);
-    if (!file.existsSync()) {
-      throw BrokerClientException(
-        'broker endpoint ファイルが見つかりません: $resolvedSession',
-      );
-    }
-    return BrokerClient._(
-      BrokerEndpoint.fromJson(_readJsonFile(resolvedSession)),
-    );
-  }
-
-  static String? resolveSessionFile({
-    String? sessionFile,
-    Map<String, String>? environment,
-  }) {
-    final resolvedEnvironment = environment ?? Platform.environment;
-    return sessionFile ??
-        resolvedEnvironment['GUI_SHELL_BROKER_ENDPOINT_JSON'] ??
-        resolvedEnvironment['GUI_SHELL_BROKER_SESSION_JSON'] ??
-        _candidateSessionFilePath();
-  }
+  static Future<BrokerClient> connect({MethodChannel? channel}) async =>
+      BrokerClient._(channel ?? const MethodChannel('gui_shell/broker'));
 
   @override
   Future<Map<String, Object?>> request(
@@ -54,7 +27,6 @@ class BrokerClient implements BrokerTransport {
     final issuedAt = _rfc3339Seconds(DateTime.now().toUtc());
     final request = <String, Object?>{
       'request_id': 'flutter-request-$_counter',
-      'session_id': operation == 'health' ? null : _endpoint.sessionId,
       'operation': operation,
       'payload_hash': _payloadHash(payload),
       'nonce':
@@ -63,190 +35,38 @@ class BrokerClient implements BrokerTransport {
       'metadata': {'client': 'desktop_flutter'},
       if (payload != null) 'payload': payload,
     };
-
-    final socket = await Socket.connect(
-      _endpoint.host,
-      _endpoint.port,
-      timeout: const Duration(seconds: 5),
-    );
+    final String responseText;
     try {
-      socket.write('${_endpoint.sessionSecret}\n${jsonEncode(request)}\n');
-      await socket.flush();
-      final responseLine = await _readResponseLine(socket);
-      final decoded = jsonDecode(utf8.decode(responseLine));
-      if (decoded is! Map) {
-        throw const BrokerClientException('broker 応答が object ではありません');
+      final response = await _channel
+          .invokeMethod<String>('request', jsonEncode(request))
+          .timeout(const Duration(seconds: 5));
+      if (response == null || utf8.encode(response).length > 4 * 1024 * 1024) {
+        throw const BrokerClientException('broker応答が空または上限超過です');
       }
-      if (decoded['request_id'] != request['request_id'] ||
-          decoded['operation'] != operation) {
-        throw const BrokerClientException('broker応答が現在の要求と一致しません');
-      }
-      return Map<String, Object?>.from(decoded);
-    } finally {
-      socket.destroy();
+      responseText = response;
+    } on PlatformException {
+      throw const BrokerClientException('安全Brokerとの通信に失敗しました');
+    } on MissingPluginException {
+      throw const BrokerClientException('安全Brokerとの通信路が利用できません');
+    } on TimeoutException {
+      throw const BrokerClientException('安全Brokerの応答が期限を超過しました');
     }
-  }
 
-  BrokerEndpoint get endpoint => _endpoint;
-}
-
-class BrokerEndpoint {
-  const BrokerEndpoint({
-    required this.host,
-    required this.port,
-    required this.sessionId,
-    required this.sessionSecret,
-    required this.transport,
-    required this.maxRequestBytes,
-  });
-
-  final String host;
-  final int port;
-  final String sessionId;
-  final String sessionSecret;
-  final String transport;
-  final int maxRequestBytes;
-
-  factory BrokerEndpoint.fromJson(Map<String, Object?> json) {
-    const requiredFields = <String>{
-      'host',
-      'port',
-      'session_id',
-      'session_secret',
-      'credential_role',
-      'transport',
-      'max_request_bytes',
-    };
-    if (json.length != requiredFields.length ||
-        !json.keys.every(requiredFields.contains) ||
-        json['host'] != '127.0.0.1' ||
-        json['port'] is! int ||
-        (json['port']! as int) < 1 ||
-        (json['port']! as int) > 65535 ||
-        json['credential_role'] != 'normal' ||
-        json['transport'] != 'authenticated_loopback_tcp' ||
-        json['session_id'] is! String ||
-        (json['session_id']! as String).isEmpty ||
-        json['session_secret'] is! String ||
-        !RegExp(r'^[a-f0-9]{64}$')
-            .hasMatch(json['session_secret']! as String) ||
-        (json['session_secret']! as String).length != 64 ||
-        json['max_request_bytes'] is! int ||
-        (json['max_request_bytes']! as int) < 1) {
-      throw const BrokerClientException('brokerの接続先または通常資格が不正です');
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(responseText);
+    } on FormatException {
+      throw const BrokerClientException('broker応答のJSONが不正です');
     }
-    return BrokerEndpoint(
-      host: json['host'] as String? ?? '127.0.0.1',
-      port: json['port'] as int? ?? 0,
-      sessionId: json['session_id'] as String? ?? '',
-      sessionSecret: json['session_secret'] as String? ?? '',
-      transport: json['transport'] as String? ?? 'authenticated_loopback_tcp',
-      maxRequestBytes: json['max_request_bytes'] as int? ?? 0,
-    );
-  }
-}
-
-Map<String, Object?> _readJsonFile(String path) {
-  final decoded = jsonDecode(File(path).readAsStringSync());
-  if (decoded is! Map) {
-    throw const BrokerClientException('broker endpoint ファイルが object ではありません');
-  }
-  return Map<String, Object?>.from(decoded);
-}
-
-/// Broker protocolは一要求一JSON行で応答を完結する。EOFまで待つと、Brokerが
-/// lifecycle fixture childを起動したときにWindowsで継承されたsocket handleのため
-/// 応答済みでも待機が続き得る。最初の完全な応答行だけを上限付きで受け取る。
-Future<Uint8List> _readResponseLine(Socket socket) {
-  const responseLimitBytes = 4 * 1024 * 1024;
-  final result = Completer<Uint8List>();
-  final buffer = BytesBuilder(copy: false);
-  StreamSubscription<Uint8List>? subscription;
-  Timer? timeout;
-
-  void finish(Uint8List line) {
-    if (result.isCompleted) return;
-    timeout?.cancel();
-    unawaited(subscription?.cancel());
-    result.complete(line);
-  }
-
-  void fail(Object error, [StackTrace? stackTrace]) {
-    if (result.isCompleted) return;
-    timeout?.cancel();
-    unawaited(subscription?.cancel());
-    if (stackTrace == null) {
-      result.completeError(error);
-    } else {
-      result.completeError(error, stackTrace);
+    if (decoded is! Map) {
+      throw const BrokerClientException('broker応答がobjectではありません');
     }
-  }
-
-  subscription = socket.listen(
-    (chunk) {
-      if (result.isCompleted) return;
-      final newline = chunk.indexOf(0x0a);
-      final end = newline < 0 ? chunk.length : newline;
-      if (buffer.length + end > responseLimitBytes) {
-        fail(const BrokerClientException('broker応答が受信上限を超えました'));
-        return;
-      }
-      buffer.add(chunk.sublist(0, end));
-      if (newline < 0) return;
-      final bytes = buffer.takeBytes();
-      final length = bytes.isNotEmpty && bytes.last == 0x0d
-          ? bytes.length - 1
-          : bytes.length;
-      if (length == 0) {
-        fail(const BrokerClientException('broker応答が空です'));
-        return;
-      }
-      finish(Uint8List.sublistView(bytes, 0, length));
-    },
-    onError: fail,
-    onDone: () => fail(const BrokerClientException('broker応答が空です')),
-    cancelOnError: true,
-  );
-  timeout = Timer(const Duration(seconds: 5), () {
-    fail(const BrokerClientException('broker応答の受信が期限を超過しました'));
-  });
-  return result.future;
-}
-
-Directory _brokerRuntimeRoot() {
-  final override = Platform.environment['GUI_SHELL_BROKER_RUNTIME_DIR'];
-  if (override != null && override.isNotEmpty) {
-    return Directory(override)..createSync(recursive: true);
-  }
-  if (Platform.isWindows) {
-    final localAppData = Platform.environment['LOCALAPPDATA'];
-    if (localAppData != null && localAppData.isNotEmpty) {
-      return Directory('$localAppData\\GUI-Shell\\broker')
-        ..createSync(recursive: true);
+    if (decoded['request_id'] != request['request_id'] ||
+        decoded['operation'] != operation) {
+      throw const BrokerClientException('broker応答が現在の要求と一致しません');
     }
+    return Map<String, Object?>.from(decoded);
   }
-  return Directory('.gui_shell/broker')..createSync(recursive: true);
-}
-
-String? _candidateSessionFilePath() {
-  final root = _brokerRuntimeRoot();
-  final runtimeSession =
-      '${root.path}${Platform.pathSeparator}broker_session.json';
-  if (File(runtimeSession).existsSync()) {
-    return runtimeSession;
-  }
-  final executableDir = File(Platform.resolvedExecutable).parent.path;
-  final candidates = <String>[
-    '$executableDir${Platform.pathSeparator}broker_session.json',
-    '.gui_shell/broker/broker_session.json',
-    '.gui-shell/broker/broker_session.json',
-  ];
-  for (final candidate in candidates) {
-    if (File(candidate).existsSync()) {
-      return candidate;
-    }
-  }
-  return null;
 }
 
 String _rfc3339Seconds(DateTime value) {

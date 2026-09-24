@@ -93,6 +93,25 @@ def _is_bounded_windows_tray_channel(path: Path, text: str) -> bool:
     )
 
 
+def _is_bounded_broker_pipe_channel(path: Path, text: str) -> bool:
+    """要求本文だけをRunnerへ渡す固定Broker transport channel。"""
+    expected = DESKTOP_FLUTTER / "lib" / "services" / "broker_client.dart"
+    return (
+        path == expected
+        and "MethodChannel('gui_shell/broker')" in text
+        and text.count("MethodChannel(") == 1
+        and "invokeMethod<String>('request'" in text
+        and "Socket.connect" not in text
+        and "dart:io" not in text
+        and "session_secret" not in text
+        and "sessionSecret" not in text
+        and "Process.run" not in text
+        and "Process.start" not in text
+        and "dart:ffi" not in text
+        and "flutter_rust_bridge" not in text
+    )
+
+
 def assert_flutter_product_entry_uses_broker() -> RuntimeAssertion:
     main = _read("apps/desktop_flutter/lib/main.dart")
     if "await ShellCoreClient.product()" not in main:
@@ -282,7 +301,10 @@ def assert_no_ffi_or_direct_bridge_authority_path() -> RuntimeAssertion:
     findings = _scan_files(_desktop_lib_files(), dart_forbidden)
     for path in _desktop_lib_files():
         text = path.read_text(encoding="utf-8")
-        if "MethodChannel(" in text and not _is_bounded_windows_tray_channel(path, text):
+        if "MethodChannel(" in text and not (
+            _is_bounded_windows_tray_channel(path, text)
+            or _is_bounded_broker_pipe_channel(path, text)
+        ):
             findings.append(f"{path.relative_to(ROOT).as_posix()} が許可外のMethodChannel(を含む")
     findings.extend(_scan_files(list((ROOT / "native" / "rust_helper" / "src").rglob("*.rs")), rust_forbidden))
     if findings:
@@ -295,24 +317,30 @@ def assert_no_ffi_or_direct_bridge_authority_path() -> RuntimeAssertion:
     return _pass(
         "no_ffi_authority_path",
         "CONFIG",
-        "Flutter/Rust authority surfaceのscanでDart FFI、flutter_rust_bridge、許可外MethodChannel、Rust FFI export tokenは検出されなかった。Windowsトレイの固定MethodChannelは表示と操作通知だけに限定される。",
-        "authority-sensitiveなFlutter-Rust通信はindependent-process IPC上に保ち、トレイチャネルは権限経路にしない。",
+        "Flutter/Rust authority surfaceのscanでDart FFI、flutter_rust_bridge、許可外MethodChannel、Rust FFI export tokenは検出されなかった。Broker channelは要求本文だけをRunnerへ渡し、トレイchannelは表示・通知に限定される。",
+        "Broker channelはRust起動器のPID照合pipeと既存Broker認証を必須にし、独立process間の境界を維持する。",
     )
 
 
-def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
+def assert_broker_client_uses_runner_pipe_channel() -> RuntimeAssertion:
     text = _read("apps/desktop_flutter/lib/services/broker_client.dart")
     required = [
-        "Socket.connect",
-        "sessionSecret",
-        "session_secret",
-        "credential_role",
-        "json['credential_role'] != 'normal'",
-        "GUI_SHELL_BROKER_ENDPOINT_JSON",
-        "127.0.0.1",
+        "MethodChannel('gui_shell/broker')",
+        "invokeMethod<String>('request'",
+        "_payloadHash(payload)",
     ]
     missing = [token for token in required if token not in text]
-    forbidden = ["Process.run", "Process.start", "MethodChannel(", "flutter_rust_bridge", "dart:ffi"]
+    forbidden = [
+        "Socket.connect",
+        "dart:io",
+        "session_secret",
+        "sessionSecret",
+        "GUI_SHELL_BROKER_ENDPOINT_JSON",
+        "Process.run",
+        "Process.start",
+        "flutter_rust_bridge",
+        "dart:ffi",
+    ]
     findings = [token for token in forbidden if token in text]
     if missing or findings:
         pieces = []
@@ -321,16 +349,16 @@ def assert_broker_client_uses_authenticated_loopback_ipc() -> RuntimeAssertion:
         if findings:
             pieces.append("禁止token: " + ", ".join(findings))
         return _fail(
-            "broker_client_uses_authenticated_loopback_ipc",
+            "broker_client_uses_runner_pipe_channel",
             "CONFIG",
             "; ".join(pieces),
-            "BrokerClientはendpoint/session fileを用いた認証付きloopback IPC上に保つ。",
+            "Dartは資格を保持せず、要求JSONだけを固定Runner channelへ渡す。",
         )
     return _pass(
-        "broker_client_uses_authenticated_loopback_ipc",
+        "broker_client_uses_runner_pipe_channel",
         "CONFIG",
-        "BrokerClientはnormal roleを厳格に確認したbroker endpoint/session fieldとSocket.connectを使い、direct bridgeやprocess-start tokenを持たない。",
-        "request authenticationとendpoint discoveryはbroker testの対象に保つ。",
+        "Dart BrokerClientはBroker資格・endpoint・Socketを保持せず、要求JSONだけをgui_shell/brokerへ渡す。",
+        "RunnerからRust起動器pipe、既存Broker認証・認可・AuditまでのLIVE_RUNTIME試験を必須とする。",
     )
 
 
@@ -360,24 +388,20 @@ def assert_broker_client_binds_payload_hash_to_payload() -> RuntimeAssertion:
 
 
 def assert_broker_secret_not_projected_to_ui() -> RuntimeAssertion:
-    files = [
-        path
-        for path in _desktop_lib_files()
-        if path.name != "broker_client.dart"
-    ]
+    files = _desktop_lib_files()
     findings = _scan_files(files, ["session_secret", "sessionSecret"])
     if findings:
         return _fail(
             "broker_secret_not_projected_to_ui",
             "CONFIG",
-            "Broker session secret tokenがBrokerClientの外に現れる: " + "; ".join(findings),
-            "broker session secretをUI model、text、audit payload、snapshotに入れない。",
+            "Broker session secret tokenがproduction Dart sourceに現れる: " + "; ".join(findings),
+            "broker session secretをFlutter/Dartへ投影しない。",
         )
     return _pass(
         "broker_secret_not_projected_to_ui",
         "CONFIG",
-        "Broker session secret tokenはBrokerClientに限定され、UI/snapshot file経由で射影されない。",
-        "secretをdisplayとaudit payloadから分離する。",
+        "Broker session secret tokenはproduction Dart sourceに存在しない。",
+        "資格はRust起動器とBroker内に閉じ込める。",
     )
 
 
@@ -445,7 +469,7 @@ def run_release_runtime_assertions() -> list[RuntimeAssertion]:
         assert_flutter_does_not_spawn_python_product_path(),
         assert_launch_scripts_start_broker_without_python_snapshot(),
         assert_no_ffi_or_direct_bridge_authority_path(),
-        assert_broker_client_uses_authenticated_loopback_ipc(),
+        assert_broker_client_uses_runner_pipe_channel(),
         assert_broker_client_binds_payload_hash_to_payload(),
         assert_broker_secret_not_projected_to_ui(),
         assert_flutter_fail_closed_tests_exist(),

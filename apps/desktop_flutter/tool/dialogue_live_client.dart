@@ -1,13 +1,13 @@
-// 開発専用の実IPC試験。製品clientを使い、owner承認は外側の試験操作者が行う。
+// 開発専用の旧TCP Broker試験fixture。製品Flutter経路からは使用しない。
 import 'dart:convert';
 import 'dart:io';
-import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/runtime_dialogue_client.dart';
+import '../test/support/test_broker_tcp_transport.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length != 2) throw ArgumentError('通常資格fileと試験出力directoryが必要です');
   final client =
-      RuntimeDialogueClient(await BrokerClient.connect(sessionFile: args[0]));
+      RuntimeDialogueClient(await TestBrokerTcpTransport.connect(args[0]));
   final sessions = [await client.start('left'), await client.start('right')];
   final requests = [
     await client.send(sessions[0], 'こんにちは'),

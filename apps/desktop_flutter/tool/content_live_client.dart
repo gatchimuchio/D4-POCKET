@@ -1,11 +1,10 @@
-// 開発専用。外側の隔離試験が承認し、この製品clientは通常資格だけを使う。
+// 開発専用の旧TCP Broker試験fixture。製品Flutter経路からは使用しない。
 import 'package:gui_shell_ui/history_client.dart';
-import 'package:gui_shell_desktop/services/broker_client.dart';
+import '../test/support/test_broker_tcp_transport.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length != 2) throw ArgumentError('通常資格fileと要求IDが必要');
-  final client =
-      HistoryClient(await BrokerClient.connect(sessionFile: args[0]));
+  final client = HistoryClient(await TestBrokerTcpTransport.connect(args[0]));
   final history = await client.status();
   if (history == null) throw StateError('履歴承認がない');
   final page = await client.page(history, requestId: args[1]);

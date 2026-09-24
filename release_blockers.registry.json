@@ -125,8 +125,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "既存apps/desktop_flutter/lib/services/broker_client.dartはDart内でendpoint fileを読み、session_secretを保持し、Socket.connectでloopback IPCを行う。D4 Pocket指示のFlutter filesystem／credential／network責務禁止に対するRust側移譲経路と実証は未成立。",
-      "required_action": "既存Broker統治経路を迂回しないRust-owned channel設計を確立し、Flutterからfile・secret・socketへの直接アクセスを除去する。通常・Owner分離、Authority拒否、Audit、Recovery、replay／stale／malformed負例をproduction pathで検証する。"
+      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。一方、clean committed productのformal smoke、全negative/failure経路、正常終了は未確認であり、Setup Doctor・snapshot・export等の別Flutter filesystem/network/process surfaceも未解決。",
+      "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。Flutter内の別filesystem/network/process surfaceも独立契約・移譲・負例試験へ接続する。"
     },
     {
       "name": "rev2_export_owner_ui_authority_path",

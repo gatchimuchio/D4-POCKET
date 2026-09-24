@@ -1,13 +1,16 @@
 //! Windows向けDesktop起動管理。権限判断はBrokerに残し、Flutterへ通常IPC資格だけを渡す。
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{ErrorKind, Read};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use zeroize::Zeroize;
 
 use crate::broker::ipc_server::BrokerServerError;
 use crate::broker::{
@@ -18,6 +21,8 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
 const UI_POLL: Duration = Duration::from_millis(50);
 const MAX_ENDPOINT_BYTES: u64 = 4096;
 const MAX_REQUEST_BYTES: usize = 64 * 1024;
+const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+const RELAY_IO_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_FILE: &str = "broker_session.json";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -387,7 +392,7 @@ fn read_endpoint(path: &Path) -> Result<(Vec<u8>, BrokerEndpoint), DesktopLaunch
         )
     })?;
     let mut bytes = Vec::with_capacity(MAX_ENDPOINT_BYTES as usize);
-    file.by_ref()
+    Read::by_ref(&mut file)
         .take(MAX_ENDPOINT_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| {
@@ -440,9 +445,111 @@ fn remove_failed_start_files(session_file: &Path) {
     let _ = remove_managed_file(&session_file.with_extension("json.tmp"));
 }
 
+/// Rust起動器内だけで通常資格を保持し、要求を既存Brokerへ転送する。
+/// Pipe側はBroker認可・Approval・Auditの代替を行わない。
+struct RelayEndpoint(BrokerEndpoint);
+
+impl Drop for RelayEndpoint {
+    fn drop(&mut self) {
+        self.0.session_secret.zeroize();
+    }
+}
+
+fn normalize_channel_request(input: &[u8], session_id: &str) -> Vec<u8> {
+    let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(input) else {
+        return input.to_vec();
+    };
+    let Some(object) = value.as_object_mut() else {
+        return input.to_vec();
+    };
+    if object.contains_key("session_id") {
+        object.insert(
+            "desktop_channel_session_id_forbidden".into(),
+            serde_json::Value::Bool(true),
+        );
+    } else {
+        object.insert(
+            "session_id".into(),
+            serde_json::Value::String(session_id.to_owned()),
+        );
+    }
+    serde_json::to_vec(&value).unwrap_or_else(|_| input.to_vec())
+}
+
+fn relay_channel_frame(
+    frame: gui_shell_windows_broker_channel::PipeFrame,
+    endpoint: &BrokerEndpoint,
+) -> Option<Vec<u8>> {
+    let request = match frame {
+        gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
+            normalize_channel_request(&bytes, &endpoint.session_id)
+        }
+        gui_shell_windows_broker_channel::PipeFrame::Oversized => {
+            vec![b' '; endpoint.max_request_bytes.saturating_add(1)]
+        }
+    };
+    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), endpoint.port);
+    let deadline = Instant::now() + RELAY_IO_TIMEOUT;
+    let mut stream = TcpStream::connect_timeout(&address, RELAY_IO_TIMEOUT).ok()?;
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return None;
+    }
+    stream.set_write_timeout(Some(remaining)).ok()?;
+    stream.write_all(endpoint.session_secret.as_bytes()).ok()?;
+    stream.write_all(b"\n").ok()?;
+    stream.write_all(&request).ok()?;
+    stream.write_all(b"\n").ok()?;
+    stream.flush().ok()?;
+
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return None;
+    }
+    stream.set_read_timeout(Some(remaining)).ok()?;
+    let reader = BufReader::new(stream);
+    let mut response = Vec::new();
+    let read = reader
+        .take((MAX_RESPONSE_BYTES + 1) as u64)
+        .read_until(b'\n', &mut response)
+        .ok()?;
+    if read == 0 || response.len() > MAX_RESPONSE_BYTES || response.last() != Some(&b'\n') {
+        return None;
+    }
+    response.pop();
+    if response.last() == Some(&b'\r') {
+        response.pop();
+    }
+    Some(response)
+}
+
+fn run_channel_server(
+    pipe_name: String,
+    endpoint: RelayEndpoint,
+    expected_client_pid: Arc<AtomicU32>,
+    shutdown: Arc<AtomicBool>,
+    ready: mpsc::SyncSender<()>,
+) -> Result<(), BrokerServerError> {
+    gui_shell_windows_broker_channel::run_server(
+        pipe_name,
+        expected_client_pid,
+        shutdown,
+        ready,
+        endpoint.0.max_request_bytes,
+        MAX_RESPONSE_BYTES,
+        |frame| relay_channel_frame(frame, &endpoint.0),
+    )
+    .map_err(|error| BrokerServerError {
+        message: format!("安全Brokerの通信路に問題があります。code={}", error.code()),
+    })
+}
+
 struct RunningBroker {
     shutdown: Arc<AtomicBool>,
     server: Option<JoinHandle<Result<(), BrokerServerError>>>,
+    channel_server: Option<JoinHandle<Result<(), BrokerServerError>>>,
+    channel_pipe_name: String,
+    frontend_pid: Arc<AtomicU32>,
     session_file: PathBuf,
     session_bytes: Vec<u8>,
 }
@@ -485,7 +592,7 @@ impl RunningBroker {
             }
         }
 
-        let (session_bytes, _endpoint) = match read_endpoint(&session_file) {
+        let (mut session_bytes, mut endpoint) = match read_endpoint(&session_file) {
             Ok(value) => value,
             Err(error) => {
                 shutdown.store(true, Ordering::Release);
@@ -494,9 +601,82 @@ impl RunningBroker {
                 return Err(error);
             }
         };
+        let mut random = [0u8; 16];
+        if getrandom::getrandom(&mut random).is_err() {
+            endpoint.session_secret.zeroize();
+            session_bytes.zeroize();
+            shutdown.store(true, Ordering::Release);
+            let _ = server.join();
+            remove_failed_start_files(&session_file);
+            return Err(DesktopLaunchError::new(
+                "BROKER_CHANNEL_START_FAILED",
+                "画面と安全Brokerの通信路を準備できません。",
+            ));
+        }
+        let channel_pipe_name =
+            match gui_shell_windows_broker_channel::pipe_name(&hex::encode(random)) {
+                Ok(name) => name,
+                Err(_) => {
+                    endpoint.session_secret.zeroize();
+                    session_bytes.zeroize();
+                    shutdown.store(true, Ordering::Release);
+                    let _ = server.join();
+                    remove_failed_start_files(&session_file);
+                    return Err(DesktopLaunchError::new(
+                        "BROKER_CHANNEL_START_FAILED",
+                        "画面と安全Brokerの通信路を準備できません。",
+                    ));
+                }
+            };
+        let frontend_pid = Arc::new(AtomicU32::new(0));
+        let channel_shutdown = Arc::clone(&shutdown);
+        let channel_expected_pid = Arc::clone(&frontend_pid);
+        let (channel_ready_tx, channel_ready_rx) = mpsc::sync_channel(1);
+        let channel_name_for_thread = channel_pipe_name.clone();
+        let relay_endpoint = RelayEndpoint(endpoint);
+        let channel_server = match thread::Builder::new()
+            .name("gui-shell-desktop-broker-pipe".to_string())
+            .spawn(move || {
+                run_channel_server(
+                    channel_name_for_thread,
+                    relay_endpoint,
+                    channel_expected_pid,
+                    channel_shutdown,
+                    channel_ready_tx,
+                )
+            }) {
+            Ok(server) => server,
+            Err(_) => {
+                session_bytes.zeroize();
+                shutdown.store(true, Ordering::Release);
+                let _ = server.join();
+                remove_failed_start_files(&session_file);
+                return Err(DesktopLaunchError::new(
+                    "BROKER_CHANNEL_START_FAILED",
+                    "画面と安全Brokerの通信路を準備できません。",
+                ));
+            }
+        };
+        match channel_ready_rx.recv_timeout(STARTUP_TIMEOUT) {
+            Ok(()) => {}
+            Err(_) => {
+                shutdown.store(true, Ordering::Release);
+                let _ = channel_server.join();
+                let _ = server.join();
+                session_bytes.zeroize();
+                remove_failed_start_files(&session_file);
+                return Err(DesktopLaunchError::new(
+                    "BROKER_CHANNEL_START_FAILED",
+                    "画面と安全Brokerの通信路を準備できません。",
+                ));
+            }
+        }
         Ok(Self {
             shutdown,
             server: Some(server),
+            channel_server: Some(channel_server),
+            channel_pipe_name,
+            frontend_pid,
             session_file,
             session_bytes,
         })
@@ -504,10 +684,24 @@ impl RunningBroker {
 
     fn has_stopped(&self) -> bool {
         self.server.as_ref().is_none_or(JoinHandle::is_finished)
+            || self
+                .channel_server
+                .as_ref()
+                .is_none_or(JoinHandle::is_finished)
     }
 
     fn finish(&mut self) -> Result<(), DesktopLaunchError> {
         self.shutdown.store(true, Ordering::Release);
+        let channel_result = self
+            .channel_server
+            .take()
+            .map(|server| match server.join() {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(_)) | Err(_) => Err(DesktopLaunchError::new(
+                    "BROKER_CHANNEL_SHUTDOWN_FAILED",
+                    "画面と安全Brokerの通信路を正常に終了できませんでした。",
+                )),
+            });
         let server_result = self.server.take().map(|server| match server.join() {
             Ok(Ok(())) => Ok(()),
             Ok(Err(_)) | Err(_) => Err(DesktopLaunchError::new(
@@ -517,9 +711,10 @@ impl RunningBroker {
         });
         let session_result = remove_session_if_unchanged(&self.session_file, &self.session_bytes);
         let temporary_result = remove_managed_file(&self.session_file.with_extension("json.tmp"));
-        self.session_bytes.fill(0);
+        self.session_bytes.zeroize();
         session_result?;
         temporary_result?;
+        channel_result.unwrap_or(Ok(()))?;
         server_result.unwrap_or(Ok(()))
     }
 }
@@ -564,12 +759,12 @@ fn launch_frontend(
     runtime_dir: &Path,
     broker: &RunningBroker,
 ) -> Result<ExitStatus, DesktopLaunchError> {
-    let session_file = runtime_dir.join(SESSION_FILE);
     let mut command = Command::new(&layout.app_exe);
     command
         .current_dir(&layout.app_dir)
-        .env("GUI_SHELL_BROKER_ENDPOINT_JSON", &session_file)
+        .env("GUI_SHELL_BROKER_CHANNEL_PIPE", &broker.channel_pipe_name)
         .env("GUI_SHELL_BROKER_RUNTIME_DIR", runtime_dir)
+        .env_remove("GUI_SHELL_BROKER_ENDPOINT_JSON")
         .env_remove("GUI_SHELL_BROKER_SESSION_JSON")
         .env_remove("GUI_SHELL_SNAPSHOT_JSON")
         .env_remove("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON")
@@ -581,6 +776,7 @@ fn launch_frontend(
             "D4 Pocket画面を起動できません。製品ファイルを確認してください。",
         )
     })?;
+    broker.frontend_pid.store(frontend.id(), Ordering::Release);
     wait_for_frontend(&mut frontend, broker)
 }
 
@@ -728,6 +924,185 @@ mod tests {
         );
         assert!(path.exists(), "changed file must not be deleted");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn desktop_channel_relay_reuses_normal_broker_auth_and_audited_rejections() {
+        let root = test_root("desktop-channel-relay");
+        let session_file = root.join(SESSION_FILE);
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server = thread::spawn(move || {
+            run_loopback_server_cancellable(
+                BrokerServerConfig::new(server_store_dir, server_session_file),
+                server_shutdown,
+                ready_tx,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (mut session_bytes, mut endpoint) = read_endpoint(&session_file).unwrap();
+
+        let request = serde_json::json!({
+            "request_id": "desktop-channel-health-1",
+            "operation": "health",
+            "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "nonce": "desktop-channel-nonce-1",
+            "issued_at": crate::broker::BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let accepted = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&request).unwrap(),
+            ),
+            &endpoint,
+        )
+        .unwrap();
+        let accepted: serde_json::Value = serde_json::from_slice(&accepted).unwrap();
+        assert_eq!(accepted["status"], "accepted");
+        assert_eq!(accepted["operation"], "health");
+        assert_eq!(accepted["request_id"], "desktop-channel-health-1");
+
+        let replayed = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&request).unwrap(),
+            ),
+            &endpoint,
+        )
+        .unwrap();
+        let replayed: serde_json::Value = serde_json::from_slice(&replayed).unwrap();
+        assert_eq!(replayed["status"], "rejected");
+        assert_eq!(replayed["error"]["code"], "broker_replay_detected");
+
+        let owner_request = serde_json::json!({
+            "request_id": "desktop-channel-owner-operation-1",
+            "operation": "作業領域承認",
+            "payload_hash": "sha256:d3626ac30a87e6f7a6428233b3c68299976865fa5508e4267c5415c76af7a772",
+            "nonce": "desktop-channel-owner-nonce-1",
+            "issued_at": crate::broker::BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": {"b": 1, "a": 2}
+        });
+        let owner_rejected = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&owner_request).unwrap(),
+            ),
+            &endpoint,
+        )
+        .unwrap();
+        let owner_rejected: serde_json::Value = serde_json::from_slice(&owner_rejected).unwrap();
+        assert_eq!(owner_rejected["status"], "rejected");
+        assert_eq!(owner_rejected["error"]["code"], "権限拒否");
+
+        let stale = serde_json::json!({
+            "request_id": "desktop-channel-stale-1",
+            "operation": "health",
+            "payload_hash": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "nonce": "desktop-channel-stale-nonce-1",
+            "issued_at": "2000-01-01T00:00:00Z",
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let stale = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&stale).unwrap()),
+            &endpoint,
+        )
+        .unwrap();
+        let stale: serde_json::Value = serde_json::from_slice(&stale).unwrap();
+        assert_eq!(stale["status"], "rejected");
+        assert_eq!(stale["error"]["code"], "broker_issued_at_invalid");
+
+        for (field, value) in [
+            ("session_secret", serde_json::json!("not-a-credential")),
+            ("credential_role", serde_json::json!("owner")),
+            ("authority", serde_json::json!({"approved": true})),
+        ] {
+            let mut injected = request.clone();
+            injected[field] = value;
+            let rejected = relay_channel_frame(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&injected).unwrap(),
+                ),
+                &endpoint,
+            )
+            .unwrap();
+            let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+            assert_eq!(rejected["status"], "rejected");
+            assert_eq!(rejected["error"]["code"], "broker_request_malformed");
+        }
+
+        let mut injected_session = request.clone();
+        injected_session["session_id"] = serde_json::Value::String("forged-session".into());
+        let rejected = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&injected_session).unwrap(),
+            ),
+            &endpoint,
+        )
+        .unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected["status"], "rejected");
+        assert_eq!(rejected["error"]["code"], "broker_request_malformed");
+
+        let malformed = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(b"{".to_vec()),
+            &endpoint,
+        )
+        .unwrap();
+        let malformed: serde_json::Value = serde_json::from_slice(&malformed).unwrap();
+        assert_eq!(malformed["status"], "rejected");
+        assert_eq!(malformed["error"]["code"], "broker_request_malformed");
+
+        let oversized = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Oversized,
+            &endpoint,
+        )
+        .unwrap();
+        let oversized: serde_json::Value = serde_json::from_slice(&oversized).unwrap();
+        assert_eq!(oversized["status"], "rejected");
+        assert_eq!(oversized["error"]["code"], "broker_request_oversized");
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        let mut unavailable_endpoint = endpoint.clone();
+        unavailable_endpoint.port = 0;
+        assert!(relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&request).unwrap()
+            ),
+            &unavailable_endpoint,
+        )
+        .is_none());
+        let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
+        assert!(audit.contains("broker_request_malformed"));
+        assert!(audit.contains("broker_request_oversized"));
+        endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn desktop_channel_normalization_never_accepts_ui_session_identity() {
+        let valid = br#"{"request_id":"r1","operation":"health"}"#;
+        let normalized = normalize_channel_request(valid, "broker-session-owned");
+        let normalized: serde_json::Value = serde_json::from_slice(&normalized).unwrap();
+        assert_eq!(normalized["session_id"], "broker-session-owned");
+        assert!(normalized
+            .get("desktop_channel_session_id_forbidden")
+            .is_none());
+
+        let forged = br#"{"request_id":"r2","operation":"health","session_id":"fake"}"#;
+        let forged = normalize_channel_request(forged, "broker-session-owned");
+        let forged: serde_json::Value = serde_json::from_slice(&forged).unwrap();
+        assert_eq!(forged["session_id"], "fake");
+        assert_eq!(forged["desktop_channel_session_id_forbidden"], true);
+
+        let malformed = b"{";
+        assert_eq!(normalize_channel_request(malformed, "session"), malformed);
+        let non_object = b"[]";
+        assert_eq!(normalize_channel_request(non_object, "session"), non_object);
     }
 
     #[test]

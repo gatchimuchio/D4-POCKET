@@ -5179,7 +5179,21 @@ def test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge() -> 
                 and "dart:ffi" not in text
                 and "flutter_rust_bridge" not in text
             )
-            if not allowed_tray:
+            allowed_broker_transport = (
+                path == DESKTOP_FLUTTER / "lib" / "services" / "broker_client.dart"
+                and "MethodChannel('gui_shell/broker')" in text
+                and text.count("MethodChannel(") == 1
+                and "invokeMethod<String>('request'" in text
+                and "Socket.connect" not in text
+                and "dart:io" not in text
+                and "session_secret" not in text
+                and "sessionSecret" not in text
+                and "Process.run" not in text
+                and "Process.start" not in text
+                and "dart:ffi" not in text
+                and "flutter_rust_bridge" not in text
+            )
+            if not (allowed_tray or allowed_broker_transport):
                 errors.append(f"{path.relative_to(ROOT)} が許可外のMethodChannel(を含む")
     return errors
 
