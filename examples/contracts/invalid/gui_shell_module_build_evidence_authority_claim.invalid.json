@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "evidence_type": "development_module_pruning_build",
+  "evidence_source": "INTERNAL_STATE",
+  "product_artifact_claimed": false,
+  "standalone_app_claimed": false,
+  "selection_input_trust": "unverified_receipt_json_selection_only",
+  "authority_verified": true,
+  "source_commit": "0000000000000000000000000000000000000000",
+  "source_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "worktree_clean": true,
+  "toolchain": {"flutter": "3.0.0", "dart": "3.0.0", "framework_revision": "0000000000000000000000000000000000000000"},
+  "target_platform": "windows",
+  "build_mode": "release",
+  "build_scope": "desktop_flutter_ui_only",
+  "catalog_version": 1,
+  "selection_mode": "explicit_optional",
+  "requested_optional_module_ids": [],
+  "included_module_ids": [
+    "core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure",
+    "shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings"
+  ],
+  "excluded_optional_module_ids": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"],
+  "dart_defines": {
+    "GUI_SHELL_MODULE_SETUP_DOCTOR": false,
+    "GUI_SHELL_MODULE_HISTORY": false,
+    "GUI_SHELL_MODULE_EVALUATION_LAB": false,
+    "GUI_SHELL_MODULE_HOST_CAPABILITIES": false,
+    "GUI_SHELL_MODULE_NOTIFICATIONS": false,
+    "GUI_SHELL_MODULE_OBSERVABILITY": false,
+    "GUI_SHELL_MODULE_TRACE_INSPECTOR": false,
+    "GUI_SHELL_MODULE_HOST_OPERATIONS": false
+  },
+  "build_command": ["flutter", "--suppress-analytics", "build", "windows", "--release", "--no-pub", "--dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false", "--dart-define=GUI_SHELL_MODULE_HISTORY=false", "--dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false", "--dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false", "--dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false", "--dart-define=GUI_SHELL_MODULE_OBSERVABILITY=false", "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=false", "--dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false"],
+  "build_duration_ms": 1234,
+  "artifact_root": "app",
+  "artifact_files": [{"path": "gui_shell_desktop.exe", "size_bytes": 1024, "sha256": "1111111111111111111111111111111111111111111111111111111111111111"}],
+  "artifact_total_bytes": 1024,
+  "artifact_tree_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "binary_pruning_verified": false,
+  "pruning_status": "compile_time_defines_applied_binary_comparison_pending",
+  "signed": false
+}

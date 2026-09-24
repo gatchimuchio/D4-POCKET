@@ -39,6 +39,27 @@ const String kD4PocketProductTitle = 'D4 Pocket';
 const String kGuiShellProductTitle = 'D4 Pocket powered by GUI Shell';
 const double _navigationRailMinScrollableExtent = 960;
 
+const bool kGuiShellModuleSetupDoctor =
+    bool.fromEnvironment('GUI_SHELL_MODULE_SETUP_DOCTOR', defaultValue: true);
+const bool kGuiShellModuleHistory =
+    bool.fromEnvironment('GUI_SHELL_MODULE_HISTORY', defaultValue: true);
+const bool kGuiShellModuleEvaluationLab =
+    bool.fromEnvironment('GUI_SHELL_MODULE_EVALUATION_LAB', defaultValue: true);
+const bool kGuiShellModuleHostCapabilities = bool.fromEnvironment(
+    'GUI_SHELL_MODULE_HOST_CAPABILITIES',
+    defaultValue: true);
+const bool kGuiShellModuleNotifications =
+    bool.fromEnvironment('GUI_SHELL_MODULE_NOTIFICATIONS', defaultValue: true);
+const bool kGuiShellModuleObservability =
+    bool.fromEnvironment('GUI_SHELL_MODULE_OBSERVABILITY', defaultValue: true);
+const bool kGuiShellModuleTraceInspector = bool.fromEnvironment(
+        'GUI_SHELL_MODULE_TRACE_INSPECTOR',
+        defaultValue: true) &&
+    kGuiShellModuleObservability;
+const bool kGuiShellModuleHostOperations = bool.fromEnvironment(
+    'GUI_SHELL_MODULE_HOST_OPERATIONS',
+    defaultValue: true);
+
 Future<void> main() async {
   await runZonedGuarded<Future<void>>(
     () async {
@@ -280,7 +301,10 @@ class _ShellHomePageState extends State<ShellHomePage> {
     _dialogueVisited = _dialogueVisited || selectedIndex == 12;
     final pages = [
       Dashboard(client: widget.client),
-      SetupDoctor(client: widget.client),
+      if (kGuiShellModuleSetupDoctor)
+        SetupDoctor(client: widget.client)
+      else
+        const SizedBox.shrink(),
       TrustCenter(client: widget.client),
       RuntimeCenter(
         client: widget.client,
@@ -303,22 +327,42 @@ class _ShellHomePageState extends State<ShellHomePage> {
         RuntimeDialogueScreen(readOnly: viewMode == _ShellViewMode.demo)
       else
         const SizedBox.shrink(),
-      if (selectedIndex == 13 && viewMode == _ShellViewMode.ownerUse)
+      if (kGuiShellModuleHistory &&
+          selectedIndex == 13 &&
+          viewMode == _ShellViewMode.ownerUse)
         const HistoryScreen()
       else
         const SizedBox.shrink(),
-      EvaluationLab(
-        client: widget.evaluationClient,
-        connect: widget.evaluationConnect ?? connectEvaluationClient,
-      ),
-      HostCapabilityCenter(client: widget.client),
-      NotificationsScreen(
-        client: widget.client,
-        onNavigate: _navigateFromNotification,
-      ),
-      ObservabilityCenter(client: widget.client),
-      TraceInspector(client: widget.client),
-      HostOperationCenter(client: widget.client),
+      if (kGuiShellModuleEvaluationLab)
+        EvaluationLab(
+          client: widget.evaluationClient,
+          connect: widget.evaluationConnect ?? connectEvaluationClient,
+        )
+      else
+        const SizedBox.shrink(),
+      if (kGuiShellModuleHostCapabilities)
+        HostCapabilityCenter(client: widget.client)
+      else
+        const SizedBox.shrink(),
+      if (kGuiShellModuleNotifications)
+        NotificationsScreen(
+          client: widget.client,
+          onNavigate: _navigateFromNotification,
+        )
+      else
+        const SizedBox.shrink(),
+      if (kGuiShellModuleObservability)
+        ObservabilityCenter(client: widget.client)
+      else
+        const SizedBox.shrink(),
+      if (kGuiShellModuleTraceInspector)
+        TraceInspector(client: widget.client)
+      else
+        const SizedBox.shrink(),
+      if (kGuiShellModuleHostOperations)
+        HostOperationCenter(client: widget.client)
+      else
+        const SizedBox.shrink(),
     ];
     final pageEntries = _pageEntries();
     final visiblePageEntries = pageEntries
@@ -358,7 +402,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
             body: Column(
               children: [
                 _TopCommandBar(
-                  selectedLabel: pageEntries[selectedIndex].label,
+                  selectedLabel: pageEntries
+                      .firstWhere((page) => page.index == selectedIndex)
+                      .label,
                   viewMode: viewMode,
                   navigationGroup: navigationGroup,
                   onViewModeChanged: (mode) => setState(() => viewMode = mode),
@@ -402,13 +448,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                             selectedIcon: Icon(Icons.dashboard),
                                             label: Text('概要'),
                                           ),
-                                          NavigationRailDestination(
-                                            icon: Icon(
-                                                Icons.build_circle_outlined),
-                                            selectedIcon:
-                                                Icon(Icons.build_circle),
-                                            label: Text('診断'),
-                                          ),
+                                          if (kGuiShellModuleSetupDoctor)
+                                            NavigationRailDestination(
+                                              icon: Icon(
+                                                  Icons.build_circle_outlined),
+                                              selectedIcon:
+                                                  Icon(Icons.build_circle),
+                                              label: Text('診断'),
+                                            ),
                                           NavigationRailDestination(
                                             icon: Icon(
                                                 Icons.verified_user_outlined),
@@ -483,45 +530,58 @@ class _ShellHomePageState extends State<ShellHomePage> {
                                                 Icon(Icons.chat_bubble),
                                             label: Text('対話'),
                                           ),
-                                          NavigationRailDestination(
-                                            icon: Icon(Icons.history_outlined),
-                                            selectedIcon: Icon(Icons.history),
-                                            label: Text('履歴'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon: Icon(Icons.science_outlined),
-                                            selectedIcon: Icon(Icons.science),
-                                            label: Text('評価ラボ'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon: Icon(Icons.public_outlined),
-                                            selectedIcon: Icon(Icons.public),
-                                            label: Text('ホスト能力'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon:
-                                                Icon(Icons.notifications_none),
-                                            selectedIcon:
-                                                Icon(Icons.notifications),
-                                            label: Text('通知'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon: Icon(Icons.insights_outlined),
-                                            selectedIcon: Icon(Icons.insights),
-                                            label: Text('観測'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon: Icon(Icons.timeline_outlined),
-                                            selectedIcon: Icon(Icons.timeline),
-                                            label: Text('追跡'),
-                                          ),
-                                          NavigationRailDestination(
-                                            icon:
-                                                Icon(Icons.swap_horiz_outlined),
-                                            selectedIcon:
-                                                Icon(Icons.swap_horiz),
-                                            label: Text('Host操作'),
-                                          ),
+                                          if (kGuiShellModuleHistory)
+                                            NavigationRailDestination(
+                                              icon:
+                                                  Icon(Icons.history_outlined),
+                                              selectedIcon: Icon(Icons.history),
+                                              label: Text('履歴'),
+                                            ),
+                                          if (kGuiShellModuleEvaluationLab)
+                                            NavigationRailDestination(
+                                              icon:
+                                                  Icon(Icons.science_outlined),
+                                              selectedIcon: Icon(Icons.science),
+                                              label: Text('評価ラボ'),
+                                            ),
+                                          if (kGuiShellModuleHostCapabilities)
+                                            NavigationRailDestination(
+                                              icon: Icon(Icons.public_outlined),
+                                              selectedIcon: Icon(Icons.public),
+                                              label: Text('ホスト能力'),
+                                            ),
+                                          if (kGuiShellModuleNotifications)
+                                            NavigationRailDestination(
+                                              icon: Icon(
+                                                  Icons.notifications_none),
+                                              selectedIcon:
+                                                  Icon(Icons.notifications),
+                                              label: Text('通知'),
+                                            ),
+                                          if (kGuiShellModuleObservability)
+                                            NavigationRailDestination(
+                                              icon:
+                                                  Icon(Icons.insights_outlined),
+                                              selectedIcon:
+                                                  Icon(Icons.insights),
+                                              label: Text('観測'),
+                                            ),
+                                          if (kGuiShellModuleTraceInspector)
+                                            NavigationRailDestination(
+                                              icon:
+                                                  Icon(Icons.timeline_outlined),
+                                              selectedIcon:
+                                                  Icon(Icons.timeline),
+                                              label: Text('追跡'),
+                                            ),
+                                          if (kGuiShellModuleHostOperations)
+                                            NavigationRailDestination(
+                                              icon: Icon(
+                                                  Icons.swap_horiz_outlined),
+                                              selectedIcon:
+                                                  Icon(Icons.swap_horiz),
+                                              label: Text('Host操作'),
+                                            ),
                                         ]
                                       : [
                                           for (final page in visiblePageEntries)
@@ -558,8 +618,9 @@ class _ShellHomePageState extends State<ShellHomePage> {
     return const [
       _ShellPageEntry(
           0, '概要', Icons.dashboard_outlined, _ShellNavigationGroup.operation),
-      _ShellPageEntry(1, '環境診断', Icons.build_circle_outlined,
-          _ShellNavigationGroup.development),
+      if (kGuiShellModuleSetupDoctor)
+        _ShellPageEntry(1, '環境診断', Icons.build_circle_outlined,
+            _ShellNavigationGroup.development),
       _ShellPageEntry(2, '信頼センター', Icons.verified_user_outlined,
           _ShellNavigationGroup.safety),
       _ShellPageEntry(
@@ -582,20 +643,27 @@ class _ShellHomePageState extends State<ShellHomePage> {
           11, '設定', Icons.settings_outlined, _ShellNavigationGroup.settings),
       _ShellPageEntry(12, '実行系との対話', Icons.chat_bubble_outline,
           _ShellNavigationGroup.operation),
-      _ShellPageEntry(
-          13, '実行履歴', Icons.history, _ShellNavigationGroup.operation),
-      _ShellPageEntry(
-          14, '評価ラボ', Icons.science_outlined, _ShellNavigationGroup.operation),
-      _ShellPageEntry(
-          15, 'ホスト能力', Icons.public_outlined, _ShellNavigationGroup.operation),
-      _ShellPageEntry(16, '通知センター', Icons.notifications_none,
-          _ShellNavigationGroup.operation),
-      _ShellPageEntry(17, '観測センター', Icons.insights_outlined,
-          _ShellNavigationGroup.operation),
-      _ShellPageEntry(18, '追跡情報', Icons.timeline_outlined,
-          _ShellNavigationGroup.development),
-      _ShellPageEntry(19, 'Host操作面', Icons.swap_horiz_outlined,
-          _ShellNavigationGroup.operation),
+      if (kGuiShellModuleHistory)
+        _ShellPageEntry(
+            13, '実行履歴', Icons.history, _ShellNavigationGroup.operation),
+      if (kGuiShellModuleEvaluationLab)
+        _ShellPageEntry(14, '評価ラボ', Icons.science_outlined,
+            _ShellNavigationGroup.operation),
+      if (kGuiShellModuleHostCapabilities)
+        _ShellPageEntry(15, 'ホスト能力', Icons.public_outlined,
+            _ShellNavigationGroup.operation),
+      if (kGuiShellModuleNotifications)
+        _ShellPageEntry(16, '通知センター', Icons.notifications_none,
+            _ShellNavigationGroup.operation),
+      if (kGuiShellModuleObservability)
+        _ShellPageEntry(17, '観測センター', Icons.insights_outlined,
+            _ShellNavigationGroup.operation),
+      if (kGuiShellModuleTraceInspector)
+        _ShellPageEntry(18, '追跡情報', Icons.timeline_outlined,
+            _ShellNavigationGroup.development),
+      if (kGuiShellModuleHostOperations)
+        _ShellPageEntry(19, 'Host操作面', Icons.swap_horiz_outlined,
+            _ShellNavigationGroup.operation),
     ];
   }
 
@@ -632,7 +700,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
   }
 
   void _selectPage(int index) {
-    final page = _pageEntries().firstWhere((entry) => entry.index == index);
+    final matches = _pageEntries().where((entry) => entry.index == index);
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この書出し構成には対象Moduleが含まれていません。')),
+      );
+      return;
+    }
+    final page = matches.first;
     setState(() {
       selectedIndex = index;
       if (!navigationGroup.includes(page.group)) {
@@ -673,9 +748,14 @@ class _ShellHomePageState extends State<ShellHomePage> {
     BuildContext context,
     ShellSnapshot snapshot,
   ) async {
+    final availablePageIndices =
+        _pageEntries().map((page) => page.index).toSet();
     final selected = await showDialog<GlobalSearchResult>(
       context: context,
-      builder: (context) => _GlobalSearchDialog(snapshot: snapshot),
+      builder: (context) => _GlobalSearchDialog(
+        snapshot: snapshot,
+        availablePageIndices: availablePageIndices,
+      ),
     );
     if (selected == null || !mounted) return;
     _selectPage(selected.pageIndex);
@@ -760,78 +840,82 @@ class _ShellHomePageState extends State<ShellHomePage> {
   }
 
   List<_CommandEntry> _featureCommandEntries() {
-    return const [
-      _CommandEntry(
+    return [
+      const _CommandEntry(
         title: 'Runtimeを開く',
         subtitle: '実行系センターへ移動',
         pageIndex: 3,
         icon: Icons.hub_outlined,
         keywords: 'Runtime 実行系',
       ),
-      _CommandEntry(
+      const _CommandEntry(
         title: 'Agentを開く',
         subtitle: 'エージェントセンターへ移動',
         pageIndex: 5,
         icon: Icons.smart_toy_outlined,
         keywords: 'Agent エージェント',
       ),
-      _CommandEntry(
-        title: '履歴検索',
-        subtitle: '実行履歴の検索画面を開く',
-        pageIndex: 13,
-        icon: Icons.history,
-        keywords: '履歴 実行履歴 検索',
-      ),
-      _CommandEntry(
-        title: '評価実行',
-        subtitle: '評価ラボを開く。実行はBrokerとowner承認の統治経路を使う',
-        pageIndex: 14,
-        icon: Icons.science_outlined,
-        keywords: '評価 評価ラボ Experiment Dataset',
-      ),
-      _CommandEntry(
+      if (kGuiShellModuleHistory)
+        const _CommandEntry(
+          title: '履歴検索',
+          subtitle: '実行履歴の検索画面を開く',
+          pageIndex: 13,
+          icon: Icons.history,
+          keywords: '履歴 実行履歴 検索',
+        ),
+      if (kGuiShellModuleEvaluationLab)
+        const _CommandEntry(
+          title: '評価実行',
+          subtitle: '評価ラボを開く。実行はBrokerとowner承認の統治経路を使う',
+          pageIndex: 14,
+          icon: Icons.science_outlined,
+          keywords: '評価 評価ラボ Experiment Dataset',
+        ),
+      const _CommandEntry(
         title: 'MCP接続',
         subtitle: 'MCP接続の設定面を開く',
         pageIndex: 11,
         icon: Icons.extension_outlined,
         keywords: 'MCP 接続 道具 資源 提示',
       ),
-      _CommandEntry(
-        title: '通知表示',
-        subtitle: '通知センターを開く',
-        pageIndex: 16,
-        icon: Icons.notifications_none,
-        keywords: '通知 通知センター',
-      ),
-      _CommandEntry(
+      if (kGuiShellModuleNotifications)
+        const _CommandEntry(
+          title: '通知表示',
+          subtitle: '通知センターを開く',
+          pageIndex: 16,
+          icon: Icons.notifications_none,
+          keywords: '通知 通知センター',
+        ),
+      const _CommandEntry(
         title: '資源監視',
         subtitle: '実行系センターの資源観測面を開く',
         pageIndex: 3,
         icon: Icons.memory_outlined,
         keywords: '資源 CPU RAM 観測 実行系',
       ),
-      _CommandEntry(
+      const _CommandEntry(
         title: '資格情報',
         subtitle: '資格情報の設定面を開く',
         pageIndex: 11,
         icon: Icons.key_outlined,
         keywords: '資格情報 Credential 秘密',
       ),
-      _CommandEntry(
+      const _CommandEntry(
         title: '更新確認',
         subtitle: '更新センターを開く',
         pageIndex: 11,
         icon: Icons.system_update_outlined,
         keywords: '更新 Update 署名',
       ),
-      _CommandEntry(
-        title: 'Host切替',
-        subtitle: 'Host操作面を開く。切替はBrokerの表示コンテキスト操作で行う',
-        pageIndex: 19,
-        icon: Icons.swap_horiz_outlined,
-        keywords: 'Host 切替 接続状態 Trust',
-      ),
-      _CommandEntry(
+      if (kGuiShellModuleHostOperations)
+        const _CommandEntry(
+          title: 'Host切替',
+          subtitle: 'Host操作面を開く。切替はBrokerの表示コンテキスト操作で行う',
+          pageIndex: 19,
+          icon: Icons.swap_horiz_outlined,
+          keywords: 'Host 切替 接続状態 Trust',
+        ),
+      const _CommandEntry(
         title: '全Runtime停止要求を確認',
         subtitle: '実行系センターを開き、Brokerの承認境界を確認する',
         pageIndex: 3,
@@ -1154,9 +1238,13 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
 }
 
 class _GlobalSearchDialog extends StatefulWidget {
-  const _GlobalSearchDialog({required this.snapshot});
+  const _GlobalSearchDialog({
+    required this.snapshot,
+    required this.availablePageIndices,
+  });
 
   final ShellSnapshot snapshot;
+  final Set<int> availablePageIndices;
 
   @override
   State<_GlobalSearchDialog> createState() => _GlobalSearchDialogState();
@@ -1173,10 +1261,10 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final results = GlobalSearchIndex.search(
-      widget.snapshot,
-      _controller.text,
-    );
+    final results = GlobalSearchIndex.search(widget.snapshot, _controller.text)
+        .where(
+            (result) => widget.availablePageIndices.contains(result.pageIndex))
+        .toList(growable: false);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820, maxHeight: 680),

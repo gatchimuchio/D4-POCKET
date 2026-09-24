@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import copy
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -61,6 +62,14 @@ from tooling.validate_all import (
 )
 from tooling.windows_release_evidence import validate_windows_release_evidence
 from tooling.broker_parity.run_authority_parity import DEFAULT_BROKER_START_TIMEOUT_SECONDS
+from tooling.build_module_pruned_windows import (
+    EXPECTED_CORE_IDS,
+    EXPECTED_OPTIONAL_IDS,
+    EXPECTED_REQUIRED_IDS,
+    _validate_catalog,
+    dart_defines,
+    resolve_module_plan,
+)
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
@@ -143,6 +152,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_export",
     "gui_shell_export_receipt",
     "gui_shell_module_catalog",
+    "gui_shell_module_build_evidence",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -375,6 +385,20 @@ def test_required_docs_exist() -> list[str]:
     existing = {path.name for path in DOC_SPECS.glob("*.md")}
     for missing in sorted(required_docs - existing):
         errors.append(f"docs/specs/{missing} が存在しない")
+    phase_mapping = ROOT / "docs" / "D4_POCKET_PHASE_MAPPING.md"
+    if not phase_mapping.is_file():
+        errors.append("docs/D4_POCKET_PHASE_MAPPING.md が存在しない")
+    else:
+        mapping_text = phase_mapping.read_text(encoding="utf-8")
+        required_mappings = [
+            *(f"| `Phase {phase}` |" for phase in range(46)),
+            *(f"| `C{phase}` |" for phase in range(35)),
+        ]
+        errors.extend(
+            f"D4 Phase／rev1 C対応表に行がない: {row}"
+            for row in required_mappings
+            if row not in mapping_text
+        )
     return errors
 
 
@@ -6204,6 +6228,90 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     return errors
 
 
+def test_gui_shell_module_build_is_untrusted_ui_only_selection() -> list[str]:
+    evidence = load_contract_fixture("gui_shell_module_build_evidence.valid.json")
+    schema = load_schema("gui_shell_module_build_evidence.schema.json")
+    errors = validate_instance(evidence, schema)
+    artifact_paths = [item.get("path") for item in evidence.get("artifact_files", [])]
+    if len(artifact_paths) != len(set(artifact_paths)):
+        errors.append("Module build証拠のartifact pathが重複している")
+    if (
+        evidence.get("product_artifact_claimed") is not False
+        or evidence.get("standalone_app_claimed") is not False
+        or evidence.get("authority_verified") is not False
+        or evidence.get("selection_input_trust")
+        != "unverified_receipt_json_selection_only"
+        or evidence.get("binary_pruning_verified") is not False
+    ):
+        errors.append("開発build証拠が製品・Owner権限・binary除去を主張している")
+
+    receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    catalog = None
+    try:
+        catalog = _validate_catalog(
+            json.loads((SPECS / "gui_shell_module_catalog.json").read_text(encoding="utf-8"))
+        )
+        plan = resolve_module_plan(receipt, catalog)
+        defines = dart_defines(plan, catalog)
+        expected = {
+            "GUI_SHELL_MODULE_SETUP_DOCTOR": False,
+            "GUI_SHELL_MODULE_HISTORY": False,
+            "GUI_SHELL_MODULE_EVALUATION_LAB": False,
+            "GUI_SHELL_MODULE_HOST_CAPABILITIES": False,
+            "GUI_SHELL_MODULE_NOTIFICATIONS": False,
+            "GUI_SHELL_MODULE_OBSERVABILITY": True,
+            "GUI_SHELL_MODULE_TRACE_INSPECTOR": True,
+            "GUI_SHELL_MODULE_HOST_OPERATIONS": False,
+        }
+        if defines != expected:
+            errors.append("Manifest選択・依存閉包とFlutter compile-time defineが一致しない")
+        if list(plan.included_module_ids) != evidence.get("included_module_ids"):
+            errors.append("Module build証拠の包含ModuleがReceipt選択と一致しない")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append(f"Module buildのManifest選択検査が失敗した: {exc}")
+
+    authority_claim = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_module_build_evidence_authority_claim.invalid.json")
+        .read_text(encoding="utf-8")
+    )
+    product_claim = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_module_build_evidence_product_claim.invalid.json")
+        .read_text(encoding="utf-8")
+    )
+    if not validate_instance(authority_claim, schema):
+        errors.append("開発build証拠がOwner Authority検証を主張できる")
+    if not validate_instance(product_claim, schema):
+        errors.append("開発build証拠が完成製品artifactを主張できる")
+
+    if catalog is not None:
+        cyclic_catalog = copy.deepcopy(catalog)
+        by_id = {item["module_id"]: item for item in cyclic_catalog["optional_modules"]}
+        by_id["shell.history"]["depends_on"] = ["shell.evaluation_lab"]
+        by_id["shell.evaluation_lab"]["depends_on"] = ["shell.history"]
+        try:
+            _validate_catalog(cyclic_catalog)
+            errors.append("循環Module依存をbuild計画が受け入れた")
+        except ValueError:
+            pass
+
+    desktop_source = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
+    command_start = desktop_source.index("List<_CommandEntry> _featureCommandEntries")
+    command_block = desktop_source[command_start : desktop_source.index("class _OpenCommandPaletteIntent")]
+    if not re.search(
+        r"if\s*\(kGuiShellModuleHostOperations\)\s*const _CommandEntry\(\s*title: 'Host切替'",
+        command_block,
+    ):
+        errors.append("除外可能なHost操作Moduleへのコマンドパレット導線が未連動")
+
+    if set(EXPECTED_CORE_IDS) != set(catalog["unprunable_core_ids"]):
+        errors.append("開発build計画が除去禁止Core境界を保持しない")
+    if set(EXPECTED_REQUIRED_IDS) != set(catalog["required_module_ids"]):
+        errors.append("開発build計画が必須画面Moduleを保持しない")
+    if set(EXPECTED_OPTIONAL_IDS) != {item["module_id"] for item in catalog["optional_modules"]}:
+        errors.append("開発build計画の任意Module一覧が固定surfaceと一致しない")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6807,6 +6915,7 @@ def main() -> int:
         test_gui_shell_preview_is_read_only_and_non_rollback,
         test_gui_shell_edit_proposal_is_owner_review_only,
         test_gui_shell_export_is_new_identity_and_non_inheriting,
+        test_gui_shell_module_build_is_untrusted_ui_only_selection,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

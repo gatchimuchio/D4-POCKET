@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "fb0d37cd3167e448c87799101c5a83a5772b962bf9233c5db707f68db1fd79e2"
+      "sha256": "821c63156aff0f4fcf70b19490fca2b37fb2f2a61d9d12e25e5b272c7ff52738"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "c97661b8aa882981d7c9509c640ec0cfe5fc4566aaacbe5e551e9303b77ac310"
+      "sha256": "093807e16b44d572dc77b98ad683e926fd06f2d05671f88b4eb77b4efa715a19"
     },
     {
       "path": "SECURITY.md",
@@ -185,7 +185,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "bb3ebb305156c956669fa60e4ba8f89640bc4627e10c4923a7465358107ae159"
+      "sha256": "78afb7445c815a0f2e67f05797742b1012cf9a2d750eb8beef8d482c1652c1fb"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -566,6 +566,10 @@
     {
       "path": "apps/desktop_flutter/test/history_screen_test.dart",
       "sha256": "9fb6e1d750a57ebbbd079d743b2468a6154d4292eae098c4eb573fad129e4d98"
+    },
+    {
+      "path": "apps/desktop_flutter/test/module_pruning_test.dart",
+      "sha256": "a1f366ad6020968f5b8e4fdcd5ef7debd1d7236141411f78d7b30c1837933b76"
     },
     {
       "path": "apps/desktop_flutter/test/notification_client_test.dart",
@@ -1064,6 +1068,10 @@
       "sha256": "e0fa5d6240d24bcd9cfc4054ae514f1dd0952f5a84c3db7ab08e4dc7e55b2ec8"
     },
     {
+      "path": "docs/D4_POCKET_PHASE_MAPPING.md",
+      "sha256": "b3e9acd22359e2a9851eddefd25a6a10acc6c93229050bac4c1d7d094a980e68"
+    },
+    {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
       "sha256": "19f447b52c125d36903f46058f3c0825e7005afd97edcdf3f5995c2b1ce3a25e"
     },
@@ -1113,7 +1121,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "7e699997e17c9704820823ed5a802e8a6dda8bbd121e5a0f0b678870e2491461"
+      "sha256": "564ba7b23efaa84248f19810aac5a70c6dba9df9a99e48635e864bdb8c0d6c34"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1293,7 +1301,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "aa29351d57d79b02dd00f2cdf2d0c24177f47193ed47ab455430c93b2aa88404"
+      "sha256": "590e149b1edc52f4b7f0d2879d76a2c15707767ca6ad5daa78324c5e5b0b5206"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -1632,6 +1640,10 @@
       "sha256": "066280fc3dc4a2edc5d03ddcd53ba266f0a74425cbb8a46da8138bdd3c78e24c"
     },
     {
+      "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
+      "sha256": "de1987b5dd45dc2f04dc31a13aebe1137760676be7f997fb859392c6066a44ed"
+    },
+    {
       "path": "examples/contracts/gui_shell_module_catalog.valid.json",
       "sha256": "5db01bef96ce090e869233099af6d92087e43f3588379a159ee89f52efa40269"
     },
@@ -1930,6 +1942,14 @@
     {
       "path": "examples/contracts/invalid/gui_shell_export_unknown_module.invalid.json",
       "sha256": "76cfae5a50399dcacd061c25944de332c73ee1877e4dbf7503d8b31c5c7abef5"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
+      "sha256": "84fa99c5cdd140f9164a62a230e9d52df1111b08d57dfbd0dd97b881df687ad5"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_module_build_evidence_product_claim.invalid.json",
+      "sha256": "14bf68be95bded329aa64010ca453a51e53212881296b8c3e589ee342e964db0"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_catalog_missing_core.invalid.json",
@@ -3464,6 +3484,10 @@
       "sha256": "3e1a6b4d7cdf8177c067d581ea6f91d7243a4b554cbb7e95ead37912a18e9d7b"
     },
     {
+      "path": "specs/gui_shell_module_build_evidence.schema.json",
+      "sha256": "75c38d67b3fd4f83af703fe225e6df2e04de5df96aa404c244157a929fc8d284"
+    },
+    {
       "path": "specs/gui_shell_module_catalog.json",
       "sha256": "a533db586ff3a085c2f527931a1c680b40343fbc004e0a96f90985430341bceb"
     },
@@ -3744,6 +3768,10 @@
       "sha256": "960816772d5369f875016aa34c892bd202b28f37ba899bf935185248a780911d"
     },
     {
+      "path": "tooling/build_module_pruned_windows.py",
+      "sha256": "98ee083d587ab66f49f1153f2cad4acbe311563cf44672260a81dad50bc19917"
+    },
+    {
       "path": "tooling/canonicalization_vectors/runtime_resource_observation_decimal.json",
       "sha256": "0a4cf0ef4c1098a5c9c59297dd049ac7ebd340b7a113e84b628c9529d9b2643b"
     },
@@ -3757,7 +3785,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b879717ea1e35dfda6c6fe31c633e729b8674695d97bf29c49ca0f27a0f2eb39"
+      "sha256": "354adad2de2874ed5243f7d68596e444ec6da1f9ab20adb271fee589563bd576"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3833,7 +3861,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "fb59bb85a75f8eac43dd042064244a262eb5fdfe16ff77a102f6b6e06dba650c"
+      "sha256": "55bf4dd52a9352688b9579c59c24c7f8a82351b670b4e630afb5b2b85156e681"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -3869,7 +3897,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "5c8cb8290e7e397715facff06f47481e0b5b3606f5179d331476437c34673911"
+      "sha256": "69193a5f200b58a4f41c9c2261d255807148e86ee9499af1b40c093769cc7a42"
     }
   ]
 }

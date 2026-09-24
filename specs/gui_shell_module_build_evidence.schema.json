@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_module_build_evidence.schema.json",
+  "title": "開発用GUI Shell画面Module選択build証拠",
+  "type": "object",
+  "required": [
+    "version",
+    "evidence_type",
+    "evidence_source",
+    "product_artifact_claimed",
+    "standalone_app_claimed",
+    "selection_input_trust",
+    "authority_verified",
+    "source_commit",
+    "source_receipt_sha256",
+    "worktree_clean",
+    "toolchain",
+    "target_platform",
+    "build_mode",
+    "build_scope",
+    "catalog_version",
+    "selection_mode",
+    "requested_optional_module_ids",
+    "included_module_ids",
+    "excluded_optional_module_ids",
+    "dart_defines",
+    "build_command",
+    "build_duration_ms",
+    "artifact_root",
+    "artifact_files",
+    "artifact_total_bytes",
+    "artifact_tree_sha256",
+    "binary_pruning_verified",
+    "pruning_status",
+    "signed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "evidence_type": { "const": "development_module_pruning_build" },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "product_artifact_claimed": { "const": false },
+    "standalone_app_claimed": { "const": false },
+    "selection_input_trust": { "const": "unverified_receipt_json_selection_only" },
+    "authority_verified": { "const": false },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "worktree_clean": { "const": true },
+    "toolchain": {
+      "type": "object",
+      "required": ["flutter", "dart", "framework_revision"],
+      "additionalProperties": false,
+      "properties": {
+        "flutter": { "type": "string", "minLength": 1 },
+        "dart": { "type": "string", "minLength": 1 },
+        "framework_revision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "target_platform": { "const": "windows" },
+    "build_mode": { "const": "release" },
+    "build_scope": { "const": "desktop_flutter_ui_only" },
+    "catalog_version": { "const": 1 },
+    "selection_mode": { "enum": ["all_optional", "explicit_optional"] },
+    "requested_optional_module_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ]
+      }
+    },
+    "included_module_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "core.security_broker",
+          "core.cryptography",
+          "core.audit_finality",
+          "core.credentials",
+          "core.os_controls",
+          "core.permission_enforcement",
+          "core.approval_enforcement",
+          "core.content_exposure",
+          "shell.dashboard",
+          "shell.runtime_operation",
+          "shell.agent_operation",
+          "shell.authority",
+          "shell.approval",
+          "shell.audit",
+          "shell.recovery",
+          "shell.problems",
+          "shell.evidence",
+          "shell.settings",
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ]
+      }
+    },
+    "excluded_optional_module_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "shell.setup_doctor",
+          "shell.history",
+          "shell.evaluation_lab",
+          "shell.host_capabilities",
+          "shell.notifications",
+          "shell.observability",
+          "shell.trace_inspector",
+          "shell.host_operations"
+        ]
+      }
+    },
+    "dart_defines": {
+      "type": "object",
+      "required": [
+        "GUI_SHELL_MODULE_SETUP_DOCTOR",
+        "GUI_SHELL_MODULE_HISTORY",
+        "GUI_SHELL_MODULE_EVALUATION_LAB",
+        "GUI_SHELL_MODULE_HOST_CAPABILITIES",
+        "GUI_SHELL_MODULE_NOTIFICATIONS",
+        "GUI_SHELL_MODULE_OBSERVABILITY",
+        "GUI_SHELL_MODULE_TRACE_INSPECTOR",
+        "GUI_SHELL_MODULE_HOST_OPERATIONS"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "GUI_SHELL_MODULE_SETUP_DOCTOR": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HISTORY": { "type": "boolean" },
+        "GUI_SHELL_MODULE_EVALUATION_LAB": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HOST_CAPABILITIES": { "type": "boolean" },
+        "GUI_SHELL_MODULE_NOTIFICATIONS": { "type": "boolean" },
+        "GUI_SHELL_MODULE_OBSERVABILITY": { "type": "boolean" },
+        "GUI_SHELL_MODULE_TRACE_INSPECTOR": { "type": "boolean" },
+        "GUI_SHELL_MODULE_HOST_OPERATIONS": { "type": "boolean" }
+      }
+    },
+    "build_command": {
+      "type": "array",
+      "minItems": 14,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "build_duration_ms": { "type": "integer", "minimum": 0 },
+    "artifact_root": { "const": "app" },
+    "artifact_files": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+          },
+          "size_bytes": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "artifact_total_bytes": { "type": "integer", "minimum": 1 },
+    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "binary_pruning_verified": { "const": false },
+    "pruning_status": { "const": "compile_time_defines_applied_binary_comparison_pending" },
+    "signed": { "const": false }
+  }
+}

@@ -121,6 +121,7 @@ REQUIRED = {
     "gui_shell_export.schema.json",
     "gui_shell_export_receipt.schema.json",
     "gui_shell_module_catalog.schema.json",
+    "gui_shell_module_build_evidence.schema.json",
     "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",

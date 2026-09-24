@@ -136,6 +136,10 @@
       "責任": "現行phase、v1.0射程、release blocker"
     },
     {
+      "path": "docs/D4_POCKET_PHASE_MAPPING.md",
+      "責任": "D4 Pocket Phase 0〜45と総合機能拡張rev1 C0〜C34の要求範囲対応。状態や完了証拠を移転しない"
+    },
+    {
       "path": "docs/standards/gui-shell-extended-standard.md",
       "責任": "拡張標準と技術選択文脈"
     },
@@ -154,6 +158,10 @@
     {
       "path": "specs/gui_shell_module_catalog.json",
       "責任": "書出し対象Desktop画面Module、必須境界、依存、source surfaceの機械可読一覧"
+    },
+    {
+      "path": "specs/gui_shell_module_build_evidence.schema.json",
+      "責任": "Developer専用Flutter画面選択buildのcommit・未信頼Receipt入力・artifact hash証拠。Owner Authority、独立製品、binary除去完了を主張しない"
     },
     {
       "path": "CLAIM.md",

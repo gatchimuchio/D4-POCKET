@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 33追補: Flutter画面選択build経路（2026-09-24）
+
+Phase 33の既存ModulePlanをFlutter Desktopの画面表示選択へ接続するDeveloper専用build補助を追加した。8つの任意画面をcompile-time defineで個別に選択でき、定義省略時は従来どおり全画面を有効にする。Trace Inspectorを選ぶ場合はObservabilityを依存として含める。必須画面の位置・表示と安全Coreの保持条件を変更しない。
+
+- 実装面: `apps/desktop_flutter/lib/main.dart`の任意画面・NavigationRail・画面切替・関連Command Palette項目をcompile-time defineで制御する。対象画面を含まない古いnavigation要求は例外にせず、日本語の非搭載案内を表示する。`tooling/build_module_pruned_windows.py`はDeveloperが明示実行し、Export Receipt JSONを未検証の画面選択入力としてSchema照合・依存閉包検査後、Windows Flutter Release buildへdefineを渡す。製品RuntimeとExport UIからこのtoolを呼び出さない。
+- 信頼・証拠境界: Receipt JSONの署名、出所、Owner操作の真正性は検証しない。選択入力はAuthorityではなく、`authority_verified=false`を記録する。出力証拠も`product_artifact_claimed=false`、`standalone_app_claimed=false`、`binary_pruning_verified=false`を固定する。これはDesktop Flutter UIのbuildに限られ、Rust／第三者Moduleの除去、独立App構成、Installer、実製品配布を証明しない。
+- Contract・回帰: `specs/gui_shell_module_build_evidence.schema.json`と正常・負例fixtureを追加し、Schema検査・Conformanceへ接続した。正常例は権限検証・製品・独立App・binary除去を主張できず、権限または製品完成を偽って主張する2負例は拒否する。全Phase 0〜45と既存rev1 C0〜C34の要求範囲対応を`docs/D4_POCKET_PHASE_MAPPING.md`へ追加した。対応表は範囲の紐付けだけで、旧工程のPASS・失敗・証拠を移転または上書きしない。
+- この追補作成前に実行した確認: `python tooling/schema_check/check_schemas.py`（Schema 120、正常例120、negative fixture 145）、`python tooling/conformance_tests/run_conformance_skeleton.py`（189 checks）、`python tooling/build_module_pruned_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --plan-only`（成功。Trace InspectorとObservability依存を含む計画を表示し、Authority検証false・binary pruning未検証を明示）、Desktop／Mobileの`flutter analyze`（問題なし）、Desktop `flutter test --no-pub`（105件成功）、8画面無効の`flutter test --no-pub --dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false --dart-define=GUI_SHELL_MODULE_HISTORY=false --dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false --dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false --dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false --dart-define=GUI_SHELL_MODULE_OBSERVABILITY=false --dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=false --dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false test/module_pruning_test.dart`（2件成功）、`python tooling/日本語基底監査.py --strict`（findings 0）。工程表対応表の日本語修正後にConformance・manifest・梱包・集約検証を再実行し、この作業単位の最終結果を確定する。
+- 未成立分類: 同一commit・toolchainに固定した全画面baselineと選択buildのartifact比較、binaryからの除去実証、差分size・cold startup・resource実測は`release_blocker`（`rev2_module_pruning_binary_and_measurement`）。Owner操作資格付きGUI Export経路は`release_blocker`（`rev2_export_owner_ui_authority_path`）。実Windows Release build結果は本追補作成時点で未実行であり、実行結果を別の追補へ記録する。Installer・署名・導入済み製品証拠も既存release gateに従って未成立のままとする。
+
 ## D4 Pocket Phase 33: Module Pruning選択計画（2026-09-24）
 
 Desktop画面Module一覧、必須Module、任意選択、依存閉包をSchema・Rust Export Broker・設定画面に接続した。Authority、Approval、Audit、Recovery等の必須Moduleは選択入力で外せず、Trace Inspector選択時はObservabilityを依存として含める。旧要求で選択fieldがない場合は全任意Moduleを保持する。
