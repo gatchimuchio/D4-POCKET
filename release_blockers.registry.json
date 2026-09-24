@@ -125,8 +125,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "現状は画面Moduleの選択計画のみで、build artifactからの実除去とサイズ・cold startup・resourceの比較実測がない。",
-      "required_action": "Export Manifestを実build対象へ接続し、安全基盤を保持する負例・回帰試験を通したうえで、同一条件の未pruned/pruned Windows artifactを生成し、hash結合されたサイズ・cold startup・resourceを測定する。"
+      "reason": "Developer用compile-time画面選択をWindows Flutter Release UI buildへ接続しhash証拠を得たが、同一条件の全画面baselineとの比較、選択対象の実binary除去確認、サイズ・cold startup・resource比較は未実施である。独立製品Exportでもない。",
+      "required_action": "同一source commit・toolchain・build条件でall-enabled baselineと選択buildを生成し、artifact hashを比較記録する。選択対象のbinary除去と必須安全Core保持を負例・回帰試験およびartifact検査で実証し、hash結合されたsize・cold startup・resourceを測定する。"
     },
     {
       "name": "windows_rust_integration_test_execution_policy",

@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "821c63156aff0f4fcf70b19490fca2b37fb2f2a61d9d12e25e5b272c7ff52738"
+      "sha256": "f20ce4e1c48a7d1a259c53abd8395433fa6e00545da1dd658937136a25eb93ce"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "093807e16b44d572dc77b98ad683e926fd06f2d05671f88b4eb77b4efa715a19"
+      "sha256": "2aeb2e727ce18f855c62d0d74c830f5ef884ee86c5278a77d81a9197b0b5d4d4"
     },
     {
       "path": "SECURITY.md",
@@ -1121,7 +1121,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "564ba7b23efaa84248f19810aac5a70c6dba9df9a99e48635e864bdb8c0d6c34"
+      "sha256": "0437993cd40afef3a7ebf06106051f8a3d7969181367b9001b8acec81f84ccfc"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1301,7 +1301,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "ef433d63bd04c1140aa8065e81145ae5386adff4d38cf99cc289b7058afca77f"
+      "sha256": "27c6c1fbb4fa21844b12c40d13806b0e36e8095ff092757f83f7facf37899ed1"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -3257,7 +3257,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "6a2d6c2092dd3a1754c8c824597de9c452ad406a846f4574f7976c949f66e5f8"
+      "sha256": "e6cbd28be89162f94ce29ce861dc6aef23cf17222fdc1bf8bb265326234bbca8"
     },
     {
       "path": "requirements-dev.txt",

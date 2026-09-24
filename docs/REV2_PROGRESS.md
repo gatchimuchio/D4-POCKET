@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 33追補: Windows Developer Release build実証（2026-09-24）
+
+commit `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`から、Receiptの画面選択をcompile-time defineへ渡すWindows Release AOT buildを実行し、全artifact file hashを採取した。Developer専用のDesktop Flutter UI build経路とそのhash採取は成立したが、独立製品、実導入・起動、実binary pruningの証拠ではない。
+
+- 実行command: `python tooling/build_module_pruned_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --artifact-dir C:\Users\ohira\AppData\Local\GUI-Shell\developer-module-builds\phase33-f0e9a40`。build補助は出力先をCodex Windows packageのLocalCacheへ仮想化して保存した。採取先は`C:\Users\ohira\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\GUI-Shell\developer-module-builds\phase33-f0e9a40`で、Repository外である。
+- Windows build実証: toolがclean worktreeとsource commitを確認し、Flutter `3.44.0`／Dart `3.12.0`／framework revision `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`で`flutter --suppress-analytics build windows --release --no-pub`と8つのdefineを実行した。build所要`47971 ms`、artifact合計`30663118 bytes`、tree SHA-256 `8182ece8cfb5c989052642a977d1d5119a9124029d209dc4851645443828e1d2`。Receipt SHA-256は`066280fc3dc4a2edc5d03ddcd53ba266f0a74425cbb8a46da8138bdd3c78e24c`。 evidence JSONは出力先の`build_evidence.json`に保存し、Schema照合済み。
+- 選択内容: 全必須画面と安全Coreを保持し、任意画面はObservabilityとTrace Inspectorを含めた。Setup Doctor、History、Evaluation Lab、Host Capabilities、Notifications、Host Operationsは選択外。Receiptは未信頼の画面選択JSONとしてだけ扱い、Owner権限を検証・獲得していない。
+- failureと修正履歴: 最初の起動はPowerShellが解決する裸の`flutter`名をPython子processが直接起動できず、`WinError 2`でbuild前に停止した。PATH上の実物が`flutter.bat`であることを観測し、toolを`flutter.bat`／`flutter.cmd`／`flutter.exe`探索へ修正した。独自wrapperや環境回避策は追加せず、明示fileを直接呼ぶ再実行でRelease buildとevidence生成に成功した。
+- 証拠の上限: evidenceは`INTERNAL_STATE`で、`product_artifact_claimed=false`、`standalone_app_claimed=false`、`authority_verified=false`、`binary_pruning_verified=false`、`signed=false`を固定する。`compile_time_defines_applied_binary_comparison_pending`であり、画面codeが最終binaryから除去されたかを比較・調査していない。artifactを起動・installせず、同一commit／toolchainでのall-enabled baselineも作成していない。
+- このbuild実行後に確認した検査: Schema 120・正常example 120・negative fixture 145、Conformance 189 checks、strict日本語監査findings 0、manifest check、packaging portability check、Python構文検査、plan-only依存閉包検査はPASS。Flutter実物probeは上記3.44.0／3.12.0／revisionを返した。Desktop／Mobile `flutter analyze`とDesktop 105試験は前段の同一DartソースでPASSし、選択無効化focus test 2件もPASSした。集約`validate_all.py --python-only --desktop-platform windows`は直前commit `3e4403799eae4bc44c1e034f24a7ad16c8cdc1fc`でPASSしており、後続のFlutter command resolver修正commitには再実行していない。
+- 未成立分類: baselineと選択artifactの同一条件・hash結合比較、binary内容の除去実証、size差、cold startup、resource比較は`release_blocker`（`rev2_module_pruning_binary_and_measurement`）。Owner操作資格付きGUI Export経路は`release_blocker`（`rev2_export_owner_ui_authority_path`）。artifact単体の起動・Installer・署名・installed product証拠も独立release gateに残る。
+
 ## D4 Pocket Phase 33追補: Flutter画面選択build経路（2026-09-24）
 
 Phase 33の既存ModulePlanをFlutter Desktopの画面表示選択へ接続するDeveloper専用build補助を追加した。8つの任意画面をcompile-time defineで個別に選択でき、定義省略時は従来どおり全画面を有効にする。Trace Inspectorを選ぶ場合はObservabilityを依存として含める。必須画面の位置・表示と安全Coreの保持条件を変更しない。

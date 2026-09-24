@@ -34,7 +34,7 @@ WindowsではFlutterの実行物がPATH上の`flutter.bat`等になるため、t
 
 ## 未成立範囲
 
-- Developer専用のManifest選択→Flutter画面compile-time define経路は接続対象。正確なcommitに結合したWindows Release build証拠は実行結果を確認するまで未成立。
+- 開発者専用の`Manifest`選択をFlutter画面のコンパイル時定義へ反映する経路と、`commit` `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`に結び付くWindows向けAOT画面生成および各ファイルの`hash`証拠は成立した。詳細は`docs/REV2_PROGRESS.md`に記録し、独立製品やOwner操作を主張しない。
 - Flutter以外のRust／第三者Module除去は未接続であり、安全基盤を別Moduleへ分割した主張をしない。
 - 現行Desktop Export UIは通常Broker資格を使うが、Export操作はOwner資格を要求するため、GUIからのOwner操作経路が未成立。
 - baseline／選択artifactを同一条件でhash結合した比較、実binary除去確認、差分サイズ、cold startup、resource比較は未測定。
