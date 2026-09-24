@@ -179,6 +179,8 @@ $replay = $null
 $freshAfterRestart = $null
 $crashFailClosed = $false
 $normalEndpointCredentialRoleVerified = $false
+$sessionFileCreated = $false
+$sessionFileRemovedAfterCollection = $false
 $replayNonce = "windows-installed-replay-nonce-$([guid]::NewGuid().ToString('N'))"
 $freshNonce = "windows-installed-fresh-nonce-$([guid]::NewGuid().ToString('N'))"
 
@@ -240,8 +242,19 @@ try {
 } catch {
   $errors.Add($_.Exception.Message)
 } finally {
-  Stop-Broker -Process $broker -Endpoint $endpoint
-  Stop-Broker -Process $restartBroker -Endpoint $restartEndpoint
+  try {
+    Stop-Broker -Process $broker -Endpoint $endpoint
+  } finally {
+    try {
+      Stop-Broker -Process $restartBroker -Endpoint $restartEndpoint
+    } finally {
+      $sessionFileCreated = Test-Path -LiteralPath $SessionFile
+      if ($sessionFileCreated) {
+        Remove-Item -LiteralPath $SessionFile -Force
+      }
+      $sessionFileRemovedAfterCollection = !(Test-Path -LiteralPath $SessionFile)
+    }
+  }
 }
 
 $result = [ordered]@{
@@ -249,14 +262,15 @@ $result = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_broker_smoke.ps1"
-    collector_version = "4"
+    collector_version = "5"
     synthetic = $false
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 -BrokerHelperExe `"$($helper.Path)`""
   }
   helper_exe_path = $helper.Path
   helper_exe_exists = $true
   session_file = $SessionFile
-  session_file_created = (Test-Path $SessionFile)
+  session_file_created = $sessionFileCreated
+  session_file_removed_after_collection = $sessionFileRemovedAfterCollection
   store_dir = $StoreDir
   endpoint_host = $endpoint.host
   endpoint_port = $endpoint.port
@@ -273,6 +287,7 @@ $result = [ordered]@{
   field_provenance = [ordered]@{
     helper_exe_exists = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE" }
     session_file_created = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    session_file_removed_after_collection = [ordered]@{ source_type = "directly_measured"; evidence_class = "EXTERNAL_EVIDENCE" }
     normal_endpoint_credential_role_verified = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     restricted_loopback_bind = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     authenticated_ipc_connection = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }

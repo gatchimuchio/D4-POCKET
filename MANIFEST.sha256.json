@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8afc69efb5ee50a114bc531f5154934e9029f5285b1d72c5494185137f6b1b24"
+      "sha256": "c614b0dfb3ee93c720b456369af9c25ac35064334fce9fd017a6eca6df736eb2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2601,7 +2601,7 @@
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
-      "sha256": "a573f98646d1a1bb8d9632b5db7e216e3f241e3666e649f3b54421005285e869"
+      "sha256": "f4f9059189f62600fffc963f308bca00fbc551443d97be0638c8dcf0e8f33f97"
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
@@ -3353,7 +3353,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9a86c78598d9a95c4291d600640c57989af8ef887d203aee6d09b79658ae0b9e"
+      "sha256": "a8a176012e1acac807c2d208f1982f0aeeed35c18f675321bea482b12a614f03"
     },
     {
       "path": "requirements-dev.txt",
@@ -3901,7 +3901,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f68218822cb53de1b5c81345f67689fbac8b145102c6b718ff7c142d44109aac"
+      "sha256": "df92d01e3b013b6fe7f68433eea9ff6a26be322f03e3b4c98fa34b9dc207f064"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3997,7 +3997,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "2957de59368afbf94fa5d09498f776b7a3114fd316a24d3b6ff513a6829973fe"
+      "sha256": "b8f8f258101367435eadbaaf4281f6ac4569f50863fb6fe07f715dcfac31c86a"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

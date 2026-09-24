@@ -45,7 +45,7 @@
       "classification": "release_blocker",
       "blocks_release": true,
       "reason": "インストール済みRustブローカーの起動・接続・再起動・異常終了証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "installer/windows/collect_broker_smoke.ps1を実行してブローカー証拠をrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyへ合格させてください。"
+      "required_action": "installer/windows/collect_broker_smoke.ps1を実行し、IPC／再起動／異常終了と一時session資格fileの削除を実測したブローカー証拠をrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyへ合格させてください。"
     },
     {
       "name": "audit_anchor_external_tamper_evidence_proof",

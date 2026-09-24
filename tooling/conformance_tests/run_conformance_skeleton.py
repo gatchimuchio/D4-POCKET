@@ -1776,7 +1776,7 @@ def _valid_windows_installed_evidence() -> dict:
             "status": "passed",
             "evidence_source": {
                 "collector": "installer/windows/collect_broker_smoke.ps1",
-                "collector_version": "1",
+                "collector_version": "5",
                 "synthetic": False,
                 "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1",
             },
@@ -1784,6 +1784,7 @@ def _valid_windows_installed_evidence() -> dict:
             "helper_exe_exists": True,
             "session_file": r"C:\ProgramData\GUI-Shell\broker\broker_session.json",
             "session_file_created": True,
+            "session_file_removed_after_collection": True,
             "store_dir": r"C:\ProgramData\GUI-Shell\broker\store",
             "endpoint_host": "127.0.0.1",
             "endpoint_port": 49152,
@@ -1800,6 +1801,7 @@ def _valid_windows_installed_evidence() -> dict:
             "field_provenance": {
                 "helper_exe_exists": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE"},
                 "session_file_created": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "session_file_removed_after_collection": {"source_type": "directly_measured", "evidence_class": "EXTERNAL_EVIDENCE"},
                 "normal_endpoint_credential_role_verified": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "restricted_loopback_bind": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "authenticated_ipc_connection": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
@@ -1985,6 +1987,7 @@ def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evid
     bad["broker"]["evidence_source"]["synthetic"] = True
     bad["broker"]["restricted_loopback_bind"] = False
     bad["broker"]["restart_replay_rejected"] = False
+    bad["broker"]["session_file_removed_after_collection"] = False
     bad["broker"]["python_runtime_required_for_authority"] = True
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "windows_installed_smoke.json"
@@ -2284,8 +2287,14 @@ def test_windows_broker_smoke_keeps_full_duplex_response() -> list[str]:
         errors.append("collect_broker_smoke.ps1がWindows応答前に送信側socketをshutdownしている")
     if "$raw = $reader.ReadLine()" not in text:
         errors.append("collect_broker_smoke.ps1がBrokerの改行区切り応答を1フレームとして読んでいない")
-    if 'collector_version = "4"' not in text:
-        errors.append("collect_broker_smoke.ps1のcollector versionがWindows full-duplex修正を反映していない")
+    if 'collector_version = "5"' not in text:
+        errors.append("collect_broker_smoke.ps1のcollector versionが一時資格file cleanupを反映していない")
+    if "$sessionFileCreated = Test-Path -LiteralPath $SessionFile" not in text:
+        errors.append("collect_broker_smoke.ps1がcleanup前にendpoint file生成を観測していない")
+    if "$sessionFileRemovedAfterCollection = !(Test-Path -LiteralPath $SessionFile)" not in text:
+        errors.append("collect_broker_smoke.ps1がendpoint資格file削除後の状態を測定していない")
+    if "session_file_removed_after_collection = $sessionFileRemovedAfterCollection" not in text:
+        errors.append("collect_broker_smoke.ps1が資格file cleanupをevidenceへ結合していない")
     return errors
 
 

@@ -1258,3 +1258,23 @@ Runner XCTestを追加し、重複／escape重複JSON key、招待binding・expi
   blocks_release: yes
 
 この実装単位もD4 Pocket完成、Mobile実機安全性、正式配布、owner GOを成立させない。`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`を未解決release blockerとして維持する。
+
+
+## Windows Broker smoke一時session資格fileの後始末（2026-09-25）
+
+Windows実行で既存の`collect_broker_smoke.ps1`を確認したところ、Brokerを強制終了した後も、session secretを含むendpoint fileが検証用profileに残ることを観測した。資格値そのものは表示・記録していない。collectorをversion 5へ更新し、Broker停止処理の後始末でfile生成の観測値を固定してからendpoint fileを削除する。停止経路で例外があってもnested `finally`で削除を試み、削除失敗は成功として扱わない。証拠には`session_file_created`と`session_file_removed_after_collection`を別fieldで記録する。release validatorは両方の直接測定とfield provenanceを要求し、削除falseの負例を拒否する。`windows_broker_installed_smoke`のrequired actionもcleanup実測を含むよう更新した。
+
+現行Rust source commit `5310c4c1c64f20a16dc02beae730734e1c3a5b1a`からWindows debug helperをbuildし、collector version 5をdirty worktreeから隔離profileで実行した。結果は`status=passed`、IPC認証・loopback bind・durable store・restart後replay拒否・新規要求・crash fail-closedがすべてtrue、errors 0。endpoint fileはcollector開始時に前回の検証残留を除去し、今回の終了後にも`session_file_removed_after_collection=true`、実file不存在を確認した。session資格は生成evidenceへ含まない。artifactは`%LOCALAPPDATA%\GUI-Shell\development-evidence\broker-smoke-5310c4c-2af62dbde1c44c8ead8669fffad490d0\windows_broker_smoke.json`、SHA-256 `7425ed3bbb4285c2a2145c30c1b0190148ea6f76fdeb485dceccdcd44ddd54ba`。helper SHA-256は`66bd3cf43dfeb7e4a797cd3f48b86f3244b58492e2196541bed97e1093d7d54c`。collector証拠を`validate_broker_smoke`へ直接渡し、broker evidence項目として機械検証に合格した。
+
+検証結果:
+
+- `cargo build --locked --manifest-path native/rust_helper/Cargo.toml`：成功（Windows debug profile）。
+- `powershell -NoProfile -ExecutionPolicy Bypass -File installer/windows/collect_broker_smoke.ps1 -BrokerHelperExe "C:\Users\ohira\OneDrive\ドキュメント\ChatGPT\D4ポケット\native\rust_helper\target\debug\gui_shell_rust_helper.exe" -OutputPath "C:\Users\ohira\AppData\Local\GUI-Shell\development-evidence\broker-smoke-5310c4c-2af62dbde1c44c8ead8669fffad490d0\windows_broker_smoke.json" -StoreDir "C:\Users\ohira\AppData\Local\GUI-Shell\development-evidence\broker-smoke-5310c4c-2af62dbde1c44c8ead8669fffad490d0\store" -SessionFile "C:\Users\ohira\AppData\Local\GUI-Shell\development-evidence\broker-smoke-5310c4c-2af62dbde1c44c8ead8669fffad490d0\broker_session.json"`：成功。Brokerを実起動してrestart/replay/crash境界とcredential file cleanupを実測した。出力は`LIVE_RUNTIME`／`EXTERNAL_EVIDENCE`だが、helperはdevelopment build、collector sourceも未commit時点であり、clean-source／installed product証拠ではない。
+- `python -c 'import json; from tooling.windows_release_evidence import validate_broker_smoke; p=r"C:\Users\ohira\AppData\Local\GUI-Shell\development-evidence\broker-smoke-5310c4c-2af62dbde1c44c8ead8669fffad490d0\windows_broker_smoke.json"; data=json.loads(open(p, encoding="utf-8").read()); print(validate_broker_smoke({"broker": data}))'`：成功。これはcollector objectの項目検査であり、installed product全体の合格ではない。
+- `python -m py_compile tooling/windows_release_evidence.py tooling/conformance_tests/run_conformance_skeleton.py`：成功。
+- `python tooling/schema_check/check_schemas.py`：Schema 124件、正常例124件、拒否fixture150件で成功。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：197件で成功。削除falseのBroker証拠をrelease blockerとして拒否する。
+- Windows PowerShell parser：`collect_broker_smoke.ps1`を構文解析し成功。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`：初回は今回の変更によるMANIFEST不一致でmanifest／release gate／packaging checkが失敗。`python tooling/manifest.py --write`後の再実行では集約開発検証が完了し、日本語基底監査・Schema・Conformance・manifest・release gate・packaging・release smoke・evidence bundle・runtime assertionsが成功した。Windows installed evidenceは未存在のため各製品release gateは`release_blocker`、`release_ready=false`のまま。
+
+証拠の範囲は開発用Rust Broker processであり、正式配置、Rust起動器→Flutter Runner→named pipe→Brokerの結合、Setup Doctor、初回設定生成、署名配布を証明しない。`windows_broker_installed_smoke`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`rev2_flutter_broker_channel_boundary`は引き続き`release_blocker`とし、状態を合格へ変更しない。

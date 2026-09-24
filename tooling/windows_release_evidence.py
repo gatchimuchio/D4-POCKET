@@ -34,6 +34,7 @@ REQUIRED_SETUP_CHECKS = {
 REQUIRED_BROKER_TRUE_FIELDS = {
     "helper_exe_exists",
     "session_file_created",
+    "session_file_removed_after_collection",
     "normal_endpoint_credential_role_verified",
     "restricted_loopback_bind",
     "authenticated_ipc_connection",
@@ -670,11 +671,11 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_broker_installed_smoke",
             "; ".join(errors),
-            "installed Rust broker helper に対して installer/windows/collect_broker_smoke.ps1 を実行し、測定済みの IPC/restart/crash field provenance だけを release_evidence/windows_installed_smoke.json に含める。",
+            "installed Rust broker helper に対して installer/windows/collect_broker_smoke.ps1 を実行し、測定済みの IPC/restart/crash と一時資格file削除の provenance だけを release_evidence/windows_installed_smoke.json に含める。",
         )
     return _passed(
         "windows_broker_installed_smoke",
-        "Windows installed-path broker の launch/connect/restart/crash evidence が機械検証に合格した。no-Python/no-FFI は個別に分類された static evidence または installed-launch evidence のままである。",
+        "Windows installed-path broker の launch/connect/restart/crash と一時資格file削除 evidence が機械検証に合格した。no-Python/no-FFI は個別に分類された static evidence または installed-launch evidence のままである。",
         "release candidate ごとに broker の installed-path smoke evidence を最新に保つ。",
     )
 
