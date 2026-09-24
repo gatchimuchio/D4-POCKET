@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/desktop_broker_channel_request.schema.json",
+  "title": "Windows Desktop UIからRust Brokerへ渡す要求（DesktopBrokerChannelRequest）",
+  "type": "object",
+  "required": [
+    "request_id",
+    "operation",
+    "payload_hash",
+    "nonce",
+    "issued_at",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "payload": {
+      "description": "操作別契約が定める要求本文。資格、権限、Approvalを生成しない。",
+      "additionalProperties": true
+    }
+  }
+}

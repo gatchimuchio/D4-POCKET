@@ -2,6 +2,12 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 34追補: Flutter–Rust Broker channel契約（2026-09-24）
+
+現行`broker_client.dart`がendpoint file・session secret・TCP socketを直接扱い、Flutter UI責務の境界を越えていることを再確認した。Windows Desktopの次期経路を、Rust起動器所有pipe → Flutter child PID照合 → Rust内relay → 既存authenticated loopback TCP Brokerへ限定する日本語契約とSchemaを追加した。relayはnormal資格だけを使い、既存Brokerのoperation判定・Audit・replay/stale検査を再実装しない。Owner経路、資格file、session secretはRunner/Dartへ渡さず、pipe不通時もfallbackしない。
+
+この変更時点で成立したのは設計契約の`CONFIG`とnegative fixtureの`FIXTURE`範囲だけである。`python tooling/schema_check/check_schemas.py`はSchema122・正常example122・負例147、`python tooling/conformance_tests/run_conformance_skeleton.py`は192件でPASSし、`git diff --check`もPASSした。`python -X utf8 tooling/日本語基底監査.py --strict`は既存の`docs/specs/windows-desktop-launcher.md`、`native/rust_helper/src/broker/ipc_server.rs`、`native/rust_helper/src/desktop_launcher.rs`の3 files / 19 findingsでFAILし、新規channel文書・Schemaのfindingはなかった。Rust named-pipe server、Runner MethodChannel client、Flutter direct socket/file removal、pipeのPID/malformed/replay否定実行、clean Windows LIVE_RUNTIME実証は未成立であり、`rev2_flutter_broker_channel_boundary`を`release_blocker`のまま保持する。Flutter内Setup Doctor、local snapshot、export等の別filesystem/network/process使用はこのchannel契約の対象外で、別途監査を要する。
+
 ## D4 Pocket Phase 34追補: clean commitからのWindows staged実起動（2026-09-24）
 
 commit `1674c3b05f58fb7c2e53ffb2ee67089c46ce4432`のclean sourceからWindows Releaseを再buildし、Developer staging root `C:\Users\ohira\AppData\Local\Temp\D4Pocket-PostCommit-1674c3b-20260924`の`gui_shell_desktop_launcher.exe`で起動した。manifestは`source_worktree_clean=true`、source commit一致を記録する。artifact SHA-256はFlutter app `fcbdc9aac97b64f680eef1709ba4d90f8475f23833a293f83d16fec2582daa45`、Broker `52126f7b53e8cdf708db43a31842ad060f101895de49c21fdf45872210475c3c`、起動器 `1c21080ac0bb8da61c60114700f50853d3eb179064682b1ffb8d02f632f7f508`。

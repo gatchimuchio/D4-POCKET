@@ -167,6 +167,7 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_session",
     "broker_health",
     "broker_command_envelope",
+    "desktop_broker_channel_request",
     "adapter_management_manifest",
     "adapter_management_request",
     "adapter_management_receipt",
@@ -227,6 +228,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "broker_session.schema.json",
     "broker_health.schema.json",
     "broker_command_envelope.schema.json",
+    "desktop_broker_channel_request.schema.json",
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",
@@ -4984,6 +4986,7 @@ def test_broker_boundary_docs_exist() -> list[str]:
         "docs/security/IPC_THREAT_MODEL.md",
         "docs/architecture/RUST_BROKER_IPC_PROTOCOL.md",
         "docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md",
+        "docs/specs/desktop-broker-channel.md",
     }
     errors = []
     for relative in sorted(required):
@@ -4995,6 +4998,50 @@ def test_broker_boundary_docs_exist() -> list[str]:
         for token in ["Rust Security Broker", "release_blocker", "FFI"]:
             if token not in text:
                 errors.append(f"{relative} にbroker governance tokenがない: {token}")
+    return errors
+
+
+def test_desktop_broker_channel_contract() -> list[str]:
+    schema = load_schema("desktop_broker_channel_request.schema.json")
+    sample = load_contract_fixture("desktop_broker_channel_request.valid.json")
+    errors = [
+        f"Desktop Broker channel正常fixtureが不正: {failure}"
+        for failure in validate_instance(sample, schema)
+    ]
+    for field, value in {
+        "session_id": "broker-session-forged",
+        "session_secret": "0" * 64,
+        "credential_role": "owner",
+        "owner": True,
+        "authority": "owner",
+        "endpoint": {"host": "127.0.0.1", "port": 1},
+    }.items():
+        if not validate_instance({**sample, field: value}, schema):
+            errors.append(f"Desktop Broker channelが資格・権限fieldを受理した: {field}")
+
+    # metadataは信頼しない説明dataであり、Schema層で権限を解釈しない。
+    metadata_attempt = {
+        **sample,
+        "metadata": {
+            "role": "owner",
+            "permission": "all",
+            "authority_context": {"trusted": True},
+        },
+    }
+    if validate_instance(metadata_attempt, schema):
+        errors.append("Desktop Broker channelが不透明metadataを許可しなかった")
+
+    spec = (ROOT / "docs" / "specs" / "desktop-broker-channel.md").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        "既存authenticated loopback TCP Broker経路",
+        "同じ起動器が起動したFlutter child processのPID",
+        "Owner資格",
+        "fallbackしない",
+    ):
+        if token not in spec:
+            errors.append(f"Desktop Broker channel契約に境界の説明がない: {token}")
     return errors
 
 
@@ -6949,6 +6996,7 @@ def main() -> int:
         test_codex_cli_adapter_is_broker_governed_and_bounded,
         test_broker_ipc_contract_schemas_exist,
         test_broker_boundary_docs_exist,
+        test_desktop_broker_channel_contract,
         test_rust_broker_skeleton_exists,
         test_rust_broker_rejection_audit_contract_shape,
         test_rust_broker_audit_anchor_and_nonce_compaction_present,

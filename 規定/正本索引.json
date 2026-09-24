@@ -232,6 +232,10 @@
       "責任": "C20 Windows常駐トレイの表示射影、Broker停止要求、native trayとFlutterの非権限境界、実停止未接続境界"
     },
     {
+      "path": "docs/specs/desktop-broker-channel.md",
+      "責任": "Windows Desktop Flutter要求のRust-owned transport、起動child PID照合、既存Broker再利用、資格・権限非継承と未実装証拠境界"
+    },
+    {
       "path": "docs/specs/command-palette-surface.md",
       "責任": "C21コマンドパレットの新機能別登録、keyboard-first画面遷移、Broker操作・承認・権限非到達境界"
     },

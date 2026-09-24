@@ -131,6 +131,7 @@ REQUIRED = {
     "broker_session.schema.json",
     "broker_health.schema.json",
     "broker_command_envelope.schema.json",
+    "desktop_broker_channel_request.schema.json",
 }
 
 TYPE_MAP = {

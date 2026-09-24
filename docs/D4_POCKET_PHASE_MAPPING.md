@@ -44,7 +44,7 @@
 | `Phase 31` | AI編集提案 | rev1に同一の独立C工程はなく、OwnerまたはDeveloperが明示開始するD4追加範囲。 |
 | `Phase 32` | `Windows`独立App書出し | rev1に同一の独立C工程はなく、D4追加範囲。 |
 | `Phase 33` | 機能単位選択・除去 | rev1に同一の独立C工程はなく、D4追加範囲。安全Core保持と実binary／比較証拠を別々に追跡する。 |
-| `Phase 34` | 製品配布 | `C33`・`C34`と関連する。manifest-onlyやDeveloper buildを配布完了へ昇格しない。 |
+| `Phase 34` | 製品配布 | `C33`・`C34`と関連する。Rust Desktop起動器、Flutter–Broker channel、installed evidenceを含む。manifest-onlyやDeveloper buildを配布完了へ昇格しない。 |
 | `Phase 35` | Mobile統合 | `C24`・`C26`と関連する。Android実機凍結や正式配布条件は独立条件として保持する。 |
 | `Phase 36` | Apple／Linux補助検証 | `C25`・`C26`の補助検証と関連する。仮想環境を実機証拠へ昇格しない。 |
 | `Phase 37` | `MINIDORA`接続口 | rev1に同一の独立C工程はなく、実行系契約と安全境界を分離するD4追加範囲。 |

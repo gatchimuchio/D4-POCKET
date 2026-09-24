@@ -1,0 +1,10 @@
+{
+  "request_id": "desktop-ui-1",
+  "operation": "health",
+  "payload_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": "desktop-nonce-1",
+  "issued_at": "2026-09-24T00:00:00Z",
+  "metadata": {
+    "client": "desktop_flutter"
+  }
+}
