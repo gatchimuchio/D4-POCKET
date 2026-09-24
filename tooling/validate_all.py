@@ -108,6 +108,13 @@ def build_steps(include_mobile_release: bool, desktop_platform: str, python_only
             python_step("tooling/release_runtime_assertions.py", "--check"),
             ROOT,
         ),
+        ValidationStep(
+            "c32_final_development_audit",
+            python_step("tooling/final_development_audit.py"),
+            ROOT,
+            in_release_scope=False,
+            post_v1_reason="C32の対応表構造監査。全機能完成、installed製品、正式releaseの証拠ではない",
+        ),
     ]
     if python_only:
         return steps

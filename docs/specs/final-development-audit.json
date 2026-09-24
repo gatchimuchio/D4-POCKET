@@ -1,0 +1,131 @@
+{
+  "版": 1,
+  "状態": "開発監査用の対応表",
+  "目的": "総合機能拡張rev1のC0からC31について、意味正本、Contract、Code、Production path、Test、Negative、Recovery、Audit、UI、Evidenceの対応漏れを検出する。",
+  "必須項目": [
+    "意味正本",
+    "Contract",
+    "Code",
+    "Production path",
+    "Test",
+    "Negative",
+    "Recovery",
+    "Audit",
+    "UI",
+    "Evidence"
+  ],
+  "共通": {
+    "意味正本": "AGENTS.md、規定/00_日本語基底規定.md、総合機能拡張rev1の実装仕様書・工程表・進捗",
+    "Negative": "不正Schema、未知field、Authority metadata昇格、stale／replay、credential漏えい、未観測状態の成功扱いを拒否する。",
+    "Recovery": "失敗を握り潰さず、RecoveryActionまたはSUSPENDへ対応付ける。owner再承認、失効、再起動拒否、bounded再試行の範囲を越えて自動復旧しない。",
+    "Audit": "AuditEvent、証拠class（CONFIG／INTERNAL_STATE／LIVE_RUNTIME／EXTERNAL_EVIDENCE／FIXTURE）、非主張範囲、残存分類を記録する。"
+  },
+  "共通参照": [
+    "AGENTS.md",
+    "規定/00_日本語基底規定.md",
+    "docs/総合機能拡張_rev1/実装仕様書.md",
+    "docs/総合機能拡張_rev1/工程表.md",
+    "docs/総合機能拡張_rev1/進捗.md"
+  ],
+  "工程": [
+    {
+      "番号": "C0", "名称": "Baseline再固定", "Contract": "specs/ と conformance の現行contract", "Code": "tooling/validate_all.py とMANIFEST", "Production path": "検証入口から開発検査を束ね、release判定へは昇格させない。", "Test": "validate_all.py の開発検査、schema、conformance、manifest", "UI": "対象外（基準検証）", "Evidence": "CONFIG／INTERNAL_STATE。基準commitの履歴証拠は現行commitへ読み替えない。", "状態": "部分成立", "参照": ["tooling/validate_all.py", "MANIFEST.sha256.json"], "残存risk": [{"classification": "release_blocker", "reason": "C0-C34全数完成と正式release条件は別関門。", "required_action": "後続監査とWindows installed evidenceを完了する。"}]
+    },
+    {
+      "番号": "C1", "名称": "作業領域インスペクタ", "Contract": "workspace inspection／workspace diff contract", "Code": "native/rust_helper と packages/shell_core", "Production path": "現在の読取承認をBrokerで再照合し、boundedな差分projectionを返す。", "Test": "workspace reader／diffのRust単体・IPC・統合試験", "UI": "apps/desktop_flutter のworkspace操作面", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE／FIXTURE。全workspace探索、実履歴、rollback previewは未成立。", "状態": "部分成立", "参照": ["docs/specs/workspace-inspection.md", "specs/workspace_diff.schema.json", "apps/desktop_flutter", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "実データ取得と全UI／履歴／rollback経路が未完了。", "required_action": "現在Approval・Audit・Recoveryを含む実運用経路を追加監査する。"}]
+    },
+    {
+      "番号": "C2", "名称": "実行履歴・再実行・分岐", "Contract": "runtime execution history／dialogue contract", "Code": "native/rust_helper、packages/gui_shell_ui、apps/desktop_flutter", "Production path": "Brokerが承認済み実行履歴をmetadataとしてboundedに投影し、新承認なしの再利用を拒否する。", "Test": "runtime history、dialogue、content exposureのRust／Flutter試験", "UI": "Desktop履歴・対話surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE／FIXTURE。実task履歴と完全な分岐は未成立。", "状態": "部分成立", "参照": ["docs/specs/runtime-dialogue.md", "specs/runtime_execution_history.schema.json", "specs/runtime_dialogue_session.schema.json", "packages/gui_shell_ui", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "保存／破棄Recovery、実履歴、再実行・分岐の全経路が未完了。", "required_action": "新承認、失効、監査、復旧を含むproduction pathを完成させる。"}]
+    },
+    {
+      "番号": "C3", "名称": "資源監視", "Contract": "runtime resource observation contract", "Code": "native/rust_helper、packages/gui_shell_ui、apps/desktop_flutter", "Production path": "Brokerが再照合したRuntime resourceをbounded observationとして返し、取得不能値をunknownへ射影する。", "Test": "runtime resource observation、C27 projection、Rust IPC試験", "UI": "Desktop資源概要・通知・Mobile projection", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE／FIXTURE。installed product負荷とWindows以外の実機は未成立。", "状態": "部分成立", "参照": ["docs/specs/runtime-resource-observation.md", "specs/runtime_resource_observation.schema.json", "apps/desktop_flutter", "apps/mobile_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "installed productの資源測定と実Runtime負荷が未取得。", "required_action": "Windows installed-pathで測定済みevidenceを収集する。"}]
+    },
+    {
+      "番号": "C4", "名称": "Runtimeライフサイクル", "Contract": "runtime lifecycle contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "owner controlと通常IPCを分離したBroker lifecycle handlerが、状態・停止要求・復旧候補をboundedに返す。", "Test": "runtime lifecycle Rust／Flutter／fixture試験", "UI": "Desktop Runtime Center", "Evidence": "LIVE_RUNTIME／FIXTURE。installed productの実process lifecycleは未成立。", "状態": "部分成立", "参照": ["docs/specs/runtime-lifecycle.md", "specs/runtime_lifecycle_request.schema.json", "specs/runtime_lifecycle_result.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "実installed processの起動・停止・再起動証拠がない。", "required_action": "Broker-mediated installed smokeを収集する。"}]
+    },
+    {
+      "番号": "C5", "名称": "評価ラボ", "Contract": "evaluation lab contract", "Code": "native/rust_helper、packages/gui_shell_ui、apps/desktop_flutter", "Production path": "owner専用Dataset／Caseと既存対話承認をBrokerへ渡し、決定論評価結果をmetadataへ射影する。", "Test": "evaluation contract／Rust／shared／Desktop試験", "UI": "Desktop Evaluation surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE／FIXTURE。実稼働Runtimeの評価証拠ではない。", "状態": "部分成立", "参照": ["docs/specs/evaluation-lab.md", "specs/evaluation_dataset.schema.json", "specs/evaluation_comparison.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "実Runtimeを用いる評価とinstalled product証拠が未成立。", "required_action": "外部Runtimeを権限境界内で接続し、再現可能な評価evidenceを収集する。"}]
+    },
+    {
+      "番号": "C6", "名称": "対話から回帰Case登録", "Contract": "regression case contract", "Code": "native/rust_helper、tooling、apps/desktop_flutter", "Production path": "完了済み対話の要求hash・結果証跡・終了監査をBrokerが照合し、owner redactionだけを保管する。", "Test": "regression case Rust／Schema／Conformance試験", "UI": "Owner control導線。private登録画面とCase一覧は未成立。", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。元本文を自動保存しない。", "状態": "部分成立", "参照": ["docs/specs/regression-case.md", "specs/regression_case_registration.schema.json", "specs/regression_case_receipt.schema.json"], "残存risk": [{"classification": "release_blocker", "reason": "GUI登録、一覧、削除Recovery、実機owner証拠が未成立。", "required_action": "Broker境界を維持してUIとRecoveryを接続する。"}]
+    },
+    {
+      "番号": "C7", "名称": "資格情報保管庫", "Contract": "credential vault contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "owner controlがProtectedStoreへ登録し、通常IPCはmetadata-only一覧だけを返す。", "Test": "credential protected store／Rust／Conformance試験", "UI": "Desktop Credential surfaceはmetadata範囲。", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。秘密値を保持・投影しない。", "状態": "部分成立", "参照": ["docs/specs/credential-vault.md", "specs/credential_registration.schema.json", "specs/credential_list.schema.json", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "取得・注入、更新、失効、削除、Recovery、GUI管理が未成立。", "required_action": "秘密値をUI／ログへ出さないBroker経路を追加監査する。"}]
+    },
+    {
+      "番号": "C8", "名称": "MCP外部概念射影契約", "Contract": "MCP metadata-only contract", "Code": "native/rust_helper、specs、tooling/conformance_tests", "Production path": "MCP metadataをAuthorityなしのbounded projectionへ正規化する。", "Test": "MCP schema／fixture／Conformance", "UI": "Desktop MCP metadata surface", "Evidence": "CONFIG／FIXTURE。実MCP接続・Tool実行の証拠ではない。", "状態": "部分成立", "参照": ["docs/specs/mcp-contract.md", "specs/mcp_contract.schema.json", "tooling/conformance_tests/run_conformance_skeleton.py"], "残存risk": [{"classification": "release_blocker", "reason": "実MCP execution、credential injection、quarantineが未成立。", "required_action": "Tool実行をBroker Approval／Audit／Recoveryへ接続して検証する。"}]
+    },
+    {
+      "番号": "C9", "名称": "MCP接続センター", "Contract": "MCP connection center contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "owner controlがstdio discovery／catalogをBrokerへ渡し、通常IPCはmetadata-only一覧を返す。", "Test": "MCP stdio／timeout／secret／authority Rust試験", "UI": "Desktop MCP Connection Center", "Evidence": "LIVE_RUNTIME／FIXTURE。Tool executionは未成立。", "状態": "部分成立", "参照": ["docs/specs/mcp-connection-center.md", "specs/mcp_connection.schema.json", "specs/mcp_connection_list.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "実Tool／Resource／Prompt運用、OAuth、disconnect、quarantineが未成立。", "required_action": "外部processをBroker境界内で接続し、障害とRecoveryを実測する。"}]
+    },
+    {
+      "番号": "C10", "名称": "運用プロファイル", "Contract": "operation profile contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "BrokerがProfileを検証・永続化し、適用要求をAuditするがPermissionを生成しない。", "Test": "operation profile Rust／Schema／Desktop試験", "UI": "Desktop Settings／Profile surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。Runtime反映とfile pickerは未成立。", "状態": "部分成立", "参照": ["docs/specs/operation-profile.md", "apps/desktop_flutter", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "Runtime反映、専用file picker、installed証拠が未成立。", "required_action": "設定から権限を生成しない適用経路を追加監査する。"}]
+    },
+    {
+      "番号": "C11", "名称": "更新センター", "Contract": "update center contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "Broker所有trustで候補を検証・保存し、download／install／rollback要求はsuspendedへ固定する。", "Test": "update signature／persistence／Desktop試験", "UI": "Desktop Settings／Update surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。外部artifact作用は未成立。", "状態": "部分成立", "参照": ["docs/specs/update-center.md", "apps/desktop_flutter", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "外部download、install、process、rollbackとtrust本番provisioningが未成立。", "required_action": "正式release前にowner承認と署名検証を含む導入経路を別監査する。"}]
+    },
+    {
+      "番号": "C12", "名称": "通知センター", "Contract": "notification center contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "Audit eventからsummaryだけをBrokerが生成し、既読・破棄はhash結合して永続化する。", "Test": "notification Rust／IPC／Desktop試験", "UI": "Desktop Notification surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。native toastとinstalled証拠は未成立。", "状態": "部分成立", "参照": ["docs/specs/notification-center.md", "apps/desktop_flutter", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "Windows native toastと全sourceのinstalled通知証拠がない。", "required_action": "表示内容をsummary境界に固定したnative証拠を収集する。"}]
+    },
+    {
+      "番号": "C13", "名称": "観測センター", "Contract": "observability center contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "Audit確定処理からbounded Span／Trace／Metricを内部射影し、観測一覧を返す。", "Test": "observability Rust／IPC／Desktop試験", "UI": "Desktop Observability surface", "Evidence": "INTERNAL_STATE。TelemetryをAuditへ昇格しない。", "状態": "部分成立", "参照": ["docs/specs/observability-center.md", "apps/desktop_flutter", "native/rust_helper"], "残存risk": [{"classification": "post_v1_scope", "reason": "OpenTelemetry exportと外部collectorは現行scope外。", "required_action": "明示要求時にAuditとの責任分離を維持して追加監査する。"}]
+    },
+    {
+      "番号": "C14", "名称": "Trace Inspector", "Contract": "trace inspector contract", "Code": "apps/desktop_flutter、packages/gui_shell_ui", "Production path": "Broker内部の実測Spanだけを通常IPCから読み取り、bounded waterfallへ投影する。", "Test": "Trace Inspector Desktop widget／Broker試験", "UI": "Desktop Trace Inspector", "Evidence": "INTERNAL_STATE／FIXTURE。Runtime／外部通信traceは未成立。", "状態": "部分成立", "参照": ["docs/specs/trace-inspector.md", "apps/desktop_flutter", "packages/gui_shell_ui"], "残存risk": [{"classification": "release_blocker", "reason": "Runtime／Adapter／Tool／外部通信のproduction traceとinstalled証拠がない。", "required_action": "実測範囲を拡大する前にAudit raw contentを露出しないことを検証する。"}]
+    },
+    {
+      "番号": "C15", "名称": "A2A接続契約", "Contract": "A2A metadata-only contract", "Code": "native/rust_helper、specs、tooling/conformance_tests", "Production path": "Agent Card／Task／Message／Artifact／StreamをAuthorityなしのmetadata projectionへ正規化する。", "Test": "A2A schema／fixture／Authority Strip Conformance", "UI": "Desktop A2A metadata surface", "Evidence": "CONFIG／FIXTURE。実Agent実物interfaceの証拠ではない。", "状態": "部分成立", "参照": ["docs/specs/a2a-contract.md", "specs/a2a_contract.schema.json", "tooling/conformance_tests/run_conformance_skeleton.py"], "残存risk": [{"classification": "release_blocker", "reason": "実Agent discovery、Task／Message、Artifact本文、Stream、Trustが未成立。", "required_action": "外部Agentを自動trusted登録せずBrokerへ接続する。"}]
+    },
+    {
+      "番号": "C16", "名称": "A2A接続センター", "Contract": "A2A connection center contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "owner controlからloopback Agent Cardを取得し、Brokerがmetadata-only receiptと再承認要求を管理する。", "Test": "A2A loopback／再起動／拒否Rust試験", "UI": "Desktop A2A connection surfaceは限定範囲", "Evidence": "LIVE_RUNTIME／FIXTURE。HTTPS／TLS、外部Agent、Task実行は未成立。", "状態": "部分成立", "参照": ["docs/specs/a2a-connection-center.md", "specs/a2a_connection.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "HTTPS、Task／Message、Artifact、Stream、quarantine、Desktop接続画面が未成立。", "required_action": "実物interfaceを確認してからBroker統治経路を追加する。"}]
+    },
+    {
+      "番号": "C17", "名称": "複数Host", "Contract": "Host registry contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "owner controlでHostを登録し、通常IPCはhash-only metadata一覧を返す。", "Test": "Host registry Rust／永続化／malformed state試験", "UI": "Desktop Host surface（C18で接続）", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。remote discoveryと実認証は未成立。", "状態": "部分成立", "参照": ["docs/specs/host-registry.md", "specs/host_registration.schema.json", "specs/host_list.schema.json", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "live接続、Device Link実認証、Host間Workspace隔離がない。", "required_action": "Host metadataから権限を生成しないまま実接続を別監査する。"}]
+    },
+    {
+      "番号": "C18", "名称": "Host操作面", "Contract": "Host operation surface contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "Host一覧をSnapshotへ投影し、Host切替をBroker監査付き表示context操作として返す。", "Test": "Host switch／unknown host／non-contamination Rust／Desktop試験", "UI": "Desktop Host operation surface", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。remote個別状態を未観測として扱う。", "状態": "部分成立", "参照": ["docs/specs/host-operation-surface.md", "specs/host_switch.schema.json", "specs/host_switch_receipt.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "live再接続、Trust検証、remote discovery、Workspace隔離が未成立。", "required_action": "Host間Permission／Approval／Authorityを再利用しない実証を追加する。"}]
+    },
+    {
+      "番号": "C19", "名称": "Adapter管理操作", "Contract": "Adapter management contract", "Code": "native/rust_helper、apps/desktop_flutter", "Production path": "Runtime CenterからBroker catalogへmetadata-only管理要求を渡し、署名検査と隔離再利用拒否を行う。", "Test": "Adapter management signature／state／restart／Desktop試験", "UI": "Desktop Runtime Center", "Evidence": "LIVE_RUNTIME／INTERNAL_STATE。外部artifactの作用は未成立。", "状態": "部分成立", "参照": ["docs/specs/adapter-management-surface.md", "specs/adapter_management_request.schema.json", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "download、filesystem導入、process起動、実削除、installed証拠がない。", "required_action": "外部artifactを追加する場合はowner承認・署名・監査・Recoveryを先に固定する。"}]
+    },
+    {
+      "番号": "C20", "名称": "Windows常駐トレイ", "Contract": "Windows tray projection／stop request contract", "Code": "apps/desktop_flutter/windows、apps/desktop_flutter、native/rust_helper", "Production path": "Win32 tray → Flutter表示channel → Broker通常IPC。停止要求はowner再承認待ちreceiptへ固定する。", "Test": "tray schema／Rust lifecycle／Desktop widget／Windows debug build", "UI": "Windows native tray", "Evidence": "FIXTURE／LIVE_RUNTIME。installed trayと実停止lifecycleは未成立。", "状態": "部分成立", "参照": ["docs/specs/windows-tray-surface.md", "specs/windows_tray_projection.schema.json", "apps/desktop_flutter/windows", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "installed productの常駐、前面化、終了、実停止証拠がない。", "required_action": "Broker経由installed smokeを収集する。"}]
+    },
+    {
+      "番号": "C21", "名称": "Command Palette拡張", "Contract": "command palette surface contract", "Code": "apps/desktop_flutter、packages/gui_shell_ui", "Production path": "画面遷移commandをFlutter表示状態へ限定し、権限作用は既存画面の統治経路だけへ渡す。", "Test": "Desktop command palette widget／Conformance試験", "UI": "Desktop Command Palette", "Evidence": "FIXTURE。全機能実行とinstalled画面操作は未成立。", "状態": "部分成立", "参照": ["docs/specs/command-palette-surface.md", "apps/desktop_flutter", "packages/gui_shell_ui"], "残存risk": [{"classification": "release_blocker", "reason": "全commandの実作用とinstalled product UI evidenceがない。", "required_action": "各commandを既存Broker経路へ1対1で対応付ける。"}]
+    },
+    {
+      "番号": "C22", "名称": "グローバル検索", "Contract": "global search surface contract", "Code": "apps/desktop_flutter、packages/gui_shell_ui", "Production path": "ShellSnapshotのbounded metadataを検索し、結果は画面遷移だけを行う。", "Test": "global search widget／boundary／Conformance試験", "UI": "Desktop Global Search", "Evidence": "FIXTURE／INTERNAL_STATE。live横断取得と本文検索は未成立。", "状態": "部分成立", "参照": ["docs/specs/global-search-surface.md", "apps/desktop_flutter", "packages/gui_shell_ui"], "残存risk": [{"classification": "release_blocker", "reason": "実Runtime／Agent／MCP／A2Aのinstalled横断evidenceがない。", "required_action": "本文・秘密値を検索対象にせずlive取得を別途監査する。"}]
+    },
+    {
+      "番号": "C23", "名称": "Desktop UX統合", "Contract": "desktop UX integration contract", "Code": "apps/desktop_flutter、packages/gui_shell_ui", "Production path": "Navigation group selection → Flutter表示対象絞り込み → 既存画面選択。", "Test": "Desktop widget／analyze／build／Conformance", "UI": "Desktop Navigationの5論理group", "Evidence": "FIXTURE。Windows installedの実画面操作は未成立。", "状態": "部分成立", "参照": ["docs/specs/desktop-ux-integration.md", "apps/desktop_flutter", "packages/gui_shell_ui"], "残存risk": [{"classification": "release_blocker", "reason": "installed productでの4 group実画面操作とowner GOがない。", "required_action": "現行commitに結合したWindows UI evidenceを収集する。"}]
+    },
+    {
+      "番号": "C24", "名称": "Mobile対応", "Contract": "Mobile surface／Device Link contract", "Code": "apps/mobile_flutter、packages/gui_shell_ui、native/rust_helper", "Production path": "Mobile Flutter → Device Link → Rust Broker読み取り専用handler → bounded projection。", "Test": "Mobile analyze／test、Device Link fixture、Rust端末統治試験", "UI": "Mobile 9画面と選択的projection", "Evidence": "FIXTURE／LIVE_RUNTIME。実端末、native secure storage、TLS実接続は未成立。", "状態": "部分成立", "参照": ["docs/specs/mobile-surface.md", "apps/mobile_flutter", "native/rust_helper"], "残存risk": [{"classification": "release_blocker", "reason": "実端末、Windows installed連携、正式署名・配布が未成立。", "required_action": "ownerの再開指示後に実機証拠を収集する。"}]
+    },
+    {
+      "番号": "C25", "名称": "Apple補助検証", "Contract": "Apple manual workflow contract", "Code": ".github/workflows/apple-manual-build.yml、apps/mobile_flutter", "Production path": "workflow_dispatchによる補助build／試験。通常production pathやWindows releaseを代替しない。", "Test": "Apple補助workflowは現行commitの実行結果を再確認する。", "UI": "対象外（補助検証）", "Evidence": "EXTERNAL_EVIDENCEの過去補助結果はsource commit固定。現行総合証拠へ読み替えない。", "状態": "未確認範囲あり", "参照": [".github/workflows/apple-manual-build.yml", "apps/mobile_flutter", "COMPATIBILITY_MATRIX.md"], "残存risk": [{"classification": "release_blocker", "reason": "現行commitのMac host／実機／正式配布証拠は未成立。", "required_action": "利用可能なMac hostで現行commitを再実行する。"}]
+    },
+    {
+      "番号": "C26", "名称": "Android build回帰", "Contract": "Mobile build／distribution boundary", "Code": "apps/mobile_flutter、.github/workflows/android-manual-emulator.yml", "Production path": "Windows hostでFlutter解析・試験・debug artifactを生成する。debug artifactをreleaseへ昇格しない。", "Test": "flutter analyze、flutter test、debug APK／AAB build", "UI": "対象外（build回帰）", "Evidence": "INTERNAL_STATE／FIXTURE。実端末install・launch・secure storageは未成立。", "状態": "部分成立", "参照": ["apps/mobile_flutter", ".github/workflows/android-manual-emulator.yml", "MOBILE_STATUS.md"], "残存risk": [{"classification": "release_blocker", "reason": "Android実機、正式署名、配布、OS lifecycleが未成立。", "required_action": "凍結解除後にowner指定の実機証拠を収集する。"}]
+    },
+    {
+      "番号": "C27", "名称": "全数性能試験", "Contract": "performance validation contract", "Code": "tooling/performance_validation.py、apps/desktop_flutter", "Production path": "開発用snapshot／Flutter projectionへbounded watchdogを適用し、性能SLAを主張しない。", "Test": "tooling/performance_validation.py、C27 Flutter test", "UI": "対象外（開発測定）", "Evidence": "INTERNAL_STATE／FIXTURE。installed cold／warm start、GPU frame、実Runtime負荷は未成立。", "状態": "開発範囲で成立", "参照": ["docs/specs/performance-validation.md", "tooling/performance_validation.py", "apps/desktop_flutter"], "残存risk": [{"classification": "release_blocker", "reason": "installed product性能と実Runtime負荷が未測定。", "required_action": "Windows installed evidenceで測定する。"}]
+    },
+    {
+      "番号": "C28", "名称": "長時間運用試験", "Contract": "long-run validation contract", "Code": "tooling/long_run_validation.py、native/rust_helper", "Production path": "実Broker IPC、localhost Runtime fixture、再起動、接続断、bounded履歴を開発用に反復する。", "Test": "30秒smoke、120秒試験、8時間入口", "UI": "対象外（開発運用試験）", "Evidence": "LIVE_RUNTIME／FIXTURE／INTERNAL_STATE。8時間試行は通常対話通信失敗で未成立。", "状態": "短時間のみ成立", "参照": ["docs/specs/long-run-validation.md", "tooling/long_run_validation.py"], "残存risk": [{"classification": "release_blocker", "reason": "8時間、installed product、外部Runtime負荷が未成立。", "required_action": "失敗履歴を保持したまま原因を再現・修正・再測定する。"}]
+    },
+    {
+      "番号": "C29", "名称": "障害注入", "Contract": "failure injection validation contract", "Code": "tooling/failure_injection_validation.py、native/rust_helper", "Production path": "一時storeと実Brokerを分離し、障害を注入してfail-closed／Recovery射影を観測する。", "Test": "Runtime crash、Broker crash、MCP／A2A timeout、Credential、store、Audit、stateの8件", "UI": "対象外（開発障害試験）", "Evidence": "LIVE_RUNTIME／FIXTURE／INTERNAL_STATE。外部サービス・物理disk fullの証拠ではない。", "状態": "開発範囲で成立", "参照": ["docs/specs/failure-injection-validation.md", "tooling/failure_injection_validation.py"], "残存risk": [{"classification": "release_blocker", "reason": "installed product、外部MCP／A2A、実容量枯渇の障害証拠がない。", "required_action": "外部接続時の失敗境界をBrokerで再検証する。"}]
+    },
+    {
+      "番号": "C30", "名称": "全数回帰", "Contract": "full regression validation contract", "Code": "tooling/full_regression_validation.py、既存Rust／Flutter／fixture", "Production path": "既存の統治経路を変更せず、TrustからDevice Linkまでをboundedなlocal matrixとして再実行する。", "Test": "tooling/full_regression_validation.py、validate_all.py", "UI": "対象外（統合監査）", "Evidence": "CONFIG／INTERNAL_STATE／LIVE_RUNTIME／FIXTURE。AgentはCodex CLI version/helpだけ、Compare／Device Linkはfixture。", "状態": "開発範囲で成立", "参照": ["docs/specs/full-regression-validation.md", "tooling/full_regression_validation.py", "tooling/validate_all.py"], "残存risk": [{"classification": "release_blocker", "reason": "外部Agent、実端末、installed product、C31以降は未成立。", "required_action": "C32監査、C33 Windows最大到達点、C34 release前作業へ進む。"}]
+    },
+    {
+      "番号": "C31", "名称": "文書更新", "Contract": "文書責任・証拠境界の正本接続", "Code": "README、ROADMAP、GUI操作面、SECURITY、CONFIG、MOBILE_STATUS、COMPATIBILITY_MATRIX、REV2_PROGRESS", "Production path": "文書が現行実装、検証範囲、Authority境界、残存分類を参照し、未検証をreleaseへ昇格させない。", "Test": "日本語基底監査、schema、conformance、manifest、python-only validate_all", "UI": "対象外（文書監査）", "Evidence": "CONFIG／INTERNAL_STATE。文書の存在はruntime完成やinstalled product証拠ではない。", "状態": "成立", "参照": ["README.md", "ROADMAP.md", "docs/GUI_OPERATION_SURFACES.md", "SECURITY.md", "CONFIG.md", "MOBILE_STATUS.md", "COMPATIBILITY_MATRIX.md", "docs/REV2_PROGRESS.md"], "残存risk": [{"classification": "release_blocker", "reason": "C32〜C34、Windows installed evidence、owner GO、正式releaseが未成立。", "required_action": "監査表を現行commitごとに再実行し、C33／C34の証拠を追加する。"}]
+    }
+  ],
+  "未監査工程": ["C32", "C33", "C34"],
+  "release_ready": false,
+  "release_blocker": true
+}

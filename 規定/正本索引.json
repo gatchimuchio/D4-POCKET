@@ -232,6 +232,14 @@
       "責任": "C30のTrust・Authority・Permission・Approval・Audit・Recovery・Evidence・Runtime・Agent・Dialogue・Compare・Device Link回帰matrixと証拠境界"
     },
     {
+      "path": "docs/specs/final-development-audit.md",
+      "責任": "C32のC0〜C31最終開発監査、必須10面の対応表、参照path検査、release未成立境界"
+    },
+    {
+      "path": "docs/specs/final-development-audit.json",
+      "責任": "C32監査器が読むC0〜C31の意味正本・Contract・Code・Production path・Test・Negative・Recovery・Audit・UI・Evidence対応データ"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
       "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
     },

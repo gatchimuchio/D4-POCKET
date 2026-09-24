@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "29dc86cef78545ac66534265f7359f63707ef897b0ef7095689f42f74c3f977c"
+      "sha256": "00177f7694ecde09a7838f9484af97e1dc91e0df73b388d04ff6912d614d5b18"
     },
     {
       "path": "SECURITY.md",
@@ -1228,6 +1228,14 @@
       "sha256": "fa192564b359e9b2af1060649775d7b3f40de59bc91b2da2b216d49dc5b8cc5d"
     },
     {
+      "path": "docs/specs/final-development-audit.json",
+      "sha256": "005b4a8898f58e8bebae6399cc5f85bf29b9fb663f9f282d0518c8223e3671df"
+    },
+    {
+      "path": "docs/specs/final-development-audit.md",
+      "sha256": "e487e69ad67f0d3b4ac37bfca248dee1620457c5e574dedda98a1435ecd426f3"
+    },
+    {
       "path": "docs/specs/full-regression-validation.md",
       "sha256": "f5e0444520c10fd95f3dbbcba2d0815054f0456542be20947737586452ac42f0"
     },
@@ -1345,7 +1353,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "0287a70fea155431039672e6a39b68dd2aae93a1a2568e2671be1c8bef961fb9"
+      "sha256": "208e5fa52ac5eeade234c77e823ec709962e939034395b8dfc0b65119894d2b9"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -3564,6 +3572,10 @@
       "sha256": "33b580da247bc5a1f0d92d93a654a649ffd7afb519b01fde650bebe1174f7cb1"
     },
     {
+      "path": "tooling/final_development_audit.py",
+      "sha256": "81430695313ecc65a4dda4814b45aa533860601ce830e4184b0d35e6a47d2f7d"
+    },
+    {
       "path": "tooling/full_regression_validation.py",
       "sha256": "347f088559b348fd15c1c63ef46531fc65ce5e5a6e082469da965525b2939045"
     },
@@ -3617,7 +3629,7 @@
     },
     {
       "path": "tooling/validate_all.py",
-      "sha256": "dd4f1e1a78b5dbe44d833734d9e9981e4226b19e2c5bc5c4f0c34b01ed0daab8"
+      "sha256": "3e3bd6170a6e7a7f8d615cf18c8ca71c7ab0049c3a01cb173c6db2101c924d65"
     },
     {
       "path": "tooling/windows_dpapi_check.ps1",
@@ -3641,7 +3653,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "b86bda40d77b320958ea2af996fcf2baf969e6b284ea18670483201b18424c4e"
+      "sha256": "3146cb91eec46b23aef8092a37aba52f63cba4d4907314ed1012a01817e3fbe0"
     }
   ]
 }
