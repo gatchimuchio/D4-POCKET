@@ -822,12 +822,12 @@ mod tests {
 
     fn test_root(label: &str) -> PathBuf {
         let mut random = [0u8; 16];
-        getrandom::getrandom(&mut random).expect("random id");
+        getrandom::getrandom(&mut random).expect("乱数識別子");
         let path = std::env::temp_dir().join(format!(
             "gui-shell-launcher-{label}-{}",
             hex::encode(random)
         ));
-        fs::create_dir_all(&path).expect("temporary directory");
+        fs::create_dir_all(&path).expect("一時作業ディレクトリ");
         path
     }
 
@@ -1129,8 +1129,8 @@ mod tests {
             .arg(&junction)
             .arg(&outside)
             .output()
-            .expect("create Windows junction fixture");
-        assert!(result.status.success(), "junction fixture creation failed");
+            .expect("Windows junction試験用実体の作成");
+        assert!(result.status.success(), "junction試験用実体の作成失敗");
 
         let error = runtime_directory(&root).unwrap_err();
         assert_eq!(error.code, "USER_DATA_ROOT_INVALID");
@@ -1151,8 +1151,8 @@ mod tests {
             .arg(&junction)
             .arg(&outside)
             .output()
-            .expect("create Windows junction fixture");
-        assert!(result.status.success(), "junction fixture creation failed");
+            .expect("Windows junction試験用実体の作成");
+        assert!(result.status.success(), "junction試験用実体の作成失敗");
 
         let error = ensure_store_directory(&root).unwrap_err();
         assert_eq!(error.code, "BROKER_STORE_INVALID");

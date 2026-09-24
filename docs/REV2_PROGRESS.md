@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase35追補: 日本語監査とWindows Rust全target試験の再確認（2026-09-25）
+
+直前のWindows環境では日本語基底監査が3 files／19 findingsで失敗し、Rust統合test executable 3件もOS policyに拒否された記録がある。これらの旧FAILは当時の履歴として保持する。現在の修正では、Rust試験用失敗説明18箇所とWindows launcher仕様の英語混在1箇所だけを日本語化し、公開識別子・Broker挙動・Protocol・authority判定は変えていない。`python -X utf8 tooling/日本語基底監査.py --strict`は負債0 files／0 findingsでPASSした。
+
+Windowsで`cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`を全targetに対して実行し、library 244件、helper binary 7件、integration 35件（`broker_ipc` 9件を含む）がすべて成功した。これにより、現環境でRust test executableが実行前に拒否されるという`windows_rust_integration_test_execution_policy`の開発上の阻害状態を解消し、registry上の項目をresolvedへ更新する。これはRust test suiteの実行証拠であり、Windows installed productやrelease readinessの証拠ではない。
+
+補助の`rustfmt --check --edition 2021 native/rust_helper/src/broker/ipc_server.rs native/rust_helper/src/desktop_launcher.rs`は、対象file内の広範なformat差分を報告した。今回触れていない行を一括整形せず、書式差はこの機能・安全性変更と分離して扱う。対象Rust codeは全target testでcompile・実行できた。
+
 ## D4 Pocket Phase35追補: 必須source manifest漏れの修復（2026-09-25）
 
 commit `c45a1bd8d39cd59018928fa5fa1b4572924d87f9` 後の現行mainを使った集約基準検証で、Phase35のAgent状態面に属する5つのGit追跡file（Mobile画面、Schema、正常例、拒否例2件）が`MANIFEST.sha256.json`へ未登録であることを確認した。このためmanifest検査と、それに依存するrelease gate／packaging portability検査が失敗していた。既存成果の意味や検査条件は変更せず、現行Git追跡fileとhashからmanifestを再生成した。

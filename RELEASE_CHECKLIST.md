@@ -187,13 +187,6 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   required_action: 安全基盤の保持をnegative testし、同一Windows条件のpruned／unpruned artifactをhash結合して比較測定する。
   blocks_release: yes
 
-- item: Windows Rust integration tests blocked by Enterprise signing policy
-  classification: release_blocker
-  registry_id: windows_rust_integration_test_execution_policy
-  reason: Code Integrity Event 3033／3077が3 test executables、計17件を実行前に拒否し、Rust test suite全数の実行証拠が未成立である。
-  required_action: OS policyを変更せず、Owner／組織承認済みの署名済みまたはpolicy適合Windows validation環境で全Rust test suiteを実行する。
-  blocks_release: yes
-
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke

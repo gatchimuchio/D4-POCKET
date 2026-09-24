@@ -466,19 +466,19 @@ mod tests {
 
     fn temporary_directory() -> PathBuf {
         let mut random = [0u8; 16];
-        getrandom::getrandom(&mut random).expect("random id");
+        getrandom::getrandom(&mut random).expect("乱数識別子");
         let path = std::env::temp_dir().join(format!(
             "gui-shell-launcher-broker-{}",
             hex::encode(random)
         ));
-        std::fs::create_dir_all(&path).expect("temporary directory");
+        std::fs::create_dir_all(&path).expect("一時作業ディレクトリ");
         path
     }
 
     fn read_audit(path: &std::path::Path) -> String {
-        let mut file = std::fs::File::open(path).expect("open audit file");
+        let mut file = std::fs::File::open(path).expect("監査記録を開く");
         let mut text = String::new();
-        file.read_to_string(&mut text).expect("read audit file");
+        file.read_to_string(&mut text).expect("監査記録を読む");
         text
     }
 
@@ -502,16 +502,16 @@ mod tests {
 
         ready_rx
             .recv_timeout(Duration::from_secs(5))
-            .expect("broker listener readiness");
+            .expect("Broker待受け準備完了");
         assert!(session_file.is_file());
         assert!(store_dir.is_dir());
         let startup: serde_json::Value = serde_json::from_str(
             read_audit(&store_dir.join("audit.jsonl"))
                 .lines()
                 .next()
-                .expect("startup audit event"),
+                .expect("起動監査event"),
         )
-        .expect("startup audit JSON");
+        .expect("起動監査JSON");
         assert_eq!(startup["operation"], "D4 Pocket Desktop起動");
         assert!(startup["reason"]
             .as_str()
@@ -522,19 +522,19 @@ mod tests {
         shutdown.store(true, Ordering::Release);
         server
             .join()
-            .expect("broker thread join")
-            .expect("broker shutdown");
+            .expect("Broker threadの終了待ち")
+            .expect("Broker終了");
 
-        assert!(session_file.is_file(), "session cleanup belongs to the launcher");
+        assert!(session_file.is_file(), "session fileの後処理は起動器が担う");
         assert!(store_dir.is_dir(), "durable user state must survive app exit");
         let audit_text = read_audit(&store_dir.join("audit.jsonl"));
         let events: Vec<serde_json::Value> = audit_text
             .lines()
-            .map(|line| serde_json::from_str(line).expect("audit event JSON"))
+            .map(|line| serde_json::from_str(line).expect("監査event JSONの形式"))
             .collect();
         assert_eq!(events.len(), 2);
         assert_eq!(events[1]["operation"], "D4 Pocket Desktop終了");
         assert!(events[1]["reason"].as_str().unwrap().contains("RecoveryAction="));
-        std::fs::remove_dir_all(root).expect("remove only the test-owned temporary directory");
+        std::fs::remove_dir_all(root).expect("試験専用の一時ディレクトリだけを削除");
     }
 }

@@ -126,13 +126,6 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   required_action: 安全基盤を保持する実build経路を接続し、同一条件のpruned／unpruned Windows artifactをhash結合して比較測定する。
   blocks_release: yes
 
-- item: Windows Rust統合試験がEnterprise signing policyで起動拒否
-  classification: release_blocker
-  registry_id: windows_rust_integration_test_execution_policy
-  reason: 3つのintegration test executable、計17件がCode Integrity Event 3033／3077で起動前に拒否され、完全なRust suite実行証拠が成立していない。
-  required_action: OS保護を弱めず、Owner／組織承認済みの署名済みまたはpolicy適合Windows検証環境で全Rust testを完遂する。
-  blocks_release: yes
-
 - item: macOS planned portability target が未検証
   classification: known_limitation
   reason: 現在利用できる macOS validation environment がないため、GUI-Shell v1.0 は検証済みの macOS support を主張しない。

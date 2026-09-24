@@ -93,7 +93,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "04174f449385667cdc65feafa88a6c8730da41dc2da822e17137a9f5d2df6c27"
+      "sha256": "63f54d343a7978c9e743c2d99c22493c5ef30393f5349c7dffc3c2431a009289"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -145,7 +145,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "261cc205efe6e44f76f49e0c2c98c37b71c0972de5db05726e435ce06700fd9e"
+      "sha256": "b9d133a5ea6611dcb796e565d6d565decf2a1796154fbec76bfdc4c0452ed370"
     },
     {
       "path": "ROADMAP.md",
@@ -1129,7 +1129,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "4805a43b2533437643f2e9599e12b120dcbb0b1636538ee470cc5929a7f31c8c"
+      "sha256": "8ded65344f55bc82be54c6e468f26ebdd7924a443bfafb1ea214fa4e2d25f293"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1393,7 +1393,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "f2c2e5e390d8377c8b0d9ea4e34baeadd07606d6eb640c481a72f7f69783ee44"
+      "sha256": "7f8d8ac6a2264012dfc974ad8daa13e3460302d9dab4c1fc2843b090ec95af0f"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -2741,7 +2741,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "193a87ebae347cf4023a79b01a37e6c449c36655905b78b78ab340b7e4e95046"
+      "sha256": "204b33502cc5c1cdd927321b7f33fdde18ca937bf7ac5122ffb26f4300328dc1"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2813,7 +2813,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "02f2ae1a551c838930c385c30b4b43571d90d1f8713ba55b6c073fb22e8f61cd"
+      "sha256": "d89eeaa1924e6813398f83f4feb915b1c7678ddb5e877dd89eb5632bf7899fcf"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3317,7 +3317,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e6228a48a1154fdfc3cd2cc04ae8bbfd67dac0e6f7b98512041c71ce775fd460"
+      "sha256": "53e7f66aebd0777bd88b3df4d72af6dc71fb440ce12e345b6859469ba1e73e48"
     },
     {
       "path": "requirements-dev.txt",

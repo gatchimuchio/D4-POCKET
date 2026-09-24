@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Windows Code IntegrityのEnterprise signing policyが、Rust integration test executable 3件を未署名として起動前に拒否するため、関連17試験の実行証拠がない。",
-      "required_action": "OS保護policyを弱めず、Owner／組織が認めた署名済みまたはpolicy適合のWindows検証環境を用意し、cargo test --locked --manifest-path native/rust_helper/Cargo.toml --tests -- --test-threads=1を完遂して結果を記録する。"
+      "reason": "2026-09-25のWindows実行でcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1が完遂し、library 244件、helper binary 7件、integration 35件（broker_ipc 9件を含む）が成功した。以前のOS policy拒否は履歴として維持する。",
+      "required_action": "現行Windows環境での追加対応はない。今後同じ実行policy拒否を観測した場合は、未実行を成功へ昇格せず、この項目を再評価する。"
     }
   ]
 }

@@ -61,7 +61,7 @@ Rust単体試験は固定配置検査、endpoint拒否条件、同一起動lock�
 
 次は本局所正本の範囲外で、別工程・別証拠が必要:
 
-- item: Installer、Uninstall、Download→Install→Launch、Signed Update、Rollback
+- item: 正式配布物の導入・削除、取得から導入・起動まで、署名付き更新、以前の版への復旧
   classification: release_blocker
   reason: 本変更はstaged配置からのGUI起動とBroker lifecycle管理だけを扱う。
   required_action: 正式配布identity、署名条件、更新信頼、失敗復旧、導入先実測を含むPhase 34の各contractと実製品検証を完成する。
