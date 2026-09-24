@@ -418,6 +418,8 @@ pub enum BrokerOperation {
     GuiShell構成,
     #[serde(rename = "GUI Shell構成Preview")]
     GuiShell構成Preview,
+    #[serde(rename = "GUI Shell編集提案")]
+    GuiShell編集提案,
     #[serde(rename = "更新一覧")]
     更新一覧,
     #[serde(rename = "更新確認")]
@@ -565,6 +567,7 @@ impl BrokerOperation {
             BrokerOperation::プロファイル一覧 => "プロファイル一覧",
             BrokerOperation::GuiShell構成 => "GUI Shell構成",
             BrokerOperation::GuiShell構成Preview => "GUI Shell構成Preview",
+            BrokerOperation::GuiShell編集提案 => "GUI Shell編集提案",
             BrokerOperation::更新一覧 => "更新一覧",
             BrokerOperation::更新確認 => "更新確認",
             BrokerOperation::更新署名検査 => "更新署名検査",
@@ -1190,6 +1193,7 @@ impl Broker {
             operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
             BrokerOperation::GuiShell構成 => super::compose_center::compose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::GuiShell構成Preview => super::compose_center::preview(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::GuiShell編集提案 => super::ai_edit_center::propose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
+import '../services/ai_edit_client.dart';
 import '../services/compose_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
@@ -26,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _phaseReleaseOnly = false;
   late final ProfileClient? _profileClient;
   late final ComposeClient? _composeClient;
+  late final AiEditClient? _aiEditClient;
   late final UpdateClient? _updateClient;
   Future<List<Map<String, Object?>>>? _profilesFuture;
   Future<Map<String, Object?>>? _updatesFuture;
@@ -38,11 +40,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _composeMessage;
   String? _composedManifest;
   String? _previewJson;
+  String? _aiEditMessage;
+  String? _aiEditReceipt;
   String? _updateMessage;
   final TextEditingController _composeIdController =
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
       TextEditingController(text: 'D4 Pocket ローカル構成');
+  final TextEditingController _editInstructionController =
+      TextEditingController(text: '構成Preview結果へ対象platformを表示する');
+  final TextEditingController _editTargetPathController = TextEditingController(
+      text: 'apps/desktop_flutter/lib/screens/settings.dart');
 
   @override
   void dispose() {
@@ -51,6 +59,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileNameController.dispose();
     _composeIdController.dispose();
     _composeNameController.dispose();
+    _editInstructionController.dispose();
+    _editTargetPathController.dispose();
     super.dispose();
   }
 
@@ -63,6 +73,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _composeClient = widget.client.brokerTransport == null
         ? null
         : ComposeClient(widget.client.brokerTransport!);
+    _aiEditClient = widget.client.brokerTransport == null
+        ? null
+        : AiEditClient(widget.client.brokerTransport!);
     _updateClient = widget.client.brokerTransport == null
         ? null
         : UpdateClient(widget.client.brokerTransport!);
@@ -136,6 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _profilePanel(),
         _composePanel(),
+        _aiEditPanel(),
         _updatePanel(),
         if (filtered.isEmpty)
           const EmptyStatePanel(
@@ -292,6 +306,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (error) {
       _setComposeMessage('GUI Shell構成Previewに失敗しました: $error');
     }
+  }
+
+  Widget _aiEditPanel() {
+    final client = _aiEditClient;
+    if (client == null) {
+      return const BorderedPanel(
+        child: Text('GUI Shell編集提案: Broker接続がないため操作できません。自動編集は行いません。'),
+      );
+    }
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('GUI Shell編集提案', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text(
+              'Owner／Developerが明示開始した提案だけを審査待ちで記録します。Repositoryの自動編集、自己承認、Permission変更は行いません。'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _editInstructionController,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '編集指示',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _editTargetPathController,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: '対象path（カンマ区切り）',
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () => _runAiEdit(client),
+            icon: const Icon(Icons.rate_review_outlined),
+            label: const Text('編集提案を送信'),
+          ),
+          if (_aiEditMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(_aiEditMessage!),
+          ],
+          if (_aiEditReceipt != null) ...[
+            const SizedBox(height: 8),
+            SelectableText(_aiEditReceipt!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runAiEdit(AiEditClient client) async {
+    try {
+      final targetPaths = _editTargetPathController.text
+          .split(',')
+          .map((path) => path.trim())
+          .where((path) => path.isNotEmpty)
+          .toList(growable: false);
+      final receipt = await client.propose(
+        editId: 'settings-edit-proposal',
+        scope: 'composition',
+        instruction: _editInstructionController.text.trim(),
+        targetPaths: targetPaths,
+        expectedChanges: const ['Owner／Developerが内容を確認してから実装を開始する'],
+      );
+      _aiEditReceipt = aiEditJson(receipt);
+      _setAiEditMessage('編集提案を審査待ちで記録しました。file変更と自動applyは行っていません。');
+    } catch (error) {
+      _setAiEditMessage('GUI Shell編集提案に失敗しました: $error');
+    }
+  }
+
+  void _setAiEditMessage(String message) {
+    if (mounted) setState(() => _aiEditMessage = message);
   }
 
   void _setComposeMessage(String message) {

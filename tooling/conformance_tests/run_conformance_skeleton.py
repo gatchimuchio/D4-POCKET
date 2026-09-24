@@ -138,6 +138,8 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_compose_receipt",
     "gui_shell_preview",
     "gui_shell_preview_receipt",
+    "gui_shell_edit_proposal",
+    "gui_shell_edit_proposal_receipt",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -193,6 +195,7 @@ BROKER_REQUIRED_SOURCES = {
     "notification_center.rs",
     "observation_center.rs",
     "compose_center.rs",
+    "ai_edit_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -233,6 +236,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "gui_shell_compose_receipt.schema.json",
     "gui_shell_preview.schema.json",
     "gui_shell_preview_receipt.schema.json",
+    "gui_shell_edit_proposal.schema.json",
+    "gui_shell_edit_proposal_receipt.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -5961,6 +5966,54 @@ def test_gui_shell_preview_is_read_only_and_non_rollback() -> list[str]:
     return errors
 
 
+def test_gui_shell_edit_proposal_is_owner_review_only() -> list[str]:
+    proposal = load_contract_fixture("gui_shell_edit_proposal.valid.json")
+    receipt = load_contract_fixture("gui_shell_edit_proposal_receipt.valid.json")
+    proposal_schema = load_schema("gui_shell_edit_proposal.schema.json")
+    receipt_schema = load_schema("gui_shell_edit_proposal_receipt.schema.json")
+    errors = []
+    errors.extend(validate_instance(proposal, proposal_schema))
+    errors.extend(validate_instance(receipt, receipt_schema))
+    if proposal.get("self_approval") is not False:
+        errors.append("GUI Shell編集提案が自己承認を許可した")
+    if proposal.get("execution_mode") != "proposal_only":
+        errors.append("GUI Shell編集提案が自動適用を許可した")
+    if (
+        receipt.get("review_required") is not True
+        or receipt.get("files_written") is not False
+        or receipt.get("permission_generated") is not False
+        or receipt.get("approval_state") != "owner_review_required"
+    ):
+        errors.append("GUI Shell編集提案Receiptが審査待ち境界を満たさない")
+    invalid = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_edit_proposal_self_approval.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid, proposal_schema):
+        errors.append("GUI Shell編集提案がself_approval=trueを受け入れた")
+    invalid_receipt = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_edit_proposal_receipt_apply.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid_receipt, receipt_schema):
+        errors.append("GUI Shell編集提案Receiptがapply完了を受け入れた")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        if "GUI Shell編集提案" not in operations:
+            errors.append(f"{name}にGUI Shell編集提案操作がない")
+    source = (RUST_HELPER / "src" / "broker" / "ai_edit_center.rs").read_text(
+        encoding="utf-8"
+    )
+    for token in ("owner_required", "proposal_only", "files_written", "permission_generated"):
+        if token not in source:
+            errors.append(f"GUI Shell編集提案Broker経路に境界tokenがない: {token}")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6562,6 +6615,7 @@ def main() -> int:
         test_agent_handoff_projection_requires_reassessment_and_redaction,
         test_gui_shell_compose_is_manifest_only_and_non_inheriting,
         test_gui_shell_preview_is_read_only_and_non_rollback,
+        test_gui_shell_edit_proposal_is_owner_review_only,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

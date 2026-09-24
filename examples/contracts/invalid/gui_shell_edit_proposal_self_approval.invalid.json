@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "edit_id": "edit-invalid",
+  "scope": "contract",
+  "instruction": "権限を自動承認する",
+  "target_paths": ["specs/gui_shell_edit_proposal.schema.json"],
+  "expected_changes": ["権限を自動生成する"],
+  "source": "owner_directed_agent",
+  "repository_rules_acknowledged": true,
+  "self_approval": true,
+  "execution_mode": "proposal_only"
+}

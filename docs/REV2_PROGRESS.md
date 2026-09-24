@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket 第7段階 編集提案（2026-09-24）
+
+GUI Shell編集提案の開発経路を追加した。Owner／Developerが明示開始した構成・UI・Contract変更候補を、認証済みRust Brokerが対象path、規約確認、自己承認禁止、提案専用実行を再検証し、審査待ちReceiptへ射影する。製品Runtimeの自己変更や自動applyは行わない。
+
+- Contract: `specs/gui_shell_edit_proposal.schema.json`と`specs/gui_shell_edit_proposal_receipt.schema.json`を追加し、対象path境界、`owner_directed_agent`、`proposal_only`、`review_required`、`files_written=false`、`permission_generated=false`を固定した。
+- Production path: Desktop Settings → `AiEditClient` → owner資格付きRust Broker `GUI Shell編集提案` → 提案再検証 → `INTERNAL_STATE` AuditEvent付き審査待ちReceipt。指示本文は返さず、要求hashだけをReceiptへ結合する。
+- Negative boundary: 通常資格、self approval、未知field、許可外path、secret／credential／private／signing path、自動applyを拒否する。提案metadataはAuthority、Permission、Approval、Credentialを生成しない。
+- 未成立分類: 提案を実差分へapplyするOwner／Developer操作、独立App Export、Module Pruning、Distributionは`release_blocker`。提案Receiptだけで実装完了、自己変更、製品releaseを主張しない。
+
 ## D4 Pocket 第6段階 構成Preview（2026-09-24）
 
 GUI Shell構成のPreview経路を追加した。現在Manifestと候補Manifestを認証済みRust Brokerへ渡し、実行基盤・エージェント・ツール・MCP接続・機能要件の差分、対象platform、版rollbackの可否を決定論的に返す。Desktop設定画面はPreview結果を表示する。

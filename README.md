@@ -14,8 +14,8 @@
   <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20in%20progress-orange.svg">
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
-  <img alt="Schemas" src="https://img.shields.io/badge/schemas-114%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-186%20checks-success.svg">
+  <img alt="Schemas" src="https://img.shields.io/badge/schemas-116%20validated-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-187%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -51,7 +51,7 @@
 D4 PocketはGUI Shellを技術基盤とする製品表面であり、GUI Shellは通常の app templateでもBLUE-TANUKI専用 GUIでもない。
 
 - 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
-- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行検査対象には114 schema、valid example、negative fixtureがある。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行検査対象には116 schema、valid example、negative fixtureがある。
 - 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
 - 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 
@@ -307,9 +307,9 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ### 2026-09-24 の現況
 
-D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Previewの開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用であり、独立App生成や配布を完了扱いにしない。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
+D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Preview／編集提案の開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用、編集提案は審査待ちであり、独立App生成や配布を完了扱いにしない。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
 
-現行の基準検査はSchema 114件、Conformance 186件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
+現行の基準検査はSchema 116件、Conformance 187件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
 
 この repository は **v1.0 product completion に向けた作業中であり、product release をまだ主張していない。** 機械判定上の状態は `not yet a completed product release` である。
 

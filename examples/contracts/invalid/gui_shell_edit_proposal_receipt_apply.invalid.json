@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "operation": "GUI Shell編集提案",
+  "status": "accepted",
+  "edit_id": "edit-invalid",
+  "scope": "ui",
+  "target_paths": ["apps/desktop_flutter/lib/main.dart"],
+  "expected_change_count": 1,
+  "execution_mode": "apply",
+  "review_required": false,
+  "apply_status": "applied",
+  "files_written": true,
+  "permission_generated": false,
+  "approval_state": "owner_review_required",
+  "authority_strip": true,
+  "evidence_source": "INTERNAL_STATE",
+  "instruction_hash": "sha256:example",
+  "audit_id": "audit-edit-invalid"
+}

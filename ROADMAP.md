@@ -29,6 +29,8 @@ D4 Pocket統合の次単位では、GUI Shell構成ManifestをSchema-firstで追
 
 続くGUI Shell構成Preview単位では、現在Manifestと候補Manifestの差分、機能要件、対象platform、版rollbackの可否を認証済みRust Brokerで計算し、Desktopへ読み取り専用のPreview Receiptを返す。`rollback_available=false`、build／Export未開始、権限非生成、継承禁止を固定し、Previewを実rollbackや独立App生成へ昇格させない。現行基準値はSchema 114件、Conformance 186件であり、Windows Export、Module Pruning、Distribution、owner GO、正式releaseは未成立である。
 
+続くGUI Shell編集提案単位では、Owner／Developerが明示開始した構成・UI・Contract変更候補を、許可path、規約確認、自己承認禁止、`proposal_only`でBrokerへ接続する。Receiptは審査待ち、未適用、未書込、権限非生成を固定し、製品Runtimeの自己変更や自動applyを行わない。現行基準値はSchema 116件、Conformance 187件であり、実差分の適用、GUI Shell Export、Module Pruning、Distribution、owner GO、正式releaseは未成立である。
+
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 
 Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`をBroker登録時にも確認するRust Adapterを追加した。ownerが絶対executableとworkspaceを明示した場合だけ、既存の実行系対話・owner承認経路から固定read-only JSONL実行を行い、Windowsの実Broker通常IPCで`codex`実行系列挙まで確認した。Broker command dispatchは停止中のままであり、任意command、write-capable Agent、MCP、複数Agent比較、Handoffは追加していない。Claude／Gemini等の未導入Agentは存在を推測しない。これはAgent Launcher基盤の現行限定実装であり、製品releaseや全Agent機能の完成を意味しない。

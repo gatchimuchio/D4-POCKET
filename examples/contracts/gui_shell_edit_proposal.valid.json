@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "edit_id": "edit-compose-preview",
+  "scope": "composition",
+  "instruction": "構成Previewへ対象platformを表示する",
+  "target_paths": ["apps/desktop_flutter/lib/screens/settings.dart", "docs/specs/gui-shell-preview.md"],
+  "expected_changes": ["Preview結果に対象platformを表示する"],
+  "source": "owner_directed_agent",
+  "repository_rules_acknowledged": true,
+  "self_approval": false,
+  "execution_mode": "proposal_only"
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_edit_proposal.schema.json",
+  "title": "GUI Shell編集提案要求",
+  "type": "object",
+  "required": ["version", "edit_id", "scope", "instruction", "target_paths", "expected_changes", "source", "repository_rules_acknowledged", "self_approval", "execution_mode"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "edit_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "scope": { "enum": ["composition", "ui", "contract"] },
+    "instruction": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "target_paths": {
+      "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^(apps/desktop_flutter|packages|specs|docs|tooling|native/rust_helper/src)/[A-Za-z0-9._/-]+$" }
+    },
+    "expected_changes": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "type": "string", "minLength": 1, "maxLength": 240 } },
+    "source": { "const": "owner_directed_agent" },
+    "repository_rules_acknowledged": { "const": true },
+    "self_approval": { "const": false },
+    "execution_mode": { "const": "proposal_only" }
+  }
+}
