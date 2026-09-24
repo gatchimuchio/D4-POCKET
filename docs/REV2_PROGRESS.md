@@ -1085,10 +1085,23 @@ local clientの正常注入、release claim偽装入力の抑止、未注入fall
 - `python tooling/release_runtime_assertions.py --check`：検査12件すべて成功。証拠区分はCONFIG／FIXTUREのみ。
 - `python -X utf8 tooling/日本語基底監査.py --strict`: FAIL。既存baselineの3 files／19 findings（`docs/specs/windows-desktop-launcher.md` 1、`native/rust_helper/src/broker/ipc_server.rs` 12、`native/rust_helper/src/desktop_launcher.rs` 6）であり、この変更の新規findingは確認されなかった。
 
-今回確認したのは静的境界、model projection、test/buildの範囲であり、live runtime、installed Windows実行、正式release証拠ではない。既存の`release_blockers.registry.json`項目`rev2_flutter_broker_channel_boundary`は継続する。Setup Doctor exportおよびsurface semantics exportには別のFlutter filesystem利用が残り、別単位で監査・移行する。
+今回確認したのは静的境界、model projection、test/buildの範囲であり、live runtime、installed Windows実行、正式release証拠ではない。既存の`release_blockers.registry.json`項目`rev2_flutter_broker_channel_boundary`は継続する。Setup Doctor exportには別のFlutter filesystem利用が残り、別単位で監査・移譲する。
 
-- item: `rev2_flutter_broker_channel_boundary`に残るSetup Doctor／surface semantics exportのfilesystem責務
-  classification: release_blocker
-  reason: 今回のlocal snapshot経路以外にFlutterからのfile read/writeが残っており、Rust Brokerへの責務集約を満たしていない。
-  required_action: 各exportの必要性と責務を調査し、既存Broker経路に権限・監査・復旧境界を追加した上でFlutterの直接file accessを除去する。診断用途をなくす変更は先に機能要求と照合する。
-  blocks_release: yes
+
+## Flutter内Surface Semantics file出力を撤去（2026-09-25）
+
+Flutter起動後にSemanticsのbuild登録表をJSON fileへ書き出す経路を削除した。この出力は`INTERNAL_STATE`で、可視surfaceの正式release入力ではなく、release validatorも受理しない。画面内の安定Semantics identifierと登録表のunit testは残し、可視性判定はWindows collectorの外部UIAutomation treeだけを使う。collectorは登録表fileへfallbackせず、外部観測が不足すれば不足のまま扱う。旧形式のregistryを明示入力された場合に拒否するvalidatorは維持した。
+
+この変更ではOwner権限・新IPC・新Bridgeを追加しない。正式Setup Doctor product exportと初回設定／audit directoryのFlutter直接file accessは未解決のままで、既存`rev2_flutter_broker_channel_boundary`の`release_blocker`に残す。古い進捗記録は当時の状態として保持する。
+
+検証結果:
+
+- `flutter analyze`（`apps/desktop_flutter`）：成功、指摘0件。
+- `flutter test --reporter compact`（`apps/desktop_flutter`）：成功、104件すべて通過。
+- `flutter build windows --release`（`apps/desktop_flutter`）：成功、`build/windows/x64/runner/Release/gui_shell_desktop.exe`を生成。installed smokeの代替ではない。
+- `python -X utf8 tooling/manifest.py --write`：成功、975件を書込（exit code 0）。`python -X utf8 tooling/manifest.py --check`：成功（exit code 0）。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：成功、192件すべて通過。
+- `python tooling/release_runtime_assertions.py --check`：成功、12件すべて通過。証拠範囲はCONFIG／FIXTURE。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：FAIL。既存baselineの3 files／19 findings（`docs/specs/windows-desktop-launcher.md` 1、`native/rust_helper/src/broker/ipc_server.rs` 12、`native/rust_helper/src/desktop_launcher.rs` 6）と一致し、この変更由来の追加findingはない。
+
+この単位の試験は静的境界・widget表示・buildまでで、Windows installed productの起動、外部UIAutomation treeの正式収集、release readinessを新たに証明しない。

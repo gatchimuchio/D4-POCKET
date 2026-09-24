@@ -21,7 +21,13 @@ import 'package:gui_shell_desktop/screens/trust_center.dart';
 import 'package:gui_shell_desktop/services/broker_client.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_desktop/services/setup_doctor_export.dart';
-import 'package:gui_shell_desktop/services/surface_semantics_export.dart';
+
+const _requiredSurfaceSemanticsLabels = [
+  'Dashboard',
+  'NavigationRail',
+  'Runtime Status',
+  'Invariant Status',
+];
 
 void main() {
   Finder findSurfaceSemanticsIdentifier(String label) {
@@ -163,29 +169,25 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('ナビゲーション')), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('実行系状態')), findsWidgets);
       expect(find.bySemanticsLabel(RegExp('不変条件状態')), findsWidgets);
-      final export = buildSurfaceSemanticsExport(path: 'surface.json');
-      expect(export['source'], 'flutter_semantics_runtime_export');
-      expect(export['path'], 'surface.json');
+      final registered = SurfaceSemanticsRegistry.observed;
+      expect(registered.keys, containsAll(_requiredSurfaceSemanticsLabels));
       expect(
-        export['registered_surfaces'],
-        containsAll(kRequiredSurfaceSemanticsLabels),
+        registered.values,
+        everyElement(startsWith('gui_shell.surface.')),
       );
-      expect(export['visible_surfaces'], isEmpty);
-      expect(export['surface_match_requirements_met'], isFalse);
-      expect(export['evidence_class'], 'INTERNAL_STATE');
     } finally {
       SurfaceSemanticsRegistry.resetForTest();
       semantics.dispose();
     }
   });
 
-  testWidgets('非表示でbuildした要素と破棄済み要素を可視証拠にしない', (tester) async {
+  testWidgets('非表示要素の登録状態を可視証拠として扱わない', (tester) async {
     SurfaceSemanticsRegistry.resetForTest();
     try {
       await tester.pumpWidget(MaterialApp(
         home: Offstage(
           child: Column(children: [
-            for (final label in kRequiredSurfaceSemanticsLabels)
+            for (final label in _requiredSurfaceSemanticsLabels)
               SurfaceSemantics(label: label, child: const Text('非表示')),
           ]),
         ),
@@ -193,15 +195,9 @@ void main() {
       expect(find.text('非表示'), findsNothing);
       for (final remove in [false, true]) {
         if (remove) await tester.pumpWidget(const SizedBox.shrink());
-        final export = buildSurfaceSemanticsExport();
-        expect(export['visible_surfaces'], isEmpty);
-        expect(export['registered_surfaces'],
-            containsAll(kRequiredSurfaceSemanticsLabels));
-        expect(export['surface_matches'], isEmpty);
-        expect(export['surface_match_requirements_met'], isFalse);
-        final tree = export['diagnostic_tree'] as Map;
-        expect(tree['observed_elements'], isEmpty);
-        expect(export['evidence_class'], 'INTERNAL_STATE');
+        final registered = SurfaceSemanticsRegistry.observed;
+        expect(registered.keys, containsAll(_requiredSurfaceSemanticsLabels));
+        expect(find.text('非表示'), findsNothing);
       }
     } finally {
       SurfaceSemanticsRegistry.resetForTest();

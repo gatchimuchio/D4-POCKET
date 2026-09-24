@@ -288,7 +288,6 @@ DESKTOP_FLUTTER_REQUIRED_FILES = {
     "windows/runner/tray_controller.h",
     "lib/services/profile_client.dart",
     "lib/services/update_client.dart",
-    "lib/services/surface_semantics_export.dart",
     "lib/services/observation_client.dart",
     "lib/screens/observability_center.dart",
     "lib/screens/trace_inspector.dart",
@@ -2335,11 +2334,16 @@ def test_windows_installed_smoke_uia_properties_are_stringified() -> list[str]:
         "window_found = $windowFound",
         "observed_elements = @($observedElementValues)",
         "evidence_bundle_files = @($evidenceBundleFileValues)",
-        "GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON",
-        "surface_semantics_export.json",
     ]:
         if token not in text:
             errors.append(f"collect_installed_smoke.ps1にmaterialize済みUIAutomation evidence tokenがない: {token}")
+    for token in ["surface_semantics_export.json", "$surfaceSemanticsPath"]:
+        if token in text:
+            errors.append(f"collect_installed_smoke.ps1がFlutter内部Semantics fileへ依存する: {token}")
+    if "$env:GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON =" in text:
+        errors.append("collect_installed_smoke.ps1がFlutterへ内部Semantics file出力先を渡す")
+    if "Collect-VisibleSurfaces `" not in text:
+        errors.append("collect_installed_smoke.ps1が外部UIAutomation treeを収集しない")
     return errors
 
 
@@ -5369,6 +5373,8 @@ def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> l
         "Invariant Status": "gui_shell.surface.invariant_status",
     }
     errors = []
+    if "writeSurfaceSemanticsExportIfRequested" in main or "surface_semantics_export.dart" in main:
+        errors.append("desktop Flutter mainが内部Semantics registryをfileへ書き出す")
     for label, identifier in required.items():
         if identifier not in shared:
             errors.append(f"desktop Flutterのsurface semantics identifierが{label}にない")

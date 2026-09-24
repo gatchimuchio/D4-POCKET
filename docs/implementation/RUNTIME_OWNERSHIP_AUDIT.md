@@ -115,3 +115,5 @@ schema validation、conformance、release evidence、migration parity oracle は
 ## 2026-09-25 更新：local診断snapshot境界
 
 本監査の2026-06-03時点の観測履歴は保持する。現行コードでは`ShellCoreClient.local()`の環境変数・filesystem読込を除去し、明示注入されたメモリ内`ShellSnapshot`だけを診断表示に使う。入力出所と鮮度はunknown、release claimは抑止する。製品状態は引き続きBroker経路である。
+
+Surface Semanticsのbuild registry file出力も製品起動経路から除去した。登録状態はwidget testでだけ検査し、可視性は外部UIAutomation treeで測定する。Flutter内の直接file read/writeは`setup_doctor_export.dart`に残り、この監査・移譲を別単位で要する。

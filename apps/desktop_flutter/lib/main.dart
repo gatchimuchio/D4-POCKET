@@ -32,7 +32,6 @@ import 'services/evaluation_client.dart';
 import 'services/global_search_index.dart';
 import 'services/setup_doctor_export.dart';
 import 'services/shell_core_client.dart';
-import 'services/surface_semantics_export.dart';
 import 'services/windows_tray_client.dart';
 
 const String kD4PocketProductTitle = 'D4 Pocket';
@@ -68,9 +67,6 @@ Future<void> main() async {
       final client = await ShellCoreClient.product();
       await writeSetupDoctorProductExportIfRequested(client.getSnapshot());
       runApp(GuiShellDesktopApp(client: client));
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(writeSurfaceSemanticsExportIfRequested());
-      });
     },
     (error, stack) {
       FlutterError.reportError(
