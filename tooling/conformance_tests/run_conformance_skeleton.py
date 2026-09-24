@@ -2194,6 +2194,23 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
     return errors
 
 
+def test_windows_installed_smoke_uses_raw_uia_tree() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    required_tokens = [
+        "function Get-RawDescendants",
+        "$walker = [System.Windows.Automation.TreeWalker]::RawViewWalker",
+        "Get-RawDescendants -RootElement $RootElement",
+        "Get-RawDescendants -RootElement $window",
+    ]
+    for token in required_tokens:
+        if token not in text:
+            errors.append(f"collect_installed_smoke.ps1がRaw UIAutomation tree tokenを欠いている: {token}")
+    if ".FindAll(" in text:
+        errors.append("collect_installed_smoke.ps1がRawViewWalkerと異なるFindAll treeを使用している")
+    return errors
+
+
 def test_windows_installed_smoke_automation_names_are_materialized() -> list[str]:
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
@@ -6235,6 +6252,7 @@ def main() -> int:
         test_windows_installed_smoke_preserves_trap_failure,
         test_windows_broker_smoke_keeps_full_duplex_response,
         test_windows_installed_smoke_reads_json_as_utf8,
+        test_windows_installed_smoke_uses_raw_uia_tree,
         test_windows_installed_smoke_automation_names_are_materialized,
         test_windows_installed_smoke_uia_properties_are_stringified,
         test_windows_audit_anchor_proof_collector_is_connected,

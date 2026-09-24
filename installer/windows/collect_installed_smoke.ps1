@@ -455,6 +455,27 @@ function Collect-VisibleSurfaces {
     }
   }
 
+  function Get-RawDescendants {
+    param($RootElement)
+
+    $elements = New-Object System.Collections.Generic.List[object]
+    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+
+    function Add-RawChildren {
+      param($ParentElement)
+
+      $child = $walker.GetFirstChild($ParentElement)
+      while ($null -ne $child) {
+        $null = $elements.Add($child)
+        Add-RawChildren -ParentElement $child
+        $child = $walker.GetNextSibling($child)
+      }
+    }
+
+    Add-RawChildren -ParentElement $RootElement
+    return @($elements.ToArray())
+  }
+
   function Get-SupportedPatternNames {
     param($Element)
     try {
@@ -551,17 +572,9 @@ function Collect-VisibleSurfaces {
     if ($null -eq $RootElement) {
       return $false
     }
-    try {
-      $elements = $RootElement.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        [System.Windows.Automation.Condition]::TrueCondition
-      )
-    } catch {
-      return $false
-    }
+    $elements = @(Get-RawDescendants -RootElement $RootElement)
     $seen = @{}
-    for ($index = 0; $index -lt $elements.Count; $index += 1) {
-      $element = $elements.Item($index)
+    foreach ($element in $elements) {
       $name = Get-ElementString -Element $element -PropertyName "Name"
       $automationId = Get-ElementString -Element $element -PropertyName "AutomationId"
       foreach ($label in $expected) {
@@ -612,12 +625,9 @@ function Collect-VisibleSurfaces {
   $observedElements = New-Object System.Collections.Generic.List[object]
   if ($null -ne $window) {
     $observedElements.Add((New-ObservedElement -Element $window -ElementKey "root" -IsRoot $true))
-    $elements = $window.FindAll(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      [System.Windows.Automation.Condition]::TrueCondition
-    )
+    $elements = @(Get-RawDescendants -RootElement $window)
     for ($index = 0; $index -lt $elements.Count; $index += 1) {
-      $element = $elements.Item($index)
+      $element = $elements[$index]
       $observedElements.Add(
         (New-ObservedElement -Element $element -ElementKey "descendant:$index" -IsRoot $false)
       )
