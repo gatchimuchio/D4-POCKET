@@ -1121,7 +1121,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "0437993cd40afef3a7ebf06106051f8a3d7969181367b9001b8acec81f84ccfc"
+      "sha256": "8af4f406bfa00ba9eb23e6af7e8bf5a18bfd620d919b6637c7c7334bb2dc11a3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1301,7 +1301,7 @@
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "878a7ac87cb0e7074773c92f64e0c21e87569325c4d8e72ac74c7b7942df3850"
+      "sha256": "1acc0545742a695866e38683d124f29541bdcdb54a829d36d075de9ed5bf0cc4"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -1649,7 +1649,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_module_comparison_evidence.valid.json",
-      "sha256": "ef8603fc94768c814de845e40c515466c58b81182d7efc2aee6cb8ae8f0127c7"
+      "sha256": "bedefe6edbeeaa99f0d681ad6e560ae2444236c6e369a4b3f1651492ab15ac26"
     },
     {
       "path": "examples/contracts/gui_shell_preview.valid.json",
@@ -3265,7 +3265,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e6cbd28be89162f94ce29ce861dc6aef23cf17222fdc1bf8bb265326234bbca8"
+      "sha256": "a2154561970ab0c797dd5c71401616e4b12129ef11f904c8b7cdd2602eab2e89"
     },
     {
       "path": "requirements-dev.txt",
@@ -3505,7 +3505,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "sha256": "b724dae90e3e7a8870cf6c4c90f290910b19521c88c4c2ce26f0af24a8b03220"
+      "sha256": "49dc5bcfa6a62175b15e983b294c1ca5e99629dafa1d9cc6c9a36d2ce7bae9b3"
     },
     {
       "path": "specs/gui_shell_preview.schema.json",
@@ -3797,11 +3797,11 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "4c89553600c4303f1e5496f6abe7bee6b2913b63d8e690f8a5b4337a1db3e3f6"
+      "sha256": "8c1d870cc387e4b78ea2ca2ec792fb4c8d2a0c2e49f604fda72b2944da71a1c4"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "67c4f708691ba688c4d2b0b22b56ae7df619ddba9facbba69437cb94c3bc5e0b"
+      "sha256": "9ad34d3c8366368086c4962053c312b2cd6cad7151ebaf61cf619b2c8ad4e81d"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3913,7 +3913,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "fbfb052379f71612403bd3ef2359fba57931bc5829085d272c261765f3d404b3"
+      "sha256": "810c31f341ea2900e80abd216de7d1a6c8a2d56e80b021befcb07036ac93c8f1"
     }
   ]
 }

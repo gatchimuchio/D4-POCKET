@@ -125,8 +125,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Developer用compile-time画面選択をWindows Flutter Release UI buildへ接続しhash証拠を得たが、同一条件の全画面baselineとの比較、選択対象の実binary除去確認、サイズ・cold startup・resource比較は未実施である。独立製品Exportでもない。",
-      "required_action": "同一source commit・toolchain・build条件でall-enabled baselineと選択buildを生成し、artifact hashを比較記録する。選択対象のbinary除去と必須安全Core保持を負例・回帰試験およびartifact検査で実証し、hash結合されたsize・cold startup・resourceを測定する。"
+      "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較は実施済みであり、6つの選択外Dart surface library nodeはFlutter AOT report上で不在、選択した2 nodeは存在し、全artifact差は224 KiBである。ただしこれはINTERNAL_STATEのDesktop Flutter UI証拠で、最終製品の意味上の除去、安全Core保持、Rust／third-party除去、独立Exportを証明しない。cold startupと実行時resourceも未測定である。",
+      "required_action": "Catalog surface library inventoryを含むSchema適合の比較evidenceを同一commit・toolchainのWindows buildから生成・監査する。別途、hash固定した独立製品artifactで必須安全Core保持と除外対象の実挙動をnegative／regression試験し、cold startup・resourceを測定する。Flutter UI比較をRust／third-party pruningや製品完成へ読み替えない。"
     },
     {
       "name": "windows_rust_integration_test_execution_policy",

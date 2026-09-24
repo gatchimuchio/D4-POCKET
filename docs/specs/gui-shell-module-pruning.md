@@ -47,16 +47,16 @@ python tooling/compare_module_builds_windows.py `
   --artifact-dir C:\Users\<user>\AppData\Local\GUI-Shell\developer-module-builds\comparison-<commit>
 ```
 
-出力先はRepository外の未作成directoryに限る。`specs/gui_shell_module_comparison_evidence.schema.json`が比較条件と非権限・非製品の主張境界を固定し、ConformanceがReceiptとのModulePlan一致、baselineの全有効、define command、共通build条件、artifact size/hash差分の内部整合を検査する。
+出力先はRepository外の未作成directoryに限る。`specs/gui_shell_module_comparison_evidence.schema.json`が比較条件と非権限・非製品の主張境界を固定し、ConformanceがReceiptとのModulePlan一致、baselineの全有効、define command、共通build条件、artifact size/hash差分の内部整合を検査する。各Flutter size-analysis reportからCatalogに列挙されたDart library nodeを抽出し、baselineには全surface、選択buildには選択Moduleのsurfaceだけが現れることを要求する。AOT treeまたはCatalog対象nodeを一意に特定できない場合は比較証拠を作らない。
 
-この比較は`INTERNAL_STATE`の開発証拠である。`data/app.so`のsize/hash差やFlutter解析reportの存在だけでは、どの画面意味が最終binaryから消えたか、Rust／third-party Moduleが除去されたか、独立製品が成立したかを証明しない。`binary_pruning_verified=false`を維持する。Cold startupと実行時resourceも、このbuild比較では測らない。測定できるbuild所要時間を製品startup性能へ読み替えない。
+この比較は`INTERNAL_STATE`の開発証拠である。AOT report上でCatalog対象library nodeが選択と一致することは、そのFlutter compiler reportにおける当該library nodeの有無を示す。画面意味全体の不存在、共有symbolの不存在、別artifact・別toolchainへの一般化、起動時挙動、Rust／third-party Module除去、安全Coreの最終製品内保持、独立製品成立までは証明しない。したがって`binary_pruning_verified=false`を維持し、`semantic_pruning_status`も`flutter_aot_report_surface_libraries_match_selection; runtime_unverified`と範囲限定する。Cold startupと実行時resourceは測らない。build所要時間を製品startup性能へ読み替えない。
 
 ## 未成立範囲
 
 - 開発者専用の`Manifest`選択をFlutter画面のコンパイル時定義へ反映する経路と、`commit` `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`に結び付くWindows向けAOT画面生成および各ファイルの`hash`証拠は成立した。詳細は`docs/REV2_PROGRESS.md`に記録し、独立製品やOwner操作を主張しない。
 - Flutter以外のRust／第三者Module除去は未接続であり、安全基盤を別Moduleへ分割した主張をしない。
 - 現行Desktop Export UIは通常Broker資格を使うが、Export操作はOwner資格を要求するため、GUIからのOwner操作経路が未成立。
-- 同一commit／toolchainの比較toolとContractは追加済みだが、baseline／選択artifactの実比較とsize-analysis証拠は未採取。実binary・意味上の除去、cold startup、実行時resource比較は未成立。
+- 実行済み同一commit／toolchain比較の記録は`docs/REV2_PROGRESS.md`の最新Phase 33追補を参照する。AOT report上のCatalog surface node有無とartifact差分は限定された開発証拠であり、最終製品の除去・挙動を主張しない。cold startup、実行時resource比較、独立製品の実起動は未成立。
 - Installer、署名、実起動、配布は別工程として扱う。
 
 上記は開発自体を止めない`development_blocker`ではなく、該当製品成果とreleaseを止める`release_blocker`である。未成立を隠してPhase 33やreleaseを完了扱いしない。

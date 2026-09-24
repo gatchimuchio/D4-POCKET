@@ -6348,6 +6348,10 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         evidence["baseline"]["artifact_files"], evidence["selected"]["artifact_files"]
     ):
         errors.append("比較summaryがartifact recordから再計算できない")
+    if len(evidence["baseline"]["aot_surface_libraries"]) != len(EXPECTED_OPTIONAL_IDS):
+        errors.append("all-enabled baselineのFlutter AOT surface libraryが揃っていない")
+    if len(evidence["selected"]["aot_surface_libraries"]) != 2:
+        errors.append("選択buildのFlutter AOT surface libraryがReceiptの選択数と一致しない")
     try:
         _safe_console_text("░", "cp932").encode("cp932")
     except (LookupError, UnicodeEncodeError):
@@ -6371,6 +6375,25 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     bad_summary["comparison"]["total_bytes_reduced"] += 1
     if not validate_comparison_evidence(bad_summary, schema, receipt=receipt, catalog=catalog):
         errors.append("artifact byte数と矛盾する比較結果を受け入れた")
+
+    bad_surface_retained = copy.deepcopy(evidence)
+    bad_surface_retained["selected"]["aot_surface_libraries"].append(
+        "apps/desktop_flutter/lib/screens/setup_doctor.dart"
+    )
+    bad_surface_retained["selected"]["aot_surface_libraries"].sort()
+    if not validate_comparison_evidence(
+        bad_surface_retained, schema, receipt=receipt, catalog=catalog
+    ):
+        errors.append("選択外Setup Doctor libraryがFlutter AOT reportに残る結果を受け入れた")
+
+    bad_surface_missing = copy.deepcopy(evidence)
+    bad_surface_missing["selected"]["aot_surface_libraries"].remove(
+        "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    )
+    if not validate_comparison_evidence(
+        bad_surface_missing, schema, receipt=receipt, catalog=catalog
+    ):
+        errors.append("選択済みTrace Inspector libraryがFlutter AOT reportにない結果を受け入れた")
     return errors
 
 

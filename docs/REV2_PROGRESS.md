@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 33追補: AOT surface証拠の機械検査（2026-09-24）
+
+Windows比較toolを拡張し、Flutter size-analysis reportのDart AOT treeからCatalog記載surface library nodeを抽出するようにした。baselineは全Catalog surface、選択buildは選択Moduleに対応するsurfaceのみを記録し、ConformanceがReceipt／Catalog／defineと一致しない残存・欠落を拒否する。選択外library残存と選択済library欠落のnegative testを追加した。`binary_pruning_verified=false`は維持し、AOT report nodeの一致を実行時・独立製品の証拠へ昇格させない。
+
+- 既存の`comparison-d732047`（source commit `d7320470f9d75608c68f24fcbf21660dc3d346a8`）に含まれるbaseline／selected reportへ、新しい読取専用抽出関数を適用し、baseline 8 library、selected 2 library（Observability、Trace Inspector）の期待集合と一致することを確認した。保存済みevidence JSONやartifactは変更していない。
+- 今回の検査: Python構文検査PASS、Schema 121件・正常example 121件・negative fixture 146件PASS、Conformance 190 checks PASS。実buildに新fieldを記録した正式比較evidenceは、この実装を含むclean commit後に再生成して別追補へ記録する。
+- 未成立分類: release blocker `rev2_module_pruning_binary_and_measurement`は継続する。AOT reportのsurface node確認は限定的なFlutter compiler evidenceであり、最終製品意味・runtime挙動・Rust／third-party除去・安全Core保持、cold startup、実行時resource、独立Export起動の証拠ではない。
+
 ## D4 Pocket Phase 33追補: Windows Developer Release build実証（2026-09-24）
 
 commit `f0e9a40bd279b25c36fcefd6a65a50a3c1a80c9c`から、Receiptの画面選択をcompile-time defineへ渡すWindows Release AOT buildを実行し、全artifact file hashを採取した。Developer専用のDesktop Flutter UI build経路とそのhash採取は成立したが、独立製品、実導入・起動、実binary pruningの証拠ではない。

@@ -165,7 +165,7 @@
     },
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
-      "責任": "Developer専用Windows all-enabled baseline／画面選択AOT比較のcommand、toolchain、artifact、size-analysis hash証拠。byte差だけで意味上の除去、製品、権限、起動、資源を主張しない"
+      "責任": "Developer専用Windows all-enabled baseline／画面選択AOT比較のcommand、toolchain、artifact、Flutter AOT surface library有無、size-analysis hash証拠。report node一致の証拠範囲を超えて製品、権限、安全Core、起動、資源を主張しない"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

@@ -11,7 +11,7 @@ import stat
 import subprocess
 import sys
 import time
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +39,8 @@ MAX_RECEIPT_BYTES = 1_000_000
 MAX_ANALYSIS_BYTES = 50_000_000
 APP_CODE_PATH = "data/app.so"
 APP_EXECUTABLE = "gui_shell_desktop.exe"
+AOT_REPORT_ROOT = "app.so (Dart AOT)"
+DART_PACKAGE_ROOT = ("package:gui_shell_desktop", "package:gui_shell_desktop")
 
 
 def _safe_console_text(value: str, encoding: str | None = None) -> str:
@@ -93,6 +95,50 @@ def comparison_summary(
     }
 
 
+def _aot_surface_libraries(report: dict[str, Any], catalog: dict[str, Any]) -> list[str]:
+    """Flutter AOT size report内に存在するCatalog対象Dart libraryを列挙する。"""
+    aot_roots: list[dict[str, Any]] = []
+    pending: list[Any] = [report]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            if value.get("n") == AOT_REPORT_ROOT:
+                aot_roots.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    if len(aot_roots) != 1:
+        raise ValueError("Flutter size-analysis reportにDart AOT treeが一意に存在しない")
+
+    targets: dict[str, tuple[str, ...]] = {}
+    lib_root = PurePosixPath("apps/desktop_flutter/lib")
+    for module in catalog["optional_modules"]:
+        for surface in module["source_surfaces"]:
+            source = PurePosixPath(surface)
+            try:
+                relative = source.relative_to(lib_root)
+            except ValueError as exc:
+                raise ValueError(f"Catalog surfaceがDesktop Flutter lib外にある: {surface}") from exc
+            if not relative.parts or source.suffix != ".dart":
+                raise ValueError(f"Catalog surfaceがDart library pathではない: {surface}")
+            targets[surface] = (*DART_PACKAGE_ROOT, *relative.parts)
+
+    found: set[str] = set()
+    pending_paths: list[tuple[Any, tuple[str, ...]]] = [(aot_roots[0], ())]
+    while pending_paths:
+        value, ancestors = pending_paths.pop()
+        if isinstance(value, dict):
+            name = value.get("n")
+            path = (*ancestors, name) if isinstance(name, str) else ancestors
+            for surface, target in targets.items():
+                if len(path) >= len(target) and path[-len(target) :] == target:
+                    found.add(surface)
+            pending_paths.extend((child, path) for child in value.values())
+        elif isinstance(value, list):
+            pending_paths.extend((child, ancestors) for child in value)
+    return sorted(found)
+
+
 def validate_comparison_evidence(
     evidence: dict[str, Any],
     schema: dict[str, Any],
@@ -118,6 +164,29 @@ def validate_comparison_evidence(
         errors.append("選択buildのdart-define引数と有効値が一致しない")
     if all(selected["effective_dart_defines"].values()):
         errors.append("選択buildが任意Moduleを一つも除外していない")
+
+    active_catalog = catalog if catalog is not None else _load_catalog()
+    try:
+        all_surfaces = sorted(
+            surface
+            for module in active_catalog["optional_modules"]
+            for surface in module["source_surfaces"]
+        )
+        expected_baseline_surfaces = all_surfaces
+        expected_selected_surfaces = sorted(
+            surface
+            for module in active_catalog["optional_modules"]
+            if selected["effective_dart_defines"].get(
+                "GUI_SHELL_MODULE_" + MODULE_DEFINE_NAMES.get(module["module_id"], "")
+            )
+            for surface in module["source_surfaces"]
+        )
+        if baseline["aot_surface_libraries"] != expected_baseline_surfaces:
+            errors.append("baselineのFlutter AOT reportに全Catalog surface libraryが存在しない")
+        if selected["aot_surface_libraries"] != expected_selected_surfaces:
+            errors.append("選択buildのFlutter AOT report libraryがModule選択と一致しない")
+    except (KeyError, TypeError, ValueError) as exc:
+        errors.append(f"Flutter AOT surface library記録を照合できない: {exc}")
 
     def common_build_arguments(run: dict[str, Any]) -> tuple[list[str], list[str]]:
         command = run["build_command"]
@@ -202,7 +271,6 @@ def validate_comparison_evidence(
 
     if receipt is not None:
         try:
-            active_catalog = catalog if catalog is not None else _load_catalog()
             plan = resolve_module_plan(receipt, active_catalog)
             expected_selected_defines = dart_defines(plan, active_catalog)
             if evidence["selected"]["effective_dart_defines"] != expected_selected_defines:
@@ -364,6 +432,7 @@ def _capture_run(
     effective_defines: dict[str, bool],
     executable: str,
     evidence_root: Path,
+    catalog: dict[str, Any],
 ) -> dict[str, Any]:
     run_root = output_root / label
     run_root.mkdir(parents=True, exist_ok=False)
@@ -373,6 +442,9 @@ def _capture_run(
         defines=command_defines,
         profile_input_dir=profile_input_dir,
         cwd=ROOT / "apps" / "desktop_flutter",
+    )
+    aot_surface_libraries = _aot_surface_libraries(
+        _parse_json_bytes(report_source.read_bytes()), catalog
     )
     if not (BUILD_OUTPUT / APP_EXECUTABLE).is_file() or not (BUILD_OUTPUT / APP_CODE_PATH).is_file():
         raise ValueError("Windows release出力にapp executableまたはDart AOT imageがない")
@@ -416,6 +488,7 @@ def _capture_run(
         "artifact_files": copied_files,
         "artifact_total_bytes": copied_bytes,
         "artifact_tree_sha256": copied_tree_hash,
+        "aot_surface_libraries": aot_surface_libraries,
         "size_analysis_report": report_record,
         "size_analysis_inputs": input_records,
     }
@@ -447,6 +520,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         effective_defines=baseline_defines,
         executable=executable,
         evidence_root=output_dir,
+        catalog=catalog,
     )
     _clean_source_commit(source_commit)
     selected = _capture_run(
@@ -456,6 +530,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         effective_defines=selected_defines,
         executable=executable,
         evidence_root=output_dir,
+        catalog=catalog,
     )
     _clean_source_commit(source_commit)
     if _flutter_versions(executable) != versions:
@@ -488,7 +563,7 @@ def _comparison_evidence(receipt_path: Path, output_dir: Path) -> dict[str, Any]
         "selected": selected,
         "comparison": summary,
         "binary_pruning_verified": False,
-        "semantic_pruning_status": "not_verified_by_size_delta_alone",
+        "semantic_pruning_status": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified",
         "cold_start_status": "not_measured",
         "resource_comparison_status": "not_measured",
         "signed": False,

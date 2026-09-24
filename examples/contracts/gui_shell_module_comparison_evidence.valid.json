@@ -92,6 +92,16 @@
     ],
     "artifact_total_bytes": 1100,
     "artifact_tree_sha256": "57180631c4591f1e1a88a4a68ed7f96e11b47f436d797e47ebb9a1ae4870cf0c",
+    "aot_surface_libraries": [
+      "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
+      "apps/desktop_flutter/lib/screens/history_screen.dart",
+      "apps/desktop_flutter/lib/screens/host_capability_center.dart",
+      "apps/desktop_flutter/lib/screens/host_operation_center.dart",
+      "apps/desktop_flutter/lib/screens/notifications.dart",
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/setup_doctor.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
     "size_analysis_report": {
       "path": "baseline/analysis/report.json",
       "size_bytes": 123,
@@ -166,6 +176,10 @@
     ],
     "artifact_total_bytes": 800,
     "artifact_tree_sha256": "8602a93703c9268885f2913c670a358770bc67550cc29136a24af6eec07bc7c8",
+    "aot_surface_libraries": [
+      "apps/desktop_flutter/lib/screens/observability_center.dart",
+      "apps/desktop_flutter/lib/screens/trace_inspector.dart"
+    ],
     "size_analysis_report": {
       "path": "selected/analysis/report.json",
       "size_bytes": 123,
@@ -198,7 +212,7 @@
     "non_aot_artifacts_identical": true
   },
   "binary_pruning_verified": false,
-  "semantic_pruning_status": "not_verified_by_size_delta_alone",
+  "semantic_pruning_status": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified",
   "cold_start_status": "not_measured",
   "resource_comparison_status": "not_measured",
   "signed": false

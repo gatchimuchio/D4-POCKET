@@ -149,7 +149,9 @@
       }
     },
     "binary_pruning_verified": { "const": false },
-    "semantic_pruning_status": { "const": "not_verified_by_size_delta_alone" },
+    "semantic_pruning_status": {
+      "const": "flutter_aot_report_surface_libraries_match_selection; runtime_unverified"
+    },
     "cold_start_status": { "const": "not_measured" },
     "resource_comparison_status": { "const": "not_measured" },
     "signed": { "const": false }
@@ -273,6 +275,7 @@
         "artifact_files",
         "artifact_total_bytes",
         "artifact_tree_sha256",
+        "aot_surface_libraries",
         "size_analysis_report",
         "size_analysis_inputs"
       ],
@@ -319,6 +322,11 @@
         },
         "artifact_total_bytes": { "type": "integer", "minimum": 1 },
         "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "aot_surface_libraries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "size_analysis_report": { "$ref": "#/$defs/analysis_file" },
         "size_analysis_inputs": {
           "type": "array",
