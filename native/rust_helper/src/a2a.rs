@@ -590,7 +590,7 @@ mod tests {
 
     #[test]
     fn loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する() {
-        use std::net::{Shutdown, TcpListener};
+        use std::net::TcpListener;
         use std::thread;
 
         let listener = TcpListener::bind("127.0.0.1:0").expect("loopback待受");
@@ -613,7 +613,6 @@ mod tests {
             stream.write_all(header.as_bytes()).expect("応答header");
             stream.write_all(&response_body).expect("応答body");
             stream.flush().expect("応答flush");
-            stream.shutdown(Shutdown::Write).expect("応答終了");
         });
         let uri = format!("http://{address}/.well-known/agent-card.json");
         let projected = fetch_agent_card(&uri, "remote-agent-example", "1.0", &credential())

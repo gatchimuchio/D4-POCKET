@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_export_receipt.schema.json",
+  "title": "GUI Shell書出し応答",
+  "type": "object",
+  "required": ["version", "operation", "status", "export_id", "export_manifest", "build_status", "artifact_status", "credential_inherited", "permission_inherited", "approval_inherited", "audit_chain_inherited", "authority_strip", "evidence_source", "audit_id"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "operation": { "const": "GUI Shell書出し" },
+    "status": { "const": "accepted" },
+    "export_id": { "type": "string", "minLength": 1 },
+    "export_manifest": {
+      "type": "object", "required": ["app_identity", "audit_store", "settings", "runtime_manifest", "adapter_configuration", "capability_requirements", "distribution_metadata", "inheritance_policy"], "additionalProperties": false,
+      "properties": {
+        "app_identity": { "type": "object", "required": ["app_id", "display_name", "target_platform"], "additionalProperties": false, "properties": { "app_id": { "type": "string" }, "display_name": { "type": "string" }, "target_platform": { "const": "windows" } } },
+        "audit_store": { "type": "object", "required": ["store_id", "chain_status", "inherited"], "additionalProperties": false, "properties": { "store_id": { "type": "string" }, "chain_status": { "const": "new" }, "inherited": { "const": false } } },
+        "settings": { "type": "object", "required": ["locale", "density", "content_visibility"], "additionalProperties": false, "properties": { "locale": {}, "density": {}, "content_visibility": {} } },
+        "runtime_manifest": { "type": "object", "required": ["runtime_ids"], "additionalProperties": false, "properties": { "runtime_ids": { "type": "array", "items": { "type": "string" } } } },
+        "adapter_configuration": { "type": "object", "required": ["agent_ids", "tool_ids", "mcp_connection_ids"], "additionalProperties": false, "properties": { "agent_ids": { "type": "array", "items": { "type": "string" } }, "tool_ids": { "type": "array", "items": { "type": "string" } }, "mcp_connection_ids": { "type": "array", "items": { "type": "string" } } } },
+        "capability_requirements": { "type": "array", "items": { "type": "string" } },
+        "distribution_metadata": { "type": "object", "required": ["target_platform", "artifact_status", "installer_status", "signed", "channel"], "additionalProperties": false, "properties": { "target_platform": { "const": "windows" }, "artifact_status": { "const": "not_built" }, "installer_status": { "const": "not_started" }, "signed": { "const": false }, "channel": { "enum": ["local", "installer_candidate"] } } },
+        "inheritance_policy": { "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false, "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } } }
+      }
+    },
+    "build_status": { "const": "not_started" },
+    "artifact_status": { "const": "not_built" },
+    "credential_inherited": { "const": false },
+    "permission_inherited": { "const": false },
+    "approval_inherited": { "const": false },
+    "audit_chain_inherited": { "const": false },
+    "authority_strip": { "const": true },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "audit_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -915,7 +915,7 @@ mod tests {
     #[test]
     fn owner接続をBrokerで受理し通常IPC一覧へbounded射影する() {
         use std::io::{Read, Write};
-        use std::net::{Shutdown, TcpListener};
+        use std::net::TcpListener;
         use std::thread;
 
         let store =
@@ -951,7 +951,6 @@ mod tests {
             stream.write_all(header.as_bytes()).expect("応答header");
             stream.write_all(&response_body).expect("応答body");
             stream.flush().expect("応答flush");
-            stream.shutdown(Shutdown::Write).expect("応答終了");
         });
         let mut payload = valid_payload();
         payload["Agent Card URI"] =

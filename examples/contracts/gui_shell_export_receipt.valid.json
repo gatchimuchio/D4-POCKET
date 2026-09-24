@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "operation": "GUI Shell書出し",
+  "status": "accepted",
+  "export_id": "export-d4-pocket",
+  "export_manifest": {"app_identity": {"app_id": "app-d4-pocket-example", "display_name": "D4 Pocket ローカル構成", "target_platform": "windows"}, "audit_store": {"store_id": "audit-store-example", "chain_status": "new", "inherited": false}, "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"}, "runtime_manifest": {"runtime_ids": ["gui_shell_rust_broker"]}, "adapter_configuration": {"agent_ids": ["codex"], "tool_ids": [], "mcp_connection_ids": []}, "capability_requirements": ["agent.metadata", "runtime.read"], "distribution_metadata": {"target_platform": "windows", "artifact_status": "not_built", "installer_status": "not_started", "signed": false, "channel": "local"}, "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"}},
+  "build_status": "not_started",
+  "artifact_status": "not_built",
+  "credential_inherited": false,
+  "permission_inherited": false,
+  "approval_inherited": false,
+  "audit_chain_inherited": false,
+  "authority_strip": true,
+  "evidence_source": "INTERNAL_STATE",
+  "audit_id": "audit-export-example"
+}

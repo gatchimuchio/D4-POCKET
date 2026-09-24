@@ -140,6 +140,8 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_preview_receipt",
     "gui_shell_edit_proposal",
     "gui_shell_edit_proposal_receipt",
+    "gui_shell_export",
+    "gui_shell_export_receipt",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -196,6 +198,7 @@ BROKER_REQUIRED_SOURCES = {
     "observation_center.rs",
     "compose_center.rs",
     "ai_edit_center.rs",
+    "export_center.rs",
 }
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
@@ -238,6 +241,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "gui_shell_preview_receipt.schema.json",
     "gui_shell_edit_proposal.schema.json",
     "gui_shell_edit_proposal_receipt.schema.json",
+    "gui_shell_export.schema.json",
+    "gui_shell_export_receipt.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -6014,6 +6019,72 @@ def test_gui_shell_edit_proposal_is_owner_review_only() -> list[str]:
     return errors
 
 
+def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
+    request = load_contract_fixture("gui_shell_export.valid.json")
+    receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    request_schema = load_schema("gui_shell_export.schema.json")
+    receipt_schema = load_schema("gui_shell_export_receipt.schema.json")
+    errors = []
+    errors.extend(validate_instance(request, request_schema))
+    errors.extend(validate_instance(receipt, receipt_schema))
+    if request.get("target_platform") != "windows" or request.get("export_mode") != "manifest_only":
+        errors.append("GUI Shell書出しがWindows manifest-only境界でない")
+    if (
+        receipt.get("build_status") != "not_started"
+        or receipt.get("artifact_status") != "not_built"
+        or receipt.get("authority_strip") is not True
+    ):
+        errors.append("GUI Shell書出しがbuildまたはartifactを完成扱いにした")
+    if any(
+        receipt.get(key) is not False
+        for key in (
+            "credential_inherited",
+            "permission_inherited",
+            "approval_inherited",
+            "audit_chain_inherited",
+        )
+    ):
+        errors.append("GUI Shell書出しが資格・権限・承認・監査chainを継承した")
+    export_manifest = receipt.get("export_manifest", {})
+    if export_manifest.get("audit_store", {}).get("inherited") is not False:
+        errors.append("GUI Shell書出しの監査storeが新規化されていない")
+    if not export_manifest.get("app_identity", {}).get("app_id"):
+        errors.append("GUI Shell書出しの新規App identityが空である")
+    invalid_request = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_export_credential.invalid.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if not validate_instance(invalid_request, request_schema):
+        errors.append("GUI Shell書出しがCredential継承要求を受け入れた")
+    invalid_receipt = json.loads(
+        (
+            INVALID_CONTRACT_EXAMPLES
+            / "gui_shell_export_receipt_inherited.invalid.json"
+        ).read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid_receipt, receipt_schema):
+        errors.append("GUI Shell書出しReceiptが継承済み状態を受け入れた")
+    for name in ("ipc_request", "ipc_response"):
+        operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
+        if "GUI Shell書出し" not in operations:
+            errors.append(f"{name}にGUI Shell書出し操作がない")
+    source = (RUST_HELPER / "src" / "broker" / "export_center.rs").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        "d4-pocket-app-",
+        "audit-store-",
+        "credential_inherited",
+        "permission_inherited",
+        "artifact_status",
+        "target_platform",
+    ):
+        if token not in source:
+            errors.append(f"GUI Shell書出しBroker経路に境界tokenがない: {token}")
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -6616,6 +6687,7 @@ def main() -> int:
         test_gui_shell_compose_is_manifest_only_and_non_inheriting,
         test_gui_shell_preview_is_read_only_and_non_rollback,
         test_gui_shell_edit_proposal_is_owner_review_only,
+        test_gui_shell_export_is_new_identity_and_non_inheriting,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
         test_l3_bounded_reference_extension_negative_cases_fail_closed,

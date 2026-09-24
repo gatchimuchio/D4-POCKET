@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_export.schema.json",
+  "title": "GUI Shell書出し要求",
+  "type": "object",
+  "required": ["version", "export_id", "compose_manifest", "target_platform", "export_mode", "distribution_channel"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "compose_manifest": { "$ref": "gui_shell_compose.schema.json" },
+    "target_platform": { "const": "windows" },
+    "export_mode": { "const": "manifest_only" },
+    "distribution_channel": { "enum": ["local", "installer_candidate"] }
+  }
+}

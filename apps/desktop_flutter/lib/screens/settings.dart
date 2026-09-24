@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/generated_contracts.dart';
 import '../services/ai_edit_client.dart';
 import '../services/compose_client.dart';
+import '../services/export_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
@@ -27,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _phaseReleaseOnly = false;
   late final ProfileClient? _profileClient;
   late final ComposeClient? _composeClient;
+  late final ExportClient? _exportClient;
   late final AiEditClient? _aiEditClient;
   late final UpdateClient? _updateClient;
   Future<List<Map<String, Object?>>>? _profilesFuture;
@@ -40,6 +42,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _composeMessage;
   String? _composedManifest;
   String? _previewJson;
+  String? _exportMessage;
+  String? _exportReceipt;
   String? _aiEditMessage;
   String? _aiEditReceipt;
   String? _updateMessage;
@@ -73,6 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _composeClient = widget.client.brokerTransport == null
         ? null
         : ComposeClient(widget.client.brokerTransport!);
+    _exportClient = widget.client.brokerTransport == null
+        ? null
+        : ExportClient(widget.client.brokerTransport!);
     _aiEditClient = widget.client.brokerTransport == null
         ? null
         : AiEditClient(widget.client.brokerTransport!);
@@ -149,6 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _profilePanel(),
         _composePanel(),
+        _exportPanel(),
         _aiEditPanel(),
         _updatePanel(),
         if (filtered.isEmpty)
@@ -306,6 +314,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (error) {
       _setComposeMessage('GUI Shell構成Previewに失敗しました: $error');
     }
+  }
+
+  Widget _exportPanel() {
+    final client = _exportClient;
+    if (client == null) {
+      return const BorderedPanel(
+        child: Text('GUI Shell Windows書出し: Broker接続がないため操作できません。'),
+      );
+    }
+    return BorderedPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('GUI Shell Windows書出し',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text(
+              'Owner制御資格で新規App identityと監査storeを持つManifestを生成します。実artifact、Installer、署名、filesystem書込み、権限継承は行いません。'),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () => _runExport(client),
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('Windows書出しManifestを生成'),
+          ),
+          if (_exportMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(_exportMessage!),
+          ],
+          if (_exportReceipt != null) ...[
+            const SizedBox(height: 8),
+            SelectableText(_exportReceipt!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runExport(ExportClient client) async {
+    try {
+      final receipt = await client.export(
+        exportId: 'settings-windows-export',
+        composeManifest: _composeManifest(),
+      );
+      _exportReceipt = exportJson(receipt);
+      _setExportMessage(
+          '新規App identityと監査storeを生成しました。artifact、Installer、署名、権限継承は未実行です。');
+    } catch (error) {
+      _setExportMessage('GUI Shell Windows書出しに失敗しました。Owner制御資格が必要です: $error');
+    }
+  }
+
+  void _setExportMessage(String message) {
+    if (mounted) setState(() => _exportMessage = message);
   }
 
   Widget _aiEditPanel() {

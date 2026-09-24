@@ -18,14 +18,14 @@ const OP_PREVIEW: &str = "GUI Shell構成Preview";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Theme {
+pub(super) struct Theme {
     theme_id: String,
     mode: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Settings {
+pub(super) struct Settings {
     locale: String,
     density: String,
     content_visibility: String,
@@ -33,7 +33,7 @@ struct Settings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct InheritancePolicy {
+pub(super) struct InheritancePolicy {
     authority: String,
     permission: String,
     approval: String,
@@ -43,7 +43,7 @@ struct InheritancePolicy {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ComposeManifest {
+pub(super) struct ComposeManifest {
     version: u64,
     compose_id: String,
     display_name: String,
@@ -277,7 +277,7 @@ pub(super) fn preview(
     }
 }
 
-fn parse_manifest(value: &Value) -> Result<ComposeManifest, String> {
+pub(super) fn parse_manifest(value: &Value) -> Result<ComposeManifest, String> {
     let manifest: ComposeManifest = serde_json::from_value(value.clone())
         .map_err(|_| "GUI Shell構成の構造が不正または禁止fieldがある".to_string())?;
     validate_manifest(manifest)

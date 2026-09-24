@@ -120,6 +120,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: Owner／Developer明示の`GUI Shell編集提案`を認証済みBrokerへ渡し、規約確認済みの対象path、予定変更、提案hashを審査待ちReceiptへ射影する。Desktop設定画面は提案結果を表示する。
   authority_boundary: `proposal_only`、`review_required=true`、`files_written=false`に固定し、製品Runtimeの自己変更、自動apply、自己承認、Permission生成、Approval迂回、Credential取得を行わない。実装差分の適用とOwner確認は別の開発作業として残る`release_blocker`である。
 
+- item: D4 Pocket GUI Shell Windows書出し（Phase 32 current scope）
+  classification: required_for_v1
+  status: implemented_for_current_scope
+  evidence: Owner制御資格付きBrokerの`GUI Shell書出し`へCompose Manifestを渡し、Windows向け新規App identity、新規監査store、設定、Runtime／Adapter構成、Capability requirement、配布metadataをManifest-only Receiptへ射影する。Desktop設定面はReceiptを表示する。
+  authority_boundary: 書出し元のAuthority、Permission、Approval、Credential、Audit chainを継承せず、`authority_strip=true`と各`*_inherited=false`を固定する。実artifact、Installer、署名、filesystem書込み、process起動、Distribution、Module Pruningは未成立の`release_blocker`として保持する。
+
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope

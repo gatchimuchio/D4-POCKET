@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "operation": "GUI Shell書出し",
+  "status": "accepted",
+  "export_id": "export-invalid",
+  "export_manifest": {},
+  "build_status": "completed",
+  "artifact_status": "built",
+  "credential_inherited": true,
+  "permission_inherited": true,
+  "approval_inherited": true,
+  "audit_chain_inherited": true,
+  "authority_strip": false,
+  "evidence_source": "INTERNAL_STATE",
+  "audit_id": "audit-invalid"
+}

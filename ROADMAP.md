@@ -7,6 +7,8 @@
 
 ## 現行D4 Pocket統合単位（2026-09-24）
 
+D4 PocketのGUI Shell Windows書出し単位では、`docs/specs/gui-shell-export.md`を意味正本として、認証済みRust BrokerがCompose Manifestを再検証し、Windows向けの新規App identity、新規監査store、設定、Runtime／Adapter構成、Capability requirement、配布metadataをManifest-onlyで生成する。Credential、Permission、Approval、Authority、Audit chainは継承せず、Flutterは応答表示だけを担当する。実artifact、Installer、署名、Module Pruning、Distribution、書出し先の起動は未成立の`release_blocker`である。現行基準値はSchema 118件、正常example 118件、negative fixture 139件、Conformance 188件である。
+
 C24ではdocs/specs/mobile-surface.mdを正本として、Mobileの既存9画面を保持しながら資源概要、履歴、MCP状態を追加した。通知summary、Runtime lifecycle状態、資源観測、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataだけを、Device Linkから既存Rust Brokerの読み取り専用handlerへ接続する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。Mobile実機、TLS実接続、Windows installed product証拠、長時間運用、障害注入、owner GO、正式releaseはrelease_blockerとして保持する。
 
 rev2のHost操作面とC19 Adapter管理操作を、既存のGUI-Shell契約とRust Broker経路へ接続した。`docs/specs/host-operation-surface.md`と`docs/specs/adapter-management-surface.md`を正本とし、Hostの表示コンテキスト操作、Adapter metadata一覧、owner限定のAdapter状態管理、署名検査、隔離再利用拒否を実装・検証する。Host metadataとAdapter metadataはPermission・Approval・Authority・Credentialを生成しない。Adapter導入・更新・削除は現時点ではBroker catalogのmetadata操作に限定し、外部artifactのdownload、filesystem操作、process起動を完了扱いにしない。
@@ -29,7 +31,7 @@ D4 Pocket統合の次単位では、GUI Shell構成ManifestをSchema-firstで追
 
 続くGUI Shell構成Preview単位では、現在Manifestと候補Manifestの差分、機能要件、対象platform、版rollbackの可否を認証済みRust Brokerで計算し、Desktopへ読み取り専用のPreview Receiptを返す。`rollback_available=false`、build／Export未開始、権限非生成、継承禁止を固定し、Previewを実rollbackや独立App生成へ昇格させない。現行基準値はSchema 114件、Conformance 186件であり、Windows Export、Module Pruning、Distribution、owner GO、正式releaseは未成立である。
 
-続くGUI Shell編集提案単位では、Owner／Developerが明示開始した構成・UI・Contract変更候補を、許可path、規約確認、自己承認禁止、`proposal_only`でBrokerへ接続する。Receiptは審査待ち、未適用、未書込、権限非生成を固定し、製品Runtimeの自己変更や自動applyを行わない。現行基準値はSchema 116件、Conformance 187件であり、実差分の適用、GUI Shell Export、Module Pruning、Distribution、owner GO、正式releaseは未成立である。
+続くGUI Shell編集提案単位では、Owner／Developerが明示開始した構成・UI・Contract変更候補を、許可path、規約確認、自己承認禁止、`proposal_only`でBrokerへ接続する。Receiptは審査待ち、未適用、未書込、権限非生成を固定し、製品Runtimeの自己変更や自動applyを行わない。実差分の適用、GUI Shell Export、Module Pruning、Distribution、owner GO、正式releaseは未成立である。Windows書出しの現行Manifest-only経路は次の第8段階で追加した。
 
 この単位はrev2全体、総合機能拡張rev1 C0-C34、Windows installed product、owner GOの完成を意味しない。未完了範囲と既存release_blockerは`docs/REV2_PROGRESS.md`、`release_blockers.registry.json`、各正本の分類を保持する。
 
