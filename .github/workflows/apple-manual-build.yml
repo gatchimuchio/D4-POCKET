@@ -59,23 +59,6 @@ jobs:
           flutter analyze --no-pub 2>&1 | tee ../../evidence/desktop-analyze.txt
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/desktop-test.txt
           flutter build macos --debug 2>&1 | tee ../../evidence/macos-build.txt
-      - name: iOS Simulatorのnative安全保管を検証
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcrun simctl list devices available -j > evidence/simulator-devices.json
-          simulator_id=$(python3 -c 'import json; d=json.load(open("evidence/simulator-devices.json")); ids=[v["udid"] for k,vs in d["devices"].items() if ".iOS-" in k for v in vs if v.get("isAvailable") and v["name"].startswith("iPhone") and v["state"]=="Shutdown"]; assert ids, "利用可能なiPhone Simulatorがない"; print(ids[0])')
-          printf '%s\n' "$simulator_id" > evidence/simulator-id.txt
-          xcrun simctl boot "$simulator_id"
-          trap 'xcrun simctl shutdown "$simulator_id"' EXIT
-          xcrun simctl bootstatus "$simulator_id" -b 2>&1 | tee evidence/simulator-boot.txt
-          cd apps/mobile_flutter
-          flutter pub get 2>&1 | tee ../../evidence/mobile-integration-pub-get.txt
-          flutter test integration_test/native_store_test.dart --no-pub -d "$simulator_id" --reporter expanded 2>&1 | tee ../../evidence/ios-native-store-test.txt
-          cd ../..
-          git clone https://github.com/gatchimuchio/NOTNN-LLM-MINIDORA.git "$RUNNER_TEMP/minidora-reference"
-          git -C "$RUNNER_TEMP/minidora-reference" checkout --detach 3400a3bb68b37efa1dc14ee8aaa28fda779bf1f8
-          python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --mobile-simulator "$simulator_id" 2>&1 | tee evidence/ios-native-live-test.txt
       - name: iOS Simulator appをbuild
         working-directory: apps/mobile_flutter
         shell: bash

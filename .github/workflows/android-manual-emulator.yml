@@ -1,4 +1,4 @@
-name: Android仮想端末の手動補助検証
+name: Android手動補助build・仮想端末起動確認
 
 'on': workflow_dispatch
 
@@ -61,7 +61,7 @@ jobs:
           grep -F 'ndkVersion = flutter.ndkVersion' apps/mobile_flutter/android/app/build.gradle.kts
           "$sdkmanager" --uninstall "ndk;27.3.13750724" "ndk;29.0.14206865" </dev/null 2>&1 | tee evidence/sdk-unused-ndk-removal.txt
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
-          "$sdkmanager" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
+          "$sdkmanager" "platforms;android-37" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
           "$sdkmanager" --list_installed > evidence/sdk-installed.txt
           "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee evidence/emulator-acceleration.txt
           mkdir -p "$ANDROID_AVD_HOME"
@@ -71,7 +71,7 @@ jobs:
           df -B1 "$ANDROID_AVD_HOME" > evidence/emulator-disk-before.txt
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee evidence/configured-avds.txt
           grep -Fx gui_shell_native_test evidence/configured-avds.txt
-      - name: Androidのnative安全保管を検証
+      - name: Flutter検査・Android build・仮想端末起動を確認
         shell: bash
         run: |
           set -euo pipefail
@@ -104,9 +104,18 @@ jobs:
           flutter pub get 2>&1 | tee ../../evidence/mobile-pub-get.txt
           flutter analyze --no-pub 2>&1 | tee ../../evidence/mobile-analyze.txt
           flutter test --no-pub --reporter expanded 2>&1 | tee ../../evidence/mobile-test.txt
-          flutter test integration_test/native_store_test.dart --no-pub -d emulator-5554 --reporter expanded 2>&1 | tee ../../evidence/android-native-store-test.txt
+          flutter build apk --debug --no-pub 2>&1 | tee ../../evidence/android-apk-build.txt
+          flutter build appbundle --debug --no-pub 2>&1 | tee ../../evidence/android-appbundle-build.txt
+          timeout 60 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r build/app/outputs/flutter-apk/app-debug.apk 2>&1 | tee ../../evidence/android-install.txt
+          timeout 30 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am start -W -n com.example.gui_shell_mobile/.MainActivity 2>&1 | tee ../../evidence/android-start.txt
+          deadline=$((SECONDS + 60))
+          until timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell dumpsys activity activities | grep -F 'mResumedActivity' | grep -F 'com.example.gui_shell_mobile/.MainActivity' > ../../evidence/android-resumed.txt; do
+            test "$SECONDS" -lt "$deadline"
+            sleep 2
+          done
+          timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell pidof com.example.gui_shell_mobile | tee ../../evidence/android-process.txt
           cd ../..
-          python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --android-emulator emulator-5554 2>&1 | tee evidence/android-native-live-test.txt
+          python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --mobile-client 2>&1 | tee evidence/device-link-rust-live-test.txt
       - name: 追跡差分を検査
         shell: bash
         run: |

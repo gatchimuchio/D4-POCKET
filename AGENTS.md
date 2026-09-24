@@ -286,6 +286,8 @@ LLMはGUI Shell contractの第一級の実装・統合consumerだが、権限源
 - Adapter Contractはruntime中立を保つ
 - Flutterは交換可能なUI Layerを保つ
 - Flutter / DartはUI Product Layerであり、Authority Boundaryになってはならない
+- OS lifecycleなどnativeが観測すべき実状態をFlutterが設定・偽装できるchannel methodを設けない。画面の観測はローカル要求を止めるために使えるが、native側が持つ実際のforeground状態を上書きしてはならない。
+- Mobileの招待・端末資格・secretをdebug VM extension、Dart integration test、shell argument、環境変数、log、trace、test artifactへ渡してはならない。platform実動作試験がnative境界のまま成立しない場合は安全なtest harnessの設計まで当該live testを保留し、Release blockerを維持する。過去のDart直接経路の成功を現行native経路の証拠へ転用しない。
 - Rustは、権限に敏感なhelper、broker、IPC、Audit、signature、runtime command envelope作業のnative safety boundaryとする
 - TypeScript / NodeをGUI-Shell core runtimeにしてはならない。external SDK、Adapter sample、protocol client sample、bridge exampleの範囲に限定する
 - PythonをGUI-Shell runtime dependencyにしてはならない。dev-only tooling、Schema generation、migration helper、local validation、release evidence validation、一時validation scriptの範囲に限定する

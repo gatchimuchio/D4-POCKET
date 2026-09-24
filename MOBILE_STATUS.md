@@ -2,10 +2,11 @@
 
 ## D4 Pocket rev2 最新境界確認（2026-09-25）
 
-現行sourceの確認で、MobileのDartが招待JSON TextField、資格object、flutter_secure_storage API、SecureSocket TLS／networkを直接扱っている。これはD4 Pocket rev2で明示されたFlutter UI境界に未適合である。mobile_device_link_channel_requestの日本語意味正本、Schema、正常／拒否fixture、Conformanceは追加したが、native transport・保管へのproduction移行はまだ成立していない。過去のDart client → TLS → Rust Broker実行は現行境界の適合証拠として扱わない。
+旧Dart製品client、資格モデル、安全保管API、SecureSocket、招待をDartへ注入するdebug VM integration harnessを廃止した。Flutterは固定MethodChannelを通じて状態projectionとallowlist済みBroker operationだけを送受信する。Android Kotlin側にnative招待UI、Android Keystore暗号化保管、証明書hash固定TLS、有限frame／timeout、native Activity lifecycleによるsocket停止を実装し、Kotlin compile、7件のunit test、debug APK/AAB buildがPASSした。Flutter analyzeと13件のtestもPASS。実TLS・Keystore実機動作は未検証である。iOS native handlerは未実装のためchannel呼出しはfail-closedとなる。Flutterからnative foreground状態を偽装できる`set_foreground` channelは設けない。
 
-- release_blocker: rev2_mobile_flutter_native_device_link_boundary。Android／iOS native招待UI、OS安全保管、TLS／network移行、秘密非通過・既存Broker到達のproduction検証が未完了。
-- Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。native fixture／host testは実機証拠へ昇格しない。
+- `release_blocker`: rev2_mobile_flutter_native_device_link_boundary。Android build／実接続検証、iOS native handler、Dart/debug VM/log/artifactへ秘密を渡さないplatform test harnessが未完了。
+- Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。Flutter/Kotlin unit test・APK build・emulator起動は実機証拠へ昇格しない。
+- 旧Dart client・Simulator integrationのPASSは履歴のまま保持し、現行native経路の適合根拠に使用しない。
 
 ## C31現況（2026-09-24）
 

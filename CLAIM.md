@@ -193,8 +193,8 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 - item: D4 Pocket rev2 MobileのDevice LinkがFlutter禁止境界に未適合
   classification: release_blocker
   registry_id: rev2_mobile_flutter_native_device_link_boundary
-  reason: 現行Dart経路が招待、端末資格、SecureSocket TLS／network、安全保管を直接扱う。native channel契約は追加済みだが、Android／iOS production移行は未実装。
-  required_action: native招待UI、OS保管、TLS transportを実装し、秘密非通過・既存Rust Broker到達・否定経路を検証する。実機凍結、実機証拠、正式配布の各gateも別途維持する。
+  reason: Dart直接の招待・資格・TLS／安全保管経路は廃止した。Android Kotlin unit testとAPK/AAB buildはPASSだが、実OS保管・TLS・lifecycleの動作証拠がなく、iOS native handlerも未実装。過去Dart経路のPASSは現行適合証拠ではない。
+  required_action: iOS Keychain/TLS handlerを実装する。招待・資格をDart/debug VM/log/artifactへ渡さない実動作試験を整え、実機凍結・実機証拠・正式配布のgateも別途満たす。
   blocks_release: yes
 ~~~
 

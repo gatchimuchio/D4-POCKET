@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: Rustの暗号化端末経路とowner制御、既存Mobile client・保管・lifecycleの接続は実装済み。現行Dart製品経路は資格とTLS/networkをFlutter側で扱うため、D4 Pocket rev2のFlutter禁止境界には未適合であり、native transport／保管への移行が必要。過去のDart TLS実行証拠を現在の適合証拠へ読み替えない。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
+状態: Rustの暗号化端末経路とowner制御は実装済み。Android native Device Linkへの移行は進行中であり、iOS native handlerは未実装。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験はFIXTUREであり、Android/iOSの安全保管や端末実機の証拠とは区別する。
 
 ## 対象と責任
 
@@ -44,6 +44,8 @@ Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限
 
 起動・復帰は資格の読取後に端末確認を行い、失効・期限切れ・Host不一致では入力と送信を無効にする。background中はpollingと新規送信を停止する。応答待ちは復帰後に同じ要求を照会し、自動再送しない。離脱はserver失効を先に要求する。通信不能時のlocal削除はserver失効と区別し、owner側の失効操作を案内する。
 
+現在の`local_delete`は通信不能時に端末内資格だけを消す回復操作だが、Desktop Rust Brokerの`AuditEvent`を生成・永続化しない。Flutterの確認dialogや成功表示は監査証拠ではない。したがって、この回復経路は監査閉包が未成立のrelease blockerとして扱い、監査済みのBroker操作または安全境界を維持する明示的な回復監査契約が成立するまで、Device Link全体の監査完了を主張しない。
+
 復帰・手動再確認では安全保管の端末IDと資格を再読取し、構造・期限と現在の結合内容を照合してから通信する。削除・破損・変更・読取障害時にメモリ上の旧資格を代用せず、変更された資格を自動採用しない。読取や接続確認の途中でbackgroundに移った確認結果を、後の復帰の接続成功に転用しない。
 
 通常の解除では有効なclientから端末離脱の応答を確認し、client不在を解除成功にしない。保存資格の削除後は同じ保管経路で再読取し、不在を確認してから端末内の削除完了を表示する。資格が残る場合や再読取に失敗した場合は通信停止を維持し、削除未確認として再操作を案内する。これは保管APIを通した観測であり、媒体上の物理消去や別processによる後続の再書込み防止を証明しない。
@@ -56,9 +58,11 @@ Flutterは接続状態と許可済みprojectionだけを表示する。招待JSO
 
 Flutterからnativeへのchannel要求は、版、固定method名、必要な場合の既存Device Link operationとその業務payloadだけから成る。pairing要求は引数なしであり、招待・資格・secret・token・session credentialをchannel越しに渡さない。nativeの通常要求経路は既存Device Link TLSの宛先へ接続し、既存Rust Brokerの資格検査・nonce・allowlist・所有関係・Audit・Approval・Recoveryへ必ず到達する。native側に権限判断、Owner操作、任意host／URL、任意commandを追加しない。
 
+foreground状態の正本はAndroid Activity／iOS sceneなどplatform-native lifecycle観測とする。Flutterから`set_foreground`等の状態設定要求を受け付けず、Flutterのlifecycle通知だけでnative通信を再開しない。復帰時はnative自身がforeground状態を確認したうえで端末資格を再照合する。Flutter側のlifecycle状態は、UI要求を止める保守的な追加条件としてのみ使う。
+
 履歴閲覧時だけ、現在のowner承認状態を照合するための`approval_id`参照と閉じた履歴queryをnative channel経由でBrokerへ渡せる。これはApproval本文・token・発行操作ではなく、native側は権限や承認有効性を解釈しない。許可はRust Brokerが保持する現在のowner grant、期限、実行系範囲の照合だけで決まる。他操作のpayloadでは`approval_id`を含む権限・監査fieldを引き続き拒否する。
 
-AndroidはOS Keystore保護のnative暗号化保管、iOSはThisDeviceOnly Keychain保管を使う。OS保管が利用できない場合はfail-closedとし、Dart保管・平文保存・backup復元へfallbackしない。TLS証明書hashと有効期間、有限timeout、bounded frame、background中のsocket停止、要求一回限りの扱いを既存契約から弱めない。native応答はoperationごとに検証し、資格field／資格実値を再帰的に除去または拒否してからFlutterへ渡す。例外・system log・test artifactにも秘密値を含めない。
+Android実装はAndroid Keystore保護のnative暗号化保管を使い、iOSはThisDeviceOnly Keychain handlerの実装を要する。OS保管が利用できない場合はfail-closedとし、Dart保管・平文保存・backup復元へfallbackしない。TLS証明書hashと有効期間、有限timeout、bounded frame、background中のsocket停止、要求一回限りの扱いを既存契約から弱めない。native応答はoperationごとに検証し、資格field／資格実値を再帰的に除去または拒否してからFlutterへ渡す。例外・system log・test artifactにも秘密値を含めない。
 
 このchannelはMobile製品内のnative transport／保管境界であり、Rust Brokerを迂回する別bridgeではない。Schema・fixture・静的conformanceは契約形状の証拠に限る。実Device Link、Android/iOS OS保管、TLS、background停止のLIVE_RUNTIME証拠とは区別する。
 
@@ -72,11 +76,11 @@ Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を
 
 - item: 端末連携の実装と実機検証
   classification: release_blocker
-  reason: 契約定義とfixtureは製品接続の成立を証明しない。
-  required_action: Rust・Flutterの消費経路と否定経路を実装し、Android/iOSのbuild・install・launch・結合・対話・lifecycleを測定する。
+  reason: Android native移行中でありiOS native handlerが未実装。source・fixture・buildだけではOS保管、実TLS、失効、background lifecycleの成立を証明しない。Android実機検証はowner指示で凍結中。
+  required_action: Android移行をbuild・unit testし、iOSのnative経路を実装する。秘密をDartへ渡さないplatform test harnessを作り、凍結解除後にAndroid実機を含む各platformの結合・対話・失効・lifecycleを測定する。
   blocks_release: yes
 
-技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)、[DartのSecureSocket](https://api.dart.dev/dart-io/SecureSocket/connect.html)。これらは暗号化機構のAPI資料でありGUI Shellの権限源ではない。
+技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)。これは暗号化機構のAPI資料でありGUI Shellの権限源ではない。
 
 ## Rustの実接続と操作
 
@@ -86,16 +90,8 @@ owner CLIは `対話承認操作 --session-file <owner資格file> 端末招待 <
 
 `python tooling/minidora_live_check.py --reference <固定参照clone> --mobile-client --dart-client` は実TLSから実MINIDORAへの経路を実行する。テストのPython clientは開発専用であり、Mobile製品client・安全保管・実機lifecycleの証拠にはしない。
 
-## 仮想端末でのnative保管検証
+## 廃止済みのMobile live integration harness
 
-`apps/mobile_flutter/integration_test/native_store_test.dart` はdevelopment専用で、製品のSecureDeviceStoreを実行する。試験ごとのprefixだけを付け、既存端末IDや実資格を読取・上書きしない。非秘密の試験値だけを保存し、終了時に削除を再読取で確認する。平文fallbackやMethodChannel置換を行わない。
+以前のSimulator/仮想端末driverは、招待JSONをhost processからFlutter debug VM extensionを介してDart integration testへ渡していた。これはrev2の「招待・資格をDartへ渡さない」という境界と整合しないため、driver、test、`--mobile-simulator`、`--android-emulator`、`--dart-mobile-client`の経路を廃止した。履歴上の過去PASSは過去のDart client／保管test実行記録であり、現行native経路の証拠ではない。
 
-別instanceからの読取・更新・削除、端末IDのcontroller再生成後の一致、資格なし・破損資格の接続拒否を検査する。前景切替はcontroller呼出しによるINTERNAL_STATE検査であり、OSのbackground遷移やprocess再起動の証明ではない。保管APIの実行結果は仮想端末上のLIVE_RUNTIME証拠に限定し、実機Keychain保護、端末lock、媒体消去、実TLS再接続へ昇格しない。残る実機・実TLS・OS lifecycleの検証は上記release_blockerに保持する。
-
-## native保管と実TLSを通すSimulator統合
-
-開発専用の `tooling/minidora_live_check.py --mobile-simulator <UDID>` は、固定参照MINIDORAの二実API・一時Rust broker・iOS Simulatorを接続する。通常の製品起動には追加しない。招待は一時試験資格だけを使用し、host側driverからFlutterの認証付きdebug VM接続へ渡す。秘密をdart-define、ソース、一般設定、log、成果物へ埋め込まない。owner制御資格はhostの既存試験harnessだけが保持し、Mobileへ渡さない。
-
-native安全保管後のcontroller再生成・実TLS再確認、OSによる背景移動と復帰、同じ要求の応答照会、保存資格消失時の通信停止、正常な端末離脱とnative削除を検査する。OS遷移は専用Simulator上で設定appを前景化し、元appへ戻す。MobileHomeの実WidgetsBindingObserverとcontrollerの変化を観測する。実APIの応答は既存の一時owner検証経路で当該試験要求だけを承認する。これはSimulator内のLIVE_RUNTIME証拠であり、実機のlock・OS強制終了・物理Keychain保護・正式配布の証拠ではない。
-
-driverの拡張はintegration_test内だけに登録し、開発デバッグ資格以上の製品権限を付与しない。試験には起動・応答・全体の期限を設ける。失敗時も一時processを停止し、一時資格を除去する。記録は対象commit、試験状態、要求ID、時刻、非秘密の遷移事実に限定する。
+再導入する場合は、招待入力からnative保管・TLSまで秘密をFlutter/Dart、debug VM extension、shell argument、log、test artifactへ渡さないplatform-native test harnessを先に設計する。Android emulator上の起動確認およびApple workflowのbuildは補助証拠であり、実機やKeychain/Keystoreのrelease証明ではない。

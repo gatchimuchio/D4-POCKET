@@ -1195,3 +1195,27 @@ FlutterのSetup Doctor file操作・export helper・mainからの呼出しを削
 - Android実機接続・install・起動は実施していない。既存指示による凍結を維持し、`rev2_mobile_device_evidence`を`release_blocker`のまま保持する。
 
 本単位はPhase35のAgent metadata表示面と既存read-only経路接続の部分成果であり、Phase35全体、Agent実task実行、Mobileの実機・配布、Windows installed product、rev1総合完成を成立させない。既存release blockerの状態は変更していない。
+
+
+## D4 Pocket rev2 Mobile: Android Device Linkをnative境界へ移行（2026-09-25）
+
+現行Mobile sourceを再確認し、Dartが招待JSON、DeviceCredential、Secure Storage、TLS／networkを直接扱う経路と、試験招待をdebug VM extensionからDartへ渡すintegration harnessが残っていたことを確認した。後者は「資格・secretをFlutterへ渡さない」というrev2境界と両立しないため、旧Dart client、試験driver、integration test、および`--dart-mobile-client`／Simulator用harness経路を廃止した。旧PASS記録は履歴として保持し、現行native経路の証拠へ読み替えない。
+
+Flutter側は資格の有無を示すboolと閉じた状態projection、固定MethodChannel経由のBroker operationだけを扱う。招待JSON、端末ID、Host情報、資格値、TLS、暗号化保管はDartへ返さない。履歴閲覧時だけ既存Brokerが現在のowner grantを照合するための`approval_id`参照とbounded queryをchannelへ渡し、他operationでは同fieldを拒否する。request payloadをIPC前に64KiBへ制限し、応答の資格field・error自由文を拒否／除去する。
+
+Android Kotlin経路にnative招待dialog、Host／HostID／証明書hashの操作者照合、Android Keystore由来AES-GCM暗号化保管、private IPv4範囲・期限・credential bindingの検証、証明書hash固定TLS、bounded single-frame JSON、有限timeout、background時のsocket cancellationを追加した。backupとdevice transferをManifest／data extraction ruleから除外する。Activityの`onResume`／`onPause`／`onStop`だけがnative foreground状態を更新し、Flutter channelから状態を偽装する`set_foreground`要求を削除した。native pairingは二重開始を排他し、結合中のread／Broker／解除要求を拒否する。
+
+検証結果:
+
+- `flutter analyze --no-pub`（`apps/mobile_flutter`）：成功、指摘0件。
+- `flutter test --no-pub --reporter expanded`（`apps/mobile_flutter`）：13件成功。固定channel、資格field拒否、history grant参照の限定、自由文error除去、背景中要求拒否、native側foreground再確認、MissingPlugin fail-closedを含む。
+- `gradlew.bat :app:testDebugUnitTest`（`apps/mobile_flutter/android`）：成功。Strict JSON、重複key／malformed input、payload allowlist、credential leak拒否、Host／端末bindingのKotlin unit test 7件。
+- `flutter build apk --debug --no-pub`、`flutter build appbundle --debug --no-pub`：両方成功。これらはemulator／実機installやnative runtime動作を証明しない。
+- `python tooling/schema_check/check_schemas.py`：Schema124件、正常例124件、拒否fixture150件すべて成功。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：197件成功。Mobile channel Schema、Rust Device Link allowlist、Flutter禁止経路、native lifecycle正本、pairing排他を含む。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：成功、追加負債0件。
+- `python tooling/manifest.py --check`、`python tooling/release_gate_check.py`、`python tooling/packaging_portability_check.py`：成功。
+- `python -m py_compile tooling/minidora_live_check.py tooling/conformance_tests/run_conformance_skeleton.py`：成功。
+- `flutter devices`：Windows／Chrome／Edgeのみ。Android device/emulatorは検出されない。Android実機検証凍結を維持しinstall／起動／結合／TLS接続は行っていない。
+
+この単位でAndroid sourceのcompileとdebug package生成は成立したが、Android Keystoreの実OS動作、TLSから実Rust Brokerへのnative接続、結合・失効・OS背景遷移は未検証。iOS native handlerは未実装である。iOS compileはWindowsでは行えない。秘密をDart／debug VM／log／artifactへ渡さないplatform live-test harnessも未成立である。加えて現行`local_delete`はDesktop Rust BrokerのAuditEventを生成しないため、回復監査の閉包も未成立と明記した。`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`を`release_blocker`のまま保持し、Android実機凍結と正式配布識別子／署名blockerも変更しない。

@@ -123,7 +123,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
         const RecoveryInstruction(),
         if (_dialogueVisited)
           RuntimeDialogueScreen(
-            key: ValueKey(c.credential?.id),
+            key: ValueKey(c.connectionGeneration),
             connect: () async => c.dialogue,
             active: c.ready && c.foreground && _selected == 7,
           )

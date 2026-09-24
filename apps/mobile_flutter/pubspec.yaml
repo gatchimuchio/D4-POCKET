@@ -7,18 +7,12 @@ environment:
   sdk: ">=3.8.0 <4.0.0"
 
 dependencies:
-  crypto: ^3.0.7
-  flutter_secure_storage: ^11.0.0
   gui_shell_ui:
     path: ../../packages/gui_shell_ui
   flutter:
     sdk: flutter
 
 dev_dependencies:
-  flutter_driver:
-    sdk: flutter
-  integration_test:
-    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0

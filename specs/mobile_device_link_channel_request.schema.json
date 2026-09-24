@@ -21,8 +21,7 @@
         "pair",
         "broker_request",
         "disconnect",
-        "local_delete",
-        "set_foreground"
+        "local_delete"
       ]
     },
     "broker_operation": {
@@ -43,10 +42,7 @@
         "対話履歴閲覧"
       ]
     },
-    "payload": {},
-    "foreground": {
-      "type": "boolean"
-    }
+    "payload": {}
   },
   "$defs": {
     "safe_value": {
@@ -267,25 +263,6 @@
       "required": [
         "version",
         "method"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "properties": {
-        "version": {
-          "const": 1
-        },
-        "method": {
-          "const": "set_foreground"
-        },
-        "foreground": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "version",
-        "method",
-        "foreground"
       ],
       "additionalProperties": false
     }

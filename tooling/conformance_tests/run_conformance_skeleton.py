@@ -302,6 +302,17 @@ MOBILE_FLUTTER_REQUIRED_FILES = {
     "lib/screens/runtime_status.dart",
     "lib/screens/emergency_stop.dart",
     "lib/screens/recovery_instruction.dart",
+    "lib/services/device_link_client.dart",
+    "lib/services/device_link_controller.dart",
+    "test/device_link_test.dart",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkTlsClient.kt",
+    "android/app/src/main/kotlin/com/example/gui_shell_mobile/StrictJson.kt",
+    "android/app/src/test/kotlin/com/example/gui_shell_mobile/DeviceLinkPolicyTest.kt",
+    "android/app/src/test/kotlin/com/example/gui_shell_mobile/StrictJsonTest.kt",
 }
 RELEASE_HARDENING_FILES = {
     "RELEASE_CHECKLIST.md",
@@ -2595,7 +2606,6 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "latest_per_request": True, "include_audit_context": True, "include_result_evidence": True, "include_content_receipt": True, "filter": {"実行系ID": "local"}}}},
         {"version": 1, "method": "disconnect"},
         {"version": 1, "method": "local_delete"},
-        {"version": 1, "method": "set_foreground", "foreground": False},
     ]
     for candidate in valid:
         if validate_instance(candidate, schema):
@@ -2616,6 +2626,8 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "owner": True}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "filter": {"authority": "owner"}}}},
         {"version": 1, "method": "pair", "authority": "owner"},
+        {"version": 1, "method": "set_foreground", "foreground": False},
+        {"version": 1, "method": "set_foreground", "foreground": True},
         {"version": 1, "method": "unknown"},
     ]
     for candidate in invalid:
@@ -5630,12 +5642,28 @@ def test_mobile_flutter_required_files_exist() -> list[str]:
 
 
 def test_mobile_flutter_cannot_create_hidden_authority() -> list[str]:
-    required_terms = ["device_id", "pairing_id", "操作者確認", "監査事象", "取消し", "復旧経路"]
-    combined = "\n".join(path.read_text(encoding="utf-8") for path in sorted((MOBILE_FLUTTER / "lib").glob("**/*.dart")))
+    required_terms = ["device_id", "pairing_id", "操作者が照合", "監査事象", "取消し", "復旧経路"]
+    dart_sources = sorted((MOBILE_FLUTTER / "lib").glob("**/*.dart"))
+    native_sources = sorted((MOBILE_FLUTTER / "android/app/src/main/kotlin").glob("**/*.kt"))
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in [*dart_sources, *native_sources])
     errors = []
     for term in required_terms:
         if term not in combined:
             errors.append(f"mobile pairing contractのtermがない: {term}")
+    dart_only = "\n".join(path.read_text(encoding="utf-8") for path in dart_sources)
+    for marker in ("import 'dart:io'", "SecureSocket", "flutter_secure_storage", "class DeviceCredential", "class SecureDeviceStore"):
+        if marker in dart_only:
+            errors.append("Mobile Dartが資格・network・安全保管を直接扱う: " + marker)
+    main_activity = (MOBILE_FLUTTER / "android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt").read_text(encoding="utf-8")
+    native_service = (MOBILE_FLUTTER / "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt").read_text(encoding="utf-8")
+    if "onResume()" not in main_activity or "setForeground(true)" not in main_activity or "onPause()" not in main_activity or "setForeground(false)" not in main_activity:
+        errors.append("Android native foregroundの正本がActivity lifecycleへ接続されていない")
+    if '"set_foreground"' in native_service:
+        errors.append("FlutterからAndroid native foregroundを設定できるchannel methodが残っている")
+    if "pairingInProgress.compareAndSet(false, true)" not in native_service:
+        errors.append("Android native pairingが重複開始を排他していない")
+    if native_service.count("check(!pairingInProgress.get())") < 3:
+        errors.append("Android native pairing中に通常要求・解除が許可される可能性がある")
     forbidden = ["independent authority: true", "silently pair", "'full_payload'", "hidden payload available"]
     for pattern in forbidden:
         if pattern in combined:

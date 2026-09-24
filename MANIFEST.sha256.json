@@ -65,11 +65,11 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "c2a18886667116f21bae3c27316192b4b5d6773cb194067499c0773ff2efee3f"
+      "sha256": "118a1b3e2b3cc4188145da9f9a6d8e51ee1b06c1224c667a1bdc44507c88eaac"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
-      "sha256": "50cc42e949a0f6fecf5a842d4a17846c284eec232325d519f03ffe7ea7e86e64"
+      "sha256": "f27dc04c008bb2ae142076829f6b4540290d34346ee4907ac636230fb903e04c"
     },
     {
       "path": ".gitignore",
@@ -77,7 +77,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "3b13fca0a1c4ff38dd137787b1a6df1db84af032281b986d1292c241fe9030a3"
+      "sha256": "b0c844bdf0abdc9c182df80337b84fe6ed4a94a1f977d0a9af64a9395da22127"
     },
     {
       "path": "AUDIT.md",
@@ -93,7 +93,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "6f11e3af898d6c5fc8fe604a4841cec02c77f237d814a597b0468b52ce6e9cda"
+      "sha256": "6532747b2437f2c1dd3ee1d29c67195e98cda50e0381a85078070617c9dd9d05"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -129,7 +129,7 @@
     },
     {
       "path": "MOBILE_STATUS.md",
-      "sha256": "0f3c5d5a3c800bcbac100bdfd0037707de2326dba9b480cbbf6f25cfce7d89d4"
+      "sha256": "de88103e703e5916b71f370ab6c812d403c524c3a792a1eccf777e1bb6a3d983"
     },
     {
       "path": "NOTICE",
@@ -145,7 +145,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "bc6f844f296fb6852eabf14bcb65675e6617919503a2c51e743230268bb87fd1"
+      "sha256": "71f82aa4dd52545a7916d322d60e932769c3e4c1ce8fec41c76991fe396d7af8"
     },
     {
       "path": "ROADMAP.md",
@@ -717,7 +717,7 @@
     },
     {
       "path": "apps/mobile_flutter/README.md",
-      "sha256": "9c5ac62a04af067d0e2d40865f9aaffb1063cff20ed93bd2828ca8e9fec0d32d"
+      "sha256": "c500a8aa1cf90ce75d3e7a0028cdec2aa9bb093b50c2b2c617d7e64792c73263"
     },
     {
       "path": "apps/mobile_flutter/android/.gitignore",
@@ -725,7 +725,7 @@
     },
     {
       "path": "apps/mobile_flutter/android/app/build.gradle.kts",
-      "sha256": "ca3c3662fcfa45478d4eb3de1017cbdd98346ce869bb1333795404195f80219f"
+      "sha256": "2a35849fb6daebf5a98eef3f49cbcd9ec792d47402607033dfaae77dc47a1799"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/debug/AndroidManifest.xml",
@@ -736,8 +736,28 @@
       "sha256": "0e6a1b390dc2c48d66ae59a35444cf024163811e61a640dab755ee4a7712398c"
     },
     {
+      "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt",
+      "sha256": "5c7944d50cba04593c94985af67c6ec56894693ae0c1c863b332522ffb1d992b"
+    },
+    {
+      "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt",
+      "sha256": "378bb4be2f1eaf99b0cc2e765939a46d627f1cd1590cfdd8e7d0d5652f53c3a7"
+    },
+    {
+      "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt",
+      "sha256": "1695836fa146c3e5f38ef0ba2a20dcc609c8feef45bd0305c2bebe2ea819ed41"
+    },
+    {
+      "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkTlsClient.kt",
+      "sha256": "61ee81e485df4f44f86980fff6eb73f46188bcf2c3bd08cd0bd5550667f5c8ae"
+    },
+    {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt",
-      "sha256": "5a83a238682ca0c70708abb5bf539c76fb5132dc282a4c169e41b8c102ed4734"
+      "sha256": "29cd8913d8ea5ec451197d90416b5e5e4e8802da17fe5f37fe1a4f77a5ebd66c"
+    },
+    {
+      "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/StrictJson.kt",
+      "sha256": "965712055094373886d04d7a7e1bb7d4201d20800a59ca8cfd2910a4e13517d5"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/res/drawable-v21/launch_background.xml",
@@ -784,6 +804,14 @@
       "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
     },
     {
+      "path": "apps/mobile_flutter/android/app/src/test/kotlin/com/example/gui_shell_mobile/DeviceLinkPolicyTest.kt",
+      "sha256": "e7d381fc94033223864c577914749415ba5b135c4acca128c2564e7439f173fc"
+    },
+    {
+      "path": "apps/mobile_flutter/android/app/src/test/kotlin/com/example/gui_shell_mobile/StrictJsonTest.kt",
+      "sha256": "8278b68d1fbc2c53047ad22a4a97943784e4055f46e6fe1fe182cd6ae8669634"
+    },
+    {
       "path": "apps/mobile_flutter/android/build.gradle.kts",
       "sha256": "6a26dba2cb8dfba1e74f540b0d17a89d96c1301d3c3bfda14348bed257fddcba"
     },
@@ -798,18 +826,6 @@
     {
       "path": "apps/mobile_flutter/android/settings.gradle.kts",
       "sha256": "a4bb954fc832724d8c6aef689f0d82873af7ae4c6ff630cb19f4e0c7cd837d46"
-    },
-    {
-      "path": "apps/mobile_flutter/integration_test/device_link_native_test.dart",
-      "sha256": "b32b7c46c1b97fb913a3aa7b45c2561e8cea242adb2d2b2fa39f405c129e4608"
-    },
-    {
-      "path": "apps/mobile_flutter/integration_test/native_store.dart",
-      "sha256": "5d14a78a5966d2fc5accd131781ece0db90e326bcaef4e8cc0737ebe8d935ac2"
-    },
-    {
-      "path": "apps/mobile_flutter/integration_test/native_store_test.dart",
-      "sha256": "3807b0b85f744d069a21983457ce45ecf4775ae4f49602db5555cb553841210c"
     },
     {
       "path": "apps/mobile_flutter/ios/.gitignore",
@@ -977,7 +993,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "5b72c50f016d16aedbd5e4f22db2afc70d46c6fd0a063ad364c9ec29d17dc768"
+      "sha256": "0265cd6fb5803b665aeaaa5a6a3c2834e48c35888a2cea0b6840794a5c3908bf"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/agent_status.dart",
@@ -989,7 +1005,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/device_connection.dart",
-      "sha256": "9389da72d4efa01a8e59b9caf10122609e79e66aecbdf2c36ab9b42dd059e226"
+      "sha256": "280c6e9a1b5e6d66cad7dacd74cd5c4c4630051eaa4320f620addfb5c200f694"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/emergency_stop.dart",
@@ -1029,11 +1045,11 @@
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_client.dart",
-      "sha256": "b9a06fe58165967dad40c1f23b1b260c276aa7afddf315d002f085c1799fb0b4"
+      "sha256": "9f225d6f4fc01003aebe67b4d7b10445c395771c1b5f31de0274bb9cdfc5dd6d"
     },
     {
       "path": "apps/mobile_flutter/lib/services/device_link_controller.dart",
-      "sha256": "785354e0366d584c411eaa05425a99f5811c43ebb7438eaa8d9f5e9b002738c2"
+      "sha256": "9fa1ac9bf2fbbff70b78d143df75e883b905ef1395398918e4e8ba62379987c9"
     },
     {
       "path": "apps/mobile_flutter/lib/services/mobile_projection_client.dart",
@@ -1041,23 +1057,15 @@
     },
     {
       "path": "apps/mobile_flutter/pubspec.yaml",
-      "sha256": "23fba8be83b4ba5ff19f0800c518264d1d0a0e2f53c96266608790d3491f8b1a"
+      "sha256": "30343bcfce0371ca3025a5bc60859be2daa1296e93cb5eea3a174675a2bf0f10"
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "1ddbb271657e9cb0366df07957f7534d05b9361a355d19c3d215767397bae706"
+      "sha256": "f0cd0345c3e3c84491cb43bd348ba8ee7b16c96bcefaf772345d4491dc6463f0"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
       "sha256": "c3165abae3a804100fbb7b307941a0c23cb9adf2781e296a3db4fe2bb91ff606"
-    },
-    {
-      "path": "apps/mobile_flutter/test_driver/device_link_driver.dart",
-      "sha256": "f2e2e1c952ab9f22504285617a5b1a011d219bafc3388303d7bfe0a2bf59ec22"
-    },
-    {
-      "path": "apps/mobile_flutter/tool/device_link_live_client.dart",
-      "sha256": "6d52344282dc607d0fd842e1264d4d2087d9a99059ec153551ff38ce56f2a983"
     },
     {
       "path": "config/audit_signing_trust.json",
@@ -1129,7 +1137,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "725ffc99851764e0234a8e1733608e6937637307d5b130d1e1274c74268819a8"
+      "sha256": "057c25121e7c377cf65ba71a588b4f5f25c036fb5300316d936997e03894b772"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1273,7 +1281,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "sha256": "d3711c010fe656d6533065e51a1d741182cd8d75322e3c866dc6cad72bf8c0e9"
+      "sha256": "f63ea83afd1329791fc1551ed01f51e692c4ab46fb0faf202ec9ebaa3b33c5a0"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
@@ -3325,7 +3333,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "83eeea66007a1e3cdfaa2df7b9b82e0cf88df1de184295ed121d9bc20e179271"
+      "sha256": "2838e3f5fde667da5d1a323c2c0f0721a297268eb334a933407ba170e57a6490"
     },
     {
       "path": "requirements-dev.txt",
@@ -3633,7 +3641,7 @@
     },
     {
       "path": "specs/mobile_device_link_channel_request.schema.json",
-      "sha256": "61dc4f663abf6cb881855a72710730989512eca965430b60f1ad899e8f456670"
+      "sha256": "2e734045081cfad05645c6bac797fa06618e106cded609b8b9b555e034e4f01c"
     },
     {
       "path": "specs/notification.schema.json",
@@ -3873,7 +3881,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "9e3095e2f4edbf84dec7d5a86cb02c8dcdc65904666ca0599b9372231269a169"
+      "sha256": "f68218822cb53de1b5c81345f67689fbac8b145102c6b718ff7c142d44109aac"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3925,7 +3933,7 @@
     },
     {
       "path": "tooling/minidora_live_check.py",
-      "sha256": "924389e10126b3d568ecfa5b3a328351b927107f88ac0d67f92822f005757d52"
+      "sha256": "3f40c96eeb4e5912301454424aa06fab54b155f77c819cf21482073aa1750242"
     },
     {
       "path": "tooling/packaging_portability_check.py",
