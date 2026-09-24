@@ -980,6 +980,10 @@
       "sha256": "5b72c50f016d16aedbd5e4f22db2afc70d46c6fd0a063ad364c9ec29d17dc768"
     },
     {
+      "path": "apps/mobile_flutter/lib/screens/agent_status.dart",
+      "sha256": "044b9b738aa89d90bc42426593f2f14dea7d9e1967c050341a583875b003edc6"
+    },
+    {
       "path": "apps/mobile_flutter/lib/screens/approval_review.dart",
       "sha256": "4c4a61733458c8b1b32aa6b3429d133b6e29e622f22906ae78859adc8287de90"
     },
@@ -1125,7 +1129,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6ebf04809d03f208485cfa63fbfbdabb557439811a956276c4b14e580b8c9d1b"
+      "sha256": "4805a43b2533437643f2e9599e12b120dcbb0b1636538ee470cc5929a7f31c8c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2052,6 +2056,14 @@
       "sha256": "678c63d1c27e28d507d368810ed528384530b83d214134bcfc0464da108a41e3"
     },
     {
+      "path": "examples/contracts/invalid/mobile_agent_list_authority.invalid.json",
+      "sha256": "320e6737c0600da6b46d25b472f577cf1c4caa202387c6f89749f851de3322b2"
+    },
+    {
+      "path": "examples/contracts/invalid/mobile_agent_list_secret.invalid.json",
+      "sha256": "2e63d3c296f7ec1242bcb8494c2c0f1fa11359912f284c14f6e2cb996284c572"
+    },
+    {
       "path": "examples/contracts/invalid/notification.invalid.json",
       "sha256": "efb01c00306f1d4eb7a1ec69ae65db1218add8c0d4e5aa4b36d53dc790ebc132"
     },
@@ -2314,6 +2326,10 @@
     {
       "path": "examples/contracts/mcp_contract.valid.json",
       "sha256": "87e81e161da530d6df8dc1bad85b055c8daa4c41d1a95d01211e45b2d9a6019c"
+    },
+    {
+      "path": "examples/contracts/mobile_agent_list.valid.json",
+      "sha256": "ee0b85fdd5dbc2dd011e6558acdb430e4a9e441d9b89c6e1d2d722418dd6935b"
     },
     {
       "path": "examples/contracts/notification.valid.json",
@@ -3602,6 +3618,10 @@
     {
       "path": "specs/mcp_contract.schema.json",
       "sha256": "dc3595755e55d0b230de515890348520278e447efc62efaf1f9d3cf390bee657"
+    },
+    {
+      "path": "specs/mobile_agent_list.schema.json",
+      "sha256": "7603acd626bfcb6c3bda91b19551fd207f187953277600be67db3c26198b4589"
     },
     {
       "path": "specs/notification.schema.json",

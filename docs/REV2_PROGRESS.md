@@ -2,6 +2,12 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase35追補: 必須source manifest漏れの修復（2026-09-25）
+
+commit `c45a1bd8d39cd59018928fa5fa1b4572924d87f9` 後の現行mainを使った集約基準検証で、Phase35のAgent状態面に属する5つのGit追跡file（Mobile画面、Schema、正常例、拒否例2件）が`MANIFEST.sha256.json`へ未登録であることを確認した。このためmanifest検査と、それに依存するrelease gate／packaging portability検査が失敗していた。既存成果の意味や検査条件は変更せず、現行Git追跡fileとhashからmanifestを再生成した。
+
+再検証では`python tooling/manifest.py --check`、`python tooling/packaging_portability_check.py`、`python tooling/schema_check/check_schemas.py`（Schema123・正常例123・拒否例149）、`python tooling/conformance_tests/run_conformance_skeleton.py`（195 checks）、`python tooling/release_gate_check.py`が成功した。集約検証時点の`python -X utf8 tooling/日本語基底監査.py --strict`は既存3 files／19 findings（Windows launcher仕様1、Rust IPC 12、Rust Desktop launcher 6）で失敗しており、本修復の対象外として`release_blocker`のまま保持する。Agent状態面・Device Linkの実接続やrelease readinessを、このmanifest修復から推論しない。
+
 ## D4 Pocket Phase 34追補: Flutter–Rust Broker channel契約（2026-09-24）
 
 現行`broker_client.dart`がendpoint file・session secret・TCP socketを直接扱い、Flutter UI責務の境界を越えていることを再確認した。Windows Desktopの次期経路を、Rust起動器所有pipe → Flutter child PID照合 → Rust内relay → 既存authenticated loopback TCP Brokerへ限定する日本語契約とSchemaを追加した。relayはnormal資格だけを使い、既存Brokerのoperation判定・Audit・replay/stale検査を再実装しない。Owner経路、資格file、session secretはRunner/Dartへ渡さず、pipe不通時もfallbackしない。
