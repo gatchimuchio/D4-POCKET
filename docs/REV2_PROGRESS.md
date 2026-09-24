@@ -9,7 +9,7 @@ GUI Shell構成Manifestを、Windows向け独立Appの初期Manifestへ変換す
 - Contract: `specs/gui_shell_export.schema.json`と`specs/gui_shell_export_receipt.schema.json`を追加し、Windows、`manifest_only`、新規App identity、新規監査store、`authority_strip=true`、Credential／Permission／Approval／Audit chain非継承、`not_built`、installer未開始、未署名を固定した。
 - Production path: Desktop Settings → `ExportClient` → Owner制御資格付きRust Broker `GUI Shell書出し` → Compose Manifest再検証 → 新規identity／監査store生成 → `INTERNAL_STATE` AuditEvent付き書出しReceipt。Flutterは応答表示だけを行い、filesystem、process、network、Credential、Permission、Approvalへ直接到達しない。
 - Negative boundary: 通常資格、未知field、構成Manifestの継承要求、書出し先の継承済みReceiptを拒否する。書出し元Capability requirementをPermissionへ昇格せず、既存のAuthority、Approval、Credential、Audit chainを再利用しない。
-- Validation: Schema 118件、正常example 118件、negative fixture 139件、Conformance 188件、Rust全試験はPhase32変更後に再実行してPASS。Flutter接続と全体検証はこの単位の完了前に実行する。
+- Validation: Schema 118件、正常example 118件、negative fixture 139件、Conformance 188件、厳格日本語監査、Manifest検査、梱包可能性検査、`validate_all.py --python-only --desktop-platform windows`、Flutter `analyze`／全104試験、Windows debug build、Rust全試験（lib 231件、main 7件、統合9・1・8・2・2・7件）がPASSした。A2A loopbackのWindows試験fixtureは応答送信後の`Shutdown::Write`をやめ、通常の接続終了で安定化した。
 - 未成立分類: 実artifact生成、Installer、署名、Module Pruning、Distribution、書出し先の実起動、Windows installed productの正式証拠は`release_blocker`。Manifest Receiptだけで独立App完成や正式releaseを主張しない。
 
 ## D4 Pocket 第7段階 編集提案（2026-09-24）
