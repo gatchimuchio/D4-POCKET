@@ -156,6 +156,10 @@
       "責任": "書出し画面Moduleの必須境界、任意選択、依存閉包、同一条件Windows AOT比較、binary除去・計測との証拠分離"
     },
     {
+      "path": "docs/specs/windows-desktop-launcher.md",
+      "責任": "Windows Desktop起動器の固定配置、Rust Broker lifecycle、normal endpoint、ユーザー保存・cleanup、未成立の配布工程境界"
+    },
+    {
       "path": "specs/gui_shell_module_catalog.json",
       "責任": "書出し対象Desktop画面Module、必須境界、依存、source surfaceの機械可読一覧"
     },

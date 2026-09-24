@@ -5,6 +5,9 @@
   [Parameter(Mandatory = $true)]
   [string]$BrokerHelperExe,
 
+  [Parameter(Mandatory = $true)]
+  [string]$DesktopLauncherExe,
+
   [string]$InstallRoot = "",
 
   [string]$RunId = "",
@@ -66,6 +69,7 @@ function Write-JsonEvidence {
 
 $release = Resolve-Path $FlutterReleaseDir
 $helper = Resolve-Path $BrokerHelperExe
+$desktopLauncher = Resolve-Path $DesktopLauncherExe
 
 if ($RunId -eq "") {
   $RunId = "run-$((Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
@@ -79,6 +83,10 @@ if ($BuildTimestamp -eq "") {
 if ($GitRoot -eq "") {
   $GitRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
+if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+  throw "LOCALAPPDATA を確認できないため、Desktop起動器の保存先宣言を作成できません。"
+}
+$launcherRuntimeDir = Join-Path $env:LOCALAPPDATA "GUI-Shell\broker\desktop"
 
 if ((Test-Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
   throw "InstallRoot はすでに存在します。正式証拠には新規の分離実行 root が必要です: $InstallRoot"
@@ -102,84 +110,16 @@ $evidenceDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.
 
 Copy-Item -Recurse -Force -Path (Join-Path $release.Path "*") -Destination $appDir.FullName
 Copy-Item -Force -Path $helper.Path -Destination (Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe")
+Copy-Item -Force -Path $desktopLauncher.Path -Destination (Join-Path $installRootPath.FullName "gui_shell_desktop_launcher.exe")
 
 $appExe = Join-Path $appDir.FullName "gui_shell_desktop.exe"
 $brokerExe = Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe"
+$launcherExe = Join-Path $installRootPath.FullName "gui_shell_desktop_launcher.exe"
 $configPath = Join-Path $configDir.FullName "gui_shell.json"
 $sessionFile = Join-Path $runtimeDir.FullName "broker_session.json"
 $appArtifactSha256 = Get-TaggedSha256 -Path $appExe
 $brokerArtifactSha256 = Get-TaggedSha256 -Path $brokerExe
-
-$launcher = Join-Path $installRootPath.FullName "GUI-Shell.brokered.ps1"
-$launcherText = @'
-$ErrorActionPreference = "Stop"
-
-$InstallRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$AppExe = Join-Path $InstallRoot "app\gui_shell_desktop.exe"
-$BrokerExe = Join-Path $InstallRoot "broker\gui_shell_rust_helper.exe"
-$RuntimeDir = Join-Path $InstallRoot "runtime"
-$StoreDir = Join-Path $RuntimeDir "broker_store"
-$SessionFile = Join-Path $RuntimeDir "broker_session.json"
-
-New-Item -ItemType Directory -Force -Path $StoreDir | Out-Null
-if (Test-Path $SessionFile) {
-  Remove-Item -Force -Path $SessionFile
-}
-
-$Broker = Start-Process -FilePath $BrokerExe -ArgumentList @(
-  "broker-server",
-  "--store-dir",
-  $StoreDir,
-  "--session-file",
-  $SessionFile
-) -PassThru -WindowStyle Hidden
-
-try {
-  for ($Index = 0; $Index -lt 100; $Index += 1) {
-    if (Test-Path $SessionFile) {
-      break
-    }
-    $Broker.Refresh()
-    if ($Broker.HasExited) {
-      throw "Rust broker が endpoint 準備前に終了しました: $($Broker.ExitCode)"
-    }
-    Start-Sleep -Milliseconds 50
-  }
-
-  if (-not (Test-Path $SessionFile)) {
-    throw "Rust broker endpoint ファイルが作成されませんでした: $SessionFile"
-  }
-
-  $Endpoint = Get-Content -Raw -Path $SessionFile | ConvertFrom-Json
-  if ($Endpoint.credential_role -ne "normal" -or
-      $Endpoint.host -ne "127.0.0.1" -or
-      $Endpoint.transport -ne "authenticated_loopback_tcp") {
-    throw "Flutterへ渡すbroker通常接続資格が不正"
-  }
-
-  $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $SessionFile
-  $env:GUI_SHELL_BROKER_RUNTIME_DIR = $RuntimeDir
-  $App = Start-Process -FilePath $AppExe -PassThru
-  $App.WaitForExit()
-}
-finally {
-  if ($null -ne $Broker) {
-    $Broker.Refresh()
-    if (-not $Broker.HasExited) {
-      Stop-Process -Id $Broker.Id -Force
-    }
-  }
-}
-'@
-
-Set-Content -Encoding UTF8 -Path $launcher -Value $launcherText
-
-$cmdLauncher = Join-Path $installRootPath.FullName "GUI-Shell.brokered.cmd"
-$cmdText = @"
-@echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0GUI-Shell.brokered.ps1"
-"@
-Set-Content -Encoding ASCII -Path $cmdLauncher -Value $cmdText
+$launcherArtifactSha256 = Get-TaggedSha256 -Path $launcherExe
 
 $manifest = [ordered]@{
   manifest_version = 2
@@ -193,6 +133,16 @@ $manifest = [ordered]@{
   install_root = $installRootPath.FullName
   app_exe = $appExe
   broker_exe = $brokerExe
+  launcher_exe = $launcherExe
+  launcher_runtime = [ordered]@{
+    root = $launcherRuntimeDir
+    store_dir = (Join-Path $launcherRuntimeDir "store")
+    session_file = (Join-Path $launcherRuntimeDir "broker_session.json")
+    scope = "per_user"
+    isolated = $false
+    evidence_class = "CONFIG"
+    formal_runtime_proof = $false
+  }
   runtime_dir = $runtimeDir.FullName
   store_dir = $storeDir.FullName
   config_dir = $configDir.FullName
@@ -200,11 +150,10 @@ $manifest = [ordered]@{
   audit_dir = $auditDir.FullName
   evidence_dir = $evidenceDir.FullName
   broker_session_file = $sessionFile
-  launcher_ps1 = $launcher
-  launcher_cmd = $cmdLauncher
   broker_mediated = $true
   app_artifact_sha256 = $appArtifactSha256
   broker_artifact_sha256 = $brokerArtifactSha256
+  launcher_artifact_sha256 = $launcherArtifactSha256
   isolation = [ordered]@{
     uses_shared_fixed_install_root = $false
     isolated_install_root = $installRootPath.FullName
@@ -232,4 +181,5 @@ $manifest = [ordered]@{
 $manifestPath = Join-Path $installRootPath.FullName "installed_manifest.json"
 Write-JsonEvidence -Value $manifest -Path $manifestPath -Depth 8
 Write-Host "GUI-Shell のインストール済み app を stage しました: $($installRootPath.FullName)"
+Write-Host "通常起動器: $launcherExe"
 Write-Host "manifest $manifestPath"

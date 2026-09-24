@@ -33,7 +33,7 @@ pub mod store;
 
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};
 pub use ipc_server::{
-    run_loopback_server, BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig,
+    run_loopback_server, run_loopback_server_cancellable, BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig,
 };
 pub use protocol::{
     Broker, BrokerError, BrokerHealth, BrokerMetadata, BrokerOperation, BrokerPersistenceMode,

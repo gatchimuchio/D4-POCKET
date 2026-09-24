@@ -2215,6 +2215,35 @@ def test_windows_stage_installer_powershell_boolean_grouping() -> list[str]:
     return errors
 
 
+def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
+    stage = (INSTALLER / "windows" / "stage_installed_app.ps1").read_text(encoding="utf-8")
+    launcher = (ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
+    broker_server = (ROOT / "native" / "rust_helper" / "src" / "broker" / "ipc_server.rs").read_text(encoding="utf-8")
+    launcher_doc = (ROOT / "docs" / "specs" / "windows-desktop-launcher.md").read_text(encoding="utf-8")
+    errors = []
+    for token in ["[string]$DesktopLauncherExe", "gui_shell_desktop_launcher.exe", "launcher_exe =", "launcher_artifact_sha256", "launcher_runtime = [ordered]@{", "formal_runtime_proof = $false"]:
+        if token not in stage:
+            errors.append(f"staged installがnative起動器を配置・hash結合しない: {token}")
+    if 'Join-Path $env:LOCALAPPDATA "GUI-Shell\\broker\\desktop"' not in stage:
+        errors.append("staged manifestが起動器のper-user runtime rootを示さない")
+    for token in ["run_loopback_server_cancellable", "BrokerCredentialRole::Normal", "authenticated_loopback_tcp", "GUI_SHELL_BROKER_ENDPOINT_JSON", "env_remove(\"GUI_SHELL_SNAPSHOT_JSON\")"]:
+        if token not in launcher:
+            errors.append(f"Rust Desktop起動器の既存Broker境界が欠落: {token}")
+    for token in ["for component in [\"GUI-Shell\", \"broker\", \"desktop\"]", "canonical.starts_with(&root)", "ensure_store_directory", "broker_store_directory_rejects_junction_outside_runtime_root"]:
+        if token not in launcher:
+            errors.append(f"Rust Desktop起動器のユーザー保存先reparse境界が欠落: {token}")
+    for token in ["D4 Pocket Desktop起動", "D4 Pocket Desktop終了", "Capability=desktop.launch", "RecoveryAction=", "LIVE_RUNTIME"]:
+        if token not in broker_server:
+            errors.append(f"Desktop起動器のBroker lifecycle監査対応が欠落: {token}")
+    if "Command::new(&layout.broker_exe)" in launcher or "owner-session-file" in launcher:
+        errors.append("Desktop起動器がBrokerを別権限経路・Owner資格で起動する")
+    if any(token in stage for token in ["GUI-Shell.brokered.ps1", "GUI-Shell.brokered.cmd", "Start-Process", "powershell -ExecutionPolicy"]):
+        errors.append("staged product rootがscript/terminal launcherを生成する")
+    if "Owner資格を作成・読み込み・Flutterへ渡さない" not in launcher_doc:
+        errors.append("Windows起動仕様にOwner資格境界がない")
+    return errors
+
+
 def test_windows_installed_smoke_preserves_trap_failure() -> list[str]:
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
@@ -5297,8 +5326,8 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
     ]:
         if token not in main:
             errors.append(f"desktop Flutterのproduct baselineにtokenがない: {token}")
-    if 'window.Create(L"GUI Shell", origin, size)' not in windows_main:
-        errors.append("Windows runnerのproduct window titleがGUI Shellではない")
+    if 'window.Create(L"D4 Pocket", origin, size)' not in windows_main:
+        errors.append("Windows runnerのproduct window titleがD4 Pocketではない")
     if "Win32Window::Size size(1280, 800)" not in windows_main:
         errors.append("Windows runnerのdefault product window sizeが1280x800に固定されていない")
     for token in ["WM_GETMINMAXINFO", "kMinWindowWidth = 1024", "kMinWindowHeight = 640"]:
@@ -6904,6 +6933,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_aggregate_surface_root_match,
         test_installed_app_setup_doctor_product_export_contract_exists,
         test_windows_stage_installer_powershell_boolean_grouping,
+        test_windows_stage_uses_terminal_free_native_launcher,
         test_windows_installed_smoke_preserves_trap_failure,
         test_windows_broker_smoke_keeps_full_duplex_response,
         test_windows_installed_smoke_reads_json_as_utf8,

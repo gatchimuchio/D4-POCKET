@@ -65,10 +65,13 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 
 ## 収集フロー
 
+> 現行`collect_installed_smoke.ps1`はFlutter executableを直接起動する旧collectorであり、Rust Desktop起動器経由のfirst-run evidenceを採れない。下記の分離pathはcollector scratch用途であり、起動器の実runtime `%LOCALAPPDATA%\GUI-Shell\broker\desktop` と同一ではない。collectorを起動器に接続し、実runtimeを分離user profileへ隔離する修正と検証が完了するまで、この手順の出力を`windows_installer_first_run_smoke` PASSとして扱ってはならない。
+
 ~~~powershell
 powershell -ExecutionPolicy Bypass -File installer\windows\stage_installed_app.ps1 `
   -FlutterReleaseDir .\apps\desktop_flutter\build\windows\x64\runner\Release `
-  -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe
+  -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe `
+  -DesktopLauncherExe .\native\rust_helper\target\release\gui_shell_desktop_launcher.exe
 
 $Manifest = Get-Content -Raw "$env:LOCALAPPDATA\GUI-Shell\installed-runs\<run_id>\installed_manifest.json" | ConvertFrom-Json
 

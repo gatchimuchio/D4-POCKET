@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 #[cfg(windows)]
+pub mod desktop_launcher;
+#[cfg(windows)]
 pub mod protected_store;
 
 pub mod audit_hash;

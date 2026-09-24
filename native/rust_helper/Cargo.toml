@@ -34,4 +34,4 @@ rustix = { version = "=1.1.4", features = ["fs"] }
 [target.'cfg(windows)'.dependencies]
 gui_shell_windows_protection = { path = "../windows_protection" }
 gui_shell_windows_runtime_observation = { path = "../windows_runtime_observation" }
-winsafe = { version = "=0.0.29", default-features = false, features = ["kernel", "psapi"] }
+winsafe = { version = "=0.0.29", default-features = false, features = ["kernel", "psapi", "user"] }

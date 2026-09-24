@@ -530,6 +530,12 @@ void main() {
       'approval_edit',
       'command_envelope',
     ]);
+    expect(
+      transport.requests.singleWhere(
+        (request) => request['operation'] == 'Agent一覧',
+      )['payload'],
+      const <String, Object?>{},
+    );
   });
 
   test('ブローカー利用不可時に製品クライアントが閉鎖側へ失敗する', () async {
@@ -906,6 +912,7 @@ class _FakeBrokerTransport implements BrokerTransport {
 
   final List<Map<String, Object?>> _responses;
   final List<String> operations = [];
+  final List<Map<String, Object?>> requests = [];
 
   @override
   Future<Map<String, Object?>> request(
@@ -913,6 +920,7 @@ class _FakeBrokerTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
+    requests.add({'operation': operation, 'payload': payload});
     if (_responses.isEmpty) {
       throw BrokerClientException('$operation 用の fake broker 応答がありません');
     }

@@ -50,7 +50,7 @@ class ShellCoreClient {
       );
       final agentAdapterListResponse = await broker.request(
         'Agent一覧',
-        payload: {'版': 1},
+        payload: const <String, Object?>{},
       );
       final agentAdapterList = _acceptedResponseBodyMap(
         agentAdapterListResponse,

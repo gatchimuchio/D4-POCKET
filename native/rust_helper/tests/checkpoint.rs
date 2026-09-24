@@ -13,7 +13,7 @@ fn key() -> (Ed25519KeyPair, Vec<u8>, Trust) {
     (key,der,trust)
 }
 fn installation(root: &std::path::Path) {
-    for path in ["app/gui_shell_desktop.exe", "app/data/app.so", "app/flutter_windows.dll", "broker/gui_shell_rust_helper.exe", "GUI-Shell.brokered.cmd", "GUI-Shell.brokered.ps1"] {
+    for path in ["app/gui_shell_desktop.exe", "app/data/app.so", "app/flutter_windows.dll", "broker/gui_shell_rust_helper.exe", "gui_shell_desktop_launcher.exe"] {
         let file = root.join(path); std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(file, path.as_bytes()).unwrap();
     }
@@ -164,7 +164,7 @@ fn 配布物の変更追加削除とpath変更と旧署名を拒否する() {
             assert!(verify(&bytes,sig.as_ref(),&der,&trust,&floor,None,&measured,1000).is_err());
         }
     };
-    for path in ["app/data/app.so","app/flutter_windows.dll","broker/gui_shell_rust_helper.exe","GUI-Shell.brokered.ps1"] {
+    for path in ["app/data/app.so","app/flutter_windows.dll","broker/gui_shell_rust_helper.exe","gui_shell_desktop_launcher.exe"] {
         let p=root.join(path);let before=std::fs::read(&p).unwrap();
         std::fs::write(&p,b"altered").unwrap();rejects();std::fs::write(&p,&before).unwrap();
         std::fs::remove_file(&p).unwrap();rejects();std::fs::write(&p,&before).unwrap();

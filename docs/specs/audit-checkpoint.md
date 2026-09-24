@@ -27,7 +27,7 @@ CollectorはRepository固定公開鍵fingerprint、ownerの継続性記録、現
 
 installed_artifact_sha256は、Rustが配置rootを直接走査して作るcanonical JSON一覧のSHA-256とする。exe単体を署名したversion 1は拒否する。実運用鍵が未導入のため既存の正式署名の移行はない。checkpointの他fieldと並び順は維持する。
 
-対象はapp/とbroker/以下の全directory・通常file、およびrootのGUI-Shell.brokered.cmdとGUI-Shell.brokered.ps1。rootで許容する他の名前はruntimeとinstalled_manifest.jsonのみであり、これら可変データは一覧から除外する。監査log/anchorはcheckpointの別fieldで結合する。その他のroot追加は拒否する。app/gui_shell_desktop.exe、app/data/app.so、app/flutter_windows.dll、broker/gui_shell_rust_helper.exeと両launcherを必須にする。外部OS libraryはこの成果物範囲外。
+対象はapp/とbroker/以下の全directory・通常file、およびrootの`gui_shell_desktop_launcher.exe`。rootで許容する他の名前はruntimeとinstalled_manifest.jsonのみであり、これら可変データは一覧から除外する。監査log/anchorはcheckpointの別fieldで結合する。その他のroot追加は拒否する。app/gui_shell_desktop.exe、app/data/app.so、app/flutter_windows.dll、broker/gui_shell_rust_helper.exe、`gui_shell_desktop_launcher.exe`を必須にする。PowerShell／CMD起動scriptは製品配置へ含めない。外部OS libraryはこの成果物範囲外。
 
 一覧はformat=gui-shell-windows-artifact、version=1、entriesの固定順序JSON（UTF-8、空白・末尾改行なし）。entriesは相対pathのASCII昇順とし、path、kind、size、sha256の順。directoryはsize=0/hash=null、通常fileは実byte数とSHA-256。区切りは/。path componentはASCII英数字・空白・dot・underscore・hyphen・丸括弧のみ、末尾dot/空白、空名、dot segment、予約device名、大小文字衝突を拒否する。symbolic link・junction等のreparse pointと特殊fileを拒否する。depth上限32、entry上限100000、単一file上限1GiB、全file合計4GiB。規約外の配布物は暗黙に除外せず失敗する。
 

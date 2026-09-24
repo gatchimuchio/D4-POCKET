@@ -23,7 +23,7 @@
       "classification": "release_blocker",
       "blocks_release": true,
       "reason": "Windowsインストール後の初回起動証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "ブローカー経由のFlutter .exe起動、Python実行系なしの起動、可視画面、設定、監査試行を含むネイティブWindowsインストール済みアプリの初回起動簡易証拠を収集し、tooling/windows_release_evidence.pyへ合格させてください。"
+      "required_action": "collect_installed_smoke.ps1をRust Desktop起動器経由へ更新し、起動器が実際に使うBroker保存先を分離WindowsユーザーprofileのLOCALAPPDATAで隔離してください。起動・終了AuditEvent、通常資格Broker接続、Python実行系なしの可視画面、設定、監査試行を含むclean-sourceのWindows installed product証拠を収集し、tooling/windows_release_evidence.pyへ合格させてください。Flutter exeの直接起動、stage manifestのcollector scratch path、独立したBroker smokeで代替しないでください。"
     },
     {
       "name": "windows_setup_doctor_smoke",
@@ -107,6 +107,26 @@
       "blocks_release": true,
       "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。",
       "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+    },
+    {
+      "name": "rev2_desktop_product_distribution",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器とBroker lifecycleまでであり、正式Installer／Uninstaller、Download→Install→Launch、Signed Update、Rollback、正式package identity／signing identityは未成立。",
+      "required_action": "Ownerがformal app identity・Publisher・signing条件を指定した後、Installer、Uninstaller、download／install／launch、署名済みupdate、rollback、失敗復旧を各Contract・negative test・分離Windows実測へ接続し、Owner GO前のrelease gateを維持する。"
+    },
+    {
+      "name": "rev2_flutter_broker_channel_boundary",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "既存apps/desktop_flutter/lib/services/broker_client.dartはDart内でendpoint fileを読み、session_secretを保持し、Socket.connectでloopback IPCを行う。D4 Pocket指示のFlutter filesystem／credential／network責務禁止に対するRust側移譲経路と実証は未成立。",
+      "required_action": "既存Broker統治経路を迂回しないRust-owned channel設計を確立し、Flutterからfile・secret・socketへの直接アクセスを除去する。通常・Owner分離、Authority拒否、Audit、Recovery、replay／stale／malformed負例をproduction pathで検証する。"
     },
     {
       "name": "rev2_export_owner_ui_authority_path",

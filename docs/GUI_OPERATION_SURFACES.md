@@ -197,6 +197,12 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   status: implemented
   evidence: python3 tooling/release_runtime_assertions.py --checkは、製品Flutter entryがbroker IPCを使用し、製品pathがPythonを起動せずPython snapshot生成も呼び出さないこと、authority surface scanにFlutter/Rust FFIまたはdirect bridge tokenがないこと、broker secret tokenがUI snapshotへ投影されないこと、およびfail-closed / restart persistence test coverageが存在することを検証する。
   authority_boundary: assertion出力はvalidation evidenceに限る。完成製品リリースの前にはWindows installed-path runtime proofが引き続き必要である。
+
+- item: D4 Pocket Phase 34 Windows staged Desktop起動器
+  classification: release_blocker
+  status: implemented_for_staged_launch_management
+  evidence: staged product rootにWindows GUI subsystemのRust起動器を置き、同一process内で既存Rust Brokerを起動し、固定配置Flutter executableを通常Broker endpointへ接続する。2026-09-24のWindows staged smokeでは画面が実Broker snapshotまで初期化し、Broker操作と起動・終了Audit、endpoint cleanup、durable store保持を実測した。manifestはsource commit a3c8dc573afe609e8b0c5400584d2165a5b9a11aだがdirty worktreeと記録しており、clean-sourceまたはformal installed evidenceではない。詳細なartifact hashと限界はdocs/REV2_PROGRESS.mdのPhase 34 staged起動実測追補を参照。
+  authority_boundary: UI／起動器はOwner資格、Permission、privileged Approvalを生成しない。起動器は固定child process lifecycleだけを管理する。現行Dart BrokerClientのfile／session secret／loopback socket責務は未解消。staged manifestのcollector scratch runtimeと起動器のper-user runtimeは別pathで、後者は分離profileで未検証。Windows installed smoke collectorも直接Flutterを起動し、今回のmanual Developer stage runをformal installed evidenceへ昇格させない。formal Installer、Uninstaller、update、rollback、formal identity・署名は別blocker。
 ~~~
 
 ## 残存リリースブロッカー

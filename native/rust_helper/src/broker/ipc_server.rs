@@ -2,6 +2,11 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::SyncSender,
+    Arc,
+};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -79,10 +84,43 @@ impl BrokerServerError {
 }
 
 pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServerError> {
+    run_loopback_server_inner(config, None, None)
+}
+
+/// Rust desktop launcherだけが使う、process内管理停止付きのBroker起動口。
+/// 停止通知はIPCへ露出せず、Flutterのnormal資格やUI stateから生成できない。
+pub fn run_loopback_server_cancellable(
+    config: BrokerServerConfig,
+    shutdown: Arc<AtomicBool>,
+    ready: SyncSender<()>,
+) -> Result<(), BrokerServerError> {
+    run_loopback_server_inner(config, Some(shutdown), Some(ready))
+}
+
+fn run_loopback_server_inner(
+    config: BrokerServerConfig,
+    shutdown: Option<Arc<AtomicBool>>,
+    ready: Option<SyncSender<()>>,
+) -> Result<(), BrokerServerError> {
+    if shutdown_requested(&shutdown) { return Ok(()); }
     let session_id = format!("broker-session-{}", random_hex(16)?);
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
+    if shutdown_requested(&shutdown) { return Ok(()); }
+
+    if shutdown.is_some() {
+        let reason = "Capability=desktop.launch Permission=固定Desktop起動器のlifecycleのみ Approval=通常画面起動のためOwner承認不要・privileged actionは非承認 RecoveryAction=失敗時は起動器管理Brokerを停止し未変更endpointだけを整理してstoreを保持";
+        let payload_hash = crate::audit_hash::sha256_tagged(b"gui-shell-desktop-launcher:start:v1");
+        broker.append_audit(
+            &format!("desktop-launcher:{}:start", session_id),
+            "D4 Pocket Desktop起動",
+            "recorded",
+            reason,
+            "LIVE_RUNTIME",
+            &payload_hash,
+        ).map_err(|error| BrokerServerError::new(error.message()))?;
+    }
 
     for (id, address) in &config.minidora_runtimes {
         let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
@@ -164,6 +202,7 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         transport: "authenticated_loopback_tcp".to_string(),
         max_request_bytes: config.max_request_bytes,
     };
+    if shutdown_requested(&shutdown) { return Ok(()); }
     if let Some(path) = &config.owner_session_file {
         let absolute = |p: &std::path::Path| -> Result<String, BrokerServerError> {
             let parent = p.parent().filter(|v| !v.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
@@ -181,7 +220,10 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
     write_endpoint_file(&config.session_file, &endpoint)?;
 
     listener.set_nonblocking(true).map_err(|_|BrokerServerError::new("listener設定失敗"))?;
+    if shutdown_requested(&shutdown) { return Ok(()); }
+    if let Some(ready) = ready { let _ = ready.send(()); }
     loop {
+        if shutdown_requested(&shutdown) { break; }
         broker.端末期限処理();
         if let Ok((stream,_)) = listener.accept() {
             if handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config).unwrap_or(false) {break;}
@@ -189,7 +231,23 @@ pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServe
         if let Some(mobile) = &mobile {mobile.poll(&mut broker);}
         std::thread::sleep(Duration::from_millis(10));
     }
+    if shutdown_requested(&shutdown) {
+        let reason = "Capability=desktop.launch Permission=起動器が所有するDesktop process lifecycleのみ Approval=UI終了後の内部停止通知でありprivileged actionは非承認 AuditEvent=Broker終了 RecoveryAction=変更endpointは削除せずdurable storeを保持";
+        let payload_hash = crate::audit_hash::sha256_tagged(b"gui-shell-desktop-launcher:stop:v1");
+        broker.append_audit(
+            &format!("desktop-launcher:{}:stop", endpoint.session_id),
+            "D4 Pocket Desktop終了",
+            "recorded",
+            reason,
+            "LIVE_RUNTIME",
+            &payload_hash,
+        ).map_err(|error| BrokerServerError::new(error.message()))?;
+    }
     Ok(())
+}
+
+fn shutdown_requested(shutdown: &Option<Arc<AtomicBool>>) -> bool {
+    shutdown.as_ref().is_some_and(|signal| signal.load(Ordering::Acquire))
 }
 
 fn handle_stream(
@@ -400,4 +458,83 @@ fn random_hex(byte_count: usize) -> Result<String, BrokerServerError> {
 enum IpcLineError {
     Io(String),
     Oversized,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temporary_directory() -> PathBuf {
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).expect("random id");
+        let path = std::env::temp_dir().join(format!(
+            "gui-shell-launcher-broker-{}",
+            hex::encode(random)
+        ));
+        std::fs::create_dir_all(&path).expect("temporary directory");
+        path
+    }
+
+    fn read_audit(path: &std::path::Path) -> String {
+        let mut file = std::fs::File::open(path).expect("open audit file");
+        let mut text = String::new();
+        file.read_to_string(&mut text).expect("read audit file");
+        text
+    }
+
+    #[test]
+    fn process_internal_cancellation_is_audited_and_preserves_durable_state() {
+        let root = temporary_directory();
+        let session_file = root.join("broker_session.json");
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+        let thread_shutdown = Arc::clone(&shutdown);
+        let thread_session_file = session_file.clone();
+        let thread_store_dir = store_dir.clone();
+        let server = std::thread::spawn(move || {
+            run_loopback_server_cancellable(
+                BrokerServerConfig::new(thread_store_dir, thread_session_file),
+                thread_shutdown,
+                ready_tx,
+            )
+        });
+
+        ready_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("broker listener readiness");
+        assert!(session_file.is_file());
+        assert!(store_dir.is_dir());
+        let startup: serde_json::Value = serde_json::from_str(
+            read_audit(&store_dir.join("audit.jsonl"))
+                .lines()
+                .next()
+                .expect("startup audit event"),
+        )
+        .expect("startup audit JSON");
+        assert_eq!(startup["operation"], "D4 Pocket Desktop起動");
+        assert!(startup["reason"]
+            .as_str()
+            .unwrap()
+            .contains("Capability=desktop.launch"));
+        assert_eq!(startup["evidence_source"], "LIVE_RUNTIME");
+
+        shutdown.store(true, Ordering::Release);
+        server
+            .join()
+            .expect("broker thread join")
+            .expect("broker shutdown");
+
+        assert!(session_file.is_file(), "session cleanup belongs to the launcher");
+        assert!(store_dir.is_dir(), "durable user state must survive app exit");
+        let audit_text = read_audit(&store_dir.join("audit.jsonl"));
+        let events: Vec<serde_json::Value> = audit_text
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("audit event JSON"))
+            .collect();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1]["operation"], "D4 Pocket Desktop終了");
+        assert!(events[1]["reason"].as_str().unwrap().contains("RecoveryAction="));
+        std::fs::remove_dir_all(root).expect("remove only the test-owned temporary directory");
+    }
 }

@@ -2,6 +2,29 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 34追補: Windows staged Desktop起動器（2026-09-24）
+
+staged Windows配置の標準entry pointとして、Windows GUI subsystemのRust起動器を追加する。起動器は既存Brokerを同一process内の管理threadで起動し、固定配置を検証したFlutter executableへ既存normal Broker endpoint pathとruntime directoryだけを渡す。session secretをcommand line／environmentへ複製せず、FlutterにOwner資格を渡さず、子process終了後はBrokerへprocess内部停止を通知する。durable storeは保持し、endpointは起動時byteと停止後byteが一致する場合だけ消去する。
+
+- 配布境界: `installer/windows/stage_installed_app.ps1`はDeveloper staging toolのまま必須の`-DesktopLauncherExe`を受け取りrootへcopyし、hashをmanifestへ記録する。旧CMD／PowerShell launcher fileをproduct rootへ生成しない。
+- Authority／Audit: 起動要求・起動器管理Broker終了を既存永続Audit chainへ記録する。監査append失敗時はUIを起動せず、起動器はCapability／Permission／Approvalをprivileged operation用に生成しない。終了時も管理対象Brokerのみ停止し、durable storeを維持する。
+- Negative: loopback以外、Owner role、未知transport、不正secret形式、過大request上限、endpoint差替えcleanup、重複起動、必須package file欠落を拒否する。
+- 既存Gap: Windows installed smoke collectorはFlutter executableを直接起動する現状のままで、この起動器とlifecycle Auditを通す正式evidenceではない。Flutter `BrokerClient`のDart file read／session secret保持／loopback socketもD4指定のRust側責務とのGapとしてrelease blockerへ追加し、今回の変更では修正済みと主張しない。
+- 未成立分類: 正式Installer／Uninstaller、Download→Install→Launch、Signed Update、Rollback、formal package identity／signing、installed product LIVE_RUNTIME証拠、GUI Shell Export／Module Pruning、owner GO、正式releaseは`release_blocker`。Phase 33も独立に未完了。
+
+## D4 Pocket Phase 34追補: Windows staged起動実測と初期化契約修正（2026-09-24）
+
+修正版Desktop Releaseをstaged配置へ置き、Rust Desktop起動器からWindows GUIを実起動した。Flutter起動直後の初期化要求に既存Broker契約との不一致があり、画面がBroker利用不可へfail-closedすることをAuditと表示の両方で確認した。`Agent一覧`はBroker側で空objectだけを許可していたが、Flutterは版metadata付きobjectを送り、最初の実行で拒否された。metadataを省略した再試行もBrokerで`null`となり拒否されたため、Flutter要求を明示的な空object `{}`へ修正した。再build後は製品画面の初期化がBroker snapshotまで完了した。
+
+- Windows実測対象: 最終buildは`C:\Users\ohira\AppData\Local\Temp\D4Pocket-Launcher-Smoke-20260924-Retest-03`。manifestはsource commit `a3c8dc573afe609e8b0c5400584d2165a5b9a11a`、`source_worktree_clean=false`を記録する。Flutter artifact SHA-256 `fcbdc9aac97b64f680eef1709ba4d90f8475f23833a293f83d16fec2582daa45`、Broker `87f2a594d10662caef748f867e06c7a9c1945fd84e9f8490c49bc769d70439a6`、起動器 `fb6390082bf72fc8e791a64f549fbd4fc5a48861ce1a126e232e859b28dd97a6`。manifestはcollector scratch runtimeと起動器runtimeを分け、後者を`%LOCALAPPDATA%\GUI-Shell\broker\desktop`、`scope=per_user`、`isolated=false`、`evidence_class=CONFIG`、`formal_runtime_proof=false`として宣言した。dirty sourceによるDeveloper stageでありclean commit／formal installed evidenceではない。
+- 実行経路と観測範囲: stage rootの`gui_shell_desktop_launcher.exe`→同一processのRust Broker→固定配置`app/gui_shell_desktop.exe`。Windows native window titleは`D4 Pocket`。画面とaccessibility treeは`snapshot_source=broker`、`broker_session=restricted (authenticated_loopback_tcp)`、Audit `durable_file_store`、不変条件`ok`、完成製品release未主張を表示した。health、Host能力／一覧、Adapter一覧、Agent一覧、normalize、redacted content projection、作業領域一覧、Profile／Update／Notification／Observation一覧が通常Broker要求として受理された。保護field編集probeは製品projection上で`rejected`、`command_envelope`は`suspended`で、いずれも権限付与へ昇格していない。
+- Lifecycle: 最終runの起動・終了は永続Audit chainへ`LIVE_RUNTIME`で記録され（終了event `broker-audit-65`）、endpoint fileは終了後に不在、durable storeとAudit chainは保持された。検証後、正確なstage pathのFlutter childだけを停止したため起動器は`FRONTEND_EXIT_FAILED`を表示した。通常tray Exit経路は今回確認していないため、手動staging smokeを正式なinstaller初回起動証拠へ昇格させない。
+- 追レビュー修正: staged実測artifactの作成後、Broker `store` directory自体をjunctionで外部へ向けられる検査漏れを発見した。起動器はStoreを再帰作成せず、通常directory・root内canonical pathを検査するよう修正し、junction拒否negative testを追加した。後述のlibrary testには含むが、上記staged artifact hashとGUI実測にはこの追レビュー修正が含まれないため、修正後のclean-source staging再実測が必要。
+- 検証: 単独実行した`flutter test`は105件PASS、`flutter analyze`はDesktop／MobileともPASS、`flutter build windows --release` PASS、`cargo build --release --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher` PASS。`python tooling/schema_check/check_schemas.py`はSchema 121／example 121／negative fixture 146、`python tooling/conformance_tests/run_conformance_skeleton.py`は191 checks PASS。単独実行したRust library testは242件PASS（junction拒否を含む）。
+- 実行環境による未成立: full `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はBroker子process起動がWindows App Control／Code IntegrityのOS error 4551で拒否され、`tests/broker_ipc.rs`の9件を実行できず全体exit 1。これはhost policyにより未実行であり、Product PASSへ読み替えない。該当release blockerを維持する。
+- Staging manifest境界: `runtime_dir`／`store_dir`はcollector用scratch pathで、標準起動器は`launcher_runtime`に宣言するper-user `%LOCALAPPDATA%\GUI-Shell\broker\desktop`を使う。後者は`isolated=false`、`evidence_class=CONFIG`、`formal_runtime_proof=false`であり、実runtimeを分離user profileで測った証拠ではない。
+- `release_blocker`: Flutter `BrokerClient`のDart内file read／session secret保持／loopback socketをRust境界へ移譲する経路、公式installed smoke collectorの起動器経由化と実runtimeを隔離したclean evidence、formal Installer／Uninstaller／署名／identity／update／rollback、Phase 33の製品binary pruningと実行時性能、外部Runtime／Agent／MCP／A2A、実端末、C28長時間実測、owner GO、正式release。
+
 ## D4 Pocket Phase 33追補: Windows同一commit AOT比較とsurface node実証（2026-09-24）
 
 commit `aa3f2eac4f829d230a782fbd5f5cf7fc58d79c6c`をsourceとして、all-enabled baselineとReceipt選択buildを同じWindows Flutter toolchain／Release条件で実行した。比較tool自身がAOT reportからCatalogのsurface library一覧を読み取り、新Schemaへ記録した。保存evidence・両report・両artifact・snapshot・precompiler traceをread-backし、Schema／Receipt対応とsize・SHA-256・tree hashを照合した。

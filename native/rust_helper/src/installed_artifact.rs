@@ -3,19 +3,13 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fs, io::Read, path::Path};
 
-const ROOTS: [&str; 4] = [
-    "app",
-    "broker",
-    "GUI-Shell.brokered.cmd",
-    "GUI-Shell.brokered.ps1",
-];
-const REQUIRED: [&str; 6] = [
+const ROOTS: [&str; 3] = ["app", "broker", "gui_shell_desktop_launcher.exe"];
+const REQUIRED: [&str; 5] = [
     "app/gui_shell_desktop.exe",
     "app/data/app.so",
     "app/flutter_windows.dll",
     "broker/gui_shell_rust_helper.exe",
-    "GUI-Shell.brokered.cmd",
-    "GUI-Shell.brokered.ps1",
+    "gui_shell_desktop_launcher.exe",
 ];
 const FILE_LIMIT: u64 = 1024 * 1024 * 1024;
 
