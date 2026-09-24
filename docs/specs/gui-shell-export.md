@@ -16,4 +16,4 @@ GUI Shell Windows書出しは、D4 Pocketの構成Manifestから独立Appの初�
 
 ## 未成立範囲
 
-`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外を実binaryからの削除へ読み替えない。実artifact生成、実binaryのModule除去、サイズ・起動時間・資源の比較実測、Installer、署名、配布、rollback、実際のfilesystem書込みは未成立の`release_blocker`として保持し、Manifest Receiptだけで独立App完成や製品releaseを主張しない。
+`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外をExport artifactからの削除へ読み替えない。Developer専用Flutter UIのbaseline／選択build比較とAOT report上のsurface library node有無は確認済みだが、独立Export artifactの生成・pruning、安全Core保持、製品起動・資源比較、Installer、署名、配布、rollback、実際のfilesystem書込みは未成立の`release_blocker`として保持する。Manifest ReceiptやDeveloper UI buildだけで独立App完成や製品releaseを主張しない。

@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "2aeb2e727ce18f855c62d0d74c830f5ef884ee86c5278a77d81a9197b0b5d4d4"
+      "sha256": "c22f0b6600277d702ee388daca1a2e93c1535e881184e5c7c839d886703dbef2"
     },
     {
       "path": "SECURITY.md",
@@ -1297,11 +1297,11 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "c55c9210f8bbe6891173649a3e41986cb1301696ca1159807d46dffdbd504239"
+      "sha256": "0dab4bea862bbdb8b2e3f5f4e4af87683f569c60f310b4fd777662c068d0f9ca"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "1acc0545742a695866e38683d124f29541bdcdb54a829d36d075de9ed5bf0cc4"
+      "sha256": "75f2fa8244273884f24a7fd9d2068b8956606deb45843da40ce5280ff0d7a3ce"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",

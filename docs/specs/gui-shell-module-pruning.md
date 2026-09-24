@@ -30,7 +30,7 @@ WindowsではFlutterの実行物がPATH上の`flutter.bat`等になるため、t
 
 入力Receipt JSONは現行Schemaへ照合するが、署名・origin・Owner操作の真正性は検証しない。入力から得るのは画面選択だけで、build toolはAuthority、Permission、Approval、Credential、Auditを付与・継承せず、`authority_verified=false`と`selection_input_trust=unverified_receipt_json_selection_only`を証拠に記録する。選択は権限でもOwner承認でもない。
 
-この経路はDesktop Flutter UIだけをbuildする。Rust Broker、安全Core、第三者依存、Installer、app identity、初期Audit store、Runtime設定を新規製品として構成せず、独立製品や配布可能Exportとして扱わない。`binary_pruning_verified=false`を固定し、実除去の比較確認前はModule pruning完了を主張しない。
+この経路はDesktop Flutter UIだけをbuildする。Rust Broker、安全Core、第三者依存、Installer、app identity、初期Audit store、Runtime設定を新規製品として構成せず、独立製品や配布可能Exportとして扱わない。AOT report nodeの選択整合は観測済みだが、独立Export artifactや安全境界を含む最終製品の完成証拠ではない。`binary_pruning_verified=false`を固定し、Phase 33全体のModule pruning完了を主張しない。
 
 ## Developer専用の同一commit AOT比較
 
