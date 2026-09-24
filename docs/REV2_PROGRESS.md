@@ -2,12 +2,23 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 33: Module Pruning選択計画（2026-09-24）
+
+Desktop画面Module一覧、必須Module、任意選択、依存閉包をSchema・Rust Export Broker・設定画面に接続した。Authority、Approval、Audit、Recovery等の必須Moduleは選択入力で外せず、Trace Inspector選択時はObservabilityを依存として含める。旧要求で選択fieldがない場合は全任意Moduleを保持する。
+
+- Contract／経路: `specs/gui_shell_module_catalog.json` → Export要求の`module_selection` → Rust Brokerによる一覧・依存再検査 → Export Receiptの`module_plan`。任意画面チェックはUI stateであり、AuthorityやPermissionを生成しない。
+- 既知の経路欠陥: 既存Phase32記録の「Desktop SettingsからOwner制御資格付きBrokerへ到達する」というProduction path記述は正確でなかった。現行Flutter `BrokerClient`は通常資格endpointを使い、Rust BrokerはExportをOwner専用として拒否する。Owner秘密値をFlutterへ渡す回避は採らず、`rev2_export_owner_ui_authority_path`をrelease blockerとして登録した。
+- 固定安全境界: Catalog欠落がSchemaとCatalogを同時に縮小すれば通る隙を監査で検出した。Rust BrokerがCore 8 IDと必須画面10 IDを固定値と照合し、Catalog／Receipt Schemaの件数を固定、Conformanceでも全IDを独立照合し、欠落Coreのnegative fixtureとRust負例を追加した。
+- 証拠境界: Receiptは`binary_pruning_status=not_applied`を固定する。Module選択・依存閉包の検証は実施するが、artifactからのコード除去やサイズ、cold startup、resourceの測定はこの単位で成立しない。
+- 未成立分類: Owner明示操作のBroker統治経路は`release_blocker`（`rev2_export_owner_ui_authority_path`）。実binary除去と、hashで比較対象を固定したサイズ・cold startup・resource測定は`release_blocker`（`rev2_module_pruning_binary_and_measurement`）。Windows Enterprise signing policyが3つのRust integration test executable（計17件）を起動拒否し、完全実行証拠がないことも`release_blocker`（`windows_rust_integration_test_execution_policy`）。Installer・署名・配布・installed product証拠も独立したrelease blockerのままである。
+- 検証結果: `python tooling/schema_check/check_schemas.py`はSchema 119・正常example 119・negative fixture 143、`python tooling/conformance_tests/run_conformance_skeleton.py`は188 check、`python tooling/日本語基底監査.py --strict`はfindings 0、`python tooling/manifest.py --check`、`python tooling/packaging_portability_check.py`、`python tooling/validate_all.py --python-only --desktop-platform windows`はPASS。全体validationはdevelopment modeでありrelease_ready=false。Rustは`cargo test --no-run --tests`が全target compile PASS、`cargo test --lib --bins -- --test-threads=1`がlib 235・main 7の計242件PASS、Export対象unit testが6件PASS。integration targetは6 suite・計18件PASSした。一方、`broker_ipc` 9件、`protected_startup` 1件、`workspace_startup` 7件はWindows Code Integrity Event 3033／3077によりEnterprise signing level不適合として起動前に拒否された（OS error 4551）。拒否された17件は未実行でありassertion failureではない。OS保護policyは変更・回避していない。Flutter `analyze`は問題0、desktop testは104件PASS、Windows debug buildも成功。計画Receiptやfixtureだけを実製品のpruning／起動／資源証拠として報告しない。
+
 ## D4 Pocket 第8段階 Windows書出し（2026-09-24）
 
 GUI Shell構成Manifestを、Windows向け独立Appの初期Manifestへ変換するBroker経路を追加した。現行単位は実artifactを作らず、書出し先のidentityと監査storeを新規生成し、設定、Runtime／Adapter構成、Capability requirement、配布metadataを返す。
 
 - Contract: `specs/gui_shell_export.schema.json`と`specs/gui_shell_export_receipt.schema.json`を追加し、Windows、`manifest_only`、新規App identity、新規監査store、`authority_strip=true`、Credential／Permission／Approval／Audit chain非継承、`not_built`、installer未開始、未署名を固定した。
-- Production path: Desktop Settings → `ExportClient` → Owner制御資格付きRust Broker `GUI Shell書出し` → Compose Manifest再検証 → 新規identity／監査store生成 → `INTERNAL_STATE` AuditEvent付き書出しReceipt。Flutterは応答表示だけを行い、filesystem、process、network、Credential、Permission、Approvalへ直接到達しない。
+- Production path（後日監査で訂正）: Desktop Settings → `ExportClient`は通常資格endpointへ送信する。Rust Brokerの`GUI Shell書出し`はOwner制御資格が必要なため、現行Flutterからの要求は拒否される。Broker Owner処理自体はunit test経路に存在するが、これをDesktopから使える製品経路として扱わない。
 - Negative boundary: 通常資格、未知field、構成Manifestの継承要求、書出し先の継承済みReceiptを拒否する。書出し元Capability requirementをPermissionへ昇格せず、既存のAuthority、Approval、Credential、Audit chainを再利用しない。
 - Validation: Schema 118件、正常example 118件、negative fixture 139件、Conformance 188件、厳格日本語監査、Manifest検査、梱包可能性検査、`validate_all.py --python-only --desktop-platform windows`、Flutter `analyze`／全104試験、Windows debug build、Rust全試験（lib 231件、main 7件、統合9・1・8・2・2・7件）がPASSした。A2A loopbackのWindows試験fixtureは応答送信後の`Shutdown::Write`をやめ、通常の接続終了で安定化した。
 - 未成立分類: 実artifact生成、Installer、署名、Module Pruning、Distribution、書出し先の実起動、Windows installed productの正式証拠は`release_blocker`。Manifest Receiptだけで独立App完成や正式releaseを主張しない。

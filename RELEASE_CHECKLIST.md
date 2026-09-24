@@ -173,6 +173,27 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   required_action: Windows installed app を一意の run root に stage し、<code>installer\windows\collect_broker_smoke.ps1</code> を実行し、native Windows 上で <code>-BrokerHelperExe</code>、<code>-NoPythonRuntime</code>、UIAutomation diagnostic tree evidence、broker evidence、config path、audit dir probe input、installed manifest を指定して <code>installer\windows\collect_installed_smoke.ps1</code> を実行し、<code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
+- item: GUI Shell書出しのOwner認可経路がDesktop UIに未接続
+  classification: release_blocker
+  registry_id: rev2_export_owner_ui_authority_path
+  reason: Desktop ExportClientは通常Broker資格を使う一方、Broker操作はOwner制御資格を要求するため、現行GUI要求は受理されない。
+  required_action: FlutterへOwner秘密値やprivileged IPCを露出させず、Owner明示操作をBrokerで認証・監査する経路と、通常資格の拒否試験を実装する。
+  blocks_release: yes
+
+- item: Export Moduleの実binary除去と比較計測が未成立
+  classification: release_blocker
+  registry_id: rev2_module_pruning_binary_and_measurement
+  reason: 現行Receiptは選択計画に限られ、pruned artifact、サイズ、cold startup、resourceの実測がない。
+  required_action: 安全基盤の保持をnegative testし、同一Windows条件のpruned／unpruned artifactをhash結合して比較測定する。
+  blocks_release: yes
+
+- item: Windows Rust integration tests blocked by Enterprise signing policy
+  classification: release_blocker
+  registry_id: windows_rust_integration_test_execution_policy
+  reason: Code Integrity Event 3033／3077が3 test executables、計17件を実行前に拒否し、Rust test suite全数の実行証拠が未成立である。
+  required_action: OS policyを変更せず、Owner／組織承認済みの署名済みまたはpolicy適合Windows validation環境で全Rust test suiteを実行する。
+  blocks_release: yes
+
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke

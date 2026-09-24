@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "unprunable_core_ids": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure"],
+  "required_module_ids": ["shell.dashboard"],
+  "optional_modules": [
+    {"module_id": "shell.trace_inspector", "depends_on": ["shell.unknown"], "source_surfaces": ["apps/desktop_flutter/lib/screens/trace_inspector.dart"]}
+  ]
+}

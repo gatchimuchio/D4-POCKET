@@ -144,6 +144,18 @@
       "責任": "実装言語と安全境界の分担。自然言語の日本語基底は規定/00_日本語基底規定.mdが正本"
     },
     {
+      "path": "docs/specs/gui-shell-export.md",
+      "責任": "GUI Shell独立書出しのOwner境界、権限非継承、manifest-onlyと未成立製品経路"
+    },
+    {
+      "path": "docs/specs/gui-shell-module-pruning.md",
+      "責任": "書出し画面Moduleの必須境界、任意選択、依存閉包、binary除去・計測との証拠分離"
+    },
+    {
+      "path": "specs/gui_shell_module_catalog.json",
+      "責任": "書出し対象Desktop画面Module、必須境界、依存、source surfaceの機械可読一覧"
+    },
+    {
       "path": "CLAIM.md",
       "責任": "外部へ主張できる成立範囲"
     },

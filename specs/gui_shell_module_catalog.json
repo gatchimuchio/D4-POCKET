@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "unprunable_core_ids": [
+    "core.security_broker",
+    "core.cryptography",
+    "core.audit_finality",
+    "core.credentials",
+    "core.os_controls",
+    "core.permission_enforcement",
+    "core.approval_enforcement",
+    "core.content_exposure"
+  ],
+  "required_module_ids": [
+    "shell.dashboard",
+    "shell.runtime_operation",
+    "shell.agent_operation",
+    "shell.authority",
+    "shell.approval",
+    "shell.audit",
+    "shell.recovery",
+    "shell.problems",
+    "shell.evidence",
+    "shell.settings"
+  ],
+  "optional_modules": [
+    {
+      "module_id": "shell.setup_doctor",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/setup_doctor.dart"]
+    },
+    {
+      "module_id": "shell.history",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/history_screen.dart"]
+    },
+    {
+      "module_id": "shell.evaluation_lab",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/evaluation_lab.dart"]
+    },
+    {
+      "module_id": "shell.host_capabilities",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/host_capability_center.dart"]
+    },
+    {
+      "module_id": "shell.notifications",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/notifications.dart"]
+    },
+    {
+      "module_id": "shell.observability",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/observability_center.dart"]
+    },
+    {
+      "module_id": "shell.trace_inspector",
+      "depends_on": ["shell.observability"],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/trace_inspector.dart"]
+    },
+    {
+      "module_id": "shell.host_operations",
+      "depends_on": [],
+      "source_surfaces": ["apps/desktop_flutter/lib/screens/host_operation_center.dart"]
+    }
+  ]
+}

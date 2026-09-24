@@ -11,7 +11,7 @@
     "status": { "const": "accepted" },
     "export_id": { "type": "string", "minLength": 1 },
     "export_manifest": {
-      "type": "object", "required": ["app_identity", "audit_store", "settings", "runtime_manifest", "adapter_configuration", "capability_requirements", "distribution_metadata", "inheritance_policy"], "additionalProperties": false,
+      "type": "object", "required": ["app_identity", "audit_store", "settings", "runtime_manifest", "adapter_configuration", "capability_requirements", "distribution_metadata", "inheritance_policy", "module_plan"], "additionalProperties": false,
       "properties": {
         "app_identity": { "type": "object", "required": ["app_id", "display_name", "target_platform"], "additionalProperties": false, "properties": { "app_id": { "type": "string" }, "display_name": { "type": "string" }, "target_platform": { "const": "windows" } } },
         "audit_store": { "type": "object", "required": ["store_id", "chain_status", "inherited"], "additionalProperties": false, "properties": { "store_id": { "type": "string" }, "chain_status": { "const": "new" }, "inherited": { "const": false } } },
@@ -20,7 +20,22 @@
         "adapter_configuration": { "type": "object", "required": ["agent_ids", "tool_ids", "mcp_connection_ids"], "additionalProperties": false, "properties": { "agent_ids": { "type": "array", "items": { "type": "string" } }, "tool_ids": { "type": "array", "items": { "type": "string" } }, "mcp_connection_ids": { "type": "array", "items": { "type": "string" } } } },
         "capability_requirements": { "type": "array", "items": { "type": "string" } },
         "distribution_metadata": { "type": "object", "required": ["target_platform", "artifact_status", "installer_status", "signed", "channel"], "additionalProperties": false, "properties": { "target_platform": { "const": "windows" }, "artifact_status": { "const": "not_built" }, "installer_status": { "const": "not_started" }, "signed": { "const": false }, "channel": { "enum": ["local", "installer_candidate"] } } },
-        "inheritance_policy": { "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false, "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } } }
+        "inheritance_policy": { "type": "object", "required": ["authority", "permission", "approval", "credential", "audit_chain"], "additionalProperties": false, "properties": { "authority": { "const": "none" }, "permission": { "const": "none" }, "approval": { "const": "none" }, "credential": { "const": "none" }, "audit_chain": { "const": "none" } } },
+        "module_plan": {
+          "type": "object",
+          "required": ["catalog_version", "selection_mode", "requested_optional_module_ids", "unprunable_core_ids", "mandatory_module_ids", "included_module_ids", "excluded_optional_module_ids", "binary_pruning_status"],
+          "additionalProperties": false,
+          "properties": {
+            "catalog_version": { "const": 1 },
+            "selection_mode": { "enum": ["all_optional", "explicit_optional"] },
+            "requested_optional_module_ids": { "type": "array", "uniqueItems": true, "items": { "enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] } },
+            "unprunable_core_ids": { "type": "array", "minItems": 8, "maxItems": 8, "uniqueItems": true, "items": { "enum": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure"] } },
+            "mandatory_module_ids": { "type": "array", "minItems": 10, "maxItems": 10, "uniqueItems": true, "items": { "enum": ["shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings"] } },
+            "included_module_ids": { "type": "array", "uniqueItems": true, "items": { "enum": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure", "shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings", "shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] } },
+            "excluded_optional_module_ids": { "type": "array", "uniqueItems": true, "items": { "enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] } },
+            "binary_pruning_status": { "const": "not_applied" }
+          }
+        }
       }
     },
     "build_status": { "const": "not_started" },

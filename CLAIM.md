@@ -38,7 +38,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 ~~~yaml
 - item: schema と conformance skeleton
   classification: required_for_v1
-  status: 現在の development validation は 139 の conformance check とともに通過している。過去の check count は <code>VALIDATION.txt</code> に履歴として保持する。Conformance の tautology は production の Authority Strip と ApprovalQueue の挙動を検査することで解消した。ghost invariant は production の InvariantEvaluator が測定する。Normalization Firewall の Conformance は PolicyEvaluator と Adapter metadata ingress を対象に含む。Broker IPC Contract、static な no-FFI / no-Python-spawn assertion、構造化された release blocker registry、release-facing blocker と文書の同期、packaging portability、および範囲を限定した LLM-readable extension の Contract / Conformance check を対象に含む。
+  status: 現在の development validation は 188 の conformance check とともに通過している。過去の check count は <code>VALIDATION.txt</code> に履歴として保持する。Conformance の tautology は production の Authority Strip と ApprovalQueue の挙動を検査することで解消した。ghost invariant は production の InvariantEvaluator が測定する。Normalization Firewall の Conformance は PolicyEvaluator と Adapter metadata ingress を対象に含む。Broker IPC Contract、static な no-FFI / no-Python-spawn assertion、構造化された release blocker registry、release-facing blocker と文書の同期、packaging portability、および範囲を限定した LLM-readable extension の Contract / Conformance check を対象に含む。
 
 - item: 範囲を限定した cross-agent LLM-readable extension reproduction
   classification: required_for_v1
@@ -110,6 +110,27 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
   reason: Windows project support と過去の owner-trial launch smoke は保持されているが、現在の strict R2 evidence には、native Windows の新しい隔離 installed run が必要である。その run は source commit、clean worktree state、app / Broker artifact hash、evidence bundle hash、UIAutomation diagnostic tree、Broker の measured field provenance、installed app が生成した Setup Doctor product export を含まなければならない。product export path は存在するが、<code>release_evidence/windows_installed_smoke.json</code> がない。
   required_action: 隔離された staged run から native Windows installed smoke collection を実行し、measured window、visible-surface diagnostic tree、config JSON、Audit の write / read / delete、Broker IPC / restart / crash の field provenance、installed app が生成した Setup Doctor product evidence を収集する。その後 <code>python tooling\windows_release_evidence.py</code> を通過させる。
+  blocks_release: yes
+
+- item: GUI Shell書出しのOwner認可経路がDesktop UIに未接続
+  classification: release_blocker
+  registry_id: rev2_export_owner_ui_authority_path
+  reason: Desktop ExportClientは通常Broker資格を使うが、Broker書出し操作はOwner制御資格を要求するため、現行GUIからの要求は拒否される。
+  required_action: FlutterへOwner秘密値やprivileged IPCを渡さず、Owner明示操作をBrokerで再認証・監査する統治経路を実装し、通常資格拒否も検証する。
+  blocks_release: yes
+
+- item: Export Moduleの実binary除去と比較計測が未成立
+  classification: release_blocker
+  registry_id: rev2_module_pruning_binary_and_measurement
+  reason: 現在のModulePlanはManifest上の選択だけで、artifactからの除去、サイズ、cold startup、resourceの実測を行っていない。
+  required_action: 安全基盤を保持する実build経路を接続し、同一条件のpruned／unpruned Windows artifactをhash結合して比較測定する。
+  blocks_release: yes
+
+- item: Windows Rust統合試験がEnterprise signing policyで起動拒否
+  classification: release_blocker
+  registry_id: windows_rust_integration_test_execution_policy
+  reason: 3つのintegration test executable、計17件がCode Integrity Event 3033／3077で起動前に拒否され、完全なRust suite実行証拠が成立していない。
+  required_action: OS保護を弱めず、Owner／組織承認済みの署名済みまたはpolicy適合Windows検証環境で全Rust testを完遂する。
   blocks_release: yes
 
 - item: macOS planned portability target が未検証

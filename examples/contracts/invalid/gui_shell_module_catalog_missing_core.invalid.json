@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "unprunable_core_ids": [
+    "core.security_broker",
+    "core.cryptography",
+    "core.audit_finality",
+    "core.credentials",
+    "core.os_controls",
+    "core.permission_enforcement",
+    "core.approval_enforcement"
+  ],
+  "required_module_ids": [
+    "shell.dashboard",
+    "shell.runtime_operation",
+    "shell.agent_operation",
+    "shell.authority",
+    "shell.approval",
+    "shell.audit",
+    "shell.recovery",
+    "shell.problems",
+    "shell.evidence",
+    "shell.settings"
+  ],
+  "optional_modules": []
+}

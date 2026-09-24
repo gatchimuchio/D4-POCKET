@@ -3,6 +3,17 @@ import 'dart:convert';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
+const Map<String, String> guiShellOptionalExportModules = {
+  'shell.setup_doctor': '環境診断',
+  'shell.history': '実行履歴',
+  'shell.evaluation_lab': '評価ラボ',
+  'shell.host_capabilities': 'ホスト能力',
+  'shell.notifications': '通知',
+  'shell.observability': '観測',
+  'shell.trace_inspector': '追跡情報',
+  'shell.host_operations': 'Host操作',
+};
+
 class ExportClient {
   const ExportClient(this._transport);
 
@@ -12,6 +23,7 @@ class ExportClient {
     required String exportId,
     required Map<String, Object?> composeManifest,
     String distributionChannel = 'local',
+    List<String>? optionalModuleIds,
   }) async {
     final response = await _transport.request(
       'GUI Shell書出し',
@@ -22,6 +34,10 @@ class ExportClient {
         'target_platform': 'windows',
         'export_mode': 'manifest_only',
         'distribution_channel': distributionChannel,
+        if (optionalModuleIds != null)
+          'module_selection': {
+            'optional_module_ids': optionalModuleIds,
+          },
       },
     );
     if (response['status'] != 'accepted') {

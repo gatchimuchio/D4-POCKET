@@ -142,6 +142,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_edit_proposal_receipt",
     "gui_shell_export",
     "gui_shell_export_receipt",
+    "gui_shell_module_catalog",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -243,6 +244,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "gui_shell_edit_proposal_receipt.schema.json",
     "gui_shell_export.schema.json",
     "gui_shell_export_receipt.schema.json",
+    "gui_shell_module_catalog.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -6050,6 +6052,121 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
         errors.append("GUI Shell書出しの監査storeが新規化されていない")
     if not export_manifest.get("app_identity", {}).get("app_id"):
         errors.append("GUI Shell書出しの新規App identityが空である")
+    module_catalog = load_contract_fixture("gui_shell_module_catalog.valid.json")
+    module_schema = load_schema("gui_shell_module_catalog.schema.json")
+    errors.extend(validate_instance(module_catalog, module_schema))
+    authoritative_catalog = json.loads(
+        (SPECS / "gui_shell_module_catalog.json").read_text(encoding="utf-8")
+    )
+    if module_catalog != authoritative_catalog:
+        errors.append("Module一覧exampleが機械可読正本と一致しない")
+    optional_ids = [item["module_id"] for item in module_catalog.get("optional_modules", [])]
+    required_ids = module_catalog.get("required_module_ids", [])
+    core_ids = module_catalog.get("unprunable_core_ids", [])
+    expected_core_ids = [
+        "core.security_broker",
+        "core.cryptography",
+        "core.audit_finality",
+        "core.credentials",
+        "core.os_controls",
+        "core.permission_enforcement",
+        "core.approval_enforcement",
+        "core.content_exposure",
+    ]
+    expected_required_ids = [
+        "shell.dashboard",
+        "shell.runtime_operation",
+        "shell.agent_operation",
+        "shell.authority",
+        "shell.approval",
+        "shell.audit",
+        "shell.recovery",
+        "shell.problems",
+        "shell.evidence",
+        "shell.settings",
+    ]
+    if core_ids != expected_core_ids:
+        errors.append("Module一覧が固定された除去禁止Core安全境界と一致しない")
+    if required_ids != expected_required_ids:
+        errors.append("Module一覧が固定された必須画面一覧と一致しない")
+    if len(set(optional_ids)) != len(optional_ids):
+        errors.append("Module一覧で任意Module IDが重複している")
+    if set(optional_ids) & (set(required_ids) | set(core_ids)):
+        errors.append("Module一覧で任意Moduleが必須境界と重複している")
+    request_module_ids = request_schema["properties"]["module_selection"]["properties"]["optional_module_ids"]["items"]["enum"]
+    catalog_module_ids = module_schema["properties"]["optional_modules"]["items"]["properties"]["module_id"]["enum"]
+    if request_module_ids != optional_ids or catalog_module_ids != optional_ids:
+        errors.append("書出し要求／Module一覧Schemaと任意Module一覧が同期していない")
+    receipt_plan_schema = receipt_schema["properties"]["export_manifest"]["properties"]["module_plan"]["properties"]
+    if receipt_plan_schema["unprunable_core_ids"]["items"]["enum"] != core_ids:
+        errors.append("Receipt Schemaの除去禁止Core一覧が正本と同期していない")
+    if receipt_plan_schema["mandatory_module_ids"]["items"]["enum"] != required_ids:
+        errors.append("Receipt Schemaの必須画面Module一覧が正本と同期していない")
+    if not set(core_ids).isdisjoint(required_ids):
+        errors.append("除去禁止Core識別子と必須画面識別子が分離されていない")
+    module_plan = export_manifest.get("module_plan", {})
+    unprunable_core = core_ids
+    mandatory = required_ids
+    optional = optional_ids
+    included = module_plan.get("included_module_ids", [])
+    if module_plan.get("mandatory_module_ids") != mandatory:
+        errors.append("Module計画が必須Module一覧を保持しない")
+    if module_plan.get("unprunable_core_ids") != unprunable_core:
+        errors.append("Module計画が除去禁止のCore安全境界を保持しない")
+    if not set(unprunable_core + mandatory).issubset(included):
+        errors.append("Module計画から必須画面または除去禁止安全境界が欠落している")
+    if module_plan.get("binary_pruning_status") != "not_applied":
+        errors.append("Manifest-only Module計画がbinary除去済みと誤表示している")
+    requested = set(module_plan.get("requested_optional_module_ids", []))
+    expected_included = set(unprunable_core) | set(mandatory) | requested
+    dependency_map = {
+        item["module_id"]: item.get("depends_on", [])
+        for item in module_catalog.get("optional_modules", [])
+    }
+    previous_count = -1
+    while len(expected_included) != previous_count:
+        previous_count = len(expected_included)
+        for module_id in list(expected_included):
+            expected_included.update(dependency_map.get(module_id, []))
+    if set(included) != expected_included:
+        errors.append("Module計画が選択Moduleの依存閉包と一致しない")
+    if set(module_plan.get("excluded_optional_module_ids", [])) != set(optional) - expected_included:
+        errors.append("Module計画の除外一覧が選択結果と一致しない")
+    for module in module_catalog.get("optional_modules", []):
+        for surface in module.get("source_surfaces", []):
+            if ".." in surface or surface.startswith(("/", "\\")):
+                errors.append(f"Module一覧がroot外pathを参照: {surface}")
+            elif not (ROOT / surface).is_file():
+                errors.append(f"Module一覧が存在しない画面pathを参照: {surface}")
+    for module in module_catalog.get("optional_modules", []):
+        for dependency in module.get("depends_on", []):
+            if dependency not in set(optional) | set(mandatory):
+                errors.append(f"Module依存先が必須／任意一覧にない: {dependency}")
+
+    graph = {
+        module["module_id"]: module.get("depends_on", [])
+        for module in module_catalog.get("optional_modules", [])
+    }
+    def has_cycle(module_id: str, active: set[str], complete: set[str]) -> bool:
+        if module_id in active:
+            return True
+        if module_id in complete:
+            return False
+        active.add(module_id)
+        if any(has_cycle(dep, active, complete) for dep in graph.get(module_id, [])):
+            return True
+        active.remove(module_id)
+        complete.add(module_id)
+        return False
+    completed: set[str] = set()
+    if any(has_cycle(module_id, set(), completed) for module_id in graph):
+        errors.append("Module一覧の依存関係に循環がある")
+    invalid_module_receipt = json.loads(
+        (INVALID_CONTRACT_EXAMPLES / "gui_shell_export_receipt_pruning_claim.invalid.json")
+        .read_text(encoding="utf-8")
+    )
+    if not validate_instance(invalid_module_receipt, receipt_schema):
+        errors.append("実build前のReceiptがbinary Module除去済みを主張できる")
     invalid_request = json.loads(
         (INVALID_CONTRACT_EXAMPLES / "gui_shell_export_credential.invalid.json").read_text(
             encoding="utf-8"
@@ -6079,6 +6196,8 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
         "permission_inherited",
         "artifact_status",
         "target_platform",
+        "resolve_module_plan",
+        "binary_pruning_status",
     ):
         if token not in source:
             errors.append(f"GUI Shell書出しBroker経路に境界tokenがない: {token}")

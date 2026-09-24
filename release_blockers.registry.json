@@ -107,6 +107,36 @@
       "blocks_release": true,
       "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。",
       "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+    },
+    {
+      "name": "rev2_export_owner_ui_authority_path",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Desktop ExportClientは通常Broker資格を利用する一方、GUI Shell書出し操作はOwner制御資格を要求するため、現行GUIから実Export要求は受理されない。",
+      "required_action": "Ownerが明示操作するBroker統治経路を実装し、FlutterへOwner秘密値・privileged IPCを露出させず、通常資格拒否とOwner操作の監査を実経路で検証する。"
+    },
+    {
+      "name": "rev2_module_pruning_binary_and_measurement",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "現状は画面Moduleの選択計画のみで、build artifactからの実除去とサイズ・cold startup・resourceの比較実測がない。",
+      "required_action": "Export Manifestを実build対象へ接続し、安全基盤を保持する負例・回帰試験を通したうえで、同一条件の未pruned/pruned Windows artifactを生成し、hash結合されたサイズ・cold startup・resourceを測定する。"
+    },
+    {
+      "name": "windows_rust_integration_test_execution_policy",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "blocks_release": true,
+      "reason": "Windows Code IntegrityのEnterprise signing policyが、Rust integration test executable 3件を未署名として起動前に拒否するため、関連17試験の実行証拠がない。",
+      "required_action": "OS保護policyを弱めず、Owner／組織が認めた署名済みまたはpolicy適合のWindows検証環境を用意し、cargo test --locked --manifest-path native/rust_helper/Cargo.toml --tests -- --test-threads=1を完遂して結果を記録する。"
     }
   ]
 }

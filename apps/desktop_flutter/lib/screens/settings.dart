@@ -21,6 +21,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final Set<String> _selectedExportModules =
+      Set<String>.of(guiShellOptionalExportModules.keys);
   final TextEditingController _searchController = TextEditingController();
   bool _modifiedOnly = false;
   bool _authorityOnly = false;
@@ -331,7 +333,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-              'Owner制御資格で新規App identityと監査storeを持つManifestを生成します。実artifact、Installer、署名、filesystem書込み、権限継承は行いません。'),
+              '切出し対象の任意画面を選べます。権限・承認・監査・復旧などの必須境界は常に保持します。選択はManifest上の計画であり、実binaryからの除去・build・Installer・署名・filesystem書込みはまだ行いません。ExportにはOwner制御資格が必要です。'),
+          const SizedBox(height: 8),
+          Text('任意画面', style: Theme.of(context).textTheme.titleSmall),
+          for (final entry in guiShellOptionalExportModules.entries)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: _selectedExportModules.contains(entry.key),
+              title: Text(entry.value),
+              subtitle: entry.key == 'shell.trace_inspector'
+                  ? const Text('観測Moduleも自動的に含めます')
+                  : null,
+              onChanged: (selected) => setState(() {
+                if (selected == true) {
+                  _selectedExportModules.add(entry.key);
+                } else {
+                  _selectedExportModules.remove(entry.key);
+                }
+              }),
+            ),
           const SizedBox(height: 8),
           FilledButton.icon(
             onPressed: () => _runExport(client),
@@ -356,10 +377,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final receipt = await client.export(
         exportId: 'settings-windows-export',
         composeManifest: _composeManifest(),
+        optionalModuleIds: _selectedExportModules.toList()..sort(),
       );
       _exportReceipt = exportJson(receipt);
       _setExportMessage(
-          '新規App identityと監査storeを生成しました。artifact、Installer、署名、権限継承は未実行です。');
+          'Module選択計画を含むReceiptを生成しました。実binaryからの除去、build、Installer、署名、権限継承は未実行です。');
     } catch (error) {
       _setExportMessage('GUI Shell Windows書出しに失敗しました。Owner制御資格が必要です: $error');
     }

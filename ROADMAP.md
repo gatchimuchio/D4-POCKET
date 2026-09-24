@@ -7,7 +7,7 @@
 
 ## 現行D4 Pocket統合単位（2026-09-24）
 
-D4 PocketのGUI Shell Windows書出し単位では、`docs/specs/gui-shell-export.md`を意味正本として、認証済みRust BrokerがCompose Manifestを再検証し、Windows向けの新規App identity、新規監査store、設定、Runtime／Adapter構成、Capability requirement、配布metadataをManifest-onlyで生成する。Credential、Permission、Approval、Authority、Audit chainは継承せず、Flutterは応答表示だけを担当する。実artifact、Installer、署名、Module Pruning、Distribution、書出し先の起動は未成立の`release_blocker`である。現行基準値はSchema 118件、正常example 118件、negative fixture 139件、Conformance 188件である。
+D4 Pocket Phase 33では`docs/specs/gui-shell-module-pruning.md`と機械可読Module一覧を追加し、Brokerが必須Moduleを維持しながら任意画面の選択計画・依存閉包をReceiptへ記録する。これはManifest計画に限られ、`binary_pruning_status=not_applied`である。現行Flutter ExportClientは通常資格を使う一方Broker書出しはOwner専用で、GUI Export経路も未成立と確認した。Owner UI認可経路、実binary除去、サイズ・cold startup・resource比較、Installer、署名、配布、書出し先起動は`release_blocker`。本単位はPhase33完了やreleaseを意味しない。検証件数は`docs/REV2_PROGRESS.md`のPhase33節を参照する。
 
 C24ではdocs/specs/mobile-surface.mdを正本として、Mobileの既存9画面を保持しながら資源概要、履歴、MCP状態を追加した。通知summary、Runtime lifecycle状態、資源観測、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataだけを、Device Linkから既存Rust Brokerの読み取り専用handlerへ接続する。MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。Mobile実機、TLS実接続、Windows installed product証拠、長時間運用、障害注入、owner GO、正式releaseはrelease_blockerとして保持する。
 

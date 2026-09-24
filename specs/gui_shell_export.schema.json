@@ -11,6 +11,19 @@
     "compose_manifest": { "$ref": "gui_shell_compose.schema.json" },
     "target_platform": { "const": "windows" },
     "export_mode": { "const": "manifest_only" },
-    "distribution_channel": { "enum": ["local", "installer_candidate"] }
+    "distribution_channel": { "enum": ["local", "installer_candidate"] },
+    "module_selection": {
+      "type": "object",
+      "required": ["optional_module_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "optional_module_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "items": {"enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"]}
+        }
+      }
+    }
   }
 }

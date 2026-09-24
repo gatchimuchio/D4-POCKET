@@ -6,7 +6,9 @@ GUI Shell Windows書出しは、D4 Pocketの構成Manifestから独立Appの初�
 
 ## Broker経路
 
-Owner制御資格の`GUI Shell書出し`要求をRust Brokerで再検証し、`INTERNAL_STATE`のAuditEventと書出しReceiptを返す。FlutterはBrokerの応答を表示するだけで、filesystem、process、network、Credential、Permission、Approvalを直接扱わない。対象platformはWindows、出力modeは`manifest_only`に固定する。
+`GUI Shell書出し`要求をRust Brokerで再検証し、`INTERNAL_STATE`のAuditEventと書出しReceiptを返す。対象platformはWindows、出力modeは`manifest_only`に固定する。任意画面の選択はGUI入力にすぎず、Brokerが機械可読なModule一覧を照合し、必須Moduleと依存閉包を再計算する。
+
+現行Desktopの`BrokerClient`は通常資格だけを利用する一方、Brokerの書出し操作はOwner制御資格を要求する。このため現在の設定画面からの要求はBrokerで拒否され、Owner資格をFlutterへ渡す代替経路は作らない。Ownerが明示操作できるBroker統治経路は別途必要であり、現行画面から実Exportできるとは扱わない。
 
 ## 継承禁止
 
@@ -14,4 +16,4 @@ Owner制御資格の`GUI Shell書出し`要求をRust Brokerで再検証し、`I
 
 ## 未成立範囲
 
-`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。実artifact生成、Installer、署名、Module Pruning、配布、rollback、実際のfilesystem書込みはこの単位で開始しない。これらは`release_blocker`として保持し、Manifest Receiptだけで独立App完成や製品releaseを主張しない。
+`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外を実binaryからの削除へ読み替えない。実artifact生成、実binaryのModule除去、サイズ・起動時間・資源の比較実測、Installer、署名、配布、rollback、実際のfilesystem書込みは未成立の`release_blocker`として保持し、Manifest Receiptだけで独立App完成や製品releaseを主張しない。

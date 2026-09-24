@@ -123,7 +123,7 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket GUI Shell Windows書出し（Phase 32 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: Owner制御資格付きBrokerの`GUI Shell書出し`へCompose Manifestを渡し、Windows向け新規App identity、新規監査store、設定、Runtime／Adapter構成、Capability requirement、配布metadataをManifest-only Receiptへ射影する。Desktop設定面はReceiptを表示する。
+  evidence: Desktop設定面はCompose Manifestと任意画面Module選択を通常資格のBroker IPC要求として送る。Brokerの`GUI Shell書出し`はOwner制御資格がない要求を拒否するため、現在のFlutter経路では実Exportは成立しない。Owner資格をFlutterへ露出する迂回は行わない。BrokerのOwner経路が受理した場合もManifest-only計画に限り、実binary除去、build、filesystem、署名、配布を開始しない。
   authority_boundary: 書出し元のAuthority、Permission、Approval、Credential、Audit chainを継承せず、`authority_strip=true`と各`*_inherited=false`を固定する。実artifact、Installer、署名、filesystem書込み、process起動、Distribution、Module Pruningは未成立の`release_blocker`として保持する。
 
 - item: D4 Pocket Regression Case registration（C6 current scope）
