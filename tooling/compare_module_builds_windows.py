@@ -274,7 +274,7 @@ def _analysis_report_path(output: str) -> Path:
     metadata = _reject_link_or_reparse(report_path, "Flutter size-analysis report")
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_ANALYSIS_BYTES:
         raise ValueError("Flutter size-analysis reportが通常fileでないか50 MB上限を超えている")
-    analysis_root = FLUTTER_PROJECT / ".flutter-devtools"
+    analysis_root = Path.home() / ".flutter-devtools"
     _reject_link_or_reparse(analysis_root, "Flutter size-analysis directory")
     try:
         report_path.resolve(strict=True).relative_to(analysis_root.resolve(strict=True))

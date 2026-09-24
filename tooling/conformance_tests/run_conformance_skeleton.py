@@ -6348,9 +6348,6 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
         evidence["baseline"]["artifact_files"], evidence["selected"]["artifact_files"]
     ):
         errors.append("比較summaryがartifact recordから再計算できない")
-    desktop_ignore = (DESKTOP_FLUTTER / ".gitignore").read_text(encoding="utf-8")
-    if ".flutter-devtools/" not in desktop_ignore:
-        errors.append("Flutter size-analysisの生成directoryがRepository状態から分離されていない")
     try:
         _safe_console_text("░", "cp932").encode("cp932")
     except (LookupError, UnicodeEncodeError):

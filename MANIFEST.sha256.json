@@ -169,7 +169,7 @@
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
-      "sha256": "66950e54c9ccff7969e268372d467dc5284d514272488c20c10a2370c5c075d5"
+      "sha256": "4a8d984279954e0461e0ffef9b9e7455340a0a762f227c01065a53482a83a4f1"
     },
     {
       "path": "apps/desktop_flutter/.metadata",
@@ -3797,11 +3797,11 @@
     },
     {
       "path": "tooling/compare_module_builds_windows.py",
-      "sha256": "819bac9d952d4bf93fc0d6ed95600b544c8452a16698b77771a3cfef5c61580f"
+      "sha256": "4c89553600c4303f1e5496f6abe7bee6b2913b63d8e690f8a5b4337a1db3e3f6"
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "09325a6980cffaee6ac1abbbc73942e6144b5dc22aa52f72f7d03d1d022ad3e6"
+      "sha256": "67c4f708691ba688c4d2b0b22b56ae7df619ddba9facbba69437cb94c3bc5e0b"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
