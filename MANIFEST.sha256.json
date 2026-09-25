@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "28527fb0c4053754c58baaaf6c3f74db44a8e4c24d4447b66cdd4ceba86f0d01"
+      "sha256": "6092cda3928ab1cec925cd311d85cce5f345d6265a7d727ef8fa51566692067f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1361,7 +1361,7 @@
     },
     {
       "path": "docs/specs/long-run-validation.md",
-      "sha256": "d93a3373c9deb81b4f152abdef458cfd46b98844008826b25b159114ac39f39f"
+      "sha256": "e9d97d2cad7d66f75c31d895a1f37d36d5b38b463384a6c6b7f26a3960801e8a"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -3901,7 +3901,11 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f4a463cd8a4b959625e7714191c308251090da9e03d0b00528bee20b312a0299"
+      "sha256": "915f1979a30267ae03f1ccb110cd4da65476ac71a3677007acfc7042b1c4caf6"
+    },
+    {
+      "path": "tooling/conformance_tests/test_long_run_validation.py",
+      "sha256": "7ed756a0708d4883b34db5650c162b2882205c52e46f1554677f817a09535f29"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3941,7 +3945,7 @@
     },
     {
       "path": "tooling/long_run_validation.py",
-      "sha256": "91a60ad55f0d86cfd80d83be76f9d97391ada6c178f19f542c1f1c1892a67fca"
+      "sha256": "aca818e35739d37457c40fcf3ce60a0d8209821903c30e156520073cde9b6250"
     },
     {
       "path": "tooling/manifest.py",

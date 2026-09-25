@@ -1315,3 +1315,30 @@ Agent Adapter metadata検証を含むsource commit `8202ac796eba0909c9d5b83cf71e
 - `known_limitation`: C27/C29測定は開発時のfixture・限定障害注入範囲であり、製品SLAまたは全外部障害条件の証拠へ昇格しない。
 
 既存release blocker registryは変更していない。`release_ready=false`を維持する。
+
+
+## D4 Pocket rev2 C28再測定失敗と一時資格file cleanup修正（2026-09-25）
+
+前項の8時間試行は、source commit `8202ac796eba0909c9d5b83cf71e89d8fc97fc5a`で703.391秒後、`段階=Broker再起動`においてC28検証器自身が次回起動前に一時`broker.json`を削除できず終了した。証拠は`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-8202ac7-20260925.json`。状態は`failed`、対話成功150、接続断で想定した失敗37、Broker再起動37。記録された例外はWindows `Permission denied`である。失敗後の後始末で一時directoryが削除され、Broker helper processが残っていないことを確認した。拒否が一時file占有かACL等のどれに由来したかは特定できていない。C28失敗をRuntime製品欠陥または成功へ読み替えない。
+
+検証器のBroker再起動処理だけを変更し、normal／owner一時資格fileの`PermissionError`を最大20回・50ms間隔で再試行する。再試行回数を`Broker資格file削除再試行数`として証拠へ含め、上限後も拒否される場合は従来どおりfailedにする。削除対象は検証器が所有する固定session pathに限り、Broker操作、Audit、Runtime requestは再試行しない。製品のBroker、Owner資格、IPC、Authority、Permissionのproduction経路は変更していない。
+
+- Unit test: `python -m unittest tooling.conformance_tests.test_long_run_validation`は4件成功。瞬間的PermissionErrorからの回復、継続拒否の失敗維持、既削除file、統計への再試行数計上を確認した。
+- C28 30秒: status `passed`、対話成功10、想定disconnect失敗2、Runtime相当再起動3、Broker再起動2、資格file削除再試行0。実Broker／localhost fixtureの短時間smoke。
+- C28 120秒: status `passed`、対話成功36、想定disconnect失敗9、Runtime相当再起動9、Broker再起動9、再接続18、資格file削除再試行0。実Broker／localhost fixtureの短時間stress。
+- `python tooling/failure_injection_validation.py`: 修正後にC29障害注入8件すべて`passed`。Runtime crash、Broker crash、MCP／A2A timeout、credential unavailable、store書込不能simulation、Audit failure、malformed stateを含む。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。strict日本語監査、Schema、conformance 199件、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査のconfigured stepが成功した。`--python-only`のためC27/C28/C29、Rust test、Flutter test/buildは含まず、C28/C29は上記の個別実行結果である。release blockerは残り`release_ready=false`。
+- これらは未commit作業ツリーでの検証器回帰であり、8時間完遂、installed product、外部Runtime、実製品性能を証明しない。clean committed sourceからの8時間再試行は別途実施する。
+
+- item: C28の8時間運用完遂
+  classification: release_blocker
+  reason: 旧試行は検証器の一時資格file削除拒否で703.391秒後にfailedとなり、修正後は30秒・120秒のfixture試験だけである。
+  required_action: 修正をcommit・pushしたclean source commitで8時間試験を再実行し、失敗時は失敗内容を保持して調査する。
+  blocks_release: yes
+- item: Windows installed product／外部Runtime長時間運用
+  classification: release_blocker
+  reason: C28は開発用localhost fixtureとdevelopment Brokerを使い、installed productまたは外部Runtimeを検証しない。
+  required_action: C28とは独立したWindows installed productおよび外部RuntimeのLIVE_RUNTIME証拠を成立させる。
+  blocks_release: yes
+
+release blocker registryを変更せず、`release_ready=false`を維持する。

@@ -15,6 +15,8 @@
 5. HTTP fixtureを停止した対話が成功へ昇格しないことを確認し、fixture復帰後の対話成功を確認する。
 6. Brokerのworking set、永続store bytes、対話応答時間、HTTP要求数をbounded sampleとして記録する。
 
+Broker再起動時に検証器自身が所有する一時normal／owner資格fileを削除する。既に存在しないfileは正常とする。削除が`PermissionError`となった場合は最大20回、50ms間隔で再試行し、成功した再試行回数を`Broker資格file削除再試行数`として報告する。上限後も削除できない場合はC28をfailedにする。資格file cleanup以外のBroker操作、Audit、store失敗は再試行で成功へ変換しない。
+
 既定の短時間smokeは通常検証から実行できる。8時間の実測は次で明示的に開始する。
 
 ```text

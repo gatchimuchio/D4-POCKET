@@ -32,6 +32,8 @@ HELPER_BINARY = HELPER_ROOT / "target" / "debug" / (
     "gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"
 )
 MAX_REPORT_SAMPLES = 512
+C28_ENDPOINT_UNLINK_MAX_ATTEMPTS = 20
+C28_ENDPOINT_UNLINK_RETRY_SECONDS = 0.05
 
 
 def json_bytes(value: Any) -> bytes:
@@ -45,6 +47,21 @@ def payload_hash(value: Any) -> str:
 
 def now_text() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def unlink_restart_endpoint(path: Path) -> int:
+    """C28専用一時資格fileのPermissionErrorを有限回再試行し、回数を返す。"""
+    for attempt in range(C28_ENDPOINT_UNLINK_MAX_ATTEMPTS):
+        try:
+            path.unlink()
+            return attempt
+        except FileNotFoundError:
+            return attempt
+        except PermissionError:
+            if attempt + 1 >= C28_ENDPOINT_UNLINK_MAX_ATTEMPTS:
+                raise
+            time.sleep(C28_ENDPOINT_UNLINK_RETRY_SECONDS)
+    raise AssertionError("C28 endpoint cleanup retryの到達不能状態")
 
 
 def wait_for_file(path: Path, process: subprocess.Popen, timeout: float = 30.0) -> dict[str, Any]:
@@ -367,6 +384,7 @@ class Statistics:
     history_reads: int = 0
     lifecycle_restarts: int = 0
     broker_restarts: int = 0
+    endpoint_cleanup_retries: int = 0
     runtime_restarts: int = 0
     reconnects: int = 0
     latency_count: int = 0
@@ -398,6 +416,7 @@ class Statistics:
             "Runtime相当再起動数": self.runtime_restarts,
             "Runtime lifecycle再起動数": self.lifecycle_restarts,
             "Broker再起動数": self.broker_restarts,
+            "Broker資格file削除再試行数": self.endpoint_cleanup_retries,
             "再接続数": self.reconnects,
             "対話応答平均Millis": round(self.latency_total_ms / self.latency_count, 2)
             if self.latency_count
@@ -461,10 +480,7 @@ class LongRun:
 
     def _paths_for_restart(self) -> None:
         for path in (self.session, self.owner_session):
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
+            self.stats.endpoint_cleanup_retries += unlink_restart_endpoint(path)
 
     def start_broker(self) -> None:
         self._paths_for_restart()

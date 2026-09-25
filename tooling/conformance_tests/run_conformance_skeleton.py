@@ -7154,6 +7154,19 @@ def test_desktop_agent_center_required_surface_exists() -> list[str]:
     return [f"エージェントセンターにsurfaceがない: {item}" for item in required if item not in text]
 
 
+def test_c28_restart_endpoint_cleanup_retry_is_bounded() -> list[str]:
+    result = subprocess.run(
+        [sys.executable, "-m", "unittest", "tooling.conformance_tests.test_long_run_validation"],
+        cwd=ROOT,
+        capture_output=True,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        return []
+    details = (result.stdout + result.stderr).decode("utf-8", errors="replace")[-4000:]
+    return ["C28資格file cleanupの有限再試行testが失敗: " + details]
+
+
 def main() -> int:
     tests = [
         test_required_docs_exist,
@@ -7353,6 +7366,7 @@ def main() -> int:
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
+        test_c28_restart_endpoint_cleanup_retry_is_bounded,
         test_desktop_agent_center_required_surface_exists,
     ]
     errors = []
