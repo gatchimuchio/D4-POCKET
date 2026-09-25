@@ -2685,6 +2685,7 @@ def Mobile_local_deleteを有界の非権威回復記録へ閉じる() -> list[s
     if not validate_instance(forged_revocation, schema):
         errors.append("端末内回復記録がDesktop失効の虚偽確認を拒否しない")
     for timestamp in (
+        "2026-02-30T12:00:00Z",
         "2026-09-25T12:00:00+00:00",
         "2026-09-25T12:00:00Z\n",
         "2026-09-25T12:00:00.1Z",
@@ -2767,6 +2768,28 @@ def test_schema_validator_supports_composition_keywords() -> list[str]:
         errors.append("schema validatorのcontainsが一致要素を拒否した")
     if not validate_instance(["flutter", "build", "windows"], contains):
         errors.append("schema validatorのcontainsが不一致配列を拒否しなかった")
+    return errors
+
+
+def test_schema_validator_enforces_date_time_format() -> list[str]:
+    schema = {"type": "string", "format": "date-time"}
+    errors = []
+    for value in (
+        "2026-09-25T12:00:00Z",
+        "2026-09-25T12:00:00.123456789Z",
+        "2026-09-25T12:00:00+09:00",
+        "2026-09-25t12:00:00z",
+    ):
+        if validate_instance(value, schema):
+            errors.append(f"schema validatorが有効なdate-timeを拒否した: {value!r}")
+    for value in (
+        "2026-02-30T12:00:00Z",
+        "2026-09-25T12:00:00",
+        "2026-09-25T12:00:00+24:00",
+        "2026-09-25T12:00:00Z\n",
+    ):
+        if not validate_instance(value, schema):
+            errors.append(f"schema validatorが不正なdate-timeを受理した: {value!r}")
     return errors
 
 
@@ -7400,6 +7423,7 @@ def main() -> int:
         Mobile_native_Device_Link_channelを秘密非通過に制限する,
         Mobile_local_deleteを有界の非権威回復記録へ閉じる,
         test_schema_validator_supports_composition_keywords,
+        test_schema_validator_enforces_date_time_format,
         二実行系比較の非混線を検査する,
         評価ラボの契約と境界を検査する,
         回帰Caseの契約と境界を検査する,

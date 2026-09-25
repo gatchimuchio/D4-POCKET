@@ -1,5 +1,6 @@
 from pathlib import Path
 from copy import deepcopy
+from datetime import datetime
 import json
 import math
 import re
@@ -8,6 +9,23 @@ ROOT = Path(__file__).resolve().parents[2]
 SPECS = ROOT / "specs"
 EXAMPLES = ROOT / "examples" / "contracts"
 INVALID_EXAMPLES = EXAMPLES / "invalid"
+DATE_TIME_PATTERN = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:\.[0-9]+)?(?:[Zz]|[+-][0-9]{2}:[0-9]{2})"
+)
+
+
+def is_date_time(value: str) -> bool:
+    if DATE_TIME_PATTERN.fullmatch(value) is None:
+        return False
+    normalized = value.replace("t", "T").replace("z", "Z")
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 REQUIRED = {
     "runtime_content_discard.schema.json",
@@ -260,6 +278,8 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
             errors.append(f"{path}: value {value!r}がenumにない")
 
     if isinstance(value, str):
+        if schema.get("format") == "date-time" and not is_date_time(value):
+            errors.append(f"{path}: RFC3339 date-timeとして不正")
         if "minLength" in schema and len(value) < schema["minLength"]:
             errors.append(f"{path}: minLength {schema['minLength']}より短い")
         if "maxLength" in schema and len(value) > schema["maxLength"]:

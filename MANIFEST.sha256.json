@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "2065f1a014cb346460788291861c4f620dcb993a4dc8a6f85728f10686d53059"
+      "sha256": "9d6db2e5874465f3c279eca5d987c35563e01cb1ddba78d1506384b392717303"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2094,6 +2094,10 @@
     {
       "path": "examples/contracts/invalid/mobile_device_link_channel_request_secret.invalid.json",
       "sha256": "a007fe6f6daf839e68382755f8c1c4e4c236ac9f1c2370cdc21cc8ceff0bf5bc"
+    },
+    {
+      "path": "examples/contracts/invalid/mobile_local_recovery_audit_non_utc.invalid.json",
+      "sha256": "428dccba2ef48bf1747347582a0143f9dcb508bb480494ad14ff409732263338"
     },
     {
       "path": "examples/contracts/invalid/mobile_local_recovery_audit_secret.invalid.json",
@@ -3913,7 +3917,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8a2bbde74e79ec7d94afc4a42bfe2500888c8588895305ce1ed6fad86f6b1bc5"
+      "sha256": "a8b2a57aa47f4096c58aaa349d1b78c693bf114cfee4b64353bf478cb290212f"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -3993,7 +3997,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "9505570cb423656283eeadeeaba3ab5313057eb774fbc7f8a394ee57a7d96b4f"
+      "sha256": "27dc463833bd551a607d5cfcb8ed0cf7d832deb432466b69a88ab4346d4cd864"
     },
     {
       "path": "tooling/shell_snapshot.py",

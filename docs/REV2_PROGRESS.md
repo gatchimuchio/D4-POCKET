@@ -2,6 +2,12 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase35追補: Schema date-time形式検査（2026-09-25）
+
+端末内回復記録のUTC時刻に`format: date-time`と形状patternを定義していたが、共有Schema検査器がJSON Schemaの`format`を評価せず、`2026-02-30T12:00:00Z`を受理することを再現した。検査器へRFC3339 date-timeの書式・暦日・時刻・UTC offset検査を追加し、既存の各date-time Schemaも同じ意味検査を通す。
+
+有効例（秒、長い小数、offset、小文字区切り）と無効例（実在しない日、zoneなし、範囲外offset、末尾改行）をConformanceへ追加し、端末内回復Schema用に実在しない暦日のnegative fixtureを追加した。`python tooling/schema_check/check_schemas.py`はSchema 125／正常例125／negative fixture 153、`python tooling/conformance_tests/run_conformance_skeleton.py`は201 checksでPASSした。`python -X utf8 tooling/日本語基底監査.py --strict`も負債0 files／0 findingsでPASSした。`python tooling/validate_all.py --python-only --desktop-platform windows`は10検査すべてPASSし、既存release blocker 5件と`release_ready=false`を維持した。これは`CONFIG`／`FIXTURE`範囲のSchema検証器の改善であり、live runtimeや実際の記録保存を証明しない。
+
 ## D4 Pocket Phase35追補: 履歴閲覧grant参照の限定例外（2026-09-25）
 
 既存Mobile `HistoryClient`が、ownerによる事前承認後に`approval_id`と閉じたqueryを`対話履歴閲覧`で提示することを現行sourceから確認した。直前のnative Channel Schemaは権限関連keyを一律拒否していたため、正規のread-only履歴閲覧まで構造上利用不能だった。`approval_id`を`対話履歴閲覧`のみに限定した操作別payloadへ移し、他operationのauthority／approval／audit keyは引き続き拒否する。native adapterは値を権限として評価せず、現在有効なgrant、期限、実行系scopeの最終照合をRust Brokerだけが行う。
