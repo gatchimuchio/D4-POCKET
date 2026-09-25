@@ -75,14 +75,14 @@ macOSは未検証の移植予定対象である。GUI-Shell v1.0は検証済み�
   classification: release_blocker
   registry_id: windows_installer_first_run_smoke
   reason: native Windowsのisolated installed-path installerおよびfirst-run evidenceがrelease_evidence/windows_installed_smoke.jsonに存在しない。
-  required_action: 固有のstaged Windows pathを通してinstallし、installed Rust brokerを介してinstalled Flutter .exeを起動する。installer\windows\collect_broker_smoke.ps1を実行し、-BrokerHelperExe、-NoPythonRuntime、installed manifest、measured UIAutomation diagnostic tree、config、audit、およびbroker field-provenance inputを指定してinstaller\windows\collect_installed_smoke.ps1を実行し、python tooling\windows_release_evidence.pyを通す。
+  required_action: stage時と異なるWindows user profileからcollect_installed_smoke.ps1 -DesktopLauncherExe -UseCurrentWindowsProfile -NoPythonRuntimeを実行し、Rust起動器の実runtime／lifecycle Audit／通常資格で受理されたhealth要求Auditを測定する。health Auditはclient応答受信やPID帰属を証明しない。別profileでのclean-source実測と初回config生成が成立するまではblockerを維持し、その後python tooling\windows_release_evidence.pyを通す。
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: installed-app generated Setup Doctor product exportへの対応は存在するが、native Windows isolated-run evidenceが存在しない。PowerShell Setup Doctor collectorはexternal probe evidenceであり、product proofとして拒否される。
-  required_action: collect_installed_smoke.ps1を実行してinstalled appにmachine-readable Setup Doctor product export evidenceを書き出させ、python tooling\windows_release_evidence.pyを通す。
+  reason: 現行Rust Desktop起動器はcollector注入export環境変数をFlutter childから除去し、正式なBroker統治product export経路は未接続である。PowerShell Setup Doctor collectorはexternal probe evidenceであり、product proofとして拒否される。
+  required_action: installed appにmachine-readable Setup Doctor product export経路を接続してから、product-generated evidenceをstage manifestのexternal probeと分離して収集し、python tooling\windows_release_evidence.pyを通す。
   blocks_release: yes
 
 - item: Windows installed evidence validator

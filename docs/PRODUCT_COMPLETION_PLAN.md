@@ -45,8 +45,8 @@ platform の優先順位:
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: installed-app generated Setup Doctor product export の support は存在するが、native Windows product diagnostics evidence は未収集である。現在の PowerShell Setup Doctor collector は external probe evidence にすぎない。
-  required_action: isolated Windows installed smoke を介して、installed-app generated machine-readable Setup Doctor export evidence を収集する。
+  reason: 現行Rust起動器はcollector注入export環境変数をFlutter childから除去し、正式なBroker統治Setup Doctor product export経路が未接続である。PowerShell collectorはexternal probeにすぎない。
+  required_action: Broker統治されたproduction export経路を実装し、isolated Windows installed smokeからmachine-readable product evidenceを収集する。
   blocks_release: yes
 
 - item: Single-user local-first mode

@@ -23,7 +23,7 @@
       "classification": "release_blocker",
       "blocks_release": true,
       "reason": "Windowsインストール後の初回起動証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "collect_installed_smoke.ps1をRust Desktop起動器経由へ更新し、起動器が実際に使うBroker保存先を分離WindowsユーザーprofileのLOCALAPPDATAで隔離してください。起動・終了AuditEvent、通常資格Broker接続、Python実行系なしの可視画面、設定、監査試行を含むclean-sourceのWindows installed product証拠を収集し、tooling/windows_release_evidence.pyへ合格させてください。Flutter exeの直接起動、stage manifestのcollector scratch path、独立したBroker smokeで代替しないでください。"
+      "required_action": "stage時と異なるSIDのWindows user profileからcollect_installed_smoke.ps1を実行し、Rust Desktop起動器の直接child、run固有LOCALAPPDATA内の実Broker runtime、endpoint cleanup、起動・終了AuditEvent、通常資格で受理されたhealth要求AuditEvent、可視画面をclean-source証拠として収集してください。health要求AuditはBrokerによる認証済み要求の受理・記録を示しますが、client応答受信や呼出し元PIDを証明しません。別profileでのclean-source実測と初回設定生成を成立させてからtooling/windows_release_evidence.pyへ合格させてください。Flutter exe直接起動、stage manifestのcollector scratch path、独立Broker smoke、endpoint role metadataだけで代替しないでください。"
     },
     {
       "name": "windows_setup_doctor_smoke",
@@ -34,7 +34,7 @@
       "classification": "release_blocker",
       "blocks_release": true,
       "reason": "インストール済みアプリが生成した環境診断の製品証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "インストール済みアプリが機械可読な環境診断製品証拠を書き出すようネイティブWindowsのインストール簡易検査を実行し、tooling/windows_release_evidence.pyへ合格させてください。"
+      "required_action": "Brokerの統治下にある通常の製品実行経路へ、機械可読なSetup Doctor出力契約を接続してください。Flutter起動器が除去するcollector注入環境変数は再導入せず、Windowsネイティブのインストール済み製品実行から製品生成の証拠を収集し、tooling/windows_release_evidence.pyの検証に合格させてください。"
     },
     {
       "name": "windows_broker_installed_smoke",

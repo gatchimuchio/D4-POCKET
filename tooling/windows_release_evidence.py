@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import sys
 import argparse
 import hashlib
+import ntpath
 import subprocess
+import sys
 import json
 import re
 import math
@@ -47,6 +48,7 @@ AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Inva
 BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS = {
     "setup_doctor",
     "broker_smoke",
+    "broker_lifecycle_audit",
     "visible_surfaces",
     "runtime_assertions",
 }
@@ -57,6 +59,8 @@ BASE_REQUIRED_FIELD_PROVENANCE = {
     "artifact": ("directly_measured", {"EXTERNAL_EVIDENCE"}),
     "first_run.process": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
     "first_run.visible_surfaces": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "first_run.broker_lifecycle_audit": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
+    "first_run.broker_health_request": ("directly_measured", {"LIVE_RUNTIME"}),
     "first_run.config_audit": ("directly_measured", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
     "first_run.installer_authority_boundary": ("static_assertion", {"CONFIG"}),
     "setup_doctor": ("product_export", {"LIVE_RUNTIME", "EXTERNAL_EVIDENCE"}),
@@ -333,6 +337,17 @@ def _path_contains_run_id(path_value: Any, run_id: str) -> bool:
     return bool(run_id) and run_id.casefold() in path
 
 
+def _windows_path_is_within(path_value: Any, root_value: Any) -> bool:
+    path = ntpath.normcase(ntpath.normpath(str(path_value or "")))
+    root = ntpath.normcase(ntpath.normpath(str(root_value or "")))
+    if not path or not root:
+        return False
+    try:
+        return ntpath.commonpath((path, root)) == root
+    except ValueError:
+        return False
+
+
 def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT_EVIDENCE_PATH) -> EvidenceResult:
     errors: list[str] = []
     provenance = data.get("provenance")
@@ -352,12 +367,15 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
         for field in ("build_command", "build_timestamp", "staged_manifest_path"):
             if not provenance.get(field):
                 errors.append(f"provenance.{field} がない")
-        for field in ("installed_manifest_sha256", "app_artifact_sha256", "broker_artifact_sha256", "evidence_bundle_sha256"):
+        for field in ("installed_manifest_sha256", "app_artifact_sha256", "launcher_artifact_sha256", "broker_artifact_sha256", "evidence_bundle_sha256"):
             if not _is_sha256_tag(provenance.get(field)):
                 errors.append(f"provenance.{field} には sha256 tag が必要である")
         artifact_hash = _get(data, "artifact.sha256")
         if _is_sha256_tag(artifact_hash) and provenance.get("app_artifact_sha256") != artifact_hash:
             errors.append("provenance.app_artifact_sha256 は artifact.sha256 と一致しなければならない")
+        launcher_hash = _get(data, "artifact.desktop_launcher_sha256")
+        if _is_sha256_tag(launcher_hash) and provenance.get("launcher_artifact_sha256") != launcher_hash:
+            errors.append("provenance.launcher_artifact_sha256 は artifact.desktop_launcher_sha256 と一致しなければならない")
 
         isolation = provenance.get("isolation")
         if not isinstance(isolation, dict):
@@ -369,8 +387,8 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
                 "isolated_install_root",
                 "isolated_runtime_dir",
                 "isolated_store_dir",
-                "isolated_config_dir",
                 "isolated_audit_dir",
+                "isolated_localappdata",
             ]
             for field in path_fields:
                 value = isolation.get(field)
@@ -381,6 +399,24 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
             install_root = str(isolation.get("isolated_install_root") or "").replace("/", "\\").casefold()
             if install_root.endswith(LEGACY_FIXED_INSTALL_ROOT_SUFFIX):
                 errors.append("provenance.isolation.isolated_install_root が旧式の共有固定 install root を使用している")
+            if isolation.get("separate_windows_user_profile") is not True:
+                errors.append("provenance.isolation.separate_windows_user_profile を実証できなかった")
+            local_appdata = isolation.get("isolated_localappdata")
+            runtime_dir = isolation.get("isolated_runtime_dir")
+            config_dir = isolation.get("isolated_config_dir")
+            if not _windows_path_is_within(runtime_dir, local_appdata):
+                errors.append("起動器runtimeが実行user profileのisolated LOCALAPPDATA外にある")
+            if config_dir and not _windows_path_is_within(config_dir, local_appdata):
+                errors.append("製品config directoryが実行user profileのisolated LOCALAPPDATA外にある")
+            config_path = _get(data, "first_run.config_path")
+            if config_path and not _windows_path_is_within(config_path, local_appdata):
+                errors.append("初回config pathが実行user profileのisolated LOCALAPPDATA外にある")
+            if str(_get(data, "first_run.launcher_runtime_dir") or "") != str(isolation.get("isolated_runtime_dir") or ""):
+                errors.append("実起動器runtime pathがprovenance.isolationの実runtime pathと一致しない")
+            if not _windows_path_is_within(_get(data, "first_run.broker_endpoint_file"), isolation.get("isolated_runtime_dir")):
+                errors.append("Broker endpoint pathが起動器runtime外にある")
+            if not _windows_path_is_within(_get(data, "first_run.broker_lifecycle_audit.path"), isolation.get("isolated_store_dir")):
+                errors.append("Broker lifecycle Audit pathが起動器の実Store外にある")
 
         bundle_files = provenance.get("evidence_bundle_files")
         if not isinstance(bundle_files, list) or not bundle_files:
@@ -455,12 +491,57 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
     installed_exe_path = str(_get(data, "artifact.installed_exe_path") or "")
     if not installed_exe_path.lower().endswith(".exe"):
         errors.append("artifact.installed_exe_path は installed Flutter executable を指さなければならない")
+    launcher_path = str(_get(data, "artifact.desktop_launcher_path") or "")
+    if not launcher_path.lower().endswith("gui_shell_desktop_launcher.exe"):
+        errors.append("artifact.desktop_launcher_path はRust Desktop起動器を指さなければならない")
+    if not SHA256_RE.match(str(_get(data, "artifact.desktop_launcher_sha256") or "")):
+        errors.append("artifact.desktop_launcher_sha256 にはsha256 tagが必要である")
+    if not SHA256_RE.match(str(_get(data, "artifact.broker_helper_sha256") or "")):
+        errors.append("artifact.broker_helper_sha256 にはsha256 tagが必要である")
     if _get(data, "first_run.status") != "passed":
         errors.append("first_run.status は passed でなければならない")
     if not _is_true(data, "first_run.launched_from_installed_path"):
         errors.append("first run が installed app path から起動しなかった")
+    if not _is_true(data, "first_run.launched_via_rust_desktop_launcher"):
+        errors.append("first run がRust Desktop起動器を経由しなかった")
+    launcher_pid = _get(data, "first_run.launcher_process_id")
+    app_pid = _get(data, "first_run.process_id")
+    if not isinstance(launcher_pid, int) or not isinstance(app_pid, int) or launcher_pid == app_pid:
+        errors.append("Rust起動器とFlutter画面のprocessを別々に観測できなかった")
+    process_identity = _get(data, "first_run.process_identity")
+    if not isinstance(process_identity, dict):
+        errors.append("起動器childの親PID・実行image hash証拠がない")
+    else:
+        if process_identity.get("method") != "direct_parent_pid_and_sha256":
+            errors.append("起動器child identityは親PIDとSHA-256の直接観測でなければならない")
+        if process_identity.get("evidence_class") != "LIVE_RUNTIME":
+            errors.append("起動器child identity証拠がLIVE_RUNTIMEではない")
+        if process_identity.get("direct_child_observed") is not True:
+            errors.append("Flutter processがRust起動器の直接childであることを確認できなかった")
+        if not isinstance(launcher_pid, int) or process_identity.get("parent_process_id") != launcher_pid:
+            errors.append("Flutter processのobserved parent PIDがRust起動器PIDと一致しない")
+        if process_identity.get("same_windows_session") is not True:
+            errors.append("Flutter childとRust起動器が同じWindows sessionであることを確認できなかった")
+        if process_identity.get("started_after_launcher") is not True:
+            errors.append("Flutter childがRust起動器起動後に作成されたことを確認できなかった")
+        if process_identity.get("image_sha256") != _get(data, "artifact.sha256"):
+            errors.append("Flutter processのimage SHA-256がstaged artifactと一致しない")
+        if process_identity.get("image_matches_manifest") is not True:
+            errors.append("Flutter processのimage hashをstaged manifestと照合できなかった")
+    if not _is_true(data, "first_run.profile_identity_isolated_from_staging_user"):
+        errors.append("stage作業者と異なるWindows user profileでの実行を確認できなかった")
+    if not _get(data, "first_run.launcher_runtime_dir"):
+        errors.append("実起動器が使用したBroker runtime pathがない")
+    if not _is_true(data, "first_run.launcher_exited_after_frontend") or _get(data, "first_run.launcher_exit_code") != 0:
+        errors.append("Flutter終了後にRust Desktop起動器が正常終了したことを確認できなかった")
     if not _is_true(data, "first_run.process_running_after_launch"):
         errors.append("起動後に process が動作していることを確認できなかった")
+    if not _is_true(data, "first_run.frontend_exit_menu_invoked"):
+        errors.append("製品の通知領域『終了』操作を実行したことを確認できなかった")
+    if not _is_false(data, "first_run.frontend_forced_to_exit"):
+        errors.append("Flutter画面を強制終了せず通常終了したことを確認できなかった")
+    if not _is_false(data, "first_run.frontend_cleanup_error"):
+        errors.append("Flutter画面の通常終了・cleanupでerrorが発生した")
     if not isinstance(_get(data, "first_run.process_id"), int):
         errors.append("first_run.process_id がない")
     if not isinstance(_get(data, "first_run.main_window_handle"), int) or _get(data, "first_run.main_window_handle") == 0:
@@ -475,16 +556,51 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("first_run.broker_endpoint_file がない")
     if not _is_true(data, "first_run.broker_endpoint_created"):
         errors.append("first run で broker endpoint file の作成を確認できなかった")
+    if not _is_true(data, "first_run.broker_endpoint_removed_after_shutdown"):
+        errors.append("起動器終了後に同一実行のBroker endpoint cleanupを確認できなかった")
     if _get(data, "first_run.broker_transport") != "authenticated_loopback_tcp":
         errors.append("first_run.broker_transport は authenticated_loopback_tcp でなければならない")
     if _get(data, "first_run.broker_endpoint_credential_role") != "normal":
         errors.append("first_run.broker_endpoint_credential_role は normal でなければならない")
     if not _is_true(data, "first_run.normal_endpoint_credential_role_verified"):
         errors.append("first run で broker通常接続資格のroleを確認できなかった")
+    health_request = _get(data, "first_run.broker_health_request")
+    if not isinstance(health_request, dict):
+        errors.append("Brokerのhealth要求受理を示すAudit evidenceがない")
+    else:
+        accepted_event_count = health_request.get("accepted_event_count")
+        if not _is_true(health_request, "accepted"):
+            errors.append("通常資格Brokerがhealth要求を受理したLIVE_RUNTIME AuditEventがない")
+        if type(accepted_event_count) is not int or accepted_event_count < 1:
+            errors.append("Broker health受理AuditEvent数が1件以上の実測値ではない")
+        if not re.fullmatch(r"broker-audit-[1-9][0-9]*", str(health_request.get("first_audit_event_id") or "")):
+            errors.append("Broker health受理AuditEventのevent_idがない")
+        if health_request.get("evidence_class") != "LIVE_RUNTIME":
+            errors.append("Broker health受理AuditEventの証拠種別がLIVE_RUNTIMEではない")
+        if health_request.get("caller_process_attributed") is not False:
+            errors.append("Broker Auditにない呼出し元process attributionを主張している")
+        if health_request.get("client_response_receipt_observed") is not False:
+            errors.append("Broker Auditが証明しないclient応答受信を主張している")
+    lifecycle_audit = _get(data, "first_run.broker_lifecycle_audit")
+    if not isinstance(lifecycle_audit, dict):
+        errors.append("起動器管理Brokerのlifecycle Audit evidenceがない")
+    else:
+        if lifecycle_audit.get("evidence_class") != "LIVE_RUNTIME":
+            errors.append("Broker lifecycle Audit evidenceがLIVE_RUNTIMEではない")
+        if not _is_true(lifecycle_audit, "startup_event_recorded"):
+            errors.append("Broker startup AuditEventを確認できなかった")
+        if not _is_true(lifecycle_audit, "shutdown_event_recorded"):
+            errors.append("Broker shutdown AuditEventを確認できなかった")
+        if not isinstance(lifecycle_audit.get("startup_event_count"), int) or lifecycle_audit["startup_event_count"] < 1:
+            errors.append("Broker startup AuditEvent countが不正")
+        if not isinstance(lifecycle_audit.get("shutdown_event_count"), int) or lifecycle_audit["shutdown_event_count"] < 1:
+            errors.append("Broker shutdown AuditEvent countが不正")
+        if not SHA256_RE.match(str(lifecycle_audit.get("sha256") or "")):
+            errors.append("Brokerの起動・終了監査記録ファイルにSHA-256値がない")
     if not _is_true(data, "first_run.no_python_runtime_requested"):
-        errors.append("first run が no-Python runtime evidence mode を要求しなかった")
+        errors.append("初回起動でPython実行系なしの実測モードを要求していなかった")
     if not _is_true(data, "first_run.python_runtime_path_scrubbed"):
-        errors.append("first-run 起動前に Python runtime PATH scrub が適用されなかった")
+        errors.append("初回起動前にPATHからPython実行系を除外していなかった")
     if _get(data, "first_run.python_path_entries_remaining_count") != 0:
         errors.append("first-run 起動前に Python PATH entry が可視のまま残った")
     python_commands = _get(data, "first_run.python_commands_visible_after_scrub")
@@ -535,7 +651,7 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         return _failed(
             "windows_installer_first_run_smoke",
             "; ".join(errors),
-            "-BrokerHelperExe と -NoPythonRuntime を指定して Windows installed first-run smoke を実行し、妥当な release_evidence/windows_installed_smoke.json を記録する。",
+            "Rust Desktop起動器、分離Windows user profile、実runtime lifecycle／health受理Audit、Setup Doctor／config製品証拠を同一clean-source runから収集する。",
         )
     return _passed(
         "windows_installer_first_run_smoke",

@@ -40,7 +40,7 @@ release_evidence/windows_installed_smoke.json
 - `isolated_install_root`
 - `isolated_runtime_dir`
 - `isolated_store_dir`
-- `isolated_config_dir`
+- `isolated_localappdata`（起動器runtimeと初回product configを内包する実行user profileの分離領域）
 - `isolated_audit_dir`
 - `evidence_bundle_sha256`
 - ファイルごとのevidence bundle hash
@@ -55,6 +55,7 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 - `artifact`: `directly_measured`、`EXTERNAL_EVIDENCE`
 - `first_run.process`: `directly_measured`、`LIVE_RUNTIME`
 - `first_run.visible_surfaces`: `directly_measured`、`LIVE_RUNTIME`
+- `first_run.broker_health_request`: `directly_measured`、`LIVE_RUNTIME`（通常資格認証後にBrokerがhealth要求を受理し、Auditへ永続記録したこと。clientの応答受信と呼出し元PIDは証明しない）
 - `first_run.config_audit`: `directly_measured`、`LIVE_RUNTIME`
 - `first_run.installer_authority_boundary`: `static_assertion`、`CONFIG`
 - formal gateの要求: `product_export`、`LIVE_RUNTIME`（現行の外部probeは`external_probe`、`EXTERNAL_EVIDENCE`であり不適合）
@@ -65,7 +66,11 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 
 ## 収集フロー
 
-> 現行`collect_installed_smoke.ps1`はFlutter executableを直接起動する旧collectorであり、Rust Desktop起動器経由のfirst-run evidenceを採れない。下記の分離pathはcollector scratch用途であり、起動器の実runtime `%LOCALAPPDATA%\GUI-Shell\broker\desktop` と同一ではない。collectorを起動器に接続し、実runtimeを分離user profileへ隔離する修正と検証が完了するまで、この手順の出力を`windows_installer_first_run_smoke` PASSとして扱ってはならない。
+> `collect_installed_smoke.ps1`はRust Desktop起動器経由へ変更済みである。正式実行はstageに使ったWindows userとは別のprofileから行い、`-UseCurrentWindowsProfile`を指定する。collectorはそのprofile内にrun固有のLOCALAPPDATAを作って起動器の実Broker runtimeを分離する。manifestはrun固有salt付きuser identity digestだけを保存し、raw SIDを含めない。stage manifestの`runtime/` pathは外部probe scratchであり、製品runtime／config／Auditの証拠として使用しない。Flutter本番起動が最初に要求するhealthについて、通常資格認証後のBroker `accepted / LIVE_RUNTIME` AuditEventをcollectorが数え、event IDを記録する。この記録はBrokerが認証済み要求を受理・記録した証拠であり、Flutterが応答を受け取ったことや呼出し元PIDは証明しない。別profileでの実収集、初回config生成、Setup Doctor製品出力は未成立なのでrelease blockerを維持する。
+
+Flutter child processの同定は、起動器PIDを親PIDとして持つ`Win32_Process`観測、起動器と同じWindows session、起動後のprocess作成時刻、実行imageのSHA-256一致を組み合わせる。Windows package virtualizationがWMIの`ExecutablePath`を別のLocalCache表記へ写す場合があるため、path文字列一致だけをimage identityの根拠にしない。終了時cleanupも同じ親PID・時刻・session・hash条件で対象を再確認する。Desktopの`WM_CLOSE`は通常trayへ隠す動作であり終了ではないため、collectorは実tray callbackからnative『終了』menuを開き、UIAutomationで該当processのmenu itemを実行する。強制終了またはcleanup errorがあれば正式smokeを拒否する。evidenceの`first_run.process_identity`はprocess identityのLIVE_RUNTIME観測を保持し、BrokerがFlutter caller PIDを識別したという意味ではない。
+
+収集は二つのWindows user contextで行う。stage ownerはartifactをstageし、Broker単体smokeとruntime assertionsを共有evidence directoryへ出力する。その後、stage時とは別のWindows account/profileでDesktop collectorを起動する。別profileにはrepository collector script・stage済みapp／manifestへのread accessと、共有evidence directoryへのwrite accessが必要である。ACLはownerが限定範囲で準備し、collectorはACLを変更しない。同一userの別PowerShell processではprofile分離条件を満たさない。
 
 ~~~powershell
 powershell -ExecutionPolicy Bypass -File installer\windows\stage_installed_app.ps1 `
@@ -73,31 +78,35 @@ powershell -ExecutionPolicy Bypass -File installer\windows\stage_installed_app.p
   -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe `
   -DesktopLauncherExe .\native\rust_helper\target\release\gui_shell_desktop_launcher.exe
 
-$Manifest = Get-Content -Raw "$env:LOCALAPPDATA\GUI-Shell\installed-runs\<run_id>\installed_manifest.json" | ConvertFrom-Json
+$Manifest = Get-Content -Raw "<stage-installed-root>\installed_manifest.json" | ConvertFrom-Json
+$EvidenceRoot = "<ownerがtest userに必要最小限のACLを設定した共有evidence directory>"
+New-Item -ItemType Directory -Path $EvidenceRoot -ErrorAction Stop | Out-Null
 
 powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 `
   -BrokerHelperExe $Manifest.broker_exe `
   -StoreDir $Manifest.store_dir `
   -SessionFile $Manifest.broker_session_file `
-  -OutputPath (Join-Path $Manifest.evidence_dir "windows_broker_smoke.json")
+  -OutputPath (Join-Path $EvidenceRoot "windows_broker_smoke.json")
 
-python tooling\release_runtime_assertions.py --json > release_evidence\release_runtime_assertions.json
+python tooling\release_runtime_assertions.py --json | Set-Content -LiteralPath (Join-Path $EvidenceRoot "release_runtime_assertions.json") -Encoding UTF8
+
+# ここでstage時と異なるWindows account/profileに切り替え、別shellで以下を実行する。
+$Manifest = Get-Content -Raw "<stage-installed-root>\installed_manifest.json" | ConvertFrom-Json
+$EvidenceRoot = "<ownerがtest userに必要最小限のACLを設定した共有evidence directory>"
 
 powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smoke.ps1 `
   -InstalledExe $Manifest.app_exe `
+  -DesktopLauncherExe $Manifest.launcher_exe `
   -InstalledManifestJson (Join-Path $Manifest.install_root "installed_manifest.json") `
-  -SetupDoctorJson (Join-Path $Manifest.evidence_dir "setup_doctor_external_probe.json") `
-  -ConfigPath $Manifest.config_path `
-  -AuditDir $Manifest.audit_dir `
-  -VisibleSurfacesOutputPath (Join-Path $Manifest.evidence_dir "visible_surfaces.json") `
-  -BrokerEvidenceJson (Join-Path $Manifest.evidence_dir "windows_broker_smoke.json") `
-  -BrokerHelperExe $Manifest.broker_exe `
-  -BrokerStoreDir $Manifest.store_dir `
-  -BrokerSessionFile $Manifest.broker_session_file `
+  -BrokerEvidenceJson (Join-Path $EvidenceRoot "windows_broker_smoke.json") `
+  -VisibleSurfacesOutputPath (Join-Path $EvidenceRoot "visible_surfaces.json") `
+  -UseCurrentWindowsProfile `
   -NoPythonRuntime `
-  -RuntimeAssertionsJson release_evidence\release_runtime_assertions.json `
-  -OutputPath release_evidence\windows_installed_smoke.json
+  -RuntimeAssertionsJson (Join-Path $EvidenceRoot "release_runtime_assertions.json") `
+  -OutputPath (Join-Path $EvidenceRoot "windows_installed_smoke.json")
 ~~~
+
+collectorはstage manifestのconfig／audit scratchを読み書きせず、外部Setup Doctor JSONも取り込まない。独立した`collect_setup_doctor.ps1`のprobe結果はproduct evidenceとは別に保管する。起動器lifecycle Auditとhealth受理Auditは新規profile内の実Storeから収集する。endpointのnormal role metadata単独はBroker接続証拠にならず、health受理eventもclient応答受信・PID帰属へ昇格しない。壊れたAudit JSON行は読み飛ばさず収集失敗にする。test userがstage時userとは異なるSIDでない場合、collectorは正式実行を拒否する。出力先とinstalled rootへのACL設定は外部のowner管理作業であり、collectorは権限を変更しない。
 
 次のコマンドで検証する。
 

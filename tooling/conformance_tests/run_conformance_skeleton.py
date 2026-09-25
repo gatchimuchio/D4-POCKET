@@ -1601,19 +1601,24 @@ def _valid_windows_installed_evidence() -> dict:
             "staged_manifest_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\installed_manifest.json",
             "installed_manifest_sha256": "sha256:" + "2" * 64,
             "app_artifact_sha256": "sha256:" + "1" * 64,
+            "launcher_artifact_sha256": "sha256:" + "b" * 64,
             "broker_artifact_sha256": "sha256:" + "3" * 64,
             "isolation": {
                 "uses_shared_fixed_install_root": False,
                 "isolated_install_root": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4",
-                "isolated_runtime_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime",
-                "isolated_store_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\broker_store",
-                "isolated_config_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\config",
-                "isolated_audit_dir": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\audit",
+                "isolated_localappdata": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123",
+                "isolated_runtime_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop",
+                "isolated_store_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store",
+                "isolated_config_dir": None,
+                "isolated_audit_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store",
+                "run_id": "run-20260605T000000Z-a1b2c3d4-smoke-0123",
+                "separate_windows_user_profile": True,
             },
             "evidence_bundle_sha256": "sha256:" + "4" * 64,
             "evidence_bundle_files": [
                 {"kind": "setup_doctor", "path": r"C:\evidence\setup_doctor.json", "sha256": "sha256:" + "5" * 64},
                 {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
+                {"kind": "broker_lifecycle_audit", "path": r"C:\evidence\broker-audit.jsonl", "sha256": "sha256:" + "a" * 64},
                 {"kind": "visible_surfaces", "path": r"C:\evidence\visible_surfaces.json", "sha256": "sha256:" + "7" * 64},
                 {"kind": "runtime_assertions", "path": r"C:\evidence\runtime_assertions.json", "sha256": "sha256:" + "8" * 64},
                 {"kind": "audit_anchor_external_tamper_evidence", "path": r"C:\evidence\audit_anchor_external.json", "sha256": "sha256:" + "9" * 64},
@@ -1624,6 +1629,8 @@ def _valid_windows_installed_evidence() -> dict:
             "first_run.process": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "first_run.visible_surfaces": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "first_run.config_audit": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.broker_lifecycle_audit": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.broker_health_request": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "first_run.installer_authority_boundary": {"source_type": "static_assertion", "evidence_class": "CONFIG", "formal_release_input": True},
             "setup_doctor": {"source_type": "product_export", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "broker.ipc_restart_crash": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
@@ -1633,7 +1640,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "6",
+            "collector_version": "12",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1641,24 +1648,66 @@ def _valid_windows_installed_evidence() -> dict:
             "installed_exe_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\app\gui_shell_desktop.exe",
             "installed_exe_exists": True,
             "sha256": "sha256:" + "1" * 64,
+            "desktop_launcher_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\gui_shell_desktop_launcher.exe",
+            "desktop_launcher_sha256": "sha256:" + "b" * 64,
+            "broker_helper_path": r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\broker\gui_shell_rust_helper.exe",
+            "broker_helper_sha256": "sha256:" + "3" * 64,
         },
         "first_run": {
             "status": "passed",
             "command": r".\gui_shell_desktop.exe",
             "launched_from_installed_path": True,
+            "launched_via_rust_desktop_launcher": True,
+            "launcher_process_id": 4321,
+            "launcher_exited_after_frontend": True,
+            "launcher_exit_code": 0,
+            "launcher_runtime_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop",
+            "profile_identity_isolated_from_staging_user": True,
+            "profile_identity_sid_exposed": False,
             "config_existed_before_launch": False,
             "process_id": 1234,
+            "process_identity": {
+                "method": "direct_parent_pid_and_sha256",
+                "evidence_class": "LIVE_RUNTIME",
+                "direct_child_observed": True,
+                "parent_process_id": 4321,
+                "same_windows_session": True,
+                "started_after_launcher": True,
+                "image_sha256": "sha256:" + "1" * 64,
+                "image_matches_manifest": True,
+            },
             "process_running_after_launch": True,
+            "frontend_exit_menu_invoked": True,
+            "frontend_forced_to_exit": False,
+            "frontend_cleanup_error": False,
             "main_window_handle": 100,
             "window_title": "GUI-Shell",
             "first_window_visible": True,
             "broker_mediated_launch": True,
             "broker_helper_path": r"C:\Program Files\GUI-Shell\broker\gui_shell_rust_helper.exe",
-            "broker_endpoint_file": r"C:\ProgramData\GUI-Shell\broker\broker_session.json",
+            "broker_endpoint_file": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\broker_session.json",
             "broker_endpoint_created": True,
+            "broker_endpoint_removed_after_shutdown": True,
             "broker_transport": "authenticated_loopback_tcp",
             "broker_endpoint_credential_role": "normal",
             "normal_endpoint_credential_role_verified": True,
+            "broker_health_request": {
+                "accepted": True,
+                "accepted_event_count": 1,
+                "first_audit_event_id": "broker-audit-2",
+                "evidence_class": "LIVE_RUNTIME",
+                "caller_process_attributed": False,
+                "client_response_receipt_observed": False,
+            },
+            "broker_lifecycle_audit": {
+                "path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\audit.jsonl",
+                "sha256": "sha256:" + "c" * 64,
+                "startup_event_count": 1,
+                "startup_event_recorded": True,
+                "shutdown_event_count": 1,
+                "shutdown_event_recorded": True,
+                "evidence_class": "LIVE_RUNTIME",
+            },
             "no_python_runtime_requested": True,
             "python_runtime_path_scrubbed": True,
             "python_path_entries_removed_count": 2,
@@ -1754,7 +1803,7 @@ def _valid_windows_installed_evidence() -> dict:
                     ],
                 },
             },
-            "config_path": r"C:\ProgramData\GUI-Shell\config\gui_shell.json",
+            "config_path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\config\gui_shell.json",
             "config_created": True,
             "config_json_valid": True,
             "audit_dir": r"C:\ProgramData\GUI-Shell\audit",
@@ -1985,6 +2034,179 @@ def test_windows_release_evidence_validator_rejects_external_setup_probe_as_prod
     return errors
 
 
+def test_windows_release_evidence_requires_accepted_broker_health_audit() -> list[str]:
+    errors = []
+    for mutate, label, expected_reason in (
+        (
+            lambda item: item["first_run"].update(broker_health_request={"accepted": False}),
+            "endpoint role metadata only",
+            "health要求",
+        ),
+        (
+            lambda item: item["first_run"]["broker_health_request"].update(accepted_event_count=0),
+            "accepted flag without an observed event",
+            "AuditEvent数",
+        ),
+        (
+            lambda item: item["first_run"]["broker_health_request"].update(client_response_receipt_observed=True),
+            "unsupported response-receipt claim",
+            "応答受信",
+        ),
+    ):
+        evidence = _valid_windows_installed_evidence()
+        evidence["first_run"]["normal_endpoint_credential_role_verified"] = True
+        mutate(evidence)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+            errors.append(f"{label}だけでBroker health受理のLIVE_RUNTIME evidenceを代替できている")
+        if expected_reason not in result_by_name["windows_installer_first_run_smoke"].reason:
+            errors.append(f"{label}に対するhealth Audit validatorの理由が出力に含まれない")
+    return errors
+
+
+def test_windows_release_evidence_requires_verified_launcher_child() -> list[str]:
+    errors = []
+    for mutate, label, expected_reason in (
+        (
+            lambda item: item["first_run"].pop("process_identity"),
+            "missing process identity",
+            "childの親PID・実行image hash証拠がない",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(direct_child_observed=False),
+            "non-child process",
+            "直接childであることを確認できなかった",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(parent_process_id=9876),
+            "mismatched parent PID",
+            "observed parent PID",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(same_windows_session=False),
+            "different Windows session",
+            "同じWindows session",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(started_after_launcher=False),
+            "pre-existing frontend process",
+            "起動器起動後に作成",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(image_sha256="sha256:" + "f" * 64),
+            "mismatched image hash",
+            "image SHA-256",
+        ),
+        (
+            lambda item: item["first_run"]["process_identity"].update(image_matches_manifest=False),
+            "unverified image hash",
+            "image hashをstaged manifestと照合できなかった",
+        ),
+    ):
+        evidence = _valid_windows_installed_evidence()
+        mutate(evidence)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+            errors.append(f"{label}をWindows installed smoke validatorが受け入れた")
+        if expected_reason not in result_by_name["windows_installer_first_run_smoke"].reason:
+            errors.append(f"{label}のprocess identity不備をvalidatorが具体的に指摘しなかった")
+    return errors
+
+
+def test_windows_release_evidence_requires_normal_frontend_exit() -> list[str]:
+    errors = []
+    for mutate, label, expected_reason in (
+        (
+            lambda item: item["first_run"].update(frontend_exit_menu_invoked=False),
+            "missing product exit action",
+            "通知領域『終了』操作",
+        ),
+        (
+            lambda item: item["first_run"].update(frontend_forced_to_exit=True),
+            "forced frontend termination",
+            "強制終了せず通常終了",
+        ),
+        (
+            lambda item: item["first_run"].update(frontend_cleanup_error=True),
+            "frontend cleanup error",
+            "cleanupでerror",
+        ),
+    ):
+        evidence = _valid_windows_installed_evidence()
+        mutate(evidence)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+            errors.append(f"{label}をWindows installed smoke validatorが受け入れた")
+        if expected_reason not in result_by_name["windows_installer_first_run_smoke"].reason:
+            errors.append(f"{label}をvalidatorが具体的に指摘しなかった")
+    return errors
+
+
+def test_windows_release_evidence_rejects_staged_runtime_scratch_path() -> list[str]:
+    evidence = _valid_windows_installed_evidence()
+    evidence["first_run"]["broker_endpoint_file"] = (
+        evidence["provenance"]["isolation"]["isolated_install_root"] + r"\runtime\broker_session.json"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(evidence), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
+        return ["stage manifestのcollector scratch endpoint pathを起動器runtimeとして受け入れた"]
+    return []
+
+
+def test_windows_release_evidence_rejects_runtime_or_config_outside_isolated_profile() -> list[str]:
+    errors: list[str] = []
+    for field, value, label in (
+        (
+            "isolated_runtime_dir",
+            r"C:\Users\owner\AppData\Local\GUI-Shell\broker\desktop",
+            "起動器runtime",
+        ),
+        (
+            "isolated_config_dir",
+            r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\runtime\config",
+            "stage collector scratch config directory",
+        ),
+        (
+            "first_run.config_path",
+            r"C:\ProgramData\GUI-Shell\config\gui_shell.json",
+            "初回config",
+        ),
+    ):
+        evidence = _valid_windows_installed_evidence()
+        if field == "first_run.config_path":
+            evidence["first_run"]["config_path"] = value
+        elif field == "isolated_runtime_dir":
+            evidence["provenance"]["isolation"][field] = value
+            evidence["first_run"]["launcher_runtime_dir"] = value
+            evidence["first_run"]["broker_endpoint_file"] = value + r"\broker_session.json"
+        else:
+            evidence["provenance"]["isolation"][field] = value
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
+            errors.append(f"isolated LOCALAPPDATA外の{label}を正式evidenceとして受け入れた")
+    return errors
+
+
 def test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence() -> list[str]:
     bad = _valid_windows_installed_evidence()
     bad["evidence_source"]["manual_confirmation"] = True
@@ -2204,10 +2426,12 @@ def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
     for token in ("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON", "GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON", "setup_doctor_context"):
         if token in collector_text:
             errors.append(f"installed smoke collectorがFlutter Setup Doctor export経路を使っている: {token}")
-    if "collect_setup_doctor.ps1" not in collector_text:
-        errors.append("installed smoke collectorが独立したSetup Doctor観測を実行していない")
-    if "configExistedBeforeLaunch" not in collector_text or "!$configExistedBeforeLaunch" not in collector_text:
-        errors.append("installed smoke collectorが起動前config存在を除外せず初回生成と扱う")
+    if "collect_setup_doctor.ps1" in collector_text:
+        errors.append("installed smoke collectorがstage scratch pathを使う外部Setup Doctor probeを実行している")
+    if "config_created = $configCreated" not in collector_text or "$configCreated = $false" not in collector_text:
+        errors.append("installed smoke collectorが製品config export未観測を未成立として記録しない")
+    if 'config_path = $null' not in collector_text or '"first_run_configuration_product_export"' not in collector_text:
+        errors.append("installed smoke collectorが不在の製品config pathを推測せずunsupported claimにする")
     external_probe_text = external_probe.read_text(encoding="utf-8")
     if (
         "formal_product_evidence = $false" not in external_probe_text
@@ -2222,8 +2446,10 @@ def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
     first_run_config_check = external_probe_text.split('-CheckId "first_run.config_created"', 1)
     if len(first_run_config_check) != 2 or '-Status "warning"' not in first_run_config_check[1].split("  New-DoctorCheck", 1)[0]:
         errors.append("外部probeが起動中の生成を観測していないconfigを初回生成合格として扱う")
-    if "formal_release_input = ((Get-EvidenceValue -Object $setupDoctor -Name \"formal_product_evidence\") -eq $true)" not in collector_text:
-        errors.append("非製品生成Setup Doctor probeがformal release inputとして扱われる")
+    if 'setup_doctor = [ordered]@{ source_type = "external_probe"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $false }' not in collector_text:
+        errors.append("外部Setup Doctor inputをproduct-generated LIVE_RUNTIME evidenceへ昇格できる")
+    if "[string]$SetupDoctorJson" in collector_text:
+        errors.append("installed smoke collectorが未検証Setup Doctor JSONをproduct evidenceへ取り込める")
     return errors
 
 
@@ -2258,7 +2484,7 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     broker_server = (ROOT / "native" / "rust_helper" / "src" / "broker" / "ipc_server.rs").read_text(encoding="utf-8")
     launcher_doc = (ROOT / "docs" / "specs" / "windows-desktop-launcher.md").read_text(encoding="utf-8")
     errors = []
-    for token in ["[string]$DesktopLauncherExe", "gui_shell_desktop_launcher.exe", "launcher_exe =", "launcher_artifact_sha256", "launcher_runtime = [ordered]@{", "formal_runtime_proof = $false"]:
+    for token in ["[string]$DesktopLauncherExe", "gui_shell_desktop_launcher.exe", "launcher_exe =", "launcher_artifact_sha256", "launcher_runtime = [ordered]@{", "formal_runtime_proof = $false", "staging_user_identity = [ordered]@{", "salted_hash = $stagingUserIdentityHash"]:
         if token not in stage:
             errors.append(f"staged installがnative起動器を配置・hash結合しない: {token}")
     if 'Join-Path $env:LOCALAPPDATA "GUI-Shell\\broker\\desktop"' not in stage:
@@ -2318,8 +2544,93 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "9"' not in text:
-        errors.append("collect_installed_smoke.ps1のcollector versionがUTF-8修正を反映していない")
+    if 'collector_version = "12"' not in text:
+        errors.append("collect_installed_smoke.ps1のcollector versionがprocess image identity計測を反映していない")
+    return errors
+
+
+def test_windows_installed_smoke_uses_launcher_owned_runtime() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    required = [
+        "[string]$DesktopLauncherExe",
+        "Start-Process -FilePath $launcher.Path -PassThru",
+        "Find-InstalledFrontendProcess -LauncherProcess $launcherProcess -ExpectedPath $exe.Path",
+        "Get-VerifiedInstalledFrontendChildren",
+        "-ExpectedSha256 $hash",
+        "Get-FileHash -LiteralPath $child.ExecutablePath -Algorithm SHA256",
+        "$candidate.SessionId -ne $launcherSessionId",
+        "$candidate.StartTime -lt $launcherStartTime",
+        'process_identity = [ordered]@{',
+        'method = "direct_parent_pid_and_sha256"',
+        "function Request-InstalledFrontendExit",
+        "if ($Frontend.HasExited) { return $false }",
+        '[System.Windows.Automation.ControlType]::MenuItem',
+        '$item.Current.Name -eq "終了"',
+        "frontend_exit_menu_invoked = $frontendExitMenuInvoked",
+        "same_windows_session = $true",
+        "started_after_launcher = $true",
+        'SetEnvironmentVariable("LOCALAPPDATA", $localAppDataRoot, "Process")',
+        'Join-Path $localAppDataRoot "GUI-Shell\\broker\\desktop"',
+        "isolated_runtime_dir = $brokerRuntimeRoot",
+        "D4 Pocket Desktop起動",
+        "D4 Pocket Desktop終了",
+        "broker_health_request = [ordered]@{",
+        "accepted_event_count = $normalBrokerHealthEventCount",
+        "first_audit_event_id = $normalBrokerHealthFirstEventId",
+        "caller_process_attributed = $false",
+        "client_response_receipt_observed = $false",
+        "profile_identity_isolated_from_staging_user = $separateWindowsProfileVerified",
+    ]
+    for token in required:
+        if token not in text:
+            errors.append(f"installed smoke collectorにRust起動器・実runtimeの観測tokenがない: {token}")
+    forbidden = [
+        "Start-SmokeBroker",
+        "Start-Process -FilePath $exe",
+        "$env:GUI_SHELL_BROKER_ENDPOINT_JSON =",
+        "[string]$BrokerHelperExe",
+    ]
+    for token in forbidden:
+        if token in text:
+            errors.append(f"installed smoke collectorが直接Flutter起動または独立Broker経路を残している: {token}")
+    if 'New-EvidenceFileRecord -Kind "broker_lifecycle_audit" -Path $brokerAuditPath' not in text:
+        errors.append("installed smoke collectorがBroker lifecycle Audit fileをevidence bundleへ結合しない")
+    for token in [
+        'operation -eq "health"',
+        'decision -eq "accepted"',
+        'reason -eq "health status returned"',
+        'evidence_source -eq "LIVE_RUNTIME"',
+        'throw "Broker lifecycle Auditに不正なJSON行があります。"',
+    ]:
+        if token not in text:
+            errors.append(f"installed smoke collectorがauthenticated health Auditを厳格に観測しない: {token}")
+    return errors
+
+
+def test_windows_installed_smoke_exit_matches_native_tray_contract() -> list[str]:
+    collector = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
+    tray = (ROOT / "apps" / "desktop_flutter" / "windows" / "runner" / "tray_controller.cpp").read_text(encoding="utf-8")
+    window = (ROOT / "apps" / "desktop_flutter" / "windows" / "runner" / "flutter_window.cpp").read_text(encoding="utf-8")
+    errors = []
+    for token in (
+        'constexpr UINT kTrayCallbackMessage = WM_APP + 41;',
+        'if (lparam == WM_RBUTTONUP)',
+        r'AppendMenuW(menu, MF_STRING, kTrayExitCommand, L"\u7d42\u4e86");',
+        'if (command == kTrayExitCommand) RequestExit();',
+    ):
+        if token not in tray:
+            errors.append(f"native tray exit contractに必要な実装がない: {token}")
+    for token in (
+        'if (message == WM_CLOSE && tray_controller_ &&',
+        '!tray_controller_->ExitRequested()',
+        'ShowWindow(hwnd, SW_HIDE);',
+    ):
+        if token not in window:
+            errors.append(f"Desktop WM_CLOSE hide contractに必要な実装がない: {token}")
+    for token in ('[uint32]0x8029', '[IntPtr]0x0205', '$item.Current.ProcessId -eq $Frontend.Id'):
+        if token not in collector:
+            errors.append(f"installed collectorがnative tray exit callbackを正確に操作しない: {token}")
     return errors
 
 
@@ -7492,6 +7803,11 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_preexisting_first_run_config,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
+        test_windows_release_evidence_requires_accepted_broker_health_audit,
+        test_windows_release_evidence_requires_verified_launcher_child,
+        test_windows_release_evidence_requires_normal_frontend_exit,
+        test_windows_release_evidence_rejects_staged_runtime_scratch_path,
+        test_windows_release_evidence_rejects_runtime_or_config_outside_isolated_profile,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
         test_windows_japanese_surface_labels,
@@ -7507,6 +7823,8 @@ def main() -> int:
         test_windows_installed_smoke_preserves_trap_failure,
         test_windows_broker_smoke_keeps_full_duplex_response,
         test_windows_installed_smoke_reads_json_as_utf8,
+        test_windows_installed_smoke_uses_launcher_owned_runtime,
+        test_windows_installed_smoke_exit_matches_native_tray_contract,
         test_windows_installed_smoke_uses_raw_uia_tree,
         test_windows_installed_smoke_automation_names_are_materialized,
         test_windows_installed_smoke_uia_properties_are_stringified,

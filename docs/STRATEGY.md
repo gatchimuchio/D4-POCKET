@@ -48,8 +48,8 @@ GUI-Shell v1.0 は検証済みの macOS support を主張しない。macOS は�
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: installed app は machine-readable Setup Doctor product export を扱うが、native Windows product evidence は未収集である。PowerShell Setup Doctor collector は external probe evidence であり、formal product evidence としては無効である。
-  required_action: isolated Windows installed smoke を介して、installed-app generated machine-readable Setup Doctor export evidence を収集する。
+  reason: 現行Rust Desktop起動器はcollector注入export環境変数をFlutter childから除去し、正式なBroker統治Setup Doctor product export経路は未接続である。PowerShell collectorはexternal probe evidenceであり、formal product evidenceとして無効である。
+  required_action: Broker統治された通常production経路を実装し、isolated Windows installed smokeを介してmachine-readable product evidenceを収集する。
   blocks_release: yes
 
 - item: installer and first-run Setup Doctor

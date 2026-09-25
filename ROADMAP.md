@@ -694,3 +694,9 @@ python3 tooling/validate_all.py
 - sensitive action の audit evidence が存在する
 - installer behavior が検証されている
 - owner が release promotion を明示的に承認する
+
+## 2026-09-26 Windows collector／C28現況
+
+Windows installed smoke collectorをRust Desktop起動器経由へ更新した。別Windows user profileとrun固有LOCALAPPDATAを要求し、endpoint、Broker lifecycle Audit、通常起動時のhealth受理Audit、artifact hashを実runから採る。health AuditはBroker側の認証済み要求受理・永続記録を示すが、client応答受信や呼出し元PIDは証明しない。validatorはendpoint／Auditに加えruntimeとconfig pathをisolated profileへ結び付ける。Conformance 205件、Schema 132件、日本語strict監査、Windows python-only集約の全10検査はPASS。Rust起動器、Broker helper、Flutter Release executableがworkspaceにないため、実built productのcollector実行は未確認である。初回config生成とBroker統治Setup Doctor production exportは未接続。該当するWindows first-run／Setup Doctor gateは`release_blocker`のまま、`release_ready=false`を維持する。
+
+C28 clean commit `b81fc607e65ecaf7fc8bc5de53376e39949e0f20`からの8時間再試行は約0.578秒で`大量対話`段階に失敗した。`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-b81fc60-20260925-145127.json`（SHA-256 `AC69F9D977F9FAE6E10941F7FB3555CA5D06F2585C09FBFB119CCC7A1D3DC0B0`）はfailed記録として保持する。`dialogue_result_not_success`とhealth read headersの`ConnectionReset`が記録された。fixture serverのflush成功はclient受信証拠ではなく、8時間完遂も原因確定も成立しない。

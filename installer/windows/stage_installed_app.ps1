@@ -28,6 +28,18 @@ function Get-TaggedSha256 {
   return "sha256:$((Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant())"
 }
 
+function Get-TaggedStringSha256 {
+  param([Parameter(Mandatory = $true)][string]$Text)
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+  $bytes = $encoding.GetBytes($Text)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return "sha256:$(([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant())"
+  } finally {
+    $sha.Dispose()
+  }
+}
+
 function Invoke-GitString {
   param(
     [Parameter(Mandatory = $true)]
@@ -98,6 +110,9 @@ if ((Test-LegacyFixedInstallRoot -Path $InstallRoot) -and !$AllowExistingInstall
 $sourceCommit = Invoke-GitString -Root $GitRoot -Arguments @("rev-parse", "HEAD")
 $sourceStatus = Invoke-GitString -Root $GitRoot -Arguments @("status", "--porcelain")
 $sourceWorktreeClean = ($null -ne $sourceCommit -and $null -ne $sourceStatus -and $sourceStatus -eq "")
+$stagingUserIdentitySalt = [guid]::NewGuid().ToString("N")
+$stagingUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$stagingUserIdentityHash = Get-TaggedStringSha256 -Text "$stagingUserIdentitySalt|$stagingUserSid"
 
 $installRootPath = New-Item -ItemType Directory -Force -Path $InstallRoot
 $appDir = New-Item -ItemType Directory -Force -Path (Join-Path $installRootPath.FullName "app")
@@ -128,6 +143,11 @@ $manifest = [ordered]@{
   source_commit = $sourceCommit
   source_worktree_clean = $sourceWorktreeClean
   source_status_porcelain = $(if ($null -ne $sourceStatus) { $sourceStatus } else { "" })
+  staging_user_identity = [ordered]@{
+    hash_algorithm = "SHA-256"
+    per_run_salt = $stagingUserIdentitySalt
+    salted_hash = $stagingUserIdentityHash
+  }
   build_command = $BuildCommand
   build_timestamp = $BuildTimestamp
   install_root = $installRootPath.FullName

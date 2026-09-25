@@ -1562,3 +1562,37 @@ clean commit `6a7ccffe9bb3b433c35e9b97e2dc7bef7604a1a7`から開始した8時間
 - 追加の30秒Broker regressionもpassed（対話成功12、想定disconnect失敗3）。単独Runtime fixture stop／start／probeの20反復もpassedだが、Brokerとの結合安定性を示さない。
 - `python -X utf8 tooling/日本語基底監査.py --strict`: PASS、負債file 0／finding 0。`python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0、設定された10検査がすべてPASS。Schema 132／正常例132／negative fixture 163、Conformance 201件、manifest、release gate、配布互換性、release smoke、evidence bundle、runtime assertions、C32構造監査を含む。統合検証のC28は30秒smokeであり、8時間試行のfailed記録を置き換えない。
 - この短時間証拠は8時間成立へ昇格しない。診断改善を含むclean commitからC28の8時間試験を再実行する。`release_blocker`: 8時間運用完遂、installed product・外部Runtime evidence。`known_limitation`: fixture測定はinstalled product、外部Runtime、製品SLAを証明しない。`release_ready=false`を維持する。
+
+## D4 Pocket rev2 Windows installed evidence collector境界更新（2026-09-26）
+
+clean commit `b81fc607e65ecaf7fc8bc5de53376e39949e0f20`から行ったC28 8時間再試行は、開始約0.578秒で`大量対話`段階に失敗した。証拠 `%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-b81fc60-20260925-145127.json` のSHA-256は`AC69F9D977F9FAE6E10941F7FB3555CA5D06F2585C09FBFB119CCC7A1D3DC0B0`。固定分類は`dialogue_result_not_success`、診断は`C28_RUNTIME_DIAGNOSTIC|health|read_headers|ConnectionReset`。fixtureはhealth要求2件についてserver-side flush成功を記録しただけで、clientがresponse bytesを受信した証拠ではない。過去failed記録は保持し、8時間PASS・根本原因特定へ昇格しない。
+
+Windows collectorでは、`collect_installed_smoke.ps1`のFlutter executable直接起動と独立Broker起動を除き、staged manifestでhash照合したRust Desktop起動器からFlutter childを同一実行内で起動する。正式collectorはstage時と異なるWindows user profileを要求し、run固有LOCALAPPDATA下の実runtime endpointとBroker起動／終了Auditを観測する。raw SIDやsession secretを証拠へ書かず、manifestにはrun固有salt付きSID digestだけを保存する。外部Setup Doctor JSON、stage scratch config／Auditを正式product evidenceへ混入しない。endpoint role metadataのみを製品接続証明にしない。
+
+validatorにはruntime・config pathが実行userのisolated LOCALAPPDATA配下にあることを要求する否定試験を追加した。PowerShell構文解析、Schema 132／example 132／negative fixture 163、Conformance 205件、manifest 1,025 file、`python -X utf8 tooling/日本語基底監査.py --strict`、`python tooling/validate_all.py --python-only --desktop-platform windows`（全10検査）がPASSした。統合集約はrelease blocker 5件と`release_ready=false`を維持した。Rust起動器、Broker helper、Flutter Release executableはいずれもworkspaceに存在しないため、installed collectorの実行・別Windows profile実証は未実施である。現行Desktop productは通常Broker接続signal、初回config生成、Broker統治Setup Doctor exportをformal pathとして提供していないため、first-run／Setup Doctor blockerを維持する。
+
+### 同日ソース追跡の補足
+
+前項の「通常Broker接続signal未接続」はsource確認不足を含むため、ここで証拠境界を更新する。`apps/desktop_flutter/lib/services/shell_core_client.dart`の製品起動は最初に`health`を要求し、Rust `handle_stream`は通常endpoint secretの照合後にだけBroker処理へ進む。`Broker::accept_health`は受理時に`operation=health`、`decision=accepted`、`evidence_source=LIVE_RUNTIME`を永続Auditへ記録し、Audit書込み成功後にresponseを書き出す。collectorは新規隔離StoreのこのAuditを読み、厳密なhealth受理record数と最初のevent IDを記録する。endpoint metadataだけの証明ではない。
+
+このAuditはBroker側の認証済み要求受理・永続記録を示す一方、clientがresponse bytesを受信したことや、記録の呼出し元PIDを識別するものではない。evidenceには両方を未観測と明記し、通常資格のhealth受理Auditを`LIVE_RUNTIME` provenanceとしてvalidatorが要求する。したがってsignalの収集実装は存在するが、実際のclean-source／別Windows profile runは未実施であり、初回config生成と正式Setup Doctor product exportも未接続である。前項の実行・release blocker判定は解除せず、説明だけをこの観測境界へ精密化する。
+
+初回conformanceでは合成証拠の`unsupported_claims`を非空にしたため厳格validatorに拒否された。client応答受信・PID帰属は専用fieldで未観測と記録し、unsupported claim一覧を空にした後の再実行は205件PASSした。最終検証ではPowerShell parse、`git diff --check`、Schema 132／example 132／negative fixture 163、日本語厳格監査（負債file 0／finding 0）、manifest 1,025 fileがPASSした。文書・fixture修正後の`python tooling/validate_all.py --python-only --desktop-platform windows`もexit 0で設定済み10検査すべてPASSし、release blocker 5件と`release_ready=false`を維持した。Rust／Flutter toolchainは利用可能だが、Rust起動器、Broker helper、Flutter Release executableがworkspaceに存在しないため、実installed product・別profile収集は未実施であり製品実証へ昇格させない。
+
+### 同日Windows installed app診断・collector process同定修正（2026-09-26）
+
+上記source追跡に続けて、OneDrive外の短い一時checkoutをclean基準commit `b81fc607e65ecaf7fc8bc5de53376e39949e0f20`へ固定し、Rust Release起動器／Broker helperとFlutter Windows Release appをbuildし、run固有rootへstageした。clean product binaryに対する同一profile `-DiagnosticOnly` runではD4 Pocket画面が実際に起動し、Broker Auditに通常資格後の`health / accepted / LIVE_RUNTIME`と画面初期化の複数recordが残った。一方、collectorは起動器childを特定できず失敗し、失敗処理が画面processを残すことも確認した。この診断は別Windows profileではないため正式release evidenceではない。
+
+原因はWindows package virtualizationにより、WMI `ExecutablePath`がstage pathではなくCodex packageの`LocalCache`表記を返すことだった。独立process probeで、報告されたimageのSHA-256はstage済みFlutter executableと一致し、observed parent PIDはRust起動器PID、Windows sessionも一致することを確認した。collectorは旧来のpath文字列一致を、直接親PID・同session・起動後start time・image SHA-256による照合へ置換する。失敗時cleanupも同じ検証済みchild選択を使う。strict evidence validatorとnegative conformanceは、親PID不一致、child関係欠落、image hash不一致／未検証を拒否する。
+
+当該記録作成時点では、この修正後の再実行・cleanup確認、全ローカルvalidation、commit／push／remote HEAD確認は未完了であり、結果を先取りしていない。Windowsの別profile、初回config製品生成、Setup Doctor product exportを含む既存release blocker 5件と`release_ready=false`を維持する。
+
+### 同日実installed app診断の再試行（2026-09-26）
+
+tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e39949e0f20` product binaryを使い、更新済みcollector version 12を`-DiagnosticOnly -NoPythonRuntime`で再実行した。可視UIA surface 4件、直接child／parent PID／same session／起動後start time／image SHA-256照合、通常資格health受理Audit 1件、lifecycle shutdown Audit、endpoint削除を観測した。通知領域『終了』menuはUIAutomationで起動器childのprocess上から実行され、強制終了=false、cleanup error=false、起動器exit code 0で完了した。終了後に対象runのapp processとendpointが残存しないことを確認した。
+
+実測evidence `%LOCALAPPDATA%\D4Pocket-Windows-Diagnostic-853a77b567c64d73b1f659aa0a928720\installed-smoke-diagnostic-final.json` のSHA-256は`ab575eaa3ff4d332279b7f74ae124276a9b9b520b602a1d99c11273c8bcff3fe`。statusは意図どおり`diagnostic_only`、stage userと同じprofile（`profileSeparate=false`）であるため、Windows正式release evidenceには昇格しない。別profile実証、初回config product生成、正式Setup Doctor export等のrelease blocker 5件と`release_ready=false`は継続する。
+
+修正作業blockの最終検証は、`python tooling/schema_check/check_schemas.py`（Schema 132／正常例132／negative fixture 163）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（208件）、`python -X utf8 tooling/日本語基底監査.py --strict`（負債0件）、`python tooling/manifest.py --check`、PowerShell AST parse、`git diff --check`がすべて成功した。`python tooling/validate_all.py --python-only --desktop-platform windows`もexit 0でconfigured 10 checksが成功し、既存release blocker 5件と`release_ready=false`を維持した。Rust／Flutter product sourceはこのblockでは変更していない。別profile正式runとrelease evidence欠落は依然として`release_blocker`である。
+
+終了操作の自然終了raceを拒否するguardを加えた最終sourceでもcollector version 12を再実行した。`installed-smoke-diagnostic-final-v2.json`のSHA-256は`311d56c7bad2981cc6a0032bbecf7f001f652d4c4b5da4c8fdf648ab03336309`。statusは`diagnostic_only`、profile分離false、可視surface 4件、health受理1件、shutdown Auditあり、endpoint削除済み、終了menu実行済み、強制終了なし、cleanup errorなし、起動器exit code 0であり、対象app processも残っていない。正式release証拠ではない。

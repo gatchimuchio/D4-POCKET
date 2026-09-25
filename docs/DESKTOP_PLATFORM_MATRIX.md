@@ -43,8 +43,8 @@ GUI-Shell v1.0は検証済みのmacOS対応を主張しない。macOSホスト�
 
 - item: Windows Setup Doctor diagnostics
   classification: release_blocker
-  reason: installed-app generated Setup Doctor product exportへの対応は存在するが、主要Windows製品対象についてのWindows product evidenceは収集されていない。
-  required_action: release_evidence/windows_installed_smoke.jsonを通してWindows Setup Doctor product export evidenceを合格させる。
+  reason: 現行Rust起動器はcollector注入export環境変数をFlutter childから除去し、主要Windows製品対象に正式なBroker統治Setup Doctor export経路が未接続である。
+  required_action: production pathを接続し、分離Windows profileからproduct export evidenceを取得してrelease_evidence/windows_installed_smoke.jsonで検証する。
   blocks_release: yes
 
 - item: mobile full release

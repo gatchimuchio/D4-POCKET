@@ -2,15 +2,10 @@
   [Parameter(Mandatory = $true)]
   [string]$InstalledExe,
 
+  [Parameter(Mandatory = $true)]
+  [string]$DesktopLauncherExe,
+
   [string]$OutputPath = "release_evidence/windows_installed_smoke.json",
-  [Parameter(Mandatory = $true)]
-  [string]$SetupDoctorJson,
-
-  [Parameter(Mandatory = $true)]
-  [string]$ConfigPath,
-
-  [Parameter(Mandatory = $true)]
-  [string]$AuditDir,
 
   [string]$VisibleSurfacesJson = "",
 
@@ -20,13 +15,9 @@
 
   [string]$BrokerEvidenceJson = "",
 
-  [string]$BrokerHelperExe = "",
-
-  [string]$BrokerStoreDir = "",
-
-  [string]$BrokerSessionFile = "",
-
   [switch]$NoPythonRuntime,
+
+  [switch]$UseCurrentWindowsProfile,
 
   [string]$RuntimeAssertionsJson = "",
 
@@ -40,20 +31,78 @@
 )
 
 $ErrorActionPreference = "Stop"
+$MaximumEvidenceFileBytes = 67108864
+$MaximumBrokerAuditBytes = 8388608
 
 $exe = Resolve-Path $InstalledExe
+$launcher = Resolve-Path $DesktopLauncherExe
 $hash = (Get-FileHash -Algorithm SHA256 -Path $exe).Hash.ToLowerInvariant()
-$brokerProcess = $null
+$launcherHash = (Get-FileHash -Algorithm SHA256 -Path $launcher).Hash.ToLowerInvariant()
+$process = $null
+$launcherProcess = $null
+$launcherStartTime = $null
+$launcherSessionId = $null
+$frontendDirectChildVerified = $false
+$frontendImageSha256Verified = $false
+$frontendObservedParentProcessId = $null
 $brokerEndpoint = $null
 $brokerEndpointFile = $null
 $brokerMediatedLaunch = $false
-$previousBrokerEndpointEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_ENDPOINT_JSON", "Process")
-$previousBrokerRuntimeDirEnv = [Environment]::GetEnvironmentVariable("GUI_SHELL_BROKER_RUNTIME_DIR", "Process")
 $previousPathEnv = [Environment]::GetEnvironmentVariable("Path", "Process")
+$previousLocalAppDataEnv = [Environment]::GetEnvironmentVariable("LOCALAPPDATA", "Process")
+$smokeEnvironmentVariables = @(
+  "GUI_SHELL_BROKER_ENDPOINT_JSON",
+  "GUI_SHELL_BROKER_SESSION_JSON",
+  "GUI_SHELL_BROKER_RUNTIME_DIR",
+  "GUI_SHELL_BROKER_CHANNEL_PIPE",
+  "GUI_SHELL_SNAPSHOT_JSON",
+  "GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON"
+)
+$previousSmokeEnvironment = [ordered]@{}
+foreach ($name in $smokeEnvironmentVariables) {
+  $previousSmokeEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+}
 $pythonRuntimePathScrubbed = $false
 $pythonPathEntriesRemovedCount = 0
 $pythonPathEntriesRemainingCount = 0
 $pythonCommandsVisibleAfterScrub = @()
+$frontendRunningAfterLaunch = $false
+$frontendCloseRequested = $false
+$frontendExitMenuInvoked = $false
+$frontendForcedToExit = $false
+$frontendCleanupError = $false
+$launcherExitCode = $null
+$launcherExitedAfterFrontend = $false
+$sessionFileRemovedAfterShutdown = $false
+$startupAuditEventCount = 0
+$shutdownAuditEventCount = 0
+$startupAuditRecorded = $false
+$shutdownAuditRecorded = $false
+$normalBrokerHealthEventCount = 0
+$normalBrokerHealthFirstEventId = $null
+$normalBrokerHealthRequestAccepted = $false
+$separateWindowsProfileVerified = $false
+$currentUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$runIsolationId = ""
+$localAppDataRoot = ""
+$brokerRuntimeRoot = ""
+$brokerStoreDir = ""
+
+if ($UseCurrentWindowsProfile.IsPresent) {
+  $actualProfileLocalAppData = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)
+  if ([string]::IsNullOrWhiteSpace($actualProfileLocalAppData) -or
+      [string]::Compare((Resolve-Path -LiteralPath $env:LOCALAPPDATA).Path, $actualProfileLocalAppData, $true) -ne 0) {
+    throw "現在のWindows user profileとLOCALAPPDATAが一致しません。"
+  }
+  $localAppDataRoot = $actualProfileLocalAppData
+} else {
+  if (!$DiagnosticOnly.IsPresent) {
+    throw "正式collectorでは別Windows user profileを確認してください。同一profileでの実行は-DiagnosticOnlyに限定します。"
+  }
+}
+if ($VisibleSurfacesJson -ne "" -and !$DiagnosticOnly.IsPresent) {
+  throw "正式collectorは現在画面を自身でUIAutomation計測します。外部visible-surface JSONは-DiagnosticOnlyでのみ読めます。"
+}
 
 function Write-JsonEvidence {
   param(
@@ -76,6 +125,9 @@ function Read-Utf8Json {
   )
 
   $resolved = Resolve-Path $Path
+  if ((Get-Item -LiteralPath $resolved.Path).Length -gt $MaximumEvidenceFileBytes) {
+    throw "証拠JSONが読み込み上限を超えています。"
+  }
   return [System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
 }
 
@@ -84,6 +136,9 @@ function Get-TaggedSha256 {
 
   if ($Path -eq "" -or !(Test-Path $Path)) {
     return $null
+  }
+  if ((Get-Item -LiteralPath $Path).Length -gt $MaximumEvidenceFileBytes) {
+    throw "証拠fileがhash対象上限を超えています。"
   }
   return "sha256:$((Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant())"
 }
@@ -188,76 +243,24 @@ function Assert-NormalBrokerEndpoint {
   }
 }
 
-function Start-SmokeBroker {
-  param(
-    [string]$HelperExe,
-    [string]$StoreDir,
-    [string]$SessionFile
-  )
-
-  $helper = Resolve-Path $HelperExe
-  if ($StoreDir -eq "") {
-    $StoreDir = Join-Path (Split-Path -Parent $helper.Path) "store"
-  }
-  if ($SessionFile -eq "") {
-    $SessionFile = Join-Path (Split-Path -Parent $helper.Path) "broker_session.json"
-  }
-  New-Item -ItemType Directory -Force -Path $StoreDir | Out-Null
-  if (Test-Path $SessionFile) {
-    Remove-Item -Force -Path $SessionFile
-  }
-  $process = Start-Process -FilePath $helper.Path -ArgumentList @(
-    "broker-server",
-    "--store-dir",
-    $StoreDir,
-    "--session-file",
-    $SessionFile
-  ) -WindowStyle Hidden -PassThru
-  for ($index = 0; $index -lt 100; $index += 1) {
-    if (Test-Path $SessionFile) {
-      $endpoint = Read-Utf8Json -Path $SessionFile
-      Assert-NormalBrokerEndpoint -Endpoint $endpoint
-      return [ordered]@{
-        process = $process
-        session_file = $SessionFile
-        endpoint = $endpoint
-      }
-    }
-    $process.Refresh()
-    if ($process.HasExited) {
-      throw "Rust broker が endpoint 準備前に終了しました: $($process.ExitCode)"
-    }
-    Start-Sleep -Milliseconds 50
-  }
-  throw "Rust broker endpoint ファイルが作成されませんでした: $SessionFile"
-}
-
-function Stop-SmokeBroker {
-  param($Process)
-  if ($null -eq $Process) {
-    return
-  }
-  $Process.Refresh()
-  if (!$Process.HasExited) {
-    Stop-Process -Id $Process.Id -Force
-  }
-}
-
 function Restore-SmokeEnvironment {
-  if ($null -eq $previousBrokerEndpointEnv) {
-    Remove-Item Env:\GUI_SHELL_BROKER_ENDPOINT_JSON -ErrorAction SilentlyContinue
-  } else {
-    $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $previousBrokerEndpointEnv
-  }
-  if ($null -eq $previousBrokerRuntimeDirEnv) {
-    Remove-Item Env:\GUI_SHELL_BROKER_RUNTIME_DIR -ErrorAction SilentlyContinue
-  } else {
-    $env:GUI_SHELL_BROKER_RUNTIME_DIR = $previousBrokerRuntimeDirEnv
+  foreach ($name in $smokeEnvironmentVariables) {
+    $value = $previousSmokeEnvironment[$name]
+    if ($null -eq $value) {
+      [Environment]::SetEnvironmentVariable($name, $null, "Process")
+    } else {
+      [Environment]::SetEnvironmentVariable($name, $value, "Process")
+    }
   }
   if ($null -eq $previousPathEnv) {
-    Remove-Item Env:\Path -ErrorAction SilentlyContinue
+    [Environment]::SetEnvironmentVariable("Path", $null, "Process")
   } else {
-    $env:Path = $previousPathEnv
+    [Environment]::SetEnvironmentVariable("Path", $previousPathEnv, "Process")
+  }
+  if ($null -eq $previousLocalAppDataEnv) {
+    [Environment]::SetEnvironmentVariable("LOCALAPPDATA", $null, "Process")
+  } else {
+    [Environment]::SetEnvironmentVariable("LOCALAPPDATA", $previousLocalAppDataEnv, "Process")
   }
 }
 
@@ -272,6 +275,217 @@ function Enable-NoPythonLaunchPath {
     Get-Command python, python3, py -ErrorAction SilentlyContinue |
       Select-Object -ExpandProperty Name -Unique
   )
+}
+
+function Get-VerifiedInstalledFrontendChildren {
+  param(
+    [System.Diagnostics.Process]$LauncherProcess,
+    [string]$ExpectedPath,
+    [string]$ExpectedSha256
+  )
+
+  $expectedName = [System.IO.Path]::GetFileName($ExpectedPath)
+  $matches = New-Object 'System.Collections.Generic.List[object]'
+  $children = Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($LauncherProcess.Id)" -ErrorAction SilentlyContinue
+  foreach ($child in @($children)) {
+    if ([string]::IsNullOrWhiteSpace($child.ExecutablePath) -or
+        [string]::Compare([System.IO.Path]::GetFileName($child.ExecutablePath), $expectedName, $true) -ne 0) {
+      continue
+    }
+    try {
+      $observedSha256 = (Get-FileHash -LiteralPath $child.ExecutablePath -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+      if ($observedSha256 -ne $ExpectedSha256) {
+        continue
+      }
+      $candidate = Get-Process -Id ([int]$child.ProcessId) -ErrorAction Stop
+      $candidate.Refresh()
+      if ($candidate.HasExited -or
+          $candidate.SessionId -ne $launcherSessionId -or
+          $candidate.StartTime -lt $launcherStartTime) {
+        continue
+      }
+      $matches.Add([pscustomobject]@{
+        Process = $candidate
+        ParentProcessId = [int]$child.ParentProcessId
+        ImageSha256 = "sha256:$observedSha256"
+      })
+    } catch {
+      continue
+    }
+  }
+  return $matches.ToArray()
+}
+
+function Find-InstalledFrontendProcess {
+  param([System.Diagnostics.Process]$LauncherProcess, [string]$ExpectedPath, [string]$ExpectedSha256)
+
+  for ($attempt = 0; $attempt -lt 300; $attempt += 1) {
+    $LauncherProcess.Refresh()
+    if ($LauncherProcess.HasExited) {
+      throw "Rust Desktop起動器がFlutter画面を起動する前に終了しました: $($LauncherProcess.ExitCode)"
+    }
+    $children = @(Get-VerifiedInstalledFrontendChildren -LauncherProcess $LauncherProcess -ExpectedPath $ExpectedPath -ExpectedSha256 $ExpectedSha256)
+    if ($children.Count -eq 1) {
+      $script:frontendDirectChildVerified = $true
+      $script:frontendImageSha256Verified = $true
+      $script:frontendObservedParentProcessId = $children[0].ParentProcessId
+      return $children[0].Process
+    }
+    if ($children.Count -gt 1) {
+      throw "Rust Desktop起動器からhash一致するFlutter childが複数起動しました。"
+    }
+    Start-Sleep -Milliseconds 100
+  }
+  throw "Rust Desktop起動器の直接childから配置済みFlutter imageをhash照合できませんでした。"
+}
+
+function Request-InstalledFrontendExit {
+  param([System.Diagnostics.Process]$Frontend)
+
+  $Frontend.Refresh()
+  if ($Frontend.HasExited) { return $false }
+  $windowHandle = $Frontend.MainWindowHandle
+  if ($windowHandle -eq [IntPtr]::Zero) { return $false }
+
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  if ($null -eq ("GuiShellInstalledSmokeWin32" -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class GuiShellInstalledSmokeWin32 {
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+}
+"@
+  }
+
+  # 通知領域controllerへ右button releaseを渡し、製品の終了menuを開く。
+  $posted = [GuiShellInstalledSmokeWin32]::PostMessage(
+    $windowHandle,
+    [uint32]0x8029,
+    [IntPtr]::Zero,
+    [IntPtr]0x0205
+  )
+  if (!$posted) { return $false }
+
+  $desktop = [System.Windows.Automation.AutomationElement]::RootElement
+  for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
+    Start-Sleep -Milliseconds 200
+    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+    $pending = New-Object 'System.Collections.Generic.Stack[object]'
+    try {
+      $topLevel = $walker.GetFirstChild($desktop)
+      $topLevelCount = 0
+      while ($null -ne $topLevel -and $topLevelCount -lt 1024) {
+        $pending.Push($topLevel)
+        $topLevel = $walker.GetNextSibling($topLevel)
+        $topLevelCount += 1
+      }
+    } catch {
+      continue
+    }
+    $observedCount = 0
+    while ($pending.Count -gt 0 -and $observedCount -lt 8192) {
+      $item = $pending.Pop()
+      $observedCount += 1
+      try {
+        if ($item.Current.ControlType -eq [System.Windows.Automation.ControlType]::MenuItem -and
+            $item.Current.Name -eq "終了" -and
+            $item.Current.ProcessId -eq $Frontend.Id -and
+            $item.Current.IsEnabled) {
+          $pattern = $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+          $pattern.Invoke()
+          return $true
+        }
+      } catch {
+        continue
+      }
+      try {
+        $child = $walker.GetFirstChild($item)
+        $siblingCount = 0
+        while ($null -ne $child -and $siblingCount -lt 1024) {
+          $pending.Push($child)
+          $child = $walker.GetNextSibling($child)
+          $siblingCount += 1
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+  return $false
+}
+
+function Stop-InstalledLauncher {
+  $frontends = @()
+  if ($null -ne $process) {
+    $frontends = @([pscustomobject]@{
+      Process = $process
+      ParentProcessId = $frontendObservedParentProcessId
+      ImageSha256 = "sha256:$hash"
+    })
+  } elseif ($null -ne $launcherProcess -and $null -ne $launcherStartTime -and $null -ne $launcherSessionId) {
+    try {
+      $frontends = @(Get-VerifiedInstalledFrontendChildren -LauncherProcess $launcherProcess -ExpectedPath $exe.Path -ExpectedSha256 $hash)
+      if ($frontends.Count -eq 1) {
+        $script:process = $frontends[0].Process
+        $script:frontendDirectChildVerified = $true
+        $script:frontendImageSha256Verified = $true
+        $script:frontendObservedParentProcessId = $frontends[0].ParentProcessId
+      } elseif ($frontends.Count -gt 1) {
+        $script:frontendCleanupError = $true
+      }
+    } catch {
+      $script:frontendCleanupError = $true
+    }
+  }
+  foreach ($frontendIdentity in $frontends) {
+    $frontend = $frontendIdentity.Process
+    $frontend.Refresh()
+    if (!$frontend.HasExited) {
+      try {
+        $exitMenuInvoked = Request-InstalledFrontendExit -Frontend $frontend
+        if ($exitMenuInvoked) {
+          $script:frontendCloseRequested = $true
+          $script:frontendExitMenuInvoked = $true
+        }
+        if (!$exitMenuInvoked) {
+          $script:frontendCleanupError = $true
+          $null = $frontend.CloseMainWindow()
+          $exitedAfterGracefulRequest = $frontend.WaitForExit(3000)
+        } else {
+          $exitedAfterGracefulRequest = $frontend.WaitForExit(20000)
+        }
+        if (!$exitedAfterGracefulRequest) {
+          $script:frontendCleanupError = $true
+          $script:frontendForcedToExit = $true
+          Stop-Process -Id $frontend.Id -Force -ErrorAction SilentlyContinue
+          $null = $frontend.WaitForExit(10000)
+        }
+      } catch {
+        $script:frontendCleanupError = $true
+        $script:frontendForcedToExit = $true
+        Stop-Process -Id $frontend.Id -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+  if ($null -ne $launcherProcess) {
+    $launcherProcess.Refresh()
+    if (!$launcherProcess.HasExited) {
+      $script:launcherExitedAfterFrontend = $launcherProcess.WaitForExit(15000)
+      if (!$script:launcherExitedAfterFrontend) {
+        $script:frontendCleanupError = $true
+        Stop-Process -Id $launcherProcess.Id -Force -ErrorAction SilentlyContinue
+      }
+    } else {
+      $script:launcherExitedAfterFrontend = $true
+    }
+    $launcherProcess.Refresh()
+    if ($launcherProcess.HasExited) {
+      $script:launcherExitCode = $launcherProcess.ExitCode
+    }
+  }
 }
 
 function Test-ObservedSurfaceVisible {
@@ -739,61 +953,106 @@ function Collect-VisibleSurfaces {
 
 trap {
   $failure = $_
+  Stop-InstalledLauncher
   Restore-SmokeEnvironment
-  if ($null -ne $process) {
-    $process.Refresh()
-    if (!$process.HasExited) {
-      Stop-Process -Id $process.Id -Force
-    }
-  }
-  Stop-SmokeBroker -Process $brokerProcess
   throw $failure
 }
 
-if ($BrokerHelperExe -ne "") {
-  $startedBroker = Start-SmokeBroker -HelperExe $BrokerHelperExe -StoreDir $BrokerStoreDir -SessionFile $BrokerSessionFile
-  $brokerProcess = $startedBroker.process
-  $brokerEndpoint = $startedBroker.endpoint
-  $brokerEndpointFile = $startedBroker.session_file
-  $brokerMediatedLaunch = $true
-  $env:GUI_SHELL_BROKER_ENDPOINT_JSON = $brokerEndpointFile
-  $env:GUI_SHELL_BROKER_RUNTIME_DIR = Split-Path -Parent $brokerEndpointFile
+$installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
+if ($null -eq $installedManifestPath) {
+  throw "起動器・App・Broker artifactの由来を照合するinstalled manifestがありません。"
 }
+$installedManifest = Read-Utf8Json -Path $installedManifestPath
+foreach ($item in @(
+    @{ actual = $exe.Path; expected = $installedManifest.app_exe; label = "App" },
+    @{ actual = $launcher.Path; expected = $installedManifest.launcher_exe; label = "Rust Desktop起動器" }
+  )) {
+  if ([string]::Compare([System.IO.Path]::GetFullPath([string]$item.actual), [System.IO.Path]::GetFullPath([string]$item.expected), $true) -ne 0) {
+    throw "$($item.label) pathがstaged manifestと一致しません。"
+  }
+}
+if ([string]$installedManifest.app_artifact_sha256 -ne "sha256:$hash" -or
+    [string]$installedManifest.launcher_artifact_sha256 -ne "sha256:$launcherHash") {
+  throw "AppまたはRust Desktop起動器のartifact hashがstaged manifestと一致しません。"
+}
+$brokerHelperPath = [string]$installedManifest.broker_exe
+$brokerHash = Get-TaggedSha256 -Path $brokerHelperPath
+if ($null -eq $brokerHash -or [string]$installedManifest.broker_artifact_sha256 -ne $brokerHash) {
+  throw "staged Rust Broker helperのartifact hashを確認できません。"
+}
+$stagingUserIdentity = $installedManifest.staging_user_identity
+$stagingUserIdentitySalt = [string]$stagingUserIdentity.per_run_salt
+$stagingUserIdentityHash = [string]$stagingUserIdentity.salted_hash
+if ($stagingUserIdentity.hash_algorithm -ne "SHA-256" -or
+    $stagingUserIdentitySalt -notmatch '^[a-f0-9]{32}$' -or
+    $stagingUserIdentityHash -notmatch '^sha256:[a-f0-9]{64}$') {
+  throw "staged manifestに比較可能なper-run user identity digestがありません。現行形式で再stageしてください。"
+}
+$currentUserIdentityHash = Get-TaggedStringSha256 -Text "$stagingUserIdentitySalt|$currentUserSid"
+$separateWindowsProfileVerified = ![string]::Equals($currentUserIdentityHash, $stagingUserIdentityHash, [System.StringComparison]::OrdinalIgnoreCase)
+if ($UseCurrentWindowsProfile.IsPresent -and !$separateWindowsProfileVerified) {
+  throw "起動器runtimeを分離するため、stage時とは異なるWindows user profileで実行してください。"
+}
+$runIsolationId = "$($installedManifest.run_id)-smoke-$([guid]::NewGuid().ToString('N'))"
+if ($UseCurrentWindowsProfile.IsPresent) {
+  $localAppDataRoot = Join-Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) ("D4Pocket-installed-smoke\" + $runIsolationId)
+  New-Item -ItemType Directory -Path $localAppDataRoot -ErrorAction Stop | Out-Null
+} else {
+  $newLocalAppDataRoot = Join-Path $env:TEMP ("D4Pocket-installed-smoke-" + $runIsolationId)
+  New-Item -ItemType Directory -Path $newLocalAppDataRoot -ErrorAction Stop | Out-Null
+  $localAppDataRoot = $newLocalAppDataRoot
+}
+$brokerRuntimeRoot = Join-Path $localAppDataRoot "GUI-Shell\broker\desktop"
+$brokerStoreDir = Join-Path $brokerRuntimeRoot "store"
+$brokerEndpointFile = Join-Path $brokerRuntimeRoot "broker_session.json"
 
-$setupDoctorPath = Resolve-InputOrOutputPath -Path $SetupDoctorJson
-$configExistedBeforeLaunch = Test-Path -LiteralPath $ConfigPath -PathType Leaf
-
-$process = $null
 try {
   if ($NoPythonRuntime.IsPresent) {
     Enable-NoPythonLaunchPath
   }
-  $process = Start-Process -FilePath $exe -PassThru
+  foreach ($name in $smokeEnvironmentVariables) {
+    [Environment]::SetEnvironmentVariable($name, $null, "Process")
+  }
+  [Environment]::SetEnvironmentVariable("LOCALAPPDATA", $localAppDataRoot, "Process")
+  $launcherProcess = Start-Process -FilePath $launcher.Path -PassThru
+  $launcherProcess.Refresh()
+  $launcherStartTime = $launcherProcess.StartTime
+  $launcherSessionId = $launcherProcess.SessionId
+  $process = Find-InstalledFrontendProcess -LauncherProcess $launcherProcess -ExpectedPath $exe.Path -ExpectedSha256 $hash
+  for ($attempt = 0; $attempt -lt 100 -and !(Test-Path -LiteralPath $brokerEndpointFile); $attempt += 1) {
+    $launcherProcess.Refresh()
+    if ($launcherProcess.HasExited) {
+      throw "Broker endpoint準備後にRust Desktop起動器が終了しました: $($launcherProcess.ExitCode)"
+    }
+    Start-Sleep -Milliseconds 100
+  }
+  if (!(Test-Path -LiteralPath $brokerEndpointFile)) {
+    throw "Rust Desktop起動器が実使用Broker endpointを作成しませんでした。"
+  }
+  try {
+    $brokerEndpoint = Read-Utf8Json -Path $brokerEndpointFile
+  } catch {
+    throw "Rust Desktop起動器のBroker endpoint JSONを読み取れません。"
+  }
+  Assert-NormalBrokerEndpoint -Endpoint $brokerEndpoint
+  $brokerMediatedLaunch = $true
   Start-Sleep -Seconds 3
   $process.Refresh()
+  $frontendRunningAfterLaunch = !$process.HasExited
 } finally {
   Restore-SmokeEnvironment
 }
 
-$installedManifestPath = Find-InstalledManifestPath -ExePath $exe.Path
-$installedManifest = $null
-if ($null -ne $installedManifestPath) {
-  $installedManifest = Read-Utf8Json -Path $installedManifestPath
+$setupDoctorPath = $null
+$setupDoctor = [ordered]@{
+  status = "missing"
+  formal_product_evidence = $false
+  evidence_source = [ordered]@{
+    collector = "installer/windows/collect_installed_smoke.ps1"
+    source_kind = "product_export_not_observed"
+    product_generated = $false
+  }
 }
-$setupDoctorArgs = @{
-  InstalledExe = $exe.Path
-  OutputPath = $setupDoctorPath
-  ConfigPath = $ConfigPath
-  AuditDir = $AuditDir
-}
-if ($BrokerEvidenceJson -ne "") {
-  $setupDoctorArgs.BrokerEvidenceJson = $BrokerEvidenceJson
-}
-if ($null -ne $installedManifestPath) {
-  $setupDoctorArgs.InstalledManifestJson = $installedManifestPath
-}
-& (Join-Path $PSScriptRoot "collect_setup_doctor.ps1") @setupDoctorArgs
-$setupDoctor = Read-Utf8Json -Path $setupDoctorPath
 if ($VisibleSurfacesJson -ne "") {
   $visibleSurfacesPath = Resolve-Path $VisibleSurfacesJson
   $visibleSurfaceEvidence = Read-Utf8Json -Path $visibleSurfacesPath.Path
@@ -810,6 +1069,56 @@ if ($VisibleSurfacesJson -ne "") {
     -OutputPath $VisibleSurfacesOutputPath `
     -WaitSeconds $VisibleSurfaceWaitSeconds
 }
+$process.Refresh()
+$mainWindowHandle = 0
+$windowTitle = ""
+if (!$process.HasExited) {
+  $mainWindowHandle = $process.MainWindowHandle.ToInt64()
+  $windowTitle = $process.MainWindowTitle
+}
+$firstWindowVisible = (!$process.HasExited -and $mainWindowHandle -ne 0)
+Stop-InstalledLauncher
+$sessionFileRemovedAfterShutdown = !(Test-Path -LiteralPath $brokerEndpointFile)
+$brokerAuditPath = Join-Path $brokerStoreDir "audit.jsonl"
+if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
+  if ((Get-Item -LiteralPath $brokerAuditPath).Length -gt $MaximumBrokerAuditBytes) {
+    throw "Broker lifecycle Audit fileが読み込み上限を超えています。"
+  }
+  foreach ($line in [System.IO.File]::ReadAllLines($brokerAuditPath, [System.Text.Encoding]::UTF8)) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try {
+      $auditEvent = $line | ConvertFrom-Json
+    } catch {
+      throw "Broker lifecycle Auditに不正なJSON行があります。"
+    }
+    if ([string]$auditEvent.operation -eq "health" -and
+        [string]$auditEvent.decision -eq "accepted" -and
+        [string]$auditEvent.reason -eq "health status returned" -and
+        [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME" -and
+        [string]$auditEvent.request_id -ne "" -and
+        [string]$auditEvent.event_id -match '^broker-audit-[1-9][0-9]*$' -and
+        [string]$auditEvent.payload_hash -match '^sha256:[a-f0-9]{64}$' -and
+        [string]$auditEvent.event_hash -match '^sha256:[a-f0-9]{64}$') {
+      $normalBrokerHealthEventCount += 1
+      if ($null -eq $normalBrokerHealthFirstEventId) {
+        $normalBrokerHealthFirstEventId = [string]$auditEvent.event_id
+      }
+    }
+    if ([string]$auditEvent.operation -eq "D4 Pocket Desktop起動") {
+      $startupAuditEventCount += 1
+      if ([string]$auditEvent.decision -eq "recorded" -and [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME") {
+        $startupAuditRecorded = $true
+      }
+    }
+    if ([string]$auditEvent.operation -eq "D4 Pocket Desktop終了") {
+      $shutdownAuditEventCount += 1
+      if ([string]$auditEvent.decision -eq "recorded" -and [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME") {
+        $shutdownAuditRecorded = $true
+      }
+    }
+  }
+}
+$normalBrokerHealthRequestAccepted = $normalBrokerHealthEventCount -gt 0
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
@@ -829,6 +1138,7 @@ $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
     (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath),
     (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
+    (New-EvidenceFileRecord -Kind "broker_lifecycle_audit" -Path $brokerAuditPath),
     (New-EvidenceFileRecord -Kind "visible_surfaces" -Path (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path")),
     (New-EvidenceFileRecord -Kind "runtime_assertions" -Path $RuntimeAssertionsJson),
     (New-EvidenceFileRecord -Kind "audit_anchor_external_tamper_evidence" -Path $AuditAnchorEvidenceJson),
@@ -843,25 +1153,9 @@ $evidenceBundleFileValues = @($evidenceBundleFiles.ToArray())
 $bundleText = (@{ files = @($evidenceBundleFileValues) } | ConvertTo-Json -Compress -Depth 10)
 $evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
 
-$mainWindowHandle = 0
-$windowTitle = ""
-if (!$process.HasExited) {
-  $mainWindowHandle = $process.MainWindowHandle.ToInt64()
-  $windowTitle = $process.MainWindowTitle
-}
-
-$resolvedConfigPath = Resolve-Path $ConfigPath -ErrorAction SilentlyContinue
 $configJsonValid = $false
-if ($null -ne $resolvedConfigPath) {
-  try {
-    Read-Utf8Json -Path $resolvedConfigPath.Path | Out-Null
-    $configJsonValid = $true
-  } catch {
-    $configJsonValid = $false
-  }
-}
 
-$resolvedAuditDir = Resolve-Path $AuditDir -ErrorAction SilentlyContinue
+$resolvedAuditDir = Resolve-Path $brokerStoreDir -ErrorAction SilentlyContinue
 $auditWriteProbe = [ordered]@{
   attempted = $false
   write = $false
@@ -913,8 +1207,8 @@ if ($null -ne $resolvedAuditDir) {
   }
 }
 
-$firstWindowVisible = (!$process.HasExited -and $mainWindowHandle -ne 0)
-$configCreated = (!$configExistedBeforeLaunch -and $null -ne $resolvedConfigPath -and $configJsonValid)
+$configCreated = $false
+$configExistedBeforeLaunch = $null
 $auditDirWritable = (
   $auditWriteProbe.attempted -and
   $auditWriteProbe.write -and
@@ -956,6 +1250,13 @@ foreach ($surface in $requiredVisibleSurfaces) {
 if ($aggregateSurfaceShortcutDetected -or !$surfaceMatchRequirementsMet) {
   $visibleSurfacesComplete = $false
 }
+$unsupportedClaims = @(
+  "first_run_configuration_product_export",
+  "formal_setup_doctor_product_export"
+)
+if (!$separateWindowsProfileVerified) {
+  $unsupportedClaims += "separate_windows_user_profile"
+}
 
 $evidence = [ordered]@{
   platform = "windows"
@@ -971,14 +1272,18 @@ $evidence = [ordered]@{
     staged_manifest_path = $installedManifestPath
     installed_manifest_sha256 = $(if ($null -ne $installedManifestPath) { Get-TaggedSha256 -Path $installedManifestPath } else { $null })
     app_artifact_sha256 = "sha256:$hash"
-    broker_artifact_sha256 = $(if ($null -ne $installedManifest) { $installedManifest.broker_artifact_sha256 } elseif ($BrokerHelperExe -ne "") { Get-TaggedSha256 -Path (Resolve-Path $BrokerHelperExe).Path } else { $null })
+    launcher_artifact_sha256 = "sha256:$launcherHash"
+    broker_artifact_sha256 = $brokerHash
     isolation = [ordered]@{
       uses_shared_fixed_install_root = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.uses_shared_fixed_install_root } else { $true })
       isolated_install_root = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_install_root } else { $null })
-      isolated_runtime_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_runtime_dir } else { $null })
-      isolated_store_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_store_dir } else { $BrokerStoreDir })
-      isolated_config_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_config_dir } else { Split-Path -Parent $ConfigPath })
-      isolated_audit_dir = $(if ($null -ne $installedManifest -and $null -ne $installedManifest.isolation) { $installedManifest.isolation.isolated_audit_dir } else { $AuditDir })
+      isolated_localappdata = $localAppDataRoot
+      isolated_runtime_dir = $brokerRuntimeRoot
+      isolated_store_dir = $brokerStoreDir
+      isolated_config_dir = $null
+      isolated_audit_dir = $brokerStoreDir
+      run_id = $runIsolationId
+      separate_windows_user_profile = $separateWindowsProfileVerified
     }
     evidence_bundle_files = @($evidenceBundleFileValues)
     evidence_bundle_sha256 = $evidenceBundleSha256
@@ -991,20 +1296,18 @@ $evidence = [ordered]@{
       evidence_class = $(if ($surfaceBuildRegistry) { "INTERNAL_STATE" } else { "LIVE_RUNTIME" })
       formal_release_input = !$surfaceBuildRegistry
     }
-    "first_run.config_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.broker_lifecycle_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.broker_health_request" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.config_audit" = [ordered]@{ source_type = "unsupported_claim"; evidence_class = "CONFIG"; formal_release_input = $false }
     "first_run.installer_authority_boundary" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
-    setup_doctor = [ordered]@{
-      source_type = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "product_export" } else { "external_probe" })
-      evidence_class = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { "LIVE_RUNTIME" } else { "EXTERNAL_EVIDENCE" })
-      formal_release_input = ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true)
-    }
+    setup_doctor = [ordered]@{ source_type = "external_probe"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $false }
     "broker.ipc_restart_crash" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     release_runtime_assertions = [ordered]@{ source_type = "static_assertion"; evidence_class = @("CONFIG", "FIXTURE"); formal_release_input = $true }
-    unsupported_claims = $(if ((Get-EvidenceValue -Object $setupDoctor -Name "formal_product_evidence") -eq $true) { @() } else { @("formal_setup_doctor_product_export") })
+    unsupported_claims = @($unsupportedClaims)
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "9"
+    collector_version = "12"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -1012,23 +1315,66 @@ $evidence = [ordered]@{
     installed_exe_path = $exe.Path
     installed_exe_exists = $true
     sha256 = "sha256:$hash"
+    desktop_launcher_path = $launcher.Path
+    desktop_launcher_sha256 = "sha256:$launcherHash"
+    broker_helper_path = $brokerHelperPath
+    broker_helper_sha256 = $brokerHash
   }
   first_run = [ordered]@{
-    status = $(if ($DiagnosticOnly.IsPresent) { "diagnostic_only" } elseif ($firstWindowVisible -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete) { "passed" } else { "failed" })
-    command = "& `"$($exe.Path)`""
+    status = $(if ($DiagnosticOnly.IsPresent) { "diagnostic_only" } elseif ($firstWindowVisible -and $frontendExitMenuInvoked -and !$frontendForcedToExit -and !$frontendCleanupError -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete -and $startupAuditRecorded -and $shutdownAuditRecorded -and $sessionFileRemovedAfterShutdown -and $separateWindowsProfileVerified -and $normalBrokerHealthRequestAccepted -and $launcherExitedAfterFrontend -and $launcherExitCode -eq 0) { "passed" } else { "failed" })
+    command = "& `"$($launcher.Path)`""
     launched_from_installed_path = $true
+    launched_via_rust_desktop_launcher = $true
+    launcher_process_id = $launcherProcess.Id
+    launcher_exited_after_frontend = $launcherExitedAfterFrontend
+    launcher_exit_code = $launcherExitCode
+    launcher_runtime_dir = $brokerRuntimeRoot
+    profile_identity_isolated_from_staging_user = $separateWindowsProfileVerified
+    profile_identity_sid_exposed = $false
     process_id = $process.Id
-    process_running_after_launch = !$process.HasExited
+    process_identity = [ordered]@{
+      method = "direct_parent_pid_and_sha256"
+      evidence_class = "LIVE_RUNTIME"
+      direct_child_observed = $frontendDirectChildVerified
+      parent_process_id = $frontendObservedParentProcessId
+      same_windows_session = $true
+      started_after_launcher = $true
+      image_sha256 = "sha256:$hash"
+      image_matches_manifest = $frontendImageSha256Verified
+    }
+    process_running_after_launch = $frontendRunningAfterLaunch
+    frontend_close_requested = $frontendCloseRequested
+    frontend_exit_menu_invoked = $frontendExitMenuInvoked
+    frontend_forced_to_exit = $frontendForcedToExit
+    frontend_cleanup_error = $frontendCleanupError
     main_window_handle = $mainWindowHandle
     window_title = $windowTitle
     first_window_visible = $firstWindowVisible
     broker_mediated_launch = $brokerMediatedLaunch
-    broker_helper_path = $(if ($BrokerHelperExe -ne "") { (Resolve-Path $BrokerHelperExe).Path } else { $null })
+    broker_helper_path = $brokerHelperPath
     broker_endpoint_file = $brokerEndpointFile
-    broker_endpoint_created = $(if ($null -ne $brokerEndpointFile) { Test-Path $brokerEndpointFile } else { $false })
+    broker_endpoint_created = ($null -ne $brokerEndpoint)
+    broker_endpoint_removed_after_shutdown = $sessionFileRemovedAfterShutdown
     broker_transport = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.transport } else { $null })
     broker_endpoint_credential_role = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.credential_role } else { $null })
     normal_endpoint_credential_role_verified = $(if ($null -ne $brokerEndpoint) { $brokerEndpoint.credential_role -eq "normal" } else { $false })
+    broker_health_request = [ordered]@{
+      accepted = $normalBrokerHealthRequestAccepted
+      accepted_event_count = $normalBrokerHealthEventCount
+      first_audit_event_id = $normalBrokerHealthFirstEventId
+      evidence_class = "LIVE_RUNTIME"
+      caller_process_attributed = $false
+      client_response_receipt_observed = $false
+    }
+    broker_lifecycle_audit = [ordered]@{
+      path = $brokerAuditPath
+      sha256 = Get-TaggedSha256 -Path $brokerAuditPath
+      startup_event_count = $startupAuditEventCount
+      startup_event_recorded = $startupAuditRecorded
+      shutdown_event_count = $shutdownAuditEventCount
+      shutdown_event_recorded = $shutdownAuditRecorded
+      evidence_class = "LIVE_RUNTIME"
+    }
     no_python_runtime_requested = [bool]$NoPythonRuntime
     python_runtime_path_scrubbed = $pythonRuntimePathScrubbed
     python_path_entries_removed_count = $pythonPathEntriesRemovedCount
@@ -1045,11 +1391,11 @@ $evidence = [ordered]@{
       surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
       diagnostic_tree = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "diagnostic_tree"
     }
-    config_path = $(if ($null -ne $resolvedConfigPath) { $resolvedConfigPath.Path } else { $ConfigPath })
+    config_path = $null
     config_existed_before_launch = $configExistedBeforeLaunch
     config_created = $configCreated
     config_json_valid = $configJsonValid
-    audit_dir = $(if ($null -ne $resolvedAuditDir) { $resolvedAuditDir.Path } else { $AuditDir })
+    audit_dir = $(if ($null -ne $resolvedAuditDir) { $resolvedAuditDir.Path } else { $brokerStoreDir })
     audit_dir_writable = $auditDirWritable
     audit_write_probe = $auditWriteProbe
     installer_grants_authority = $false
@@ -1092,10 +1438,5 @@ if ($null -ne $auditAnchorEvidence) {
 
 $output = New-Item -ItemType File -Force -Path $OutputPath
 Write-JsonEvidence -Value $evidence -Path $output.FullName -Depth 10
-
-if ($null -ne $process -and !$process.HasExited) {
-  Stop-Process -Id $process.Id
-}
-Stop-SmokeBroker -Process $brokerProcess
 
 Write-Host "書き出しました: $($output.FullName)"

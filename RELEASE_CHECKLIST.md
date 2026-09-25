@@ -183,7 +183,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   classification: release_blocker
   registry_id: windows_installer_first_run_smoke
   reason: strict R2 provenance／isolation contract を伴う Windows installed-path first-run evidence は、<code>release_evidence/windows_installed_smoke.json</code> に記録されていない。
-  required_action: Windows installed app を一意の run root に stage し、<code>installer\windows\collect_broker_smoke.ps1</code> を実行し、native Windows 上で <code>-BrokerHelperExe</code>、<code>-NoPythonRuntime</code>、UIAutomation diagnostic tree evidence、broker evidence、config path、audit dir probe input、installed manifest を指定して <code>installer\windows\collect_installed_smoke.ps1</code> を実行し、<code>python tooling\windows_release_evidence.py</code> を通過させる。
+  required_action: stage時と異なるWindows user profile（SID）から <code>collect_installed_smoke.ps1 -DesktopLauncherExe -UseCurrentWindowsProfile -NoPythonRuntime</code> を実行し、起動器の実runtime、lifecycle Audit、通常資格で受理されたhealth要求Audit、endpoint cleanup、UIAutomationを収集する。health Auditはclient応答受信やPID帰属を証明しない。clean-source実測と初回config生成が成立するまではrelease blockerを維持し、<code>python tooling\windows_release_evidence.py</code>を通過させる。
   blocks_release: yes
 
 - item: GUI Shell書出しのOwner認可経路がDesktop UIに未接続
@@ -203,8 +203,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: installed app は machine-readable Setup Doctor product export を扱うが、native Windows isolated-run evidence は未収集かつ未検証である。PowerShell Setup Doctor collector は引き続き external probe evidence のみである。
-  required_action: isolated Windows installed smoke を実行して installed app に Setup Doctor product export evidence を書き出させ、<code>python tooling\windows_release_evidence.py</code> を通過させる。
+  reason: 現行Rust Desktop起動器はcollector注入のSetup Doctor export環境変数をFlutter childから除去し、正式なBroker統治product export経路は未接続である。PowerShell Setup Doctor collectorはexternal probe evidenceのみである。
+  required_action: Broker統治されたSetup Doctor product export contractと通常起動経路を接続し、分離Windows profileからproduct evidenceを収集した後、<code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
 - item: macOS planned portability target unverified

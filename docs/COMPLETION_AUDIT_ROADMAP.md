@@ -147,7 +147,7 @@ GUI-Shell は、三つの完了定義を分離して使用する。
 - item: Windows installer and first-run smoke
   classification: release_blocker
   reason: installed app path の first-run evidence が release_evidence/windows_installed_smoke.json に存在しない。
-  required_action: collect_broker_smoke.ps1、collect_setup_doctor.ps1、collect_installed_smoke.ps1 -BrokerHelperExe -NoPythonRuntime を使って native Windows installed smoke collection を実行し、python tooling/windows_release_evidence.py を通過させる。計測済み windows_installed_smoke.json が存在するまでは strict release を引き続き失敗させる。
+  required_action: stage時と異なるWindows user profileから起動器基準collectorを実行し、実runtime／lifecycle Audit／通常資格で受理されたhealth要求Auditを収集する。health Auditはclient応答受信やPID帰属を証明しない。初回config生成とSetup Doctor exportを含むclean-source実測が揃うまではstrict releaseを失敗させる。
   blocks_release: yes
 
 - item: Windows Setup Doctor real diagnostics smoke

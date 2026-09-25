@@ -1,5 +1,9 @@
 # GUI Shell の主張境界
 
+## Windows Setup Doctorの現行状態（2026-09-26）
+
+通常production起動からのBroker統治machine-readable Setup Doctor exportは未接続である。過去にcollector注入環境変数で得たproduct-shaped JSONは通常production pathの証拠ではなく、現行Rust起動器はその注入環境変数をFlutter childから除去する。PowerShell collectorもexternal probeに限る。この項目は下記の過去記録に優先し、native Windows product evidenceとともに`release_blocker`を維持する。
+
 ## rev2の現在証拠（2026-09-10）
 
 以下の旧Desktop v1.0記録は過去の基準面を含む。現行owner rev2ではMobile・端末連携・Android・Apple補助buildも作業対象であり、旧post_v1_scopeを理由に未完了を除外しない。現在の要求別監査は `docs/REV2_PROGRESS.md`、Mobile状態は `MOBILE_STATUS.md` を参照する。
@@ -108,7 +112,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 - item: Windows Installer、first-run、Setup Doctor の release validation が未通過
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_setup_doctor_smoke, windows_broker_installed_smoke
-  reason: Windows project support と過去の owner-trial launch smoke は保持されているが、現在の strict R2 evidence には、native Windows の新しい隔離 installed run が必要である。その run は source commit、clean worktree state、app / Broker artifact hash、evidence bundle hash、UIAutomation diagnostic tree、Broker の measured field provenance、installed app が生成した Setup Doctor product export を含まなければならない。product export path は存在するが、<code>release_evidence/windows_installed_smoke.json</code> がない。
+  reason: Windows project support と過去の owner-trial launch smoke は保持されているが、現在の strict R2 evidence にはnative Windowsの隔離installed runが必要である。そのrunはsource commit、clean worktree state、artifact hash、evidence bundle、UIAutomation tree、Broker field provenance、および通常production pathから生成されたSetup Doctor product exportを必要とする。過去のcollector注入exportはproduction pathではなく、現行Rust起動器はその注入変数をchildから除去する。正式export contractと<code>release_evidence/windows_installed_smoke.json</code>はいずれも未成立。
   required_action: 隔離された staged run から native Windows installed smoke collection を実行し、measured window、visible-surface diagnostic tree、config JSON、Audit の write / read / delete、Broker IPC / restart / crash の field provenance、installed app が生成した Setup Doctor product evidence を収集する。その後 <code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
@@ -135,8 +139,8 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 - item: Windows Setup Doctor diagnostics が未通過
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: installed app は machine-readable な Setup Doctor product export を提供するが、その evidence は native Windows で収集されておらず、strict validator も通過していない。PowerShell の Setup Doctor collector は external probe evidence にすぎない。
-  required_action: 隔離された Windows installed smoke を通じて app-generated Setup Doctor product export を収集し、<code>python tooling\windows_release_evidence.py</code> を通過させる。
+  reason: 現行installed appは通常production pathからmachine-readable Setup Doctor product exportを提供していない。過去のcollector注入測定はproduction経路ではなく、PowerShell Setup Doctor collectorもexternal probe evidenceにすぎない。native Windows product evidenceは未成立である。
+  required_action: Broker統治されたSetup Doctor production pathを実装し、隔離Windows installed smokeからproduct exportを収集して<code>python tooling\windows_release_evidence.py</code>を通過させる。
   blocks_release: yes
 
 - item: Audit anchor の external tamper-evidence proof がない

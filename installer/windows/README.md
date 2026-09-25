@@ -25,11 +25,15 @@ cargo build --release --locked --manifest-path native\rust_helper\Cargo.toml --b
 
 staged manifestの`launcher_runtime`は起動器が使う`%LOCALAPPDATA%\GUI-Shell\broker\desktop`を示す`CONFIG`宣言で、per-user scope、`isolated=false`、`formal_runtime_proof=false`を明記する。manifestの`runtime_dir`／`store_dir`／`config_dir`／`audit_dir`は証拠collector用の分離scratch pathであり、標準起動器の保存先ではない。この差をWindows installed evidenceで解消せず、二つのpathを同じruntimeとして報告してはならない。
 
-`collect_broker_smoke.ps1`と`collect_installed_smoke.ps1`は別個のevidence collectorである。現行`collect_installed_smoke.ps1`は診断出力収集のためFlutter executableを直接起動しており、標準Rust起動器の経路を実証しない。collectorを起動器経由へ接続し、分離Windows環境からclean sourceの証拠を採るまで該当release gateを維持する。
+`collect_broker_smoke.ps1`と`collect_installed_smoke.ps1`は別個のevidence collectorである。後者はRust Desktop起動器を起動し、起動器の直接child、同じWindows session、起動後の生成時刻、Flutter executableのSHA-256でprocess identityを確認する。Windows package virtualizationがWMI `ExecutablePath`を書き換える場合があるため、path文字列一致を要求しない。`LOCALAPPDATA`はrun固有の新規pathへ限定し、実際のBroker runtime、endpoint、Store、AuditEventをそこで観測する。stage時の`runtime/` scratch pathや独立Broker smokeを製品起動の代替にしない。
+
+正式collectorはstageを実行したWindows user SIDと異なるWindows user profileから起動し、`-UseCurrentWindowsProfile`を指定する。staged manifestにはuser SIDそのものではなく、run固有salt付きSHA-256 digestを保存し、collector内だけで現在userと比較する。対象installed rootとmanifestには読み取り権限、evidence出力先には当該test userの書き込み権限が必要だが、collectorはACLを変更しない。同一profileでの開発確認は`-DiagnosticOnly`に限定し、Temp下に別runtimeを作成する。
+
+現行製品は機械可読なSetup Doctor出力と初回設定生成をまだ提供しない。Flutter本番起動はBroker health要求を行い、Rust Brokerは通常endpoint認証後に受理したhealth要求を`LIVE_RUNTIME`永続Auditへ記録する。collectorはこの記録を測定できるが、client応答受信や呼出し元PIDまでは証明しない。stage manifestのconfig／audit scratchを使わず、外部Setup Doctor JSONも取り込まない。未接続機能と証拠限界を記録し、endpoint付帯情報や画面だけで代替せず、厳格な正式公開検証を失敗させる。
 
 `collect_broker_smoke.ps1`は認証IPC、`127.0.0.1`限定bind、`credential_role=normal`、永続store準備、Broker restart後のreplay拒否、crash時のfail-closedを検証する。これはBroker単体のLIVE_RUNTIME証拠であり、Desktop起動器、installed product、正式releaseを証明しない。No-Python／no-FFI値は非正式なstatic declarationに限る。
 
-`collect_setup_doctor.ps1`は外部installer／config／Broker確認だけを行い、正式な製品証拠として扱わない。`collect_installed_smoke.ps1`もこの外部probeを証拠へ格納するだけで、Flutterへ診断出力や設定生成を要求しない。`-NoPythonRuntime`は対象PATHを無効化する。正式な初回起動証拠へは、Rust起動器の利用、実画面、Broker統治された製品Setup Doctor、初回設定、監査、field provenanceを接続する必要がある。
+`collect_setup_doctor.ps1`は外部installer／config／Broker確認だけを行い、正式な製品証拠として扱わない。`collect_installed_smoke.ps1`はこの外部probeを取り込まず、現行Rust Desktop起動器もSetup Doctor用のcollector注入環境変数をFlutter childから除去する。正式な初回起動証拠へは、実画面、Broker統治された製品Setup Doctor、初回設定、health受理Audit、監査、field provenanceを接続する必要がある。health受理AuditはBroker側の要求受理のみを示し、client応答受信や呼出し元PIDは証明しない。`-NoPythonRuntime`は対象PATHを無効化する。
 
 ## 監査アンカー収集器の証拠範囲
 
