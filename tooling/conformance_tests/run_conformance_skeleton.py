@@ -94,6 +94,8 @@ REQUIRED_SCHEMA_NAMES = {
     "evaluation_dataset_registration",
     "regression_case_registration",
     "regression_case_receipt",
+    "regression_case_list_request",
+    "regression_case_list",
     "mcp_contract",
     "a2a_contract",
     "mcp_connection",
@@ -4063,17 +4065,24 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
         "RecoveryAction",
         "normal IPC",
         "自動コピー",
+        "metadata_only",
+        "通常IPC",
+        "cursor",
     ):
         if token not in specification_text:
             不整合.append(f"C6回帰Case仕様に必須境界がない: {token}")
 
     registration = load_contract_fixture("regression_case_registration.valid.json")
     receipt = load_contract_fixture("regression_case_receipt.valid.json")
+    listing = load_contract_fixture("regression_case_list.valid.json")
     registration_schema = load_schema("regression_case_registration.schema.json")
     receipt_schema = load_schema("regression_case_receipt.schema.json")
+    list_request_schema = load_schema("regression_case_list_request.schema.json")
+    list_schema = load_schema("regression_case_list.schema.json")
     for name, value, schema in (
         ("registration", registration, registration_schema),
         ("receipt", receipt, receipt_schema),
+        ("metadata list", listing, list_schema),
     ):
         failures = validate_instance(value, schema)
         if failures:
@@ -4097,6 +4106,58 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
     if not validate_instance(raw_receipt, receipt_schema):
         不整合.append("C6公開receiptのraw入力混入を拒否しない")
 
+    for request in (
+        {"版": 1, "after": 0, "limit": 100},
+        {"版": 1, "after": 12, "limit": 1},
+    ):
+        if validate_instance(request, list_request_schema):
+            不整合.append("C6ページ要求の正常なcursor/limitを拒否した")
+    for request in (
+        {"版": 1, "after": -1, "limit": 10},
+        {"版": 1, "after": 0, "limit": 101},
+        {"版": 1, "after": 0, "limit": 10, "approval_id": "injected"},
+    ):
+        if not validate_instance(request, list_request_schema):
+            不整合.append("C6ページ要求が負数・上限超過・権限fieldを許可した")
+    private_listing = copy.deepcopy(listing)
+    private_listing["回帰Case一覧"][0]["期待経路"] = "must-not-be-returned"
+    if not validate_instance(private_listing, list_schema):
+        不整合.append("C6 metadata一覧がprivate fieldの混入を許可した")
+
+    def list_page_matches(request: dict, response: dict) -> bool:
+        items = response.get("回帰Case一覧")
+        if not isinstance(items, list):
+            return False
+        after = request.get("after")
+        limit = request.get("limit")
+        count = response.get("件数")
+        total = response.get("合計件数")
+        if not all(isinstance(value, int) and not isinstance(value, bool) for value in (after, limit, count, total)):
+            return False
+        if count != len(items) or count > limit or after + count > total:
+            return False
+        expected_next = after + count if after + count < total else None
+        return response.get("次cursor") == expected_next
+
+    list_request = {"版": 1, "after": 0, "limit": 100}
+    if not list_page_matches(list_request, listing):
+        不整合.append("C6 metadata一覧の件数またはcursor関係が不正")
+    count_mismatch = copy.deepcopy(listing)
+    count_mismatch["件数"] = 0
+    if list_page_matches(list_request, count_mismatch):
+        不整合.append("C6 metadata一覧の件数不一致を関係検査が許可した")
+    next_cursor_mismatch = copy.deepcopy(listing)
+    next_cursor_mismatch["合計件数"] = 2
+    next_cursor_mismatch["次cursor"] = None
+    if list_page_matches(list_request, next_cursor_mismatch):
+        不整合.append("C6 metadata一覧の次cursor欠落を関係検査が許可した")
+    request_contract = json.loads((SPECS / "ipc_request.schema.json").read_text(encoding="utf-8"))
+    response_contract = json.loads((SPECS / "ipc_response.schema.json").read_text(encoding="utf-8"))
+    if "回帰Case一覧" not in request_contract["properties"]["operation"]["enum"]:
+        不整合.append("C6 metadata一覧operationがIPC request contractへ未接続")
+    if "回帰Case一覧" not in response_contract["properties"]["operation"]["enum"]:
+        不整合.append("C6 metadata一覧operationがIPC response contractへ未接続")
+
     rust = (RUST_HELPER / "src" / "broker" / "regression_case.rs").read_text(encoding="utf-8")
     dialogue = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
     protected = (RUST_HELPER / "src" / "protected_store.rs").read_text(encoding="utf-8")
@@ -4107,12 +4168,18 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
         ("終了監査ID", rust + dialogue),
         ("hash_only", rust),
         ("秘密候補入力", rust),
+        ("回帰Case一覧処理", rust),
+        ("stored_regression_cases", rust),
+        ("metadata_projection", rust),
+        ("store.inspect", rust),
         ("Regression", protected),
     ):
         if token not in source:
             不整合.append(f"C6実装に統治境界tokenがない: {token}")
     if "Purpose::Evaluation" in rust:
         不整合.append("C6がC5 Evaluation purposeへ混入している")
+    if "unprotect(" in rust:
+        不整合.append("C6 metadata一覧経路がprivate定義を復号している")
     return 不整合
 
 

@@ -43,7 +43,7 @@ D4 Pocket統合の次単位では、GUI Shell構成ManifestをSchema-firstで追
 
 Agent Adapter契約をSchema-firstで接続し、Windows上の実物Codex CLI（`codex-cli 0.155.0-alpha.16`）について、versionと`codex exec --help`をBroker登録時にも確認するRust Adapterを追加した。ownerが絶対executableとworkspaceを明示した場合だけ、既存の実行系対話・owner承認経路から固定read-only JSONL実行を行い、Windowsの実Broker通常IPCで`codex`実行系列挙まで確認した。Broker command dispatchは停止中のままであり、任意command、write-capable Agent、MCP、複数Agent比較、Handoffは追加していない。Claude／Gemini等の未導入Agentは存在を推測しない。これはAgent Launcher基盤の現行限定実装であり、製品releaseや全Agent機能の完成を意味しない。
 
-続くC6単位では、`docs/specs/regression-case.md`を正本とするowner専用の`回帰Case登録`を追加する。Brokerは完了済み通常対話の要求ID/hash、全文表示、結果証跡、終了監査を照合し、owner明示のredacted定義をC5と別purposeのWindows ProtectedStoreへ保存する。元の対話本文の自動コピー、normal IPCへのraw本文返却、C5 Datasetへの自動importは行わない。GUI登録面、Case一覧、削除Recovery、Windows実機owner登録証拠は後続作業としてrelease_blockerに保持する。
+続くC6単位では、`docs/specs/regression-case.md`を正本とするowner専用の`回帰Case登録`に加え、通常IPCへ限定metadataのページ一覧を接続した。Brokerは完了済み通常対話の要求ID/hash、全文表示、結果証跡、終了監査を照合し、owner明示のredacted定義をC5と別purposeのWindows ProtectedStoreへ保存する。一覧は監査receipt由来の公開項目だけを返し、ページ対象の暗号文hashを照合する。元の対話本文・Case定義は一覧へ返さず、C5 Datasetへ自動importしない。Desktopの回帰Caseタブは公開metadataの手動読取に限る。Owner専用登録画面、削除Recovery、C5への明示import、Windows実機owner登録証拠は未完了の`release_blocker`として保持する。
 
 続くC7の現行単位では、`docs/specs/credential-vault.md`を正本とするowner専用の新規資格情報登録と、通常IPCの検証付きmetadata一覧を接続した。秘密値は`ProtectedStore::Purpose::Credential`のWindows DPAPIへ保管し、資格情報からAuthority、Permission、Approvalを生成しない。秘密値の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、Recovery、GUI管理面は未接続のrelease_blockerとして保持する。
 

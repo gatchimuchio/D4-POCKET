@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_list_request.schema.json",
+  "title": "回帰Case metadata一覧要求",
+  "description": "通常IPCの読取専用ページ要求。cursorは権限・承認ではない。",
+  "type": "object",
+  "required": ["版", "after", "limit"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "after": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+  }
+}

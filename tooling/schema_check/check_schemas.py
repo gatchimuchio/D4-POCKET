@@ -69,6 +69,8 @@ REQUIRED = {
     "evaluation_dataset_registration.schema.json",
     "regression_case_registration.schema.json",
     "regression_case_receipt.schema.json",
+    "regression_case_list_request.schema.json",
+    "regression_case_list.schema.json",
     "credential_registration.schema.json",
     "credential_receipt.schema.json",
     "credential_list.schema.json",

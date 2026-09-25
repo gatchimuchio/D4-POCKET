@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bb136b4f9cd78b4b35e456eb971bf38e3b4615a4f849938d60eadfef2b5457e9"
+      "sha256": "cbd1925f0e4f7a0d07482c690628073b079fb301571aceb56f4ab1ea6d72ddde"
     },
     {
       "path": "SECURITY.md",
@@ -213,7 +213,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
-      "sha256": "836a5de2ebaabd67f615a5b9112e162bb1c5f29c7a648cccec8a4751a68ab700"
+      "sha256": "f4a7674821d3be23b95b0527e7dc69260219eddaec59adae7a4dc46594ae2c60"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
@@ -330,6 +330,10 @@
     {
       "path": "apps/desktop_flutter/lib/services/profile_client.dart",
       "sha256": "350cb3fe3fcafb5c73eb704d20bee5bbfd3a178a8c1ad1910f89f36974c73f69"
+    },
+    {
+      "path": "apps/desktop_flutter/lib/services/regression_case_client.dart",
+      "sha256": "4f462893dc07b92866a48504410f5fd8ce60e52b010c2c539ff5bc838576d808"
     },
     {
       "path": "apps/desktop_flutter/lib/services/runtime_dialogue_client.dart",
@@ -541,7 +545,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
-      "sha256": "7f1c329fde4df7236cb7db6cb1b38c5683d298394394569972b33891309d083c"
+      "sha256": "38aafbea434de20019c54d56900f233846e80df20ae62e240dd7fb1c6c0ee30b"
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
@@ -1121,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "a4d8bbc4daf35710c322b12610b1bc1327a2f3ab6764fbb070dde5e2a823f5e9"
+      "sha256": "c4fdb82e81df7a027b7e3e9e12c6281463c861b66749aba8f9f63c8c4646f61d"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1157,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "9d6db2e5874465f3c279eca5d987c35563e01cb1ddba78d1506384b392717303"
+      "sha256": "a0ac77770570eb09485d079f3392aa6590791172a43488733a867fd073a05c5d"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1313,7 +1317,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "005b4a8898f58e8bebae6399cc5f85bf29b9fb663f9f282d0518c8223e3671df"
+      "sha256": "80433302aecc2b6f30e764207f91c1eb6db5fc70967f27e580ce0eba206367ab"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -1393,7 +1397,7 @@
     },
     {
       "path": "docs/specs/regression-case.md",
-      "sha256": "8e339a3ef0383740835cb9a8ad24e6b458831feb9109ebb9aca78ce69bfad50b"
+      "sha256": "e65f41d70ed9b5075216649d5b1aa4c34e8ba11f81438cb1029b8c2f509b921a"
     },
     {
       "path": "docs/specs/runtime-catalog.md",
@@ -1461,7 +1465,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "ee2655757d81c3a8ed4e88797424481aac8e4665528e14c978a13907da2e1357"
+      "sha256": "33c264586f551d0650b9b844abb32d87b8f15103398a0181a2ffd9a085708d6d"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2096,6 +2100,10 @@
       "sha256": "a007fe6f6daf839e68382755f8c1c4e4c236ac9f1c2370cdc21cc8ceff0bf5bc"
     },
     {
+      "path": "examples/contracts/invalid/mobile_local_recovery_audit_invalid_calendar_date.invalid.json",
+      "sha256": "f6f5c598f0f658a0df283eea94f6a486dbc6119af822b19025a1debe2dea2d38"
+    },
+    {
       "path": "examples/contracts/invalid/mobile_local_recovery_audit_non_utc.invalid.json",
       "sha256": "428dccba2ef48bf1747347582a0143f9dcb508bb480494ad14ff409732263338"
     },
@@ -2150,6 +2158,14 @@
     {
       "path": "examples/contracts/invalid/recovery_missing_message.invalid.json",
       "sha256": "fa7a4c08d29e63fde254fcfbe072c335c85080a93cac71b1541fb4252068c45d"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_list_private_field.invalid.json",
+      "sha256": "d3c1d3d22954a97734cb8ead16c264ab2bb3f7bb0ec7b0d97aa163ca2cb495a6"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_list_request_over_limit.invalid.json",
+      "sha256": "73d7e73aed46a8c2af174b363483272e356dcf00dabd7e895e60650ab24448b5"
     },
     {
       "path": "examples/contracts/invalid/regression_case_receipt_raw.invalid.json",
@@ -2426,6 +2442,14 @@
     {
       "path": "examples/contracts/recovery.valid.json",
       "sha256": "63d9afc31517579fca1a2647d3c1526bf29dfced41782ec8045eaf26fe781826"
+    },
+    {
+      "path": "examples/contracts/regression_case_list.valid.json",
+      "sha256": "8d2eefbc90265aa9b0f90ccc374ae5ace0701793a8b53e73b83d27354a5bcddc"
+    },
+    {
+      "path": "examples/contracts/regression_case_list_request.valid.json",
+      "sha256": "421e4f730b715bb4d1a978bf0912aae8d814004a7ca9d49eac2a5cb9e6996821"
     },
     {
       "path": "examples/contracts/regression_case_receipt.valid.json",
@@ -2817,11 +2841,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "24801f4617e28c333fe0f8e9949d72de6388a7bef08a55851b0f2af8a51949ca"
+      "sha256": "ef9c6732e90033f9426e0effbf2650c07e5ec5c6c5f3d039cf61af5e672d1c27"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
-      "sha256": "45fbc5a2539d410956358596e57153441abbb2fac73e853c3a60558979c2e385"
+      "sha256": "eea091954bf395ee89c5083364d24c1ea2c98893cd7e5a5a2caa7d574798d566"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -3173,11 +3197,15 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/gui_shell_ui.dart",
-      "sha256": "7c158874cbedc7a1bcb834481fde2f8fb8a3028e5a8424675828a4f9264dd6ff"
+      "sha256": "8dfa7c35ee9b5d5504c8161a1ffe62b6a65e6f288635d8230e6963a443419a6c"
     },
     {
       "path": "packages/gui_shell_ui/lib/history_client.dart",
       "sha256": "eedd063de0761a53314e58951a0f5c753d0d65f41e3fd7ced3c124a0e98e0eab"
+    },
+    {
+      "path": "packages/gui_shell_ui/lib/regression_case_client.dart",
+      "sha256": "0c68f63449e846212c912b2939af02e929e7af23b332f3c5289c57332f8b8e91"
     },
     {
       "path": "packages/gui_shell_ui/lib/runtime_dialogue_client.dart",
@@ -3204,6 +3232,10 @@
       "sha256": "29e0a358270503d1830ae660773573940e3d676ba31c2eeedfe6275eb3827e18"
     },
     {
+      "path": "packages/gui_shell_ui/lib/src/regression_case_client.dart",
+      "sha256": "8ab12142c8d002efe89c51578dec44159b68d93385368710ecad8a83e2ffe5bc"
+    },
+    {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
       "sha256": "e3bb7b1c171cdf2b4f50a1d938f3556f56b7e052641b79ce97f4d97629e24a8e"
     },
@@ -3226,6 +3258,10 @@
     {
       "path": "packages/gui_shell_ui/test/evaluation_client_test.dart",
       "sha256": "8e9b6f834d6d4a69d28800169d77a78c977f9d143d446308c12ef5cf4b5f78bc"
+    },
+    {
+      "path": "packages/gui_shell_ui/test/regression_case_client_test.dart",
+      "sha256": "4a9834d2658ac38d874ce56f01fffdfeafe53f768123cf0d88a1fc8b17b69f92"
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_independent_poll_test.dart",
@@ -3645,11 +3681,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "5abba7b4d9d63e311b0957fd482f9ab9eea9d86617d6719d1cb7ea76e3460fa4"
+      "sha256": "e91e930f0b14cfd633403dfa185f6d0bcccde9f7b2c2de78ec1ef2c8397b12d0"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "659a98e15bd7a963b57ce6b04e47e2403330b736f40700b95998207b046923ce"
+      "sha256": "734483dd8385a2ba56a8c52efb6c74ff72e5d2c2f4a91810f2d28aac8cce95d9"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -3726,6 +3762,14 @@
     {
       "path": "specs/recovery.schema.json",
       "sha256": "5c5dbc7174f3c676e33cd5d951cad0355214654603c20a69fdf60b233eb66f33"
+    },
+    {
+      "path": "specs/regression_case_list.schema.json",
+      "sha256": "6e32b00c2a31b9f19e2b9cc81a0b9ad8d4982a9648d2246a11653d00ccf5d1fc"
+    },
+    {
+      "path": "specs/regression_case_list_request.schema.json",
+      "sha256": "093563b257237a252049e3644aeb77dfe67683fec1f732a388266dc382583887"
     },
     {
       "path": "specs/regression_case_receipt.schema.json",
@@ -3917,7 +3961,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a8b2a57aa47f4096c58aaa349d1b78c693bf114cfee4b64353bf478cb290212f"
+      "sha256": "04aa0dd9639a67b0f89f19f009f259cbdd85e0f8afa66295d37cce83303f0679"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -3997,7 +4041,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "27dc463833bd551a607d5cfcb8ed0cf7d832deb432466b69a88ab4346d4cd864"
+      "sha256": "93b0dbff66def4cc190fe7fbbec20272fb133cff339a52a6367d81ba88693ab4"
     },
     {
       "path": "tooling/shell_snapshot.py",

@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "回帰Case一覧": [],
+  "件数": 0,
+  "合計件数": 0,
+  "次cursor": null,
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE",
+  "入力": { "本文": "must-not-be-returned" }
+}

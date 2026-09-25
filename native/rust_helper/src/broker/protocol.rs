@@ -366,6 +366,8 @@ pub enum BrokerOperation {
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
     回帰Case登録,
+    #[serde(rename = "回帰Case一覧")]
+    回帰Case一覧,
     #[serde(rename = "資格情報登録")]
     資格情報登録,
     #[serde(rename = "資格情報一覧")]
@@ -543,6 +545,7 @@ impl BrokerOperation {
             BrokerOperation::Agent一覧 => "Agent一覧",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
+            BrokerOperation::回帰Case一覧 => "回帰Case一覧",
             BrokerOperation::資格情報登録 => "資格情報登録",
             BrokerOperation::資格情報一覧 => "資格情報一覧",
             BrokerOperation::MCP接続 => "MCP接続",
@@ -1251,6 +1254,7 @@ impl Broker {
             BrokerOperation::全Runtime停止要求 => self.全Runtime停止要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
             BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::回帰Case登録 => self.回帰Case登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::回帰Case一覧 => self.回帰Case一覧処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             #[cfg(windows)]
             BrokerOperation::資格情報登録 => self.資格情報登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             #[cfg(not(windows))]

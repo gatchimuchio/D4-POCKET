@@ -1,0 +1,29 @@
+{
+  "版": 1,
+  "回帰Case一覧": [
+    {
+      "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+      "定義hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "暗号文hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "公開表示名": "Codex基本対話回帰",
+      "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "要求hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "実行系ID": "codex",
+      "結果状態": "成功",
+      "応答hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "終了監査ID": "audit-regression-ended",
+      "必要条件数": 1,
+      "禁止条件数": 1,
+      "必要参照数": 1,
+      "作成時刻UnixMillis": 1780000000000,
+      "作成監査ID": "audit-regression-created",
+      "公開範囲": "metadata_only",
+      "証拠種別": "INTERNAL_STATE"
+    }
+  ],
+  "件数": 1,
+  "合計件数": 1,
+  "次cursor": null,
+  "公開範囲": "metadata_only",
+  "証拠種別": "INTERNAL_STATE"
+}

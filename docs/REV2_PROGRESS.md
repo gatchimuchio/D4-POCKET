@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C6回帰Case一覧（2026-09-25、metadata-only）
+
+C6既存保存物を閲覧する読み取り専用経路を追加した。通常Broker IPCの`回帰Case一覧`は、既存Audit登録receiptから公開metadataだけを最大100件単位で返し、要求cursorはページ位置にのみ用いる。対象ページの保存ciphertext hashをreceiptと照合するが、private本文を復号せず、本文・credential・authority情報を応答へ含めない。C5 DatasetとC6回帰Caseは別operation・別Desktop tabのまま分離した。Desktop「評価ラボ」に手動更新と次ページだけのC6 tabを追加し、登録・削除・復旧・実行・本文表示は実装していない。
+
+Production接続面は`標準BrokerClient → Rust Broker回帰Case一覧 → Audit receiptとProtectedStore metadata照合 → metadata-only response → Desktop C6 tab`。Schema、normal／negative fixture、Python schema checker、conformance、shared Dart client、Desktop表示testをこの経路へ接続した。これらのfixture・source testは構造およびcomponent範囲の証拠であり、Windows実BrokerによるC6 runtime一連動作を代替しない。
+
+WindowsでRust test binaryの実行はApplication Control（OS error 4551）に拒否され、隔離target dirでの再試行も同じ制約を受けた。`cargo test --no-run`は全targetのtest executableをcompileするが、Rust testの実行成功を意味しない。Windows productでのC6実Broker実測も未実施である。これらはWindows開発環境／runtime evidenceの不足であり、既存release blockerを解消しない。
+
+C6に残す機能範囲は、Owner権限による登録UI、削除とRecovery、明示的なC5 import、Windows Owner操作および実Broker evidenceである。read-only一覧の追加をC6完成やrelease readinessへ昇格せず、全体`release_ready=false`と既存release blocker 5件を維持する。
+
+検証結果: `python tooling/schema_check/check_schemas.py`はSchema 127件・正常例127件・否定例155件でPASS、`python tooling/conformance_tests/run_conformance_skeleton.py`は201 checksでPASS、`python -X utf8 tooling/日本語基底監査.py --strict`は負債0 files／0 findingsでPASSした。共有Clientの`flutter test --no-pub test/regression_case_client_test.dart`は2/2、Desktopの`flutter test --no-pub test/evaluation_lab_test.dart`は3/3 PASSし、両packageの`flutter analyze --no-pub`も問題なし。`cargo test --no-run --locked --manifest-path native/rust_helper/Cargo.toml`は全12 test executableをcompileしたが実行はしていない。Windows Rust test実行はApplication Control（OS error 4551）で拒否され、runtime test結果は未確認である。
+
+`python tooling/manifest.py --write`後の`python tooling/manifest.py --check`と`git diff --cached --check`はPASS。統合集約`python tooling/validate_all.py --python-only --desktop-platform windows`は開発modeの10 checkがすべてPASSし、release gate checkも既存blockerを分類できた。一方、installed Windows evidenceが未収集のためrelease blockerは5件、`release_ready=false`であり、集約内のrelease smoke／構造検査をinstalled product実証へ読み替えない。
+
 ## D4 Pocket Phase35追補: Schema date-time形式検査（2026-09-25）
 
 端末内回復記録のUTC時刻に`format: date-time`と形状patternを定義していたが、共有Schema検査器がJSON Schemaの`format`を評価せず、`2026-02-30T12:00:00Z`を受理することを再現した。検査器へRFC3339 date-timeの書式・暦日・時刻・UTC offset検査を追加し、既存の各date-time Schemaも同じ意味検査を通す。

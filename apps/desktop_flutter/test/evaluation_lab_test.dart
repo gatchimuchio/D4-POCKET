@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_desktop/screens/evaluation_lab.dart';
 import 'package:gui_shell_desktop/services/evaluation_client.dart';
+import 'package:gui_shell_desktop/services/regression_case_client.dart';
 import 'package:gui_shell_ui/evaluation_client.dart' show BrokerTransport;
 
 const _datasetId = '11111111111111111111111111111111';
@@ -10,12 +11,12 @@ const _experimentId = '44444444444444444444444444444444';
 
 void main() {
   Finder selectableTextContaining(String value) => find.byWidgetPredicate(
-    (widget) =>
-        widget is SelectableText && (widget.data?.contains(value) ?? false),
-    description: '指定文言を含むSelectableText: $value',
-  );
+        (widget) =>
+            widget is SelectableText && (widget.data?.contains(value) ?? false),
+        description: '指定文言を含むSelectableText: $value',
+      );
 
-  testWidgets('評価ラボは四tabを持ちowner資格の入力面を作らない', (tester) async {
+  testWidgets('評価ラボは五tabを持ちowner資格の入力面を作らない', (tester) async {
     final transport = _FixtureTransport({
       '評価実験開始': [
         _accepted(
@@ -31,6 +32,7 @@ void main() {
     expect(find.text('Run'), findsOneWidget);
     expect(find.text('Result'), findsOneWidget);
     expect(find.text('Compare'), findsOneWidget);
+    expect(find.text('回帰Case'), findsOneWidget);
     expect(
       find.textContaining('権限、Permission、Approval、監査、release判定'),
       findsOneWidget,
@@ -80,6 +82,33 @@ void main() {
       selectableTextContaining('計画監査ID: audit.evaluation.experiment.plan.1'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('C6 Case一覧は公開metadataだけをpage取得しC5へ混ぜない', (tester) async {
+    final transport = _FixtureTransport({
+      '回帰Case一覧': [_accepted('回帰Case一覧', _regressionCaseListBody())],
+    });
+    await tester.pumpWidget(
+      _testApp(EvaluationClient(transport), RegressionCaseClient(transport)),
+    );
+    await tester.tap(find.text('回帰Case'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('regression-case-refresh')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('公開Case'), findsOneWidget);
+    expect(find.textContaining('C5 Datasetへ自動追加しません'), findsOneWidget);
+    expect(
+      find.text('この画面は閲覧専用です。登録・削除・復旧・実行は行いません。'),
+      findsOneWidget,
+    );
+    expect(find.text('private regression input'), findsNothing);
+    expect(transport.requests.single.operation, '回帰Case一覧');
+    expect(transport.requests.single.payload, const {
+      '版': 1,
+      'after': 0,
+      'limit': 50,
+    });
   });
 
   testWidgets('公開metadataと安全な集計だけを表示する', (tester) async {
@@ -151,9 +180,18 @@ void main() {
   });
 }
 
-Widget _testApp(EvaluationClient client) => MaterialApp(
-  home: Scaffold(body: EvaluationLab(client: client)),
-);
+Widget _testApp(
+  EvaluationClient client, [
+  RegressionCaseClient? regressionCaseClient,
+]) =>
+    MaterialApp(
+      home: Scaffold(
+        body: EvaluationLab(
+          client: client,
+          regressionCaseClient: regressionCaseClient,
+        ),
+      ),
+    );
 
 class _FixtureTransport implements BrokerTransport {
   _FixtureTransport(this.responses);
@@ -201,27 +239,57 @@ Map<String, Object?> _accepted(
 }
 
 Map<String, Object?> _listingBody() => {
-  '版': 1,
-  '評価Dataset一覧': [_dataset()],
-};
+      '版': 1,
+      '評価Dataset一覧': [_dataset()],
+    };
+
+Map<String, Object?> _regressionCaseListBody() => {
+      '版': 1,
+      '回帰Case一覧': [
+        {
+          '回帰CaseID': 'cccccccccccccccccccccccccccccccc',
+          '定義hash': _hash('d'),
+          '暗号文hash': _hash('e'),
+          '公開表示名': '公開Case',
+          '要求ID': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          '要求hash': _hash('b'),
+          '実行系ID': 'codex',
+          '結果状態': '成功',
+          '応答hash': _hash('f'),
+          '終了監査ID': 'audit-dialogue-end',
+          '必要条件数': 1,
+          '禁止条件数': 0,
+          '必要参照数': 1,
+          '作成時刻UnixMillis': 1780000000000,
+          '作成監査ID': 'audit-regression-created',
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      ],
+      '件数': 1,
+      '合計件数': 1,
+      '次cursor': null,
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    };
 
 Map<String, Object?> _dataset() => {
-  '版': 1,
-  '評価DatasetID': _datasetId,
-  'revision': 1,
-  '定義hash': _hash('0'),
-  '非公開保管ID': '99999999999999999999999999999999',
-  '暗号文hash': _hash('b'),
-  '公開表示名': '基本対話評価',
-  'Case数': 1,
-  'Case一覧': [
-    {'評価CaseID': _caseId, '定義hash': _hash('d')},
-  ],
-  '公開範囲': 'hash_only',
-  '作成時刻UnixMillis': 1726300000000,
-  '作成監査ID': 'audit.evaluation.dataset.create.1',
-  '証拠種別': 'INTERNAL_STATE',
-};
+      '版': 1,
+      '評価DatasetID': _datasetId,
+      'revision': 1,
+      '定義hash': _hash('0'),
+      '非公開保管ID': '99999999999999999999999999999999',
+      '暗号文hash': _hash('b'),
+      '公開表示名': '基本対話評価',
+      'Case数': 1,
+      'Case一覧': [
+        {'評価CaseID': _caseId, '定義hash': _hash('d')},
+      ],
+      '公開範囲': 'hash_only',
+      '作成時刻UnixMillis': 1726300000000,
+      '作成監査ID': 'audit.evaluation.dataset.create.1',
+      '証拠種別': 'INTERNAL_STATE',
+    };
 
 Map<String, Object?> _experiment({int resultCount = 0}) {
   final completed = resultCount == 2;
@@ -244,51 +312,51 @@ Map<String, Object?> _experiment({int resultCount = 0}) {
 }
 
 Map<String, Object?> _statusBody() => {
-  '版': 1,
-  '評価実験': _experiment(resultCount: 1),
-  '公開結果一覧': [_safeResult()],
-};
+      '版': 1,
+      '評価実験': _experiment(resultCount: 1),
+      '公開結果一覧': [_safeResult()],
+    };
 
 Map<String, Object?> _safeResult() => {
-  '評価ExperimentID': _experimentId,
-  '評価DatasetID': _datasetId,
-  '評価CaseID': _caseId,
-  '実行系ID': 'runtime-a',
-  '判定': '成立',
-  '評価器判定一覧': [
-    {
-      '評価器ID': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      '種類': 'exact',
+      '評価ExperimentID': _experimentId,
+      '評価DatasetID': _datasetId,
+      '評価CaseID': _caseId,
+      '実行系ID': 'runtime-a',
       '判定': '成立',
-      '理由code': '一致',
-    },
-  ],
-  'LatencyMillis': 12,
-  '総合hash': _hash('e'),
-  '評価監査ID': 'audit.evaluation.result.1',
-};
+      '評価器判定一覧': [
+        {
+          '評価器ID': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          '種類': 'exact',
+          '判定': '成立',
+          '理由code': '一致',
+        },
+      ],
+      'LatencyMillis': 12,
+      '総合hash': _hash('e'),
+      '評価監査ID': 'audit.evaluation.result.1',
+    };
 
 Map<String, Object?> _comparison() => {
-  '版': 1,
-  '比較ID': '88888888888888888888888888888888',
-  '評価DatasetID': _datasetId,
-  'Dataset定義hash': _hash('0'),
-  '実験一覧': [
-    _comparisonExperiment(_experimentId, 'runtime-a', passedCount: 1),
-    _comparisonExperiment(_experimentId, 'runtime-b', passedCount: 1),
-  ],
-  '計画Case数': 1,
-  '成立数': 2,
-  '不成立数': 0,
-  '評価不能数': 0,
-  '中断数': 0,
-  '比較時刻UnixMillis': 1726300000300,
-  '経路差': 'same',
-  '参照差': 'same',
-  '能力差': 'unknown',
-  '比較監査ID': 'audit.evaluation.comparison.1',
-  '証拠種別': 'INTERNAL_STATE',
-};
+      '版': 1,
+      '比較ID': '88888888888888888888888888888888',
+      '評価DatasetID': _datasetId,
+      'Dataset定義hash': _hash('0'),
+      '実験一覧': [
+        _comparisonExperiment(_experimentId, 'runtime-a', passedCount: 1),
+        _comparisonExperiment(_experimentId, 'runtime-b', passedCount: 1),
+      ],
+      '計画Case数': 1,
+      '成立数': 2,
+      '不成立数': 0,
+      '評価不能数': 0,
+      '中断数': 0,
+      '比較時刻UnixMillis': 1726300000300,
+      '経路差': 'same',
+      '参照差': 'same',
+      '能力差': 'unknown',
+      '比較監査ID': 'audit.evaluation.comparison.1',
+      '証拠種別': 'INTERNAL_STATE',
+    };
 
 Map<String, Object?> _comparisonExperiment(
   String experimentId,
@@ -297,16 +365,16 @@ Map<String, Object?> _comparisonExperiment(
   int failedCount = 0,
   int indeterminateCount = 0,
   int interruptedCount = 0,
-}
-) => {
-  '評価ExperimentID': experimentId,
-  '実行系ID': runtimeId,
-  'Dataset定義hash': _hash('0'),
-  '成立数': passedCount,
-  '不成立数': failedCount,
-  '評価不能数': indeterminateCount,
-  '中断数': interruptedCount,
-  '平均LatencyMillis': null,
-};
+}) =>
+    {
+      '評価ExperimentID': experimentId,
+      '実行系ID': runtimeId,
+      'Dataset定義hash': _hash('0'),
+      '成立数': passedCount,
+      '不成立数': failedCount,
+      '評価不能数': indeterminateCount,
+      '中断数': interruptedCount,
+      '平均LatencyMillis': null,
+    };
 
 String _hash(String character) => 'sha256:${character * 64}';

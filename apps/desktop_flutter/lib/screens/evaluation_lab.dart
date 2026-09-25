@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/evaluation_client.dart';
+import '../services/regression_case_client.dart';
 import 'shared.dart';
 
 /// C5の通常資格向け評価操作面。
@@ -11,10 +12,14 @@ class EvaluationLab extends StatefulWidget {
     super.key,
     this.client,
     this.connect = connectEvaluationClient,
+    this.regressionCaseClient,
+    this.connectRegressionCases = connectRegressionCaseClient,
   });
 
   final EvaluationClient? client;
   final EvaluationClientConnector connect;
+  final RegressionCaseClient? regressionCaseClient;
+  final RegressionCaseClientConnector connectRegressionCases;
 
   @override
   State<EvaluationLab> createState() => _EvaluationLabState();
@@ -29,13 +34,19 @@ class _EvaluationLabState extends State<EvaluationLab>
   final _comparisonExperimentId = TextEditingController();
 
   EvaluationClient? _client;
+  RegressionCaseClient? _regressionClient;
   EvaluationDatasetListing? _datasets;
+  List<RegressionCaseSummary> _regressionCases = const [];
+  int? _regressionNextCursor;
+  int _regressionTotalCount = 0;
+  String? _regressionAuditId;
   EvaluationExperiment? _startedExperiment;
   EvaluationExperimentStatus? _status;
   EvaluationComparison? _comparison;
   bool _busy = false;
   int _generation = 0;
   String _datasetMessage = 'Dataset一覧は自動更新しません。更新要求を作成してください。';
+  String _regressionMessage = '回帰Caseの公開metadataだけを手動更新します。';
   String _runMessage = 'Dataset IDと1〜8件の実行系IDだけをBrokerへ送ります。';
   String _resultMessage = '評価Experiment IDを指定して、公開済みの結果projectionだけを更新します。';
   String _comparisonMessage = '評価Experiment IDを指定して、集計比較だけを更新します。';
@@ -44,22 +55,31 @@ class _EvaluationLabState extends State<EvaluationLab>
   void initState() {
     super.initState();
     _client = widget.client;
-    _tabs = TabController(length: 4, vsync: this);
+    _regressionClient = widget.regressionCaseClient;
+    _tabs = TabController(length: 5, vsync: this);
   }
 
   @override
   void didUpdateWidget(covariant EvaluationLab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.client != widget.client ||
-        oldWidget.connect != widget.connect) {
+        oldWidget.connect != widget.connect ||
+        oldWidget.regressionCaseClient != widget.regressionCaseClient ||
+        oldWidget.connectRegressionCases != widget.connectRegressionCases) {
       _generation += 1;
       _client = widget.client;
+      _regressionClient = widget.regressionCaseClient;
       _datasets = null;
+      _regressionCases = const [];
+      _regressionNextCursor = null;
+      _regressionTotalCount = 0;
+      _regressionAuditId = null;
       _startedExperiment = null;
       _status = null;
       _comparison = null;
       _busy = false;
       _datasetMessage = '接続条件が変わりました。Dataset一覧を更新してください。';
+      _regressionMessage = '接続条件が変わりました。回帰Case一覧を更新してください。';
       _runMessage = '接続条件が変わりました。実験要求を作成し直してください。';
       _resultMessage = '接続条件が変わりました。結果を更新してください。';
       _comparisonMessage = '接続条件が変わりました。比較を更新してください。';
@@ -109,6 +129,7 @@ class _EvaluationLabState extends State<EvaluationLab>
               Tab(text: 'Run'),
               Tab(text: 'Result'),
               Tab(text: 'Compare'),
+              Tab(text: '回帰Case'),
             ],
           ),
         ),
@@ -122,8 +143,10 @@ class _EvaluationLabState extends State<EvaluationLab>
                 return _runPanel();
               case 2:
                 return _resultPanel();
-              default:
+              case 3:
                 return _comparisonPanel();
+              default:
+                return _regressionCasePanel();
             }
           },
         ),
@@ -175,6 +198,70 @@ class _EvaluationLabState extends State<EvaluationLab>
               const SizedBox(height: 12),
             ],
         ],
+      ],
+    );
+  }
+
+  Widget _regressionCasePanel() {
+    final nextCursor = _regressionNextCursor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('回帰Case一覧', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              const Text(
+                'C6の公開metadataだけを通常Broker経路から取得します。入力本文・条件・参照は表示せず、C5 Datasetへ自動追加しません。',
+              ),
+              const SizedBox(height: 6),
+              const Text('この画面は閲覧専用です。登録・削除・復旧・実行は行いません。'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilledButton.icon(
+                    key: const ValueKey('regression-case-refresh'),
+                    onPressed: _busy ? null : () => _refreshRegressionCases(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('一覧を更新'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('regression-case-next-page'),
+                    onPressed: _busy || nextCursor == null
+                        ? null
+                        : () => _refreshRegressionCases(
+                              after: nextCursor,
+                              append: true,
+                            ),
+                    icon: const Icon(Icons.navigate_next),
+                    label: const Text('次の一覧'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(_regressionMessage),
+              if (_busy) ...[
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
+              ],
+            ],
+          ),
+        ),
+        if (_regressionAuditId case final auditId?) ...[
+          const SizedBox(height: 12),
+          Text('一覧監査ID: $auditId'),
+          Text('表示 ${_regressionCases.length} / $_regressionTotalCount 件'),
+        ],
+        if (_regressionCases.isEmpty && _regressionAuditId != null)
+          const BorderedPanel(child: Text('公開可能な回帰Caseはありません。'))
+        else
+          for (final item in _regressionCases) ...[
+            const SizedBox(height: 10),
+            _RegressionCaseSummaryPanel(item: item),
+          ],
       ],
     );
   }
@@ -354,6 +441,56 @@ class _EvaluationLabState extends State<EvaluationLab>
     return _client ??= widget.client ?? await widget.connect();
   }
 
+  Future<RegressionCaseClient> _regressionClientForRequest() async =>
+      _regressionClient ??=
+          widget.regressionCaseClient ?? await widget.connectRegressionCases();
+
+  Future<void> _refreshRegressionCases(
+      {int after = 0, bool append = false}) async {
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      if (!append) {
+        _regressionCases = const [];
+        _regressionNextCursor = null;
+        _regressionTotalCount = 0;
+        _regressionAuditId = null;
+      }
+      _regressionMessage = 'Brokerへ回帰Case metadata一覧を要求しています。';
+    });
+    try {
+      final page = await (await _regressionClientForRequest()).list(
+        after: after,
+        limit: 50,
+      );
+      if (!mounted || generation != _generation) return;
+      final combined =
+          append ? [..._regressionCases, ...page.cases] : page.cases;
+      if (combined.map((item) => item.caseId).toSet().length !=
+          combined.length) {
+        throw StateError('回帰Case cursor pageに重複があります');
+      }
+      setState(() {
+        _regressionCases = List.unmodifiable(combined);
+        _regressionNextCursor = page.nextCursor;
+        _regressionTotalCount = page.totalCount;
+        _regressionAuditId = page.auditId;
+        _regressionMessage =
+            'metadataのみを監査ID ${page.auditId} で確認しました。権限・承認・Case内容は取得していません。';
+      });
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _regressionMessage = '回帰Caseの監査、暗号文照合、cursor、または安全な応答を確認できません。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   Future<void> _refreshDatasets() async {
     final generation = ++_generation;
     setState(() {
@@ -498,6 +635,31 @@ class _EvaluationLabState extends State<EvaluationLab>
       _tabs.animateTo(1);
     });
   }
+}
+
+class _RegressionCaseSummaryPanel extends StatelessWidget {
+  const _RegressionCaseSummaryPanel({required this.item});
+
+  final RegressionCaseSummary item;
+
+  @override
+  Widget build(BuildContext context) => BorderedPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(item.displayName,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+            SelectableText('回帰事例ID: ${item.caseId}'),
+            Text('実行系: ${item.runtimeId}　結果: ${item.resultStatus}'),
+            Text(
+              '必要条件 ${item.requiredConditionCount}　禁止条件 ${item.forbiddenConditionCount}　必要参照 ${item.requiredReferenceCount}',
+            ),
+            Text('作成監査ID: ${item.createdAuditId}　終了監査ID: ${item.endAuditId}'),
+            const Text('公開範囲: metadata_only　証拠種別: INTERNAL_STATE'),
+          ],
+        ),
+      );
 }
 
 class _DatasetSummaryPanel extends StatelessWidget {

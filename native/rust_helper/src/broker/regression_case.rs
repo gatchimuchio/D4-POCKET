@@ -1,4 +1,4 @@
-//! C6 回帰Caseのowner登録経路。
+//! C6 回帰Caseのowner登録と通常経路の公開一覧。
 //!
 //! 元の対話本文を自動コピーせず、Broker内の完了結果証跡とownerが明示した
 //! サニタイズ済み定義を結合して、C5とは別purposeのProtectedStoreへ保管する。
@@ -9,9 +9,171 @@ use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::識別子生成;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 
 const OPERATION: &str = "回帰Case登録";
+const LIST_OPERATION: &str = "回帰Case一覧";
 const MAX_OWNER_REGRESSION_BYTES: usize = 48 * 1024;
+const MAX_LIST_PAGE: usize = 100;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 一覧要求 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "after")]
+    after: u64,
+    #[serde(rename = "limit")]
+    limit: u16,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 公開記録 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+    #[serde(rename = "定義hash")]
+    definition_hash: String,
+    #[serde(rename = "非公開保管ID")]
+    storage_id: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "公開表示名")]
+    display_name: String,
+    #[serde(rename = "要求ID")]
+    request_id: String,
+    #[serde(rename = "要求hash")]
+    request_hash: String,
+    #[serde(rename = "実行系ID")]
+    runtime_id: String,
+    #[serde(rename = "結果状態")]
+    result_status: String,
+    #[serde(rename = "応答hash")]
+    response_hash: String,
+    #[serde(rename = "終了監査ID")]
+    end_audit_id: String,
+    #[serde(rename = "公開範囲")]
+    exposure: String,
+    #[serde(rename = "必要条件数")]
+    required_condition_count: u16,
+    #[serde(rename = "禁止条件数")]
+    forbidden_condition_count: u16,
+    #[serde(rename = "必要参照数")]
+    required_reference_count: u16,
+    #[serde(rename = "作成時刻UnixMillis")]
+    created_at: i64,
+    #[serde(rename = "作成監査ID")]
+    created_audit_id: String,
+    #[serde(rename = "証拠種別")]
+    evidence_source: String,
+}
+
+impl 公開記録 {
+    fn valid_for(&self, audit_event_id: &str) -> bool {
+        self.版 == 1
+            && hex_identifier(&self.case_id)
+            && self.storage_id == self.case_id
+            && super::is_tagged_sha256(&self.definition_hash)
+            && super::is_tagged_sha256(&self.ciphertext_hash)
+            && !self.display_name.trim().is_empty()
+            && self.display_name.chars().count() <= 128
+            && hex_identifier(&self.request_id)
+            && super::is_tagged_sha256(&self.request_hash)
+            && !self.runtime_id.is_empty()
+            && self.runtime_id.len() <= 128
+            && self
+                .runtime_id
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphanumeric)
+            && self
+                .runtime_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-'))
+            && matches!(self.result_status.as_str(), "成功" | "保留")
+            && super::is_tagged_sha256(&self.response_hash)
+            && !self.end_audit_id.is_empty()
+            && self.end_audit_id.len() <= 256
+            && self.exposure == "hash_only"
+            && self.required_condition_count <= 16
+            && self.forbidden_condition_count <= 16
+            && self.required_reference_count <= 64
+            && self.created_at >= 0
+            && self.created_audit_id == audit_event_id
+            && self.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
+    }
+
+    fn metadata_projection(&self) -> Value {
+        json!({
+            "回帰CaseID": self.case_id,
+            "定義hash": self.definition_hash,
+            "暗号文hash": self.ciphertext_hash,
+            "公開表示名": self.display_name,
+            "要求ID": self.request_id,
+            "要求hash": self.request_hash,
+            "実行系ID": self.runtime_id,
+            "結果状態": self.result_status,
+            "応答hash": self.response_hash,
+            "終了監査ID": self.end_audit_id,
+            "必要条件数": self.required_condition_count,
+            "禁止条件数": self.forbidden_condition_count,
+            "必要参照数": self.required_reference_count,
+            "作成時刻UnixMillis": self.created_at,
+            "作成監査ID": self.created_audit_id,
+            "公開範囲": "metadata_only",
+            "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        })
+    }
+}
+
+fn stored_regression_cases(
+    log: &super::BrokerAuditLog,
+    after: u64,
+    limit: usize,
+) -> Result<(Vec<公開記録>, u64), ()> {
+    let mut page = Vec::with_capacity(limit);
+    let mut total = 0_u64;
+    for event in log
+        .events()
+        .iter()
+        .filter(|event| event.operation == OPERATION && event.decision == "accepted")
+    {
+        let encoded = event.reason.strip_prefix("回帰Case登録記録:").ok_or(())?;
+        let record: 公開記録 = serde_json::from_str(encoded).map_err(|_| ())?;
+        if event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
+            || event.payload_hash != sha256_tagged(encoded.as_bytes())
+            || !record.valid_for(&event.event_id)
+        {
+            return Err(());
+        }
+        if total >= after && page.len() < limit {
+            page.push(record);
+        }
+        total = total.checked_add(1).ok_or(())?;
+    }
+    let mut page_ids = HashSet::with_capacity(page.len());
+    if page
+        .iter()
+        .any(|record| !page_ids.insert(record.case_id.as_str()))
+    {
+        return Err(());
+    }
+    Ok((page, total))
+}
+
+fn parse_list_request(payload: &Value) -> Result<一覧要求, ()> {
+    let request: 一覧要求 = serde_json::from_value(payload.clone()).map_err(|_| ())?;
+    if request.版 != 1
+        || request.limit == 0
+        || request.limit as usize > MAX_LIST_PAGE
+        || request.after > 9_007_199_254_740_991
+    {
+        return Err(());
+    }
+    Ok(request)
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -50,7 +212,10 @@ struct 登録指定 {
 }
 
 fn hex_identifier(value: &str) -> bool {
-    value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 /// 既知のcredential表現だけを拒否する補助境界。任意の秘密値の不存在は証明しない。
@@ -372,11 +537,341 @@ impl Broker {
             }
         }
     }
+
+    /// 公開receiptからmetadataだけを通常IPCへ返す。private定義は復号・投影しない。
+    pub(super) fn 回帰Case一覧処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        if owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                LIST_OPERATION,
+                "通常経路限定",
+                "回帰Case metadata一覧は通常IPCの読取専用操作です",
+                true,
+                payload_hash,
+            );
+        }
+        if !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                LIST_OPERATION,
+                "broker_persistence_unavailable",
+                "回帰Case一覧には永続監査が必要です",
+                true,
+                payload_hash,
+            );
+        }
+        let request = match parse_list_request(payload) {
+            Ok(value) => value,
+            Err(()) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    LIST_OPERATION,
+                    "回帰Case一覧要求不正",
+                    "版、cursor、limitだけを上限内で指定してください",
+                    true,
+                    payload_hash,
+                )
+            }
+        };
+        let (records, total) =
+            match stored_regression_cases(&self.audit_log, request.after, request.limit as usize) {
+                Ok(value) => value,
+                Err(()) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        LIST_OPERATION,
+                        "回帰Case監査不正",
+                        "回帰Case登録Auditを検証できないため一覧を停止しました",
+                    )
+                }
+            };
+        if request.after > total {
+            return self.reject_with_payload_hash(
+                request_id,
+                LIST_OPERATION,
+                "回帰Case cursor不正",
+                "一覧cursorが現在のCase件数を超えています。先頭から再読込してください",
+                true,
+                payload_hash,
+            );
+        }
+        if self
+            .append_audit(
+                request_id,
+                LIST_OPERATION,
+                "received",
+                "公開metadataのみの回帰Case一覧を要求",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
+            .is_err()
+        {
+            return self.audit_store_failed_response(
+                request_id,
+                LIST_OPERATION,
+                "回帰Case監査記録失敗",
+                "回帰Case一覧の受信Auditを確定できません",
+            );
+        }
+
+        #[cfg(not(windows))]
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                LIST_OPERATION,
+                "保管未対応",
+                "回帰Case保管の照合はWindows ProtectedStore環境に限定されています",
+                true,
+                payload_hash,
+            );
+        }
+
+        #[cfg(windows)]
+        {
+            let Some(store) = self.protected_store.as_ref() else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    LIST_OPERATION,
+                    "保管未登録",
+                    "起動制御でWindows ProtectedStoreを登録してから再試行してください",
+                    true,
+                    payload_hash,
+                );
+            };
+            let end = request.after.saturating_add(records.len() as u64);
+            for record in &records {
+                match store.inspect(
+                    crate::protected_store::Purpose::Regression,
+                    &record.storage_id,
+                ) {
+                    Ok(Some((hash, _))) if hash == record.ciphertext_hash => {}
+                    Ok(Some(_)) => {
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            LIST_OPERATION,
+                            "回帰Case保管改変",
+                            "暗号文のhashが登録Auditと一致しないため部分一覧を返しません",
+                            true,
+                            payload_hash,
+                        )
+                    }
+                    Ok(None) | Err(_) => {
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            LIST_OPERATION,
+                            "回帰Case保管欠落",
+                            "暗号文の欠落または安全な読取失敗を部分一覧へ変換しません",
+                            true,
+                            payload_hash,
+                        )
+                    }
+                }
+            }
+            let items: Vec<Value> = records.iter().map(公開記録::metadata_projection).collect();
+            let body = json!({
+                "版": 1,
+                "回帰Case一覧": items,
+                "件数": records.len(),
+                "合計件数": total,
+                "次cursor": if end < total { Some(end) } else { None },
+                "公開範囲": "metadata_only",
+                "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+            });
+            let event = match self.append_audit(
+                request_id,
+                LIST_OPERATION,
+                "accepted",
+                "回帰Caseのmetadataだけを返却。private定義は復号・投影しない",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &super::canonical_payload_hash(Some(&body)),
+            ) {
+                Ok(event) => event,
+                Err(_) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        LIST_OPERATION,
+                        "回帰Case監査記録失敗",
+                        "回帰Case一覧の結果Auditを確定できません",
+                    )
+                }
+            };
+            BrokerResponse {
+                request_id: request_id.to_string(),
+                operation: LIST_OPERATION.to_string(),
+                status: BrokerStatus::Accepted,
+                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+                audit_event_id: event.event_id,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: self.shutdown_requested,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    use std::io::Write;
+
+    #[cfg(windows)]
+    fn broker_with_store(name: &str) -> (Broker, std::path::PathBuf) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("gui-shell-regression-{name}-{stamp}"));
+        let audit = root.join("audit");
+        let vault = root.join("vault");
+        std::fs::create_dir_all(&vault).expect("vault");
+        let mut broker =
+            Broker::new_persistent("session-regression", &audit).expect("永続Brokerを作成");
+        broker.current_epoch_seconds_override = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_secs() as i64,
+        );
+        broker
+            .保管先起動登録(&vault, true, std::slice::from_ref(&audit))
+            .expect("保護保管先を登録");
+        (broker, root)
+    }
+
+    #[cfg(windows)]
+    fn seed_case(broker: &mut Broker, sequence: usize) -> String {
+        let case_id = format!("{sequence:032x}");
+        let private = format!("synthetic-private-input-{sequence}");
+        let ciphertext_hash = broker
+            .protected_store
+            .as_ref()
+            .expect("保護保管先を取得")
+            .create(
+                crate::protected_store::Purpose::Regression,
+                &case_id,
+                private.as_bytes(),
+            )
+            .expect("暗号化保存");
+        let created_audit_id = broker.audit_log.next_event_id();
+        let receipt = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": sha256_tagged(private.as_bytes()),
+            "非公開保管ID": case_id,
+            "暗号文hash": ciphertext_hash,
+            "公開表示名": format!("回帰試験{sequence}"),
+            "要求ID": "a".repeat(32),
+            "要求hash": format!("sha256:{}", "b".repeat(64)),
+            "実行系ID": "codex",
+            "結果状態": "成功",
+            "応答hash": format!("sha256:{}", "c".repeat(64)),
+            "終了監査ID": "audit-dialogue-end",
+            "公開範囲": "hash_only",
+            "必要条件数": 1,
+            "禁止条件数": 0,
+            "必要参照数": 1,
+            "作成時刻UnixMillis": 1780000000000_i64,
+            "作成監査ID": created_audit_id,
+            "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        });
+        let encoded = receipt.to_string();
+        broker
+            .append_audit(
+                "regression-case-fixture",
+                OPERATION,
+                "accepted",
+                &format!("回帰Case登録記録:{encoded}"),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(encoded.as_bytes()),
+            )
+            .expect("登録監査fixture");
+        case_id
+    }
+
+    #[cfg(windows)]
+    fn list(broker: &mut Broker, payload: Value, owner: bool) -> BrokerResponse {
+        let request_id = format!("regression-list-{}", broker.audit_events().len());
+        let mut envelope = BrokerRequestEnvelope::command_envelope_at(
+            &request_id,
+            "session-regression",
+            &format!("nonce-{request_id}"),
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        envelope.operation = Some(BrokerOperation::回帰Case一覧);
+        envelope.payload = Some(payload);
+        envelope.refresh_payload_hash();
+        broker.処理(envelope, owner)
+    }
+
+    fn append_receipt_fixture(log: &mut BrokerAuditLog, sequence: usize) {
+        let case_id = format!("{sequence:032x}");
+        let created_audit_id = log.next_event_id();
+        let receipt = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": format!("sha256:{}", "d".repeat(64)),
+            "非公開保管ID": case_id,
+            "暗号文hash": format!("sha256:{}", "e".repeat(64)),
+            "公開表示名": format!("回帰試験{sequence}"),
+            "要求ID": "a".repeat(32),
+            "要求hash": format!("sha256:{}", "b".repeat(64)),
+            "実行系ID": "codex",
+            "結果状態": "成功",
+            "応答hash": format!("sha256:{}", "c".repeat(64)),
+            "終了監査ID": "audit-dialogue-end",
+            "公開範囲": "hash_only",
+            "必要条件数": 1,
+            "禁止条件数": 0,
+            "必要参照数": 1,
+            "作成時刻UnixMillis": 1780000000000_i64,
+            "作成監査ID": created_audit_id,
+            "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+        });
+        let encoded = receipt.to_string();
+        log.append(
+            "regression-list-fixture",
+            OPERATION,
+            "accepted",
+            &format!("回帰Case登録記録:{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(encoded.as_bytes()),
+        );
+    }
+
+    #[test]
+    fn 一覧要求は厳格にbounded_pageへ制限する() {
+        assert!(parse_list_request(&json!({"版":1,"after":0,"limit":100})).is_ok());
+        assert!(parse_list_request(&json!({"版":1,"after":0,"limit":0})).is_err());
+        assert!(parse_list_request(&json!({"版":1,"after":0,"limit":101})).is_err());
+        assert!(parse_list_request(&json!({"版":1,"after":-1,"limit":10})).is_err());
+        assert!(
+            parse_list_request(&json!({"版":1,"after":0,"limit":10,"approval_id":"x"})).is_err()
+        );
+    }
+
+    #[test]
+    fn 登録監査からbounded_metadata_pageだけを射影する() {
+        let mut log = BrokerAuditLog::default();
+        append_receipt_fixture(&mut log, 1);
+        append_receipt_fixture(&mut log, 2);
+        let (page, total) = stored_regression_cases(&log, 1, 1).expect("公開receiptページ");
+        assert_eq!(total, 2);
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].display_name, "回帰試験2");
+        let projection = page[0].metadata_projection();
+        assert!(projection.get("非公開保管ID").is_none());
+        assert!(projection.get("期待経路").is_none());
+        assert_eq!(projection["公開範囲"], "metadata_only");
+    }
 
     #[test]
     fn 既知の秘密markerだけを拒否し入力本文を返さない() {
@@ -410,5 +905,104 @@ mod tests {
         copied["入力方式"] = json!("auto_from_dialogue");
         let copied: 登録指定 = serde_json::from_value(copied).expect("構造は同じでも方式は別");
         assert!(!valid_registration(&copied));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 通常metadata一覧はページ化しprivate定義を返さない() {
+        let (mut broker, root) = broker_with_store("paged-list");
+        seed_case(&mut broker, 1);
+        seed_case(&mut broker, 2);
+
+        let first = list(&mut broker, json!({"版":1,"after":0,"limit":1}), false);
+        assert_eq!(first.status, BrokerStatus::Accepted, "{first:?}");
+        let first_body = first.body.expect("先頭ページ");
+        assert_eq!(first_body["件数"], 1);
+        assert_eq!(first_body["合計件数"], 2);
+        assert_eq!(first_body["次cursor"], 1);
+        assert_eq!(first_body["公開範囲"], "metadata_only");
+        let first_json = serde_json::to_string(&first_body).expect("JSON");
+        assert!(!first_json.contains("synthetic-private-input"));
+        assert!(!first_json.contains("非公開保管ID"));
+
+        let second = list(&mut broker, json!({"版":1,"after":1,"limit":1}), false);
+        assert_eq!(second.status, BrokerStatus::Accepted, "{second:?}");
+        let second_body = second.body.expect("次ページ");
+        assert_eq!(second_body["件数"], 1);
+        assert_eq!(second_body["次cursor"], Value::Null);
+
+        let owner = list(&mut broker, json!({"版":1,"after":0,"limit":10}), true);
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(owner.error.expect("error").code, "通常経路限定");
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cursor外れ権限fieldと破損保管を拒否する() {
+        let (mut broker, root) = broker_with_store("negative-list");
+        let case_id = seed_case(&mut broker, 3);
+        let invalid = list(&mut broker, json!({"版":1,"after":0,"limit":101}), false);
+        assert_eq!(invalid.status, BrokerStatus::Rejected);
+        let authority = list(
+            &mut broker,
+            json!({"版":1,"after":0,"limit":10,"approval_id":"injected"}),
+            false,
+        );
+        assert_eq!(authority.status, BrokerStatus::Rejected);
+        let stale = list(&mut broker, json!({"版":1,"after":2,"limit":10}), false);
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.expect("error").code, "回帰Case cursor不正");
+
+        let ciphertext = root
+            .join("vault")
+            .join(format!("regression-{case_id}.dpapi"));
+        let mut changed_file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&ciphertext)
+            .expect("暗号文");
+        changed_file
+            .write_all(b"synthetic-tampered-ciphertext")
+            .expect("改変");
+        let changed = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(changed.status, BrokerStatus::Rejected);
+        assert!(changed.body.is_none());
+        assert_eq!(changed.error.expect("error").code, "回帰Case保管改変");
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 欠落暗号文と不正登録監査を一覧へ昇格しない() {
+        let (mut broker, root) = broker_with_store("missing-list");
+        let case_id = seed_case(&mut broker, 4);
+        let ciphertext = root
+            .join("vault")
+            .join(format!("regression-{case_id}.dpapi"));
+        std::fs::remove_file(&ciphertext).expect("暗号文削除");
+        let missing = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(missing.status, BrokerStatus::Rejected);
+        assert!(missing.body.is_none());
+        assert_eq!(missing.error.expect("error").code, "回帰Case保管欠落");
+
+        broker
+            .append_audit(
+                "malformed-regression-fixture",
+                OPERATION,
+                "accepted",
+                "回帰Case登録記録:{malformed}",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(b"{malformed}"),
+            )
+            .expect("不正監査fixture");
+        let malformed = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(malformed.status, BrokerStatus::Rejected);
+        assert!(malformed.body.is_none());
+        assert_eq!(malformed.error.expect("error").code, "回帰Case監査不正");
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 }
