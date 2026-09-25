@@ -1278,3 +1278,26 @@ Windows実行で既存の`collect_broker_smoke.ps1`を確認したところ、Br
 - `python tooling/validate_all.py --python-only --desktop-platform windows`：初回は今回の変更によるMANIFEST不一致でmanifest／release gate／packaging checkが失敗。`python tooling/manifest.py --write`後の再実行では集約開発検証が完了し、日本語基底監査・Schema・Conformance・manifest・release gate・packaging・release smoke・evidence bundle・runtime assertionsが成功した。Windows installed evidenceは未存在のため各製品release gateは`release_blocker`、`release_ready=false`のまま。
 
 証拠の範囲は開発用Rust Broker processであり、正式配置、Rust起動器→Flutter Runner→named pipe→Brokerの結合、Setup Doctor、初回設定生成、署名配布を証明しない。`windows_broker_installed_smoke`、`windows_installer_first_run_smoke`、`windows_setup_doctor_smoke`、`rev2_flutter_broker_channel_boundary`は引き続き`release_blocker`とし、状態を合格へ変更しない。
+
+
+## D4 Pocket rev2 BrokerのAgent Adapter宣言検証（2026-09-25）
+
+既存の`Agent一覧`経路を再確認し、Flutter側にはAgent Adapter Schema検査がある一方、BrokerはAdapterの任意JSONを未検証のまま一覧へ投影していたGapを確認した。Brokerで既存`agent_adapter.schema.json`の必須field、型、列挙値、上限、nested unknown field、`secret_value_present=false`を検査する。Authority metadataと既知credential markerを含む文字列、重複Adapter／Agent IDも拒否し、失敗時は本文をerror／Auditへ複写せず`応答不正`とBroker Audit記録だけを返す。有効な宣言は既存read-only一覧経路で維持する。既知marker検出はそのmarker群だけを対象とし、任意形式の秘密値が存在しないことを証明しない。
+
+Rust単体試験では、schema準拠fixture、有効Agent一覧のBroker受理、root／nested Authority・credential field、既知credential形式を説明文字列へ埋め込む試行、`secret_value_present=true`、null optional fieldを検証する。Broker拒否試験ではresponseとAuditの両方に試験用sentinelが現れないことを確認した。日本語意味正本へこの宣言境界を追加し、正本索引へ登録した。Agent実task接続、Agent間比較、Handoff、同一Workspace汚染の実Agent試験を成立させる変更ではない。
+
+検証結果:
+
+- `python tooling/schema_check/check_schemas.py`：Schema124件、正常例124件、拒否fixture150件で成功。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：198件成功。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：成功、新規負債0件。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：初回は246件中245件成功。既存A2A loopback試験1件が応答本文のsocket読取で失敗したため、同試験の単独再実行は成功し、その後の全体再実行では246件すべて成功した。失敗を隠さず記録する。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib agent_list_rejects_untrusted_adapter_metadata_with_audit_and_no_leak`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する`：成功。有効metadataのBroker経由一覧投影を確認。
+- `cargo build --locked --manifest-path native/rust_helper/Cargo.toml`：Windows debug profile build成功。
+- `python tooling/manifest.py --write`／`python tooling/manifest.py --check`：成功。現行tracked fileをmanifestへ再固定した。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`：終了code 0。日本語監査、Schema、Conformance、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32 development auditの全stepが成功。これはPython側の統合開発検証であり、Rust library試験・buildおよびWindows installed product evidenceとは別範囲。release evidence bundleは`release_ready=false`と既存blockerを維持した。
+- `rustfmt --edition 2021 --check native/rust_helper/src/broker/dialogue.rs`：既存の同file内format差分を含むため失敗。新規追加部の差分は整形したが、task外の既存行は変更していない。
+- `git diff --check`：成功。
+
+既存release blocker registryは変更していない。Owner操作を伴うGUI-Shell Export経路、総合機能拡張rev1全体、Windows installed product、正式配布、実Agentの本番接続は本単位では成立しない。release_readyはfalseのまま維持する。

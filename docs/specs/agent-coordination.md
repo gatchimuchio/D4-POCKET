@@ -4,6 +4,12 @@
 
 D4 Pocketは複数Agentの結果を比較し、必要に応じて別Agentへ作業を引き継ぐ。ただし、Agentの変更は権限の変更ではない。この文書は、実Agentの起動経路が未接続でも先に固定できる、安全な投影境界を定義する。
 
+## Agent Adapterの宣言検証
+
+Brokerの`Agent一覧`はAdapterが返すmetadataを未信頼の宣言として扱い、`agent_adapter.schema.json`と同じ必須field・型・列挙値・上限を検査してから返す。rootとnested objectの未知field、Authorityを示すfield／値、既知のcredential形式を含む文字列、`secret_value_present=true`、不正または重複したAgent／Adapter IDは、一覧全体を`応答不正`として拒否し、拒否をBroker Auditへ記録する。不正metadata本文はerror／Auditへ複写せず、検査に合格した公開fieldだけを一覧snapshotへ返す。credential形式の検出は既知markerに限り、任意形式の秘密値が含まれないことまでは保証しない。
+
+この検査は宣言の形を保証するだけで、AgentのTrust、Permission、Approval、実行可能性を生成しない。`unsupported`、`unavailable`、`unknown`はそのまま維持する。
+
 ## 比較
 
 `agent_comparison.schema.json`の比較投影は、2件以上8件以下のAgentセッションを対象とする。各セッションは、異なるWorkspaceでなければならない。同一Workspace、同一セッションの重複、またはWorkspaceを識別できない入力は比較を拒否する。

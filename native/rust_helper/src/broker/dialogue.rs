@@ -95,6 +95,222 @@ pub trait 実行系Adapter: Send + Sync {
     ) -> Result<実行結果, 対話失敗>;
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentAdapterMetadata {
+    adapter_id: String,
+    agent_id: String,
+    provider: String,
+    version: String,
+    model: String,
+    status: String,
+    capabilities: Vec<AgentCapabilityMetadata>,
+    workspace_requirements: AgentWorkspaceMetadata,
+    tool_support: AgentSupportMetadata,
+    mcp_support: AgentSupportMetadata,
+    session_support: AgentSupportMetadata,
+    cancellation_support: AgentSupportMetadata,
+    usage_metrics_support: AgentSupportMetadata,
+    cost_metrics_support: AgentSupportMetadata,
+    authentication: AgentAuthenticationMetadata,
+    host_requirements: AgentHostMetadata,
+    #[serde(default, deserialize_with = "deserialize_non_null_optional_string")]
+    evidence_source: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_non_null_optional_string")]
+    evidence_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentCapabilityMetadata {
+    capability_id: String,
+    support: AgentSupportMetadata,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentSupportMetadata {
+    status: String,
+    reason: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentWorkspaceMetadata {
+    mode: String,
+    boundary_policy: String,
+    secret_paths: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentAuthenticationMetadata {
+    method: String,
+    secret_value_present: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentHostMetadata {
+    platforms: Vec<String>,
+    network_scope: String,
+    process_spawn: AgentSupportMetadata,
+}
+
+fn deserialize_non_null_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    String::deserialize(deserializer).map(Some)
+}
+
+impl AgentAdapterMetadata {
+    fn read(value: &Value) -> Result<Self, 対話失敗> {
+        if agent_metadata_contains_credential_marker(value)
+            || super::protocol::metadata_attempts_authority_value(value)
+        {
+            return Err(対話失敗::応答不正);
+        }
+        let metadata: Self =
+            serde_json::from_value(value.clone()).map_err(|_| 対話失敗::応答不正)?;
+        if !agent_text_valid(&metadata.adapter_id)
+            || !agent_text_valid(&metadata.agent_id)
+            || !agent_text_valid(&metadata.provider)
+            || !agent_text_valid(&metadata.version)
+            || !agent_text_valid(&metadata.model)
+            || !["ready", "degraded", "unavailable", "unsupported"]
+                .contains(&metadata.status.as_str())
+            || metadata.capabilities.len() > 64
+            || metadata.capabilities.iter().any(|capability| {
+                !agent_text_valid(&capability.capability_id)
+                    || !agent_support_valid(&capability.support)
+            })
+            || metadata
+                .capabilities
+                .iter()
+                .map(|capability| capability.capability_id.as_str())
+                .collect::<BTreeSet<_>>()
+                .len()
+                != metadata.capabilities.len()
+            || !["required", "optional"].contains(&metadata.workspace_requirements.mode.as_str())
+            || metadata.workspace_requirements.boundary_policy != "deny_outside_workspace"
+            || metadata.workspace_requirements.secret_paths.len() > 64
+            || metadata
+                .workspace_requirements
+                .secret_paths
+                .iter()
+                .any(|path| !agent_text_valid(path))
+            || !agent_support_valid(&metadata.tool_support)
+            || !agent_support_valid(&metadata.mcp_support)
+            || !agent_support_valid(&metadata.session_support)
+            || !agent_support_valid(&metadata.cancellation_support)
+            || !agent_support_valid(&metadata.usage_metrics_support)
+            || !agent_support_valid(&metadata.cost_metrics_support)
+            || ![
+                "none",
+                "api_key_reference",
+                "oauth_reference",
+                "local_credential_reference",
+                "unsupported",
+                "unknown",
+            ]
+            .contains(&metadata.authentication.method.as_str())
+            || metadata.authentication.secret_value_present
+            || metadata.host_requirements.platforms.is_empty()
+            || metadata.host_requirements.platforms.len() > 8
+            || metadata.host_requirements.platforms.iter().any(|platform| {
+                !["windows", "macos", "linux", "android", "ios", "unknown"]
+                    .contains(&platform.as_str())
+            })
+            || ![
+                "loopback_only",
+                "outbound_allowed",
+                "unsupported",
+                "unknown",
+            ]
+            .contains(&metadata.host_requirements.network_scope.as_str())
+            || !agent_support_valid(&metadata.host_requirements.process_spawn)
+            || metadata.evidence_source.as_deref().is_some_and(|source| {
+                ![
+                    "CONFIG",
+                    "INTERNAL_STATE",
+                    "LIVE_RUNTIME",
+                    "EXTERNAL_EVIDENCE",
+                    "FIXTURE",
+                ]
+                .contains(&source)
+            })
+            || metadata
+                .evidence_reason
+                .as_deref()
+                .is_some_and(|reason| !agent_text_valid(reason))
+        {
+            return Err(対話失敗::応答不正);
+        }
+        Ok(metadata)
+    }
+}
+
+/// 全fieldから既知のcredential形式を拒否する。未知形式の秘密値不存在までは証明しない。
+fn agent_metadata_contains_credential_marker(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => object
+            .values()
+            .any(agent_metadata_contains_credential_marker),
+        Value::Array(items) => items.iter().any(agent_metadata_contains_credential_marker),
+        Value::String(value) => {
+            let lower = value.to_ascii_lowercase();
+            [
+                "api_key=",
+                "api-key=",
+                "token=",
+                "password=",
+                "bearer ",
+                "openai_api_key",
+                "codex_api_key",
+                "github_pat_",
+                "ghp_",
+                "xoxb-",
+                "xoxp-",
+                "-----begin",
+                "AIza",
+                "sk-",
+            ]
+            .iter()
+            .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
+        }
+        _ => false,
+    }
+}
+
+fn agent_text_valid(value: &str) -> bool {
+    !value.is_empty() && value.chars().count() <= 256
+}
+
+fn agent_support_valid(value: &AgentSupportMetadata) -> bool {
+    ["supported", "unsupported", "unknown"].contains(&value.status.as_str())
+        && agent_text_valid(&value.reason)
+}
+
+fn agent_metadata_projection(
+    adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
+) -> Result<Vec<Value>, 対話失敗> {
+    let mut adapter_ids = BTreeSet::new();
+    let mut agent_ids = BTreeSet::new();
+    let mut projection = Vec::new();
+    for adapter in adapters.values() {
+        let Some(metadata) = adapter.agent_metadata() else {
+            continue;
+        };
+        let validated = AgentAdapterMetadata::read(&metadata)?;
+        if !adapter_ids.insert(validated.adapter_id) || !agent_ids.insert(validated.agent_id) {
+            return Err(対話失敗::応答不正);
+        }
+        projection.push(metadata);
+    }
+    Ok(projection)
+}
+
 /// Broker内の対話記録から得る統計。OS測定値ではなく、現在processの権限や健全性を示さない。
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct 実行系資源統計 {
@@ -549,13 +765,7 @@ impl 対話制御 {
             }
             "Agent一覧" => {
                 空入力(値)?;
-                Ok(json!({
-                    "Agent": self
-                        .実行系
-                        .values()
-                        .filter_map(|adapter| adapter.agent_metadata())
-                        .collect::<Vec<_>>()
-                }))
+                Ok(json!({"Agent": agent_metadata_projection(&self.実行系)?}))
             }
             "対話開始" => {
                 let 指定: 実行系指定 = 読取(値)?;
@@ -1093,6 +1303,57 @@ fn 表示射影(work: &作業, 結果: &Result<実行結果, 対話失敗>) -> V
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn AgentAdapter投影は既存SchemaとAuthority境界を検証する() {
+        let valid: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("正常Agent Adapter fixture");
+        assert!(AgentAdapterMetadata::read(&valid).is_ok());
+
+        let mut authority = valid.clone();
+        authority["permission"] = json!("all");
+        assert_eq!(
+            AgentAdapterMetadata::read(&authority).err(),
+            Some(対話失敗::応答不正)
+        );
+
+        let mut credential = valid.clone();
+        credential["api_key"] = json!("TEST_ONLY_SECRET_SENTINEL");
+        assert_eq!(
+            AgentAdapterMetadata::read(&credential).err(),
+            Some(対話失敗::応答不正)
+        );
+
+        let mut nested_credential = valid.clone();
+        nested_credential["authentication"]["api_key"] = json!("TEST_ONLY_SECRET_SENTINEL");
+        assert_eq!(
+            AgentAdapterMetadata::read(&nested_credential).err(),
+            Some(対話失敗::応答不正)
+        );
+
+        let mut embedded_credential = valid.clone();
+        embedded_credential["tool_support"]["reason"] = json!("Bearer TEST_ONLY_SECRET_SENTINEL");
+        assert_eq!(
+            AgentAdapterMetadata::read(&embedded_credential).err(),
+            Some(対話失敗::応答不正)
+        );
+
+        let mut secret_flag = valid.clone();
+        secret_flag["authentication"]["secret_value_present"] = json!(true);
+        assert_eq!(
+            AgentAdapterMetadata::read(&secret_flag).err(),
+            Some(対話失敗::応答不正)
+        );
+
+        let mut malformed_optional = valid;
+        malformed_optional["evidence_source"] = Value::Null;
+        assert_eq!(
+            AgentAdapterMetadata::read(&malformed_optional).err(),
+            Some(対話失敗::応答不正)
+        );
+    }
 
     #[test]
     fn 対話開始監査hashは既存session射影と一致する() {

@@ -4762,12 +4762,72 @@ mod 端末統治試験 {
         b.端末要求処理(&json!({"版":1,"HostID":c["HostID"],"端末ID":c["端末ID"],"資格ID":c.get("結合ID").unwrap_or(&c["招待ID"]),
             "資格秘密":c.get("端末秘密").unwrap_or(&c["招待秘密"]),"nonce":識別子生成().unwrap(),"発行時刻":b.current_epoch_seconds(),"操作":op,"内容":p}).to_string())
     }
+    struct AgentMetadataAdapter(Value);
+    impl 実行系Adapter for AgentMetadataAdapter {
+        fn 接続対象(&self) -> String { "agent-metadata-test://read-only".into() }
+        fn agent_metadata(&self) -> Option<Value> { Some(self.0.clone()) }
+        fn 応答(
+            &self,
+            _: &crate::broker::dialogue::対話要求,
+            _: &std::sync::atomic::AtomicBool,
+            _: Instant,
+            _: &mut Vec<Vec<u8>>,
+        ) -> Result<crate::broker::dialogue::実行結果, 対話失敗> {
+            Err(対話失敗::応答不正)
+        }
+    }
     fn 準備(b:&mut Broker)->(Value,Value){
         let i=制御(b,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
         let c=通信(b,&i,"端末結合",json!({})).body.unwrap();
         let session=通信(b,&c,"対話開始",json!({"実行系ID":"local"})).body.unwrap();
         let pending=通信(b,&c,"対話送信",json!({"対話セッションID":session["対話セッションID"],"入力":"こんにちは"})).body.unwrap();
         (c,pending)
+    }
+    #[test]
+    fn agent_list_rejects_untrusted_adapter_metadata_with_audit_and_no_leak() {
+        let secret_marker = "TEST_ONLY_SECRET_SENTINEL";
+        for (index, metadata) in [
+            json!({"permission": "all"}),
+            json!({"api_key": secret_marker}),
+            {
+                let mut metadata: Value = serde_json::from_str(include_str!(
+                    "../../../../examples/contracts/agent_adapter.valid.json"
+                ))
+                .unwrap();
+                metadata["tool_support"]["reason"] =
+                    json!(format!("sk-{secret_marker}"));
+                metadata
+            },
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut environment = 環境生成();
+            environment
+                .broker
+                .実行系登録("hostile-agent", Arc::new(AgentMetadataAdapter(metadata)))
+                .unwrap();
+            let mut request = BrokerRequestEnvelope::health(
+                &format!("agent-list-request-{index}"),
+                &format!("agent-list-nonce-{index}"),
+            );
+            request.session_id = Some("device-test".into());
+            request.operation = Some(BrokerOperation::Agent一覧);
+            request.payload = Some(json!({}));
+            request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+            request.refresh_payload_hash();
+
+            let response = environment.broker.handle(request);
+            assert_eq!(response.status, BrokerStatus::Rejected);
+            assert_eq!(response.error.as_ref().map(|error| error.code.as_str()), Some("応答不正"));
+
+            let response_json = serde_json::to_string(&response).unwrap();
+            let audit_json = serde_json::to_string(environment.broker.audit_events()).unwrap();
+            assert!(!response_json.contains(secret_marker));
+            assert!(!audit_json.contains(secret_marker));
+            assert!(audit_json.contains("Agent一覧"));
+            assert!(audit_json.contains("\"decision\":\"rejected\""));
+        }
     }
     #[test]
     fn 監査障害時も失効資格の保留送信を隔離する(){
@@ -4796,6 +4856,13 @@ mod 端末統治試験 {
     #[allow(non_snake_case)]
     fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する(){
         let mut e=環境生成();
+        let agent_fixture: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("正常Agent Adapter fixture");
+        e.broker
+            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(agent_fixture.clone())))
+            .unwrap();
         let invitation=制御(&mut e.broker,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
         let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
         for (operation,payload) in [
@@ -4814,6 +4881,7 @@ mod 端末統治試験 {
         let agent_body=agent_list.body.as_ref().expect("Agent一覧projection");
         assert_eq!(agent_body.as_object().map(serde_json::Map::len),Some(1));
         assert!(agent_body.get("Agent").is_some_and(Value::is_array));
+        assert_eq!(agent_body["Agent"], json!([agent_fixture]));
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);

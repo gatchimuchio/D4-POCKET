@@ -148,6 +148,10 @@
       "責任": "実装言語と安全境界の分担。自然言語の日本語基底は規定/00_日本語基底規定.mdが正本"
     },
     {
+      "path": "docs/specs/agent-coordination.md",
+      "責任": "Agent Adapter metadataの検証、複数Agent比較のWorkspace分離、Handoff時のAuthority再評価"
+    },
+    {
       "path": "docs/specs/gui-shell-export.md",
       "責任": "GUI Shell独立書出しのOwner境界、権限非継承、manifest-onlyと未成立製品経路"
     },

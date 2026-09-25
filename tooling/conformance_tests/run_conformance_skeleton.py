@@ -6052,6 +6052,45 @@ def test_agent_adapter_is_declaration_only_and_unsupported_is_explicit() -> list
     return []
 
 
+def test_broker_agent_metadata_is_validated_before_projection() -> list[str]:
+    schema = load_schema("agent_adapter.schema.json")
+    authentication = schema.get("properties", {}).get("authentication", {})
+    secret_flag = authentication.get("properties", {}).get("secret_value_present", {})
+    if secret_flag.get("const") is not False:
+        return ["Agent Adapter Schemaが秘密値の非保持を固定していない"]
+
+    dialogue = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(
+        encoding="utf-8"
+    )
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    contract = (ROOT / "docs" / "specs" / "agent-coordination.md").read_text(
+        encoding="utf-8"
+    )
+    for token in (
+        "struct AgentAdapterMetadata",
+        "deny_unknown_fields",
+        "metadata_attempts_authority_value",
+        "agent_metadata_contains_credential_marker",
+        "secret_value_present",
+        "agent_metadata_projection",
+    ):
+        if token not in dialogue:
+            return [f"BrokerのAgent metadata検証経路が不足: {token}"]
+    if "agent_list_rejects_untrusted_adapter_metadata_with_audit_and_no_leak" not in protocol:
+        return ["Agent metadataのAuthority／secret拒否をBroker実監査経路で試験していない"]
+    for token in (
+        "一覧全体を`応答不正`として拒否",
+        "Broker Audit",
+        "Permission",
+        "既知markerに限り",
+    ):
+        if token not in contract:
+            return [f"Agent metadata意味正本に拒否境界がない: {token}"]
+    return []
+
+
 def test_agent_adapter_probe_is_read_only_and_fail_closed() -> list[str]:
     adapter = build_adapter_record("codex", "0.155.0-alpha.16", True, True)
     schema = load_schema("agent_adapter.schema.json")
@@ -7292,6 +7331,7 @@ def main() -> int:
         test_agent_generated_diff_must_be_auditable,
         test_agent_auto_permission_is_advisory_only,
         test_agent_adapter_is_declaration_only_and_unsupported_is_explicit,
+        test_broker_agent_metadata_is_validated_before_projection,
         test_agent_adapter_probe_is_read_only_and_fail_closed,
         test_agent_comparison_projection_is_isolated_and_non_authoritative,
         test_agent_handoff_projection_requires_reassessment_and_redaction,

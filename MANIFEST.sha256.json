@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "c614b0dfb3ee93c720b456369af9c25ac35064334fce9fd017a6eca6df736eb2"
+      "sha256": "9af953c7520826f15bbb2c4156e3732b915158f22d2f1262347f61605bd03a6a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1261,7 +1261,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "ce88ab16d592c4817929504128fb20e32032319cd243e515dc6e1149c6c099fb"
+      "sha256": "812b9f23e792a0cf3c26da4394f36186e394daa3e217ac8a97e64f56e4f1c96f"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -2745,7 +2745,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "5e1ddb7bceee6d0ad16202cd0b82e7e8948426c625073baf40188afe8cd0f659"
+      "sha256": "88a3bc61482747901bb8d21fbe171a6985a1613b2d641a1bd21ea443ff4f094f"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -2805,7 +2805,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "a2737eb0bd0db1a16224818a4dd961614ab94ff7308f89620b62ee4c383ab1d9"
+      "sha256": "da9b6e64766537bfb9ec93b3a58513af472d20674894c3d37681b7921840f1d2"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3901,7 +3901,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "df92d01e3b013b6fe7f68433eea9ff6a26be322f03e3b4c98fa34b9dc207f064"
+      "sha256": "f4a463cd8a4b959625e7714191c308251090da9e03d0b00528bee20b312a0299"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -4013,7 +4013,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "e25509b9f7a982c7c3868d497a6613695267f5f3f171c4c907aa0f4300b3ebcd"
+      "sha256": "df07e7a4134d592c143d45ce919821e8941c2b6f2a853238cd8f54c4444ef7fe"
     }
   ]
 }
