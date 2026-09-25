@@ -76,6 +76,19 @@ C28_DIAGNOSTIC_DETAILS = {
     "not_200_or_invalid_version",
 }
 C28_DIAGNOSTIC_LIMIT = 32
+C28_DIAGNOSTIC_READ_LIMIT = 64 * 1024
+C28_FAILURE_CODES = {
+    "dialogue_result_not_success",
+    "dialogue_unexpected_success",
+    "dialogue_completion_timeout",
+    "broker_rejected_operation",
+    "runtime_fixture_probe_failed",
+    "operation_timeout",
+    "permission_denied",
+    "connection_error",
+    "io_error",
+    "unexpected_error",
+}
 
 
 def fixture_http_route(path: str) -> str:
@@ -127,6 +140,41 @@ def safe_c28_error_type(error: BaseException) -> str:
     """例外messageを含めず、report用の型名だけ返す。"""
     name = type(error).__name__
     return name if name.isascii() and name.isidentifier() else "Exception"
+
+
+class C28ValidationError(RuntimeError):
+    """秘密を含み得る例外文とは分離した固定失敗分類。"""
+
+    def __init__(self, code: str, message: str) -> None:
+        if code not in C28_FAILURE_CODES:
+            raise ValueError("C28の失敗分類codeが許可リスト外です")
+        super().__init__(message)
+        self.code = code
+
+
+def safe_c28_failure_code(error: BaseException) -> str:
+    if isinstance(error, C28ValidationError) and error.code in C28_FAILURE_CODES:
+        return error.code
+    if isinstance(error, TimeoutError):
+        return "operation_timeout"
+    if isinstance(error, PermissionError):
+        return "permission_denied"
+    if isinstance(error, ConnectionError):
+        return "connection_error"
+    if isinstance(error, OSError):
+        return "io_error"
+    return "unexpected_error"
+
+
+def safe_c28_diagnostics_since(path: Path, offset: int) -> list[str]:
+    """現在の検証操作が追記した範囲から固定診断だけを読み取る。"""
+    try:
+        with path.open("rb") as stream:
+            stream.seek(max(0, offset), os.SEEK_SET)
+            raw = stream.read(C28_DIAGNOSTIC_READ_LIMIT)
+    except OSError:
+        return []
+    return safe_c28_diagnostics(raw.decode("utf-8", errors="replace"))
 
 
 def unlink_restart_endpoint(path: Path) -> int:
@@ -427,7 +475,10 @@ class RuntimeServer:
             sock.sendall(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
             response = sock.recv(4096)
         if b"200" not in response:
-            raise RuntimeError(f"Runtime fixture health probeが不正: {response!r}")
+            raise C28ValidationError(
+                "runtime_fixture_probe_failed",
+                "Runtime fixture health probeが不正",
+            )
         time.sleep(0.02)
 
 
@@ -465,7 +516,9 @@ class BrokerClient:
     def accepted(self, operation: str, payload: Any = None) -> dict[str, Any]:
         response = self.request(operation, payload)
         if response.get("status") != "accepted":
-            raise RuntimeError(f"Brokerが{operation}を拒否: {response}")
+            raise C28ValidationError(
+                "broker_rejected_operation", f"Brokerが{operation}を拒否"
+            )
         return response
 
     def shutdown(self) -> None:
@@ -535,6 +588,7 @@ class Report:
         self.started_at = now_text()
         self.status = "running"
         self.error: str | None = None
+        self.failure_code: str | None = None
         self.body: dict[str, Any] = {}
 
     def write(self) -> None:
@@ -576,6 +630,7 @@ class LongRun:
         self.started_monotonic = 0.0
         self.next_sample = 0.0
         self.last_phase = "準備"
+        self.diagnostic_offset = 0
 
     def _paths_for_restart(self) -> None:
         for path in (self.session, self.owner_session):
@@ -746,14 +801,21 @@ class LongRun:
                 break
             time.sleep(0.02)
         if result is None:
-            raise TimeoutError("長時間試験の対話完了待機がtimeoutした")
+            raise C28ValidationError(
+                "dialogue_completion_timeout",
+                "長時間試験の対話完了待機がtimeoutした",
+            )
         broker.accepted("対話終了", {"対話セッションID": session_id})
         success = result.get("結果", {}).get("状態") == "成功"
         elapsed_ms = (time.perf_counter() - started) * 1000
         if not expected_failure and not success:
-            raise RuntimeError(f"対話が成功にならない: {json.dumps(result, ensure_ascii=False)}")
+            raise C28ValidationError(
+                "dialogue_result_not_success", "対話が成功にならない"
+            )
         if expected_failure and success:
-            raise RuntimeError("接続断中の対話が成功へ昇格した")
+            raise C28ValidationError(
+                "dialogue_unexpected_success", "接続断中の対話が成功へ昇格した"
+            )
         if success:
             self.stats.dialogue_success += 1
             self.stats.add_latency(elapsed_ms)
@@ -814,6 +876,7 @@ class LongRun:
             else 0,
             "統計": self.stats.as_dict(),
             "段階": self.last_phase,
+            "失敗分類": self.report.failure_code,
             "エラー": self.report.error,
             "installed製品の証明ではない": True,
             "Runtime fixture観測": {
@@ -862,6 +925,7 @@ class LongRun:
         while time.monotonic() < deadline:
             self.last_phase = phase_actions[action_index % len(phase_actions)][0]
             action = phase_actions[action_index % len(phase_actions)][1]
+            self.diagnostic_offset = self.stderr.stat().st_size if self.stderr.exists() else 0
             action()
             action_index += 1
             if self.stats.dialogue_success and self.stats.dialogue_success % 10 == 0:
@@ -939,19 +1003,9 @@ def main() -> int:
         return 0
     except BaseException as error:
         report.status = "failed"
-        diagnostics: list[str] = []
-        if run.stderr.exists():
-            try:
-                with run.stderr.open("rb") as stream:
-                    stream.seek(0, os.SEEK_END)
-                    size = stream.tell()
-                    stream.seek(max(0, size - 64 * 1024), os.SEEK_SET)
-                    diagnostics = safe_c28_diagnostics(
-                        stream.read().decode("utf-8", errors="replace")
-                    )
-            except OSError:
-                diagnostics = []
+        diagnostics = safe_c28_diagnostics_since(run.stderr, run.diagnostic_offset)
         detail = " / Runtime transport diagnostics: " + "; ".join(diagnostics) if diagnostics else ""
+        report.failure_code = safe_c28_failure_code(error)
         report.error = safe_c28_error_type(error) + detail
         run.last_phase = run.last_phase or "失敗"
         run.sample(run.last_phase)

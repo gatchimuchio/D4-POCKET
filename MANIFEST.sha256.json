@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "089f9358312347cbe0142f7e750652cce3adaded3737abc2165c373358bbba48"
+      "sha256": "10c1a08519bc156255028a31bc2192345767864ad6d326af476e9149046f5c3b"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "3cdc43c34eb59f72a9cf19689fbb2bf6448099e27abf5613498d556fc699532e"
+      "sha256": "c1cd8f9a4d590a471c319e5e61b5f977286a65d940b457a912844d712ada3fa4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1317,7 +1317,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "5e79ca744e90bc455f7fe7d264433f3a48c0e6c2645b600614d8d02787de50a6"
+      "sha256": "8c617c497cee83e868dd437d87bbe6ad2d8e7a7cdf5c8337900af80267f1c88a"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -1365,7 +1365,7 @@
     },
     {
       "path": "docs/specs/long-run-validation.md",
-      "sha256": "3bd750993d552148c63b4943f8f3b86d562a736c68cd1659b3f17799dd4fc778"
+      "sha256": "0a696f44b913b0515f8a2cb8ca388e8c1ae98b449cf7575174b4ebc74a4c96a3"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -1465,7 +1465,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "5521c0914f7c5d7dc26863923041be0e3f932c84ab66738cc6119c8ff0f5b56d"
+      "sha256": "bc4d45fe0c0a4d99b97007c527d2a720a79f21d435c1c8bc5685186cb7b279f0"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -4045,7 +4045,7 @@
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
-      "sha256": "c57531f26709d36c991510bd319ceaf2feb3e9ecec6956944b409f63cf81f146"
+      "sha256": "463ca2a9e9e35be33c75c38d3fc63b4736a3c3987ba5015ff2e10ec18aca5488"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -4085,7 +4085,7 @@
     },
     {
       "path": "tooling/long_run_validation.py",
-      "sha256": "c53f2e309ebcf9095bee0f33bcad0bc00b98f7439bdedda54f343cbaa7ee9b84"
+      "sha256": "80151d02ad797121db61803699a249adf3495239f457c8a9e9500a27998c6b21"
     },
     {
       "path": "tooling/manifest.py",

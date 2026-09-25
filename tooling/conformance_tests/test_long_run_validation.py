@@ -154,9 +154,44 @@ class RestartEndpointCleanupTests(unittest.TestCase):
         error = RuntimeError("CREDENTIAL_SENTINEL_001")
 
         safe = c28.safe_c28_error_type(error)
+        code = c28.safe_c28_failure_code(error)
 
         self.assertEqual(safe, "RuntimeError")
+        self.assertEqual(code, "unexpected_error")
         self.assertNotIn("CREDENTIAL_SENTINEL_001", safe)
+        self.assertNotIn("CREDENTIAL_SENTINEL_001", code)
+
+    def test_fixed_dialogue_failure_code_omits_exception_message(self):
+        error = c28.C28ValidationError(
+            "dialogue_result_not_success", "PRIVATE_DIALOGUE_SENTINEL"
+        )
+
+        self.assertEqual(
+            c28.safe_c28_failure_code(error), "dialogue_result_not_success"
+        )
+        self.assertNotIn(
+            "PRIVATE_DIALOGUE_SENTINEL", c28.safe_c28_failure_code(error)
+        )
+
+    def test_unlisted_failure_code_is_rejected(self):
+        with self.assertRaises(ValueError):
+            c28.C28ValidationError("PRIVATE_SENTINEL", "private message")
+
+    def test_diagnostics_are_scoped_to_the_current_offset(self):
+        import tempfile
+
+        earlier = b"C28_RUNTIME_DIAGNOSTIC|chat|read_headers|ConnectionReset\n"
+        current = b"C28_RUNTIME_DIAGNOSTIC|health|connect|TimedOut\n"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "broker.stderr"
+            path.write_bytes(earlier + current)
+
+            diagnostics = c28.safe_c28_diagnostics_since(path, len(earlier))
+
+        self.assertEqual(
+            diagnostics,
+            ["C28_RUNTIME_DIAGNOSTIC|health|connect|TimedOut"],
+        )
 
 
 if __name__ == "__main__":

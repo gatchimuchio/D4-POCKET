@@ -1550,3 +1550,15 @@ OneDrive上の生成物ACLを変更せず通常Android検証を完了できる�
 - Flutter `test --no-pub --reporter expanded`: 16件成功。Flutter `analyze --no-pub`: 指摘0件。
 - `python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。日本語基底strict、Schema 125／正常例125／negative 152、conformance 200、manifest、release gate、配布互換性、release smoke、evidence bundle、runtime assertions、C32構造監査が成功した。既存release blocker 5件と`release_ready=false`を維持する。統合検証にはiOS／Android native compile、Flutter試験、実機検証は含まれない。
 - Android実機検証の凍結、Apple開発環境によるiOS compile／XCTest、実際のTLS通信／Rust Broker結合、KeyStore／Keychainを用いる実機動作、lifecycleはこの検証で成立しない。既存のMobile統合・実機証拠に関する`release_blocker`と`release_ready=false`を維持する。
+
+## D4 Pocket rev2 C28失敗分類・phase診断境界の改善（2026-09-25）
+
+clean commit `6a7ccffe9bb3b433c35e9b97e2dc7bef7604a1a7`から開始した8時間試行は22.766秒後、Runtime相当再起動phaseでfailedとなった。証拠`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-6a7ccff-20260925-142215.json`のSHA-256は`8B8876ADAF0F856DC7E9A1E95728AC03B480632AF6F4F8AB914F5B40CDDE0868`。対話成功9件、想定disconnect失敗2件、Runtime再起動3件、Broker再起動2件、再接続5件で終了した。reportは旧形式の`RuntimeError`とphaseをまたぐtransport診断しかなく、根本原因は特定不能だった。証拠ファイルは変更していない。
+
+検証器へ固定allowlistの`失敗分類`を追加し、既知の対話非成功、Broker拒否、fixture probe失敗、timeoutを固定codeへ分類した。transport診断は各phase action開始offset以降の最大64 KiBだけから抽出し、既存のroute／stage／detail allowlistと32行上限を維持する。exception message、stderr全文、対話本文、資格値は出力しない。Retry、成功条件の緩和、production adapter timeout変更は行っていない。
+
+- `python -m unittest tooling.conformance_tests.test_long_run_validation`: 12 tests passed。未知code拒否、secret markerを含むexception messageの非出力、古いphase diagnosticの除外を含む。
+- 変更中worktreeでの`python tooling/long_run_validation.py --duration-seconds 120 --output %LOCALAPPDATA%\GUI-Shell\development-evidence\c28-120s-classified-6a7ccff-20260925.json`: passed、120.25秒、対話成功38、想定disconnect失敗9、Runtime再起動10、Broker再起動9、再接続19、Broker working set 12,005,376〜14,843,904 bytes、store 14,747〜573,165 bytes。artifact SHA-256: `383DF236F9CA63174E4A7FAA69E54824F5BEE0648B412ED1E393BD98CA5F3303`。
+- 追加の30秒Broker regressionもpassed（対話成功12、想定disconnect失敗3）。単独Runtime fixture stop／start／probeの20反復もpassedだが、Brokerとの結合安定性を示さない。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: PASS、負債file 0／finding 0。`python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0、設定された10検査がすべてPASS。Schema 132／正常例132／negative fixture 163、Conformance 201件、manifest、release gate、配布互換性、release smoke、evidence bundle、runtime assertions、C32構造監査を含む。統合検証のC28は30秒smokeであり、8時間試行のfailed記録を置き換えない。
+- この短時間証拠は8時間成立へ昇格しない。診断改善を含むclean commitからC28の8時間試験を再実行する。`release_blocker`: 8時間運用完遂、installed product・外部Runtime evidence。`known_limitation`: fixture測定はinstalled product、外部Runtime、製品SLAを証明しない。`release_ready=false`を維持する。

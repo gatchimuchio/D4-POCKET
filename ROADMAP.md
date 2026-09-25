@@ -21,7 +21,7 @@ rev2のHost操作面とC19 Adapter管理操作を、既存のGUI-Shell契約とR
 
 C27では`docs/specs/performance-validation.md`を正本として、開発用snapshot生成とDesktopのbounded projectionを5秒watchdog付きで測定する。測定は`INTERNAL_STATE`または`FIXTURE`に限定し、実installed製品の起動時間、GPU frame、実Runtime負荷、8時間運用へ昇格させない。C27の開発測定はPASSしたが、C0-C34全数完成、Windows installed product証拠、owner GO、正式releaseは未成立である。
 
-C28では`docs/specs/long-run-validation.md`を正本として、実Broker IPCによる対話反復、localhost Runtime fixtureの再起動、開発用lifecycle fixtureの再起動、Broker再起動、接続断・再接続、bounded履歴読取、Broker working set／永続store観測を検証する。通常検証には30秒smokeを接続し、8時間実測は`--duration-hours 8`の明示実行だけを証拠とする。C28の短時間smokeは実装済みだが、8時間、installed product、外部Runtime／Agent負荷、正式releaseは未成立である。
+C28では`docs/specs/long-run-validation.md`を正本として、実Broker IPCによる対話反復、localhost Runtime fixtureの再起動、開発用lifecycle fixtureの再起動、Broker再起動、接続断・再接続、bounded履歴読取、Broker working set／永続store観測を検証する。通常検証には30秒smokeを接続し、8時間実測は`--duration-hours 8`の明示実行だけを証拠とする。clean commit `6a7ccff`からの8時間試行は22.766秒後にRuntime相当再起動中の通信失敗で終了した。失敗codeが欠けており根本条件は未特定のため、検証器へ固定失敗分類と作業段階内に限定した診断読取を追加し、12件の回帰試験と120秒stressはPASSした。これは再試行準備と短時間回帰の証拠であり、8時間完遂の代替ではない。8時間、installed product、外部Runtime／Agent負荷、正式releaseは未成立である。
 
 C29では`docs/specs/failure-injection-validation.md`を正本として、Runtime停止相当、Broker process停止、MCP／A2A timeout、Credential unavailable、store書込不能simulation、Audit書込失敗、malformed stateを実Broker経路へ注入し、fail-closedを確認する。通常検証にはC29 smokeを接続する。fixtureとtemporary storeの結果はinstalled製品・外部サービスの障害耐性証拠へ昇格させない。
 
