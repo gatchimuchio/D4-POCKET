@@ -39,7 +39,11 @@ class BrokerClient implements BrokerTransport {
     try {
       final response = await _channel
           .invokeMethod<String>('request', jsonEncode(request))
-          .timeout(const Duration(seconds: 5));
+          .timeout(
+            operation == 'GUI Shell書出し'
+                ? const Duration(seconds: 305)
+                : const Duration(seconds: 5),
+          );
       if (response == null || utf8.encode(response).length > 4 * 1024 * 1024) {
         throw const BrokerClientException('broker応答が空または上限超過です');
       }

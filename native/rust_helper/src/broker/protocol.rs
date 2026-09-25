@@ -635,6 +635,13 @@ pub struct BrokerRequestEnvelope {
     pub payload: Option<Value>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExportOwnerConfirmation {
+    NotOwner,
+    OwnerCredential,
+    DesktopNativeConfirmation,
+}
+
 impl BrokerRequestEnvelope {
     pub fn from_json_str(input: &str) -> Result<Self, serde_json::Error> {
         let raw: JsonRequestEnvelope = super::json_input::read_unique(input)?;
@@ -1026,12 +1033,79 @@ impl Broker {
 
     pub(crate) fn owner要求処理(&mut self, input: &str) -> BrokerResponse {
         match BrokerRequestEnvelope::from_json_str(input) {
-            Ok(envelope) => self.処理(envelope, true),
+            Ok(envelope) => self.処理_with_export_confirmation(
+                envelope,
+                true,
+                ExportOwnerConfirmation::OwnerCredential,
+            ),
             Err(_) => self.reject_with_payload_hash("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true, &sha256_tagged(input.as_bytes())),
         }
     }
 
+    /// Rust起動器のネイティブ確認を通過したGUI Shell書出しだけを受け付ける。
+    /// Owner権限は要求本文やmetadataから作らず、このprocess内呼出しだけが供給する。
+    pub(crate) fn desktop_owner_export_json(&mut self, input: &str) -> BrokerResponse {
+        let envelope = match BrokerRequestEnvelope::from_json_str(input) {
+            Ok(envelope) => envelope,
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    "desktop-owner-export-malformed",
+                    "GUI Shell書出し",
+                    "broker_request_malformed",
+                    "Owner確認後の書出し要求が不正",
+                    true,
+                    &sha256_tagged(input.as_bytes()),
+                )
+            }
+        };
+        let request_id = envelope.request_id.as_deref().unwrap_or("malformed-request");
+        let operation = envelope
+            .operation
+            .as_ref()
+            .map(BrokerOperation::as_str)
+            .unwrap_or("unknown");
+        let payload_hash = envelope.payload_hash.as_deref().unwrap_or("unknown");
+        let metadata_is_desktop = envelope.metadata.len() == 1
+            && envelope.metadata[0].key == "client"
+            && envelope.metadata[0].value == "desktop_flutter";
+        if envelope.operation != Some(BrokerOperation::GuiShell書出し)
+            || envelope.session_id.as_deref() != Some(self.session_id.as_str())
+            || !metadata_is_desktop
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "desktop_owner_export_request_invalid",
+                "Rust Desktop起動器が確認した書出し要求ではない",
+                true,
+                payload_hash,
+            );
+        }
+        self.処理_with_export_confirmation(
+            envelope,
+            true,
+            ExportOwnerConfirmation::DesktopNativeConfirmation,
+        )
+    }
+
     pub(super) fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
+        self.処理_with_export_confirmation(
+            envelope,
+            owner,
+            if owner {
+                ExportOwnerConfirmation::OwnerCredential
+            } else {
+                ExportOwnerConfirmation::NotOwner
+            },
+        )
+    }
+
+    fn 処理_with_export_confirmation(
+        &mut self,
+        envelope: BrokerRequestEnvelope,
+        owner: bool,
+        export_confirmation: ExportOwnerConfirmation,
+    ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
             .request_id
@@ -1197,7 +1271,7 @@ impl Broker {
             BrokerOperation::GuiShell構成 => super::compose_center::compose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::GuiShell構成Preview => super::compose_center::preview(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::GuiShell編集提案 => super::ai_edit_center::propose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::GuiShell書出し => super::export_center::export(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::GuiShell書出し => super::export_center::export(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, export_confirmation, &payload_hash),
             operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
@@ -2710,7 +2784,7 @@ fn lifecycle_identifier_valid(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(byte))
 }
 
-pub(super) fn canonical_payload_hash(payload: Option<&Value>) -> String {
+pub(crate) fn canonical_payload_hash(payload: Option<&Value>) -> String {
     let encoded =
         serde_json::to_vec(payload.unwrap_or(&Value::Null)).unwrap_or_else(|_| b"null".to_vec());
     sha256_tagged(&encoded)
@@ -2721,6 +2795,10 @@ fn issued_at_is_fresh(value: &str, current_epoch_seconds: i64) -> bool {
         return false;
     };
     issued_epoch_seconds.abs_diff(current_epoch_seconds) <= REQUEST_FRESHNESS_WINDOW_SECONDS
+}
+
+pub(crate) fn request_issued_at_is_current(value: &str) -> bool {
+    issued_at_is_fresh(value, current_epoch_seconds())
 }
 
 fn parse_issued_at_epoch_seconds(value: &str) -> Option<i64> {

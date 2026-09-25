@@ -265,7 +265,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "ddc6fbb4b43aef894b9314bf96f7b81005ed4b43b779569605c9524e6fb70ab0"
+      "sha256": "f7f7c7b1146864bd52b3ceeed6efb60863130dd02a0fef5d535b8316940d5c25"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -301,7 +301,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "411f6749982672b2aea490feedb44ace14f3403f9d8f902b7f3fa3ce360979ea"
+      "sha256": "a857471a1e4b3f8c5d0df57c4925c83c3a49d6f5682fe853c9f754a9a64786a6"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -313,7 +313,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/export_client.dart",
-      "sha256": "413a4b76b6b88d217787961d5f5f097ec28f3a87bb5270890af9953ef30b619f"
+      "sha256": "eb0642e008a66e1f54e938c71e1d5d5116e7e499adccae368f6598c0e30735ad"
     },
     {
       "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
@@ -545,7 +545,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
-      "sha256": "5007787103c4a3c856a3d65f1e169159acbc3977bd38fdb2f01c22bf18f7ec09"
+      "sha256": "1d9ea92bac1a2c4340c760b30c26e84d9b741cb154340cf7a1d9f5e4d1ce9e60"
     },
     {
       "path": "apps/desktop_flutter/test/global_search_index_test.dart",
@@ -653,7 +653,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "1666ae308dc5620fdeb0e73f454e4591e42424d4f2d04c686f5388ec38e80000"
+      "sha256": "579acb1eaed9e680ddaa7aa698be4266362ea9e47eb0b96f6b8b418d55d0eb80"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "11921152336f07a00bb04ade4a0e819e504a84e3363afe9dd1628dac372d507c"
+      "sha256": "206843c84080c4caa10655e8006920cc88a1932879f377c898498f134bac8a3c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1337,7 +1337,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "0dab4bea862bbdb8b2e3f5f4e4af87683f569c60f310b4fd777662c068d0f9ca"
+      "sha256": "b9b8e6bb1e6d9e080276615c979d27345f50d490ae3284e6f7bd40427db41732"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -2761,7 +2761,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "8e593b86abba51940e55a319733ad12cc8f6feef3c6fda5941457607c005451d"
+      "sha256": "15c1bd10ffa54511eae03fc6c019d6e7bea0a4847e8337691dd133cf28790ff2"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -2777,7 +2777,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "204b33502cc5c1cdd927321b7f33fdde18ca937bf7ac5122ffb26f4300328dc1"
+      "sha256": "fefd9ee3cbe875cd8574341cc34724ae4f93f86ead3ffaaf7787c25e5ef98f42"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2805,7 +2805,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "da9b6e64766537bfb9ec93b3a58513af472d20674894c3d37681b7921840f1d2"
+      "sha256": "24801f4617e28c333fe0f8e9949d72de6388a7bef08a55851b0f2af8a51949ca"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2849,7 +2849,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "d89eeaa1924e6813398f83f4feb915b1c7678ddb5e877dd89eb5632bf7899fcf"
+      "sha256": "d7562a766c2b33f9336be105f0281ba86d2724dafe5dd1038420b85aff890c84"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3353,7 +3353,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "a8a176012e1acac807c2d208f1982f0aeeed35c18f675321bea482b12a614f03"
+      "sha256": "c51422d20605172a2ef56101b2628a8ba14cc7b354b89a1ecd74df3be5c133a0"
     },
     {
       "path": "requirements-dev.txt",

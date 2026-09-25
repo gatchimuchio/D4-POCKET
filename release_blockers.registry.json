@@ -135,8 +135,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Desktop ExportClientは通常Broker資格を利用する一方、GUI Shell書出し操作はOwner制御資格を要求するため、現行GUIから実Export要求は受理されない。",
-      "required_action": "Ownerが明示操作するBroker統治経路を実装し、FlutterへOwner秘密値・privileged IPCを露出させず、通常資格拒否とOwner操作の監査を実経路で検証する。"
+      "reason": "Rust起動器のnative Owner確認とBroker process内経路、自動試験は実装済み。未commit差分の隔離Windows product起動ではnative確認表示、No拒否、owner_required永続Auditを開発確認したが、clean commitへ結合したinstalled-path evidenceではない。Owner許可側の実クリックとReceipt非継承も未確認。",
+      "required_action": "clean commitのWindows installed-path evidenceを作成して正確なsource commitとartifact hashへ結合する。No拒否とAuditを再確認し、Ownerの明示GO後に限りYes操作、Owner起点Audit、非継承Receiptを検証する。FlutterへOwner資格・privileged IPCがないことを実行時証拠へ記録する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",

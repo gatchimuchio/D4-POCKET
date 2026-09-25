@@ -52,6 +52,30 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
   });
+
+  test('Owner確認の未完了を資格情報の内部詳細なしで伝える', () async {
+    final transport = _FakeExportTransport({
+      'status': 'rejected',
+      'error': {
+        'code': 'owner_required',
+        'message': 'owner-controlled credential required',
+      },
+    });
+
+    await expectLater(
+      ExportClient(transport).export(
+        exportId: 'export-settings',
+        composeManifest: const {},
+      ),
+      throwsA(
+        isA<BrokerClientException>().having(
+          (error) => error.message,
+          'message',
+          contains('Owner確認が完了しなかった'),
+        ),
+      ),
+    );
+  });
 }
 
 class _FakeExportTransport implements BrokerTransport {

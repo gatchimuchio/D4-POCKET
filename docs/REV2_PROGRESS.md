@@ -1362,7 +1362,6 @@ cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した
   blocks_release: yes
 
 既存release blocker registryは変更せず、`release_ready=false`を維持する。
-
 追加のflush計測入り120秒再現も41.969秒後、`段階=Runtime相当再起動`で`通信失敗`となった。対話成功13、想定disconnect失敗3、Runtime相当再起動4、Broker再起動3、再接続7、資格file cleanup retry 0。直前のfixture `/api/chat`とtrace responseは全件`server_flush_succeeded`だったが、これはclient受信の証明ではない。そこでC28が起動するdebug Broker childに限り、Adapterのtransport失敗stageと標準error kindを、route分類付き・最大32行・payload非記録でstderrへ出す診断を追加した。検証器側は許可値だけをreportへ抽出し、生のstderrをreportへ複写しない。次の再現で得る診断は原因特定用であり、現時点で失敗原因やproduction動作を断定しない。
 
 ## D4 Pocket rev2 C28 flush計測・transport診断付き短時間再現（2026-09-25）
@@ -1374,6 +1373,24 @@ cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::minidora`: 4 tests passed。対象fileの`rustfmt --edition 2021 --check`も成功。workspace全体の`cargo fmt --check`は変更外の既存Rust filesに大量のformat差分があるため失敗し、全体整形は行っていない。
 
 これは未commit作業ツリーでの120秒development fixture測定であり、先行したclean sourceの8時間失敗を解消した証拠ではない。C28 release blockerは維持し、次はclean committed sourceで8時間検証を再実施する。既存release blocker registryは変更せず`release_ready=false`を維持する。
+
+
+## D4 Pocket rev2 Owner確認付きGUI Shell Export統合（2026-09-25）
+
+`rev2_export_owner_ui_authority_path`の開発経路を実装した。設定画面でExportを開始すると、Flutterは通常Broker要求だけを送る。Rust Desktop起動器は厳格parse、`desktop_flutter` metadata、Broker session未注入、freshness、payload hash、Manifest、Module計画を確認し、hashと検証済み表示値を含むWindowsネイティブOwner確認を表示する。Yesの場合だけ、容量1のprocess内channelでBroker所有threadへ固定の`GUI Shell書出し`要求を渡す。Owner秘密値、Owner role、privileged IPCはFlutterへ渡さず、Owner資格fileも生成しない。No／未確認は通常資格のBroker経路へ送り、Owner不足または期限切れとして監査する。Brokerはsession、時刻、nonce/replay、payload hash、Authority metadataを処理時に再検証し、内部Owner経路ではExport以外を拒否する。
+
+受理時は既存Export contractの新規App identity／Audit store／Manifest Receiptを返し、Authority、Permission、Approval、Credential、Audit chainを継承しない。現段階はManifest-onlyの応答であり、永続Broker Audit以外のfile、binary、Installer、署名、buildは作らない。Owner確認はWindows session上の明示操作であって、Windows account再認証または本人性証明ではない。
+
+- Rust `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`: 251件成功。通常資格拒否、テスト用Yes／No、永続Broker Audit、別operation拒否、hash改変、期限切れ、session偽装、Authority metadata、継承禁止を確認。先行parallel実行は既存localhost通信test 2件のtimeoutと追加testのAudit期待文字列不一致で失敗した。期待値を実際のAudit (`owner_required`) に修正し、serial全件を再実行してPASSした。
+- `docs/specs/gui-shell-export.md`を更新し、実経路と未成立範囲を区別した。`release_blockers.registry.json`の該当blockerは実装・自動統合testだけで解消扱いにせず、clean commitからの対話的Windows Desktop確認・Yes／Noと実Audit証拠を待つ状態へ更新した。`release_ready=false`を維持する。
+- 確認ダイアログはRust `MessageBox`のdefault-No。Dart待機は305秒、Windows named-pipe transportはExport要求だけ310秒、Broker要求鮮度は300秒であり、期限後のOwner操作はBrokerが拒否する。
+- Rust `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1 --quiet`は通常のrepository pathから全target完了。library 251件、main 7件、Broker IPC 9件、その他integration 26件、合計293件がPASSした。前段の隔離worktree実行ではA2A localhost試験が1度失敗したが、単独再試験とserialのlibrary再試験、およびこの最終全体試験では再現しなかった。
+- `cargo build --locked --manifest-path native/rust_helper/Cargo.toml --bins`、Flutter `flutter analyze --no-pub`、`flutter test --no-pub`（103件）、`flutter build windows --debug --no-pub`、`flutter build windows --release --no-pub`はいずれも隔離worktreeでPASSした。Flutter Windows buildはOneDrive配下のCloud Files reparse placeholderでC++ wrapper sourceを読めず、OneDrive上のAnalyzerが不正URIで停止したため、現在のcommitと差分を一時detached worktreeへ複製して実施した。製品repositoryの恒久移動やOneDrive設定変更はしていない。
+- Release buildを一時staging layoutへ配置し、`LOCALAPPDATA`も専用試験directoryへ分離して実Desktopを起動した。設定画面のnative Owner確認には「いいえ」を選び、隔離Brokerの永続Auditで`operation=GUI Shell書出し`、`decision=rejected`、`reason=owner_required`を確認した。実行内容はManifest-onlyであり、Export artifactの作成は確認されなかった。これは未commit差分のdevelopment LIVE_RUNTIME観測であり、clean commitに結び付くinstalled-path evidence bundleではない。Ownerの「はい」は承認操作なので実施していない。
+- `python tooling/validate_all.py --python-only`は全10 check PASS（日本語基底strict、Schema 124、Conformance 199、manifest、release gate、packaging、release smoke、evidence bundle、runtime assertions、C32構造監査）。evidence bundle検査は5件の既存release blockerと`release_ready=false`を維持していることを確認した。C32のPASSは対応表構造の検査であり、全機能完成やreleaseの証明ではない。
+- Windows product起動は実施したが、clean commitからのinstalled-product証拠、Owner許可側の実クリック、独立binary生成／Module pruning／Installer／署名／配布／rollbackは未成立の`release_blocker`であり、この作業単位では解消扱いにしない。
+
+直前commit `59b9c921a0aa4e347d299b193b3ba914c136fee1`をsourceとするC28 8時間試験は、Owner Export開発を優先して628.875秒で意図的に中断した。`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-59b9c92-20260925.json`は中断時の`状態=running`のままで、対話成功138、接続断で想定した失敗34、Runtime相当再起動35、Broker再起動34、再接続69、証拠file 255,661 bytesを記録する。停止後に対象Python／Broker helper processが残っていないことを確認した。これは途中記録であり、失敗または8時間完遂・成功の証拠ではない。C28 release blockerは維持する。
 
 
 ## D4 Pocket rev2 C28検証器 telemetry 上限修正（2026-09-25）

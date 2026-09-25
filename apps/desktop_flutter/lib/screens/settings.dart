@@ -46,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _previewJson;
   String? _exportMessage;
   String? _exportReceipt;
+  bool _exportInProgress = false;
   String? _aiEditMessage;
   String? _aiEditReceipt;
   String? _updateMessage;
@@ -333,7 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-              '切出し対象の任意画面を選べます。権限・承認・監査・復旧などの必須境界は常に保持します。選択はManifest上の計画であり、実binaryからの除去・build・Installer・署名・filesystem書込みはまだ行いません。ExportにはOwner制御資格が必要です。'),
+              '切出し対象の任意画面を選べます。権限・承認・監査・復旧などの必須境界は常に保持します。選択はManifest上の計画であり、実binaryからの除去・build・Installer・署名・書出しfile作成は行いません。実行時はRust起動器のWindows確認画面でOwnerが明示許可します。キャンセルはBrokerに拒否として監査記録されます。'),
           const SizedBox(height: 8),
           Text('任意画面', style: Theme.of(context).textTheme.titleSmall),
           for (final entry in guiShellOptionalExportModules.entries)
@@ -355,9 +356,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed: () => _runExport(client),
-            icon: const Icon(Icons.file_download_outlined),
-            label: const Text('Windows書出しManifestを生成'),
+            onPressed:
+                _exportInProgress ? null : () => _runExport(client),
+            icon: _exportInProgress
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.file_download_outlined),
+            label: Text(_exportInProgress
+                ? 'Windows Owner確認を待っています'
+                : 'Owner確認してManifestを生成'),
           ),
           if (_exportMessage != null) ...[
             const SizedBox(height: 8),
@@ -373,6 +382,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _runExport(ExportClient client) async {
+    setState(() {
+      _exportInProgress = true;
+      _exportMessage = 'Rust起動器の確認画面で許可またはキャンセルしてください。';
+    });
     try {
       final receipt = await client.export(
         exportId: 'settings-windows-export',
@@ -383,7 +396,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _setExportMessage(
           'Module選択計画を含むReceiptを生成しました。実binaryからの除去、build、Installer、署名、権限継承は未実行です。');
     } catch (error) {
-      _setExportMessage('GUI Shell Windows書出しに失敗しました。Owner制御資格が必要です: $error');
+      _setExportMessage('GUI Shell Windows書出しは受理されませんでした: $error');
+    } finally {
+      if (mounted) setState(() => _exportInProgress = false);
     }
   }
 

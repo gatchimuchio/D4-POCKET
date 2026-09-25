@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    mpsc::SyncSender,
+    mpsc::{Receiver, SyncSender},
     Arc,
 };
 use std::time::Duration;
@@ -83,8 +83,14 @@ impl BrokerServerError {
     }
 }
 
+/// Desktop起動器内だけで使う、Owner確認済み書出しの一回限り要求。
+pub(crate) struct DesktopOwnerExportRequest {
+    pub request_json: String,
+    pub reply: SyncSender<BrokerResponse>,
+}
+
 pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, None, None)
+    run_loopback_server_inner(config, None, None, None)
 }
 
 /// Rust desktop launcherだけが使う、process内管理停止付きのBroker起動口。
@@ -94,13 +100,25 @@ pub fn run_loopback_server_cancellable(
     shutdown: Arc<AtomicBool>,
     ready: SyncSender<()>,
 ) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, Some(shutdown), Some(ready))
+    run_loopback_server_inner(config, Some(shutdown), Some(ready), None)
+}
+
+/// Windows Desktop起動器専用のprocess内Owner確認経路。
+/// receiverはnamed pipe／Flutterへ公開せず、処理はBroker所有threadで直列化する。
+pub(crate) fn run_loopback_server_cancellable_with_owner_exports(
+    config: BrokerServerConfig,
+    shutdown: Arc<AtomicBool>,
+    ready: SyncSender<()>,
+    owner_exports: Receiver<DesktopOwnerExportRequest>,
+) -> Result<(), BrokerServerError> {
+    run_loopback_server_inner(config, Some(shutdown), Some(ready), Some(owner_exports))
 }
 
 fn run_loopback_server_inner(
     config: BrokerServerConfig,
     shutdown: Option<Arc<AtomicBool>>,
     ready: Option<SyncSender<()>>,
+    owner_exports: Option<Receiver<DesktopOwnerExportRequest>>,
 ) -> Result<(), BrokerServerError> {
     if shutdown_requested(&shutdown) { return Ok(()); }
     let session_id = format!("broker-session-{}", random_hex(16)?);
@@ -225,6 +243,12 @@ fn run_loopback_server_inner(
     loop {
         if shutdown_requested(&shutdown) { break; }
         broker.端末期限処理();
+        if let Some(owner_exports) = &owner_exports {
+            if let Ok(request) = owner_exports.try_recv() {
+                let response = broker.desktop_owner_export_json(&request.request_json);
+                let _ = request.reply.send(response);
+            }
+        }
         if let Ok((stream,_)) = listener.accept() {
             if handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config).unwrap_or(false) {break;}
         }

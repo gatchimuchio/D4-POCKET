@@ -42,6 +42,11 @@ class ExportClient {
     );
     if (response['status'] != 'accepted') {
       final error = response['error'];
+      if (error is Map && error['code'] == 'owner_required') {
+        throw const BrokerClientException(
+          'Owner確認が完了しなかったため、書出しは拒否されました。',
+        );
+      }
       final message = error is Map
           ? error['message']?.toString() ?? response.toString()
           : response.toString();

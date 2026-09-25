@@ -12,10 +12,14 @@ use std::time::{Duration, Instant};
 
 use zeroize::Zeroize;
 
-use crate::broker::ipc_server::BrokerServerError;
+use crate::broker::export_center::{self, OwnerConfirmationSummary};
+use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerExportRequest};
 use crate::broker::{
-    run_loopback_server_cancellable, BrokerCredentialRole, BrokerEndpoint, BrokerServerConfig,
+    BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope, BrokerServerConfig,
 };
+use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
+#[cfg(test)]
+use crate::broker::ipc_server::run_loopback_server_cancellable;
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
 const UI_POLL: Duration = Duration::from_millis(50);
@@ -476,18 +480,85 @@ fn normalize_channel_request(input: &[u8], session_id: &str) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap_or_else(|_| input.to_vec())
 }
 
+#[cfg(test)]
 fn relay_channel_frame(
     frame: gui_shell_windows_broker_channel::PipeFrame,
     endpoint: &BrokerEndpoint,
 ) -> Option<Vec<u8>> {
+    relay_channel_frame_with_owner_exports(frame, endpoint, None, |_| false)
+}
+
+fn owner_export_candidate(
+    input: &[u8],
+    endpoint: &BrokerEndpoint,
+) -> Option<(String, OwnerConfirmationSummary)> {
+    if input.len() > endpoint.max_request_bytes {
+        return None;
+    }
+    let input = std::str::from_utf8(input).ok()?;
+    let envelope = BrokerRequestEnvelope::from_json_str(input).ok()?;
+    if envelope.operation != Some(crate::broker::BrokerOperation::GuiShell書出し)
+        || envelope.session_id.is_some()
+        || envelope.request_id.as_deref().is_none_or(str::is_empty)
+        || envelope.nonce.as_deref().is_none_or(str::is_empty)
+        || !envelope.issued_at.as_deref().is_some_and(request_issued_at_is_current)
+        || envelope.metadata.len() != 1
+        || envelope.metadata[0].key != "client"
+        || envelope.metadata[0].value != "desktop_flutter"
+    {
+        return None;
+    }
+    let payload_hash = canonical_payload_hash(envelope.payload.as_ref());
+    if envelope.payload_hash.as_deref() != Some(payload_hash.as_str()) {
+        return None;
+    }
+    let summary = export_center::owner_confirmation_summary(
+        envelope.payload.as_ref().unwrap_or(&serde_json::Value::Null),
+        &payload_hash,
+    )
+    .ok()?;
+    let normalized = normalize_channel_request(input.as_bytes(), &endpoint.session_id);
+    let normalized = String::from_utf8(normalized).ok()?;
+    let normalized_envelope = BrokerRequestEnvelope::from_json_str(&normalized).ok()?;
+    if normalized_envelope.session_id.as_deref() != Some(endpoint.session_id.as_str()) {
+        return None;
+    }
+    Some((normalized, summary))
+}
+
+fn relay_channel_frame_with_owner_exports<F>(
+    frame: gui_shell_windows_broker_channel::PipeFrame,
+    endpoint: &BrokerEndpoint,
+    owner_exports: Option<&mpsc::SyncSender<DesktopOwnerExportRequest>>,
+    mut confirm_owner_export: F,
+) -> Option<Vec<u8>>
+where
+    F: FnMut(&OwnerConfirmationSummary) -> bool,
+{
     let request = match frame {
         gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
+            if let Some(owner_exports) = owner_exports {
+                if let Some((request_json, summary)) = owner_export_candidate(&bytes, endpoint) {
+                    if confirm_owner_export(&summary) {
+                        let (reply, response) = mpsc::sync_channel(1);
+                        owner_exports
+                            .send(DesktopOwnerExportRequest { request_json, reply })
+                            .ok()?;
+                        let response = response.recv().ok()?;
+                        return response.to_json_string().ok().map(String::into_bytes);
+                    }
+                }
+            }
             normalize_channel_request(&bytes, &endpoint.session_id)
         }
         gui_shell_windows_broker_channel::PipeFrame::Oversized => {
             vec![b' '; endpoint.max_request_bytes.saturating_add(1)]
         }
     };
+    relay_normalized_channel_request(&request, endpoint)
+}
+
+fn relay_normalized_channel_request(request: &[u8], endpoint: &BrokerEndpoint) -> Option<Vec<u8>> {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), endpoint.port);
     let deadline = Instant::now() + RELAY_IO_TIMEOUT;
     let mut stream = TcpStream::connect_timeout(&address, RELAY_IO_TIMEOUT).ok()?;
@@ -523,12 +594,34 @@ fn relay_channel_frame(
     Some(response)
 }
 
+fn confirm_owner_export(summary: &OwnerConfirmationSummary) -> bool {
+    use winsafe::{co, prelude::*, HWND};
+
+    let text = format!(
+        "このGUI Shell構成のWindows向けManifest-only書出しを許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n\nこの操作はBroker監査へ記録されます。書出しartifact、Installer、build、署名、ユーザーfileは作成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+        summary.display_name,
+        summary.export_id,
+        summary.distribution_channel,
+        summary.optional_module_count,
+        summary.payload_hash
+    );
+    matches!(
+        HWND::NULL.MessageBox(
+            &text,
+            "D4 Pocket Owner確認",
+            co::MB::YESNO | co::MB::DEFBUTTON2 | co::MB::ICONWARNING | co::MB::TASKMODAL,
+        ),
+        Ok(co::DLGID::YES)
+    )
+}
+
 fn run_channel_server(
     pipe_name: String,
     endpoint: RelayEndpoint,
     expected_client_pid: Arc<AtomicU32>,
     shutdown: Arc<AtomicBool>,
     ready: mpsc::SyncSender<()>,
+    owner_exports: mpsc::SyncSender<DesktopOwnerExportRequest>,
 ) -> Result<(), BrokerServerError> {
     gui_shell_windows_broker_channel::run_server(
         pipe_name,
@@ -537,7 +630,14 @@ fn run_channel_server(
         ready,
         endpoint.0.max_request_bytes,
         MAX_RESPONSE_BYTES,
-        |frame| relay_channel_frame(frame, &endpoint.0),
+        |frame| {
+            relay_channel_frame_with_owner_exports(
+                frame,
+                &endpoint.0,
+                Some(&owner_exports),
+                confirm_owner_export,
+            )
+        },
     )
     .map_err(|error| BrokerServerError {
         message: format!("安全Brokerの通信路に問題があります。code={}", error.code()),
@@ -564,9 +664,17 @@ impl RunningBroker {
         let thread_shutdown = Arc::clone(&shutdown);
         let config = BrokerServerConfig::new(store_dir, session_file.clone());
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_export_tx, owner_export_rx) = mpsc::sync_channel(1);
         let server = thread::Builder::new()
             .name("gui-shell-security-broker".to_string())
-            .spawn(move || run_loopback_server_cancellable(config, thread_shutdown, ready_tx))
+            .spawn(move || {
+                crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_exports(
+                    config,
+                    thread_shutdown,
+                    ready_tx,
+                    owner_export_rx,
+                )
+            })
             .map_err(|_| {
                 DesktopLaunchError::new("BROKER_THREAD_FAILED", "安全Brokerを起動できません。")
             })?;
@@ -643,6 +751,7 @@ impl RunningBroker {
                     channel_expected_pid,
                     channel_shutdown,
                     channel_ready_tx,
+                    owner_export_tx,
                 )
             }) {
             Ok(server) => server,
@@ -841,6 +950,50 @@ mod tests {
             transport: "authenticated_loopback_tcp".into(),
             max_request_bytes: MAX_REQUEST_BYTES,
         }
+    }
+
+    fn desktop_export_request(request_id: &str, nonce: &str) -> serde_json::Value {
+        let payload = serde_json::json!({
+            "version": 1,
+            "export_id": "export-desktop-test",
+            "compose_manifest": {
+                "version": 1,
+                "compose_id": "desktop-test",
+                "display_name": "D4 Pocket Desktop test",
+                "runtime_ids": ["gui_shell_rust_broker"],
+                "agent_ids": ["codex"],
+                "tool_ids": [],
+                "mcp_connection_ids": [],
+                "theme": {"theme_id": "d4-pocket", "mode": "system"},
+                "capability_requirements": ["runtime.read"],
+                "settings": {
+                    "locale": "ja-JP",
+                    "density": "comfortable",
+                    "content_visibility": "summary"
+                },
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                },
+                "output_mode": "manifest_only"
+            },
+            "target_platform": "windows",
+            "export_mode": "manifest_only",
+            "distribution_channel": "local",
+            "module_selection": {"optional_module_ids": ["shell.history"]}
+        });
+        serde_json::json!({
+            "request_id": request_id,
+            "operation": "GUI Shell書出し",
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": nonce,
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": payload
+        })
     }
 
     #[test]
@@ -1079,6 +1232,143 @@ mod tests {
         assert!(audit.contains("broker_request_malformed"));
         assert!(audit.contains("broker_request_oversized"));
         endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn desktop_export_requires_native_confirmation_and_broker_audits_both_outcomes() {
+        let root = test_root("desktop-owner-export");
+        let session_file = root.join(SESSION_FILE);
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_export_tx, owner_export_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server = thread::spawn(move || {
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_exports(
+                BrokerServerConfig::new(server_store_dir, server_session_file),
+                server_shutdown,
+                ready_tx,
+                owner_export_rx,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (mut session_bytes, mut broker_endpoint) = read_endpoint(&session_file).unwrap();
+
+        let normal = desktop_export_request("desktop-export-normal", "desktop-export-normal-nonce");
+        let normal = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&normal).unwrap()),
+            &broker_endpoint,
+        ).unwrap();
+        let normal: serde_json::Value = serde_json::from_slice(&normal).unwrap();
+        assert_eq!(normal["status"], "rejected");
+        assert_eq!(normal["error"]["code"], "owner_required");
+
+        let confirmed = desktop_export_request("desktop-export-confirmed", "desktop-export-confirmed-nonce");
+        let mut prompt_count = 0;
+        let accepted = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&confirmed).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |summary| {
+                prompt_count += 1;
+                assert_eq!(summary.export_id, "export-desktop-test");
+                assert_eq!(summary.optional_module_count, 1);
+                assert_eq!(summary.payload_hash, confirmed["payload_hash"].as_str().unwrap());
+                true
+            },
+        ).unwrap();
+        let accepted: serde_json::Value = serde_json::from_slice(&accepted).unwrap();
+        assert_eq!(prompt_count, 1);
+        assert_eq!(accepted["status"], "accepted");
+        assert_eq!(accepted["request_id"], "desktop-export-confirmed");
+        assert_eq!(accepted["body"]["authority_strip"], true);
+        assert_eq!(accepted["body"]["credential_inherited"], false);
+
+        let declined = desktop_export_request("desktop-export-declined", "desktop-export-declined-nonce");
+        let declined = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&declined).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| false,
+        ).unwrap();
+        let declined: serde_json::Value = serde_json::from_slice(&declined).unwrap();
+        assert_eq!(declined["status"], "rejected");
+        assert_eq!(declined["error"]["code"], "owner_required");
+
+        let mut changed_hash = desktop_export_request("desktop-export-changed-hash", "desktop-export-changed-hash-nonce");
+        changed_hash["payload_hash"] = serde_json::Value::String("sha256:forged".into());
+        let mut invalid_prompt_count = 0;
+        let rejected = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&changed_hash).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| { invalid_prompt_count += 1; true },
+        ).unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(invalid_prompt_count, 0);
+        assert_eq!(rejected["error"]["code"], "broker_payload_hash_invalid");
+
+        let mut authority_metadata = desktop_export_request("desktop-export-authority-metadata", "desktop-export-authority-metadata-nonce");
+        authority_metadata["metadata"]["authority"] = serde_json::Value::Bool(true);
+        let rejected = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&authority_metadata).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| panic!("権限metadataで確認画面へ到達してはならない"),
+        ).unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], "broker_authority_metadata_rejected");
+
+        let mut forged_session = desktop_export_request("desktop-export-forged-session", "desktop-export-forged-session-nonce");
+        forged_session["session_id"] = serde_json::Value::String("forged-session".into());
+        let rejected = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&forged_session).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| panic!("偽造sessionで確認画面へ到達してはならない"),
+        ).unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], "broker_request_malformed");
+
+        let mut stale = desktop_export_request("desktop-export-stale", "desktop-export-stale-nonce");
+        stale["issued_at"] = serde_json::Value::String("2000-01-01T00:00:00Z".into());
+        let rejected = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&stale).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| panic!("期限切れ要求で確認画面へ到達してはならない"),
+        ).unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], "broker_issued_at_invalid");
+
+        let non_export = serde_json::json!({
+            "request_id": "desktop-owner-operation-not-export",
+            "operation": "資格情報一覧",
+            "payload_hash": canonical_payload_hash(None),
+            "nonce": "desktop-owner-operation-not-export-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let rejected = relay_channel_frame_with_owner_exports(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&non_export).unwrap()),
+            &broker_endpoint,
+            Some(&owner_export_tx),
+            |_| panic!("Export以外のOwner操作で確認画面を表示してはならない"),
+        ).unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected["status"], "rejected");
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
+        assert!(audit.contains("Rust Desktop起動器のネイティブ確認"));
+        assert!(audit.contains("owner_required"));
+        assert!(audit.contains("broker_payload_hash_invalid"));
+        broker_endpoint.session_secret.zeroize();
         session_bytes.zeroize();
         fs::remove_dir_all(root).unwrap();
     }

@@ -17,7 +17,8 @@ constexpr UINT kBrokerPipeResponseMessage = WM_APP + 42;
 constexpr size_t kMaxRequestBytes = 64 * 1024;
 constexpr size_t kMaxResponseBytes = 4 * 1024 * 1024;
 constexpr size_t kMaxConcurrentRequests = 4;
-constexpr DWORD kPipeTimeoutMs = 5000;
+constexpr DWORD kDefaultPipeTimeoutMs = 5000;
+constexpr DWORD kOwnerConfirmationPipeTimeoutMs = 310000;
 constexpr wchar_t kPipePrefix[] = L"\\\\.\\pipe\\D4PocketBroker-";
 
 struct PipeResult {
@@ -138,8 +139,13 @@ bool ReadLine(HANDLE pipe, std::string* response,
 }
 
 PipeResult Exchange(const std::wstring& pipe_name, const std::string& request) {
+  // This only classifies the transport timeout; Rust retains all authority decisions.
+  const DWORD timeout_ms =
+      request.find("\"operation\":\"GUI Shell\xE6\x9B\xB8\xE5\x87\xBA\xE3\x81\x97\"") != std::string::npos
+          ? kOwnerConfirmationPipeTimeoutMs
+          : kDefaultPipeTimeoutMs;
   const auto deadline = std::chrono::steady_clock::now() +
-                        std::chrono::milliseconds(kPipeTimeoutMs);
+                        std::chrono::milliseconds(timeout_ms);
   if (!IsValidPipeName(pipe_name) || request.empty() || request.size() > kMaxRequestBytes) {
     return {};
   }
