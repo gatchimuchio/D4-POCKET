@@ -1393,6 +1393,21 @@ cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した
 直前commit `59b9c921a0aa4e347d299b193b3ba914c136fee1`をsourceとするC28 8時間試験は、Owner Export開発を優先して628.875秒で意図的に中断した。`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-59b9c92-20260925.json`は中断時の`状態=running`のままで、対話成功138、接続断で想定した失敗34、Runtime相当再起動35、Broker再起動34、再接続69、証拠file 255,661 bytesを記録する。停止後に対象Python／Broker helper processが残っていないことを確認した。これは途中記録であり、失敗または8時間完遂・成功の証拠ではない。C28 release blockerは維持する。
 
 
+## D4 Pocket rev2 clean-commit Windows Export拒否確認（2026-09-25）
+
+source commit `bde6d3c51fcf27820e952d52ad2f4abaac53b868`を共有cloneから隔離Tempへcheckoutし、そのtracked sourceを変更せずWindows Release productをbuild・起動した。Flutterはclean cloneに`.dart_tool`がないため最初の`flutter build windows --release --no-pub`がDart plugin生成で失敗した。`flutter pub get`でlockfile依存を復元後、同じbuild commandは91.5秒で成功した。Temp stagingのためMSBuild `MSB8029` warningが出たがbuildは完了した。`cargo build --locked --release --manifest-path native/rust_helper/Cargo.toml --bins`も成功した（release時に未使用となるC28診断関数2件のdead-code warning）。
+
+配置した主要実行ファイルのSHA-256値:
+
+- Flutter `gui_shell_desktop.exe`: `47D58E153F928914A97A8B3943757A3B24DED39B10EBF97B623E4C5FD4B89F19`
+- Rust `gui_shell_desktop_launcher.exe`: `41CF83731C77179C9FFD65ED23A0B730BA9A0F5350C0C1BBA27AA5F83D3B0388`
+- Rust helper実行ファイル `gui_shell_rust_helper.exe`: `40101206EDEB8A896F52333AA5C138AE187974BC82FD622229AD92BE41F68298`
+
+製品を独立`LOCALAPPDATA`の隔離directoryで起動し、実設定画面からnative Owner確認を開いた。dialogはManifest-only、artifact／Installer／build／署名／user fileなし、Windows account再認証ではない旨を表示した。「いいえ」を選び、隔離Brokerの永続Auditに`operation=GUI Shell書出し`、`decision=rejected`、`reason=owner_required`、`evidence_source=INTERNAL_STATE`が記録された。製品を実際に起動したnegative動作確認だが、Auditの証拠源は`INTERNAL_STATE`であり、外部収集証拠やformal installerを経たinstalled-path evidenceではない。全package hashも未取得。Ownerの「はい」は承認操作なので実行していない。
+
+従って`rev2_export_owner_ui_authority_path`はrelease blockerのまま維持する。Owner許可側Audit／Receipt非継承、formal installed-path collector、完全な独立Export artifact／Module pruning／Installer／署名／配布は未確認または未成立である。前回のdirty worktree実証をclean-source証拠へ書き換えず、この追補で新しい検証条件と範囲を記録する。
+
+
 ## D4 Pocket rev2 C28検証器 telemetry 上限修正（2026-09-25）
 
 commit `0bfc1aa21966c6f75ddb7430cc1c2ab3cbbce22f`から開始した8時間C28試験は、約1,408.89秒後に手動中断した。出力`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-0bfc1aa-20260925.json`は中断時点の`状態=running`を保持し、file sizeは1,521,395 bytesだった。C28 fixtureがtrace IDを含む可変HTTP pathをroute counterのkeyへ使い、trace詳細辞書も無制限に保持していた。これは検証器自身のメモリ・証拠量を増加させ、8時間の資源測定を汚染するため、このrunを完遂証拠として採用しない。出力は改変・削除せず、部分記録として保持する。専用Python／Broker helper processが終了したことを確認した。

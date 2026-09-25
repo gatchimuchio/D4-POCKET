@@ -135,8 +135,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Rust起動器のnative Owner確認とBroker process内経路、自動試験は実装済み。未commit差分の隔離Windows product起動ではnative確認表示、No拒否、owner_required永続Auditを開発確認したが、clean commitへ結合したinstalled-path evidenceではない。Owner許可側の実クリックとReceipt非継承も未確認。",
-      "required_action": "clean commitのWindows installed-path evidenceを作成して正確なsource commitとartifact hashへ結合する。No拒否とAuditを再確認し、Ownerの明示GO後に限りYes操作、Owner起点Audit、非継承Receiptを検証する。FlutterへOwner資格・privileged IPCがないことを実行時証拠へ記録する。"
+      "reason": "Rust起動器のnative Owner確認とBroker process内経路、自動試験は実装済み。clean source commit bde6d3c51fcf27820e952d52ad2f4abaac53b868由来の隔離Windows Release productを実際に起動し、native確認表示とNo拒否動作を確認した。永続Auditはoperation=GUI Shell書出し、decision=rejected、reason=owner_requiredを保持し、そのevidence_sourceはINTERNAL_STATEである。主要3 executableのhashはREV2_PROGRESSへ記録したが、外部収集証拠、formal installer経由のinstalled-path evidence、全package hashではない。Owner許可側の実クリックとReceipt非継承も未確認。",
+      "required_action": "formal Windows installed-path collectorで正確なsource commitと全package artifact hashに結合した証拠を作成し、No拒否と永続Auditを再確認する。Ownerの明示GOが得られた場合に限りYes操作を行い、Owner起点Auditと非継承Receiptを検証する。FlutterへOwner資格・privileged IPCがないことを実行時証拠へ記録する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
