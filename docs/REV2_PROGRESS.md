@@ -2,9 +2,23 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C6 Owner削除と中断Recovery（2026-09-25）
+
+前段で接続したmetadata-only一覧の上に、既存Owner CLI→認証済みRust Broker経路だけを使う一件削除と中断Recoveryを追加した。Owner CLIはCase ID・定義hash・暗号文hashを要求し、Brokerは登録receipt、既存Audit chain、ProtectedStoreの排他削除準備を照合する。削除承認Auditを永続化した後に削除し、ProtectedStoreの削除後再観測で暗号文不在を確かめ、結果Auditが確定した場合にだけ`削除確定`を返す。結果はfile状態の`LIVE_RUNTIME`観測であり、媒体の物理消去を主張しない。
+
+中断時は通常一覧から未確定Caseを除外し、自動再削除しない。Ownerの`回帰Case削除 --session-file … 中断照合 <CaseID>`は現在状態を再観測し、`暗号文不在・中断照合済み`または`暗号文残存・再試行可能`をLIVE_RUNTIMEでAuditへ記録する。残存が同一ciphertext hashの場合のみ通常一覧へ戻り、次の削除には新しいOwner要求と削除承認Auditが要る。秘密値はFlutterや通常IPCへ渡さず、新Bridgeは追加していない。
+
+Production path: `Owner CLI → 既存認証Broker control → 登録receipt／Audit検証 → ProtectedStore prepare_delete → 削除承認Audit → 削除 → file不在再観測 → 結果Audit`。Recovery pathは`Owner CLI → 既存認証Broker control → 未確定削除Audit照合 → ProtectedStore現在状態観測 → 結果Audit`。Schema・正常／否定fixture・conformanceはこの経路のcontract境界を検査するが、Rust test binary実行とWindows実Broker owner操作の成功を代替しない。
+
+Validation: `python tooling/schema_check/check_schemas.py`はSchema 131件／正常例131件／否定例161件、`python tooling/conformance_tests/run_conformance_skeleton.py`は201 checks、`python -X utf8 tooling/日本語基底監査.py --strict`は負債0 files／0 findings、`python tooling/final_development_audit.py`はC0〜C31の対応32件でPASS。`cargo test --no-run --locked --manifest-path native/rust_helper/Cargo.toml`も全target compileでPASSした。
+
+`cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`は全307件（lib 263、main 9、integration 35）PASS。標準並列実行ではMINIDORAとA2Aのloopback HTTP fixture試験が各1件timeout由来で失敗したが、2試験を個別実行するとPASSし、直列全数実行もPASSした。現在の証拠はWindows上のRust試験と実ProtectedStore操作を含むが、Owner CLIからinstalled Windows製品を通した実Broker操作証拠ではない。
+
+`cargo fmt --all -- --check`はRust workspace内の複数moduleにformat差分を報告してexit 1となった。広範な既存format差分を一括変更するのは本作業範囲外のためformatterによる一括書換えは行っていない。これは形式検査の未成立であり、compile／test成功とは区別する。C6 Owner GUI登録・削除面、C5明示import、Windows installed product上のOwner実Broker実証は`release_blocker`のまま。全体`release_ready=false`を維持する。
+
 ## D4 Pocket C6回帰Case一覧（2026-09-25、metadata-only）
 
-C6既存保存物を閲覧する読み取り専用経路を追加した。通常Broker IPCの`回帰Case一覧`は、既存Audit登録receiptから公開metadataだけを最大100件単位で返し、要求cursorはページ位置にのみ用いる。対象ページの保存ciphertext hashをreceiptと照合するが、private本文を復号せず、本文・credential・authority情報を応答へ含めない。C5 DatasetとC6回帰Caseは別operation・別Desktop tabのまま分離した。Desktop「評価ラボ」に手動更新と次ページだけのC6 tabを追加し、登録・削除・復旧・実行・本文表示は実装していない。
+C6既存保存物を閲覧する読み取り専用経路を追加した。通常Broker IPCの`回帰Case一覧`は、既存Audit登録receiptから公開metadataだけを最大100件単位で返し、要求cursorはページ位置にのみ用いる。対象ページの保存ciphertext hashをreceiptと照合するが、private本文を復号せず、本文・credential・authority情報を応答へ含めない。C5 DatasetとC6回帰Caseは別operation・別Desktop tabのまま分離した。Desktop「評価ラボ」に手動更新と次ページだけのC6 tabを追加した。当時はOwner削除・Recoveryを未実装としていたが、次の2026-09-25追補で既存Owner CLI→Broker経路に接続した。
 
 Production接続面は`標準BrokerClient → Rust Broker回帰Case一覧 → Audit receiptとProtectedStore metadata照合 → metadata-only response → Desktop C6 tab`。Schema、normal／negative fixture、Python schema checker、conformance、shared Dart client、Desktop表示testをこの経路へ接続した。これらのfixture・source testは構造およびcomponent範囲の証拠であり、Windows実BrokerによるC6 runtime一連動作を代替しない。
 

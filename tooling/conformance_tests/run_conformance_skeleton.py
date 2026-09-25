@@ -96,6 +96,10 @@ REQUIRED_SCHEMA_NAMES = {
     "regression_case_receipt",
     "regression_case_list_request",
     "regression_case_list",
+    "regression_case_delete_request",
+    "regression_case_delete_receipt",
+    "regression_case_delete_recovery_request",
+    "regression_case_delete_recovery_receipt",
     "mcp_contract",
     "a2a_contract",
     "mcp_connection",
@@ -4068,6 +4072,12 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
         "metadata_only",
         "通常IPC",
         "cursor",
+        "削除承認Audit",
+        "回帰Case削除中断確認",
+        "物理消去",
+        "LIVE_RUNTIME",
+        "暗号文不在・中断照合済み",
+        "暗号文残存・再試行可能",
     ):
         if token not in specification_text:
             不整合.append(f"C6回帰Case仕様に必須境界がない: {token}")
@@ -4151,14 +4161,56 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
     next_cursor_mismatch["次cursor"] = None
     if list_page_matches(list_request, next_cursor_mismatch):
         不整合.append("C6 metadata一覧の次cursor欠落を関係検査が許可した")
+
+    deletion_request = load_contract_fixture("regression_case_delete_request.valid.json")
+    deletion_receipt = load_contract_fixture("regression_case_delete_receipt.valid.json")
+    recovery_request = load_contract_fixture("regression_case_delete_recovery_request.valid.json")
+    recovery_receipt = load_contract_fixture("regression_case_delete_recovery_receipt.valid.json")
+    deletion_request_schema = load_schema("regression_case_delete_request.schema.json")
+    deletion_receipt_schema = load_schema("regression_case_delete_receipt.schema.json")
+    recovery_request_schema = load_schema("regression_case_delete_recovery_request.schema.json")
+    recovery_receipt_schema = load_schema("regression_case_delete_recovery_receipt.schema.json")
+    for name, value, schema in (
+        ("deletion request", deletion_request, deletion_request_schema),
+        ("deletion receipt", deletion_receipt, deletion_receipt_schema),
+        ("recovery request", recovery_request, recovery_request_schema),
+        ("recovery receipt", recovery_receipt, recovery_receipt_schema),
+    ):
+        failures = validate_instance(value, schema)
+        if failures:
+            不整合.extend(f"C6 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+
+    for invalid_name, schema in (
+        ("regression_case_delete_request_authority.invalid.json", deletion_request_schema),
+        ("regression_case_delete_receipt_evidence.invalid.json", deletion_receipt_schema),
+        ("regression_case_delete_receipt_physical_erasure.invalid.json", deletion_receipt_schema),
+        ("regression_case_delete_recovery_request_authority.invalid.json", recovery_request_schema),
+        ("regression_case_delete_recovery_receipt_evidence.invalid.json", recovery_receipt_schema),
+        ("regression_case_list_deleted_claim.invalid.json", list_schema),
+    ):
+        invalid = json.loads((INVALID_CONTRACT_EXAMPLES / invalid_name).read_text(encoding="utf-8"))
+        if not validate_instance(invalid, schema):
+            不整合.append(f"C6否定fixtureをSchemaが許可した: {invalid_name}")
+
+    false_physical_erasure = copy.deepcopy(deletion_receipt)
+    false_physical_erasure["物理消去"] = True
+    if not validate_instance(false_physical_erasure, deletion_receipt_schema):
+        不整合.append("C6削除結果が物理消去主張を拒否しない")
+    authority_deletion = copy.deepcopy(deletion_request)
+    authority_deletion["approval_id"] = "injected"
+    if not validate_instance(authority_deletion, deletion_request_schema):
+        不整合.append("C6削除要求がapproval_idを許可した")
+
     request_contract = json.loads((SPECS / "ipc_request.schema.json").read_text(encoding="utf-8"))
     response_contract = json.loads((SPECS / "ipc_response.schema.json").read_text(encoding="utf-8"))
-    if "回帰Case一覧" not in request_contract["properties"]["operation"]["enum"]:
-        不整合.append("C6 metadata一覧operationがIPC request contractへ未接続")
-    if "回帰Case一覧" not in response_contract["properties"]["operation"]["enum"]:
-        不整合.append("C6 metadata一覧operationがIPC response contractへ未接続")
+    for operation in ("回帰Case一覧", "回帰Case削除", "回帰Case削除中断確認"):
+        if operation not in request_contract["properties"]["operation"]["enum"]:
+            不整合.append(f"C6 {operation} operationがIPC request contractへ未接続")
+        if operation not in response_contract["properties"]["operation"]["enum"]:
+            不整合.append(f"C6 {operation} operationがIPC response contractへ未接続")
 
     rust = (RUST_HELPER / "src" / "broker" / "regression_case.rs").read_text(encoding="utf-8")
+    owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     dialogue = (RUST_HELPER / "src" / "broker" / "dialogue.rs").read_text(encoding="utf-8")
     protected = (RUST_HELPER / "src" / "protected_store.rs").read_text(encoding="utf-8")
     for token, source in (
@@ -4172,6 +4224,13 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
         ("stored_regression_cases", rust),
         ("metadata_projection", rust),
         ("store.inspect", rust),
+        ("回帰Case削除処理", rust),
+        ("回帰Case削除中断確認処理", rust),
+        ("stored_regression_case_deletions", rust),
+        ("prepare_delete", rust),
+        ("prepared.commit()", rust),
+        ("回帰Case削除", owner_cli),
+        ("回帰Case削除中断確認", owner_cli),
         ("Regression", protected),
     ):
         if token not in source:

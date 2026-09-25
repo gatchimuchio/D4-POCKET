@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_delete_request.schema.json",
+  "title": "回帰Case削除要求",
+  "description": "owner controlだけが指定登録receiptと暗号文hashを結合して削除する。",
+  "type": "object",
+  "required": ["版", "回帰CaseID", "定義hash", "暗号文hash"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "回帰CaseID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+    "定義hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "暗号文hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" }
+  }
+}

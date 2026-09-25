@@ -9,10 +9,12 @@ use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::識別子生成;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 const OPERATION: &str = "回帰Case登録";
 const LIST_OPERATION: &str = "回帰Case一覧";
+const DELETE_OPERATION: &str = "回帰Case削除";
+const RECOVERY_OPERATION: &str = "回帰Case削除中断確認";
 const MAX_OWNER_REGRESSION_BYTES: usize = 48 * 1024;
 const MAX_LIST_PAGE: usize = 100;
 
@@ -25,6 +27,98 @@ struct 一覧要求 {
     after: u64,
     #[serde(rename = "limit")]
     limit: u16,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 削除要求 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+    #[serde(rename = "定義hash")]
+    definition_hash: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 削除中断照合要求 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 削除意図 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+    #[serde(rename = "定義hash")]
+    definition_hash: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 削除結果 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+    #[serde(rename = "定義hash")]
+    definition_hash: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "削除承認監査ID")]
+    approval_audit_id: String,
+    #[serde(rename = "状態")]
+    state: String,
+    #[serde(rename = "証拠種別")]
+    evidence_source: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct 削除中断照合結果 {
+    #[serde(rename = "版")]
+    版: u8,
+    #[serde(rename = "回帰CaseID")]
+    case_id: String,
+    #[serde(rename = "削除承認監査ID")]
+    approval_audit_id: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "現在状態")]
+    current_state: String,
+    #[serde(rename = "観測監査head")]
+    observed_audit_head: String,
+    #[serde(rename = "観測時刻UnixMillis")]
+    observed_at_unix_millis: i64,
+    #[serde(rename = "証拠種別")]
+    evidence_source: String,
+}
+
+#[derive(Clone, Debug)]
+struct 削除承認状態 {
+    audit_id: String,
+    request_id: String,
+    definition_hash: String,
+    ciphertext_hash: String,
+}
+
+#[derive(Clone, Debug, Default)]
+struct 回帰削除状態 {
+    pending: Option<削除承認状態>,
+    definition_hash: Option<String>,
+    ciphertext_hash: Option<String>,
+    deleted: bool,
+    retryable: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -128,23 +222,208 @@ impl 公開記録 {
     }
 }
 
+fn parse_registration_receipt(event: &super::BrokerAuditEvent) -> Result<公開記録, ()> {
+    let encoded = event.reason.strip_prefix("回帰Case登録記録:").ok_or(())?;
+    let record: 公開記録 = serde_json::from_str(encoded).map_err(|_| ())?;
+    if event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
+        || event.payload_hash != sha256_tagged(encoded.as_bytes())
+        || !record.valid_for(&event.event_id)
+    {
+        return Err(());
+    }
+    Ok(record)
+}
+
+fn receipt_for_case(
+    log: &super::BrokerAuditLog,
+    case_id: &str,
+) -> Result<Option<公開記録>, ()> {
+    let mut found = None;
+    for event in log
+        .events()
+        .iter()
+        .filter(|event| event.operation == OPERATION && event.decision == "accepted")
+    {
+        let record = parse_registration_receipt(event)?;
+        if record.case_id == case_id {
+            if found.is_some() {
+                return Err(());
+            }
+            found = Some(record);
+        }
+    }
+    Ok(found)
+}
+
+fn receive_is_bound(
+    log: &super::BrokerAuditLog,
+    before: usize,
+    operation: &str,
+    request_id: &str,
+    payload: &Value,
+) -> bool {
+    let expected_hash = sha256_tagged(payload.to_string().as_bytes());
+    log.events()[..before]
+        .iter()
+        .filter(|event| {
+            event.operation == operation
+                && event.request_id == request_id
+                && event.decision == "received"
+                && event.payload_hash == expected_hash
+                && event.evidence_source == EVIDENCE_SOURCE_INTERNAL_STATE
+        })
+        .count()
+        == 1
+}
+
+fn stored_regression_case_deletions(
+    log: &super::BrokerAuditLog,
+) -> Result<HashMap<String, 回帰削除状態>, ()> {
+    let mut states = HashMap::<String, 回帰削除状態>::new();
+    for (index, event) in log.events().iter().enumerate() {
+        if event.operation == DELETE_OPERATION && event.decision == "recorded" {
+            let encoded = event.reason.strip_prefix("回帰Case削除承認:").ok_or(())?;
+            let intent: 削除意図 = serde_json::from_str(encoded).map_err(|_| ())?;
+            if event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
+                || event.payload_hash != sha256_tagged(encoded.as_bytes())
+                || intent.版 != 1
+                || !hex_identifier(&intent.case_id)
+                || !super::is_tagged_sha256(&intent.definition_hash)
+                || !super::is_tagged_sha256(&intent.ciphertext_hash)
+            {
+                return Err(());
+            }
+            let request = json!({
+                "版": 1,
+                "回帰CaseID": intent.case_id,
+                "定義hash": intent.definition_hash,
+                "暗号文hash": intent.ciphertext_hash,
+            });
+            if !receive_is_bound(log, index, DELETE_OPERATION, &event.request_id, &request) {
+                return Err(());
+            }
+            let state = states.entry(intent.case_id.clone()).or_default();
+            if state.pending.is_some() || state.deleted {
+                return Err(());
+            }
+            state.definition_hash = Some(intent.definition_hash.clone());
+            state.ciphertext_hash = Some(intent.ciphertext_hash.clone());
+            state.retryable = false;
+            state.pending = Some(削除承認状態 {
+                audit_id: event.event_id.clone(),
+                request_id: event.request_id.clone(),
+                definition_hash: intent.definition_hash,
+                ciphertext_hash: intent.ciphertext_hash,
+            });
+        } else if event.operation == DELETE_OPERATION && event.decision == "accepted" {
+            let encoded = event.reason.strip_prefix("回帰Case削除記録:").ok_or(())?;
+            let result: 削除結果 = serde_json::from_str(encoded).map_err(|_| ())?;
+            if event.evidence_source != "LIVE_RUNTIME"
+                || event.payload_hash != sha256_tagged(encoded.as_bytes())
+                || result.版 != 1
+                || !hex_identifier(&result.case_id)
+                || !super::is_tagged_sha256(&result.definition_hash)
+                || !super::is_tagged_sha256(&result.ciphertext_hash)
+                || result.state != "削除確定"
+                || result.evidence_source != "LIVE_RUNTIME"
+            {
+                return Err(());
+            }
+            let state = states.get_mut(&result.case_id).ok_or(())?;
+            let pending = state.pending.take().ok_or(())?;
+            if pending.audit_id != result.approval_audit_id
+                || pending.request_id != event.request_id
+                || pending.definition_hash != result.definition_hash
+                || pending.ciphertext_hash != result.ciphertext_hash
+            {
+                return Err(());
+            }
+            state.deleted = true;
+            state.retryable = false;
+        } else if event.operation == RECOVERY_OPERATION && event.decision == "accepted" {
+            let encoded = event
+                .reason
+                .strip_prefix("回帰Case削除中断照合記録:")
+                .ok_or(())?;
+            let result: 削除中断照合結果 = serde_json::from_str(encoded).map_err(|_| ())?;
+            if event.evidence_source != "LIVE_RUNTIME"
+                || event.payload_hash != sha256_tagged(encoded.as_bytes())
+                || result.版 != 1
+                || !hex_identifier(&result.case_id)
+                || !super::is_tagged_sha256(&result.ciphertext_hash)
+                || result.observed_at_unix_millis < 0
+                || !super::is_tagged_sha256(&result.observed_audit_head)
+                || result.evidence_source != "LIVE_RUNTIME"
+            {
+                return Err(());
+            }
+            let received = log.events().get(index.checked_sub(1).ok_or(())?).ok_or(())?;
+            let recovery_request = json!({"版": 1, "回帰CaseID": result.case_id});
+            if received.event_hash != result.observed_audit_head
+                || received.operation != RECOVERY_OPERATION
+                || received.request_id != event.request_id
+                || !receive_is_bound(log, index, RECOVERY_OPERATION, &event.request_id, &recovery_request)
+            {
+                return Err(());
+            }
+            let state = states.get_mut(&result.case_id).ok_or(())?;
+            let pending = state.pending.take().ok_or(())?;
+            if pending.audit_id != result.approval_audit_id
+                || pending.ciphertext_hash != result.ciphertext_hash
+            {
+                return Err(());
+            }
+            match result.current_state.as_str() {
+                "暗号文不在・中断照合済み" => {
+                    state.deleted = true;
+                    state.retryable = false;
+                }
+                "暗号文残存・再試行可能" => {
+                    state.deleted = false;
+                    state.retryable = true;
+                }
+                _ => return Err(()),
+            }
+        }
+    }
+    Ok(states)
+}
+
 fn stored_regression_cases(
     log: &super::BrokerAuditLog,
     after: u64,
     limit: usize,
 ) -> Result<(Vec<公開記録>, u64), ()> {
     let mut page = Vec::with_capacity(limit);
+    let mut deletions = stored_regression_case_deletions(log)?;
+    let mut seen_ids = HashSet::new();
     let mut total = 0_u64;
     for event in log
         .events()
         .iter()
         .filter(|event| event.operation == OPERATION && event.decision == "accepted")
     {
-        let encoded = event.reason.strip_prefix("回帰Case登録記録:").ok_or(())?;
-        let record: 公開記録 = serde_json::from_str(encoded).map_err(|_| ())?;
-        if event.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
-            || event.payload_hash != sha256_tagged(encoded.as_bytes())
-            || !record.valid_for(&event.event_id)
+        let record = parse_registration_receipt(event)?;
+        if !seen_ids.insert(record.case_id.clone()) {
+            return Err(());
+        }
+        let deletion = deletions.remove(&record.case_id);
+        if let Some(deletion) = deletion.as_ref() {
+            if deletion.definition_hash.as_deref() != Some(record.definition_hash.as_str())
+                || deletion.ciphertext_hash.as_deref() != Some(record.ciphertext_hash.as_str())
+            {
+                return Err(());
+            }
+        }
+        if deletion.as_ref().is_some_and(|state| state.pending.is_some()) {
+            continue;
+        }
+        if deletion.as_ref().is_some_and(|state| state.deleted) {
+            continue;
+        }
+        if deletion
+            .as_ref()
+            .is_some_and(|state| !state.retryable)
         {
             return Err(());
         }
@@ -153,14 +432,30 @@ fn stored_regression_cases(
         }
         total = total.checked_add(1).ok_or(())?;
     }
-    let mut page_ids = HashSet::with_capacity(page.len());
-    if page
-        .iter()
-        .any(|record| !page_ids.insert(record.case_id.as_str()))
-    {
+    if !deletions.is_empty() {
         return Err(());
     }
     Ok((page, total))
+}
+
+fn parse_delete_request(payload: &Value) -> Result<削除要求, ()> {
+    let request: 削除要求 = serde_json::from_value(payload.clone()).map_err(|_| ())?;
+    if request.版 != 1
+        || !hex_identifier(&request.case_id)
+        || !super::is_tagged_sha256(&request.definition_hash)
+        || !super::is_tagged_sha256(&request.ciphertext_hash)
+    {
+        return Err(());
+    }
+    Ok(request)
+}
+
+fn parse_delete_recovery_request(payload: &Value) -> Result<削除中断照合要求, ()> {
+    let request: 削除中断照合要求 = serde_json::from_value(payload.clone()).map_err(|_| ())?;
+    if request.版 != 1 || !hex_identifier(&request.case_id) {
+        return Err(());
+    }
+    Ok(request)
 }
 
 fn parse_list_request(payload: &Value) -> Result<一覧要求, ()> {
@@ -714,6 +1009,536 @@ impl Broker {
             }
         }
     }
+
+    /// owner制御で対象receiptを再照合し、監査承認後に限って暗号文を削除する。
+    pub(super) fn 回帰Case削除処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        if !owner || !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                DELETE_OPERATION,
+                "権限拒否",
+                "owner制御資格と永続監査が必要です",
+                true,
+                payload_hash,
+            );
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = payload;
+            self.reject_with_payload_hash(
+                request_id,
+                DELETE_OPERATION,
+                "保管未対応",
+                "回帰Caseの安全な削除はWindows ProtectedStoreに限定されています",
+                true,
+                payload_hash,
+            )
+        }
+        #[cfg(windows)]
+        {
+            let log = match self
+                .state_store
+                .persistent_store
+                .as_ref()
+                .and_then(|store| store.verified_audit_log().ok())
+            {
+                Some(log) if log == self.audit_log => log,
+                _ => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        DELETE_OPERATION,
+                        "監査失敗",
+                        "削除前に保管監査を再確認してください",
+                    )
+                }
+            };
+            if stored_regression_cases(&log, 0, 0).is_err() {
+                return self.audit_store_failed_response(
+                    request_id,
+                    DELETE_OPERATION,
+                    "削除監査不整合",
+                    "全Caseの登録・削除receiptを照合できないため停止しました",
+                );
+            }
+            if self
+                .append_audit(
+                    request_id,
+                    DELETE_OPERATION,
+                    "received",
+                    "Capability=回帰Case一件削除 Permission=現在owner制御 Approval=登録hash照合後の削除要求 RecoveryAction=保管監査再確認",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    payload_hash,
+                )
+                .is_err()
+            {
+                return self.audit_store_failed_response(
+                    request_id,
+                    DELETE_OPERATION,
+                    "監査失敗",
+                    "削除を開始せず保管監査を再確認してください",
+                );
+            }
+            let request = match parse_delete_request(payload) {
+                Ok(request) => request,
+                Err(()) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除要求不正",
+                        "版、Case ID、定義hash、暗号文hashを確認してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+            let record = match receipt_for_case(&log, &request.case_id) {
+                Ok(Some(record)) => record,
+                Ok(None) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除対象不明",
+                        "登録Auditに一致する回帰Caseがありません",
+                        true,
+                        payload_hash,
+                    )
+                }
+                Err(()) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        DELETE_OPERATION,
+                        "登録監査不正",
+                        "登録receiptを検証できないため削除を停止しました",
+                    )
+                }
+            };
+            if request.definition_hash != record.definition_hash
+                || request.ciphertext_hash != record.ciphertext_hash
+            {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    DELETE_OPERATION,
+                    "削除対象不一致",
+                    "要求hashと現在登録receiptが一致しません",
+                    true,
+                    payload_hash,
+                );
+            }
+            let mut deletion_states = match stored_regression_case_deletions(&log) {
+                Ok(states) => states,
+                Err(()) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除監査不正",
+                        "既存の削除・復旧監査を検証できません",
+                    )
+                }
+            };
+            if let Some(state) = deletion_states.remove(&request.case_id) {
+                if state.definition_hash.as_deref() != Some(record.definition_hash.as_str())
+                    || state.ciphertext_hash.as_deref() != Some(record.ciphertext_hash.as_str())
+                {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除監査不整合",
+                        "削除状態と登録receiptのhashが一致しません",
+                    );
+                }
+                if state.deleted {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除済み",
+                        "削除済みCaseは再利用できません",
+                        true,
+                        payload_hash,
+                    );
+                }
+                if state.pending.is_some() {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除Recovery必要",
+                        "未確定の削除を先にOwner中断照合してください",
+                        true,
+                        payload_hash,
+                    );
+                }
+            }
+            let Some(store) = self.protected_store.as_ref() else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    DELETE_OPERATION,
+                    "保管未登録",
+                    "独立ProtectedStoreが登録されていません",
+                    true,
+                    payload_hash,
+                );
+            };
+            let prepared = match store.prepare_delete(
+                crate::protected_store::Purpose::Regression,
+                &record.storage_id,
+                &record.ciphertext_hash,
+            ) {
+                Ok(prepared) => prepared,
+                Err(_) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除準備失敗",
+                        "登録済み暗号文を変更せず保管状態を再確認してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+            let intent = json!({
+                "版": 1,
+                "回帰CaseID": record.case_id,
+                "定義hash": record.definition_hash,
+                "暗号文hash": record.ciphertext_hash,
+            });
+            let encoded_intent = intent.to_string();
+            let approval = match self.append_audit(
+                request_id,
+                DELETE_OPERATION,
+                "recorded",
+                &format!("回帰Case削除承認:{encoded_intent}"),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(encoded_intent.as_bytes()),
+            ) {
+                Ok(event) => event.event_id,
+                Err(_) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除承認監査失敗",
+                        "暗号文を削除せず保管監査を再確認してください",
+                    )
+                }
+            };
+            if prepared.commit().is_err() {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    DELETE_OPERATION,
+                    "削除確定失敗",
+                    "Caseを再削除せず、Owner中断照合で現在状態を確認してください",
+                    true,
+                    payload_hash,
+                );
+            }
+            match self
+                .protected_store
+                .as_ref()
+                .map(|store| {
+                    store.inspect(
+                        crate::protected_store::Purpose::Regression,
+                        &record.storage_id,
+                    )
+                })
+            {
+                Some(Ok(None)) => {}
+                Some(Ok(Some((actual_hash, _)))) if actual_hash == record.ciphertext_hash => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除後不在未確認",
+                        "暗号文が残存しています。自動再削除せずOwner中断照合を実行してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+                Some(Ok(Some(_))) | Some(Err(_)) | None => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        DELETE_OPERATION,
+                        "削除後状態不整合",
+                        "現在の保管状態が不確定です。Owner中断照合までCaseを停止してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+            }
+            let body = json!({
+                "版": 1,
+                "回帰CaseID": record.case_id,
+                "定義hash": record.definition_hash,
+                "暗号文hash": record.ciphertext_hash,
+                "削除承認監査ID": approval,
+                "状態": "削除確定",
+                "証拠種別": "LIVE_RUNTIME",
+            });
+            let encoded_result = body.to_string();
+            match self.append_audit(
+                request_id,
+                DELETE_OPERATION,
+                "accepted",
+                &format!("回帰Case削除記録:{encoded_result}"),
+                "LIVE_RUNTIME",
+                &sha256_tagged(encoded_result.as_bytes()),
+            ) {
+                Ok(event) => BrokerResponse {
+                    request_id: request_id.to_string(),
+                    operation: DELETE_OPERATION.to_string(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "LIVE_RUNTIME".to_string(),
+                    audit_event_id: event.event_id,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: self.shutdown_requested,
+                },
+                Err(_) => self.audit_store_failed_response(
+                    request_id,
+                    DELETE_OPERATION,
+                    "削除結果監査失敗",
+                    "結果未確定です。Owner中断照合で現在状態を再確認してください",
+                ),
+            }
+        }
+    }
+
+    /// 削除承認Audit後の不確定状態を、現在file metadataだけでOwner照合する。
+    pub(super) fn 回帰Case削除中断確認処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        if !owner || !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                RECOVERY_OPERATION,
+                "権限拒否",
+                "Owner中断照合には現在owner制御資格と永続監査が必要です",
+                true,
+                payload_hash,
+            );
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = payload;
+            self.reject_with_payload_hash(
+                request_id,
+                RECOVERY_OPERATION,
+                "保管未対応",
+                "回帰Case削除の中断照合はWindows ProtectedStoreに限定されています",
+                true,
+                payload_hash,
+            )
+        }
+        #[cfg(windows)]
+        {
+            let log = match self
+                .state_store
+                .persistent_store
+                .as_ref()
+                .and_then(|store| store.verified_audit_log().ok())
+            {
+                Some(log) if log == self.audit_log => log,
+                _ => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "監査失敗",
+                        "中断照合前に保管監査を再確認してください",
+                    )
+                }
+            };
+            if stored_regression_cases(&log, 0, 0).is_err() {
+                return self.audit_store_failed_response(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "削除監査不整合",
+                    "全Caseの登録・削除receiptを照合できないため停止しました",
+                );
+            }
+            if self
+                .append_audit(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "received",
+                    "Capability=指定回帰Case削除中断照合 Permission=現在owner制御 Approval=未確定削除一件 RecoveryAction=現在保管状態の再観測",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    payload_hash,
+                )
+                .is_err()
+            {
+                return self.audit_store_failed_response(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "監査失敗",
+                    "中断照合を確定せず保管監査を再確認してください",
+                );
+            }
+            let request = match parse_delete_recovery_request(payload) {
+                Ok(request) => request,
+                Err(()) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "復旧要求不正",
+                        "版とCase IDを確認してください",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+            let mut states = match stored_regression_case_deletions(&log) {
+                Ok(states) => states,
+                Err(()) => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "削除監査不正",
+                        "削除承認と過去の復旧監査を検証できません",
+                    )
+                }
+            };
+            let Some(state) = states.remove(&request.case_id) else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "復旧対象不明",
+                    "指定Caseに未確定の削除承認がありません",
+                    true,
+                    payload_hash,
+                );
+            };
+            let Some(pending) = state.pending else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "復旧対象不明",
+                    "指定Caseに未確定の削除承認がありません",
+                    true,
+                    payload_hash,
+                );
+            };
+            if state.deleted {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "復旧対象確定済み",
+                    "既に削除結果が確定したCaseは再照合できません",
+                    true,
+                    payload_hash,
+                );
+            }
+            let record = match receipt_for_case(&log, &request.case_id) {
+                Ok(Some(record)) => record,
+                _ => {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "登録監査不正",
+                        "削除対象の登録receiptを検証できません",
+                    )
+                }
+            };
+            if pending.definition_hash != record.definition_hash
+                || pending.ciphertext_hash != record.ciphertext_hash
+            {
+                return self.audit_store_failed_response(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "削除対象不整合",
+                    "承認監査と登録receiptのhashが一致しません",
+                );
+            }
+            let Some(store) = self.protected_store.as_ref() else {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "保管未登録",
+                    "独立ProtectedStoreが登録されていません",
+                    true,
+                    payload_hash,
+                );
+            };
+            let current_state = match store.inspect(
+                crate::protected_store::Purpose::Regression,
+                &record.storage_id,
+            ) {
+                Ok(None) => "暗号文不在・中断照合済み",
+                Ok(Some((actual_hash, _))) if actual_hash == record.ciphertext_hash => {
+                    "暗号文残存・再試行可能"
+                }
+                Ok(Some(_)) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "復旧照合不一致",
+                        "現在暗号文が登録hashと異なるため復旧を停止しました",
+                        true,
+                        payload_hash,
+                    )
+                }
+                Err(_) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        RECOVERY_OPERATION,
+                        "復旧照合失敗",
+                        "ProtectedStoreの現在状態を安全に観測できません",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+            let observed_audit_head = self
+                .audit_log
+                .events()
+                .last()
+                .map(|event| event.event_hash.clone())
+                .unwrap_or_default();
+            let body = json!({
+                "版": 1,
+                "回帰CaseID": request.case_id,
+                "削除承認監査ID": pending.audit_id,
+                "暗号文hash": record.ciphertext_hash,
+                "現在状態": current_state,
+                "観測監査head": observed_audit_head,
+                "観測時刻UnixMillis": self.current_epoch_millis(),
+                "証拠種別": "LIVE_RUNTIME",
+            });
+            let encoded = body.to_string();
+            match self.append_audit(
+                request_id,
+                RECOVERY_OPERATION,
+                "accepted",
+                &format!("回帰Case削除中断照合記録:{encoded}"),
+                "LIVE_RUNTIME",
+                &sha256_tagged(encoded.as_bytes()),
+            ) {
+                Ok(event) => BrokerResponse {
+                    request_id: request_id.to_string(),
+                    operation: RECOVERY_OPERATION.to_string(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: "LIVE_RUNTIME".to_string(),
+                    audit_event_id: event.event_id,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: self.shutdown_requested,
+                },
+                Err(_) => self.audit_store_failed_response(
+                    request_id,
+                    RECOVERY_OPERATION,
+                    "復旧照合監査失敗",
+                    "観測状態を確定できません。保管監査を再確認してください",
+                ),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -812,12 +1637,84 @@ mod tests {
         broker.処理(envelope, owner)
     }
 
-    fn append_receipt_fixture(log: &mut BrokerAuditLog, sequence: usize) {
+    #[cfg(windows)]
+    fn delete_case(broker: &mut Broker, payload: Value, owner: bool) -> BrokerResponse {
+        let request_id = format!("regression-delete-{}", broker.audit_events().len());
+        let mut envelope = BrokerRequestEnvelope::command_envelope_at(
+            &request_id,
+            "session-regression",
+            &format!("nonce-{request_id}"),
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        envelope.operation = Some(BrokerOperation::回帰Case削除);
+        envelope.payload = Some(payload);
+        envelope.refresh_payload_hash();
+        broker.処理(envelope, owner)
+    }
+
+    #[cfg(windows)]
+    fn recover_delete(broker: &mut Broker, case_id: &str, owner: bool) -> BrokerResponse {
+        let request_id = format!("regression-recovery-{}", broker.audit_events().len());
+        let mut envelope = BrokerRequestEnvelope::command_envelope_at(
+            &request_id,
+            "session-regression",
+            &format!("nonce-{request_id}"),
+            &BrokerRequestEnvelope::current_issued_at(),
+        );
+        envelope.operation = Some(BrokerOperation::回帰Case削除中断確認);
+        envelope.payload = Some(json!({"版": 1, "回帰CaseID": case_id}));
+        envelope.refresh_payload_hash();
+        broker.処理(envelope, owner)
+    }
+
+    #[cfg(windows)]
+    fn append_pending_delete(
+        broker: &mut Broker,
+        record: &公開記録,
+        request_id: &str,
+    ) -> String {
+        let request = json!({
+            "版": 1,
+            "回帰CaseID": record.case_id,
+            "定義hash": record.definition_hash,
+            "暗号文hash": record.ciphertext_hash,
+        });
+        broker
+            .append_audit(
+                request_id,
+                DELETE_OPERATION,
+                "received",
+                "削除要求受信",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(request.to_string().as_bytes()),
+            )
+            .expect("削除要求受信を監査できる");
+        let intent = json!({
+            "版": 1,
+            "回帰CaseID": record.case_id,
+            "定義hash": record.definition_hash,
+            "暗号文hash": record.ciphertext_hash,
+        });
+        let encoded = intent.to_string();
+        broker
+            .append_audit(
+                request_id,
+                DELETE_OPERATION,
+                "recorded",
+                &format!("回帰Case削除承認:{encoded}"),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(encoded.as_bytes()),
+            )
+            .expect("削除承認を監査できる")
+            .event_id
+    }
+
+    fn append_receipt_fixture(log: &mut BrokerAuditLog, sequence: usize) -> String {
         let case_id = format!("{sequence:032x}");
         let created_audit_id = log.next_event_id();
         let receipt = json!({
             "版": 1,
-            "回帰CaseID": case_id,
+            "回帰CaseID": case_id.clone(),
             "定義hash": format!("sha256:{}", "d".repeat(64)),
             "非公開保管ID": case_id,
             "暗号文hash": format!("sha256:{}", "e".repeat(64)),
@@ -843,6 +1740,84 @@ mod tests {
             "accepted",
             &format!("回帰Case登録記録:{encoded}"),
             EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(encoded.as_bytes()),
+        );
+        case_id
+    }
+
+    fn append_delete_intent_fixture(
+        log: &mut BrokerAuditLog,
+        case_id: &str,
+        request_id: &str,
+        definition_hash: &str,
+        ciphertext_hash: &str,
+    ) -> String {
+        let request = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": definition_hash,
+            "暗号文hash": ciphertext_hash,
+        });
+        log.append(
+            request_id,
+            DELETE_OPERATION,
+            "received",
+            "削除要求受信",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(request.to_string().as_bytes()),
+        );
+        let intent = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": definition_hash,
+            "暗号文hash": ciphertext_hash,
+        });
+        let encoded = intent.to_string();
+        log.append(
+            request_id,
+            DELETE_OPERATION,
+            "recorded",
+            &format!("回帰Case削除承認:{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(encoded.as_bytes()),
+        )
+        .event_id
+    }
+
+    fn append_recovery_fixture(
+        log: &mut BrokerAuditLog,
+        case_id: &str,
+        request_id: &str,
+        approval_id: &str,
+        ciphertext_hash: &str,
+        current_state: &str,
+    ) {
+        let request = json!({"版": 1, "回帰CaseID": case_id});
+        let received = log.append(
+            request_id,
+            RECOVERY_OPERATION,
+            "received",
+            "中断照合要求受信",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(request.to_string().as_bytes()),
+        );
+        let result = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "削除承認監査ID": approval_id,
+            "暗号文hash": ciphertext_hash,
+            "現在状態": current_state,
+            "観測監査head": received.event_hash,
+            "観測時刻UnixMillis": 1780000000000_i64,
+            "証拠種別": "LIVE_RUNTIME",
+        });
+        let encoded = result.to_string();
+        log.append(
+            request_id,
+            RECOVERY_OPERATION,
+            "accepted",
+            &format!("回帰Case削除中断照合記録:{encoded}"),
+            "LIVE_RUNTIME",
             &sha256_tagged(encoded.as_bytes()),
         );
     }
@@ -871,6 +1846,135 @@ mod tests {
         assert!(projection.get("非公開保管ID").is_none());
         assert!(projection.get("期待経路").is_none());
         assert_eq!(projection["公開範囲"], "metadata_only");
+    }
+
+    #[test]
+    fn 削除と復旧要求は固定fieldだけを受け付ける() {
+        let valid_delete = json!({
+            "版": 1,
+            "回帰CaseID": "a".repeat(32),
+            "定義hash": format!("sha256:{}", "b".repeat(64)),
+            "暗号文hash": format!("sha256:{}", "c".repeat(64)),
+        });
+        assert!(parse_delete_request(&valid_delete).is_ok());
+        let mut authority_delete = valid_delete.clone();
+        authority_delete["approval_id"] = json!("injected");
+        assert!(parse_delete_request(&authority_delete).is_err());
+        let valid_recovery = json!({"版": 1, "回帰CaseID": "a".repeat(32)});
+        assert!(parse_delete_recovery_request(&valid_recovery).is_ok());
+        let mut authority_recovery = valid_recovery;
+        authority_recovery["owner"] = json!(true);
+        assert!(parse_delete_recovery_request(&authority_recovery).is_err());
+    }
+
+    #[test]
+    fn 削除中断状態は監査承認と照合記録が揃うまでCase一覧から外す() {
+        let mut log = BrokerAuditLog::default();
+        let case_id = append_receipt_fixture(&mut log, 11);
+        let definition_hash = format!("sha256:{}", "d".repeat(64));
+        let ciphertext_hash = format!("sha256:{}", "e".repeat(64));
+        let approval = append_delete_intent_fixture(
+            &mut log,
+            &case_id,
+            "delete-pending-11",
+            &definition_hash,
+            &ciphertext_hash,
+        );
+        let (page, total) = stored_regression_cases(&log, 0, 10).expect("未確定状態を読む");
+        assert!(page.is_empty());
+        assert_eq!(total, 0);
+
+        append_recovery_fixture(
+            &mut log,
+            &case_id,
+            "recovery-present-11",
+            &approval,
+            &ciphertext_hash,
+            "暗号文残存・再試行可能",
+        );
+        let (page, total) = stored_regression_cases(&log, 0, 10).expect("再試行可能状態を読む");
+        assert_eq!(total, 1);
+        assert_eq!(page[0].case_id, case_id);
+    }
+
+    #[test]
+    fn 削除完了と不在中断照合は再利用Case一覧から除外する() {
+        let mut completed = BrokerAuditLog::default();
+        let case_id = append_receipt_fixture(&mut completed, 12);
+        let definition_hash = format!("sha256:{}", "d".repeat(64));
+        let ciphertext_hash = format!("sha256:{}", "e".repeat(64));
+        let request_id = "delete-complete-12";
+        let approval = append_delete_intent_fixture(
+            &mut completed,
+            &case_id,
+            request_id,
+            &definition_hash,
+            &ciphertext_hash,
+        );
+        let result = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": definition_hash,
+            "暗号文hash": ciphertext_hash,
+            "削除承認監査ID": approval,
+            "状態": "削除確定",
+            "証拠種別": "LIVE_RUNTIME",
+        });
+        let encoded = result.to_string();
+        completed.append(
+            request_id,
+            DELETE_OPERATION,
+            "accepted",
+            &format!("回帰Case削除記録:{encoded}"),
+            "LIVE_RUNTIME",
+            &sha256_tagged(encoded.as_bytes()),
+        );
+        let (page, total) = stored_regression_cases(&completed, 0, 10).expect("削除済み監査");
+        assert!(page.is_empty());
+        assert_eq!(total, 0);
+
+        let mut interrupted = BrokerAuditLog::default();
+        let case_id = append_receipt_fixture(&mut interrupted, 13);
+        let approval = append_delete_intent_fixture(
+            &mut interrupted,
+            &case_id,
+            "delete-interrupted-13",
+            &definition_hash,
+            &ciphertext_hash,
+        );
+        append_recovery_fixture(
+            &mut interrupted,
+            &case_id,
+            "recovery-absent-13",
+            &approval,
+            &ciphertext_hash,
+            "暗号文不在・中断照合済み",
+        );
+        let (page, total) = stored_regression_cases(&interrupted, 0, 10).expect("不在照合監査");
+        assert!(page.is_empty());
+        assert_eq!(total, 0);
+    }
+
+    #[test]
+    fn 受信要求に結ばれない削除承認監査を拒否する() {
+        let mut log = BrokerAuditLog::default();
+        let case_id = append_receipt_fixture(&mut log, 14);
+        let intent = json!({
+            "版": 1,
+            "回帰CaseID": case_id,
+            "定義hash": format!("sha256:{}", "d".repeat(64)),
+            "暗号文hash": format!("sha256:{}", "e".repeat(64)),
+        });
+        let encoded = intent.to_string();
+        log.append(
+            "unbound-delete-intent",
+            DELETE_OPERATION,
+            "recorded",
+            &format!("回帰Case削除承認:{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(encoded.as_bytes()),
+        );
+        assert!(stored_regression_cases(&log, 0, 10).is_err());
     }
 
     #[test]
@@ -940,6 +2044,139 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn OwnerだけがCaseを削除でき削除結果監査後に通常一覧から除外する() {
+        let (mut broker, root) = broker_with_store("delete-case");
+        let case_id = seed_case(&mut broker, 21);
+        let record = receipt_for_case(&broker.audit_log, &case_id)
+            .expect("登録receiptを検証")
+            .expect("Caseを取得");
+        let request = json!({
+            "版": 1,
+            "回帰CaseID": record.case_id,
+            "定義hash": record.definition_hash,
+            "暗号文hash": record.ciphertext_hash,
+        });
+        let denied = delete_case(&mut broker, request.clone(), false);
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert!(broker
+            .protected_store
+            .as_ref()
+            .expect("保護保管先")
+            .inspect(crate::protected_store::Purpose::Regression, &case_id)
+            .expect("状態観測")
+            .is_some());
+
+        let deleted = delete_case(&mut broker, request.clone(), true);
+        assert_eq!(deleted.status, BrokerStatus::Accepted, "{deleted:?}");
+        let body = deleted.body.expect("削除receipt");
+        assert_eq!(body["状態"], "削除確定");
+        assert!(!body.as_object().unwrap().contains_key("物理消去"));
+        assert!(broker
+            .protected_store
+            .as_ref()
+            .expect("保護保管先")
+            .inspect(crate::protected_store::Purpose::Regression, &case_id)
+            .expect("削除後状態観測")
+            .is_none());
+        let listing = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(listing.status, BrokerStatus::Accepted, "{listing:?}");
+        assert_eq!(listing.body.expect("削除後一覧")["合計件数"], 0);
+
+        let repeated = delete_case(&mut broker, request, true);
+        assert_eq!(repeated.status, BrokerStatus::Rejected);
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn Case削除中断照合は残存なら再試行可能を記録し不在なら再利用を止める() {
+        let (mut broker, root) = broker_with_store("recover-delete-present");
+        let case_id = seed_case(&mut broker, 22);
+        let record = receipt_for_case(&broker.audit_log, &case_id)
+            .expect("登録receiptを検証")
+            .expect("Caseを取得");
+        let approval = append_pending_delete(&mut broker, &record, "pending-delete-present");
+        let denied = recover_delete(&mut broker, &case_id, false);
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        let recovered = recover_delete(&mut broker, &case_id, true);
+        assert_eq!(recovered.status, BrokerStatus::Accepted, "{recovered:?}");
+        let recovery_body = recovered.body.expect("照合結果");
+        assert_eq!(recovery_body["削除承認監査ID"], approval);
+        assert_eq!(recovery_body["現在状態"], "暗号文残存・再試行可能");
+        assert_eq!(recovery_body["証拠種別"], "LIVE_RUNTIME");
+        let listing = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(listing.status, BrokerStatus::Accepted, "{listing:?}");
+        assert_eq!(listing.body.expect("再試行可能一覧")["合計件数"], 1);
+
+        let delete_request = json!({
+            "版": 1,
+            "回帰CaseID": record.case_id,
+            "定義hash": record.definition_hash,
+            "暗号文hash": record.ciphertext_hash,
+        });
+        assert_eq!(delete_case(&mut broker, delete_request, true).status, BrokerStatus::Accepted);
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+
+        let (mut broker, root) = broker_with_store("recover-delete-absent");
+        let case_id = seed_case(&mut broker, 23);
+        let record = receipt_for_case(&broker.audit_log, &case_id)
+            .expect("登録receiptを検証")
+            .expect("Caseを取得");
+        let approval = append_pending_delete(&mut broker, &record, "pending-delete-absent");
+        broker
+            .protected_store
+            .as_ref()
+            .expect("保護保管先")
+            .prepare_delete(
+                crate::protected_store::Purpose::Regression,
+                &case_id,
+                &record.ciphertext_hash,
+            )
+            .expect("試験中断削除を準備")
+            .commit()
+            .expect("試験で削除を確定");
+        let recovered = recover_delete(&mut broker, &case_id, true);
+        assert_eq!(recovered.status, BrokerStatus::Accepted, "{recovered:?}");
+        let recovery_body = recovered.body.expect("不在照合結果");
+        assert_eq!(recovery_body["削除承認監査ID"], approval);
+        assert_eq!(recovery_body["現在状態"], "暗号文不在・中断照合済み");
+        let listing = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
+        assert_eq!(listing.status, BrokerStatus::Accepted, "{listing:?}");
+        assert_eq!(listing.body.expect("不在Case除外一覧")["合計件数"], 0);
+        assert_eq!(recover_delete(&mut broker, &case_id, true).status, BrokerStatus::Rejected);
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 中断Caseの現在ciphertext改変はRecoveryへ昇格しない() {
+        let (mut broker, root) = broker_with_store("recover-delete-tampered");
+        let case_id = seed_case(&mut broker, 24);
+        let record = receipt_for_case(&broker.audit_log, &case_id)
+            .expect("登録receiptを検証")
+            .expect("Caseを取得");
+        append_pending_delete(&mut broker, &record, "pending-delete-tampered");
+        let ciphertext = root
+            .join("vault")
+            .join(format!("regression-{case_id}.dpapi"));
+        let mut changed = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&ciphertext)
+            .expect("暗号文file");
+        changed.write_all(b"tampered").expect("試験暗号文を書込");
+        let recovery = recover_delete(&mut broker, &case_id, true);
+        assert_eq!(recovery.status, BrokerStatus::Rejected);
+        assert!(recovery.body.is_none());
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn cursor外れ権限fieldと破損保管を拒否する() {
         let (mut broker, root) = broker_with_store("negative-list");
         let case_id = seed_case(&mut broker, 3);
@@ -966,6 +2203,7 @@ mod tests {
         changed_file
             .write_all(b"synthetic-tampered-ciphertext")
             .expect("改変");
+        drop(changed_file);
         let changed = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
         assert_eq!(changed.status, BrokerStatus::Rejected);
         assert!(changed.body.is_none());
@@ -999,7 +2237,7 @@ mod tests {
             )
             .expect("不正監査fixture");
         let malformed = list(&mut broker, json!({"版":1,"after":0,"limit":10}), false);
-        assert_eq!(malformed.status, BrokerStatus::Rejected);
+        assert_eq!(malformed.status, BrokerStatus::Suspended);
         assert!(malformed.body.is_none());
         assert_eq!(malformed.error.expect("error").code, "回帰Case監査不正");
         drop(broker);

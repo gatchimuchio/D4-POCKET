@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_delete_recovery_request.schema.json",
+  "title": "回帰Case削除中断照合要求",
+  "description": "owner controlが未確定の削除承認一件を現在の保管状態へ再照合する。",
+  "type": "object",
+  "required": ["版", "回帰CaseID", "削除承認監査ID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "回帰CaseID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+    "削除承認監査ID": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }
+}

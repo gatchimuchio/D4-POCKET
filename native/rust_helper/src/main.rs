@@ -42,6 +42,9 @@ fn main() {
     if args.first().is_some_and(|v| v == "回帰Case登録") {
         match owner_cli::回帰Case登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
+    if args.first().is_some_and(|v| v == "回帰Case削除") {
+        match owner_cli::回帰Case削除(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if args.first().is_some_and(|v| v == "資格情報登録") {
         match owner_cli::資格情報登録(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
@@ -81,6 +84,7 @@ fn main() {
     eprintln!("lifecycle owner承認: 実行系ライフサイクル承認 --session-file <owner資格file> 承認 <承認ID> <承認hash>");
     eprintln!("評価Dataset登録: 評価Dataset登録 --session-file <owner資格file> 登録 <非公開評価データセットJSONファイル>");
     eprintln!("回帰Case登録: 回帰Case登録 --session-file <owner資格file> 登録 <回帰Case登録JSONファイル>");
+    eprintln!("回帰Case削除: 回帰Case削除 --session-file <owner資格file> 削除 <CaseID> <定義hash> <暗号文hash> 削除確認 | 中断照合 <CaseID>");
     eprintln!("資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>");
     eprintln!("MCP接続: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>");
     eprintln!("A2A接続: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>");

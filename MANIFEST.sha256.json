@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "cbd1925f0e4f7a0d07482c690628073b079fb301571aceb56f4ab1ea6d72ddde"
+      "sha256": "bc34d3313caf69b554746e49019e496bf8b14f5fcab547e8eb09f639c3f4b40e"
     },
     {
       "path": "SECURITY.md",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "c4fdb82e81df7a027b7e3e9e12c6281463c861b66749aba8f9f63c8c4646f61d"
+      "sha256": "6e559ae306589b14d43ec1521ccfe36dafc4c0a9407c51407d29568b93ee5592"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a0ac77770570eb09485d079f3392aa6590791172a43488733a867fd073a05c5d"
+      "sha256": "0ae591107df321947fe51d8fe6cd09d31f17d16ba47fd2c0f62d71f87dc664e3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1317,7 +1317,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "80433302aecc2b6f30e764207f91c1eb6db5fc70967f27e580ce0eba206367ab"
+      "sha256": "3d14c8dbaea1f642b9e6513b1e9397c1cf514a81cffd6e56b7207596d10ef553"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -1397,7 +1397,7 @@
     },
     {
       "path": "docs/specs/regression-case.md",
-      "sha256": "e65f41d70ed9b5075216649d5b1aa4c34e8ba11f81438cb1029b8c2f509b921a"
+      "sha256": "5cbae65c40b050e15eff7a854d2e977f2ec91eb9b2998663db0f760026715a1c"
     },
     {
       "path": "docs/specs/runtime-catalog.md",
@@ -1465,7 +1465,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "33c264586f551d0650b9b844abb32d87b8f15103398a0181a2ffd9a085708d6d"
+      "sha256": "6e6999393f8a2c32f11a3cb6f1e81bef4bc20a9d0edae48a46f94db1ec44b6b5"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2160,6 +2160,30 @@
       "sha256": "fa7a4c08d29e63fde254fcfbe072c335c85080a93cac71b1541fb4252068c45d"
     },
     {
+      "path": "examples/contracts/invalid/regression_case_delete_receipt_evidence.invalid.json",
+      "sha256": "9fc65272104b541a6f9c26d471bc7f57cd4011aeaa647946e5a1e1a4d94599f7"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_delete_receipt_physical_erasure.invalid.json",
+      "sha256": "45d5cbd3b1ec92eab4b7479ec4df9e459ed31dafb1e419e4855188064773253c"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_delete_recovery_receipt_evidence.invalid.json",
+      "sha256": "a1a9cd9a379e234e0329b575dda7f7583a245262ddea7a730332fa3702b71be3"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_delete_recovery_request_authority.invalid.json",
+      "sha256": "34c58b70f53148d9a5fe87857453c23a390d111f6e786066037c18ca8f389818"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_delete_request_authority.invalid.json",
+      "sha256": "b0aee38e1336445656ad2b582d9dc9a44518376459d9f75fefbfc53455cba210"
+    },
+    {
+      "path": "examples/contracts/invalid/regression_case_list_deleted_claim.invalid.json",
+      "sha256": "0795b59589807cefe5ff51e81ff9a3bfb43cc8ef8609a03416794dbdc85ad7c4"
+    },
+    {
       "path": "examples/contracts/invalid/regression_case_list_private_field.invalid.json",
       "sha256": "d3c1d3d22954a97734cb8ead16c264ab2bb3f7bb0ec7b0d97aa163ca2cb495a6"
     },
@@ -2442,6 +2466,22 @@
     {
       "path": "examples/contracts/recovery.valid.json",
       "sha256": "63d9afc31517579fca1a2647d3c1526bf29dfced41782ec8045eaf26fe781826"
+    },
+    {
+      "path": "examples/contracts/regression_case_delete_receipt.valid.json",
+      "sha256": "17ecff2180dd7dc14490e5379720dabb3029e5951c8df2982ddf26b38bba06b2"
+    },
+    {
+      "path": "examples/contracts/regression_case_delete_recovery_receipt.valid.json",
+      "sha256": "445d7951fbf369db96b5b3a3b2361c30a93e8d1ed2ae7edb7b9157e858cfca72"
+    },
+    {
+      "path": "examples/contracts/regression_case_delete_recovery_request.valid.json",
+      "sha256": "d32eb9664f52161af83bda6e1ff9a3659081817615b1b633a7fac86cd6d86595"
+    },
+    {
+      "path": "examples/contracts/regression_case_delete_request.valid.json",
+      "sha256": "ce4bbec2476869be467ddb0201bfb9de08020db8c437d637fa2a9d73c47be5b3"
     },
     {
       "path": "examples/contracts/regression_case_list.valid.json",
@@ -2841,11 +2881,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "ef9c6732e90033f9426e0effbf2650c07e5ec5c6c5f3d039cf61af5e672d1c27"
+      "sha256": "e4f16c11bfbca8bc28e36e00766ddae912a491955e7a578aa83464aae3f23dca"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
-      "sha256": "eea091954bf395ee89c5083364d24c1ea2c98893cd7e5a5a2caa7d574798d566"
+      "sha256": "cee367dca338482c63b6131bccdb29f5123f57f03cd50607dda0cce41c790be5"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -2909,7 +2949,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "fa974412ce96371adb79fb9b999086f4489995c89c9c319365f84d94eece2344"
+      "sha256": "cb90733f4afc270419808db47e96c03600f7e3db6ad885941b8aee2fa0d465e7"
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
@@ -2921,7 +2961,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "0ab0259e7b3c0aca0920d9064fe1bb714d8baade32bfd49ff2d076a3be30a392"
+      "sha256": "ac10f344fd8c62d7e251b2119d53886dc9ef009f8f255bf254442be183ea23df"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -3681,11 +3721,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "e91e930f0b14cfd633403dfa185f6d0bcccde9f7b2c2de78ec1ef2c8397b12d0"
+      "sha256": "f7bb048382d6eee8c3beb4bf56d9a490ca7a78a4dcab7d5339fe1ce558ce1897"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "734483dd8385a2ba56a8c52efb6c74ff72e5d2c2f4a91810f2d28aac8cce95d9"
+      "sha256": "0a054da80bd437f674f818dcc8ef9e1895f264bfb0c2790f9345e1462f21c978"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -3762,6 +3802,22 @@
     {
       "path": "specs/recovery.schema.json",
       "sha256": "5c5dbc7174f3c676e33cd5d951cad0355214654603c20a69fdf60b233eb66f33"
+    },
+    {
+      "path": "specs/regression_case_delete_receipt.schema.json",
+      "sha256": "5a5626106382dee97c5e488f956aabb28f8b82cff9f91d0a682f6c0693bae4e0"
+    },
+    {
+      "path": "specs/regression_case_delete_recovery_receipt.schema.json",
+      "sha256": "256f6085ba297350f650eae6dbe76a07ecb6c73a07cda48606e9f636b7e8f4b9"
+    },
+    {
+      "path": "specs/regression_case_delete_recovery_request.schema.json",
+      "sha256": "0fdae0c9a3f1c62559005f5ee27965c2b8075f12469a569a80b77bfad8212017"
+    },
+    {
+      "path": "specs/regression_case_delete_request.schema.json",
+      "sha256": "17989a0cbe27a0af72a199893ade06b8d35ea8adcc699584c0f6d85ef5e7959e"
     },
     {
       "path": "specs/regression_case_list.schema.json",
@@ -3961,7 +4017,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "04aa0dd9639a67b0f89f19f009f259cbdd85e0f8afa66295d37cce83303f0679"
+      "sha256": "44276c6cce2ca3044a2d3729e4e11db9ca18f6a58cbbc37167a7f23a15b25fe5"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4041,7 +4097,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "93b0dbff66def4cc190fe7fbbec20272fb133cff339a52a6367d81ba88693ab4"
+      "sha256": "425de959b1a375fc59f70ef0eb8d7cc593b058fac0e422ffc39ee627981bee96"
     },
     {
       "path": "tooling/shell_snapshot.py",

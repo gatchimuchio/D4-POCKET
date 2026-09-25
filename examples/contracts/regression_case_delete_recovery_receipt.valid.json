@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+  "削除承認監査ID": "audit-regression-delete-approval",
+  "暗号文hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "現在状態": "暗号文不在・中断照合済み",
+  "観測監査head": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "観測時刻UnixMillis": 1780000000000,
+  "証拠種別": "LIVE_RUNTIME"
+}

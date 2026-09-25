@@ -18,10 +18,18 @@ private定義はWindowsの`ProtectedStore::Purpose::Regression`へ暗号化し�
 
 通常IPCは、登録時に監査へ確定した公開receiptからCaseのmetadataだけをページ取得できる。要求は版、0始まりcursor、1〜100件のlimitに限定し、一覧は監査順で返す。cursorは一覧位置であり、権限・承認・保管IDとして扱わない。各ページの対象暗号文についてBrokerがProtectedStoreのfile metadataと暗号文hashを照合し、欠落・改変・link・共有競合・監査不整合があれば部分一覧を返さず拒否する。
 
-通常IPCの一覧は、Case ID、公開表示名、要求／結果の識別hash、終了監査ID、条件・参照の件数、作成時刻、保管hash、証拠種別だけを`metadata_only`として返す。入力本文、条件、必要参照、期待経路、復号値、owner資格、authority情報は返さない。一覧は内容閲覧・実行・承認を許可せず、保管状態の内部観測に限る。証拠種別は`INTERNAL_STATE`である。
+通常IPCの一覧は、Case ID、公開表示名、要求／結果の識別hash、終了監査ID、条件・参照の件数、作成時刻、保管hash、証拠種別だけを`metadata_only`として返す。入力本文、条件、必要参照、期待経路、復号値、owner資格、authority情報、削除状態は返さない。一覧は内容閲覧・実行・承認を許可せず、ProtectedStoreの現在状態とAuditから利用可能なCaseだけを抽出する内部観測に限る。削除承認後の未確定Caseと削除済みCaseは除外し、中断Recoveryで同一暗号文の残存が確認されたCaseだけ再び一覧対象となる。Recovery状態の詳細はOwner専用Recovery応答で確認し、通常一覧は状態・削除承認監査IDを公開しない。証拠種別は`INTERNAL_STATE`である。
+
+## Ownerによる削除と中断Recovery
+
+`回帰Case削除`はowner controlだけが開始できる。要求は版、Case ID、定義hash、ciphertext hashだけを受け付け、Brokerは現在の登録receiptと未削除状態を監査chainから再検証する。ProtectedStoreは同一用途・ID・ciphertext hashの現在fileを排他handleで開いて削除準備し、Brokerが削除承認Auditを永続化した後にだけ削除を確定する。成功応答は削除結果Auditの確定後に返す。通常IPC、metadata、Profile、履歴、再生、C5 Datasetは削除権限を生成しない。
+
+削除結果はProtectedStoreの削除APIが成功しただけでは確定せず、削除後の再観測で対象暗号文が不在であり、結果Auditが永続確定した場合に限り`削除確定`として返す。この結果はfile状態の`LIVE_RUNTIME`観測であり、媒体の物理消去を主張しない。
+
+削除承認Audit後にfile削除または結果Auditが不確定になった場合、Caseは`削除結果未確定`として通常一覧から除外し、再削除を自動実行しない。`回帰Case削除中断確認`はownerがCase IDを指定し、現在のProtectedStoreを再観測して状態を`LIVE_RUNTIME`で記録する。対象暗号文が不在なら`暗号文不在・中断照合済み`として削除対象一覧から除外するが、媒体の物理消去を主張しない。同一ciphertext hashのfileが残っている場合だけ`暗号文残存・再試行可能`を記録して通常一覧へ戻し、再試行には新しいowner要求と削除承認Auditを必要とする。別hash、再解析点、監査不整合、照合競合はfail-closedとする。
 
 ## C5との境界と延期
 
-C6のreceiptはC5のDatasetへ自動で追加されず、Dataset revisionや評価結果を生成しない。将来のC5 importは別のowner操作、別revision、再検証を持つ独立変更とする。通常画面は公開一覧だけを読み取る。Owner専用GUI登録、Caseの削除と中断Recovery、C5 Dataset revisionへの明示importは別の作業単位で接続する。
+C6のreceiptはC5のDatasetへ自動で追加されず、Dataset revisionや評価結果を生成しない。将来のC5 importは別のowner操作、別revision、再検証を持つ独立変更とする。通常画面は公開一覧だけを読み取る。Owner専用GUI登録・削除面とC5 Dataset revisionへの明示importは別の作業単位で接続する。
 
 このcontractの成立は、実行系のhealth、Permission、Approval、Authority、security integrity、release readinessの証拠ではない。失敗時は要求修正、対話再確認、保管監査修復などのRecoveryActionへ接続し、入力本文をエラー、Audit、traceへ出さない。

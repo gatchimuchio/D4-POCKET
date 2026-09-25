@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_delete_recovery_receipt.schema.json",
+  "title": "回帰Case削除中断照合結果",
+  "description": "現在時点の保管状態だけを記録する。削除結果や媒体上の物理消去を生成しない。",
+  "type": "object",
+  "required": ["版", "回帰CaseID", "削除承認監査ID", "暗号文hash", "現在状態", "観測監査head", "観測時刻UnixMillis", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "回帰CaseID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+    "削除承認監査ID": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "暗号文hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "現在状態": { "enum": ["暗号文残存・再試行可能", "暗号文不在・中断照合済み"] },
+    "観測監査head": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "観測時刻UnixMillis": { "type": "integer", "minimum": 0 },
+    "証拠種別": { "const": "LIVE_RUNTIME" }
+  }
+}

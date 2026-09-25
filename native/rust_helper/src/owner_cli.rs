@@ -132,6 +132,133 @@ pub fn 回帰Case登録(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// ownerがCase IDと両hashを確認した明示操作だけをBrokerへ渡す。
+/// private定義の読取・表示・復号は行わない。
+pub fn 回帰Case削除(args: &[String]) -> Result<(), String> {
+    if args.len() == 7
+        && args[0] == "--session-file"
+        && args[2] == "削除"
+        && args[6] == "削除確認"
+    {
+        let payload = json!({
+            "版": 1,
+            "回帰CaseID": args[3],
+            "定義hash": args[4],
+            "暗号文hash": args[5],
+        });
+        let body = owner操作送信(&args[1], "回帰Case削除", payload)?;
+        let receipt = 回帰Case削除公開応答(&body)?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&receipt).map_err(|_| "回帰Case削除結果の表示に失敗")?
+        );
+        return Ok(());
+    }
+    if args.len() == 4 && args[0] == "--session-file" && args[2] == "中断照合" {
+        let body = owner操作送信(
+            &args[1],
+            "回帰Case削除中断確認",
+            json!({"版": 1, "回帰CaseID": args[3]}),
+        )?;
+        let receipt = 回帰Case削除中断照合公開応答(&body)?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&receipt).map_err(|_| "回帰Case中断照合結果の表示に失敗")?
+        );
+        return Ok(());
+    }
+    Err("使用法: 回帰Case削除 --session-file <owner資格file> 削除 <CaseID> <定義hash> <暗号文hash> 削除確認 | 中断照合 <CaseID>".into())
+}
+
+fn 回帰Case削除公開応答(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "回帰Case削除結果の形式が不正".to_string())?;
+    let required = [
+        "版",
+        "回帰CaseID",
+        "定義hash",
+        "暗号文hash",
+        "削除承認監査ID",
+        "状態",
+        "証拠種別",
+    ];
+    if object.len() != required.len()
+        || required.iter().any(|key| !object.contains_key(*key))
+        || body["版"] != 1
+        || !lower_hex_id(&body["回帰CaseID"])
+        || !tagged_hash(&body["定義hash"])
+        || !tagged_hash(&body["暗号文hash"])
+        || !safe_audit_id(&body["削除承認監査ID"])
+        || body["状態"] != "削除確定"
+        || body["証拠種別"] != "LIVE_RUNTIME"
+    {
+        return Err("回帰Case削除結果へ未許可情報があるか、内容が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn 回帰Case削除中断照合公開応答(body: &Value) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "回帰Case中断照合結果の形式が不正".to_string())?;
+    let required = [
+        "版",
+        "回帰CaseID",
+        "削除承認監査ID",
+        "暗号文hash",
+        "現在状態",
+        "観測監査head",
+        "観測時刻UnixMillis",
+        "証拠種別",
+    ];
+    if object.len() != required.len()
+        || required.iter().any(|key| !object.contains_key(*key))
+        || body["版"] != 1
+        || !lower_hex_id(&body["回帰CaseID"])
+        || !safe_audit_id(&body["削除承認監査ID"])
+        || !tagged_hash(&body["暗号文hash"])
+        || !tagged_hash(&body["観測監査head"])
+        || !body["観測時刻UnixMillis"].as_i64().is_some_and(|time| time >= 0)
+        || !matches!(
+            body["現在状態"].as_str(),
+            Some("暗号文残存・再試行可能" | "暗号文不在・中断照合済み")
+        )
+        || body["証拠種別"] != "LIVE_RUNTIME"
+    {
+        return Err("回帰Case中断照合結果へ未許可情報があるか、内容が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn lower_hex_id(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        text.len() == 32
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn tagged_hash(value: &Value) -> bool {
+    value.as_str().and_then(|text| text.strip_prefix("sha256:")).is_some_and(|text| {
+        text.len() == 64
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn safe_audit_id(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        !text.is_empty()
+            && text.len() <= 256
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_.:-".contains(&byte))
+    })
+}
+
 /// privateな資格情報登録payloadをowner制御としてだけBrokerへ渡す。
 /// Broker応答のmetadataだけを表示し、秘密値を端末出力へ戻さない。
 pub fn 資格情報登録(args: &[String]) -> Result<(), String> {
@@ -886,6 +1013,44 @@ mod tests {
         let mut unsafe_body = body;
         unsafe_body["入力"] = json!("private-regression-sentinel");
         assert!(回帰Case公開投影(&unsafe_body).is_err());
+    }
+
+    #[test]
+    fn 回帰Case削除CLI結果は指定した公開fieldだけを許可する() {
+        let body = json!({
+            "版": 1,
+            "回帰CaseID": "a".repeat(32),
+            "定義hash": format!("sha256:{}", "b".repeat(64)),
+            "暗号文hash": format!("sha256:{}", "c".repeat(64)),
+            "削除承認監査ID": "broker-audit-12",
+            "状態": "削除確定",
+            "証拠種別": "LIVE_RUNTIME"
+        });
+        assert_eq!(回帰Case削除公開応答(&body).expect("公開削除結果"), body);
+        let mut wrong_evidence = body.clone();
+        wrong_evidence["証拠種別"] = json!("INTERNAL_STATE");
+        assert!(回帰Case削除公開応答(&wrong_evidence).is_err());
+        let mut unsafe_body = body;
+        unsafe_body["private"] = json!("not-output");
+        assert!(回帰Case削除公開応答(&unsafe_body).is_err());
+    }
+
+    #[test]
+    fn 回帰Case中断照合CLI結果は現時点のhash照合だけを表示する() {
+        let body = json!({
+            "版": 1,
+            "回帰CaseID": "a".repeat(32),
+            "削除承認監査ID": "broker-audit-12",
+            "暗号文hash": format!("sha256:{}", "c".repeat(64)),
+            "現在状態": "暗号文残存・再試行可能",
+            "観測監査head": format!("sha256:{}", "d".repeat(64)),
+            "観測時刻UnixMillis": 1780000000000_i64,
+            "証拠種別": "LIVE_RUNTIME"
+        });
+        assert_eq!(回帰Case削除中断照合公開応答(&body).expect("公開照合結果"), body);
+        let mut false_erasure = body;
+        false_erasure["物理消去"] = json!(true);
+        assert!(回帰Case削除中断照合公開応答(&false_erasure).is_err());
     }
 
     #[test]

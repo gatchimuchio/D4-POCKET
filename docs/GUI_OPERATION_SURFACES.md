@@ -129,8 +129,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: owner controlの`回帰Case登録`は、完了済み通常対話の要求ID/hash、表示範囲、永続結果証跡、終了監査IDをRust Broker内で再照合し、owner明示のredacted定義をWindows ProtectedStoreのRegression purposeへ暗号化して保存する。公開receiptはhash-onlyでprivate定義を返さない。通常Broker IPCとDesktopの回帰Case tabはreceiptと暗号文hashを照合したmetadata-onlyのページ一覧だけを表示する。
-  authority_boundary: 登録payloadの入力方式、履歴、Profile、MCP metadata、Agent metadataは権限源ではない。元の対話本文を自動コピーせず、Known marker拒否は秘密不存在の証明ではない。Desktop一覧は登録・削除・Recovery・実行・C5自動importを行わない。Owner専用GUI登録、削除Recovery、C5への明示import、Windows実機登録証拠は未成立として扱う。
+  evidence: owner controlの登録は完了済み通常対話の要求ID/hash、表示範囲、永続結果証跡、終了監査IDをRust Broker内で再照合し、owner明示のredacted定義をWindows ProtectedStoreのRegression purposeへ暗号化して保存する。Owner CLI経由の削除は削除後file不在を再観測し、LIVE_RUNTIME結果Audit確定後だけ成功を返す。中断Recoveryは現在のfile状態を再観測し、通常Broker IPCとDesktopの回帰Case tabはreceipt・暗号文hash由来のmetadata-only一覧を表示する。
+  authority_boundary: 登録payloadの入力方式、履歴、Profile、MCP metadata、Agent metadataは権限源ではない。元の対話本文を自動コピーせず、Known marker拒否は秘密不存在の証明ではない。Owner操作は既存Owner CLI→Broker経路に限り、Desktop一覧は登録・削除・Recovery・実行・C5自動importを行わない。物理消去、Owner専用GUI登録・削除、C5への明示import、Windows実Broker owner操作の実証は未成立として扱う。
 
 - item: D4 Pocket Credential Vault（C7 current scope）
   classification: required_for_v1

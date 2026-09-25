@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/regression_case_delete_receipt.schema.json",
+  "title": "回帰Case削除結果",
+  "description": "削除承認Audit後のProtectedStore削除と結果Auditが確定した場合だけ返す。物理消去を主張しない。",
+  "type": "object",
+  "required": ["版", "回帰CaseID", "定義hash", "暗号文hash", "削除承認監査ID", "状態", "証拠種別"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "回帰CaseID": { "type": "string", "pattern": "^[a-f0-9]{32}$(?![\\s\\S])" },
+    "定義hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "暗号文hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])" },
+    "削除承認監査ID": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "状態": { "const": "削除確定" },
+    "証拠種別": { "const": "LIVE_RUNTIME" }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "版": 1,
+  "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+  "定義hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "暗号文hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "削除承認監査ID": "audit-regression-delete-approval",
+  "状態": "削除確定",
+  "証拠種別": "INTERNAL_STATE",
+  "物理消去": true
+}
