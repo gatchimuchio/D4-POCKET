@@ -1301,3 +1301,17 @@ Rust単体試験では、schema準拠fixture、有効Agent一覧のBroker受理�
 - `git diff --check`：成功。
 
 既存release blocker registryは変更していない。Owner操作を伴うGUI-Shell Export経路、総合機能拡張rev1全体、Windows installed product、正式配布、実Agentの本番接続は本単位では成立しない。release_readyはfalseのまま維持する。
+
+
+## D4 Pocket rev2 C27/C29再測定とC28長時間試験開始（2026-09-25）
+
+Agent Adapter metadata検証を含むsource commit `8202ac796eba0909c9d5b83cf71e89d8fc97fc5a`で、C27性能測定とC29障害注入を再実行した。C27はsnapshot生成1016ms、Flutter projection test process全体20245ms。Flutter fixture内部は起動model 0ms、snapshot読込38ms、Runtime／Audit／History projection 4ms、検索2ms、通知5ms、resource polling 13ms、4096行差分UI 1041msだった。C29はRuntime停止・再接続、Broker crash、MCP timeout、A2A timeout、必須credential不在、store書込不能simulation、Audit書込失敗、malformed state起動拒否の8件すべてPASSした。
+
+証拠はC27が`INTERNAL_STATE`／`FIXTURE`、C29が`LIVE_RUNTIME`／`FIXTURE`／`INTERNAL_STATE`。C27値は性能SLA、installed product、実GPU frame、実Runtime負荷の保証ではない。C29のstore障害は容量を実際に枯渇させた物理disk-full試験ではなく、外部MCP／A2A serviceの実証でもない。
+
+同じsource commit `8202ac796eba0909c9d5b83cf71e89d8fc97fc5a`で8時間C28試験を開始した。証拠fileは`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-8202ac7-20260925.json`。2026-09-25 01:26:35Zの観測では`running`、経過662.5秒、対話144成功、接続断で想定した失敗36、Runtime相当再起動36、Broker再起動36、再接続72だった。これは試験途中の進捗であり、8時間完遂・成功を示さない。実Broker processとlocalhost Runtime fixtureによる開発試験であり、installed productまたは外部Runtimeの長時間稼働証拠ではない。終了状態を後続記録で追記する。
+
+- `release_blocker`: C28の8時間運用完遂、installed product／外部Runtimeでの運用、実製品性能測定、rev1全工程完成、Windows installed product、正式配布・署名、owner GOおよび正式releaseは未成立。Owner明示操作を伴うGUI-Shell Export経路も未成立。
+- `known_limitation`: C27/C29測定は開発時のfixture・限定障害注入範囲であり、製品SLAまたは全外部障害条件の証拠へ昇格しない。
+
+既存release blocker registryは変更していない。`release_ready=false`を維持する。
