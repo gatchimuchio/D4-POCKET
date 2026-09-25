@@ -98,8 +98,38 @@ class RestartEndpointCleanupTests(unittest.TestCase):
 
         self.assertEqual(
             state.http_results,
-            [{"path": "/health", "status": 200, "detail": "server_write_failed:BrokenPipeError"}],
+            [{"path": "health", "status": 200, "detail": "server_write_failed:BrokenPipeError"}],
         )
+
+    def test_fixture_telemetry_is_bounded_and_uses_route_labels(self):
+        state = c28.RuntimeState()
+        state.record_http("/health")
+        state.record_http("/api/capabilities")
+        state.record_http("/api/chat")
+        first_trace_id = None
+        latest_trace_id = None
+        for index in range(c28.MAX_FIXTURE_TRACES + 8):
+            trace_id, _ = state.next_trace(f"試験セッション-{index}", "検証要求")
+            first_trace_id = first_trace_id or trace_id
+            latest_trace_id = trace_id
+            state.record_http(f"/api/trace/{trace_id}")
+            state.record_http_result(f"/api/trace/{trace_id}", 200, "server_flush_succeeded")
+        state.record_http("/unrecognized/path/with/機密値001")
+        state.record_http_result("/unrecognized/path/with/機密値001", 404)
+
+        snapshot = state.http_snapshot()
+        self.assertEqual(len(state.traces), c28.MAX_FIXTURE_TRACES)
+        self.assertNotIn(first_trace_id, state.traces)
+        self.assertIn(latest_trace_id, state.traces)
+        self.assertEqual(len(state.http_results), c28.MAX_FIXTURE_HTTP_RESULTS)
+        self.assertLessEqual(len(snapshot["paths"]), 5)
+        self.assertEqual(snapshot["paths"]["trace"], c28.MAX_FIXTURE_TRACES + 8)
+        self.assertEqual(snapshot["paths"]["other"], 1)
+        self.assertEqual(snapshot["request_count"], c28.MAX_FIXTURE_TRACES + 12)
+        self.assertEqual({item["path"] for item in snapshot["results"]}, {"trace", "other"})
+        self.assertTrue(all("/api/trace/" not in item["path"] for item in snapshot["results"]))
+        self.assertTrue(all("機密値001" not in item["path"] for item in snapshot["results"]))
+        self.assertNotIn("0" * 32, str(snapshot))
 
     def test_transport_diagnostics_are_allowlisted_and_bounded(self):
         lines = [

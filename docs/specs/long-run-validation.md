@@ -15,6 +15,8 @@
 5. HTTP fixtureを停止した対話が成功へ昇格しないことを確認し、fixture復帰後の対話成功を確認する。
 6. Brokerのworking set、永続store bytes、対話応答時間、HTTP要求数をbounded sampleとして記録する。
 
+C28検証器自身の記録量も上限を持つ。資源sampleは最大512件、HTTP結果履歴は直近32件、trace fixtureの参照記録は最大128件とする。HTTP pathは`health`、`capabilities`、`chat`、`trace`、`other`の固定route labelへ正規化し、trace IDや任意pathを履歴・sampleへ蓄積しない。HTTP要求総数は単調counterとして保持する。上限を越えたtrace参照はfixture上で期限切れとして扱う。このbounded telemetryは検証器のメモリと証拠JSONの増大を制限するためのもので、製品履歴保持契約ではない。
+
 Broker再起動時に検証器自身が所有する一時normal／owner資格fileを削除する。既に存在しないfileは正常とする。削除が`PermissionError`となった場合は最大20回、50ms間隔で再試行し、成功した再試行回数を`Broker資格file削除再試行数`として報告する。上限後も削除できない場合はC28をfailedにする。資格file cleanup以外のBroker操作、Audit、store失敗は再試行で成功へ変換しない。
 
 Runtime fixtureのHTTP resultは、status lineとbodyのwrite／flush後に`server_flush_succeeded`として記録する。書込み例外時は本文や資格を含めず例外classだけを`server_write_failed:<class>`として記録して再送出する。この証拠はfixture server側のflush結果であり、client processがresponseを受信・検証したことまでは証明しない。

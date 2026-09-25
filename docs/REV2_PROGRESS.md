@@ -1374,3 +1374,24 @@ cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::minidora`: 4 tests passed。対象fileの`rustfmt --edition 2021 --check`も成功。workspace全体の`cargo fmt --check`は変更外の既存Rust filesに大量のformat差分があるため失敗し、全体整形は行っていない。
 
 これは未commit作業ツリーでの120秒development fixture測定であり、先行したclean sourceの8時間失敗を解消した証拠ではない。C28 release blockerは維持し、次はclean committed sourceで8時間検証を再実施する。既存release blocker registryは変更せず`release_ready=false`を維持する。
+
+
+## D4 Pocket rev2 C28検証器 telemetry 上限修正（2026-09-25）
+
+commit `0bfc1aa21966c6f75ddb7430cc1c2ab3cbbce22f`から開始した8時間C28試験は、約1,408.89秒後に手動中断した。出力`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-0bfc1aa-20260925.json`は中断時点の`状態=running`を保持し、file sizeは1,521,395 bytesだった。C28 fixtureがtrace IDを含む可変HTTP pathをroute counterのkeyへ使い、trace詳細辞書も無制限に保持していた。これは検証器自身のメモリ・証拠量を増加させ、8時間の資源測定を汚染するため、このrunを完遂証拠として採用しない。出力は改変・削除せず、部分記録として保持する。専用Python／Broker helper processが終了したことを確認した。
+
+修正ではHTTP pathを5種の固定route labelへ正規化し、trace fixture参照を最大128件、HTTP結果ring bufferを32件、資源sampleを512件に制限する。snapshotはlock内で複写する。任意trace IDはHTTP telemetryへ出さず、古いtraceは上限超過後にfixtureから参照できない。製品runtimeや保存契約は変更していない。
+
+- `python -m unittest tooling.conformance_tests.test_long_run_validation`: 9件成功。fixture pathの正規化、HTTP結果32件上限、trace参照128件上限、先頭trace追い出し、任意path／trace IDのtelemetry非出力を確認。
+- `python tooling/manifest.py --write`および`--check`: 成功。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: PASS、負債file 0／findings 0。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。Schema 124／124 example／150 negative、conformance 199 checks、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査を含むconfigured checksがPASS。Windows installed evidence 5項目は`release_blocker`のまま。
+- 修正後smoke `python tooling/long_run_validation.py --duration-seconds 120 --interval-seconds 1 --output %LOCALAPPDATA%\GUI-Shell\development-evidence\c28-120s-bounded-20260925.json`: `passed`、122.25秒、対話成功36、予定disconnect失敗9、Runtime再起動9、Broker再起動9、再接続18。resource sample 12、HTTP route 4種、HTTP結果32件、trace ID非出力、証拠JSON 57,505 bytes。
+
+- `release_blocker`: C28の8時間運用完遂
+  classification: release_blocker
+  reason: 先行clean-source試行は検証器telemetryが非boundedと判明したため手動中断し、完遂していない。
+  required_action: telemetry上限修正を含むclean commitから8時間試験を再実行し、完遂結果と資源sample上限を確認する。
+  blocks_release: yes
+
+既存release blocker registryは変更せず、`release_ready=false`を維持する。

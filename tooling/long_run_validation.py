@@ -32,6 +32,8 @@ HELPER_BINARY = HELPER_ROOT / "target" / "debug" / (
     "gui_shell_rust_helper.exe" if os.name == "nt" else "gui_shell_rust_helper"
 )
 MAX_REPORT_SAMPLES = 512
+MAX_FIXTURE_TRACES = 128
+MAX_FIXTURE_HTTP_RESULTS = 32
 C28_ENDPOINT_UNLINK_MAX_ATTEMPTS = 20
 C28_ENDPOINT_UNLINK_RETRY_SECONDS = 0.05
 C28_DIAGNOSTIC_PREFIX = "C28_RUNTIME_DIAGNOSTIC|"
@@ -74,6 +76,18 @@ C28_DIAGNOSTIC_DETAILS = {
     "not_200_or_invalid_version",
 }
 C28_DIAGNOSTIC_LIMIT = 32
+
+
+def fixture_http_route(path: str) -> str:
+    if path == "/health":
+        return "health"
+    if path == "/api/capabilities":
+        return "capabilities"
+    if path == "/api/chat":
+        return "chat"
+    if path.startswith("/api/trace/"):
+        return "trace"
+    return "other"
 
 
 def json_bytes(value: Any) -> bytes:
@@ -253,18 +267,31 @@ class RuntimeState:
                 "セッションID": session_id,
                 "ルートハッシュ": trace_hash,
             }
+            if len(self.traces) > MAX_FIXTURE_TRACES:
+                del self.traces[next(iter(self.traces))]
             return trace_id, trace_hash
 
     def record_http(self, path: str) -> None:
+        route = fixture_http_route(path)
         with self.lock:
             self.http_request_count += 1
-            self.http_paths[path] = self.http_paths.get(path, 0) + 1
+            self.http_paths[route] = self.http_paths.get(route, 0) + 1
 
     def record_http_result(self, path: str, status: int, detail: str = "") -> None:
         with self.lock:
-            self.http_results.append({"path": path, "status": status, "detail": detail})
-            if len(self.http_results) > 32:
-                del self.http_results[:-32]
+            self.http_results.append(
+                {"path": fixture_http_route(path), "status": status, "detail": detail}
+            )
+            if len(self.http_results) > MAX_FIXTURE_HTTP_RESULTS:
+                del self.http_results[:-MAX_FIXTURE_HTTP_RESULTS]
+
+    def http_snapshot(self) -> dict[str, Any]:
+        with self.lock:
+            return {
+                "request_count": self.http_request_count,
+                "paths": dict(self.http_paths),
+                "results": list(self.http_results),
+            }
 
 
 class ReusableHTTPServer(http.server.HTTPServer):
@@ -748,6 +775,7 @@ class LongRun:
     def sample(self, phase: str) -> None:
         broker_pid = self.broker.process.pid if self.broker is not None else None
         rss = process_rss_bytes(broker_pid) if broker_pid else None
+        http = self.runtime.state.http_snapshot()
         sample = {
             "時刻": now_text(),
             "経過Millis": round((time.monotonic() - self.started_monotonic) * 1000),
@@ -756,9 +784,9 @@ class LongRun:
             "Broker working set bytes": rss,
             "store bytes": directory_bytes(self.store),
             "Broker process alive": bool(self.broker and self.broker.process.poll() is None),
-            "Runtime HTTP request count": self.runtime.state.http_request_count,
-            "Runtime HTTP paths": dict(self.runtime.state.http_paths),
-            "Runtime HTTP results": list(self.runtime.state.http_results),
+            "Runtime HTTP request count": http["request_count"],
+            "Runtime HTTP paths": http["paths"],
+            "Runtime HTTP results": http["results"],
         }
         if len(self.stats.samples) < MAX_REPORT_SAMPLES:
             self.stats.samples.append(sample)
@@ -773,6 +801,7 @@ class LongRun:
             self.refresh_report()
 
     def refresh_report(self) -> None:
+        http = self.runtime.state.http_snapshot()
         self.report.body = {
             "版": 1,
             "状態": self.report.status,
@@ -788,9 +817,9 @@ class LongRun:
             "エラー": self.report.error,
             "installed製品の証明ではない": True,
             "Runtime fixture観測": {
-                "HTTP request count": self.runtime.state.http_request_count,
-                "HTTP paths": dict(self.runtime.state.http_paths),
-                "HTTP results": list(self.runtime.state.http_results),
+                "HTTP request count": http["request_count"],
+                "HTTP paths": http["paths"],
+                "HTTP results": http["results"],
             },
         }
         self.report.write()
