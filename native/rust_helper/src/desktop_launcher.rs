@@ -12,12 +12,17 @@ use std::time::{Duration, Instant};
 
 use zeroize::Zeroize;
 
-use crate::broker::export_center::{self, OwnerConfirmationSummary};
-use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerExportRequest};
+use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
+use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
 use crate::broker::{
-    BrokerCredentialRole, BrokerEndpoint, BrokerRequestEnvelope, BrokerServerConfig,
+    BrokerCredentialRole, BrokerEndpoint, BrokerOperation, BrokerRequestEnvelope,
+    BrokerServerConfig,
 };
-use crate::broker::protocol::{canonical_payload_hash, request_issued_at_is_current};
+use crate::broker::protocol::{
+    canonical_payload_hash, owner_delete_confirmation_summary,
+    owner_recovery_confirmation_summary, request_issued_at_is_current,
+    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+};
 #[cfg(test)]
 use crate::broker::ipc_server::run_loopback_server_cancellable;
 
@@ -28,6 +33,19 @@ const MAX_REQUEST_BYTES: usize = 64 * 1024;
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const RELAY_IO_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_FILE: &str = "broker_session.json";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DesktopOwnerOperationSummary {
+    GuiShellExport(ExportConfirmationSummary),
+    RegressionCaseDelete {
+        summary: OwnerDeleteConfirmationSummary,
+        payload_hash: String,
+    },
+    RegressionCaseRecovery {
+        summary: OwnerRecoveryConfirmationSummary,
+        payload_hash: String,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesktopLaunchError {
@@ -281,6 +299,61 @@ fn ensure_store_directory(runtime_dir: &Path) -> Result<PathBuf, DesktopLaunchEr
     Ok(canonical_store)
 }
 
+fn ensure_protected_store_directory(runtime_dir: &Path) -> Result<PathBuf, DesktopLaunchError> {
+    let protected_dir = runtime_dir.join("protected");
+    match fs::symlink_metadata(&protected_dir) {
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => match fs::create_dir(&protected_dir) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+            Err(_) => {
+                return Err(DesktopLaunchError::new(
+                    "PROTECTED_STORE_UNAVAILABLE",
+                    "保護された保存領域を準備できません。空き容量とフォルダーのアクセス権を確認してください。",
+                ));
+            }
+        },
+        Err(_) => {
+            return Err(DesktopLaunchError::new(
+                "PROTECTED_STORE_UNAVAILABLE",
+                "保護された保存領域を確認できません。",
+            ));
+        }
+    }
+
+    let metadata = fs::symlink_metadata(&protected_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "PROTECTED_STORE_UNAVAILABLE",
+            "保護された保存領域を確認できません。",
+        )
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err(DesktopLaunchError::new(
+            "PROTECTED_STORE_INVALID",
+            "保護された保存領域に再解析pointまたは不正なfolderがあります。",
+        ));
+    }
+    let runtime_root = fs::canonicalize(runtime_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "PROTECTED_STORE_UNAVAILABLE",
+            "保護された保存領域を確認できません。",
+        )
+    })?;
+    let canonical_protected = fs::canonicalize(&protected_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "PROTECTED_STORE_UNAVAILABLE",
+            "保護された保存領域を確認できません。",
+        )
+    })?;
+    if !canonical_protected.starts_with(&runtime_root) {
+        return Err(DesktopLaunchError::new(
+            "PROTECTED_STORE_INVALID",
+            "保護された保存領域が指定rootの範囲外を指しています。",
+        ));
+    }
+    Ok(canonical_protected)
+}
+
 fn reject_reparse_file(path: &Path) -> Result<Option<fs::Metadata>, DesktopLaunchError> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => {
@@ -485,20 +558,19 @@ fn relay_channel_frame(
     frame: gui_shell_windows_broker_channel::PipeFrame,
     endpoint: &BrokerEndpoint,
 ) -> Option<Vec<u8>> {
-    relay_channel_frame_with_owner_exports(frame, endpoint, None, |_| false)
+    relay_channel_frame_with_owner_operations(frame, endpoint, None, |_| false)
 }
 
-fn owner_export_candidate(
+fn owner_operation_candidate(
     input: &[u8],
     endpoint: &BrokerEndpoint,
-) -> Option<(String, OwnerConfirmationSummary)> {
+) -> Option<(String, DesktopOwnerOperationSummary)> {
     if input.len() > endpoint.max_request_bytes {
         return None;
     }
     let input = std::str::from_utf8(input).ok()?;
     let envelope = BrokerRequestEnvelope::from_json_str(input).ok()?;
-    if envelope.operation != Some(crate::broker::BrokerOperation::GuiShell書出し)
-        || envelope.session_id.is_some()
+    if envelope.session_id.is_some()
         || envelope.request_id.as_deref().is_none_or(str::is_empty)
         || envelope.nonce.as_deref().is_none_or(str::is_empty)
         || !envelope.issued_at.as_deref().is_some_and(request_issued_at_is_current)
@@ -512,11 +584,23 @@ fn owner_export_candidate(
     if envelope.payload_hash.as_deref() != Some(payload_hash.as_str()) {
         return None;
     }
-    let summary = export_center::owner_confirmation_summary(
-        envelope.payload.as_ref().unwrap_or(&serde_json::Value::Null),
-        &payload_hash,
-    )
-    .ok()?;
+    let payload = envelope.payload.as_ref().unwrap_or(&serde_json::Value::Null);
+    let summary = match envelope.operation? {
+        BrokerOperation::GuiShell書出し => DesktopOwnerOperationSummary::GuiShellExport(
+            export_center::owner_confirmation_summary(payload, &payload_hash).ok()?,
+        ),
+        BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
+            summary: owner_delete_confirmation_summary(payload).ok()?,
+            payload_hash,
+        },
+        BrokerOperation::回帰Case削除中断確認 => {
+            DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                summary: owner_recovery_confirmation_summary(payload).ok()?,
+                payload_hash,
+            }
+        }
+        _ => return None,
+    };
     let normalized = normalize_channel_request(input.as_bytes(), &endpoint.session_id);
     let normalized = String::from_utf8(normalized).ok()?;
     let normalized_envelope = BrokerRequestEnvelope::from_json_str(&normalized).ok()?;
@@ -526,23 +610,23 @@ fn owner_export_candidate(
     Some((normalized, summary))
 }
 
-fn relay_channel_frame_with_owner_exports<F>(
+fn relay_channel_frame_with_owner_operations<F>(
     frame: gui_shell_windows_broker_channel::PipeFrame,
     endpoint: &BrokerEndpoint,
-    owner_exports: Option<&mpsc::SyncSender<DesktopOwnerExportRequest>>,
-    mut confirm_owner_export: F,
+    owner_operations: Option<&mpsc::SyncSender<DesktopOwnerOperationRequest>>,
+    mut confirm_owner_operation: F,
 ) -> Option<Vec<u8>>
 where
-    F: FnMut(&OwnerConfirmationSummary) -> bool,
+    F: FnMut(&DesktopOwnerOperationSummary) -> bool,
 {
     let request = match frame {
         gui_shell_windows_broker_channel::PipeFrame::Line(bytes) => {
-            if let Some(owner_exports) = owner_exports {
-                if let Some((request_json, summary)) = owner_export_candidate(&bytes, endpoint) {
-                    if confirm_owner_export(&summary) {
+            if let Some(owner_operations) = owner_operations {
+                if let Some((request_json, summary)) = owner_operation_candidate(&bytes, endpoint) {
+                    if confirm_owner_operation(&summary) {
                         let (reply, response) = mpsc::sync_channel(1);
-                        owner_exports
-                            .send(DesktopOwnerExportRequest { request_json, reply })
+                        owner_operations
+                            .send(DesktopOwnerOperationRequest { request_json, reply })
                             .ok()?;
                         let response = response.recv().ok()?;
                         return response.to_json_string().ok().map(String::into_bytes);
@@ -594,17 +678,10 @@ fn relay_normalized_channel_request(request: &[u8], endpoint: &BrokerEndpoint) -
     Some(response)
 }
 
-fn confirm_owner_export(summary: &OwnerConfirmationSummary) -> bool {
+fn confirm_owner_operation(summary: &DesktopOwnerOperationSummary) -> bool {
     use winsafe::{co, prelude::*, HWND};
 
-    let text = format!(
-        "このGUI Shell構成のWindows向けManifest-only書出しを許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n\nこの操作はBroker監査へ記録されます。書出しartifact、Installer、build、署名、ユーザーfileは作成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-        summary.display_name,
-        summary.export_id,
-        summary.distribution_channel,
-        summary.optional_module_count,
-        summary.payload_hash
-    );
+    let text = owner_confirmation_text(summary);
     matches!(
         HWND::NULL.MessageBox(
             &text,
@@ -615,13 +692,44 @@ fn confirm_owner_export(summary: &OwnerConfirmationSummary) -> bool {
     )
 }
 
+fn owner_confirmation_text(summary: &DesktopOwnerOperationSummary) -> String {
+    match summary {
+        DesktopOwnerOperationSummary::GuiShellExport(summary) => format!(
+            "このGUI Shell構成のWindows向けManifest-only書出しを許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n\nこの操作はBroker監査へ記録されます。書出しartifact、Installer、build、署名、ユーザーfileは作成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            summary.display_name,
+            summary.export_id,
+            summary.distribution_channel,
+            summary.optional_module_count,
+            summary.payload_hash
+        ),
+        DesktopOwnerOperationSummary::RegressionCaseDelete {
+            summary,
+            payload_hash,
+        } => format!(
+            "指定した回帰Caseの保存暗号文を削除しますか？\n\n回帰Case ID: {}\n定義hash: {}\n暗号文hash: {}\n\n削除前にBrokerが登録AuditとProtectedStoreを再照合します。削除後のfile不在と結果Auditが確認された場合だけ確定します。媒体の物理消去は保証しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            summary.case_id,
+            summary.definition_hash,
+            summary.ciphertext_hash,
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::RegressionCaseRecovery {
+            summary,
+            payload_hash,
+        } => format!(
+            "指定回帰Caseの未確定削除状態を照合しますか？\n\n回帰Case ID: {}\n\nこの操作は削除を実行しません。Brokerが永続AuditとProtectedStoreの現在状態を照合します。自動再削除は行いません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            summary.case_id,
+            payload_hash
+        ),
+    }
+}
+
 fn run_channel_server(
     pipe_name: String,
     endpoint: RelayEndpoint,
     expected_client_pid: Arc<AtomicU32>,
     shutdown: Arc<AtomicBool>,
     ready: mpsc::SyncSender<()>,
-    owner_exports: mpsc::SyncSender<DesktopOwnerExportRequest>,
+    owner_operations: mpsc::SyncSender<DesktopOwnerOperationRequest>,
 ) -> Result<(), BrokerServerError> {
     gui_shell_windows_broker_channel::run_server(
         pipe_name,
@@ -631,11 +739,11 @@ fn run_channel_server(
         endpoint.0.max_request_bytes,
         MAX_RESPONSE_BYTES,
         |frame| {
-            relay_channel_frame_with_owner_exports(
+            relay_channel_frame_with_owner_operations(
                 frame,
                 &endpoint.0,
-                Some(&owner_exports),
-                confirm_owner_export,
+                Some(&owner_operations),
+                confirm_owner_operation,
             )
         },
     )
@@ -657,22 +765,24 @@ struct RunningBroker {
 impl RunningBroker {
     fn start(runtime_dir: &Path) -> Result<Self, DesktopLaunchError> {
         let store_dir = ensure_store_directory(runtime_dir)?;
+        let protected_store_dir = ensure_protected_store_directory(runtime_dir)?;
         let session_file = runtime_dir.join(SESSION_FILE);
         prepare_session_paths(&session_file)?;
 
         let shutdown = Arc::new(AtomicBool::new(false));
         let thread_shutdown = Arc::clone(&shutdown);
-        let config = BrokerServerConfig::new(store_dir, session_file.clone());
+        let mut config = BrokerServerConfig::new(store_dir, session_file.clone());
+        config.desktop_protected_store_dir = Some(protected_store_dir);
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
-        let (owner_export_tx, owner_export_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
         let server = thread::Builder::new()
             .name("gui-shell-security-broker".to_string())
             .spawn(move || {
-                crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_exports(
+                crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
                     config,
                     thread_shutdown,
                     ready_tx,
-                    owner_export_rx,
+                    owner_operation_rx,
                 )
             })
             .map_err(|_| {
@@ -751,7 +861,7 @@ impl RunningBroker {
                     channel_expected_pid,
                     channel_shutdown,
                     channel_ready_tx,
-                    owner_export_tx,
+                    owner_operation_tx,
                 )
             }) {
             Ok(server) => server,
@@ -988,6 +1098,23 @@ mod tests {
         serde_json::json!({
             "request_id": request_id,
             "operation": "GUI Shell書出し",
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": nonce,
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": payload
+        })
+    }
+
+    fn desktop_owner_request(
+        operation: &str,
+        request_id: &str,
+        nonce: &str,
+        payload: serde_json::Value,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "request_id": request_id,
+            "operation": operation,
             "payload_hash": canonical_payload_hash(Some(&payload)),
             "nonce": nonce,
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
@@ -1237,22 +1364,27 @@ mod tests {
     }
 
     #[test]
-    fn desktop_export_requires_native_confirmation_and_broker_audits_both_outcomes() {
+    fn desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes() {
         let root = test_root("desktop-owner-export");
         let session_file = root.join(SESSION_FILE);
         let store_dir = root.join("store");
+        let protected_store_dir = root.join("protected");
+        fs::create_dir(&protected_store_dir).unwrap();
         let shutdown = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
-        let (owner_export_tx, owner_export_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
         let server_shutdown = Arc::clone(&shutdown);
         let server_session_file = session_file.clone();
         let server_store_dir = store_dir.clone();
+        let server_protected_store_dir = protected_store_dir.clone();
         let server = thread::spawn(move || {
-            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_exports(
-                BrokerServerConfig::new(server_store_dir, server_session_file),
+            let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
+            config.desktop_protected_store_dir = Some(server_protected_store_dir);
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
+                config,
                 server_shutdown,
                 ready_tx,
-                owner_export_rx,
+                owner_operation_rx,
             )
         });
         ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -1269,12 +1401,15 @@ mod tests {
 
         let confirmed = desktop_export_request("desktop-export-confirmed", "desktop-export-confirmed-nonce");
         let mut prompt_count = 0;
-        let accepted = relay_channel_frame_with_owner_exports(
+        let accepted = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&confirmed).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |summary| {
                 prompt_count += 1;
+                let DesktopOwnerOperationSummary::GuiShellExport(summary) = summary else {
+                    panic!("Export要求はExport固有の確認summaryを使う")
+                };
                 assert_eq!(summary.export_id, "export-desktop-test");
                 assert_eq!(summary.optional_module_count, 1);
                 assert_eq!(summary.payload_hash, confirmed["payload_hash"].as_str().unwrap());
@@ -1288,11 +1423,126 @@ mod tests {
         assert_eq!(accepted["body"]["authority_strip"], true);
         assert_eq!(accepted["body"]["credential_inherited"], false);
 
+        let delete_payload = serde_json::json!({
+            "版": 1,
+            "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+            "定義hash": format!("sha256:{}", "d".repeat(64)),
+            "暗号文hash": format!("sha256:{}", "e".repeat(64))
+        });
+        let delete = desktop_owner_request(
+            "回帰Case削除",
+            "desktop-delete-confirmed",
+            "desktop-delete-confirmed-nonce",
+            delete_payload,
+        );
+        let mut delete_prompt_count = 0;
+        let delete_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&delete).unwrap()),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                delete_prompt_count += 1;
+                let DesktopOwnerOperationSummary::RegressionCaseDelete {
+                    summary,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("削除はCase IDと両hashを示す専用確認を使う")
+                };
+                assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
+                assert_eq!(summary.definition_hash, format!("sha256:{}", "d".repeat(64)));
+                assert_eq!(summary.ciphertext_hash, format!("sha256:{}", "e".repeat(64)));
+                assert_eq!(payload_hash, delete["payload_hash"].as_str().unwrap());
+                let text = owner_confirmation_text(
+                    &DesktopOwnerOperationSummary::RegressionCaseDelete {
+                        summary: (*summary).clone(),
+                        payload_hash: (*payload_hash).clone(),
+                    },
+                );
+                assert!(text.contains("物理消去は保証しません"));
+                true
+            },
+        )
+        .unwrap();
+        let delete_response: serde_json::Value = serde_json::from_slice(&delete_response).unwrap();
+        assert_eq!(delete_prompt_count, 1);
+        assert_eq!(delete_response["status"], "rejected");
+        assert_eq!(delete_response["error"]["code"], "削除対象不明");
+
+        let recovery_payload = serde_json::json!({
+            "版": 1,
+            "回帰CaseID": "cccccccccccccccccccccccccccccccc"
+        });
+        let recovery = desktop_owner_request(
+            "回帰Case削除中断確認",
+            "desktop-recovery-confirmed",
+            "desktop-recovery-confirmed-nonce",
+            recovery_payload,
+        );
+        let mut recovery_prompt_count = 0;
+        let recovery_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&recovery).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                recovery_prompt_count += 1;
+                let DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                    summary,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("中断照合はCase IDだけを示す専用確認を使う")
+                };
+                assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
+                assert_eq!(payload_hash, recovery["payload_hash"].as_str().unwrap());
+                assert!(owner_confirmation_text(
+                    &DesktopOwnerOperationSummary::RegressionCaseRecovery {
+                        summary: (*summary).clone(),
+                        payload_hash: (*payload_hash).clone(),
+                    },
+                )
+                .contains("自動再削除は行いません"));
+                true
+            },
+        )
+        .unwrap();
+        let recovery_response: serde_json::Value =
+            serde_json::from_slice(&recovery_response).unwrap();
+        assert_eq!(recovery_prompt_count, 1);
+        assert_eq!(recovery_response["status"], "rejected");
+        assert_eq!(recovery_response["error"]["code"], "復旧対象不明");
+
+        let stale_approval = desktop_owner_request(
+            "回帰Case削除中断確認",
+            "desktop-recovery-stale-approval",
+            "desktop-recovery-stale-approval-nonce",
+            serde_json::json!({
+                "版": 1,
+                "回帰CaseID": "cccccccccccccccccccccccccccccccc",
+                "削除承認監査ID": "audit.history.must-not-be-authority"
+            }),
+        );
+        let stale_approval_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&stale_approval).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |_| panic!("過去の承認IDを含むRecovery要求はnative確認へ進めない"),
+        )
+        .unwrap();
+        let stale_approval_response: serde_json::Value =
+            serde_json::from_slice(&stale_approval_response).unwrap();
+        assert_eq!(stale_approval_response["status"], "rejected");
+        assert_eq!(stale_approval_response["error"]["code"], "権限拒否");
+
         let declined = desktop_export_request("desktop-export-declined", "desktop-export-declined-nonce");
-        let declined = relay_channel_frame_with_owner_exports(
+        let declined = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&declined).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |_| false,
         ).unwrap();
         let declined: serde_json::Value = serde_json::from_slice(&declined).unwrap();
@@ -1302,10 +1552,10 @@ mod tests {
         let mut changed_hash = desktop_export_request("desktop-export-changed-hash", "desktop-export-changed-hash-nonce");
         changed_hash["payload_hash"] = serde_json::Value::String("sha256:forged".into());
         let mut invalid_prompt_count = 0;
-        let rejected = relay_channel_frame_with_owner_exports(
+        let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&changed_hash).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |_| { invalid_prompt_count += 1; true },
         ).unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
@@ -1314,10 +1564,10 @@ mod tests {
 
         let mut authority_metadata = desktop_export_request("desktop-export-authority-metadata", "desktop-export-authority-metadata-nonce");
         authority_metadata["metadata"]["authority"] = serde_json::Value::Bool(true);
-        let rejected = relay_channel_frame_with_owner_exports(
+        let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&authority_metadata).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |_| panic!("権限metadataで確認画面へ到達してはならない"),
         ).unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
@@ -1325,10 +1575,10 @@ mod tests {
 
         let mut forged_session = desktop_export_request("desktop-export-forged-session", "desktop-export-forged-session-nonce");
         forged_session["session_id"] = serde_json::Value::String("forged-session".into());
-        let rejected = relay_channel_frame_with_owner_exports(
+        let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&forged_session).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |_| panic!("偽造sessionで確認画面へ到達してはならない"),
         ).unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
@@ -1336,10 +1586,10 @@ mod tests {
 
         let mut stale = desktop_export_request("desktop-export-stale", "desktop-export-stale-nonce");
         stale["issued_at"] = serde_json::Value::String("2000-01-01T00:00:00Z".into());
-        let rejected = relay_channel_frame_with_owner_exports(
+        let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&stale).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
+            Some(&owner_operation_tx),
             |_| panic!("期限切れ要求で確認画面へ到達してはならない"),
         ).unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
@@ -1353,11 +1603,11 @@ mod tests {
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });
-        let rejected = relay_channel_frame_with_owner_exports(
+        let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&non_export).unwrap()),
             &broker_endpoint,
-            Some(&owner_export_tx),
-            |_| panic!("Export以外のOwner操作で確認画面を表示してはならない"),
+            Some(&owner_operation_tx),
+            |_| panic!("allowlist外のOwner操作で確認画面を表示してはならない"),
         ).unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
         assert_eq!(rejected["status"], "rejected");
@@ -1366,6 +1616,7 @@ mod tests {
         server.join().unwrap().unwrap();
         let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
         assert!(audit.contains("Rust Desktop起動器のネイティブ確認"));
+        assert!(audit.contains("Desktop固定ProtectedStore起動"));
         assert!(audit.contains("owner_required"));
         assert!(audit.contains("broker_payload_hash_invalid"));
         broker_endpoint.session_secret.zeroize();
@@ -1446,6 +1697,34 @@ mod tests {
 
         let error = ensure_store_directory(&root).unwrap_err();
         assert_eq!(error.code, "BROKER_STORE_INVALID");
+        assert!(fs::read_dir(&outside).unwrap().next().is_none());
+
+        fs::remove_dir(&junction).unwrap();
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
+    fn protected_store_directory_is_fixed_under_runtime_and_rejects_junction() {
+        let root = fs::canonicalize(test_root("protected-store-directory")).unwrap();
+        let protected = ensure_protected_store_directory(&root).unwrap();
+        assert_eq!(protected, root.join("protected"));
+        assert!(protected.is_dir());
+        fs::remove_dir_all(&root).unwrap();
+
+        let root = fs::canonicalize(test_root("protected-store-junction")).unwrap();
+        let outside = fs::canonicalize(test_root("protected-store-junction-outside")).unwrap();
+        let junction = root.join("protected");
+        let result = Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&outside)
+            .output()
+            .expect("Windows junction試験用実体の作成");
+        assert!(result.status.success(), "junction試験用実体の作成失敗");
+
+        let error = ensure_protected_store_directory(&root).unwrap_err();
+        assert_eq!(error.code, "PROTECTED_STORE_INVALID");
         assert!(fs::read_dir(&outside).unwrap().next().is_none());
 
         fs::remove_dir(&junction).unwrap();

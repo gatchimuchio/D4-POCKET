@@ -31,6 +31,9 @@ pub struct BrokerServerConfig {
     pub mobile_bind: Option<String>,
     pub workspace_config: Option<PathBuf>,
     pub protected_store_dir: Option<PathBuf>,
+    /// Rust Desktop起動器が固定runtime隣接pathを渡す製品内ProtectedStore。
+    /// owner起動設定の任意ProtectedStoreとは別経路で、資格・権限を生成しない。
+    pub desktop_protected_store_dir: Option<PathBuf>,
 }
 
 impl BrokerServerConfig {
@@ -47,6 +50,7 @@ impl BrokerServerConfig {
             mobile_bind: None,
             workspace_config: None,
             protected_store_dir: None,
+            desktop_protected_store_dir: None,
         }
     }
 }
@@ -83,8 +87,8 @@ impl BrokerServerError {
     }
 }
 
-/// Desktop起動器内だけで使う、Owner確認済み書出しの一回限り要求。
-pub(crate) struct DesktopOwnerExportRequest {
+/// Desktop起動器内だけで使う、Owner確認済みallowlist操作の一回限り要求。
+pub(crate) struct DesktopOwnerOperationRequest {
     pub request_json: String,
     pub reply: SyncSender<BrokerResponse>,
 }
@@ -105,20 +109,20 @@ pub fn run_loopback_server_cancellable(
 
 /// Windows Desktop起動器専用のprocess内Owner確認経路。
 /// receiverはnamed pipe／Flutterへ公開せず、処理はBroker所有threadで直列化する。
-pub(crate) fn run_loopback_server_cancellable_with_owner_exports(
+pub(crate) fn run_loopback_server_cancellable_with_owner_operations(
     config: BrokerServerConfig,
     shutdown: Arc<AtomicBool>,
     ready: SyncSender<()>,
-    owner_exports: Receiver<DesktopOwnerExportRequest>,
+    owner_operations: Receiver<DesktopOwnerOperationRequest>,
 ) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, Some(shutdown), Some(ready), Some(owner_exports))
+    run_loopback_server_inner(config, Some(shutdown), Some(ready), Some(owner_operations))
 }
 
 fn run_loopback_server_inner(
     config: BrokerServerConfig,
     shutdown: Option<Arc<AtomicBool>>,
     ready: Option<SyncSender<()>>,
-    owner_exports: Option<Receiver<DesktopOwnerExportRequest>>,
+    owner_operations: Option<Receiver<DesktopOwnerOperationRequest>>,
 ) -> Result<(), BrokerServerError> {
     if shutdown_requested(&shutdown) { return Ok(()); }
     let session_id = format!("broker-session-{}", random_hex(16)?);
@@ -168,11 +172,39 @@ fn run_loopback_server_inner(
     }
     let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
 
+    if config.desktop_protected_store_dir.is_some()
+        && (config.protected_store_dir.is_some()
+            || config.owner_session_file.is_some()
+            || config.workspace_config.is_some())
+    {
+        return Err(BrokerServerError::new(
+            "Desktop固定ProtectedStoreはOwner起動設定と併用できない",
+        ));
+    }
+
     if let Some(path) = &config.protected_store_dir {
         let mut protected = vec![config.store_dir.clone(), config.session_file.clone()];
         protected.extend(config.owner_session_file.iter().cloned());
         protected.extend(config.workspace_config.iter().cloned());
         broker.保管先起動登録(path, config.owner_session_file.is_some(), &protected).map_err(BrokerServerError::new)?;
+    }
+
+    if let Some(path) = &config.desktop_protected_store_dir {
+        let expected = config
+            .store_dir
+            .parent()
+            .map(|runtime_dir| runtime_dir.join("protected"));
+        if expected.as_deref() != Some(path.as_path()) {
+            return Err(BrokerServerError::new(
+                "Desktop ProtectedStore pathはruntime隣接の固定領域に限る",
+            ));
+        }
+        let mut protected = vec![config.store_dir.clone(), config.session_file.clone()];
+        protected.extend(config.owner_session_file.iter().cloned());
+        protected.extend(config.workspace_config.iter().cloned());
+        broker
+            .desktop_protected_store_startup(path, &protected)
+            .map_err(BrokerServerError::new)?;
     }
 
     if let Some(path)=&config.workspace_config {
@@ -243,9 +275,9 @@ fn run_loopback_server_inner(
     loop {
         if shutdown_requested(&shutdown) { break; }
         broker.端末期限処理();
-        if let Some(owner_exports) = &owner_exports {
-            if let Ok(request) = owner_exports.try_recv() {
-                let response = broker.desktop_owner_export_json(&request.request_json);
+        if let Some(owner_operations) = &owner_operations {
+            if let Ok(request) = owner_operations.try_recv() {
+                let response = broker.desktop_owner_operation_json(&request.request_json);
                 let _ = request.reply.send(response);
             }
         }
@@ -559,6 +591,21 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[1]["operation"], "D4 Pocket Desktop終了");
         assert!(events[1]["reason"].as_str().unwrap().contains("RecoveryAction="));
+        std::fs::remove_dir_all(root).expect("試験専用の一時ディレクトリだけを削除");
+    }
+
+    #[test]
+    fn desktop_protected_store_rejects_non_fixed_path_before_endpoint_creation() {
+        let root = temporary_directory();
+        let store_dir = root.join("store");
+        let session_file = root.join("broker_session.json");
+        let mut config = BrokerServerConfig::new(store_dir.clone(), session_file.clone());
+        config.desktop_protected_store_dir = Some(root.join("other-protected"));
+
+        let error = run_loopback_server(config).unwrap_err();
+        assert!(error.message.contains("固定領域に限る"));
+        assert!(!session_file.exists(), "検査拒否時に接続endpointを作らない");
+        assert!(store_dir.is_dir(), "既存Broker stateを削除しない");
         std::fs::remove_dir_all(root).expect("試験専用の一時ディレクトリだけを削除");
     }
 }

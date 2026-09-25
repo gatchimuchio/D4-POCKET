@@ -51,6 +51,18 @@ struct 削除中断照合要求 {
     case_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnerDeleteConfirmationSummary {
+    pub case_id: String,
+    pub definition_hash: String,
+    pub ciphertext_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnerRecoveryConfirmationSummary {
+    pub case_id: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct 削除意図 {
@@ -456,6 +468,26 @@ fn parse_delete_recovery_request(payload: &Value) -> Result<削除中断照合�
         return Err(());
     }
     Ok(request)
+}
+
+pub(crate) fn owner_delete_confirmation_summary(
+    payload: &Value,
+) -> Result<OwnerDeleteConfirmationSummary, ()> {
+    let request = parse_delete_request(payload)?;
+    Ok(OwnerDeleteConfirmationSummary {
+        case_id: request.case_id,
+        definition_hash: request.definition_hash,
+        ciphertext_hash: request.ciphertext_hash,
+    })
+}
+
+pub(crate) fn owner_recovery_confirmation_summary(
+    payload: &Value,
+) -> Result<OwnerRecoveryConfirmationSummary, ()> {
+    let request = parse_delete_recovery_request(payload)?;
+    Ok(OwnerRecoveryConfirmationSummary {
+        case_id: request.case_id,
+    })
 }
 
 fn parse_list_request(payload: &Value) -> Result<一覧要求, ()> {

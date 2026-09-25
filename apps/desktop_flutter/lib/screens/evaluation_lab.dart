@@ -14,12 +14,16 @@ class EvaluationLab extends StatefulWidget {
     this.connect = connectEvaluationClient,
     this.regressionCaseClient,
     this.connectRegressionCases = connectRegressionCaseClient,
+    this.regressionCaseOwnerClient,
+    this.connectRegressionCaseOwner = connectRegressionCaseOwnerClient,
   });
 
   final EvaluationClient? client;
   final EvaluationClientConnector connect;
   final RegressionCaseClient? regressionCaseClient;
   final RegressionCaseClientConnector connectRegressionCases;
+  final RegressionCaseOwnerClient? regressionCaseOwnerClient;
+  final RegressionCaseOwnerClientConnector connectRegressionCaseOwner;
 
   @override
   State<EvaluationLab> createState() => _EvaluationLabState();
@@ -32,9 +36,11 @@ class _EvaluationLabState extends State<EvaluationLab>
   final _runRuntimeIds = TextEditingController();
   final _resultExperimentId = TextEditingController();
   final _comparisonExperimentId = TextEditingController();
+  final _recoveryCaseId = TextEditingController();
 
   EvaluationClient? _client;
   RegressionCaseClient? _regressionClient;
+  RegressionCaseOwnerClient? _regressionOwnerClient;
   EvaluationDatasetListing? _datasets;
   List<RegressionCaseSummary> _regressionCases = const [];
   int? _regressionNextCursor;
@@ -47,6 +53,8 @@ class _EvaluationLabState extends State<EvaluationLab>
   int _generation = 0;
   String _datasetMessage = 'Dataset一覧は自動更新しません。更新要求を作成してください。';
   String _regressionMessage = '回帰Caseの公開metadataだけを手動更新します。';
+  String _regressionOwnerActionMessage =
+      'Owner操作はWindowsのnative確認後にBrokerへ送られます。';
   String _runMessage = 'Dataset IDと1〜8件の実行系IDだけをBrokerへ送ります。';
   String _resultMessage = '評価Experiment IDを指定して、公開済みの結果projectionだけを更新します。';
   String _comparisonMessage = '評価Experiment IDを指定して、集計比較だけを更新します。';
@@ -56,6 +64,7 @@ class _EvaluationLabState extends State<EvaluationLab>
     super.initState();
     _client = widget.client;
     _regressionClient = widget.regressionCaseClient;
+    _regressionOwnerClient = widget.regressionCaseOwnerClient;
     _tabs = TabController(length: 5, vsync: this);
   }
 
@@ -65,10 +74,15 @@ class _EvaluationLabState extends State<EvaluationLab>
     if (oldWidget.client != widget.client ||
         oldWidget.connect != widget.connect ||
         oldWidget.regressionCaseClient != widget.regressionCaseClient ||
-        oldWidget.connectRegressionCases != widget.connectRegressionCases) {
+        oldWidget.connectRegressionCases != widget.connectRegressionCases ||
+        oldWidget.regressionCaseOwnerClient !=
+            widget.regressionCaseOwnerClient ||
+        oldWidget.connectRegressionCaseOwner !=
+            widget.connectRegressionCaseOwner) {
       _generation += 1;
       _client = widget.client;
       _regressionClient = widget.regressionCaseClient;
+      _regressionOwnerClient = widget.regressionCaseOwnerClient;
       _datasets = null;
       _regressionCases = const [];
       _regressionNextCursor = null;
@@ -80,6 +94,7 @@ class _EvaluationLabState extends State<EvaluationLab>
       _busy = false;
       _datasetMessage = '接続条件が変わりました。Dataset一覧を更新してください。';
       _regressionMessage = '接続条件が変わりました。回帰Case一覧を更新してください。';
+      _regressionOwnerActionMessage = '接続条件が変わりました。';
       _runMessage = '接続条件が変わりました。実験要求を作成し直してください。';
       _resultMessage = '接続条件が変わりました。結果を更新してください。';
       _comparisonMessage = '接続条件が変わりました。比較を更新してください。';
@@ -94,6 +109,7 @@ class _EvaluationLabState extends State<EvaluationLab>
     _runRuntimeIds.dispose();
     _resultExperimentId.dispose();
     _comparisonExperimentId.dispose();
+    _recoveryCaseId.dispose();
     super.dispose();
   }
 
@@ -217,7 +233,8 @@ class _EvaluationLabState extends State<EvaluationLab>
                 'C6の公開metadataだけを通常Broker経路から取得します。入力本文・条件・参照は表示せず、C5 Datasetへ自動追加しません。',
               ),
               const SizedBox(height: 6),
-              const Text('この画面は閲覧専用です。登録・削除・復旧・実行は行いません。'),
+              const Text(
+                  '削除と中断照合はWindowsのnative確認を通り、Owner資格はFlutterへ渡しません。登録、private内容の閲覧、実行、C5へのimportはこの画面から行いません。'),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -243,6 +260,8 @@ class _EvaluationLabState extends State<EvaluationLab>
               ),
               const SizedBox(height: 8),
               Text(_regressionMessage),
+              const SizedBox(height: 4),
+              Text(_regressionOwnerActionMessage),
               if (_busy) ...[
                 const SizedBox(height: 8),
                 const LinearProgressIndicator(),
@@ -260,8 +279,45 @@ class _EvaluationLabState extends State<EvaluationLab>
         else
           for (final item in _regressionCases) ...[
             const SizedBox(height: 10),
-            _RegressionCaseSummaryPanel(item: item),
+            _RegressionCaseSummaryPanel(
+              item: item,
+              enabled: !_busy,
+              onDelete: () => _deleteRegressionCase(item),
+            ),
           ],
+        const SizedBox(height: 12),
+        BorderedPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('削除中断の照合', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              const Text('Case IDを指定して、Brokerが保管状態を再観測します。削除は実行せず、自動再試行もしません。'),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: 440,
+                child: TextField(
+                  key: const ValueKey('regression-case-recovery-id'),
+                  controller: _recoveryCaseId,
+                  enabled: !_busy,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: 32,
+                  decoration: const InputDecoration(
+                    labelText: '回帰Case ID',
+                    helperText: '32桁の小文字hex。監査承認IDは入力しません。',
+                  ),
+                ),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('regression-case-recovery-submit'),
+                onPressed: _busy ? null : _recoverRegressionCase,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('中断状態を照合'),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -444,6 +500,79 @@ class _EvaluationLabState extends State<EvaluationLab>
   Future<RegressionCaseClient> _regressionClientForRequest() async =>
       _regressionClient ??=
           widget.regressionCaseClient ?? await widget.connectRegressionCases();
+
+  Future<RegressionCaseOwnerClient> _regressionOwnerClientForRequest() async =>
+      _regressionOwnerClient ??= widget.regressionCaseOwnerClient ??
+          await widget.connectRegressionCaseOwner();
+
+  Future<void> _deleteRegressionCase(RegressionCaseSummary item) async {
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _regressionOwnerActionMessage =
+          'Windows native確認を待っています。拒否・期限切れなら操作は成立しません。';
+    });
+    try {
+      final receipt = await (await _regressionOwnerClientForRequest()).delete(
+        caseId: item.caseId,
+        definitionHash: item.definitionHash,
+        ciphertextHash: item.ciphertextHash,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _regressionOwnerActionMessage =
+            'Case ${receipt.caseId} の暗号文不在と結果Auditを確認しました。削除監査ID: ${receipt.auditId}。物理消去は主張しません。';
+      });
+      await _refreshRegressionCases();
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _regressionOwnerActionMessage =
+              '削除は確定していません。Owner確認、Audit、ProtectedStore状態を再確認してください。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _recoverRegressionCase() async {
+    final caseId = _recoveryCaseId.text.trim();
+    if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(caseId)) {
+      setState(() {
+        _regressionOwnerActionMessage = '回帰Case IDは32桁の小文字hexで指定してください。';
+      });
+      return;
+    }
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _regressionOwnerActionMessage = 'Windows native確認後に、指定Caseの現在状態だけを照合します。';
+    });
+    try {
+      final receipt = await (await _regressionOwnerClientForRequest())
+          .recover(caseId: caseId);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _regressionOwnerActionMessage =
+            'Case ${receipt.caseId}: ${receipt.state}。観測Audit: ${receipt.auditId}。再削除はしていません。';
+      });
+      await _refreshRegressionCases();
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _regressionOwnerActionMessage =
+              '照合できませんでした。未確定削除、Audit chain、ProtectedStore状態を確認してください。';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
 
   Future<void> _refreshRegressionCases(
       {int after = 0, bool append = false}) async {
@@ -638,9 +767,15 @@ class _EvaluationLabState extends State<EvaluationLab>
 }
 
 class _RegressionCaseSummaryPanel extends StatelessWidget {
-  const _RegressionCaseSummaryPanel({required this.item});
+  const _RegressionCaseSummaryPanel({
+    required this.item,
+    required this.enabled,
+    required this.onDelete,
+  });
 
   final RegressionCaseSummary item;
+  final bool enabled;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) => BorderedPanel(
@@ -657,6 +792,13 @@ class _RegressionCaseSummaryPanel extends StatelessWidget {
             ),
             Text('作成監査ID: ${item.createdAuditId}　終了監査ID: ${item.endAuditId}'),
             const Text('公開範囲: metadata_only　証拠種別: INTERNAL_STATE'),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: ValueKey('regression-case-delete-${item.caseId}'),
+              onPressed: enabled ? onDelete : null,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('このCaseの保存暗号文を削除'),
+            ),
           ],
         ),
       );

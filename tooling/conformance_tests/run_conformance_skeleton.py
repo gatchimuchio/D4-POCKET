@@ -4185,6 +4185,7 @@ def 回帰Caseの契約と境界を検査する() -> list[str]:
         ("regression_case_delete_receipt_evidence.invalid.json", deletion_receipt_schema),
         ("regression_case_delete_receipt_physical_erasure.invalid.json", deletion_receipt_schema),
         ("regression_case_delete_recovery_request_authority.invalid.json", recovery_request_schema),
+        ("regression_case_delete_recovery_request_stale_approval.invalid.json", recovery_request_schema),
         ("regression_case_delete_recovery_receipt_evidence.invalid.json", recovery_receipt_schema),
         ("regression_case_list_deleted_claim.invalid.json", list_schema),
     ):

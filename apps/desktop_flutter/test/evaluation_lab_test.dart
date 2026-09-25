@@ -84,7 +84,7 @@ void main() {
     );
   });
 
-  testWidgets('C6 Case一覧は公開metadataだけをpage取得しC5へ混ぜない', (tester) async {
+  testWidgets('C6一覧はmetadataだけを表示しOwner削除を別操作で送る', (tester) async {
     final transport = _FixtureTransport({
       '回帰Case一覧': [_accepted('回帰Case一覧', _regressionCaseListBody())],
     });
@@ -98,10 +98,7 @@ void main() {
 
     expect(find.text('公開Case'), findsOneWidget);
     expect(find.textContaining('C5 Datasetへ自動追加しません'), findsOneWidget);
-    expect(
-      find.text('この画面は閲覧専用です。登録・削除・復旧・実行は行いません。'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('削除と中断照合はWindowsのnative確認'), findsOneWidget);
     expect(find.text('private regression input'), findsNothing);
     expect(transport.requests.single.operation, '回帰Case一覧');
     expect(transport.requests.single.payload, const {
@@ -109,6 +106,106 @@ void main() {
       'after': 0,
       'limit': 50,
     });
+  });
+
+  testWidgets('C6 Owner削除は確認後receiptを表示し一覧を再取得する', (tester) async {
+    final transport = _FixtureTransport({
+      '回帰Case一覧': [
+        _accepted('回帰Case一覧', _regressionCaseListBody()),
+        _accepted('回帰Case一覧', _emptyRegressionCaseListBody()),
+      ],
+      '回帰Case削除': [
+        _accepted(
+          '回帰Case削除',
+          {
+            '版': 1,
+            '回帰CaseID': 'cccccccccccccccccccccccccccccccc',
+            '定義hash': _hash('d'),
+            '暗号文hash': _hash('e'),
+            '削除承認監査ID': 'audit.regression.delete.approval',
+            '状態': '削除確定',
+            '証拠種別': 'LIVE_RUNTIME',
+          },
+          evidenceSource: 'LIVE_RUNTIME',
+        ),
+      ],
+    });
+    await tester.pumpWidget(_testApp(
+      EvaluationClient(transport),
+      RegressionCaseClient(transport),
+      RegressionCaseOwnerClient(transport),
+    ));
+    await tester.tap(find.text('回帰Case'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('regression-case-refresh')));
+    await tester.pumpAndSettle();
+    final deleteButton = find.byKey(const ValueKey(
+      'regression-case-delete-cccccccccccccccccccccccccccccccc',
+    ));
+    await tester.ensureVisible(deleteButton);
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+
+    expect(transport.requests.map((request) => request.operation), [
+      '回帰Case一覧',
+      '回帰Case削除',
+      '回帰Case一覧',
+    ]);
+    expect(transport.requests[1].payload, {
+      '版': 1,
+      '回帰CaseID': 'cccccccccccccccccccccccccccccccc',
+      '定義hash': _hash('d'),
+      '暗号文hash': _hash('e'),
+    });
+    expect(find.textContaining('暗号文不在と結果Auditを確認しました'), findsOneWidget);
+    expect(find.text('公開Case'), findsNothing);
+  });
+
+  testWidgets('C6中断照合はCase IDだけを送り、再削除しない', (tester) async {
+    const caseId = 'cccccccccccccccccccccccccccccccc';
+    final transport = _FixtureTransport({
+      '回帰Case削除中断確認': [
+        _accepted(
+          '回帰Case削除中断確認',
+          {
+            '版': 1,
+            '回帰CaseID': caseId,
+            '削除承認監査ID': 'audit.regression.delete.approval',
+            '暗号文hash': _hash('e'),
+            '現在状態': '暗号文残存・再試行可能',
+            '観測監査head': _hash('f'),
+            '観測時刻UnixMillis': 1780000000000,
+            '証拠種別': 'LIVE_RUNTIME',
+          },
+          evidenceSource: 'LIVE_RUNTIME',
+        ),
+      ],
+      '回帰Case一覧': [_accepted('回帰Case一覧', _emptyRegressionCaseListBody())],
+    });
+    await tester.pumpWidget(_testApp(
+      EvaluationClient(transport),
+      RegressionCaseClient(transport),
+      RegressionCaseOwnerClient(transport),
+    ));
+    await tester.tap(find.text('回帰Case'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('regression-case-recovery-id')),
+      caseId,
+    );
+    final recoverySubmit =
+        find.byKey(const ValueKey('regression-case-recovery-submit'));
+    await tester.ensureVisible(recoverySubmit);
+    await tester.tap(recoverySubmit);
+    await tester.pumpAndSettle();
+
+    expect(transport.requests.map((request) => request.operation), [
+      '回帰Case削除中断確認',
+      '回帰Case一覧',
+    ]);
+    expect(transport.requests.first.payload, {'版': 1, '回帰CaseID': caseId});
+    expect(find.textContaining('暗号文残存・再試行可能'), findsOneWidget);
+    expect(find.textContaining('再削除はしていません'), findsOneWidget);
   });
 
   testWidgets('公開metadataと安全な集計だけを表示する', (tester) async {
@@ -183,12 +280,14 @@ void main() {
 Widget _testApp(
   EvaluationClient client, [
   RegressionCaseClient? regressionCaseClient,
+  RegressionCaseOwnerClient? regressionCaseOwnerClient,
 ]) =>
     MaterialApp(
       home: Scaffold(
         body: EvaluationLab(
           client: client,
           regressionCaseClient: regressionCaseClient,
+          regressionCaseOwnerClient: regressionCaseOwnerClient,
         ),
       ),
     );
@@ -224,12 +323,13 @@ Map<String, Object?> _accepted(
   String operation,
   Map<String, Object?> body, {
   String auditId = 'audit.evaluation.fixture',
+  String evidenceSource = 'INTERNAL_STATE',
 }) {
   return {
-    'request_id': 'request.$operation',
+    'request_id': 'request.fixture',
     'operation': operation,
     'status': 'accepted',
-    'evidence_source': 'INTERNAL_STATE',
+    'evidence_source': evidenceSource,
     'audit_event_id': auditId,
     'error': null,
     'health': null,
@@ -268,6 +368,16 @@ Map<String, Object?> _regressionCaseListBody() => {
       ],
       '件数': 1,
       '合計件数': 1,
+      '次cursor': null,
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    };
+
+Map<String, Object?> _emptyRegressionCaseListBody() => {
+      '版': 1,
+      '回帰Case一覧': const [],
+      '件数': 0,
+      '合計件数': 0,
       '次cursor': null,
       '公開範囲': 'metadata_only',
       '証拠種別': 'INTERNAL_STATE',

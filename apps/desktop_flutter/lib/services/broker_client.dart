@@ -37,13 +37,16 @@ class BrokerClient implements BrokerTransport {
     };
     final String responseText;
     try {
+      final ownerConfirmationOperation = const {
+        'GUI Shell書出し',
+        '回帰Case削除',
+        '回帰Case削除中断確認',
+      }.contains(operation);
       final response = await _channel
           .invokeMethod<String>('request', jsonEncode(request))
-          .timeout(
-            operation == 'GUI Shell書出し'
-                ? const Duration(seconds: 305)
-                : const Duration(seconds: 5),
-          );
+          .timeout(ownerConfirmationOperation
+              ? const Duration(seconds: 305)
+              : const Duration(seconds: 5));
       if (response == null || utf8.encode(response).length > 4 * 1024 * 1024) {
         throw const BrokerClientException('broker応答が空または上限超過です');
       }

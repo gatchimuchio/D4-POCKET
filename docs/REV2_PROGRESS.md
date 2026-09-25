@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C6 Desktop Owner削除・中断Recovery接続（2026-09-25）
+
+Desktop評価ラボにOwner確認付き削除と中断状態照合を接続した。Flutterは既存BrokerTransportへ通常要求を送り、秘密・Owner資格を保持しない。Rust Desktop起動器が固定allowlist（`GUI Shell書出し`、`回帰Case削除`、`回帰Case削除中断確認`）とoperation別summaryを検証してWindows native default-No確認を表示し、Yesの要求だけをcapacity-1 process内channelからBroker所有threadへ渡す。確認は本人認証ではない。Recovery要求はCase IDだけで、過去の削除承認監査IDを受け付けない。
+
+production接続に必要な既存条件も修正した。Desktop Brokerは従来ProtectedStoreを登録しておらず、C6の一覧・削除・Recoveryがfail-closedになる経路だった。Rust起動器は固定`%LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\protected`をruntime隣接領域として準備し、Broker設定はこのpath以外を拒否する。Windows NTFS、reparse point拒否、Broker store・session fileとの非重複を起動時に検査し、失敗時はendpointを出さずBroker起動を止める。Owner資格や一般Permissionは生成せず、既存の別path保管物を移動・上書き・削除しない。
+
+Schemaとruntimeの不一致も修正した。中断RecoveryのSchema／fixtureは古い削除承認IDを要求していたが、Brokerは現在の永続Auditから未確定削除を導出するため、入力仕様から承認IDを除き、余分な過去IDをnegative fixtureとConformanceで拒否する。
+
+Validation: `cargo test --no-run --locked --manifest-path native/rust_helper/Cargo.toml`成功。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はRust全target 309件成功（library 265、helper CLI 9、Broker IPC 9、残りintegration 26）。Windows実filesystemとBroker経路の試験を含むが、installed productの実操作ではない。Schema 131件／正常例131件／negative fixture 162件、Conformance 201 checks、strict日本語監査は負債0 files／0 findingsで成功。FlutterはASCII別名`R:`経由で評価ラボ5件、shared Client 6件、両packageの`flutter analyze --no-pub`、Dart format check（Desktop 4 files／shared 3 files、変更0件）が成功。
+
+追加検証: `python tooling/manifest.py --check`、`python tooling/packaging_portability_check.py`、`python tooling/final_development_audit.py`、`python tooling/validate_all.py --python-only --desktop-platform windows`が成功。集約のrelease-runtime assertion 12件は`CONFIG`／`FIXTURE`範囲であり、installed product証拠ではない。集約は5件のrelease blockerと`release_ready=false`を保持した。
+
+native確認testはoperation候補、表示summary、allowlist、拒否・stale条件、Broker監査接続を検査するが、実際のWindows MessageBox操作やinstalled productでのOwner操作を証明しない。C6 Owner登録GUI、C5への明示import、installed Windows productでのOwner削除／中断Recovery実証は`release_blocker`として残す。全体`release_ready=false`を維持する。
+
 ## D4 Pocket C6 Owner削除と中断Recovery（2026-09-25）
 
 前段で接続したmetadata-only一覧の上に、既存Owner CLI→認証済みRust Broker経路だけを使う一件削除と中断Recoveryを追加した。Owner CLIはCase ID・定義hash・暗号文hashを要求し、Brokerは登録receipt、既存Audit chain、ProtectedStoreの排他削除準備を照合する。削除承認Auditを永続化した後に削除し、ProtectedStoreの削除後再観測で暗号文不在を確かめ、結果Auditが確定した場合にだけ`削除確定`を返す。結果はfile状態の`LIVE_RUNTIME`観測であり、媒体の物理消去を主張しない。

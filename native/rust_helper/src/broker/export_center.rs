@@ -7,7 +7,7 @@
 
 use super::compose_center;
 use super::dialogue::識別子生成;
-use super::protocol::{Broker, BrokerResponse, BrokerStatus, ExportOwnerConfirmation, EVIDENCE_SOURCE_INTERNAL_STATE};
+use super::protocol::{Broker, BrokerResponse, BrokerStatus, OwnerConfirmationSource, EVIDENCE_SOURCE_INTERNAL_STATE};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -125,7 +125,7 @@ pub(super) fn export(
     request_id: &str,
     payload: &Value,
     owner: bool,
-    owner_confirmation: ExportOwnerConfirmation,
+    owner_confirmation: OwnerConfirmationSource,
     payload_hash: &str,
 ) -> BrokerResponse {
     if !owner {
@@ -217,9 +217,9 @@ pub(super) fn export(
         }
     };
     let confirmation_reason = match owner_confirmation {
-        ExportOwnerConfirmation::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
-        ExportOwnerConfirmation::OwnerCredential => "Owner制御資格による書出し操作を受理。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
-        ExportOwnerConfirmation::NotOwner => "Owner制御がない書出し要求を拒否すべき経路へ到達した",
+        OwnerConfirmationSource::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
+        OwnerConfirmationSource::OwnerCredential => "Owner制御資格による書出し操作を受理。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
+        OwnerConfirmationSource::NotOwner => "Owner制御がない書出し要求を拒否すべき経路へ到達した",
     };
     let audit = match broker.append_audit(
         request_id,
@@ -604,7 +604,7 @@ mod tests {
         let mut broker = Broker::new("session-1");
         let mut request: Value = serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
         request["metadata"] = json!({"client": "desktop_flutter"});
-        let response = broker.desktop_owner_export_json(&request.to_string());
+        let response = broker.desktop_owner_operation_json(&request.to_string());
         assert_eq!(response.status, BrokerStatus::Accepted);
         let audit = broker.audit_events().last().unwrap();
         assert_eq!(audit.operation, OPERATION);
@@ -625,15 +625,15 @@ mod tests {
             "session_id": "session-1",
             "metadata": {"client": "desktop_flutter"}
         });
-        let rejected = broker.desktop_owner_export_json(&unrelated.to_string());
+        let rejected = broker.desktop_owner_operation_json(&unrelated.to_string());
         assert_eq!(rejected.status, BrokerStatus::Rejected);
-        assert_eq!(rejected.error.unwrap().code, "desktop_owner_export_request_invalid");
+        assert_eq!(rejected.error.unwrap().code, "desktop_owner_operation_invalid");
 
         let mut request: Value = serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
         request["metadata"] = json!({"client": "desktop_flutter", "owner": true});
-        let rejected = broker.desktop_owner_export_json(&request.to_string());
+        let rejected = broker.desktop_owner_operation_json(&request.to_string());
         assert_eq!(rejected.status, BrokerStatus::Rejected);
-        assert_eq!(rejected.error.unwrap().code, "desktop_owner_export_request_invalid");
+        assert_eq!(rejected.error.unwrap().code, "desktop_owner_operation_invalid");
     }
 
     #[test]

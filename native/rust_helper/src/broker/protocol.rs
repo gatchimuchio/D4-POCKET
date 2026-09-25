@@ -33,6 +33,10 @@ use std::sync::Arc;
 mod evaluation_control;
 #[path = "regression_case.rs"]
 mod regression_case;
+pub(crate) use regression_case::{
+    owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
+    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+};
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 pub(super) const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
@@ -645,7 +649,7 @@ pub struct BrokerRequestEnvelope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ExportOwnerConfirmation {
+pub(crate) enum OwnerConfirmationSource {
     NotOwner,
     OwnerCredential,
     DesktopNativeConfirmation,
@@ -1045,23 +1049,23 @@ impl Broker {
             Ok(envelope) => self.処理_with_export_confirmation(
                 envelope,
                 true,
-                ExportOwnerConfirmation::OwnerCredential,
+                OwnerConfirmationSource::OwnerCredential,
             ),
             Err(_) => self.reject_with_payload_hash("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true, &sha256_tagged(input.as_bytes())),
         }
     }
 
-    /// Rust起動器のネイティブ確認を通過したGUI Shell書出しだけを受け付ける。
+    /// Rust起動器のnative確認を通過した固定allowlistのOwner操作だけを受け付ける。
     /// Owner権限は要求本文やmetadataから作らず、このprocess内呼出しだけが供給する。
-    pub(crate) fn desktop_owner_export_json(&mut self, input: &str) -> BrokerResponse {
+    pub(crate) fn desktop_owner_operation_json(&mut self, input: &str) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
             Err(_) => {
                 return self.reject_with_payload_hash(
-                    "desktop-owner-export-malformed",
-                    "GUI Shell書出し",
+                    "desktop-owner-operation-malformed",
+                    "unknown",
                     "broker_request_malformed",
-                    "Owner確認後の書出し要求が不正",
+                    "Owner確認後の操作要求が不正",
                     true,
                     &sha256_tagged(input.as_bytes()),
                 )
@@ -1077,15 +1081,23 @@ impl Broker {
         let metadata_is_desktop = envelope.metadata.len() == 1
             && envelope.metadata[0].key == "client"
             && envelope.metadata[0].value == "desktop_flutter";
-        if envelope.operation != Some(BrokerOperation::GuiShell書出し)
+        let operation_is_allowlisted = matches!(
+            envelope.operation,
+            Some(
+                BrokerOperation::GuiShell書出し
+                    | BrokerOperation::回帰Case削除
+                    | BrokerOperation::回帰Case削除中断確認
+            )
+        );
+        if !operation_is_allowlisted
             || envelope.session_id.as_deref() != Some(self.session_id.as_str())
             || !metadata_is_desktop
         {
             return self.reject_with_payload_hash(
                 request_id,
                 operation,
-                "desktop_owner_export_request_invalid",
-                "Rust Desktop起動器が確認した書出し要求ではない",
+                "desktop_owner_operation_invalid",
+                "Rust Desktop起動器が確認した許可対象操作ではない",
                 true,
                 payload_hash,
             );
@@ -1093,7 +1105,7 @@ impl Broker {
         self.処理_with_export_confirmation(
             envelope,
             true,
-            ExportOwnerConfirmation::DesktopNativeConfirmation,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
         )
     }
 
@@ -1102,9 +1114,9 @@ impl Broker {
             envelope,
             owner,
             if owner {
-                ExportOwnerConfirmation::OwnerCredential
+                OwnerConfirmationSource::OwnerCredential
             } else {
-                ExportOwnerConfirmation::NotOwner
+                OwnerConfirmationSource::NotOwner
             },
         )
     }
@@ -1113,7 +1125,7 @@ impl Broker {
         &mut self,
         envelope: BrokerRequestEnvelope,
         owner: bool,
-        export_confirmation: ExportOwnerConfirmation,
+        export_confirmation: OwnerConfirmationSource,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -1375,6 +1387,62 @@ impl Broker {
         })();
         if let Err(reason) = result {
             self.append_audit("保管先起動", "保管先登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "保管先拒否監査失敗")?;
+        }
+        result
+    }
+
+    /// Desktop製品がcodeで固定したruntime隣接ProtectedStoreだけを起動時に開く。
+    /// Owner資格・Permission・Approvalを作らず、起動失敗はBroker全体を停止する。
+    pub(crate) fn desktop_protected_store_startup(
+        &mut self,
+        path: &Path,
+        protected: &[std::path::PathBuf],
+    ) -> Result<(), &'static str> {
+        let hash = sha256_tagged(path.to_string_lossy().as_bytes());
+        self.append_audit(
+            "desktop-protected-store:start",
+            "Desktop固定ProtectedStore起動",
+            "received",
+            "Capability=固定Desktop保存領域をBrokerへ接続 Permission=Broker内部の用途分離保管だけ Approval=privileged operationを承認しない RecoveryAction=検証失敗時はBroker起動を停止し既存fileを保持",
+            "CONFIG",
+            &hash,
+        )
+        .map_err(|_| "Desktop ProtectedStore起動監査に失敗")?;
+        let result = (|| {
+            if self.protected_store.is_some() {
+                return Err("ProtectedStoreは既に起動登録されている");
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = protected;
+                Err("Desktop ProtectedStoreはWindows固定NTFS環境に限定")
+            }
+            #[cfg(windows)]
+            {
+                let (root, _) = super::workspace_root::open_isolated_root(path, protected)?;
+                self.append_audit(
+                    "desktop-protected-store:verified",
+                    "Desktop固定ProtectedStore起動",
+                    "verified",
+                    "固定runtime隣接path・NTFS・link拒否・Broker内部storeとの分離を確認",
+                    EVIDENCE_SOURCE_LIVE_RUNTIME,
+                    &hash,
+                )
+                .map_err(|_| "Desktop ProtectedStore検証監査に失敗")?;
+                self.protected_store = Some(crate::protected_store::ProtectedStore::new(root));
+                Ok(())
+            }
+        })();
+        if let Err(reason) = result {
+            self.append_audit(
+                "desktop-protected-store:rejected",
+                "Desktop固定ProtectedStore起動",
+                "rejected",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &hash,
+            )
+            .map_err(|_| "Desktop ProtectedStore拒否監査に失敗")?;
         }
         result
     }

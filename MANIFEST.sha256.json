@@ -213,7 +213,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evaluation_lab.dart",
-      "sha256": "f4a7674821d3be23b95b0527e7dc69260219eddaec59adae7a4dc46594ae2c60"
+      "sha256": "38869cf93fe57badbcefab6606efefeb47bca4db71d35d3a6171b2a1780ee1e0"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/evidence_center.dart",
@@ -301,7 +301,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "a857471a1e4b3f8c5d0df57c4925c83c3a49d6f5682fe853c9f754a9a64786a6"
+      "sha256": "9dece3f2c0d49b0ec1b416e9ebb814797192bfc0b69b1afa428811dd1cb8af55"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -333,7 +333,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/regression_case_client.dart",
-      "sha256": "4f462893dc07b92866a48504410f5fd8ce60e52b010c2c539ff5bc838576d808"
+      "sha256": "8a05f7aa8609dd619c95f450365805e4fad0c8f89a41eb51f264653729471693"
     },
     {
       "path": "apps/desktop_flutter/lib/services/runtime_dialogue_client.dart",
@@ -545,7 +545,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
-      "sha256": "38aafbea434de20019c54d56900f233846e80df20ae62e240dd7fb1c6c0ee30b"
+      "sha256": "132a2585a5f4ccc7722197ff09f5c8f36be92b53411881676318a1dd4cb7f85b"
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "6e559ae306589b14d43ec1521ccfe36dafc4c0a9407c51407d29568b93ee5592"
+      "sha256": "c6b3434091fd2cf9be7bd36b333d5512587a9e25c9b1a423e7d6cfc019d35276"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "0ae591107df321947fe51d8fe6cd09d31f17d16ba47fd2c0f62d71f87dc664e3"
+      "sha256": "5bf29c4d9af05ed095c4474342c5596d6171cd8c450712a88cc77987e06a57ec"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1317,7 +1317,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "3d14c8dbaea1f642b9e6513b1e9397c1cf514a81cffd6e56b7207596d10ef553"
+      "sha256": "29653f74e395cebe439e746b9108a53dc9534d0755e7c01d9c6a5fd4abc0adbf"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -1341,7 +1341,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "b9b8e6bb1e6d9e080276615c979d27345f50d490ae3284e6f7bd40427db41732"
+      "sha256": "cf8740a2cc86ebf4d757eadd9cd2883e9c8db4cf761af106b44b355fc837642e"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -1397,7 +1397,7 @@
     },
     {
       "path": "docs/specs/regression-case.md",
-      "sha256": "5cbae65c40b050e15eff7a854d2e977f2ec91eb9b2998663db0f760026715a1c"
+      "sha256": "08d0b7181790ac24fb930745b8030f7dc052a683778b4fa72ea9aca219eaa080"
     },
     {
       "path": "docs/specs/runtime-catalog.md",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "7f8d8ac6a2264012dfc974ad8daa13e3460302d9dab4c1fc2843b090ec95af0f"
+      "sha256": "13761a272580b29aca7e644cb332c5c3a6dd613659487a4c92d983f7cf00902a"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -1465,7 +1465,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "6e6999393f8a2c32f11a3cb6f1e81bef4bc20a9d0edae48a46f94db1ec44b6b5"
+      "sha256": "a6e105163c048a6c921c36f6ff749185c95a21a2079654b4c7f175895083b850"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -2176,6 +2176,10 @@
       "sha256": "34c58b70f53148d9a5fe87857453c23a390d111f6e786066037c18ca8f389818"
     },
     {
+      "path": "examples/contracts/invalid/regression_case_delete_recovery_request_stale_approval.invalid.json",
+      "sha256": "d32eb9664f52161af83bda6e1ff9a3659081817615b1b633a7fac86cd6d86595"
+    },
+    {
       "path": "examples/contracts/invalid/regression_case_delete_request_authority.invalid.json",
       "sha256": "b0aee38e1336445656ad2b582d9dc9a44518376459d9f75fefbfc53455cba210"
     },
@@ -2477,7 +2481,7 @@
     },
     {
       "path": "examples/contracts/regression_case_delete_recovery_request.valid.json",
-      "sha256": "d32eb9664f52161af83bda6e1ff9a3659081817615b1b633a7fac86cd6d86595"
+      "sha256": "92135449cc7ecd0c3e015da88155d55933940b1bf443a3795d34fc8fd5e74b3d"
     },
     {
       "path": "examples/contracts/regression_case_delete_request.valid.json",
@@ -2837,7 +2841,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "15c1bd10ffa54511eae03fc6c019d6e7bea0a4847e8337691dd133cf28790ff2"
+      "sha256": "ff1906b6769608b9ef09b2648345a24a03ef5ee12021db18d593d9c90909ee21"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -2853,7 +2857,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "fefd9ee3cbe875cd8574341cc34724ae4f93f86ead3ffaaf7787c25e5ef98f42"
+      "sha256": "e55f90f4ac347bd40ef4eaef046fec213754fbe7c0f405264a4929ba853b8f67"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2881,11 +2885,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "e4f16c11bfbca8bc28e36e00766ddae912a491955e7a578aa83464aae3f23dca"
+      "sha256": "cc158efcf24114e7c6bd1d422f181337575340e56871a4b6c729586fbc38bcd7"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
-      "sha256": "cee367dca338482c63b6131bccdb29f5123f57f03cd50607dda0cce41c790be5"
+      "sha256": "3ab441911c86f2d734f00a3b50aba87fa39ea3eea15c100246151cb1998bc270"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",
@@ -2925,7 +2929,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "d7562a766c2b33f9336be105f0281ba86d2724dafe5dd1038420b85aff890c84"
+      "sha256": "abc35636575de3a2c4340d324a760bdf76268d5af2e3245849dfbfebe214fffd"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3245,7 +3249,7 @@
     },
     {
       "path": "packages/gui_shell_ui/lib/regression_case_client.dart",
-      "sha256": "0c68f63449e846212c912b2939af02e929e7af23b332f3c5289c57332f8b8e91"
+      "sha256": "190aa9426d93c43fb7ccd5cd7e01d6ece5fb0d961c3542ab6540630bcfec0e85"
     },
     {
       "path": "packages/gui_shell_ui/lib/runtime_dialogue_client.dart",
@@ -3276,6 +3280,10 @@
       "sha256": "8ab12142c8d002efe89c51578dec44159b68d93385368710ecad8a83e2ffe5bc"
     },
     {
+      "path": "packages/gui_shell_ui/lib/src/regression_case_owner_client.dart",
+      "sha256": "432c21011ab559a10f725988ca6791f54b9443b9252ec56bc38e66b1f2a814f0"
+    },
+    {
       "path": "packages/gui_shell_ui/lib/src/runtime_dialogue.dart",
       "sha256": "e3bb7b1c171cdf2b4f50a1d938f3556f56b7e052641b79ce97f4d97629e24a8e"
     },
@@ -3302,6 +3310,10 @@
     {
       "path": "packages/gui_shell_ui/test/regression_case_client_test.dart",
       "sha256": "4a9834d2658ac38d874ce56f01fffdfeafe53f768123cf0d88a1fc8b17b69f92"
+    },
+    {
+      "path": "packages/gui_shell_ui/test/regression_case_owner_client_test.dart",
+      "sha256": "b7821c25c821c2b5b9bc9e238c673444b85ba97b839d7df3945442b7bdcc7c4c"
     },
     {
       "path": "packages/gui_shell_ui/test/runtime_dialogue_independent_poll_test.dart",
@@ -3813,7 +3825,7 @@
     },
     {
       "path": "specs/regression_case_delete_recovery_request.schema.json",
-      "sha256": "0fdae0c9a3f1c62559005f5ee27965c2b8075f12469a569a80b77bfad8212017"
+      "sha256": "f2da63868c74cade86c4f1477f2a366ac9646917c51921947c6c2010bf131972"
     },
     {
       "path": "specs/regression_case_delete_request.schema.json",
@@ -4017,7 +4029,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "44276c6cce2ca3044a2d3729e4e11db9ca18f6a58cbbc37167a7f23a15b25fe5"
+      "sha256": "dd76c852004fb9e510ac5382207e6108a46954277b797fbdcd54a7681c316f93"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
