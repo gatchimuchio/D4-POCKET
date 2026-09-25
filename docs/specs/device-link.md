@@ -1,6 +1,6 @@
 # 端末連携の意味正本
 
-状態: Rustの暗号化端末経路とowner制御は実装済み。Android Kotlin native移行はsource・unit test・package buildまで成立したが、OS実動作は未確認。iOS native handlerとSimulator XCTest sourceを追加し、Apple toolchainによるcompile／testは未確認。どちらもnativeから同じRust Brokerへ到達するLIVE_RUNTIME試験、実機の安全保管・lifecycle証拠は未成立である。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験・native unit test・Simulator buildは実機証拠とは区別する。
+状態: Rustの暗号化端末経路とowner制御は実装済み。Android KotlinとiOS Swiftのnative経路、端末内回復記録の保存・読み取り実装を追加した。Flutter test 16件・analyzeは成功。現行Android／共有UI source 117 fileのhash一致を確認したfresh Temp copyでGradle clean・unit test・debug APK buildが成功し、JUnit 8件はすべて成功した。APKは146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。元OneDrive workspaceのignored build outputは継承ACLの削除denyにより通常cleanup／resource packagingが失敗する。sourceやACLは変更せずTemp copyで検証したhost-localなknown limitationである。iOS native handlerとSimulator XCTestはApple toolchainによるcompile／testが未確認。通信不能時の端末内だけの削除はOS保護状態内へ最大32件の非権威回復記録を同時保存し、Flutterは限定された情報を読み取り表示するが、Desktop Rust Brokerの監査連鎖とは別である。nativeから同じRust Brokerへ到達する`LIVE_RUNTIME`試験、実機の安全保管・lifecycle証拠も未成立である。過去のDart TLS実行証拠を現在のFlutter境界適合証拠へ読み替えない。契約試験・native単体試験・Simulator buildは実機証拠とは区別する。
 
 ## 対象と責任
 
@@ -44,7 +44,11 @@ Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限
 
 起動・復帰は資格の読取後に端末確認を行い、失効・期限切れ・Host不一致では入力と送信を無効にする。background中はpollingと新規送信を停止する。応答待ちは復帰後に同じ要求を照会し、自動再送しない。離脱はserver失効を先に要求する。通信不能時のlocal削除はserver失効と区別し、owner側の失効操作を案内する。
 
-現在の`local_delete`は通信不能時に端末内資格だけを消す回復操作だが、Desktop Rust Brokerの`AuditEvent`を生成・永続化しない。Flutterの確認dialogや成功表示は監査証拠ではない。したがって、この回復経路は監査閉包が未成立のrelease blockerとして扱い、監査済みのBroker操作または安全境界を維持する明示的な回復監査契約が成立するまで、Device Link全体の監査完了を主張しない。
+`local_delete`は通信不能時に端末内資格だけを消す回復操作であり、Desktop Rust Brokerの`AuditEvent`を生成・永続化できない。Flutterの確認dialogや成功表示は監査証拠ではない。このためnative OS保護領域内の`mobile_local_recovery`記録を、端末内資格の削除と同じ暗号化状態へ一回の更新で追記する。記録は`mobile_local_credential_delete`、`actor=shell`、`operator_identity=unverified`、結果`success`、`evidence_source=INTERNAL_STATE`、`desktop_revocation=unconfirmed`、`authority_effect=none`に固定し、UI操作から操作者本人を証明せず、資格値、Host、端末ID、自由文を含めない。直近32件を上限に古い記録からrotateし、削除操作のhashは固定の公開操作識別子から計算する。
+
+この記録はDesktop Brokerの監査連鎖、外部収集証拠、改変耐性、Desktop側失効、本人性または権限を証明しない。記録と資格削除を一緒に再読取確認できない場合はnative操作を成功として返さない。これは資格削除の回復記録であり、端末資格が既にない場合に架空の削除記録を追加しない。通常の`disconnect`はDesktop失効Auditと削除後readbackを引き続き必要とし、端末内だけの削除と混同しない。未確認のDesktop失効はOwnerへ別操作を案内する。
+
+`read_recovery_audit`はversionだけを受け取る読み取り専用のnative channel methodであり、保存済み記録を最大32件返す。記録がない場合は空配列を返し、端末IDを新規生成しない。日時はUTC `Z`表記の秒精度または3桁ミリ秒精度に固定し、nativeとFlutter双方がfield集合、定数値、hash、実在日時、件数、event IDの一意性を再検証してから表示する。表示は内部状態の投影でありAudit chainへの書込み、復旧承認、資格復元を実行しない。
 
 復帰・手動再確認では安全保管の端末IDと資格を再読取し、構造・期限と現在の結合内容を照合してから通信する。削除・破損・変更・読取障害時にメモリ上の旧資格を代用せず、変更された資格を自動採用しない。読取や接続確認の途中でbackgroundに移った確認結果を、後の復帰の接続成功に転用しない。
 
@@ -57,6 +61,8 @@ Mobileは端末ID、Hostの固定情報、結合ID、端末秘密、有効期限
 Flutterは接続状態と許可済みprojectionだけを表示する。招待JSONをDart TextFieldへ入力しない。native側が招待入力・Host／HostID／証明書hashの確認・結合確認を行い、成功時はnative側で招待秘密を破棄して結合資格をOS安全保管へ保存する。Flutterには端末IDと資格を含まない接続状態projectionだけを返す。
 
 Flutterからnativeへのchannel要求は、版、固定method名、必要な場合の既存Device Link operationとその業務payloadだけから成る。pairing要求は引数なしであり、招待・資格・secret・token・session credentialをchannel越しに渡さない。nativeの通常要求経路は既存Device Link TLSの宛先へ接続し、既存Rust Brokerの資格検査・nonce・allowlist・所有関係・Audit・Approval・Recoveryへ必ず到達する。native側に権限判断、Owner操作、任意host／URL、任意commandを追加しない。
+
+`read_recovery_audit`はこのnative channel内のローカル読み取り専用例外であり、要求fieldは`version`だけ。返却は上記Schemaに適合する最大32件に固定し、資格値を含めず、Broker要求やauthority判断を行わない。
 
 foreground状態の正本はAndroid Activity／iOS sceneなどplatform-native lifecycle観測とする。Flutterから`set_foreground`等の状態設定要求を受け付けず、Flutterのlifecycle通知だけでnative通信を再開しない。復帰時はnative自身がforeground状態を確認したうえで端末資格を再照合する。Flutter側のlifecycle状態は、UI要求を止める保守的な追加条件としてのみ使う。
 
@@ -74,10 +80,10 @@ Android実装はAndroid Keystore保護のnative暗号化保管を使い、iOSは
 
 Schemaとconformanceは招待・保管資格・要求の構造と禁止操作を検査する。Rustの実経路では正常結合、再接続、招待取消、端末失効、期限切れ、不正資格、nonce再使用、Host不一致、他端末の所有物操作、owner昇格、監査障害を検査する。TLS実接続、異なる証明書拒否、Mobile安全保管、MINIDORA実対話、lifecycleは別のLIVE_RUNTIME証拠を必要とする。
 
-- item: 端末連携の実装と実機検証
+- item: native Device Linkの実機・統合検証
   classification: release_blocker
-  reason: Android native移行中でありiOS native handlerが未実装。source・fixture・buildだけではOS保管、実TLS、失効、background lifecycleの成立を証明しない。Android実機検証はowner指示で凍結中。
-  required_action: Android移行をbuild・unit testし、iOSのnative経路を実装する。秘密をDartへ渡さないplatform test harnessを作り、凍結解除後にAndroid実機を含む各platformの結合・対話・失効・lifecycleを測定する。
+  reason: Androidの現行sourceはfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored outputは継承ACLによりcleanupとresource packagingが拒否されるhost-local limitationであり、ACLは変更していない。Android build成功もnative Rust Broker経路・OS保管・実TLS・失効・background lifecycleを証明しない。iOS native sourceはあるがApple toolchainのcompile／XCTest未実行。Android実機検証はowner指示で凍結中。
+  required_action: Apple workflow_dispatchでiOS compile／XCTestを検証する。招待秘密をFlutter／debug VM／log／artifactへ露出させないplatform-native LIVE_RUNTIME harnessを用意し、凍結解除後に各platformの実機結合・対話・失効・lifecycleを測定する。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内回復記録はDesktop Broker AuditEventと区別する。
   blocks_release: yes
 
 技術接続の一次資料: [rustlsのserver設定](https://docs.rs/rustls/latest/rustls/server/struct.ServerConfig.html)。これは暗号化機構のAPI資料でありGUI Shellの権限源ではない。

@@ -43,6 +43,11 @@ internal class DeviceLinkNativeService(
                 else submit(result) { readState() }
                 true
             }
+            "read_recovery_audit" -> {
+                if (arguments(call, setOf("version")) == null) fail(result)
+                else submit(result) { readLocalRecoveryAudit() }
+                true
+            }
             "pair" -> {
                 if (arguments(call, setOf("version")) == null) fail(result)
                 else beginPairing(result)
@@ -164,6 +169,11 @@ internal class DeviceLinkNativeService(
         )
     }
 
+    private fun readLocalRecoveryAudit(): List<Map<String, Any?>> {
+        require(foreground && !disposed && !pairingInProgress.get())
+        return store.readLocalRecoveryAudit()
+    }
+
     private fun localSnapshot(): Map<String, Any?> {
         val state = store.loadOrCreate()
         val paired = state.credential != null
@@ -209,9 +219,10 @@ internal class DeviceLinkNativeService(
     private fun localDelete(): Map<String, Any?> {
         check(!pairingInProgress.get())
         require(foreground && !disposed)
-        val deleted = store.deleteCredential()
+        val deleted = store.deleteCredentialWithLocalRecoveryAudit()
         require(deleted.credential == null)
-        return snapshot(false, false, true, "端末内資格を削除しました。Desktop側の失効は未確認です。ownerに失効を依頼してください。")
+        require(deleted.localRecoveryAudit.isNotEmpty())
+        return snapshot(false, false, true, "端末内資格を削除し、端末内回復記録を保存しました。Desktop側の失効は未確認です。ownerに失効を依頼してください。")
     }
 
     private fun beginPairing(result: MethodChannel.Result): Boolean {

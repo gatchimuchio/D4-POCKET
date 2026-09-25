@@ -78,8 +78,112 @@ class DeviceLinkSnapshot {
   }
 }
 
+class DeviceLinkLocalRecoveryAuditEvent {
+  const DeviceLinkLocalRecoveryAuditEvent({
+    required this.eventId,
+    required this.timestamp,
+  });
+
+  final String eventId;
+  final String timestamp;
+  static const maximumEvents = 32;
+  static const _payloadHash =
+      'sha256:2f0b366fb62efa9e741f0127c676e648d81b263a471c35d0dd00814a174e5a92';
+  static final _utcTimestampPattern = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$',
+  );
+
+  static List<DeviceLinkLocalRecoveryAuditEvent> fromNative(Object? raw) {
+    if (raw is! List || raw.length > maximumEvents) throw _channelFailure;
+    final events = raw.map(_eventFromNative).toList(growable: false);
+    if (events.map((event) => event.eventId).toSet().length != events.length) {
+      throw _channelFailure;
+    }
+    return events;
+  }
+
+  static bool _isCanonicalUtcTimestamp(String value) {
+    final match = _utcTimestampPattern.firstMatch(value);
+    final parsed = DateTime.tryParse(value);
+    if (match == null || parsed == null || !parsed.isUtc) return false;
+    final parts = [
+      for (var index = 1; index <= 6; index++) int.parse(match.group(index)!),
+    ];
+    final fraction = match.group(7) ?? '';
+    final millisecond = int.parse((fraction + '000').substring(0, 3));
+    return parsed.year == parts[0] &&
+        parsed.month == parts[1] &&
+        parsed.day == parts[2] &&
+        parsed.hour == parts[3] &&
+        parsed.minute == parts[4] &&
+        parsed.second == parts[5] &&
+        parsed.millisecond == millisecond &&
+        parsed.microsecond == 0;
+  }
+
+  static DeviceLinkLocalRecoveryAuditEvent _eventFromNative(Object? raw) {
+    if (raw is! Map) throw _channelFailure;
+    final value = <String, Object?>{};
+    for (final entry in raw.entries) {
+      if (entry.key is! String) throw _channelFailure;
+      value[entry.key as String] = entry.value;
+    }
+    const eventKeys = {
+      'event_id',
+      'timestamp',
+      'actor',
+      'action',
+      'target',
+      'result',
+      'payload_hash',
+      'metadata',
+    };
+    final metadata = value['metadata'];
+    if (value.length != eventKeys.length ||
+        !eventKeys.containsAll(value.keys) ||
+        value['event_id'] is! String ||
+        !RegExp(r'^[a-f0-9]{32}$').hasMatch(value['event_id'] as String) ||
+        value['timestamp'] is! String ||
+        !_isCanonicalUtcTimestamp(value['timestamp'] as String) ||
+        value['actor'] != 'shell' ||
+        value['action'] != 'mobile_local_credential_delete' ||
+        value['target'] != 'mobile_device_link_credential' ||
+        value['result'] != 'success' ||
+        value['payload_hash'] != _payloadHash ||
+        metadata is! Map) {
+      throw _channelFailure;
+    }
+    final metadataValue = <String, Object?>{};
+    for (final entry in metadata.entries) {
+      if (entry.key is! String) throw _channelFailure;
+      metadataValue[entry.key as String] = entry.value;
+    }
+    const metadataKeys = {
+      'audit_scope',
+      'evidence_source',
+      'desktop_revocation',
+      'authority_effect',
+      'operator_identity',
+    };
+    if (metadataValue.length != metadataKeys.length ||
+        !metadataKeys.containsAll(metadataValue.keys) ||
+        metadataValue['audit_scope'] != 'mobile_local_recovery' ||
+        metadataValue['evidence_source'] != 'INTERNAL_STATE' ||
+        metadataValue['desktop_revocation'] != 'unconfirmed' ||
+        metadataValue['authority_effect'] != 'none' ||
+        metadataValue['operator_identity'] != 'unverified') {
+      throw _channelFailure;
+    }
+    return DeviceLinkLocalRecoveryAuditEvent(
+      eventId: value['event_id'] as String,
+      timestamp: value['timestamp'] as String,
+    );
+  }
+}
+
 abstract interface class DeviceLinkNativePort implements BrokerTransport {
   Future<DeviceLinkSnapshot> readState();
+  Future<List<DeviceLinkLocalRecoveryAuditEvent>> readLocalRecoveryAudit();
   Future<DeviceLinkSnapshot> pair();
   Future<DeviceLinkSnapshot> disconnect();
   Future<DeviceLinkSnapshot> localDelete();
@@ -102,6 +206,13 @@ class MethodChannelDeviceLink implements DeviceLinkNativePort {
 
   @override
   Future<DeviceLinkSnapshot> readState() => _state('read_state');
+
+  @override
+  Future<List<DeviceLinkLocalRecoveryAuditEvent>>
+  readLocalRecoveryAudit() async {
+    final raw = await _call('read_recovery_audit', const {'version': 1});
+    return DeviceLinkLocalRecoveryAuditEvent.fromNative(raw);
+  }
 
   @override
   Future<DeviceLinkSnapshot> pair() => _state('pair');

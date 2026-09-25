@@ -174,6 +174,14 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
     }
   }
 
+  Future<List<DeviceLinkLocalRecoveryAuditEvent>>
+  readLocalRecoveryAudit() async {
+    if (busy || !storageReady || !foreground || _disposed) {
+      throw const BrokerClientException('端末内回復記録を読み取れません。状態を確認してください。');
+    }
+    return _native.readLocalRecoveryAudit();
+  }
+
   @override
   Future<Map<String, Object?>> request(
     String operation, {

@@ -24,7 +24,8 @@ final class DeviceLinkNativeStore {
   func storeCredential(_ credential: DeviceLinkCredential) throws -> DeviceLinkNativeState {
     let before = try loadOrCreate()
     guard before.deviceID == credential.deviceID else { throw DeviceLinkJSONError.invalid }
-    let next = DeviceLinkNativeState(deviceID: before.deviceID, credential: credential.json)
+    let next = DeviceLinkNativeState(deviceID: before.deviceID, credential: credential.json,
+                                     localRecoveryAudit: before.localRecoveryAudit)
     try write(next)
     guard let data = try readData() else { throw DeviceLinkJSONError.invalid }
     let verified = try decode(data)
@@ -34,12 +35,36 @@ final class DeviceLinkNativeStore {
 
   func deleteCredential() throws -> DeviceLinkNativeState {
     let before = try loadOrCreate()
-    let next = DeviceLinkNativeState(deviceID: before.deviceID, credential: nil)
+    let next = DeviceLinkNativeState(deviceID: before.deviceID, credential: nil,
+                                     localRecoveryAudit: before.localRecoveryAudit)
     try write(next)
     guard let data = try readData() else { throw DeviceLinkJSONError.invalid }
     let verified = try decode(data)
     guard verified == next else { throw DeviceLinkJSONError.invalid }
     return verified
+  }
+
+  func deleteCredentialWithLocalRecoveryAudit() throws -> DeviceLinkNativeState {
+    let before = try loadOrCreate()
+    guard before.credential != nil else { throw DeviceLinkJSONError.invalid }
+    let event = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+      eventID: try Self.randomID(),
+      timestamp: ISO8601DateFormatter().string(from: Date()))
+    let events = DeviceLinkLocalRecoveryAudit.appendBounded(before.localRecoveryAudit, event: event)
+    let next = DeviceLinkNativeState(deviceID: before.deviceID, credential: nil, localRecoveryAudit: events)
+    try write(next)
+    guard let data = try readData() else { throw DeviceLinkJSONError.invalid }
+    let verified = try decode(data)
+    guard verified == next, let recorded = verified.localRecoveryAudit.last,
+          NSDictionary(dictionary: recorded).isEqual(to: event) else {
+      throw DeviceLinkJSONError.invalid
+    }
+    return verified
+  }
+
+  func readLocalRecoveryAudit() throws -> [[String: Any]] {
+    guard let data = try readData() else { return [] }
+    return try decode(data).localRecoveryAudit
   }
 
   func removeForTest() throws {
@@ -69,9 +94,10 @@ final class DeviceLinkNativeStore {
 
   private func write(_ state: DeviceLinkNativeState) throws {
     let object: [String: Any] = [
-      "version": 1,
+      "version": 2,
       "device_id": state.deviceID,
       "credential": state.credential.map { $0 as Any } ?? NSNull(),
+      "local_recovery_audit": state.localRecoveryAudit,
     ]
     let data = try DeviceLinkStrictJSON.encodeObject(object, maximumBytes: 16 * 1024)
     let attributes: [String: Any] = [
@@ -93,8 +119,12 @@ final class DeviceLinkNativeStore {
 
   private func decode(_ data: Data) throws -> DeviceLinkNativeState {
     let object = try DeviceLinkStrictJSON.parseObject(data, maximumBytes: 16 * 1024)
-    guard Set(object.keys) == Set(["version", "device_id", "credential"]),
-          DeviceLinkStrictJSON.integer(object["version"]) == 1,
+    guard let version = DeviceLinkStrictJSON.integer(object["version"]) else {
+      throw DeviceLinkJSONError.invalid
+    }
+    let stateShapeValid = (version == 1 && Set(object.keys) == Set(["version", "device_id", "credential"])) ||
+      (version == 2 && Set(object.keys) == Set(["version", "device_id", "credential", "local_recovery_audit"]))
+    guard stateShapeValid,
           let deviceID = object["device_id"] as? String,
           deviceID.utf8.count == 32,
           deviceID.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
@@ -104,7 +134,19 @@ final class DeviceLinkNativeStore {
     if object["credential"] is NSNull { credential = nil }
     else if let value = object["credential"] as? [String: Any] { credential = value }
     else { throw DeviceLinkJSONError.invalid }
-    return DeviceLinkNativeState(deviceID: deviceID, credential: credential)
+    let localRecoveryAudit: [[String: Any]]
+    if version == 1 {
+      localRecoveryAudit = []
+    } else {
+      guard let events = object["local_recovery_audit"] as? [[String: Any]],
+            events.count <= DeviceLinkLocalRecoveryAudit.maximumEvents,
+            events.allSatisfy({ DeviceLinkLocalRecoveryAudit.isValid($0) }),
+            Set(events.compactMap { $0["event_id"] as? String }).count == events.count else {
+        throw DeviceLinkJSONError.invalid
+      }
+      localRecoveryAudit = events
+    }
+    return DeviceLinkNativeState(deviceID: deviceID, credential: credential, localRecoveryAudit: localRecoveryAudit)
   }
 
   private static func randomID() throws -> String {

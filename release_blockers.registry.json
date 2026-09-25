@@ -165,8 +165,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Dart直接の招待・資格・TLS／network・安全保管経路は廃止した。Android Kotlin source・unit test・APK/AAB buildは成功したが実OS保管・TLS・lifecycle証拠はない。iOS native handlerとSimulator XCTest sourceを追加中だが、Apple toolchain compile／test未確認であり、同じRust Brokerへのnative LIVE_RUNTIME試験・実機証拠も未成立。通信不能時のnative local_deleteはDesktop Rust BrokerのAuditEventを生成しない。過去Dart経路は現行Flutter境界の適合証拠ではない。",
-      "required_action": "workflow_dispatch限定のApple補助手順で現行commitのiOS compile・native XCTestを実行し、失敗を修正する。その後、招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さず、同じDesktop Rust BrokerへのTLS結合・拒否・失効・background停止を検証するplatform-native LIVE_RUNTIME harnessを成立させる。local_deleteは監査済みBroker操作または安全境界を維持する明示的な回復監査契約へ接続し、Flutter表示をAuditEventとして扱わない。Android実機凍結と各platformのrelease evidenceは別途維持する。"
+      "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。Flutterの16試験と解析は成功。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。iOSはApple環境で未検証。Rust Brokerとの実接続試験と実機証拠もない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。",
+      "required_action": "workflow_dispatch限定のApple補助手順でiOS compile・native XCTestを実行し、失敗を修正する。その後、招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さず、同じDesktop Rust BrokerへのTLS結合・拒否・失効・background停止を検証するplatform-native LIVE_RUNTIME harnessを成立させる。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。Android実機凍結と各platformのrelease evidenceは別途維持する。"
     }
   ]
 }

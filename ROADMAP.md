@@ -5,9 +5,9 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行D4 Pocket統合単位（2026-09-24）
+## 現行D4 Pocket統合単位（2026-09-25）
 
-Mobileはrev2の現行対象であり、旧v1 post scopeへ退避しない。現行Device LinkはDartが資格・TLS／networkを扱うためrev2 Flutter境界に未適合である。native channel契約は成立したがproduction移行は未実装で、rev2_mobile_flutter_native_device_link_boundaryをrelease_blockerとして管理する。
+Mobileはrev2の現行対象であり、旧v1 post scopeへ退避しない。Device Linkの資格・暗号通信処理はAndroidのKotlin実装／iOSのSwift実装へ移し、Flutterとの接続口は固定要求と安全な状態表示に限定する。通信不能時の「端末内削除」は資格削除と同じOS保護状態に最大32件の秘密なし回復記録を保存し、読み取り専用方式で限定表示する。この記録は`INTERNAL_STATE`であり、Desktop Brokerの監査連鎖・失効・操作者本人性を証明しない。Flutterの16試験・解析、日本語／Schema／conformance／配布互換性を含むPython統合検証は成功した。Androidの現行sourceと共有UI 117 fileはfresh Temp copyとSHA-256で一致を確認し、cleanup除外なしの`gradlew.bat clean :app:testDebugUnitTest :app:assembleDebug --no-daemon --offline --console=plain`が成功した。JUnit 8件とdebug APK組立が成功し、artifact hashは`2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。元OneDrive workspaceのignored build outputには親から継承された削除deny ACLが残り、標準output pathではcleanupとresource packagingが停止するため、ACLを変更せず一時copyで検証した。これは製品source defectとは区別する開発環境上の`known_limitation`である。iOS Swift sourceのApple環境compile／XCTestは未確認。Rust Brokerへのnative LIVE_RUNTIME harness、実機・lifecycle・配布証拠も未成立であり、`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`を`release_blocker`として維持する。
 
 D4 Pocket Phase 33では`docs/specs/gui-shell-module-pruning.md`と機械可読Module一覧を追加し、Brokerが必須Moduleを維持しながら任意画面の選択計画・依存閉包をReceiptへ記録する。Desktop画面はcompile-time defineへ接続済み。cleanなsource commit `aa3f2eac4f829d230a782fbd5f5cf7fc58d79c6c`から同一Windows／Flutter toolchainのall-enabled baselineと選択buildを実行し、Flutter AOT report上で選択外6つのsurface library nodeが不在、選択2つが存在すること、artifact総量差229,376 bytes（224 KiB）、hashを確認した。JSON Receiptは画面選択としてだけ読み、出所・Owner権限は検証しない。これはDeveloper用Flutter UI build／compiler reportの証拠に限られ、共有symbolや画面意味全体、最終製品の安全Core、Rust／third-party Moduleの保持・除去、独立製品Exportを証明しないため、`binary_pruning_verified=false`を維持する。製品cold startup・実行時resourceも未測定である。現行Flutter ExportClientは通常資格を使う一方Broker書出しはOwner専用で、GUI Export経路も未成立と確認した。Owner UI認可経路、独立Export artifact上の安全Core／選択境界検証、製品測定、Installer、署名、配布、書出し先起動は`release_blocker`。Phase 33およびreleaseは未完了である。工程対応は`docs/D4_POCKET_PHASE_MAPPING.md`、toolchain・artifact・report hashと検査結果は`docs/REV2_PROGRESS.md`の最新Phase 33追補を参照する。
 

@@ -169,6 +169,7 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_command_envelope",
     "desktop_broker_channel_request",
     "mobile_device_link_channel_request",
+    "mobile_local_recovery_audit",
     "adapter_management_manifest",
     "adapter_management_request",
     "adapter_management_receipt",
@@ -304,6 +305,7 @@ MOBILE_FLUTTER_REQUIRED_FILES = {
     "lib/screens/recovery_instruction.dart",
     "lib/services/device_link_client.dart",
     "lib/services/device_link_controller.dart",
+    "lib/screens/device_connection.dart",
     "test/device_link_test.dart",
     "android/app/src/main/kotlin/com/example/gui_shell_mobile/MainActivity.kt",
     "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt",
@@ -313,6 +315,10 @@ MOBILE_FLUTTER_REQUIRED_FILES = {
     "android/app/src/main/kotlin/com/example/gui_shell_mobile/StrictJson.kt",
     "android/app/src/test/kotlin/com/example/gui_shell_mobile/DeviceLinkPolicyTest.kt",
     "android/app/src/test/kotlin/com/example/gui_shell_mobile/StrictJsonTest.kt",
+    "ios/Runner/DeviceLinkModels.swift",
+    "ios/Runner/DeviceLinkNativeService.swift",
+    "ios/Runner/DeviceLinkNativeStore.swift",
+    "ios/RunnerTests/RunnerTests.swift",
 }
 RELEASE_HARDENING_FILES = {
     "RELEASE_CHECKLIST.md",
@@ -2610,6 +2616,7 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
     errors = validate_instance(sample, schema)
     valid = [
         {"version": 1, "method": "read_state"},
+        {"version": 1, "method": "read_recovery_audit"},
         {"version": 1, "method": "pair"},
         {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "latest_per_request": True, "include_audit_context": True, "include_result_evidence": True, "include_content_receipt": True, "filter": {"実行系ID": "local"}}}},
@@ -2647,6 +2654,88 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
                 + "/"
                 + str(candidate.get("broker_operation"))
             )
+    return errors
+
+
+def Mobile_local_deleteを有界の非権威回復記録へ閉じる() -> list[str]:
+    schema = load_schema("mobile_local_recovery_audit.schema.json")
+    event = load_contract_fixture("mobile_local_recovery_audit.valid.json")
+    errors = validate_instance(event, schema)
+    if validate_instance(event, load_schema("audit.schema.json")):
+        errors.append("端末内回復記録が共通AuditEvent形式に適合しない")
+    milliseconds_event = copy.deepcopy(event)
+    milliseconds_event["timestamp"] = "2026-09-25T12:00:00.123Z"
+    if validate_instance(milliseconds_event, schema):
+        errors.append("端末内回復記録schemaが正規UTCミリ秒日時を受理しない")
+    if event.get("payload_hash") != "sha256:" + hashlib.sha256(
+        b"gui-shell/mobile/local-credential-delete/v1"
+    ).hexdigest():
+        errors.append("端末内回復記録hashが固定の公開操作識別子と一致しない")
+
+    changed_hash = copy.deepcopy(event)
+    changed_hash["payload_hash"] = "sha256:" + "0" * 64
+    if not validate_instance(changed_hash, schema):
+        errors.append("端末内回復記録schemaが固定操作hash以外を拒否しない")
+
+    secret_event = {**event, "credential_secret": "not-allowed"}
+    if not validate_instance(secret_event, schema):
+        errors.append("端末内回復記録schemaが資格秘密を拒否しない")
+    forged_revocation = copy.deepcopy(event)
+    forged_revocation["metadata"]["desktop_revocation"] = "confirmed"
+    if not validate_instance(forged_revocation, schema):
+        errors.append("端末内回復記録がDesktop失効の虚偽確認を拒否しない")
+    for timestamp in (
+        "2026-09-25T12:00:00+00:00",
+        "2026-09-25T12:00:00Z\n",
+        "2026-09-25T12:00:00.1Z",
+        "2026-09-25T12:00:00.1234Z",
+    ):
+        malformed_time = copy.deepcopy(event)
+        malformed_time["timestamp"] = timestamp
+        if not validate_instance(malformed_time, schema):
+            errors.append(f"端末内回復記録schemaが非正規UTC日時を拒否しない: {timestamp!r}")
+
+    android_store = (MOBILE_FLUTTER / "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeStore.kt").read_text(encoding="utf-8")
+    android_service = (MOBILE_FLUTTER / "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkNativeService.kt").read_text(encoding="utf-8")
+    android_models = (MOBILE_FLUTTER / "android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt").read_text(encoding="utf-8")
+    ios_store = (MOBILE_FLUTTER / "ios/Runner/DeviceLinkNativeStore.swift").read_text(encoding="utf-8")
+    ios_service = (MOBILE_FLUTTER / "ios/Runner/DeviceLinkNativeService.swift").read_text(encoding="utf-8")
+    ios_models = (MOBILE_FLUTTER / "ios/Runner/DeviceLinkModels.swift").read_text(encoding="utf-8")
+    for platform, store, service, models, limit in (
+        ("Android", android_store, android_service, android_models, "MAX_EVENTS = 32"),
+        ("iOS", ios_store, ios_service, ios_models, "maximumEvents = 32"),
+    ):
+        if "deleteCredentialWithLocalRecoveryAudit" not in store or "deleteCredentialWithLocalRecoveryAudit" not in service:
+            errors.append(f"{platform}のlocal_deleteが資格削除と回復記録の統合保存を使わない")
+        if limit not in models:
+            errors.append(f"{platform}の回復記録保持上限が32件でない")
+        if "mobile_local_credential_delete" not in models or "INTERNAL_STATE" not in models:
+            errors.append(f"{platform}の回復記録が操作と証拠範囲を固定しない")
+        if "local_recovery_audit" not in store or '"credential"' not in store:
+            errors.append(f"{platform}が資格状態と回復記録を同じ保護storeへ保存しない")
+        if "store.deleteCredential()" not in service:
+            errors.append(f"{platform}通常disconnectのDesktop失効後readback経路が保持されない")
+        if "Desktop側の失効は未確認" not in service:
+            errors.append(f"{platform}のnative表示がDesktop未失効を示さない")
+    if "1L ->" not in android_store or "2L ->" not in android_store:
+        errors.append("Android OS保護storeが旧版読取と現行版検査を維持しない")
+    if "version == 1" not in ios_store or "version == 2" not in ios_store:
+        errors.append("iOS OS保護storeが旧版読取と現行版検査を維持しない")
+    if "read_recovery_audit" not in android_service or "readLocalRecoveryAudit" not in android_store:
+        errors.append("Androidがnativeの読み取り専用回復記録経路を持たない")
+    if "read_recovery_audit" not in ios_service or "readLocalRecoveryAudit" not in ios_store:
+        errors.append("iOSがnativeの読み取り専用回復記録経路を持たない")
+    mobile_client = (MOBILE_FLUTTER / "lib/services/device_link_client.dart").read_text(encoding="utf-8")
+    mobile_screen = (MOBILE_FLUTTER / "lib/screens/device_connection.dart").read_text(encoding="utf-8")
+    if (
+        "read_recovery_audit" not in mobile_client
+        or "eventKeys.containsAll(value.keys)" not in mobile_client
+        or "metadataKeys.containsAll(metadataValue.keys)" not in mobile_client
+        or "_isCanonicalUtcTimestamp" not in mobile_client
+    ):
+        errors.append("Flutterの回復記録読取経路または秘密field拒否がない")
+    if "Desktopの監査連鎖とは別" not in mobile_screen or "端末内回復記録を確認" not in mobile_screen:
+        errors.append("Mobile回復記録画面がDesktop Auditとの非同一性を説明しない")
     return errors
 
 
@@ -7309,6 +7398,7 @@ def main() -> int:
         実行系ライフサイクルの契約と統治境界を検査する,
         端末契約の構造と禁止操作を検査する,
         Mobile_native_Device_Link_channelを秘密非通過に制限する,
+        Mobile_local_deleteを有界の非権威回復記録へ閉じる,
         test_schema_validator_supports_composition_keywords,
         二実行系比較の非混線を検査する,
         評価ラボの契約と境界を検査する,

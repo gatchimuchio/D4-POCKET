@@ -1362,6 +1362,8 @@ cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した
   blocks_release: yes
 
 既存release blocker registryは変更せず、`release_ready=false`を維持する。
+
+
 追加のflush計測入り120秒再現も41.969秒後、`段階=Runtime相当再起動`で`通信失敗`となった。対話成功13、想定disconnect失敗3、Runtime相当再起動4、Broker再起動3、再接続7、資格file cleanup retry 0。直前のfixture `/api/chat`とtrace responseは全件`server_flush_succeeded`だったが、これはclient受信の証明ではない。そこでC28が起動するdebug Broker childに限り、Adapterのtransport失敗stageと標準error kindを、route分類付き・最大32行・payload非記録でstderrへ出す診断を追加した。検証器側は許可値だけをreportへ抽出し、生のstderrをreportへ複写しない。次の再現で得る診断は原因特定用であり、現時点で失敗原因やproduction動作を断定しない。
 
 ## D4 Pocket rev2 C28 flush計測・transport診断付き短時間再現（2026-09-25）
@@ -1427,3 +1429,52 @@ commit `0bfc1aa21966c6f75ddb7430cc1c2ab3cbbce22f`から開始した8時間C28試
   blocks_release: yes
 
 既存release blocker registryは変更せず、`release_ready=false`を維持する。
+
+
+## D4 Pocket rev2 Mobile 端末内回復記録の契約・表示追加（2026-09-25）
+
+現行mainと端末連携正本、Android／iOS native source、Flutter channel、Schema・conformanceを読み直し、通信不能時の`local_delete`が端末資格を消すだけで回復記録を残さないGapを確認した。Desktopへ到達できない操作をDesktop Rust Broker AuditEventへ偽装せず、OS保護領域内の独立した`mobile_local_recovery`記録として定義した。
+
+記録は資格削除と同じ暗号化状態を一度だけ更新し、readbackで削除と記録を確認する。Androidは既存AES-GCM／Keystore保護状態、iOSはThisDeviceOnly Keychain itemを用いる。旧状態version 1を読めるようにし、次回writeでversion 2へ移行する。記録は最大32件で古いものをrotationし、固定の公開操作hashと固定fieldだけを含める。資格、Host、端末ID、自由文は含まない。操作者identityは`unverified`、Desktop失効は`unconfirmed`、authority effectは`none`、証拠源は`INTERNAL_STATE`に固定した。Flutterにはversionだけを渡す読み取り専用native methodと、限定fieldの検証・表示を追加した。未記録・破損・過大・追加secret・失効確認への偽装は拒否する。これはDesktop Audit chain、外部収集証拠、失効、本人性、権限を証明しない。
+
+検証結果:
+
+- `python tooling/schema_check/check_schemas.py`：Schema 125件、正常例125件、negative fixture 151件で成功。固定操作hashの変更と資格secret混入を拒否した。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`：200件成功。Android／iOS native store・channel契約のsource境界、上限、通常disconnect分離、Flutterの厳密projectionを検査した。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：成功、新規負債0件。途中でROADMAP／registry記述が監査閾値に触れたため日本語表現へ修正し、再実行してPASSした。
+- `flutter test --no-pub --reporter expanded`（一時`R:` path alias経由）：16件すべて成功。端末内削除からのBroker要求不発、回復記録読取、固定projection、secret field拒否、UTC日時形式と存在しない日付・改行・offset拒否を確認した。
+- `flutter analyze --no-pub`（一時`R:` path alias経由）：成功、指摘0件。
+- `dart format`：変更したFlutter client／controller／画面／testの4 fileを整形した。`git diff --check`成功。
+- `gradlew.bat :app:testDebugUnitTest`を2回、`:app:compileDebugKotlin`を1回実行したが、すべて`:app:cleanMergeDebugAssets`で停止しKotlin compile前に失敗した。対象は追跡外の`apps/mobile_flutter/build/.../mergeDebugAssets`で、ACLに`Everyone Deny DeleteSubdirectoriesAndFiles`が設定されていることを観測した。ACL変更は所有者判断を待っており、この変更後sourceのAndroid unit test／compile／APK buildは未検証である。以前のsourceに対するAPK成功を流用しない。
+- iOSの`xcodebuild`／XCTestはWindows hostにtoolchainがなく未実行。Apple補助workflowは`workflow_dispatch`限定だが、利用可能なGitHub操作にworkflow dispatchがなく、`gh` CLIも見つからないため起動していない。Simulator・実機試験の代替とはしない。
+- Android実機検証凍結を維持し、端末を接続・起動していない。今回sourceに対するAPK生成、native TLSからRust Brokerへの`LIVE_RUNTIME`、iOS Keychain実動作は未確認。
+- `python tooling/manifest.py --write`／`--check`：成功。manifestはSchema・正例・負例を含む993 fileを固定した。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。日本語strict、Schema 125／125／151、conformance 200、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査が成功。これはPython側統合検証で、Android／iOS native build・Flutter test／analyzeを含まず、`release_ready=false`と既存release blocker 5件を維持する。
+
+### Android Gradle ACL調査の追補
+
+上記の初回失敗後、ACLを変更せず生成物directoryだけを削除対象から外す診断実行を追加した。`apps/mobile_flutter/build`以下のignored生成物には親から継承した`Everyone Deny DeleteSubdirectoriesAndFiles`があり、Gradle標準cleanupが拒否されることをACLで確認した。これは製品sourceの不具合とは区別するが、標準build検証を阻害する環境制約である。
+
+- `gradlew.bat :app:testDebugUnitTest -x :app:cleanMergeDebugAssets`：`compileDebugKotlin`と`compileDebugUnitTestKotlin`は成功した。続くJUnit実行は`build/app/test-results/testDebugUnitTest/binary`の削除拒否で停止し、unit test assertionは実行されていない。
+- `gradlew.bat :app:assembleDebug -x :app:cleanMergeDebugAssets`：incremental debug APK生成は成功した。APKは161,029,992 bytes、SHA-256 `DAD766390A5CF36555C867474F7B295E8DD7B246DD385EB6AC64D7F5730EF53E`。これはclean build、標準cleanup経路、実機動作またはrelease evidenceではない。
+- `:app:cleanMergeDebugAssets`除外の責任は、ACLで削除不能な既存のFlutter生成asset directoryのcleanupをその一回だけ避け、残りのGradle taskを診断することに限る。生成物再利用の可能性が残るため、標準buildと同等のcleanlinessを主張しない。source変更や製品runtimeの回避策ではなく、一時的な検証補助であり、ACL解消後に除外指定なしのunit testとdebug APK buildを再実行する。
+- JUnit結果directoryにも同種のdeny ACLを確認した。ACL変更の許可は得られていないためACLを変更していない。通常unit test、clean build、APKの標準経路はいずれも未成立としてrelease blockerを維持する。
+
+ROADMAP、Mobile状態、端末連携正本、release blockerの説明を実装状態へ追従させた。`rev2_mobile_flutter_native_device_link_boundary`と`rev2_mobile_device_evidence`は`release_blocker`のまま維持し、`release_ready=false`を変更しない。この実装単位は変更後Android／iOS nativeの全platform build・実機動作、正式release、D4 Pocket完成を成立させない。
+
+## D4 Pocket rev2 Android一時検証先によるclean・unit test追補（2026-09-25）
+
+OneDrive上の生成物ACLを変更せず通常Android検証を完了できるかを確認した。Gradle初期化scriptでbuild出力先を後から一時場所へ移す試行は、Android Gradle Pluginが早期に固定した`:app:cleanMergeDebugAssets`出力先を移せず、同じ削除拒否で失敗した。元の作業場所で後片付けtaskだけを除外したAPK再組立も、別の除外対象`packageDebugResources\\merged.dir\\values`への`AccessDeniedException`で失敗した。従って元のAndroid build出力ACL制約は一つのdirectoryだけではなく、除外対象`apps/mobile_flutter/build`配下に及ぶことを確認した。ACL変更は行っていない。
+
+そこで現行repositoryの追跡済み／未追跡sourceをWindowsの一時workspaceへ複製した。`apps/mobile_flutter`と`packages/gui_shell_ui`の計117ファイルについて、複製直後と`flutter pub get --offline`後にSHA-256を照合し、差分0件だった。除外された端末固有の`android/local.properties`、Gradle wrapper script／JARだけは同じ元workspaceから検証用複製へ追加した。Dart／Kotlin／Swift source、Schema、製品設定の回避変更は行っていない。
+
+検証結果:
+
+- `flutter pub get --offline`: 成功。
+- `gradlew.bat clean :app:testDebugUnitTest :app:assembleDebug --no-daemon --offline --console=plain`（一時複製内の`apps/mobile_flutter/android`）: cleanup除外なしで成功。64 task、57 executed、7 up-to-date。clean出力先は新規複製内であり、OneDrive ACLには触れない。
+- JUnit XML: `DeviceLinkPolicyTest` 5件、`StrictJsonTest` 3件、計8件。failure 0、error 0、skipped 0。
+- debug APK: `%TEMP%\\D4PocketMobileValidate-90c66f63c8d246ac81eb3f62c717c3b6\\workspace\\apps\\mobile_flutter\\build\\app\\outputs\\flutter-apk\\app-debug.apk`、146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。開発用debug成果物で、実機install／起動・release署名・配布の証拠ではない。
+- これはこのWindows hostのACL制約を避ける一時検証用の複製であり、製品のbuild出力先変更ではない。OneDrive内で直接buildする必要がある場合に限り、継承ACLを管理者判断で修正後、元の作業場所上で標準commandを再実行する。ACL未解消でも同一sourceのAndroid clean／unit／package検証は成立したため、ACL制約を製品のrelease blockerへ昇格しない。
+- Flutter `test --no-pub --reporter expanded`: 16件成功。Flutter `analyze --no-pub`: 指摘0件。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。日本語基底strict、Schema 125／正常例125／negative 152、conformance 200、manifest、release gate、配布互換性、release smoke、evidence bundle、runtime assertions、C32構造監査が成功した。既存release blocker 5件と`release_ready=false`を維持する。統合検証にはiOS／Android native compile、Flutter試験、実機検証は含まれない。
+- Android実機検証の凍結、Apple開発環境によるiOS compile／XCTest、実際のTLS通信／Rust Broker結合、KeyStore／Keychainを用いる実機動作、lifecycleはこの検証で成立しない。既存のMobile統合・実機証拠に関する`release_blocker`と`release_ready=false`を維持する。

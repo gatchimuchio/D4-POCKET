@@ -305,7 +305,7 @@
     },
     {
       "path": "docs/specs/device-link.md",
-      "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信の日本語意味"
+      "責任": "端末招待・結合資格・Host照合・所有関係・失効・安全保管・暗号化通信、端末内回復記録とDesktop監査との分離の日本語意味"
     },
     {
       "path": "docs/specs/audit-checkpoint.md",

@@ -64,6 +64,10 @@ final class DeviceLinkNativeService {
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
       perform(result) { try self.readState() }
       return true
+    case "read_recovery_audit":
+      guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
+      perform(result) { try self.readLocalRecoveryAudit() }
+      return true
     case "pair":
       guard arguments(call, exactKeys: ["version"]) != nil else { fail(result); return true }
       beginPairing(result)
@@ -166,6 +170,12 @@ final class DeviceLinkNativeService {
                     status: connected ? "Desktop端末資格を確認しました。" : "Desktop接続を確認できません。資格は削除せず、通信を停止しています。")
   }
 
+  private func readLocalRecoveryAudit() throws -> [[String: Any]] {
+    let current = currentState()
+    guard current.foreground, !current.disposed, !current.pairing else { throw DeviceLinkTransportError.failed }
+    return try store.readLocalRecoveryAudit()
+  }
+
   private func brokerRequest(_ operation: String, payload: [String: Any]) throws -> [String: Any] {
     try DeviceLinkPayloadPolicy.validate(operation, payload: payload)
     let current = currentState()
@@ -200,10 +210,11 @@ final class DeviceLinkNativeService {
   private func localDelete() throws -> [String: Any] {
     let current = currentState()
     guard !current.pairing, current.foreground, !current.disposed else { throw DeviceLinkTransportError.failed }
-    let deleted = try store.deleteCredential()
+    let deleted = try store.deleteCredentialWithLocalRecoveryAudit()
     guard deleted.credential == nil else { throw DeviceLinkTransportError.failed }
+    guard !deleted.localRecoveryAudit.isEmpty else { throw DeviceLinkTransportError.failed }
     return snapshot(paired: false, connected: false, storageReady: true,
-                    status: "端末内資格を削除しました。Desktop側の失効は未確認です。ownerに失効を依頼してください。")
+                    status: "端末内資格を削除し、端末内回復記録を保存しました。Desktop側の失効は未確認です。ownerに失効を依頼してください。")
   }
 
   private func beginPairing(_ result: @escaping FlutterResult) {

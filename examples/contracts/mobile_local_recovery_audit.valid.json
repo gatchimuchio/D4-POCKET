@@ -1,0 +1,16 @@
+{
+  "event_id": "0123456789abcdef0123456789abcdef",
+  "timestamp": "2026-09-25T12:00:00Z",
+  "actor": "shell",
+  "action": "mobile_local_credential_delete",
+  "target": "mobile_device_link_credential",
+  "result": "success",
+  "payload_hash": "sha256:2f0b366fb62efa9e741f0127c676e648d81b263a471c35d0dd00814a174e5a92",
+  "metadata": {
+    "audit_scope": "mobile_local_recovery",
+    "evidence_source": "INTERNAL_STATE",
+    "desktop_revocation": "unconfirmed",
+    "authority_effect": "none",
+    "operator_identity": "unverified"
+  }
+}

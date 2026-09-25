@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct DeviceLinkCredential: Equatable {
   let hostID: String
@@ -107,9 +108,92 @@ struct DeviceLinkCredential: Equatable {
 struct DeviceLinkNativeState: Equatable {
   let deviceID: String
   let credential: [String: Any]?
+  let localRecoveryAudit: [[String: Any]]
+
+  init(deviceID: String, credential: [String: Any]?, localRecoveryAudit: [[String: Any]] = []) {
+    self.deviceID = deviceID
+    self.credential = credential
+    self.localRecoveryAudit = localRecoveryAudit
+  }
 
   static func == (lhs: DeviceLinkNativeState, rhs: DeviceLinkNativeState) -> Bool {
-    lhs.deviceID == rhs.deviceID && NSDictionary(dictionary: lhs.credential ?? [:]).isEqual(to: rhs.credential ?? [:])
+    lhs.deviceID == rhs.deviceID &&
+      NSDictionary(dictionary: ["credential": lhs.credential ?? [:], "audit": lhs.localRecoveryAudit])
+        .isEqual(to: ["credential": rhs.credential ?? [:], "audit": rhs.localRecoveryAudit])
+  }
+}
+
+enum DeviceLinkLocalRecoveryAudit {
+  static let maximumEvents = 32
+  private static let payloadMarker = "gui-shell/mobile/local-credential-delete/v1"
+
+  static var payloadHash: String {
+    "sha256:" + SHA256.hash(data: Data(payloadMarker.utf8)).map { String(format: "%02x", $0) }.joined()
+  }
+
+  static func localCredentialDeleted(eventID: String, timestamp: String) -> [String: Any] {
+    precondition(isHex(eventID, length: 32))
+    precondition(isCanonicalTimestamp(timestamp))
+    return [
+      "event_id": eventID,
+      "timestamp": timestamp,
+      "actor": "shell",
+      "action": "mobile_local_credential_delete",
+      "target": "mobile_device_link_credential",
+      "result": "success",
+      "payload_hash": payloadHash,
+      "metadata": [
+        "audit_scope": "mobile_local_recovery",
+        "evidence_source": "INTERNAL_STATE",
+        "desktop_revocation": "unconfirmed",
+        "authority_effect": "none",
+        "operator_identity": "unverified",
+      ],
+    ]
+  }
+
+  static func appendBounded(_ existing: [[String: Any]], event: [String: Any]) -> [[String: Any]] {
+    precondition(existing.count <= maximumEvents && existing.allSatisfy { isValid($0) } && isValid(event))
+    let newEventID = event["event_id"] as? String
+    precondition(newEventID != nil && !existing.contains { ($0["event_id"] as? String) == newEventID })
+    return Array((existing + [event]).suffix(maximumEvents))
+  }
+
+  static func isValid(_ event: [String: Any]) -> Bool {
+    guard Set(event.keys) == Set(["event_id", "timestamp", "actor", "action", "target", "result", "payload_hash", "metadata"]),
+          let eventID = event["event_id"] as? String, isHex(eventID, length: 32),
+          let timestamp = event["timestamp"] as? String, isCanonicalTimestamp(timestamp),
+          let metadata = event["metadata"] as? [String: Any],
+          Set(metadata.keys) == Set(["audit_scope", "evidence_source", "desktop_revocation", "authority_effect", "operator_identity"]) else {
+      return false
+    }
+    return event["actor"] as? String == "shell" &&
+      event["action"] as? String == "mobile_local_credential_delete" &&
+      event["target"] as? String == "mobile_device_link_credential" &&
+      event["result"] as? String == "success" &&
+      event["payload_hash"] as? String == payloadHash &&
+      metadata["audit_scope"] as? String == "mobile_local_recovery" &&
+      metadata["evidence_source"] as? String == "INTERNAL_STATE" &&
+      metadata["desktop_revocation"] as? String == "unconfirmed" &&
+      metadata["authority_effect"] as? String == "none" &&
+      metadata["operator_identity"] as? String == "unverified"
+  }
+
+  private static func isHex(_ value: String, length: Int) -> Bool {
+    value.utf8.count == length && value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+  }
+
+  private static func isCanonicalTimestamp(_ value: String) -> Bool {
+    guard let utc = TimeZone(secondsFromGMT: 0) else { return false }
+    let seconds = ISO8601DateFormatter()
+    seconds.formatOptions = [.withInternetDateTime]
+    seconds.timeZone = utc
+    if let date = seconds.date(from: value), seconds.string(from: date) == value { return true }
+
+    let milliseconds = ISO8601DateFormatter()
+    milliseconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    milliseconds.timeZone = utc
+    return milliseconds.date(from: value).map { milliseconds.string(from: $0) == value } ?? false
   }
 }
 

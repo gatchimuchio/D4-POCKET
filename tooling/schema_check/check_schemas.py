@@ -38,6 +38,7 @@ REQUIRED = {
     "device_link_credential.schema.json",
     "device_link_request.schema.json",
     "mobile_device_link_channel_request.schema.json",
+    "mobile_local_recovery_audit.schema.json",
     "mobile_agent_list.schema.json",
     "runtime_dialogue_operation.schema.json",
     "runtime_dialogue_request.schema.json",

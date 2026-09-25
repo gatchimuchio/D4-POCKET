@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/device_link_client.dart';
 import '../services/device_link_controller.dart';
 import 'shared.dart';
 
@@ -40,9 +41,42 @@ class DeviceConnection extends StatelessWidget {
   );
 }
 
-class DeviceSettings extends StatelessWidget {
+class DeviceSettings extends StatefulWidget {
   const DeviceSettings({super.key, required this.controller});
   final DeviceLinkController controller;
+
+  @override
+  State<DeviceSettings> createState() => _DeviceSettingsState();
+}
+
+class _DeviceSettingsState extends State<DeviceSettings> {
+  bool _readingAudit = false;
+  bool _auditLoaded = false;
+  String? _auditError;
+  List<DeviceLinkLocalRecoveryAuditEvent> _recoveryEvents = const [];
+
+  Future<void> _readRecoveryAudit() async {
+    if (_readingAudit) return;
+    setState(() {
+      _readingAudit = true;
+      _auditError = null;
+    });
+    try {
+      final events = await widget.controller.readLocalRecoveryAudit();
+      if (!mounted) return;
+      setState(() {
+        _recoveryEvents = events;
+        _auditLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _auditError = '端末内回復記録を確認できません。native保管状態を再確認してください。';
+      });
+    } finally {
+      if (mounted) setState(() => _readingAudit = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => MobilePage(
@@ -51,19 +85,20 @@ class DeviceSettings extends StatelessWidget {
       const Text(
         '端末資格はAndroid KeystoreまたはiOS ThisDeviceOnly Keychainで保護します。招待秘密や対話本文をFlutterや一般設定へ保存しません。Desktop再起動・資格失効・8時間経過後は新しい招待が必要です。',
       ),
-      Text(controller.status),
+      Text(widget.controller.status),
       FilledButton.tonal(
-        onPressed: controller.busy || !controller.hasStoredCredential
+        onPressed:
+            widget.controller.busy || !widget.controller.hasStoredCredential
             ? null
-            : controller.disconnect,
+            : widget.controller.disconnect,
         child: const Text('Desktopの結合を解除して端末資格を削除'),
       ),
       const Text('Desktopへ接続できない場合だけ端末内を削除できます。Desktop側の失効は別途ownerが確認してください。'),
       OutlinedButton(
         onPressed:
-            controller.busy ||
-                !controller.storageReady ||
-                !controller.hasStoredCredential
+            widget.controller.busy ||
+                !widget.controller.storageReady ||
+                !widget.controller.hasStoredCredential
             ? null
             : () async {
                 final confirmed = await showDialog<bool>(
@@ -86,11 +121,36 @@ class DeviceSettings extends StatelessWidget {
                   ),
                 );
                 if (confirmed == true) {
-                  await controller.disconnect(localOnly: true);
+                  await widget.controller.disconnect(localOnly: true);
+                  await _readRecoveryAudit();
                 }
               },
         child: const Text('通信不能時: 端末内の資格だけ削除'),
       ),
+      const Text(
+        '端末内回復記録は端末内の表示用記録です。Desktopの監査連鎖とは別であり、Desktop失効や操作者本人を証明しません。',
+      ),
+      OutlinedButton(
+        onPressed:
+            _readingAudit ||
+                widget.controller.busy ||
+                !widget.controller.storageReady ||
+                !widget.controller.foreground
+            ? null
+            : _readRecoveryAudit,
+        child: Text(_readingAudit ? '端末内回復記録を確認中' : '端末内回復記録を確認'),
+      ),
+      if (_auditError != null) Text(_auditError!),
+      if (_auditLoaded && _recoveryEvents.isEmpty)
+        const Text('保存された端末内回復記録はありません。'),
+      if (_auditLoaded)
+        ..._recoveryEvents.map(
+          (event) => ListTile(
+            key: ValueKey(event.eventId),
+            title: const Text('端末内資格を削除'),
+            subtitle: Text('${event.timestamp}・Desktop側失効未確認'),
+          ),
+        ),
     ],
   );
 }

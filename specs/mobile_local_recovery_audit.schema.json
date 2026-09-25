@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mobile_local_recovery_audit.schema.json",
+  "title": "端末内回復監査記録",
+  "description": "OS保護領域内に保持する、端末内だけの資格削除記録。`Desktop Broker`の監査連鎖、失効、権限または外部証拠を表さない。",
+  "type": "object",
+  "required": [
+    "event_id",
+    "timestamp",
+    "actor",
+    "action",
+    "target",
+    "result",
+    "payload_hash",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTCのZ表記。秒精度または3桁ミリ秒精度に限る。",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$(?![\\s\\S])"
+    },
+    "actor": {
+      "type": "string",
+      "const": "shell"
+    },
+    "action": {
+      "type": "string",
+      "const": "mobile_local_credential_delete"
+    },
+    "target": {
+      "type": "string",
+      "const": "mobile_device_link_credential"
+    },
+    "result": {
+      "type": "string",
+      "const": "success"
+    },
+    "payload_hash": {
+      "type": "string",
+      "const": "sha256:2f0b366fb62efa9e741f0127c676e648d81b263a471c35d0dd00814a174e5a92"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "audit_scope",
+        "evidence_source",
+        "desktop_revocation",
+        "authority_effect",
+        "operator_identity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "audit_scope": {
+          "type": "string",
+          "const": "mobile_local_recovery"
+        },
+        "evidence_source": {
+          "type": "string",
+          "const": "INTERNAL_STATE"
+        },
+        "desktop_revocation": {
+          "type": "string",
+          "const": "unconfirmed"
+        },
+        "authority_effect": {
+          "type": "string",
+          "const": "none"
+        },
+        "operator_identity": {
+          "type": "string",
+          "const": "unverified"
+        }
+      }
+    }
+  }
+}

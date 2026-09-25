@@ -1,5 +1,12 @@
 package com.example.gui_shell_mobile
 
+import java.security.MessageDigest
+import java.text.ParsePosition
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
 internal data class DeviceCredential(
     val hostId: String,
     val host: String,
@@ -96,6 +103,87 @@ internal data class DeviceCredential(
             return first == 127 || first == 10 || (first == 172 && second in 16..31) || (first == 192 && second == 168)
         }
     }
+}
+
+internal object DeviceLinkLocalRecoveryAudit {
+    const val MAX_EVENTS = 32
+    private const val PAYLOAD_MARKER = "gui-shell/mobile/local-credential-delete/v1"
+    val PAYLOAD_HASH: String by lazy {
+        val digest = MessageDigest.getInstance("SHA-256").digest(PAYLOAD_MARKER.toByteArray(Charsets.UTF_8))
+        "sha256:" + digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+    private val eventIdPattern = Regex("^[a-f0-9]{32}$")
+    private val payloadHashPattern = Regex("^sha256:[a-f0-9]{64}$")
+    private val timestampPatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+    )
+
+    fun currentTimestamp(): String = timestampFormatter("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").format(Date())
+
+    fun localCredentialDeleted(eventId: String, timestamp: String): Map<String, Any?> {
+        require(eventId.matches(eventIdPattern))
+        require(isCanonicalTimestamp(timestamp))
+        return linkedMapOf(
+            "event_id" to eventId,
+            "timestamp" to timestamp,
+            "actor" to "shell",
+            "action" to "mobile_local_credential_delete",
+            "target" to "mobile_device_link_credential",
+            "result" to "success",
+            "payload_hash" to PAYLOAD_HASH,
+            "metadata" to linkedMapOf(
+                "audit_scope" to "mobile_local_recovery",
+                "evidence_source" to "INTERNAL_STATE",
+                "desktop_revocation" to "unconfirmed",
+                "authority_effect" to "none",
+                "operator_identity" to "unverified",
+            ),
+        )
+    }
+
+    fun appendBounded(
+        existing: List<Map<String, Any?>>,
+        event: Map<String, Any?>,
+    ): List<Map<String, Any?>> {
+        require(existing.size <= MAX_EVENTS && existing.all(::isValid) && isValid(event))
+        require(existing.none { it["event_id"] == event["event_id"] })
+        return (existing + event).takeLast(MAX_EVENTS)
+    }
+
+    fun isValid(value: Map<String, Any?>): Boolean {
+        if (value.keys != setOf("event_id", "timestamp", "actor", "action", "target", "result", "payload_hash", "metadata")) return false
+        val eventId = value["event_id"] as? String ?: return false
+        val timestamp = value["timestamp"] as? String ?: return false
+        val metadata = value["metadata"] as? Map<*, *> ?: return false
+        if (metadata.keys != setOf("audit_scope", "evidence_source", "desktop_revocation", "authority_effect", "operator_identity")) return false
+        return eventId.matches(eventIdPattern) &&
+            isCanonicalTimestamp(timestamp) &&
+            value["actor"] == "shell" &&
+            value["action"] == "mobile_local_credential_delete" &&
+            value["target"] == "mobile_device_link_credential" &&
+            value["result"] == "success" &&
+            (value["payload_hash"] as? String)?.matches(payloadHashPattern) == true &&
+            value["payload_hash"] == PAYLOAD_HASH &&
+            metadata["audit_scope"] == "mobile_local_recovery" &&
+            metadata["evidence_source"] == "INTERNAL_STATE" &&
+            metadata["desktop_revocation"] == "unconfirmed" &&
+            metadata["authority_effect"] == "none" &&
+            metadata["operator_identity"] == "unverified"
+    }
+
+    private fun isCanonicalTimestamp(value: String): Boolean = timestampPatterns.any { pattern ->
+        val formatter = timestampFormatter(pattern)
+        val position = ParsePosition(0)
+        val parsed = formatter.parse(value, position)
+        parsed != null && position.index == value.length && formatter.format(parsed) == value
+    }
+
+    private fun timestampFormatter(pattern: String): SimpleDateFormat =
+        SimpleDateFormat(pattern, Locale.ROOT).apply {
+            isLenient = false
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
 }
 
 internal data class DeviceLinkSnapshot(

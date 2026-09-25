@@ -2,9 +2,10 @@
 
 ## D4 Pocket rev2 最新境界確認（2026-09-25）
 
-旧Dart製品client、資格モデル、安全保管API、SecureSocket、招待をDartへ注入するdebug VM integration harnessを廃止した。Flutterは固定MethodChannelを通じて状態projectionとallowlist済みBroker operationだけを送受信する。Android Kotlin側にnative招待UI、Android Keystore暗号化保管、証明書hash固定TLS、有限frame／timeout、native Activity lifecycleによるsocket停止を実装し、Kotlin compile、7件のunit test、debug APK/AAB buildがPASSした。Flutter analyzeと13件のtestもPASS。実TLS・Keystore実機動作は未検証である。iOS native handlerは未実装のためchannel呼出しはfail-closedとなる。Flutterからnative foreground状態を偽装できる`set_foreground` channelは設けない。
+旧Dart製品client、資格モデル、安全保管API、SecureSocket、招待をDartへ注入するdebug VM integration harnessを廃止した。Flutterは固定MethodChannelを通じて状態projectionとallowlist済みBroker operationだけを送受信する。Android Kotlin／iOS Swiftへnative store・serviceを実装し、`local_delete`は資格削除と同じOS保護状態へ最大32件の非権威回復記録を保存する。Flutterにはversionだけで読む固定methodと、秘密fieldを拒む限定表示を追加した。Flutter試験16件・analyzeは成功。現行のAndroid sourceは対象のMobileアプリと共有UI計117ファイルを一時検証先へ複製し、内容hash差分0件を確認した検証先で、`gradlew.bat clean :app:testDebugUnitTest :app:assembleDebug --no-daemon --offline --console=plain`が成功した。JUnit 8件はすべて成功し、debug APKは146,311,641 bytes、SHA-256 `2D40701A90A518261D5E9E7E5E96AADF036D1A78354B9181B0E001E9A6632129`。これは現行sourceの隔離clean build証拠で、実機・実TLS・製品releaseの証拠ではない。元OneDrive作業場所の除外対象`apps/mobile_flutter/build`には親からの`Everyone Deny DeleteSubdirectoriesAndFiles`が継承され、標準出力先では後片付けとresource生成が`AccessDenied`となる。ACLは変更せず、一時検証先で試験した。iOS native sourceは追加済みだがApple toolchain compile／XCTest未確認。実TLS・Keystore/Keychain実機動作は未検証である。Flutterからnative foreground状態を偽装できる`set_foreground` channelは設けない。
 
-- `release_blocker`: rev2_mobile_flutter_native_device_link_boundary。Android build／実接続検証、iOS native handler、Dart/debug VM/log/artifactへ秘密を渡さないplatform test harnessが未完了。
+- `release_blocker`: rev2_mobile_flutter_native_device_link_boundary。Androidの隔離clean build、unit test 8件、debug APK buildは成功した。iOS native compile／XCTest、Rust Brokerへのnative LIVE_RUNTIME harness、実機のOS保管・TLS・lifecycle証拠は未成立。local_delete記録は端末内INTERNAL_STATEだけでDesktop Audit chain・失効証明ではない。
+- `known_limitation`: OneDrive内の除外対象Android build outputに削除deny ACLが継承され、標準Gradle output pathで後片付け／resource packagingが失敗する。ACLを変更せず、hash照合した一時検証先でclean build／test／APKを検証した。in-place buildが必要な場合だけACL管理者の判断を得る。blocks_release: no。
 - Android実機検証凍結、rev2_mobile_device_evidence、正式配布blockerは維持する。Flutter/Kotlin unit test・APK build・emulator起動は実機証拠へ昇格しない。
 - 旧Dart client・Simulator integrationのPASSは履歴のまま保持し、現行native経路の適合根拠に使用しない。
 

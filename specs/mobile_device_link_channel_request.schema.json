@@ -18,6 +18,7 @@
       "type": "string",
       "enum": [
         "read_state",
+        "read_recovery_audit",
         "pair",
         "broker_request",
         "disconnect",
@@ -155,6 +156,14 @@
     }
   },
   "oneOf": [
+    {
+      "properties": {
+        "version": { "const": 1 },
+        "method": { "const": "read_recovery_audit" }
+      },
+      "required": ["version", "method"],
+      "additionalProperties": false
+    },
     {
       "properties": {
         "version": {

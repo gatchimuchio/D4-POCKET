@@ -69,6 +69,48 @@ class DeviceLinkPolicyTest {
     }
 
     @Test
+    fun localRecoveryAuditRecordIsClosedSecretFreeAndBounded() {
+        val event = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+            eventId = "a".repeat(32),
+            timestamp = "2026-09-25T12:00:00Z",
+        )
+        assertTrue(DeviceLinkLocalRecoveryAudit.isValid(event))
+        val milliseconds = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+            eventId = "b".repeat(32),
+            timestamp = "2026-09-25T12:00:00.123Z",
+        )
+        assertTrue(DeviceLinkLocalRecoveryAudit.isValid(milliseconds))
+        assertEquals("INTERNAL_STATE", (event["metadata"] as Map<*, *>)["evidence_source"])
+        assertEquals("unconfirmed", (event["metadata"] as Map<*, *>)["desktop_revocation"])
+        assertEquals("sha256:2f0b366fb62efa9e741f0127c676e648d81b263a471c35d0dd00814a174e5a92", event["payload_hash"])
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("credential_secret" to "secret")))
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("timestamp" to "2026-02-30T12:00:00Z")))
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("timestamp" to "2026-09-25T12:00:00Z\n")))
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("timestamp" to "2026-09-25T12:00:00+00:00")))
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("timestamp" to "2026-09-25T12:00:00.1Z")))
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("timestamp" to "2026-09-25T12:00:00.1234Z")))
+        val confirmed = (event["metadata"] as Map<*, *>).toMutableMap().apply {
+            this["desktop_revocation"] = "confirmed"
+        }
+        assertTrue(!DeviceLinkLocalRecoveryAudit.isValid(event + ("metadata" to confirmed)))
+
+        val history = (0..DeviceLinkLocalRecoveryAudit.MAX_EVENTS).map { index ->
+            DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+                eventId = index.toString(16).padStart(32, '0'),
+                timestamp = "2026-09-25T12:00:00Z",
+            )
+        }
+        val retained = history.dropLast(1).fold(emptyList<Map<String, Any?>>()) { acc, item ->
+            DeviceLinkLocalRecoveryAudit.appendBounded(acc, item)
+        }
+        assertEquals(DeviceLinkLocalRecoveryAudit.MAX_EVENTS, retained.size)
+        val rotated = DeviceLinkLocalRecoveryAudit.appendBounded(retained, history.last())
+        assertEquals(DeviceLinkLocalRecoveryAudit.MAX_EVENTS, rotated.size)
+        assertEquals(history[1], rotated.first())
+        assertEquals(history.last(), rotated.last())
+    }
+
+    @Test
     fun invitationAndPairedCredentialAreBoundToPrivateHostAndExistingDevice() {
         val now = 1_800_000_000L
         val device = "a".repeat(32)

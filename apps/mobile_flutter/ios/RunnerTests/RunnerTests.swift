@@ -51,6 +51,43 @@ class RunnerTests: XCTestCase {
     XCTAssertThrowsError(try DeviceLinkPayloadPolicy.validate("対話開始", payload: ["token": "x"]))
   }
 
+  func testLocalRecoveryAuditIsClosedSecretFreeAndBounded() throws {
+    let first = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+      eventID: String(repeating: "a", count: 32), timestamp: "2026-09-25T12:00:00Z")
+    XCTAssertTrue(DeviceLinkLocalRecoveryAudit.isValid(first))
+    let milliseconds = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+      eventID: String(repeating: "b", count: 32), timestamp: "2026-09-25T12:00:00.123Z")
+    XCTAssertTrue(DeviceLinkLocalRecoveryAudit.isValid(milliseconds))
+    let metadata = try XCTUnwrap(first["metadata"] as? [String: Any])
+    XCTAssertEqual(metadata["evidence_source"] as? String, "INTERNAL_STATE")
+    XCTAssertEqual(metadata["desktop_revocation"] as? String, "unconfirmed")
+    XCTAssertEqual(first["payload_hash"] as? String,
+                   "sha256:2f0b366fb62efa9e741f0127c676e648d81b263a471c35d0dd00814a174e5a92")
+    XCTAssertFalse(DeviceLinkLocalRecoveryAudit.isValid(first.merging(["credential_secret": "secret"]) { _, new in new }))
+    for timestamp in ["2026-02-30T12:00:00Z", "2026-09-25T12:00:00Z\n",
+                      "2026-09-25T12:00:00+00:00", "2026-09-25T12:00:00.1Z",
+                      "2026-09-25T12:00:00.1234Z"] {
+      XCTAssertFalse(DeviceLinkLocalRecoveryAudit.isValid(first.merging(["timestamp": timestamp]) { _, new in new }))
+    }
+
+    let history = (0...DeviceLinkLocalRecoveryAudit.maximumEvents).map { index in
+      DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+        eventID: String(format: "%032x", index), timestamp: "2026-09-25T12:00:00Z")
+    }
+    var retained = [[String: Any]]()
+    for item in history.dropLast() {
+      retained = DeviceLinkLocalRecoveryAudit.appendBounded(retained, event: item)
+    }
+    XCTAssertEqual(retained.count, DeviceLinkLocalRecoveryAudit.maximumEvents)
+    retained = DeviceLinkLocalRecoveryAudit.appendBounded(retained, event: try XCTUnwrap(history.last))
+    XCTAssertEqual(retained.count, DeviceLinkLocalRecoveryAudit.maximumEvents)
+    let retainedFirst = try XCTUnwrap(retained.first)
+    let retainedLast = try XCTUnwrap(retained.last)
+    let expectedLast = try XCTUnwrap(history.last)
+    XCTAssertTrue(NSDictionary(dictionary: retainedFirst).isEqual(to: history[1]))
+    XCTAssertTrue(NSDictionary(dictionary: retainedLast).isEqual(to: expectedLast))
+  }
+
   func testThisDeviceOnlyKeychainReadWriteDeleteAndReadback() throws {
     let service = "org.gatchimuchio.gui-shell.device-link.test.\(UUID().uuidString)"
     let store = DeviceLinkNativeStore(service: service)
@@ -83,9 +120,61 @@ class RunnerTests: XCTestCase {
     if let synchronizable = storedAttributes?[kSecAttrSynchronizable as String] {
       XCTAssertEqual((synchronizable as? NSNumber)?.boolValue, false)
     }
-    let deleted = try store.deleteCredential()
+    let deleted = try store.deleteCredentialWithLocalRecoveryAudit()
     XCTAssertNil(deleted.credential)
-    XCTAssertNil(try store.loadOrCreate().credential)
+    XCTAssertEqual(deleted.localRecoveryAudit.count, 1)
+    XCTAssertTrue(DeviceLinkLocalRecoveryAudit.isValid(try XCTUnwrap(deleted.localRecoveryAudit.last)))
+    XCTAssertEqual(try store.readLocalRecoveryAudit().count, 1)
+    let pairedAgain = try store.storeCredential(credential)
+    XCTAssertEqual(pairedAgain.localRecoveryAudit.count, 1)
+    let disconnected = try store.deleteCredential()
+    XCTAssertNil(disconnected.credential)
+    XCTAssertEqual(disconnected.localRecoveryAudit.count, 1)
+  }
+
+  func testVersionOneKeychainStateMigratesOnNextWrite() throws {
+    let service = "org.gatchimuchio.gui-shell.device-link.migration.\(UUID().uuidString)"
+    let store = DeviceLinkNativeStore(service: service)
+    defer { try? store.removeForTest() }
+    let deviceID = String(repeating: "c", count: 32)
+    let legacy = try JSONSerialization.data(withJSONObject: [
+      "version": 1,
+      "device_id": deviceID,
+      "credential": NSNull(),
+    ], options: [.sortedKeys])
+    let identity: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: "native-state",
+      kSecAttrSynchronizable as String: kCFBooleanFalse as Any,
+      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+      kSecValueData as String: legacy,
+    ]
+    XCTAssertEqual(SecItemAdd(identity as CFDictionary, nil), errSecSuccess)
+    let restored = try store.loadOrCreate()
+    XCTAssertEqual(restored.deviceID, deviceID)
+    XCTAssertTrue(restored.localRecoveryAudit.isEmpty)
+
+    let credential = DeviceLinkCredential(
+      hostID: String(repeating: "1", count: 32),
+      host: "10.0.0.2",
+      port: 44321,
+      certificateHash: String(repeating: "b", count: 64),
+      deviceID: deviceID,
+      expiresAt: Int64(Date().timeIntervalSince1970) + 3_600,
+      credentialID: String(repeating: "2", count: 32),
+      secret: try XCTUnwrap(randomHex(byteCount: 32)))
+    _ = try store.storeCredential(credential)
+    var query = identity
+    query.removeValue(forKey: kSecAttrAccessible as String)
+    query.removeValue(forKey: kSecValueData as String)
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var stored: CFTypeRef?
+    XCTAssertEqual(SecItemCopyMatching(query as CFDictionary, &stored), errSecSuccess)
+    let upgraded = try DeviceLinkStrictJSON.parseObject(try XCTUnwrap(stored as? Data), maximumBytes: 16 * 1024)
+    XCTAssertEqual(DeviceLinkStrictJSON.integer(upgraded["version"]), 2)
+    XCTAssertEqual((upgraded["local_recovery_audit"] as? [[String: Any]])?.count, 0)
   }
 
   private func randomHex(byteCount: Int) -> String? {

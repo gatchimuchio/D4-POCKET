@@ -6,7 +6,13 @@
 
 macOS projectは追加済みで、手動補助run 34446194013（commit 27b8713fd1a9ecdb81abe1d4225b99b26bda84ba）でmacOS開発app・iOS Simulator appとMac Rust64単体・5統合がPASSした。「macOS validation environmentがない」という旧記録は、この補助buildの取得前を指す。実機での起動・安全保管・対話は未確認でありrelease_blockerである。実機の製品supportや完成を主張しない。
 
-Android開発APK/AABはbuild済み。実機install以降、Windowsの中断された画面回帰、installed-path証拠、正式配布、owner GOはrelease_blockerとして保持する。開発検査のPASSはこれらのgateを解消しない。
+Android開発APK/AABは過去にbuild済みである。現行Mobile sourceは隔離Tempのfresh copyでclean・unit test・debug APK buildを通過した。実機install以降、Windowsの中断された画面回帰、installed-path証拠、正式配布、owner GOはrelease_blockerとして保持する。開発検査のPASSはこれらのgateを解消しない。
+
+- item: OneDrive内Android build出力のACL制約
+  classification: known_limitation
+  reason: このWindows hostのOneDrive workspaceではignored `apps/mobile_flutter/build`配下へ`Everyone Deny DeleteSubdirectoriesAndFiles`が継承され、Gradle標準cleanupとresource packagingが拒否される。現行Android／共有UI source 117 fileをhash照合したfresh Temp copyではcleanup除外なしのclean・unit test・APK buildが成功した。製品source問題またはrelease失敗の証拠ではない。
+  required_action: workspace pathでのin-place buildが必要な場合に限り、ACL管理者が継承元と範囲を確認して修正する。通常の検証はhash照合済みisolated Temp copyで実行できる。Codexはowner承認なしにACLを変更しない。
+  blocks_release: no
 
 
 このリポジトリで「release」とは、completed product release を意味する。skeleton、preview、alpha、beta、scaffold、contract-preview の状態は release state ではない。

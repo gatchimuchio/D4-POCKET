@@ -14,6 +14,7 @@ import javax.crypto.spec.GCMParameterSpec
 internal data class NativeDeviceState(
     val deviceId: String,
     val credential: Map<String, Any?>?,
+    val localRecoveryAudit: List<Map<String, Any?>> = emptyList(),
 )
 
 internal class DeviceLinkNativeStore(context: Context) {
@@ -35,8 +36,29 @@ internal class DeviceLinkNativeStore(context: Context) {
         cipher.updateAAD(AAD)
         val clear = cipher.doFinal(blob.second).toString(Charsets.UTF_8)
         val state = StrictJson.parseObject(clear, MAX_STATE_BYTES)
-        require(state.keys == setOf("version", "device_id", "credential"))
-        require(state["version"] == 1L)
+        val version = state["version"] as? Long ?: throw IllegalArgumentException("state version")
+        val audit = when (version) {
+            1L -> {
+                require(state.keys == setOf("version", "device_id", "credential"))
+                emptyList()
+            }
+            2L -> {
+                require(state.keys == setOf("version", "device_id", "credential", "local_recovery_audit"))
+                val rawEvents = state["local_recovery_audit"] as? List<*> ?: throw IllegalArgumentException("recovery audit")
+                require(rawEvents.size <= DeviceLinkLocalRecoveryAudit.MAX_EVENTS)
+                val events = rawEvents.map { raw ->
+                    val event = raw as? Map<*, *> ?: throw IllegalArgumentException("recovery event")
+                    require(event.keys.all { it is String })
+                    @Suppress("UNCHECKED_CAST")
+                    val typed = event as Map<String, Any?>
+                    require(DeviceLinkLocalRecoveryAudit.isValid(typed))
+                    typed
+                }
+                require(events.mapNotNull { it["event_id"] as? String }.toSet().size == events.size)
+                events
+            }
+            else -> throw IllegalArgumentException("state version")
+        }
         val deviceId = state["device_id"] as? String ?: throw IllegalArgumentException("device id")
         require(Regex("^[a-f0-9]{32}$").matches(deviceId))
         val credential = when (val value = state["credential"]) {
@@ -48,14 +70,14 @@ internal class DeviceLinkNativeStore(context: Context) {
             }
             else -> throw IllegalArgumentException("credential state")
         }
-        return NativeDeviceState(deviceId, credential)
+        return NativeDeviceState(deviceId, credential, audit)
     }
 
     @Synchronized
     fun storeCredential(credential: DeviceCredential): NativeDeviceState {
         val before = loadOrCreate()
         require(before.deviceId == credential.deviceId)
-        val next = NativeDeviceState(before.deviceId, credential.asJson())
+        val next = NativeDeviceState(before.deviceId, credential.asJson(), before.localRecoveryAudit)
         persist(next)
         val verified = loadOrCreate()
         require(verified == next)
@@ -65,19 +87,42 @@ internal class DeviceLinkNativeStore(context: Context) {
     @Synchronized
     fun deleteCredential(): NativeDeviceState {
         val before = loadOrCreate()
-        val next = NativeDeviceState(before.deviceId, null)
+        val next = NativeDeviceState(before.deviceId, null, before.localRecoveryAudit)
         persist(next)
         val verified = loadOrCreate()
         require(verified == next)
         return verified
     }
 
+    @Synchronized
+    fun deleteCredentialWithLocalRecoveryAudit(): NativeDeviceState {
+        val before = loadOrCreate()
+        require(before.credential != null)
+        val event = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
+            eventId = randomId(),
+            timestamp = DeviceLinkLocalRecoveryAudit.currentTimestamp(),
+        )
+        val events = DeviceLinkLocalRecoveryAudit.appendBounded(before.localRecoveryAudit, event)
+        val next = NativeDeviceState(before.deviceId, null, events)
+        persist(next)
+        val verified = loadOrCreate()
+        require(verified == next && verified.localRecoveryAudit.lastOrNull() == event)
+        return verified
+    }
+
+    @Synchronized
+    fun readLocalRecoveryAudit(): List<Map<String, Any?>> {
+        if (preferences.getString(STATE_KEY, null) == null) return emptyList()
+        return loadOrCreate().localRecoveryAudit
+    }
+
     private fun persist(state: NativeDeviceState) {
         val clear = StrictJson.encode(
             linkedMapOf(
-                "version" to 1L,
+                "version" to 2L,
                 "device_id" to state.deviceId,
                 "credential" to state.credential,
+                "local_recovery_audit" to state.localRecoveryAudit,
             ),
         ).toByteArray(Charsets.UTF_8)
         require(clear.size <= MAX_STATE_BYTES)
