@@ -1,8 +1,9 @@
-"""C28検証器の一時Broker資格file後始末の回帰試験。"""
+"""C28検証器のcleanupと診断境界の回帰試験。"""
 
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import call, Mock, patch
 
 from tooling import long_run_validation as c28
 
@@ -54,6 +55,78 @@ class RestartEndpointCleanupTests(unittest.TestCase):
         self.assertEqual(unlink.call_args_list, [call(run.session), call(run.owner_session)])
         self.assertEqual(run.stats.endpoint_cleanup_retries, 3)
         self.assertEqual(run.stats.as_dict()["Broker資格file削除再試行数"], 3)
+
+    def _http_handler(self):
+        state = c28.RuntimeState()
+        handler = object.__new__(c28.RuntimeHandler)
+        handler.path = "/health"
+        handler.server = SimpleNamespace(runtime_state=state)
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.wfile = Mock()
+        return handler, state
+
+    def test_fixture_status_is_recorded_after_response_flush(self):
+        handler, state = self._http_handler()
+        events = []
+        handler.wfile.write.side_effect = lambda _body: events.append("write")
+        handler.wfile.flush.side_effect = lambda: events.append("flush")
+        original_record = state.record_http_result
+
+        def record(path, status, detail=""):
+            events.append("record")
+            original_record(path, status, detail)
+
+        with (
+            patch.object(state, "record_http_result", side_effect=record),
+            patch.object(c28.time, "sleep"),
+        ):
+            handler._send({"ok": True})
+
+        self.assertEqual(events, ["write", "flush", "record"])
+        self.assertEqual(state.http_results[0]["detail"], "server_flush_succeeded")
+
+    def test_fixture_write_failure_records_only_error_class(self):
+        handler, state = self._http_handler()
+        handler.wfile.write.side_effect = BrokenPipeError("private detail must not be copied")
+        with (
+            self.assertRaises(BrokenPipeError),
+            patch.object(c28.time, "sleep"),
+        ):
+            handler._send({"ok": True})
+
+        self.assertEqual(
+            state.http_results,
+            [{"path": "/health", "status": 200, "detail": "server_write_failed:BrokenPipeError"}],
+        )
+
+    def test_transport_diagnostics_are_allowlisted_and_bounded(self):
+        lines = [
+            "C28_RUNTIME_DIAGNOSTIC|chat|read_body|ConnectionReset",
+            "C28_RUNTIME_DIAGNOSTIC|trace|read_headers|TimedOut",
+            "C28_RUNTIME_DIAGNOSTIC|chat|read_body|private-session-secret",
+            "C28_RUNTIME_DIAGNOSTIC|../secret|read_body|ConnectionReset",
+            "unrelated stderr containing private-session-secret",
+        ]
+        lines.extend(
+            f"C28_RUNTIME_DIAGNOSTIC|chat|read_body|ConnectionReset" for _ in range(40)
+        )
+
+        safe = c28.safe_c28_diagnostics("\n".join(lines))
+
+        self.assertEqual(len(safe), c28.C28_DIAGNOSTIC_LIMIT)
+        self.assertTrue(all("private-session-secret" not in line for line in safe))
+        self.assertTrue(all("../secret" not in line for line in safe))
+        self.assertEqual(safe[0], "C28_RUNTIME_DIAGNOSTIC|chat|read_body|ConnectionReset")
+
+    def test_error_report_omits_exception_message(self):
+        error = RuntimeError("CREDENTIAL_SENTINEL_001")
+
+        safe = c28.safe_c28_error_type(error)
+
+        self.assertEqual(safe, "RuntimeError")
+        self.assertNotIn("CREDENTIAL_SENTINEL_001", safe)
 
 
 if __name__ == "__main__":

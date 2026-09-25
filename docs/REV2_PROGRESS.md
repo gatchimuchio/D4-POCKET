@@ -1342,3 +1342,35 @@ Agent Adapter metadata検証を含むsource commit `8202ac796eba0909c9d5b83cf71e
   blocks_release: yes
 
 release blocker registryを変更せず、`release_ready=false`を維持する。
+
+
+## D4 Pocket rev2 C28 clean-source再試行の通信失敗（2026-09-25）
+
+cleanup修正commit `adc9e1d2f5e533e83e3b0f065ea6280d3585b77b`から開始した8時間再試行は、122.265秒後、`段階=network切断`でfailedとなった。証拠fileは`%LOCALAPPDATA%\GUI-Shell\development-evidence\c28-8h-adc9e1d-20260925.json`。対話成功35、予定した接続断失敗9、Broker再起動9、再接続18、資格file削除retry 0。失敗後の復旧対話はBroker上で`通信失敗`となり、本文・応答routeなしで完了記録された。
+
+同証拠のRuntime fixture観測では失敗した対話の`/api/chat`および`/api/trace` handlerまで到達し、status 200が記録されている。ただし現行fixtureはHTTP statusをresponse write前に記録するため、全response bytesのflushまたはRust Adapterによる受信を証明しない。この観測だけではBroker／Adapter側の通信失敗とfixture側の送信切断を切り分けられない。cleanup修正がこの失敗を解決したとは扱わない。
+
+- item: C28の8時間運用とRuntime切断後の復旧対話
+  classification: release_blocker
+  reason: clean commitでの8時間再試行が122.265秒後に通信失敗となり、現fixture evidenceはHTTP response送信完了を示さない。
+  required_action: fixtureのresponse flush結果とbounded transport error classを記録し、対話本文や資格を露出せず失敗層を特定する。原因修正後、clean committed sourceで長時間再試験を行う。
+  blocks_release: yes
+- item: C28 fixture HTTP statusの送信証拠範囲
+  classification: known_limitation
+  reason: statusがresponse write前に採取され、server handler到達は示すがclient受信を示さない。
+  required_action: status採取をwrite/flush後へ移し、送信失敗時はerror classのみを記録する。証拠をserver-side flush範囲に限定して説明する。
+  blocks_release: yes
+
+既存release blocker registryは変更せず、`release_ready=false`を維持する。
+
+追加のflush計測入り120秒再現も41.969秒後、`段階=Runtime相当再起動`で`通信失敗`となった。対話成功13、想定disconnect失敗3、Runtime相当再起動4、Broker再起動3、再接続7、資格file cleanup retry 0。直前のfixture `/api/chat`とtrace responseは全件`server_flush_succeeded`だったが、これはclient受信の証明ではない。そこでC28が起動するdebug Broker childに限り、Adapterのtransport失敗stageと標準error kindを、route分類付き・最大32行・payload非記録でstderrへ出す診断を追加した。検証器側は許可値だけをreportへ抽出し、生のstderrをreportへ複写しない。次の再現で得る診断は原因特定用であり、現時点で失敗原因やproduction動作を断定しない。
+
+## D4 Pocket rev2 C28 flush計測・transport診断付き短時間再現（2026-09-25）
+
+前回失敗の観測限界を閉じるため、Runtime fixtureはwrite／flush成功後にstatusを記録し、送信例外時は例外classだけを記録するよう変更した。debug Broker childにはopt-in診断を追加し、C28失敗reportは許可値に合う最大32件の固定transport分類だけを含む。例外messageとBroker stderr全文はreportへ出さず、例外型名のみを残す。これらの診断はfailure-onlyの補助情報で、通信成功やclient受信の保証ではない。
+
+- `python tooling/long_run_validation.py --duration-seconds 120 --output %LOCALAPPDATA%\GUI-Shell\development-evidence\c28-120s-diagnostics-20260925.json`: status `passed`、経過122.671秒、対話成功44、予定disconnect失敗11、Runtime相当再起動11、Broker再起動11、再接続22、資格file cleanup retry 0。対話最大1112.73ms。Broker working setは11,948,032～14,577,664 bytes、storeは14,113～675,297 bytes。観測区間中に予期しないtransport failureはなく、Rust診断の実失敗経路はこのrunでは発火していない。
+- `python -m unittest tooling.conformance_tests.test_long_run_validation`: 8 tests passed。資格file cleanup、flush前後の計測順、fixture write error class限定、diagnostic allowlist／32行上限、exception message非出力を検証。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::minidora`: 4 tests passed。対象fileの`rustfmt --edition 2021 --check`も成功。workspace全体の`cargo fmt --check`は変更外の既存Rust filesに大量のformat差分があるため失敗し、全体整形は行っていない。
+
+これは未commit作業ツリーでの120秒development fixture測定であり、先行したclean sourceの8時間失敗を解消した証拠ではない。C28 release blockerは維持し、次はclean committed sourceで8時間検証を再実施する。既存release blocker registryは変更せず`release_ready=false`を維持する。

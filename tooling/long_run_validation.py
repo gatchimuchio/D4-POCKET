@@ -34,6 +34,46 @@ HELPER_BINARY = HELPER_ROOT / "target" / "debug" / (
 MAX_REPORT_SAMPLES = 512
 C28_ENDPOINT_UNLINK_MAX_ATTEMPTS = 20
 C28_ENDPOINT_UNLINK_RETRY_SECONDS = 0.05
+C28_DIAGNOSTIC_PREFIX = "C28_RUNTIME_DIAGNOSTIC|"
+C28_DIAGNOSTIC_ROUTES = {"health", "capabilities", "chat", "trace", "other"}
+C28_DIAGNOSTIC_STAGES = {
+    "connect",
+    "configure_read_timeout",
+    "configure_write_timeout",
+    "write_request",
+    "read_headers",
+    "response_status",
+    "read_body",
+}
+C28_DIAGNOSTIC_DETAILS = {
+    "ConnectionRefused",
+    "ConnectionReset",
+    "ConnectionAborted",
+    "HostUnreachable",
+    "NetworkUnreachable",
+    "NetworkDown",
+    "NetworkReset",
+    "NotConnected",
+    "AddrNotAvailable",
+    "AddrInUse",
+    "BrokenPipe",
+    "AlreadyExists",
+    "WouldBlock",
+    "TimedOut",
+    "Interrupted",
+    "UnexpectedEof",
+    "PermissionDenied",
+    "NotFound",
+    "InvalidInput",
+    "InvalidData",
+    "WriteZero",
+    "Unsupported",
+    "OutOfMemory",
+    "Other",
+    "zero_bytes",
+    "not_200_or_invalid_version",
+}
+C28_DIAGNOSTIC_LIMIT = 32
 
 
 def json_bytes(value: Any) -> bytes:
@@ -47,6 +87,32 @@ def payload_hash(value: Any) -> str:
 
 def now_text() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def safe_c28_diagnostics(stderr_text: str) -> list[str]:
+    """Broker stderrから固定形式のtransport分類だけを最大32行抽出する。"""
+    safe = []
+    for line in stderr_text.splitlines():
+        if not line.startswith(C28_DIAGNOSTIC_PREFIX):
+            continue
+        fields = line[len(C28_DIAGNOSTIC_PREFIX) :].split("|")
+        if len(fields) != 3:
+            continue
+        route, stage, detail = fields
+        if (
+            route not in C28_DIAGNOSTIC_ROUTES
+            or stage not in C28_DIAGNOSTIC_STAGES
+            or detail not in C28_DIAGNOSTIC_DETAILS
+        ):
+            continue
+        safe.append(f"{C28_DIAGNOSTIC_PREFIX}{route}|{stage}|{detail}")
+    return safe[-C28_DIAGNOSTIC_LIMIT:]
+
+
+def safe_c28_error_type(error: BaseException) -> str:
+    """例外messageを含めず、report用の型名だけ返す。"""
+    name = type(error).__name__
+    return name if name.isascii() and name.isidentifier() else "Exception"
 
 
 def unlink_restart_endpoint(path: Path) -> int:
@@ -228,14 +294,20 @@ class RuntimeHandler(http.server.BaseHTTPRequestHandler):
 
     def _send(self, body: dict[str, Any], status: int = 200) -> None:
         encoded = json_bytes(body)
-        self._state().record_http_result(self.path, status)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(encoded)
-        self.wfile.flush()
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(encoded)
+            self.wfile.flush()
+        except OSError as error:
+            self._state().record_http_result(
+                self.path, status, f"server_write_failed:{type(error).__name__}"
+            )
+            raise
+        self._state().record_http_result(self.path, status, "server_flush_succeeded")
         time.sleep(0.005)
 
     def do_GET(self) -> None:
@@ -485,6 +557,8 @@ class LongRun:
     def start_broker(self) -> None:
         self._paths_for_restart()
         stderr = self.stderr.open("ab")
+        broker_env = os.environ.copy()
+        broker_env["GUI_SHELL_C28_DIAGNOSTICS"] = "1"
         process = subprocess.Popen(
             [
                 str(HELPER_BINARY),
@@ -504,6 +578,7 @@ class LongRun:
             cwd=HELPER_ROOT,
             stdout=subprocess.DEVNULL,
             stderr=stderr,
+            env=broker_env,
         )
         try:
             endpoint = require_endpoint(wait_for_file(self.session, process))
@@ -835,10 +910,20 @@ def main() -> int:
         return 0
     except BaseException as error:
         report.status = "failed"
-        detail = ""
+        diagnostics: list[str] = []
         if run.stderr.exists():
-            detail = run.stderr.read_text(encoding="utf-8", errors="replace")[-4000:]
-        report.error = str(error) + (f" / Broker stderr: {detail}" if detail else "")
+            try:
+                with run.stderr.open("rb") as stream:
+                    stream.seek(0, os.SEEK_END)
+                    size = stream.tell()
+                    stream.seek(max(0, size - 64 * 1024), os.SEEK_SET)
+                    diagnostics = safe_c28_diagnostics(
+                        stream.read().decode("utf-8", errors="replace")
+                    )
+            except OSError:
+                diagnostics = []
+        detail = " / Runtime transport diagnostics: " + "; ".join(diagnostics) if diagnostics else ""
+        report.error = safe_c28_error_type(error) + detail
         run.last_phase = run.last_phase or "失敗"
         run.sample(run.last_phase)
         run.refresh_report()

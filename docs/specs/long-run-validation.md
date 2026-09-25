@@ -17,6 +17,10 @@
 
 Broker再起動時に検証器自身が所有する一時normal／owner資格fileを削除する。既に存在しないfileは正常とする。削除が`PermissionError`となった場合は最大20回、50ms間隔で再試行し、成功した再試行回数を`Broker資格file削除再試行数`として報告する。上限後も削除できない場合はC28をfailedにする。資格file cleanup以外のBroker操作、Audit、store失敗は再試行で成功へ変換しない。
 
+Runtime fixtureのHTTP resultは、status lineとbodyのwrite／flush後に`server_flush_succeeded`として記録する。書込み例外時は本文や資格を含めず例外classだけを`server_write_failed:<class>`として記録して再送出する。この証拠はfixture server側のflush結果であり、client processがresponseを受信・検証したことまでは証明しない。
+
+C28のdevelopment Broker起動時だけ`GUI_SHELL_C28_DIAGNOSTICS=1`を子processへ渡す。debug buildのMINIDORA AdapterはHTTP transport失敗時に、固定route分類、固定stage、標準I/O error kindだけをstderrへ最大32行記録する。URL、trace ID、request／response body、credential、error messageは記録しない。検証器は許可値と形式が一致する行だけを最大32行reportへ採用し、Broker stderr全文も例外messageもreportへ複写しない。失敗reportの`エラー`は例外型名と採用済みtransport分類だけを含む。release buildでは診断は無効である。診断は失敗位置を分類する補助証拠で、対話成功やclient受信を証明しない。
+
 既定の短時間smokeは通常検証から実行できる。8時間の実測は次で明示的に開始する。
 
 ```text

@@ -7154,7 +7154,7 @@ def test_desktop_agent_center_required_surface_exists() -> list[str]:
     return [f"エージェントセンターにsurfaceがない: {item}" for item in required if item not in text]
 
 
-def test_c28_restart_endpoint_cleanup_retry_is_bounded() -> list[str]:
+def test_c28_harness_regressions_are_registered() -> list[str]:
     result = subprocess.run(
         [sys.executable, "-m", "unittest", "tooling.conformance_tests.test_long_run_validation"],
         cwd=ROOT,
@@ -7366,7 +7366,7 @@ def main() -> int:
         test_desktop_setup_doctor_ui_does_not_require_development_toolchains,
         test_broker_parity_startup_timeout_allows_local_cold_build,
         test_broker_parity_waits_after_process_kill,
-        test_c28_restart_endpoint_cleanup_retry_is_bounded,
+        test_c28_harness_regressions_are_registered,
         test_desktop_agent_center_required_surface_exists,
     ]
     errors = []

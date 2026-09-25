@@ -7,6 +7,43 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+#[cfg(debug_assertions)]
+static C28_DIAGNOSTIC_LINES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+const C28_DIAGNOSTIC_LIMIT: usize = 32;
+
+fn c28_route_label(route: &str) -> &'static str {
+    match route {
+        "/health" => "health",
+        "/api/capabilities" => "capabilities",
+        "/api/chat" => "chat",
+        value if value.starts_with("/api/trace/") => "trace",
+        _ => "other",
+    }
+}
+
+#[cfg(debug_assertions)]
+fn c28_diagnostic(route: &str, stage: &'static str, detail: &str) {
+    let enabled = std::env::var_os("GUI_SHELL_C28_DIAGNOSTICS")
+        .is_some_and(|value| value == std::ffi::OsStr::new("1"));
+    if !enabled || C28_DIAGNOSTIC_LINES.fetch_add(1, Ordering::Relaxed) >= C28_DIAGNOSTIC_LIMIT {
+        return;
+    }
+    eprintln!(
+        "C28_RUNTIME_DIAGNOSTIC|{}|{}|{}",
+        c28_route_label(route),
+        stage,
+        detail
+    );
+}
+
+#[cfg(not(debug_assertions))]
+fn c28_diagnostic(_route: &str, _stage: &'static str, _detail: &str) {}
+
+fn c28_io_diagnostic(route: &str, stage: &'static str, error: &std::io::Error) {
+    c28_diagnostic(route, stage, &format!("{:?}", error.kind()));
+}
+
 pub struct MinidoraAdapter {
     接続先: SocketAddr,
 }
@@ -30,13 +67,22 @@ impl MinidoraAdapter {
             &self.接続先,
             Duration::from_secs(1).min(期限.saturating_duration_since(Instant::now())),
         )
-        .map_err(|_| 対話失敗::通信失敗)?;
+        .map_err(|error| {
+            c28_io_diagnostic(経路, "connect", &error);
+            対話失敗::通信失敗
+        })?;
         stream
             .set_read_timeout(Some(Duration::from_millis(100)))
-            .map_err(|_| 対話失敗::通信失敗)?;
+            .map_err(|error| {
+                c28_io_diagnostic(経路, "configure_read_timeout", &error);
+                対話失敗::通信失敗
+            })?;
         stream
             .set_write_timeout(Some(Duration::from_millis(100)))
-            .map_err(|_| 対話失敗::通信失敗)?;
+            .map_err(|error| {
+                c28_io_diagnostic(経路, "configure_write_timeout", &error);
+                対話失敗::通信失敗
+            })?;
         let method = if 本文.is_some() { "POST" } else { "GET" };
         let bytes = 本文.unwrap_or_default();
         let mut request = format!("{method} {経路} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", self.接続先, bytes.len()).into_bytes();
@@ -45,10 +91,16 @@ impl MinidoraAdapter {
         while sent < request.len() {
             時間確認(取消, 期限)?;
             match stream.write(&request[sent..]) {
-                Ok(0) => return Err(対話失敗::通信失敗),
+                Ok(0) => {
+                    c28_diagnostic(経路, "write_request", "zero_bytes");
+                    return Err(対話失敗::通信失敗);
+                }
                 Ok(n) => sent += n,
                 Err(e) if 待機可能(&e) => continue,
-                Err(_) => return Err(対話失敗::通信失敗),
+                Err(error) => {
+                    c28_io_diagnostic(経路, "write_request", &error);
+                    return Err(対話失敗::通信失敗);
+                }
             }
         }
         let mut buffer = Vec::new();
@@ -56,13 +108,20 @@ impl MinidoraAdapter {
         let (開始, 長さ) = loop {
             時間確認(取消, 期限)?;
             match stream.read(&mut chunk) {
-                Ok(0) => return Err(対話失敗::応答不正),
+                Ok(0) => {
+                    c28_diagnostic(経路, "read_headers", "UnexpectedEof");
+                    return Err(対話失敗::応答不正);
+                }
                 Ok(n) => buffer.extend_from_slice(&chunk[..n]),
                 Err(e) if 待機可能(&e) => continue,
-                Err(_) => return Err(対話失敗::通信失敗),
+                Err(error) => {
+                    c28_io_diagnostic(経路, "read_headers", &error);
+                    return Err(対話失敗::通信失敗);
+                }
             }
             if let Some(pos) = buffer.windows(4).position(|v| v == b"\r\n\r\n") {
                 if pos > 16384 {
+                    c28_diagnostic(経路, "read_headers", "InvalidData");
                     return Err(対話失敗::応答不正);
                 }
                 let header =
@@ -72,6 +131,7 @@ impl MinidoraAdapter {
                 if !matches!(status.next(), Some("HTTP/1.0" | "HTTP/1.1"))
                     || status.next() != Some("200")
                 {
+                    c28_diagnostic(経路, "response_status", "not_200_or_invalid_version");
                     return Err(対話失敗::通信失敗);
                 }
                 let mut length = None;
@@ -112,6 +172,7 @@ impl MinidoraAdapter {
                 break (pos + 4, length);
             }
             if buffer.len() > 16384 {
+                c28_diagnostic(経路, "read_headers", "InvalidData");
                 return Err(対話失敗::応答不正);
             }
         };
@@ -119,13 +180,20 @@ impl MinidoraAdapter {
             時間確認(取消, 期限)?;
             let limit = chunk.len().min(開始 + 長さ - buffer.len());
             match stream.read(&mut chunk[..limit]) {
-                Ok(0) => return Err(対話失敗::応答不正),
+                Ok(0) => {
+                    c28_diagnostic(経路, "read_body", "UnexpectedEof");
+                    return Err(対話失敗::応答不正);
+                }
                 Ok(n) => buffer.extend_from_slice(&chunk[..n]),
                 Err(e) if 待機可能(&e) => continue,
-                Err(_) => return Err(対話失敗::通信失敗),
+                Err(error) => {
+                    c28_io_diagnostic(経路, "read_body", &error);
+                    return Err(対話失敗::通信失敗);
+                }
             }
         }
         if buffer.len() != 開始 + 長さ {
+            c28_diagnostic(経路, "read_body", "InvalidData");
             return Err(対話失敗::応答不正);
         }
         時間確認(取消, 期限)?;
@@ -335,5 +403,14 @@ mod tests {
         ] {
             assert!(MinidoraAdapter::new(addr).is_err());
         }
+    }
+
+    #[test]
+    fn C28診断は外部pathを固定route分類へ縮約する() {
+        assert_eq!(c28_route_label("/health"), "health");
+        assert_eq!(c28_route_label("/api/capabilities"), "capabilities");
+        assert_eq!(c28_route_label("/api/chat"), "chat");
+        assert_eq!(c28_route_label("/api/trace/0123456789abcdef"), "trace");
+        assert_eq!(c28_route_label("/unexpected/path"), "other");
     }
 }

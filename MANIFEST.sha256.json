@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6092cda3928ab1cec925cd311d85cce5f345d6265a7d727ef8fa51566692067f"
+      "sha256": "c32c3f47aa8c4919724981fe2114f328b51de3fe729d068cbe38f686b2969ae6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1361,7 +1361,7 @@
     },
     {
       "path": "docs/specs/long-run-validation.md",
-      "sha256": "e9d97d2cad7d66f75c31d895a1f37d36d5b38b463384a6c6b7f26a3960801e8a"
+      "sha256": "d2672e00cd25c5ba250d9873b3b49ab3aa94aa4d3ada6013473467a0f7c127da"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
@@ -2665,7 +2665,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "cb0f8e6b8cf5cb6ba37c426d03e0b6779ae6b7db800b60f9a9e15f4dfe713daf"
+      "sha256": "ee63dc9ab3992ed3251c1506c6fe1607223279c9e3652e884dc701ff9032c57b"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
@@ -3901,11 +3901,11 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "915f1979a30267ae03f1ccb110cd4da65476ac71a3677007acfc7042b1c4caf6"
+      "sha256": "5779daf95c39bd96945bd788202c0dd3ca1d46d14f4546c8cc9029dcba748087"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
-      "sha256": "7ed756a0708d4883b34db5650c162b2882205c52e46f1554677f817a09535f29"
+      "sha256": "1605b5c62f09ad2a1c6cfbef97abfe2c7c7aed23aa8c84cb406d393c4079580b"
     },
     {
       "path": "tooling/conformance_tests/test_windows_anchor_collector.py",
@@ -3945,7 +3945,7 @@
     },
     {
       "path": "tooling/long_run_validation.py",
-      "sha256": "aca818e35739d37457c40fcf3ce60a0d8209821903c30e156520073cde9b6250"
+      "sha256": "f9aee3b906a3f3068a9ec3446a4d51b52b6559e23272a17da90d01500221d23f"
     },
     {
       "path": "tooling/manifest.py",
