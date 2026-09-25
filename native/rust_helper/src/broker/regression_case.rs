@@ -63,6 +63,18 @@ pub(crate) struct OwnerRecoveryConfirmationSummary {
     pub case_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OwnerRegistrationConfirmationSummary {
+    pub request_id: String,
+    pub request_hash: String,
+    pub display_name: String,
+    pub expected_status: String,
+    pub input_characters: usize,
+    pub required_condition_count: usize,
+    pub forbidden_condition_count: usize,
+    pub required_reference_count: usize,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct 削除意図 {
@@ -487,6 +499,29 @@ pub(crate) fn owner_recovery_confirmation_summary(
     let request = parse_delete_recovery_request(payload)?;
     Ok(OwnerRecoveryConfirmationSummary {
         case_id: request.case_id,
+    })
+}
+
+pub(crate) fn owner_registration_confirmation_summary(
+    payload: &Value,
+) -> Result<OwnerRegistrationConfirmationSummary, ()> {
+    let registration: 登録指定 = serde_json::from_value(payload.clone()).map_err(|_| ())?;
+    if !valid_registration(&registration) || contains_secret_marker_in_registration(&registration) {
+        return Err(());
+    }
+    let encoded = serde_json::to_vec(&registration).map_err(|_| ())?;
+    if encoded.len() > MAX_OWNER_REGRESSION_BYTES {
+        return Err(());
+    }
+    Ok(OwnerRegistrationConfirmationSummary {
+        request_id: registration.要求ID,
+        request_hash: registration.要求hash,
+        display_name: registration.公開表示名,
+        expected_status: registration.期待状態,
+        input_characters: registration.入力.本文.chars().count(),
+        required_condition_count: registration.必要条件.len(),
+        forbidden_condition_count: registration.禁止条件.len(),
+        required_reference_count: registration.必要参照.len(),
     })
 }
 

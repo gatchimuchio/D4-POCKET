@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'regression_case_owner_client.dart';
 import 'runtime_dialogue_client.dart';
 
 /// 対話の表示と入力だけを所有する。実行の採否はbrokerから取得する。
@@ -8,10 +9,12 @@ class RuntimeDialogueScreen extends StatefulWidget {
       {super.key,
       required this.connect,
       this.client,
+      this.connectOwnerRegistration,
       this.readOnly = false,
       this.active = true});
   final Future<RuntimeDialogueClient> Function() connect;
   final RuntimeDialogueClient? client;
+  final Future<RegressionCaseOwnerClient> Function()? connectOwnerRegistration;
   final bool readOnly;
   final bool active;
   @override
@@ -22,10 +25,12 @@ class _Conversation {
   String? runtime;
   String? session;
   String? request;
+  String? requestHash;
   String state = '未開始';
   String? error;
   DialogueResult? result;
   DialogueExecutionRecord? record;
+  RegressionCaseRegistrationReceipt? registrationReceipt;
   bool pending = false;
   bool busy = false;
   bool polling = false;
@@ -91,8 +96,10 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       setState(() {
         side.session = null;
         side.request = null;
+        side.requestHash = null;
         side.result = null;
         side.record = null;
+        side.registrationReceipt = null;
         side.state = '未開始';
       });
       if (!widget.active) return;
@@ -104,8 +111,10 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       setState(() {
         side.session = session;
         side.request = null;
+        side.requestHash = null;
         side.result = null;
         side.record = null;
+        side.registrationReceipt = null;
         side.state = '入力待ち';
       });
     } catch (_) {
@@ -127,16 +136,18 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       side.busy = true;
       side.result = null;
       side.record = null;
+      side.registrationReceipt = null;
       side.error = null;
     });
     try {
-      final request = await client.send(side.session!, input);
+      final request = await client.sendReference(side.session!, input);
       if (!mounted) {
-        await client.cancel(request);
+        await client.cancel(request.requestId);
         return;
       }
       setState(() {
-        side.request = request;
+        side.request = request.requestId;
+        side.requestHash = request.requestHash;
         side.state = '承認待ち';
         side.pending = true;
       });
@@ -251,8 +262,10 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       setState(() {
         side.session = null;
         side.request = null;
+        side.requestHash = null;
         side.result = null;
         side.record = null;
+        side.registrationReceipt = null;
         side.state = '未開始';
         side.error = null;
       });
@@ -264,6 +277,44 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
       if (mounted) {
         setState(() => side.busy = false);
       }
+    }
+  }
+
+  bool _canRegister(_Conversation side) {
+    final result = side.result;
+    final record = side.record;
+    return widget.connectOwnerRegistration != null &&
+        !widget.readOnly &&
+        widget.active &&
+        side.request != null &&
+        side.requestHash != null &&
+        result != null &&
+        result.text('表示範囲') == 'full' &&
+        const {'成功', '保留'}.contains(result.text('状態')) &&
+        record != null &&
+        record.audit('終了監査ID') != '未記録';
+  }
+
+  Future<void> _registerCase(_Conversation side) async {
+    if (!_canRegister(side) || side.busy || side.pending) return;
+    final requestId = side.request!;
+    final requestHash = side.requestHash!;
+    final expectedStatus = side.result!.text('状態');
+    final receipt = await showDialog<RegressionCaseRegistrationReceipt>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _RegressionCaseRegistrationDialog(
+        requestId: requestId,
+        requestHash: requestHash,
+        expectedStatus: expectedStatus,
+        connectOwner: widget.connectOwnerRegistration!,
+      ),
+    );
+    if (receipt != null && mounted) {
+      setState(() => side.registrationReceipt = receipt);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('回帰Caseを保存しました: ${receipt.caseId}')),
+      );
     }
   }
 
@@ -407,6 +458,8 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
                 if (side.session != null)
                   SelectableText('セッション: ${side.session}'),
                 if (side.request != null) SelectableText('要求: ${side.request}'),
+                if (side.requestHash != null)
+                  SelectableText('要求hash: ${side.requestHash}'),
                 if (side.state == '承認待ち') const Text('ownerの承認操作を待っています。'),
                 if (side.request != null && side.record == null)
                   const Text('実行記録は未取得です。'),
@@ -444,8 +497,230 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
                   for (final key in ['経路', '追跡ID', '追跡hash', '応答hash'])
                     if (result.text(key).isNotEmpty)
                       SelectableText('$key: ${result.text(key)}'),
+                  if (_canRegister(side))
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        key: ValueKey('dialogue-register-case-${side.request}'),
+                        onPressed: active || side.busy
+                            ? null
+                            : () => _registerCase(side),
+                        icon: const Icon(Icons.bookmark_add_outlined),
+                        label: const Text('この完了結果から回帰Caseを登録'),
+                      ),
+                    ),
                 ],
+                if (side.registrationReceipt != null)
+                  SelectableText(
+                    '登録済み回帰事例: ${side.registrationReceipt!.caseId}\n'
+                    '定義ハッシュ: ${side.registrationReceipt!.definitionHash}\n'
+                    '監査ID: ${side.registrationReceipt!.auditId}',
+                  ),
               ],
             )));
   }
+}
+
+class _RegressionCaseRegistrationDialog extends StatefulWidget {
+  const _RegressionCaseRegistrationDialog({
+    required this.requestId,
+    required this.requestHash,
+    required this.expectedStatus,
+    required this.connectOwner,
+  });
+
+  final String requestId;
+  final String requestHash;
+  final String expectedStatus;
+  final Future<RegressionCaseOwnerClient> Function() connectOwner;
+
+  @override
+  State<_RegressionCaseRegistrationDialog> createState() =>
+      _RegressionCaseRegistrationDialogState();
+}
+
+class _RegressionCaseRegistrationDialogState
+    extends State<_RegressionCaseRegistrationDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _displayName = TextEditingController();
+  final _redactedInput = TextEditingController();
+  final _requiredConditions = TextEditingController();
+  final _forbiddenConditions = TextEditingController();
+  final _requiredReferences = TextEditingController();
+  final _expectedRoute = TextEditingController();
+  String? _error;
+  bool _busy = false;
+
+  List<String> _lines(TextEditingController controller) => controller.text
+      .split('\n')
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList(growable: false);
+
+  String? _listError(String? value, int maximumItems, int maximumLength) {
+    final entries = (value ?? '')
+        .split('\n')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
+    if (entries.length > maximumItems ||
+        entries.any((entry) => entry.runes.length > maximumLength)) {
+      return '1行1件で、件数・文字数の上限内にしてください';
+    }
+    return null;
+  }
+
+  Future<void> _submit() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final owner = await widget.connectOwner();
+      final receipt = await owner.register(
+        requestId: widget.requestId,
+        requestHash: widget.requestHash,
+        displayName: _displayName.text,
+        redactedInput: _redactedInput.text,
+        requiredConditions: _lines(_requiredConditions),
+        forbiddenConditions: _lines(_forbiddenConditions),
+        expectedStatus: widget.expectedStatus,
+        requiredReferences: _lines(_requiredReferences),
+        expectedRoute: _expectedRoute.text,
+      );
+      if (mounted) Navigator.of(context).pop(receipt);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = '登録を確認できません。対象結果、Windows確認、Broker監査を確認してください。';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _displayName.dispose();
+    _redactedInput.dispose();
+    _requiredConditions.dispose();
+    _forbiddenConditions.dispose();
+    _requiredReferences.dispose();
+    _expectedRoute.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('回帰Caseのowner登録'),
+        content: SizedBox(
+          width: 560,
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('対象要求ID: ${widget.requestId}'),
+                  SelectableText('対象要求hash: ${widget.requestHash}'),
+                  Text('Brokerで完了確認済みの結果状態: ${widget.expectedStatus}'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '元の対話本文は自動コピーしません。下記には秘密を除いた再現用定義だけを記入してください。'
+                    '既知の秘密候補検査は、秘密が含まれないことを保証しません。登録内容はprivate保管されます。',
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-name'),
+                    controller: _displayName,
+                    maxLength: 128,
+                    decoration: const InputDecoration(
+                      labelText: '公開表示名',
+                      helperText: '通常一覧に表示されます',
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? '入力してください'
+                        : null,
+                  ),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-input'),
+                    controller: _redactedInput,
+                    minLines: 2,
+                    maxLines: 5,
+                    maxLength: 4096,
+                    decoration: const InputDecoration(
+                      labelText: '秘密を除いた再現入力',
+                      helperText: '対話時の入力を貼り付けず、必要な内容を自分で書き直してください',
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'サニタイズ済み入力を記入してください'
+                        : null,
+                  ),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-required'),
+                    controller: _requiredConditions,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '必要条件（1行1件、任意）',
+                    ),
+                    validator: (value) => _listError(value, 16, 512),
+                  ),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-forbidden'),
+                    controller: _forbiddenConditions,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '禁止条件（1行1件、任意）',
+                    ),
+                    validator: (value) => _listError(value, 16, 512),
+                  ),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-references'),
+                    controller: _requiredReferences,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '必要参照（1行1件、任意）',
+                    ),
+                    validator: (value) => _listError(value, 64, 2048),
+                  ),
+                  TextFormField(
+                    key: const ValueKey('regression-registration-route'),
+                    controller: _expectedRoute,
+                    maxLength: 256,
+                    decoration: const InputDecoration(labelText: '期待経路'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? '入力してください'
+                        : null,
+                  ),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            key: const ValueKey('regression-registration-submit'),
+            onPressed: _busy ? null : _submit,
+            child: Text(_busy ? 'native確認待ち' : '登録を依頼'),
+          ),
+        ],
+      );
 }

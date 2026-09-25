@@ -30,12 +30,14 @@ Windows Desktop production pathではRust起動器が固定する`%LOCALAPPDATA%
 
 削除承認Audit後にfile削除または結果Auditが不確定になった場合、Caseは`削除結果未確定`として通常一覧から除外し、再削除を自動実行しない。`回帰Case削除中断確認`はownerがCase IDを指定し、現在のProtectedStoreを再観測して状態を`LIVE_RUNTIME`で記録する。対象暗号文が不在なら`暗号文不在・中断照合済み`として削除対象一覧から除外するが、媒体の物理消去を主張しない。同一ciphertext hashのfileが残っている場合だけ`暗号文残存・再試行可能`を記録して通常一覧へ戻し、再試行には新しいowner要求と削除承認Auditを必要とする。別hash、再解析点、監査不整合、照合競合はfail-closedとする。
 
-Desktop UIは既存PID-bound Rust Named Pipeから通常Broker要求を送り、起動器が削除／中断照合それぞれの固定summaryをWindows native確認へ表示する。確認Yesの場合だけ、既存capacity-1 process内channelを通じてBroker所有threadが処理する。許可操作は`回帰Case削除`と`回帰Case削除中断確認`に限定し、候補時とBroker処理時に要求のsession、desktop metadata、時刻、payload hash、nonce、各operation contractを検証する。確認No、期限切れ、不正payload、allowlist外operationは通常資格経路へ戻し、Ownerとして扱わない。削除確認はCase IDと両hashを、中断照合確認はCase IDを表示する。秘密値、Owner資格、Owner roleはFlutterへ渡さない。
+Desktop UIは既存PID-bound Rust Named Pipeから通常Broker要求を送り、起動器が登録／削除／中断照合それぞれの固定summaryをWindows native確認へ表示する。確認Yesの場合だけ、既存capacity-1 process内channelを通じてBroker所有threadが処理する。許可操作は`回帰Case登録`、`回帰Case削除`、`回帰Case削除中断確認`に限定し、候補時とBroker処理時に要求のsession、desktop metadata、時刻、payload hash、nonce、各operation contractを検証する。確認No、期限切れ、不正payload、allowlist外operationは通常資格経路へ戻し、Ownerとして扱わない。削除確認はCase IDと両hash、中断照合確認はCase ID、登録確認は公開表示名と対象要求・件数だけを表示する。秘密値、Owner資格、Owner roleはFlutterへ渡さない。
+
+Desktopの登録UIは完了結果の対話paneからのみ開始し、送信受付時にBrokerが返した要求ID/hashを固定して渡す。表示範囲が`full`で、結果が成功または保留、実行記録に終了監査IDがある場合だけ操作を表示する。元の対話入力・応答を登録欄へ自動転記せず、ownerが公開名、サニタイズ済み入力、条件、参照、期待経路を明示入力する。要求hashは結果との相関値でありowner確認ではない。登録はRust起動器の固定allowlistとoperation別native確認を通り、確認画面は公開名、対象要求、状態、件数、owner入力の文字数、payload hashだけを表示する。入力本文・条件・参照・期待経路は確認画面、Audit、receiptへ出さず、BrokerはYes後にも現在の対話証跡と保管条件を再検証する。native確認はWindows accountの再認証や本人性証明ではない。
 
 中断照合要求が受け取るのは版とCase IDだけであり、削除承認監査IDを要求側から受け付けない。Brokerは永続Auditから現在の未確定削除一件を導出するため、履歴や画面入力の承認IDを再利用できない。Windows native確認は現在のWindows session上の明示操作であり、Windows account再認証や本人性証明ではない。
 
 ## C5との境界と延期
 
-C6のreceiptはC5のDatasetへ自動で追加されず、Dataset revisionや評価結果を生成しない。将来のC5 importは別のowner操作、別revision、再検証を持つ独立変更とする。Desktop画面は公開一覧とOwner確認付き削除／中断照合を提供するが、登録UI、private定義閲覧、実行、C5 importは行わない。
+C6のreceiptはC5のDatasetへ自動で追加されず、Dataset revisionや評価結果を生成しない。将来のC5 importは別のowner操作、別revision、再検証を持つ独立変更とする。Desktop画面は公開一覧、完了対話からのowner登録、Owner確認付き削除／中断照合を提供する。private定義閲覧、実行、C5 importは行わない。
 
 このcontractの成立は、実行系のhealth、Permission、Approval、Authority、security integrity、release readinessの証拠ではない。失敗時は要求修正、対話再確認、保管監査修復などのRecoveryActionへ接続し、入力本文をエラー、Audit、traceへ出さない。

@@ -12,6 +12,8 @@
 
 要求は `要求ID`、`実行系ID`、`対話セッションID`、`入力` を必須とする。入力は空白だけを拒否し、1〜4096文字に限る。要求IDとセッションIDは broker が生成する128bit以上の乱数に由来する識別子とし、構造検証の成功だけを乱数生成や権限の証拠にしない。
 
+`対話送信`の受付receiptはBrokerが生成した`要求ID`、`要求hash`、`状態=承認待ち`、Unix秒の`期限`だけを返す。受付receiptの構造は`runtime_dialogue_submission_receipt.schema.json`で検証する。要求hashは現在要求との相関値であり、ownerの再確認やC6登録の候補特定に使えても、Approval、Permission、Owner資格、実行許可を生成しない。期限の到来だけで状態を成功へ読み替えない。
+
 実行系IDは登録済み識別子を参照する。要求中の任意 URL、port、Adapter 名、Permission、Approval、authority_source、metadata から実行先や権限を作らない。未知の追加fieldは拒否する。セッションは作成後に実行系を変更しない。別実行系への切替は別セッションを作る。同一セッションの同時送信は拒否し、再送は新しい要求として操作者が判断する。
 
 実行系列挙は一意な実行系IDの一覧とする。消費側は重複IDを選択欄へ渡さず応答不正として拒否し、黙って重複排除して正常応答にしない。空一覧を許容し、一意な一覧の返却順序を保持する。
@@ -69,7 +71,7 @@ UIの応答照会に伴う遅延例外も元の要求に結合する。中止済
 
 ## 接続と完成証拠
 
-四つの JSON Schema を `specs/runtime_dialogue_*.schema.json` に置く。Schema catalog と conformance が構造・関係・拒否ケースを消費する。これは契約検証の完成範囲である。
+五つの JSON Schema を `specs/runtime_dialogue_*.schema.json` に置く。送信受付receiptも、Broker発行hashをowner UIが結果との相関に使うための独立Schema・fixture・Conformanceを持つ。Schema catalog と conformance が構造・関係・拒否ケースを消費する。これは契約検証の完成範囲である。
 
 - item: 製品対話・Adapter・Desktop / Mobile・端末連携への接続
   classification: release_blocker

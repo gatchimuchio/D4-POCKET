@@ -8,6 +8,7 @@ export 'package:gui_shell_ui/regression_case_client.dart'
         RegressionCaseDeleteReceipt,
         RegressionCaseOwnerClient,
         RegressionCasePage,
+        RegressionCaseRegistrationReceipt,
         RegressionCaseRecoveryReceipt,
         RegressionCaseSummary;
 

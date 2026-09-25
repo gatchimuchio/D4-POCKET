@@ -35,7 +35,8 @@ mod evaluation_control;
 mod regression_case;
 pub(crate) use regression_case::{
     owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
-    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+    owner_registration_confirmation_summary, OwnerDeleteConfirmationSummary,
+    OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
 };
 
 const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
@@ -1087,6 +1088,7 @@ impl Broker {
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
+                    | BrokerOperation::回帰Case登録
             )
         );
         if !operation_is_allowlisted

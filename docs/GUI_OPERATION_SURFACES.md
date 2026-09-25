@@ -129,8 +129,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: owner controlの登録は完了済み通常対話の要求ID/hash、表示範囲、永続結果証跡、終了監査IDをRust Broker内で再照合し、owner明示のredacted定義をWindows ProtectedStoreのRegression purposeへ暗号化して保存する。Owner CLI経由およびDesktop native確認付きの削除／中断Recoveryは既存Broker内で現在状態とAuditを再照合する。通常Broker IPCとDesktopの回帰Case tabはreceipt・暗号文hash由来のmetadata-only一覧を表示する。
-  authority_boundary: 登録payloadの入力方式、履歴、Profile、MCP metadata、Agent metadataは権限源ではない。元の対話本文を自動コピーせず、Known marker拒否は秘密不存在の証明ではない。Flutterは通常資格の要求だけを送り、削除／中断照合の許可はRust起動器のoperation別native確認とBroker再検証に限る。private定義の閲覧、実行、C5自動import、物理消去は行わない。Owner登録GUI、C5への明示import、Windows installed productでのOwner実操作証拠は未成立として扱う。
+  evidence: Desktop対話paneは送信時に受け取った要求ID/hashを固定し、full表示・成功または保留結果・終了監査記録が揃う場合だけ登録面を提供する。ownerが明示記入したredacted定義をRust起動器の固定allowlist・native確認とBroker再照合へ通し、Windows ProtectedStoreのRegression purposeへ暗号化保存する。通常Broker IPCとDesktop回帰Case tabはreceipt・暗号文hash由来のmetadata-only一覧を表示する。Owner CLIとDesktop native確認付き削除／中断Recoveryは現在状態とAuditを再照合する。
+  authority_boundary: 要求hashは相関値でありOwner確認ではない。登録payload、履歴、Profile、MCP metadata、Agent metadataは権限源ではない。元の対話本文を自動コピーせず、登録のnative確認には入力本文・条件・参照・期待経路を出さない。Known marker拒否は秘密不存在の証明ではない。Flutterは通常資格とOwnerが明示記入した定義だけを要求として送り、Owner資格・Owner roleは保持しない。登録／削除／中断照合のOwner扱いはRust起動器のoperation別native確認とBroker再検証に限る。private定義の閲覧、実行、C5自動import、物理消去は行わない。C5への明示importとWindows installed productでのOwner実操作証拠は未成立として扱う。
 
 - item: D4 Pocket Credential Vault（C7 current scope）
   classification: required_for_v1

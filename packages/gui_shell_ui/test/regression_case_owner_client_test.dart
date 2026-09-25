@@ -2,10 +2,74 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/regression_case_client.dart';
 
 const _caseId = 'cccccccccccccccccccccccccccccccc';
+const _requestId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 final _definitionHash = 'sha256:${List.filled(64, 'd').join()}';
 final _ciphertextHash = 'sha256:${List.filled(64, 'e').join()}';
+final _requestHash = 'sha256:${List.filled(64, 'b').join()}';
 
 void main() {
+  test('登録は対話要求hashとowner記入内容を送りhash-only receiptだけを返す', () async {
+    final transport = _FixtureTransport({
+      '回帰Case登録': _accepted(
+        '回帰Case登録',
+        'INTERNAL_STATE',
+        {
+          '版': 1,
+          '回帰CaseID': _caseId,
+          '定義hash': _definitionHash,
+          '非公開保管ID': _caseId,
+          '暗号文hash': _ciphertextHash,
+          '公開表示名': 'sanitized-case',
+          '要求ID': _requestId,
+          '要求hash': _requestHash,
+          '実行系ID': 'runtime-a',
+          '結果状態': '成功',
+          '応答hash': _definitionHash,
+          '終了監査ID': 'audit.dialogue.end',
+          '公開範囲': 'hash_only',
+          '必要条件数': 1,
+          '禁止条件数': 0,
+          '必要参照数': 1,
+          '作成時刻UnixMillis': 1780000000000,
+          '作成監査ID': 'audit.regression.register',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      ),
+    });
+
+    final receipt = await RegressionCaseOwnerClient(transport).register(
+      requestId: _requestId,
+      requestHash: _requestHash,
+      displayName: 'sanitized-case',
+      redactedInput: 'rewritten-without-secrets',
+      requiredConditions: const ['condition'],
+      forbiddenConditions: const [],
+      expectedStatus: '成功',
+      requiredReferences: const ['reference'],
+      expectedRoute: 'expected-route',
+    );
+
+    expect(transport.operation, '回帰Case登録');
+    expect(transport.payload, {
+      '版': 1,
+      '要求ID': _requestId,
+      '要求hash': _requestHash,
+      '公開表示名': 'sanitized-case',
+      '入力方式': 'owner_explicit_redacted',
+      '入力': {
+        '内容表示範囲': 'full',
+        '本文': 'rewritten-without-secrets',
+      },
+      '必要条件': ['condition'],
+      '禁止条件': <String>[],
+      '期待状態': '成功',
+      '必要参照': ['reference'],
+      '期待経路': 'expected-route',
+    });
+    expect(receipt.caseId, _caseId);
+    expect(receipt.auditId, 'audit.delete.result');
+  });
+
   test('削除はCase IDと両hashだけを送信しLIVE_RUNTIME receiptを検証する', () async {
     final transport = _FixtureTransport({
       '回帰Case削除': _accepted(
@@ -133,6 +197,68 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
     expect(transport.operation, isNull);
+  });
+
+  test('登録payloadの上限超過や追加authority応答を拒否する', () async {
+    final transport = _FixtureTransport(const {});
+    await expectLater(
+      RegressionCaseOwnerClient(transport).register(
+        requestId: _requestId,
+        requestHash: _requestHash,
+        displayName: 'case',
+        redactedInput: 'x',
+        requiredConditions: const [],
+        forbiddenConditions: const [],
+        expectedStatus: '成功',
+        requiredReferences: List<String>.filled(64, 'r' * 2048),
+        expectedRoute: 'route',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.operation, isNull);
+
+    final response = _accepted(
+      '回帰Case登録',
+      'INTERNAL_STATE',
+      {
+        '版': 1,
+        '回帰CaseID': _caseId,
+        '定義hash': _definitionHash,
+        '非公開保管ID': _caseId,
+        '暗号文hash': _ciphertextHash,
+        '公開表示名': 'case',
+        '要求ID': _requestId,
+        '要求hash': _requestHash,
+        '実行系ID': 'runtime-a',
+        '結果状態': '成功',
+        '応答hash': _definitionHash,
+        '終了監査ID': 'audit.dialogue.end',
+        '公開範囲': 'hash_only',
+        '必要条件数': 0,
+        '禁止条件数': 0,
+        '必要参照数': 0,
+        '作成時刻UnixMillis': 1780000000000,
+        '作成監査ID': 'audit.regression.register',
+        '証拠種別': 'INTERNAL_STATE',
+        'owner': true,
+      },
+    );
+    await expectLater(
+      RegressionCaseOwnerClient(_FixtureTransport({
+        '回帰Case登録': response,
+      })).register(
+        requestId: _requestId,
+        requestHash: _requestHash,
+        displayName: 'case',
+        redactedInput: 'x',
+        requiredConditions: const [],
+        forbiddenConditions: const [],
+        expectedStatus: '成功',
+        requiredReferences: const [],
+        expectedRoute: 'route',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 }
 

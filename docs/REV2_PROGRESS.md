@@ -2,6 +2,30 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket rev2 C6 Desktop対話pane owner登録接続（2026-09-25）
+
+前段のC6回帰Case保管・一覧・Owner削除／中断Recoveryに対し、Desktop対話paneから完了結果をownerが明示的に回帰Case登録する経路を追加した。送信受付時にBrokerが返す要求ID／要求hashを対話clientが厳密に検証して保持する。要求hashは結果との相関値に限定し、Approval、Permission、Owner資格、実行許可を生成しない。既存Broker応答にSchemaがなかったため、`runtime_dialogue_submission_receipt.schema.json`、正常／否定fixture、Schema checker、Conformanceを追加し、既存応答のfieldと権限境界を固定した。
+
+Desktop画面は`full`表示かつ成功／保留結果で、終了監査ID付き実行記録を確認できる場合だけ登録操作を示す。元の対話入力・応答は自動転記せず、ownerが公開名、秘密を除いた再現入力、条件、参照、期待経路を明示記入する。Flutterは既存の通常Broker transportから登録要求を送り、owner資格、秘密、privileged IPCを持たない。既存Rust起動器のoperation別native確認・capacity-1 process内Owner経路を再利用し、登録用の固定summaryには公開名、要求ID／hash、結果状態、件数、入力文字数、payload hashだけを含める。ownerが確認してもBrokerは現在の要求hash、full表示、結果証跡、終了監査、ProtectedStore条件を再検証する。登録定義の本文・条件・参照・期待経路はnative summary、Audit、receiptへ出さない。既知secret marker拒否は秘密が存在しないことの証明ではない。native確認もWindows account再認証や本人性証明ではない。
+
+Production pathは`Desktop対話pane → 既存Rust起動器のnamed-pipe relay → operation別native確認 → process内Owner操作channel → Broker再検証・永続Audit・Regression ProtectedStore → hash-only receipt`。新bridge、C5自動import、private定義の通常閲覧・実行、Authority継承は追加していない。C5 Datasetへの明示importとOwner確認を伴うinstalled Windows product上の登録／削除／中断Recoveryは別途未成立の`release_blocker`であり、全体`release_ready=false`を維持する。
+
+検証結果:
+
+- `python tooling/schema_check/check_schemas.py`: Schema 132件／正常例132件／negative fixture 163件でPASS。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`: 201 checksでPASS。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 最初の実行では対話画面の新規英語表示1行を検出してFAILした。表示語を日本語化して再実行し、負債0 files／0 findingsでPASS。例外登録はしていない。
+- `python tooling/final_development_audit.py`: C0〜C31の32工程対応を確認してPASS。これは対応表構造の検査であり全機能完成の証明ではない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`: library 265件、helper CLI 9件、Broker IPC 9件、他integration 26件、合計309件でPASS。先行実行ではA2A loopback試験2件に読み取り失敗が出たが、単独再試験と直列全target再試験はPASSした。失敗原因は特定しておらず、直列成功だけを恒久的な安定性保証へ昇格しない。
+- `flutter test --no-pub`（共有UI）: 51件でPASS。表示語修正後も`flutter test --no-pub test/runtime_dialogue_test.dart`は全件PASS。
+- `flutter test --no-pub`（Desktop Flutter）: 106件でPASS。共有UI／Desktop双方の`flutter analyze --no-pub`は指摘なし。Dart formatは対象8 file、変更0件。
+- `flutter build windows --debug --no-pub`をOneDrive workspaceの`R:` aliasから試行したが、`windows/flutter/ephemeral/cpp_client_wrapper`の再解析点配下に必要な4 C++ sourceが実体化しておらず、MSBuild C1083で失敗した。再解析点とsource欠落を確認し、製品sourceの不具合とは区別した。
+- 同じstaged差分をdetached Temp worktreeへ適用し、`flutter pub get --offline`、`flutter build windows --debug --no-pub`、`cargo build --locked --bins --manifest-path native/rust_helper/Cargo.toml`を実行。Debug DesktopとRust全binaryのbuildは成功した。MSBuildはTemp内build出力に対するMSB8029 warningを出したがerrorではなく、OneDrive workspaceまたは正式installed productの実行証拠とはしない。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`: 編集途中の日本語監査／古いmanifest、新規Schema／fixtureが未stageだった配布互換性検査という先行FAILを修正し、sourceをGit indexへ登録、manifest追補後に最終再実行した。開発modeの10 checksすべてPASS。evidence bundleは既存release blocker 5件と`release_ready=false`を保持し、CONFIG／FIXTUREのsmoke・assertionをWindows installed product証拠へ昇格しない。
+- Rust format checkは変更Rust file内の既存広範差分を報告してFAIL。無関係な行を大量変更する整形は行わず、`git diff --check`で差分空白を別途確認する。
+
+この節はContract、Desktop source、component試験の成立を記録する。Windows native MessageBoxでOwnerのYes／Noを操作した実証、clean commitからのinstalled product、外部収集証拠、C5 importは含まない。以前のC6進捗節は当時の状態を示す履歴としてそのまま保持する。
+
 ## D4 Pocket C6 Desktop Owner削除・中断Recovery接続（2026-09-25）
 
 Desktop評価ラボにOwner確認付き削除と中断状態照合を接続した。Flutterは既存BrokerTransportへ通常要求を送り、秘密・Owner資格を保持しない。Rust Desktop起動器が固定allowlist（`GUI Shell書出し`、`回帰Case削除`、`回帰Case削除中断確認`）とoperation別summaryを検証してWindows native default-No確認を表示し、Yesの要求だけをcapacity-1 process内channelからBroker所有threadへ渡す。確認は本人認証ではない。Recovery要求はCase IDだけで、過去の削除承認監査IDを受け付けない。

@@ -65,14 +65,27 @@ class RuntimeDialogueClient {
   }
 
   Future<String> send(String session, String input) async {
+    return (await sendReference(session, input)).requestId;
+  }
+
+  Future<DialogueRequestReference> sendReference(
+      String session, String input) async {
     if (input.trim().isEmpty || input.runes.length > 4096) {
       throw const BrokerClientException('入力は空白以外の1〜4096文字にしてください');
     }
     final body = await operation('対話送信', {'対話セッションID': session, '入力': input});
-    if (!validId(body['要求ID']) || body['状態'] != '承認待ち') {
+    final requestHash = body['要求hash'];
+    final expiresAt = body['期限'];
+    if (!validId(body['要求ID']) ||
+        requestHash is! String ||
+        !_hash.hasMatch(requestHash) ||
+        body['状態'] != '承認待ち' ||
+        !_safeInteger(expiresAt) ||
+        body.length != 4 ||
+        !const {'要求ID', '要求hash', '状態', '期限'}.containsAll(body.keys)) {
       throw const BrokerClientException('送信要求の対応が不正です');
     }
-    return body['要求ID']! as String;
+    return DialogueRequestReference(body['要求ID']! as String, requestHash);
   }
 
   Future<DialogueProgress> poll(
@@ -115,9 +128,18 @@ class RuntimeDialogueClient {
   }
 
   static final _id = RegExp(r'^[a-f0-9]{32}$');
+  static final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
   static final _runtime = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$');
   static bool validId(Object? value) =>
       value is String && value.length == 32 && _id.hasMatch(value);
+  static bool _safeInteger(Object? value) =>
+      value is int && value >= 0 && value <= 9007199254740991;
+}
+
+class DialogueRequestReference {
+  const DialogueRequestReference(this.requestId, this.requestHash);
+  final String requestId;
+  final String requestHash;
 }
 
 class DialogueProgress {

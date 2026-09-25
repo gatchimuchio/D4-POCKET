@@ -39,6 +39,7 @@ class BrokerClient implements BrokerTransport {
     try {
       final ownerConfirmationOperation = const {
         'GUI Shell書出し',
+        '回帰Case登録',
         '回帰Case削除',
         '回帰Case削除中断確認',
       }.contains(operation);

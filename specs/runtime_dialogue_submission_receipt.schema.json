@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_submission_receipt.schema.json",
+  "title": "実行系対話の送信受付receipt",
+  "description": "Brokerが生成した要求ID・要求hashと承認待ち状態の相関を返す。要求hash・期限はApproval、Permission、Owner確認、実行許可を生成しない。",
+  "type": "object",
+  "required": ["要求ID", "要求hash", "状態", "期限"],
+  "additionalProperties": false,
+  "properties": {
+    "要求ID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "要求hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "状態": { "const": "承認待ち" },
+    "期限": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

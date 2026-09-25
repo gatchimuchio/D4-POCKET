@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/gui_shell_ui.dart';
+import 'package:gui_shell_ui/regression_case_client.dart';
+
+final _dialogueRequestHash = 'sha256:${'b' * 64}';
 
 Map<String, Object?> result(String runtime, String session, String request,
         {String scope = 'full', bool failed = false}) =>
@@ -35,8 +38,14 @@ class DialogueFixture implements BrokerTransport {
   bool swap = false;
   String? failOperation;
   String? progressState;
+  String? sendHashOverride;
+  bool omitSendHash = false;
+  bool omitSendExpiry = false;
+  bool addSendAuthority = false;
   Map<String, Object?>? resultOverride;
   bool includeRecord = false;
+  Map<String, Object?>? registrationResponse;
+  Map<String, Object?>? registrationPayload;
   void Function(Map<String, Object?>)? mutateRecord;
   Completer<void>? pollWait;
   @override
@@ -57,7 +66,13 @@ class DialogueFixture implements BrokerTransport {
         final id = (++counter).toRadixString(16).padLeft(32, '0');
         requests[id] = p['対話セッションID']! as String;
         inputs.add(p['入力']! as String);
-        body = {'要求ID': id, '状態': '承認待ち'};
+        body = {
+          '要求ID': id,
+          if (!omitSendHash) '要求hash': sendHashOverride ?? _dialogueRequestHash,
+          '状態': '承認待ち',
+          if (!omitSendExpiry) '期限': 1780000300,
+          if (addSendAuthority) 'owner': true,
+        };
       case '対話取得':
         if (pollWait != null) await pollWait!.future;
         final id = p['要求ID']! as String;
@@ -87,6 +102,10 @@ class DialogueFixture implements BrokerTransport {
           mutateRecord?.call(record);
           body['実行記録'] = record;
         }
+      case '回帰Case登録':
+        registrationPayload = Map<String, Object?>.from(p);
+        body = registrationResponse ??
+            (throw StateError('回帰Case登録response fixtureがありません'));
       case '対話中止':
         body = {'要求ID': p['要求ID'], '状態': '中止'};
       case '対話終了':
@@ -95,10 +114,15 @@ class DialogueFixture implements BrokerTransport {
         throw StateError('試験で許可していない操作');
     }
     return {
+      'request_id': 'fixture-request',
       'operation': operation,
       'audit_event_id': 'fixture-audit',
       'status': 'accepted',
-      'body': body
+      'evidence_source': 'INTERNAL_STATE',
+      'error': null,
+      'health': null,
+      'body': body,
+      'shutdown_requested': false,
     };
   }
 }
@@ -108,7 +132,9 @@ void main() {
     final f = DialogueFixture()..complete = true;
     final client = RuntimeDialogueClient(f);
     final session = await client.start('left');
-    final request = await client.send(session, '試験');
+    final reference = await client.sendReference(session, '試験');
+    final request = reference.requestId;
+    expect(reference.requestHash, _dialogueRequestHash);
     expect((await client.poll(request, 'left', session)).record, isNull);
     f.includeRecord = true;
     final record = (await client.poll(request, 'left', session)).record!;
@@ -170,6 +196,174 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('完了対話からownerが明示記入したredacted Caseだけを登録する', (tester) async {
+    const requestId = '00000000000000000000000000000002';
+    const caseId = 'cccccccccccccccccccccccccccccccc';
+    final f = DialogueFixture()
+      ..complete = true
+      ..includeRecord = true
+      ..registrationResponse = {
+        '版': 1,
+        '回帰CaseID': caseId,
+        '定義hash': 'sha256:${'d' * 64}',
+        '非公開保管ID': caseId,
+        '暗号文hash': 'sha256:${'e' * 64}',
+        '公開表示名': 'public sanitized case',
+        '要求ID': requestId,
+        '要求hash': _dialogueRequestHash,
+        '実行系ID': 'left',
+        '結果状態': '成功',
+        '応答hash': 'sha256:${'f' * 64}',
+        '終了監査ID': 'finished',
+        '公開範囲': 'hash_only',
+        '必要条件数': 1,
+        '禁止条件数': 0,
+        '必要参照数': 0,
+        '作成時刻UnixMillis': 1780000000000,
+        '作成監査ID': 'audit.case.created',
+        '証拠種別': 'INTERNAL_STATE',
+      };
+    final owner = RegressionCaseOwnerClient(f);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RuntimeDialogueScreen(
+          connect: () async => RuntimeDialogueClient(f),
+          connectOwnerRegistration: () async => owner,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'original-dialogue-input');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    final register =
+        find.byKey(const ValueKey('dialogue-register-case-$requestId'));
+    expect(register, findsOneWidget);
+    await tester.ensureVisible(register);
+    await tester.tap(register);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('regression-registration-input')),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('regression-registration-name')),
+      'public sanitized case',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('regression-registration-input')),
+      'rewritten sanitized input',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('regression-registration-required')),
+      'must remain bounded',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('regression-registration-route')),
+      'runtime-to-result',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('regression-registration-submit')),
+    );
+    await tester
+        .tap(find.byKey(const ValueKey('regression-registration-submit')));
+    await tester.pumpAndSettle();
+
+    expect(f.registrationPayload, {
+      '版': 1,
+      '要求ID': requestId,
+      '要求hash': _dialogueRequestHash,
+      '公開表示名': 'public sanitized case',
+      '入力方式': 'owner_explicit_redacted',
+      '入力': {
+        '内容表示範囲': 'full',
+        '本文': 'rewritten sanitized input',
+      },
+      '必要条件': ['must remain bounded'],
+      '禁止条件': <String>[],
+      '期待状態': '成功',
+      '必要参照': <String>[],
+      '期待経路': 'runtime-to-result',
+    });
+    expect(find.textContaining('登録済み回帰事例: $caseId'), findsOneWidget);
+    expect(find.textContaining('rewritten sanitized input'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('full表示でない対話には登録操作を出さない', (tester) async {
+    final f = DialogueFixture()
+      ..complete = true
+      ..includeRecord = true
+      ..resultOverride = result(
+        'left',
+        '00000000000000000000000000000001',
+        '00000000000000000000000000000002',
+        scope: 'summary',
+      );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RuntimeDialogueScreen(
+          connect: () async => RuntimeDialogueClient(f),
+          connectOwnerRegistration: () async => RegressionCaseOwnerClient(f),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'input');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const ValueKey(
+          'dialogue-register-case-00000000000000000000000000000002',
+        )),
+        findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('終了監査記録がない対話には登録操作を出さない', (tester) async {
+    final f = DialogueFixture()
+      ..complete = true
+      ..includeRecord = true
+      ..mutateRecord = (record) {
+        record['終了時刻'] = null;
+        record['終了監査ID'] = null;
+      };
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RuntimeDialogueScreen(
+          connect: () async => RuntimeDialogueClient(f),
+          connectOwnerRegistration: () async => RegressionCaseOwnerClient(f),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'input');
+    await tester.ensureVisible(find.byKey(const ValueKey('dialogue-send')));
+    await tester.tap(find.byKey(const ValueKey('dialogue-send')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey(
+        'dialogue-register-case-00000000000000000000000000000002',
+      )),
+      findsNothing,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('重複実行系を選択欄へ渡さず接続エラーを表示する', (tester) async {
     final f = DialogueFixture()..runtimeNames = ['left', 'left'];
     await tester.pumpWidget(MaterialApp(
@@ -204,6 +398,21 @@ void main() {
     ]) {
       f.runtimeNames = names;
       expect(await client.runtimes(), names);
+    }
+  });
+  test('owner登録用の要求hashが欠落・不正なら要求参照を返さない', () async {
+    for (final fixture in [
+      DialogueFixture()..omitSendHash = true,
+      DialogueFixture()..sendHashOverride = 'sha256:wrong',
+      DialogueFixture()..omitSendExpiry = true,
+      DialogueFixture()..addSendAuthority = true,
+    ]) {
+      final client = RuntimeDialogueClient(fixture);
+      final session = await client.start('left');
+      await expectLater(
+        client.sendReference(session, 'sanitized test'),
+        throwsA(isA<BrokerClientException>()),
+      );
     }
   });
   test('検証後の元配列の変更を表示結果へ反映しない', () {

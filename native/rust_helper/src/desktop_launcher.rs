@@ -20,8 +20,9 @@ use crate::broker::{
 };
 use crate::broker::protocol::{
     canonical_payload_hash, owner_delete_confirmation_summary,
-    owner_recovery_confirmation_summary, request_issued_at_is_current,
-    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+    owner_recovery_confirmation_summary, owner_registration_confirmation_summary,
+    request_issued_at_is_current, OwnerDeleteConfirmationSummary,
+    OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
 };
 #[cfg(test)]
 use crate::broker::ipc_server::run_loopback_server_cancellable;
@@ -43,6 +44,10 @@ enum DesktopOwnerOperationSummary {
     },
     RegressionCaseRecovery {
         summary: OwnerRecoveryConfirmationSummary,
+        payload_hash: String,
+    },
+    RegressionCaseRegistration {
+        summary: OwnerRegistrationConfirmationSummary,
         payload_hash: String,
     },
 }
@@ -599,6 +604,12 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::回帰Case登録 => {
+            DesktopOwnerOperationSummary::RegressionCaseRegistration {
+                summary: owner_registration_confirmation_summary(payload).ok()?,
+                payload_hash,
+            }
+        }
         _ => return None,
     };
     let normalized = normalize_channel_request(input.as_bytes(), &endpoint.session_id);
@@ -718,6 +729,21 @@ fn owner_confirmation_text(summary: &DesktopOwnerOperationSummary) -> String {
         } => format!(
             "指定回帰Caseの未確定削除状態を照合しますか？\n\n回帰Case ID: {}\n\nこの操作は削除を実行しません。Brokerが永続AuditとProtectedStoreの現在状態を照合します。自動再削除は行いません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             summary.case_id,
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::RegressionCaseRegistration {
+            summary,
+            payload_hash,
+        } => format!(
+            "完了済み対話から回帰Caseを登録しますか？\n\n公開名: {}\n対象要求ID: {}\n対象要求hash: {}\n期待状態: {}\nowner記入本文: {}文字\n必要条件: {}件 / 禁止条件: {}件 / 必要参照: {}件\n\n入力本文・条件・参照・期待経路はこの確認画面やAuditへ表示しません。元の対話本文を自動コピーしていません。内容を確認し、秘密を除いた定義であることを確認してください。秘密候補の検査は秘密不存在を証明しません。Brokerは処理時に現在の対話証跡とProtectedStore条件を再確認します。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            summary.display_name.escape_debug(),
+            summary.request_id,
+            summary.request_hash,
+            summary.expected_status,
+            summary.input_characters,
+            summary.required_condition_count,
+            summary.forbidden_condition_count,
+            summary.required_reference_count,
             payload_hash
         ),
     }
@@ -1513,6 +1539,97 @@ mod tests {
         assert_eq!(recovery_prompt_count, 1);
         assert_eq!(recovery_response["status"], "rejected");
         assert_eq!(recovery_response["error"]["code"], "復旧対象不明");
+
+        let registration_payload = serde_json::json!({
+            "版": 1,
+            "要求ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "要求hash": format!("sha256:{}", "b".repeat(64)),
+            "公開表示名": "回帰Case登録試験",
+            "入力方式": "owner_explicit_redacted",
+            "入力": {"内容表示範囲": "full", "本文": "owner-authored-redacted-input"},
+            "必要条件": ["private-required-condition"],
+            "禁止条件": [],
+            "期待状態": "成功",
+            "必要参照": ["private-reference"],
+            "期待経路": "private-route"
+        });
+        let registration = desktop_owner_request(
+            "回帰Case登録",
+            "desktop-registration-confirmed",
+            "desktop-registration-confirmed-nonce",
+            registration_payload,
+        );
+        let mut registration_prompt_count = 0;
+        let registration_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&registration).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                registration_prompt_count += 1;
+                let DesktopOwnerOperationSummary::RegressionCaseRegistration {
+                    summary,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("登録は公開要約だけを表示する専用native確認を使う")
+                };
+                assert_eq!(summary.request_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+                assert_eq!(summary.display_name, "回帰Case登録試験");
+                assert_eq!(summary.input_characters, "owner-authored-redacted-input".chars().count());
+                assert_eq!(summary.required_condition_count, 1);
+                assert_eq!(payload_hash, registration["payload_hash"].as_str().unwrap());
+                let text = owner_confirmation_text(
+                    &DesktopOwnerOperationSummary::RegressionCaseRegistration {
+                        summary: (*summary).clone(),
+                        payload_hash: (*payload_hash).clone(),
+                    },
+                );
+                assert!(text.contains("現在の対話証跡"));
+                assert!(text.contains(&summary.request_hash));
+                assert!(!text.contains("owner-authored-redacted-input"));
+                assert!(!text.contains("private-required-condition"));
+                assert!(!text.contains("private-reference"));
+                assert!(!text.contains("private-route"));
+                true
+            },
+        )
+        .unwrap();
+        let registration_response: serde_json::Value =
+            serde_json::from_slice(&registration_response).unwrap();
+        assert_eq!(registration_prompt_count, 1);
+        assert_eq!(registration_response["status"], "rejected");
+        assert_eq!(registration_response["error"]["code"], "対話証跡不在");
+
+        let mut secret_registration = registration.clone();
+        secret_registration["request_id"] = serde_json::Value::String(
+            "desktop-registration-secret-marker".into(),
+        );
+        secret_registration["nonce"] =
+            serde_json::Value::String("desktop-registration-secret-marker-nonce".into());
+        secret_registration["payload"]["入力"]["本文"] =
+            serde_json::Value::String("api_key=must-not-be-shown".into());
+        secret_registration["payload_hash"] = serde_json::Value::String(
+            canonical_payload_hash(secret_registration.get("payload")).to_string(),
+        );
+        let mut secret_prompt_count = 0;
+        let secret_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&secret_registration).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |_| {
+                secret_prompt_count += 1;
+                true
+            },
+        )
+        .unwrap();
+        let secret_response: serde_json::Value = serde_json::from_slice(&secret_response).unwrap();
+        assert_eq!(secret_prompt_count, 0);
+        assert_eq!(secret_response["status"], "rejected");
+        assert_eq!(secret_response["error"]["code"], "権限拒否");
 
         let stale_approval = desktop_owner_request(
             "回帰Case削除中断確認",

@@ -85,6 +85,7 @@ REQUIRED_SCHEMA_NAMES = {
     "workspace_inspection_response",
     "runtime_dialogue_operation",
     "runtime_dialogue_request",
+    "runtime_dialogue_submission_receipt",
     "runtime_dialogue_session",
     "runtime_dialogue_response",
     "runtime_dialogue_comparison",
@@ -3626,9 +3627,21 @@ def 対話契約の関係と表示境界を検査する() -> list[str]:
     from tooling.dialogue_contract_check import 要求関係検査, 応答関係検査, 比較関係検査
 
     要求 = load_contract_fixture("runtime_dialogue_request.valid.json")
+    送信受付 = load_contract_fixture("runtime_dialogue_submission_receipt.valid.json")
+    送信受付schema = load_schema("runtime_dialogue_submission_receipt.schema.json")
     セッション = load_contract_fixture("runtime_dialogue_session.valid.json")
     応答 = load_contract_fixture("runtime_dialogue_response.valid.json")
     不整合 = 要求関係検査(要求, セッション) + 応答関係検査(要求, 応答, "none")
+    if validate_instance(送信受付, 送信受付schema):
+        不整合.append("Broker送信受付receiptのvalid fixtureがschemaに適合しない")
+    for 変更 in (
+        {"要求ID": "not-an-id"},
+        {"要求hash": "sha256:stale"},
+        {"状態": "成功"},
+        {"owner": True},
+    ):
+        if not validate_instance({**送信受付, **変更}, 送信受付schema):
+            不整合.append("送信受付receiptが不正hash・状態またはauthority fieldを拒否しない")
     for 変更 in ({"入力": " "}, {"入力": "あ" * 4097}, {"実行系ID": "別実行系"},
                {"要求ID": "1" * 32 + "\n"}, {"実行系ID": "runtime-a\n"},
                {"対話セッションID": "3" * 32}, {"authority_source": "gui_state"}):

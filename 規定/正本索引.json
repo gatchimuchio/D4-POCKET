@@ -193,7 +193,7 @@
     },
     {
       "path": "docs/specs/runtime-dialogue.md",
-      "責任": "実行系対話要求・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点。C6回帰Caseは独立contractへ接続"
+      "責任": "実行系対話要求・送信受付receipt・応答・セッション・比較の日本語意味、表示境界、取消、外部API固定点。送信受付の要求hashは相関値で権限を生成しない。C6回帰Caseは独立contractへ接続"
     },
     {
       "path": "docs/specs/evaluation-lab.md",
