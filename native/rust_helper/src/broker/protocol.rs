@@ -48,6 +48,12 @@ const ZERO_PAYLOAD_HASH: &str =
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SetupDoctorReportRequest {
+    version: u8,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct 実行系資源観測指定 {
     #[serde(rename = "版")]
     version: u8,
@@ -296,6 +302,15 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    pub fn write_setup_doctor_report(&self, bytes: &[u8]) -> Result<(), BrokerStoreError> {
+        let Some(store) = &self.persistent_store else {
+            return Err(BrokerStoreError::Io(
+                "Setup Doctor reportには永続Broker storeが必要".to_string(),
+            ));
+        };
+        store.write_setup_doctor_report(bytes)
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_update_trust();
@@ -307,6 +322,8 @@ impl BrokerStateStore {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrokerOperation {
+    #[serde(rename = "Setup Doctor報告取得")]
+    SetupDoctor報告取得,
     #[serde(rename = "対話履歴承認")]
     対話履歴承認,
     #[serde(rename = "対話履歴失効")]
@@ -518,6 +535,7 @@ pub enum BrokerOperation {
 impl BrokerOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
+            BrokerOperation::SetupDoctor報告取得 => "Setup Doctor報告取得",
             BrokerOperation::作業領域一覧 => "作業領域一覧",
             BrokerOperation::作業領域承認 => "作業領域承認",
             BrokerOperation::作業領域失効 => "作業領域失効",
@@ -855,6 +873,8 @@ pub struct Broker {
     pub(super) shutdown_requested: bool,
     pub(super) current_epoch_seconds_override: Option<i64>,
     pub(super) state_store: BrokerStateStore,
+    desktop_install_path_verified: bool,
+    desktop_loopback_bind_verified: bool,
 }
 
 impl Broker {
@@ -887,6 +907,8 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
+            desktop_install_path_verified: false,
+            desktop_loopback_bind_verified: false,
         }
     }
 
@@ -951,7 +973,18 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
+            desktop_install_path_verified: false,
+            desktop_loopback_bind_verified: false,
         })
+    }
+
+    pub(crate) fn set_desktop_setup_doctor_runtime_evidence(
+        &mut self,
+        installed_path_verified: bool,
+        loopback_bind_verified: bool,
+    ) {
+        self.desktop_install_path_verified = installed_path_verified;
+        self.desktop_loopback_bind_verified = loopback_bind_verified;
     }
 
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
@@ -1310,6 +1343,11 @@ impl Broker {
             BrokerOperation::対話保管状態 => self.保管状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::SetupDoctor報告取得 => self.setup_doctor_report(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
             BrokerOperation::Health => self.accept_health(&request_id, &payload_hash),
             BrokerOperation::Shutdown => self.accept_shutdown(&request_id, &payload_hash),
             BrokerOperation::CommandEnvelope => self.suspend_command(
@@ -2349,6 +2387,182 @@ impl Broker {
         }
     }
 
+    fn setup_doctor_report(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        match serde_json::from_value::<SetupDoctorReportRequest>(payload.clone()) {
+            Ok(request) if request.version == 1 => {}
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    BrokerOperation::SetupDoctor報告取得.as_str(),
+                    "setup_doctor_request_invalid",
+                    "Setup Doctor要求はversion 1だけを受け付けます",
+                    true,
+                    payload_hash,
+                );
+            }
+        }
+
+        let health = self.health(EVIDENCE_SOURCE_LIVE_RUNTIME);
+        let checks = vec![
+            setup_doctor_check(
+                "setup_doctor.ran_from_installed_app_path",
+                if self.desktop_install_path_verified { "pass" } else { "unknown" },
+                if self.desktop_install_path_verified {
+                    "Rust起動器が固定installed package配置を検証しました。"
+                } else {
+                    "固定installed package配置を実行時に確認できません。"
+                },
+                "正式installed配置からRust Desktop起動器を開始し、製品file検査を再実行してください。",
+                if self.desktop_install_path_verified { EVIDENCE_SOURCE_LIVE_RUNTIME } else { "CONFIG" },
+            ),
+            setup_doctor_check(
+                "setup_doctor.runtime_connection",
+                "pass",
+                "通常資格で認証されたBroker要求をRust Brokerが処理しています。",
+                "Broker接続が切れた場合はD4 Pocketを終了し、Desktop起動器から再起動してください。",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+            ),
+            setup_doctor_check(
+                "setup_doctor.authority_boundary",
+                "pass",
+                "Setup Doctor報告は権限を生成せず、installerも権限を付与・承認しません。",
+                "権限境界の検査に失敗した場合は権限依存操作を停止し、監査可能なBroker buildへ更新してください。",
+                "CONFIG",
+            ),
+            setup_doctor_check(
+                "setup_doctor.network_public_bind",
+                if self.desktop_loopback_bind_verified { "pass" } else { "unknown" },
+                if self.desktop_loopback_bind_verified {
+                    "実際にbindしたBroker IPCはIPv4 loopbackに限定されています。"
+                } else {
+                    "Brokerの実bind addressをloopback限定として確認できません。"
+                },
+                "bind範囲を確認できない場合はBrokerを停止し、loopback固定のDesktop起動経路から再起動してください。",
+                if self.desktop_loopback_bind_verified { EVIDENCE_SOURCE_LIVE_RUNTIME } else { "INTERNAL_STATE" },
+            ),
+            setup_doctor_check(
+                "setup_doctor.recovery_instruction",
+                "pass",
+                "各診断checkに個別の復旧案内があります。",
+                "復旧案内が欠落するreportを使用せず、製品診断を再実行してください。",
+                "CONFIG",
+            ),
+            setup_doctor_check(
+                "setup_doctor.audit_storage",
+                if health.persistence_ready { "pass" } else { "warning" },
+                if health.persistence_ready {
+                    "Brokerは永続Audit storeを使用しています。"
+                } else {
+                    "Broker永続Audit storeの準備完了を確認できません。"
+                },
+                "Audit storeを利用できない場合は権限依存操作を停止し、Brokerの固定storeを復旧してください。",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+            ),
+            setup_doctor_check(
+                "setup_doctor.config_created",
+                "unknown",
+                "Rust Broker統治下の初回製品config生成は未接続です。",
+                "初回config生成contractとBroker経路が成立するまでは初回設定完了として扱わないでください。",
+                "CONFIG",
+            ),
+        ];
+        let status = if checks.iter().any(|check| check["status"] == "fail") {
+            "fail"
+        } else if checks.iter().any(|check| {
+            matches!(check["status"].as_str(), Some("warning" | "unknown"))
+        }) {
+            "warning"
+        } else {
+            "pass"
+        };
+        let request_hash = sha256_tagged(request_id.as_bytes());
+        let report = serde_json::json!({
+            "version": 1,
+            "report_id": format!("setup-doctor-{}", &request_hash[7..]),
+            "generated_at": epoch_seconds_to_rfc3339(self.current_epoch_seconds()),
+            "status": status,
+            "evidence_source": EVIDENCE_SOURCE_LIVE_RUNTIME,
+            "checks": checks,
+            "installer_grants_authority": false,
+            "installer_silently_approves_permissions": false
+        });
+        let report_bytes = match serde_json::to_vec(&report) {
+            Ok(bytes) if !bytes.is_empty() && bytes.len() <= 64 * 1024 => bytes,
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    BrokerOperation::SetupDoctor報告取得.as_str(),
+                    "setup_doctor_report_invalid",
+                    "Setup Doctor reportを安全な上限内で生成できません",
+                    true,
+                    payload_hash,
+                );
+            }
+        };
+        let operation = BrokerOperation::SetupDoctor報告取得.as_str();
+        let receipt_reason = "Capability=diagnostics.report Permission=Broker固定storeの最新診断report一件だけをatomic replace Approval=権限・利用者content・外部共有を含まない診断projectionのためprivileged Approval不要 RecoveryAction=失敗時はreportをrelease evidenceとして使用せずBroker storeを確認";
+        if let Err(error) = self.append_audit(
+            request_id,
+            operation,
+            "received",
+            receipt_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        ) {
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_audit_append_failed",
+                &error.message(),
+            );
+        }
+        if self.state_store.write_setup_doctor_report(&report_bytes).is_err() {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "setup_doctor_report_storage_failed",
+                "Setup Doctor reportをBroker固定storeへ安全に保存できません。復旧後に診断を再実行してください。",
+                true,
+                payload_hash,
+            );
+        }
+        let report_hash = sha256_tagged(&report_bytes);
+        let audit_event = match self.append_audit(
+            request_id,
+            operation,
+            "accepted",
+            "setup_doctor_report_exported",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &report_hash,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                );
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: None,
+            health: None,
+            body: Some(report),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
     fn ホスト能力処理(
         &mut self,
         request_id: &str,
@@ -2960,6 +3174,23 @@ fn epoch_seconds_to_rfc3339(epoch_seconds: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
+fn setup_doctor_check(
+    check_id: &str,
+    status: &str,
+    message: &str,
+    recovery_instruction: &str,
+    evidence_class: &str,
+) -> Value {
+    serde_json::json!({
+        "check_id": check_id,
+        "status": status,
+        "message": message,
+        "recovery_instruction": recovery_instruction,
+        "evidence_class": evidence_class,
+        "grants_authority": false
+    })
+}
+
 fn parse_digits(value: &str, start: usize, end: usize) -> Option<u32> {
     value.get(start..end)?.parse().ok()
 }
@@ -3195,6 +3426,69 @@ mod tests {
         broker.current_epoch_seconds_override =
             Some(parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap());
         broker
+    }
+
+    fn setup_doctor_request(request_id: &str, payload: Value) -> BrokerRequestEnvelope {
+        let mut request = BrokerRequestEnvelope::health(request_id, &format!("nonce-{request_id}"));
+        request.session_id = Some("setup-doctor-session".to_string());
+        request.operation = Some(BrokerOperation::SetupDoctor報告取得);
+        request.payload = Some(payload);
+        request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        request.refresh_payload_hash();
+        request
+    }
+
+    #[test]
+    fn setup_doctor_report_is_broker_generated_audited_and_keeps_unknown_unknown() {
+        let root = temp_store_dir("setup-doctor-report");
+        let mut broker = Broker::new_persistent("setup-doctor-session", &root).unwrap();
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true);
+
+        let response = broker.handle(setup_doctor_request(
+            "setup-report-1",
+            json!({"version": 1}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let report = response.body.expect("Brokerが生成した報告");
+        assert_eq!(report["evidence_source"], EVIDENCE_SOURCE_LIVE_RUNTIME);
+        assert_eq!(report["status"], "warning");
+        assert_eq!(report["checks"].as_array().unwrap().len(), 7);
+        assert_eq!(report["checks"][0]["status"], "pass");
+        assert_eq!(report["checks"][3]["status"], "pass");
+        assert_eq!(report["checks"][6]["status"], "unknown");
+        assert_eq!(report["checks"][6]["evidence_class"], "CONFIG");
+        assert!(report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|check| check["grants_authority"] == false));
+
+        let bytes = serde_json::to_vec(&report).unwrap();
+        let report_hash = crate::audit_hash::sha256_tagged(&bytes);
+        let exported = broker
+            .audit_events()
+            .iter()
+            .find(|event| {
+                event.operation == "Setup Doctor報告取得"
+                    && event.decision == "accepted"
+                    && event.reason == "setup_doctor_report_exported"
+            })
+            .expect("製品報告を受理した監査記録");
+        assert_eq!(exported.payload_hash, report_hash);
+        assert_eq!(response.audit_event_id, exported.event_id);
+        assert_eq!(fs::read(root.join("setup_doctor_report.json")).unwrap(), bytes);
+
+        let invalid = broker.handle(setup_doctor_request(
+            "setup-report-2",
+            json!({"version": 1, "output_path": "C:/secret"}),
+        ));
+        assert_eq!(invalid.status, BrokerStatus::Rejected);
+        assert_eq!(
+            invalid.error.as_ref().map(|error| error.code.as_str()),
+            Some("setup_doctor_request_invalid")
+        );
+        assert_eq!(fs::read(root.join("setup_doctor_report.json")).unwrap(), bytes);
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn command_request_with_operation(

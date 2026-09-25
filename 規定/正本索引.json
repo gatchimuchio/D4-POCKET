@@ -240,6 +240,10 @@
       "責任": "Windows Desktop Flutter要求のRust-owned transport、起動child PID照合、既存Broker再利用、資格・権限非継承と未実装証拠境界"
     },
     {
+      "path": "specs/setup_doctor_report.schema.json",
+      "責任": "Rust Brokerが生成・永続化するSetup Doctor報告の構造、根拠区分、非権限性"
+    },
+    {
       "path": "docs/specs/command-palette-surface.md",
       "責任": "C21コマンドパレットの新機能別登録、keyboard-first画面遷移、Broker操作・承認・権限非到達境界"
     },

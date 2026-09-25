@@ -16,8 +16,8 @@ Windows優先のリリース検証では、分離され、機械可読なイン�
 - item: native Windows Setup Doctor product evidence unresolved
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: Flutterがcollector注入環境変数を使って直接生成していた診断JSONは、実際の通常製品経路ではなくfilesystem境界にも違反していたため撤去した。現行collect_setup_doctor.ps1は設定・監査・Brokerを外部観測するだけであり、正式product evidenceとして受理してはならない。
-  required_action: 初回設定とBroker診断結果をRust Brokerまたは明示されたinstaller責任へ移し、productが返すmachine-readable診断contractと外部installed-run測定を分離して実装・LIVE_RUNTIME検証する。その後strict validatorで確認する。
+  reason: Rust Broker生成reportとaccepted Auditのhash結合は実装したが、初回config生成はunknownのままで、Windows installed product runとoperator readabilityの実測も未取得。strict validatorはunknown/warningを受理しない。
+  required_action: 初回config生成contractを完成させ、stage時と異なるuser profileでWindows installed product runを行う。固定store report、accepted Audit hash、Setup Doctor画面の実読取を収集し、全checkがpassのときだけstrict validatorへ入力する。
   blocks_release: yes
 ~~~
 
@@ -64,9 +64,17 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 
 未対応の主張、および未分類のcollector declarationはリリースブロッカーである。
 
+## Broker生成Setup Doctor report（実装状態 2026-09-26）
+
+通常製品UIは認証済みRust Broker IPCで`Setup Doctor報告取得`（payloadは`version: 1`のみ）を要求し、受け取ったreportを表示する。Brokerは実起動時に検証したinstalled package配置、実際のIPv4 loopback bind、永続Audit状態から固定7 checkを生成し、`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\setup_doctor_report.json`へ最大64 KiB・最新一件だけをatomic replaceする。要求から出力pathを選べず、reportはCapability／Permission／Approvalを生成しない。保存byte列のSHA-256は同operationの`accepted` AuditEvent payload hashへ結合する。保存・Audit失敗時は成功reportを返さない。
+
+Windows collector version 13は通常起動した製品が生成した固定store reportを読み、正確なbyte列、SHA-256、`Setup Doctor報告取得 / accepted / setup_doctor_report_exported / LIVE_RUNTIME` AuditEventを照合する。report bytesとAuditEventをrelease evidenceへ同梱する。外部probe、collector推定check、任意JSONを製品reportとしては受け入れない。strict validatorは正本Schema、hash、Audit payload hash、evidence bundle file、fixed store path、check一覧を再検証し、全check `pass`とoperator readabilityを要求する。
+
+初回config生成は別contractで未接続のため、現reportは`setup_doctor.config_created=unknown`かつoverall `warning`である。また新sourceから作成したWindows installed reportと画面のoperator readabilityは未観測である。従って本経路のsource実装が成立しても`windows_setup_doctor_smoke`は`release_blocker`のままで、release-readyを意味しない。
+
 ## 収集フロー
 
-> `collect_installed_smoke.ps1`はRust Desktop起動器経由へ変更済みである。正式実行はstageに使ったWindows userとは別のprofileから行い、`-UseCurrentWindowsProfile`を指定する。collectorはそのprofile内にrun固有のLOCALAPPDATAを作って起動器の実Broker runtimeを分離する。manifestはrun固有salt付きuser identity digestだけを保存し、raw SIDを含めない。stage manifestの`runtime/` pathは外部probe scratchであり、製品runtime／config／Auditの証拠として使用しない。Flutter本番起動が最初に要求するhealthについて、通常資格認証後のBroker `accepted / LIVE_RUNTIME` AuditEventをcollectorが数え、event IDを記録する。この記録はBrokerが認証済み要求を受理・記録した証拠であり、Flutterが応答を受け取ったことや呼出し元PIDは証明しない。別profileでの実収集、初回config生成、Setup Doctor製品出力は未成立なのでrelease blockerを維持する。
+> `collect_installed_smoke.ps1`はRust Desktop起動器経由へ変更済みである。正式実行はstageに使ったWindows userとは別のprofileから行い、`-UseCurrentWindowsProfile`を指定する。collectorはそのprofile内にrun固有のLOCALAPPDATAを作って起動器の実Broker runtimeを分離する。manifestはrun固有salt付きuser identity digestだけを保存し、raw SIDを含めない。stage manifestの`runtime/` pathは外部probe scratchであり、製品runtime／config／Auditの証拠として使用しない。Flutter本番起動が最初に要求するhealthについて、通常資格認証後のBroker `accepted / LIVE_RUNTIME` AuditEventをcollectorが数え、event IDを記録する。この記録はBrokerが認証済み要求を受理・記録した証拠であり、Flutterが応答を受け取ったことや呼出し元PIDは証明しない。Setup Doctor reportは同じ実runtime固定storeから読み、accepted Audit payload hashと照合する。別profileでの実収集、初回config生成、operator readabilityは未成立なのでrelease blockerを維持する。
 
 Flutter child processの同定は、起動器PIDを親PIDとして持つ`Win32_Process`観測、起動器と同じWindows session、起動後のprocess作成時刻、実行imageのSHA-256一致を組み合わせる。Windows package virtualizationがWMIの`ExecutablePath`を別のLocalCache表記へ写す場合があるため、path文字列一致だけをimage identityの根拠にしない。終了時cleanupも同じ親PID・時刻・session・hash条件で対象を再確認する。Desktopの`WM_CLOSE`は通常trayへ隠す動作であり終了ではないため、collectorは実tray callbackからnative『終了』menuを開き、UIAutomationで該当processのmenu itemを実行する。強制終了またはcleanup errorがあれば正式smokeを拒否する。evidenceの`first_run.process_identity`はprocess identityのLIVE_RUNTIME観測を保持し、BrokerがFlutter caller PIDを識別したという意味ではない。
 
@@ -106,7 +114,7 @@ powershell -ExecutionPolicy Bypass -File installer\windows\collect_installed_smo
   -OutputPath (Join-Path $EvidenceRoot "windows_installed_smoke.json")
 ~~~
 
-collectorはstage manifestのconfig／audit scratchを読み書きせず、外部Setup Doctor JSONも取り込まない。独立した`collect_setup_doctor.ps1`のprobe結果はproduct evidenceとは別に保管する。起動器lifecycle Auditとhealth受理Auditは新規profile内の実Storeから収集する。endpointのnormal role metadata単独はBroker接続証拠にならず、health受理eventもclient応答受信・PID帰属へ昇格しない。壊れたAudit JSON行は読み飛ばさず収集失敗にする。test userがstage時userとは異なるSIDでない場合、collectorは正式実行を拒否する。出力先とinstalled rootへのACL設定は外部のowner管理作業であり、collectorは権限を変更しない。
+collectorはstage manifestのconfig／audit scratchを読み書きせず、外部Setup Doctor JSONも取り込まない。独立した`collect_setup_doctor.ps1`のprobe結果はproduct evidenceとは別扱いにする。起動器lifecycle Audit、health受理Audit、Setup Doctor accepted Auditは新規profile内の実Storeから収集する。Setup Doctor evidenceには保存済みreportのbase64 byte列とhashを保持し、report hashに一致するaccepted AuditEventだけを関連付ける。endpointのnormal role metadata単独はBroker接続証拠にならず、health受理eventもclient応答受信・PID帰属へ昇格しない。壊れたAudit JSON行は読み飛ばさず収集失敗にする。test userがstage時userとは異なるSIDでない場合、collectorは正式実行を拒否する。出力先とinstalled rootへのACL設定は外部のowner管理作業であり、collectorはACLを変更しない。
 
 次のコマンドで検証する。
 

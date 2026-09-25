@@ -69,4 +69,12 @@ Flutter/DartはSetup Doctorを含め、filesystem、process、networkへ直接�
 
 Windowsのinstalled smoke collectorは、Setup Doctor product exportが実在しない限り、実行file・設定JSON・監査directory・Broker smokeを独立に観測した外部evidenceとして記録する。collectorがcheckを組み立てた結果をproduct-generatedまたはSetup DoctorのLIVE_RUNTIME証拠へ昇格させない。現行strict release validatorが要求するproduct evidenceを満たした扱いにもせず、正式Setup Doctor blockerを維持する。
 
-初回設定の生成とBroker診断の機械可読な取得は別contractとして実装する。filesystem作用はRust Brokerまたは明示されたinstaller責任へ割り当て、Capability、Permission、Approval、AuditEvent、failure時RecoveryAction、path制約、negative testを先に定義する。これらが実装・接続・LIVE_RUNTIME検証されるまでは、未生成の設定や未観測の製品機能を成功扱いしない。
+初回設定の生成とBroker診断の機械可読な取得は別contractとする。report取得・固定store保存・Audit hash結合は8.1の経路で実装し、初回設定生成は未接続のまま独立して管理する。filesystem作用はRust Brokerまたは明示されたinstaller責任へ割り当て、Capability、Permission、Approval、AuditEvent、failure時RecoveryAction、path制約、negative testを定義する。未生成の設定や未観測の製品機能を成功扱いしない。
+
+### 8.1 Broker生成Setup Doctor報告
+
+初回設定生成とは独立して、通常資格による`Setup Doctor報告取得`を定義する。payloadは`{"version":1}`だけを受け付け、出力先path、任意command、資格、authority、Approvalを要求本文から受け取らない。Brokerは自身の現在health、Desktop起動器が検証した固定package配置、実際のloopback bind、永続Audit状態からreportを構成する。収集不能または未実装の項目は`unknown`とし、0、pass、以前の結果で置換しない。
+
+reportは機密・path・資格を含まない最大64 KiBのJSONとし、Broker durable store内の固定`setup_doctor_report.json`一件だけをatomic replaceする。任意path書込みや履歴蓄積はしない。報告生成は`Setup Doctor報告取得`の`received`／`accepted`／`rejected` Auditへ対応づける。`accepted` eventのpayload hashは、保存したreportの正確なUTF-8 byte列のSHA-256と一致しなければならない。保存失敗、監査失敗、永続store不在では成功reportを返さず、固定recovery案内を返す。保存reportはAuthority、Permission、Approvalを生成せず、監査記録そのものの代替にもならない。
+
+各checkは日本語のmessage、recovery instruction、evidence class、`grants_authority=false`を持つ。現行report対象はinstalled path、Broker応答、authority境界、loopback bind、recovery instruction、Audit永続性、および独立contract待ちの初回設定生成である。初回設定生成が`unknown`の間、strict release validatorはSetup Doctorをrelease証拠として受理しない。Flutterは返却reportを表示するだけで、保存、check生成、status昇格をしない。

@@ -789,7 +789,7 @@ struct RunningBroker {
 }
 
 impl RunningBroker {
-    fn start(runtime_dir: &Path) -> Result<Self, DesktopLaunchError> {
+    fn start(runtime_dir: &Path, installed_package_verified: bool) -> Result<Self, DesktopLaunchError> {
         let store_dir = ensure_store_directory(runtime_dir)?;
         let protected_store_dir = ensure_protected_store_directory(runtime_dir)?;
         let session_file = runtime_dir.join(SESSION_FILE);
@@ -799,6 +799,7 @@ impl RunningBroker {
         let thread_shutdown = Arc::clone(&shutdown);
         let mut config = BrokerServerConfig::new(store_dir, session_file.clone());
         config.desktop_protected_store_dir = Some(protected_store_dir);
+        config.desktop_install_path_verified = installed_package_verified;
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
         let server = thread::Builder::new()
@@ -1046,7 +1047,7 @@ pub fn run() -> Result<(), DesktopLaunchError> {
         })?;
     let runtime_dir = runtime_directory(&local_app_data)?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
-    let mut broker = RunningBroker::start(&runtime_dir)?;
+    let mut broker = RunningBroker::start(&runtime_dir, true)?;
 
     let frontend_result = launch_frontend(&layout, &runtime_dir, &broker);
     let broker_result = broker.finish();

@@ -495,8 +495,8 @@ void main() {
     expect(
       snapshot.setupDoctorChecks.any(
         (check) =>
-            check.checkId == 'broker.protected_field_edit' &&
-            check.status == 'pass',
+            check.checkId == 'setup_doctor.config_created' &&
+            check.status == 'unknown',
       ),
       isTrue,
     );
@@ -516,6 +516,7 @@ void main() {
     );
     expect(transport.operations, [
       'health',
+      'Setup Doctor報告取得',
       'ホスト能力',
       'Host一覧',
       'アダプター一覧',
@@ -527,10 +528,52 @@ void main() {
     ]);
     expect(
       transport.requests.singleWhere(
+        (request) => request['operation'] == 'Setup Doctor報告取得',
+      )['payload'],
+      const <String, Object?>{'version': 1},
+    );
+    expect(
+      transport.requests.singleWhere(
         (request) => request['operation'] == 'Agent一覧',
       )['payload'],
       const <String, Object?>{},
     );
+  });
+
+  test('不正なBroker Setup Doctor報告はunknownへ閉じる', () async {
+    final invalidResponse = _brokerSetupDoctorResponse();
+    final invalidBody =
+        Map<String, Object?>.from(invalidResponse['body'] as Map);
+    final invalidChecks = List<Object?>.from(invalidBody['checks'] as List);
+    final injectedCheck = Map<String, Object?>.from(invalidChecks.first as Map);
+    injectedCheck['credential'] = 'must-not-be-projected';
+    invalidChecks[0] = injectedCheck;
+    invalidBody['checks'] = invalidChecks;
+    invalidResponse['body'] = invalidBody;
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      invalidResponse,
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {
+        'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
+      }),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ]);
+
+    final client = await ShellCoreClient.product(transport: transport);
+    final snapshot = client.getSnapshot();
+
+    expect(client.mode, 'broker');
+    expect(snapshot.setupDoctorStatus, 'unknown');
+    expect(snapshot.setupDoctorChecks, isNotEmpty);
+    expect(
+        snapshot.setupDoctorChecks.every((check) => check.status == 'unknown'),
+        isTrue);
   });
 
   test('ブローカー利用不可時に製品クライアントが閉鎖側へ失敗する', () async {
@@ -814,11 +857,96 @@ class _FakeBrokerTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
+    if (operation == 'Setup Doctor報告取得' &&
+        (_responses.isEmpty || _responses.first['operation'] != operation)) {
+      return Future.value(_brokerSetupDoctorResponse());
+    }
     if (_responses.isEmpty) {
       throw BrokerClientException('$operation 用の fake broker 応答がありません');
     }
     return _responses.removeAt(0);
   }
+}
+
+Map<String, Object?> _brokerSetupDoctorResponse() {
+  const checks = <Map<String, Object?>>[
+    {
+      'check_id': 'setup_doctor.ran_from_installed_app_path',
+      'status': 'unknown',
+      'message': 'installed package配置は未検証です。',
+      'recovery_instruction': '正式配置からD4 Pocketを起動してください。',
+      'evidence_class': 'INTERNAL_STATE',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.runtime_connection',
+      'status': 'pass',
+      'message': 'Broker要求を処理しました。',
+      'recovery_instruction': '接続が切れた場合は再起動してください。',
+      'evidence_class': 'LIVE_RUNTIME',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.authority_boundary',
+      'status': 'pass',
+      'message': '診断報告は権限を生成しません。',
+      'recovery_instruction': '問題時は権限依存操作を停止してください。',
+      'evidence_class': 'CONFIG',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.network_public_bind',
+      'status': 'unknown',
+      'message': 'loopback bindを確認できません。',
+      'recovery_instruction': '固定loopback設定を確認してください。',
+      'evidence_class': 'INTERNAL_STATE',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.recovery_instruction',
+      'status': 'pass',
+      'message': '復旧案内を含みます。',
+      'recovery_instruction': '最新の報告を再取得してください。',
+      'evidence_class': 'CONFIG',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.audit_storage',
+      'status': 'pass',
+      'message': 'Broker永続storeが利用可能です。',
+      'recovery_instruction': 'Broker storeを復旧してください。',
+      'evidence_class': 'LIVE_RUNTIME',
+      'grants_authority': false,
+    },
+    {
+      'check_id': 'setup_doctor.config_created',
+      'status': 'unknown',
+      'message': '初回config生成は未接続です。',
+      'recovery_instruction': '初回config契約の成立前は完了扱いしないでください。',
+      'evidence_class': 'CONFIG',
+      'grants_authority': false,
+    },
+  ];
+  return {
+    'request_id': 'test-Setup Doctor報告取得',
+    'operation': 'Setup Doctor報告取得',
+    'status': 'accepted',
+    'evidence_source': 'LIVE_RUNTIME',
+    'audit_event_id': 'audit-setup-doctor',
+    'error': null,
+    'body': {
+      'version': 1,
+      'report_id':
+          'setup-doctor-0000000000000000000000000000000000000000000000000000000000000000',
+      'generated_at': '2026-09-26T00:00:00Z',
+      'status': 'warning',
+      'evidence_source': 'LIVE_RUNTIME',
+      'checks': checks,
+      'installer_grants_authority': false,
+      'installer_silently_approves_permissions': false,
+    },
+    'shutdown_requested': false,
+  };
 }
 
 class _FailingBrokerTransport implements BrokerTransport {

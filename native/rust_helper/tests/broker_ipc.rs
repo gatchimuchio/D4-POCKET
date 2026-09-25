@@ -3,7 +3,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -15,6 +16,32 @@ use serde_json::Value;
 struct BrokerProcess {
     child: Child,
     endpoint: BrokerEndpoint,
+}
+
+struct InProcessBrokerServer {
+    shutdown: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<Result<(), gui_shell_rust_helper::broker::ipc_server::BrokerServerError>>>,
+}
+
+impl InProcessBrokerServer {
+    fn stop(mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        if let Some(server) = self.thread.take() {
+            server
+                .join()
+                .expect("Broker threadの終了")
+                .expect("Brokerが正常終了");
+        }
+    }
+}
+
+impl Drop for InProcessBrokerServer {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Release);
+        if let Some(server) = self.thread.take() {
+            let _ = server.join();
+        }
+    }
 }
 
 // Windowsのloopback Broker試験は子processとowner CLI clientを起動する。
@@ -43,6 +70,108 @@ fn workspace_control_is_rejected_over_normal_authenticated_ipc() {
         assert_eq!(result["error"]["code"],"権限拒否");
         assert!(result["body"].is_null());
     }
+}
+
+#[test]
+fn setup_doctor_report_uses_normal_ipc_and_binds_saved_bytes_to_live_audit() {
+    let _test_guard = broker_ipc_test_guard();
+    use gui_shell_rust_helper::audit_hash::sha256_tagged;
+
+    let workspace = temp_workspace("setup-doctor-report");
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let thread_shutdown = Arc::clone(&shutdown);
+    let thread_store = workspace.store_dir.clone();
+    let thread_session_file = workspace.session_file.clone();
+    let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let server = thread::spawn(move || {
+        gui_shell_rust_helper::broker::ipc_server::run_loopback_server_cancellable(
+            gui_shell_rust_helper::broker::ipc_server::BrokerServerConfig::new(
+                thread_store,
+                thread_session_file,
+            ),
+            thread_shutdown,
+            ready_tx,
+        )
+    });
+    let server = InProcessBrokerServer {
+        shutdown,
+        thread: Some(server),
+    };
+    ready_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("loopback Brokerが待受けを開始する");
+    let endpoint = wait_for_endpoint(&workspace.session_file).expect("Broker接続情報");
+    let report_path = workspace.store_dir.join("setup_doctor_report.json");
+    let payload = serde_json::json!({"version": 1});
+    let request = serde_json::json!({
+        "request_id": "setup-doctor-report-1",
+        "session_id": endpoint.session_id,
+        "operation": "Setup Doctor報告取得",
+        "payload": payload,
+        "payload_hash": sha256_tagged(payload.to_string().as_bytes()),
+        "nonce": "setup-doctor-report-nonce-1",
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {},
+    })
+    .to_string();
+
+    let unauthenticated = send_raw(&endpoint, "wrong-secret", &request);
+    assert_eq!(unauthenticated["status"], "rejected");
+    assert!(!report_path.exists(), "認証拒否からreportを生成しない");
+
+    let accepted = send_request(&endpoint, &request);
+    assert_eq!(accepted["status"], "accepted", "{accepted}");
+    let report = &accepted["body"];
+    assert_eq!(report["status"], "warning");
+    assert_eq!(report["checks"].as_array().unwrap().len(), 7);
+    assert_eq!(report["checks"][0]["status"], "unknown");
+    assert_eq!(report["checks"][3]["status"], "pass");
+    assert_eq!(report["checks"][6]["status"], "unknown");
+
+    let saved_bytes = fs::read(&report_path).unwrap();
+    assert_eq!(serde_json::from_slice::<Value>(&saved_bytes).unwrap(), *report);
+    let report_hash = sha256_tagged(&saved_bytes);
+    let audit_events: Vec<Value> = fs::read_to_string(workspace.store_dir.join("audit.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let accepted_export = audit_events
+        .iter()
+        .find(|event| {
+            event["operation"] == "Setup Doctor報告取得"
+                && event["decision"] == "accepted"
+                && event["reason"] == "setup_doctor_report_exported"
+        })
+        .expect("保存済みreportに対応する受理監査event");
+    assert_eq!(accepted_export["payload_hash"], report_hash);
+    assert_eq!(accepted_export["evidence_source"], "LIVE_RUNTIME");
+    assert_eq!(accepted["audit_event_id"], accepted_export["event_id"]);
+
+    let arbitrary_path = workspace.store_dir.join("should_not_write.json");
+    let invalid_payload = serde_json::json!({
+        "version": 1,
+        "output_path": arbitrary_path.to_string_lossy(),
+    });
+    let invalid_request = serde_json::json!({
+        "request_id": "setup-doctor-report-2",
+        "session_id": endpoint.session_id,
+        "operation": "Setup Doctor報告取得",
+        "payload": invalid_payload,
+        "payload_hash": sha256_tagged(invalid_payload.to_string().as_bytes()),
+        "nonce": "setup-doctor-report-nonce-2",
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {},
+    })
+    .to_string();
+    assert_eq!(send_request(&endpoint, &invalid_request)["status"], "rejected");
+    assert!(!arbitrary_path.exists(), "要求指定pathへ書き込まない");
+    assert_eq!(
+        fs::read(&report_path).unwrap(),
+        saved_bytes,
+        "拒否時に最新reportを維持する"
+    );
+    server.stop();
 }
 
 impl Drop for BrokerProcess {

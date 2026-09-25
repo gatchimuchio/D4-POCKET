@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "report_id": "setup-doctor-0000000000000000000000000000000000000000000000000000000000000000",
+  "generated_at": "2026-09-26T00:00:00Z",
+  "status": "warning",
+  "evidence_source": "LIVE_RUNTIME",
+  "checks": [
+    {"check_id":"setup_doctor.ran_from_installed_app_path","status":"pass","message":"固定installed package配置をBroker起動器が検証した。","recovery_instruction":"配置確認後に製品を再起動してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.runtime_connection","status":"pass","message":"Brokerが認証済み要求を処理した。","recovery_instruction":"接続が切れた場合は製品を再起動してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.authority_boundary","status":"pass","message":"診断報告は権限を生成しない。","recovery_instruction":"権限境界に問題があれば権限依存操作を停止してください。","evidence_class":"CONFIG","grants_authority":false},
+    {"check_id":"setup_doctor.network_public_bind","status":"pass","message":"Broker IPCはIPv4 loopbackへbindした。","recovery_instruction":"公開bindを検出した場合はBrokerを停止してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.recovery_instruction","status":"pass","message":"全checkに復旧案内がある。","recovery_instruction":"復旧案内のある最新reportを再取得してください。","evidence_class":"CONFIG","grants_authority":false},
+    {"check_id":"setup_doctor.audit_storage","status":"pass","message":"Broker永続Audit storeが利用可能。","recovery_instruction":"storeを復旧して診断を再実行してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.config_created","status":"unknown","message":"初回config生成は未接続。","recovery_instruction":"config生成contract成立前は初回設定完了として扱わないでください。","evidence_class":"CONFIG","grants_authority":false}
+  ],
+  "installer_grants_authority": false,
+  "installer_silently_approves_permissions": false
+}

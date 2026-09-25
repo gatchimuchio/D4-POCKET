@@ -14,6 +14,7 @@ const MAX_REPLAY_NONCE_RECORDS: usize = 100_000;
 const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerStoreError {
@@ -71,6 +72,7 @@ pub struct BrokerPersistentStore {
     a2a_path: PathBuf,
     host_path: PathBuf,
     adapter_path: PathBuf,
+    setup_doctor_report_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -118,6 +120,7 @@ impl BrokerPersistentStore {
             a2a_path: root.join("a2a_connections.json"),
             host_path: root.join("hosts.json"),
             adapter_path: root.join("adapters.json"),
+            setup_doctor_report_path: root.join("setup_doctor_report.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
@@ -406,6 +409,68 @@ impl BrokerPersistentStore {
         atomic_write(&self.adapter_path, serialized.as_bytes()).map_err(|error| {
             BrokerStoreError::Io(format!("broker Adapter stateの書込みに失敗: {error}"))
         })
+    }
+
+    pub fn write_setup_doctor_report(&self, bytes: &[u8]) -> Result<(), BrokerStoreError> {
+        if bytes.is_empty() || bytes.len() > MAX_SETUP_DOCTOR_REPORT_BYTES {
+            return Err(BrokerStoreError::Io(
+                "Setup Doctor reportのsizeが許容範囲外".to_string(),
+            ));
+        }
+        let root_metadata = fs::symlink_metadata(&self.root).map_err(|_| {
+            BrokerStoreError::Io("Setup Doctor storeのrootを確認できない".to_string())
+        })?;
+        if !root_metadata.is_dir()
+            || root_metadata.file_type().is_symlink()
+            || is_reparse_point(&root_metadata)
+        {
+            return Err(BrokerStoreError::Io(
+                "Setup Doctor storeのrootが通常directoryではない".to_string(),
+            ));
+        }
+        match fs::symlink_metadata(&self.setup_doctor_report_path) {
+            Ok(metadata)
+                if !metadata.is_file()
+                    || metadata.file_type().is_symlink()
+                    || is_reparse_point(&metadata) =>
+            {
+                return Err(BrokerStoreError::Io(
+                    "Setup Doctor reportの既存targetが通常fileではない".to_string(),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => {
+                return Err(BrokerStoreError::Io(
+                    "Setup Doctor reportの既存targetを確認できない".to_string(),
+                ));
+            }
+        }
+
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).map_err(|_| {
+            BrokerStoreError::Io("Setup Doctor一時file識別子を生成できない".to_string())
+        })?;
+        let temporary_path = self
+            .root
+            .join(format!(".setup_doctor_report-{}.tmp", hex::encode(random)));
+        let write_result = (|| {
+            let mut file = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temporary_path)?;
+            file.write_all(bytes)?;
+            file.sync_all()?;
+            drop(file);
+            fs::rename(&temporary_path, &self.setup_doctor_report_path)
+        })();
+        if write_result.is_err() {
+            let _ = fs::remove_file(&temporary_path);
+            return Err(BrokerStoreError::Io(
+                "Setup Doctor reportを安全に保存できない".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
@@ -796,4 +861,66 @@ fn current_epoch_seconds() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(windows)]
+fn is_reparse_point(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    metadata.file_attributes() & 0x400 != 0
+}
+
+#[cfg(not(windows))]
+fn is_reparse_point(_metadata: &fs::Metadata) -> bool {
+    false
+}
+
+#[cfg(test)]
+mod setup_doctor_report_tests {
+    use super::*;
+
+    #[test]
+    fn setup_doctor_report_is_bounded_and_only_latest_report_is_retained() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-setup-doctor-store-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let (store, _) = BrokerPersistentStore::open_or_create(&root, "setup-doctor-test")
+            .expect("永続storeを作成する");
+        let target = root.join("setup_doctor_report.json");
+
+        store
+            .write_setup_doctor_report(br#"{"version":1,"status":"warning"}"#)
+            .unwrap();
+        assert_eq!(
+            fs::read(&target).unwrap(),
+            br#"{"version":1,"status":"warning"}"#
+        );
+        store
+            .write_setup_doctor_report(br#"{"version":1,"status":"unknown"}"#)
+            .unwrap();
+        assert_eq!(
+            fs::read(&target).unwrap(),
+            br#"{"version":1,"status":"unknown"}"#
+        );
+        assert_eq!(
+            fs::read_dir(&root)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".setup_doctor_report-"))
+                .count(),
+            0
+        );
+        assert!(store
+            .write_setup_doctor_report(&vec![0; MAX_SETUP_DOCTOR_REPORT_BYTES + 1])
+            .is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 }

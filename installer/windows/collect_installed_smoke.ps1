@@ -1043,14 +1043,16 @@ try {
   Restore-SmokeEnvironment
 }
 
-$setupDoctorPath = $null
+$setupDoctorPath = Join-Path $brokerStoreDir "setup_doctor_report.json"
 $setupDoctor = [ordered]@{
-  status = "missing"
+  status = "unknown"
   formal_product_evidence = $false
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
     source_kind = "product_export_not_observed"
     product_generated = $false
+    collector_derives_checks = $false
+    synthetic = $false
   }
 }
 if ($VisibleSurfacesJson -ne "") {
@@ -1080,6 +1082,30 @@ $firstWindowVisible = (!$process.HasExited -and $mainWindowHandle -ne 0)
 Stop-InstalledLauncher
 $sessionFileRemovedAfterShutdown = !(Test-Path -LiteralPath $brokerEndpointFile)
 $brokerAuditPath = Join-Path $brokerStoreDir "audit.jsonl"
+$setupDoctorReport = $null
+$setupDoctorReportRawBytes = $null
+$setupDoctorReportSha256 = $null
+$setupDoctorFileObserved = $false
+$setupDoctorAuditEvent = $null
+$setupDoctorAcceptedAuditMatchCount = 0
+if (Test-Path -LiteralPath $setupDoctorPath -PathType Leaf) {
+  $setupDoctorItem = Get-Item -LiteralPath $setupDoctorPath -ErrorAction Stop
+  if (($setupDoctorItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0 -and
+      $setupDoctorItem.Length -gt 0 -and $setupDoctorItem.Length -le 65536) {
+    try {
+      $setupDoctorReportRawBytes = [System.IO.File]::ReadAllBytes($setupDoctorPath)
+      $setupDoctorReport = Read-Utf8Json -Path $setupDoctorPath
+      $setupDoctorReportSha256 = Get-TaggedSha256 -Path $setupDoctorPath
+      $setupDoctorFileObserved = ($setupDoctorReport -is [System.Management.Automation.PSCustomObject] -and
+        $setupDoctorReportSha256 -match '^sha256:[a-f0-9]{64}$')
+    } catch {
+      $setupDoctorReport = $null
+      $setupDoctorReportRawBytes = $null
+      $setupDoctorReportSha256 = $null
+      $setupDoctorFileObserved = $false
+    }
+  }
+}
 if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
   if ((Get-Item -LiteralPath $brokerAuditPath).Length -gt $MaximumBrokerAuditBytes) {
     throw "Broker lifecycle Audit fileが読み込み上限を超えています。"
@@ -1104,6 +1130,17 @@ if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
         $normalBrokerHealthFirstEventId = [string]$auditEvent.event_id
       }
     }
+    if ($setupDoctorFileObserved -and
+        [string]$auditEvent.operation -eq "Setup Doctor報告取得" -and
+        [string]$auditEvent.decision -eq "accepted" -and
+        [string]$auditEvent.reason -eq "setup_doctor_report_exported" -and
+        [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME" -and
+        [string]$auditEvent.payload_hash -eq $setupDoctorReportSha256 -and
+        [string]$auditEvent.event_id -match '^broker-audit-[1-9][0-9]*$' -and
+        [string]$auditEvent.event_hash -match '^sha256:[a-f0-9]{64}$') {
+      $setupDoctorAcceptedAuditMatchCount += 1
+      $setupDoctorAuditEvent = $auditEvent
+    }
     if ([string]$auditEvent.operation -eq "D4 Pocket Desktop起動") {
       $startupAuditEventCount += 1
       if ([string]$auditEvent.decision -eq "recorded" -and [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME") {
@@ -1119,6 +1156,38 @@ if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
   }
 }
 $normalBrokerHealthRequestAccepted = $normalBrokerHealthEventCount -gt 0
+$setupDoctorAuditMatched = ($setupDoctorFileObserved -and $setupDoctorAcceptedAuditMatchCount -eq 1)
+$setupDoctorStatus = "unknown"
+$setupDoctorChecks = @()
+if ($setupDoctorAuditMatched) {
+  $setupDoctorStatus = [string]$setupDoctorReport.status
+  $setupDoctorChecks = @($setupDoctorReport.checks)
+}
+$setupDoctor = [ordered]@{
+  status = $setupDoctorStatus
+  formal_product_evidence = [bool]$setupDoctorAuditMatched
+  report_path = $(if ($setupDoctorFileObserved) { $setupDoctorPath } else { $null })
+  report_sha256 = $setupDoctorReportSha256
+  serialized_report_base64 = $(if ($setupDoctorFileObserved) { [System.Convert]::ToBase64String($setupDoctorReportRawBytes) } else { $null })
+  product_report = $setupDoctorReport
+  accepted_audit_event = $setupDoctorAuditEvent
+  ran_from_installed_app_path = ($setupDoctorAuditMatched -and $frontendImageSha256Verified -and
+    (@($setupDoctorChecks | Where-Object { $_.check_id -eq "setup_doctor.ran_from_installed_app_path" -and $_.status -eq "pass" }).Count -eq 1))
+  operator_readable = $false
+  installer_grants_authority = $false
+  installer_silently_approves_permissions = $false
+  checks = $setupDoctorChecks
+  evidence_source = [ordered]@{
+    collector = "installer/windows/collect_installed_smoke.ps1"
+    source_kind = $(if ($setupDoctorAuditMatched) { "installed_app_machine_readable_export" } else { "product_export_not_verified" })
+    product_generated = [bool]$setupDoctorFileObserved
+    collector_derives_checks = $false
+    synthetic = $false
+    command = "通常起動したD4 Pocket UIが認証済みBroker IPCのSetup Doctor報告取得を呼び出し"
+    accepted_audit_event_id = $(if ($null -ne $setupDoctorAuditEvent) { $setupDoctorAuditEvent.event_id } else { $null })
+    accepted_audit_event_payload_hash = $(if ($null -ne $setupDoctorAuditEvent) { $setupDoctorAuditEvent.payload_hash } else { $null })
+  }
+}
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
@@ -1251,9 +1320,11 @@ if ($aggregateSurfaceShortcutDetected -or !$surfaceMatchRequirementsMet) {
   $visibleSurfacesComplete = $false
 }
 $unsupportedClaims = @(
-  "first_run_configuration_product_export",
-  "formal_setup_doctor_product_export"
+  "first_run_configuration_product_export"
 )
+if (!$setupDoctorAuditMatched) {
+  $unsupportedClaims += "formal_setup_doctor_product_export"
+}
 if (!$separateWindowsProfileVerified) {
   $unsupportedClaims += "separate_windows_user_profile"
 }
@@ -1300,14 +1371,18 @@ $evidence = [ordered]@{
     "first_run.broker_health_request" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     "first_run.config_audit" = [ordered]@{ source_type = "unsupported_claim"; evidence_class = "CONFIG"; formal_release_input = $false }
     "first_run.installer_authority_boundary" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
-    setup_doctor = [ordered]@{ source_type = "external_probe"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $false }
+    setup_doctor = [ordered]@{
+      source_type = $(if ($setupDoctorAuditMatched) { "product_export" } else { "unsupported_claim" })
+      evidence_class = $(if ($setupDoctorAuditMatched) { "LIVE_RUNTIME" } else { "INTERNAL_STATE" })
+      formal_release_input = [bool]$setupDoctorAuditMatched
+    }
     "broker.ipc_restart_crash" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     release_runtime_assertions = [ordered]@{ source_type = "static_assertion"; evidence_class = @("CONFIG", "FIXTURE"); formal_release_input = $true }
     unsupported_claims = @($unsupportedClaims)
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "12"
+    collector_version = "13"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }

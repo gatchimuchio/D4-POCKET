@@ -1596,3 +1596,20 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 修正作業blockの最終検証は、`python tooling/schema_check/check_schemas.py`（Schema 132／正常例132／negative fixture 163）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（208件）、`python -X utf8 tooling/日本語基底監査.py --strict`（負債0件）、`python tooling/manifest.py --check`、PowerShell AST parse、`git diff --check`がすべて成功した。`python tooling/validate_all.py --python-only --desktop-platform windows`もexit 0でconfigured 10 checksが成功し、既存release blocker 5件と`release_ready=false`を維持した。Rust／Flutter product sourceはこのblockでは変更していない。別profile正式runとrelease evidence欠落は依然として`release_blocker`である。
 
 終了操作の自然終了raceを拒否するguardを加えた最終sourceでもcollector version 12を再実行した。`installed-smoke-diagnostic-final-v2.json`のSHA-256は`311d56c7bad2981cc6a0032bbecf7f001f652d4c4b5da4c8fdf648ab03336309`。statusは`diagnostic_only`、profile分離false、可視surface 4件、health受理1件、shutdown Auditあり、endpoint削除済み、終了menu実行済み、強制終了なし、cleanup errorなし、起動器exit code 0であり、対象app processも残っていない。正式release証拠ではない。
+
+## D4 Pocket rev2 Broker統治Setup Doctor報告経路（2026-09-26）
+
+通常製品UIから認証済みRust Broker IPCへ固定payload `{version: 1}`を送り、Brokerが生成した7項目のSetup Doctor報告を読む経路を追加した。報告には任意の保存先指定を許さず、固定Broker Store内の最新一件だけを64 KiB以内でatomic replaceする。保存byte列のSHA-256を同じ要求の`accepted / LIVE_RUNTIME` AuditEventへ結び、保存・監査が成立しない場合は成功応答を返さない。Flutterはfilesystemを触らず報告を表示し、Schemaどおりのfield集合・識別子・状態・証拠classを満たさない入力は`unknown`へ閉じる。Windows collectorは固定storeの生byte列と受理Auditを照合してbundleへ含め、strict validatorはSchema・hash・Audit結合・隔離store pathを再検証する。Setup Doctor自体はAuthorityを付与しない。
+
+検証結果:
+
+- `cargo test -- --test-threads=1`：最終再実行成功。Rust library 267件、CLI 9件、統合・checkpoint等36件を含む全targetがPASSし、Setup Doctorのloopback TCP IPC、認証拒否時の非生成、保存byte列と受理Audit hashの一致、任意path拒否を実行した。手戻し中の初回compileはreparse判定helper不足を検出したため実装し、最終全targetを再実行した。さらに、先行する一回はWindows Application Controlが生成test executableの起動をerror 4551で拒否したが、OS設定変更・別配置binaryによる迂回をせず、後続の最終source全target試験は成功した。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 133件、正常例133件、negative fixture 164件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：210件成功。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で成功。これは静的意味監査であり、実画面や自然さを証明しない。
+- `flutter test --no-pub --reporter expanded`：107件すべて成功。`dart format lib/services/shell_core_client.dart test/widget_test.dart`を実施した。追加fieldに資格値を混入する否定試験が画面側で`unknown`へ閉じることを含む。
+- `flutter analyze --no-pub`：OneDrive内では既存Flutter ephemeral reparse pathの削除拒否があるため、一時検証copyで実行。変更した両Dart fileのSHA-256を作業treeと照合後、指摘0件で成功した。これは作業tree外copy上のsource解析であり、Desktop実行証拠ではない。
+- `python -m py_compile tooling/windows_release_evidence.py tooling/schema_check/check_schemas.py tooling/conformance_tests/run_conformance_skeleton.py`、PowerShell parserによるcollector AST parse、`git diff --check`：成功。
+- `python tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、configured 10検査すべてPASS。Schema／conformance／manifest／release gate／配布互換性／release smoke／evidence bundle／runtime assertion／C32構造監査を含む。集約はrelease blocker 5件と`release_ready=false`を維持する。Windows installed product証拠や製品完成の証明ではない。
+
+今回の報告はsource-levelのproduction経路・認証済みloopback統合試験までを示し、変更後Windows installed productの別profile runやSetup Doctor画面の実読取を示さない。初回config生成contractは未接続で`setup_doctor.config_created=unknown`、`operator_readable=false`を維持し、`windows_setup_doctor_smoke`等のrelease blockerと`release_ready=false`は解除しない。前回までの失敗記録を成功へ書き換えず、現行実装の検証結果を別記する。

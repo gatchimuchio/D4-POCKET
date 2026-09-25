@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/setup_doctor_report.schema.json",
+  "title": "Brokerが生成するD4 Pocket環境診断報告（SetupDoctorReport）",
+  "type": "object",
+  "required": [
+    "version",
+    "report_id",
+    "generated_at",
+    "status",
+    "evidence_source",
+    "checks",
+    "installer_grants_authority",
+    "installer_silently_approves_permissions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "report_id": { "type": "string", "pattern": "^setup-doctor-[a-f0-9]{64}$" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["pass", "warning", "fail", "unknown"] },
+    "evidence_source": { "enum": ["LIVE_RUNTIME", "INTERNAL_STATE"] },
+    "checks": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "required": [
+          "check_id",
+          "status",
+          "message",
+          "recovery_instruction",
+          "evidence_class",
+          "grants_authority"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "check_id": {
+            "enum": [
+              "setup_doctor.ran_from_installed_app_path",
+              "setup_doctor.runtime_connection",
+              "setup_doctor.authority_boundary",
+              "setup_doctor.network_public_bind",
+              "setup_doctor.recovery_instruction",
+              "setup_doctor.audit_storage",
+              "setup_doctor.config_created"
+            ]
+          },
+          "status": { "enum": ["pass", "warning", "fail", "unknown"] },
+          "message": { "type": "string", "minLength": 1 },
+          "recovery_instruction": { "type": "string", "minLength": 1 },
+          "evidence_class": {
+            "enum": ["CONFIG", "INTERNAL_STATE", "LIVE_RUNTIME"]
+          },
+          "grants_authority": { "type": "boolean", "const": false }
+        }
+      }
+    },
+    "installer_grants_authority": { "type": "boolean", "const": false },
+    "installer_silently_approves_permissions": { "type": "boolean", "const": false }
+  }
+}

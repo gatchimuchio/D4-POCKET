@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import ntpath
 import subprocess
@@ -21,16 +22,13 @@ SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUIRED_VISIBLE_SURFACES = {"Dashboard", "NavigationRail", "Runtime Status", "Invariant Status"}
 REQUIRED_SETUP_CHECKS = {
-    "windows.installed_app_path",
-    "windows.artifact_hash",
-    "first_run.config_created",
-    "first_run.audit_dir_writable",
     "setup_doctor.ran_from_installed_app_path",
     "setup_doctor.runtime_connection",
     "setup_doctor.authority_boundary",
     "setup_doctor.network_public_bind",
     "setup_doctor.recovery_instruction",
     "setup_doctor.audit_storage",
+    "setup_doctor.config_created",
 }
 REQUIRED_BROKER_TRUE_FIELDS = {
     "helper_exe_exists",
@@ -668,8 +666,8 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
     else:
         if setup.get("formal_product_evidence") is not True:
             errors.append("Setup Doctor は外部 probe ではなく installed-app product evidence でなければならない")
-        if setup.get("status") not in ("pass", "warning"):
-            errors.append("setup_doctor.status は pass または warning でなければならない")
+        if setup.get("status") != "pass":
+            errors.append("strict releaseではSetup Doctor全checkがpassでなければならない")
         evidence_source = setup.get("evidence_source")
         if not isinstance(evidence_source, dict):
             errors.append("Setup Doctor の evidence_source がない")
@@ -684,6 +682,75 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
                 errors.append("合成した Setup Doctor evidence は受理しない")
             if not evidence_source.get("command"):
                 errors.append("Setup Doctor の evidence_source.command がない")
+        encoded_report = setup.get("serialized_report_base64")
+        report_hash = setup.get("report_sha256")
+        product_report = setup.get("product_report")
+        accepted_audit = setup.get("accepted_audit_event")
+        report_bytes: bytes | None = None
+        if not isinstance(encoded_report, str) or len(encoded_report) > 96 * 1024:
+            errors.append("Setup Doctorの保存済みreport byte列がない、またはsize上限を超える")
+        else:
+            try:
+                report_bytes = base64.b64decode(encoded_report, validate=True)
+            except (ValueError, base64.binascii.Error):
+                errors.append("Setup Doctorの保存済みreport byte列がbase64として不正")
+        if report_bytes is not None:
+            if not report_bytes or len(report_bytes) > 64 * 1024:
+                errors.append("Setup Doctor report byte列が許容size外")
+            actual_report_hash = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+            if report_hash != actual_report_hash:
+                errors.append("Setup Doctor report hashが保存byte列と一致しない")
+            if not isinstance(product_report, dict):
+                errors.append("Setup Doctorのproduct_report objectがない")
+            else:
+                try:
+                    decoded_report = json.loads(report_bytes.decode("utf-8", errors="strict"))
+                    from tooling.schema_check.check_schemas import validate_instance
+                    schema = json.loads((ROOT / "specs" / "setup_doctor_report.schema.json").read_text(encoding="utf-8"))
+                    if not isinstance(decoded_report, dict) or decoded_report != product_report:
+                        errors.append("Setup Doctor product_reportが保存されたUTF-8 reportと一致しない")
+                    elif validate_instance(decoded_report, schema):
+                        errors.append("Setup Doctor product reportが正本Schemaに適合しない")
+                    elif decoded_report.get("status") != setup.get("status") or decoded_report.get("checks") != setup.get("checks"):
+                        errors.append("Setup Doctorの表示・collector値がBroker reportと一致しない")
+                except (OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError) as error:
+                    errors.append(f"Setup Doctor product reportを検証できない: {error}")
+        if not isinstance(accepted_audit, dict):
+            errors.append("Setup Doctorのaccepted AuditEventがない")
+        else:
+            expected_report_hash = report_hash if isinstance(report_hash, str) else ""
+            if (
+                accepted_audit.get("operation") != "Setup Doctor報告取得"
+                or accepted_audit.get("decision") != "accepted"
+                or accepted_audit.get("reason") != "setup_doctor_report_exported"
+                or accepted_audit.get("evidence_source") != "LIVE_RUNTIME"
+                or accepted_audit.get("payload_hash") != expected_report_hash
+                or not re.fullmatch(r"broker-audit-[1-9][0-9]*", str(accepted_audit.get("event_id", "")))
+                or not SHA256_RE.fullmatch(str(accepted_audit.get("event_hash", "")))
+                or not accepted_audit.get("request_id")
+            ):
+                errors.append("Setup Doctor accepted AuditEventがproduct reportのLIVE_RUNTIME hashと一致しない")
+            if evidence_source and evidence_source.get("accepted_audit_event_id") != accepted_audit.get("event_id"):
+                errors.append("Setup Doctor evidence_sourceのaccepted AuditEvent IDが一致しない")
+            if evidence_source and evidence_source.get("accepted_audit_event_payload_hash") != expected_report_hash:
+                errors.append("Setup Doctor evidence_sourceのAudit payload hashが一致しない")
+        provenance = data.get("provenance")
+        bundle_files = provenance.get("evidence_bundle_files") if isinstance(provenance, dict) else None
+        setup_file = next((item for item in bundle_files or [] if isinstance(item, dict) and item.get("kind") == "setup_doctor"), None)
+        if (
+            not isinstance(setup_file, dict)
+            or setup_file.get("exists") is not True
+            or setup_file.get("sha256") != report_hash
+            or setup_file.get("path") != setup.get("report_path")
+        ):
+            errors.append("Setup Doctor reportの固定store file記録/hashがevidence bundleと一致しない")
+        isolation = _get(data, "provenance.isolation")
+        if isinstance(isolation, dict) and setup.get("report_path"):
+            expected_report_path = ntpath.normcase(ntpath.normpath(
+                ntpath.join(str(isolation.get("isolated_store_dir") or ""), "setup_doctor_report.json")
+            ))
+            if ntpath.normcase(ntpath.normpath(str(setup.get("report_path")))) != expected_report_path:
+                errors.append("Setup Doctor reportは固定Broker Store path以外から収集してはならない")
         if not setup.get("ran_from_installed_app_path"):
             errors.append("Setup Doctor が installed app path から実行されなかった")
         if not setup.get("operator_readable"):
@@ -696,6 +763,8 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
         if not isinstance(checks, list) or not checks:
             errors.append("Setup Doctor の checks は空でない list でなければならない")
         else:
+            if any(check.get("status") != "pass" for check in checks if isinstance(check, dict)):
+                errors.append("strict releaseではunknown、warning、failを含むSetup Doctor checkを受理しない")
             if any(check.get("status") == "fail" for check in checks if isinstance(check, dict)):
                 errors.append("Setup Doctor に失敗した check が含まれる")
             if any(check.get("grants_authority") is not False for check in checks if isinstance(check, dict)):

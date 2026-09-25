@@ -1,4 +1,5 @@
 from pathlib import Path
+import base64
 import copy
 import hashlib
 import json
@@ -175,6 +176,7 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_health",
     "broker_command_envelope",
     "desktop_broker_channel_request",
+    "setup_doctor_report",
     "mobile_device_link_channel_request",
     "mobile_local_recovery_audit",
     "adapter_management_manifest",
@@ -238,6 +240,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "broker_health.schema.json",
     "broker_command_envelope.schema.json",
     "desktop_broker_channel_request.schema.json",
+    "setup_doctor_report.schema.json",
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",
@@ -480,6 +483,20 @@ def test_contract_fixtures_are_available() -> list[str]:
         if not isinstance(fixture, dict):
             errors.append(f"examples/contracts/{name} はJSON objectでなければならない")
     return errors
+
+
+def test_setup_doctor_report_schema_preserves_unknown_and_denies_authority() -> list[str]:
+    schema = load_schema("setup_doctor_report.schema.json")
+    valid = load_contract_fixture("setup_doctor_report.valid.json")
+    invalid = load_contract_fixture("invalid/setup_doctor_report_authority_escalation.invalid.json")
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"Setup Doctorの正常報告例が契約に適合しない: {errors}"]
+    if valid.get("status") != "warning" or valid["checks"][-1].get("status") != "unknown":
+        return ["初回設定が未実装なら状態を不明のまま保持しなければならない"]
+    if validate_instance(invalid, schema) == []:
+        return ["環境診断報告のSchemaが権限昇格を拒否しない"]
+    return []
 
 
 def schema_name_from_invalid_fixture(path: Path) -> str:
@@ -1567,17 +1584,14 @@ def test_evidence_bundle_is_development_classified_and_non_authoritative() -> li
 
 def _valid_windows_installed_evidence() -> dict:
     setup_checks = []
-    for check_id in [
-        "windows.installed_app_path",
-        "windows.artifact_hash",
-        "first_run.config_created",
-        "first_run.audit_dir_writable",
-        "setup_doctor.ran_from_installed_app_path",
-        "setup_doctor.runtime_connection",
-        "setup_doctor.authority_boundary",
-        "setup_doctor.network_public_bind",
-        "setup_doctor.recovery_instruction",
-        "setup_doctor.audit_storage",
+    for check_id, evidence_class in [
+        ("setup_doctor.ran_from_installed_app_path", "LIVE_RUNTIME"),
+        ("setup_doctor.runtime_connection", "LIVE_RUNTIME"),
+        ("setup_doctor.authority_boundary", "CONFIG"),
+        ("setup_doctor.network_public_bind", "LIVE_RUNTIME"),
+        ("setup_doctor.recovery_instruction", "CONFIG"),
+        ("setup_doctor.audit_storage", "LIVE_RUNTIME"),
+        ("setup_doctor.config_created", "CONFIG"),
     ]:
         setup_checks.append(
             {
@@ -1585,9 +1599,33 @@ def _valid_windows_installed_evidence() -> dict:
                 "status": "pass",
                 "message": f"{check_id} passed",
                 "recovery_instruction": "Rerun installed-path smoke after remediation.",
+                "evidence_class": evidence_class,
                 "grants_authority": False,
             }
         )
+    setup_report = {
+        "version": 1,
+        "report_id": "setup-doctor-" + "c" * 64,
+        "generated_at": "2026-06-05T00:00:00Z",
+        "status": "pass",
+        "evidence_source": "LIVE_RUNTIME",
+        "checks": setup_checks,
+        "installer_grants_authority": False,
+        "installer_silently_approves_permissions": False,
+    }
+    setup_report_bytes = json.dumps(setup_report, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    setup_report_sha256 = "sha256:" + hashlib.sha256(setup_report_bytes).hexdigest()
+    setup_report_path = r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\setup_doctor_report.json"
+    setup_audit_event = {
+        "event_id": "broker-audit-42",
+        "request_id": "setup-report-request-1",
+        "operation": "Setup Doctor報告取得",
+        "decision": "accepted",
+        "reason": "setup_doctor_report_exported",
+        "evidence_source": "LIVE_RUNTIME",
+        "payload_hash": setup_report_sha256,
+        "event_hash": "sha256:" + "d" * 64,
+    }
     data = {
         "platform": "windows",
         "provenance": {
@@ -1616,7 +1654,7 @@ def _valid_windows_installed_evidence() -> dict:
             },
             "evidence_bundle_sha256": "sha256:" + "4" * 64,
             "evidence_bundle_files": [
-                {"kind": "setup_doctor", "path": r"C:\evidence\setup_doctor.json", "sha256": "sha256:" + "5" * 64},
+                {"kind": "setup_doctor", "path": setup_report_path, "exists": True, "sha256": setup_report_sha256},
                 {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
                 {"kind": "broker_lifecycle_audit", "path": r"C:\evidence\broker-audit.jsonl", "sha256": "sha256:" + "a" * 64},
                 {"kind": "visible_surfaces", "path": r"C:\evidence\visible_surfaces.json", "sha256": "sha256:" + "7" * 64},
@@ -1640,7 +1678,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "12",
+            "collector_version": "13",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1819,14 +1857,21 @@ def _valid_windows_installed_evidence() -> dict:
             "installer_silently_approves_permissions": False,
         },
         "setup_doctor": {
-            "status": "warning",
+            "status": "pass",
             "formal_product_evidence": True,
+            "report_path": setup_report_path,
+            "report_sha256": setup_report_sha256,
+            "serialized_report_base64": base64.b64encode(setup_report_bytes).decode("ascii"),
+            "product_report": setup_report,
+            "accepted_audit_event": setup_audit_event,
             "evidence_source": {
                 "source_kind": "installed_app_machine_readable_export",
                 "product_generated": True,
                 "collector_derives_checks": False,
                 "synthetic": False,
-                "command": r".\gui_shell_desktop.exe --setup-doctor --json",
+                "command": "通常起動したD4 Pocket UIが認証済みBroker IPCのSetup Doctor報告取得を呼び出し",
+                "accepted_audit_event_id": setup_audit_event["event_id"],
+                "accepted_audit_event_payload_hash": setup_report_sha256,
             },
             "ran_from_installed_app_path": True,
             "operator_readable": True,
@@ -2032,6 +2077,31 @@ def test_windows_release_evidence_validator_rejects_external_setup_probe_as_prod
     if result_by_name["windows_evidence_provenance_isolation"].classification != "release_blocker":
         errors.append("Windows provenance validatorがexternal Setup Doctor provenanceをproduct exportとして受け入れた")
     return errors
+
+
+def test_windows_setup_doctor_does_not_promote_unknown_to_release_pass() -> list[str]:
+    bad = _valid_windows_installed_evidence()
+    setup = bad["setup_doctor"]
+    setup["status"] = "warning"
+    setup["product_report"]["status"] = "warning"
+    setup["product_report"]["checks"][-1]["status"] = "unknown"
+    report_bytes = json.dumps(
+        setup["product_report"], ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    report_hash = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+    setup["serialized_report_base64"] = base64.b64encode(report_bytes).decode("ascii")
+    setup["report_sha256"] = report_hash
+    setup["accepted_audit_event"]["payload_hash"] = report_hash
+    setup["evidence_source"]["accepted_audit_event_payload_hash"] = report_hash
+    next(item for item in bad["provenance"]["evidence_bundle_files"] if item["kind"] == "setup_doctor")["sha256"] = report_hash
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
+        return ["strict Windows Setup Doctor validatorがunknown checkをrelease証拠として受け入れた"]
+    return []
 
 
 def test_windows_release_evidence_requires_accepted_broker_health_audit() -> list[str]:
@@ -2414,6 +2484,7 @@ def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
     external_probe = INSTALLER / "windows" / "collect_setup_doctor.ps1"
     main_text = main.read_text(encoding="utf-8")
     collector_text = collector.read_text(encoding="utf-8")
+    shell_core_text = (DESKTOP_FLUTTER / "lib" / "services" / "shell_core_client.dart").read_text(encoding="utf-8")
     errors = []
     if export.exists():
         errors.append("Flutter内Setup Doctor filesystem export helperが残っている")
@@ -2446,8 +2517,24 @@ def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
     first_run_config_check = external_probe_text.split('-CheckId "first_run.config_created"', 1)
     if len(first_run_config_check) != 2 or '-Status "warning"' not in first_run_config_check[1].split("  New-DoctorCheck", 1)[0]:
         errors.append("外部probeが起動中の生成を観測していないconfigを初回生成合格として扱う")
-    if 'setup_doctor = [ordered]@{ source_type = "external_probe"; evidence_class = "EXTERNAL_EVIDENCE"; formal_release_input = $false }' not in collector_text:
-        errors.append("外部Setup Doctor inputをproduct-generated LIVE_RUNTIME evidenceへ昇格できる")
+    for token in (
+        "Setup Doctor報告取得",
+        "_validatedSetupDoctorReport",
+        "_unknownSetupDoctorReport",
+        "setup_doctor_checks': setupDoctorReport['checks']",
+    ):
+        if token not in shell_core_text:
+            errors.append(f"Flutter Setup DoctorがBroker reportを表示するread-only経路を持たない: {token}")
+    for token in (
+        'Join-Path $brokerStoreDir "setup_doctor_report.json"',
+        "$setupDoctorAuditMatched",
+        '"setup_doctor_report_exported"',
+        "serialized_report_base64",
+        "accepted_audit_event = $setupDoctorAuditEvent",
+        'source_type = $(if ($setupDoctorAuditMatched) { "product_export" } else { "unsupported_claim" })',
+    ):
+        if token not in collector_text:
+            errors.append(f"installed collectorがBroker Setup Doctor reportとAuditを照合しない: {token}")
     if "[string]$SetupDoctorJson" in collector_text:
         errors.append("installed smoke collectorが未検証Setup Doctor JSONをproduct evidenceへ取り込める")
     return errors
@@ -2544,8 +2631,8 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "12"' not in text:
-        errors.append("collect_installed_smoke.ps1のcollector versionがprocess image identity計測を反映していない")
+    if 'collector_version = "13"' not in text:
+        errors.append("collect_installed_smoke.ps1の版識別子がBroker報告のhashと監査照合を表さない")
     return errors
 
 
@@ -7735,6 +7822,7 @@ def main() -> int:
         test_required_docs_exist,
         test_gui_shell_spec_v1_declares_core_boundaries,
         test_contract_fixtures_are_available,
+        test_setup_doctor_report_schema_preserves_unknown_and_denies_authority,
         test_negative_contract_fixtures_cover_all_schemas,
         test_adapter_authority_strip_schema,
         test_inbound_authority_keys_are_stripped,
@@ -7803,6 +7891,7 @@ def main() -> int:
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_preexisting_first_run_config,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
+        test_windows_setup_doctor_does_not_promote_unknown_to_release_pass,
         test_windows_release_evidence_requires_accepted_broker_health_audit,
         test_windows_release_evidence_requires_verified_launcher_child,
         test_windows_release_evidence_requires_normal_frontend_exit,

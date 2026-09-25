@@ -27,6 +27,23 @@ class ShellCoreClient {
         'health',
         bodyKey: 'health',
       );
+      Map<String, Object?> setupDoctorReport;
+      try {
+        final setupDoctorResponse = await broker.request(
+          'Setup Doctor報告取得',
+          payload: const <String, Object?>{'version': 1},
+        );
+        setupDoctorReport = _validatedSetupDoctorReport(
+          _acceptedResponseBodyMap(
+            setupDoctorResponse,
+            'Setup Doctor報告取得',
+          ),
+        );
+      } on Object {
+        setupDoctorReport = _unknownSetupDoctorReport(
+          'Rust Brokerから有効なSetup Doctor報告を取得できません。',
+        );
+      }
       final hostCapabilityResponse = await broker.request('ホスト能力');
       final hostCapability = _acceptedResponseBodyMap(
         hostCapabilityResponse,
@@ -99,6 +116,7 @@ class ShellCoreClient {
         _brokerSnapshot(
           healthResponse: healthResponse,
           health: health,
+          setupDoctorReport: setupDoctorReport,
           hostCapabilityResponse: hostCapabilityResponse,
           hostCapability: hostCapability,
           hostListResponse: hostListResponse,
@@ -517,9 +535,126 @@ void _requireAccepted(Map<String, Object?> response, String operation) {
   }
 }
 
+Map<String, Object?> _unknownSetupDoctorReport(String message) {
+  const checkIds = <String>[
+    'setup_doctor.ran_from_installed_app_path',
+    'setup_doctor.runtime_connection',
+    'setup_doctor.authority_boundary',
+    'setup_doctor.network_public_bind',
+    'setup_doctor.recovery_instruction',
+    'setup_doctor.audit_storage',
+    'setup_doctor.config_created',
+  ];
+  return <String, Object?>{
+    'status': 'unknown',
+    'checks': [
+      for (final checkId in checkIds)
+        <String, Object?>{
+          'check_id': checkId,
+          'status': 'unknown',
+          'message': message,
+          'recovery_instruction': 'Broker接続を確認してSetup Doctorを再取得してください。',
+          'evidence_class': 'INTERNAL_STATE',
+          'grants_authority': false,
+        },
+    ],
+  };
+}
+
+Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {
+  const reportFields = <String>{
+    'version',
+    'report_id',
+    'generated_at',
+    'status',
+    'evidence_source',
+    'checks',
+    'installer_grants_authority',
+    'installer_silently_approves_permissions',
+  };
+  const checkFields = <String>{
+    'check_id',
+    'status',
+    'message',
+    'recovery_instruction',
+    'evidence_class',
+    'grants_authority',
+  };
+  const checkIds = <String>{
+    'setup_doctor.ran_from_installed_app_path',
+    'setup_doctor.runtime_connection',
+    'setup_doctor.authority_boundary',
+    'setup_doctor.network_public_bind',
+    'setup_doctor.recovery_instruction',
+    'setup_doctor.audit_storage',
+    'setup_doctor.config_created',
+  };
+  final actualReportFields = report.keys.toSet();
+  final checks = report['checks'];
+  final reportId = report['report_id'];
+  final generatedAt = report['generated_at'];
+  if (actualReportFields.length != reportFields.length ||
+      !actualReportFields.containsAll(reportFields) ||
+      reportId is! String ||
+      !RegExp(r'^setup-doctor-[a-f0-9]{64}$').hasMatch(reportId) ||
+      generatedAt is! String ||
+      DateTime.tryParse(generatedAt) == null ||
+      report['version'] != 1 ||
+      report['evidence_source'] != 'LIVE_RUNTIME' ||
+      report['installer_grants_authority'] != false ||
+      report['installer_silently_approves_permissions'] != false ||
+      checks is! List ||
+      checks.length != checkIds.length) {
+    return _unknownSetupDoctorReport('Brokerが返したSetup Doctor報告の形を確認できません。');
+  }
+  final seen = <String>{};
+  final normalized = <Map<String, Object?>>[];
+  var hasWarningOrUnknown = false;
+  var hasFailure = false;
+  for (final item in checks) {
+    if (item is! Map) {
+      return _unknownSetupDoctorReport(
+          'Brokerが返したSetup Doctor checkの形を確認できません。');
+    }
+    final check = Map<String, Object?>.from(item);
+    final actualCheckFields = check.keys.toSet();
+    final id = check['check_id'];
+    final status = check['status'];
+    final evidenceClass = check['evidence_class'];
+    if (actualCheckFields.length != checkFields.length ||
+        !actualCheckFields.containsAll(checkFields) ||
+        id is! String ||
+        !checkIds.contains(id) ||
+        !seen.add(id) ||
+        status is! String ||
+        !const {'pass', 'warning', 'fail', 'unknown'}.contains(status) ||
+        check['message'] is! String ||
+        (check['message'] as String).isEmpty ||
+        check['recovery_instruction'] is! String ||
+        (check['recovery_instruction'] as String).isEmpty ||
+        !const {'CONFIG', 'INTERNAL_STATE', 'LIVE_RUNTIME'}
+            .contains(evidenceClass) ||
+        check['grants_authority'] != false) {
+      return _unknownSetupDoctorReport(
+          'Brokerが返したSetup Doctor checkの内容を検証できません。');
+    }
+    hasFailure |= status == 'fail';
+    hasWarningOrUnknown |= status == 'warning' || status == 'unknown';
+    normalized.add(check);
+  }
+  final expectedStatus =
+      hasFailure ? 'fail' : (hasWarningOrUnknown ? 'warning' : 'pass');
+  if (seen.length != checkIds.length || report['status'] != expectedStatus) {
+    return _unknownSetupDoctorReport(
+        'Brokerが返したSetup Doctor report全体の状態が一致しません。');
+  }
+  return <String, Object?>{'status': expectedStatus, 'checks': normalized};
+}
+
 ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> healthResponse,
   required Map<String, Object?> health,
+  required Map<String, Object?> setupDoctorReport,
   required Map<String, Object?> hostCapabilityResponse,
   required Map<String, Object?> hostCapability,
   required Map<String, Object?> hostListResponse,
@@ -702,47 +837,10 @@ ShellSnapshot _brokerSnapshot({
       'authority_bridge_uses_ffi': false,
       'approval_protected_field_edit_allowed': !protectedEditRejected,
     },
-    'setup_doctor_status': brokerReady ? 'warning' : 'fail',
+    'setup_doctor_status': setupDoctorReport['status']?.toString() ?? 'unknown',
     'installer_grants_authority': false,
     'installer_silently_approves_permissions': false,
-    'setup_doctor_checks': [
-      {
-        'check_id': 'broker.ipc',
-        'status': brokerReady ? 'pass' : 'fail',
-        'message': 'Flutter製品経路は、権限状態の取得に認証済みブローカーIPCを使用しました。',
-        'recovery_instruction':
-            brokerReady ? null : 'Rustブローカーを再起動して再接続してください。',
-        'grants_authority': false,
-      },
-      {
-        'check_id': 'broker.persistence',
-        'status': persistenceReady ? 'pass' : 'fail',
-        'message':
-            '永続化準備=${persistenceReady.toString()} 監査=${health['audit_persistence']} 再生=${health['replay_persistence']} セッション=${health['session_persistence']}',
-        'recovery_instruction':
-            persistenceReady ? null : 'ブローカー永続保管庫へのアクセスを修復してください。',
-        'grants_authority': false,
-      },
-      {
-        'check_id': 'broker.protected_field_edit',
-        'status': protectedEditRejected ? 'pass' : 'fail',
-        'message': protectedEditRejected
-            ? '保護項目payload_hashの編集を拒否しました。'
-            : '保護項目の編集試行が拒否されませんでした。',
-        'recovery_instruction':
-            protectedEditRejected ? null : '権限作用を停止し、承認編集の強制を復旧してください。',
-        'grants_authority': false,
-      },
-      {
-        'check_id': 'broker.command_dispatch',
-        'status': commandDispatchEnabled ? 'pass' : 'warning',
-        'message':
-            'command_dispatch_enabled=${commandDispatchEnabled.toString()}',
-        'recovery_instruction':
-            commandDispatchEnabled ? null : 'コマンド封筒配送の権限対応を完了してください。',
-        'grants_authority': false,
-      },
-    ],
+    'setup_doctor_checks': setupDoctorReport['checks'],
     'trust_records': [
       {
         'scope': 'broker_session',

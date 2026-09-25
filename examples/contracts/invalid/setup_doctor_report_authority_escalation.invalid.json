@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "report_id": "setup-doctor-0000000000000000000000000000000000000000000000000000000000000000",
+  "generated_at": "2026-09-26T00:00:00Z",
+  "status": "warning",
+  "evidence_source": "LIVE_RUNTIME",
+  "checks": [
+    {"check_id":"setup_doctor.ran_from_installed_app_path","status":"pass","message":"配置を検証した。","recovery_instruction":"再起動してください。","evidence_class":"LIVE_RUNTIME","grants_authority":true},
+    {"check_id":"setup_doctor.runtime_connection","status":"pass","message":"Brokerからの要求を正常に処理した。","recovery_instruction":"接続が切れた場合は製品を再起動してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.authority_boundary","status":"pass","message":"権限を生成しない。","recovery_instruction":"問題時は停止してください。","evidence_class":"CONFIG","grants_authority":false},
+    {"check_id":"setup_doctor.network_public_bind","status":"pass","message":"IPv4内部接続だけで待受けている。","recovery_instruction":"外部公開を検出した場合はBrokerを停止してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.recovery_instruction","status":"pass","message":"復旧案内あり。","recovery_instruction":"再取得してください。","evidence_class":"CONFIG","grants_authority":false},
+    {"check_id":"setup_doctor.audit_storage","status":"pass","message":"監査記録の保存庫を利用できる。","recovery_instruction":"監査記録の保存庫を復旧してください。","evidence_class":"LIVE_RUNTIME","grants_authority":false},
+    {"check_id":"setup_doctor.config_created","status":"unknown","message":"未接続。","recovery_instruction":"完了扱いしないでください。","evidence_class":"CONFIG","grants_authority":false}
+  ],
+  "installer_grants_authority": false,
+  "installer_silently_approves_permissions": false
+}
