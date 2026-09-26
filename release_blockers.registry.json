@@ -155,7 +155,7 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-25の全target成功は履歴として保持する。現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5ではcargo test --libの273件は成功した。一方、通常の全target試行はA2A loopback応答読取testの一時失敗でlibrary target内に停止し、対象test単独は成功した後、次のdesktop launcher test executableがWindows Application ControlにOS error 4551で拒否された。現行sourceの全target実行は成立していない。",
+      "reason": "2026-09-25の全target成功は履歴として保持する。現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5ではcargo test --libの273件とA2A loopback対象testの連続20回再試行は成功した。一方、通常の全target試行は同testの一時失敗でlibrary target内に停止し、対象test単独の後、次のdesktop launcher test executableがWindows Application ControlにOS error 4551で拒否された。現行sourceの全target実行は成立していない。",
       "required_action": "OS policyを無効化せず、生成済みRust test executableを実行できる許可済みWindows host上で、変更後sourceのcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target成功させ、正確なsource commitと結果を記録する。"
     },
     {

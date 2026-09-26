@@ -49,7 +49,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: cargo test gate for in-scope Rust helper
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
-  reason: 現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5のcargo test --lib 273件は成功した。通常の全target試行ではA2A loopback応答読取testが一度失敗し、対象test単独と全library再試行は成功したが、後続desktop launcher test executableはWindows Application ControlのOS error 4551で拒否され、全target完遂に至っていない。2026-09-25の別sourceに対する成功記録は履歴であり、現行sourceの全target test evidenceを代替しない。
+  reason: 現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5のcargo test --lib 273件とA2A loopback対象testの連続20回再試行は成功した。通常の全target試行では同testが一度失敗し、対象test単独と全library再試行は成功したが、後続desktop launcher test executableはWindows Application ControlのOS error 4551で拒否され、全target完遂に至っていない。2026-09-25の別sourceに対する成功記録は履歴であり、現行sourceの全target test evidenceを代替しない。
   required_action: OS policyを無効化せず、許可済みWindows hostで現行sourceの <code>cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1</code> を全target成功させ、正確なcommitと結果を記録する。
   blocks_release: yes
 
