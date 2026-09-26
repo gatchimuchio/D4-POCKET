@@ -183,8 +183,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: GUI Shell書出しのOwner UI LIVE_RUNTIME証拠が未成立
   classification: release_blocker
   registry_id: rev2_export_owner_ui_authority_path
-  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証、通常資格拒否の自動試験とcreate-only Manifest file生成は実装済み。Schema・hash・byte長を再照合してunsigned Windows bundleを組む開発toolも追加したが、Receiptの出所・Owner操作を認証しない。Credential artifact scanは未実施で、runtime Manifest消費・起動・formal installed-path evidenceは未確認。
-  required_action: clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。実際のBroker生成Receipt／Manifestから作る全package hashと製品別runtime／Audit storeを検証し、Credential非露出を監査する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Authority／Credential非継承を同じsource commitと全package hashへ結合して検証する。
+  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証、通常資格拒否の自動試験とcreate-only Manifest file生成は実装済み。Schema・hash・byte長を再照合してunsigned Windows bundleを組む開発toolも追加した。clean pushed commitからの試行ではFlutter Releaseは成功したが、Cargo build scriptがWindows Application ControlのOS error 4551で拒否されbundle未生成。host policyは変更・回避しない。Receiptの出所・Owner操作は認証せず、Credential artifact scanは未実施、runtime Manifest消費・起動・formal installed-path evidenceも未確認。
+  required_action: Windows Application Controlを弱めずにCargo build scriptを実行できる承認済みWindows環境で、clean-sourceのportable bundle構築を完遂する。clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。実際のBroker生成Receipt／Manifestから作る全package hashと製品別runtime／Audit storeを検証し、Credential非露出を監査する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Authority／Credential非継承を同じsource commitと全package hashへ結合して検証する。
   blocks_release: yes
 
 - item: Export Moduleの実binary除去と比較計測が未成立
