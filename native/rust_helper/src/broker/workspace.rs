@@ -31,6 +31,8 @@ struct RegisteredWorkspace {
     runtime: String,
     root_device: u64,
     root_file_id: u64,
+    root_ancestry: Vec<super::workspace_root::DirectoryIdentity>,
+    root_ancestry_complete: bool,
     registration_hash: String,
     reader: WorkspaceReader,
     grant: Option<Grant>,
@@ -106,7 +108,15 @@ impl WorkspaceRegistry {
                 now < grant.expires && Instant::now() < grant.deadline && body["approval_id"] == grant.id)
     }
     /// 信頼済み起動制御面が渡すhandleを保持する。登録だけでは読取許可を作らない。
-    pub(crate) fn register(&mut self, runtime: &str, id: &str, root: Dir, secrets: &[String], audit: &mut Audit<'_>) -> Result<(), &'static str> {
+    pub(crate) fn register(
+        &mut self,
+        runtime: &str,
+        id: &str,
+        root: Dir,
+        secrets: &[String],
+        ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
+        audit: &mut Audit<'_>,
+    ) -> Result<(), &'static str> {
         if !identifier(id) || !identifier(runtime) || self.entries.contains_key(id) || self.entries.len() >= 16 {
             return Err("作業領域の登録指定が不正または上限超過");
         }
@@ -116,20 +126,45 @@ impl WorkspaceRegistry {
         if root_file_id == 0 {
             return Err("root file IDが未観測のため作業領域登録を拒否");
         }
-        if self.entries.values().any(|entry| {
-            entry.runtime != runtime
-                && entry.root_device == root_device
-                && entry.root_file_id == root_file_id
+        let root_identity=super::workspace_root::DirectoryIdentity {device:root_device,file_id:root_file_id};
+        let (root_ancestry,root_ancestry_complete)=match ancestry {
+            Some(ancestry)
+                if !ancestry.is_empty()
+                    && ancestry.len()>=2
+                    && ancestry.len()<=65
+                    && ancestry.last()==Some(&root_identity)
+                    && ancestry.iter().all(|identity|identity.file_id!=0) => (ancestry,true),
+            Some(_) => return Err("作業領域の親子識別範囲が不正または未観測"),
+            None => (vec![root_identity],false),
+        };
+        let other_runtimes:Vec<&RegisteredWorkspace>=self.entries.values()
+            .filter(|entry|entry.runtime!=runtime).collect();
+        if other_runtimes.iter().any(|entry| {
+            entry.root_device == root_device && entry.root_file_id == root_file_id
         }) {
             return Err("別Agentとの同一物理作業領域共有を拒否");
+        }
+        if other_runtimes.iter().any(|entry|!entry.root_ancestry_complete) || (!other_runtimes.is_empty()&&!root_ancestry_complete) {
+            return Err("別AgentとのWorkspace分離範囲を確認できないため登録を拒否");
+        }
+        if other_runtimes.iter().any(|entry| {
+            let existing_root=super::workspace_root::DirectoryIdentity {
+                device:entry.root_device,
+                file_id:entry.root_file_id,
+            };
+            entry.root_ancestry.contains(&root_identity)
+                || root_ancestry.contains(&existing_root)
+        }) {
+            return Err("別Agentとの親子Workspace範囲重複を拒否");
         }
         let reader = WorkspaceReader::from_registered_dir(root, secrets).map_err(|_| "作業領域の除外指定が不正")?;
         let nonce = 識別子生成().map_err(|_| "登録識別子を生成できない")?;
         let registration_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets,
-            "root_device":cap_fs_ext::MetadataExt::dev(&identity),"root_file_id":cap_fs_ext::MetadataExt::ino(&identity)}));
+            "root_device":root_device,"root_file_id":root_file_id,
+            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}));
         audit("作業領域登録・Permission拒否", &registration_hash)?;
         self.entries.insert(id.into(), RegisteredWorkspace {
-            runtime:runtime.into(),root_device,root_file_id,registration_hash,reader,grant:None,baseline:None,
+            runtime:runtime.into(),root_device,root_file_id,root_ancestry,root_ancestry_complete,registration_hash,reader,grant:None,baseline:None,
         });
         Ok(())
     }

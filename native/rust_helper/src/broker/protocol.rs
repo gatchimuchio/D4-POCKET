@@ -1598,9 +1598,9 @@ impl Broker {
         let result=(|| {
             if self.ライフサイクル.is_terminally_quarantined(&config.runtime_id) {return Err("実行系はterminal隔離中");}
             if !self.authority_registry.runtime_registered(&config.runtime_id) && !self.対話.登録済み(&config.runtime_id) {return Err("実行系が未登録");}
-            let (root,filesystem)=super::workspace_root::open_registered_root(config,protected)?;
+            let (root,filesystem,ancestry)=super::workspace_root::open_registered_root_with_ancestry(config,protected)?;
             self.append_audit("作業領域起動", "作業領域登録", "verified", "rootの対応filesystemと内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &sha256_tagged(format!("{hash}:{filesystem}").as_bytes())).map_err(|_| "root検査の監査失敗")?;
-            self.作業領域登録(&config.runtime_id,&config.workspace_id,root,&config.secret_paths)
+            self.作業領域登録範囲付き(&config.runtime_id,&config.workspace_id,root,&config.secret_paths,Some(ancestry))
         })();
         if let Err(reason)=result {
             self.作業領域=Default::default();
@@ -1611,12 +1611,23 @@ impl Broker {
 
     /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
     pub fn 作業領域登録(&mut self, runtime: &str, id: &str, root: cap_std::fs::Dir, secrets: &[String]) -> Result<(), &'static str> {
+        self.作業領域登録範囲付き(runtime,id,root,secrets,None)
+    }
+
+    fn 作業領域登録範囲付き(
+        &mut self,
+        runtime: &str,
+        id: &str,
+        root: cap_std::fs::Dir,
+        secrets: &[String],
+        ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
+    ) -> Result<(), &'static str> {
         if !self.state_store.persistence_ready() {return Err("作業領域登録には永続監査が必要");}
         if self.ライフサイクル.is_terminally_quarantined(runtime) {return Err("実行系はterminal隔離中");}
         if !self.authority_registry.runtime_registered(runtime) && !self.対話.登録済み(runtime) {return Err("実行系が未登録");}
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
-        let result = registry.register(runtime, id, root, secrets, &mut |reason, hash| {
+        let result = registry.register(runtime, id, root, secrets, ancestry, &mut |reason, hash| {
             self.append_audit("作業領域登録", "作業領域登録", "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash)
                 .map(|_|()).map_err(|_| {audit_failed = true; "監査失敗"})
         });

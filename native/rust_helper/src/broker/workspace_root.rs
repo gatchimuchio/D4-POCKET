@@ -4,6 +4,12 @@ use cap_std::fs::Dir;
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::{Component, Path, PathBuf}};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DirectoryIdentity {
+    pub(crate) device: u64,
+    pub(crate) file_id: u64,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StartupConfig {
@@ -37,8 +43,14 @@ pub(crate) fn read_config(path: &Path) -> Result<StartupConfig, &'static str> {
     Ok(config)
 }
 
-fn device(dir: &Dir) -> Result<u64, &'static str> {
-    Ok(cap_fs_ext::MetadataExt::dev(&dir.dir_metadata().map_err(|_| "root metadataを確認できない")?))
+fn directory_identity(dir: &Dir) -> Result<DirectoryIdentity, &'static str> {
+    let metadata=dir.dir_metadata().map_err(|_| "作業領域pathのdirectory識別子を確認できない")?;
+    let identity=DirectoryIdentity {
+        device:cap_fs_ext::MetadataExt::dev(&metadata),
+        file_id:cap_fs_ext::MetadataExt::ino(&metadata),
+    };
+    if identity.file_id==0 {return Err("作業領域pathのfile IDが未観測");}
+    Ok(identity)
 }
 fn safe_directory(dir: &Dir) -> Result<(), &'static str> {
     let meta=dir.dir_metadata().map_err(|_| "root metadataを確認できない")?;
@@ -72,7 +84,7 @@ fn parts(path: &Path) -> Result<Vec<String>, &'static str> {
 }
 
 #[cfg(windows)]
-fn open_path(path: &Path) -> Result<(Dir, &'static str), &'static str> {
+fn open_path(path: &Path) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
     use std::path::Prefix;
     let components=parts(path)?;
     let letter=match path.components().next() {
@@ -85,7 +97,8 @@ fn open_path(path: &Path) -> Result<(Dir, &'static str), &'static str> {
     let drive=format!("{}:\\",char::from(letter).to_ascii_uppercase());
     let mut root=Dir::open_ambient_dir(&drive,cap_std::ambient_authority()).map_err(|_| "root driveを開けない")?;
     safe_directory(&root)?;
-    let serial=device(&root)?;
+    let mut ancestry=vec![directory_identity(&root)?];
+    let serial=ancestry[0].device;
     let mut observed_serial=0u32;let mut filesystem=String::new();
     if winsafe::GetDriveType(Some(&drive))!=winsafe::co::DRIVE::FIXED {return Err("rootは固定diskに限る");}
     winsafe::GetVolumeInformation(Some(&drive),None,Some(&mut observed_serial),None,None,Some(&mut filesystem)).map_err(|_| "root filesystemを確認できない")?;
@@ -93,21 +106,25 @@ fn open_path(path: &Path) -> Result<(Dir, &'static str), &'static str> {
     for component in components {
         root=root.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
         safe_directory(&root)?;
-        if device(&root)?!=serial {return Err("root途中の別volumeを拒否");}
+        let identity=directory_identity(&root)?;
+        if identity.device!=serial {return Err("root途中の別volumeを拒否");}
+        ancestry.push(identity);
     }
-    Ok((root,"NTFS"))
+    Ok((root,"NTFS",ancestry))
 }
 
 #[cfg(unix)]
-fn open_path(path: &Path) -> Result<(Dir, &'static str), &'static str> {
+fn open_path(path: &Path) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
     let components=parts(path)?;
     let mut root=Dir::open_ambient_dir("/",cap_std::ambient_authority()).map_err(|_| "root directoryを開けない")?;
+    let mut ancestry=vec![directory_identity(&root)?];
     for component in components {
         root=root.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
         safe_directory(&root)?;
+        ancestry.push(directory_identity(&root)?);
     }
     let filesystem=unix_filesystem(&root)?;
-    Ok((root,filesystem))
+    Ok((root,filesystem,ancestry))
 }
 #[cfg(target_os="linux")]
 fn unix_filesystem(root: &Dir) -> Result<&'static str, &'static str> {
@@ -139,21 +156,30 @@ fn comparison_parts(path: &Path) -> Vec<String> {
     }).collect()
 }
 
-pub(crate) fn open_registered_root(config: &WorkspaceStartup, protected: &[PathBuf]) -> Result<(Dir, &'static str), &'static str> {
-    open_isolated_root(Path::new(&config.root_path), protected)
+pub(crate) fn open_registered_root_with_ancestry(config: &WorkspaceStartup, protected: &[PathBuf]) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
+    open_isolated_root_with_ancestry(Path::new(&config.root_path),protected)
 }
 
 pub(crate) fn open_isolated_root(path: &Path, protected: &[PathBuf]) -> Result<(Dir, &'static str), &'static str> {
-    let (root,filesystem)=open_path(path)?;
+    let (root,filesystem,_)=open_isolated_root_with_ancestry(path,protected)?;
+    Ok((root,filesystem))
+}
+
+pub(crate) fn open_isolated_root_with_ancestry(path: &Path, protected: &[PathBuf]) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
+    let (root,filesystem,ancestry)=open_path(path)?;
     let canonical=std::fs::canonicalize(path).map_err(|_| "rootの正本pathを確認できない")?;
     let root_parts=comparison_parts(&canonical);
     for protected_path in protected {
         let guarded=comparison_parts(&canonical_protected(protected_path)?);
         if guarded.starts_with(&root_parts) || root_parts.starts_with(&guarded) {return Err("rootがBroker内部store・資格・設定と重なる");}
     }
-    let (current,current_fs)=open_path(path)?;
+    let (current,current_fs,current_ancestry)=open_path(path)?;
+    if current_fs!=filesystem || ancestry!=current_ancestry {return Err("確認中のroot範囲置換を拒否");}
     let original=root.dir_metadata().map_err(|_| "root metadataを確認できない")?;
     let current_meta=current.dir_metadata().map_err(|_| "root metadataを再確認できない")?;
-    if current_fs!=filesystem || device(&root)?!=device(&current)? || cap_fs_ext::MetadataExt::ino(&original)!=cap_fs_ext::MetadataExt::ino(&current_meta) {return Err("確認中のroot置換を拒否");}
-    Ok((root,filesystem))
+    if cap_fs_ext::MetadataExt::dev(&original)!=cap_fs_ext::MetadataExt::dev(&current_meta)
+        || cap_fs_ext::MetadataExt::ino(&original)!=cap_fs_ext::MetadataExt::ino(&current_meta) {
+        return Err("確認中のroot置換を拒否");
+    }
+    Ok((root,filesystem,ancestry))
 }

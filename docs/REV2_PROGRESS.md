@@ -1894,3 +1894,25 @@ Rust unit testは同一temporary rootを別handleから二つのAgent runtimeへ
 - `python -X utf8 tooling/packaging_portability_check.py`：portable source archiveを展開し、内包Manifest／Conformance／release gate検査を含めて合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。10の登録済みPython／Windows開発検査がすべて成功し、Evidence bundleは既存release blocker 5件と`release_ready=false`を維持した。release smoke等のsynthetic結果はWindows installed productや実Agent実行の証拠へ昇格しない。
 - `git diff --check`および`git diff --cached --check`：commit前の最終差分確認で実行し、結果を記録する。
+
+## D4 Pocket Phase 7 Agent Workspace親子root重複拒否（2026-09-27）
+
+Workspace起動時に、nofollowで開いたvolume／rootから指定directoryまでの各(directory device ID, file ID)を取得し、同じpathを二度解決した際にfilesystemと識別列全体が一致することを確認するよう拡張した。WorkspaceRegistryは識別列をregistration hashへ含め、異なるruntime間では同一rootだけでなく通常pathで観測した親子rootも拒否する。親→子・子→親の双方を拒否し、独立rootは受理する。既存のhandle-only登録に完全な祖先列がない場合、他runtimeと併存する登録をfail-closedで拒否する。Owner起動登録の親子拒否はBroker Auditへ記録され、失敗後にWorkspace一覧へrootを残さない。
+
+根拠はRust test process内のtemporary filesystemとBrokerを用いた`FIXTURE`検査であり、製品Runtimeの実Agent間書込み隔離を証明しない。通常path上のidentity列から外れるbind mount等の別名範囲は網羅しない。実Agentの比較・Handoff・cross-agent contamination試験も未成立のままであり、`comprehensive_extension_rev1_completion`は`release_blocker`、`release_ready=false`を維持する。
+
+検証結果:
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --tests`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 別Agentの同一rootと親子rootを拒否し独立rootを許可する -- --test-threads=1`：1件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib workspace_startup_rejects_parent_child_roots_and_records_rejection_audit -- --test-threads=1`：1件成功。
+- A2A loopback Broker projectionの単独再実行：1件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml`：exit 101。library 290件中288件成功、loopback HTTP試験2件が通信読取で失敗。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：library 290件成功。その後のdesktop launcher test executableはWindows Application ControlにOS error 4551で起動前に拒否され、全targetは未完了。実行fileの移動・再配置やApplication Control変更は行っていない。`windows_rust_integration_test_execution_policy`を未解決へ戻し、release checklist／registryと同期した。
+- 最終codeで`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`を再実行し、290件すべて成功した。追加したroot identityだけの不完全祖先列拒否もこのlibrary試験に含む。
+- 続けて最終sourceで`cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`を再実行し、exit 0。library 290件、CLI 9件、Broker IPC 10件、canonical hash 1件、checkpoint 8件、protected data 2件、protected startup 1件、protected store 3件、workspace diff 2件、workspace reader 2件、workspace startup 7件の全335 testが成功した。desktop launcher test binaryは正常起動し0件、doc-testも0件で正常終了。先行runのOS error 4551は再発せず、実行fileの移動・再配置やApplication Control変更は行っていないため、`windows_rust_integration_test_execution_policy`をresolved／inactiveへ戻した。
+- 既知のloopback揺らぎを`RELEASE_CHECKLIST.md`に更新記録した。並列失敗と直列library成功の因果は未確認であり、実Runtime接続証拠ではない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138件、正常example 138件、negative fixture 170件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。`python -X utf8 tooling/manifest.py --write`はtracked source 1045件を書込み、`--check`も合格。
+- `python -X utf8 tooling/packaging_portability_check.py`：合格。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済み10検査すべて合格。Evidence bundleは他の未解決release blockerにより`release_ready=false`を維持する。このPython-only集約自体はRust試験を含まず、別記した全target 335件の結果を置き換えない。
+- `python -m json.tool release_blockers.registry.json`と`git diff --check`：合格。

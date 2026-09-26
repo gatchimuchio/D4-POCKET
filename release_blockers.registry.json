@@ -105,8 +105,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではBroker由来session metadataをDesktopへ投影し、異なる実行系IDによる同一device ID／file IDのWorkspace root再利用は拒否するが、親子directory重複・別名範囲・実Agentの独立実行とcross-agent contamination検証は未成立。",
-      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Phase 7では親子・別名を含むWorkspace範囲分離、実Agentの独立比較、cross-agent contamination負例をBroker統治経路で実証する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではBroker由来session metadata投影と、異なる実行系ID間の同一rootおよび通常pathで観測できる親子Workspace root拒否を実装・fixture検査したが、bind mount等の別名範囲、実Agentの独立実行、cross-agent contamination検証は未成立。",
+      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Phase 7ではmount等の別名範囲の明示的扱い、実Agentの独立比較、cross-agent contamination負例をBroker統治経路で実証する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
     },
     {
       "name": "rev2_desktop_product_distribution",
@@ -155,8 +155,8 @@
       "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-27のWorkspaceRegistry変更後、Windows hostでcargo test --locked --manifest-path native/rust_helper/Cargo.toml --quiet -- --test-threads=1がexit 0となり、Rustライブラリ／実行ファイル／結合試験を合わせた334件がすべて成功した。以前のWindows Application ControlのOSエラー4551は、この全対象実行では再発しなかった。途中のライブラリ実行ではA2A loopback fixtureの一時失敗があったが、その後の単独再実行と全対象実行は成功し、既知の実行揺らぎとしてRELEASE_CHECKLIST.mdへ分離記録した。この関門の解消はローカル試験実行だけを示し、installed productやrelease readinessの証拠ではない。",
-      "required_action": "現sourceのRust全target検証gateに追加作業はない。以後Rust source変更時は全targetを再実行する。"
+      "reason": "2026-09-27のWorkspaceRegistry最終sourceでcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1がexit 0となり、library、CLI、Broker IPC、integrationの全335 testが成功した。直前の試行ではdesktop launcher executableがWindows Application ControlのOS error 4551で拒否されたが、後続runはfile移動・再配置やpolicy変更なしに完了し、現在sourceの全target gateは解消した。通常の並列実行で観測したloopback揺らぎはRELEASE_CHECKLIST.mdの別known_limitationとして維持する。このgateはlocal test実行だけを示し、installed productやrelease readinessの証拠ではない。",
+      "required_action": "このsourceのRust全target gateに追加作業はない。以後Rust source変更時は全targetを再実行する。Application Control拒否が再発しても実行fileの移動・再配置やpolicy変更で回避せず、失敗を記録して承認済み条件で再確認する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

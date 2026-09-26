@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "426070bd0ba93ffd88c2e4ffc727c8df847199ca1d06ca41173ee342b8529bb4"
+      "sha256": "614648ef88845ba4e53ec7a9481e5c89d0ddb7c810ffbb01e14dc91160b36834"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b46598c11996930cb81ae4b3c32cad61ef2e1d69bce20ee4cbc263ea7b19b49d"
+      "sha256": "3c6d32dc6172e66f0b011e82b7d5d5048b895ea7ebb5eaa9337f812dc713a296"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "3320319cbe50bba9aea74783994dc061b87395c5fe7b8610e0a8378a8aac43f7"
+      "sha256": "a0cb995d75fdc3a2e06098ea10ce151e036040ac4bf4c18b27b20469e3bc79d6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "af842a671adc6c6d8ec9d1bd3f5da5a22a96dccc7d5d1af51d44f3887a5493e7"
+      "sha256": "7ef885d883954522a46a98f1f03d1099576b2ffe1062fcea07143ff36784c309"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -1437,7 +1437,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "fca35a128199bf688d4fe93cd007bd64a814cd160d02aebef41e156690a0fd55"
+      "sha256": "9344a36991161bd87a2e88d52270c38dc0ca7954b9683258644fdabc23830d96"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -2945,7 +2945,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "0b7a83befb97fef15968aa191e01c4a7c18dfc2d589757645c2417e61c24de01"
+      "sha256": "34eab87ee830b1c69cdaaccc92c207392a6c2b3b86f7430af784aad395954de0"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2973,11 +2973,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "dfcc2ef563cc991e325b5976a9a5fa19d44ad3caae83364de7507501d5aee35e"
+      "sha256": "e09d7b41a5add527c29d8022b428902d33b2c6b2afd80ccf02f8101859a408aa"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
-      "sha256": "ed341146df8cb4f14fcea9fb0a8aa081344f355425c098ad2d167efb8b079ab7"
+      "sha256": "4a23996d2d54b47478f74781c28d1b85837003d2b28d76733bc241f64efa7f62"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
@@ -3077,11 +3077,11 @@
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
-      "sha256": "d5102531d2dc95d3cceb7f618173011f0056b3f287e8189b45b8784b4fdcfd66"
+      "sha256": "4252dee039e6898a6ad21ea0f5e464d4a5768a6eb8750306ffa6635613b8f60d"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_registry.rs",
-      "sha256": "093dfec1973598bc17263223122a2b6a221147e1ac3d06546dab9bbace262d9d"
+      "sha256": "0dc007d282271748a8d32096605853fbdc2b213187280831b96faab6953a4d05"
     },
     {
       "path": "native/rust_helper/tests/workspace_diff.rs",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "21eb5a9f692a9e5d5c76af844093811aa2fd924cd515f447ab7d12ba671649e1"
+      "sha256": "41642ba64e468f3dd8afdde550e4455598628dc3e1e957af815d3f6621914aac"
     },
     {
       "path": "requirements-dev.txt",

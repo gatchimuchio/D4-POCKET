@@ -123,6 +123,36 @@ fn workspace_registration_rejects_unknown_runtime_duplicate_and_nonpersistent_st
 }
 
 #[test]
+fn workspace_startup_rejects_parent_child_roots_and_records_rejection_audit() {
+    let root=std::env::temp_dir().join(format!("gui-shell-workspace-overlap-{}",crate::broker::dialogue::識別子生成().unwrap()));
+    let parent=root.join("parent");let child=parent.join("child");
+    fs::create_dir_all(&child).unwrap();
+    let mut broker=Broker::new_persistent("workspace-test",root.join("store")).unwrap();
+    let startup=|runtime:&str,id:&str,path:&std::path::Path|super::super::workspace_root::WorkspaceStartup {
+        runtime_id:runtime.to_string(),workspace_id:id.to_string(),root_path:path.to_string_lossy().to_string(),secret_paths:vec![],
+    };
+    let protected=[root.join("store")];
+    broker.作業領域起動登録(&startup(REGISTERED_RUNTIME,"parent-workspace",&parent),&protected).unwrap();
+    broker.実行系登録(
+        "agent-runtime-b",
+        std::sync::Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+    ).unwrap();
+    assert_eq!(
+        broker.作業領域起動登録(&startup("agent-runtime-b","child-workspace",&child),&protected),
+        Err("別Agentとの親子Workspace範囲重複を拒否"),
+    );
+    let rejection=broker.audit_events().last().unwrap();
+    assert_eq!(rejection.operation,"作業領域登録");
+    assert_eq!(rejection.decision,"rejected");
+    assert_eq!(rejection.reason,"別Agentとの親子Workspace範囲重複を拒否");
+    let listed=request(&mut broker,"作業領域一覧",json!({}),false);
+    assert_eq!(listed.status,BrokerStatus::Accepted);
+    assert_eq!(listed.body.unwrap()["作業領域"],json!([]));
+    drop(broker);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn workspace_duplicate_fields_in_raw_json_are_rejected_before_permission() {
     let mut f=fixture();let b=f.broker.as_mut().unwrap();approve(b,"full");
     let payload=json!({"作業領域ID":"workspace-a","相対path":"private-document.txt"});

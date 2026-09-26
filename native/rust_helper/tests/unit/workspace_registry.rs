@@ -1,39 +1,92 @@
 use super::*;
+fn open_scoped(path:&std::path::Path)->(Dir,Vec<super::super::workspace_root::DirectoryIdentity>) {
+    let (root,_,ancestry)=super::super::workspace_root::open_isolated_root_with_ancestry(path,&[]).unwrap();
+    (root,ancestry)
+}
 #[test]
-fn 別Agentへ同一物理作業領域を二重登録できない() {
+fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
     let shared=std::env::temp_dir().join(format!("gui-shell-agent-shared-root-{}",識別子生成().unwrap()));
+    let child=shared.join("child");
     let isolated=std::env::temp_dir().join(format!("gui-shell-agent-isolated-root-{}",識別子生成().unwrap()));
-    std::fs::create_dir(&shared).unwrap();
+    std::fs::create_dir_all(&child).unwrap();
     std::fs::create_dir(&isolated).unwrap();
     let mut registry=WorkspaceRegistry::default();
     let mut audit_calls=0;
+    let (shared_root,shared_ancestry)=open_scoped(&shared);
     registry.register(
         "agent-runtime-a",
         "workspace-a",
-        Dir::open_ambient_dir(&shared,cap_std::ambient_authority()).unwrap(),
+        shared_root,
         &[],
+        Some(shared_ancestry),
         &mut |_,_| {audit_calls+=1;Ok(())},
     ).unwrap();
+    let (same_root,same_ancestry)=open_scoped(&shared);
     assert_eq!(
         registry.register(
             "agent-runtime-b",
             "workspace-b",
-            Dir::open_ambient_dir(&shared,cap_std::ambient_authority()).unwrap(),
+            same_root,
             &[],
+            Some(same_ancestry),
             &mut |_,_| {audit_calls+=1;Ok(())},
         ),
         Err("別Agentとの同一物理作業領域共有を拒否"),
     );
-    assert_eq!(audit_calls,1,"拒否されたrootの登録監査前処理が走らない");
+    let (child_root,child_ancestry)=open_scoped(&child);
+    assert_eq!(
+        registry.register(
+            "agent-runtime-b",
+            "workspace-b",
+            child_root,
+            &[],
+            Some(child_ancestry),
+            &mut |_,_| {audit_calls+=1;Ok(())},
+        ),
+        Err("別Agentとの親子Workspace範囲重複を拒否"),
+    );
+    assert_eq!(audit_calls,1,"成功登録として記録するcallbackは拒否時に呼ばれない");
+    let (isolated_root,isolated_ancestry)=open_scoped(&isolated);
     registry.register(
         "agent-runtime-b",
         "workspace-b",
-        Dir::open_ambient_dir(&isolated,cap_std::ambient_authority()).unwrap(),
+        isolated_root,
         &[],
+        Some(isolated_ancestry),
         &mut |_,_| {audit_calls+=1;Ok(())},
     ).unwrap();
     assert_eq!(registry.entries.len(),2);
     drop(registry);
+
+    let mut reverse=WorkspaceRegistry::default();
+    let (child_root,child_ancestry)=open_scoped(&child);
+    reverse.register("agent-runtime-a","child-first",child_root,&[],Some(child_ancestry),&mut |_,_|Ok(())).unwrap();
+    let (parent_root,parent_ancestry)=open_scoped(&shared);
+    assert_eq!(
+        reverse.register("agent-runtime-b","parent-second",parent_root,&[],Some(parent_ancestry),&mut |_,_|Ok(())),
+        Err("別Agentとの親子Workspace範囲重複を拒否"),
+    );
+    drop(reverse);
+
+    let mut malformed=WorkspaceRegistry::default();
+    let (root_handle,root_ancestry)=open_scoped(&isolated);
+    let root_identity=*root_ancestry.last().unwrap();
+    assert_eq!(
+        malformed.register("agent-runtime-a","root-only",root_handle,&[],Some(vec![root_identity]),&mut |_,_|Ok(())),
+        Err("作業領域の親子識別範囲が不正または未観測"),
+    );
+    drop(malformed);
+
+    let mut incomplete=WorkspaceRegistry::default();
+    incomplete.register(
+        "agent-runtime-a","handle-only",Dir::open_ambient_dir(&isolated,cap_std::ambient_authority()).unwrap(),&[],None,&mut |_,_|Ok(()),
+    ).unwrap();
+    let (independent_root,independent_ancestry)=open_scoped(&shared);
+    assert_eq!(
+        incomplete.register("agent-runtime-b","cannot-prove",independent_root,&[],Some(independent_ancestry),&mut |_,_|Ok(())),
+        Err("別AgentとのWorkspace分離範囲を確認できないため登録を拒否"),
+    );
+    drop(incomplete);
     std::fs::remove_dir_all(shared).unwrap();
     std::fs::remove_dir_all(isolated).unwrap();
 }
@@ -45,7 +98,7 @@ fn failed_grant_audit_never_enables_read_and_failed_result_audit_returns_no_body
     std::fs::write(path.join("file.txt"),"監査後だけ返す本文").unwrap();
     let root=Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap();
     let mut registry=WorkspaceRegistry::default();
-    registry.register("runtime-a","workspace-a",root,&[],&mut |_,_|Ok(())).unwrap();
+    registry.register("runtime-a","workspace-a",root,&[],None,&mut |_,_|Ok(())).unwrap();
     let hash=registry.entries["workspace-a"].registration_hash.clone();
     let approval=json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":"full"});
     assert!(registry.operate("作業領域承認",&approval,true,100,&mut |_,_|Err("試験監査障害")).is_err());
@@ -72,7 +125,7 @@ fn baseline_capture_audit_failure_and_expiry_never_publish_old_content() {
     let path=std::env::temp_dir().join(format!("gui-shell-baseline-{}",識別子生成().unwrap()));
     std::fs::create_dir(&path).unwrap();std::fs::write(path.join("file.txt"),"比較前").unwrap();
     let mut registry=WorkspaceRegistry::default();
-    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],&mut |_,_|Ok(())).unwrap();
+    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],None,&mut |_,_|Ok(())).unwrap();
     let hash=registry.entries["workspace-a"].registration_hash.clone();
     let grant=json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":"full"});
     registry.operate("作業領域承認",&grant,true,100,&mut |_,_|Ok(())).unwrap();
@@ -104,7 +157,7 @@ fn whole_baseline_handles_empty_scope_bounds_retention_and_drops_failed_capture(
     let path=std::env::temp_dir().join(format!("gui-shell-whole-{}",識別子生成().unwrap()));
     std::fs::create_dir(&path).unwrap();
     let mut registry=WorkspaceRegistry::default();
-    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],&mut |_,_|Ok(())).unwrap();
+    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],None,&mut |_,_|Ok(())).unwrap();
     let hash=registry.entries["workspace-a"].registration_hash.clone();
     registry.operate("作業領域承認",&json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":"full"}),true,100,&mut |_,_|Ok(())).unwrap();
     let capture=json!({"作業領域ID":"workspace-a","登録hash":hash});

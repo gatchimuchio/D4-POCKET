@@ -9,11 +9,11 @@
 
 ### Phase 7 Agent対話セッションのmetadata投影（2026-09-27）
 
-Rust Brokerの通常認証IPCへ`対話セッション一覧`を追加し、Schema適合Agent Adapterに結び付く現在sessionから、session ID・runtime ID・状態・開始監査IDだけを上限64件でDesktopへ投影する。Adapter metadataはAgent表示の分類にだけ使い、AuthorityやTrustを与えない。証拠は`INTERNAL_STATE`であり、実Agent稼働・Workspace隔離・Task実行を示さない。DesktopはWorkspace未結合sessionのTask内容、比較、Handoffを表示しない。Mobile経路は増やさず、Agent本体の起動・実行も追加していない。直前の全target試験ではWindows Application ControlのOSエラー4551により未完了だったが、2026-09-27の再実行では334件すべてが合格し、`windows_rust_integration_test_execution_policy`はローカル全対象試験の関門として解消した。別のrelease blockerは継続し、`release_ready=false`を維持する。詳細は`docs/specs/runtime-dialogue.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
+Rust Brokerの通常認証IPCへ`対話セッション一覧`を追加し、Schema適合Agent Adapterに結び付く現在sessionから、session ID・runtime ID・状態・開始監査IDだけを上限64件でDesktopへ投影する。Adapter metadataはAgent表示の分類にだけ使い、AuthorityやTrustを与えない。証拠は`INTERNAL_STATE`であり、実Agent稼働・Workspace隔離・Task実行を示さない。DesktopはWorkspace未結合sessionのTask内容、比較、Handoffを表示しない。Mobile経路は増やさず、Agent本体の起動・実行も追加していない。直前の試行ではdesktop launcher試験実行fileがWindows Application ControlのOS error 4551で拒否されたが、後続の現source全target直列試験はfile移動・再配置やpolicy変更なしに335件すべて成功し、`windows_rust_integration_test_execution_policy`を解消した。並列loopback fixtureの揺らぎは別known limitationとして維持する。別のrelease blockerも継続し、`release_ready=false`を維持する。詳細は`docs/specs/runtime-dialogue.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
-### Phase 7 同一物理Workspace rootのAgent間共有拒否（2026-09-27）
+### Phase 7 Agent間Workspace root範囲重複の拒否（2026-09-27）
 
-Rust Workspace registryは、異なるRuntime IDが同一device ID／file IDのdirectory handleを登録する操作をfail-closedで拒否し、安定file IDを観測できないrootも受理しない。Rust unit testは同じ物理rootを二つのAgent runtimeから別handleで登録する負例と、独立rootの正常登録を確認する。これは`FIXTURE`相当のregistry動作検査であり、親子rootの範囲重複、bind mount等の別名、Agentの実書込み・比較・Handoff隔離を証明しないため、比較は未接続のまま維持する。仕様と残存境界は`docs/specs/workspace-inspection.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
+Rust Workspace registryは、異なるRuntime ID間の同一物理rootと通常pathで観測できる親子rootの重複をfail-closedで拒否する。起動時にnofollowで開いたdirectory identity列を二度のpath解決で照合し、負例は親→子・子→親の両順、識別範囲不明のhandle-only登録、Broker拒否Auditを確認する。独立rootは登録できる。証拠は一時directoryと試験Brokerによる`FIXTURE`であり、bind mount等の別名範囲や実Agentの同時書込み・比較・Handoff隔離を示さない。比較は未接続のまま維持する。仕様と残存境界は`docs/specs/workspace-inspection.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
 ### Phase 32 Windows Export build tool追加（2026-09-26）
 

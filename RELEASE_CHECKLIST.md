@@ -382,13 +382,13 @@ known limitation を認める条件は、次のとおりである。
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
   status: resolved
-  reason: 2026-09-27のWorkspaceRegistry変更後、Windows hostで全target cargo testがexit 0となり、Rust library／binary／integrationを合わせた334 testがすべて成功した。以前のOS error 4551はこの全target実行では再発しなかった。これは現sourceのlocal Rust test gate解消であり、installed productやrelease readinessの証拠ではない。
-  required_action: 今回のRust全target検証gateに追加作業はない。以後Rust sourceを変更した各blockで全target試験を再実行する。
+  reason: 2026-09-27のWorkspaceRegistry最終sourceで直列cargo testがexit 0となり、Rust library／CLI／Broker IPC／integrationの全335 testが成功した。直前の試行でWindows Application ControlにOS error 4551が出たが、後続runはfile移動・再配置やpolicy変更なしに完了した。これは現sourceのlocal全target test gate解消であり、installed productやrelease readinessの証拠ではない。
+  required_action: このsourceに追加作業はない。以後Rust source変更時は全target試験を再実行する。Application Control拒否が再発した場合は迂回せず記録し、承認済み条件で再確認する。
   blocks_release: yes
 
 - item: Windows A2A loopback fixture試験の実行揺らぎ
   classification: known_limitation
-  reason: 2026-09-27のRust library一括実行と単独再実行で、A2Aのloopback Agent Card fixtureが一時`a2a_connection_failed`／`A2A Agent Card bodyを読めない`となった。その後の単独再実行と全target実行は成功したが、最初の失敗から低層OS通信errorを採取できず、原因は確定していない。これはfixture実行の揺らぎであり、実外部Agent接続の証拠ではない。
+  reason: 2026-09-27の全library並列実行でMinidora／A2A loopback fixtureの応答読取が一時失敗し、別の並列実行ではA2A Broker projectionも`a2a_connection_failed`となった。A2A単独再実行と後続の直列library 290件は成功したが、失敗時の低層OS通信errorを採取できておらず原因は未確定。これはfixture実行の揺らぎであり、実外部Agent接続の証拠ではない。
   required_action: 再発時はfixture接続の低層OS errorと実行環境を採取し、原因を特定してから試験安定性を修正する。未完了の全target runを成功扱いせず、fixture結果を実外部Runtimeの証拠へ昇格しない。
   blocks_release: no
 ~~~
