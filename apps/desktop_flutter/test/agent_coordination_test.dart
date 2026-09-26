@@ -6,10 +6,12 @@ import 'package:gui_shell_desktop/services/agent_coordination.dart';
 AgentSessionRecord _session(
   String id,
   String workspace, {
+  String? agentRuntimeId,
   String task = '文書を更新する',
 }) {
   return AgentSessionRecord(
     sessionId: id,
+    agentRuntimeId: agentRuntimeId ?? 'runtime-$id',
     workspace: workspace,
     task: task,
     changedFiles: const ['README.md'],
@@ -80,6 +82,29 @@ void main() {
     ]);
     expect(tooMany.available, isFalse);
     expect(tooMany.statusMessage, contains('8件'));
+  });
+
+  test('Agent比較は識別不能または重複したAgent実行系を拒否する', () {
+    final missingRuntime = AgentComparisonProjection.fromSessions([
+      _session('agent-one', 'workspace-a', agentRuntimeId: ''),
+      _session('agent-two', 'workspace-b'),
+    ]);
+    expect(missingRuntime.available, isFalse);
+    expect(missingRuntime.statusMessage, contains('Agent実行系識別子'));
+
+    final malformedRuntime = AgentComparisonProjection.fromSessions([
+      _session('agent-one', 'workspace-a', agentRuntimeId: 'agent/one'),
+      _session('agent-two', 'workspace-b'),
+    ]);
+    expect(malformedRuntime.available, isFalse);
+    expect(malformedRuntime.statusMessage, contains('Agent実行系識別子'));
+
+    final duplicateRuntime = AgentComparisonProjection.fromSessions([
+      _session('agent-one', 'workspace-a', agentRuntimeId: 'codex-cli'),
+      _session('agent-two', 'workspace-b', agentRuntimeId: 'codex-cli'),
+    ]);
+    expect(duplicateRuntime.available, isFalse);
+    expect(duplicateRuntime.statusMessage, contains('同一Agent実行系'));
   });
 
   test('Handoff投影は公開概要と権限再評価だけを示す', () {

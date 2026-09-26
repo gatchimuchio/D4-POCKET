@@ -1270,6 +1270,7 @@ const _mockSnapshot = ShellSnapshot(
   agentSessions: [
     AgentSessionRecord(
       sessionId: 'agent-session-1',
+      agentRuntimeId: 'unknown',
       workspace: '/workspace/project',
       task: '文書を更新する',
       changedFiles: ['README.md', 'docs/STRATEGY.md'],

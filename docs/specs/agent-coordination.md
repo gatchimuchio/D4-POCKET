@@ -40,7 +40,7 @@ target Agentの条件でAuthorityを再評価することを必須とする。Ha
 
 Desktop Agent Centerは、現在のsnapshotから比較可否と公開Handoff概要を読み取り表示するだけである。FlutterはAgentを起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Workspaceを検出した場合はfail-closedで比較を止める。
 
-Desktop側の比較可否は2〜8件、比較用Session IDの形式、空でないWorkspace参照、Session ID／Workspace参照の重複だけを検査する。ここで使うsnapshotのWorkspace文字列が異なることは、実Workspaceの隔離やpath alias／junction不在の証明ではない。UIは「Workspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
+Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
 
 ## 未成立範囲
 

@@ -2,6 +2,12 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7補足: Agent runtime識別のUI projection同期（2026-09-27）
+
+Desktop Agent比較projectionがSession／Workspace参照しか保持せず、同一Agent runtimeを異なるAgentとして比較可能にする契約不整合を修正した。snapshot由来のAgent runtime IDを保持し、欠落・不正形式・entry間の重複で比較を停止する。Schema／Conformanceの一意性要件とFlutterの入力検査を同期した。
+
+この検査はINTERNAL_STATEの宣言識別子の照合であり、実Agent identity、別Workspace実体、path alias不在、実行時のcross-agent contamination防止を証明しない。実Agentの隔離実行経路は`release_blocker`のまま維持する。
+
 ## D4 Pocket Phase 32補足: portable Export Credential scan（2026-09-27）
 
 Windows portable Export buildへ、artifact公開前の既知Credential pattern scanを追加した。署名鍵marker、AWS／GitHub／Google／Slackの既知token形式、Credential名付き設定値、Bearer authorization、Credentialを示す固定file名をbundle内のruntime artifact全fileから検出し、該当時は公開を停止する。AWS markerを1 MiB chunk境界にまたがらせた負例を含め、全対象fileをchunk読取し、scan前後のartifact inventoryとtree hashが一致することを検査する。build evidenceはscanのfile数、byte数、0 finding、対象tree hashを持つ。

@@ -29,10 +29,19 @@ class AgentComparisonProjection {
       );
     }
     final sessionIds = sessions.map((session) => session.sessionId).toList();
+    final agentRuntimeIds =
+        sessions.map((session) => session.agentRuntimeId).toList();
     if (sessionIds.any((id) => !_isComparisonId(id))) {
       return const AgentComparisonProjection(
         available: false,
         statusMessage: 'セッション識別子を検証できないため比較を停止しました。',
+        sessionIds: [],
+      );
+    }
+    if (agentRuntimeIds.any((id) => !_isComparisonId(id))) {
+      return const AgentComparisonProjection(
+        available: false,
+        statusMessage: 'Agent実行系識別子を検証できないため比較を停止しました。',
         sessionIds: [],
       );
     }
@@ -48,6 +57,13 @@ class AgentComparisonProjection {
       return AgentComparisonProjection(
         available: false,
         statusMessage: '同一セッションの重複を検出したため比較を停止しました。',
+        sessionIds: sessionIds,
+      );
+    }
+    if (agentRuntimeIds.toSet().length != agentRuntimeIds.length) {
+      return AgentComparisonProjection(
+        available: false,
+        statusMessage: '同一Agent実行系の重複を検出したため比較を停止しました。',
         sessionIds: sessionIds,
       );
     }

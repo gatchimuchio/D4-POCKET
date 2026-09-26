@@ -189,7 +189,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
-      "sha256": "00705f58b680c0d8b88c8c848aa946624b6a31c4e759c549e908459e59a573d9"
+      "sha256": "6f9a4c0964eb90e89b6fe23a1ec90f3d9f49e1cdd1ce96e491f2abe6d81a78f5"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "e808cbd5e1e8cb4ecdbc01382d431c646ab171aaca8d4707eba8cc806290dc43"
+      "sha256": "20f493f9badc5d830f6c27527bf9312756459bca7cd8938213e3386432dda3c8"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -349,7 +349,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "60f0d8dfaa53e4ae0192c929ef494d1e7b6d608179301d0134773ee7866ae5ee"
+      "sha256": "79708ef01046e3f5bf48374ffc3483e3aa971796ce378815a1c66ae66963d338"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -525,7 +525,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "5040c4cfbfe9e7fa4934ab6c57703f039e8cc4875063621114af14ef3d643b67"
+      "sha256": "8ff34019a157f2bf977aa08181d33072af79d47e5e4a37c85265c3b78aaf203f"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "642534f128adf78ea5e9c76f9bef7d7a9674d53855bac97245d0006224512c47"
+      "sha256": "f949e35a4e433599a80f5944290956512efcf7200a7f82a0152d041b4a82ab54"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "9460c25f7fc14be55623a205c63ee76be6410b5abcc27c06290f6c7630a5289d"
+      "sha256": "429f6cf37bc15f986d40444f6d0f74f22678d0b895cea96892774a62b68331e2"
     },
     {
       "path": "docs/specs/agent-runtime.md",
