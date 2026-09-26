@@ -1801,3 +1801,12 @@ ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から�
 - `MANIFEST.sha256.json`を更新し、統合検証内の`manifest.py --check`がPASS。
 
 通常のFlutter test commandでは生成用`build/unit_test_assets`の削除がWindows ACL／reparse pointで拒否された。test assetを無効にした同一Desktop test suiteは全件PASSした。製品のSchema、Broker、Rust権限経路は変更していない。既存のWindows installed evidence等の`release_blocker`と`release_ready=false`は維持する。本単位はManifest編集・Preview改善であり、Compose／Previewのproduction接続完成や独立App配布を意味しない。
+
+## D4 Pocket Windows Export短縮scratch再試行（2026-09-27）
+
+前回の長い一時pathでのMSBuild失敗を切り分けるため、Repository／OneDrive外の短い`%USERPROFILE%\D4PB`を専用scratchにし、当該PowerShell processだけ`TEMP`／`TMP`を`%USERPROFILE%\D4PB\t`へ向けて、clean pushed commit `d05eae4be26e73f0866cce220b6f43cfc52b10fc`からExport buildを再試行した。合成valid fixtureを用いたため、実Broker生成ReceiptやOwner操作の証拠ではない。
+
+- `git fetch --prune origin`後、local `main`、`origin/main`、remote HEADはすべて`d05eae4be26e73f0866cce220b6f43cfc52b10fc`で一致し、working treeはcleanだった。
+- `python -X utf8 tooling/export_windows_product.py --receipt <scratch receipt.json> --manifest-file <scratch d4-pocket-app-11111111111111111111111111111111.json> --output-dir <scratch output>`：Flutter `pub get`とWindows Release buildは成功し、実行時間は約80秒。MSB8029警告はあったがFlutter executableを生成した。その後Cargoは`io-lifetimes`と`proc-macro2`のbuild script executableを起動できず、Windows Application ControlのOS error 4551でexit 101。tool全体はexit 1で停止し、portable outputは生成されなかった。
+- 短いprofile直下pathでFlutter buildが完了したため、今回のCargo停止は先行LNK1104のpath長障害とは別である。Cargo targetや拒否されたexecutableの移動、Application Control policy変更は行っていない。Cargoの一時source／targetはtool終了時に片付き、残存する専用scratchにはfixture入力と空のMSBuild管理directoryだけがある。
+- 出力は未署名bundleの構築段階にも到達せず、Credential scan、Manifest runtime消費、binary pruning、起動、配布、formal LIVE_RUNTIMEを証明しない。`rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`、`release_ready=false`を維持する。
