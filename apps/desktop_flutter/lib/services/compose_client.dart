@@ -35,6 +35,47 @@ class ComposeClient {
   }
 }
 
+/// 画面の改行入力をManifestの参照識別子へ変換する。
+/// 空行だけを除外し、重複はBrokerの契約検証に残す。
+List<String> composeReferenceIdsFromLines(String input) => input
+    .split('\n')
+    .map((line) => line.trim())
+    .where((line) => line.isNotEmpty)
+    .toList(growable: false);
+
+Map<String, Object?> buildComposeManifestDraft({
+  required String composeId,
+  required String displayName,
+  required String runtimeIds,
+  required String agentIds,
+  required String toolIds,
+  required String mcpConnectionIds,
+}) =>
+    {
+      'version': 1,
+      'compose_id': composeId.trim(),
+      'display_name': displayName.trim(),
+      'runtime_ids': composeReferenceIdsFromLines(runtimeIds),
+      'agent_ids': composeReferenceIdsFromLines(agentIds),
+      'tool_ids': composeReferenceIdsFromLines(toolIds),
+      'mcp_connection_ids': composeReferenceIdsFromLines(mcpConnectionIds),
+      'theme': {'theme_id': 'd4-pocket', 'mode': 'system'},
+      'capability_requirements': ['runtime.read', 'agent.metadata'],
+      'settings': {
+        'locale': 'ja-JP',
+        'density': 'comfortable',
+        'content_visibility': 'summary',
+      },
+      'inheritance_policy': {
+        'authority': 'none',
+        'permission': 'none',
+        'approval': 'none',
+        'credential': 'none',
+        'audit_chain': 'none',
+      },
+      'output_mode': 'manifest_only',
+    };
+
 String composeJson(Map<String, Object?> value) =>
     const JsonEncoder.withIndent('  ').convert(value);
 

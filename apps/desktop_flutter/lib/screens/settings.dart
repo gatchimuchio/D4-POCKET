@@ -54,6 +54,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController(text: 'd4-pocket-local');
   final TextEditingController _composeNameController =
       TextEditingController(text: 'D4 Pocket ローカル構成');
+  final TextEditingController _composeRuntimeIdsController =
+      TextEditingController();
+  final TextEditingController _composeAgentIdsController =
+      TextEditingController();
+  final TextEditingController _composeToolIdsController =
+      TextEditingController();
+  final TextEditingController _composeMcpIdsController =
+      TextEditingController();
+  Map<String, Object?>? _lastAcceptedComposeManifest;
   final TextEditingController _editInstructionController =
       TextEditingController(text: '構成Preview結果へ対象platformを表示する');
   final TextEditingController _editTargetPathController = TextEditingController(
@@ -66,6 +75,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _profileNameController.dispose();
     _composeIdController.dispose();
     _composeNameController.dispose();
+    _composeRuntimeIdsController.dispose();
+    _composeAgentIdsController.dispose();
+    _composeToolIdsController.dispose();
+    _composeMcpIdsController.dispose();
     _editInstructionController.dispose();
     _editTargetPathController.dispose();
     super.dispose();
@@ -236,12 +249,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 8),
+          const Text(
+            '各欄は1行につき1つのManifest参照IDです。候補一覧の取得や実在性・接続・信頼の確認は行いません。IDやCapability要件は権限を付与せず、重複などの契約検証はBrokerが行います。',
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _composeRuntimeIdsController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Runtime参照ID（任意・1行に1つ）',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _composeAgentIdsController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Agent参照ID（任意・1行に1つ）',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _composeToolIdsController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Tool参照ID（任意・1行に1つ）',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _composeMcpIdsController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'MCP接続参照ID（任意・1行に1つ）',
+            ),
+          ),
+          const SizedBox(height: 8),
           const SectionList(
             title: '選択内容',
             rows: [
-              '実行基盤: gui_shell_rust_broker',
-              '接続エージェント: codex（実物interface確認済み、縮退状態）',
-              'ツール／MCP接続: なし',
               '表示テーマ: d4-pocket / system',
               '機能要件: runtime.read、agent.metadata',
               '設定: ja-JP、comfortable、summary',
@@ -266,38 +320,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Map<String, Object?> _composeManifest() => {
-        'version': 1,
-        'compose_id': _composeIdController.text.trim(),
-        'display_name': _composeNameController.text.trim(),
-        'runtime_ids': ['gui_shell_rust_broker'],
-        'agent_ids': ['codex'],
-        'tool_ids': const <String>[],
-        'mcp_connection_ids': const <String>[],
-        'theme': {'theme_id': 'd4-pocket', 'mode': 'system'},
-        'capability_requirements': ['runtime.read', 'agent.metadata'],
-        'settings': {
-          'locale': 'ja-JP',
-          'density': 'comfortable',
-          'content_visibility': 'summary',
-        },
-        'inheritance_policy': {
-          'authority': 'none',
-          'permission': 'none',
-          'approval': 'none',
-          'credential': 'none',
-          'audit_chain': 'none',
-        },
-        'output_mode': 'manifest_only',
-      };
+  Map<String, Object?> _composeManifest() => buildComposeManifestDraft(
+        composeId: _composeIdController.text,
+        displayName: _composeNameController.text,
+        runtimeIds: _composeRuntimeIdsController.text,
+        agentIds: _composeAgentIdsController.text,
+        toolIds: _composeToolIdsController.text,
+        mcpConnectionIds: _composeMcpIdsController.text,
+      );
 
   Future<void> _runCompose(ComposeClient client) async {
     try {
       final receipt = await client.compose(_composeManifest());
       final manifest = receipt['compose_manifest'];
-      _composedManifest = manifest is Map
-          ? composeJson(Map<String, Object?>.from(manifest))
-          : null;
+      _lastAcceptedComposeManifest =
+          manifest is Map ? Map<String, Object?>.from(manifest) : null;
+      _composedManifest = _lastAcceptedComposeManifest == null
+          ? null
+          : composeJson(_lastAcceptedComposeManifest!);
       _setComposeMessage('Manifestだけを作成しました。buildとApp identity生成は未実行です。');
     } catch (error) {
       _setComposeMessage('GUI Shell構成に失敗しました: $error');
@@ -307,7 +347,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _runPreview(ComposeClient client) async {
     try {
       final receipt = await client.preview(
-        currentManifest: null,
+        currentManifest: _lastAcceptedComposeManifest,
         candidateManifest: _composeManifest(),
       );
       _previewJson = composeJson(receipt);

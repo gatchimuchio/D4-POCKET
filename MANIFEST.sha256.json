@@ -265,7 +265,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "3fb59c2996acb854ceb2d5693c4a3d48f69658e70bb82bf4c5737276ff689443"
+      "sha256": "7cd02873be711a1173639e28698f5f961a9dfc5a466820967159674a9f4ed72a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -305,7 +305,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
-      "sha256": "211cf0a1b02550f51144cd761e6fe5ad6d7c289a9b46cefd82d1c0cfd8139336"
+      "sha256": "66acbb429fe590274217d00eb1e9555553ecb26e5525431c442cd38aee00d293"
     },
     {
       "path": "apps/desktop_flutter/lib/services/evaluation_client.dart",
@@ -541,7 +541,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/compose_client_test.dart",
-      "sha256": "b87b6d026c0784f13aca8f77038cdbcc4c013402def74b0e3ab85582cdf27e6d"
+      "sha256": "d260eafe9538cef807b0d1c74f80b7707315d43deca4477b48b23abb944f23ed"
     },
     {
       "path": "apps/desktop_flutter/test/evaluation_lab_test.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "0bff9a0b8027cf345386ac809905cf7ebe967644ae17aa27fe3c916b56ac630c"
+      "sha256": "4a5578a5e80d3680b1ed7ab7dbd2dd068a756fb1e444c5614c83ca7a02815c3a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1337,7 +1337,7 @@
     },
     {
       "path": "docs/specs/gui-shell-compose.md",
-      "sha256": "84d23d04847719e56f7527991c57ddca5f0aa8755c4454636fb1656b1bc64e80"
+      "sha256": "7163dcc9a4cdc8ae41ca25e0a389e60f90891ab6c46b8a6c8be9727a926f08d5"
     },
     {
       "path": "docs/specs/gui-shell-export.md",

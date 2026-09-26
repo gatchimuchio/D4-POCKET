@@ -14,13 +14,33 @@ void main() {
         'compose_manifest': {'compose_id': 'd4-pocket-local'},
       },
     });
-    final receipt = await ComposeClient(transport).compose({
-      'version': 1,
-      'compose_id': 'd4-pocket-local',
-    });
+    final manifest = buildComposeManifestDraft(
+      composeId: ' d4-pocket-local ',
+      displayName: ' D4 Pocket local ',
+      runtimeIds: 'runtime.local',
+      agentIds: 'agent.example',
+      toolIds: 'tool.notes',
+      mcpConnectionIds: 'mcp.local',
+    );
+    final receipt = await ComposeClient(transport).compose(manifest);
 
     expect(transport.operation, 'GUI Shell構成');
     expect(transport.payload?['compose_id'], 'd4-pocket-local');
+    expect(transport.payload?['runtime_ids'], manifest['runtime_ids']);
+    expect(transport.payload?['agent_ids'], manifest['agent_ids']);
+    expect(transport.payload?['tool_ids'], manifest['tool_ids']);
+    expect(
+      transport.payload?['mcp_connection_ids'],
+      manifest['mcp_connection_ids'],
+    );
+    expect(manifest['output_mode'], 'manifest_only');
+    expect(manifest['inheritance_policy'], {
+      'authority': 'none',
+      'permission': 'none',
+      'approval': 'none',
+      'credential': 'none',
+      'audit_chain': 'none',
+    });
     expect(receipt['permission_generated'], isFalse);
     expect(receipt['build_status'], 'not_started');
   });
@@ -48,14 +68,28 @@ void main() {
         'version_preview': {'rollback_available': false},
       },
     });
+    const currentManifest = {
+      'version': 1,
+      'compose_id': 'existing',
+    };
     final receipt = await ComposeClient(transport).preview(
-      currentManifest: null,
+      currentManifest: currentManifest,
       candidateManifest: const {'version': 1, 'compose_id': 'd4-pocket-local'},
     );
 
     expect(transport.operation, 'GUI Shell構成Preview');
     expect(transport.payload?['preview_mode'], 'version_rollback');
+    expect(transport.payload?['current_manifest'], currentManifest);
     expect(receipt['version_preview'], isA<Map>());
+  });
+
+  test('構成参照IDは空行と前後空白だけを整理し重複はBroker検証へ残す', () {
+    expect(
+      composeReferenceIdsFromLines(
+        '  runtime.local  \r\n\nagent.example\n runtime.local ',
+      ),
+      ['runtime.local', 'agent.example', 'runtime.local'],
+    );
   });
 }
 

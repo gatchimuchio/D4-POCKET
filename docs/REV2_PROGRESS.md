@@ -1787,3 +1787,17 @@ GUI-Shell ExportのManifest file生成後に、Broker Export ReceiptとManifest 
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：library 279件、helper CLI 9件、integration 36件、全324件PASS。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。統合されたPython-only検証10項目PASS。Evidence bundleは既存release blocker 5件と`release_ready=false`を維持した。
 - `rustfmt --edition 2021 --check native/rust_helper/src/broker/export_center.rs`：不合格。今回の追加箇所はrustfmt出力と一致させたが、対象fileの既存箇所に広範な整形差分が残るためfile全体の一括整形は行わなかった。
+
+## D4 Pocket rev2 Compose UI参照入力とPreview比較元（2026-09-26）
+
+ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から改行区切り入力へ変更する。これらはManifest内の未解決参照であり、候補発見、存在・接続・信頼の確認、権限付与を行わない。ComposeをBrokerが受理した後、同画面を開いている間だけそのManifestをPreview比較元として保持し、拒否された要求では比較元を更新しない。これは保存、履歴、Approval、復旧、Authorityの仕組みではない。
+
+検証結果:
+
+- `flutter test --no-pub --no-test-assets`（`apps/desktop_flutter`）：109 tests PASS。Compose参照ID draft、Compose送信配列、Preview比較元の転送を含む。
+- `flutter analyze --no-pub`（`Z:\apps\desktop_flutter`）：No issues found。`flutter analyze --no-pub`（`Z:\apps\mobile_flutter`）：No issues found。日本語を含む元のOneDrive pathではAnalysis ServerがLSP JSON `FormatException`で終了したため、一時`subst Z:`経由で実行し、検証後に割当を解除した。workspace内容・ACLは変更していない。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債0 files／0 findingsでPASS。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema 137、正常example 137、negative fixture 169、Conformance 216 checks、Manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32開発監査がPASS。
+- `MANIFEST.sha256.json`を更新し、統合検証内の`manifest.py --check`がPASS。
+
+通常のFlutter test commandでは生成用`build/unit_test_assets`の削除がWindows ACL／reparse pointで拒否された。test assetを無効にした同一Desktop test suiteは全件PASSした。製品のSchema、Broker、Rust権限経路は変更していない。既存のWindows installed evidence等の`release_blocker`と`release_ready=false`は維持する。本単位はManifest編集・Preview改善であり、Compose／Previewのproduction接続完成や独立App配布を意味しない。
