@@ -1759,7 +1759,7 @@ Windows installed productのclean-source formal smoke、Dart経路の全negative
 
 GUI-Shell ExportのManifest file生成後に、Broker Export ReceiptとManifest fileを検証してWindows向けportable開発bundleを組み立てる開発専用経路を追加した。Receipt／Manifestのschema・ID・filename・byte length・SHA-256・module planを照合し、sourceはcleanでpush済みの`main`と`origin/main`一致を要求する。source snapshot、Flutter build、Cargo build、依存cacheはrepository／OneDrive外の一時領域へ分離する。FlutterとRust子processへ渡す環境変数を許可list化し、出力は同一volume上のstagingで検証してから新規pathへ確定する。Build receiptはartifact inventoryとtree hashを記録し、実行・runtime接続・binary pruning・credential scan・正式配布が未検証である状態を明示する。
 
-これは実際のBrokerによるOwner承認済みReceiptではなく、repository内のsynthetic example fixtureを使う予定の開発build経路である。clean pushed sourceからWindows bundleを実buildする検証は、最初の実装commitをpushしてから別途行う。fixtureによるbuild成功はOwner authority、LIVE_RUNTIME、credential非混入、standalone app、binary pruning、release readinessの証拠にならない。正式identity、署名、installer、実runtime／独立Audit、module pruningは未成立で、対応する`release_blocker`と`release_ready=false`を維持する。
+これは実際のBrokerによるOwner承認済みReceiptではなく、repository内のsynthetic example fixtureを使う開発build経路である。最初のclean pushed commitからの実構築ではFlutter Windows Releaseが77.7秒で成功した一方、Cargo linkerの出力pathが260文字に達し、MSVC `link.exe`が中間実行fileを開けずLNK1104で停止した。これはWindows path上限との不一致が強く示唆されるが、OS側の原因codeを別途取得したわけではない。TemporaryDirectoryの後片付けもWinError 145で失敗し、当該実行が作った一時Cargo build directoryが`%TEMP%`に残った。修正ではApp／Audit identity pairのSHA-256を使う短いCargo target path、短いcache名、linker出力path 240 UTF-16文字の事前上限検査を追加した。修正後のclean pushed sourceでFlutter／Cargo両方を含む再構築は未実行である。fixtureによるbuild成功はOwner authority、LIVE_RUNTIME、credential非混入、standalone app、binary pruning、release readinessの証拠にならない。正式identity、署名、installer、実runtime／独立Audit、module pruningは未成立で、対応する`release_blocker`と`release_ready=false`を維持する。
 
 実行済みの局所検証（実build前）:
 

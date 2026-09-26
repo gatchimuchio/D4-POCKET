@@ -38,6 +38,7 @@ CATALOG_PATH = ROOT / "specs" / "gui_shell_module_catalog.json"
 MAX_INPUT_BYTES = 1_000_000
 MAX_MANIFEST_BYTES = 65_536
 RECEIPT_NAME = "d4_pocket_build_receipt.json"
+MAX_CARGO_LINKER_PATH_CHARS = 240
 BUILD_ENVIRONMENT_ALLOWLIST = {
     "APPDATA",
     "COMSPEC",
@@ -123,6 +124,27 @@ def _build_child_environment(
                 del result[existing]
         result[name] = value
     return result
+
+
+def _cargo_target_directory(temporary_root: Path, app_id: str, audit_store_id: str) -> Path:
+    identity = f"{app_id}\0{audit_store_id}".encode("utf-8")
+    identity_key = hashlib.sha256(identity).hexdigest()
+    return temporary_root / "c" / identity_key
+
+
+def _validate_cargo_target_path(target_dir: Path) -> None:
+    linker_output = (
+        target_dir
+        / "release"
+        / "build"
+        / "windows_x86_64_msvc-0000000000000000"
+        / "build_script_build-0000000000000000.exe"
+    )
+    path_characters = len(str(linker_output).encode("utf-16-le")) // 2
+    if path_characters > MAX_CARGO_LINKER_PATH_CHARS:
+        raise ValueError(
+            "Cargo構築用パスがWindowsのリンク上限を超えた。より短い一時フォルダーを指定する。"
+        )
 
 
 def _is_one_drive_path(path: Path) -> bool:
@@ -463,11 +485,11 @@ def build_portable_bundle(
 
     build_started = time.perf_counter()
     with tempfile.TemporaryDirectory(
-        prefix="d4pocket-export-publish-", dir=output.parent
+        prefix="d4p-", dir=output.parent
     ) as staging_parent:
         staging_root = Path(staging_parent) / "bundle"
         with tempfile.TemporaryDirectory(
-            prefix="d4pocket-export-build-", dir=_resolve_build_temp_root()
+            prefix="d4b-", dir=_resolve_build_temp_root()
         ) as temporary:
             temporary_root = Path(temporary)
             source_root = temporary_root / "source"
@@ -477,7 +499,7 @@ def build_portable_bundle(
             _safe_extract_source(archive_path, source_root)
 
             flutter_environment = _build_child_environment(
-                {"PUB_CACHE": str(temporary_root / "pub-cache")}
+                {"PUB_CACHE": str(temporary_root / "p")}
             )
             pub_arguments = ["--suppress-analytics", "pub", "get", "--enforce-lockfile"]
             subprocess.run(
@@ -509,7 +531,8 @@ def build_portable_bundle(
                 flutter_project / "build" / "windows" / "x64" / "runner" / "Release"
             )
 
-            target_dir = temporary_root / "cargo-target" / app_id / audit_store_id
+            target_dir = _cargo_target_directory(temporary_root, app_id, audit_store_id)
+            _validate_cargo_target_path(target_dir)
             rust_arguments = [
                 "build",
                 "--release",
@@ -525,7 +548,7 @@ def build_portable_bundle(
             ]
             rust_environment = _build_child_environment(
                 {
-                    "CARGO_HOME": str(temporary_root / "cargo-home"),
+                    "CARGO_HOME": str(temporary_root / "g"),
                     "GUI_SHELL_PRODUCT_APP_ID": app_id,
                     "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": audit_store_id,
                 }

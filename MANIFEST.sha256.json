@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5ab8ab2066db171edbbdd41397178f0ac4838913d85aa5cfa7cc1327aabca6fc"
+      "sha256": "b94b2f64ba590328219607d92a7525ded73a1860b9363e1ed6fc6c30d1d521ec"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6056271682f4a94c7ca8f1a549c7bfc898ff05e8641eff6f459f614e671408e8"
+      "sha256": "049079d6db9076483c16e958be216b04dc42d13e3cacc61b9b314342727c1d94"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1341,11 +1341,11 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "776a0fccc42da838145d5b094ec2c970e11054da07c4a668772b2d8646e62036"
+      "sha256": "b8d0ef5eb30b8fd662b953d22150a09c3c7ae0763a3634097e0c43b0b4c5abef"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
-      "sha256": "c1e76d8a9f272eb77a03f8c9be57517cfd59f731d5116d9e13039f0bf874d239"
+      "sha256": "fc4b85dbf1093659b5024b38e91ca4e95cd788b4f5ea337f208ca2bb4d18eaa7"
     },
     {
       "path": "docs/specs/gui-shell-preview.md",
@@ -4105,7 +4105,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ec384fa935f7b75ac712333cf0e11f102df9d81e6525e0ab84b8e02c631753fe"
+      "sha256": "a13dff1ca9538879aa1306c16a3fe67f34cf495597aaa6c89e785dabb7c65732"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4137,7 +4137,7 @@
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "45f3c2770e9614f31fb4491ab094d1ea4e73a60d315d00e71073d86b8e256d2b"
+      "sha256": "44ef02c49f044fab9ec7cee8c59309148b6055aa5853dbdf157584395bd4e337"
     },
     {
       "path": "tooling/failure_injection_validation.py",

@@ -81,11 +81,13 @@ from tooling.compare_module_builds_windows import (
 )
 from tooling.export_windows_product import (
     _build_child_environment,
+    _cargo_target_directory,
     _require_clean_source,
     _artifact_inventory,
     _copy_bundle,
     _resolve_output_directory,
     _safe_extract_source,
+    _validate_cargo_target_path,
     validate_build_evidence,
     validate_export_inputs,
 )
@@ -7786,6 +7788,26 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         or "AWS_SECRET_ACCESS_KEY" in rust_environment
     ):
         errors.append("Rust build childへcredential環境を残すか、compile-time identityを分離しない")
+
+    with tempfile.TemporaryDirectory(prefix="d4b-") as temporary:
+        temporary_root = Path(temporary)
+        app_id = "d4-pocket-app-" + "1" * 32
+        audit_store_id = "audit-store-" + "2" * 32
+        cargo_target = _cargo_target_directory(temporary_root, app_id, audit_store_id)
+        distinct_target = _cargo_target_directory(
+            temporary_root, app_id, "audit-store-" + "3" * 32
+        )
+        if cargo_target == distinct_target or app_id in str(cargo_target) or audit_store_id in str(cargo_target):
+            errors.append("Cargo target directoryがApp／Audit identity pairごとに短く分離されない")
+        try:
+            _validate_cargo_target_path(cargo_target)
+        except ValueError as exc:
+            errors.append(f"通常の短いWindows TEMPでもCargo linker pathを許可しない: {exc}")
+        try:
+            _validate_cargo_target_path(Path("C:/") / ("x" * 150) / "c" / ("a" * 64))
+            errors.append("Windows linker path budgetを超えるCargo targetを拒否しない")
+        except ValueError:
+            pass
 
     for path, value, label in (
         (("authority_boundary", "source_authority_verified"), True, "source authority"),
