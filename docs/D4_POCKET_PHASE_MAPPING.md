@@ -97,6 +97,8 @@
 | `C33` | `Phase 34`・`Phase 44` |
 | `C34` | `Phase 45` |
 
+Codex Adapterの固定作業pathと同一runtime IDのWorkspace rootを起動時に照合するpreflightは、D4 `Phase 4`／`Phase 6`から`Phase 7`へ進むための局所前提であり、rev1 `C1`の製品Workspace登録と関連する。identity一致はsession結合や独立Agent比較の完了を意味せず、いずれのPhase／C工程も完了へ変更しない。
+
 ## D4追加範囲
 
 次のPhaseはrev1 C0〜C34と同一の独立工程がないD4追加範囲であり、既存Cの状態を転記して完了扱いしない。

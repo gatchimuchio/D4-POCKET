@@ -15,6 +15,8 @@ Rust Brokerの通常認証IPCへ`対話セッション一覧`を追加し、Sche
 
 Rust Workspace registryは、異なるRuntime ID間の同一物理rootと通常pathで観測できる親子rootの重複をfail-closedで拒否する。起動時にnofollowで開いたdirectory identity列を二度のpath解決で照合し、負例は親→子・子→親の両順、識別範囲不明のhandle-only登録、Broker拒否Auditを確認する。独立rootは登録できる。証拠は一時directoryと試験Brokerによる`FIXTURE`であり、bind mount等の別名範囲や実Agentの同時書込み・比較・Handoff隔離を示さない。比較は未接続のまま維持する。仕様と残存境界は`docs/specs/workspace-inspection.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
+同Phaseの追加単位として、owner起動設定内のCodex runtimeと同じruntime IDを持つWorkspace rootを、Codex Adapterの固定作業pathと物理directory identityで照合する。不一致や識別不能rootはRuntime probe前に拒否し、未設定のWorkspace bindingは推定しない。これは起動設定の取り違え防止だけであり、Session binding、実行時path差替え防止、Agent比較・Handoff・cross-agent isolationの完成ではない。詳細と検査証拠は`docs/REV2_PROGRESS.md`の対応追補を参照する。
+
 ### Phase 32 Windows Export build tool追加（2026-09-26）
 
 Brokerが生成するReceipt／ManifestをSchema・hash・byte長・identityで再照合し、cleanでremote `main`と一致するcommitからWindows Flutter ReleaseとRust Broker／起動器を組み立てる開発専用toolを追加した。最初のclean commit実構築ではFlutter Windows Releaseが成功した一方、Cargo linkerの出力pathが260文字となり、LNK1104で失敗した。短縮path修正後の再実行ではFlutter Windows Releaseが成功し、Cargoは`proc-macro2` build scriptがWindows Application ControlのOS error 4551で拒否されたため停止した。portable bundleは未生成であり、host policyを弱めずCargo構築を完遂できるWindows環境で再検証する。Owner／source authority、Credential artifact scan、runtime Manifest消費、binary pruning、製品起動、Installer／署名／配布は証明せず、release blockerを維持する。詳細は`docs/specs/gui-shell-export.md`と`docs/REV2_PROGRESS.md`を参照する。

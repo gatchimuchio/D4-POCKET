@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "581e13ae386d873a5720a9182a2ca940f0fcc50cf29134f985776119c7b5f196"
+      "sha256": "a061dc7d1c99cb3e891c026f0e1b01cc39bbeaacf5e913249050adc3cb2d2ad4"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3c6d32dc6172e66f0b011e82b7d5d5048b895ea7ebb5eaa9337f812dc713a296"
+      "sha256": "fdd545d2c8e5be3d566969f9134bcd7c5d5405d976b03b367209e00aedf528fb"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "39194998e46694d21588999f8a638a3cd657459a82bea7ab8a88962a0859f224"
+      "sha256": "40917710115f9c320b45b9d8e78dea0f73d29284b216af788a016c69d127f348"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6aa601d4b2c575f798a3a06c77a28d1b2006370d8f8421caebcfc7eff91abcab"
+      "sha256": "3e0b82c230be957e0b1ea946434c7ff89dabfbe57444ab20cac0238f3d374ed7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "7ef885d883954522a46a98f1f03d1099576b2ffe1062fcea07143ff36784c309"
+      "sha256": "cf2e7ad2c8425e1c66622f29cb7489cda2c980280e3e002c24c6a69709096337"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -1437,7 +1437,7 @@
     },
     {
       "path": "docs/specs/workspace-inspection.md",
-      "sha256": "9344a36991161bd87a2e88d52270c38dc0ca7954b9683258644fdabc23830d96"
+      "sha256": "f3ddae88fdb8a5162a74bb8c2cc3af388adf765aba904673aeb610133d7a4127"
     },
     {
       "path": "docs/standards/gui-shell-extended-standard.md",
@@ -2917,7 +2917,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "dff2cf7498b2578d62b959f1f710cc771a281d51d30f471f9d100dad895384e2"
+      "sha256": "749ea96c133cf74775ca52955418bf856f913232d81bd4a461cac58b518228ed"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
-      "sha256": "4a23996d2d54b47478f74781c28d1b85837003d2b28d76733bc241f64efa7f62"
+      "sha256": "d33d1bf57f2a492c5e32af5ea2c6bf57135eedbd8add4feb0cb3ba2b6b5f715c"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "41642ba64e468f3dd8afdde550e4455598628dc3e1e957af815d3f6621914aac"
+      "sha256": "1e3fb39eb1b545b190a457b37af73530ad76c795a710a75986c1ed2990814330"
     },
     {
       "path": "requirements-dev.txt",

@@ -44,6 +44,8 @@ Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合�
 
 Workspace registryは、異なる実行系ID間の同一rootと通常pathで観測した親子rootの登録を拒否する。起動登録ではnofollowで開いた各directoryの(device ID, file ID)列を二度のpath解決間で照合し、別runtimeとの範囲交差を確認する。Rust試験は親→子・子→親の拒否、独立rootの許可、root identityだけの不完全列と識別列を持たないhandle-only登録の拒否、およびBroker起動登録での拒否Auditを確認する。これらは一時directoryと試験Brokerを使う`FIXTURE`証拠であり、bind mount等の別path aliasを網羅せず、実Agent間の書込み隔離も証明しない。独立Workspace比較とcross-agent contaminationの実行試験は引き続き未成立である。
 
+owner起動設定でCodex runtimeと同じ`runtime_id`を持つWorkspaceについては、Broker起動前にAdapter固定作業pathとWorkspace rootをnofollowで開き、device ID／file IDが一致しない設定を拒否する。設定拒否は`CONFIG`として監査する。これは起動時に観測したdirectory identityの一致だけであり、SessionにWorkspace IDを結合しない。Workspace設定がないSessionへのWorkspace推定、検査後のpath差替え防止、実Agentの別Workspace書込隔離、比較・Handoffの許可には使わない。
+
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
 
 ## 未成立範囲

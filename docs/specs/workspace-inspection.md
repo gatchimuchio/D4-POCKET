@@ -56,6 +56,8 @@ owner用CLIは `gui_shell_rust_helper 作業領域制御 --session-file <owner�
 
 `broker-server --workspace-config <JSON file>` をownerの起動設定として追加する。version=1、workspacesは最大16件、各項目はruntime_id・workspace_id・root_path・secret_pathsを持つ。設定は最大65,536 bytes、通常fileのみ、重複・未知field・不正versionを拒否する。owner-session-fileと永続監査を必須とし、設定の登録は読取承認を発生させない。rootは絶対pathの実directoryに限り、volume全体、secret名、途中のlink/junction、曖昧な相対要素を拒否する。起動後の通常IPCへroot指定を追加しない。
 
+owner設定にあるWorkspaceの`runtime_id`がCodex Adapterのruntime IDと一致する場合、BrokerはAdapterの固定作業pathと当該Workspace rootを既存のnofollow・filesystem・保護範囲検査で開き、device ID／file IDを照合する。不一致またはどちらかのrootを安全に識別できない場合、設定を拒否監査してRuntime probeより前に起動を停止する。該当Workspace設定がない場合はWorkspace bindingを推定しない。この検査は起動設定の物理root整合だけを確認し、対話SessionへのWorkspace結合、process起動時の同一性維持、Agent比較・書込隔離を証明しない。これらが別途成立するまで比較・Handoffは無効のままとする。
+
 Windowsの初期対応は固定diskのNTFSとする。開いたdrive handleのvolume serialをWin32 GetVolumeInformationのserialと照合し、GetDriveTypeがFIXED、filesystem名がNTFSのときだけ続ける。続く各directoryをnofollowで開き、reparse pointと別volumeを拒否する。ReFS・network・removable・未確定のfilesystemは登録を拒否する。標準Rustにこの安全なvolume照会APIがないため、Windowsだけwinsafe 0.0.29のkernel featureを使用する。独自unsafe、PowerShell runtime、任意process起動を導入しない。実装根拠は取得済み0.0.29 sourceと[公開API](https://docs.rs/winsafe/0.0.29/winsafe/fn.GetVolumeInformation.html)、[Win32仕様](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationw)。
 
 Linuxはdirectory handleのfstatfsでext4系またはtmpfs、macOSはAPFSだけを登録対象とする。Unixでは既存依存と同版のrustix 1.1.4のfs featureを直接使用する。対象外filesystemのsupportはrelease_blockerとして追加実装・実証拠を要する。既存取得器もrootのdevice IDを保持し、配下で別filesystemへ移る読取を拒否する。administratorによる同一deviceのbind mount偽装やvolume serialの意図的衝突を防ぐとは主張しない。

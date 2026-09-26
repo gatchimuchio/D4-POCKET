@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "resolved",
+      "status": "unresolved",
       "status_source": "manual",
-      "active": false,
+      "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-27のWorkspaceRegistry最終sourceでcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1がexit 0となり、library、CLI、Broker IPC、integrationの全335 testが成功した。直前の試行ではdesktop launcher executableがWindows Application ControlのOS error 4551で拒否されたが、後続runはfile移動・再配置やpolicy変更なしに完了し、現在sourceの全target gateは解消した。通常の並列実行で観測したloopback揺らぎはRELEASE_CHECKLIST.mdの別known_limitationとして維持する。このgateはlocal test実行だけを示し、installed productやrelease readinessの証拠ではない。",
-      "required_action": "このsourceのRust全target gateに追加作業はない。以後Rust source変更時は全targetを再実行する。Application Control拒否が再発しても実行fileの移動・再配置やpolicy変更で回避せず、失敗を記録して承認済み条件で再確認する。"
+      "reason": "直前のclean sourceではRust全target 335件が成功して一度解消したが、2026-09-27の今回実行ではworkspace_startupの7件が子Broker process起動時にWindows Application ControlのOS error 4551で拒否され、後続の全target commandもtest harness起動前に同errorで停止した。別の全target試行はA2A loopbackの間欠失敗で291/292となった一方、Rust libraryだけの直列再実行は292件すべて成功した。policy変更、実行fileの移動・再配置、test除外は行っていない。local全target gateは未確認であり、installed productやrelease readinessの証拠でもない。",
+      "required_action": "Windows Application Controlを変更・回避せず、承認済み条件でRust全targetを再実行する。process起動を含むworkspace／Broker integration suiteを含む全target successを確認するまでresolvedへ戻さない。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

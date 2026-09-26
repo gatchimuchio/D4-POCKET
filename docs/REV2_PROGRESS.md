@@ -2,6 +2,21 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Codex Workspace root設定の物理identity照合（2026-09-27）
+
+Codex Adapterの固定作業pathと、owner起動設定で同じruntime IDへ登録するWorkspace rootが独立指定であり、食い違いを検知する起動preflightがなかった。Workspace設定をCodex CLIのversion／help probe前に一度読み、同じruntime IDの全Workspace rootとAdapter作業pathを既存のnofollow・filesystem・保護path検査で開いてdevice ID／file IDを比較する。不一致・未観測・保護領域重複は`CONFIG`拒否Auditを残し、IPC endpointを作る前に起動を止める。読み取った同じ設定objectを後続のWorkspace登録へ渡す。
+
+この単位はownerが宣言した固定path同士の起動時整合だけを検査する。Workspace設定のないSessionへbindingを推定せず、対話SessionへWorkspace IDを結合しない。照合後のpath差替え防止、実Agent間の書込み隔離、Agent比較・Handoffは未成立のまま保持する。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib codex_workspace -- --nocapture`：一致root／不一致root／複数指定中の不一致／異なるruntimeの非binding、および実Broker起動での拒否監査・endpoint非生成を含む2件が成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --test workspace_startup -- --test-threads=1`：7件すべて、Broker子プロセス起動時にWindows Application ControlからOSエラー4551が返り失敗。Workspace検査へ到達する前であり、制御設定の変更や実行ファイルの移動・再配置はしていない。`windows_rust_integration_test_execution_policy`を未解決へ戻す。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：機能実装後のRust単体試験292件すべて成功。全targetの1回目は292件中291件成功し、未変更のA2A Broker模擬HTTP接続試験が`a2a_connection_failed`となって終了値1。再実行した全target commandは試験実行file起動前にWindows Application ControlからOSエラー4551で拒否された。全対象試験の成功とは扱わず、両方の失敗を保持する。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138、正常example 138、negative fixture 170で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件で合格。`python -X utf8 tooling/日本語基底監査.py --strict`：負債0／finding 0で合格。
+- `python -X utf8 tooling/manifest.py --write`：tracked source 1045件を更新し、続く`--check`が合格。書込み前のrelease gate失敗はこの5 fileのManifest hash不一致であり、後続に再実行する。
+- `rustfmt --edition 2021 --check native/rust_helper/src/broker/ipc_server.rs native/rust_helper/src/broker/workspace_root.rs`：不合格。変更対象外の既存コードを多数含むfile全体にformat driftがある。追加範囲は局所的に整形し、無関係な一括再formatは行わない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済みPython／開発検証10件すべて成功。release gate整合性はpassだが、既存release blockerにより`release_ready=false`を維持する。
+- 証拠境界: 物理identity検査はOS directory handleを使うが、この試験の証拠は`FIXTURE`である。導入済みCodex processが同じWorkspaceを使ったこと、起動後も結合が維持されたことは証明しない。Git状態の閉包は最終確認待ち。
+
 ## D4 Pocket Phase 7追補: 比較可否表示と操作面記述の同期（2026-09-27）
 
 比較projectionのAgent runtime ID一意性検査に合わせ、Agent Centerの状態文言とGUI操作面の責任記述を更新した。表示は宣言上のruntime／Workspace参照が重複しない場合に限る条件付き表示であり、実Agent identityや実行時隔離の確認済み表示にはしない。

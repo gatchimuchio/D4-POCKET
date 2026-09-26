@@ -160,6 +160,35 @@ pub(crate) fn open_registered_root_with_ancestry(config: &WorkspaceStartup, prot
     open_isolated_root_with_ancestry(Path::new(&config.root_path),protected)
 }
 
+/// Codex Adapterの固定作業pathとowner設定Workspaceのrootが同じ物理directoryかを確認する。
+/// どちらも既存のnofollow・filesystem・保護範囲検査を通し、開いたhandleのidentityを比べる。
+pub(crate) fn verify_same_physical_root(
+    left: &Path,
+    right: &Path,
+    protected: &[PathBuf],
+) -> Result<(), &'static str> {
+    let (left_root, _, _) = open_isolated_root_with_ancestry(left, protected)?;
+    let left_metadata = left_root
+        .dir_metadata()
+        .map_err(|_| "Codex作業rootの識別子を確認できない")?;
+    let left_identity = DirectoryIdentity {
+        device: cap_fs_ext::MetadataExt::dev(&left_metadata),
+        file_id: cap_fs_ext::MetadataExt::ino(&left_metadata),
+    };
+    let (right_root, _, _) = open_isolated_root_with_ancestry(right, protected)?;
+    let right_metadata = right_root
+        .dir_metadata()
+        .map_err(|_| "Workspace rootの識別子を確認できない")?;
+    let right_identity = DirectoryIdentity {
+        device: cap_fs_ext::MetadataExt::dev(&right_metadata),
+        file_id: cap_fs_ext::MetadataExt::ino(&right_metadata),
+    };
+    if left_identity.file_id == 0 || left_identity != right_identity {
+        return Err("Codex実行系の作業pathとWorkspace rootの物理directoryが一致しない");
+    }
+    Ok(())
+}
+
 pub(crate) fn open_isolated_root(path: &Path, protected: &[PathBuf]) -> Result<(Dir, &'static str), &'static str> {
     let (root,filesystem,_)=open_isolated_root_with_ancestry(path,protected)?;
     Ok((root,filesystem))

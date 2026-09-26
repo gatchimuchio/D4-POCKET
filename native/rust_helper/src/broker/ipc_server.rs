@@ -164,6 +164,47 @@ fn run_loopback_server_inner(
             .map_err(|_| BrokerServerError::new("初回UI設定を安全に生成・検証できないため起動を停止しました"))?;
     }
 
+    let workspace_startup = if let Some(path) = &config.workspace_config {
+        broker
+            .作業領域設定監査(path, "received", "owner起動設定の読取を受信")
+            .map_err(BrokerServerError::new)?;
+        let parsed = (|| {
+            let owner_file = config
+                .owner_session_file
+                .as_ref()
+                .ok_or("作業領域登録にはowner資格設定が必要")?;
+            Ok((super::workspace_root::read_config(path)?, owner_file))
+        })();
+        let (settings, owner_file) = match parsed {
+            Ok(value) => value,
+            Err(reason) => {
+                broker
+                    .作業領域設定監査(path, "rejected", reason)
+                    .map_err(BrokerServerError::new)?;
+                return Err(BrokerServerError::new(reason));
+            }
+        };
+        let mut protected = vec![
+            config.store_dir.clone(),
+            config.session_file.clone(),
+            owner_file.clone(),
+            path.clone(),
+        ];
+        protected.extend(config.protected_store_dir.iter().cloned());
+        protected.extend(config.desktop_protected_store_dir.iter().cloned());
+        if let Err(reason) =
+            verify_codex_workspace_roots(&config.codex_runtimes, &settings, &protected)
+        {
+            broker
+                .作業領域設定監査(path, "rejected", reason)
+                .map_err(BrokerServerError::new)?;
+            return Err(BrokerServerError::new(reason));
+        }
+        Some((settings, protected))
+    } else {
+        None
+    };
+
     for (id, address) in &config.minidora_runtimes {
         let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
         broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
@@ -227,23 +268,9 @@ fn run_loopback_server_inner(
             .map_err(BrokerServerError::new)?;
     }
 
-    if let Some(path)=&config.workspace_config {
-        broker.作業領域設定監査(path,"received","owner起動設定の読取を受信").map_err(BrokerServerError::new)?;
-        let parsed=(|| {
-            let owner_file=config.owner_session_file.as_ref().ok_or("作業領域登録にはowner資格設定が必要")?;
-            Ok((super::workspace_root::read_config(path)?,owner_file))
-        })();
-        let (settings,owner_file)=match parsed {
-            Ok(value)=>value,
-            Err(reason)=>{
-                broker.作業領域設定監査(path,"rejected",reason).map_err(BrokerServerError::new)?;
-                return Err(BrokerServerError::new(reason));
-            }
-        };
-        let mut protected=vec![config.store_dir.clone(),config.session_file.clone(),owner_file.clone(),path.clone()];
-        protected.extend(config.protected_store_dir.iter().cloned());
+    if let Some((settings, protected)) = workspace_startup {
         for workspace in &settings.workspaces {
-            broker.作業領域起動登録(workspace,&protected).map_err(BrokerServerError::new)?;
+            broker.作業領域起動登録(workspace, &protected).map_err(BrokerServerError::new)?;
         }
     }
 
@@ -322,6 +349,27 @@ fn run_loopback_server_inner(
             "LIVE_RUNTIME",
             &payload_hash,
         ).map_err(|error| BrokerServerError::new(error.message()))?;
+    }
+    Ok(())
+}
+
+fn verify_codex_workspace_roots(
+    codex_runtimes: &[(String, PathBuf, PathBuf)],
+    settings: &super::workspace_root::StartupConfig,
+    protected: &[PathBuf],
+) -> Result<(), &'static str> {
+    for (runtime_id, _, codex_workspace) in codex_runtimes {
+        for workspace in settings
+            .workspaces
+            .iter()
+            .filter(|workspace| workspace.runtime_id == *runtime_id)
+        {
+            super::workspace_root::verify_same_physical_root(
+                codex_workspace,
+                std::path::Path::new(&workspace.root_path),
+                protected,
+            )?;
+        }
     }
     Ok(())
 }
@@ -583,6 +631,110 @@ mod tests {
         let mut text = String::new();
         file.read_to_string(&mut text).expect("監査記録を読む");
         text
+    }
+
+    fn workspace_settings(
+        runtime_id: &str,
+        roots: &[&std::path::Path],
+    ) -> super::super::workspace_root::StartupConfig {
+        super::super::workspace_root::StartupConfig {
+            version: 1,
+            workspaces: roots
+                .iter()
+                .enumerate()
+                .map(|(index, root)| super::super::workspace_root::WorkspaceStartup {
+                    runtime_id: runtime_id.to_string(),
+                    workspace_id: format!("workspace-{index}"),
+                    root_path: root.to_string_lossy().into_owned(),
+                    secret_paths: Vec::new(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn codex_workspace_config_requires_matching_physical_root_for_same_runtime() {
+        let root = temporary_directory();
+        let codex_root = root.join("codex-workspace");
+        let different_root = root.join("different-workspace");
+        std::fs::create_dir(&codex_root).expect("Codexの作業領域");
+        std::fs::create_dir(&different_root).expect("別Workspace");
+        let runtime = "codex-agent".to_string();
+        let codex_runtimes = vec![(runtime.clone(), root.join("codex.exe"), codex_root.clone())];
+
+        let matching = workspace_settings(&runtime, &[&codex_root]);
+        assert!(verify_codex_workspace_roots(&codex_runtimes, &matching, &[]).is_ok());
+
+        let mismatching = workspace_settings(&runtime, &[&different_root]);
+        assert_eq!(
+            verify_codex_workspace_roots(&codex_runtimes, &mismatching, &[]),
+            Err("Codex実行系の作業pathとWorkspace rootの物理directoryが一致しない"),
+        );
+        let multiple = workspace_settings(&runtime, &[&codex_root, &different_root]);
+        assert_eq!(
+            verify_codex_workspace_roots(&codex_runtimes, &multiple, &[]),
+            Err("Codex実行系の作業pathとWorkspace rootの物理directoryが一致しない"),
+        );
+
+        let mut unbound = workspace_settings("another-runtime", &[&different_root]);
+        assert!(verify_codex_workspace_roots(&codex_runtimes, &unbound, &[]).is_ok());
+        unbound.workspaces.push(super::super::workspace_root::WorkspaceStartup {
+            runtime_id: runtime,
+            workspace_id: "workspace-extra".into(),
+            root_path: codex_root.to_string_lossy().into_owned(),
+            secret_paths: Vec::new(),
+        });
+        assert!(verify_codex_workspace_roots(&codex_runtimes, &unbound, &[]).is_ok());
+
+        std::fs::remove_dir_all(root).expect("試験専用directory");
+    }
+
+    #[test]
+    fn mismatched_codex_workspace_is_audited_before_cli_probe_or_endpoint_creation() {
+        let root = temporary_directory();
+        let codex_root = root.join("codex-workspace");
+        let registered_root = root.join("registered-workspace");
+        std::fs::create_dir(&codex_root).expect("Codexの作業領域");
+        std::fs::create_dir(&registered_root).expect("登録Workspace");
+        let workspace_config = root.join("workspace.json");
+        let config_text = serde_json::json!({
+            "version": 1,
+            "workspaces": [{
+                "runtime_id": "codex-agent",
+                "workspace_id": "codex-workspace",
+                "root_path": registered_root,
+                "secret_paths": []
+            }]
+        })
+        .to_string();
+        std::fs::File::create(&workspace_config)
+            .expect("Workspace起動設定file")
+            .write_all(config_text.as_bytes())
+            .expect("Workspace起動設定を書き込む");
+
+        let store_dir = root.join("store");
+        let session_file = root.join("normal.json");
+        let mut config = BrokerServerConfig::new(store_dir.clone(), session_file.clone());
+        config.owner_session_file = Some(root.join("owner.json"));
+        config.workspace_config = Some(workspace_config);
+        config.codex_runtimes.push((
+            "codex-agent".into(),
+            root.join("not-installed-codex.exe"),
+            codex_root,
+        ));
+
+        let error = run_loopback_server(config).expect_err("root不一致を先に拒否");
+        assert_eq!(
+            error.message,
+            "Codex実行系の作業pathとWorkspace rootの物理directoryが一致しない"
+        );
+        assert!(!session_file.exists(), "拒否時にIPC endpointを作らない");
+        let audit = read_audit(&store_dir.join("audit.jsonl"));
+        assert!(audit.contains("物理directoryが一致しない"), "拒否理由を監査へ記録する");
+        assert!(audit.contains("rejected"), "設定拒否の判定を監査へ記録する");
+        assert!(!audit.contains("not-installed-codex.exe"), "executable pathを監査へ複写しない");
+
+        std::fs::remove_dir_all(root).expect("試験専用directory");
     }
 
     #[test]

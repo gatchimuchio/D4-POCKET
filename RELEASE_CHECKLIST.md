@@ -381,14 +381,14 @@ known limitation を認める条件は、次のとおりである。
 - item: Windows Rust全target試験の実行gate
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
-  status: resolved
-  reason: 2026-09-27のWorkspaceRegistry最終sourceで直列cargo testがexit 0となり、Rust library／CLI／Broker IPC／integrationの全335 testが成功した。直前の試行でWindows Application ControlにOS error 4551が出たが、後続runはfile移動・再配置やpolicy変更なしに完了した。これは現sourceのlocal全target test gate解消であり、installed productやrelease readinessの証拠ではない。
-  required_action: このsourceに追加作業はない。以後Rust source変更時は全target試験を再実行する。Application Control拒否が再発した場合は迂回せず記録し、承認済み条件で再確認する。
+  status: unresolved
+  reason: 直前のclean sourceでは全335件が成功して一度解消したが、2026-09-27の今回実行では<code>cargo test --locked --manifest-path native/rust_helper/Cargo.toml --test workspace_startup -- --test-threads=1</code>の7件すべてがtest assertion前の子process起動時にWindows Application ControlのOS error 4551で拒否された。後続の全target直列実行もtest harness自体が同じOS error 4551で起動できなかった。別の全target runではA2A loopback試験が間欠失敗した一方、Rust library 292件だけの直列runは成功した。policy変更、拒否fileの移動・再配置、test除外は行っていない。
+  required_action: Windows Application Controlを変更・回避せず、承認済み条件で全target試験を再実行する。process起動を含むworkspace／Broker integration suiteの全件成功を確認するまでresolvedへ戻さない。
   blocks_release: yes
 
 - item: Windows loopback HTTP fixture試験のConnectionReset揺らぎ
   classification: known_limitation
-  reason: 2026-09-27、全target標準並列実行でMinidora／A2A loopback試験が間欠失敗し、診断有効時はMinidora `read_headers`のOS error `ConnectionReset`を観測した。A2A単独反復でも失敗が残る。要求headerを完全に読み、応答を一括送信し、送信半閉鎖後に相手のcloseを待つよう3つのtest fixtureを修正した。A2A Broker fixtureの欠陥修正後はBroker projection単独と直列全target 335件が成功した一方、標準並列全targetではA2A module fixture 1件が再度失敗した。失敗の発生源は未確定であり、test fixture結果は実外部Agent接続の証拠ではない。
+  reason: 2026-09-27、全target標準並列実行でMinidora／A2A loopback試験が間欠失敗し、診断有効時はMinidora `read_headers`のOS error `ConnectionReset`を観測した。A2A単独反復でも失敗が残る。要求headerを完全に読み、応答を一括送信し、送信半閉鎖後に相手のcloseを待つよう3つのtest fixtureを修正した。A2A Broker fixtureの欠陥修正後はBroker projection単独と直列全target 335件が成功した一方、今回の直列全target試行ではA2A Broker loopback fixtureが`a2a_connection_failed`となりlibrary 291/292件で失敗した。後続の直列library再実行では292件すべて成功した。発生源は未確定であり、test fixture結果は実外部Agent接続の証拠ではない。
   required_action: Windows loopback TCP resetの発生条件を引き続き調べる。失敗を直列実行への置換、retry、結果抑制で隠さず、未完了の全target runを成功扱いせず、fixture結果を実外部Runtimeの証拠へ昇格しない。
   blocks_release: no
 ~~~
