@@ -1876,3 +1876,21 @@ ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から�
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。10の登録済みPython／Windows開発検査が成功し、Evidence bundleは`release_ready=false`を維持した。`git diff --check`も合格。合成smoke／fixtureは製品実行証拠へ昇格しない。
 
 新たなOS error 4551を受け、`windows_rust_integration_test_execution_policy`を`release_blocker`／unresolvedへ戻し、`RELEASE_CHECKLIST.md`とregistryを同期した。これは開発停止理由ではなく、全target検証の未成立を表す。Windows Application Controlを弱めず全Rust targetを実行できる承認済み環境での再検証が必要であり、他工程は継続する。ほかのrelease blockerも維持し、`release_ready=false`である。
+
+## D4 Pocket Phase 7 Workspace rootのAgent間重複拒否（2026-09-27）
+
+既存Workspace registryは、異なるWorkspace ID／Agent runtime IDへroot handleを登録するとき、各rootのdevice IDとfile IDを保持し、別runtimeですでに登録された同一物理directoryを拒否する。file IDが0で未観測の場合も登録しない。実装はRust Broker WorkspaceRegistryであり、Agent Adapter metadataやFlutter stateをauthorityに使わない。owner起動登録経路は拒否をBroker Auditへ記録し、登録成功しない。
+
+Rust unit testは同一temporary rootを別handleから二つのAgent runtimeへ登録する負例が拒否されること、および別rootなら二つ目の登録が通ることを確認する。これはregistryの`FIXTURE`相当の境界試験であり、親子directory rootの重なり、別名となるmount、実Agentの同時書込み・比較・Handoff隔離を証明しない。Workspace comparisonとHandoffは実Agent経路が成立するまで未接続である。`comprehensive_extension_rev1_completion`は`release_blocker`のまま維持し、`release_ready=false`である。
+
+検証結果:
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：最初と最後の全library実行は289件合格。間の一括実行と単独実行では既存A2A loopback Agent Card fixtureが`a2a_connection_failed`となったが、続く単独実行と全target実行は合格した。失敗時の低層OS通信errorは採取できなかったため、この揺らぎを`RELEASE_CHECKLIST.md`へ`known_limitation`として記録した。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --quiet -- --test-threads=1`：exit 0。ライブラリ／実行ファイル／結合試験の全対象334件が合格し、Windows Application ControlのOSエラー4551は再発しなかった。`windows_rust_integration_test_execution_policy`はローカルRust全対象試験の実行関門を解消状態へ戻した。これは製品runtimeやrelease証拠ではない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138件、valid example 138件、negative fixture 170件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件のcheckが合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債0件／finding 0件で合格。初回はこの進捗記録とregistryの非日本語diagnostic語句を2件検出したため日本語化し、監査例外を追加せず再実行で解消した。
+- `python -X utf8 tooling/manifest.py --write`：tracked source 1045件を更新し、`python -X utf8 tooling/manifest.py --check`が合格。
+- `python -X utf8 tooling/packaging_portability_check.py`：portable source archiveを展開し、内包Manifest／Conformance／release gate検査を含めて合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。10の登録済みPython／Windows開発検査がすべて成功し、Evidence bundleは既存release blocker 5件と`release_ready=false`を維持した。release smoke等のsynthetic結果はWindows installed productや実Agent実行の証拠へ昇格しない。
+- `git diff --check`および`git diff --cached --check`：commit前の最終差分確認で実行し、結果を記録する。

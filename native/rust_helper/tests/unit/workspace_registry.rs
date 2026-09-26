@@ -1,5 +1,44 @@
 use super::*;
 #[test]
+fn 別Agentへ同一物理作業領域を二重登録できない() {
+    let shared=std::env::temp_dir().join(format!("gui-shell-agent-shared-root-{}",識別子生成().unwrap()));
+    let isolated=std::env::temp_dir().join(format!("gui-shell-agent-isolated-root-{}",識別子生成().unwrap()));
+    std::fs::create_dir(&shared).unwrap();
+    std::fs::create_dir(&isolated).unwrap();
+    let mut registry=WorkspaceRegistry::default();
+    let mut audit_calls=0;
+    registry.register(
+        "agent-runtime-a",
+        "workspace-a",
+        Dir::open_ambient_dir(&shared,cap_std::ambient_authority()).unwrap(),
+        &[],
+        &mut |_,_| {audit_calls+=1;Ok(())},
+    ).unwrap();
+    assert_eq!(
+        registry.register(
+            "agent-runtime-b",
+            "workspace-b",
+            Dir::open_ambient_dir(&shared,cap_std::ambient_authority()).unwrap(),
+            &[],
+            &mut |_,_| {audit_calls+=1;Ok(())},
+        ),
+        Err("別Agentとの同一物理作業領域共有を拒否"),
+    );
+    assert_eq!(audit_calls,1,"拒否されたrootの登録監査前処理が走らない");
+    registry.register(
+        "agent-runtime-b",
+        "workspace-b",
+        Dir::open_ambient_dir(&isolated,cap_std::ambient_authority()).unwrap(),
+        &[],
+        &mut |_,_| {audit_calls+=1;Ok(())},
+    ).unwrap();
+    assert_eq!(registry.entries.len(),2);
+    drop(registry);
+    std::fs::remove_dir_all(shared).unwrap();
+    std::fs::remove_dir_all(isolated).unwrap();
+}
+
+#[test]
 fn failed_grant_audit_never_enables_read_and_failed_result_audit_returns_no_body() {
     let path=std::env::temp_dir().join(format!("gui-shell-workspace-audit-{}",識別子生成().unwrap()));
     std::fs::create_dir(&path).unwrap();

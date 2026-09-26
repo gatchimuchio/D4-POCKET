@@ -105,8 +105,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。",
-      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではBroker由来session metadataをDesktopへ投影し、異なる実行系IDによる同一device ID／file IDのWorkspace root再利用は拒否するが、親子directory重複・別名範囲・実Agentの独立実行とcross-agent contamination検証は未成立。",
+      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Phase 7では親子・別名を含むWorkspace範囲分離、実Agentの独立比較、cross-agent contamination負例をBroker統治経路で実証する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
     },
     {
       "name": "rev2_desktop_product_distribution",
@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-27のRust source変更後にcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を再実行した。Rust library 288件、CLI 9件、Broker IPC 10件、canonical hash 1件、checkpoint 8件は成功したが、protected_dataのintegration executableはWindows Application ControlにOS error 4551で起動前に拒否された。protected_startupとworkspace_startupも個別実行で同じOS error 4551となった。拒否されたexecutableを移動・再配置せず、policyも変更していない。したがって全target試験は未完了であり、以前のresolved状態を維持できない。",
-      "required_action": "Windows Application Controlを弱めず、当該Rust test executableを実行可能な承認済みWindows環境でcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target実行し、成功結果を記録する。実行fileの移動・再配置やpolicy回避を行わない。"
+      "reason": "2026-09-27のWorkspaceRegistry変更後、Windows hostでcargo test --locked --manifest-path native/rust_helper/Cargo.toml --quiet -- --test-threads=1がexit 0となり、Rustライブラリ／実行ファイル／結合試験を合わせた334件がすべて成功した。以前のWindows Application ControlのOSエラー4551は、この全対象実行では再発しなかった。途中のライブラリ実行ではA2A loopback fixtureの一時失敗があったが、その後の単独再実行と全対象実行は成功し、既知の実行揺らぎとしてRELEASE_CHECKLIST.mdへ分離記録した。この関門の解消はローカル試験実行だけを示し、installed productやrelease readinessの証拠ではない。",
+      "required_action": "現sourceのRust全target検証gateに追加作業はない。以後Rust source変更時は全targetを再実行する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

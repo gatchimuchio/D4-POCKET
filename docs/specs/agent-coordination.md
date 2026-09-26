@@ -42,6 +42,8 @@ Desktop Agent Centerは、現在のsnapshotから比較可否と公開Handoff概
 
 Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合したAgent Adapterに結び付く現在sessionのID、実行系ID、状態、作成監査IDだけを`INTERNAL_STATE`としてDesktopへ渡す。Agent metadata適合は分類に限り、信頼・権限を与えず、実Agentの稼働証明でもない。Workspace bindingの別証拠がないsessionは比較・Handoff対象にせず、Task、差分、Tool、コマンド内容を表示しない。ローカル／mock snapshotのサンプル情報をBroker観測へ読み替えない。
 
+Workspace registryは、異なる実行系IDに対する同一device ID／file IDの物理root再登録を拒否するRust負例試験を持つ。この試験は別handleから同一rootを登録する試みを扱い、親子directory、bind mount等を含む範囲重複の不在や実Agent間の書込み隔離を証明しない。独立Workspace比較とcross-agent contaminationの実行試験は引き続き未成立である。
+
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
 
 ## 未成立範囲
