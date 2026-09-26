@@ -1660,3 +1660,27 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 同じ実行でWindows window handleと`D4 Pocket` titleは観測したが、UIAutomation treeはroot windowと`FLUTTERVIEW` containerの2 nodeのみで、必須surface `Dashboard`、`NavigationRail`、`Runtime Status`、`Invariant Status`はいずれも取得されず、`visible_surfaces_complete=false`。collectorの終了menu操作は成立せず、強制cleanup=true、cleanup error=true、起動器通常終了falseとなった。cleanup後に当該実行のprocess残存はなかった。実行profileのSIDはstage時と同一（`profile_identity_isolated_from_staging_user=false`）であり、これは`diagnostic_only`に限定される。別profile formal evidenceではない。
 
 この診断によって「初回設定未接続」は現行sourceについて訂正できた一方、Windows Setup Doctor画面の操作者向け可読性／画面要素の意味情報、通常終了・後片付け、別利用者profileによる証拠、Rust全target統合試験は未解決である。`windows_installer_first_run_smoke`と`windows_setup_doctor_smoke`は`release_blocker`のまま維持し、registry／checklistの理由と必須対応をUIA／後片付けの観測に合わせた。`release_ready=false`を維持する。
+
+### 同日Windows Flutter UIAutomation surface露出の修正・診断（2026-09-26）
+
+現行sourceからWindows Flutter Releaseを再構築し、UIAutomation treeが2 nodeに留まった診断を基準に、Windows Embedderの`DartProject`で`AccessibilityMode::IAccessibleEx`を明示選択した。Dart rootで`SemanticsBinding.instance.ensureSemantics()`を常時保持する実験はsurface公開を改善せず、明示modeと併用した試行でもsemantic nodeを観測できなかったため、製品sourceへ残さなかった。今回の成功実行ではIAccessibleEx明示選択とOSのsemantics lifecycleに任せる構成を使い、Flutter 3.44.0 Windows Releaseの実測範囲だけを記録する。これはEmbedder mode選択との観測上の比較であり、他Flutter engine版に一般化する因果保証ではない。
+
+一時検証workspaceは`C:\Users\ohira\AppData\Local\Temp\d4pocket-first-run-source-current-20260926`。Dart `main.dart`と`widget_test.dart`のSHA-256はそれぞれ`7EEB0E1C837655EB96FAB4C122E907AE623703BF6A0D6393FB4FDCC827AE119A`、`FECE3CC984D67FF9BCE41BB2EF64298CDA8F708DAD960C1CD02BA78283F7086B`で、変更前HEADと一致した。runner sourceの一時copyとの差はこの修正で加えた非機能commentだけで、IAccessibleEx選択行は同一。`flutter build windows --release --no-pub`はexit 0（MSBuildは一時pathについてMSB8029 warningを出力）。App SHA-256は`18d6481da5a0ab33273a88c997bf89e6edf059e3b83a9747e4057d36bed2d1dd`。生成物は同一SIDの一時stagingからcollector v14相当を`-DiagnosticOnly -NoPythonRuntime`で実行し、source commit `a0836bbffe3a3db527045e318784939d154b1889`、dirty対象がWindows runner設定のみであることを記録した。staged Rust launcher／Brokerのhashはそれぞれ`d4c57d037aa0e0638ebe59daf4130d6909545adf60034050423187cad47a935d`、`af368cf9bfd5d2ea963eea1300bbca8b3080656d3597874d72b3e762df80edc1`。
+
+診断JSONのSHA-256は`C05464FF4BC4F64D0BD8BCC78C01EF8BE6FB49241ACDA0B7B3C195F1E199CA9A`、可視surface JSONは`3084289F0FCB48E1F49DCF6D11E2477866DC79C4DA648BCE2D85EA0BF94404E6`。UIAutomationは121 nodeを列挙し、`Dashboard`、`NavigationRail`、`Runtime Status`、`Invariant Status`の4 surfaceを個別に認識した。通知領域の通常終了が成立し、強制終了false、cleanup errorなし、起動器終了およびBroker endpoint除去を観測した。Setup Doctor report自体のstatusはpassだったが、画面上のoperator readabilityはfalseのままであり、画面操作・可読性の証拠ではない。stage userと実行profileのSIDは同一で、statusは`diagnostic_only`。正式collectorのstrict validatorにも通していない。
+
+`apps/desktop_flutter/windows/runner/main.cpp`でFlutterView作成前にIAccessibleExを選ぶ回帰検査をConformanceへ追加し、Desktop Dart rootがSemantics treeを強制しないことも固定した。READMEはAPIのexperimental性と実証範囲を記し、Setup Doctor blockerの理由・対応を現在の観測に合わせた。従前の2-node／終了cleanup失敗記録は履歴として保持する。Flutter Windows EmbedderがIAccessibleExをexperimentalと説明しているため、`windows_flutter_iaccessible_experimental_mode`を非release-blockingな`known_limitation`として追加し、engine更新時のUIA・screen reader再検証を要求する。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 135件、正常例135件、negative fixture 167件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：215件成功。Windows runnerのEmbedder mode選択とDart Semantics treeの常時強制禁止を含む。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で成功。
+- `python -X utf8 tooling/manifest.py --write`／`--check`：1,035件を記録し、検査成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、構成済み10検査すべてPASS。Windows formal evidence fileがないrelease gateは失敗／blockerとして正しく残り、集約は`release_ready=false`。
+- `flutter analyze --no-pub`：一時検証workspaceと分離`LOCALAPPDATA`で指摘0件。これは静的Dart解析で、Windows runtime証拠ではない。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter compact`：実リポジトリを一時`R:` drive aliasから実行し、Desktop全108件成功。aliasは終了時に解除。先行する一時copy上の試行は8件失敗し、そのうちRust lifecycle testはcopyに`native/rust_helper/target/debug`がなく明示的に失敗したため、copy実行を製品結果として扱わず、Rust helperを含む実リポジトリから全件を再実行した。
+- `python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`、`git diff --check`：成功。
+- Rust sourceはこの作業blockで変更していないためRust testは再実行していない。全target実行に関する既存blockerは引き続き別途保持する。
+
+この結果は現Flutter 3.44.0 Release上のUIAutomation surface露出と通常tray終了を改善した診断である。別Windows profileのformal evidence、Setup Doctor画面の可読性、strict evidence validator、実screen reader、他Flutter engine版は未確認であり、`windows_setup_doctor_smoke`と`release_ready=false`を維持する。

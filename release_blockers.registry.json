@@ -33,8 +33,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "現行sourceのDiagnosticOnly installed runでSetup Doctor報告・初回設定生成／取得・accepted Audit hash結合は観測したが、Windows UIAutomationは必要な製品surfaceを認識せず、operator readabilityは未成立です。終了時も通常tray終了ではなく強制cleanupとなり、stage時と異なるprofileのformal evidenceもありません。strict validatorはDiagnosticOnlyと未観測surfaceを受理しません。",
-      "required_action": "Flutter/Dart semanticsからDashboard、NavigationRail、Runtime Status、Invariant StatusをWindows UIAutomationで個別に観測できるようにし、起動器の通常終了・cleanup errorなしも再検証する。現行sourceをstage時と異なるWindows user profileからRust Desktop起動器経由で実行し、config／report byte hashとaccepted AuditEventを照合した上でtooling/windows_release_evidence.pyをstrict条件で合格させる。"
+      "reason": "Flutter 3.44.0のRelease診断では明示的IAccessibleEx選択後にWindows UIAutomation tree 121 node、必須4 surface、通常tray終了を観測した。ただしDiagnosticOnlyの同一SID実行であり、Setup Doctor画面そのもののoperator readability、別profileのformal evidence、strict validator合格は未成立です。",
+      "required_action": "IAccessibleExを使うWindows Releaseをstage時と異なるuser profileからformal collectorへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集してtooling/windows_release_evidence.pyへ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。"
     },
     {
       "name": "windows_broker_installed_smoke",

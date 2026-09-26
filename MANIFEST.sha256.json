@@ -145,7 +145,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "8637286236700aa988bbfe10a996e9547979e789548c53c74c2ddd0c4916b913"
+      "sha256": "9277c3a00f68da2f3aed236a580e392f9818566b6f040a8f20d5a931753a079f"
     },
     {
       "path": "ROADMAP.md",
@@ -177,7 +177,7 @@
     },
     {
       "path": "apps/desktop_flutter/README.md",
-      "sha256": "66e59b8e92ce10e79eb2e035a3cb79e8cfe885d5628caffb6d3db21d379fd823"
+      "sha256": "7384b9c604b69bb2dd96a39c1aff70d36b0dfc7d050df60bb4fae2ef37cf5bed"
     },
     {
       "path": "apps/desktop_flutter/analysis_options.yaml",
@@ -673,7 +673,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/main.cpp",
-      "sha256": "0b60b138421c7c62b6ecf43fac4481c15b4999bff745f202d980cc2cf90bdce2"
+      "sha256": "93f650e83e4a5aaaa71686768478e58368ab56e69fb7bd22ea69dba6faff7a46"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/resource.h",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a78939a3fc0eb45401ff1f75600948bcdf82949b47d75f6797606d0c0d87ec4c"
+      "sha256": "418f3eded3c5af4e88f1018f84c58249292736c025fda0404009d271bbd626d8"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3489,7 +3489,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "359bf359790c8223499b223fc114502d2ad683a545308c77094d9e27c431e24e"
+      "sha256": "0e4bcdbc82fa05ed1a588e43cb10fdf02ffa725138620c421e07f77cb6533132"
     },
     {
       "path": "requirements-dev.txt",
@@ -4081,7 +4081,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "4cf0e5683419609afdf19153b42fa2371210fcb55b32ef059e3e0c675af052c0"
+      "sha256": "2799fff2470feb547ab0b58c4e04a5e4e72e30357e57abb8633c0f0aefc08097"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

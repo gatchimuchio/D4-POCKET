@@ -6276,6 +6276,26 @@ def test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injecti
     return errors
 
 
+def test_desktop_flutter_windows_uses_platform_accessibility_lifecycle() -> list[str]:
+    runner_main = DESKTOP_FLUTTER / "windows" / "runner" / "main.cpp"
+    dart_main = DESKTOP_FLUTTER / "lib" / "main.dart"
+    if not runner_main.exists() or not dart_main.exists():
+        return ["Desktop Windows accessibilityの検査対象fileがない"]
+    runner_text = runner_main.read_text(encoding="utf-8")
+    dart_text = dart_main.read_text(encoding="utf-8")
+    project = 'flutter::DartProject project(L"data");'
+    mode = "project.set_accessibility_mode(flutter::AccessibilityMode::IAccessibleEx);"
+    window = "FlutterWindow window(project);"
+    errors = []
+    if project not in runner_text or mode not in runner_text or window not in runner_text:
+        errors.append("Windows runnerがFlutter IAccessibleEx providerを選択しない")
+    elif not runner_text.index(project) < runner_text.index(mode) < runner_text.index(window):
+        errors.append("Windows runnerがFlutterView生成前にIAccessibleEx providerを選択しない")
+    if "SemanticsBinding.instance.ensureSemantics()" in dart_text:
+        errors.append("Desktop Dart rootがWindows OS要求前にSemantics treeを常時強制する")
+    return errors
+
+
 def test_desktop_flutter_exposes_individual_surface_semantics_identifiers() -> list[str]:
     shared = (DESKTOP_FLUTTER / "lib" / "screens" / "shared.dart").read_text(encoding="utf-8")
     main = (DESKTOP_FLUTTER / "lib" / "main.dart").read_text(encoding="utf-8")
@@ -8060,6 +8080,7 @@ def main() -> int:
         test_rust_filesystem_diagnostic_detects_secret_symlink,
         test_desktop_flutter_does_not_spawn_python_or_use_ffi_authority_bridge,
         test_desktop_flutter_windows_runner_rejects_native_surface_aggregate_injection,
+        test_desktop_flutter_windows_uses_platform_accessibility_lifecycle,
         test_desktop_flutter_exposes_individual_surface_semantics_identifiers,
         test_desktop_flutter_product_baseline_chrome_exists,
         test_validate_all_uses_running_python_interpreter_for_python_steps,

@@ -204,9 +204,16 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: DiagnosticOnly installed runでconfig生成／読取とSetup Doctor report／Audit hash結合は実測したが、UIAutomationが必須surfaceを認識せずoperator readability未成立。cleanup errorもあり、別profileのformal evidenceはない。
-  required_action: Flutter/Dart semanticsをWindows UIAutomationからsurface単位で観測可能にし、通常終了・cleanup errorなしを確認する。その後、stage時と異なるuser profileからformal collectorを実行し、config／report hash、accepted AuditEvent、画面を収集して<code>python tooling\windows_release_evidence.py</code>を通過させる。
+  reason: Flutter 3.44.0のRelease診断では明示的IAccessibleEx選択後にUIAutomation tree 121 nodeと必須4 surface、および通常tray終了を観測した。ただしDiagnosticOnlyの同一SID実行であり、Setup Doctor画面そのもののoperator readability、別profileのformal evidence、strict validator合格は未成立。
+  required_action: IAccessibleExを使うWindows Releaseをstage時と異なるuser profileからformal collectorへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集して<code>python tooling\windows_release_evidence.py</code>へ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。
   blocks_release: yes
+
+- item: Flutter Windows UIAのexperimental IAccessibleEx依存
+  classification: known_limitation
+  registry_id: windows_flutter_iaccessible_experimental_mode
+  reason: 必須surfaceのUIA公開にFlutter Windows Embedderのexperimental IAccessibleEx modeを使う。Release treeはFlutter 3.44.0でのみ今回実測し、他engine版および実screen readerは未確認。
+  required_action: 配布対象Flutter engine版を固定・文書化し、engine更新時にWindows UIA surface、tray終了、実screen readerを再検証する。
+  blocks_release: no
 
 - item: macOS planned portability target unverified
   classification: known_limitation
