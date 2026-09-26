@@ -39,7 +39,8 @@
     "artifact_root",
     "artifact_files",
     "artifact_total_bytes",
-    "artifact_tree_sha256"
+    "artifact_tree_sha256",
+    "credential_artifact_scan"
   ],
   "additionalProperties": false,
   "properties": {
@@ -75,7 +76,7 @@
         "owner_authorization_verified": { "const": false },
         "authority_strip": { "const": true },
         "credential_values_explicitly_supplied": { "const": false },
-        "credential_artifact_scan_status": { "const": "not_performed" },
+        "credential_artifact_scan_status": { "const": "passed_known_patterns" },
         "credential_inherited": { "const": false },
         "permission_inherited": { "const": false },
         "approval_inherited": { "const": false },
@@ -184,6 +185,30 @@
       }
     },
     "artifact_total_bytes": { "type": "integer", "minimum": 1 },
-    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "credential_artifact_scan": {
+      "type": "object",
+      "required": [
+        "version",
+        "status",
+        "scope",
+        "coverage",
+        "files_scanned",
+        "bytes_scanned",
+        "findings",
+        "artifact_tree_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": 1 },
+        "status": { "const": "passed_known_patterns" },
+        "scope": { "const": "runtime_artifact_files" },
+        "coverage": { "const": "known_patterns_only" },
+        "files_scanned": { "type": "integer", "minimum": 7 },
+        "bytes_scanned": { "type": "integer", "minimum": 1 },
+        "findings": { "const": 0 },
+        "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
   }
 }

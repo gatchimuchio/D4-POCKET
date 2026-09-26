@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -39,6 +40,56 @@ MAX_INPUT_BYTES = 1_000_000
 MAX_MANIFEST_BYTES = 65_536
 RECEIPT_NAME = "d4_pocket_build_receipt.json"
 MAX_CARGO_LINKER_PATH_CHARS = 240
+CREDENTIAL_SCAN_CHUNK_BYTES = 1024 * 1024
+CREDENTIAL_SCAN_OVERLAP_BYTES = 1024
+CREDENTIAL_SCAN_STATUS = "passed_known_patterns"
+CREDENTIAL_PATTERNS = (
+    ("aws_access_key_id", re.compile(rb"(?:AKIA|ASIA)[A-Z0-9]{16}")),
+    (
+        "github_token",
+        re.compile(
+            rb"(?:gh[pour]_[A-Za-z0-9_]{20,255}|ghs_[A-Za-z0-9_.-]{12,512}|"
+            rb"github_pat_[A-Za-z0-9_]{20,255})"
+        ),
+    ),
+    ("google_api_key", re.compile(rb"AIza[0-9A-Za-z_-]{16,128}")),
+    (
+        "slack_token",
+        re.compile(
+            rb"(?:xox[bacprs]-[0-9A-Za-z-]{10,128}|xapp-[0-9A-Za-z-]{10,128}|"
+            rb"xwfp-[0-9A-Za-z-]{10,128})"
+        ),
+    ),
+    (
+        "private_key_marker",
+        re.compile(
+            rb"-----BEGIN (?:(?:RSA |DSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY|"
+            rb"PGP PRIVATE KEY BLOCK)-----"
+        ),
+    ),
+    (
+        "credential_assignment",
+        re.compile(
+            rb"(?i)\b(?:api[_-]?key|access[_-]?token|aws[_-]?secret[_-]?access[_-]?key|"
+            rb"client[_-]?secret|password|session[_-]?secret)\b"
+            rb"\s*[:=]\s*[\"']?[A-Za-z0-9/+=._-]{12,256}"
+        ),
+    ),
+    (
+        "bearer_authorization",
+        re.compile(rb"(?i)authorization\s*:\s*bearer\s+[A-Za-z0-9._~+/-]{20,512}"),
+    ),
+)
+SENSITIVE_ARTIFACT_NAMES = {
+    ".env",
+    ".env.local",
+    "credentials",
+    "credentials.json",
+    "id_ed25519",
+    "id_rsa",
+    "secrets.json",
+    "token.json",
+}
 BUILD_ENVIRONMENT_ALLOWLIST = {
     "APPDATA",
     "COMSPEC",
@@ -366,6 +417,77 @@ def _artifact_inventory(
     return records, total_bytes, tree_hash.hexdigest()
 
 
+def scan_credential_artifacts(
+    root: Path, *, expected_tree_sha256: str | None = None
+) -> dict[str, Any]:
+    """既知の資格値形式を全bundle fileから探す。資格不存在の一般証明ではない。"""
+    records, total_bytes, tree_hash = _artifact_inventory(
+        root, excluded_paths=frozenset({RECEIPT_NAME})
+    )
+    if expected_tree_sha256 is not None and tree_hash != expected_tree_sha256:
+        raise ValueError("Credential検査対象のartifact hashがinventoryと一致しない")
+    return _scan_credential_inventory(root, records, total_bytes, tree_hash)
+
+
+def _scan_credential_inventory(
+    root: Path,
+    records: list[dict[str, Any]],
+    total_bytes: int,
+    tree_hash: str,
+) -> dict[str, Any]:
+    files_scanned = 0
+    bytes_scanned = 0
+    for record in records:
+        relative = record["path"]
+        path = root / PurePosixPath(relative)
+        artifact_name = PurePosixPath(relative).name.casefold()
+        if artifact_name in SENSITIVE_ARTIFACT_NAMES or Path(artifact_name).suffix in {
+            ".jks",
+            ".key",
+            ".keystore",
+            ".p12",
+            ".pfx",
+            ".pem",
+        }:
+            raise ValueError(f"Credentialらしい固定file名をbundleで検出した: {relative}")
+
+        carry = b""
+        with path.open("rb") as source:
+            while True:
+                chunk = source.read(CREDENTIAL_SCAN_CHUNK_BYTES)
+                if not chunk:
+                    break
+                bytes_scanned += len(chunk)
+                candidate = carry + chunk
+                for pattern_id, pattern in CREDENTIAL_PATTERNS:
+                    if pattern.search(candidate):
+                        raise ValueError(
+                            f"既知Credential patternをbundleで検出した: {pattern_id} ({relative})"
+                        )
+                carry = candidate[-CREDENTIAL_SCAN_OVERLAP_BYTES:]
+        files_scanned += 1
+
+    after_records, after_bytes, after_tree_hash = _artifact_inventory(
+        root, excluded_paths=frozenset({RECEIPT_NAME})
+    )
+    if (
+        after_records != records
+        or after_bytes != total_bytes
+        or after_tree_hash != tree_hash
+    ):
+        raise ValueError("Credential検査中にbundle artifactが変化した")
+    return {
+        "version": 1,
+        "status": CREDENTIAL_SCAN_STATUS,
+        "scope": "runtime_artifact_files",
+        "coverage": "known_patterns_only",
+        "files_scanned": files_scanned,
+        "bytes_scanned": bytes_scanned,
+        "findings": 0,
+        "artifact_tree_sha256": tree_hash,
+    }
+
+
 def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> None:
     errors = validate_instance(evidence, _schema(BUILD_SCHEMA.name))
     if errors:
@@ -385,6 +507,15 @@ def validate_build_evidence(evidence: dict[str, Any], artifact_root: Path) -> No
         or tree_hash != evidence["artifact_tree_sha256"]
     ):
         raise ValueError("Export build evidenceとportable bundle file inventoryが一致しない")
+    credential_scan = _scan_credential_inventory(
+        artifact_root, artifact_files, total_bytes, tree_hash
+    )
+    if (
+        credential_scan != evidence["credential_artifact_scan"]
+        or evidence["authority_boundary"]["credential_artifact_scan_status"]
+        != credential_scan["status"]
+    ):
+        raise ValueError("Credential検査結果がportable bundleに一致しない")
     required_paths = {
         "app/gui_shell_desktop.exe",
         "app/flutter_windows.dll",
@@ -562,7 +693,10 @@ def build_portable_bundle(
             _copy_bundle(
                 flutter_release, helper_exe, launcher_exe, manifest_raw, staging_root
             )
-            artifact_files, total_bytes, tree_hash = _artifact_inventory(staging_root)
+        artifact_files, total_bytes, tree_hash = _artifact_inventory(staging_root)
+        credential_scan = _scan_credential_inventory(
+            staging_root, artifact_files, total_bytes, tree_hash
+        )
 
         elapsed_ms = round((time.perf_counter() - build_started) * 1000)
         catalog = _validate_catalog(
@@ -587,7 +721,7 @@ def build_portable_bundle(
                 "owner_authorization_verified": False,
                 "authority_strip": True,
                 "credential_values_explicitly_supplied": False,
-                "credential_artifact_scan_status": "not_performed",
+                "credential_artifact_scan_status": CREDENTIAL_SCAN_STATUS,
                 "credential_inherited": False,
                 "permission_inherited": False,
                 "approval_inherited": False,
@@ -642,6 +776,7 @@ def build_portable_bundle(
             "artifact_files": artifact_files,
             "artifact_total_bytes": total_bytes,
             "artifact_tree_sha256": tree_hash,
+            "credential_artifact_scan": credential_scan,
         }
         validate_build_evidence(evidence, staging_root)
         (staging_root / RECEIPT_NAME).write_text(

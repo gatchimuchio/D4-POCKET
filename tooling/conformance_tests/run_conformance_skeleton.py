@@ -88,6 +88,7 @@ from tooling.export_windows_product import (
     _resolve_output_directory,
     _safe_extract_source,
     _validate_cargo_target_path,
+    scan_credential_artifacts,
     validate_build_evidence,
     validate_export_inputs,
 )
@@ -7730,8 +7731,16 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     errors: list[str] = []
     if validate_instance(evidence, schema):
         errors.append("Windows Export buildの正常証拠がSchemaに適合しない")
-    if evidence.get("authority_boundary", {}).get("credential_artifact_scan_status") != "not_performed":
-        errors.append("Windows Export build証拠が未実施のcredential scanをPASSへ昇格する")
+    scan_record = evidence.get("credential_artifact_scan", {})
+    if (
+        evidence.get("authority_boundary", {}).get("credential_artifact_scan_status")
+        != "passed_known_patterns"
+        or scan_record.get("scope") != "runtime_artifact_files"
+        or scan_record.get("coverage") != "known_patterns_only"
+        or scan_record.get("findings") != 0
+        or scan_record.get("artifact_tree_sha256") != evidence.get("artifact_tree_sha256")
+    ):
+        errors.append("Windows Export build証拠が限定Credential scanをartifact hashへ結合しない")
 
     original_git_value = windows_export._git_value
     commit = "a" * 40
@@ -7898,11 +7907,77 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
         good = copy.deepcopy(evidence)
         good["source_manifest_sha256"] = hashlib.sha256(manifest_raw).hexdigest()
         good["artifact_files"], good["artifact_total_bytes"], good["artifact_tree_sha256"] = _artifact_inventory(bundle)
+        good["credential_artifact_scan"] = scan_credential_artifacts(
+            bundle, expected_tree_sha256=good["artifact_tree_sha256"]
+        )
+        good["authority_boundary"]["credential_artifact_scan_status"] = (
+            good["credential_artifact_scan"]["status"]
+        )
         good["app_id"] = source_manifest["manifest"]["app_identity"]["app_id"]
         good["audit_store_id"] = source_manifest["manifest"]["audit_store"]["store_id"]
         good["rust_compile_time_identity"]["app_id"] = good["app_id"]
         good["rust_compile_time_identity"]["audit_store_id"] = good["audit_store_id"]
         validate_build_evidence(good, bundle)
+
+        probe = bundle / "app" / "data" / "flutter_assets" / "credential-probe.bin"
+        probe.write_bytes(
+            b"x" * (windows_export.CREDENTIAL_SCAN_CHUNK_BYTES - 6)
+            + b"AKIA1234567890ABCDEF"
+        )
+        try:
+            scan_credential_artifacts(bundle)
+            errors.append("chunk境界をまたぐ既知AWS access-key markerをCredential scanが拒否しない")
+        except ValueError:
+            pass
+        probe.write_bytes(b"AWS_SECRET_ACCESS_KEY=synthetic-not-a-real-secret")
+        try:
+            scan_credential_artifacts(bundle)
+            errors.append("Credential名に結び付いたsynthetic値をscanが拒否しない")
+        except ValueError:
+            pass
+        probe.write_bytes(b"synthetic private-key boundary: -----BEGIN PRIVATE KEY-----")
+        try:
+            scan_credential_artifacts(bundle)
+            errors.append("private-key markerを含むportable bundleをCredential scanが拒否しない")
+        except ValueError:
+            pass
+        for label, marker in (
+            ("GitHub", b"ghp_" + b"a" * 40),
+            ("GitHub stateless", b"ghs_APPID_" + b"a" * 48 + b"." + b"b" * 32),
+            ("Google", b"AIza" + b"A" * 35),
+            ("Slack", b"xoxb-" + b"A" * 16),
+            ("Slack app-level", b"xapp-" + b"A" * 16),
+            ("Slack workflow", b"xwfp-" + b"A" * 16),
+            ("Bearer", b"Authorization: Bearer " + b"A" * 32),
+        ):
+            probe.write_bytes(marker)
+            try:
+                scan_credential_artifacts(bundle)
+                errors.append(f"{label}のsynthetic credential markerをscanが拒否しない")
+            except ValueError:
+                pass
+        probe.unlink()
+        named_secret = bundle / "app" / "data" / "flutter_assets" / "credentials.json"
+        named_secret.write_bytes(b"synthetic")
+        try:
+            scan_credential_artifacts(bundle)
+            errors.append("Credential固定file名を含むportable bundleをscanが拒否しない")
+        except ValueError:
+            pass
+        named_secret.unlink()
+        rescan = scan_credential_artifacts(bundle)
+        if (
+            rescan["findings"] != 0
+            or rescan["artifact_tree_sha256"] != good["artifact_tree_sha256"]
+        ):
+            errors.append("Credential scanのnegative probe後に元のartifact treeへ戻らない")
+        forged_scan = copy.deepcopy(good)
+        forged_scan["credential_artifact_scan"]["files_scanned"] += 1
+        try:
+            validate_build_evidence(forged_scan, bundle)
+            errors.append("portable bundleと一致しないCredential scan件数をbuild evidenceが受け入れる")
+        except ValueError:
+            pass
 
         mismatch = copy.deepcopy(good)
         mismatch["rust_compile_time_identity"]["app_id"] = "d4-pocket-app-" + "9" * 32

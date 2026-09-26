@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 32補足: portable Export Credential scan（2026-09-27）
+
+Windows portable Export buildへ、artifact公開前の既知Credential pattern scanを追加した。署名鍵marker、AWS／GitHub／Google／Slackの既知token形式、Credential名付き設定値、Bearer authorization、Credentialを示す固定file名をbundle内のruntime artifact全fileから検出し、該当時は公開を停止する。AWS markerを1 MiB chunk境界にまたがらせた負例を含め、全対象fileをchunk読取し、scan前後のartifact inventoryとtree hashが一致することを検査する。build evidenceはscanのfile数、byte数、0 finding、対象tree hashを持つ。
+
+scan範囲は有限の既知pattern集合であり、`known_patterns_only`として記録する。未知形式、暗号化、分割、変換された秘密の不存在は証明しない。自己参照のためbuild evidence自身はruntime artifact inventory／scan対象から除く。合成fixture上のConformance成功は実bundleのscan結果ではない。
+
+- Validation: `python -m py_compile tooling/export_windows_product.py tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/schema_check/check_schemas.py`（Schema 137／正常例137／負例169）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（216件）、`python -X utf8 tooling/日本語基底監査.py --strict`（負債0／finding0）はPASS。
+- 最初の集約実行は更新前Manifestのhash不一致で失敗した。Manifest更新後の実行では追加した進捗行が厳格日本語監査に1件検出されたため、その記述を直して再検証した。最終 `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows` はexit 0で設定済み10検査すべて成功し、既存release blocker 5件と`release_ready=false`を維持した。集約に含むsmoke／fixture成功を実bundleやinstalled製品の証拠へ昇格しない。
+- 実物検証: この変更ではExport buildを再実行していない。直近の試行では`Cargo`の`build script`が`Windows Application Control`に`OS error 4551`で拒否され、生成物は作られなかった。このため製品bundleの`Credential scan`、導入後の起動、実行時`Manifest`読込、Module除去は未確認であり、成立を主張しない。`rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`は`release_blocker`のまま、`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 32追補: Export runtime保存領域の分離対応（2026-09-26）
 
 Rust Desktop起動器に、コンパイル時に埋め込まれた生成済みApp IDとAudit store IDから製品別runtime rootを選ぶ経路を追加した。両IDが未設定の既存GUI-Shell起動は従来の`%LOCALAPPDATA%\GUI-Shell\broker\desktop`を維持する。両IDが所定形式なら`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`を使い、片側欠落・不正形式では保存directoryの作成、Broker起動、Flutter起動より前にfail-closedとなる。reparse point拒否とLocal AppData rootへのcontainment検査を各directory componentへ適用し、製品別Owner確認に保存先を表示する。

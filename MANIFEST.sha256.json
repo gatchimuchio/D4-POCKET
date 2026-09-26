@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6b0ca49d6403aa3ea164f120712188846d096989e1caa45a24b258eee82eda22"
+      "sha256": "642534f128adf78ea5e9c76f9bef7d7a9674d53855bac97245d0006224512c47"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1341,7 +1341,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "b8d0ef5eb30b8fd662b953d22150a09c3c7ae0763a3634097e0c43b0b4c5abef"
+      "sha256": "2a3a83f4f89aeff3269db6baa698468ede7f37635f1eba78bd6d24398cc48975"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -1725,7 +1725,7 @@
     },
     {
       "path": "examples/contracts/gui_shell_windows_export_build.valid.json",
-      "sha256": "63a8af068d6a08da1d6983a9accabe2b003cc9627ca3b8d8c6236d01ac23359a"
+      "sha256": "3bc9abe8fde37a4928a0fef66f420e504f572c86444f47677af1246c3e42ce92"
     },
     {
       "path": "examples/contracts/host_capability.valid.json",
@@ -3773,7 +3773,7 @@
     },
     {
       "path": "specs/gui_shell_windows_export_build.schema.json",
-      "sha256": "16ac5d6d4e67b31826ffef61d3e637f30ff0814d72f62f3f7f6ffc197cc04fc4"
+      "sha256": "403e3eaf578f2ba061958979e08954d47f63fb00b2f538cdf217b88355310d3a"
     },
     {
       "path": "specs/host_capability.schema.json",
@@ -4105,7 +4105,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8b2631f16b97132df22fbb8d19ce0fb8446cd6d4f7361effd4aec0965cc01ea8"
+      "sha256": "9c556ae220a17f509e812cd78f142ec34d250f049b33f68c1f6110b2fffece4a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4137,7 +4137,7 @@
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "44ef02c49f044fab9ec7cee8c59309148b6055aa5853dbdf157584395bd4e337"
+      "sha256": "f9299f09ab186d64c806b0a066bc8ac3f77ac2d3b4107bf47ac5937cf71fc78c"
     },
     {
       "path": "tooling/failure_injection_validation.py",

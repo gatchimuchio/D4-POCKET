@@ -17,7 +17,7 @@
     "owner_authorization_verified": false,
     "authority_strip": true,
     "credential_values_explicitly_supplied": false,
-    "credential_artifact_scan_status": "not_performed",
+    "credential_artifact_scan_status": "passed_known_patterns",
     "credential_inherited": false,
     "permission_inherited": false,
     "approval_inherited": false,
@@ -69,5 +69,15 @@
     {"path": "product_manifest.json", "size_bytes": 2048, "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}
   ],
   "artifact_total_bytes": 15360,
-  "artifact_tree_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  "artifact_tree_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "credential_artifact_scan": {
+    "version": 1,
+    "status": "passed_known_patterns",
+    "scope": "runtime_artifact_files",
+    "coverage": "known_patterns_only",
+    "files_scanned": 7,
+    "bytes_scanned": 15360,
+    "findings": 0,
+    "artifact_tree_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  }
 }
