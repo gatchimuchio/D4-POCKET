@@ -1916,3 +1916,23 @@ Workspace起動時に、nofollowで開いたvolume／rootから指定directory�
 - `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。`python -X utf8 tooling/manifest.py --write`はtracked source 1045件を書込み、`--check`も合格。
 - `python -X utf8 tooling/packaging_portability_check.py`：合格。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済み10検査すべて合格。Evidence bundleは他の未解決release blockerにより`release_ready=false`を維持する。このPython-only集約自体はRust試験を含まず、別記した全target 335件の結果を置き換えない。
 - `python -m json.tool release_blockers.registry.json`と`git diff --check`：合格。
+
+## D4 Pocket Phase 7 loopback HTTP fixtureのreset調査（2026-09-27）
+
+Windows上のRust loopback HTTP試験が間欠的に`ConnectionReset`となる現象を調査した。製品transport、read/write timeout、retry、Authority pathは変更していない。
+
+test fixture側で確認した欠陥を修正した。MINIDORA fixtureは要求を1回だけreadして残りを無視していたため、boundedなread timeoutを設定し、HTTP header終端まで要求を読むようにした。A2A moduleとBrokerのfixtureでは、同じbounded request readに加え、header/bodyを一括送信し、応答側write半閉鎖後にclient closeを待つ。A2A module fixtureはclient結果が失敗してもserver workerの結果を先に回収する。
+
+失敗観測では、fixture改善前のA2A body応答でheader 91 byte受信後にreset、header受信前のresetもあった。fixture改善後も単独A2A反復100回中1回が`a2a_connection_failed`となり、全target標準並列実行でA2A module fixture 1件が失敗した。Minidoraの診断有効実行では`read_headers / ConnectionReset`を採取した。A2A Broker fixtureの不足を修正した後は同Broker test単独と直列全targetが通過した。従ってtest fixtureの欠陥は一部解消したが、Windows loopback resetの残存発生源は未確定であり、`RELEASE_CHECKLIST.md`の`known_limitation`を維持する。失敗を直列化、retry、結果抑制で隠さず、fixture成功を実外部Agent接続の証拠へ昇格しない。
+
+検証結果:
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::a2a_center::tests::owner接続をBrokerで受理し通常IPC一覧へbounded射影する' -- --exact`：1件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --quiet -- --test-threads=1`：exit 0。全335件（library 290、CLI 9、Broker IPC 10、他integration 26）が成功。
+- 修正後の標準並列 `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --quiet`：exit 101。library 290件中289件成功、A2A module loopback fixture 1件が`a2a_connection_failed`。並列全target成功とは扱わない。
+- `cargo fmt --manifest-path native/rust_helper/Cargo.toml -- --check`：不合格。変更対象外を含むcrate内の多数の既存fileで整形差分を検出したため、一括整形は行わず、今回のfixture変更file以外へ波及させていない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138件、valid example 138件、negative fixture 170件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：最初はfixture診断の英語2件を検出して不合格。両方を日本語化した後の最終runは負債0／finding0で合格。
+- `python -X utf8 tooling/manifest.py --write`：tracked source 1045件を書込み、`--check`合格。`python -X utf8 tooling/packaging_portability_check.py`も合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済み10検査が成功。Evidence bundleは`release_ready=false`を維持し、合成smokeはinstalled productの証拠ではない。`python -X utf8 tooling/release_gate_check.py`、registry JSON検証、`git diff --check`も合格。
+- この作業単位ではproduction runtimeを変更せず、既存release blockerおよびWindows並列loopback試験の`known_limitation`を維持する。

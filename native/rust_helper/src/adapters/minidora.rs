@@ -343,9 +343,19 @@ mod tests {
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
-            let mut buffer = [0; 8192];
-            let _ = stream.read(&mut buffer);
+            let mut request = Vec::new();
+            let mut buffer = [0; 512];
+            while !request.windows(4).any(|value| value == b"\r\n\r\n") {
+                let size = stream.read(&mut buffer).expect("HTTP要求読取");
+                assert!(size > 0, "header前に要求が終了");
+                request.extend_from_slice(&buffer[..size]);
+                assert!(request.len() < 16 * 1024, "HTTP要求header上限");
+            }
             let _ = stream.write_all(&raw);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            let mut client_close = [0; 1];
+            let _ = stream.read(&mut client_close);
         });
         (adapter, worker)
     }

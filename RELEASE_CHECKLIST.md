@@ -386,9 +386,9 @@ known limitation を認める条件は、次のとおりである。
   required_action: このsourceに追加作業はない。以後Rust source変更時は全target試験を再実行する。Application Control拒否が再発した場合は迂回せず記録し、承認済み条件で再確認する。
   blocks_release: yes
 
-- item: Windows A2A loopback fixture試験の実行揺らぎ
+- item: Windows loopback HTTP fixture試験のConnectionReset揺らぎ
   classification: known_limitation
-  reason: 2026-09-27の全library並列実行でMinidora／A2A loopback fixtureの応答読取が一時失敗し、別の並列実行ではA2A Broker projectionも`a2a_connection_failed`となった。A2A単独再実行と後続の直列library 290件は成功したが、失敗時の低層OS通信errorを採取できておらず原因は未確定。これはfixture実行の揺らぎであり、実外部Agent接続の証拠ではない。
-  required_action: 再発時はfixture接続の低層OS errorと実行環境を採取し、原因を特定してから試験安定性を修正する。未完了の全target runを成功扱いせず、fixture結果を実外部Runtimeの証拠へ昇格しない。
+  reason: 2026-09-27、全target標準並列実行でMinidora／A2A loopback試験が間欠失敗し、診断有効時はMinidora `read_headers`のOS error `ConnectionReset`を観測した。A2A単独反復でも失敗が残る。要求headerを完全に読み、応答を一括送信し、送信半閉鎖後に相手のcloseを待つよう3つのtest fixtureを修正した。A2A Broker fixtureの欠陥修正後はBroker projection単独と直列全target 335件が成功した一方、標準並列全targetではA2A module fixture 1件が再度失敗した。失敗の発生源は未確定であり、test fixture結果は実外部Agent接続の証拠ではない。
+  required_action: Windows loopback TCP resetの発生条件を引き続き調べる。失敗を直列実行への置換、retry、結果抑制で隠さず、未完了の全target runを成功扱いせず、fixture結果を実外部Runtimeの証拠へ昇格しない。
   blocks_release: no
 ~~~

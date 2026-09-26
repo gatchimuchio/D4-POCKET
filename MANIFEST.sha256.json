@@ -145,7 +145,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "614648ef88845ba4e53ec7a9481e5c89d0ddb7c810ffbb01e14dc91160b36834"
+      "sha256": "581e13ae386d873a5720a9182a2ca940f0fcc50cf29134f985776119c7b5f196"
     },
     {
       "path": "ROADMAP.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a0cb995d75fdc3a2e06098ea10ce151e036040ac4bf4c18b27b20469e3bc79d6"
+      "sha256": "6aa601d4b2c575f798a3a06c77a28d1b2006370d8f8421caebcfc7eff91abcab"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2793,7 +2793,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "d8be4fe7c42360c8be35c54ad12a87d7fb9498ce57613c9bb38813445b7a39eb"
+      "sha256": "c1fc8be10424e114739ba2431edd58a1790b667133ca54ff42b24a753a93c6f9"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -2805,7 +2805,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "ee63dc9ab3992ed3251c1506c6fe1607223279c9e3652e884dc701ff9032c57b"
+      "sha256": "074ea8d5540838124a72c5bcdf7eacf4e900563141d22846903e0162ece90e64"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
@@ -2821,7 +2821,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "8c38282d2e6c88919a6c9822992d44d92188794f06f6c9c2769ad83b56dd865b"
+      "sha256": "e4a0a4245a9c671adace6c7564dd5f50270d6d996d7af548aef0717e37d4a600"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",

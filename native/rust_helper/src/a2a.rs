@@ -599,6 +599,9 @@ mod tests {
         let response_length = response_body.len();
         let worker = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("Agent Card要求");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("要求読取期限");
             let mut request = Vec::new();
             let mut chunk = [0u8; 512];
             while !request.windows(4).any(|value| value == b"\r\n\r\n") {
@@ -610,14 +613,21 @@ mod tests {
             let header = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {response_length}\r\nConnection: close\r\n\r\n"
             );
-            stream.write_all(header.as_bytes()).expect("応答header");
-            stream.write_all(&response_body).expect("応答body");
+            let mut response = header.into_bytes();
+            response.extend_from_slice(&response_body);
+            stream.write_all(&response).expect("Agent Card応答");
             stream.flush().expect("応答flush");
+            stream
+                .shutdown(std::net::Shutdown::Write)
+                .expect("応答側shutdown");
+            let mut client_close = [0; 1];
+            assert_eq!(stream.read(&mut client_close).expect("相手側終了"), 0);
         });
         let uri = format!("http://{address}/.well-known/agent-card.json");
-        let projected = fetch_agent_card(&uri, "remote-agent-example", "1.0", &credential())
-            .expect("loopback Agent Card射影");
-        worker.join().expect("Agent Card試験worker");
+        let projected = fetch_agent_card(&uri, "remote-agent-example", "1.0", &credential());
+        let worker_result = worker.join();
+        worker_result.expect("Agent Card試験worker");
+        let projected = projected.expect("loopback Agent Card射影");
         assert_eq!(projected["証拠種別"], "LIVE_RUNTIME");
         assert_eq!(projected["公開範囲"], "metadata_only");
         assert_eq!(projected["Agent Card"]["origin"], "live_runtime");
