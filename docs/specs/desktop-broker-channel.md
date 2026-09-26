@@ -69,7 +69,7 @@ Flutter/DartはSetup Doctorを含め、filesystem、process、networkへ直接�
 
 Windowsのinstalled smoke collectorは、Setup Doctor product exportが実在しない限り、実行file・設定JSON・監査directory・Broker smokeを独立に観測した外部evidenceとして記録する。collectorがcheckを組み立てた結果をproduct-generatedまたはSetup DoctorのLIVE_RUNTIME証拠へ昇格させない。現行strict release validatorが要求するproduct evidenceを満たした扱いにもせず、正式Setup Doctor blockerを維持する。
 
-初回設定の生成とBroker診断の機械可読な取得は別contractとする。report取得・固定store保存・Audit hash結合は8.1の経路で実装し、初回設定生成は未接続のまま独立して管理する。filesystem作用はRust Brokerまたは明示されたinstaller責任へ割り当て、Capability、Permission、Approval、AuditEvent、failure時RecoveryAction、path制約、negative testを定義する。未生成の設定や未観測の製品機能を成功扱いしない。
+初回設定の生成、初回設定の取得、Broker診断の機械可読な取得は別contractとする。report取得・固定store保存・Audit hash結合は8.1、初回設定の生成・取得は8.2で定義する。filesystem作用はRust Brokerへ割り当て、Capability、Permission、Approval状態、AuditEvent、failure時RecoveryAction、固定path、negative testを定義する。未生成の設定や未観測の製品機能を成功扱いしない。
 
 ### 8.1 Broker生成Setup Doctor報告
 
@@ -77,4 +77,16 @@ Windowsのinstalled smoke collectorは、Setup Doctor product exportが実在し
 
 reportは機密・path・資格を含まない最大64 KiBのJSONとし、Broker durable store内の固定`setup_doctor_report.json`一件だけをatomic replaceする。任意path書込みや履歴蓄積はしない。報告生成は`Setup Doctor報告取得`の`received`／`accepted`／`rejected` Auditへ対応づける。`accepted` eventのpayload hashは、保存したreportの正確なUTF-8 byte列のSHA-256と一致しなければならない。保存失敗、監査失敗、永続store不在では成功reportを返さず、固定recovery案内を返す。保存reportはAuthority、Permission、Approvalを生成せず、監査記録そのものの代替にもならない。
 
-各checkは日本語のmessage、recovery instruction、evidence class、`grants_authority=false`を持つ。現行report対象はinstalled path、Broker応答、authority境界、loopback bind、recovery instruction、Audit永続性、および独立contract待ちの初回設定生成である。初回設定生成が`unknown`の間、strict release validatorはSetup Doctorをrelease証拠として受理しない。Flutterは返却reportを表示するだけで、保存、check生成、status昇格をしない。
+各checkは日本語のmessage、recovery instruction、evidence class、`grants_authority=false`を持つ。現行report対象はinstalled path、Broker応答、authority境界、loopback bind、recovery instruction、Audit永続性、および8.2の初回設定状態である。初回設定が`unknown`の間、strict release validatorはSetup Doctorをrelease証拠として受理しない。Flutterは返却reportを表示するだけで、保存、check生成、status昇格をしない。
+
+### 8.2 Broker統治の初回UI設定
+
+Windows Rust Desktop起動器がinstalled package配置を検証した場合に限り、Brokerは固定durable store内のfirst_run_configuration.jsonを初回起動時に生成する。pathは%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\first_run_configuration.jsonであり、要求本文・環境変数・UIがpathを指定できない。開発Broker、installed配置未検証、永続store未接続では生成済みと扱わない。
+
+設定内容はspecs/first_run_configuration.schema.jsonの日本語UI既定値だけとする。追加field、Profile、Permission、Capability、Approval、Authority、Runtime、Agent、Credential、監査内容、filesystem pathを含めない。設定は要求設定であり権限源ではない。現在の初回契約では既定値だけを受理し、利用者設定の更新・migrationは別contractが成立するまで行わない。
+
+生成は既存targetを置換しないatomic create-onlyとする。既存fileは通常file・非reparse point・Schema適合を確認して保持する。不正、改変、symbolic link、reparse point、上限超過、store不在、監査失敗では起動をfail-closedとし、既存byte列を削除・修復・上書きしない。生成byte列のSHA-256をaccepted AuditEventへ結合し、要求受信・拒否も監査する。監査保存が成立しない生成は成功として応答しない。
+
+境界対応はCapability=製品初回設定、Permission=固定store内の初期設定一fileだけをcreate-onlyで作成・読取、Approval=固定かつ非権限の既定値初期化のため不要、AuditEvent=受信・生成または既存検証・拒否。acceptedのpayload hashは設定byte列、RecoveryAction=既存fileを保持し、保存物を保全した上で固定storeの破損原因を確認して再起動、とする。Runtime Capability、要求metadata、ProfileからこのPermissionを得ない。
+
+Flutterは既存の認証済みBroker IPCで初回設定の安全なprojectionを取得し、UI preferenceとしてだけ使用する。接続失敗、拒否、unknown field、非既定値、不一致応答では、設定を推測・合成せず、Broker未利用のlocal fallbackへ切り替えない。Setup Doctorのconfig_createdは、installed pathが検証済みで、Brokerが固定storeの設定をSchema検証し、Auditへhash結合できた同一runtimeだけでpassにできる。別Windows profileからのclean installed実測はこの実装状態だけでは証明されず、release evidenceを別途要する。

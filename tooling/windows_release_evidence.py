@@ -47,6 +47,7 @@ BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS = {
     "setup_doctor",
     "broker_smoke",
     "broker_lifecycle_audit",
+    "first_run_configuration",
     "visible_surfaces",
     "runtime_assertions",
 }
@@ -632,6 +633,48 @@ def validate_installer_first_run(data: dict[str, Any]) -> EvidenceResult:
         errors.append("first-run config JSON の妥当性を確認できなかった")
     if not _get(data, "first_run.config_path"):
         errors.append("first-run config path がない")
+    config_audit = _get(data, "first_run.config_audit")
+    if not isinstance(config_audit, dict):
+        errors.append("first-run configとBroker Auditを結ぶ証拠がない")
+    else:
+        if config_audit.get("evidence_class") != "LIVE_RUNTIME":
+            errors.append("first-run config Audit evidenceはLIVE_RUNTIMEでなければならない")
+        if config_audit.get("accepted_event_count") != 1:
+            errors.append("first-run configのaccepted AuditEventは一件でなければならない")
+        config_hash = config_audit.get("config_sha256")
+        if not _is_sha256_tag(config_hash):
+            errors.append("first-run configのSHA-256がない")
+        event = config_audit.get("accepted_event")
+        if not isinstance(event, dict):
+            errors.append("first-run configのaccepted Broker AuditEventがない")
+        else:
+            if event.get("operation") != "初回設定取得" or event.get("decision") != "accepted":
+                errors.append("first-run config AuditEventが初回設定取得のaccepted eventではない")
+            if event.get("reason") != "初回UI設定を固定Broker storeからprojection。authorityは生成しない":
+                errors.append("first-run config AuditEventのreasonが一致しない")
+            if event.get("evidence_source") != "LIVE_RUNTIME":
+                errors.append("first-run config AuditEventの証拠種別がLIVE_RUNTIMEではない")
+            if not re.fullmatch(r"broker-audit-[1-9][0-9]*", str(event.get("event_id") or "")):
+                errors.append("first-run config AuditEventのevent_idが不正")
+            if not event.get("request_id"):
+                errors.append("first-run config AuditEventのrequest_idがない")
+            if not _is_sha256_tag(event.get("event_hash")):
+                errors.append("first-run config AuditEventのevent_hashがない")
+            if event.get("payload_hash") != config_hash:
+                errors.append("first-run config AuditEvent payload_hashがconfig file hashと一致しない")
+        bundle_files = _get(data, "provenance.evidence_bundle_files")
+        config_files = [
+            item for item in bundle_files or []
+            if isinstance(item, dict) and item.get("kind") == "first_run_configuration"
+        ] if isinstance(bundle_files, list) else []
+        if len(config_files) != 1:
+            errors.append("evidence bundleにfirst-run config fileが一件だけ含まれていない")
+        elif (
+            config_files[0].get("path") != _get(data, "first_run.config_path")
+            or config_files[0].get("sha256") != config_hash
+            or config_files[0].get("exists") is not True
+        ):
+            errors.append("evidence bundleのfirst-run config path/hashがAuditと一致しない")
     if not _is_true(data, "first_run.audit_dir_writable"):
         errors.append("audit directory の書込み可能性を確認できなかった")
     probe = _get(data, "first_run.audit_write_probe")

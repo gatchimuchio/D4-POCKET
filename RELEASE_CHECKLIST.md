@@ -47,10 +47,11 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   blocks_release: yes
 
 - item: cargo test gate for in-scope Rust helper
-  classification: required_for_v1
-  reason: completed desktop-first v1.0 release には Rust helper と Rust Security Broker skeleton の validation が必要である。2026-06-01 の現在の run は、broker JSON envelope test と rejection test を含めて通過した。
-  required_action: release candidate で <code>cd native/rust_helper && cargo test</code> を通過させる。
-  blocks_release: no
+  classification: release_blocker
+  registry_id: windows_rust_integration_test_execution_policy
+  reason: 2026-09-26の変更後sourceではlibrary 273件と全target cargo checkが成功したが、全target cargo testはWindows Application Controlが生成integration executableをOS error 4551で起動拒否して完遂していない。2026-09-25の別sourceに対する成功記録は履歴であり、現行sourceのtest evidenceを代替しない。
+  required_action: OS policyを無効化せず、許可済みWindows hostで現行sourceの <code>cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1</code> を全target成功させ、正確なcommitと結果を記録する。
+  blocks_release: yes
 
 - item: desktop flutter analyze gate
   classification: required_for_v1
@@ -182,7 +183,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: Windows installer first-run smoke not passed
   classification: release_blocker
   registry_id: windows_installer_first_run_smoke
-  reason: strict R2 provenance／isolation contract を伴う Windows installed-path first-run evidence は、<code>release_evidence/windows_installed_smoke.json</code> に記録されていない。
+  reason: DiagnosticOnly installed runでは初回設定の未作成→生成、read-only取得accepted Audit、設定hash一致を観測したが、stage時と異なるWindows user profileによるformal evidenceはなく、strict R2 evidenceにも記録されていない。
   required_action: stage時と異なるWindows user profile（SID）から <code>collect_installed_smoke.ps1 -DesktopLauncherExe -UseCurrentWindowsProfile -NoPythonRuntime</code> を実行し、起動器の実runtime、lifecycle Audit、通常資格で受理されたhealth要求Audit、endpoint cleanup、UIAutomationを収集する。health Auditはclient応答受信やPID帰属を証明しない。clean-source実測と初回config生成が成立するまではrelease blockerを維持し、<code>python tooling\windows_release_evidence.py</code>を通過させる。
   blocks_release: yes
 
@@ -203,8 +204,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: Windows Setup Doctor smoke not passed
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: 現行Rust Desktop起動器はcollector注入のSetup Doctor export環境変数をFlutter childから除去し、正式なBroker統治product export経路は未接続である。PowerShell Setup Doctor collectorはexternal probe evidenceのみである。
-  required_action: Broker統治されたSetup Doctor product export contractと通常起動経路を接続し、分離Windows profileからproduct evidenceを収集した後、<code>python tooling\windows_release_evidence.py</code> を通過させる。
+  reason: DiagnosticOnly installed runでconfig生成／読取とSetup Doctor report／Audit hash結合は実測したが、UIAutomationが必須surfaceを認識せずoperator readability未成立。cleanup errorもあり、別profileのformal evidenceはない。
+  required_action: Flutter/Dart semanticsをWindows UIAutomationからsurface単位で観測可能にし、通常終了・cleanup errorなしを確認する。その後、stage時と異なるuser profileからformal collectorを実行し、config／report hash、accepted AuditEvent、画面を収集して<code>python tooling\windows_release_evidence.py</code>を通過させる。
   blocks_release: yes
 
 - item: macOS planned portability target unverified

@@ -11,6 +11,8 @@ dependencies:
     path: ../../packages/gui_shell_ui
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

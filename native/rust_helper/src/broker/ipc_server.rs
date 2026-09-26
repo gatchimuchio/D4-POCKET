@@ -146,6 +146,12 @@ fn run_loopback_server_inner(
             &payload_hash,
         ).map_err(|error| BrokerServerError::new(error.message()))?;
     }
+    if shutdown.is_some() && config.desktop_install_path_verified {
+        broker.set_desktop_setup_doctor_runtime_evidence(true, false);
+        broker
+            .initialize_desktop_first_run_configuration()
+            .map_err(|_| BrokerServerError::new("初回UI設定を安全に生成・検証できないため起動を停止しました"))?;
+    }
 
     for (id, address) in &config.minidora_runtimes {
         let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;

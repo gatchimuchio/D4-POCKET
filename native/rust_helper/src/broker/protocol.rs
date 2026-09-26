@@ -54,6 +54,12 @@ struct SetupDoctorReportRequest {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct FirstRunConfigurationRequest {
+    version: u8,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct 実行系資源観測指定 {
     #[serde(rename = "版")]
     version: u8,
@@ -311,6 +317,17 @@ impl BrokerStateStore {
         store.write_setup_doctor_report(bytes)
     }
 
+    fn initialize_first_run_configuration(
+        &self,
+    ) -> Result<(Vec<u8>, bool), BrokerStoreError> {
+        let Some(store) = &self.persistent_store else {
+            return Err(BrokerStoreError::Io(
+                "初回設定の生成には永続Broker storeが必要".to_string(),
+            ));
+        };
+        store.initialize_first_run_configuration()
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_update_trust();
@@ -324,6 +341,8 @@ impl BrokerStateStore {
 pub enum BrokerOperation {
     #[serde(rename = "Setup Doctor報告取得")]
     SetupDoctor報告取得,
+    #[serde(rename = "初回設定取得")]
+    初回設定取得,
     #[serde(rename = "対話履歴承認")]
     対話履歴承認,
     #[serde(rename = "対話履歴失効")]
@@ -536,6 +555,7 @@ impl BrokerOperation {
     pub fn as_str(&self) -> &'static str {
         match self {
             BrokerOperation::SetupDoctor報告取得 => "Setup Doctor報告取得",
+            BrokerOperation::初回設定取得 => "初回設定取得",
             BrokerOperation::作業領域一覧 => "作業領域一覧",
             BrokerOperation::作業領域承認 => "作業領域承認",
             BrokerOperation::作業領域失効 => "作業領域失効",
@@ -875,6 +895,7 @@ pub struct Broker {
     pub(super) state_store: BrokerStateStore,
     desktop_install_path_verified: bool,
     desktop_loopback_bind_verified: bool,
+    desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
 }
 
 impl Broker {
@@ -909,6 +930,7 @@ impl Broker {
             state_store: BrokerStateStore::in_memory_skeleton(),
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
+            desktop_first_run_configuration: None,
         }
     }
 
@@ -975,6 +997,7 @@ impl Broker {
             state_store: BrokerStateStore::durable_file_store(persistent_store),
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
+            desktop_first_run_configuration: None,
         })
     }
 
@@ -985,6 +1008,63 @@ impl Broker {
     ) {
         self.desktop_install_path_verified = installed_path_verified;
         self.desktop_loopback_bind_verified = loopback_bind_verified;
+    }
+
+    pub(crate) fn initialize_desktop_first_run_configuration(
+        &mut self,
+    ) -> Result<(), BrokerStoreError> {
+        if !self.desktop_install_path_verified {
+            return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+                "installed package配置の検証がない".to_string(),
+            ));
+        }
+        let operation = "D4 Pocket初回設定生成";
+        let request_hash = sha256_tagged(b"d4-pocket-first-run-configuration:v1");
+        let receipt_reason = "Capability=製品初回設定 Permission=固定store内の初期設定一fileをcreate-onlyで生成・読取 Approval=非権限の固定既定値初期化のため不要 RecoveryAction=既存fileを保持し固定storeの破損原因を確認";
+        self.append_audit(
+            &format!("desktop-first-run:{}:received", self.session_id),
+            operation,
+            "received",
+            receipt_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &request_hash,
+        )?;
+
+        let (bytes, created) = match self.state_store.initialize_first_run_configuration() {
+            Ok(result) => result,
+            Err(error) => {
+                self.append_audit(
+                    &format!("desktop-first-run:{}:rejected", self.session_id),
+                    operation,
+                    "rejected",
+                    "first_run_configuration_unavailable RecoveryAction=既存fileを保全して固定storeを確認",
+                    EVIDENCE_SOURCE_LIVE_RUNTIME,
+                    &request_hash,
+                )?;
+                return Err(error);
+            }
+        };
+        let configuration: Value = serde_json::from_slice(&bytes).map_err(|_| {
+            BrokerStoreError::MalformedFirstRunConfiguration(
+                "初回設定のJSON検証に失敗".to_string(),
+            )
+        })?;
+        let content_hash = sha256_tagged(&bytes);
+        let accepted_reason = if created {
+            "first_run_configuration_created Capability=製品初回設定 Permission=固定store内の初期設定一fileをcreate-onlyで作成 Approval=不要 RecoveryAction=固定storeを確認"
+        } else {
+            "first_run_configuration_existing_validated Capability=製品初回設定 Permission=固定store内の初期設定一fileを読取 Approval=不要 RecoveryAction=固定storeを確認"
+        };
+        self.append_audit(
+            &format!("desktop-first-run:{}:accepted", self.session_id),
+            operation,
+            "accepted",
+            accepted_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &content_hash,
+        )?;
+        self.desktop_first_run_configuration = Some((configuration, bytes));
+        Ok(())
     }
 
     pub fn handle(&mut self, envelope: BrokerRequestEnvelope) -> BrokerResponse {
@@ -1344,6 +1424,11 @@ impl Broker {
             BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::SetupDoctor報告取得 => self.setup_doctor_report(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::初回設定取得 => self.first_run_configuration(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 &payload_hash,
@@ -2387,6 +2472,84 @@ impl Broker {
         }
     }
 
+    fn first_run_configuration(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        match serde_json::from_value::<FirstRunConfigurationRequest>(payload.clone()) {
+            Ok(request) if request.version == 1 => {}
+            _ => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    BrokerOperation::初回設定取得.as_str(),
+                    "first_run_configuration_request_invalid",
+                    "初回設定取得要求はversion 1だけを受け付けます",
+                    true,
+                    payload_hash,
+                );
+            }
+        }
+        let Some((configuration, bytes)) = self.desktop_first_run_configuration.clone() else {
+            return self.reject_with_payload_hash(
+                request_id,
+                BrokerOperation::初回設定取得.as_str(),
+                "first_run_configuration_unavailable",
+                "Brokerが検証済み初回設定を保持していません。Desktop起動器から再起動してください。",
+                true,
+                payload_hash,
+            );
+        };
+        let operation = BrokerOperation::初回設定取得.as_str();
+        let receipt_reason = "Capability=製品初回設定 Permission=固定store内の初期設定一fileをread-only取得 Approval=不要。権限を生成しない RecoveryAction=取得失敗時はBroker固定storeを確認";
+        if let Err(error) = self.append_audit(
+            request_id,
+            operation,
+            "received",
+            receipt_reason,
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            payload_hash,
+        ) {
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_audit_append_failed",
+                &error.message(),
+            );
+        }
+        let content_hash = sha256_tagged(&bytes);
+        let audit_event = match self.append_audit(
+            request_id,
+            operation,
+            "accepted",
+            "初回UI設定を固定Broker storeからprojection。authorityは生成しない",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &content_hash,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "broker_audit_append_failed",
+                    &error.message(),
+                );
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            audit_event_id: audit_event.event_id,
+            error: None,
+            health: None,
+            body: Some(configuration),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
     fn setup_doctor_report(
         &mut self,
         request_id: &str,
@@ -2465,10 +2628,14 @@ impl Broker {
             ),
             setup_doctor_check(
                 "setup_doctor.config_created",
-                "unknown",
-                "Rust Broker統治下の初回製品config生成は未接続です。",
-                "初回config生成contractとBroker経路が成立するまでは初回設定完了として扱わないでください。",
-                "CONFIG",
+                if self.desktop_first_run_configuration.is_some() { "pass" } else { "unknown" },
+                if self.desktop_first_run_configuration.is_some() {
+                    "Rust Brokerが固定storeの初回UI設定をSchema検証し、Audit hashへ結合しました。"
+                } else {
+                    "installed Desktop起動器が検証した初回UI設定を確認できません。"
+                },
+                "設定状態を確認できない場合はRust Desktop起動器から再起動し、固定Broker storeとAuditを確認してください。",
+                if self.desktop_first_run_configuration.is_some() { EVIDENCE_SOURCE_LIVE_RUNTIME } else { "CONFIG" },
             ),
         ];
         let status = if checks.iter().any(|check| check["status"] == "fail") {
@@ -3436,6 +3603,101 @@ mod tests {
         request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
         request.refresh_payload_hash();
         request
+    }
+
+    fn first_run_configuration_request(
+        request_id: &str,
+        payload: Value,
+    ) -> BrokerRequestEnvelope {
+        let mut request = BrokerRequestEnvelope::health(request_id, &format!("nonce-{request_id}"));
+        request.session_id = Some("first-run-session".to_string());
+        request.operation = Some(BrokerOperation::初回設定取得);
+        request.payload = Some(payload);
+        request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        request.refresh_payload_hash();
+        request
+    }
+
+    #[test]
+    fn first_run_configuration_is_create_only_broker_audited_and_used_by_setup_doctor() {
+        let root = temp_store_dir("first-run-config");
+        let mut broker = Broker::new_persistent("first-run-session", &root).unwrap();
+        assert!(broker.initialize_desktop_first_run_configuration().is_err());
+        assert!(!root.join("first_run_configuration.json").exists());
+
+        broker.set_desktop_setup_doctor_runtime_evidence(true, true);
+        broker.initialize_desktop_first_run_configuration().unwrap();
+        let bytes = fs::read(root.join("first_run_configuration.json")).unwrap();
+        let created_hash = crate::audit_hash::sha256_tagged(&bytes);
+        let created_event = broker
+            .audit_events()
+            .iter()
+            .find(|event| {
+                event.operation == "D4 Pocket初回設定生成"
+                    && event.decision == "accepted"
+                    && event.reason.starts_with("first_run_configuration_created")
+            })
+            .expect("初回設定生成をhash結合したAuditEvent");
+        assert_eq!(created_event.payload_hash, created_hash);
+
+        let response = broker.handle(first_run_configuration_request(
+            "first-config-1",
+            json!({"version": 1}),
+        ));
+        assert_eq!(response.status, BrokerStatus::Accepted);
+        let configuration = response.body.expect("UI設定projection");
+        assert_eq!(configuration["ui_preferences"]["theme"], "system");
+        let read_hash = crate::audit_hash::sha256_tagged(&bytes);
+        let read_event = broker
+            .audit_events()
+            .iter()
+            .find(|event| event.event_id == response.audit_event_id)
+            .expect("UI設定取得のaccepted AuditEvent");
+        assert_eq!(read_event.operation, "初回設定取得");
+        assert_eq!(read_event.payload_hash, read_hash);
+
+        let mut report_request = setup_doctor_request(
+            "setup-report-config",
+            json!({"version": 1}),
+        );
+        report_request.session_id = Some("first-run-session".to_string());
+        let report = broker.handle(report_request);
+        assert_eq!(report.status, BrokerStatus::Accepted, "{:?}", report.error);
+        let report = report.body.expect("Setup Doctor報告");
+        assert_eq!(report["checks"][6]["status"], "pass");
+        assert_eq!(report["checks"][6]["evidence_class"], "LIVE_RUNTIME");
+        assert_eq!(report["status"], "pass");
+
+        let invalid = broker.handle(first_run_configuration_request(
+            "first-config-2",
+            json!({"version": 1, "output_path": "C:/outside.json"}),
+        ));
+        assert_eq!(invalid.status, BrokerStatus::Rejected);
+        assert_eq!(
+            invalid.error.unwrap().code,
+            "first_run_configuration_request_invalid"
+        );
+        assert_eq!(
+            fs::read(root.join("first_run_configuration.json")).unwrap(),
+            bytes
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn malformed_existing_first_run_configuration_is_not_replaced() {
+        let root = temp_store_dir("first-run-config-preserve");
+        let target = root.join("first_run_configuration.json");
+        let original = br#"{"version":1,"product":"D4 Pocket","ui_preferences":{"theme":"dark","density":"compact","locale":"ja-JP"}}"#;
+        fs::write(&target, original).unwrap();
+        let mut broker = Broker::new_persistent("first-run-session", &root).unwrap();
+        broker.set_desktop_setup_doctor_runtime_evidence(true, false);
+        assert!(broker.initialize_desktop_first_run_configuration().is_err());
+        assert_eq!(fs::read(&target).unwrap(), original);
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == "D4 Pocket初回設定生成" && event.decision == "rejected"
+        }));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

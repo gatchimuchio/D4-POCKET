@@ -1005,6 +1005,11 @@ if ($UseCurrentWindowsProfile.IsPresent) {
 $brokerRuntimeRoot = Join-Path $localAppDataRoot "GUI-Shell\broker\desktop"
 $brokerStoreDir = Join-Path $brokerRuntimeRoot "store"
 $brokerEndpointFile = Join-Path $brokerRuntimeRoot "broker_session.json"
+$firstRunConfigurationPath = Join-Path $brokerStoreDir "first_run_configuration.json"
+$configExistedBeforeLaunch = Test-Path -LiteralPath $firstRunConfigurationPath
+if ($configExistedBeforeLaunch) {
+  throw "初回設定fileが起動前から存在します。clean installed first-run用の隔離LOCALAPPDATAを確認してください。"
+}
 
 try {
   if ($NoPythonRuntime.IsPresent) {
@@ -1088,6 +1093,12 @@ $setupDoctorReportSha256 = $null
 $setupDoctorFileObserved = $false
 $setupDoctorAuditEvent = $null
 $setupDoctorAcceptedAuditMatchCount = 0
+$configCreated = $false
+$configFileObserved = $false
+$configJsonValid = $false
+$configSha256 = $null
+$configAuditEvent = $null
+$configAuditAcceptedMatchCount = 0
 if (Test-Path -LiteralPath $setupDoctorPath -PathType Leaf) {
   $setupDoctorItem = Get-Item -LiteralPath $setupDoctorPath -ErrorAction Stop
   if (($setupDoctorItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0 -and
@@ -1106,6 +1117,69 @@ if (Test-Path -LiteralPath $setupDoctorPath -PathType Leaf) {
     }
   }
 }
+$configurationItem = Get-Item -LiteralPath $firstRunConfigurationPath -ErrorAction SilentlyContinue
+if ($null -ne $configurationItem -and $configurationItem -is [System.IO.FileInfo] -and
+    ($configurationItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0 -and
+    $configurationItem.Length -gt 0 -and $configurationItem.Length -le 16384) {
+  $configurationStream = $null
+  try {
+    $configurationStream = [System.IO.File]::Open(
+      $firstRunConfigurationPath,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::Read
+    )
+    if ($configurationStream.Length -gt 0 -and $configurationStream.Length -le 16384) {
+      $configurationBytes = New-Object byte[] ([int]$configurationStream.Length)
+      $configurationOffset = 0
+      while ($configurationOffset -lt $configurationBytes.Length) {
+        $configurationRead = $configurationStream.Read(
+          $configurationBytes,
+          $configurationOffset,
+          $configurationBytes.Length - $configurationOffset
+        )
+        if ($configurationRead -le 0) { break }
+        $configurationOffset += $configurationRead
+      }
+      $configurationHasTrailingBytes = $configurationStream.ReadByte() -ne -1
+      if ($configurationOffset -eq $configurationBytes.Length -and !$configurationHasTrailingBytes) {
+        $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+        $configurationText = $strictUtf8.GetString($configurationBytes)
+        $configurationDocument = $configurationText | ConvertFrom-Json
+        $rootProperties = @($configurationDocument.PSObject.Properties.Name | Sort-Object)
+        $preferenceProperties = @($configurationDocument.ui_preferences.PSObject.Properties.Name | Sort-Object)
+        $configJsonValid = (
+          $configurationDocument -is [System.Management.Automation.PSCustomObject] -and
+          ($rootProperties -join ",") -ceq "product,ui_preferences,version" -and
+          (($preferenceProperties -join ",") -ceq "density,locale,theme") -and
+          $configurationDocument.version -eq 1 -and
+          $configurationDocument.product -ceq "D4 Pocket" -and
+          $configurationDocument.ui_preferences.theme -ceq "system" -and
+          $configurationDocument.ui_preferences.density -ceq "compact" -and
+          $configurationDocument.ui_preferences.locale -ceq "ja-JP"
+        )
+        if ($configJsonValid) {
+          $configHashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
+          try {
+            $configSha256 = "sha256:$(([System.BitConverter]::ToString($configHashAlgorithm.ComputeHash($configurationBytes))).Replace('-', '').ToLowerInvariant())"
+          } finally {
+            $configHashAlgorithm.Dispose()
+          }
+          $configFileObserved = $true
+        }
+      }
+    }
+  } catch {
+    $configJsonValid = $false
+    $configSha256 = $null
+    $configFileObserved = $false
+  } finally {
+    if ($null -ne $configurationStream) {
+      $configurationStream.Dispose()
+    }
+  }
+}
+$configCreated = (!$configExistedBeforeLaunch -and $configFileObserved)
 if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
   if ((Get-Item -LiteralPath $brokerAuditPath).Length -gt $MaximumBrokerAuditBytes) {
     throw "Broker lifecycle Audit fileが読み込み上限を超えています。"
@@ -1141,6 +1215,18 @@ if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
       $setupDoctorAcceptedAuditMatchCount += 1
       $setupDoctorAuditEvent = $auditEvent
     }
+    if ($configJsonValid -and $null -ne $configSha256 -and
+        [string]$auditEvent.operation -eq "初回設定取得" -and
+        [string]$auditEvent.decision -eq "accepted" -and
+        [string]$auditEvent.reason -eq "初回UI設定を固定Broker storeからprojection。authorityは生成しない" -and
+        [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME" -and
+        [string]$auditEvent.payload_hash -eq $configSha256 -and
+        [string]$auditEvent.request_id -ne "" -and
+        [string]$auditEvent.event_id -match '^broker-audit-[1-9][0-9]*$' -and
+        [string]$auditEvent.event_hash -match '^sha256:[a-f0-9]{64}$') {
+      $configAuditAcceptedMatchCount += 1
+      $configAuditEvent = $auditEvent
+    }
     if ([string]$auditEvent.operation -eq "D4 Pocket Desktop起動") {
       $startupAuditEventCount += 1
       if ([string]$auditEvent.decision -eq "recorded" -and [string]$auditEvent.evidence_source -eq "LIVE_RUNTIME") {
@@ -1157,6 +1243,7 @@ if (Test-Path -LiteralPath $brokerAuditPath -PathType Leaf) {
 }
 $normalBrokerHealthRequestAccepted = $normalBrokerHealthEventCount -gt 0
 $setupDoctorAuditMatched = ($setupDoctorFileObserved -and $setupDoctorAcceptedAuditMatchCount -eq 1)
+$configAuditMatched = ($configFileObserved -and $configJsonValid -and $configAuditAcceptedMatchCount -eq 1)
 $setupDoctorStatus = "unknown"
 $setupDoctorChecks = @()
 if ($setupDoctorAuditMatched) {
@@ -1206,6 +1293,7 @@ if ($AuditAnchorEvidenceJson -ne "") {
 $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
     (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath),
+    (New-EvidenceFileRecord -Kind "first_run_configuration" -Path $firstRunConfigurationPath),
     (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
     (New-EvidenceFileRecord -Kind "broker_lifecycle_audit" -Path $brokerAuditPath),
     (New-EvidenceFileRecord -Kind "visible_surfaces" -Path (Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "path")),
@@ -1221,8 +1309,6 @@ foreach ($record in @(
 $evidenceBundleFileValues = @($evidenceBundleFiles.ToArray())
 $bundleText = (@{ files = @($evidenceBundleFileValues) } | ConvertTo-Json -Compress -Depth 10)
 $evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
-
-$configJsonValid = $false
 
 $resolvedAuditDir = Resolve-Path $brokerStoreDir -ErrorAction SilentlyContinue
 $auditWriteProbe = [ordered]@{
@@ -1276,8 +1362,6 @@ if ($null -ne $resolvedAuditDir) {
   }
 }
 
-$configCreated = $false
-$configExistedBeforeLaunch = $null
 $auditDirWritable = (
   $auditWriteProbe.attempted -and
   $auditWriteProbe.write -and
@@ -1319,9 +1403,10 @@ foreach ($surface in $requiredVisibleSurfaces) {
 if ($aggregateSurfaceShortcutDetected -or !$surfaceMatchRequirementsMet) {
   $visibleSurfacesComplete = $false
 }
-$unsupportedClaims = @(
-  "first_run_configuration_product_export"
-)
+$unsupportedClaims = @()
+if (!$configAuditMatched) {
+  $unsupportedClaims += "first_run_configuration_product_export"
+}
 if (!$setupDoctorAuditMatched) {
   $unsupportedClaims += "formal_setup_doctor_product_export"
 }
@@ -1369,7 +1454,11 @@ $evidence = [ordered]@{
     }
     "first_run.broker_lifecycle_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     "first_run.broker_health_request" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
-    "first_run.config_audit" = [ordered]@{ source_type = "unsupported_claim"; evidence_class = "CONFIG"; formal_release_input = $false }
+    "first_run.config_audit" = [ordered]@{
+      source_type = $(if ($configAuditMatched) { "directly_measured" } else { "unsupported_claim" })
+      evidence_class = $(if ($configAuditMatched) { "LIVE_RUNTIME" } else { "INTERNAL_STATE" })
+      formal_release_input = [bool]$configAuditMatched
+    }
     "first_run.installer_authority_boundary" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
     setup_doctor = [ordered]@{
       source_type = $(if ($setupDoctorAuditMatched) { "product_export" } else { "unsupported_claim" })
@@ -1382,7 +1471,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "13"
+    collector_version = "14"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -1396,7 +1485,7 @@ $evidence = [ordered]@{
     broker_helper_sha256 = $brokerHash
   }
   first_run = [ordered]@{
-    status = $(if ($DiagnosticOnly.IsPresent) { "diagnostic_only" } elseif ($firstWindowVisible -and $frontendExitMenuInvoked -and !$frontendForcedToExit -and !$frontendCleanupError -and $configCreated -and $auditDirWritable -and $visibleSurfacesComplete -and $startupAuditRecorded -and $shutdownAuditRecorded -and $sessionFileRemovedAfterShutdown -and $separateWindowsProfileVerified -and $normalBrokerHealthRequestAccepted -and $launcherExitedAfterFrontend -and $launcherExitCode -eq 0) { "passed" } else { "failed" })
+    status = $(if ($DiagnosticOnly.IsPresent) { "diagnostic_only" } elseif ($firstWindowVisible -and $frontendExitMenuInvoked -and !$frontendForcedToExit -and !$frontendCleanupError -and $configCreated -and $configAuditMatched -and $auditDirWritable -and $visibleSurfacesComplete -and $startupAuditRecorded -and $shutdownAuditRecorded -and $sessionFileRemovedAfterShutdown -and $separateWindowsProfileVerified -and $normalBrokerHealthRequestAccepted -and $launcherExitedAfterFrontend -and $launcherExitCode -eq 0) { "passed" } else { "failed" })
     command = "& `"$($launcher.Path)`""
     launched_from_installed_path = $true
     launched_via_rust_desktop_launcher = $true
@@ -1466,10 +1555,16 @@ $evidence = [ordered]@{
       surface_match_requirements_met = [bool]$surfaceMatchRequirementsMet
       diagnostic_tree = Get-EvidenceValue -Object $visibleSurfaceEvidence -Name "diagnostic_tree"
     }
-    config_path = $null
+    config_path = $firstRunConfigurationPath
     config_existed_before_launch = $configExistedBeforeLaunch
     config_created = $configCreated
     config_json_valid = $configJsonValid
+    config_audit = [ordered]@{
+      evidence_class = $(if ($configAuditMatched) { "LIVE_RUNTIME" } else { "INTERNAL_STATE" })
+      accepted_event_count = $configAuditAcceptedMatchCount
+      config_sha256 = $configSha256
+      accepted_event = $configAuditEvent
+    }
     audit_dir = $(if ($null -ne $resolvedAuditDir) { $resolvedAuditDir.Path } else { $brokerStoreDir })
     audit_dir_writable = $auditDirWritable
     audit_write_probe = $auditWriteProbe

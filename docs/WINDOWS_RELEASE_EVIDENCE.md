@@ -16,8 +16,8 @@ Windows優先のリリース検証では、分離され、機械可読なイン�
 - item: native Windows Setup Doctor product evidence unresolved
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: Rust Broker生成reportとaccepted Auditのhash結合は実装したが、初回config生成はunknownのままで、Windows installed product runとoperator readabilityの実測も未取得。strict validatorはunknown/warningを受理しない。
-  required_action: 初回config生成contractを完成させ、stage時と異なるuser profileでWindows installed product runを行う。固定store report、accepted Audit hash、Setup Doctor画面の実読取を収集し、全checkがpassのときだけstrict validatorへ入力する。
+  reason: 現行sourceのDiagnosticOnly installed runではreport・初回設定・Audit hash結合を実測したが、UIAutomationが必須surfaceを認識せず、operator readabilityは未成立。終了時cleanup errorがあり、別profileのformal evidenceも未取得。strict validatorはDiagnosticOnlyを受理しない。
+  required_action: Flutter/Dart semanticsによる個別surface観測と通常終了を成立させ、stage時と異なるuser profileでformal runを行う。固定store config/report、accepted Audit hash、画面を収集し、全checkがpassのときだけstrict validatorへ入力する。
   blocks_release: yes
 ~~~
 
@@ -64,13 +64,13 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 
 未対応の主張、および未分類のcollector declarationはリリースブロッカーである。
 
-## Broker生成Setup Doctor report（実装状態 2026-09-26）
+## Broker生成Setup Doctor reportと初回設定（実装状態 2026-09-26）
 
 通常製品UIは認証済みRust Broker IPCで`Setup Doctor報告取得`（payloadは`version: 1`のみ）を要求し、受け取ったreportを表示する。Brokerは実起動時に検証したinstalled package配置、実際のIPv4 loopback bind、永続Audit状態から固定7 checkを生成し、`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\setup_doctor_report.json`へ最大64 KiB・最新一件だけをatomic replaceする。要求から出力pathを選べず、reportはCapability／Permission／Approvalを生成しない。保存byte列のSHA-256は同operationの`accepted` AuditEvent payload hashへ結合する。保存・Audit失敗時は成功reportを返さない。
 
-Windows collector version 13は通常起動した製品が生成した固定store reportを読み、正確なbyte列、SHA-256、`Setup Doctor報告取得 / accepted / setup_doctor_report_exported / LIVE_RUNTIME` AuditEventを照合する。report bytesとAuditEventをrelease evidenceへ同梱する。外部probe、collector推定check、任意JSONを製品reportとしては受け入れない。strict validatorは正本Schema、hash、Audit payload hash、evidence bundle file、fixed store path、check一覧を再検証し、全check `pass`とoperator readabilityを要求する。
+Windows collector version 14は通常起動した製品が生成した固定store reportを読み、正確なbyte列、SHA-256、`Setup Doctor報告取得 / accepted / setup_doctor_report_exported / LIVE_RUNTIME` AuditEventを照合する。report bytesとAuditEventをrelease evidenceへ同梱する。初回UI設定についても起動前不在、固定既定値、固定store fileのSHA-256、`初回設定取得 / accepted / LIVE_RUNTIME` AuditEventのpayload hashを照合し、config fileをbundleへ含める。外部probe、collector推定check、任意JSONを製品reportとしては受け入れない。strict validatorは正本Schema、hash、Audit payload hash、evidence bundle file、fixed store path、check一覧を再検証し、全check `pass`とoperator readabilityを要求する。
 
-初回config生成は別contractで未接続のため、現reportは`setup_doctor.config_created=unknown`かつoverall `warning`である。また新sourceから作成したWindows installed reportと画面のoperator readabilityは未観測である。従って本経路のsource実装が成立しても`windows_setup_doctor_smoke`は`release_blocker`のままで、release-readyを意味しない。
+初回UI設定の固定store生成・read-only IPC取得contractはSetup Doctor reportとは別に接続済みであり、report側の`config_created`は同一実行中にinstalled path・固定store・Schema・Audit hashが一致した場合だけ`pass`へできる。変更後sourceから作成したWindows installed reportと画面のoperator readabilityは未観測である。従ってsource実装が成立しても`windows_setup_doctor_smoke`は`release_blocker`のままで、release-readyを意味しない。
 
 ## 収集フロー
 
@@ -138,6 +138,8 @@ python tooling\validate_all.py --strict-release --desktop-platform=windows
 - `parent/child edge`（親子間の辺）
 
 原因観測用のrunでは`-DiagnosticOnly`を使用してよい。診断専用出力は失敗分析に有用だが、正式runが合格するまで、その`first_run.status=diagnostic_only`はリリースブロッカーである。
+
+2026-09-26の現行source Windows diagnostic runでは、初回configの生成・Schema妥当性・read-only取得accepted AuditEventと保存hash一致、およびSetup Doctor report取得を観測した。一方、UIAutomation treeは`D4 Pocket` windowと`FLUTTERVIEW` containerの2要素のみで、必須surface labelを一つも認識しなかった。通常終了も成立せず、collectorは強制cleanupとcleanup errorを記録した。これはUI semanticsと終了経路の未解決を示す診断であり、別profile／正式release evidenceへの代替ではない。
 
 ## 厳格な境界
 

@@ -240,8 +240,16 @@
       "責任": "Windows Desktop Flutter要求のRust-owned transport、起動child PID照合、既存Broker再利用、資格・権限非継承と未実装証拠境界"
     },
     {
-      "path": "specs/setup_doctor_report.schema.json",
-      "責任": "Rust Brokerが生成・永続化するSetup Doctor報告の構造、根拠区分、非権限性"
+     "path": "specs/setup_doctor_report.schema.json",
+     "責任": "Rust Brokerが生成・永続化するSetup Doctor報告の構造、根拠区分、非権限性"
+   },
+    {
+     "path": "specs/first_run_configuration.schema.json",
+     "責任": "D4 Pocket初回UI設定の固定既定値、Broker固定store、権限・資格情報を含まない構造"
+   },
+    {
+      "path": "specs/first_run_configuration_request.schema.json",
+      "責任": "初回設定取得要求の版固定、任意path・資格・権限field拒否"
     },
     {
       "path": "docs/specs/command-palette-surface.md",

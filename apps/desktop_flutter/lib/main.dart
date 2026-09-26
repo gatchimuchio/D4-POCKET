@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 
 import 'models/generated_contracts.dart';
@@ -121,12 +122,28 @@ class GuiShellDesktopApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final client = this.client ?? ShellCoreClient.mock();
+    final initialConfiguration = client.initialUiConfiguration;
+    final localeParts = initialConfiguration.locale.split('-');
     return MaterialApp(
       title: kGuiShellProductTitle,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: _buildShellTheme(Brightness.light),
-      darkTheme: _buildShellTheme(Brightness.dark),
+      themeMode: switch (initialConfiguration.theme) {
+        'system' => ThemeMode.system,
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      },
+      locale: Locale(localeParts[0], localeParts[1]),
+      supportedLocales: [Locale(localeParts[0], localeParts[1])],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      theme: _buildShellTheme(
+        Brightness.light,
+        density: initialConfiguration.density,
+      ),
+      darkTheme: _buildShellTheme(
+        Brightness.dark,
+        density: initialConfiguration.density,
+      ),
       home: ShellHomePage(
         client: client,
         runtimeResourceClient: runtimeResourceClient,
@@ -140,7 +157,7 @@ class GuiShellDesktopApp extends StatelessWidget {
   }
 }
 
-ThemeData _buildShellTheme(Brightness brightness) {
+ThemeData _buildShellTheme(Brightness brightness, {required String density}) {
   final scheme = ColorScheme.fromSeed(
     seedColor: const Color(0xff2f6f5e),
     brightness: brightness,
@@ -148,7 +165,8 @@ ThemeData _buildShellTheme(Brightness brightness) {
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    visualDensity: VisualDensity.compact,
+    visualDensity:
+        density == 'compact' ? VisualDensity.compact : VisualDensity.standard,
     scaffoldBackgroundColor: scheme.surface,
   );
 }

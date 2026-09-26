@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
+const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerStoreError {
@@ -30,6 +31,8 @@ pub enum BrokerStoreError {
     MalformedA2aState(String),
     MalformedHostState(String),
     MalformedAdapterState(String),
+    MalformedFirstRunConfiguration(String),
+    MissingFirstRunConfiguration,
 }
 
 impl BrokerStoreError {
@@ -47,6 +50,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedA2aState(message)
             | BrokerStoreError::MalformedHostState(message)
             | BrokerStoreError::MalformedAdapterState(message) => message.clone(),
+            BrokerStoreError::MalformedFirstRunConfiguration(message) => message.clone(),
+            BrokerStoreError::MissingFirstRunConfiguration => "初回設定fileが存在しない".to_string(),
         }
     }
 }
@@ -73,6 +78,7 @@ pub struct BrokerPersistentStore {
     host_path: PathBuf,
     adapter_path: PathBuf,
     setup_doctor_report_path: PathBuf,
+    first_run_configuration_path: PathBuf,
     audit_anchor_key: Vec<u8>,
 }
 
@@ -95,6 +101,22 @@ struct AuditAnchorRecord {
     event_count: usize,
     head_event_hash: Option<String>,
     anchor_hmac: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct FirstRunConfigurationDocument {
+    version: u8,
+    product: String,
+    ui_preferences: FirstRunUiPreferences,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct FirstRunUiPreferences {
+    theme: String,
+    density: String,
+    locale: String,
 }
 
 impl BrokerPersistentStore {
@@ -121,6 +143,7 @@ impl BrokerPersistentStore {
             host_path: root.join("hosts.json"),
             adapter_path: root.join("adapters.json"),
             setup_doctor_report_path: root.join("setup_doctor_report.json"),
+            first_run_configuration_path: root.join("first_run_configuration.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
             root,
         };
@@ -473,6 +496,118 @@ impl BrokerPersistentStore {
         Ok(())
     }
 
+    pub fn initialize_first_run_configuration(
+        &self,
+    ) -> Result<(Vec<u8>, bool), BrokerStoreError> {
+        let root_metadata = fs::symlink_metadata(&self.root).map_err(|_| {
+            BrokerStoreError::MalformedFirstRunConfiguration(
+                "初回設定の固定storeを確認できない".to_string(),
+            )
+        })?;
+        if !root_metadata.is_dir()
+            || root_metadata.file_type().is_symlink()
+            || is_reparse_point(&root_metadata)
+        {
+            return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+                "初回設定の固定storeが通常directoryではない".to_string(),
+            ));
+        }
+
+        match self.read_first_run_configuration() {
+            Ok(bytes) => return Ok((bytes, false)),
+            Err(BrokerStoreError::MissingFirstRunConfiguration) => {}
+            Err(error) => return Err(error),
+        }
+
+        let bytes = br#"{
+  "version": 1,
+  "product": "D4 Pocket",
+  "ui_preferences": {
+    "theme": "system",
+    "density": "compact",
+    "locale": "ja-JP"
+  }
+}"#
+        .to_vec();
+        validate_first_run_configuration(&bytes)?;
+
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).map_err(|_| {
+            BrokerStoreError::Io("初回設定の一時file識別子を生成できない".to_string())
+        })?;
+        let temporary_path = self
+            .root
+            .join(format!(".first_run_configuration-{}.tmp", hex::encode(random)));
+        let write_result = (|| {
+            let mut file = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temporary_path)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            drop(file);
+            fs::hard_link(&temporary_path, &self.first_run_configuration_path)?;
+            fs::remove_file(&temporary_path)?;
+            Ok::<(), std::io::Error>(())
+        })();
+        match write_result {
+            Ok(()) => {
+                let stored = self.read_first_run_configuration()?;
+                Ok((stored, true))
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let _ = fs::remove_file(&temporary_path);
+                let stored = self.read_first_run_configuration()?;
+                Ok((stored, false))
+            }
+            Err(_) => {
+                let _ = fs::remove_file(&temporary_path);
+                Err(BrokerStoreError::Io(
+                    "初回設定を既存fileを置換せず安全に生成できない".to_string(),
+                ))
+            }
+        }
+    }
+
+    fn read_first_run_configuration(&self) -> Result<Vec<u8>, BrokerStoreError> {
+        let metadata = match fs::symlink_metadata(&self.first_run_configuration_path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(BrokerStoreError::MissingFirstRunConfiguration);
+            }
+            Err(_) => {
+                return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+                    "初回設定fileを確認できない".to_string(),
+                ));
+            }
+        };
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || is_reparse_point(&metadata)
+            || metadata.len() > MAX_FIRST_RUN_CONFIGURATION_BYTES as u64
+        {
+            return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+                "初回設定fileの種類またはsizeが不正".to_string(),
+            ));
+        }
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        File::open(&self.first_run_configuration_path)
+            .map_err(|_| {
+                BrokerStoreError::MalformedFirstRunConfiguration(
+                    "初回設定fileを読めない".to_string(),
+                )
+            })?
+            .take((MAX_FIRST_RUN_CONFIGURATION_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|_| {
+                BrokerStoreError::MalformedFirstRunConfiguration(
+                    "初回設定fileを読めない".to_string(),
+                )
+            })?;
+        validate_first_run_configuration(&bytes)?;
+        Ok(bytes)
+    }
+
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
         let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
@@ -811,6 +946,30 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     fs::rename(&temporary_path, path)
 }
 
+fn validate_first_run_configuration(bytes: &[u8]) -> Result<(), BrokerStoreError> {
+    if bytes.is_empty() || bytes.len() > MAX_FIRST_RUN_CONFIGURATION_BYTES {
+        return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+            "初回設定fileが空または上限超過である".to_string(),
+        ));
+    }
+    let document: FirstRunConfigurationDocument = serde_json::from_slice(bytes).map_err(|_| {
+        BrokerStoreError::MalformedFirstRunConfiguration(
+            "初回設定fileのJSON構造が不正".to_string(),
+        )
+    })?;
+    if document.version != 1
+        || document.product != "D4 Pocket"
+        || document.ui_preferences.theme != "system"
+        || document.ui_preferences.density != "compact"
+        || document.ui_preferences.locale != "ja-JP"
+    {
+        return Err(BrokerStoreError::MalformedFirstRunConfiguration(
+            "初回設定fileが固定既定値contractに適合しない".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn nonce_is_retained(recorded_at_epoch_seconds: i64, now_epoch_seconds: i64) -> bool {
     now_epoch_seconds.saturating_sub(recorded_at_epoch_seconds) <= REPLAY_NONCE_RETENTION_SECONDS
 }
@@ -872,6 +1031,79 @@ fn is_reparse_point(metadata: &fs::Metadata) -> bool {
 #[cfg(not(windows))]
 fn is_reparse_point(_metadata: &fs::Metadata) -> bool {
     false
+}
+
+#[cfg(test)]
+mod first_run_configuration_tests {
+    use super::*;
+
+    fn temp_store(label: &str) -> (PathBuf, BrokerPersistentStore) {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-first-run-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        let (store, _) = BrokerPersistentStore::open_or_create(&root, "first-run-test")
+            .expect("永続storeを初期化する");
+        (root, store)
+    }
+
+    #[test]
+    fn fixed_default_configuration_is_create_only_and_idempotent() {
+        let (root, store) = temp_store("create-only");
+        let (first_bytes, first_created) = store
+            .initialize_first_run_configuration()
+            .expect("初回設定を生成する");
+        assert!(first_created);
+        validate_first_run_configuration(&first_bytes).expect("生成設定を検証する");
+        let target = root.join("first_run_configuration.json");
+        assert_eq!(fs::read(&target).unwrap(), first_bytes);
+
+        let before = fs::read(&target).unwrap();
+        let (second_bytes, second_created) = store
+            .initialize_first_run_configuration()
+            .expect("既存設定を検証する");
+        assert!(!second_created);
+        assert_eq!(second_bytes, before);
+        assert_eq!(fs::read(&target).unwrap(), before);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn malformed_or_modified_configuration_is_preserved_and_rejected() {
+        let (root, store) = temp_store("preserve-invalid");
+        let target = root.join("first_run_configuration.json");
+        let original = br#"{"version":1,"product":"D4 Pocket","ui_preferences":{"theme":"dark","density":"compact","locale":"ja-JP"}}"#;
+        fs::write(&target, original).unwrap();
+        assert!(store.initialize_first_run_configuration().is_err());
+        assert_eq!(fs::read(&target).unwrap(), original);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn unknown_configuration_fields_are_rejected_without_replacement() {
+        let (root, store) = temp_store("unknown-field");
+        let target = root.join("first_run_configuration.json");
+        let original = br#"{"version":1,"product":"D4 Pocket","ui_preferences":{"theme":"system","density":"compact","locale":"ja-JP"},"permission":"filesystem.write"}"#;
+        fs::write(&target, original).unwrap();
+        assert!(store.initialize_first_run_configuration().is_err());
+        assert_eq!(fs::read(&target).unwrap(), original);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn oversized_configuration_is_rejected_without_replacement() {
+        let (root, store) = temp_store("oversized");
+        let target = root.join("first_run_configuration.json");
+        let original = vec![b'x'; MAX_FIRST_RUN_CONFIGURATION_BYTES + 1];
+        fs::write(&target, &original).unwrap();
+        assert!(store.initialize_first_run_configuration().is_err());
+        assert_eq!(fs::read(&target).unwrap(), original);
+        let _ = fs::remove_dir_all(root);
+    }
 }
 
 #[cfg(test)]

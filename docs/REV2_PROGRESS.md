@@ -1613,3 +1613,50 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 - `python tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、configured 10検査すべてPASS。Schema／conformance／manifest／release gate／配布互換性／release smoke／evidence bundle／runtime assertion／C32構造監査を含む。集約はrelease blocker 5件と`release_ready=false`を維持する。Windows installed product証拠や製品完成の証明ではない。
 
 今回の報告はsource-levelのproduction経路・認証済みloopback統合試験までを示し、変更後Windows installed productの別profile runやSetup Doctor画面の実読取を示さない。初回config生成contractは未接続で`setup_doctor.config_created=unknown`、`operator_readable=false`を維持し、`windows_setup_doctor_smoke`等のrelease blockerと`release_ready=false`は解除しない。前回までの失敗記録を成功へ書き換えず、現行実装の検証結果を別記する。
+
+## D4 Pocket rev2 Broker統治 初回UI設定の生成・読取接続（2026-09-26）
+
+既存UI既定値をBroker所有の固定初回設定へ接続した。インストール先検証済みDesktop起動器だけが起動前に固定Broker storeへ既定設定をcreate-onlyで生成し、通常Broker IPCは固定payloadのread-only取得だけを受け付ける。既存fileの改変・未知field・過大値・reparse pointは置換せずfail-closedにする。初期生成と取得はBroker Auditへ記録し、取得Auditのpayload hashは保存byte列のSHA-256と結び付ける。Flutterは設定を表示テーマ・locale・densityへ投影するだけで、file、process、資格情報、networkへ直接触れず、未知fieldや固定Schema外の値を受け取った場合はBroker unavailableへ閉じる。初回設定はUI preferenceだけであり、Capability、Permission、Approval、authorityを含まない。
+
+`first_run_configuration`／`first_run_configuration_request` JSON Schemaと正常・negative fixtureを追加し、Schema checker、conformance、Broker persistent store、IPC起動経路、Flutter product client、Windows installed evidence collector、strict evidence validatorへ接続した。collectorは起動前のfile不在、固定pathでの生成、厳格UTF-8／field／値検査、accepted `初回設定取得` AuditEventと実file byte hashの一致を要求する。証拠bundleとvalidatorも同一path・hash・LIVE_RUNTIME eventを再照合する。失敗・事前作成・hash不一致は正式first-run PASSに昇格しない。
+
+統合検証の初回実行では、未追跡の新規Schema／fixtureがGit-index基準の配布file一覧から欠落し、展開後conformanceがSchemaを見つけられないことを検出した。意図した新規contract fileをstage対象に含めてから検査を行う運用へ合わせ、Manifestを更新し、source archiveにcontract／fixtureが入ることを確認した。またWindowsでは配布検査とrelease gateの子Pythonがlocale依存出力を行い、親のUTF-8読取threadが`UnicodeDecodeError`を起こし得る境界を確認した。両checkerのPython子processにUTF-8 mode／stdout encodingを明示し、親もUTF-8で読取るよう固定した。失敗時の日本語diagnosticを保持するconformanceを加えた。この固定UTF-8接続は恒久的な検査契約であり、製品runtimeや権限境界は変更しない。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 135件、正常例135件、negative fixture 167件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：214件成功。新しいSchemaの権限・path・preference拒否、Windows evidenceのfile hashとAudit不一致拒否、配布子processのUTF-8 diagnostic保持を含む。
+- `python -X utf8 tooling/packaging_portability_check.py`：成功。1035件のGit追跡済み入力からsource archiveを作成・展開し、展開先でManifest、conformance、release gateを実行した。Schema／fixtureを含むことを確認した。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：成功。負債file 0、finding 0。静的監査であり、実画面の自然さやruntime表示を証明しない。
+- `python -X utf8 tooling/manifest.py --write`：file 1035件を記録。文書追記後に再生成・照合する。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter compact`：Desktop Flutter全108 test成功。OneDrive管理下のtest asset reparse pointを削除しないno-test-assets経路であり、実Desktop起動の証拠ではない。
+- `flutter analyze --no-pub`：一時`R:` path aliasと分離`LOCALAPPDATA`から実行し、指摘0件。aliasは検証終了時に解除した。
+- `cargo test --lib --target-dir C:\Users\ohira\AppData\Local\Temp\codex-d4pocket-rust-target-20260926 -- --test-threads=1`（`native/rust_helper`から）：Rust library 273件成功。初回configのcreate-only、改変／未知field／過大値を置換しない試験を含む。
+- `cargo check --all-targets --target-dir C:\Users\ohira\AppData\Local\Temp\codex-d4pocket-rust-target-20260926`（`native/rust_helper`から）：成功。
+- Python `py_compile`、Windows PowerShell parserによるcollector AST parse、`git diff --check`：成功。
+- `cargo test`全targetはWindows Application Controlが生成済みtest executableをerror 4551で拒否した試行があり、全targetの実行結果は本記録では確定しない。library 273件とall-target `cargo check`は成功したが、統合test executableの実行証拠には代替しない。OS policyを無効化して回避しない。
+
+残存項目:
+
+- item: current sourceのWindows installed productを別user profileから正式collectorで再実行し、初回設定・Audit hash・Setup Doctor画面・Broker lifecycleを実測する。
+  classification: release_blocker
+  reason: 今回の証拠はSchema／conformance／unit test／配布展開検証であり、変更後installed productのLIVE_RUNTIME evidenceではない。
+  required_action: clean sourceから生成した製品をstage時と異なるSIDのWindows profileで起動し、strict evidence validatorへ合格させる。
+  blocks_release: yes
+ - item: `windows_rust_integration_test_execution_policy`。変更後sourceの全target Rust integration testを実行できなかった。
+  classification: release_blocker
+  reason: Windows Application Controlのerror 4551でtest executableが起動拒否された。cargo checkとlibrary testは別の検証面である。
+  required_action: OS policyを弱めず、許可済みWindows hostで変更後sourceの全target `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`を成功させる。
+  blocks_release: yes
+
+過去の「初回設定未接続」と2026-09-25のRust全target成功記録は履歴として保持する。現行sourceについて全target integration test実行が未成立の新証拠を受け、`windows_rust_integration_test_execution_policy`を`unresolved`へ戻し、Release Checklistとregistryのrequired actionを同期した。他のblockerを解消扱いせず`release_ready=false`を維持する。この実装blockはD4 Pocket完成、Windows正式証拠、製品releaseを成立させない。
+
+### 同日現行source Windows installed app 診断追補（2026-09-26）
+
+変更中sourceの追跡済み29 pathを一時workspaceへ複製しSHA-256一致を確認後、Flutter Windows Release executableとRust Desktop launcher／Brokerをbuildしてstaged packageを起動した。document／registry更新後のコピー差はmetadataのみで、実行binaryへ影響するsourceは同一。staged App SHA-256 `98f99fff10089650f28cf36685cf61635107a47b8d370db5dd8c5aeab266ca1c`、launcher `d4c57d037aa0e0638ebe59daf4130d6909545adf60034050423187cad47a935d`、Broker `af368cf9bfd5d2ea963eea1300bbca8b3080656d3597874d72b3e762df80edc1`。Windows collector v14を`-DiagnosticOnly -NoPythonRuntime`で実行し、collector exit 0、diagnostic output SHA-256 `3715b79bc041eb9bcb0a907936781b39d62bc1ed466db565aaa6f8a495c43e4e`。
+
+実測では、起動前config不存在、固定Broker storeでのconfig生成、Schema field/value妥当性、config SHA-256 `c7617ab054b70ee2388d96c9d76ee33835800ca9b76298d01686e5320db9f817`、`初回設定取得` accepted／`LIVE_RUNTIME` AuditEvent 1件（`broker-audit-8`）とのpayload hash一致を確認した。通常資格のhealth要求、Setup Doctor report生成・accepted Audit hash結合、no-Python PATH scrubも動作した。Setup Doctor report statusはpassだが、製品画面上のoperator readabilityを意味しない。
+
+同じ実行でWindows window handleと`D4 Pocket` titleは観測したが、UIAutomation treeはroot windowと`FLUTTERVIEW` containerの2 nodeのみで、必須surface `Dashboard`、`NavigationRail`、`Runtime Status`、`Invariant Status`はいずれも取得されず、`visible_surfaces_complete=false`。collectorの終了menu操作は成立せず、強制cleanup=true、cleanup error=true、起動器通常終了falseとなった。cleanup後に当該実行のprocess残存はなかった。実行profileのSIDはstage時と同一（`profile_identity_isolated_from_staging_user=false`）であり、これは`diagnostic_only`に限定される。別profile formal evidenceではない。
+
+この診断によって「初回設定未接続」は現行sourceについて訂正できた一方、Windows Setup Doctor画面の操作者向け可読性／画面要素の意味情報、通常終了・後片付け、別利用者profileによる証拠、Rust全target統合試験は未解決である。`windows_installer_first_run_smoke`と`windows_setup_doctor_smoke`は`release_blocker`のまま維持し、registry／checklistの理由と必須対応をUIA／後片付けの観測に合わせた。`release_ready=false`を維持する。

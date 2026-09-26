@@ -22,8 +22,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Windowsインストール後の初回起動証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "stage時と異なるSIDのWindows user profileからcollect_installed_smoke.ps1を実行し、Rust Desktop起動器の直接child、run固有LOCALAPPDATA内の実Broker runtime、endpoint cleanup、起動・終了AuditEvent、通常資格で受理されたhealth要求AuditEvent、可視画面をclean-source証拠として収集してください。health要求AuditはBrokerによる認証済み要求の受理・記録を示しますが、client応答受信や呼出し元PIDを証明しません。別profileでのclean-source実測と初回設定生成を成立させてからtooling/windows_release_evidence.pyへ合格させてください。Flutter exe直接起動、stage manifestのcollector scratch path、独立Broker smoke、endpoint role metadataだけで代替しないでください。"
+      "reason": "現行sourceのDiagnosticOnly installed runでは、起動器経由起動・初回設定生成・read-only取得accepted Auditと設定hash一致を観測したが、stage時と異なるWindows user profileによるformal証拠はなく、strict release evidenceにも未収録です。",
+      "required_action": "stage時と異なるSIDのWindows user profileからcollect_installed_smoke.ps1を実行し、Rust Desktop起動器の直接child、run固有LOCALAPPDATA内の実Broker runtime、endpoint cleanup、起動・終了AuditEvent、通常資格で受理されたhealth要求AuditEvent、可視画面をclean-source証拠として収集してください。health要求AuditはBrokerによる認証済み要求の受理・記録を示しますが、client応答受信や呼出し元PIDを証明しません。初回設定について起動前不存在、固定既定値、初回設定取得accepted AuditEventのpayload hashと実config byte hash一致も収集し、別profileのclean-source evidenceをtooling/windows_release_evidence.pyへ通してください。Flutter exe直接起動、stage manifestのcollector scratch path、独立Broker smoke、endpoint role metadataだけで代替しないでください。"
     },
     {
       "name": "windows_setup_doctor_smoke",
@@ -33,8 +33,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Broker生成report・固定store保存・LIVE_RUNTIME accepted Auditとのhash結合は実装済みだが、初回config生成がunknownで、Windows installed product runとoperator readabilityの実測も未取得。strict release validatorはunknown/warningを受理しない。",
-      "required_action": "新sourceをWindows release構成でbuildし、stage時と異なるuser profileからRust Desktop起動器経由で実行する。Setup Doctor画面の実表示を測定し、固定Broker store report byte hashとaccepted Setup Doctor報告取得 AuditEventを照合する。初回config生成contract・実動作を実装してsetup_doctor.config_createdを安全にpassへできない限りrelease blockerを維持し、tooling/windows_release_evidence.pyをstrict条件で合格させる。"
+      "reason": "現行sourceのDiagnosticOnly installed runでSetup Doctor報告・初回設定生成／取得・accepted Audit hash結合は観測したが、Windows UIAutomationは必要な製品surfaceを認識せず、operator readabilityは未成立です。終了時も通常tray終了ではなく強制cleanupとなり、stage時と異なるprofileのformal evidenceもありません。strict validatorはDiagnosticOnlyと未観測surfaceを受理しません。",
+      "required_action": "Flutter/Dart semanticsからDashboard、NavigationRail、Runtime Status、Invariant StatusをWindows UIAutomationで個別に観測できるようにし、起動器の通常終了・cleanup errorなしも再検証する。現行sourceをstage時と異なるWindows user profileからRust Desktop起動器経由で実行し、config／report byte hashとaccepted AuditEventを照合した上でtooling/windows_release_evidence.pyをstrict条件で合格させる。"
     },
     {
       "name": "windows_broker_installed_smoke",
@@ -125,8 +125,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、Broker/installerへ移譲された初回設定生成と正式Setup Doctor product evidenceは未成立。",
-      "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。初回設定生成とSetup Doctor product evidenceをBroker/installerの明示contractへ移譲し、negative testとLIVE_RUNTIME証拠で接続する。"
+      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。初回設定の固定store create-only生成・read-only IPC取得もBrokerへ接続されRust library testに含む。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、変更後sourceのfirst-run／Setup Doctor product evidenceは未成立。",
+      "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。初回設定の固定store生成・read-only IPC取得contractとSetup Doctor product evidenceのWindows実行をnegative test・LIVE_RUNTIME証拠で確認する。"
     },
     {
       "name": "rev2_export_owner_ui_authority_path",
@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "resolved",
+      "status": "unresolved",
       "status_source": "manual",
-      "active": false,
+      "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-25のWindows実行でcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1が完遂し、library 244件、helper binary 7件、integration 35件（broker_ipc 9件を含む）が成功した。以前のOS policy拒否は履歴として維持する。",
-      "required_action": "現行Windows環境での追加対応はない。今後同じ実行policy拒否を観測した場合は、未実行を成功へ昇格せず、この項目を再評価する。"
+      "reason": "2026-09-25の全target成功は履歴として保持する。2026-09-26の変更後sourceではRust library 273件とcargo check --all-targetsが成功した一方、全target cargo testのintegration executableをWindows Application ControlがOS error 4551で起動拒否し、current sourceの全target実行は成立していない。これはassertion failureではなくhost execution policyによる未実行である。",
+      "required_action": "OS policyを無効化せず、生成済みRust test executableを実行できる許可済みWindows host上で、変更後sourceのcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target成功させ、正確なsource commitと結果を記録する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

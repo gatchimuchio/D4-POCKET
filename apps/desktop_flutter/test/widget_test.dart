@@ -516,6 +516,7 @@ void main() {
     );
     expect(transport.operations, [
       'health',
+      '初回設定取得',
       'Setup Doctor報告取得',
       'ホスト能力',
       'Host一覧',
@@ -529,6 +530,12 @@ void main() {
     expect(
       transport.requests.singleWhere(
         (request) => request['operation'] == 'Setup Doctor報告取得',
+      )['payload'],
+      const <String, Object?>{'version': 1},
+    );
+    expect(
+      transport.requests.singleWhere(
+        (request) => request['operation'] == '初回設定取得',
       )['payload'],
       const <String, Object?>{'version': 1},
     );
@@ -574,6 +581,23 @@ void main() {
     expect(
         snapshot.setupDoctorChecks.every((check) => check.status == 'unknown'),
         isTrue);
+  });
+
+  test('不正な初回設定projectionはproduct UIをBroker unavailableへ閉じる', () async {
+    final invalidResponse = _brokerFirstRunConfigurationResponse();
+    final invalidBody =
+        Map<String, Object?>.from(invalidResponse['body'] as Map);
+    invalidBody['permission'] = ['filesystem.write'];
+    invalidResponse['body'] = invalidBody;
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      invalidResponse,
+    ]);
+
+    final client = await ShellCoreClient.product(transport: transport);
+    expect(client.mode, 'broker_unavailable');
+    expect(client.getSnapshot().snapshotSource, 'broker_unavailable');
+    expect(transport.operations, ['health', '初回設定取得']);
   });
 
   test('ブローカー利用不可時に製品クライアントが閉鎖側へ失敗する', () async {
@@ -857,6 +881,10 @@ class _FakeBrokerTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     requests.add({'operation': operation, 'payload': payload});
+    if (operation == '初回設定取得' &&
+        (_responses.isEmpty || _responses.first['operation'] != operation)) {
+      return Future.value(_brokerFirstRunConfigurationResponse());
+    }
     if (operation == 'Setup Doctor報告取得' &&
         (_responses.isEmpty || _responses.first['operation'] != operation)) {
       return Future.value(_brokerSetupDoctorResponse());
@@ -867,6 +895,25 @@ class _FakeBrokerTransport implements BrokerTransport {
     return _responses.removeAt(0);
   }
 }
+
+Map<String, Object?> _brokerFirstRunConfigurationResponse() => {
+      'request_id': 'test-初回設定取得',
+      'operation': '初回設定取得',
+      'status': 'accepted',
+      'evidence_source': 'LIVE_RUNTIME',
+      'audit_event_id': 'audit-first-run-configuration',
+      'error': null,
+      'body': {
+        'version': 1,
+        'product': 'D4 Pocket',
+        'ui_preferences': {
+          'theme': 'system',
+          'density': 'compact',
+          'locale': 'ja-JP',
+        },
+      },
+      'shutdown_requested': false,
+    };
 
 Map<String, Object?> _brokerSetupDoctorResponse() {
   const checks = <Map<String, Object?>>[

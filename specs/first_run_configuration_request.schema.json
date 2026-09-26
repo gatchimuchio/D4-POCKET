@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/first_run_configuration_request.schema.json",
+  "title": "D4 Pocket初回設定取得要求",
+  "description": "認証済み通常Broker IPCの固定初回UI設定取得要求。任意path、資格、権限、Approvalを受け付けない。",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 }
+  }
+}

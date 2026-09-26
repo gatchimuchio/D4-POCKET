@@ -48,7 +48,7 @@ from tooling.schema_check.check_schemas import parse_json_text, validate_instanc
 from tooling.release_smoke import run_release_smokes
 from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bundle
 from tooling.manifest import build_manifest, matches_forbidden, working_tree_eol_errors
-from tooling.packaging_portability_check import portable_path_errors
+from tooling.packaging_portability_check import portable_path_errors, run_check
 from tooling.release_gate_check import (
     CURRENT_FACING_RELEASE_DOCS,
     release_blocker_doc_sync_errors,
@@ -177,6 +177,8 @@ REQUIRED_SCHEMA_NAMES = {
     "broker_command_envelope",
     "desktop_broker_channel_request",
     "setup_doctor_report",
+    "first_run_configuration",
+    "first_run_configuration_request",
     "mobile_device_link_channel_request",
     "mobile_local_recovery_audit",
     "adapter_management_manifest",
@@ -241,6 +243,8 @@ BROKER_REQUIRED_SCHEMAS = {
     "broker_command_envelope.schema.json",
     "desktop_broker_channel_request.schema.json",
     "setup_doctor_report.schema.json",
+    "first_run_configuration.schema.json",
+    "first_run_configuration_request.schema.json",
     "profile.schema.json",
     "profile_receipt.schema.json",
     "profile_list.schema.json",
@@ -496,6 +500,45 @@ def test_setup_doctor_report_schema_preserves_unknown_and_denies_authority() -> 
         return ["初回設定が未実装なら状態を不明のまま保持しなければならない"]
     if validate_instance(invalid, schema) == []:
         return ["環境診断報告のSchemaが権限昇格を拒否しない"]
+    return []
+
+
+def test_first_run_configuration_schema_is_fixed_and_non_authoritative() -> list[str]:
+    schema = load_schema("first_run_configuration.schema.json")
+    valid = load_contract_fixture("first_run_configuration.valid.json")
+    invalid_authority = load_contract_fixture(
+        "invalid/first_run_configuration_authority_escalation.invalid.json"
+    )
+    invalid_preferences = load_contract_fixture(
+        "invalid/first_run_configuration_preference_escalation.invalid.json"
+    )
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"初回UI設定の正常例が契約に適合しない: {errors}"]
+    if valid["ui_preferences"] != {
+        "theme": "system",
+        "density": "compact",
+        "locale": "ja-JP",
+    }:
+        return ["初回UI設定の既定値が現行Desktop UIと一致しない"]
+    if validate_instance(invalid_authority, schema) == []:
+        return ["初回UI設定Schemaが未知のauthority/permission fieldを拒否しない"]
+    if validate_instance(invalid_preferences, schema) == []:
+        return ["初回UI設定Schemaが未契約preferenceへの差し替えを拒否しない"]
+    return []
+
+
+def test_first_run_configuration_request_rejects_caller_paths_and_authority() -> list[str]:
+    schema = load_schema("first_run_configuration_request.schema.json")
+    valid = load_contract_fixture("first_run_configuration_request.valid.json")
+    invalid = load_contract_fixture(
+        "invalid/first_run_configuration_request_path.invalid.json"
+    )
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"初回設定取得要求の正常例が契約に適合しない: {errors}"]
+    if validate_instance(invalid, schema) == []:
+        return ["初回設定取得要求Schemaが任意pathを拒否しない"]
     return []
 
 
@@ -1657,6 +1700,7 @@ def _valid_windows_installed_evidence() -> dict:
                 {"kind": "setup_doctor", "path": setup_report_path, "exists": True, "sha256": setup_report_sha256},
                 {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
                 {"kind": "broker_lifecycle_audit", "path": r"C:\evidence\broker-audit.jsonl", "sha256": "sha256:" + "a" * 64},
+                {"kind": "first_run_configuration", "path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\first_run_configuration.json", "exists": True, "sha256": "sha256:" + "c" * 64},
                 {"kind": "visible_surfaces", "path": r"C:\evidence\visible_surfaces.json", "sha256": "sha256:" + "7" * 64},
                 {"kind": "runtime_assertions", "path": r"C:\evidence\runtime_assertions.json", "sha256": "sha256:" + "8" * 64},
                 {"kind": "audit_anchor_external_tamper_evidence", "path": r"C:\evidence\audit_anchor_external.json", "sha256": "sha256:" + "9" * 64},
@@ -1678,7 +1722,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "13",
+            "collector_version": "14",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1841,9 +1885,24 @@ def _valid_windows_installed_evidence() -> dict:
                     ],
                 },
             },
-            "config_path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\config\gui_shell.json",
+            "config_path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\first_run_configuration.json",
             "config_created": True,
             "config_json_valid": True,
+            "config_audit": {
+                "evidence_class": "LIVE_RUNTIME",
+                "accepted_event_count": 1,
+                "config_sha256": "sha256:" + "c" * 64,
+                "accepted_event": {
+                    "event_id": "broker-audit-12",
+                    "request_id": "first-run-config-request",
+                    "operation": "初回設定取得",
+                    "decision": "accepted",
+                    "reason": "初回UI設定を固定Broker storeからprojection。authorityは生成しない",
+                    "evidence_source": "LIVE_RUNTIME",
+                    "payload_hash": "sha256:" + "c" * 64,
+                    "event_hash": "sha256:" + "d" * 64,
+                },
+            },
             "audit_dir": r"C:\ProgramData\GUI-Shell\audit",
             "audit_dir_writable": True,
             "audit_write_probe": {
@@ -2057,6 +2116,39 @@ def test_windows_release_evidence_validator_rejects_preexisting_first_run_config
     if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
         return ["Windows first-run validatorが起動前から存在するconfigを初回生成として受け入れた"]
     return []
+
+
+def test_windows_release_evidence_rejects_unbound_first_run_config_audit() -> list[str]:
+    errors: list[str] = []
+    cases = (
+        (
+            "AuditEvent payload hashがconfigと異なる",
+            lambda item: item["first_run"]["config_audit"]["accepted_event"].update(
+                payload_hash="sha256:" + "e" * 64
+            ),
+        ),
+        (
+            "config fileがevidence bundleにない",
+            lambda item: item["provenance"]["evidence_bundle_files"].__setitem__(
+                slice(None),
+                [
+                    record for record in item["provenance"]["evidence_bundle_files"]
+                    if record["kind"] != "first_run_configuration"
+                ],
+            ),
+        ),
+    )
+    for label, mutate in cases:
+        evidence = _valid_windows_installed_evidence()
+        mutate(evidence)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(evidence), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_installer_first_run_smoke"].classification != "release_blocker":
+            errors.append(f"Windows first-run validatorが{label}を受け入れた")
+    return errors
 
 
 def test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence() -> list[str]:
@@ -2501,8 +2593,16 @@ def test_flutter_setup_doctor_has_no_filesystem_export_path() -> list[str]:
         errors.append("installed smoke collectorがstage scratch pathを使う外部Setup Doctor probeを実行している")
     if "config_created = $configCreated" not in collector_text or "$configCreated = $false" not in collector_text:
         errors.append("installed smoke collectorが製品config export未観測を未成立として記録しない")
-    if 'config_path = $null' not in collector_text or '"first_run_configuration_product_export"' not in collector_text:
-        errors.append("installed smoke collectorが不在の製品config pathを推測せずunsupported claimにする")
+    for token in (
+        'Join-Path $brokerStoreDir "first_run_configuration.json"',
+        'config_path = $firstRunConfigurationPath',
+        'New-EvidenceFileRecord -Kind "first_run_configuration" -Path $firstRunConfigurationPath',
+        '"first_run.config_audit"',
+        'configAuditMatched = ($configFileObserved -and $configJsonValid -and $configAuditAcceptedMatchCount -eq 1)',
+        'config path/hashがAuditと一致しない',
+    ):
+        if token not in collector_text and token not in (ROOT / "tooling" / "windows_release_evidence.py").read_text(encoding="utf-8"):
+            errors.append(f"installed smoke collectorの初回config/Audit証拠契約が欠落: {token}")
     external_probe_text = external_probe.read_text(encoding="utf-8")
     if (
         "formal_product_evidence = $false" not in external_probe_text
@@ -2631,7 +2731,7 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "13"' not in text:
+    if 'collector_version = "14"' not in text:
         errors.append("collect_installed_smoke.ps1の版識別子がBroker報告のhashと監査照合を表さない")
     return errors
 
@@ -2950,6 +3050,29 @@ def test_packaging_portability_checker_exists() -> list[str]:
     if "packaging_portability_check" not in validate_all.read_text(encoding="utf-8"):
         errors.append("validate_all.pyがpackaging portability checkを実行していない")
     return errors
+
+
+def test_packaging_portability_subprocess_output_is_utf8_safe() -> list[str]:
+    errors = run_check(
+        ROOT,
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write('日本語出力'.encode('utf-8')); sys.exit(1)",
+        ],
+    )
+    if len(errors) != 1 or "日本語出力" not in errors[0]:
+        return ["packaging portability checkerがUTF-8 subprocess出力を保持しない"]
+    release_gate = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
+    for token in (
+        'env["PYTHONUTF8"] = "1"',
+        'env["PYTHONIOENCODING"] = "utf-8"',
+        'encoding="utf-8"',
+        'errors="replace"',
+    ):
+        if token not in release_gate:
+            return [f"release gateのmanifest subprocessがUTF-8境界を固定しない: {token}"]
+    return []
 
 
 def 端末契約の構造と禁止操作を検査する() -> list[str]:
@@ -6193,8 +6316,9 @@ def test_desktop_flutter_product_baseline_chrome_exists() -> list[str]:
         "PlatformDispatcher.instance.onError",
         "ErrorWidget.builder",
         "GuiShellFatalErrorScreen",
-        "themeMode: ThemeMode.system",
-        "darkTheme: _buildShellTheme(Brightness.dark)",
+        "themeMode: switch (initialConfiguration.theme)",
+        "darkTheme: _buildShellTheme(",
+        "localizationsDelegates: GlobalMaterialLocalizations.delegates",
         "kGuiShellProductTitle",
     ]:
         if token not in main:
@@ -7823,6 +7947,8 @@ def main() -> int:
         test_gui_shell_spec_v1_declares_core_boundaries,
         test_contract_fixtures_are_available,
         test_setup_doctor_report_schema_preserves_unknown_and_denies_authority,
+        test_first_run_configuration_schema_is_fixed_and_non_authoritative,
+        test_first_run_configuration_request_rejects_caller_paths_and_authority,
         test_negative_contract_fixtures_cover_all_schemas,
         test_adapter_authority_strip_schema,
         test_inbound_authority_keys_are_stripped,
@@ -7890,6 +8016,7 @@ def main() -> int:
         test_windows_release_evidence_validator_preserves_audit_anchor_external_blocker,
         test_windows_release_evidence_validator_rejects_authority_and_missing_installed_path,
         test_windows_release_evidence_validator_rejects_preexisting_first_run_config,
+        test_windows_release_evidence_rejects_unbound_first_run_config_audit,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_setup_doctor_does_not_promote_unknown_to_release_pass,
         test_windows_release_evidence_requires_accepted_broker_health_audit,
@@ -7959,6 +8086,7 @@ def main() -> int:
         test_release_facing_docs_sync_release_blockers_to_registry,
         test_release_gate_scans_ipc_threat_model,
         test_packaging_portability_checker_exists,
+        test_packaging_portability_subprocess_output_is_utf8_safe,
         test_packaging_portability_utf8_governance_allowlist_is_exact,
         書庫展開で日本語名と内容を保持する,
         対話契約の関係と表示境界を検査する,

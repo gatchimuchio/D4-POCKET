@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "product": "D4 Pocket",
+  "ui_preferences": {
+    "theme": "system",
+    "density": "compact",
+    "locale": "ja-JP"
+  },
+  "settings": {
+    "theme": "dark",
+    "density": "comfortable",
+    "locale": "en-US"
+  }
+}

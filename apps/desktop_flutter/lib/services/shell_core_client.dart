@@ -4,16 +4,35 @@ import '../models/generated_contracts.dart';
 import 'broker_client.dart';
 import 'workspace_client.dart';
 
+class D4PocketUiConfiguration {
+  const D4PocketUiConfiguration({
+    required this.theme,
+    required this.density,
+    required this.locale,
+  });
+
+  const D4PocketUiConfiguration.defaults()
+      : theme = 'system',
+        density = 'compact',
+        locale = 'ja-JP';
+
+  final String theme;
+  final String density;
+  final String locale;
+}
+
 class ShellCoreClient {
   const ShellCoreClient._(
     this.snapshot,
     this.mode, [
     this.workspaceClient,
     this.brokerTransport,
+    this.initialUiConfiguration = const D4PocketUiConfiguration.defaults(),
   ]);
 
   final WorkspaceClient? workspaceClient;
   final BrokerTransport? brokerTransport;
+  final D4PocketUiConfiguration initialUiConfiguration;
 
   final ShellSnapshot snapshot;
   final String mode;
@@ -26,6 +45,16 @@ class ShellCoreClient {
         healthResponse,
         'health',
         bodyKey: 'health',
+      );
+      final initialConfigurationResponse = await broker.request(
+        '初回設定取得',
+        payload: const <String, Object?>{'version': 1},
+      );
+      final initialUiConfiguration = _validatedFirstRunConfiguration(
+        _acceptedResponseBodyMap(
+          initialConfigurationResponse,
+          '初回設定取得',
+        ),
       );
       Map<String, Object?> setupDoctorReport;
       try {
@@ -135,6 +164,7 @@ class ShellCoreClient {
         'broker',
         WorkspaceClient(broker),
         broker,
+        initialUiConfiguration,
       );
     } on Object catch (error) {
       return ShellCoreClient._(
@@ -559,6 +589,26 @@ Map<String, Object?> _unknownSetupDoctorReport(String message) {
         },
     ],
   };
+}
+
+D4PocketUiConfiguration _validatedFirstRunConfiguration(
+    Map<String, Object?> configuration) {
+  const expectedFields = <String>{'version', 'product', 'ui_preferences'};
+  const expectedPreferences = <String>{'theme', 'density', 'locale'};
+  final preferences = configuration['ui_preferences'];
+  if (configuration.keys.toSet().length != expectedFields.length ||
+      !configuration.keys.toSet().containsAll(expectedFields) ||
+      configuration['version'] != 1 ||
+      configuration['product'] != 'D4 Pocket' ||
+      preferences is! Map ||
+      preferences.keys.toSet().length != expectedPreferences.length ||
+      !preferences.keys.toSet().containsAll(expectedPreferences) ||
+      preferences['theme'] != 'system' ||
+      preferences['density'] != 'compact' ||
+      preferences['locale'] != 'ja-JP') {
+    throw const BrokerClientException('Broker初回UI設定が固定Schemaまたは既定値に適合しません');
+  }
+  return const D4PocketUiConfiguration.defaults();
 }
 
 Map<String, Object?> _validatedSetupDoctorReport(Map<String, Object?> report) {

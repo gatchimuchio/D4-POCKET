@@ -29,7 +29,7 @@ staged manifestの`launcher_runtime`は起動器が使う`%LOCALAPPDATA%\GUI-She
 
 正式collectorはstageを実行したWindows user SIDと異なるWindows user profileから起動し、`-UseCurrentWindowsProfile`を指定する。staged manifestにはuser SIDそのものではなく、run固有salt付きSHA-256 digestを保存し、collector内だけで現在userと比較する。対象installed rootとmanifestには読み取り権限、evidence出力先には当該test userの書き込み権限が必要だが、collectorはACLを変更しない。同一profileでの開発確認は`-DiagnosticOnly`に限定し、Temp下に別runtimeを作成する。
 
-Rust Broker生成のSetup Doctor report取得・固定store保存・accepted Auditとのreport hash結合は実装済みである。通常起動UIはBroker reportを読み取り表示し、Flutterはfileへ書かない。初回config生成は未接続のためreportに`unknown`が残り、strict release validatorは受理しない。collector version 13は実runtimeの固定report fileと同一hashの`LIVE_RUNTIME` accepted AuditEventを照合してevidenceへ含める。Windows installed product runとSetup Doctor画面のoperator readabilityは未実測であり、product reportの存在だけではrelease blockerを解消しない。
+Rust BrokerはSetup Doctor reportとfirst-run UI configurationを固定storeへ生成・読取するcontractを実装済みである。通常起動UIは認証済みBroker IPCから両方のprojectionを読み取り、Flutterはfileへ書かない。collector version 14はfirst-run configの起動前不在・既定値・file hashとaccepted AuditEventを照合し、Setup Doctor reportの固定store byte hashとaccepted AuditEventもevidence bundleへ含める。変更後sourceによるWindows installed product runとSetup Doctor画面のoperator readabilityは未実測であり、contract・unit test・collectorの存在だけではrelease blockerを解消しない。
 
 `collect_broker_smoke.ps1`は認証IPC、`127.0.0.1`限定bind、`credential_role=normal`、永続store準備、Broker restart後のreplay拒否、crash時のfail-closedを検証する。これはBroker単体のLIVE_RUNTIME証拠であり、Desktop起動器、installed product、正式releaseを証明しない。No-Python／no-FFI値は非正式なstatic declarationに限る。
 

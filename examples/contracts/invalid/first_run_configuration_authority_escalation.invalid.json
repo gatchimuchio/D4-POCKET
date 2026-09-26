@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "product": "D4 Pocket",
+  "ui_preferences": {
+    "theme": "system",
+    "density": "compact",
+    "locale": "ja-JP"
+  },
+  "permission": ["filesystem.write"]
+}

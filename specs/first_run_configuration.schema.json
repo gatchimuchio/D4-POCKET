@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/first_run_configuration.schema.json",
+  "title": "D4 Pocket 初回UI設定",
+  "description": "Windows Desktop初回起動時にRust Brokerが固定storeへ一度だけ生成する既定UI設定。権限、Approval、Credential、pathを含まない。",
+  "type": "object",
+  "required": ["version", "product", "ui_preferences"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "product": { "const": "D4 Pocket" },
+    "ui_preferences": {
+      "type": "object",
+      "required": ["theme", "density", "locale"],
+      "additionalProperties": false,
+      "properties": {
+        "theme": { "const": "system" },
+        "density": { "const": "compact" },
+        "locale": { "const": "ja-JP" }
+      }
+    }
+  }
+}
