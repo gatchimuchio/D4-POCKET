@@ -7308,6 +7308,31 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
         errors.append("GUI Shell書出しの監査storeが新規化されていない")
     if not export_manifest.get("app_identity", {}).get("app_id"):
         errors.append("GUI Shell書出しの新規App identityが空である")
+    for target_name, target, schema in (
+        ("Receipt", receipt, receipt_schema),
+        ("Manifest file", manifest_file, manifest_file_schema),
+    ):
+        invalid_app_identity = copy.deepcopy(target)
+        app_identity = (
+            invalid_app_identity.get("export_manifest", {}).get("app_identity")
+            if target_name == "Receipt"
+            else invalid_app_identity.get("manifest", {}).get("app_identity")
+        )
+        if isinstance(app_identity, dict):
+            app_identity["app_id"] = "d4-pocket-app-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        if not validate_instance(invalid_app_identity, schema):
+            errors.append(f"GUI Shell書出し{target_name}Schemaが大文字App IDを拒否しない")
+
+        invalid_audit_store = copy.deepcopy(target)
+        audit_store = (
+            invalid_audit_store.get("export_manifest", {}).get("audit_store")
+            if target_name == "Receipt"
+            else invalid_audit_store.get("manifest", {}).get("audit_store")
+        )
+        if isinstance(audit_store, dict):
+            audit_store["store_id"] = "audit-store-example"
+        if not validate_instance(invalid_audit_store, schema):
+            errors.append(f"GUI Shell書出し{target_name}Schemaが不定形式Audit store IDを拒否しない")
     module_catalog = load_contract_fixture("gui_shell_module_catalog.valid.json")
     module_schema = load_schema("gui_shell_module_catalog.schema.json")
     errors.extend(validate_instance(module_catalog, module_schema))

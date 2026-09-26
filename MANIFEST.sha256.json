@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "5c217b640bdbe498c0bde533c63feef0b42a866e61f011200ebd2bfce337daac"
+      "sha256": "0e457787c0d85066c38c02a9162337849e6dd27af857903971886d858be67e2e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1341,7 +1341,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "b2d8b9ac0022eb95b849d52d9d4c0b50664796c58f30414770d176e42257003b"
+      "sha256": "1111b73133b8b2e43b2cd616b69edd46fc1562d03dc9a76aabf0f9dec43c139f"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -1697,11 +1697,11 @@
     },
     {
       "path": "examples/contracts/gui_shell_export_manifest.valid.json",
-      "sha256": "89c04b5b16efd180522a823c4cff57c81b5b7fc3570440713569dd1612dcd4a1"
+      "sha256": "4ab0bd23b31a2d75a38f5de0b3076082b744cc0ee81d6319fa466b3626696a31"
     },
     {
       "path": "examples/contracts/gui_shell_export_receipt.valid.json",
-      "sha256": "e5abcaf45a7810da7ee054ada5c49872f1bec00660257729a7f18448446e55c2"
+      "sha256": "933af0fc238e06304df8243e9ed0f3b61ab57fa5cfda3ca38e7a586e0ee847ff"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -2025,7 +2025,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_export_receipt_pruning_claim.invalid.json",
-      "sha256": "81bbfdad9d99a7286182508590f619fab3bc7b7ee055c5bdf15c99f3a9e73d66"
+      "sha256": "b1a5a85e0d2e493baa1b9358ffbe6696b5f7dd7816ab7c7fb462e85ab4465895"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_export_unknown_module.invalid.json",
@@ -2885,7 +2885,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "602988ba6040a06e4f855810b9bdb21e75b159d89ccc3dcf9b776abe3ec93ea9"
+      "sha256": "1386c7fdb8e0a99df4dfc8a5b2508666466d0ffb593b9a68e5b06e264bdbd274"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -3737,7 +3737,7 @@
     },
     {
       "path": "specs/gui_shell_export_receipt.schema.json",
-      "sha256": "41451e7e9247abb4330ea0de4974f62690577db36b3a0f8d68e12a8058880d84"
+      "sha256": "b472cedfd647d81d5512c03fe91cec46e5a0c4529d131e958efb7c652fe63022"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -4093,7 +4093,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8e17c2a7f3c60ba9ac4d99239c4c31dd686dbf471b00a9e6bf77caccf72ea871"
+      "sha256": "2572c001f927bf1f427fae37ceb5fcdc9c2f08f36351a14b2f73a4a39e3e05f6"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

@@ -5,7 +5,7 @@
   "export_id": "export-d4-pocket",
   "export_manifest": {
     "app_identity": {"app_id": "app-d4-pocket-example", "display_name": "D4 Pocket無効例", "target_platform": "windows"},
-    "audit_store": {"store_id": "audit-store-example", "chain_status": "new", "inherited": false},
+    "audit_store": {"store_id": "audit-store-22222222222222222222222222222222", "chain_status": "new", "inherited": false},
     "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
     "runtime_manifest": {"runtime_ids": []},
     "adapter_configuration": {"agent_ids": [], "tool_ids": [], "mcp_connection_ids": []},

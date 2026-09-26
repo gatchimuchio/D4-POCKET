@@ -18,6 +18,8 @@ Owner資格、privileged IPC、Owner role flagをFlutterへ渡さず、Rust起�
 
 書出し元のAuthority、Permission、Approval、Credential、Audit chainは継承しない。Manifest内のApp identityとAudit store identityは新規で、`authority_strip=true`、各`*_inherited=false`、`inheritance_policy`の各値`none`を返す。これらは識別子の割当てであり、実行可能Appや物理Audit storeの生成を意味しない。Capability requirementは必要機能の説明であり、Permissionではない。
 
+Brokerが生成するApp IDは`d4-pocket-app-`に小文字hex 32桁を続けた形式、Audit store IDは`audit-store-`に小文字hex 32桁を続けた形式とする。ReceiptとManifest fileのSchemaはこの形式を検査する。識別子は新規構成を対応付ける値であり、信頼、Permission、Approval、Credentialを表さない。
+
 ## 未成立範囲
 
 `manifest_file_status=written`は設定Manifest fileの作成だけを表す。一時file状態は`removed`または`cleanup_pending`として復旧情報と組で明示する。`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外をbinaryからの削除へ読み替えない。Owner経路の自動試験は通常資格拒否、模擬Yes／No、hash・session・Authority metadata・期限の負例、永続Broker Auditを確認する。実Desktop上での対話的なWindows確認表示・クリックと、file作成後のAudit／hashを含むformal LIVE_RUNTIME確認は別途必要である。Developer専用Flutter UIのbaseline／選択build比較とAOT report上のsurface library node有無は確認済みだが、実行可能な独立Export bundle、別Runtime／Audit store、pruning、安全Core保持、製品起動・資源比較、Installer、署名、配布、rollbackは未成立の`release_blocker`として保持する。Manifest file作成を独立App完成や製品releaseへ昇格させない。

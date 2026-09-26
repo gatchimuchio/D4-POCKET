@@ -1742,3 +1742,19 @@ MethodChannel／PID-bound pipeは現行実装済みのため再実装せず、`d
 - 最終進捗追記後の`python -X utf8 tooling/日本語基底監査.py --strict`：未解消負債0件。`python -X utf8 tooling/manifest.py --write`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`もすべて成功。
 
 Windows installed productのclean-source formal smoke、Dart経路の全negative/failure実測、正常終了とfirst-run／Setup Doctor evidenceは未確認で、`rev2_flutter_broker_channel_boundary`を`release_blocker`のまま維持する。正式distribution、Module Pruning最終artifact検証、Mobile実機／iOS、owner GO等の既存blockerも変わらず、`release_ready=false`である。
+
+## D4 Pocket rev2 Export identity形式の契約同期（2026-09-26）
+
+現行BrokerはApp IDを`d4-pocket-app-`＋小文字hex 32桁、Audit store IDを`audit-store-`＋小文字hex 32桁として生成する。一方、Receipt／Manifest fileが共有するSchemaは両方を任意文字列として許し、valid exampleのAudit store IDもBroker生成形式と異なっていた。Schemaへ両形式を固定し、valid example、日本語のExport意味正本、ReceiptおよびManifest file双方のnegative Conformanceを同期した。大文字hex App IDと不定形式Audit store IDを拒否する。
+
+この変更はJSON形状の検査だけであり、IDの出所、Owner操作、暗号学的真正性、IDの実行時利用を証明しない。権限・Runtime・Manifest file生成経路は変更していない。独立Export artifact、別Runtime／Audit store、Module pruning、製品性能は依然未成立であり、`rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`は`release_blocker`、`release_ready=false`を維持する。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 136件、正常example 136件、negative fixture 168件でPASS。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：215 checksでPASS。ReceiptとManifest fileのApp ID／Audit store ID不正形式を個別に拒否した。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債0件、違反0件でPASS。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml 書出しは新規identityと監査storeを生成するが権限を継承しない`：Brokerが実生成した両識別子の形式検査1件PASS。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：library 279件、helper CLI 9件、integration 36件、全324件PASS。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。統合されたPython-only検証10項目PASS。Evidence bundleは既存release blocker 5件と`release_ready=false`を維持した。
+- `rustfmt --edition 2021 --check native/rust_helper/src/broker/export_center.rs`：不合格。今回の追加箇所はrustfmt出力と一致させたが、対象fileの既存箇所に広範な整形差分が残るためfile全体の一括整形は行わなかった。

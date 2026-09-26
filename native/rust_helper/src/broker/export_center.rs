@@ -824,10 +824,19 @@ mod tests {
         let response = broker.owner要求処理(&raw);
         assert_eq!(response.status, BrokerStatus::Accepted);
         let body = response.body.unwrap();
-        assert!(body["export_manifest"]["app_identity"]["app_id"]
+        let app_id = body["export_manifest"]["app_identity"]["app_id"]
             .as_str()
-            .unwrap()
-            .starts_with("d4-pocket-app-"));
+            .unwrap();
+        let audit_store_id = body["export_manifest"]["audit_store"]["store_id"]
+            .as_str()
+            .unwrap();
+        for (identifier, prefix) in [(app_id, "d4-pocket-app-"), (audit_store_id, "audit-store-")] {
+            let suffix = identifier.strip_prefix(prefix).unwrap();
+            assert_eq!(suffix.len(), 32);
+            assert!(suffix
+                .bytes()
+                .all(|byte| { byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) }));
+        }
         assert_eq!(body["export_manifest"]["audit_store"]["inherited"], false);
         assert_eq!(body["build_status"], "not_started");
         assert_eq!(body["manifest_file_status"], "written");
