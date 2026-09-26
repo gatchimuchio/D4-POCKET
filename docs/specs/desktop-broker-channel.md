@@ -1,6 +1,6 @@
 # Windows Desktop Flutter–Broker要求路
 
-状態: rev2契約。実装・実行証拠が成立するまでは未完成。
+状態: Rust起動器・Windows Runner・Flutter間の実装あり。clean product一連実行を含む正式`LIVE_RUNTIME`証拠は未成立。
 
 ## 1. 責任
 
@@ -49,15 +49,17 @@ Schema/fixtureは接続要求の形だけを証明し、Windows pipe、PID照合
 
 ## 6. 移行境界
 
-現行TCP BrokerとOwner CLI経路は維持する。Flutter productionのBrokerClientからendpoint file・session secret・TCP Socketへの直接アクセスは除去する。Android/iOSのDevice Linkは別Transport/別証拠面であり、このWindows Desktop契約によって完了扱いしない。Flutter内のSetup Doctor、snapshot、export等のfilesystem/network/process利用も独立に調査・移譲する。
+現行TCP BrokerとOwner CLI経路は維持する。Desktop Flutter productionのBrokerClientはWindows Runner MethodChannelと起動器owned PID-bound named pipeを使い、endpoint file・session secret・TCP Socketへ直接アクセスしない。Flutter childにはOS実行に必要な限定環境変数とpipe接続先札だけを渡し、親processの残りの環境変数を継承しない。Android/iOSのDevice Linkは別Transport／別証拠面であり、このWindows Desktop契約によって完了扱いしない。Flutter内のSetup Doctor、snapshot、export等のfilesystem/network/process利用も独立に調査・移譲する。
 
 この契約の作成は`release_blocker`を解消しない。Schema・fixture・conformanceはCONFIG/FIXTURE証拠に限られ、Runtime接続は別途実装・実測する。
 
-## 7. 実装状況と証拠境界（2026-09-24）
+## 7. 実装状況と証拠境界（2026-09-26）
 
 Rust起動器は起動ごとのpipe名を生成し、Windows named-pipe serverでremote clientを拒否する。接続ごとに`GetNamedPipeClientProcessId`を読み、起動器が生成したFlutter child PIDと一致する場合だけframeを処理する。Rust relayはBroker発行session IDを補い、normal secretで既存loopback Brokerへ接続する。secretはRustのrelay所有領域で消去し、Dart/Runnerへ渡さない。session IDを要求側が指定した場合はBrokerのdeny-unknown-fieldsへ到達する未知fieldを加え、healthを含めて拒否・Auditさせる。oversizeも既存Brokerへ上限超過frameとして渡す。
 
 Windows Runnerは`gui_shell/broker` MethodChannelを受け、要求JSON文字列を最大64 KiB、同時処理4件に制限する。名前付きpipeで要求・応答lineを運び、5秒期限と4 MiB応答上限を適用する。Dart BrokerClientはendpoint file、secret、Socketを扱わず、応答JSON・request ID・operationを検査する。pipe不通、Runner未導入、期限超過にfallbackはない。
+
+Rust起動器はFlutter child環境を一度消去し、`APPDATA`、`LOCALAPPDATA`、`PROGRAMDATA`、`SYSTEMDRIVE`、`SYSTEMROOT`、`TEMP`、`TMP`、`USERPROFILE`、`WINDIR`だけを引き継いだ上で`GUI_SHELL_BROKER_CHANNEL_PIPE`を設定する。`PATH`、資格情報候補、Codex環境、Broker runtime／endpoint／session情報など親環境の他の値は継承しない。この環境分離はRust起動器の実子process試験で確認する。これは秘密値が親環境の他経路に存在しないことや、正式installed productの全境界を証明するものではない。
 
 component testではnamed-pipeの同一PID許可・別PID拒否、Brokerを実起動したnormal認証relay、session ID注入・malformed・oversizeのBroker拒否とAuditを確認する。FlutterはMethodChannelの要求形状、資格field不在、不一致応答拒否をfixtureで確認する。これらは各component境界の証拠であり、clean packaged launcher → Flutter Runner → pipe → Brokerの一連を通す`LIVE_RUNTIME`証拠ではない。
 

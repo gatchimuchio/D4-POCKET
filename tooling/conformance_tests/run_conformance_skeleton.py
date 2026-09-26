@@ -2678,7 +2678,14 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
             errors.append(f"staged installがnative起動器を配置・hash結合しない: {token}")
     if 'Join-Path $env:LOCALAPPDATA "GUI-Shell\\broker\\desktop"' not in stage:
         errors.append("staged manifestが起動器のper-user runtime rootを示さない")
-    for token in ["run_loopback_server_cancellable", "BrokerCredentialRole::Normal", "authenticated_loopback_tcp", "GUI_SHELL_BROKER_ENDPOINT_JSON", "env_remove(\"GUI_SHELL_SNAPSHOT_JSON\")"]:
+    for token in [
+        "run_loopback_server_cancellable",
+        "BrokerCredentialRole::Normal",
+        "authenticated_loopback_tcp",
+        "configure_frontend_environment(",
+        ".env_clear()",
+        '"GUI_SHELL_BROKER_CHANNEL_PIPE"',
+    ]:
         if token not in launcher:
             errors.append(f"Rust Desktop起動器の既存Broker境界が欠落: {token}")
     for token in ["for component in [\"GUI-Shell\", \"broker\", \"desktop\"]", "canonical.starts_with(&root)", "ensure_store_directory", "broker_store_directory_rejects_junction_outside_runtime_root"]:
@@ -5959,9 +5966,89 @@ def test_desktop_broker_channel_contract() -> list[str]:
         "同じ起動器が起動したFlutter child processのPID",
         "Owner資格",
         "fallbackしない",
+        "親processの残りの環境変数を継承しない",
     ):
         if token not in spec:
             errors.append(f"Desktop Broker channel契約に境界の説明がない: {token}")
+
+    launcher_source = (
+        RUST_HELPER / "src" / "desktop_launcher.rs"
+    ).read_text(encoding="utf-8")
+    environment_allowlist = launcher_source.split(
+        "const FRONTEND_ENVIRONMENT_ALLOWLIST:", 1
+    )[1].split("];", 1)[0]
+    actual_allowlist = set(re.findall(r'"([A-Z0-9_]+)"', environment_allowlist))
+    expected_allowlist = {
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "SYSTEMDRIVE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "USERPROFILE",
+        "WINDIR",
+    }
+    if actual_allowlist != expected_allowlist:
+        errors.append(
+            "Flutter childのOS environment allowlistが正本と一致しない: "
+            f"missing={sorted(expected_allowlist - actual_allowlist)}, "
+            f"extra={sorted(actual_allowlist - expected_allowlist)}"
+        )
+    frontend_launch = launcher_source.split("fn launch_frontend(", 1)[1].split(
+        "pub fn run()", 1
+    )[0]
+    frontend_environment = launcher_source.split(
+        "fn configure_frontend_environment(", 1
+    )[1].split("\n}", 1)[0]
+    for token in (
+        "std::env::vars_os()",
+        "configure_frontend_environment(",
+        "OsStr::new(&broker.channel_pipe_name)",
+    ):
+        if token not in frontend_launch:
+            errors.append(f"Desktop起動器のFlutter起動経路に環境境界がない: {token}")
+    for token in (
+        ".env_clear()",
+        ".envs(filtered_frontend_environment(inherited))",
+        '.env("GUI_SHELL_BROKER_CHANNEL_PIPE", channel_pipe_name)',
+    ):
+        if token not in frontend_environment:
+            errors.append(f"Desktop起動器がFlutter環境を限定していない: {token}")
+    for token in (
+        '"OPENAI_API_KEY"',
+        '"CODEX_HOME"',
+        '"GUI_SHELL_BROKER_RUNTIME_DIR"',
+        '"GUI_SHELL_BROKER_ENDPOINT_JSON"',
+        '"GUI_SHELL_BROKER_SESSION_JSON"',
+        '"PATH"',
+    ):
+        if token not in launcher_source:
+            errors.append(f"Flutter子process環境分離のnegative試験にcaseがない: {token}")
+
+    launcher_spec = (ROOT / "docs" / "specs" / "windows-desktop-launcher.md").read_text(
+        encoding="utf-8"
+    )
+    operation_surfaces = (ROOT / "docs" / "GUI_OPERATION_SURFACES.md").read_text(
+        encoding="utf-8"
+    )
+    roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+    for document, stale_claim in (
+        (launcher_spec, "Flutterは既存`BrokerClient`の認証付き`127.0.0.1`接続を使う。"),
+        (launcher_spec, "Flutterへ渡す環境変数はendpoint file pathとBroker runtime directoryに限る。"),
+        (operation_surfaces, "現行Dart BrokerClientのfile／session secret／loopback socket責務は未解消。"),
+        (roadmap, "現行Flutter BrokerClientのDart内file／session-secret／loopback socket処理もD4責務境界とのGap"),
+    ):
+        if stale_claim in document:
+            errors.append(f"Desktop Broker channel現行実装と文書記述が不一致: {stale_claim}")
+    for token in (
+        "gui_shell/broker",
+        "PID照合",
+        "GUI_SHELL_BROKER_CHANNEL_PIPE",
+        "親processの残りの環境変数を継承しない",
+    ):
+        if token not in launcher_spec:
+            errors.append(f"Windows Desktop起動器正本に現行境界がない: {token}")
     return errors
 
 

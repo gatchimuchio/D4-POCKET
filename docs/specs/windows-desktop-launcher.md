@@ -27,11 +27,12 @@ broker/gui_shell_rust_helper.exe
 → Rust起動器がユーザー保存領域と単一起動lockを確認
 → 既存Rust Brokerを起動器内threadで起動
 → loopback bind・通常資格endpointの生成完了を待つ
-→ 固定配置のFlutter executableを通常資格endpoint path付きで起動
+→ 起動ごとのPID-bound pipeを準備して固定配置のFlutter executableを起動
+→ Flutter RunnerのMethodChannel要求を起動器owned pipeから既存Brokerへrelay
 → Flutter終了後、起動器がprocess内停止通知をBrokerへ送り、endpointを照合削除
 ```
 
-Flutterは既存`BrokerClient`の認証付き`127.0.0.1`接続を使う。新bridge、FFI、privileged IPC、任意command、任意executable、Flutterからのprocess管理を追加しない。Brokerは権限を判断し、起動器はprocess lifecycleだけを管理する。
+Flutterは`gui_shell/broker` MethodChannelで要求JSONだけをWindows Runnerへ渡し、Rust起動器が当該Flutter child PIDを照合したPID照合済み名前付きpipe経由で既存の認証付きloopback Brokerへrelayする。Dartからのendpoint file、secret、Socket、networkへの直接アクセスやfallbackはない。別bridge、FFI、privileged IPC、任意command、任意executable、Flutterからのprocess管理を追加しない。Brokerは権限を判断し、起動器はprocess lifecycleと境界付きrelayを管理する。
 
 ## 3. 接続情報と権限境界
 
@@ -40,8 +41,8 @@ Flutterは既存`BrokerClient`の認証付き`127.0.0.1`接続を使う。新bri
 - 起動lifecycle自体はOwner権限を付与しない。別contractで明示された操作に限り、PID-bound Named Pipe要求をRust起動器がoperation別にparseし、Windows native default-No確認を表示した後、capacity-1 process内channel経由でBroker所有threadへ渡す。現行allowlistは`GUI Shell書出し`、`回帰Case削除`、`回帰Case削除中断確認`だけであり、任意Owner operationへ拡張しない。No／未確認は通常資格経路でOwner不足として拒否される。
 - Native確認はWindows session上の明示操作記録であって、Windows account再認証や本人性証明ではない。表示は各operation contractから検証済みfieldだけを射影し、Brokerはsession、時刻、nonce、payload hashおよびoperation固有条件を再検証する。秘密値・Owner資格・privileged IPCをFlutterへ渡さない。
 - 起動AuditEventのappendが失敗した場合、Brokerはendpoint準備完了を通知せずFlutterを起動しない。終了AuditEventまたはBroker停止が失敗した場合も正常終了として扱わず、起動器管理Brokerだけを止め、byte列が一致するendpointだけを整理し、durable storeを保持する。
-- Flutterへ渡す環境変数はendpoint file pathとBroker runtime directoryに限る。秘密値そのものをenvironment、command line、UI、snapshot、log、traceへ複製しない。
-- 開発用snapshot・Setup Doctor export・Semantics exportのenvironment overrideは、通常のFlutter起動processから取り除く。
+- Flutter childの環境は起動器で消去し、`APPDATA`、`LOCALAPPDATA`、`PROGRAMDATA`、`SYSTEMDRIVE`、`SYSTEMROOT`、`TEMP`、`TMP`、`USERPROFILE`、`WINDIR`だけを引き継ぐ。これに起動ごとのpipe接続先札`GUI_SHELL_BROKER_CHANNEL_PIPE`を追加する。endpoint path、Broker runtime directory、資格情報、任意の親環境変数は渡さず、親processの残りの環境変数を継承しない。
+- 開発用snapshot・Setup Doctor export・Semantics exportのenvironment overrideを含め、上記許可list外の環境変数は通常のFlutter起動processから取り除く。
 - 受信した引数は受け付けず、起動先は配置root内の固定Flutter executableに限定する。
 
 ## 4. 保存・同時起動・終了

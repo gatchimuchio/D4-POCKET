@@ -1721,3 +1721,24 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 - Windows installed product上のOwner No／Yes、実Manifest file、完了Auditに対するformal LIVE_RUNTIME evidenceは取得していない。OwnerのYes操作も実施していない。
 
 `rev2_export_owner_ui_authority_path`はUI未接続ではなくinstalled productのformal LIVE_RUNTIME evidence未成立を理由とする`release_blocker`のまま維持する。`rev2_module_pruning_binary_and_measurement`も実package、binary pruning、安全Core保持、独立Runtime、性能測定が未成立のため維持する。`windows_rust_integration_test_execution_policy`はApplication Controlによる実integration test拒否と、修正後test未実証を理由に維持する。Release statusは`release_ready=false`。
+
+## D4 Pocket rev2 Flutter子process環境分離とRust全target再確認（2026-09-26）
+
+作業開始時の`main`はcleanで`origin/main`と一致する`c0c50c39a31da352cc2fbc3ce9fa4ef32b0c5691`だった。2世代rollback refは`codex/backup-main=c0c50c39a31da352cc2fbc3ce9fa4ef32b0c5691`、`codex/backup-main-prev=405de8a608e6ec48a2f82882b4502ccbb4db12fb`で、remote backup tagも同じhashを指す。Ownerはpushとcleanupを禁止しているため、この追補を含む変更はlocal作業状態に保持し、push、temp／build削除、branch cleanupは行わない。
+
+再監査でRust起動器の`Command`が親process環境を継承していた点を確認した。起動器はFlutter child環境を`env_clear()`し、`APPDATA`、`LOCALAPPDATA`、`PROGRAMDATA`、`SYSTEMDRIVE`、`SYSTEMROOT`、`TEMP`、`TMP`、`USERPROFILE`、`WINDIR`だけを許可し、起動ごとの`GUI_SHELL_BROKER_CHANNEL_PIPE`だけを別途設定する。`PATH`、資格情報候補、Codex環境、Broker runtime／endpoint／session環境値は継承しない。Windows `cmd.exe`を実際に起動するRust unit testへ合成markerを置き、子環境にOS必須値とpipe札があり、credential・Codex・PATH・Broker path markerがないことを観測する。Dart、Runner、Authority、IPC protocolは変更していない。
+
+MethodChannel／PID-bound pipeは現行実装済みのため再実装せず、`desktop-broker-channel.md`、`windows-desktop-launcher.md`、ROADMAP、GUI操作面台帳を同期した。ConformanceはRust実起動経路が環境をclearしてallowlist＋pipeだけを設定すること、negative marker試験があること、旧いDart直Socket/fileやendpoint環境引渡しの記述が再導入されないことを検査する。`rev2_flutter_broker_channel_boundary`の正式clean product smoke／failure coverage／first-run・Setup Doctor evidenceは未成立であり継続する。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 136件、正常example 136件、negative fixture 168件でPASS。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：215項目が合格。Broker子プロセス環境の許可リストと、旧契約記述の再導入防止を含む。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：未解消の日本語負債0件、違反0件で合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：現sourceで全target成功。Rust library 279件、helper CLI 9件、integration 36件、合計324件が成功し、失敗0件。起動器binaryとdoc testは各0件で正常終了した。子process環境分離testもこの全件実行に含む。
+- 全対象一括試験の合格前に行ったライブラリ再試行では、A2A BrokerのTCP折返し通信試験が`a2a_connection_failed`／`A2A Agent Card bodyを読めない`で2回、MINIDORAのTCP折返し通信試験が`対話失敗::通信失敗`で1回失敗した。各対象を単独実行した結果は合格し、その後の全対象一括試験も合格した。失敗時の低層OS通信基盤のエラー種別を取得できず、根本原因を特定したとは主張しない。この実行揺らぎは`RELEASE_CHECKLIST.md`の既知制約へ記録し、再発時にOS側のエラー種別を採取する。Application Controlのエラー4551は今回の最終全対象実行では再現しなかったため、`windows_rust_integration_test_execution_policy`を解決済み／無効へ更新した。これはローカル試験実行gateの解消であり、release evidenceではない。
+- `rustfmt --edition 2021 --check native/rust_helper/src/desktop_launcher.rs`：整形検査は不合格。ファイル全体に既存の広範な整形差分があるため、今回の変更箇所以外は一括整形しなかった。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。日本語厳格監査、Schema 136件・正常example 136件・negative fixture 168件、conformance 215件、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertion 12件（失敗0件）、C32開発監査が合格した。Evidence bundleはrelease blocker 5件を保持し、`release_ready=false`。Windows installed evidence欠落による5件のrelease blockerは継続する。
+- 最終進捗追記後の`python -X utf8 tooling/日本語基底監査.py --strict`：未解消負債0件。`python -X utf8 tooling/manifest.py --write`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`もすべて成功。
+
+Windows installed productのclean-source formal smoke、Dart経路の全negative/failure実測、正常終了とfirst-run／Setup Doctor evidenceは未確認で、`rev2_flutter_broker_channel_boundary`を`release_blocker`のまま維持する。正式distribution、Module Pruning最終artifact検証、Mobile実機／iOS、owner GO等の既存blockerも変わらず、`release_ready=false`である。

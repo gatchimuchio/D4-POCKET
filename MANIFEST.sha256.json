@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "3bc56a26d8e6a62d37d7a9096564bfe32a72b11a274dcdc3f063e3f43e9b7974"
+      "sha256": "38959175e21ac8fda0b799ae2bb925a516e0f99809c7d8398b7fbe312c0048fe"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4d8c2853b90280bd7ca4658e65902bc41c23df398bebb3266ecbce1e01970095"
+      "sha256": "1ea35ff55e8d5a811f196a80f4246311013df01ed2eb1e10ad9af7897d0c07af"
     },
     {
       "path": "SECURITY.md",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "12b3a3e64aa9fc51c8b3e282cf9f1e9a1a39d83ecc502bab1b5b6403d266fdfb"
+      "sha256": "fa83f00469dbc9ae1425dbb0146964d4f373af0a5d654b8be74e365f1e40f5b2"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "6f1ac7c3b86f1da806a3513adff2e5254834d882d6bd61b3a096d3f17c629a02"
+      "sha256": "5c217b640bdbe498c0bde533c63feef0b42a866e61f011200ebd2bfce337daac"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
-      "sha256": "d261eeb0f3b62b39d254a352c9a407e108555a977a1612bd6d925525d55ecc9e"
+      "sha256": "f2e3f6b4d8becf2e5ee1bac7c1609345cd83d2784354df879ec204a83ac47c03"
     },
     {
       "path": "docs/specs/desktop-ux-integration.md",
@@ -1425,7 +1425,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "13761a272580b29aca7e644cb332c5c3a6dd613659487a4c92d983f7cf00902a"
+      "sha256": "6f24262c1794fffc6c0c6e50b409105bd1c8979201c0accd400a5ec634200794"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -2973,7 +2973,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "a6b5b7218513bbc7322a901185e853f74698fe869b32028a0a0ed9c66a939ada"
+      "sha256": "a9b1b92e8dc6f9616c6b2b681b800953a738558b6c8b7bfcde02bb71bee8ce83"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3497,7 +3497,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1919e9b94ca505d2bd4dbdcebbd4845ef1e5dc2935f5aea244e715a80586e9ac"
+      "sha256": "92cfbc07a4022399e05aa4f4425d35cb8a93fa8f0eb4cf90f576ac69c40baf6c"
     },
     {
       "path": "requirements-dev.txt",
@@ -4093,7 +4093,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a2b899618b44ed799fe24ae0803ec5c400497038158a594a0b46f7359868d1db"
+      "sha256": "8e17c2a7f3c60ba9ac4d99239c4c31dd686dbf471b00a9e6bf77caccf72ea871"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

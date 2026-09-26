@@ -1,5 +1,6 @@
-//! Windows向けDesktop起動管理。権限判断はBrokerに残し、Flutterへ通常IPC資格だけを渡す。
+//! Windows向けDesktop起動管理。権限判断はBrokerに残し、FlutterへBroker資格を渡さない。
 
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
@@ -35,6 +36,17 @@ const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const RELAY_IO_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_FILE: &str = "broker_session.json";
 const EXPORT_DIRECTORY_NAME: &str = "exports";
+const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "SYSTEMDRIVE",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "WINDIR",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
@@ -1070,20 +1082,15 @@ fn wait_for_frontend(
 
 fn launch_frontend(
     layout: &PackageLayout,
-    runtime_dir: &Path,
     broker: &RunningBroker,
 ) -> Result<ExitStatus, DesktopLaunchError> {
     let mut command = Command::new(&layout.app_exe);
-    command
-        .current_dir(&layout.app_dir)
-        .env("GUI_SHELL_BROKER_CHANNEL_PIPE", &broker.channel_pipe_name)
-        .env("GUI_SHELL_BROKER_RUNTIME_DIR", runtime_dir)
-        .env_remove("GUI_SHELL_BROKER_ENDPOINT_JSON")
-        .env_remove("GUI_SHELL_BROKER_SESSION_JSON")
-        .env_remove("GUI_SHELL_SNAPSHOT_JSON")
-        .env_remove("GUI_SHELL_SETUP_DOCTOR_EXPORT_JSON")
-        .env_remove("GUI_SHELL_SETUP_DOCTOR_CONTEXT_JSON")
-        .env_remove("GUI_SHELL_SURFACE_SEMANTICS_EXPORT_JSON");
+    configure_frontend_environment(
+        &mut command,
+        std::env::vars_os(),
+        OsStr::new(&broker.channel_pipe_name),
+    );
+    command.current_dir(&layout.app_dir);
     let mut frontend = command.spawn().map_err(|_| {
         DesktopLaunchError::new(
             "FRONTEND_START_FAILED",
@@ -1092,6 +1099,32 @@ fn launch_frontend(
     })?;
     broker.frontend_pid.store(frontend.id(), Ordering::Release);
     wait_for_frontend(&mut frontend, broker)
+}
+
+fn filtered_frontend_environment(
+    inherited: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Vec<(OsString, OsString)> {
+    inherited
+        .into_iter()
+        .filter(|(name, _)| {
+            name.to_str().is_some_and(|name| {
+                FRONTEND_ENVIRONMENT_ALLOWLIST
+                    .iter()
+                    .any(|allowed| name.eq_ignore_ascii_case(allowed))
+            })
+        })
+        .collect()
+}
+
+fn configure_frontend_environment(
+    command: &mut Command,
+    inherited: impl IntoIterator<Item = (OsString, OsString)>,
+    channel_pipe_name: &OsStr,
+) {
+    command
+        .env_clear()
+        .envs(filtered_frontend_environment(inherited))
+        .env("GUI_SHELL_BROKER_CHANNEL_PIPE", channel_pipe_name);
 }
 
 pub fn run() -> Result<(), DesktopLaunchError> {
@@ -1117,7 +1150,7 @@ pub fn run() -> Result<(), DesktopLaunchError> {
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
     let mut broker = RunningBroker::start(&runtime_dir, true)?;
 
-    let frontend_result = launch_frontend(&layout, &runtime_dir, &broker);
+    let frontend_result = launch_frontend(&layout, &broker);
     let broker_result = broker.finish();
     broker_result?;
     let status = frontend_result?;
@@ -1143,6 +1176,69 @@ mod tests {
         ));
         fs::create_dir_all(&path).expect("一時作業ディレクトリ");
         path
+    }
+
+    #[test]
+    fn flutter_child_environment_is_allowlisted() {
+        let system_root = std::env::var_os("SystemRoot").expect("SystemRoot環境変数がない");
+        let system32 = PathBuf::from(&system_root).join("System32");
+        let command_exe = system32.join("cmd.exe");
+        let inherited = vec![
+            (OsString::from("SystemRoot"), system_root),
+            (
+                OsString::from("OPENAI_API_KEY"),
+                OsString::from("secret-marker-openai"),
+            ),
+            (
+                OsString::from("CODEX_HOME"),
+                OsString::from("secret-marker-codex"),
+            ),
+            (OsString::from("PATH"), OsString::from("secret-marker-path")),
+            (
+                OsString::from("GUI_SHELL_BROKER_RUNTIME_DIR"),
+                OsString::from("private-runtime-path"),
+            ),
+            (
+                OsString::from("GUI_SHELL_BROKER_ENDPOINT_JSON"),
+                OsString::from("endpoint-marker"),
+            ),
+            (
+                OsString::from("GUI_SHELL_BROKER_SESSION_JSON"),
+                OsString::from("session-marker"),
+            ),
+        ];
+        let mut command = Command::new(command_exe);
+        configure_frontend_environment(
+            &mut command,
+            inherited,
+            OsStr::new(r"\\.\pipe\D4PocketBroker-0123456789abcdef0123456789abcdef"),
+        );
+        let output = command
+            .args(["/d", "/c", "set"])
+            .output()
+            .expect("隔離環境の確認process");
+        assert!(output.status.success(), "環境確認processが失敗した");
+        let environment = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+        assert!(environment.contains("systemroot="));
+        assert!(environment.contains("gui_shell_broker_channel_pipe="));
+        for marker in [
+            "openai_api_key",
+            "secret-marker-openai",
+            "codex_home",
+            "secret-marker-codex",
+            "path=secret-marker-path",
+            "gui_shell_broker_runtime_dir",
+            "private-runtime-path",
+            "gui_shell_broker_endpoint_json",
+            "endpoint-marker",
+            "gui_shell_broker_session_json",
+            "session-marker",
+        ] {
+            assert!(
+                !environment.contains(marker),
+                "親process環境が子processへ漏れた: {marker}"
+            );
+        }
     }
 
     fn endpoint() -> BrokerEndpoint {

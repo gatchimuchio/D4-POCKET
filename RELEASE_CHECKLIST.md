@@ -46,13 +46,6 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   required_action: <code>docs/implementation/RUST_SECURITY_BROKER_MIGRATION_PLAN.md</code> の migration plan を完了し、installed product runtime では Python が dev／test／migration oracle のみに限定されることを実証し、broker-mediated Windows installed-path evidence を収集し、strict release validation を再実行する。
   blocks_release: yes
 
-- item: cargo test gate for in-scope Rust helper
-  classification: release_blocker
-  registry_id: windows_rust_integration_test_execution_policy
-  reason: 現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5のcargo test --lib 273件とA2A loopback対象testの連続20回再試行は成功した。通常の全target試行では同testが一度失敗し、対象test単独と全library再試行は成功したが、後続desktop launcher test executableはWindows Application ControlのOS error 4551で拒否され、全target完遂に至っていない。2026-09-25の別sourceに対する成功記録は履歴であり、現行sourceの全target test evidenceを代替しない。
-  required_action: OS policyを無効化せず、許可済みWindows hostで現行sourceの <code>cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1</code> を全target成功させ、正確なcommitと結果を記録する。
-  blocks_release: yes
-
 - item: desktop flutter analyze gate
   classification: required_for_v1
   reason: completed desktop-first v1.0 release には desktop Flutter analyze が必要である。<code>unzip</code> が利用可能になった後、2026-05-25 の現在の run は通過した。
@@ -379,5 +372,17 @@ known limitation を認める条件は、次のとおりである。
 - classification: known_limitation
   reason: 制約が safety、authority、audit、recovery、installer、validation の failure を隠さない
   required_action: release-facing documentation で明示し続ける
+  blocks_release: no
+~~~
+
+## 解決済み開発検証gateと既知の実行揺らぎ
+
+~~~yaml
+- item: Windows Rust全target試験の実行gate
+  classification: known_limitation
+  registry_id: windows_rust_integration_test_execution_policy
+  status: resolved
+  reason: 2026-09-26の現行sourceで全target cargo testが成功した。先行library再試行ではA2A／MINIDORA loopback body read testが断続的に失敗し、A2Aはcode=a2a_connection_failed、message=A2A Agent Card bodyを読めない、MINIDORAは対話失敗::通信失敗だった。両testの単独再実行と後続の全target実行は成功。失敗時の低層OS socket error kindは取得できておらず、原因を特定したとは主張しない。過去のApplication Control OS error 4551は今回の全target実行では再現しなかった。
+  required_action: Rust source変更時に全target cargo testを実行する。loopback errorが再発した場合は実際のOS error kindを取得し、test fixture／host環境／product runtimeを分けて再調査する。
   blocks_release: no
 ~~~

@@ -125,7 +125,7 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。初回設定の固定store create-only生成・read-only IPC取得もBrokerへ接続されRust library testに含む。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、変更後sourceのfirst-run／Setup Doctor product evidenceは未成立。",
+      "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。Flutter child環境は起動器で消去し、OS実行allowlistとpipe接続先札だけを渡す境界をRust子process試験とConformanceで検査する。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。初回設定の固定store create-only生成・read-only IPC取得もBrokerへ接続されRust library testに含む。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、変更後sourceのfirst-run／Setup Doctor product evidenceは未成立。",
       "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。初回設定の固定store生成・read-only IPC取得contractとSetup Doctor product evidenceのWindows実行をnegative test・LIVE_RUNTIME証拠で確認する。"
     },
     {
@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-25の全target成功と過去の273件成功は履歴として保持する。現行sourceのRust library 278件は成功した。全targetの初回再試行ではA2A／MINIDORA loopback testが一時失敗したが個別再実行は成功した。次の試行ではworkspace startup統合testがshutdown accepted Audit後も終了待ちとなり、応答後socket drain失敗がshutdownを通常継続へ落とさないよう修正しunit testを追加した。再build後の当該integration executable実行はWindows Application ControlのOS error 4551で拒否され、修正後の全targetは未検証。",
-      "required_action": "OS policyを無効化せず、生成済みRust test executableを実行できる許可済みWindows host上で、変更後sourceのcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target成功させ、正確なsource commitと結果を記録する。"
+      "reason": "2026-09-26の現行sourceでcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1が全target成功したため、Rust test executableを起動できないWindows Application Controlの開発阻害を解消した。直前のlibrary全件再試行ではA2A／MINIDORA loopbackのbody read errorが断続したが、対象test単独再実行と最終全target実行はいずれも成功した。断続errorの低層socket原因は確定しておらず、RELEASE_CHECKLIST.mdのknown_limitationへ記録する。これはlocal test実行の解決であり、Windows installed product証拠やrelease readinessを意味しない。",
+      "required_action": "このlocal Rust test executable実行gateに追加作業はない。Rust source変更時は全target cargo testを再実行し、loopback failureが再発した場合はOS error kindを取得して原因を別途追跡する。Windows installed product・正式releaseの独立blockerは維持する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",
