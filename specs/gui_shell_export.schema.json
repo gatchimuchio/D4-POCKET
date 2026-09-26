@@ -10,7 +10,7 @@
     "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
     "compose_manifest": { "$ref": "gui_shell_compose.schema.json" },
     "target_platform": { "const": "windows" },
-    "export_mode": { "const": "manifest_only" },
+    "export_mode": { "const": "manifest_file" },
     "distribution_channel": { "enum": ["local", "installer_candidate"] },
     "module_selection": {
       "type": "object",

@@ -93,7 +93,7 @@
     },
     {
       "path": "CLAIM.md",
-      "sha256": "271435443a48a08401481bd26cfb420a2abeb21b98931d52d93da8aec407cc8a"
+      "sha256": "6011e68200c80a11e4a1eb7f02361f85a2d7040b3d563e7f4d4d4d223290afe9"
     },
     {
       "path": "COMPATIBILITY_MATRIX.md",
@@ -141,15 +141,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "7dd7d82eb7b9d8e50a4ae05dda5cf07da5af2e279cbec38865c4029851e94a80"
+      "sha256": "ea34a34eade51e879474d1b2791e46896c309c8feba46dd716055bc529f3e98a"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "de26ce5bb9c8313b1d6dd7d8d24bf69dd0e9541c493e534d0cdd32742e10cd3b"
+      "sha256": "3bc56a26d8e6a62d37d7a9096564bfe32a72b11a274dcdc3f063e3f43e9b7974"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0acb852b7ebe00433e8eecb666eb7471587b782e65b7ce2e697e95e80885fc0a"
+      "sha256": "4d8c2853b90280bd7ca4658e65902bc41c23df398bebb3266ecbce1e01970095"
     },
     {
       "path": "SECURITY.md",
@@ -265,7 +265,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "f7f7c7b1146864bd52b3ceeed6efb60863130dd02a0fef5d535b8316940d5c25"
+      "sha256": "3fb59c2996acb854ceb2d5693c4a3d48f69658e70bb82bf4c5737276ff689443"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -313,7 +313,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/export_client.dart",
-      "sha256": "eb0642e008a66e1f54e938c71e1d5d5116e7e499adccae368f6598c0e30735ad"
+      "sha256": "12cab7f6e62d39bba62d36a62389e78a3d5a5bc816cee3ef519a159a6c8027e0"
     },
     {
       "path": "apps/desktop_flutter/lib/services/global_search_index.dart",
@@ -549,7 +549,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/export_client_test.dart",
-      "sha256": "1d9ea92bac1a2c4340c760b30c26e84d9b741cb154340cf7a1d9f5e4d1ce9e60"
+      "sha256": "4b530ab9900e5cba65c2ab2ee43b7dbfeba262a8bcbf5e91b82136561d2b58e2"
     },
     {
       "path": "apps/desktop_flutter/test/global_search_index_test.dart",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "86a0d81e51fab80d9c65bfbc87b03d67953b8950e873f67d21c27fe9cb9df840"
+      "sha256": "12b3a3e64aa9fc51c8b3e282cf9f1e9a1a39d83ecc502bab1b5b6403d266fdfb"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "66b2be5b3e9a77d0823e08ca67aeedc70bccb7388037d5ae00bcb42f4e322d91"
+      "sha256": "6f1ac7c3b86f1da806a3513adff2e5254834d882d6bd61b3a096d3f17c629a02"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1341,7 +1341,7 @@
     },
     {
       "path": "docs/specs/gui-shell-export.md",
-      "sha256": "cf8740a2cc86ebf4d757eadd9cd2883e9c8db4cf761af106b44b355fc837642e"
+      "sha256": "b2d8b9ac0022eb95b849d52d9d4c0b50664796c58f30414770d176e42257003b"
     },
     {
       "path": "docs/specs/gui-shell-module-pruning.md",
@@ -1693,11 +1693,15 @@
     },
     {
       "path": "examples/contracts/gui_shell_export.valid.json",
-      "sha256": "7904e1e8dd9eac0640e4ab3e703f8cfaad4086fd044d0eece963d4e348aa10c8"
+      "sha256": "b7d8bd373f88ccdd284d9b862724cd53138d250ef26fd99dca583b7dbf4c80c9"
+    },
+    {
+      "path": "examples/contracts/gui_shell_export_manifest.valid.json",
+      "sha256": "89c04b5b16efd180522a823c4cff57c81b5b7fc3570440713569dd1612dcd4a1"
     },
     {
       "path": "examples/contracts/gui_shell_export_receipt.valid.json",
-      "sha256": "066280fc3dc4a2edc5d03ddcd53ba266f0a74425cbb8a46da8138bdd3c78e24c"
+      "sha256": "e5abcaf45a7810da7ee054ada5c49872f1bec00660257729a7f18448446e55c2"
     },
     {
       "path": "examples/contracts/gui_shell_module_build_evidence.valid.json",
@@ -2009,7 +2013,11 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_export_credential.invalid.json",
-      "sha256": "b0803d686ce103a1f5078bb3e0bf6adef28786083e1335d25e1f7a60a22db0b8"
+      "sha256": "f7dff171035a286c10009b6f01110b35f8790f3422d9cfe226ce0c1d990c3cee"
+    },
+    {
+      "path": "examples/contracts/invalid/gui_shell_export_manifest_shape.invalid.json",
+      "sha256": "498bb5d03f5cd4d0824e524ecc5c2a6abf9da84bf023bc98dc8e90bfc5e3f48a"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_export_receipt_inherited.invalid.json",
@@ -2021,7 +2029,7 @@
     },
     {
       "path": "examples/contracts/invalid/gui_shell_export_unknown_module.invalid.json",
-      "sha256": "76cfae5a50399dcacd061c25944de332c73ee1877e4dbf7503d8b31c5c7abef5"
+      "sha256": "d202ef5da4e5ec99afc7e54b9bfe8d46936443f7a85d3e37c25fe31e4c38c477"
     },
     {
       "path": "examples/contracts/invalid/gui_shell_module_build_evidence_authority_claim.invalid.json",
@@ -2877,7 +2885,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/export_center.rs",
-      "sha256": "ff1906b6769608b9ef09b2648345a24a03ef5ee12021db18d593d9c90909ee21"
+      "sha256": "602988ba6040a06e4f855810b9bdb21e75b159d89ccc3dcf9b776abe3ec93ea9"
     },
     {
       "path": "native/rust_helper/src/broker/history_access.rs",
@@ -2893,7 +2901,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/ipc_server.rs",
-      "sha256": "5cdbd6adc4b82351ce687f2c9bcd7d7dcbbc5ad7e9b516cfd2badc0e25ce2492"
+      "sha256": "dff2cf7498b2578d62b959f1f710cc771a281d51d30f471f9d100dad895384e2"
     },
     {
       "path": "native/rust_helper/src/broker/json_input.rs",
@@ -2921,7 +2929,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "f2cfd7fa101cc8bf1c43acb4ad393fe348010fb0755fb7531f6653e1bcac80f2"
+      "sha256": "097b9ee80c247929cadf9b91a3e107f4eb1b2553b37249aefb5f64b9a6589847"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2965,7 +2973,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "84e483bb7cbbc496773ce5cdb21547124413785d0336fefd55f3701a4e3d844a"
+      "sha256": "a6b5b7218513bbc7322a901185e853f74698fe869b32028a0a0ed9c66a939ada"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3489,7 +3497,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "7c9db3a09efb060342c17446bedb15fd25bcef147ae8aac3cb716719d9a09a20"
+      "sha256": "1919e9b94ca505d2bd4dbdcebbd4845ef1e5dc2935f5aea244e715a80586e9ac"
     },
     {
       "path": "requirements-dev.txt",
@@ -3721,11 +3729,15 @@
     },
     {
       "path": "specs/gui_shell_export.schema.json",
-      "sha256": "783f47bdba46d8a287fcdb429af40017ff7c22b66c0c87e9992efa7b944f1b5f"
+      "sha256": "b6ff71f67988f36295eb99187db4c58ecf676e0ae5ab65d2fed26b307ebe8063"
+    },
+    {
+      "path": "specs/gui_shell_export_manifest.schema.json",
+      "sha256": "f74df3025dc1459467afae23f8d4fd0a98ddda9a4b09edfde496995ebfa7706d"
     },
     {
       "path": "specs/gui_shell_export_receipt.schema.json",
-      "sha256": "3e1a6b4d7cdf8177c067d581ea6f91d7243a4b554cbb7e95ead37912a18e9d7b"
+      "sha256": "41451e7e9247abb4330ea0de4974f62690577db36b3a0f8d68e12a8058880d84"
     },
     {
       "path": "specs/gui_shell_module_build_evidence.schema.json",
@@ -4081,7 +4093,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2799fff2470feb547ab0b58c4e04a5e4e72e30357e57abb8633c0f0aefc08097"
+      "sha256": "a2b899618b44ed799fe24ae0803ec5c400497038158a594a0b46f7359868d1db"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4161,7 +4173,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "395398a4fefe4d26b876fb9d209d7a6e51d2de0eb6cdbe77d3256540cda1c42a"
+      "sha256": "e5aa9df1b61c6b241a44b27116e03b229f90d331c5a37656fa2f034c8100dc2f"
     },
     {
       "path": "tooling/shell_snapshot.py",

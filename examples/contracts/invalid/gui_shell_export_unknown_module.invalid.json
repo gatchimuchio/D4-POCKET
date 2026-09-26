@@ -3,7 +3,7 @@
   "export_id": "export-invalid-module",
   "compose_manifest": {"version": 1, "compose_id": "d4-pocket-local", "display_name": "不明Module", "runtime_ids": [], "agent_ids": [], "tool_ids": [], "mcp_connection_ids": [], "theme": {"theme_id": "d4-pocket", "mode": "system"}, "capability_requirements": [], "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"}, "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"}, "output_mode": "manifest_only"},
   "target_platform": "windows",
-  "export_mode": "manifest_only",
+  "export_mode": "manifest_file",
   "distribution_channel": "local",
   "module_selection": {"optional_module_ids": ["shell.unknown"]}
 }

@@ -116,18 +116,18 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
   required_action: 隔離された staged run から native Windows installed smoke collection を実行し、measured window、visible-surface diagnostic tree、config JSON、Audit の write / read / delete、Broker IPC / restart / crash の field provenance、installed app が生成した Setup Doctor product evidence を収集する。その後 <code>python tooling\windows_release_evidence.py</code> を通過させる。
   blocks_release: yes
 
-- item: GUI Shell書出しのOwner認可経路がDesktop UIに未接続
+- item: GUI Shell書出しのOwner UI LIVE_RUNTIME証拠が未成立
   classification: release_blocker
   registry_id: rev2_export_owner_ui_authority_path
-  reason: Desktop ExportClientは通常Broker資格を使うが、Broker書出し操作はOwner制御資格を要求するため、現行GUIからの要求は拒否される。
-  required_action: FlutterへOwner秘密値やprivileged IPCを渡さず、Owner明示操作をBrokerで再認証・監査する統治経路を実装し、通常資格拒否も検証する。
+  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証と通常資格拒否の自動試験は実装済み。Manifest file生成は固定Broker Export directoryへ接続したが、clean installed productからのOwner Yes操作、file hashと完了Auditのformal LIVE_RUNTIME収集は未確認。
+  required_action: clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Credential／Authority非継承を同じsource commitと全package hashへ結合して検証する。
   blocks_release: yes
 
 - item: Export Moduleの実binary除去と比較計測が未成立
   classification: release_blocker
   registry_id: rev2_module_pruning_binary_and_measurement
-  reason: 現在のModulePlanはManifest上の選択だけで、artifactからの除去、サイズ、cold startup、resourceの実測を行っていない。
-  required_action: 安全基盤を保持する実build経路を接続し、同一条件のpruned／unpruned Windows artifactをhash結合して比較測定する。
+  reason: Brokerは新規identityを含むManifest JSON fileを出力するが、実行可能packageはまだ生成しない。選択計画はbinaryからの除去ではなく、製品サイズ、cold startup、resourceも未測定。
+  required_action: 独立製品Export経路へ安全基盤保持試験を接続し、同一Windows条件のpruned／unpruned最終artifactをhash結合して実挙動・サイズ・cold startup・bounded resourceを比較測定する。
   blocks_release: yes
 
 - item: macOS planned portability target が未検証

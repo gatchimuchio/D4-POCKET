@@ -1,9 +1,8 @@
 {
   "version": 1,
-  "operation": "GUI Shell書出し",
-  "status": "accepted",
+  "product": "D4 Pocket",
   "export_id": "export-d4-pocket",
-  "export_manifest": {
+  "manifest": {
     "app_identity": {"app_id": "d4-pocket-app-11111111111111111111111111111111", "display_name": "D4 Pocket ローカル構成", "target_platform": "windows"},
     "audit_store": {"store_id": "audit-store-example", "chain_status": "new", "inherited": false},
     "settings": {"locale": "ja-JP", "density": "comfortable", "content_visibility": "summary"},
@@ -22,24 +21,5 @@
       "excluded_optional_module_ids": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.host_operations"],
       "binary_pruning_status": "not_applied"
     }
-  },
-  "manifest_file_status": "written",
-  "manifest_file": {
-    "file_name": "d4-pocket-app-11111111111111111111111111111111.json",
-    "path": "C:\\Users\\Example\\AppData\\Local\\GUI-Shell\\broker\\desktop\\exports\\d4-pocket-app-11111111111111111111111111111111.json",
-    "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "byte_length": 8192,
-    "temporary_file_status": "removed",
-    "temporary_file_name": ".11111111111111111111111111111111.manifest.tmp",
-    "recovery_action": "none"
-  },
-  "build_status": "not_started",
-  "artifact_status": "not_built",
-  "credential_inherited": false,
-  "permission_inherited": false,
-  "approval_inherited": false,
-  "audit_chain_inherited": false,
-  "authority_strip": true,
-  "evidence_source": "INTERNAL_STATE",
-  "audit_id": "audit-export-example"
+  }
 }

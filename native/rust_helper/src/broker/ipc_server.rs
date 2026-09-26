@@ -97,7 +97,7 @@ pub(crate) struct DesktopOwnerOperationRequest {
 }
 
 pub fn run_loopback_server(config: BrokerServerConfig) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, None, None, None)
+    run_loopback_server_inner(config, None, None, None, None)
 }
 
 /// Rust desktop launcherだけが使う、process内管理停止付きのBroker起動口。
@@ -107,7 +107,7 @@ pub fn run_loopback_server_cancellable(
     shutdown: Arc<AtomicBool>,
     ready: SyncSender<()>,
 ) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, Some(shutdown), Some(ready), None)
+    run_loopback_server_inner(config, Some(shutdown), Some(ready), None, None)
 }
 
 /// Windows Desktop起動器専用のprocess内Owner確認経路。
@@ -117,8 +117,15 @@ pub(crate) fn run_loopback_server_cancellable_with_owner_operations(
     shutdown: Arc<AtomicBool>,
     ready: SyncSender<()>,
     owner_operations: Receiver<DesktopOwnerOperationRequest>,
+    desktop_export_root: Option<(PathBuf, cap_std::fs::Dir)>,
 ) -> Result<(), BrokerServerError> {
-    run_loopback_server_inner(config, Some(shutdown), Some(ready), Some(owner_operations))
+    run_loopback_server_inner(
+        config,
+        Some(shutdown),
+        Some(ready),
+        Some(owner_operations),
+        desktop_export_root,
+    )
 }
 
 fn run_loopback_server_inner(
@@ -126,12 +133,16 @@ fn run_loopback_server_inner(
     shutdown: Option<Arc<AtomicBool>>,
     ready: Option<SyncSender<()>>,
     owner_operations: Option<Receiver<DesktopOwnerOperationRequest>>,
+    desktop_export_root: Option<(PathBuf, cap_std::fs::Dir)>,
 ) -> Result<(), BrokerServerError> {
     if shutdown_requested(&shutdown) { return Ok(()); }
     let session_id = format!("broker-session-{}", random_hex(16)?);
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
+    if let Some((path, root)) = desktop_export_root {
+        broker.set_desktop_export_root(path, root);
+    }
     if shutdown_requested(&shutdown) { return Ok(()); }
 
     if shutdown.is_some() {
@@ -400,8 +411,19 @@ fn handle_stream(
     let response = if owner { broker.owner要求処理(&request_json) } else { broker.handle_json(&request_json) };
     let shutdown = response.shutdown_requested;
     write_response(reader.get_mut(), &response)?;
-    drain_after_response(&mut reader)?;
-    Ok(shutdown)
+    response_drain_result(shutdown, drain_after_response(&mut reader))
+}
+
+fn response_drain_result(
+    shutdown: bool,
+    drain_result: Result<(), BrokerServerError>,
+) -> Result<bool, BrokerServerError> {
+    if shutdown {
+        // 認証・監査済みshutdownは、応答後のpeer切断状態にかかわらず終了させる。
+        // close/RST処理の失敗を通常継続へ変換すると、accepted応答後もlistenし続ける。
+        return Ok(true);
+    }
+    drain_result.map(|()| false)
 }
 
 fn drain_after_response(reader: &mut BufReader<TcpStream>) -> Result<(), BrokerServerError> {
@@ -532,6 +554,18 @@ enum IpcLineError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 監査済みshutdownは応答後の切断errorにかかわらず終了する() {
+        let error = BrokerServerError::new("試験用の切断error");
+        assert!(response_drain_result(true, Err(error)).unwrap());
+        assert!(!response_drain_result(false, Ok(())).unwrap());
+        assert!(response_drain_result(
+            false,
+            Err(BrokerServerError::new("試験用の切断error"))
+        )
+        .is_err());
+    }
 
     fn temporary_directory() -> PathBuf {
         let mut random = [0u8; 16];

@@ -166,6 +166,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_edit_proposal_receipt",
     "gui_shell_export",
     "gui_shell_export_receipt",
+    "gui_shell_export_manifest",
     "gui_shell_module_catalog",
     "gui_shell_module_build_evidence",
     "gui_shell_module_comparison_evidence",
@@ -280,6 +281,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "gui_shell_edit_proposal_receipt.schema.json",
     "gui_shell_export.schema.json",
     "gui_shell_export_receipt.schema.json",
+    "gui_shell_export_manifest.schema.json",
     "gui_shell_module_catalog.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
@@ -7157,19 +7159,53 @@ def test_gui_shell_edit_proposal_is_owner_review_only() -> list[str]:
 def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     request = load_contract_fixture("gui_shell_export.valid.json")
     receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    manifest_file = load_contract_fixture("gui_shell_export_manifest.valid.json")
     request_schema = load_schema("gui_shell_export.schema.json")
     receipt_schema = load_schema("gui_shell_export_receipt.schema.json")
+    manifest_file_schema = load_schema("gui_shell_export_manifest.schema.json")
     errors = []
     errors.extend(validate_instance(request, request_schema))
     errors.extend(validate_instance(receipt, receipt_schema))
-    if request.get("target_platform") != "windows" or request.get("export_mode") != "manifest_only":
-        errors.append("GUI Shell書出しがWindows manifest-only境界でない")
+    errors.extend(validate_instance(manifest_file, manifest_file_schema))
+    if request.get("target_platform") != "windows" or request.get("export_mode") != "manifest_file":
+        errors.append("GUI Shell書出しがWindows Manifest file生成契約でない")
     if (
         receipt.get("build_status") != "not_started"
         or receipt.get("artifact_status") != "not_built"
+        or receipt.get("manifest_file_status") != "written"
         or receipt.get("authority_strip") is not True
     ):
-        errors.append("GUI Shell書出しがbuildまたはartifactを完成扱いにした")
+        errors.append("GUI Shell書出しがManifest file生成と実行可能artifactの状態を分離していない")
+    if (
+        manifest_file.get("export_id") != receipt.get("export_id")
+        or manifest_file.get("manifest") != receipt.get("export_manifest")
+    ):
+        errors.append("実生成Manifest fileとBroker Receiptの内容が一致しない")
+    file_record = receipt.get("manifest_file", {})
+    app_id = receipt.get("export_manifest", {}).get("app_identity", {}).get("app_id")
+    if (
+        file_record.get("file_name") != f"{app_id}.json"
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", file_record.get("sha256", ""))
+        or not isinstance(file_record.get("byte_length"), int)
+        or file_record.get("byte_length", 0) <= 0
+        or file_record.get("temporary_file_status") != "removed"
+        or file_record.get("temporary_file_name")
+        != f".{app_id.removeprefix('d4-pocket-app-')}.manifest.tmp"
+        or file_record.get("recovery_action") != "none"
+    ):
+        errors.append("Manifest file Receiptの名前、hash、size、一時file後処理が実体検証可能でない")
+    pending_cleanup = copy.deepcopy(receipt)
+    pending_cleanup["manifest_file"].update(
+        {
+            "temporary_file_status": "cleanup_pending",
+            "recovery_action": "owner_review_and_remove_after_hash_verification",
+        }
+    )
+    if validate_instance(pending_cleanup, receipt_schema):
+        errors.append("一時file後処理待ちReceiptが明示RecoveryAction付きで受理されない")
+    pending_cleanup["manifest_file"]["recovery_action"] = "none"
+    if not validate_instance(pending_cleanup, receipt_schema):
+        errors.append("一時file後処理待ちReceiptがRecoveryActionなしで受理された")
     if any(
         receipt.get(key) is not False
         for key in (
@@ -7300,6 +7336,10 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     )
     if not validate_instance(invalid_module_receipt, receipt_schema):
         errors.append("実build前のReceiptがbinary Module除去済みを主張できる")
+    invalid_pruning_claim = copy.deepcopy(receipt)
+    invalid_pruning_claim["export_manifest"]["module_plan"]["binary_pruning_status"] = "applied"
+    if not validate_instance(invalid_pruning_claim, receipt_schema):
+        errors.append("Manifest file Receiptが実binary Module除去済みを主張できる")
     invalid_request = json.loads(
         (INVALID_CONTRACT_EXAMPLES / "gui_shell_export_credential.invalid.json").read_text(
             encoding="utf-8"
@@ -7315,6 +7355,14 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     )
     if not validate_instance(invalid_receipt, receipt_schema):
         errors.append("GUI Shell書出しReceiptが継承済み状態を受け入れた")
+    invalid_inheritance_claim = copy.deepcopy(receipt)
+    invalid_inheritance_claim["credential_inherited"] = True
+    if not validate_instance(invalid_inheritance_claim, receipt_schema):
+        errors.append("GUI Shell書出しReceiptがcredential継承を受け入れた")
+    invalid_manifest_file = copy.deepcopy(manifest_file)
+    invalid_manifest_file["manifest"]["inheritance_policy"]["credential"] = "credential.value"
+    if not validate_instance(invalid_manifest_file, manifest_file_schema):
+        errors.append("Manifest fileがcredential継承を受け入れた")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         if "GUI Shell書出し" not in operations:
@@ -7331,9 +7379,21 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
         "target_platform",
         "resolve_module_plan",
         "binary_pruning_status",
+        "write_manifest_file",
+        "MAX_MANIFEST_FILE_BYTES",
+        "hard_link",
+        "desktop_export_root",
+        "temporary_file_status",
+        "owner_review_and_remove_after_hash_verification",
+        "with_temporary_cleanup_hint",
     ):
         if token not in source:
             errors.append(f"GUI Shell書出しBroker経路に境界tokenがない: {token}")
+    launcher_source = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(
+        encoding="utf-8"
+    )
+    if "Dir::open_ambient_dir" not in launcher_source or "Some((export_dir, export_root))" not in launcher_source:
+        errors.append("GUI Shell書出しが検査済み固定保存先のDirectory handleをBrokerへ渡さない")
     return errors
 
 

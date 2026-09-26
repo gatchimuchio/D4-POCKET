@@ -1695,3 +1695,29 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する -- --exact --quiet --test-threads=1`：PowerShellから同一testを20回連続実行し、20回すべて成功。再現性の低い一時失敗の原因特定や全target成功の証拠にはならない。
 
 したがってRust libraryは現sourceで273件PASSだが、helper／launcher／integrationを含む全target testは未完了であり、Windows Application Controlの実行拒否も再確認された。OS policyを無効化したり別配置binaryへ移したりせず、許可済みWindows hostで全target試験を完遂する必要がある。`windows_rust_integration_test_execution_policy`は`release_blocker`のまま維持し、過去の全target PASS記録を現sourceへ転用しない。`release_ready=false`を維持する。
+
+## D4 Pocket rev2 GUI Shell Export実file生成・終了経路修正（2026-09-26）
+
+現行`main`を変更前に`origin/main`と一致するclean stateで確認し、2世代rollback refを更新してから着手した。旧GUI Shell ExportはReceiptを返すのみでfileを作成しなかった。現単位では製品完成・実行可能Appではなく、独立構成Manifest JSON fileの生成までを実体化した。
+
+`export_mode=manifest_file`要求をRust Brokerで再検証し、Rust Desktop起動器が固定 `%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports` pathを検査して開いたdirectory handleだけをBrokerへ渡す。Brokerは新規128-bit App ID名のManifestを最大64 KiBで作り、symlink追跡を無効にしたcreate-new一時fileからhard-linkで確定するため、既存fileを上書きしない。Receiptと完了Auditは実fileのpath、SHA-256、byte長を結び、credential／permission／approval／audit chainは継承しない。`cleanup_pending`時は一時file名とOwner確認・hash照合後のRecoveryActionをReceipt／Auditへ明示し、Flutterにも警告する。完了Auditに失敗した場合は成功Receiptを返さず、確定fileと一時fileの復旧情報を返して停止する。Exportを起動可能package、物理Audit store、独立Runtime、binary pruning、Installer、署名へ読み替えない。
+
+併せて全target試験で、永続Auditにshutdown acceptedがあるのにloopback listenerが残り、`workspace_startup` integration testがprocess終了を待ち続ける実行を観測した。応答後socket drain errorを`unwrap_or(false)`が通常継続へ潰す経路を局所修正し、shutdown結果を切断後処理から独立させるRust unit testを追加した。再build後に同じintegration executableを起動する試行はWindows Application ControlのOS error 4551で拒否され、この実integrationでの修正確認は成立していない。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 136件、正常example 136件、negative fixture 168件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：215 check成功。新Manifest Schema／receipt、一時file後処理状態、既存file非上書き、directory handle境界、権限非継承を含む。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：Rust library 278件成功。書出しfile、既存file非上書き、cleanup pending、固定保存先なし拒否、junction拒否、Owner／Audit境界とshutdown後処理unit testを含む。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --test workspace_startup startup_owner_approval_real_ipc_read_and_revocation_are_connected -- --exact --nocapture --test-threads=1`：再build後のintegration executable起動をWindows Application ControlがOS error 4551で拒否。修正後の実process統合testは未検証。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：1回目はA2A／MINIDORA loopback testが一時失敗し、各単独再実行は成功。次の実行はlibrary 277件、CLI 9件、IPC 10件などを通過後、workspace startup shutdown待ちで完了しなかったため停止した。修正後の全target成功は未確認。
+- `flutter analyze --no-pub`：Desktop、Mobileとも一時`R:` drive aliasから実行し指摘0件。直接の日本語OneDrive pathではAnalyzer JSON parse errorが発生したが、path alias利用で回避できた。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter failures-only`：Desktop全108件成功。書出しClientの古い`manifest_only`期待値を`manifest_file`へ同期した後の結果。Owner書出しClientの個別testも3件成功。
+- `python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py tooling/schema_check/check_schemas.py`：正常に終了した。
+- `rustfmt --edition 2021 --check`を変更Rust fileへ実行した結果はexit 1。未変更領域を含む既存の広範なRust書式差分があり、全fileの一括formatは実施していない。
+- `python -X utf8 tooling/manifest.py --write`：1038 fileを記録し、その後の`--check`も合格した。最初のsource archive検査は新規Schema／fixtureがGit index未登録で失敗したが、stage後の`python -X utf8 tooling/packaging_portability_check.py`は合格した。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済みPython／Windows検査は成功し、formal Windows evidenceがない既存release blockerと`release_ready=false`はそのまま残る。
+- Windows installed product上のOwner No／Yes、実Manifest file、完了Auditに対するformal LIVE_RUNTIME evidenceは取得していない。OwnerのYes操作も実施していない。
+
+`rev2_export_owner_ui_authority_path`はUI未接続ではなくinstalled productのformal LIVE_RUNTIME evidence未成立を理由とする`release_blocker`のまま維持する。`rev2_module_pruning_binary_and_measurement`も実package、binary pruning、安全Core保持、独立Runtime、性能測定が未成立のため維持する。`windows_rust_integration_test_execution_policy`はApplication Controlによる実integration test拒否と、修正後test未実証を理由に維持する。Release statusは`release_ready=false`。

@@ -187,18 +187,18 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   required_action: stage時と異なるWindows user profile（SID）から <code>collect_installed_smoke.ps1 -DesktopLauncherExe -UseCurrentWindowsProfile -NoPythonRuntime</code> を実行し、起動器の実runtime、lifecycle Audit、通常資格で受理されたhealth要求Audit、endpoint cleanup、UIAutomationを収集する。health Auditはclient応答受信やPID帰属を証明しない。clean-source実測と初回config生成が成立するまではrelease blockerを維持し、<code>python tooling\windows_release_evidence.py</code>を通過させる。
   blocks_release: yes
 
-- item: GUI Shell書出しのOwner認可経路がDesktop UIに未接続
+- item: GUI Shell書出しのOwner UI LIVE_RUNTIME証拠が未成立
   classification: release_blocker
   registry_id: rev2_export_owner_ui_authority_path
-  reason: Desktop ExportClientは通常Broker資格を使う一方、Broker操作はOwner制御資格を要求するため、現行GUI要求は受理されない。
-  required_action: FlutterへOwner秘密値やprivileged IPCを露出させず、Owner明示操作をBrokerで認証・監査する経路と、通常資格の拒否試験を実装する。
+  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証と通常資格拒否の自動試験は実装済み。Manifest file生成は固定Broker Export directoryへ接続したが、clean installed productからのOwner Yes操作、file hashと完了Auditのformal LIVE_RUNTIME収集は未確認。
+  required_action: clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Credential／Authority非継承を同じsource commitと全package hashへ結合して検証する。
   blocks_release: yes
 
 - item: Export Moduleの実binary除去と比較計測が未成立
   classification: release_blocker
   registry_id: rev2_module_pruning_binary_and_measurement
-  reason: 現行Receiptは選択計画に限られ、pruned artifact、サイズ、cold startup、resourceの実測がない。
-  required_action: 安全基盤の保持をnegative testし、同一Windows条件のpruned／unpruned artifactをhash結合して比較測定する。
+  reason: Brokerは新規identityを含むManifest JSON fileを出力するが、実行可能packageはまだ生成しない。選択計画はbinaryからの除去ではなく、製品サイズ、cold startup、resourceも未測定。
+  required_action: 独立製品Export経路へ安全基盤保持試験を接続し、同一Windows条件のpruned／unpruned最終artifactをhash結合して実挙動・サイズ・cold startup・bounded resourceを比較測定する。
   blocks_release: yes
 
 - item: Windows Setup Doctor smoke not passed

@@ -135,8 +135,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Rust起動器のnative Owner確認とBroker process内経路、自動試験は実装済み。clean source commit bde6d3c51fcf27820e952d52ad2f4abaac53b868由来の隔離Windows Release productを実際に起動し、native確認表示とNo拒否動作を確認した。永続Auditはoperation=GUI Shell書出し、decision=rejected、reason=owner_requiredを保持し、そのevidence_sourceはINTERNAL_STATEである。主要3 executableのhashはREV2_PROGRESSへ記録したが、外部収集証拠、formal installer経由のinstalled-path evidence、全package hashではない。Owner許可側の実クリックとReceipt非継承も未確認。",
-      "required_action": "formal Windows installed-path collectorで正確なsource commitと全package artifact hashに結合した証拠を作成し、No拒否と永続Auditを再確認する。Ownerの明示GOが得られた場合に限りYes操作を行い、Owner起点Auditと非継承Receiptを検証する。FlutterへOwner資格・privileged IPCがないことを実行時証拠へ記録する。"
+      "reason": "Rust起動器のnative Owner確認、Broker process内allowlist、自動試験は実装済み。Owner確認後に新規App ID・Audit store IDを含むManifest fileを固定Export directoryへcreate-only生成し、path／SHA-256／byte長をReceipt、完了Auditへ結ぶ実装とRust unit／Conformance試験も成立した。ただしclean source由来のinstalled Windows product上でOwner No／Yes、実file、完了Audit、全package hashを外部収集したLIVE_RUNTIME証拠は未取得。実行可能App bundleや独立Runtimeはまだ生成しない。",
+      "required_action": "formal Windows installed-path collectorで正確なsource commitと全package artifact hashに結合した証拠を作成し、Owner No拒否と永続Auditを再確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがないことを記録する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
@@ -145,8 +145,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較は実施済みであり、6つの選択外Dart surface library nodeはFlutter AOT report上で不在、選択した2 nodeは存在し、全artifact差は224 KiBである。ただしこれはINTERNAL_STATEのDesktop Flutter UI証拠で、最終製品の意味上の除去、安全Core保持、Rust／third-party除去、独立Exportを証明しない。cold startupと実行時resourceも未測定である。",
-      "required_action": "独立製品Export経路成立後、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象の実挙動をpositive／negative／回帰試験し、製品cold startupとbounded resourceを測定する。Flutter UI比較・AOT report node差・artifact size差だけではrelease gateを閉じない。"
+      "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較では、6つの選択外Dart surface library nodeがFlutter AOT report上で不在、選択した2 nodeは存在し、artifact差は224 KiBである。Brokerは新規App／Audit store IDを含むManifest fileを生成するが、これは実行可能Export packageではない。最終製品の意味上の除去、安全Core保持、Rust／third-party除去、別Runtime／物理Audit store、cold startupと実行時resourceは未検証。",
+      "required_action": "独立製品Export経路成立後、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象の実挙動をpositive／negative／回帰試験し、製品cold startupとbounded resourceを測定する。Manifest file、Flutter UI比較、AOT report node差、artifact size差だけではrelease gateを閉じない。"
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
@@ -155,7 +155,7 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-25の全target成功は履歴として保持する。現行commit fdbff3395a337b115bf1c33b19474ea6b3e567a5ではcargo test --libの273件とA2A loopback対象testの連続20回再試行は成功した。一方、通常の全target試行は同testの一時失敗でlibrary target内に停止し、対象test単独の後、次のdesktop launcher test executableがWindows Application ControlにOS error 4551で拒否された。現行sourceの全target実行は成立していない。",
+      "reason": "2026-09-25の全target成功と過去の273件成功は履歴として保持する。現行sourceのRust library 278件は成功した。全targetの初回再試行ではA2A／MINIDORA loopback testが一時失敗したが個別再実行は成功した。次の試行ではworkspace startup統合testがshutdown accepted Audit後も終了待ちとなり、応答後socket drain失敗がshutdownを通常継続へ落とさないよう修正しunit testを追加した。再build後の当該integration executable実行はWindows Application ControlのOS error 4551で拒否され、修正後の全targetは未検証。",
       "required_action": "OS policyを無効化せず、生成済みRust test executableを実行できる許可済みWindows host上で、変更後sourceのcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target成功させ、正確なsource commitと結果を記録する。"
     },
     {

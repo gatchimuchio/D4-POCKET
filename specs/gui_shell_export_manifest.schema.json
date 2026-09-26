@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_export_manifest.schema.json",
+  "title": "D4 Pocket独立構成Manifest file",
+  "type": "object",
+  "required": ["version", "product", "export_id", "manifest"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "product": { "const": "D4 Pocket" },
+    "export_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+    "manifest": { "$ref": "gui_shell_export_receipt.schema.json#/properties/export_manifest" }
+  }
+}

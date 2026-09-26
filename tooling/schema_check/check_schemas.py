@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import math
 import re
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[2]
 SPECS = ROOT / "specs"
@@ -149,6 +150,7 @@ REQUIRED = {
     "gui_shell_edit_proposal_receipt.schema.json",
     "gui_shell_export.schema.json",
     "gui_shell_export_receipt.schema.json",
+    "gui_shell_export_manifest.schema.json",
     "gui_shell_module_catalog.schema.json",
     "gui_shell_module_build_evidence.schema.json",
     "gui_shell_module_comparison_evidence.schema.json",
@@ -233,14 +235,32 @@ def validate_instance(value, schema: dict, path: str = "$", root: dict | None = 
         if not isinstance(reference, str):
             return [f"{path}: 未対応の$ref {reference!r}"]
         if not reference.startswith("#/"):
-            external = Path(reference)
-            if external.name != reference or external.is_absolute() or ".." in external.parts:
+            resource_name, separator, fragment = reference.partition("#")
+            external = Path(resource_name)
+            if (
+                not resource_name
+                or external.name != resource_name
+                or external.is_absolute()
+                or ".." in external.parts
+            ):
                 return [f"{path}: 外部$ref pathが不正 {reference!r}"]
             external_path = SPECS / external
             external_schema, error = load_json(external_path)
             if error or not isinstance(external_schema, dict):
                 return [f"{path}: 外部$ref {reference!r}を解決できない"]
-            return validate_instance(value, external_schema, path)
+            if not separator or not fragment:
+                return validate_instance(value, external_schema, path)
+            pointer = unquote(fragment)
+            if not pointer.startswith("/"):
+                return [f"{path}: 外部$ref fragmentがJSON Pointerではない {reference!r}"]
+            target: object = external_schema
+            for part in pointer[1:].split("/"):
+                if not isinstance(target, dict):
+                    return [f"{path}: 外部$ref {reference!r}を解決できない"]
+                target = target.get(part.replace("~1", "/").replace("~0", "~"))
+            if not isinstance(target, dict):
+                return [f"{path}: 外部$ref {reference!r}を解決できない"]
+            return validate_instance(value, target, path, external_schema)
         target: object = root
         for part in reference[2:].split("/"):
             if not isinstance(target, dict):

@@ -334,7 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-              '切出し対象の任意画面を選べます。権限・承認・監査・復旧などの必須境界は常に保持します。選択はManifest上の計画であり、実binaryからの除去・build・Installer・署名・書出しfile作成は行いません。実行時はRust起動器のWindows確認画面でOwnerが明示許可します。キャンセルはBrokerに拒否として監査記録されます。'),
+              '切出し対象の任意画面をManifest計画へ記録できます。権限・承認・監査・復旧などの必須境界は常に保持します。Owner確認後、独立Manifest fileを固定保存先へ作成します。画面選択は計画だけで、実binaryからの除去や実行可能App、build、Installer、署名は行いません。Credential・Permission・Approval・Audit chainは継承しません。キャンセルはBrokerに拒否として監査記録されます。'),
           const SizedBox(height: 8),
           Text('任意画面', style: Theme.of(context).textTheme.titleSmall),
           for (final entry in guiShellOptionalExportModules.entries)
@@ -366,7 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : const Icon(Icons.file_download_outlined),
             label: Text(_exportInProgress
                 ? 'Windows Owner確認を待っています'
-                : 'Owner確認してManifestを生成'),
+                : 'Owner確認してManifest fileを生成'),
           ),
           if (_exportMessage != null) ...[
             const SizedBox(height: 8),
@@ -393,8 +393,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         optionalModuleIds: _selectedExportModules.toList()..sort(),
       );
       _exportReceipt = exportJson(receipt);
-      _setExportMessage(
-          'Module選択計画を含むReceiptを生成しました。実binaryからの除去、build、Installer、署名、権限継承は未実行です。');
+      final manifestFile = receipt['manifest_file'];
+      final manifestPath = manifestFile is Map ? manifestFile['path'] : null;
+      final cleanupPending = manifestFile is Map &&
+          manifestFile['temporary_file_status'] == 'cleanup_pending';
+      _setExportMessage(cleanupPending
+          ? 'Manifest fileは保存されました: ${manifestPath ?? 'Receiptを確認してください'}。一時fileが残る可能性があります。配布せず、ReceiptのRecoveryActionに従ってください。実行可能App生成、binary除去、build、Installer、署名は未実行です。'
+          : '独立Manifest fileを保存しました: ${manifestPath ?? '保存先はReceiptを確認してください'}。実行可能App生成、binary除去、build、Installer、署名は未実行です。');
     } catch (error) {
       _setExportMessage('GUI Shell Windows書出しは受理されませんでした: $error');
     } finally {

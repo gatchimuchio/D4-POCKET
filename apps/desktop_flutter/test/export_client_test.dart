@@ -29,7 +29,7 @@ void main() {
 
     expect(transport.operation, 'GUI Shell書出し');
     expect(transport.payload?['target_platform'], 'windows');
-    expect(transport.payload?['export_mode'], 'manifest_only');
+    expect(transport.payload?['export_mode'], 'manifest_file');
     expect(
       (transport.payload?['module_selection'] as Map)['optional_module_ids'],
       ['shell.trace_inspector'],

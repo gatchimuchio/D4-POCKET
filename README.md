@@ -51,7 +51,7 @@
 D4 PocketはGUI Shellを技術基盤とする製品表面であり、GUI Shellは通常の app templateでもBLUE-TANUKI専用 GUIでもない。
 
 - 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
-- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行検査対象には121 schema、valid example、negative fixtureがある。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行基準検査は136 schema、136正常example、168 negative fixture、215 Conformance checkである。
 - 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
 - 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 
@@ -305,11 +305,11 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ## 📊 現状
 
-### 2026-09-24 の現況
+### 2026-09-26 の現況
 
-D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Preview／編集提案の開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用、編集提案は審査待ちであり、独立App生成や配布を完了扱いにしない。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
+D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Preview／編集提案の開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用、編集提案は審査待ちである。Windows書出しはOwner確認後に独立Manifest JSON fileをBroker固定保存先へ生成し、hash付きReceipt／Auditを返す段階まで成立したが、実行可能App package、独立Runtime、binary pruning、Installerや配布は未成立である。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
 
-現行の基準検査はSchema 121件、正常example 121件、negative fixture 146件、Conformance 190件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。Windows書出しは新規identity／監査storeを生成するManifest-only経路までで、実製品Export、Installer、署名、Distributionは未成立である。Developer専用のFlutter画面選択Windows Release buildは実施済みだが、独立製品、Owner権限、binary除去完了の証拠ではない。all-enabled baselineとのAOT比較toolは追加済みで、実測は次の独立検証単位として残る。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
+現行基準検査はSchema 136件、正常example 136件、negative fixture 168件、Conformance 215件である。C30のAgent probeはPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込、複数Agent比較、handoffを証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。Manifest fileのApp ID／Audit store IDは将来用の新規識別子であり、実packageや物理storeではない。Developer専用のFlutter画面選択Windows Release buildは独立製品、Owner権限、binary除去完了の証拠ではない。独立製品Export、pruning、Installer、署名、Distribution、実起動は未成立である。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
 
 この repository は **v1.0 product completion に向けた作業中であり、product release をまだ主張していない。** 機械判定上の状態は `not yet a completed product release` である。
 
@@ -334,7 +334,7 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 誇張せずに述べた現在の事実:
 
 - ✅ **Phase A/B は owner-use の範囲で完了している。** owner は desktop shell を日常の local operation に使え、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。
-- ✅ development slice として **schema + conformance が通過**している（121 schema、190 check）。Windows書出しは新規App identity／監査storeを生成するManifest-only経路まで成立している。
+- ✅ development slice として **schema + conformance が通過**している（136 schema、136正常example、168 negative fixture、215 check）。Windows書出しはOwner確認後にManifest JSON fileを新規生成するが、実行可能App、独立Runtime、binary pruning、Installer、配布は成立していない。
 - 🧪 C33ではWindows release buildと、clean isolated runにおけるRust Broker smoke（認証IPC、永続store、replay拒否、再起動後health、crash fail-closed）がPASSした。ただしinstalled productの総合evidence validatorは、UI Automation surface不足、Setup Doctorのinstalled path不一致、外部Audit anchorが未取得のため失敗しており、Windows正式証拠は成立していない。
 - ✅ **LLM が読む基盤は definition-locked** であり、範囲を限定した Reference Extension が一つ、cross-agent reproduction report が一つある。
 - ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。

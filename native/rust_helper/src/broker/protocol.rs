@@ -893,6 +893,7 @@ pub struct Broker {
     pub(super) shutdown_requested: bool,
     pub(super) current_epoch_seconds_override: Option<i64>,
     pub(super) state_store: BrokerStateStore,
+    pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_install_path_verified: bool,
     desktop_loopback_bind_verified: bool,
     desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
@@ -928,6 +929,7 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
+            desktop_export_root: None,
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -995,6 +997,7 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
+            desktop_export_root: None,
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -1008,6 +1011,14 @@ impl Broker {
     ) {
         self.desktop_install_path_verified = installed_path_verified;
         self.desktop_loopback_bind_verified = loopback_bind_verified;
+    }
+
+    pub(crate) fn set_desktop_export_root(
+        &mut self,
+        path: std::path::PathBuf,
+        root: cap_std::fs::Dir,
+    ) {
+        self.desktop_export_root = Some((path, root));
     }
 
     pub(crate) fn initialize_desktop_first_run_configuration(

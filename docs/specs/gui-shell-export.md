@@ -2,11 +2,13 @@
 
 ## 目的
 
-GUI Shell Windows書出しは、D4 Pocketの構成Manifestから独立Appの初期Manifestを生成する。現行単位は、書出し先の新規App identity、新規監査store、設定、Runtime／Adapter構成、Capability requirement、配布metadataをBrokerで生成するManifest-only経路である。
+GUI Shell Windows書出しは、D4 Pocketの構成から将来の独立App用Manifest fileを生成する。現行成立範囲は、Brokerが新規App identityと将来用Audit store identityを割り当て、設定、Runtime／Adapter構成、Capability requirement、配布metadata、Module計画をJSON fileとして固定Export directoryへ保存するところまでである。これは実行可能App、物理Audit store、独立Runtime、Installerの生成ではない。
 
 ## Broker経路
 
-`GUI Shell書出し`要求をRust Brokerで再検証し、`INTERNAL_STATE`のAuditEventと書出しReceiptを返す。対象platformはWindows、出力modeは`manifest_only`に固定する。任意画面の選択はGUI入力にすぎず、Brokerが機械可読なModule一覧を照合し、必須Moduleと依存閉包を再計算する。現行のproduction pathはManifestを応答Receiptとして返すだけであり、ユーザーfileや配布artifactは作らない。Brokerの永続Auditは記録する。
+`GUI Shell書出し`要求をRust Brokerで再検証する。要求modeは`manifest_file`、対象platformはWindowsに固定する。任意画面の選択はGUI入力にすぎず、Brokerが機械可読なModule一覧を照合し、必須Moduleと依存閉包を再計算する。任意の保存pathは要求payloadから受け取らない。Rust起動器が検査して開いた`%LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\exports` directory handleをBrokerへ渡し、Brokerは128-bit新規App IDからfile名を導出する。fileは上限64 KiB、symlink追跡なしの一時fileへ書き、flush後にhard-linkで新規確定する。既存fileを置換しない。Receiptはfile名、絶対path、SHA-256、byte長、Manifest内容を返す。
+
+Brokerはfile生成前に要求受理Auditを記録し、file確定後にManifest file hashをpayload hashとして完了Auditへ結ぶ。一時fileの後片付けに失敗しても確定済みManifest fileを失敗扱いせず、Receipt／Auditへ`cleanup_pending`と一時file名、hash照合後にOwnerが確認・削除するRecoveryActionを記録する。完了Auditに失敗した場合は成功Receiptを返さず`Suspended`とし、既に生成された可能性があるfileのpath／hashと照合RecoveryActionをエラーへ示す。自動上書き・削除・再試行は行わない。Flutterはfileやdirectoryへ直接アクセスしない。
 
 Desktopの`BrokerClient`は通常資格だけを利用する。Ownerが設定画面で書出しを開始すると、Rust起動器が要求の構造、`desktop_flutter` metadata、Broker session、現在時刻、payload hash、Compose Manifest、Module計画を確認し、hashを含むWindowsネイティブ確認を表示する。表示値は検証済みManifestから射影し、任意payloadやCredentialは表示しない。拒否／未確認は通常Broker経路へ戻してOwner不足として監査し、許可だけがcapacity-1 process内Rust channelを通ってBroker所有threadへ届く。Brokerは同じ要求のsession、鮮度、nonce/replay、payload hash、Authority metadataを再検証する。共有channelの許可operationはこのExportと、別contractで定義する`回帰Case削除`／`回帰Case削除中断確認`の固定allowlistに限り、他のOwner操作へ一般化しない。
 
@@ -14,8 +16,8 @@ Owner資格、privileged IPC、Owner role flagをFlutterへ渡さず、Rust起�
 
 ## 継承禁止
 
-書出し元のAuthority、Permission、Approval、Credential、Audit chainは継承しない。書出し先は新規App identityと新規監査storeを持ち、`authority_strip=true`、各`*_inherited=false`、`inheritance_policy`の各値`none`を返す。Capability requirementは必要機能の説明であり、Permissionではない。
+書出し元のAuthority、Permission、Approval、Credential、Audit chainは継承しない。Manifest内のApp identityとAudit store identityは新規で、`authority_strip=true`、各`*_inherited=false`、`inheritance_policy`の各値`none`を返す。これらは識別子の割当てであり、実行可能Appや物理Audit storeの生成を意味しない。Capability requirementは必要機能の説明であり、Permissionではない。
 
 ## 未成立範囲
 
-`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外をExport artifactからの削除へ読み替えない。Owner経路の自動試験は通常資格拒否、模擬Yes／No、hash・session・Authority metadata・期限の負例、永続Broker Auditを確認する。実Desktop上での対話的なWindows確認表示・クリックは別のLIVE_RUNTIME確認が必要である。Developer専用Flutter UIのbaseline／選択build比較とAOT report上のsurface library node有無は確認済みだが、独立Export artifactの生成・pruning、安全Core保持、製品起動・資源比較、Installer、署名、配布、rollback、実際のfilesystem書込みは未成立の`release_blocker`として保持する。Manifest ReceiptやDeveloper UI buildだけで独立App完成や製品releaseを主張しない。
+`manifest_file_status=written`は設定Manifest fileの作成だけを表す。一時file状態は`removed`または`cleanup_pending`として復旧情報と組で明示する。`build_status=not_started`、`artifact_status=not_built`、installer未開始、署名なしを固定する。Module計画の`binary_pruning_status=not_applied`も固定し、Manifest上の除外をbinaryからの削除へ読み替えない。Owner経路の自動試験は通常資格拒否、模擬Yes／No、hash・session・Authority metadata・期限の負例、永続Broker Auditを確認する。実Desktop上での対話的なWindows確認表示・クリックと、file作成後のAudit／hashを含むformal LIVE_RUNTIME確認は別途必要である。Developer専用Flutter UIのbaseline／選択build比較とAOT report上のsurface library node有無は確認済みだが、実行可能な独立Export bundle、別Runtime／Audit store、pruning、安全Core保持、製品起動・資源比較、Installer、署名、配布、rollbackは未成立の`release_blocker`として保持する。Manifest file作成を独立App完成や製品releaseへ昇格させない。

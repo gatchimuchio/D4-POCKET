@@ -3,13 +3,38 @@
   "$id": "https://example.invalid/gui-shell/schemas/gui_shell_export_receipt.schema.json",
   "title": "GUI Shell書出し応答",
   "type": "object",
-  "required": ["version", "operation", "status", "export_id", "export_manifest", "build_status", "artifact_status", "credential_inherited", "permission_inherited", "approval_inherited", "audit_chain_inherited", "authority_strip", "evidence_source", "audit_id"],
+  "required": ["version", "operation", "status", "export_id", "export_manifest", "manifest_file_status", "manifest_file", "build_status", "artifact_status", "credential_inherited", "permission_inherited", "approval_inherited", "audit_chain_inherited", "authority_strip", "evidence_source", "audit_id"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },
     "operation": { "const": "GUI Shell書出し" },
     "status": { "const": "accepted" },
     "export_id": { "type": "string", "minLength": 1 },
+    "manifest_file_status": { "const": "written" },
+    "manifest_file": {
+      "type": "object",
+      "required": ["file_name", "path", "sha256", "byte_length", "temporary_file_status", "temporary_file_name", "recovery_action"],
+      "additionalProperties": false,
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}\\.json$" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "byte_length": { "type": "integer", "minimum": 1, "maximum": 65536 },
+        "temporary_file_status": { "enum": ["removed", "cleanup_pending"] },
+        "temporary_file_name": { "type": "string", "pattern": "^\\.[0-9a-f]{32}\\.manifest\\.tmp$" },
+        "recovery_action": { "enum": ["none", "owner_review_and_remove_after_hash_verification"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "temporary_file_status": { "const": "removed" } } },
+          "then": { "properties": { "recovery_action": { "const": "none" } } }
+        },
+        {
+          "if": { "properties": { "temporary_file_status": { "const": "cleanup_pending" } } },
+          "then": { "properties": { "recovery_action": { "const": "owner_review_and_remove_after_hash_verification" } } }
+        }
+      ]
+    },
     "export_manifest": {
       "type": "object", "required": ["app_identity", "audit_store", "settings", "runtime_manifest", "adapter_configuration", "capability_requirements", "distribution_metadata", "inheritance_policy", "module_plan"], "additionalProperties": false,
       "properties": {

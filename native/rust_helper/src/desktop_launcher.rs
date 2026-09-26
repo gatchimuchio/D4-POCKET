@@ -34,6 +34,7 @@ const MAX_REQUEST_BYTES: usize = 64 * 1024;
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const RELAY_IO_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_FILE: &str = "broker_session.json";
+const EXPORT_DIRECTORY_NAME: &str = "exports";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
@@ -357,6 +358,60 @@ fn ensure_protected_store_directory(runtime_dir: &Path) -> Result<PathBuf, Deskt
         ));
     }
     Ok(canonical_protected)
+}
+
+fn ensure_export_directory(runtime_dir: &Path) -> Result<PathBuf, DesktopLaunchError> {
+    let export_dir = runtime_dir.join(EXPORT_DIRECTORY_NAME);
+    match fs::symlink_metadata(&export_dir) {
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => match fs::create_dir(&export_dir) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+            Err(_) => {
+                return Err(DesktopLaunchError::new(
+                    "EXPORT_DIRECTORY_UNAVAILABLE",
+                    "Manifestの保存先を準備できません。",
+                ));
+            }
+        },
+        Err(_) => {
+            return Err(DesktopLaunchError::new(
+                "EXPORT_DIRECTORY_UNAVAILABLE",
+                "Manifestの保存先を確認できません。",
+            ));
+        }
+    }
+    let metadata = fs::symlink_metadata(&export_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "EXPORT_DIRECTORY_UNAVAILABLE",
+            "Manifestの保存先を確認できません。",
+        )
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err(DesktopLaunchError::new(
+            "EXPORT_DIRECTORY_INVALID",
+            "Manifestの保存先に再解析pointまたは不正なfolderがあります。",
+        ));
+    }
+    let runtime_root = fs::canonicalize(runtime_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "EXPORT_DIRECTORY_UNAVAILABLE",
+            "Manifestの保存先を確認できません。",
+        )
+    })?;
+    let canonical_export_dir = fs::canonicalize(&export_dir).map_err(|_| {
+        DesktopLaunchError::new(
+            "EXPORT_DIRECTORY_UNAVAILABLE",
+            "Manifestの保存先を確認できません。",
+        )
+    })?;
+    if !canonical_export_dir.starts_with(&runtime_root) {
+        return Err(DesktopLaunchError::new(
+            "EXPORT_DIRECTORY_INVALID",
+            "Manifestの保存先が固定rootの範囲外です。",
+        ));
+    }
+    Ok(canonical_export_dir)
 }
 
 fn reject_reparse_file(path: &Path) -> Result<Option<fs::Metadata>, DesktopLaunchError> {
@@ -706,11 +761,12 @@ fn confirm_owner_operation(summary: &DesktopOwnerOperationSummary) -> bool {
 fn owner_confirmation_text(summary: &DesktopOwnerOperationSummary) -> String {
     match summary {
         DesktopOwnerOperationSummary::GuiShellExport(summary) => format!(
-            "このGUI Shell構成のWindows向けManifest-only書出しを許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n\nこの操作はBroker監査へ記録されます。書出しartifact、Installer、build、署名、ユーザーfileは作成しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n保存先: %LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\{}\\<新規App ID>.json\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             summary.display_name,
             summary.export_id,
             summary.distribution_channel,
             summary.optional_module_count,
+            EXPORT_DIRECTORY_NAME,
             summary.payload_hash
         ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
@@ -792,6 +848,17 @@ impl RunningBroker {
     fn start(runtime_dir: &Path, installed_package_verified: bool) -> Result<Self, DesktopLaunchError> {
         let store_dir = ensure_store_directory(runtime_dir)?;
         let protected_store_dir = ensure_protected_store_directory(runtime_dir)?;
+        let export_dir = ensure_export_directory(runtime_dir)?;
+        let export_root = cap_std::fs::Dir::open_ambient_dir(
+            &export_dir,
+            cap_std::ambient_authority(),
+        )
+        .map_err(|_| {
+            DesktopLaunchError::new(
+                "EXPORT_DIRECTORY_UNAVAILABLE",
+                "Manifestの保存先を安全に開けません。",
+            )
+        })?;
         let session_file = runtime_dir.join(SESSION_FILE);
         prepare_session_paths(&session_file)?;
 
@@ -810,6 +877,7 @@ impl RunningBroker {
                     thread_shutdown,
                     ready_tx,
                     owner_operation_rx,
+                    Some((export_dir, export_root)),
                 )
             })
             .map_err(|_| {
@@ -1118,7 +1186,7 @@ mod tests {
                 "output_mode": "manifest_only"
             },
             "target_platform": "windows",
-            "export_mode": "manifest_only",
+            "export_mode": "manifest_file",
             "distribution_channel": "local",
             "module_selection": {"optional_module_ids": ["shell.history"]}
         });
@@ -1396,7 +1464,9 @@ mod tests {
         let session_file = root.join(SESSION_FILE);
         let store_dir = root.join("store");
         let protected_store_dir = root.join("protected");
+        let export_dir = root.join(EXPORT_DIRECTORY_NAME);
         fs::create_dir(&protected_store_dir).unwrap();
+        fs::create_dir(&export_dir).unwrap();
         let shutdown = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
@@ -1404,6 +1474,12 @@ mod tests {
         let server_session_file = session_file.clone();
         let server_store_dir = store_dir.clone();
         let server_protected_store_dir = protected_store_dir.clone();
+        let server_export_dir = export_dir.clone();
+        let server_export_root = cap_std::fs::Dir::open_ambient_dir(
+            &server_export_dir,
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
         let server = thread::spawn(move || {
             let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
             config.desktop_protected_store_dir = Some(server_protected_store_dir);
@@ -1412,6 +1488,7 @@ mod tests {
                 server_shutdown,
                 ready_tx,
                 owner_operation_rx,
+                Some((server_export_dir, server_export_root)),
             )
         });
         ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -1449,6 +1526,16 @@ mod tests {
         assert_eq!(accepted["request_id"], "desktop-export-confirmed");
         assert_eq!(accepted["body"]["authority_strip"], true);
         assert_eq!(accepted["body"]["credential_inherited"], false);
+        assert_eq!(accepted["body"]["manifest_file_status"], "written");
+        let manifest_path = accepted["body"]["manifest_file"]["path"].as_str().unwrap();
+        let manifest_bytes = fs::read(manifest_path).unwrap();
+        assert_eq!(
+            crate::audit_hash::sha256_tagged(&manifest_bytes),
+            accepted["body"]["manifest_file"]["sha256"]
+        );
+        let manifest_file: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        assert_eq!(manifest_file["product"], "D4 Pocket");
+        assert_eq!(manifest_file["manifest"]["inheritance_policy"]["credential"], "none");
 
         let delete_payload = serde_json::json!({
             "版": 1,
@@ -1770,12 +1857,37 @@ mod tests {
         let runtime = runtime_directory(&root).unwrap();
         assert!(runtime.starts_with(&root));
         assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
+        let export_dir = ensure_export_directory(&runtime).unwrap();
+        assert_eq!(export_dir, runtime.join(EXPORT_DIRECTORY_NAME));
         let first = acquire_instance_lock(&runtime).unwrap();
         let second = acquire_instance_lock(&runtime).unwrap_err();
         assert_eq!(second.code, "INSTANCE_ALREADY_RUNNING");
         drop(first);
         assert!(acquire_instance_lock(&runtime).is_ok());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn export_directory_rejects_reparse_point_outside_runtime() {
+        let root = fs::canonicalize(test_root("export-junction")).unwrap();
+        let outside = fs::canonicalize(test_root("export-junction-outside")).unwrap();
+        let runtime = runtime_directory(&root).unwrap();
+        let junction = runtime.join(EXPORT_DIRECTORY_NAME);
+        let result = Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&outside)
+            .output()
+            .expect("Export保存先junction試験の作成");
+        assert!(result.status.success(), "Export保存先junction試験の作成失敗");
+
+        let error = ensure_export_directory(&runtime).unwrap_err();
+        assert_eq!(error.code, "EXPORT_DIRECTORY_INVALID");
+        assert!(fs::read_dir(&outside).unwrap().next().is_none());
+
+        fs::remove_dir(&junction).unwrap();
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
     }
 
     #[test]

@@ -32,7 +32,7 @@ class ExportClient {
         'export_id': exportId,
         'compose_manifest': composeManifest,
         'target_platform': 'windows',
-        'export_mode': 'manifest_only',
+        'export_mode': 'manifest_file',
         'distribution_channel': distributionChannel,
         if (optionalModuleIds != null)
           'module_selection': {

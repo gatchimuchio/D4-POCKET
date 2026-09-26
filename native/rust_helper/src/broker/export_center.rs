@@ -1,19 +1,26 @@
 //! Windows向けGUI Shell書出しの独立manifestを生成するBroker境界。
 //!
 //! 現行単位は新規identity、監査store、設定、Runtime／Adapter manifestと配布
-//! metadataの生成までであり、実build、installer、process、filesystem書込み、
+//! metadataを固定Export directoryへ保存するまでであり、実build、installer、process、
 //! Credential／Permission／Approval／Audit chain継承は行わない。
 #![allow(non_snake_case)]
 
 use super::compose_center;
 use super::dialogue::識別子生成;
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, OwnerConfirmationSource, EVIDENCE_SOURCE_INTERNAL_STATE};
+use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::fs::{Dir, OpenOptions};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 use unicode_normalization::UnicodeNormalization;
 
 const VERSION: u64 = 1;
+const MAX_MANIFEST_FILE_BYTES: usize = 64 * 1024;
 const OPERATION: &str = "GUI Shell書出し";
 const UNPRUNABLE_CORE_IDS: [&str; 8] = [
     "core.security_broker",
@@ -216,16 +223,75 @@ pub(super) fn export(
             )
         }
     };
-    let confirmation_reason = match owner_confirmation {
-        OwnerConfirmationSource::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
-        OwnerConfirmationSource::OwnerCredential => "Owner制御資格による書出し操作を受理。Windows向け独立manifestとModule選択計画を生成。実binaryからの除去、build、installerは開始せず、Credential、Permission、Approval、Audit chainは継承しない",
-        OwnerConfirmationSource::NotOwner => "Owner制御がない書出し要求を拒否すべき経路へ到達した",
+    let display_name = manifest_value["display_name"].clone();
+    let settings = manifest_value["settings"].clone();
+    let runtime_ids = manifest_value["runtime_ids"].clone();
+    let agent_ids = manifest_value["agent_ids"].clone();
+    let tool_ids = manifest_value["tool_ids"].clone();
+    let mcp_connection_ids = manifest_value["mcp_connection_ids"].clone();
+    let capability_requirements = manifest_value["capability_requirements"].clone();
+    let export_manifest = json!({
+        "app_identity": {"app_id": app_id, "display_name": display_name, "target_platform": "windows"},
+        "audit_store": {"store_id": audit_store_id, "chain_status": "new", "inherited": false},
+        "settings": settings,
+        "runtime_manifest": {"runtime_ids": runtime_ids},
+        "adapter_configuration": {"agent_ids": agent_ids, "tool_ids": tool_ids, "mcp_connection_ids": mcp_connection_ids},
+        "capability_requirements": capability_requirements,
+        "distribution_metadata": {"target_platform": "windows", "artifact_status": "not_built", "installer_status": "not_started", "signed": false, "channel": request.distribution_channel},
+        "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
+        "module_plan": module_plan.receipt
+    });
+    let manifest_document = json!({
+        "version": VERSION,
+        "product": "D4 Pocket",
+        "export_id": request.export_id.clone(),
+        "manifest": export_manifest
+    });
+    let manifest_bytes = match serde_json::to_vec_pretty(&manifest_document) {
+        Ok(mut bytes) => {
+            bytes.push(b'\n');
+            bytes
+        }
+        Err(_) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "gui_shell_export_serialize_failed",
+                "独立Manifest fileを正規化できない",
+                true,
+                payload_hash,
+            )
+        }
     };
-    let audit = match broker.append_audit(
-        request_id,
+    if manifest_bytes.is_empty() || manifest_bytes.len() > MAX_MANIFEST_FILE_BYTES {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OPERATION,
+            "gui_shell_export_manifest_too_large",
+            "独立Manifest fileが保存上限を超えています。構成を縮小してください。",
+            true,
+            payload_hash,
+        );
+    }
+    if broker.desktop_export_root.is_none() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OPERATION,
+            "gui_shell_export_target_unavailable",
+            "Rust Desktop起動器が固定Manifest保存先を用意していないため、書出しを停止しました。",
+            true,
+            payload_hash,
+        );
+    }
+    let app_id = export_manifest["app_identity"]["app_id"]
+        .as_str()
+        .expect("Brokerが生成したApp identity");
+    let file_name = format!("{app_id}.json");
+    let prepared_audit = match broker.append_audit(
+        &format!("{request_id}:manifest-prepared"),
         OPERATION,
-        "accepted",
-        confirmation_reason,
+        "received",
+        &format!("Capability=gui_shell.export_manifest_file Permission=固定Export directoryへの新規単一file作成 Approval=Owner確認済み RecoveryAction=file作成前の要求受理記録。file hash={} file_name={file_name}", crate::audit_hash::sha256_tagged(&manifest_bytes)),
         EVIDENCE_SOURCE_INTERNAL_STATE,
         payload_hash,
     ) {
@@ -239,13 +305,76 @@ pub(super) fn export(
             )
         }
     };
-    let display_name = manifest_value["display_name"].clone();
-    let settings = manifest_value["settings"].clone();
-    let runtime_ids = manifest_value["runtime_ids"].clone();
-    let agent_ids = manifest_value["agent_ids"].clone();
-    let tool_ids = manifest_value["tool_ids"].clone();
-    let mcp_connection_ids = manifest_value["mcp_connection_ids"].clone();
-    let capability_requirements = manifest_value["capability_requirements"].clone();
+    let (export_root_path, export_root) = broker
+        .desktop_export_root
+        .as_ref()
+        .expect("固定Export保存先を事前確認済み");
+    let manifest_file = match write_manifest_file(
+        export_root,
+        export_root_path,
+        app_id,
+        &manifest_bytes,
+    ) {
+        Ok(file) => file,
+        Err(reason) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "gui_shell_export_file_write_failed",
+                &reason,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    let confirmation_reason = match owner_confirmation {
+        OwnerConfirmationSource::DesktopNativeConfirmation => "OwnerがRust Desktop起動器のネイティブ確認でpayload hashを確認して明示許可。新規Manifest fileを固定Export directoryに作成し、file hashをAuditEventへ結合。実行可能App、binary pruning、build、installer、署名は未実行。Credential、Permission、Approval、Audit chainは継承しない",
+        OwnerConfirmationSource::OwnerCredential => "Owner制御資格による書出し操作を受理。新規Manifest fileを固定Export directoryに作成し、file hashをAuditEventへ結合。実行可能App、binary pruning、build、installer、署名は未実行。Credential、Permission、Approval、Audit chainは継承しない",
+        OwnerConfirmationSource::NotOwner => "Owner制御がない書出し要求を拒否すべき経路へ到達した",
+    };
+    let audit = match broker.append_audit(
+        request_id,
+        OPERATION,
+        "accepted",
+        &format!(
+            "{confirmation_reason}; 保存path={} file hash={} 一時file状態={} 一時file名={} 復旧操作={}",
+            manifest_file.path,
+            manifest_file.sha256,
+            manifest_file.temporary_file_status,
+            manifest_file.temporary_file_name,
+            manifest_file.recovery_action,
+        ),
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        &manifest_file.sha256,
+    ) {
+        Ok(event) => event,
+        Err(_error) => {
+            return super::protocol::BrokerResponse {
+                request_id: request_id.to_string(),
+                operation: OPERATION.to_string(),
+                status: BrokerStatus::Suspended,
+                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+                audit_event_id: prepared_audit.event_id,
+                error: Some(super::protocol::BrokerError {
+                    code: "gui_shell_export_audit_finalize_failed".to_string(),
+                    message: format!(
+                        "Manifest fileは生成されましたが、完了Auditを確定できませんでした。配布へ進まず、上書きや削除をせず、保存path={} と file hash={} を照合してAudit状態を復旧してください。一時file状態={} 一時file名={} 復旧操作={}",
+                        manifest_file.path,
+                        manifest_file.sha256,
+                        manifest_file.temporary_file_status,
+                        manifest_file.temporary_file_name,
+                        manifest_file.recovery_action,
+                    ),
+                    recoverable: true,
+                    audit_event_required: true,
+                    fail_closed: true,
+                }),
+                health: None,
+                body: None,
+                shutdown_requested: broker.shutdown_requested,
+            };
+        }
+    };
     BrokerResponse {
         request_id: request_id.to_string(),
         operation: OPERATION.to_string(),
@@ -259,16 +388,16 @@ pub(super) fn export(
             "operation": OPERATION,
             "status": "accepted",
             "export_id": request.export_id,
-            "export_manifest": {
-                "app_identity": {"app_id": app_id, "display_name": display_name, "target_platform": "windows"},
-                "audit_store": {"store_id": audit_store_id, "chain_status": "new", "inherited": false},
-                "settings": settings,
-                "runtime_manifest": {"runtime_ids": runtime_ids},
-                "adapter_configuration": {"agent_ids": agent_ids, "tool_ids": tool_ids, "mcp_connection_ids": mcp_connection_ids},
-                "capability_requirements": capability_requirements,
-                "distribution_metadata": {"target_platform": "windows", "artifact_status": "not_built", "installer_status": "not_started", "signed": false, "channel": request.distribution_channel},
-                "inheritance_policy": {"authority": "none", "permission": "none", "approval": "none", "credential": "none", "audit_chain": "none"},
-                "module_plan": module_plan.receipt
+            "export_manifest": export_manifest,
+            "manifest_file_status": "written",
+            "manifest_file": {
+                "file_name": manifest_file.file_name,
+                "path": manifest_file.path,
+                "sha256": manifest_file.sha256,
+                "byte_length": manifest_file.byte_length,
+                "temporary_file_status": manifest_file.temporary_file_status,
+                "temporary_file_name": manifest_file.temporary_file_name,
+                "recovery_action": manifest_file.recovery_action,
             },
             "build_status": "not_started",
             "artifact_status": "not_built",
@@ -281,6 +410,93 @@ pub(super) fn export(
             "audit_id": audit.event_id,
         })),
         shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+struct ManifestFile {
+    file_name: String,
+    path: String,
+    sha256: String,
+    byte_length: usize,
+    temporary_file_status: &'static str,
+    temporary_file_name: String,
+    recovery_action: &'static str,
+}
+
+fn write_manifest_file(
+    root: &Dir,
+    root_path: &Path,
+    app_id: &str,
+    bytes: &[u8],
+) -> Result<ManifestFile, String> {
+    write_manifest_file_with_cleanup(root, root_path, app_id, bytes, |root, name| {
+        root.remove_file(name)
+    })
+}
+
+fn write_manifest_file_with_cleanup(
+    root: &Dir,
+    root_path: &Path,
+    app_id: &str,
+    bytes: &[u8],
+    remove_temporary: impl FnOnce(&Dir, &str) -> std::io::Result<()>,
+) -> Result<ManifestFile, String> {
+    let random_suffix = app_id
+        .strip_prefix("d4-pocket-app-")
+        .filter(|suffix| suffix.len() == 32 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()))
+        .ok_or_else(|| "Broker生成のApp identityが不正なためfileを作成しない".to_string())?;
+    if bytes.is_empty() || bytes.len() > MAX_MANIFEST_FILE_BYTES {
+        return Err("Manifest fileが空または保存上限超過のため作成しない".to_string());
+    }
+    let file_name = format!("d4-pocket-app-{random_suffix}.json");
+    let temporary_name = format!(".{random_suffix}.manifest.tmp");
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true).follow(FollowSymlinks::No);
+    let mut file = match root.open_with(&temporary_name, &options) {
+        Ok(file) => file,
+        Err(_) => return Err("Manifest一時fileを新規作成できない".to_string()),
+    };
+    let write_error = file
+        .write_all(bytes)
+        .err()
+        .map(|_| "Manifest一時fileを書き込めない".to_string())
+        .or_else(|| {
+            file.sync_all()
+                .err()
+                .map(|_| "Manifest一時fileを永続化できない".to_string())
+        });
+    drop(file);
+    if let Some(error) = write_error {
+        return Err(with_temporary_cleanup_hint(root, &temporary_name, error));
+    }
+    if root.hard_link(&temporary_name, root, &file_name).is_err() {
+        return Err(with_temporary_cleanup_hint(
+            root,
+            &temporary_name,
+            "既存fileを置換せずManifest fileを確定できない".to_string(),
+        ));
+    }
+    let cleanup_pending = remove_temporary(root, &temporary_name).is_err();
+    Ok(ManifestFile {
+        file_name: file_name.clone(),
+        path: root_path.join(file_name).to_string_lossy().into_owned(),
+        sha256: crate::audit_hash::sha256_tagged(bytes),
+        byte_length: bytes.len(),
+        temporary_file_status: if cleanup_pending { "cleanup_pending" } else { "removed" },
+        temporary_file_name: temporary_name,
+        recovery_action: if cleanup_pending {
+            "owner_review_and_remove_after_hash_verification"
+        } else {
+            "none"
+        },
+    })
+}
+
+fn with_temporary_cleanup_hint(root: &Dir, temporary_name: &str, error: String) -> String {
+    if root.remove_file(temporary_name).is_err() {
+        format!("{error}。残存の可能性がある一時file名: {temporary_name}。配布せずOwnerが確認してください")
+    } else {
+        error
     }
 }
 
@@ -479,7 +695,7 @@ fn parse_request(value: &Value) -> Result<ExportRequest, String> {
     if request.version != VERSION
         || !valid_identifier(&request.export_id)
         || request.target_platform != "windows"
-        || request.export_mode != "manifest_only"
+        || request.export_mode != "manifest_file"
         || !["local", "installer_candidate"].contains(&request.distribution_channel.as_str())
     {
         return Err("書出し版、識別子、対象platform、出力mode、配布channelが不正".to_string());
@@ -499,6 +715,7 @@ fn valid_identifier(value: &str) -> bool {
 mod tests {
     use super::*;
     use crate::broker::protocol::{Broker, BrokerOperation, BrokerRequestEnvelope, BrokerStatus};
+    use std::fs;
 
     fn manifest() -> Value {
         json!({
@@ -512,13 +729,78 @@ mod tests {
     }
 
     fn payload() -> Value {
-        json!({"version": 1, "export_id": "export-test", "compose_manifest": manifest(), "target_platform": "windows", "export_mode": "manifest_only", "distribution_channel": "local"})
+        json!({"version": 1, "export_id": "export-test", "compose_manifest": manifest(), "target_platform": "windows", "export_mode": "manifest_file", "distribution_channel": "local"})
+    }
+
+    fn configure_export_root(broker: &mut Broker, label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "gui-shell-export-{label}-{}",
+            crate::broker::dialogue::識別子生成().unwrap()
+        ));
+        fs::create_dir(&path).unwrap();
+        let canonical = fs::canonicalize(&path).unwrap();
+        let root = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority()).unwrap();
+        broker.set_desktop_export_root(canonical.clone(), root);
+        canonical
     }
 
     fn owner_request(broker: &mut Broker, payload: Value) -> String {
         let nonce = format!("owner-export-nonce-{}", broker.audit_events().len());
         let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
         json!({"request_id": "export-owner-test", "session_id": "session-1", "operation": OPERATION, "payload": payload, "payload_hash": payload_hash, "nonce": nonce, "issued_at": BrokerRequestEnvelope::current_issued_at(), "metadata": {}}).to_string()
+    }
+
+    #[test]
+    fn Manifest_fileは新規作成だけを許可し既存fileを置換しない() {
+        let root_path = std::env::temp_dir().join(format!(
+            "gui-shell-export-write-{}",
+            crate::broker::dialogue::識別子生成().unwrap()
+        ));
+        fs::create_dir(&root_path).unwrap();
+        let canonical = fs::canonicalize(&root_path).unwrap();
+        let root = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority()).unwrap();
+        let app_id = "d4-pocket-app-0123456789abcdef0123456789abcdef";
+        let first = write_manifest_file(&root, &canonical, app_id, b"first manifest").unwrap();
+        let second = write_manifest_file(&root, &canonical, app_id, b"replacement");
+        assert!(second.is_err());
+        assert_eq!(fs::read(&first.path).unwrap(), b"first manifest");
+        drop(root);
+        fs::remove_dir_all(root_path).unwrap();
+    }
+
+    #[test]
+    fn Manifest確定後の一時file削除失敗は生成成功と復旧要求を記録する() {
+        let root_path = std::env::temp_dir().join(format!(
+            "gui-shell-export-cleanup-{}",
+            crate::broker::dialogue::識別子生成().unwrap()
+        ));
+        fs::create_dir(&root_path).unwrap();
+        let canonical = fs::canonicalize(&root_path).unwrap();
+        let root = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority()).unwrap();
+        let app_id = "d4-pocket-app-abcdef0123456789abcdef0123456789";
+        let artifact = write_manifest_file_with_cleanup(
+            &root,
+            &canonical,
+            app_id,
+            b"manifest with cleanup pending",
+            |_root, _name| {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "試験用一時file削除失敗",
+                ))
+            },
+        )
+        .unwrap();
+        assert_eq!(artifact.temporary_file_status, "cleanup_pending");
+        assert_eq!(
+            artifact.recovery_action,
+            "owner_review_and_remove_after_hash_verification"
+        );
+        assert_eq!(fs::read(&artifact.path).unwrap(), b"manifest with cleanup pending");
+        assert!(canonical.join(&artifact.temporary_file_name).exists());
+        root.remove_file(&artifact.temporary_file_name).unwrap();
+        drop(root);
+        fs::remove_dir_all(root_path).unwrap();
     }
 
     #[test]
@@ -537,6 +819,7 @@ mod tests {
     #[test]
     fn 書出しは新規identityと監査storeを生成するが権限を継承しない() {
         let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "fresh-identity");
         let raw = owner_request(&mut broker, payload());
         let response = broker.owner要求処理(&raw);
         assert_eq!(response.status, BrokerStatus::Accepted);
@@ -547,6 +830,17 @@ mod tests {
             .starts_with("d4-pocket-app-"));
         assert_eq!(body["export_manifest"]["audit_store"]["inherited"], false);
         assert_eq!(body["build_status"], "not_started");
+        assert_eq!(body["manifest_file_status"], "written");
+        assert_eq!(body["manifest_file"]["temporary_file_status"], "removed");
+        assert_eq!(body["manifest_file"]["recovery_action"], "none");
+        let manifest_path = body["manifest_file"]["path"].as_str().unwrap();
+        let manifest_bytes = fs::read(manifest_path).unwrap();
+        assert_eq!(
+            crate::audit_hash::sha256_tagged(&manifest_bytes),
+            body["manifest_file"]["sha256"]
+        );
+        let file_document: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        assert_eq!(file_document["manifest"]["app_identity"], body["export_manifest"]["app_identity"]);
         assert_eq!(body["credential_inherited"], false);
         assert_eq!(body["permission_inherited"], false);
         assert_eq!(body["approval_inherited"], false);
@@ -575,6 +869,8 @@ mod tests {
         ] {
             assert!(included.contains(&Value::from(protected)));
         }
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
     }
 
     #[test]
@@ -602,6 +898,7 @@ mod tests {
     #[test]
     fn RustネイティブOwner確認だけがDesktop書出しを受理し監査へ起点を残す() {
         let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "native-owner");
         let mut request: Value = serde_json::from_str(&owner_request(&mut broker, payload())).unwrap();
         request["metadata"] = json!({"client": "desktop_flutter"});
         let response = broker.desktop_owner_operation_json(&request.to_string());
@@ -611,6 +908,8 @@ mod tests {
         assert!(audit.reason.contains("Rust Desktop起動器のネイティブ確認"));
         assert_eq!(audit.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
         assert_eq!(response.body.unwrap()["authority_strip"], true);
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
     }
 
     #[test]
@@ -639,6 +938,7 @@ mod tests {
     #[test]
     fn 明示選択は必須Moduleを保持し依存Moduleを閉包する() {
         let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "module-closure");
         let mut request = payload();
         request["module_selection"] = json!({"optional_module_ids": ["shell.trace_inspector"]});
         let raw = owner_request(&mut broker, request);
@@ -670,11 +970,14 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&Value::from("shell.history")));
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
     }
 
     #[test]
     fn 空選択でも必須Moduleだけは除去できない() {
         let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "empty-selection");
         let mut request = payload();
         request["module_selection"] = json!({"optional_module_ids": []});
         let raw = owner_request(&mut broker, request);
@@ -696,6 +999,8 @@ mod tests {
                 .len(),
             8
         );
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
     }
 
     #[test]
@@ -732,5 +1037,17 @@ mod tests {
             Value::from("credential.value");
         let raw = owner_request(&mut broker, invalid);
         assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
+    }
+
+    #[test]
+    fn 固定Export保存先がない要求はfileを作らず拒否する() {
+        let mut broker = Broker::new("session-1");
+        let raw = owner_request(&mut broker, payload());
+        let response = broker.owner要求処理(&raw);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "gui_shell_export_target_unavailable");
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == OPERATION && event.decision == "rejected"
+        }));
     }
 }

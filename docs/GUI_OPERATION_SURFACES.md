@@ -123,8 +123,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket GUI Shell Windows書出し（Phase 32 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: Desktop設定面はCompose Manifestと任意画面Module選択を通常資格のBroker IPC要求として送る。Brokerの`GUI Shell書出し`はOwner制御資格がない要求を拒否するため、現在のFlutter経路では実Exportは成立しない。Owner資格をFlutterへ露出する迂回は行わない。BrokerのOwner経路が受理した場合もManifest-only計画に限り、実binary除去、build、filesystem、署名、配布を開始しない。
-  authority_boundary: 書出し元のAuthority、Permission、Approval、Credential、Audit chainを継承せず、`authority_strip=true`と各`*_inherited=false`を固定する。実artifact、Installer、署名、filesystem書込み、process起動、Distribution、Module Pruningは未成立の`release_blocker`として保持する。
+  evidence: Desktop設定面はCompose Manifestと任意画面Module選択を通常資格のBroker IPC要求として送り、Rust起動器が検証済みsummaryとpayload hashをWindows native確認へ表示する。許可要求だけが既存process内Owner channelを通り、Brokerが再検証・Audit後、128-bit新規App IDを含むManifest fileを固定Export directoryへcreate-only生成する。Receiptには実fileのpath／SHA-256／byte長を含む。
+  authority_boundary: Owner資格・privileged IPCはFlutterへ渡さない。書出し元のAuthority、Permission、Approval、Credential、Audit chainを継承せず、`authority_strip=true`と各`*_inherited=false`を固定する。Manifest内identity／Audit store IDは将来用の識別子で、実行可能packageや物理Runtime／Audit storeではない。Module選択は計画のみで、binary除去、独立App起動、Installer、署名、Distribution、rollbackは未成立の`release_blocker`として保持する。固定Export directory以外のpathを要求payloadから受け取らない。
 
 - item: D4 Pocket Regression Case registration（C6 current scope）
   classification: required_for_v1
