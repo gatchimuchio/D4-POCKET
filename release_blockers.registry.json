@@ -135,8 +135,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Rust起動器はcompile-timeの生成済みApp ID／Audit store IDを検証し、従来GUI-Shell pathとの互換性を保ちながら製品別runtime rootを選ぶ実装とRust component／Conformance試験を追加した。BrokerのManifest file create-only生成、path／SHA-256／byte長のReceipt・完了Audit結合も成立済み。ただしSchema検証済みManifestからIDをExport専用buildへ渡すtool、製品別compile target orchestration、実行可能App bundle、clean source由来のinstalled Windows product上でOwner No／Yes・実file・完了Audit・全package hash・分離Runtimeを外部収集したLIVE_RUNTIME証拠は未成立。",
-      "required_action": "Schema検証済みManifestのApp ID／Audit store IDだけをcompile-time入力へ渡し、各製品で分離したCargo target directoryから実行可能bundleを構成するExport build toolを実装する。clean commitと全package hashに結合したformal Windows installed-path evidenceで製品間Runtime／Audit store分離、Owner No拒否と永続Auditを確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがないことを記録する。"
+      "reason": "Rust起動器の製品別runtime rootとBrokerのcreate-only Manifest／Receipt／Audit結合は実装済み。Schema検査済みReceipt／ManifestからApp／Audit store IDをcompile-timeへ渡すWindows開発build toolも追加したが、toolはReceiptの出所・Owner操作を認証しない。build evidenceはINTERNAL_STATEでCredential artifact scan未実施、runtime Manifest未消費、未署名、未起動を固定する。実際のclean pushed source bundle buildと、clean source由来installed productでOwner No／Audit、Owner Yes／Manifest file／完了Audit、全package hash、分離Runtime／Audit storeを外部収集するformal LIVE_RUNTIME証拠は未成立。",
+      "required_action": "clean pushed sourceから実際のBroker生成Receipt／Manifestでunsigned portable bundleを構成し、正確なpackage hashを記録する。別Windows user profileのformal installed-path evidenceで製品間runtime／Audit store分離、Owner No拒否と永続Auditを確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがなく、Credential scanの範囲が明示されていることを確認する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
@@ -145,8 +145,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較では、6つの選択外Dart surface library nodeがFlutter AOT report上で不在、選択した2 nodeは存在し、artifact差は224 KiBである。Brokerは新規App／Audit store IDを含むManifest fileを生成するが、これは実行可能Export packageではない。最終製品の意味上の除去、安全Core保持、Rust／third-party除去、別Runtime／物理Audit store、cold startupと実行時resourceは未検証。",
-      "required_action": "独立製品Export経路成立後、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象の実挙動をpositive／negative／回帰試験し、製品cold startupとbounded resourceを測定する。Manifest file、Flutter UI比較、AOT report node差、artifact size差だけではrelease gateを閉じない。"
+      "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較では、6つの選択外Dart surface library nodeがFlutter AOT report上で不在、選択した2 nodeは存在し、artifact差は224 KiBである。新しい開発Export toolは選択Module defineをFlutter／Rust portable bundleへ接続しartifact hashを記録するが、Manifestの選択記録やUI AOT node差、bundle生成はbinary pruningの証拠ではない。最終製品の意味上の除去、安全Core保持、Rust／third-party除去、別Runtime／物理Audit store、cold startupと実行時resourceは未検証。",
+      "required_action": "clean sourceから同一Windows／toolchain条件でall-enabled baselineと選択Exportを生成し、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象のpositive／negative／回帰実挙動を検証する。さらに製品cold startupとbounded resourceを測定する。Manifest file、Flutter UI比較、AOT report node差、artifact size差だけではrelease gateを閉じない。"
     },
     {
       "name": "windows_rust_integration_test_execution_policy",

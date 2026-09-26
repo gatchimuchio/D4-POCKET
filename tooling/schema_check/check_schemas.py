@@ -154,6 +154,7 @@ REQUIRED = {
     "gui_shell_module_catalog.schema.json",
     "gui_shell_module_build_evidence.schema.json",
     "gui_shell_module_comparison_evidence.schema.json",
+    "gui_shell_windows_export_build.schema.json",
     "host_capability.schema.json",
     "ipc_request.schema.json",
     "ipc_response.schema.json",

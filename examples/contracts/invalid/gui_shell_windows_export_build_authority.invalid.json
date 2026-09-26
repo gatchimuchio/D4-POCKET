@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "evidence_type": "d4_pocket_windows_export_build",
+  "evidence_source": "INTERNAL_STATE",
+  "authority_boundary": {
+    "source_authority_verified": true,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_included": false,
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  }
+}

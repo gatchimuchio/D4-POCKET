@@ -119,15 +119,15 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 - item: GUI Shell書出しのOwner UI LIVE_RUNTIME証拠が未成立
   classification: release_blocker
   registry_id: rev2_export_owner_ui_authority_path
-  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証と通常資格拒否の自動試験は実装済み。Manifest file生成は固定Broker Export directoryへ接続したが、clean installed productからのOwner Yes操作、file hashと完了Auditのformal LIVE_RUNTIME収集は未確認。
-  required_action: clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Credential／Authority非継承を同じsource commitと全package hashへ結合して検証する。
+  reason: Rust起動器のnative Owner確認、process内allowlist、Broker再検証、通常資格拒否の自動試験とcreate-only Manifest file生成は実装済み。Schema・hash・byte長を再照合してunsigned Windows bundleを組む開発toolも追加したが、Receiptの出所・Owner操作を認証しない。Credential artifact scanは未実施で、runtime Manifest消費・起動・formal installed-path evidenceは未確認。
+  required_action: clean-sourceのinstalled productをformal collectorで起動し、Owner No拒否と永続Auditを再確認する。実際のBroker生成Receipt／Manifestから作る全package hashと製品別runtime／Audit storeを検証し、Credential非露出を監査する。Ownerが明示GOした場合だけnative Yesを操作し、生成fileのpath／hash、完了Audit、Authority／Credential非継承を同じsource commitと全package hashへ結合して検証する。
   blocks_release: yes
 
 - item: Export Moduleの実binary除去と比較計測が未成立
   classification: release_blocker
   registry_id: rev2_module_pruning_binary_and_measurement
-  reason: Brokerは新規identityを含むManifest JSON fileを出力するが、実行可能packageはまだ生成しない。選択計画はbinaryからの除去ではなく、製品サイズ、cold startup、resourceも未測定。
-  required_action: 独立製品Export経路へ安全基盤保持試験を接続し、同一Windows条件のpruned／unpruned最終artifactをhash結合して実挙動・サイズ・cold startup・bounded resourceを比較測定する。
+  reason: 開発Export toolは選択Module defineをunsigned Windows bundleへ接続するが、選択記録やAOT node差、bundle生成はbinary pruningの証拠ではない。最終artifactの意味上の除去、安全Core保持、Rust／第三者module境界、製品起動・性能は未検証。
+  required_action: clean sourceから同一Windows／toolchain条件のall-enabledと選択bundleを作り、hash固定artifact上で必須安全Core保持と除外対象のpositive／negative／回帰実挙動を検証する。製品サイズ、cold startup、bounded resourceも比較測定する。
   blocks_release: yes
 
 - item: macOS planned portability target が未検証

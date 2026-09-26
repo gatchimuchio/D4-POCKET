@@ -1,13 +1,14 @@
-from pathlib import Path
 import base64
 import copy
 import hashlib
+import io
 import json
 import re
 import subprocess
 import sys
+import tarfile
 import tempfile
-import copy
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -78,6 +79,17 @@ from tooling.compare_module_builds_windows import (
     comparison_summary,
     validate_comparison_evidence,
 )
+from tooling.export_windows_product import (
+    _build_child_environment,
+    _require_clean_source,
+    _artifact_inventory,
+    _copy_bundle,
+    _resolve_output_directory,
+    _safe_extract_source,
+    validate_build_evidence,
+    validate_export_inputs,
+)
+import tooling.export_windows_product as windows_export
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
@@ -170,6 +182,7 @@ REQUIRED_SCHEMA_NAMES = {
     "gui_shell_module_catalog",
     "gui_shell_module_build_evidence",
     "gui_shell_module_comparison_evidence",
+    "gui_shell_windows_export_build",
     "ipc_request",
     "ipc_response",
     "broker_error",
@@ -283,6 +296,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "gui_shell_export_receipt.schema.json",
     "gui_shell_export_manifest.schema.json",
     "gui_shell_module_catalog.schema.json",
+    "gui_shell_windows_export_build.schema.json",
 }
 DESKTOP_FLUTTER_REQUIRED_FILES = {
     "lib/main.dart",
@@ -7698,6 +7712,279 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     return errors
 
 
+def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() -> list[str]:
+    evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
+    schema = load_schema("gui_shell_windows_export_build.schema.json")
+    errors: list[str] = []
+    if validate_instance(evidence, schema):
+        errors.append("Windows Export buildの正常証拠がSchemaに適合しない")
+    if evidence.get("authority_boundary", {}).get("credential_artifact_scan_status") != "not_performed":
+        errors.append("Windows Export build証拠が未実施のcredential scanをPASSへ昇格する")
+
+    original_git_value = windows_export._git_value
+    commit = "a" * 40
+    git_values = {
+        ("branch", "--show-current"): "main",
+        ("status", "--porcelain", "--untracked-files=all"): "",
+        ("rev-parse", "HEAD"): commit,
+        ("ls-remote", "origin", "refs/heads/main"): f"{commit}\trefs/heads/main",
+    }
+    windows_export._git_value = lambda *arguments: git_values[arguments]
+    try:
+        if _require_clean_source() != commit:
+            errors.append("clean main／GitHub同一commitをsource固定点にできない")
+        git_values[("ls-remote", "origin", "refs/heads/main")] = f"{'b' * 40}\trefs/heads/main"
+        try:
+            _require_clean_source()
+            errors.append("origin/mainと異なるsource commitでbuildを開始できる")
+        except ValueError:
+            pass
+        git_values[("status", "--porcelain", "--untracked-files=all")] = " M dirty.txt"
+        try:
+            _require_clean_source()
+            errors.append("dirty working treeからExport buildを開始できる")
+        except ValueError:
+            pass
+    finally:
+        windows_export._git_value = original_git_value
+
+    inherited = {
+        "PATH": "toolchain-path",
+        "SystemRoot": "windows-root",
+        "TEMP": "temporary-root",
+        "GITHUB_TOKEN": "secret-marker",
+        "AWS_SECRET_ACCESS_KEY": "secret-marker",
+        "GUI_SHELL_PRODUCT_APP_ID": "inherited-product-id",
+        "CARGO_HOME": "credential-bearing-user-cache",
+    }
+    flutter_environment = _build_child_environment(
+        {"PUB_CACHE": "isolated-pub-cache"}, inherited=inherited
+    )
+    if (
+        flutter_environment.get("PATH") != "toolchain-path"
+        or flutter_environment.get("SystemRoot") != "windows-root"
+        or "GITHUB_TOKEN" in flutter_environment
+        or "AWS_SECRET_ACCESS_KEY" in flutter_environment
+        or "GUI_SHELL_PRODUCT_APP_ID" in flutter_environment
+        or "CARGO_HOME" in flutter_environment
+        or flutter_environment.get("PUB_CACHE") != "isolated-pub-cache"
+    ):
+        errors.append("Flutter build childへ必要最小限以外の親環境を渡す")
+    rust_environment = _build_child_environment(
+        {
+            "CARGO_HOME": "isolated-cargo-home",
+            "GUI_SHELL_PRODUCT_APP_ID": "d4-pocket-app-" + "1" * 32,
+            "GUI_SHELL_PRODUCT_AUDIT_STORE_ID": "audit-store-" + "2" * 32,
+        },
+        inherited=inherited,
+    )
+    if (
+        rust_environment.get("CARGO_HOME") != "isolated-cargo-home"
+        or rust_environment.get("GUI_SHELL_PRODUCT_APP_ID") != "d4-pocket-app-" + "1" * 32
+        or rust_environment.get("GUI_SHELL_PRODUCT_AUDIT_STORE_ID") != "audit-store-" + "2" * 32
+        or "GITHUB_TOKEN" in rust_environment
+        or "AWS_SECRET_ACCESS_KEY" in rust_environment
+    ):
+        errors.append("Rust build childへcredential環境を残すか、compile-time identityを分離しない")
+
+    for path, value, label in (
+        (("authority_boundary", "source_authority_verified"), True, "source authority"),
+        (("authority_boundary", "owner_authorization_verified"), True, "Owner authorization"),
+        (("authority_boundary", "credential_values_explicitly_supplied"), True, "credential build input"),
+        (("authority_boundary", "credential_inherited"), True, "credential inheritance"),
+        (("authority_boundary", "permission_inherited"), True, "Permission inheritance"),
+        (("authority_boundary", "approval_inherited"), True, "Approval inheritance"),
+        (("authority_boundary", "audit_chain_inherited"), True, "Audit inheritance"),
+        (("standalone_app_verified",), True, "standalone verification"),
+        (("runtime_manifest_consumed",), True, "runtime Manifest consumption"),
+        (("binary_pruning_verified",), True, "binary pruning"),
+        (("formal_distribution_claimed",), True, "formal distribution"),
+        (("signed",), True, "signature"),
+        (("launch_status",), "verified", "live launch"),
+    ):
+        candidate = copy.deepcopy(evidence)
+        target = candidate
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+        if not validate_instance(candidate, schema):
+            errors.append(f"Windows Export build証拠が未成立の{label}を主張できる")
+
+    source_manifest_path = CONTRACT_EXAMPLES / "gui_shell_export_manifest.valid.json"
+    source_manifest = load_contract_fixture("gui_shell_export_manifest.valid.json")
+    manifest_raw = source_manifest_path.read_bytes()
+    source_receipt = load_contract_fixture("gui_shell_export_receipt.valid.json")
+    receipt_raw = (CONTRACT_EXAMPLES / "gui_shell_export_receipt.valid.json").read_bytes()
+    try:
+        validate_export_inputs(receipt_raw, manifest_raw)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append(f"一致するReceipt／Manifest fixtureをbuild入力として検査できない: {exc}")
+    else:
+        bad_receipt = copy.deepcopy(source_receipt)
+        bad_receipt["manifest_file"]["sha256"] = "sha256:" + "0" * 64
+        try:
+            validate_export_inputs(
+                json.dumps(bad_receipt, ensure_ascii=False).encode("utf-8"), manifest_raw
+            )
+            errors.append("Manifest hashが一致しないReceiptをbuild入力として受理する")
+        except ValueError:
+            pass
+        bad_name = copy.deepcopy(source_receipt)
+        bad_name["manifest_file"]["file_name"] = "other-product.json"
+        try:
+            validate_export_inputs(
+                json.dumps(bad_name, ensure_ascii=False).encode("utf-8"), manifest_raw
+            )
+            errors.append("App ID由来でないManifest file名をbuild入力として受理する")
+        except ValueError:
+            pass
+        duplicate_key_receipt = receipt_raw.replace(
+            b'"version": 1', b'"version": 1, "version": 1', 1
+        )
+        try:
+            validate_export_inputs(duplicate_key_receipt, manifest_raw)
+            errors.append("duplicate JSON keyを持つReceiptをbuild入力として受理する")
+        except ValueError:
+            pass
+
+    with tempfile.TemporaryDirectory(prefix="d4pocket-export-conformance-") as temporary:
+        bundle = Path(temporary) / "bundle"
+        for relative, payload in (
+            ("app/gui_shell_desktop.exe", b"flutter-app"),
+            ("app/flutter_windows.dll", b"flutter-engine"),
+            ("app/data/app.so", b"aot-app"),
+            ("app/data/icudtl.dat", b"icu-data"),
+            ("broker/gui_shell_rust_helper.exe", b"rust-broker"),
+            ("gui_shell_desktop_launcher.exe", b"rust-launcher"),
+            ("product_manifest.json", manifest_raw),
+        ):
+            path = bundle / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        (bundle / "app" / "data" / "flutter_assets").mkdir(parents=True, exist_ok=True)
+        (bundle / "app" / "data" / "flutter_assets" / "AssetManifest.bin").write_bytes(b"assets")
+        good = copy.deepcopy(evidence)
+        good["source_manifest_sha256"] = hashlib.sha256(manifest_raw).hexdigest()
+        good["artifact_files"], good["artifact_total_bytes"], good["artifact_tree_sha256"] = _artifact_inventory(bundle)
+        good["app_id"] = source_manifest["manifest"]["app_identity"]["app_id"]
+        good["audit_store_id"] = source_manifest["manifest"]["audit_store"]["store_id"]
+        good["rust_compile_time_identity"]["app_id"] = good["app_id"]
+        good["rust_compile_time_identity"]["audit_store_id"] = good["audit_store_id"]
+        validate_build_evidence(good, bundle)
+
+        mismatch = copy.deepcopy(good)
+        mismatch["rust_compile_time_identity"]["app_id"] = "d4-pocket-app-" + "9" * 32
+        try:
+            validate_build_evidence(mismatch, bundle)
+            errors.append("Rust compile-time App IDとManifestの不一致を受理する")
+        except ValueError:
+            pass
+
+        manifest_mismatch = copy.deepcopy(good)
+        manifest_mismatch["app_id"] = "d4-pocket-app-" + "9" * 32
+        manifest_mismatch["rust_compile_time_identity"]["app_id"] = manifest_mismatch["app_id"]
+        try:
+            validate_build_evidence(manifest_mismatch, bundle)
+            errors.append("Manifest内App IDとExport build evidenceの不一致を受理する")
+        except ValueError:
+            pass
+
+        (bundle / "app" / "gui_shell_desktop.exe").write_bytes(b"tampered")
+        try:
+            validate_build_evidence(good, bundle)
+            errors.append("変更後artifactを古いbuild inventoryで受理する")
+        except ValueError:
+            pass
+
+    with tempfile.TemporaryDirectory(prefix="d4pocket-export-location-") as temporary:
+        temporary_path = Path(temporary)
+        one_drive_root = temporary_path / "OneDrive - Test"
+        one_drive_root.mkdir()
+        try:
+            _resolve_output_directory(one_drive_root / "bundle")
+            errors.append("OneDrive同期directoryへのExport build出力を許可する")
+        except ValueError:
+            pass
+        try:
+            accepted_output = _resolve_output_directory(temporary_path / "bundle")
+            if accepted_output != temporary_path / "bundle":
+                errors.append("外部の短いoutput pathを安定して解決しない")
+        except (OSError, ValueError) as exc:
+            errors.append(f"OneDrive外のoutput directoryを解決できない: {exc}")
+
+    with tempfile.TemporaryDirectory(prefix="d4pocket-export-copy-") as temporary:
+        root = Path(temporary)
+        flutter_release = root / "flutter-release"
+        for relative, payload in (
+            ("gui_shell_desktop.exe", b"flutter-app"),
+            ("flutter_windows.dll", b"flutter-engine"),
+            ("data/app.so", b"aot-app"),
+            ("data/icudtl.dat", b"icu-data"),
+            ("data/flutter_assets/AssetManifest.bin", b"assets"),
+        ):
+            path = flutter_release / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        helper = root / "gui_shell_rust_helper.exe"
+        helper.write_bytes(b"rust-broker")
+        launcher = root / "gui_shell_desktop_launcher.exe"
+        launcher.write_bytes(b"rust-launcher")
+        copied = root / "copied-bundle"
+        _copy_bundle(flutter_release, helper, launcher, manifest_raw, copied)
+        if (copied / "product_manifest.json").read_bytes() != manifest_raw:
+            errors.append("portable bundleが入力Manifestをbyte-for-byte保持しない")
+        (flutter_release / "data" / "icudtl.dat").unlink()
+        incomplete = root / "incomplete-bundle"
+        try:
+            _copy_bundle(flutter_release, helper, launcher, manifest_raw, incomplete)
+            errors.append("Flutter locale data欠落bundleをExport buildが完成扱いする")
+        except ValueError:
+            pass
+
+    def archive_bytes(entries: list[tuple[str, bytes | None, bytes]]) -> bytes:
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode="w") as archive:
+            for name, kind, payload in entries:
+                member = tarfile.TarInfo(name)
+                if kind is None:
+                    member.type = tarfile.REGTYPE
+                    member.size = len(payload)
+                    archive.addfile(member, io.BytesIO(payload))
+                else:
+                    member.type = kind
+                    archive.addfile(member)
+        return output.getvalue()
+
+    with tempfile.TemporaryDirectory(prefix="d4pocket-source-extract-") as temporary:
+        temporary_path = Path(temporary)
+        safe_archive = temporary_path / "safe.tar"
+        safe_archive.write_bytes(archive_bytes([("src/file.txt", None, b"safe")]))
+        safe_root = temporary_path / "safe-root"
+        safe_root.mkdir()
+        _safe_extract_source(safe_archive, safe_root)
+        if (safe_root / "src" / "file.txt").read_bytes() != b"safe":
+            errors.append("許可されたGit archive fileをsource snapshotへ展開できない")
+
+        for name, kind, label in (
+            ("../escape.txt", None, "root traversal"),
+            ("bad-link", tarfile.SYMTYPE, "symlink"),
+            ("Case.txt", None, "case-fold collision"),
+        ):
+            archive_path = temporary_path / f"{label.replace(' ', '-')}.tar"
+            entries = [(name, kind, b"payload")]
+            if label == "case-fold collision":
+                entries = [("Case.txt", None, b"one"), ("case.txt", None, b"two")]
+            archive_path.write_bytes(archive_bytes(entries))
+            destination = temporary_path / f"extract-{label.replace(' ', '-')}"
+            destination.mkdir()
+            try:
+                _safe_extract_source(archive_path, destination)
+                errors.append(f"Git source archiveの{label}を拒否しない")
+            except ValueError:
+                pass
+    return errors
+
+
 def load_bounded_extension_fixture() -> dict:
     return load_contract_fixture(BOUNDED_EXTENSION_FIXTURE)
 
@@ -8363,6 +8650,7 @@ def main() -> int:
         test_gui_shell_edit_proposal_is_owner_review_only,
         test_gui_shell_export_is_new_identity_and_non_inheriting,
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
+        test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative,
         test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,

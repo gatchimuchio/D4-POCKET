@@ -1755,6 +1755,23 @@ MethodChannel／PID-bound pipeは現行実装済みのため再実装せず、`d
 
 Windows installed productのclean-source formal smoke、Dart経路の全negative/failure実測、正常終了とfirst-run／Setup Doctor evidenceは未確認で、`rev2_flutter_broker_channel_boundary`を`release_blocker`のまま維持する。正式distribution、Module Pruning最終artifact検証、Mobile実機／iOS、owner GO等の既存blockerも変わらず、`release_ready=false`である。
 
+## D4 Pocket rev2 Windows Export開発bundle構築経路（2026-09-26）
+
+GUI-Shell ExportのManifest file生成後に、Broker Export ReceiptとManifest fileを検証してWindows向けportable開発bundleを組み立てる開発専用経路を追加した。Receipt／Manifestのschema・ID・filename・byte length・SHA-256・module planを照合し、sourceはcleanでpush済みの`main`と`origin/main`一致を要求する。source snapshot、Flutter build、Cargo build、依存cacheはrepository／OneDrive外の一時領域へ分離する。FlutterとRust子processへ渡す環境変数を許可list化し、出力は同一volume上のstagingで検証してから新規pathへ確定する。Build receiptはartifact inventoryとtree hashを記録し、実行・runtime接続・binary pruning・credential scan・正式配布が未検証である状態を明示する。
+
+これは実際のBrokerによるOwner承認済みReceiptではなく、repository内のsynthetic example fixtureを使う予定の開発build経路である。clean pushed sourceからWindows bundleを実buildする検証は、最初の実装commitをpushしてから別途行う。fixtureによるbuild成功はOwner authority、LIVE_RUNTIME、credential非混入、standalone app、binary pruning、release readinessの証拠にならない。正式identity、署名、installer、実runtime／独立Audit、module pruningは未成立で、対応する`release_blocker`と`release_ready=false`を維持する。
+
+実行済みの局所検証（実build前）:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 137件、正常example 137件、negative fixture 169件でPASS。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：216 checksでPASS。Receipt／Manifestの不一致、credential・authority・permission・approval・audit・signature・runtime・pruning・launch成功の虚偽主張、manifest／artifact改変、重複JSON key、危険なarchive path、OneDrive出力を拒否する。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債0件、finding 0件でPASS。
+- `python -X utf8 tooling/manifest.py --check`：staged source 1,042件のhash manifest検査でPASS。
+- `python -X utf8 tooling/packaging_portability_check.py`：source package portability検査でPASS。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済みPython／Windows開発検査はPASS。Windows formal installed evidence等の既存blockerは保持し、`release_ready=false`。
+- `python -X utf8 -m py_compile tooling/export_windows_product.py tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/export_windows_product.py --help`、`git diff --cached --check`：全項目合格。
+- `Rust`／`Flutter`の実装は変更していない。変更を含まない`origin/main`を基点とするWindows向け出力物の構築、生成物の起動、認証情報実値が配布物へ混入していないかの調査は未実行であり、本記録時点では未検証。
+
 ## D4 Pocket rev2 Export identity形式の契約同期（2026-09-26）
 
 現行BrokerはApp IDを`d4-pocket-app-`＋小文字hex 32桁、Audit store IDを`audit-store-`＋小文字hex 32桁として生成する。一方、Receipt／Manifest fileが共有するSchemaは両方を任意文字列として許し、valid exampleのAudit store IDもBroker生成形式と異なっていた。Schemaへ両形式を固定し、valid example、日本語のExport意味正本、ReceiptおよびManifest file双方のnegative Conformanceを同期した。大文字hex App IDと不定形式Audit store IDを拒否する。

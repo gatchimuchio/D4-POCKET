@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "evidence_type": "d4_pocket_windows_export_build",
+  "evidence_source": "INTERNAL_STATE",
+  "product": "D4 Pocket",
+  "target_platform": "windows",
+  "build_mode": "release",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_archive_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "export_id": "export-d4-pocket",
+  "app_id": "d4-pocket-app-11111111111111111111111111111111",
+  "audit_store_id": "audit-store-22222222222222222222222222222222",
+  "authority_boundary": {
+    "source_authority_verified": false,
+    "owner_authorization_verified": false,
+    "authority_strip": true,
+    "credential_values_explicitly_supplied": false,
+    "credential_artifact_scan_status": "not_performed",
+    "credential_inherited": false,
+    "permission_inherited": false,
+    "approval_inherited": false,
+    "audit_chain_inherited": false
+  },
+  "module_plan": {
+    "catalog_version": 1,
+    "selection_mode": "explicit_optional",
+    "requested_optional_module_ids": ["shell.trace_inspector"],
+    "unprunable_core_ids": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure"],
+    "included_module_ids": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure", "shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings", "shell.observability", "shell.trace_inspector"],
+    "excluded_optional_module_ids": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.host_operations"]
+  },
+  "toolchain": {
+    "flutter": "3.44.0",
+    "dart": "3.12.0",
+    "framework_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cargo": "cargo 1.95.0",
+    "rustc": "rustc 1.95.0"
+  },
+  "pub_get_arguments": ["--suppress-analytics", "pub", "get", "--enforce-lockfile"],
+  "flutter_build_arguments": ["build", "windows", "--release", "--no-pub", "--dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=true"],
+  "rust_build_arguments": ["build", "--release", "--locked", "--bin", "gui_shell_rust_helper", "--bin", "gui_shell_desktop_launcher"],
+  "rust_compile_time_identity": {
+    "source": "schema_validated_manifest",
+    "app_id": "d4-pocket-app-11111111111111111111111111111111",
+    "audit_store_id": "audit-store-22222222222222222222222222222222"
+  },
+  "build_duration_ms": 127000,
+  "runtime_storage_root_template": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
+  "portable_bundle_assembled": true,
+  "manifest_copied_byte_for_byte": true,
+  "build_receipt_excluded_from_artifact_inventory": true,
+  "standalone_app_verified": false,
+  "runtime_manifest_consumed": false,
+  "binary_pruning_verified": false,
+  "formal_distribution_claimed": false,
+  "signed": false,
+  "installer_status": "not_started",
+  "launch_status": "not_verified",
+  "artifact_root": ".",
+  "artifact_files": [
+    {"path": "app/gui_shell_desktop.exe", "size_bytes": 1024, "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+    {"path": "app/flutter_windows.dll", "size_bytes": 2048, "sha256": "5555555555555555555555555555555555555555555555555555555555555555"},
+    {"path": "app/data/app.so", "size_bytes": 4096, "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+    {"path": "app/data/icudtl.dat", "size_bytes": 4096, "sha256": "6666666666666666666666666666666666666666666666666666666666666666"},
+    {"path": "broker/gui_shell_rust_helper.exe", "size_bytes": 1024, "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    {"path": "gui_shell_desktop_launcher.exe", "size_bytes": 1024, "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    {"path": "product_manifest.json", "size_bytes": 2048, "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}
+  ],
+  "artifact_total_bytes": 15360,
+  "artifact_tree_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+}

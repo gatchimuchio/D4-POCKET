@@ -27,8 +27,8 @@
   "manifest_file": {
     "file_name": "d4-pocket-app-11111111111111111111111111111111.json",
     "path": "C:\\Users\\Example\\AppData\\Local\\GUI-Shell\\broker\\desktop\\exports\\d4-pocket-app-11111111111111111111111111111111.json",
-    "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "byte_length": 8192,
+    "sha256": "sha256:4ab0bd23b31a2d75a38f5de0b3076082b744cc0ee81d6319fa466b3626696a31",
+    "byte_length": 2321,
     "temporary_file_status": "removed",
     "temporary_file_name": ".11111111111111111111111111111111.manifest.tmp",
     "recovery_action": "none"

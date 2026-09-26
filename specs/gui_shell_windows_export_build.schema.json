@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/gui_shell_windows_export_build.schema.json",
+  "title": "D4 Pocket Windows Export build記録",
+  "type": "object",
+  "required": [
+    "version",
+    "evidence_type",
+    "evidence_source",
+    "product",
+    "target_platform",
+    "build_mode",
+    "source_commit",
+    "source_archive_sha256",
+    "source_receipt_sha256",
+    "source_manifest_sha256",
+    "export_id",
+    "app_id",
+    "audit_store_id",
+    "authority_boundary",
+    "module_plan",
+    "toolchain",
+    "pub_get_arguments",
+    "flutter_build_arguments",
+    "rust_build_arguments",
+    "rust_compile_time_identity",
+    "build_duration_ms",
+    "runtime_storage_root_template",
+    "portable_bundle_assembled",
+    "manifest_copied_byte_for_byte",
+    "build_receipt_excluded_from_artifact_inventory",
+    "standalone_app_verified",
+    "runtime_manifest_consumed",
+    "binary_pruning_verified",
+    "formal_distribution_claimed",
+    "signed",
+    "installer_status",
+    "launch_status",
+    "artifact_root",
+    "artifact_files",
+    "artifact_total_bytes",
+    "artifact_tree_sha256"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "evidence_type": { "const": "d4_pocket_windows_export_build" },
+    "evidence_source": { "const": "INTERNAL_STATE" },
+    "product": { "const": "D4 Pocket" },
+    "target_platform": { "const": "windows" },
+    "build_mode": { "const": "release" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_archive_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "export_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+    "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+    "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" },
+    "authority_boundary": {
+      "type": "object",
+      "required": [
+        "source_authority_verified",
+        "owner_authorization_verified",
+        "authority_strip",
+        "credential_values_explicitly_supplied",
+        "credential_artifact_scan_status",
+        "credential_inherited",
+        "permission_inherited",
+        "approval_inherited",
+        "audit_chain_inherited"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source_authority_verified": { "const": false },
+        "owner_authorization_verified": { "const": false },
+        "authority_strip": { "const": true },
+        "credential_values_explicitly_supplied": { "const": false },
+        "credential_artifact_scan_status": { "const": "not_performed" },
+        "credential_inherited": { "const": false },
+        "permission_inherited": { "const": false },
+        "approval_inherited": { "const": false },
+        "audit_chain_inherited": { "const": false }
+      }
+    },
+    "module_plan": {
+      "type": "object",
+      "required": [
+        "catalog_version",
+        "selection_mode",
+        "requested_optional_module_ids",
+        "unprunable_core_ids",
+        "included_module_ids",
+        "excluded_optional_module_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "catalog_version": { "const": 1 },
+        "selection_mode": { "enum": ["all_optional", "explicit_optional"] },
+        "requested_optional_module_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] }
+        },
+        "unprunable_core_ids": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "enum": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure"] }
+        },
+        "included_module_ids": {
+          "type": "array",
+          "minItems": 18,
+          "uniqueItems": true,
+          "items": { "enum": ["core.security_broker", "core.cryptography", "core.audit_finality", "core.credentials", "core.os_controls", "core.permission_enforcement", "core.approval_enforcement", "core.content_exposure", "shell.dashboard", "shell.runtime_operation", "shell.agent_operation", "shell.authority", "shell.approval", "shell.audit", "shell.recovery", "shell.problems", "shell.evidence", "shell.settings", "shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] }
+        },
+        "excluded_optional_module_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["shell.setup_doctor", "shell.history", "shell.evaluation_lab", "shell.host_capabilities", "shell.notifications", "shell.observability", "shell.trace_inspector", "shell.host_operations"] }
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "required": ["flutter", "dart", "framework_revision", "cargo", "rustc"],
+      "additionalProperties": false,
+      "properties": {
+        "flutter": { "type": "string", "minLength": 1 },
+        "dart": { "type": "string", "minLength": 1 },
+        "framework_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "cargo": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 }
+      }
+    },
+    "pub_get_arguments": { "type": "array", "minItems": 4, "items": { "type": "string", "minLength": 1 } },
+    "flutter_build_arguments": { "type": "array", "minItems": 4, "items": { "type": "string", "minLength": 1 } },
+    "rust_build_arguments": { "type": "array", "minItems": 6, "items": { "type": "string", "minLength": 1 } },
+    "rust_compile_time_identity": {
+      "type": "object",
+      "required": ["source", "app_id", "audit_store_id"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "const": "schema_validated_manifest" },
+        "app_id": { "type": "string", "pattern": "^d4-pocket-app-[0-9a-f]{32}$" },
+        "audit_store_id": { "type": "string", "pattern": "^audit-store-[0-9a-f]{32}$" }
+      }
+    },
+    "build_duration_ms": { "type": "integer", "minimum": 0 },
+    "runtime_storage_root_template": { "const": "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>" },
+    "portable_bundle_assembled": { "const": true },
+    "manifest_copied_byte_for_byte": { "const": true },
+    "build_receipt_excluded_from_artifact_inventory": { "const": true },
+    "standalone_app_verified": { "const": false },
+    "runtime_manifest_consumed": { "const": false },
+    "binary_pruning_verified": { "const": false },
+    "formal_distribution_claimed": { "const": false },
+    "signed": { "const": false },
+    "installer_status": { "const": "not_started" },
+    "launch_status": { "const": "not_verified" },
+    "artifact_root": { "const": "." },
+    "artifact_files": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "allOf": [
+        { "contains": { "type": "object", "properties": { "path": { "const": "app/gui_shell_desktop.exe" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "app/flutter_windows.dll" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "app/data/app.so" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "app/data/icudtl.dat" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "broker/gui_shell_rust_helper.exe" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "gui_shell_desktop_launcher.exe" } } }, "minContains": 1 },
+        { "contains": { "type": "object", "properties": { "path": { "const": "product_manifest.json" } } }, "minContains": 1 }
+      ],
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "artifact_total_bytes": { "type": "integer", "minimum": 1 },
+    "artifact_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
