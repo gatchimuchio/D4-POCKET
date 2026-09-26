@@ -1684,3 +1684,13 @@ tray exit実装の確認後、同一のclean `b81fc607e65ecaf7fc8bc5de53376e3994
 - Rust sourceはこの作業blockで変更していないためRust testは再実行していない。全target実行に関する既存blockerは引き続き別途保持する。
 
 この結果は現Flutter 3.44.0 Release上のUIAutomation surface露出と通常tray終了を改善した診断である。別Windows profileのformal evidence、Setup Doctor画面の可読性、strict evidence validator、実screen reader、他Flutter engine版は未確認であり、`windows_setup_doctor_smoke`と`release_ready=false`を維持する。
+
+## D4 Pocket rev2 Windows Rust全target test再確認（2026-09-26）
+
+対象source commitは`fdbff3395a337b115bf1c33b19474ea6b3e567a5`。Rust sourceは直前block以降変更していないが、registryで`windows_rust_integration_test_execution_policy`が`unresolved`のため、Windows host上で要求された正規Cargo実行を再確認した。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：library 273件中272件成功、A2A loopback Agent Card取得test 1件が応答読取時の`a2a_connection_failed`で失敗。したがってCargoは最初のlibrary target内で停止し、全target完遂の証拠にはならない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する -- --exact --nocapture --test-threads=1`：library上の対象testは1件成功した。その後Cargoが次の`gui_shell_desktop_launcher` test executableを起動しようとしたが、Windows Application ControlにOS error 4551で拒否され、コマンド全体はexit 1。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：library全273件成功、32.10秒。先行失敗したA2A loopback testも成功したため、一時失敗の原因はこの検証では特定できていない。
+
+したがってRust libraryは現sourceで273件PASSだが、helper／launcher／integrationを含む全target testは未完了であり、Windows Application Controlの実行拒否も再確認された。OS policyを無効化したり別配置binaryへ移したりせず、許可済みWindows hostで全target試験を完遂する必要がある。`windows_rust_integration_test_execution_policy`は`release_blocker`のまま維持し、過去の全target PASS記録を現sourceへ転用しない。`release_ready=false`を維持する。
