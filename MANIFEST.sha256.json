@@ -193,7 +193,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "f1b772009e484c1aeed537782b481f75e7d5dbf2f134b53b874bfb4686e2d543"
+      "sha256": "19f84795b69f6aacf713951980683f15a941cee1a7f9830e38f553405fab2b27"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "c9d384fc1fb1241fe75c674b8e54410b5019f29b516322a6ddd5b794d9982842"
+      "sha256": "e808cbd5e1e8cb4ecdbc01382d431c646ab171aaca8d4707eba8cc806290dc43"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -525,7 +525,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "23c5a1fd8e6742b73dbc1d0a3b9073d02fae04819f3bca24e8290130c1b360b7"
+      "sha256": "5040c4cfbfe9e7fa4934ab6c57703f039e8cc4875063621114af14ef3d643b67"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "04bfcc4dd348a811cff1e06dd4cdfb4a6b3b6f36d18da51bdcbf4a7217bce067"
+      "sha256": "d2cbb072be87ca7f11f354e0a45beeeb9918c65b39852e6574fb111d4a52bd94"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "812b9f23e792a0cf3c26da4394f36186e394daa3e217ac8a97e64f56e4f1c96f"
+      "sha256": "98ff6261d5020e8f10749ec6cc894f7e8b5b62a1086a2a98da3f1d8a1f832aba"
     },
     {
       "path": "docs/specs/agent-runtime.md",

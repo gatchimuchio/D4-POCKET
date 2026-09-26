@@ -35,6 +35,7 @@ void main() {
       _session('b', 'workspace-b'),
     ]);
     expect(isolated.available, isTrue);
+    expect(isolated.statusMessage, contains('実行時の隔離は未検証'));
 
     final contaminated = AgentComparisonProjection.fromSessions([
       _session('a', 'workspace-a'),
@@ -42,6 +43,43 @@ void main() {
     ]);
     expect(contaminated.available, isFalse);
     expect(contaminated.statusMessage, contains('同一Workspace'));
+  });
+
+  test('Agent比較は件数と識別できる参照を契約範囲内で要求する', () {
+    final missingWorkspace = AgentComparisonProjection.fromSessions([
+      _session('a', 'workspace-a'),
+      _session('b', '   '),
+    ]);
+    expect(missingWorkspace.available, isFalse);
+    expect(missingWorkspace.statusMessage, contains('Workspace参照'));
+
+    final missingSessionId = AgentComparisonProjection.fromSessions([
+      _session('', 'workspace-a'),
+      _session('b', 'workspace-b'),
+    ]);
+    expect(missingSessionId.available, isFalse);
+    expect(missingSessionId.statusMessage, contains('セッション識別子'));
+
+    final malformedSessionId = AgentComparisonProjection.fromSessions([
+      _session('agent/one', 'workspace-a'),
+      _session('agent-two', 'workspace-b'),
+    ]);
+    expect(malformedSessionId.available, isFalse);
+    expect(malformedSessionId.statusMessage, contains('セッション識別子'));
+
+    final duplicateSessionId = AgentComparisonProjection.fromSessions([
+      _session('agent-one', 'workspace-a'),
+      _session('agent-one', 'workspace-b'),
+    ]);
+    expect(duplicateSessionId.available, isFalse);
+    expect(duplicateSessionId.statusMessage, contains('重複'));
+
+    final tooMany = AgentComparisonProjection.fromSessions([
+      for (var index = 0; index < 9; index++)
+        _session('agent-$index', 'workspace-$index'),
+    ]);
+    expect(tooMany.available, isFalse);
+    expect(tooMany.statusMessage, contains('8件'));
   });
 
   test('Handoff投影は公開概要と権限再評価だけを示す', () {

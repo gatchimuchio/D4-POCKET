@@ -63,8 +63,8 @@ class AgentCenter extends StatelessWidget {
                 title: '安全境界',
                 rows: [
                   comparison.available
-                      ? 'Workspace隔離を確認済み'
-                      : '比較実行はBroker接続済みの投影だけに限定',
+                      ? 'Workspace参照の重複なし（実行時の隔離は未検証）'
+                      : '比較条件が成立していません',
                   'Authority・Approval・Credentialは共有しない',
                 ],
               ),

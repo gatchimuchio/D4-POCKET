@@ -1810,3 +1810,13 @@ ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から�
 - `python -X utf8 tooling/export_windows_product.py --receipt <scratch receipt.json> --manifest-file <scratch d4-pocket-app-11111111111111111111111111111111.json> --output-dir <scratch output>`：Flutter `pub get`とWindows Release buildは成功し、実行時間は約80秒。MSB8029警告はあったがFlutter executableを生成した。その後Cargoは`io-lifetimes`と`proc-macro2`のbuild script executableを起動できず、Windows Application ControlのOS error 4551でexit 101。tool全体はexit 1で停止し、portable outputは生成されなかった。
 - 短いprofile直下pathでFlutter buildが完了したため、今回のCargo停止は先行LNK1104のpath長障害とは別である。Cargo targetや拒否されたexecutableの移動、Application Control policy変更は行っていない。Cargoの一時source／targetはtool終了時に片付き、残存する専用scratchにはfixture入力と空のMSBuild管理directoryだけがある。
 - 出力は未署名bundleの構築段階にも到達せず、Credential scan、Manifest runtime消費、binary pruning、起動、配布、formal LIVE_RUNTIMEを証明しない。`rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`、`release_ready=false`を維持する。
+
+## D4 Pocket Phase 7 Agent比較projectionのfail-closed同期（2026-09-27）
+
+現行Flutterの比較表示判定を`agent_comparison.schema.json`と照合したところ、2件未満だけを拒否し、9件以上や空Workspace参照を比較可能としていた。またWorkspace文字列の相違だけで「Workspace隔離を確認済み」と表示していた。Desktop側projectionを2〜8件、比較ID形式、空でないWorkspace参照、Session ID／Workspace参照の重複検査へ同期し、異なる参照は実行時隔離の証明ではないと表示・仕様へ明記した。Agent実行、Workspace作成、Broker権限経路は追加していない。
+
+- 正常／負例: 2件の異なる参照はprojection対象になるが、同一Session、同一Workspace参照、空のWorkspace参照、不正Session ID、9件は拒否する。Handoff表示のAuthority再評価要求と秘密markerの既存testも維持する。
+- 初回の厳格日本語監査はID検査用正規表現リテラルをDart画面文言として1件検出した。監査例外を追加せず、同じASCII ID規則をcode unit判定で実装し直した。最終の`python -X utf8 tooling/日本語基底監査.py --strict`は負債0／finding 0でPASS。
+- `flutter test --no-pub --no-test-assets`（Desktop、Z:一時alias）：110件PASS。`flutter analyze --no-pub`（Desktop／Mobile、同alias）：両方No issues found。`subst Z: /D`でalias解除を確認した。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema 137、正常example 137、negative fixture 169、Conformance 216、Manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32監査を含む登録済みlocal検証がPASS。release blockerと`release_ready=false`は維持する。
+- 証拠境界: これはFlutterのsnapshot projectionと表示の検査であり、Agent比較実行、path alias／junctionを含むWorkspace実隔離、実Handoffを証明しない。実Agentを隔離Workspaceで起動・比較するBroker経路とtarget側の再評価／失敗隔離／Recoveryは`release_blocker`として継続し、snapshot文字列だけで隔離を主張しない制限は`known_limitation`である。
