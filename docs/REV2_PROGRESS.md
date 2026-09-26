@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 32追補: Export runtime保存領域の分離対応（2026-09-26）
+
+Rust Desktop起動器に、コンパイル時に埋め込まれた生成済みApp IDとAudit store IDから製品別runtime rootを選ぶ経路を追加した。両IDが未設定の既存GUI-Shell起動は従来の`%LOCALAPPDATA%\GUI-Shell\broker\desktop`を維持する。両IDが所定形式なら`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`を使い、片側欠落・不正形式では保存directoryの作成、Broker起動、Flutter起動より前にfail-closedとなる。reparse point拒否とLocal AppData rootへのcontainment検査を各directory componentへ適用し、製品別Owner確認に保存先を表示する。
+
+IDはデータ分離用の識別子であり、Permission、Approval、Capability、Credential、Agent trustを生成しない。旧runtimeからの移行・継承は行わず、IDはFlutter childのenvironment allowlistへ渡さない。runtime pathとBroker起動の既存Rust経路を変更し、個別製品IDごとの異なる保存先を利用できるところまで成立した。
+
+- Evidence class: `CONFIG`（compile-time identity選択規則）、`FIXTURE`（Windows一時directory・不正ID・junction拒否のRust component testとConformance）。Installed Export Appの`LIVE_RUNTIME`証拠ではない。
+- 未接続範囲: Schema検証済みManifestからcompile-time値を供給するExport build tool、製品IDごとに分離したCargo target directoryを使うbuild orchestration、実行可能bundle、installed product上の独立Runtime／物理Audit storeは未成立。Manifest-only Exportやこの起動器対応を独立App完成へ昇格させない。
+- 検証: `python -X utf8 tooling/schema_check/check_schemas.py`（Schema／正常example 136、negative fixture 168）、`python tooling/conformance_tests/run_conformance_skeleton.py`（215 checks）、`python -X utf8 tooling/日本語基底監査.py --strict`（負債0 files／0 findings）、`python -X utf8 tooling/manifest.py --check`、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`（development 10 checks）はPASS。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`はRust全target 330件PASS（library 285、CLI 9、integration 36）。製品ID compile-time環境を指定した別targetの`runtime_directory_uses_only_embedded_identity_values`も1件PASS。`git diff --check`はPASS。
+- Format: `rustfmt --edition 2021 --check native/rust_helper/src/desktop_launcher.rs`はimport順、既存関数、既存testを含むfile全体の既存format driftでFAIL。追加した箇所はrustfmtの該当差分を確認・整形した。無関係な全file再formatは行っていない。
+- 未成立分類: `rev2_export_owner_ui_authority_path`と`rev2_module_pruning_binary_and_measurement`を`release_blocker`として維持する。Windows installed productでのOwner操作・保存先・完了Auditの`LIVE_RUNTIME`証拠、最終製品binary pruning・安全Core保持・起動／資源比較は未確認。
+
 ## D4 Pocket rev2 C6 Desktop対話pane owner登録接続（2026-09-25）
 
 前段のC6回帰Case保管・一覧・Owner削除／中断Recoveryに対し、Desktop対話paneから完了結果をownerが明示的に回帰Case登録する経路を追加した。送信受付時にBrokerが返す要求ID／要求hashを対話clientが厳密に検証して保持する。要求hashは結果との相関値に限定し、Approval、Permission、Owner資格、実行許可を生成しない。既存Broker応答にSchemaがなかったため、`runtime_dialogue_submission_receipt.schema.json`、正常／否定fixture、Schema checker、Conformanceを追加し、既存応答のfieldと権限境界を固定した。

@@ -135,8 +135,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "Rust起動器のnative Owner確認、Broker process内allowlist、自動試験は実装済み。Owner確認後に新規App ID・Audit store IDを含むManifest fileを固定Export directoryへcreate-only生成し、path／SHA-256／byte長をReceipt、完了Auditへ結ぶ実装とRust unit／Conformance試験も成立した。ただしclean source由来のinstalled Windows product上でOwner No／Yes、実file、完了Audit、全package hashを外部収集したLIVE_RUNTIME証拠は未取得。実行可能App bundleや独立Runtimeはまだ生成しない。",
-      "required_action": "formal Windows installed-path collectorで正確なsource commitと全package artifact hashに結合した証拠を作成し、Owner No拒否と永続Auditを再確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがないことを記録する。"
+      "reason": "Rust起動器はcompile-timeの生成済みApp ID／Audit store IDを検証し、従来GUI-Shell pathとの互換性を保ちながら製品別runtime rootを選ぶ実装とRust component／Conformance試験を追加した。BrokerのManifest file create-only生成、path／SHA-256／byte長のReceipt・完了Audit結合も成立済み。ただしSchema検証済みManifestからIDをExport専用buildへ渡すtool、製品別compile target orchestration、実行可能App bundle、clean source由来のinstalled Windows product上でOwner No／Yes・実file・完了Audit・全package hash・分離Runtimeを外部収集したLIVE_RUNTIME証拠は未成立。",
+      "required_action": "Schema検証済みManifestのApp ID／Audit store IDだけをcompile-time入力へ渡し、各製品で分離したCargo target directoryから実行可能bundleを構成するExport build toolを実装する。clean commitと全package hashに結合したformal Windows installed-path evidenceで製品間Runtime／Audit store分離、Owner No拒否と永続Auditを確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがないことを記録する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",

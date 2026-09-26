@@ -2688,7 +2688,24 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     ]:
         if token not in launcher:
             errors.append(f"Rust Desktop起動器の既存Broker境界が欠落: {token}")
-    for token in ["for component in [\"GUI-Shell\", \"broker\", \"desktop\"]", "canonical.starts_with(&root)", "ensure_store_directory", "broker_store_directory_rejects_junction_outside_runtime_root"]:
+    for token in [
+        "runtime_directory_with_identity(",
+        'option_env!("GUI_SHELL_PRODUCT_APP_ID")',
+        'option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID")',
+        '"D4Pocket".to_string()',
+        '"stores".to_string()',
+        "canonical.starts_with(&root)",
+        "ensure_store_directory",
+        "PRODUCT_RUNTIME_IDENTITY_INVALID",
+        "product_runtime_identity_requires_both_generated_ids",
+        "invalid_product_identity_is_rejected_before_creating_user_data",
+        "exported_products_get_distinct_app_and_audit_store_directories",
+        "product_runtime_directory_rejects_reparse_identity_parent",
+        "broker_store_directory_rejects_junction_outside_runtime_root",
+        "flutter_child_environment_is_allowlisted",
+        "GUI_SHELL_PRODUCT_APP_ID",
+        "GUI_SHELL_PRODUCT_AUDIT_STORE_ID",
+    ]:
         if token not in launcher:
             errors.append(f"Rust Desktop起動器のユーザー保存先reparse境界が欠落: {token}")
     for token in ["D4 Pocket Desktop起動", "D4 Pocket Desktop終了", "Capability=desktop.launch", "RecoveryAction=", "LIVE_RUNTIME"]:
@@ -2700,6 +2717,17 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
         errors.append("staged product rootがscript/terminal launcherを生成する")
     if "Owner資格を作成・読み込み・Flutterへ渡さない" not in launcher_doc:
         errors.append("Windows起動仕様にOwner資格境界がない")
+    for token in (
+        "GUI_SHELL_PRODUCT_APP_ID",
+        "GUI_SHELL_PRODUCT_AUDIT_STORE_ID",
+        "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
+        "旧runtimeからのcopy／migration／継承は行わない",
+        "現時点でManifestから製品buildへ値を渡すExport build toolは未接続である",
+        "将来Export build toolを実装する際は識別子ごとに分離したCargo target directoryを使い",
+        "compile-time identityはFlutter childへ渡さない",
+    ):
+        if token not in launcher_doc:
+            errors.append(f"Windows起動仕様にExport runtime identity境界がない: {token}")
     return errors
 
 

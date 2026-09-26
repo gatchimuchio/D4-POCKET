@@ -36,6 +36,9 @@ const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const RELAY_IO_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_FILE: &str = "broker_session.json";
 const EXPORT_DIRECTORY_NAME: &str = "exports";
+const EMBEDDED_PRODUCT_APP_ID: Option<&str> = option_env!("GUI_SHELL_PRODUCT_APP_ID");
+const EMBEDDED_PRODUCT_AUDIT_STORE_ID: Option<&str> =
+    option_env!("GUI_SHELL_PRODUCT_AUDIT_STORE_ID");
 const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "APPDATA",
     "LOCALAPPDATA",
@@ -88,6 +91,48 @@ impl DesktopLaunchError {
 struct PackageLayout {
     app_dir: PathBuf,
     app_exe: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProductRuntimeIdentity {
+    app_id: String,
+    audit_store_id: String,
+}
+
+fn has_generated_identity(value: &str, prefix: &str) -> bool {
+    value.strip_prefix(prefix).is_some_and(|suffix| {
+        suffix.len() == 32
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn product_runtime_identity(
+    app_id: Option<&str>,
+    audit_store_id: Option<&str>,
+) -> Result<Option<ProductRuntimeIdentity>, DesktopLaunchError> {
+    match (app_id, audit_store_id) {
+        (None, None) => Ok(None),
+        (Some(app_id), Some(audit_store_id))
+            if has_generated_identity(app_id, "d4-pocket-app-")
+                && has_generated_identity(audit_store_id, "audit-store-") =>
+        {
+            Ok(Some(ProductRuntimeIdentity {
+                app_id: app_id.to_string(),
+                audit_store_id: audit_store_id.to_string(),
+            }))
+        }
+        _ => Err(DesktopLaunchError::new(
+            "PRODUCT_RUNTIME_IDENTITY_INVALID",
+            "書出しAppの保存領域identityが不正です。製品を再生成してください。",
+        )),
+    }
+}
+
+fn compiled_product_runtime_identity() -> Result<Option<ProductRuntimeIdentity>, DesktopLaunchError>
+{
+    product_runtime_identity(EMBEDDED_PRODUCT_APP_ID, EMBEDDED_PRODUCT_AUDIT_STORE_ID)
 }
 
 fn is_reparse_point(metadata: &fs::Metadata) -> bool {
@@ -170,7 +215,25 @@ fn resolve_package_layout(launcher_exe: &Path) -> Result<PackageLayout, DesktopL
     Ok(PackageLayout { app_dir, app_exe })
 }
 
+#[cfg(test)]
 fn runtime_directory(local_app_data: &Path) -> Result<PathBuf, DesktopLaunchError> {
+    let identity = compiled_product_runtime_identity()?;
+    runtime_directory_with_identity(local_app_data, identity.as_ref())
+}
+
+fn runtime_directory_with_identity(
+    local_app_data: &Path,
+    identity: Option<&ProductRuntimeIdentity>,
+) -> Result<PathBuf, DesktopLaunchError> {
+    if identity.is_some_and(|identity| {
+        !has_generated_identity(&identity.app_id, "d4-pocket-app-")
+            || !has_generated_identity(&identity.audit_store_id, "audit-store-")
+    }) {
+        return Err(DesktopLaunchError::new(
+            "PRODUCT_RUNTIME_IDENTITY_INVALID",
+            "書出しAppの保存領域identityが不正です。製品を再生成してください。",
+        ));
+    }
     if !local_app_data.is_absolute() {
         return Err(DesktopLaunchError::new(
             "USER_DATA_ROOT_INVALID",
@@ -199,7 +262,21 @@ fn runtime_directory(local_app_data: &Path) -> Result<PathBuf, DesktopLaunchErro
         )
     })?;
     let mut canonical = root.clone();
-    for component in ["GUI-Shell", "broker", "desktop"] {
+    let components = match identity {
+        Some(identity) => vec![
+            "D4Pocket".to_string(),
+            "apps".to_string(),
+            identity.app_id.clone(),
+            "stores".to_string(),
+            identity.audit_store_id.clone(),
+        ],
+        None => vec![
+            "GUI-Shell".to_string(),
+            "broker".to_string(),
+            "desktop".to_string(),
+        ],
+    };
+    for component in components {
         let candidate = canonical.join(component);
         match fs::symlink_metadata(&candidate) {
             Ok(metadata)
@@ -756,10 +833,13 @@ fn relay_normalized_channel_request(request: &[u8], endpoint: &BrokerEndpoint) -
     Some(response)
 }
 
-fn confirm_owner_operation(summary: &DesktopOwnerOperationSummary) -> bool {
+fn confirm_owner_operation(
+    summary: &DesktopOwnerOperationSummary,
+    product_identity: Option<&ProductRuntimeIdentity>,
+) -> bool {
     use winsafe::{co, prelude::*, HWND};
 
-    let text = owner_confirmation_text(summary);
+    let text = owner_confirmation_text_for_identity(summary, product_identity);
     matches!(
         HWND::NULL.MessageBox(
             &text,
@@ -770,17 +850,37 @@ fn confirm_owner_operation(summary: &DesktopOwnerOperationSummary) -> bool {
     )
 }
 
+#[cfg(test)]
 fn owner_confirmation_text(summary: &DesktopOwnerOperationSummary) -> String {
+    owner_confirmation_text_for_identity(summary, None)
+}
+
+fn owner_confirmation_text_for_identity(
+    summary: &DesktopOwnerOperationSummary,
+    product_identity: Option<&ProductRuntimeIdentity>,
+) -> String {
     match summary {
-        DesktopOwnerOperationSummary::GuiShellExport(summary) => format!(
-            "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n保存先: %LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\{}\\<新規App ID>.json\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            summary.display_name,
-            summary.export_id,
-            summary.distribution_channel,
-            summary.optional_module_count,
-            EXPORT_DIRECTORY_NAME,
-            summary.payload_hash
-        ),
+        DesktopOwnerOperationSummary::GuiShellExport(summary) => {
+            let export_path = match product_identity {
+                Some(identity) => format!(
+                    r"%LOCALAPPDATA%\D4Pocket\apps\{}\stores\{}\exports\<新規App ID>.json",
+                    identity.app_id, identity.audit_store_id
+                ),
+                None => format!(
+                    r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\{}\<新規App ID>.json",
+                    EXPORT_DIRECTORY_NAME
+                ),
+            };
+            format!(
+                "このGUI Shell構成のWindows向け独立Manifest file作成を許可しますか？\n\nアプリ名: {}\nExport ID: {}\n配布channel: {}\n選択任意Module数: {}\n保存先: {}\n\nこの操作はBroker監査へ記録されます。実行可能App、Module除去、build、Installer、署名は作成しません。Credential、Permission、Approval、Audit chainは継承しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                summary.display_name,
+                summary.export_id,
+                summary.distribution_channel,
+                summary.optional_module_count,
+                export_path,
+                summary.payload_hash
+            )
+        }
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -824,6 +924,7 @@ fn run_channel_server(
     shutdown: Arc<AtomicBool>,
     ready: mpsc::SyncSender<()>,
     owner_operations: mpsc::SyncSender<DesktopOwnerOperationRequest>,
+    product_identity: Option<ProductRuntimeIdentity>,
 ) -> Result<(), BrokerServerError> {
     gui_shell_windows_broker_channel::run_server(
         pipe_name,
@@ -837,7 +938,7 @@ fn run_channel_server(
                 frame,
                 &endpoint.0,
                 Some(&owner_operations),
-                confirm_owner_operation,
+                |summary| confirm_owner_operation(summary, product_identity.as_ref()),
             )
         },
     )
@@ -857,7 +958,11 @@ struct RunningBroker {
 }
 
 impl RunningBroker {
-    fn start(runtime_dir: &Path, installed_package_verified: bool) -> Result<Self, DesktopLaunchError> {
+    fn start(
+        runtime_dir: &Path,
+        installed_package_verified: bool,
+        product_identity: Option<ProductRuntimeIdentity>,
+    ) -> Result<Self, DesktopLaunchError> {
         let store_dir = ensure_store_directory(runtime_dir)?;
         let protected_store_dir = ensure_protected_store_directory(runtime_dir)?;
         let export_dir = ensure_export_directory(runtime_dir)?;
@@ -959,6 +1064,7 @@ impl RunningBroker {
         let (channel_ready_tx, channel_ready_rx) = mpsc::sync_channel(1);
         let channel_name_for_thread = channel_pipe_name.clone();
         let relay_endpoint = RelayEndpoint(endpoint);
+        let channel_product_identity = product_identity.clone();
         let channel_server = match thread::Builder::new()
             .name("gui-shell-desktop-broker-pipe".to_string())
             .spawn(move || {
@@ -969,6 +1075,7 @@ impl RunningBroker {
                     channel_shutdown,
                     channel_ready_tx,
                     owner_operation_tx,
+                    channel_product_identity,
                 )
             }) {
             Ok(server) => server,
@@ -1146,9 +1253,11 @@ pub fn run() -> Result<(), DesktopLaunchError> {
                 "Windowsのユーザー保存先を確認できません。",
             )
         })?;
-    let runtime_dir = runtime_directory(&local_app_data)?;
+    let product_identity = compiled_product_runtime_identity()?;
+    let runtime_dir =
+        runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
-    let mut broker = RunningBroker::start(&runtime_dir, true)?;
+    let mut broker = RunningBroker::start(&runtime_dir, true, product_identity)?;
 
     let frontend_result = launch_frontend(&layout, &broker);
     let broker_result = broker.finish();
@@ -1206,6 +1315,14 @@ mod tests {
                 OsString::from("GUI_SHELL_BROKER_SESSION_JSON"),
                 OsString::from("session-marker"),
             ),
+            (
+                OsString::from("GUI_SHELL_PRODUCT_APP_ID"),
+                OsString::from("d4-pocket-app-0123456789abcdef0123456789abcdef"),
+            ),
+            (
+                OsString::from("GUI_SHELL_PRODUCT_AUDIT_STORE_ID"),
+                OsString::from("audit-store-0123456789abcdef0123456789abcdef"),
+            ),
         ];
         let mut command = Command::new(command_exe);
         configure_frontend_environment(
@@ -1233,6 +1350,10 @@ mod tests {
             "endpoint-marker",
             "gui_shell_broker_session_json",
             "session-marker",
+            "gui_shell_product_app_id",
+            "d4-pocket-app-0123456789abcdef0123456789abcdef",
+            "gui_shell_product_audit_store_id",
+            "audit-store-0123456789abcdef0123456789abcdef",
         ] {
             assert!(
                 !environment.contains(marker),
@@ -1950,7 +2071,7 @@ mod tests {
     #[test]
     fn runtime_state_is_separate_from_installation_and_lock_prevents_duplicate_launch() {
         let root = fs::canonicalize(test_root("runtime")).unwrap();
-        let runtime = runtime_directory(&root).unwrap();
+        let runtime = runtime_directory_with_identity(&root, None).unwrap();
         assert!(runtime.starts_with(&root));
         assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
         let export_dir = ensure_export_directory(&runtime).unwrap();
@@ -1964,10 +2085,132 @@ mod tests {
     }
 
     #[test]
+    fn product_runtime_identity_requires_both_generated_ids() {
+        let app_id = "d4-pocket-app-0123456789abcdef0123456789abcdef";
+        let audit_store_id = "audit-store-fedcba9876543210fedcba9876543210";
+        assert!(product_runtime_identity(None, None).unwrap().is_none());
+        assert!(product_runtime_identity(Some(app_id), Some(audit_store_id))
+            .unwrap()
+            .is_some());
+
+        for (candidate_app_id, candidate_store_id) in [
+            (Some(app_id), None),
+            (None, Some(audit_store_id)),
+            (Some("d4-pocket-app-../outside"), Some(audit_store_id)),
+            (
+                Some("d4-pocket-app-0123456789ABCDEF0123456789ABCDEF"),
+                Some(audit_store_id),
+            ),
+            (Some(app_id), Some("audit-store-example")),
+        ] {
+            let error = product_runtime_identity(candidate_app_id, candidate_store_id).unwrap_err();
+            assert_eq!(error.code, "PRODUCT_RUNTIME_IDENTITY_INVALID");
+        }
+    }
+
+    #[test]
+    fn exported_products_get_distinct_app_and_audit_store_directories() {
+        let root = fs::canonicalize(test_root("runtime-product-identities")).unwrap();
+        let first = product_runtime_identity(
+            Some("d4-pocket-app-0123456789abcdef0123456789abcdef"),
+            Some("audit-store-0123456789abcdef0123456789abcdef"),
+        )
+        .unwrap()
+        .unwrap();
+        let second = product_runtime_identity(
+            Some("d4-pocket-app-fedcba9876543210fedcba9876543210"),
+            Some("audit-store-fedcba9876543210fedcba9876543210"),
+        )
+        .unwrap()
+        .unwrap();
+        let first_runtime = runtime_directory_with_identity(&root, Some(&first)).unwrap();
+        let second_runtime = runtime_directory_with_identity(&root, Some(&second)).unwrap();
+        assert_ne!(first_runtime, second_runtime);
+        assert!(first_runtime.starts_with(&root));
+        assert!(second_runtime.starts_with(&root));
+        assert!(first_runtime.ends_with(
+            Path::new("D4Pocket")
+                .join("apps")
+                .join(&first.app_id)
+                .join("stores")
+                .join(&first.audit_store_id)
+        ));
+        assert!(second_runtime.ends_with(
+            Path::new("D4Pocket")
+                .join("apps")
+                .join(&second.app_id)
+                .join("stores")
+                .join(&second.audit_store_id)
+        ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn invalid_product_identity_is_rejected_before_creating_user_data() {
+        let root = fs::canonicalize(test_root("runtime-invalid-product-identity")).unwrap();
+        let identity = ProductRuntimeIdentity {
+            app_id: "d4-pocket-app-../outside".into(),
+            audit_store_id: "audit-store-0123456789abcdef0123456789abcdef".into(),
+        };
+
+        let error = runtime_directory_with_identity(&root, Some(&identity)).unwrap_err();
+        assert_eq!(error.code, "PRODUCT_RUNTIME_IDENTITY_INVALID");
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn runtime_directory_uses_only_embedded_identity_values() {
+        let root = fs::canonicalize(test_root("runtime-embedded-identity")).unwrap();
+        let identity = compiled_product_runtime_identity().unwrap();
+        let runtime = runtime_directory(&root).unwrap();
+        let expected = runtime_directory_with_identity(&root, identity.as_ref()).unwrap();
+        assert_eq!(runtime, expected);
+        if let Some(identity) = identity {
+            assert!(runtime.ends_with(
+                Path::new("D4Pocket")
+                    .join("apps")
+                    .join(identity.app_id)
+                    .join("stores")
+                    .join(identity.audit_store_id)
+            ));
+        } else {
+            assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn product_export_confirmation_shows_its_isolated_store_path() {
+        let identity = product_runtime_identity(
+            Some("d4-pocket-app-0123456789abcdef0123456789abcdef"),
+            Some("audit-store-fedcba9876543210fedcba9876543210"),
+        )
+        .unwrap()
+        .unwrap();
+        let summary = DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
+            display_name: "独立構成".into(),
+            export_id: "export-test".into(),
+            distribution_channel: "local".into(),
+            optional_module_count: 1,
+            payload_hash: format!("sha256:{}", "a".repeat(64)),
+        });
+        let text = owner_confirmation_text_for_identity(&summary, Some(&identity));
+        assert!(text.contains(&format!(
+            r"%LOCALAPPDATA%\D4Pocket\apps\{}\stores\{}\exports\<新規App ID>.json",
+            identity.app_id, identity.audit_store_id
+        )));
+        assert!(!text.contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+        assert!(owner_confirmation_text(&summary)
+            .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+    }
+
+    #[test]
     fn export_directory_rejects_reparse_point_outside_runtime() {
         let root = fs::canonicalize(test_root("export-junction")).unwrap();
         let outside = fs::canonicalize(test_root("export-junction-outside")).unwrap();
-        let runtime = runtime_directory(&root).unwrap();
+        let runtime = runtime_directory_with_identity(&root, None).unwrap();
         let junction = runtime.join(EXPORT_DIRECTORY_NAME);
         let result = Command::new("cmd.exe")
             .args(["/d", "/c", "mklink", "/J"])
@@ -1999,9 +2242,42 @@ mod tests {
             .expect("Windows junction試験用実体の作成");
         assert!(result.status.success(), "junction試験用実体の作成失敗");
 
-        let error = runtime_directory(&root).unwrap_err();
+        let error = runtime_directory_with_identity(&root, None).unwrap_err();
         assert_eq!(error.code, "USER_DATA_ROOT_INVALID");
         assert!(!outside.join("broker").exists());
+
+        fs::remove_dir(&junction).unwrap();
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
+    fn product_runtime_directory_rejects_reparse_identity_parent() {
+        let root = fs::canonicalize(test_root("runtime-product-junction")).unwrap();
+        let outside = fs::canonicalize(test_root("runtime-product-junction-outside")).unwrap();
+        let identity = product_runtime_identity(
+            Some("d4-pocket-app-0123456789abcdef0123456789abcdef"),
+            Some("audit-store-fedcba9876543210fedcba9876543210"),
+        )
+        .unwrap()
+        .unwrap();
+        let apps = root.join("D4Pocket").join("apps");
+        fs::create_dir_all(&apps).unwrap();
+        let junction = apps.join(&identity.app_id);
+        let result = Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&outside)
+            .output()
+            .expect("Export runtime junction試験の作成");
+        assert!(
+            result.status.success(),
+            "Export runtime junction試験の作成失敗"
+        );
+
+        let error = runtime_directory_with_identity(&root, Some(&identity)).unwrap_err();
+        assert_eq!(error.code, "USER_DATA_ROOT_INVALID");
+        assert!(!outside.join("stores").exists());
 
         fs::remove_dir(&junction).unwrap();
         fs::remove_dir_all(root).unwrap();
