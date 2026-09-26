@@ -12,7 +12,7 @@ Brokerの`Agent一覧`はAdapterが返すmetadataを未信頼の宣言として�
 
 ## 比較
 
-`agent_comparison.schema.json`の比較投影は、2件以上8件以下のAgentセッションを対象とする。各セッションは、異なるWorkspaceでなければならない。同一Workspace、同一セッションの重複、またはWorkspaceを識別できない入力は比較を拒否する。
+`agent_comparison.schema.json`の比較投影は、2件以上8件以下のAgentセッションを対象とする。各entryは異なるAgent runtimeとWorkspaceに属さなければならない。同一Agent runtime、同一Workspace、同一セッションの重複、またはWorkspaceを識別できない入力は比較を拒否する。複数entry間の一意性はJSON Schemaだけでは表現できないため、Conformanceと将来のBroker比較経路で検査する。
 
 比較できるのは、次のboundedな公開概要だけである。
 

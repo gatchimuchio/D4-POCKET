@@ -1820,3 +1820,12 @@ ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から�
 - `flutter test --no-pub --no-test-assets`（Desktop、Z:一時alias）：110件PASS。`flutter analyze --no-pub`（Desktop／Mobile、同alias）：両方No issues found。`subst Z: /D`でalias解除を確認した。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema 137、正常example 137、negative fixture 169、Conformance 216、Manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32監査を含む登録済みlocal検証がPASS。release blockerと`release_ready=false`は維持する。
 - 証拠境界: これはFlutterのsnapshot projectionと表示の検査であり、Agent比較実行、path alias／junctionを含むWorkspace実隔離、実Handoffを証明しない。実Agentを隔離Workspaceで起動・比較するBroker経路とtarget側の再評価／失敗隔離／Recoveryは`release_blocker`として継続し、snapshot文字列だけで隔離を主張しない制限は`known_limitation`である。
+
+## D4 Pocket Phase 7 比較ContractのAgent識別分離（2026-09-27）
+
+比較projectionのsemantic Conformanceに、Session／Workspaceの一意性だけでなくAgent runtime IDの一意性を追加した。別Session・別Workspaceを用意しても同じAgent runtimeを複数Agentとして水増しする入力を拒否する。配列entry間の関係であるためSchema形状は変えず、`docs/specs/agent-coordination.md`にConformanceおよび将来Broker経路での検査責任を記録した。
+
+- `python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`：合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：Conformance 216件で合格。同一Agent実行系、Workspace、Sessionの重複、Authorityの再利用、取得不能値を0で補う入力を拒否する。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 137、正常example 137、negative fixture 169で合格。Conformanceのみの意味制約のためSchema件数・fixture形状は変更していない。
+- 証拠境界: この検査は比較記録の識別値を照合するだけであり、Agent起動、別実Workspaceの作成、並列実行時に一方のAgentの状態が他方へ混入しないこと、実結果の比較を証明しない。実Agent比較と隔離Broker経路の`release_blocker`は維持する。

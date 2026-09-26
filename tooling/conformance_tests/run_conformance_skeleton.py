@@ -7040,9 +7040,12 @@ def agent_comparison_projection_errors(record: dict) -> list[str]:
         errors.append("agent comparisonは二つ以上のentryを必要とする")
         return errors
     session_ids = [entry.get("session_id") for entry in entries]
+    agent_runtime_ids = [entry.get("agent_runtime_id") for entry in entries]
     workspace_ids = [entry.get("workspace_id") for entry in entries]
     if len(set(session_ids)) != len(session_ids):
         errors.append("agent comparisonは同じsessionを重複して比較してはならない")
+    if len(set(agent_runtime_ids)) != len(agent_runtime_ids):
+        errors.append("agent comparisonは同じAgent runtimeを別Agentとして比較してはならない")
     if len(set(workspace_ids)) != len(workspace_ids):
         errors.append("agent comparisonは同一Workspaceを比較へ混在させてはならない")
     if record.get("workspace_isolation") != "passed":
@@ -7074,6 +7077,13 @@ def test_agent_comparison_projection_is_isolated_and_non_authoritative() -> list
     same_workspace["entries"][1]["workspace_id"] = same_workspace["entries"][0]["workspace_id"]
     if not agent_comparison_projection_errors(same_workspace):
         return ["agent comparisonが同一Workspaceのentryを受け入れた"]
+
+    same_agent_runtime = copy.deepcopy(comparison)
+    same_agent_runtime["entries"][1]["agent_runtime_id"] = (
+        same_agent_runtime["entries"][0]["agent_runtime_id"]
+    )
+    if not agent_comparison_projection_errors(same_agent_runtime):
+        return ["agent comparisonが同じAgent runtimeを複数Agentとして受け入れた"]
 
     unknown_metric = copy.deepcopy(comparison)
     unknown_metric["entries"][0]["token_count"] = {"status": "unknown", "value": 0}

@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "d2cbb072be87ca7f11f354e0a45beeeb9918c65b39852e6574fb111d4a52bd94"
+      "sha256": "6b0ca49d6403aa3ea164f120712188846d096989e1caa45a24b258eee82eda22"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "98ff6261d5020e8f10749ec6cc894f7e8b5b62a1086a2a98da3f1d8a1f832aba"
+      "sha256": "9460c25f7fc14be55623a205c63ee76be6410b5abcc27c06290f6c7630a5289d"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -4105,7 +4105,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "a13dff1ca9538879aa1306c16a3fe67f34cf495597aaa6c89e785dabb7c65732"
+      "sha256": "8b2631f16b97132df22fbb8d19ce0fb8446cd6d4f7361effd4aec0965cc01ea8"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
