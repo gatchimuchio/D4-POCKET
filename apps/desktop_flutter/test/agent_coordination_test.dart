@@ -8,10 +8,13 @@ AgentSessionRecord _session(
   String workspace, {
   String? agentRuntimeId,
   String task = '文書を更新する',
+  String status = 'completed',
 }) {
   return AgentSessionRecord(
     sessionId: id,
     agentRuntimeId: agentRuntimeId ?? 'runtime-$id',
+    status: status,
+    evidenceSource: 'FIXTURE',
     workspace: workspace,
     task: task,
     changedFiles: const ['README.md'],

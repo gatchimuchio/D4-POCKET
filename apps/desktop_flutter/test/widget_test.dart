@@ -8,6 +8,7 @@ import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/screens/approval_center.dart';
 import 'package:gui_shell_desktop/screens/authority_map.dart';
 import 'package:gui_shell_desktop/screens/audit_viewer.dart';
+import 'package:gui_shell_desktop/screens/agent_center.dart';
 import 'package:gui_shell_desktop/screens/dashboard.dart';
 import 'package:gui_shell_desktop/screens/evidence_center.dart';
 import 'package:gui_shell_desktop/screens/problems_panel.dart';
@@ -26,6 +27,8 @@ const _requiredSurfaceSemanticsLabels = [
   'Runtime Status',
   'Invariant Status',
 ];
+
+String _testSessionId(String character) => List.filled(32, character).join();
 
 void main() {
   Finder findSurfaceSemanticsIdentifier(String label) {
@@ -461,6 +464,14 @@ void main() {
       _brokerHostListResponse(),
       _brokerAdapterListResponse(),
       _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': _testSessionId('a'),
+          '実行系ID': 'runtime-codex',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created',
+        },
+      ]),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
       _brokerAcceptedBody('content_projection', {
         'redacted_payload': {'path': 'notes/today.md', 'content': '[redacted]'},
@@ -484,6 +495,19 @@ void main() {
     expect(snapshot.pendingApprovals, isEmpty);
     expect(snapshot.authorityMap, isEmpty);
     expect(snapshot.agentAdapters.single.agentId, 'codex');
+    expect(snapshot.agentSessions.single.sessionId, _testSessionId('a'));
+    expect(snapshot.agentSessions.single.agentRuntimeId, 'runtime-codex');
+    expect(snapshot.agentSessions.single.status, '利用中');
+    expect(snapshot.agentSessions.single.evidenceSource, 'INTERNAL_STATE');
+    expect(snapshot.agentSessions.single.workspace, isEmpty);
+    expect(snapshot.agentSessions.single.task, isEmpty);
+    expect(snapshot.agentSessions.single.auditEventId, 'audit-session-created');
+    expect(
+      snapshot.auditEvents.any(
+        (event) => event.eventId == 'audit-session-list-read',
+      ),
+      isTrue,
+    );
     expect(
       snapshot.evidence.any(
         (record) =>
@@ -522,6 +546,7 @@ void main() {
       'Host一覧',
       'アダプター一覧',
       'Agent一覧',
+      '対話セッション一覧',
       'normalize_payload',
       'content_projection',
       'approval_edit',
@@ -545,6 +570,92 @@ void main() {
       )['payload'],
       const <String, Object?>{},
     );
+  });
+
+  testWidgets('Broker対話sessionはWorkspace未結合のmetadataだけを表示する',
+      (WidgetTester tester) async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': _testSessionId('b'),
+          '実行系ID': 'runtime-codex',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created',
+        },
+      ]),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    expect(find.text('runtime-codex'), findsOneWidget);
+    expect(find.text('audit-session-created'), findsOneWidget);
+    expect(find.textContaining('Workspace結合は未確認'), findsOneWidget);
+    expect(find.textContaining('比較・Handoff・Task内容は利用できません。'), findsOneWidget);
+    expect(find.textContaining('文書を更新する'), findsNothing);
+  });
+
+  test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {
+    final valid = {
+      '対話セッションID': _testSessionId('c'),
+      '実行系ID': 'runtime-codex',
+      '状態': '利用中',
+      '作成監査ID': 'audit-session-created',
+    };
+    final invalidSessionLists = <List<Map<String, Object?>>>[
+      [valid, valid],
+      <Map<String, Object?>>[
+        {...valid, '入力': 'PRIVATE_TASK_MARKER'},
+      ],
+      List<Map<String, Object?>>.generate(
+        65,
+        (index) => {
+          '対話セッションID': index.toRadixString(16).padLeft(32, '0'),
+          '実行系ID': 'runtime-$index',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-$index',
+        },
+      ),
+    ];
+    for (final sessions in invalidSessionLists) {
+      final transport = _FakeBrokerTransport([
+        _brokerHealthResponse(),
+        _brokerHostCapabilityResponse(),
+        _brokerHostListResponse(),
+        _brokerAdapterListResponse(),
+        _brokerAgentAdapterListResponse(),
+        _brokerDialogueSessionListResponse(sessions: sessions),
+      ]);
+      final client = await ShellCoreClient.product(transport: transport);
+      expect(client.mode, 'broker_unavailable');
+      expect(client.getSnapshot().runtimes.single.diagnosticSummary,
+          isNot(contains('PRIVATE_TASK_MARKER')));
+    }
+
+    final wrongEvidenceResponse = _brokerDialogueSessionListResponse();
+    wrongEvidenceResponse['evidence_source'] = 'LIVE_RUNTIME';
+    final wrongEvidenceClient = await ShellCoreClient.product(
+      transport: _FakeBrokerTransport([
+        _brokerHealthResponse(),
+        _brokerHostCapabilityResponse(),
+        _brokerHostListResponse(),
+        _brokerAdapterListResponse(),
+        _brokerAgentAdapterListResponse(),
+        wrongEvidenceResponse,
+      ]),
+    );
+    expect(wrongEvidenceClient.mode, 'broker_unavailable');
   });
 
   test('不正なBroker Setup Doctor報告はunknownへ閉じる', () async {
@@ -889,6 +1000,10 @@ class _FakeBrokerTransport implements BrokerTransport {
         (_responses.isEmpty || _responses.first['operation'] != operation)) {
       return Future.value(_brokerSetupDoctorResponse());
     }
+    if (operation == '対話セッション一覧' &&
+        (_responses.isEmpty || _responses.first['operation'] != operation)) {
+      return Future.value(_brokerDialogueSessionListResponse());
+    }
     if (_responses.isEmpty) {
       throw BrokerClientException('$operation 用の fake broker 応答がありません');
     }
@@ -1050,6 +1165,22 @@ Map<String, Object?> _brokerAcceptedBody(
     'error': null,
     'health': null,
     'body': body,
+    'shutdown_requested': false,
+  };
+}
+
+Map<String, Object?> _brokerDialogueSessionListResponse({
+  List<Map<String, Object?>> sessions = const [],
+}) {
+  return {
+    'request_id': 'test-対話セッション一覧',
+    'operation': '対話セッション一覧',
+    'status': 'accepted',
+    'evidence_source': 'INTERNAL_STATE',
+    'audit_event_id': 'audit-session-list-read',
+    'error': null,
+    'health': null,
+    'body': {'版': 1, '対話セッション': sessions},
     'shutdown_requested': false,
   };
 }

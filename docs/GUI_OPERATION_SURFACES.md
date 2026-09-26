@@ -99,8 +99,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket Agent Launcher（Codex current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。
-  authority_boundary: Flutterはexecutable、workspace、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。実taskのwrite実行、MCP、実Agentの複数比較、実Handoff、Claude／Gemini接続は未成立として扱う。Desktop Agent Centerの比較・Handoff表示はsnapshotのbounded projectionだけを扱い、同一Agent runtime ID／Workspace参照をfail-closedで拒否する。異なる宣言値は実Agent identityや実Workspace隔離の証明ではない。
+  evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。DesktopはRust Brokerの`対話セッション一覧`から、Schema適合したAgent Adapterに結び付く現在sessionのID、実行系ID、状態、作成監査IDだけを受け取る。
+  authority_boundary: Flutterはexecutable、workspace、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。実taskのwrite実行、MCP、実Agentの複数比較、実Handoff、Claude／Gemini接続は未成立として扱う。session一覧は`INTERNAL_STATE`であり、実Agentの稼働やWorkspace隔離を証明しない。Workspace binding未確認の間は比較・Handoff・Task内容を表示しない。比較projectionのsnapshot参照は同一Agent runtime ID／Workspace参照をfail-closedで拒否し、異なる宣言値を実Agent identityや実Workspace隔離の証明へ昇格しない。
 
 - item: D4 Pocket GUI Shell Compose（Phase 29 current scope）
   classification: required_for_v1

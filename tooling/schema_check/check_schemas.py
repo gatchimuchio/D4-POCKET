@@ -63,6 +63,7 @@ REQUIRED = {
     "runtime_dialogue_request.schema.json",
     "runtime_dialogue_submission_receipt.schema.json",
     "runtime_dialogue_session.schema.json",
+    "runtime_dialogue_session_list.schema.json",
     "runtime_dialogue_response.schema.json",
     "runtime_dialogue_comparison.schema.json",
     "evaluation_dataset.schema.json",

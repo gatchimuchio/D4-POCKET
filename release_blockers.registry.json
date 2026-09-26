@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "resolved",
+      "status": "unresolved",
       "status_source": "manual",
-      "active": false,
+      "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-26の現行sourceでcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1が全target成功したため、Rust test executableを起動できないWindows Application Controlの開発阻害を解消した。直前のlibrary全件再試行ではA2A／MINIDORA loopbackのbody read errorが断続したが、対象test単独再実行と最終全target実行はいずれも成功した。断続errorの低層socket原因は確定しておらず、RELEASE_CHECKLIST.mdのknown_limitationへ記録する。これはlocal test実行の解決であり、Windows installed product証拠やrelease readinessを意味しない。",
-      "required_action": "このlocal Rust test executable実行gateに追加作業はない。Rust source変更時は全target cargo testを再実行し、loopback failureが再発した場合はOS error kindを取得して原因を別途追跡する。Windows installed product・正式releaseの独立blockerは維持する。"
+      "reason": "2026-09-27のRust source変更後にcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を再実行した。Rust library 288件、CLI 9件、Broker IPC 10件、canonical hash 1件、checkpoint 8件は成功したが、protected_dataのintegration executableはWindows Application ControlにOS error 4551で起動前に拒否された。protected_startupとworkspace_startupも個別実行で同じOS error 4551となった。拒否されたexecutableを移動・再配置せず、policyも変更していない。したがって全target試験は未完了であり、以前のresolved状態を維持できない。",
+      "required_action": "Windows Application Controlを弱めず、当該Rust test executableを実行可能な承認済みWindows環境でcargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1を全target実行し、成功結果を記録する。実行fileの移動・再配置やpolicy回避を行わない。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

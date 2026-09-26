@@ -40,6 +40,8 @@ target Agentの条件でAuthorityを再評価することを必須とする。Ha
 
 Desktop Agent Centerは、現在のsnapshotから比較可否と公開Handoff概要を読み取り表示するだけである。FlutterはAgentを起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Workspaceを検出した場合はfail-closedで比較を止める。
 
+Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合したAgent Adapterに結び付く現在sessionのID、実行系ID、状態、作成監査IDだけを`INTERNAL_STATE`としてDesktopへ渡す。Agent metadata適合は分類に限り、信頼・権限を与えず、実Agentの稼働証明でもない。Workspace bindingの別証拠がないsessionは比較・Handoff対象にせず、Task、差分、Tool、コマンド内容を表示しない。ローカル／mock snapshotのサンプル情報をBroker観測へ読み替えない。
+
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
 
 ## 未成立範囲
@@ -48,4 +50,4 @@ Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの
 - `release_blocker`: 実結果のdiff／test／duration／tool／token／cost／resource／approval／audit比較
 - `release_blocker`: target Agentへの実Handoff、再評価、取消、失敗隔離、Recovery
 - `known_limitation`: Desktopの比較可否はsnapshot文字列の検査に限り、実Workspace隔離や別pathから同一領域へ到達する別名関係を証明しない
-- `known_limitation`: 現行UI投影のTask概要は既存snapshotの表示用文字列からboundedに生成される。秘密値の非混入はBroker由来の公開投影が正本になるまで、これだけでは実証しない
+- `known_limitation`: Local／mock snapshotにはfixture由来の表示文字列が含まれ得るため、実Agent作業やBroker観測の証拠として扱わない。Brokerの対話セッション一覧はTask内容を受け取らない

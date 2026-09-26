@@ -103,6 +103,7 @@ REQUIRED_SCHEMA_NAMES = {
     "runtime_dialogue_request",
     "runtime_dialogue_submission_receipt",
     "runtime_dialogue_session",
+    "runtime_dialogue_session_list",
     "runtime_dialogue_response",
     "runtime_dialogue_comparison",
     "evaluation_dataset",
@@ -3173,7 +3174,7 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
         errors.extend(validate_instance({**sample, "操作": operation, "内容": payload}, schema))
         if not validate_instance({**sample, "操作": operation, "内容": {**payload, "owner": True}}, schema):
             errors.append("端末操作が権限fieldを受理")
-    for operation in ("対話承認", "対話承認待ち", "shutdown", "command_envelope", "端末招待", "端末失効"):
+    for operation in ("対話承認", "対話承認待ち", "対話セッション一覧", "shutdown", "command_envelope", "端末招待", "端末失効"):
         if not validate_instance({**sample, "操作": operation, "内容": {}}, schema):
             errors.append("端末経路が禁止操作を受理: " + operation)
     if not validate_instance({**sample, "操作": "対話取得", "内容": {"対話セッションID": "a" * 32}}, schema):
@@ -3217,6 +3218,7 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {**sample, "招待秘密": "e" * 64},
         {"version": 1, "method": "pair", "invitation": {"招待ID": "d" * 32}},
         {"version": 1, "method": "broker_request", "broker_operation": "端末招待", "payload": {}},
+        {"version": 1, "method": "broker_request", "broker_operation": "対話セッション一覧", "payload": {}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"端末秘密": "e" * 64}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"credential": {"value": "e" * 64}}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"authority": "owner"}}},
@@ -3379,7 +3381,7 @@ def 対話操作の分岐と未知fieldを検査する() -> list[str]:
     schema = load_schema("runtime_dialogue_operation.schema.json")
     errors = []
     samples = {
-        "実行系列挙": {}, "対話承認待ち": {}, "対話開始": {"実行系ID": "local"},
+        "実行系列挙": {}, "対話セッション一覧": {}, "対話承認待ち": {}, "対話開始": {"実行系ID": "local"},
         "対話送信": {"対話セッションID": "a" * 32, "入力": "こんにちは"},
         "対話取得": {"要求ID": "b" * 32}, "対話中止": {"要求ID": "b" * 32},
         "対話終了": {"対話セッションID": "a" * 32},
@@ -3396,6 +3398,64 @@ def 対話操作の分岐と未知fieldを検査する() -> list[str]:
             errors.append("操作とpayloadの不整合を受理した")
     if not validate_instance({}, {"oneOf": [{"type": "object"}, {"type": "object"}]}):
         errors.append("oneOfの複数一致を拒否しなかった")
+    return errors
+
+
+def 対話セッション一覧の有界投影を検査する() -> list[str]:
+    schema = load_schema("runtime_dialogue_session_list.schema.json")
+    fixture = load_contract_fixture("runtime_dialogue_session_list.valid.json")
+    negative = load_contract_fixture("invalid/runtime_dialogue_session_list_content.invalid.json")
+    errors = validate_instance(fixture, schema)
+    if validate_instance(negative, schema) == []:
+        errors.append("対話セッション一覧がTask本文を含む未知fieldを拒否しない")
+
+    sessions = fixture.get("対話セッション", [])
+    identifiers = [item.get("対話セッションID") for item in sessions if isinstance(item, dict)]
+    if len(identifiers) != len(set(identifiers)):
+        errors.append("正常fixtureの対話セッションIDが重複している")
+
+    duplicate = {
+        "版": 1,
+        "対話セッション": [fixture["対話セッション"][0], fixture["対話セッション"][0]],
+    }
+    def 識別子一意(value: dict) -> bool:
+        items = value.get("対話セッション")
+        if not isinstance(items, list):
+            return False
+        identifiers = [item.get("対話セッションID") for item in items if isinstance(item, dict)]
+        return len(identifiers) == len(items) == len(set(identifiers))
+
+    if not 識別子一意(fixture) or 識別子一意(duplicate):
+        errors.append("重複対話セッションIDを意味検査で拒否できない")
+
+    bounded = {
+        "版": 1,
+        "対話セッション": [
+            {
+                "対話セッションID": f"{index:032x}",
+                "実行系ID": f"runtime-{index}",
+                "状態": "利用中",
+                "作成監査ID": f"audit-dialogue-{index}",
+            }
+            for index in range(64)
+        ],
+    }
+    if validate_instance(bounded, schema):
+        errors.append("上限64件の対話セッション一覧を受理しない")
+    over_bound = {**bounded, "対話セッション": [*bounded["対話セッション"], bounded["対話セッション"][0]]}
+    if validate_instance(over_bound, schema) == []:
+        errors.append("上限超過の対話セッション一覧を拒否しない")
+
+    for invalid in (
+        {**fixture, "版": 2},
+        {**fixture, "authority": "owner"},
+        {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "Workspace": "workspace-a"}]},
+        {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "状態": "trusted"}]},
+        {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "実行系ID": "../runtime"}]},
+        {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "作成監査ID": ""}]},
+    ):
+        if validate_instance(invalid, schema) == []:
+            errors.append("版違い・Authority・未検証Workspaceを拒否しない")
     return errors
 
 
@@ -8706,6 +8766,7 @@ def main() -> int:
         書庫展開で日本語名と内容を保持する,
         対話契約の関係と表示境界を検査する,
         対話操作の分岐と未知fieldを検査する,
+        対話セッション一覧の有界投影を検査する,
         履歴入力概要のhash_only境界を検査する,
         実行系資源観測の証拠境界を検査する,
         実行系ライフサイクルの契約と統治境界を検査する,

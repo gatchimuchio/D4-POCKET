@@ -257,6 +257,8 @@ class AgentSessionRecord {
   const AgentSessionRecord({
     required this.sessionId,
     required this.agentRuntimeId,
+    required this.status,
+    required this.evidenceSource,
     required this.workspace,
     required this.task,
     required this.changedFiles,
@@ -271,6 +273,8 @@ class AgentSessionRecord {
 
   final String sessionId;
   final String agentRuntimeId;
+  final String status;
+  final String evidenceSource;
   final String workspace;
   final String task;
   final List<String> changedFiles;
@@ -286,7 +290,10 @@ class AgentSessionRecord {
     return AgentSessionRecord(
       sessionId: json['session_id'] as String? ?? '',
       agentRuntimeId: json['agent_runtime_id'] as String? ?? '',
-      workspace: json['workspace'] as String? ?? '',
+      status: json['status'] as String? ?? 'unknown',
+      evidenceSource: json['evidence_source'] as String? ?? 'unknown',
+      workspace:
+          json['workspace'] as String? ?? json['workspace_id'] as String? ?? '',
       task: json['task'] as String? ?? '',
       changedFiles: _stringList(json['changed_files']),
       toolCalls: _stringList(json['tool_calls']),

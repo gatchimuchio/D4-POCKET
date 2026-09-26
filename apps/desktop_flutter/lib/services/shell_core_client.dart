@@ -99,6 +99,23 @@ class ShellCoreClient {
         agentAdapterListResponse,
         'Agent一覧',
       );
+      final agentSessionListResponse = await broker.request(
+        '対話セッション一覧',
+        payload: const <String, Object?>{},
+      );
+      final sessionListAuditId = agentSessionListResponse['audit_event_id'];
+      if (agentSessionListResponse['operation'] != '対話セッション一覧' ||
+          agentSessionListResponse['evidence_source'] != 'INTERNAL_STATE' ||
+          sessionListAuditId is! String ||
+          !_isSafeAuditIdentifier(sessionListAuditId)) {
+        throw const BrokerClientException(
+          '対話セッション一覧の応答識別・証拠種別・監査参照が不正です',
+        );
+      }
+      final agentSessionList = _acceptedResponseBodyMap(
+        agentSessionListResponse,
+        '対話セッション一覧',
+      );
 
       final normalizeResponse = await broker.request(
         'normalize_payload',
@@ -154,6 +171,8 @@ class ShellCoreClient {
           adapterList: adapterList,
           agentAdapterListResponse: agentAdapterListResponse,
           agentAdapterList: agentAdapterList,
+          agentSessionListResponse: agentSessionListResponse,
+          agentSessionList: agentSessionList,
           normalizeResponse: normalizeResponse,
           projectionResponse: projectionResponse,
           projection: projection,
@@ -485,6 +504,99 @@ List<Map<String, Object?>> _agentAdapterSnapshotJson(
   ];
 }
 
+List<Map<String, Object?>> _agentSessionSnapshotJson(
+  Map<String, Object?> body,
+) {
+  const allowedBodyKeys = {'版', '対話セッション'};
+  if (body['版'] != 1 ||
+      body.keys.any((key) => !allowedBodyKeys.contains(key))) {
+    throw const BrokerClientException('対話セッション一覧の版またはfieldが不正です');
+  }
+  final sessions = body['対話セッション'];
+  if (sessions is! List || sessions.length > 64) {
+    throw const BrokerClientException('対話セッション一覧の件数が不正です');
+  }
+
+  const allowedSessionKeys = {
+    '対話セッションID',
+    '実行系ID',
+    '状態',
+    '作成監査ID',
+  };
+  const allowedStatuses = {'利用中', '終了', '中止後隔離'};
+  final seenSessionIds = <String>{};
+  final result = <Map<String, Object?>>[];
+  for (final item in sessions) {
+    if (item is! Map) {
+      throw const BrokerClientException('対話セッション一覧の項目がobjectではありません');
+    }
+    final raw = Map<String, Object?>.from(item);
+    if (raw.length != allowedSessionKeys.length ||
+        raw.keys.any((key) => !allowedSessionKeys.contains(key))) {
+      throw const BrokerClientException('対話セッション一覧に未知または欠落fieldがあります');
+    }
+    final sessionId = raw['対話セッションID'];
+    final runtimeId = raw['実行系ID'];
+    final status = raw['状態'];
+    final auditId = raw['作成監査ID'];
+    if (sessionId is! String || !_isLowerHexSessionId(sessionId)) {
+      throw const BrokerClientException('対話セッションIDが不正です');
+    }
+    if (!seenSessionIds.add(sessionId)) {
+      throw const BrokerClientException('対話セッションIDが重複しています');
+    }
+    if (runtimeId is! String || !_isRuntimeIdentifier(runtimeId)) {
+      throw const BrokerClientException('実行系IDが不正です');
+    }
+    if (status is! String || !allowedStatuses.contains(status)) {
+      throw const BrokerClientException('対話セッション状態が不正です');
+    }
+    if (auditId is! String || !_isSafeAuditIdentifier(auditId)) {
+      throw const BrokerClientException('作成監査IDが不正です');
+    }
+    result.add({
+      'session_id': sessionId,
+      'agent_runtime_id': runtimeId,
+      'status': status,
+      'evidence_source': 'INTERNAL_STATE',
+      'workspace': '',
+      'task': '',
+      'changed_files': const <String>[],
+      'tool_calls': const <String>[],
+      'shell_commands': const <String>[],
+      'test_status': 'unknown',
+      'diff_summary': '',
+      'pending_approval_count': 0,
+      'rollback_candidate': '',
+      'audit_event_id': auditId,
+    });
+  }
+  return result;
+}
+
+bool _isLowerHexSessionId(String value) {
+  if (value.length != 32) return false;
+  return value.codeUnits.every((unit) =>
+      (unit >= 0x30 && unit <= 0x39) || (unit >= 0x61 && unit <= 0x66));
+}
+
+bool _isRuntimeIdentifier(String value) {
+  if (value.isEmpty || value.length > 128) return false;
+  final units = value.codeUnits;
+  bool isAlphaNumeric(int unit) =>
+      (unit >= 0x30 && unit <= 0x39) ||
+      (unit >= 0x41 && unit <= 0x5a) ||
+      (unit >= 0x61 && unit <= 0x7a);
+  if (!isAlphaNumeric(units.first)) return false;
+  return units.every((unit) =>
+      isAlphaNumeric(unit) || unit == 0x5f || unit == 0x2e || unit == 0x2d);
+}
+
+bool _isSafeAuditIdentifier(String value) =>
+    value.trim().isNotEmpty &&
+    value.length <= 256 &&
+    !value.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
+
 const _adapterIdSnapshotKey = 'adapter_id';
 const _runtimeIdSnapshotKey = 'runtime_id';
 const _adapterIdInputKey = 'Adapter ID';
@@ -713,6 +825,8 @@ ShellSnapshot _brokerSnapshot({
   required Map<String, Object?> adapterList,
   required Map<String, Object?> agentAdapterListResponse,
   required Map<String, Object?> agentAdapterList,
+  required Map<String, Object?> agentSessionListResponse,
+  required Map<String, Object?> agentSessionList,
   required Map<String, Object?> normalizeResponse,
   required Map<String, Object?> projectionResponse,
   required Map<String, Object?> projection,
@@ -817,6 +931,11 @@ ShellSnapshot _brokerSnapshot({
     _auditJson(adapterListResponse, 'broker.adapter_list', 'accepted'),
     _auditJson(
         agentAdapterListResponse, 'broker.agent_adapter_list', 'accepted'),
+    _auditJson(
+      agentSessionListResponse,
+      'broker.dialogue_session_list',
+      'accepted',
+    ),
     _auditJson(normalizeResponse, 'broker.normalize_payload', 'accepted'),
     _auditJson(projectionResponse, 'broker.content_projection', 'accepted'),
     _auditJson(
@@ -861,7 +980,7 @@ ShellSnapshot _brokerSnapshot({
     ],
     'host_capabilities': [_hostCapabilitySnapshotJson(hostCapability)],
     'hosts': _hostRegistrySnapshotJson(hostList),
-    'agent_sessions': [],
+    'agent_sessions': _agentSessionSnapshotJson(agentSessionList),
     'agent_adapters': _agentAdapterSnapshotJson(agentAdapterList),
     'permissions': [],
     'pending_approvals': [],
@@ -1271,6 +1390,8 @@ const _mockSnapshot = ShellSnapshot(
     AgentSessionRecord(
       sessionId: 'agent-session-1',
       agentRuntimeId: 'unknown',
+      status: 'unknown',
+      evidenceSource: 'FIXTURE',
       workspace: '/workspace/project',
       task: '文書を更新する',
       changedFiles: ['README.md', 'docs/STRATEGY.md'],

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/runtime_dialogue_session_list.schema.json",
+  "title": "実行系対話セッション一覧",
+  "description": "Rust Brokerが現在保持するAgent Adapter結合済みの有界な対話セッション識別情報。Task、本文、Workspace結合、Authorityを含めない。構造適合は権限を付与しない。",
+  "type": "object",
+  "required": ["版", "対話セッション"],
+  "additionalProperties": false,
+  "properties": {
+    "版": {
+      "const": 1
+    },
+    "対話セッション": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "allOf": [
+          {
+            "$ref": "runtime_dialogue_session.schema.json"
+          },
+          {
+            "type": "object",
+            "required": ["作成監査ID"]
+          }
+        ]
+      }
+    }
+  }
+}

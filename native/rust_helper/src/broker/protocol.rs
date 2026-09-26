@@ -401,6 +401,8 @@ pub enum BrokerOperation {
     NormalizePayload,
     #[serde(rename = "実行系列挙")]
     実行系列挙,
+    #[serde(rename = "対話セッション一覧")]
+    対話セッション一覧,
     #[serde(rename = "Agent一覧")]
     Agent一覧,
     #[serde(rename = "評価Dataset登録")]
@@ -589,6 +591,7 @@ impl BrokerOperation {
             BrokerOperation::対話履歴一覧 => "対話履歴一覧",
             BrokerOperation::NormalizePayload => "normalize_payload",
             BrokerOperation::実行系列挙 => "実行系列挙",
+            BrokerOperation::対話セッション一覧 => "対話セッション一覧",
             BrokerOperation::Agent一覧 => "Agent一覧",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
@@ -1426,7 +1429,7 @@ impl Broker {
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::Agent一覧 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -5485,6 +5488,17 @@ mod 端末統治試験 {
         b.owner要求処理(&json!({"request_id":id,"nonce":id,"session_id":"device-test","operation":op,"payload":p,
             "payload_hash":sha256_tagged(p.to_string().as_bytes()),"issued_at":BrokerRequestEnvelope::current_issued_at(),"metadata":{}}).to_string())
     }
+    fn 通常要求(b: &mut Broker, operation: BrokerOperation, payload: Value) -> BrokerResponse {
+        let id=識別子生成().unwrap();
+        let nonce=識別子生成().unwrap();
+        let mut request=BrokerRequestEnvelope::health(&id,&nonce);
+        request.session_id=Some("device-test".into());
+        request.operation=Some(operation);
+        request.payload=Some(payload);
+        request.issued_at=Some(BrokerRequestEnvelope::current_issued_at());
+        request.refresh_payload_hash();
+        b.handle(request)
+    }
     fn 通信(b:&mut Broker,c:&Value,op:&str,p:Value)->BrokerResponse{
         b.端末要求処理(&json!({"版":1,"HostID":c["HostID"],"端末ID":c["端末ID"],"資格ID":c.get("結合ID").unwrap_or(&c["招待ID"]),
             "資格秘密":c.get("端末秘密").unwrap_or(&c["招待秘密"]),"nonce":識別子生成().unwrap(),"発行時刻":b.current_epoch_seconds(),"操作":op,"内容":p}).to_string())
@@ -5557,6 +5571,31 @@ mod 端末統治試験 {
         }
     }
     #[test]
+    fn 対話セッション一覧は通常要求経路で監査済み内部状態だけを返す() {
+        let mut e=環境生成();
+        let metadata: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("Agent接続例を読み込む");
+        e.broker
+            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata)))
+            .unwrap();
+        let started=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent"}));
+        assert_eq!(started.status,BrokerStatus::Accepted);
+        let listed=通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({}));
+        assert_eq!(listed.status,BrokerStatus::Accepted);
+        assert_eq!(listed.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
+        let body=listed.body.as_ref().expect("対話セッション一覧");
+        assert_eq!(body["版"],1);
+        assert_eq!(body["対話セッション"].as_array().unwrap().len(),1);
+        assert_eq!(body["対話セッション"][0]["作成監査ID"],started.audit_event_id);
+        assert_eq!(body["対話セッション"][0].as_object().unwrap().len(),4);
+        assert_eq!(
+            通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({"authority":"owner"})).status,
+            BrokerStatus::Rejected
+        );
+    }
+    #[test]
     fn 監査障害時も失効資格の保留送信を隔離する(){
         let mut e=環境生成();let (c,p)=準備(&mut e.broker);
         let audit=e.path.join("audit.jsonl");let saved=e.path.join("audit.saved");
@@ -5609,6 +5648,18 @@ mod 端末統治試験 {
         assert_eq!(agent_body.as_object().map(serde_json::Map::len),Some(1));
         assert!(agent_body.get("Agent").is_some_and(Value::is_array));
         assert_eq!(agent_body["Agent"], json!([agent_fixture]));
+        assert_eq!(通信(&mut e.broker,&credential,"対話セッション一覧",json!({})).status,BrokerStatus::Rejected);
+        let started=制御(&mut e.broker,"対話開始",json!({"実行系ID":"fixture-agent"}));
+        assert_eq!(started.status,BrokerStatus::Accepted);
+        let created_audit_id=started.audit_event_id.clone();
+        let listed=制御(&mut e.broker,"対話セッション一覧",json!({}));
+        assert_eq!(listed.status,BrokerStatus::Accepted);
+        assert_eq!(listed.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
+        let listed_body=listed.body.as_ref().expect("対話セッション一覧");
+        assert_eq!(listed_body["版"],1);
+        assert_eq!(listed_body["対話セッション"].as_array().unwrap().len(),1);
+        assert_eq!(listed_body["対話セッション"][0]["作成監査ID"],created_audit_id);
+        assert_eq!(listed_body["対話セッション"][0].as_object().unwrap().len(),4);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);

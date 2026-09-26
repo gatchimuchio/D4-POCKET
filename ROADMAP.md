@@ -5,7 +5,11 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行D4 Pocket統合単位（2026-09-25）
+## 現行D4 Pocket統合単位（2026-09-27）
+
+### Phase 7 Agent対話セッションのmetadata投影（2026-09-27）
+
+Rust Brokerの通常認証IPCへ`対話セッション一覧`を追加し、Schema適合Agent Adapterに結び付く現在sessionから、session ID・runtime ID・状態・開始監査IDだけを上限64件でDesktopへ投影する。Adapter metadataはAgent表示の分類にだけ使い、AuthorityやTrustを与えない。証拠は`INTERNAL_STATE`であり、実Agent稼働・Workspace隔離・Task実行を示さない。DesktopはWorkspace未結合sessionのTask内容、比較、Handoffを表示しない。Mobile経路は増やさず、Agent本体の起動・実行も追加していない。Rust全target validationはWindows Application ControlのOS error 4551で一部integration executableが起動拒否され未完了のため、`windows_rust_integration_test_execution_policy`を`release_blocker`として再開し、`release_ready=false`を維持する。詳細は`docs/specs/runtime-dialogue.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
 ### Phase 32 Windows Export build tool追加（2026-09-26）
 

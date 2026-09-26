@@ -1853,3 +1853,26 @@ ComposeのRuntime／Agent／Tool／MCP参照IDを設定画面の固定値から�
 - `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：Conformance 216件で合格。同一Agent実行系、Workspace、Sessionの重複、Authorityの再利用、取得不能値を0で補う入力を拒否する。
 - `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 137、正常example 137、negative fixture 169で合格。Conformanceのみの意味制約のためSchema件数・fixture形状は変更していない。
 - 証拠境界: この検査は比較記録の識別値を照合するだけであり、Agent起動、別実Workspaceの作成、並列実行時に一方のAgentの状態が他方へ混入しないこと、実結果の比較を証明しない。実Agent比較と隔離Broker経路の`release_blocker`は維持する。
+
+## D4 Pocket Phase 7 Agent対話セッションmetadata投影（2026-09-27）
+
+現行BrokerとDesktopの接続を確認したところ、Rust BrokerはAgent metadata一覧と対話開始を扱うが、DesktopのAgent Centerに表示するBroker由来session一覧が未接続だった。通常認証IPCに空payloadの`対話セッション一覧`を追加し、現在Broker内で保持するsessionのうち、登録済みAdapter metadataが既存`agent_adapter` Schemaに適合するAgent runtimeに結び付くものだけを、最大64件で返す。Agent metadataは表示上の分類にだけ使用し、Trust、Permission、Approval、Authorityを生成しない。一般Runtimeや未登録RuntimeのsessionはAgent表示へ混ぜない。
+
+一覧fieldはsession ID、runtime ID、状態、作成監査IDに限定する。Brokerの既存対話開始監査が成功した後に監査IDをsessionへ保持し、開始応答とその既存Audit hash射影は変更しない。Desktopは応答operation・`INTERNAL_STATE`証拠種別・Audit参照・版・field集合・識別子・状態・最大件数を検査してからAgent Centerへ投影する。Workspace bindingがないためTask、差分、Tool、command、承認数、比較、Handoffは表示・利用しない。通常Mobile Device Link allowlistには追加しない。
+
+本経路はmetadata読取だけであり、Adapter invocation、Agent起動、Task実行、外部Runtime health、Workspace隔離を証明しない。監査IDはBroker内の開始監査への参照であり、client側の連鎖検証証拠ではない。証拠種別は`INTERNAL_STATE`。fixtureを用いた自動試験結果を`LIVE_RUNTIME`へ昇格しない。
+
+検証結果:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138件、正常example 138件、negative fixture 170件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件のcheckが合格。Task混入、未知field、Authority、Workspace、状態、監査参照、重複ID、件数上限、Mobile経路への混入を拒否する。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：最初の実行は新規Rust試験の英語診断2行を検出して失敗。診断を日本語化し、最終実行は負債0件／finding 0件で合格。監査例外は追加していない。
+- Desktop `flutter test --no-pub --no-test-assets --concurrency 1 --reporter failures-only`：113件合格。Broker応答解析、異常field・重複ID・上限超過・証拠種別不一致拒否、未結合WorkspaceでTask／比較／Handoffを表示しないことを含む。
+- `flutter analyze --no-pub`：DesktopとMobileの両方で指摘なし。日本語OneDrive pathによるAnalysis ServerのJSON parse問題を避ける一時`Z:` aliasから実行し、検証後に割当を解除した。Mobile source／権限経路は変更していない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：288件合格。通常Broker経路、Agent metadata分類、一般／未知Runtime除外、64件上限、監査参照、既存開始Audit hash非変更、Mobile拒否を含む。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：exit 101。library 288件、CLI 9件、Broker IPC 10件、canonical hash 1件、checkpoint 8件は合格したが、`protected_data` integration executableをWindows Application ControlがOS error 4551で起動前に拒否した。`protected_startup`、`workspace_startup`の個別起動も同じ拒否。`protected_store` 3件、`workspace_diff` 2件、`workspace_reader` 2件は個別実行で合格した。拒否されたexecutableの移動・再配置、Application Control変更はしていない。
+- 新しい試験の初回全体実行では既存Mobile投影試験が一般Runtimeを指定していたため、Agent session一覧が正しく空になり、その試験の期待値が不一致だった。試験をschema適合Agent Adapterへ結び直し、通常Mobile側での拒否も含めて修正版Library 288件とBroker IPC 10件が合格した。
+- `python -X utf8 tooling/manifest.py --write`でtracked source 1045件を反映し、`python -X utf8 tooling/manifest.py --check`は合格。追跡対象を含むportable source archiveでの`python -X utf8 tooling/packaging_portability_check.py`も合格した。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。10の登録済みPython／Windows開発検査が成功し、Evidence bundleは`release_ready=false`を維持した。`git diff --check`も合格。合成smoke／fixtureは製品実行証拠へ昇格しない。
+
+新たなOS error 4551を受け、`windows_rust_integration_test_execution_policy`を`release_blocker`／unresolvedへ戻し、`RELEASE_CHECKLIST.md`とregistryを同期した。これは開発停止理由ではなく、全target検証の未成立を表す。Windows Application Controlを弱めず全Rust targetを実行できる承認済み環境での再検証が必要であり、他工程は継続する。ほかのrelease blockerも維持し、`release_ready=false`である。

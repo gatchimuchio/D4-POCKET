@@ -20,6 +20,14 @@
 
 セッションの状態は `利用中`、`終了`、`中止後隔離`。終了・中止後隔離からの再利用を拒否する。再起動で保持する場合は、履歴だけで権限を復元せず承認と実行系結合を再検証する。
 
+### 対話セッション一覧
+
+通常の認証済みDesktop IPCに限り、`対話セッション一覧`はRust Brokerに登録されたAgent Adapterのうち、Agent metadataが既存Schemaに適合する実行系に結び付いたsessionだけを最大64件返す。metadata適合は一覧の分類だけに使い、Trust、Permission、Approval、Authorityを生成しない。通常の要求処理が既存workの受信済み進捗を先に反映することはあるが、この一覧操作自体は新しいAdapter呼出し、Task実行、権限操作を開始しない。これはBroker内部状態（`INTERNAL_STATE`）の観測であり、外部Agentの稼働、過去履歴の完全性、現在のRuntime healthを証明しない。返却順は対話セッションIDの昇順とする。
+
+各項目は対話セッションID、実行系ID、状態、作成監査IDだけを含む。Task、入力・応答本文、Tool出力、Credential、Permission、Approval、Authority、Workspace参照は返さない。作成監査IDは対応する監査記録への参照であり、それ単独では監査鎖の完全性や承認を証明しない。未知field、重複セッションID、64件超過、未対応版は消費側で拒否する。Mobile Device Linkの操作許可集合には追加しない。
+
+Desktopはこの一覧をAgent操作面の状態表示にだけ用いる。Workspace bindingが別の統治経路で検証されるまではWorkspaceを空のまま保ち、Agent比較とHandoffを有効にせず、Task・差分等の内容を推定または表示しない。
+
 ## 統治経路
 
 Flutter は要求を入力する操作面であり、Runtime へ直接通信しない。Shell Core の製品責任は Rust broker 内の対話制御に置く。Python は契約検証・移行 oracle・開発試験に限る。Rust 側は要求検証、実行系解決、Policy 評価、Adapter 呼出し、応答正規化、Audit、失敗分類、Recovery、取消を所有する。MINIDORA の内部 import は禁止する。

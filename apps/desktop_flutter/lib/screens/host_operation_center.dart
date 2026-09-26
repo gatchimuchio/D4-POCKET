@@ -58,9 +58,10 @@ class _HostOperationCenterState extends State<HostOperationCenter> {
             busy: _busy,
             message: _message,
             onSelect: (hostId) => setState(() => _candidateHostId = hostId),
-            onSwitch: selected == null || _busy || selected.hostId == _activeHostId
-                ? null
-                : () => _switchHost(selected),
+            onSwitch:
+                selected == null || _busy || selected.hostId == _activeHostId
+                    ? null
+                    : () => _switchHost(selected),
             snapshot: snapshot,
           ),
         const BorderedPanel(
@@ -201,7 +202,8 @@ class _HostDetail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(host.displayName, style: Theme.of(context).textTheme.titleLarge),
+              Text(host.displayName,
+                  style: Theme.of(context).textTheme.titleLarge),
               Text('ホスト識別子: ${host.hostId}'),
               Text('基盤: ${host.platform}'),
               const SizedBox(height: 8),
@@ -216,7 +218,8 @@ class _HostDetail extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Text('Runtime summary: ${host.runtimeCount}件 / Agent summary: ${host.agentCount}件'),
+              Text(
+                  'Runtime summary: ${host.runtimeCount}件 / Agent summary: ${host.agentCount}件'),
               Text(active ? '現在の表示Host' : '切替候補'),
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -268,7 +271,9 @@ class _HostDetail extends StatelessWidget {
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       title: Text(agent.sessionId),
-                      subtitle: Text('${agent.task} / Broker観測'),
+                      subtitle: Text(
+                        '${agent.agentRuntimeId} / ${agent.status} / ${agent.evidenceSource}',
+                      ),
                     ),
                 ]
               : const [],

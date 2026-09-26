@@ -14,6 +14,7 @@
       "type": "string",
       "enum": [
         "実行系列挙",
+        "対話セッション一覧",
         "対話開始",
         "対話送信",
         "対話取得",
@@ -49,6 +50,19 @@
       "properties": {
         "operation": {
           "const": "実行系列挙"
+        },
+        "payload": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "operation": {
+          "const": "対話セッション一覧"
         },
         "payload": {
           "type": "object",

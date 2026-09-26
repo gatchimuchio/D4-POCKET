@@ -375,14 +375,14 @@ known limitation を認める条件は、次のとおりである。
   blocks_release: no
 ~~~
 
-## 解決済み開発検証gateと既知の実行揺らぎ
+## Windows Rust検証gateと既知の実行揺らぎ
 
 ~~~yaml
 - item: Windows Rust全target試験の実行gate
-  classification: known_limitation
+  classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
-  status: resolved
-  reason: 2026-09-26の現行sourceで全target cargo testが成功した。先行library再試行ではA2A／MINIDORA loopback body read testが断続的に失敗し、A2Aはcode=a2a_connection_failed、message=A2A Agent Card bodyを読めない、MINIDORAは対話失敗::通信失敗だった。両testの単独再実行と後続の全target実行は成功。失敗時の低層OS socket error kindは取得できておらず、原因を特定したとは主張しない。過去のApplication Control OS error 4551は今回の全target実行では再現しなかった。
-  required_action: Rust source変更時に全target cargo testを実行する。loopback errorが再発した場合は実際のOS error kindを取得し、test fixture／host環境／product runtimeを分けて再調査する。
-  blocks_release: no
+  status: unresolved
+  reason: 2026-09-27のRust source変更後、全target cargo testはRust library 288件、CLI 9件、Broker IPC 10件、canonical hash 1件、checkpoint 8件の成功後にprotected_data executableの起動をWindows Application ControlのOS error 4551で拒否された。protected_startupとworkspace_startup executableも個別試験で同じ起動拒否となった。拒否fileの移動・再配置やpolicy変更はしていないため、全target結果は未成立である。
+  required_action: Windows Application Controlを弱めず当該test executableを起動できる承認済みWindows環境で全target cargo testを実行し、全結果を記録する。拒否fileの移動・再配置やpolicy回避をしない。
+  blocks_release: yes
 ~~~

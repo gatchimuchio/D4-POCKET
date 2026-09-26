@@ -292,13 +292,13 @@ fn agent_support_valid(value: &AgentSupportMetadata) -> bool {
         && agent_text_valid(&value.reason)
 }
 
-fn agent_metadata_projection(
+fn agent_adapter_projection(
     adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
-) -> Result<Vec<Value>, 対話失敗> {
+) -> Result<Vec<(String, Value)>, 対話失敗> {
     let mut adapter_ids = BTreeSet::new();
     let mut agent_ids = BTreeSet::new();
     let mut projection = Vec::new();
-    for adapter in adapters.values() {
+    for (runtime_id, adapter) in adapters {
         let Some(metadata) = adapter.agent_metadata() else {
             continue;
         };
@@ -306,9 +306,18 @@ fn agent_metadata_projection(
         if !adapter_ids.insert(validated.adapter_id) || !agent_ids.insert(validated.agent_id) {
             return Err(対話失敗::応答不正);
         }
-        projection.push(metadata);
+        projection.push((runtime_id.clone(), metadata));
     }
     Ok(projection)
+}
+
+fn agent_metadata_projection(
+    adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
+) -> Result<Vec<Value>, 対話失敗> {
+    Ok(agent_adapter_projection(adapters)?
+        .into_iter()
+        .map(|(_, metadata)| metadata)
+        .collect())
 }
 
 /// Broker内の対話記録から得る統計。OS測定値ではなく、現在processの権限や健全性を示さない。
@@ -344,6 +353,34 @@ struct セッション {
     対話セッションID: String,
     実行系ID: String,
     状態: String,
+    作成監査ID: String,
+}
+
+fn Agent実行系ID取得(
+    adapters: &BTreeMap<String, Arc<dyn 実行系Adapter>>,
+    sessions: &BTreeMap<String, セッション>,
+) -> Result<BTreeSet<String>, 対話失敗> {
+    let candidates = sessions
+        .values()
+        .map(|session| session.実行系ID.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut adapter_ids = BTreeSet::new();
+    let mut agent_ids = BTreeSet::new();
+    let mut agent_runtime_ids = BTreeSet::new();
+    for runtime_id in candidates {
+        let Some(adapter) = adapters.get(runtime_id) else {
+            continue;
+        };
+        let Some(metadata) = adapter.agent_metadata() else {
+            continue;
+        };
+        let validated = AgentAdapterMetadata::read(&metadata)?;
+        if !adapter_ids.insert(validated.adapter_id) || !agent_ids.insert(validated.agent_id) {
+            return Err(対話失敗::応答不正);
+        }
+        agent_runtime_ids.insert(runtime_id.to_owned());
+    }
+    Ok(agent_runtime_ids)
 }
 
 /// 対話開始を監査へ結び付ける正規の安全な射影。
@@ -763,6 +800,18 @@ impl 対話制御 {
                 空入力(値)?;
                 Ok(json!({"実行系": self.実行系.keys().collect::<Vec<_>>()}))
             }
+            "対話セッション一覧" => {
+                空入力(値)?;
+                let agent_runtime_ids = Agent実行系ID取得(&self.実行系, &self.セッション)?;
+                Ok(json!({
+                    "版": 1,
+                    "対話セッション": self
+                        .セッション
+                        .values()
+                        .filter(|session| agent_runtime_ids.contains(&session.実行系ID))
+                        .collect::<Vec<_>>(),
+                }))
+            }
             "Agent一覧" => {
                 空入力(値)?;
                 Ok(json!({"Agent": agent_metadata_projection(&self.実行系)?}))
@@ -776,17 +825,19 @@ impl 対話制御 {
                     return Err(対話失敗::要求不正);
                 }
                 let ID = 識別子生成()?;
-                let session = セッション {
+                let mut session = セッション {
                     対話セッションID: ID.clone(),
                     実行系ID: 指定.実行系ID,
                     状態: "利用中".into(),
+                    作成監査ID: String::new(),
                 };
                 let body = 対話開始監査射影(&session.対話セッションID, &session.実行系ID);
-                監査(
+                let 作成監査ID = 監査(
                     "対話開始",
                     &ID,
                     &対話開始監査hash(&session.対話セッションID, &session.実行系ID),
                 )?;
+                session.作成監査ID = 作成監査ID;
                 self.セッション.insert(ID, session);
                 Ok(body)
             }
@@ -1361,8 +1412,13 @@ mod tests {
             対話セッションID: "session-fixture".into(),
             実行系ID: "runtime-fixture".into(),
             状態: "利用中".into(),
+            作成監査ID: "audit-fixture".into(),
         };
-        let legacy_body = serde_json::to_value(&session).expect("Session射影");
+        let legacy_body = json!({
+            "対話セッションID": &session.対話セッションID,
+            "実行系ID": &session.実行系ID,
+            "状態": "利用中",
+        });
         assert_eq!(
             対話開始監査hash(&session.対話セッションID, &session.実行系ID),
             sha256_tagged(legacy_body.to_string().as_bytes())
@@ -1374,10 +1430,23 @@ mod tests {
         失敗: bool,
         別session: bool,
         遅延: bool,
+        Agentmetadata有効: bool,
     }
     impl 実行系Adapter for 試験Adapter {
         fn 接続対象(&self) -> String {
             "試験専用".into()
+        }
+        fn agent_metadata(&self) -> Option<Value> {
+            if !self.Agentmetadata有効 {
+                return None;
+            }
+            let mut metadata: Value = serde_json::from_str(include_str!(
+                "../../../../examples/contracts/agent_adapter.valid.json"
+            ))
+            .expect("Agent接続例を読み込む");
+            metadata["adapter_id"] = json!("dialogue-test-adapter");
+            metadata["agent_id"] = json!("dialogue-test-agent");
+            Some(metadata)
         }
         fn 応答(
             &self,
@@ -1421,6 +1490,7 @@ mod tests {
                 失敗,
                 別session,
                 遅延,
+                Agentmetadata有効: true,
             }),
         )
         .unwrap();
@@ -1442,6 +1512,61 @@ mod tests {
             .as_str()
             .unwrap()
             .into()
+    }
+    #[test]
+    fn 対話セッション一覧は開始監査に結合した有界metadataだけを返す() {
+        let (mut c, adapter_calls) = 準備(false, false, false);
+        let session_id = 開始(&mut c, "left");
+        assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
+        let listing = 操作(&mut c, "対話セッション一覧", json!({}), false).unwrap();
+
+        assert_eq!(listing["版"], 1);
+        assert_eq!(listing["対話セッション"].as_array().unwrap().len(), 1);
+        assert_eq!(listing["対話セッション"][0]["対話セッションID"], session_id);
+        assert_eq!(listing["対話セッション"][0]["実行系ID"], "left");
+        assert_eq!(listing["対話セッション"][0]["状態"], "利用中");
+        assert_eq!(listing["対話セッション"][0]["作成監査ID"], "fixture-audit");
+        assert_eq!(listing["対話セッション"][0].as_object().unwrap().len(), 4);
+        assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
+        assert!(操作(&mut c, "対話セッション一覧", json!({"authority":"owner"}), false).is_err());
+
+        for index in 1..64 {
+            let _ = 開始(&mut c, "left");
+            assert_eq!(index, c.セッション.len() - 1);
+        }
+        assert_eq!(操作(&mut c, "対話セッション一覧", json!({}), false).unwrap()["対話セッション"].as_array().unwrap().len(), 64);
+        assert_eq!(操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false), Err(対話失敗::要求不正));
+    }
+    #[test]
+    fn 対話セッション一覧は一般Runtimeと未知実行系をAgent表示へ混ぜない() {
+        let (mut c, _) = 準備(false, false, false);
+        let agent_session = 開始(&mut c, "left");
+        c.登録(
+            "runtime-only",
+            Arc::new(試験Adapter {
+                回数: Arc::new(AtomicUsize::new(0)),
+                失敗: false,
+                別session: false,
+                遅延: false,
+                Agentmetadata有効: false,
+            }),
+        )
+        .unwrap();
+        let _runtime_session = 開始(&mut c, "runtime-only");
+        c.セッション.insert(
+            "f".repeat(32),
+            セッション {
+                対話セッションID: "f".repeat(32),
+                実行系ID: "unregistered-runtime".into(),
+                状態: "利用中".into(),
+                作成監査ID: "audit-unregistered-runtime".into(),
+            },
+        );
+
+        let listing = 操作(&mut c, "対話セッション一覧", json!({}), false).unwrap();
+        assert_eq!(listing["対話セッション"].as_array().unwrap().len(), 1);
+        assert_eq!(listing["対話セッション"][0]["対話セッションID"], agent_session);
+        assert_eq!(listing["対話セッション"][0]["実行系ID"], "left");
     }
     fn 要求(c: &mut 対話制御, s: &str) -> Value {
         操作(
@@ -2242,6 +2367,7 @@ mod tests {
                     失敗: right,
                     別session: false,
                     遅延: false,
+                    Agentmetadata有効: true,
                 }),
             )
             .unwrap();
