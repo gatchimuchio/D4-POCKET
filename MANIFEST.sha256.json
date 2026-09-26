@@ -193,7 +193,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "19f84795b69f6aacf713951980683f15a941cee1a7f9830e38f553405fab2b27"
+      "sha256": "258011cc1711ab8103481bf58febbb91fd15e5941f655678c820bdc8249e7d23"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "20f493f9badc5d830f6c27527bf9312756459bca7cd8938213e3386432dda3c8"
+      "sha256": "c80f3a3628d5569247070fa87350b3b031e5c64aaad4282365c68c460ff5bbc1"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -525,7 +525,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "8ff34019a157f2bf977aa08181d33072af79d47e5e4a37c85265c3b78aaf203f"
+      "sha256": "c9924ee0676fa5778b60c5c12d8bfc939b9357621051b7f128e27708551e1d11"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "fa83f00469dbc9ae1425dbb0146964d4f373af0a5d654b8be74e365f1e40f5b2"
+      "sha256": "5633b49da2d023259fd3ba10c6931936890c85d60f2d71b937f0a4f1ed0c622a"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "f949e35a4e433599a80f5944290956512efcf7200a7f82a0152d041b4a82ab54"
+      "sha256": "281f437d85152fa4d079647ee1d21bdb3ddb3e5b762c3adc37889c87797a7421"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

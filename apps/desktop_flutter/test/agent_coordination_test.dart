@@ -37,6 +37,7 @@ void main() {
       _session('b', 'workspace-b'),
     ]);
     expect(isolated.available, isTrue);
+    expect(isolated.statusMessage, contains('Agent runtime IDとWorkspace参照'));
     expect(isolated.statusMessage, contains('実行時の隔離は未検証'));
 
     final contaminated = AgentComparisonProjection.fromSessions([

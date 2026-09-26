@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7追補: 比較可否表示と操作面記述の同期（2026-09-27）
+
+比較projectionのAgent runtime ID一意性検査に合わせ、Agent Centerの状態文言とGUI操作面の責任記述を更新した。表示は宣言上のruntime／Workspace参照が重複しない場合に限る条件付き表示であり、実Agent identityや実行時隔離の確認済み表示にはしない。
+
+- `dart format --output=none --set-exit-if-changed apps/desktop_flutter/lib/services/agent_coordination.dart apps/desktop_flutter/lib/screens/agent_center.dart apps/desktop_flutter/test/agent_coordination_test.dart`：合格。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter expanded test/agent_coordination_test.dart`：4件成功。`flutter analyze --no-pub`：Desktop／Mobileとも指摘なし。変更前後のDesktop全体111件試験も成功。
+- 証拠境界: UI文言・projectionの整合であり、実Agentの比較起動、Workspace隔離、Agent間汚染防止は実証しない。これらの`release_blocker`は維持する。
+
 ## D4 Pocket Phase 7補足: Agent runtime識別のUI projection同期（2026-09-27）
 
 Desktop Agent比較projectionがSession／Workspace参照しか保持せず、同一Agent runtimeを異なるAgentとして比較可能にする契約不整合を修正した。snapshot由来のAgent runtime IDを保持し、欠落・不正形式・entry間の重複で比較を停止する。Schema／Conformanceの一意性要件とFlutterの入力検査を同期した。

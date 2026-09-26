@@ -76,7 +76,7 @@ class AgentComparisonProjection {
     }
     return AgentComparisonProjection(
       available: true,
-      statusMessage: 'Workspace参照が重複していない公開投影です。実行時の隔離は未検証です。',
+      statusMessage: 'Agent runtime IDとWorkspace参照が重複していない公開投影です。実行時の隔離は未検証です。',
       sessionIds: sessionIds,
     );
   }
