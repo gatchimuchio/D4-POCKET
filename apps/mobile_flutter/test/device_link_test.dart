@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_mobile/main.dart';
 import 'package:gui_shell_mobile/services/device_link_client.dart';
 import 'package:gui_shell_mobile/services/device_link_controller.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart';
@@ -165,6 +167,23 @@ void main() {
     expect(controller.runtimes, ['runtime-a']);
     expect(native.calls, ['read_state', 'pair']);
     expect(native.requests, ['実行系列挙']);
+  });
+
+  testWidgets('Mobileの利用者向け名称は製品ブランドを表示する', (tester) async {
+    final controller = DeviceLinkController(nativePort: _FakeNativePort());
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(GuiShellMobileApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.title, 'D4 Pocket');
+    expect(find.text('D4 Pocket・概要'), findsOneWidget);
+    expect(find.text('GUI Shell モバイル'), findsNothing);
+
+    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+    await tester.pumpAndSettle();
+    expect(find.text('D4 Pocket（GUI Shell基盤）'), findsOneWidget);
   });
 
   test('Mobile対話clientはnative Device Link経由の選択用Workspace投影を使う', () async {

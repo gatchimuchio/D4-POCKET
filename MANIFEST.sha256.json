@@ -653,7 +653,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/Runner.rc",
-      "sha256": "2268a74297cc5f3623b5b84e6a92dc5b55d4b2e77959515d29ee51e17f28a01e"
+      "sha256": "8ba99a4433c5ca1c523b73eb67f031887ed0d850c861e85fe3f7c32950131528"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
@@ -737,7 +737,7 @@
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/AndroidManifest.xml",
-      "sha256": "0e6a1b390dc2c48d66ae59a35444cf024163811e61a640dab755ee4a7712398c"
+      "sha256": "98802876334abacedabfbdc96eccd6456c22b67122c826fcb05f851d3989c9da"
     },
     {
       "path": "apps/mobile_flutter/android/app/src/main/kotlin/com/example/gui_shell_mobile/DeviceLinkModels.kt",
@@ -997,7 +997,7 @@
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/Info.plist",
-      "sha256": "8b8efd9a8e37d63e68a7676084b62f8249f85d7bbf61e3fc143b4ab669a0beb1"
+      "sha256": "4b993d3ec67fa90925943a0558d86ee5dd5fd92afc8930f0c4b4d7617dd10a13"
     },
     {
       "path": "apps/mobile_flutter/ios/Runner/Runner-Bridging-Header.h",
@@ -1017,7 +1017,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "821f5af2d262a06a6489f4944994ce50556b20ffadb2ace085c6090d898ca815"
+      "sha256": "4b34bf07282d081b8676db70be52e1065300b94ce36f3bb692862be676f6e5ad"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/agent_status.dart",
@@ -1085,7 +1085,7 @@
     },
     {
       "path": "apps/mobile_flutter/test/device_link_test.dart",
-      "sha256": "8393f35138bd2ccdb9988be069092c62c5f50acb300917f1636213f022ebaa5d"
+      "sha256": "20be3bfb5300cebd542a7629959ca86ac4e5aad49b244b4ec17923b86c05afb0"
     },
     {
       "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "376bd90622744f6297ec66949877a343fda66d0826ca70f3feb32a3c7c0ede75"
+      "sha256": "ce5b261184f7ff6d2f4aa8ebf2fd8b4d196a04c3f38daccb027940daabac8424"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -4301,7 +4301,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u65e5\u672c\u8a9e\u57fa\u5e95\u4f8b\u5916.json",
-      "sha256": "bff2551f93ce6c776d02807a91bebb4609491c14be452a5036a84da9749e3c31"
+      "sha256": "06e4432c37cf8019bf621aa9afb60450d209ee0642f315820890bea4f3228d4b"
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",

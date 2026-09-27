@@ -2147,3 +2147,15 @@ Codex Adapterの`task_execution`能力宣言も`unknown`から`unsupported`へ�
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib AgentTask発行監査失敗ではPermissionを残さずApprovalを発行しない -- --test-threads=1`：試験実行fileのcompile後、Windows Application ControlがOS error 4551で起動を拒否。追加試験のassertionは未実行。
 
 この試験の証拠源は`FIXTURE`であり、永続Audit storeの故障注入やBrokerのLIVE_RUNTIME障害処理を実証しない。実Task consumer、一回限りの原子的消費、sandbox・独立書込隔離、実行前後Audit／Recovery、Agent Task実行のrelease blockerは維持する。
+
+## D4 Pocket 製品表示名の統一（2026-09-27）
+
+Mobileの画面・Android／iOS表示名とWindows実行fileの製品表示を`D4 Pocket`へ統一した。技術基盤名は日本語説明中の`GUI Shell`として併記し、Android namespace／applicationId、iOS bundle identifier／CFBundleName、Windows executable identityは変更していない。日本語基底の局所例外台帳には製品固有名`D4 Pocket`だけを追加し、利用者向け説明は日本語を維持した。
+
+- `flutter analyze`（`apps/mobile_flutter`、`apps/desktop_flutter`）：合格。
+- `flutter test --no-pub`（`apps/mobile_flutter`）：18 tests passed。表示名と drawer の技術基盤表記も検査。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：schema 143件、example 143件、negative fixture 177件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：221 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
+
+この表示名変更はplatform build、Mobile native Device Linkの実機安全性、正式配布、製品完成、owner GOを証明しない。既存のrelease blockerと`release_ready=false`を維持する。

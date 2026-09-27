@@ -94,6 +94,7 @@
       "handling": "lexical_only",
       "integrity": "review_on_change",
       "terms": [
+        "D4 Pocket",
         "GUI Shell",
         "GUI-Shell",
         "Runtime Operation Shell",

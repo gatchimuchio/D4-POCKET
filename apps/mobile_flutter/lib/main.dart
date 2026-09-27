@@ -24,7 +24,7 @@ class GuiShellMobileApp extends StatelessWidget {
   final DeviceLinkController? controller;
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'GUI Shell モバイル',
+    title: 'D4 Pocket',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       colorSchemeSeed: const Color(0xff2f6f5e),
@@ -142,7 +142,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
       ];
       return Scaffold(
         appBar: AppBar(
-          title: Text('GUI Shell・${_names[_selected]}'),
+          title: Text('D4 Pocket・${_names[_selected]}'),
           actions: [
             Padding(
               padding: const EdgeInsets.all(12),
@@ -162,7 +162,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
           children: [
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Text('GUI Shell モバイル'),
+              child: Text('D4 Pocket（GUI Shell基盤）'),
             ),
             for (var i = 0; i < _names.length; i++)
               NavigationDrawerDestination(
