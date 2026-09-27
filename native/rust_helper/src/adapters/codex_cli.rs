@@ -23,6 +23,8 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
     "default_permissions=\"d4p-agent-task\"",
+    // user設定を無視するTaskでもWindowsの強いsandbox方式を固定する。
+    "windows.sandbox=\"elevated\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
     "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=8",
     "permissions.d4p-agent-task.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"}}",
@@ -802,9 +804,13 @@ mod tests {
                 .any(|pair| pair == ["--cd", r"C:\workspace"]));
             if is_task {
                 assert!(!args.iter().any(|arg| arg == "--sandbox"));
+                assert!(args.iter().any(|arg| arg == "--ignore-user-config"));
                 for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
                     assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
                 }
+                assert!(args.windows(2).any(|pair| {
+                    pair == ["-c", "windows.sandbox=\"elevated\""]
+                }));
             } else {
                 assert!(args
                     .windows(2)

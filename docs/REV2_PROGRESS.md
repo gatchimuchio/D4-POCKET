@@ -2,6 +2,19 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Task用Windows sandbox方式の明示（2026-09-28）
+
+現行Codex CLI `0.158.0-alpha.2.1`とTask command構成を照合した。Task commandは`--ignore-user-config`を指定する一方、Windows sandbox方式をCLI overrideで固定していなかった。現環境のCodex user configには`[windows] sandbox = "elevated"`があるが、このTask commandはその設定fileを読まないため、製品Taskが同じ強い方式を選ぶことは保証されていなかった。
+
+Task限定のconfig overrideへ`windows.sandbox="elevated"`を追加し、Task起動時に`-c`で明示する。read-only Dialogueは引き続き既存経路を使い、このoverrideを付けない。権限profile本体・Authority経路・Adapter metadataは変更しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1`：追加後の再実行で1件成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：Task経路にelevated方式の固定値があることを含む全225件が合格。
+- `codex --version`：`codex-cli 0.158.0-alpha.2.1`。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：lib 321件、main 9件、Broker IPC 10件、他integration 15件（計355件）が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、command全体は終了code 1。`cargo check --all-targets`とfocused Codex Adapter testは別途成功。前回の全target 366件成功記録は履歴として保持し、今回の実行をPASSへ昇格しない。
+
+この変更はsandbox方式の選択を明示するだけで、deny-read ACLが実効する証拠ではない。permission profile付きhelperでは合成`.env`の読取成功と外部path deny適用失敗を既に観測しており、`codex exec` Task実動作も未検証である。実環境の否定・許可対照試験を通過するまで`task_execution=unsupported`とrelease blockerを維持する。
+
 ## D4 Pocket Phase 7 Broker強制終了後scratch回復の別プロセス試験（2026-09-28）
 
 直前の同一test process内Broker再生成試験を強化し、Rust test harnessの子process内で永続Brokerを起動し、Runtime／Workspace登録とscratch journalの予約・有効化後に準備完了PIDを通知させ、親processから子Broker processを強制終了する試験へ変更した。親は同じ永続storeを使う新Brokerで`作業領域起動登録`を実行し、実scratch directory削除、journal記録解消、回復AuditEventを確認する。試験終了時にはfixture storeとWorkspaceも削除する。

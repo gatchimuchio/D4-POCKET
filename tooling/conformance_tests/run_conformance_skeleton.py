@@ -6012,6 +6012,7 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     task_required = (
         "workspace-write",
         "d4p-agent-task",
+        r'windows.sandbox=\"elevated\"',
         "**/*.env",
         "**/.ssh/**",
         "**/secrets/**",

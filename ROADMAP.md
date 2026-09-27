@@ -9,6 +9,10 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### Phase 7 Task用Windows sandbox方式の明示（2026-09-28）
+
+Codex Task commandは`--ignore-user-config`によりuser configを読み込まないため、Task専用`-c windows.sandbox="elevated"` overrideを追加し、Task時だけ強いWindows sandbox方式を明示する。read-only Dialogueへのoverride追加や一般権限の拡張は行わない。これは方式選択の固定であり、deny-read ACLの実効、外部path拒否、`codex exec`実Agentを証明しない。helperでの合成`.env`読取成功・外部path deny失敗を踏まえ、`task_execution=unsupported`とrelease blockerは維持する。詳細は`docs/REV2_PROGRESS.md`の最新Phase 7追補を参照する。
+
 ### Phase 7 Broker crash後のAgent Task scratch回復（2026-09-28）
 
 Agent Task専用scratchを、作成前にBroker永続storeへ予約し、nofollow open後のroot／scratch identity取得を経て`active`へ進めるbounded HMAC-authenticated journalを追加した。再起動ごとに変わる権限用registration hashとは分離した安定`recovery_binding_hash`を、Runtime／Workspace ID・除外指定・root／祖先identityからBrokerが再計算する。起動時はWorkspace登録後・IPC listener開始前に、現在のbindingとidentityがすべて一致する直接子scratchだけをhandle経由で削除し、欠損pathは記録のみ解消する。予約だけで実体identityがないpath、別登録、reparse、identity不一致、破損journalは削除せず保持し、未解決WorkspaceのTaskを拒否する。本文、絶対path、Credential、Permission、Approval、出力はjournalへ保存しない。
