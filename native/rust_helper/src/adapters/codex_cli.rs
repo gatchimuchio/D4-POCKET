@@ -7,6 +7,7 @@
 
 use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::{実行系Adapter, 実行結果, 対話失敗, 対話要求};
+use super::process_tree;
 use serde_json::{json, Value};
 use std::env;
 use std::io::{Read, Write};
@@ -151,29 +152,40 @@ impl 実行系Adapter for CodexCliAdapter {
             self.workspace_identity,
             &要求.入力,
         )?;
-        let stdout = child.stdout.take().ok_or(対話失敗::通信失敗)?;
-        let stderr = child.stderr.take().ok_or(対話失敗::通信失敗)?;
+        let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
+        let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
         let stdout_reader = thread::spawn(move || bounded_read(stdout));
         let stderr_reader = thread::spawn(move || bounded_read(stderr));
 
         let status = loop {
             if 取消.load(Ordering::SeqCst) {
-                terminate(&mut child);
+                if child.terminate_tree().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
                 let _ = stdout_reader.join();
                 let _ = stderr_reader.join();
                 return Err(対話失敗::取消);
             }
             if Instant::now() >= 期限 {
-                terminate(&mut child);
+                if child.terminate_tree().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
                 let _ = stdout_reader.join();
                 let _ = stderr_reader.join();
                 return Err(対話失敗::期限超過);
             }
             match child.try_wait() {
-                Ok(Some(status)) => break status,
+                Ok(Some(status)) => {
+                    if child.stop_descendants().is_err() {
+                        return Err(対話失敗::通信失敗);
+                    }
+                    break status;
+                }
                 Ok(None) => thread::sleep(Duration::from_millis(10)),
                 Err(_) => {
-                    terminate(&mut child);
+                    if child.terminate_tree().is_err() {
+                        return Err(対話失敗::通信失敗);
+                    }
                     let _ = stdout_reader.join();
                     let _ = stderr_reader.join();
                     return Err(対話失敗::通信失敗);
@@ -325,9 +337,10 @@ fn spawn_task(
     workspace: &Path,
     expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
     input: &str,
-) -> Result<Child, 対話失敗> {
+) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
-    let child_result = command(executable, workspace)
+    let mut task_command = command(executable, workspace);
+    task_command
         .args([
             "exec",
             "--json",
@@ -343,12 +356,12 @@ fn spawn_task(
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+        .stderr(Stdio::piped());
+    let child_result = process_tree::spawn(task_command);
     // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
     drop(workspace_guard);
     let mut child = child_result.map_err(|_| 対話失敗::通信失敗)?;
-    let mut stdin = child.stdin.take().ok_or(対話失敗::通信失敗)?;
+    let mut stdin = child.child.stdin.take().ok_or(対話失敗::通信失敗)?;
     stdin
         .write_all(input.as_bytes())
         .map_err(|_| 対話失敗::通信失敗)?;

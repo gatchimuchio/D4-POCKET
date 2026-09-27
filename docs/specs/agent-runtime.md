@@ -47,7 +47,15 @@ Task状態はBroker内の独立したbounded projectionであり、通常対話�
 
 開始・終了・取消要求Auditは固定label、task ID、instruction／result hashと状態だけを保持し、本文・出力・Credentialを含めない。worker出力本文はBrokerのTask状態recordやAuditへ保存せず、Broker側でhash化後に破棄する。`result_hash`と`completed`はAgent processの応答完了を示すに限り、Workspace変更の正しさ、test成功、隔離、release readinessを証明しない。Workspace差分の列挙・内容表示は別のWorkspace inspection／Content Exposure Boundaryへ従う。worker終了Auditを確定できない場合はTaskを`quarantined`へ移し取消を要求し、成功結果を返さない。
 
-Task状態recordはBroker processの揮発状態で、再起動後は状態照会できない。PermissionとApprovalも揮発し再利用できない。Broker終了またはSession隔離時のCancellation flagだけではOS child process群の終了証明にならないため、実Adapterはprocess tree supervision、期限、取消、scratch cleanupを実装・検証するまで`task_execution=supported`にしてはならない。Codex Adapterは引き続き`unsupported`であり、現行Consumerから起動されない。Codexの`workspace-write`実行、Workspace内TEMP/TMP隔離とcleanup、Windows process-tree終了、実Workspaceの書込隔離、差分内容UIおよびLIVE_RUNTIME conformanceは別途未成立の`release_blocker`である。
+Task状態recordはBroker processの揮発状態で、再起動後は状態照会できない。PermissionとApprovalも揮発し再利用できない。Broker終了またはSession隔離時のCancellation flagだけではOS child process群の終了証明にならないため、実Adapterはprocess tree supervision、期限、取消、scratch cleanupを実装・検証するまで`task_execution=supported`にしてはならない。現行Codex Adapterのread-only対話processには、Windows Job Objectによる起動時収容、取消・期限超過・root終了後の子孫停止、およびBroker異常終了時のJob close停止を接続している。この接続は対話経路だけであり、Task Adapter／Consumerから起動されない。Codexの`workspace-write`実行、Task向けprocess-tree実証、Workspace内TEMP/TMP隔離とcleanup、実Workspaceの書込隔離、差分内容UIおよびLIVE_RUNTIME conformanceは別途未成立の`release_blocker`である。Job Objectはprocess群の終了管理であってsandboxではない。
+
+### Windows process群監督に対するunsafe例外レビュー
+
+`native/process_supervision/src/windows_job.rs`だけに、Windows Job Object、停止状態threadの割当て・再開、およびJob内process数の照会に必要なWin32 unsafe呼出しを隔離する。Rust Broker crateの`#![forbid(unsafe_code)]`は変更せず、新crateは`#![deny(unsafe_op_in_unsafe_fn)]`を適用する。各unsafe blockは直前の`SAFETY`説明でpointer、handle、構造体寿命、access範囲を特定する。
+
+標準`std::process::Child`は初期thread handleを公開しない。Jobへの割当前にchildが実行を始めないよう`CREATE_SUSPENDED`で生成し、専用Jobへ割り当ててからthreadを再開する必要がある。採用可能な既存safe APIでは、child起動前の割当てと`KILL_ON_JOB_CLOSE`の同時保証を構成できなかったため、このOS接続だけを独立crateへ隔離する。Childのprocess handleは借用のまま使い、Job、thread、snapshotのhandle所有・closeを分け、Jobにbreakaway許可を設定しない。
+
+検証は`native/process_supervision`の強制owner終了後にchild停止を確認するWindows実process試験、およびBroker Adapter側のchild取消・回収試験で行う。これはprocess-supervision機構の`LIVE_RUNTIME`証拠であり、Codex CLI本体の起動、Task実行、sandbox、Workspace書込隔離の証拠ではない。追加依存のunsafeやこの例外の拡張は別途明示レビューし、Task能力を有効化する根拠に使わない。
 
 ## Agent Task用Workspace Permission
 

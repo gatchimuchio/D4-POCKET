@@ -6197,6 +6197,47 @@ def test_rust_broker_skeleton_exists() -> list[str]:
     return errors
 
 
+def test_process_supervision_unsafe_exception_is_narrow() -> list[str]:
+    source_root = ROOT / "native" / "process_supervision" / "src"
+    source_files = sorted(source_root.rglob("*.rs"))
+    unsafe_files = [
+        path.relative_to(ROOT).as_posix()
+        for path in source_files
+        if re.search(r"\bunsafe\s*\{", path.read_text(encoding="utf-8"))
+    ]
+    allowed_file = "native/process_supervision/src/windows_job.rs"
+    errors = []
+    if unsafe_files != [allowed_file]:
+        errors.append(f"process supervisionのunsafe境界が指定file外へ拡張された: {unsafe_files}")
+
+    crate_lib = ROOT / "native" / "process_supervision" / "src" / "lib.rs"
+    if not crate_lib.is_file() or "#![deny(unsafe_op_in_unsafe_fn)]" not in crate_lib.read_text(encoding="utf-8"):
+        errors.append("process supervision crateはunsafe_op_in_unsafe_fnをdenyしなければならない")
+
+    broker_lib = RUST_HELPER / "src" / "lib.rs"
+    if "#![forbid(unsafe_code)]" not in broker_lib.read_text(encoding="utf-8"):
+        errors.append("process supervision例外によってRust Brokerのunsafe禁止を弱めてはならない")
+
+    if unsafe_files == [allowed_file]:
+        source = (ROOT / allowed_file).read_text(encoding="utf-8")
+        unsafe_blocks = len(re.findall(r"\bunsafe\s*\{", source))
+        safety_reasons = len(re.findall(r"(?m)^\s*//\s*SAFETY:", source))
+        if unsafe_blocks != safety_reasons:
+            errors.append(
+                f"process supervisionのunsafe block {unsafe_blocks}件に対しSAFETY根拠は{safety_reasons}件"
+            )
+
+    contract = DOC_SPECS / "process-supervision.md"
+    if not contract.is_file():
+        errors.append("process supervisionの明示レビュー契約がない")
+    else:
+        contract_text = contract.read_text(encoding="utf-8")
+        for required in ("KILL_ON_JOB_CLOSE", "task_execution=unsupported", "sandbox"):
+            if required not in contract_text:
+                errors.append(f"process supervision契約に必須境界がない: {required}")
+    return errors
+
+
 def test_rust_broker_rejection_audit_contract_shape() -> list[str]:
     protocol_rs = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
     audit_rs = (RUST_HELPER / "src" / "broker" / "audit.rs").read_text(encoding="utf-8")
@@ -8990,6 +9031,7 @@ def main() -> int:
         test_broker_boundary_docs_exist,
         test_desktop_broker_channel_contract,
         test_rust_broker_skeleton_exists,
+        test_process_supervision_unsafe_exception_is_narrow,
         test_rust_broker_rejection_audit_contract_shape,
         test_rust_broker_audit_anchor_and_nonce_compaction_present,
         test_rust_filesystem_diagnostic_detects_secret_symlink,

@@ -265,12 +265,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gui_shell_process_supervision"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "gui_shell_rust_helper"
 version = "0.1.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
  "getrandom",
+ "gui_shell_process_supervision",
  "gui_shell_windows_broker_channel",
  "gui_shell_windows_protection",
  "gui_shell_windows_runtime_observation",

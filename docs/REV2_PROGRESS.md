@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Windows Codex process群の終了管理基盤（2026-09-28）
+
+Codex Adapterの既存read-only対話processを、Windowsでは初期thread停止中に専用Job Objectへ割り当ててから再開する。Jobは`KILL_ON_JOB_CLOSE`を設定し、通常の取消・期限超過・異常時はprocess群の停止と終了確認を行う。Root process終了時も残存processを停止してからpipe readerを回収し、Broker異常終了ではOSによるJob handle closeを最終停止境界とする。Win32 unsafe呼出しは独立したWindows専用`native/process_supervision` crateへ閉じ、Broker crateの`#![forbid(unsafe_code)]`を保持する。
+
+- 明示unsafe例外レビューと適用範囲は`docs/specs/process-supervision.md`および`docs/specs/agent-runtime.md`へ固定し、Conformanceでunsafe呼出しを`native/process_supervision/src/windows_job.rs`一fileへ限定する。
+- `cargo test --locked --manifest-path native/process_supervision/Cargo.toml --target-dir native/rust_helper/target/process_supervision -- --nocapture`：Windows実processを使う2件が合格。Broker相当ownerを強制終了した後にJob内childが終了することを確認した。証拠はWindows OS process管理の`LIVE_RUNTIME`であり、実Codex CLIやTask実行の証拠ではない。
+- `cargo test --locked --all-targets cancellation_terminates_the_supervised_child`：Adapter側process監督接続のWindows実process試験1件が合格。
+- `cargo check --locked --all-targets`：成功。
+- `cargo test --locked --all-targets`：355件合格（library 310、CLI 9、Broker IPC 10、その他integration 26）。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：224 checksで合格。process supervision unsafe例外の範囲、Broker禁止、SAFETY根拠数と契約文書を検査する。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 144件、正常example 144件、negative fixture 178件で合格。`python -X utf8 tooling/日本語基底監査.py --strict`：負債0／finding 0で合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。`manifest`、release gate、packaging portability、release smoke等のdevelopment検査を通過。製品状態は`release_ready=false`、既存release blocker 31件を維持する。
+- これはread-only対話Adapterのprocess管理基盤であり、Codex Adapterの`task_execution=unsupported`は維持する。書込Task consumer、Workspace scratch隔離・cleanup、実Agent起動、隔離書込、Task向けLIVE_RUNTIME failure injectionは未接続で、既存`release_blocker`を維持する。Job Objectはprocess群管理であり、filesystem/network sandboxではない。
+
 ## D4 Pocket統合 Phase 7 作業TaskのBroker実行経路（2026-09-28）
 
 Rust Brokerに独立した`AgentTask実行`／`AgentTask状態`／`AgentTask取消`経路を追加した。実行開始では、構造検査済みAdapter metadataとRust Adapter実装の双方がTask対応を示すこと、現行Session、Workspace登録hash、Adapter固定root identity、Task本文hash、Owner Approvalの実行条件hash、およびWorkspace Permission／Owner Approvalの壁時計・単調時計期限を同一Broker排他区間で再照合する。開始Auditを確定した後、揮発PermissionとApprovalを不可分に取り除いてからworkerを起動し、同じgrantの再利用を拒否する。Owner Approvalの有効期間は発行後5分、Taskは開始後15分を上限とする固定実行policyをnative確認文とhash結合条件へ明示した。

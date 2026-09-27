@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "629dd73a2afec89fbc4dc0ef04f42df589a7e56e6567952680b3fc9250998e44"
+      "sha256": "b06435d99aa5db979b331e416fed6d7b544a2aba79a04d16dbdec8504dd97e40"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "22934e7a6860011c541f0f9e7de4482ae4b77216e02aeb92d4bb0b058810d2ef"
+      "sha256": "4a9a31ba8bd76f4892dd1010a34763db463ea495b5f35b32a9ffb8d25b7f7790"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "e891b60ea51c91481a87c96db69525acf3f5c4cd605c6d08023b859630b82223"
+      "sha256": "ecc3ab342892af9de6e1151914ae47fca9765306b048bbb0c7ff276fd01c554a"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1394,6 +1394,10 @@
     {
       "path": "docs/specs/performance-validation.md",
       "sha256": "93f9fab305dcd0dfab2e3d03bef2811c195f829ce8520c4a1050ba69ea479a01"
+    },
+    {
+      "path": "docs/specs/process-supervision.md",
+      "sha256": "5edad1ad3a229ce5e210f4e8fe6fe74f1a86ebdc6038b49b31d7ec10a21935e0"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -2812,12 +2816,28 @@
       "sha256": "d7f136b656cea53b4b69babd9beb3e29f6722eb29960d60e4e08965c1234eb41"
     },
     {
+      "path": "native/process_supervision/Cargo.lock",
+      "sha256": "f2cf64261f530c3307b13800a86e551a65ef7d4073db013115087ed47a466d42"
+    },
+    {
+      "path": "native/process_supervision/Cargo.toml",
+      "sha256": "6c4acb5b577e4660da71c89aedcc493e931766cdd2d572166edc051b6c9a9874"
+    },
+    {
+      "path": "native/process_supervision/src/lib.rs",
+      "sha256": "2304b4a802ff554b84dcdccf65282b8b4a91d25f79206ba01c7599e32ebd4ddb"
+    },
+    {
+      "path": "native/process_supervision/src/windows_job.rs",
+      "sha256": "7a93fb244aec19364b5cc66d915dc9594ad42bf7ca62ee2f6d06954ece8926e5"
+    },
+    {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "3c2534d64aed85b89db658938bc5be9486ec783207028b93cc62d638aac0e7e8"
+      "sha256": "f33cb36c2679cebfbd02b43e01595c1c600103573e24bbdbabd86d6052448058"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "565800ad743d49b3f1b99868ccf0387de7c7442d742939707eba5b1af04edc97"
+      "sha256": "24f7804f38162ca766e701fe78ce674090a95aa29248f8f11da4fd2777f6f9e3"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -2853,7 +2873,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "f2031a77f33918b4d24055c90b26d6a020fe82a9b1566cb0200881f6f1289c0e"
+      "sha256": "dd55ea4d09d4f14729e408b2139fe8a273bb91d7a7d3a2eccd6d80ed7b1c0325"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -2865,7 +2885,11 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
-      "sha256": "e1ba6778965ff4844ce8b926071a892621a0606a8ffdb00e07a72363b2a0f892"
+      "sha256": "bd09e36a672ebf2f7448293b98bfe3af111f4ca3aaaee84ef49fa62fc3267833"
+    },
+    {
+      "path": "native/rust_helper/src/adapters/process_tree.rs",
+      "sha256": "1b40a1d0dc7486d7d302b166ffcec15d142b1d8ad9e6dab7936af2c554e57931"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -4197,7 +4221,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "51ab99380cc9f47d7054c3631210965a2ad6f21ff097a03cd209229957cc49c8"
+      "sha256": "e4ed78e375583bbb18721db27f6286a85eba357591bf0a587bfd2c21ed86b19e"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

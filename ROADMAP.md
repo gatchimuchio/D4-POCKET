@@ -7,6 +7,12 @@
 
 ## 現行D4 Pocket統合単位（2026-09-28）
 
+### Phase 7 Windows Codex process群の終了管理（2026-09-28）
+
+既存Codex read-only対話processは、Windows上で起動threadを停止中に専用Job Objectへ割り当て、Job handle close時の全process終了を有効にしてから再開する。取消・期限超過・root終了後の残存processをJob単位で停止・確認し、pipe readerを解放する。Win32 unsafeは明示レビュー契約付きの独立process-supervision crate内へ分離し、Conformanceで一file境界と根拠数を検査する。強制Broker終了を使うWindows実process試験とRust全target 355件が成功した。
+
+この基盤は既存read-only対話Adapterのみに接続し、書込Task経路は未接続のまま`task_execution=unsupported`を維持する。Adapter側取消接続の実process試験とRust全target 354件が成功した。Task向けprocess supervision、Codex `workspace-write`、Workspace scratch隔離・cleanup、実Agent隔離書込と失敗注入は`release_blocker`。Job Objectはsandboxの証拠ではなく、`release_ready=false`を維持する。
+
 ### Phase 7 Agent Task Broker Consumerの一回消費・bounded状態（2026-09-28）
 
 Rust Brokerに独立した`AgentTask実行`／`AgentTask状態`／`AgentTask取消`を接続した。実行要求ごとにmetadataとAdapter実装双方の対応、現行Session、Workspace登録hash・固定root identity、Permission／Owner Approvalの本文hash・条件hash・wall／monotonic期限を再照合し、開始Audit確定後にPermissionとApprovalを同じBroker排他区間で一回消費してworkerを開始する。Task状態は独立projectionで、出力本文を保存せずBroker側でhash化し、同一Session／Workspaceの並行Task、全体同時4件、状態履歴128件へboundedとした。取消応答はworker停止を保証せず、terminal応答までrunningを維持する。
