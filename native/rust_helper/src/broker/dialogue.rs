@@ -759,6 +759,26 @@ impl 対話制御 {
         stats
     }
 
+    fn agent_task_permission_is_active(
+        &self,
+        session_id: &str,
+        runtime_id: &str,
+        workspace_id: &str,
+        registration_hash: &str,
+        now: i64,
+    ) -> bool {
+        self.agent_task_permissions
+            .get(session_id)
+            .is_some_and(|grant| {
+                now < grant.expires_at_epoch_seconds
+                    && Instant::now() < grant.monotonic_expiry
+                    && grant.permission_id.len() == 32
+                    && grant.agent_runtime_id == runtime_id
+                    && grant.workspace_id == workspace_id
+                    && grant.workspace_registration_hash == registration_hash
+            })
+    }
+
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
     pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
         self.失効セッション.extend(sessions.iter().cloned());
@@ -915,12 +935,23 @@ impl 対話制御 {
                 {
                     return Err(対話失敗::セッション不一致);
                 }
+                let permission_state = if self.agent_task_permission_is_active(
+                    &request.session_id,
+                    &request.agent_runtime_id,
+                    &request.workspace_id,
+                    binding.registration_hash(),
+                    現在,
+                ) {
+                    "有効"
+                } else {
+                    "未付与"
+                };
                 let instruction_hash = sha256_tagged(request.instruction.as_bytes());
                 Ok(json!({
                     "版": 1,
                     "状態": "要求検査済み",
                     "実行状態": "未実行",
-                    "Permission状態": "未付与",
+                    "Permission状態": permission_state,
                     "Approval状態": "未取得",
                     "実行系ID": request.agent_runtime_id,
                     "対話セッションID": request.session_id,
@@ -961,18 +992,13 @@ impl 対話制御 {
                 {
                     return Err(対話失敗::セッション不一致);
                 }
-                if self
-                    .agent_task_permissions
-                    .get(&request.session_id)
-                    .is_some_and(|grant| {
-                        Instant::now() < grant.monotonic_expiry
-                            && 現在 < grant.expires_at_epoch_seconds
-                            && grant.permission_id.len() == 32
-                            && grant.agent_runtime_id == request.agent_runtime_id
-                            && grant.workspace_id == request.workspace_id
-                            && grant.workspace_registration_hash == binding.registration_hash()
-                    })
-                {
+                if self.agent_task_permission_is_active(
+                    &request.session_id,
+                    &request.agent_runtime_id,
+                    &request.workspace_id,
+                    binding.registration_hash(),
+                    現在,
+                ) {
                     return Err(対話失敗::権限拒否);
                 }
                 let permission_id = 識別子生成()?;

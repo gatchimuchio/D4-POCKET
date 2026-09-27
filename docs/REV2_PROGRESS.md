@@ -2072,3 +2072,13 @@ Agent Task用Workspace Permission要求／receipt Schemaと正常・権限昇格
 - `python -X utf8 tooling/manifest.py --write`：追跡source 1059件を収録。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0で登録済み10検査を通過し、portable source、Manifest、release gateも合格。Evidence bundleは5件のrelease blockerを保持し、`release_ready=false`。
 
 静的compile、fixture、focused test、library testはそれぞれの範囲だけを証明する。全Rust target、Windows installed product、実Agent Taskの書込隔離・失敗回復・cross-agent contamination、正式releaseは証明していない。
+
+## Agent Task検査への現行Permission状態投影（2026-09-27）
+
+Permission発行後もAgent Task検査が常に「未付与」を返す不整合を修正した。Brokerは検査ごとに、揮発Permissionの壁時計期限と単調時計期限、Runtime ID、Session ID、Workspace ID、現在のWorkspace登録hashを照合し、有効／未付与だけを返す。Permission IDは応答へ出さず、Task状態は未実行、Task Approvalは未取得のまま保つ。Broker内状態の検査であり、Task実行やWorkspace隔離の証拠ではない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する -- --test-threads=1`：1件合格。Owner-native発行後はPermission状態が有効、期限境界では未付与となることを含む。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：Rust library 300件は全件合格したが、その後`gui_shell_desktop_launcher` test executableがWindows Application ControlのOS error 4551で起動前に拒否され、全targetは未完了。回避操作や試験除外はしていない。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、Schema検査（142件）、Conformance（219件）は合格。
+
+残るTask executor、独立Owner Approval、実行前後Audit、Recovery、diff保管、実Agent隔離は`release_blocker`。Windows全target試験もOS実行制御により未確認である。

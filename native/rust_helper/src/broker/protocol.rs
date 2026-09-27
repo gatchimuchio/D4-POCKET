@@ -5851,6 +5851,34 @@ mod 端末統治試験 {
                 && event.reason.contains("Task未実行")
         }));
 
+        let permission_preflight = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload.clone(),
+        );
+        assert_eq!(permission_preflight.status, BrokerStatus::Accepted);
+        assert_eq!(
+            permission_preflight.body.as_ref().unwrap()["Permission状態"],
+            "有効"
+        );
+        assert_eq!(
+            permission_preflight.body.as_ref().unwrap()["Approval状態"],
+            "未取得"
+        );
+        e.broker.current_epoch_seconds_override =
+            receipt["expires_at_epoch_seconds"].as_i64();
+        let expired_permission_preflight = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload.clone(),
+        );
+        assert_eq!(expired_permission_preflight.status, BrokerStatus::Accepted);
+        assert_eq!(
+            expired_permission_preflight.body.as_ref().unwrap()["Permission状態"],
+            "未付与"
+        );
+        e.broker.current_epoch_seconds_override = None;
+
         let duplicate_native_request = native_permission_request(
             "agent-task-permission-native-duplicate",
             "agent-task-permission-native-duplicate-nonce",
