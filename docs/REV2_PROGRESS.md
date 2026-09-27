@@ -2094,3 +2094,16 @@ Permission発行後もAgent Task検査が常に「未付与」を返す不整合
 - `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、Schema検査（142件）、Conformance（219件）は合格。
 
 残るTask executor、独立Owner Approval、実行前後Audit、Recovery、diff保管、実Agent隔離は`release_blocker`。Windows全target試験もOS実行制御により未確認である。
+
+## Agent Broker操作の共通IPC Schema登録（2026-09-27）
+
+現行Rust Broker protocolには`Agent一覧`、`Agent作業要求検査`、`AgentTaskWorkspacePermissionGrant`が実装されている一方、共通IPC要求／応答Schemaのoperation enumに同じ3操作が欠けていた。両Schemaへ登録し、当該3操作がRust protocolと要求／応答Schemaの三面で宣言されていることをConformanceへ追加した。Runtime・権限・Permission発行挙動は変更していない。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 142件、正常example 142件、negative fixture 176件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：220 checksで合格。
+- 追加した`test_agent_broker_operations_are_declared_in_ipc_contracts`：合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
+- `python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`：合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済み開発検査は合格し、release blocker 5件と`release_ready=false`を維持。
+
+これはIPC Contractとの同期を示し、Agent稼働、Task実行、Workspace隔離、Owner Approval、release readinessを証明しない。これらの既存`release_blocker`と`release_ready=false`は維持する。

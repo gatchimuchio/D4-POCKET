@@ -7014,6 +7014,30 @@ def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> lis
     return errors
 
 
+def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
+    request_schema = load_schema("ipc_request.schema.json")
+    response_schema = load_schema("ipc_response.schema.json")
+    request_operations = set(request_schema["properties"]["operation"]["enum"])
+    response_operations = set(response_schema["properties"]["operation"]["enum"])
+    broker_source = (ROOT / "native/rust_helper/src/broker/protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    required_operations = (
+        "Agent一覧",
+        "Agent作業要求検査",
+        "AgentTaskWorkspacePermissionGrant",
+    )
+    errors: list[str] = []
+    for operation in required_operations:
+        if operation not in request_operations:
+            errors.append(f"Agent Broker操作がIPC要求Schemaにない: {operation}")
+        if operation not in response_operations:
+            errors.append(f"Agent Broker操作がIPC応答Schemaにない: {operation}")
+        if operation not in broker_source:
+            errors.append(f"Agent Broker操作がRust protocolへ接続されていない: {operation}")
+    return errors
+
+
 def test_agent_task_workspace_permission_is_owner_scoped_and_one_use() -> list[str]:
     request_schema = load_schema("agent_task_workspace_permission_request.schema.json")
     permission_schema = load_schema("agent_task_workspace_permission.schema.json")
@@ -8909,6 +8933,7 @@ def main() -> int:
         test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
+        test_agent_broker_operations_are_declared_in_ipc_contracts,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,

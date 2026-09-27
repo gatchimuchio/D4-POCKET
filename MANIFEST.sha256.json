@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d3ece6d13e6587807088efeae08ae7697a524e4beae204db9682b3e5acbe22d8"
+      "sha256": "634fa95718e7272d2dbe698b4fa7d794bec5492d62610909c66d16b2c2fc45a8"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "d87a00e5524dbc493ff364c1235a1de4a5bc35dc794519df1ca440c351450c71"
+      "sha256": "f09ca9cc70be386d57adca96b07b94ee0052585d0b8b2111a101f9a0ace88486"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3861,11 +3861,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "05cfb62a33123ca809454837473b84592bcb3e3479f82fa8106a7c183160badb"
+      "sha256": "7f6b14031736cf0e20d3a54b2df5fda8261e9d12dde3dc0bc333cd30fd528d74"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "633cd222ec279c125007f557aca87547a3bcbed5f1c122d2d91010d727ee3473"
+      "sha256": "7cdd76455a34f2219d71c780e1aaa58521a72b729296146bbdf833741bf8166d"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4173,7 +4173,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "723176f53ac650da94ec6e850705f54d9a4ed2e31fd4a4535b58d0c3cbb94531"
+      "sha256": "0ac3a2921fd499f7f9e0790747135248de7ae1161c48f3b97c4111388b1425b6"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
