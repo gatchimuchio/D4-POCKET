@@ -103,7 +103,7 @@ impl 実行系Adapter for CodexCliAdapter {
             "model": "unknown",
             "status": "degraded",
             "capabilities": [
-                {"capability_id": "task_execution", "support": {"status": "unknown", "reason": "read-only interfaceだけを確認し、実taskは実行していない"}},
+                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "このAdapterはBroker統治済みの書込Task実行経路を実装していない"}},
                 {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
             ],
             "workspace_requirements": {
@@ -504,6 +504,13 @@ mod tests {
         assert_eq!(metadata["status"], "degraded");
         assert_eq!(metadata["evidence_source"], "LIVE_RUNTIME");
         assert_eq!(metadata["authentication"]["secret_value_present"], false);
+        let task_execution = metadata["capabilities"]
+            .as_array()
+            .expect("capability一覧")
+            .iter()
+            .find(|capability| capability["capability_id"] == "task_execution")
+            .expect("Task実行能力");
+        assert_eq!(task_execution["support"]["status"], "unsupported");
         assert_eq!(
             metadata["host_requirements"]["process_spawn"]["status"],
             "unsupported"

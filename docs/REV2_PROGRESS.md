@@ -2126,3 +2126,15 @@ Permission発行後もAgent Task検査が常に「未付与」を返す不整合
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema 143件、example 143件、negative fixture 177件、Conformance 221 checks、manifest、release gate、packaging portability、release smoke等の登録検査は合格。release evidence不足を含み`release_ready=false`を維持。
 
 この試験補強はTask consumer、Approvalの一回消費、sandbox・独立書込隔離、実行前後Audit／Recovery、実Agent実行を証明しない。Rust動的試験の今回追加分は未実行であり、Windows Application Controlによる検証制約を維持する。
+
+## Phase 7対応表とCodex Adapter能力宣言の現状同期（2026-09-27）
+
+`docs/D4_POCKET_PHASE_MAPPING.md`のPhase 7記述がTask要求をBroker未接続としており、現行`ROADMAP.md`および実装と矛盾していたため修正した。現状はTask要求照合、Workspace Permission、別Owner Approvalの発行・preflight照合まで接続済みであり、原子的な一回消費、実Task実行、sandbox・隔離書込、実行前後Audit／Recovery、結果保存、比較／Handoffは未成立と分けて記載した。
+
+Codex Adapterの`task_execution`能力宣言も`unknown`から`unsupported`へ修正した。現行Adapterはread-only対話だけを実装し、Broker統治済みの書込Task経路を持たないためである。実Agent側の機能可否やTask実行のLIVE_RUNTIME証拠へ読み替えない。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：変更を含むcompileは合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema、Conformance、strict日本語監査、Manifest、release gate等の登録検査は合格。
+- Rustの該当unit testは新しい`unsupported` assertionを含め未実行。Windows Application ControlのOS error 4551によりtest executable起動が阻止される既知制約のため、再試行・回避は行っていない。
+
+この訂正はTask実行経路やsandboxの成立を意味せず、release blockerと`release_ready=false`を維持する。

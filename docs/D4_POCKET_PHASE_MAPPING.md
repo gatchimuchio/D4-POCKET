@@ -17,7 +17,7 @@
 | `Phase 4` | `Agent`起動器 | rev1に同一の独立C工程はなく、実物interface確認を含むD4追加範囲。 |
 | `Phase 5` | `Agent`操作表示盤 | `C1`の`Agent Center`・作業領域表示と関連する。 |
 | `Phase 6` | 作業領域検査 | `C1`。既存の取得・差分・復旧境界を再利用し、再実装しない。 |
-| `Phase 7` | `Agent`比較・Task request contract・Session／Workspace binding | `C1`のWorkspace登録、`C30`の比較汚染回帰と関連する。Broker登録IDのSession結合と、権限非内包のTask要求Schema／negative conformanceは成立したが、Task要求はBroker未接続であり、実Agent実行・隔離・比較・HandoffはD4側で追跡する。 |
+| `Phase 7` | `Agent`比較・Task request contract・Session／Workspace binding | `C1`のWorkspace登録、`C30`の比較汚染回帰と関連する。Broker登録IDのSession結合、権限非内包のTask要求照合、Task用Workspace Permissionと別Owner Approvalのnative発行・preflight照合は接続済み。Approval／Permissionの実行直前原子的再検証・一回消費、実Agent Task実行、実証済みsandbox・独立書込隔離、実行前後Audit／Recovery、結果保存、実比較・Handoffは未成立であり、Phase 7の残作業として追跡する。 |
 | `Phase 8` | `Agent`引継ぎ | `C30`の回帰対応と関連する。成果物の受渡しと権限の非継承は別途検証する。 |
 | `Phase 9` | 実行履歴 | `C2`。 |
 | `Phase 10` | 再実行・分岐 | `C2`。履歴を承認へ昇格しない。 |
