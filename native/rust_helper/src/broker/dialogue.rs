@@ -26,6 +26,7 @@ pub enum 対話失敗 {
     取消,
     隔離済み,
     作業領域不在,
+    AgentTask非対応,
 }
 impl 対話失敗 {
     pub fn 分類(self) -> &'static str {
@@ -41,6 +42,7 @@ impl 対話失敗 {
             Self::取消 => "取消",
             Self::隔離済み => "実行系隔離済み",
             Self::作業領域不在 => "作業領域不在",
+            Self::AgentTask非対応 => "AgentTask実行非対応",
         }
     }
     pub fn 復旧(self) -> &'static str {
@@ -53,6 +55,7 @@ impl 対話失敗 {
             Self::通信失敗 | Self::応答不正 => "接続再確認",
             Self::隔離済み => "RecoveryActionによる隔離判断を確認",
             Self::作業領域不在 => "RuntimeとWorkspaceの登録対応を再確認",
+            Self::AgentTask非対応 => "Agent Task実行対応済みRuntimeを選択",
         }
     }
 }
@@ -168,6 +171,14 @@ where
 }
 
 impl AgentAdapterMetadata {
+    /// Adapter宣言は実行許可を与えない。未対応・不明な経路へOwner権限を発行しないための拒否条件にだけ使う。
+    fn task_execution_supported(&self) -> bool {
+        self.capabilities.iter().any(|capability| {
+            capability.capability_id == "task_execution"
+                && capability.support.status == "supported"
+        })
+    }
+
     fn read(value: &Value) -> Result<Self, 対話失敗> {
         if agent_metadata_contains_credential_marker(value)
             || super::protocol::metadata_attempts_authority_value(value)
@@ -976,7 +987,10 @@ impl 対話制御 {
                     .get(&request.agent_runtime_id)
                     .ok_or(対話失敗::実行系不在)?;
                 let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
-                AgentAdapterMetadata::read(&metadata)?;
+                let metadata = AgentAdapterMetadata::read(&metadata)?;
+                if !metadata.task_execution_supported() {
+                    return Err(対話失敗::AgentTask非対応);
+                }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
                     return Err(対話失敗::作業領域不在);
@@ -1044,7 +1058,10 @@ impl 対話制御 {
                     .get(&request.agent_runtime_id)
                     .ok_or(対話失敗::実行系不在)?;
                 let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
-                AgentAdapterMetadata::read(&metadata)?;
+                let metadata = AgentAdapterMetadata::read(&metadata)?;
+                if !metadata.task_execution_supported() {
+                    return Err(対話失敗::AgentTask非対応);
+                }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
                     return Err(対話失敗::作業領域不在);
@@ -1127,7 +1144,10 @@ impl 対話制御 {
                     .get(&request.agent_runtime_id)
                     .ok_or(対話失敗::実行系不在)?;
                 let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
-                AgentAdapterMetadata::read(&metadata)?;
+                let metadata = AgentAdapterMetadata::read(&metadata)?;
+                if !metadata.task_execution_supported() {
+                    return Err(対話失敗::AgentTask非対応);
+                }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
                     return Err(対話失敗::作業領域不在);
@@ -1794,7 +1814,26 @@ mod tests {
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
         .expect("正常Agent Adapter fixture");
-        assert!(AgentAdapterMetadata::read(&valid).is_ok());
+        let parsed = AgentAdapterMetadata::read(&valid).expect("正常Agent Adapter metadata");
+        assert!(!parsed.task_execution_supported(), "宣言の欠落は未対応扱い");
+
+        let mut task_unknown = valid.clone();
+        task_unknown["capabilities"].as_array_mut().unwrap().push(json!({
+            "capability_id": "task_execution",
+            "support": {"status": "unknown", "reason": "実装未確認"}
+        }));
+        assert!(!AgentAdapterMetadata::read(&task_unknown)
+            .unwrap()
+            .task_execution_supported());
+
+        let mut task_supported = valid.clone();
+        task_supported["capabilities"].as_array_mut().unwrap().push(json!({
+            "capability_id": "task_execution",
+            "support": {"status": "supported", "reason": "試験用宣言"}
+        }));
+        assert!(AgentAdapterMetadata::read(&task_supported)
+            .unwrap()
+            .task_execution_supported());
 
         let mut authority = valid.clone();
         authority["permission"] = json!("all");
@@ -1882,6 +1921,10 @@ mod tests {
             .expect("Agent接続例を読み込む");
             metadata["adapter_id"] = json!("dialogue-test-adapter");
             metadata["agent_id"] = json!("dialogue-test-agent");
+            metadata["capabilities"].as_array_mut().unwrap().push(json!({
+                "capability_id":"task_execution",
+                "support":{"status":"supported","reason":"Broker権限経路の試験専用宣言。実Taskの実行証拠ではない"}
+            }));
             Some(metadata)
         }
         fn 応答(

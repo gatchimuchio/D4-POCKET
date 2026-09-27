@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Agent Task未対応Runtimeへの権限発行拒否（2026-09-28）
+
+Rust BrokerのTask要求検査、Task Workspace Permission発行、Task Owner Approval発行に、構造検査済みAdapter metadataの`task_execution=supported`を必須とするfail-closed gateを追加した。capabilityが欠落、`unknown`、`unsupported`の場合は`AgentTask実行非対応`で拒否する。Adapter metadataは拒否条件としてだけ参照し、Permission／Approval／Trustを付与しない。Codex Adapterの現行宣言は`unsupported`のため、既知のread-only経路へTask用Owner権限を発行しない。対応を宣言する試験AdapterはBroker権限経路試験専用であり、実Task実行・隔離の証拠ではない。
+
+- capability gate導入直後の最初のAgent絞込testは、Task Permission発行用試験Adapterが`supported`を宣言していなかったため1件失敗した。試験Adapterの責任範囲を明示する宣言を追加し、`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Agent -- --test-threads=1`を再実行して14件成功した。製品Adapterの能力宣言は変更していない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功。Rust library 303件、CLI unit 9件、Broker IPC 10件、他のintegration test 26件（計348件）が成功した。前節に残す過去のWindows Application Control拒否記録は履歴として保持し、今回の短い`C:\D4Pocket` checkoutにおける全target成功と混同しない。
+- `python tooling/schema_check/check_schemas.py`: Schema／正常example各143件、negative fixture 177件で成功。`python tooling/conformance_tests/run_conformance_skeleton.py`: 221件成功。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で成功。`python -X utf8 tooling/manifest.py --write`（1062 file）／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`も成功。Flutter／Mobile／実Agent・Task実行は今回変更対象外で未実行。
+- commit／pushとremote HEAD／backup確認は、この作業単位のclose時に記録する。
+- `release_blocker`: Task実行Consumer、一回消費と実行直前の原子的再検証、実証済みsandbox／隔離Workspace、実行前後Audit／Recovery、結果/diff、比較／Handoff、Windows実Broker子process等は未成立。能力gateの試験は`FIXTURE`であり、実Task／release readinessの証拠ではない。
+
 ## D4 Pocket Phase 7 Rust全target Windows検証の追補（2026-09-28）
 
 `b12aeb8e2ecf852bd2f5f8341f16355e6e711e0a`で全targetを実行した。Rust library 302件とCLI unit 9件は成功した。一方、`broker_ipc` integration 10件のうち1件は成功、9件は失敗した。失敗testは共通してBroker子processの`Command::spawn()`でWindows Application Control `OS error 4551`を受け、対象IPC挙動へ到達していない。integration test sourceの該当spawn箇所と例外を照合した。

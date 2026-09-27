@@ -5748,10 +5748,14 @@ mod 端末統治試験 {
     #[allow(non_snake_case)]
     fn Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する() {
         let mut e = 環境生成();
-        let metadata: Value = serde_json::from_str(include_str!(
+        let mut metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
         .expect("Agent Adapterのfixture");
+        metadata["capabilities"].as_array_mut().unwrap().push(json!({
+            "capability_id":"task_execution",
+            "support":{"status":"supported","reason":"Broker Task権限経路の試験fixture。実Task実行の証拠ではない"}
+        }));
         e.broker
             .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata)))
             .unwrap();
@@ -6054,6 +6058,109 @@ mod 端末統治試験 {
         assert_eq!(
             after_session_end.error.as_ref().map(|error| error.code.as_str()),
             Some("セッション不一致")
+        );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTask能力が未対応なら検査とOwner権限発行を拒否する() {
+        let mut e = 環境生成();
+        let mut metadata: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("Agent Adapter試験構造を読み込む");
+        metadata["capabilities"].as_array_mut().unwrap().push(json!({
+            "capability_id":"task_execution",
+            "support":{"status":"unsupported","reason":"Broker統治済み書込Task経路なし"}
+        }));
+        e.broker
+            .実行系登録("unsupported-task-agent", Arc::new(AgentMetadataAdapter(metadata)))
+            .unwrap();
+        let root = e.path.join("unsupported-task-workspace");
+        std::fs::create_dir(&root).unwrap();
+        let (workspace_root, _, ancestry) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(&root, &[]).unwrap();
+        e.broker
+            .作業領域登録範囲付き(
+                "unsupported-task-agent",
+                "unsupported-task-workspace",
+                workspace_root,
+                &[],
+                Some(ancestry),
+            )
+            .unwrap();
+        let started = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"unsupported-task-agent","作業領域ID":"unsupported-task-workspace"}),
+        );
+        assert_eq!(started.status, BrokerStatus::Accepted);
+        let session_id = started.body.as_ref().unwrap()["対話セッションID"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let task_payload = json!({
+            "agent_runtime_id":"unsupported-task-agent",
+            "session_id":session_id,
+            "workspace_id":"unsupported-task-workspace",
+            "instruction":"隔離Task経路が未対応なら拒否する"
+        });
+        let preflight = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            task_payload.clone(),
+        );
+        assert_eq!(preflight.status, BrokerStatus::Rejected);
+        assert_eq!(
+            preflight.error.as_ref().map(|error| error.code.as_str()),
+            Some("AgentTask実行非対応")
+        );
+
+        let permission_payload = json!({
+            "agent_runtime_id":"unsupported-task-agent",
+            "session_id":session_id,
+            "workspace_id":"unsupported-task-workspace"
+        });
+        let native_request = json!({
+            "request_id":"unsupported-task-permission",
+            "session_id":"device-test",
+            "operation":"AgentTaskWorkspacePermissionGrant",
+            "payload":permission_payload,
+            "payload_hash":canonical_payload_hash(Some(&permission_payload)),
+            "nonce":"unsupported-task-permission-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),
+            "metadata":{"client":"desktop_flutter"}
+        });
+        let denied = e
+            .broker
+            .desktop_owner_operation_json(&native_request.to_string());
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.as_ref().map(|error| error.code.as_str()),
+            Some("AgentTask実行非対応")
+        );
+        assert!(!e.broker.audit_events().iter().any(|event| {
+            event.operation == "AgentTaskWorkspacePermissionGrant"
+                && event.reason.contains("発行（native Owner確認・Task未実行）")
+        }));
+
+        let approval_request = json!({
+            "request_id":"unsupported-task-approval",
+            "session_id":"device-test",
+            "operation":"AgentTaskOwnerApprovalGrant",
+            "payload":task_payload.clone(),
+            "payload_hash":canonical_payload_hash(Some(&task_payload)),
+            "nonce":"unsupported-task-approval-nonce",
+            "issued_at":BrokerRequestEnvelope::current_issued_at(),
+            "metadata":{"client":"desktop_flutter"}
+        });
+        let denied = e
+            .broker
+            .desktop_owner_operation_json(&approval_request.to_string());
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.as_ref().map(|error| error.code.as_str()),
+            Some("AgentTask実行非対応")
         );
     }
     #[test]
