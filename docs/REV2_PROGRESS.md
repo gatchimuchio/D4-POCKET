@@ -2013,3 +2013,13 @@ test fixture側で確認した欠陥を修正した。MINIDORA fixtureは要求�
 - `python -X utf8 tooling/manifest.py --write`：tracked source 1045件を書込み、`--check`合格。`python -X utf8 tooling/packaging_portability_check.py`も合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済み10検査が成功。Evidence bundleは`release_ready=false`を維持し、合成smokeはinstalled productの証拠ではない。`python -X utf8 tooling/release_gate_check.py`、registry JSON検証、`git diff --check`も合格。
 - この作業単位ではproduction runtimeを変更せず、既存release blockerおよびWindows並列loopback試験の`known_limitation`を維持する。
+
+## Windows短縮path開発checkoutの全体再検証（2026-09-27）
+
+OneDrive配下の長い日本語pathで確認されたFlutter解析・test cleanup問題を切り分けるため、`C:\D4Pocket`の独立Git cloneで現行`main` commit `1fbfabca78d05b9f0be1e1a5b62509d86646b634`を再検証した。OneDrive checkoutやACLは変更していない。短縮pathではFlutter解析とUI／client test群が進行したが、Windows Application ControlのOS error 4551は引き続きRust executableの起動を拒否した。したがって短縮pathはOneDrive path固有の問題を避ける開発場所として有効だが、全環境問題を解消したとは扱わない。
+
+- `python tooling/validate_all.py --python-only --desktop-platform windows`（作業dir `C:\D4Pocket`）：exit 0。厳格日本語監査、Schema 139件、正常example 139件、negative fixture 173件、Conformance 217件、Manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32監査を含む登録済み検査が合格。Windows installed-evidence上の5項目をrelease blockerとして検出し、`release_ready=false`。
+- `flutter analyze --no-pub`（`C:\D4Pocket\apps\desktop_flutter`）：`No issues found`。
+- `flutter test --no-pub`：113件中111件合格、2件失敗。`runtime_lifecycle_test.dart`と`workspace_inspector_test.dart`の失敗は実Broker連携に必要なRust helperがbuildできず起動できないためで、helper未生成を検出した。これはDesktop suite全体の合格ではない。
+- `cargo test --locked`（`C:\D4Pocket\native\rust_helper`）：exit 1。`generic-array`および`io-extras` build script executableがWindows Application ControlにOS error 4551で起動拒否され、Rust全target試験へ到達しなかった。実行fileの移動・再配置、policy変更、試験除外はしていない。
+- 証拠境界: Pythonの統合検査はCONFIG／FIXTUREを中心とする開発検査であり、Rust全target実行、installed product、実Agentの書込み隔離、release readinessを証明しない。Windows Rust全targetの`release_blocker`は未解決のまま維持する。短縮cloneはOneDrive checkoutのACL修復や移行ではない。
