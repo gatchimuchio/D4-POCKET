@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Agent作業要求のBroker照合経路（2026-09-27）
+
+既存`agent_task_request.schema.json`をRust Brokerの`Agent作業要求検査`へ接続した。要求ごとにAgent metadata、利用中Session、Session作成時のWorkspace登録hashを現在のBroker状態と照合する。指示本文は応答・Auditへ出さずBroker計算hashだけを返し、成功応答にも未実行・Permission未付与・Approval未取得を明示する。これは登録関係の`INTERNAL_STATE`検査のみで、実Agent稼働、Workspace隔離、Task保存・実行は証明しない。既存対話ApprovalをTask権限へ流用せず、Codex Adapterのread-only境界を維持する。
+
+- `cargo test --all-targets -- --test-threads=1`: 344件成功（library 299、main 9、IPC 10、他integration 26）。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 140件、正常example 140件、negative fixture 174件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 218件で合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。`git diff --check`も合格。
+- `rustfmt --check --edition 2021 native/rust_helper/src/broker/dialogue.rs native/rust_helper/src/broker/protocol.rs native/rust_helper/src/broker/workspace.rs`: 既存未整形箇所を含む差分が検出され不合格。一括整形は行わず、既存差分を保持。
+- `python -X utf8 tooling/manifest.py --write`（tracked source 1053件）／`--check`、`python -X utf8 tooling/release_gate_check.py`：合格。release gateは残存release blockerを維持し、release readinessを示さない。
+- commit／push／remote HEAD、backup tagとrollback pointは変更単位を閉じた後に最終報告する。
+- 残る`release_blocker`: Task専用Workspace Permission、別個の一回限りOwner Approval、実行前後AuditEvent、失敗時RecoveryAction、隔離Workspace上のTask起動、結果/diff保存、比較／Handoff。
+
 ## D4 Pocket Phase 7 Agent作業要求Contractと権限非内包境界（2026-09-27）
 
 Agent作業要求の機械契約として`specs/agent_task_request.schema.json`を追加し、登録Agent Runtime ID・Session ID・Workspace ID・最大32,768文字の指示本文だけを受け付ける。Permission／Approval／Audit ID、authority、sandbox、実path、executable、command、credential fieldを拒否するpositive／negative contract exampleとConformanceを追加した。意味正本では、対話送信のApprovalと書込みTaskのPermission／Owner Approvalを別物と定義し、要求本文のhashはBroker側が計算する責任を定めた。

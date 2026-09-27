@@ -11,7 +11,7 @@
 
 Agent Adapterの対話開始にWorkspace IDの明示選択を必須化し、Rust Brokerが現在登録中のWorkspace IDとRuntime IDを照合してからSessionを作る。Desktop対話面は既存のBroker Workspace一覧から同一RuntimeのIDを選び、通常要求へ渡す。作成Audit hashの既存射影は維持し、Session・Runtime・Workspace・登録hashの関係を別AuditEventへ記録する。通常Desktop一覧は作成Audit参照とWorkspace結合Audit参照を区別して返し、UIはBroker登録のmetadata対応として表示する。MobileはDevice Link TLS上の既存Rust Broker Workspace一覧handlerを利用し、応答をWorkspace ID／Runtime IDだけへ限定して対話画面の選択に使う。Desktop Agent Centerはproduct modeでBroker session metadataだけを表示し、local／mock fixtureのTask・diff・Tool・commandを実結果として表示しない。Handoffは未接続の固定状態とし、regex redactionから公開概要を合成しない。Agent専用実行Session、実際の作業directory、書込み隔離、Task実行、比較・Handoffは未成立で、実Agent実行、独立Workspace隔離、実機TLS統合を`release_blocker`として維持し、`release_ready=false`を保つ。
 
-Phase 7のTask契約先行単位として、`agent_task_request.schema.json`にRuntime／Session／登録Workspace IDと指示本文だけを定義する。要求からPermission、対話Approval、Audit ID、実行path、command、sandboxを受け付けない。これはcontractとnegative conformanceの追加であり、Broker consumer・Task専用Permission／Owner Approval・Audit・Recovery・write executionを接続しない。Codex Adapterは引き続きread-onlyで、実Agent Taskと書込み隔離の`release_blocker`は維持する。
+Phase 7のTask要求境界は`agent_task_request.schema.json`をRust Brokerの`Agent作業要求検査`へ接続した。Brokerは現在Agent Adapter、利用中Session、Session作成時と同じWorkspace登録hashを照合し、指示本文を応答／Auditへ出さずBroker計算hashのみを返す。成功状態も「未実行／Permission未付与／Approval未取得」であり、Task保存・起動はしない。Task専用Workspace Permission／独立Owner Approval／Audit・Recovery／隔離書込実行・結果保存は引き続き未接続で、Codex Adapterはread-only、実Agent Task／書込み隔離は`release_blocker`のまま。
 
 ### Phase 7 Agent対話セッションmetadata投影の先行単位（2026-09-27）
 

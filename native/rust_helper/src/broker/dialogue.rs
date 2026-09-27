@@ -361,6 +361,26 @@ struct セッション {
     作業領域ID: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     作業領域結合監査ID: Option<String>,
+    #[serde(skip)]
+    作業領域登録hash: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Agent作業要求 {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+    instruction: String,
+}
+
+fn Agent作業要求識別子妥当(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
 }
 
 fn Agent実行系ID取得(
@@ -843,6 +863,50 @@ impl 対話制御 {
                 空入力(値)?;
                 Ok(json!({"Agent": agent_metadata_projection(&self.実行系)?}))
             }
+            "Agent作業要求検査" => {
+                let request: Agent作業要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.agent_runtime_id)
+                    || !Agent作業要求識別子妥当(&request.session_id)
+                    || !Agent作業要求識別子妥当(&request.workspace_id)
+                    || request.instruction.trim().is_empty()
+                    || request.instruction.chars().count() > 32_768
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let adapter = self
+                    .実行系
+                    .get(&request.agent_runtime_id)
+                    .ok_or(対話失敗::実行系不在)?;
+                let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
+                AgentAdapterMetadata::read(&metadata)?;
+                let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
+                if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
+                    return Err(対話失敗::作業領域不在);
+                }
+                let session = self
+                    .セッション
+                    .get(&request.session_id)
+                    .ok_or(対話失敗::セッション不一致)?;
+                if session.状態 != "利用中"
+                    || session.実行系ID != request.agent_runtime_id
+                    || session.作業領域ID.as_deref() != Some(request.workspace_id.as_str())
+                    || session.作業領域登録hash.as_deref() != Some(binding.registration_hash())
+                {
+                    return Err(対話失敗::セッション不一致);
+                }
+                let instruction_hash = sha256_tagged(request.instruction.as_bytes());
+                Ok(json!({
+                    "版": 1,
+                    "状態": "要求検査済み",
+                    "実行状態": "未実行",
+                    "Permission状態": "未付与",
+                    "Approval状態": "未取得",
+                    "実行系ID": request.agent_runtime_id,
+                    "対話セッションID": request.session_id,
+                    "作業領域ID": request.workspace_id,
+                    "指示hash": instruction_hash,
+                }))
+            }
             "対話開始" => {
                 let 指定: 実行系指定 = 読取(値)?;
                 let adapter = self
@@ -885,6 +949,8 @@ impl 対話制御 {
                     作成監査ID: String::new(),
                     作業領域ID: workspace_id,
                     作業領域結合監査ID: None,
+                    作業領域登録hash: 作業領域結合
+                        .map(|binding| binding.registration_hash().to_owned()),
                 };
                 let body = 対話開始監査射影(&session.対話セッションID, &session.実行系ID);
                 let 作成監査ID = 監査(
@@ -1477,6 +1543,7 @@ mod tests {
             作成監査ID: "audit-fixture".into(),
             作業領域ID: None,
             作業領域結合監査ID: None,
+            作業領域登録hash: None,
         };
         let legacy_body = json!({
             "対話セッションID": &session.対話セッションID,
@@ -1761,6 +1828,7 @@ mod tests {
                 作成監査ID: "audit-unregistered-runtime".into(),
                 作業領域ID: None,
                 作業領域結合監査ID: None,
+                作業領域登録hash: None,
             },
         );
 

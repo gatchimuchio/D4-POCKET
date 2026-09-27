@@ -56,6 +56,10 @@ impl DialogueWorkspaceBinding {
         &self.workspace_id
     }
 
+    pub(crate) fn registration_hash(&self) -> &str {
+        &self.registration_hash
+    }
+
     pub(crate) fn audit_hash(&self, session_id: &str) -> String {
         digest(&json!({
             "対話セッションID": session_id,

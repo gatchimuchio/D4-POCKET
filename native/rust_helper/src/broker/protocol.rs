@@ -405,6 +405,8 @@ pub enum BrokerOperation {
     対話セッション一覧,
     #[serde(rename = "Agent一覧")]
     Agent一覧,
+    #[serde(rename = "Agent作業要求検査")]
+    Agent作業要求検査,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -593,6 +595,7 @@ impl BrokerOperation {
             BrokerOperation::実行系列挙 => "実行系列挙",
             BrokerOperation::対話セッション一覧 => "対話セッション一覧",
             BrokerOperation::Agent一覧 => "Agent一覧",
+            BrokerOperation::Agent作業要求検査 => "Agent作業要求検査",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::回帰Case一覧 => "回帰Case一覧",
@@ -1429,7 +1432,7 @@ impl Broker {
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::Agent作業要求検査 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -2447,7 +2450,7 @@ impl Broker {
         if matches!(operation, BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) && !owner {
             return self.reject_with_payload_hash(request_id, operation.as_str(), "権限拒否", "owner制御資格が必要", true, payload_hash);
         }
-        if payload.get("実行系ID").and_then(Value::as_str).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
+        if payload.get("実行系ID").or_else(|| payload.get("agent_runtime_id")).and_then(Value::as_str).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
             return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterの対話操作を拒否しました", true, payload_hash);
         }
         let initial = self.append_audit(request_id, operation.as_str(), "received", "対話操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash);
@@ -2455,11 +2458,13 @@ impl Broker {
             Ok(event) => event.event_id,
             Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
         };
-        let workspace_binding = if operation == BrokerOperation::対話開始 {
-            match (
-                payload.get("実行系ID").and_then(Value::as_str),
-                payload.get("作業領域ID").and_then(Value::as_str),
-            ) {
+        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査) {
+            let (runtime, workspace) = if operation == BrokerOperation::対話開始 {
+                (payload.get("実行系ID"), payload.get("作業領域ID"))
+            } else {
+                (payload.get("agent_runtime_id"), payload.get("workspace_id"))
+            };
+            match (runtime.and_then(Value::as_str), workspace.and_then(Value::as_str)) {
                 (Some(runtime_id), Some(workspace_id)) => {
                     let Some(binding) = self.作業領域.dialogue_binding(runtime_id, workspace_id) else {
                         return self.reject_with_payload_hash(
@@ -5714,6 +5719,93 @@ mod 端末統治試験 {
         assert_eq!(
             通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({"authority":"owner"})).status,
             BrokerStatus::Rejected
+        );
+    }
+    #[test]
+    #[allow(non_snake_case)]
+    fn Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する() {
+        let mut e = 環境生成();
+        let metadata: Value = serde_json::from_str(include_str!(
+            "../../../../examples/contracts/agent_adapter.valid.json"
+        ))
+        .expect("Agent Adapterのfixture");
+        e.broker
+            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata)))
+            .unwrap();
+        let root = e.path.join("agent-task-workspace");
+        std::fs::create_dir(&root).unwrap();
+        let (workspace_root, _, ancestry) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(&root, &[]).unwrap();
+        e.broker
+            .作業領域登録範囲付き(
+                "fixture-agent",
+                "fixture-task-workspace",
+                workspace_root,
+                &[],
+                Some(ancestry),
+            )
+            .unwrap();
+        let started = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"fixture-agent","作業領域ID":"fixture-task-workspace"}),
+        );
+        assert_eq!(started.status, BrokerStatus::Accepted);
+        let session_id = started.body.as_ref().unwrap()["対話セッションID"]
+            .as_str()
+            .unwrap();
+        let instruction = "監査へ本文を漏らさない検査用一意文言";
+        let payload = json!({
+            "agent_runtime_id":"fixture-agent",
+            "session_id":session_id,
+            "workspace_id":"fixture-task-workspace",
+            "instruction":instruction,
+        });
+        let accepted = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload.clone(),
+        );
+        assert_eq!(accepted.status, BrokerStatus::Accepted);
+        assert_eq!(accepted.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let body = accepted.body.as_ref().unwrap();
+        assert_eq!(body["状態"], "要求検査済み");
+        assert_eq!(body["実行状態"], "未実行");
+        assert_eq!(body["Permission状態"], "未付与");
+        assert_eq!(body["Approval状態"], "未取得");
+        assert_eq!(
+            body["指示hash"],
+            crate::audit_hash::sha256_tagged(instruction.as_bytes())
+        );
+        let output = serde_json::to_string(&accepted).unwrap();
+        let audit = serde_json::to_string(e.broker.audit_events()).unwrap();
+        assert!(!output.contains(instruction));
+        assert!(!audit.contains(instruction));
+
+        let mut stale_session = payload.clone();
+        stale_session["session_id"] = json!("stale-agent-session");
+        let rejected = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            stale_session,
+        );
+        assert_eq!(rejected.status, BrokerStatus::Rejected);
+        assert_eq!(
+            rejected.error.as_ref().map(|error| error.code.as_str()),
+            Some("セッション不一致")
+        );
+
+        let mut authority_injection = payload;
+        authority_injection["permission_id"] = json!("attacker-controlled");
+        let rejected = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            authority_injection,
+        );
+        assert_eq!(rejected.status, BrokerStatus::Rejected);
+        assert_eq!(
+            rejected.error.as_ref().map(|error| error.code.as_str()),
+            Some("要求不正")
         );
     }
     #[test]

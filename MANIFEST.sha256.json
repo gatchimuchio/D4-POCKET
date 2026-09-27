@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "cefc6bc768ff366f166a3d56f6f86a1d75e6f57d9bedbe4a79dcd38f7eaa1724"
+      "sha256": "4ffdc25b18afa6ee690265cfe4bf499167e0e94582b7f9a4b89d356b96dcc486"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a73afc51d9c156c628ef57aa6f4beecbf345d6b96e9e4b0e2436932f3e8ed51a"
+      "sha256": "a9828d2d9be98a10e3a41b764f4fc077a71409b35e0731d9f9909bc70a8cbc30"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "01a02846c44cbbdbea07fc8d62846f4979d624b8667f4e29815531a89f424823"
+      "sha256": "63345fd1270c2635b91e2938203ce552951762734894936d7cbd22d982c03236"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2909,7 +2909,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "87075062d3127694cc6e7ce7a82f57bb3fef5e152982e7902e60b932fc968f49"
+      "sha256": "bf146437089b5eb81e2fe1865ef5a9bd809c680782ac77016ab078794e7ec8ac"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -2969,7 +2969,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "40d8caad0a8722b37016745eca909c23ab0145066e6689579065780372eff42f"
+      "sha256": "1f3daa8b4c22e51e626290c1c815b16e07f8ad2ba4981cb8d227f9ad42383cf4"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -2997,7 +2997,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "77491b64fc58fdb23eba705983c792680f8532f31103d480b72401701942f0d3"
+      "sha256": "c3666ac48195f229524750a2777a907c0c23f8e416519374eed45919aa726846"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -3537,7 +3537,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "3799e9d88a1d9e293e56d1d46123ec69a6151024a9d443884c219cfcb10b1194"
+      "sha256": "94a3bfa48ae9b0693c434de7bf38d04785084635e3b9aca05cbf01c73e8779c6"
     },
     {
       "path": "requirements-dev.txt",
