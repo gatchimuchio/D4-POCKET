@@ -10,7 +10,7 @@ Rust BrokerのTask要求検査、Task Workspace Permission発行、Task Owner Ap
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功。Rust library 303件、CLI unit 9件、Broker IPC 10件、他のintegration test 26件（計348件）が成功した。前節に残す過去のWindows Application Control拒否記録は履歴として保持し、今回の短い`C:\D4Pocket` checkoutにおける全target成功と混同しない。
 - `python tooling/schema_check/check_schemas.py`: Schema／正常example各143件、negative fixture 177件で成功。`python tooling/conformance_tests/run_conformance_skeleton.py`: 221件成功。
 - `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で成功。`python -X utf8 tooling/manifest.py --write`（1062 file）／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`も成功。Flutter／Mobile／実Agent・Task実行は今回変更対象外で未実行。
-- commit／pushとremote HEAD／backup確認は、この作業単位のclose時に記録する。
+- Git: `main`の実装commitは`124f23aa1dff9cd462f656868c090b12d9b673c4`、push成功。push直後のremote `main`は同hash、作業ツリーはcleanだった。remote backup tagは`codex/backup-main=124f23aa1dff9cd462f656868c090b12d9b673c4`、`codex/backup-main-prev=a523ebbf36ef3c4dc4e899f519614761253f3d1f`で、両hashをremote照合した。rollback pointは変更前の`a523ebbf36ef3c4dc4e899f519614761253f3d1f`。
 - `release_blocker`: Task実行Consumer、一回消費と実行直前の原子的再検証、実証済みsandbox／隔離Workspace、実行前後Audit／Recovery、結果/diff、比較／Handoff、Windows実Broker子process等は未成立。能力gateの試験は`FIXTURE`であり、実Task／release readinessの証拠ではない。
 
 ## D4 Pocket Phase 7 Rust全target Windows検証の追補（2026-09-28）
