@@ -1,13 +1,15 @@
 //! 実物Codex CLIを、Brokerの承認済み対話経路へ限定して射影する。
 //!
 //! このAdapterはIPCからcommand、argv、environment、workspaceを受け取らない。
-//! 起動時に明示登録された実行fileとworkspaceだけを使用し、実行時は固定された
-//! `codex exec --json --sandbox read-only --ephemeral` protocolを使う。
+//! 起動時に明示登録された実行fileとworkspaceだけを使用する。Dialogueはread-only、
+//! Owner承認済みAgent Taskは固定`workspace-write` protocolを使う。
 #![allow(non_snake_case)]
 
+use super::process_tree;
 use crate::audit_hash::sha256_tagged;
 use crate::broker::dialogue::{実行系Adapter, 実行結果, 対話失敗, 対話要求};
-use super::process_tree;
+use cap_fs_ext::DirExt;
+use cap_std::fs::Dir;
 use serde_json::{json, Value};
 use std::env;
 use std::io::{Read, Write};
@@ -39,6 +41,7 @@ pub struct CodexCliAdapter {
     executable: PathBuf,
     workspace: PathBuf,
     workspace_identity: crate::broker::workspace_root::DirectoryIdentity,
+    workspace_write_interface: bool,
     version: String,
 }
 
@@ -60,14 +63,16 @@ impl CodexCliAdapter {
             return Err("Codex CLIのversion interfaceを確認できない".into());
         }
         let help = run_probe(&executable, &workspace, &["exec", "--help"])?;
-        if !help.success || !String::from_utf8_lossy(&help.stdout).contains("codex exec") {
+        if !help.success || !exec_interface_present(&help.stdout) {
             return Err("Codex CLIのexec help interfaceを確認できない".into());
         }
+        let workspace_write_interface = workspace_write_interface_present(&help.stdout);
 
         Ok(Self {
             executable,
             workspace,
             workspace_identity,
+            workspace_write_interface,
             version: version_output
                 .split_whitespace()
                 .nth(1)
@@ -85,6 +90,7 @@ impl CodexCliAdapter {
                 device: 1,
                 file_id: 1,
             },
+            workspace_write_interface: true,
             version: "test".into(),
         }
     }
@@ -114,7 +120,7 @@ impl 実行系Adapter for CodexCliAdapter {
             "model": "unknown",
             "status": "degraded",
             "capabilities": [
-                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "このAdapterはBroker統治済みの書込Task実行経路を実装していない"}},
+                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "workspace-write実Task、隔離、後始末を実Agentで検証していない"}},
                 {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
             ],
             "workspace_requirements": {
@@ -135,8 +141,37 @@ impl 実行系Adapter for CodexCliAdapter {
                 "process_spawn": {"status": "unsupported", "reason": "汎用command dispatchはBrokerで停止中"}
             },
             "evidence_source": "LIVE_RUNTIME",
-            "evidence_reason": "起動時にversion/help interfaceを実物確認したが、write-capable task経路は未接続"
+            "evidence_reason": "起動時にversion/help interfaceを実物確認したが、write-capable task経路は実証前のためunsupported"
         }))
+    }
+
+    fn AgentTask実行対応(&self) -> bool {
+        cfg!(windows) && self.workspace_write_interface
+    }
+
+    fn AgentTask実行(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+    ) -> Result<String, 対話失敗> {
+        if !self.AgentTask実行対応() {
+            return Err(対話失敗::AgentTask非対応);
+        }
+        let mut scratch = WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity)?;
+        let result = run_agent_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &scratch,
+            instruction,
+            cancel,
+            deadline,
+        );
+        match scratch.cleanup() {
+            Ok(()) => result,
+            Err(error) => Err(error),
+        }
     }
 
     fn 応答(
@@ -146,11 +181,13 @@ impl 実行系Adapter for CodexCliAdapter {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗> {
-        let mut child = spawn_task(
+        let mut child = spawn_codex_task(
             &self.executable,
             &self.workspace,
             self.workspace_identity,
             &要求.入力,
+            CodexSandbox::ReadOnly,
+            None,
         )?;
         let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
         let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
@@ -332,31 +369,128 @@ fn run_probe(executable: &Path, workspace: &Path, args: &[&str]) -> Result<Probe
     }
 }
 
-fn spawn_task(
+fn exec_interface_present(output: &[u8]) -> bool {
+    let help = String::from_utf8_lossy(output);
+    [
+        "codex exec",
+        "--sandbox",
+        "--cd",
+        "--json",
+        "--ephemeral",
+        "--ignore-user-config",
+    ]
+    .iter()
+    .all(|required| help.contains(required))
+}
+
+fn workspace_write_interface_present(output: &[u8]) -> bool {
+    exec_interface_present(output) && String::from_utf8_lossy(output).contains("workspace-write")
+}
+
+#[derive(Clone, Copy)]
+enum CodexSandbox {
+    ReadOnly,
+    WorkspaceWrite,
+}
+
+impl CodexSandbox {
+    fn as_arg(self) -> &'static str {
+        match self {
+            Self::ReadOnly => "read-only",
+            Self::WorkspaceWrite => "workspace-write",
+        }
+    }
+}
+
+struct WorkspaceTaskScratch {
+    _workspace_guard: crate::broker::workspace_root::WorkspacePathGuard,
+    _workspace_dir: Dir,
+    scratch_dir: Option<Dir>,
+    path: PathBuf,
+}
+
+impl WorkspaceTaskScratch {
+    fn create(
+        workspace: &Path,
+        expected: crate::broker::workspace_root::DirectoryIdentity,
+    ) -> Result<Self, 対話失敗> {
+        let workspace_guard = pin_registered_workspace(workspace, expected)?;
+        let workspace_dir = Dir::open_ambient_dir(workspace, cap_std::ambient_authority())
+            .map_err(|_| 対話失敗::通信失敗)?;
+        let metadata = workspace_dir
+            .dir_metadata()
+            .map_err(|_| 対話失敗::通信失敗)?;
+        let identity = crate::broker::workspace_root::DirectoryIdentity {
+            device: cap_fs_ext::MetadataExt::dev(&metadata),
+            file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+        };
+        if identity != expected {
+            return Err(対話失敗::通信失敗);
+        }
+
+        for _ in 0..8 {
+            let mut nonce = [0u8; 16];
+            getrandom::getrandom(&mut nonce).map_err(|_| 対話失敗::通信失敗)?;
+            let name = format!(".d4p-tmp-{}", hex::encode(nonce));
+            match workspace_dir.create_dir(&name) {
+                Ok(()) => {
+                    let scratch_dir = match workspace_dir.open_dir_nofollow(&name) {
+                        Ok(dir) => dir,
+                        Err(_) => {
+                            let _ = workspace_dir.remove_dir_all(&name);
+                            return Err(対話失敗::通信失敗);
+                        }
+                    };
+                    return Ok(Self {
+                        _workspace_guard: workspace_guard,
+                        _workspace_dir: workspace_dir,
+                        scratch_dir: Some(scratch_dir),
+                        path: workspace.join(name),
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(_) => return Err(対話失敗::通信失敗),
+            }
+        }
+        Err(対話失敗::通信失敗)
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn cleanup(&mut self) -> Result<(), 対話失敗> {
+        self.scratch_dir
+            .take()
+            .ok_or(対話失敗::通信失敗)?
+            .remove_open_dir_all()
+            .map_err(|_| 対話失敗::通信失敗)
+    }
+}
+
+impl Drop for WorkspaceTaskScratch {
+    fn drop(&mut self) {
+        if let Some(dir) = self.scratch_dir.take() {
+            let _ = dir.remove_open_dir_all();
+        }
+    }
+}
+
+fn spawn_codex_task(
     executable: &Path,
     workspace: &Path,
     expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
     input: &str,
+    sandbox: CodexSandbox,
+    scratch: Option<&WorkspaceTaskScratch>,
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
-    let mut task_command = command(executable, workspace);
-    task_command
-        .args([
-            "exec",
-            "--json",
-            "--ephemeral",
-            "--ignore-user-config",
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            workspace.to_str().ok_or(対話失敗::要求不正)?,
-            "-",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    let task_command = build_codex_command(
+        executable,
+        workspace,
+        sandbox,
+        scratch.map(WorkspaceTaskScratch::path),
+    )?;
     let child_result = process_tree::spawn(task_command);
     // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
     drop(workspace_guard);
@@ -367,6 +501,121 @@ fn spawn_task(
         .map_err(|_| 対話失敗::通信失敗)?;
     drop(stdin);
     Ok(child)
+}
+
+fn build_codex_command(
+    executable: &Path,
+    workspace: &Path,
+    sandbox: CodexSandbox,
+    scratch: Option<&Path>,
+) -> Result<Command, 対話失敗> {
+    let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
+    let mut task_command = command(executable, workspace);
+    task_command
+        .args([
+            "exec",
+            "--json",
+            "--ephemeral",
+            "--ignore-user-config",
+            "--sandbox",
+            sandbox.as_arg(),
+            "--color",
+            "never",
+            "--cd",
+            workspace_path,
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(scratch) = scratch {
+        if !scratch.starts_with(workspace) || scratch == workspace {
+            return Err(対話失敗::要求不正);
+        }
+        let scratch_path = scratch.to_str().ok_or(対話失敗::要求不正)?;
+        task_command
+            .env("TEMP", scratch_path)
+            .env("TMP", scratch_path);
+    }
+    Ok(task_command)
+}
+
+fn run_agent_task(
+    executable: &Path,
+    workspace: &Path,
+    expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
+    scratch: &WorkspaceTaskScratch,
+    instruction: &str,
+    cancel: &AtomicBool,
+    deadline: Instant,
+) -> Result<String, 対話失敗> {
+    if cancel.load(Ordering::SeqCst) {
+        return Err(対話失敗::取消);
+    }
+    if Instant::now() >= deadline {
+        return Err(対話失敗::期限超過);
+    }
+    let mut child = spawn_codex_task(
+        executable,
+        workspace,
+        expected_workspace,
+        instruction,
+        CodexSandbox::WorkspaceWrite,
+        Some(scratch),
+    )?;
+    let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
+    let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
+    let stdout_reader = thread::spawn(move || bounded_read(stdout));
+    let stderr_reader = thread::spawn(move || bounded_read(stderr));
+
+    let status = loop {
+        if cancel.load(Ordering::SeqCst) {
+            if child.terminate_tree().is_err() {
+                return Err(対話失敗::通信失敗);
+            }
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(対話失敗::取消);
+        }
+        if Instant::now() >= deadline {
+            if child.terminate_tree().is_err() {
+                return Err(対話失敗::通信失敗);
+            }
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(対話失敗::期限超過);
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if child.stop_descendants().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
+                break status;
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(10)),
+            Err(_) => {
+                if child.terminate_tree().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(対話失敗::通信失敗);
+            }
+        }
+    };
+
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| 対話失敗::通信失敗)?
+        .map_err(|_| 対話失敗::応答不正)?;
+    let _stderr = stderr_reader
+        .join()
+        .map_err(|_| 対話失敗::通信失敗)?
+        .map_err(|_| 対話失敗::応答不正)?;
+    if !status.success() {
+        return Err(対話失敗::通信失敗);
+    }
+    parse_jsonl(&stdout).map(|(message, _)| message)
 }
 
 fn pin_registered_workspace(
@@ -455,6 +704,7 @@ fn trace_id(request_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn 実物jsonlのfinal_messageだけを本文へ射影する() {
@@ -483,35 +733,131 @@ mod tests {
     }
 
     #[test]
-    fn task_commandは固定read_only境界を持つ() {
-        let adapter = CodexCliAdapter::for_test(
-            PathBuf::from("C:\\codex.exe"),
-            PathBuf::from("C:\\workspace"),
+    fn DialogueとAgentTaskは固定sandboxを使い追加書込先を持たない() {
+        let executable = Path::new(r"C:\codex.exe");
+        let workspace = Path::new(r"C:\workspace");
+        let scratch = Path::new(r"C:\workspace\.d4p-tmp-test");
+        for (sandbox, expected) in [
+            (CodexSandbox::ReadOnly, "read-only"),
+            (CodexSandbox::WorkspaceWrite, "workspace-write"),
+        ] {
+            let command = build_codex_command(
+                executable,
+                workspace,
+                sandbox,
+                (expected == "workspace-write").then_some(scratch),
+            )
+            .expect("固定Codex command");
+            let args: Vec<_> = command
+                .get_args()
+                .map(|arg| arg.to_string_lossy().to_string())
+                .collect();
+            assert!(args.windows(2).any(|pair| pair == ["--sandbox", expected]));
+            assert!(args
+                .windows(2)
+                .any(|pair| pair == ["--cd", r"C:\workspace"]));
+            let worktree_flag = format!("{}{}", "--", "worktree");
+            let add_dir_flag = format!("{}{}", "--", "add-dir");
+            assert!(!args.iter().any(|arg| {
+                arg.contains("dangerously") || arg == &worktree_flag || arg == &add_dir_flag
+            }));
+            let has_temp = command
+                .get_envs()
+                .any(|(key, value)| key == "TEMP" && value == Some(scratch.as_os_str()));
+            let has_tmp = command
+                .get_envs()
+                .any(|(key, value)| key == "TMP" && value == Some(scratch.as_os_str()));
+            assert_eq!(has_temp, expected == "workspace-write");
+            assert_eq!(has_tmp, expected == "workspace-write");
+        }
+        assert!(build_codex_command(
+            executable,
+            workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(Path::new(r"C:\outside-temp")),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn read_onlyは維持しworkspace_writeはTaskだけに要求する() {
+        let help = b"Usage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config";
+        assert!(exec_interface_present(help));
+        assert!(!workspace_write_interface_present(help));
+        let adapter = CodexCliAdapter {
+            executable: PathBuf::from(r"C:\codex.exe"),
+            workspace: PathBuf::from(r"C:\workspace"),
+            workspace_identity: crate::broker::workspace_root::DirectoryIdentity {
+                device: 1,
+                file_id: 1,
+            },
+            workspace_write_interface: false,
+            version: "test".into(),
+        };
+        assert!(!adapter.AgentTask実行対応());
+        assert_eq!(
+            adapter.AgentTask実行("test", &AtomicBool::new(false), Instant::now()),
+            Err(対話失敗::AgentTask非対応)
         );
-        let mut command = command(&adapter.executable, &adapter.workspace);
-        command.args([
-            "exec",
-            "--json",
-            "--ephemeral",
-            "--ignore-user-config",
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            "C:\\workspace",
-            "-",
-        ]);
-        let args: Vec<_> = command
-            .get_args()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect();
-        assert!(args
-            .windows(2)
-            .any(|pair| pair == ["--sandbox", "read-only"]));
-        assert!(!args.iter().any(|arg| arg.contains("dangerously")));
-        let worktree_flag = format!("{}{}", "--", "worktree");
-        assert!(!args.iter().any(|arg| arg == &worktree_flag));
+        let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config";
+        assert!(exec_interface_present(help.as_bytes()));
+        assert!(workspace_write_interface_present(help.as_bytes()));
+    }
+
+    #[test]
+    fn workspace_task_tempは登録Workspace内に作成され明示cleanupされる() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-scratch-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("Workspaceを固定")
+            .identity;
+
+        let mut scratch =
+            WorkspaceTaskScratch::create(&workspace, identity).expect("Workspace内scratchを作成");
+        let scratch_path = scratch.path().to_path_buf();
+        assert_eq!(scratch_path.parent(), Some(workspace.as_path()));
+        fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
+        scratch.cleanup().expect("scratchを明示削除");
+        assert!(!scratch_path.exists());
+        drop(scratch);
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn workspace_task_tempはdrop時にもcleanupする() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-scratch-drop-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("Workspaceを固定")
+            .identity;
+        let scratch =
+            WorkspaceTaskScratch::create(&workspace, identity).expect("Workspace内scratchを作成");
+        let scratch_path = scratch.path().to_path_buf();
+        fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
+        drop(scratch);
+        assert!(!scratch_path.exists());
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
 
     #[test]

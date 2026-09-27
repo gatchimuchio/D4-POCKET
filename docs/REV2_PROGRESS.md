@@ -2,6 +2,22 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Codex Agent Taskの固定workspace-write Adapter（2026-09-28）
+
+実インストール済みCodex CLI `0.158.0-alpha.2.1`で`codex exec --help`を確認し、`--json`、`--ephemeral`、`--ignore-user-config`、`--sandbox workspace-write`、`--cd`とstdin promptの実物interfaceを固定した。Adapter登録は従来read-only Dialogueに必要なexec optionだけを検査し、`workspace-write`の有無はTask対応probeとして別に記録する。古いCLIがTask optionを持たなくてもread-only Dialogueの登録を妨げない。既存Dialogueは引き続き`read-only`で起動し、Task専用経路だけを`sandbox=workspace-write`にする。`--add-dir`、worktree切替、dangerous bypass、任意command／pathは追加していない。
+
+Task呼出し前に登録済みWorkspaceの実体を再照合し、OS乱数名のTEMP/TMP scratch directoryを同Workspace直下に作る。rootとscratchをnofollowで開きWorkspace identityを確認してからchild環境のTEMP/TMPだけをscratchへ上書きし、Windows Job Object監督下でCodex CLIを実行する。JSONLは上限付きで読み、完了eventとfinal agent messageが揃わなければ失敗とする。正常終了・通常error・取消・期限超過後はprocess群停止を要求し、open scratch directoryを削除する。cleanup失敗は成功へ昇格しない。
+
+`workspace-write`はWorkspace内の`.env`等の秘密fileをAgentから読めなくする契約ではない。秘密fileの読取除外・拒否を実測する機構は未成立であり、実Taskは有効化しない。またscratch削除はBrokerが稼働している通常の終了経路だけで、Broker crash／強制終了／電源断後に残るscratchを回収するreaperや再起動時Recoveryはない。これらは明示的な`release_blocker`であり、OS Job Objectによるprocess停止をfilesystem cleanupの証拠へ昇格しない。
+
+Rust Adapter実装はWindowsに限りTask起動関数を持つが、`task_execution` capability metadataは`unsupported`を維持するためBroker consumerは起動しない。model／課金資格は使わず、実Codex Agent Task・Broker経由のworkspace書込み・外部path拒否を実行していない。Broker crashまたは電源断後のscratch cleanup、実Agent sandboxの全失敗経路、差分／結果表示とContent Exposure、cross-agent contaminationは未成立の`release_blocker`として残す。Codex direct sandbox helperでの過去probeは本Task実装や`codex exec` Broker pathの証拠へ転用しない。
+
+- `codex --version`：`codex-cli 0.158.0-alpha.2.1`。`codex exec --help`のversion／option観測はinterface範囲のみ。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：358件合格（library 313、CLI 9、Broker IPC 10、その他のintegration 26）。Windows scratch明示cleanup／Drop cleanup、fixed sandbox option、外部TEMP拒否、help option gateを含む。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 144件、正常example 144件、negative fixture 178件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：224 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：初回はCodex helpを模したRust test fixtureの英語だけの固定option列1件を検出。fixtureへ日本語の用途表示を加え、再実行で負債file 0、finding 0。追加修正時、UTF-8日本語をbyte stringへ直接記述して`rustfmt --check`が一度失敗したため、UTF-8文字列から`.as_bytes()`を渡す形へ修正。修正後は`rustfmt --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs`、`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、対象Codex interface test 1件が合格。
+- 実Model呼出しと外部pathを含むAgentの試験は未実行。能力宣言は`unsupported`のまま維持し、release blockerを閉じない。
+
 ## D4 Pocket Phase 7 Windows Codex process群の終了管理基盤（2026-09-28）
 
 Codex Adapterの既存read-only対話processを、Windowsでは初期thread停止中に専用Job Objectへ割り当ててから再開する。Jobは`KILL_ON_JOB_CLOSE`を設定し、通常の取消・期限超過・異常時はprocess群の停止と終了確認を行う。Root process終了時も残存processを停止してからpipe readerを回収し、Broker異常終了ではOSによるJob handle closeを最終停止境界とする。Win32 unsafe呼出しは独立したWindows専用`native/process_supervision` crateへ閉じ、Broker crateの`#![forbid(unsafe_code)]`を保持する。

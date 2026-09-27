@@ -17,7 +17,7 @@
 | `Phase 4` | `Agent`起動器 | rev1に同一の独立C工程はなく、実物interface確認を含むD4追加範囲。 |
 | `Phase 5` | `Agent`操作表示盤 | `C1`の`Agent Center`・作業領域表示と関連する。 |
 | `Phase 6` | 作業領域検査 | `C1`。既存の取得・差分・復旧境界を再利用し、再実装しない。 |
-| `Phase 7` | `Agent`比較・`AgentTask`要求契約・`Session`／`Workspace`結合 | `C1`の作業領域登録、`C30`の比較時混線回帰と関連する。`Broker`登録IDと`Session`の結合、`Adapter`固定`root`と登録`root`の物理識別子照合、権限情報を含まない作業要求、作業用`Workspace Permission`と別`Owner Approval`、実行直前の原子的再検証・一回消費、専用の`bounded`状態・取消・開始／`terminal Audit`は`Rust Broker`へ接続済み。focused 9件と全target 353件のRust試験は修正後すべて成功した。これは`FIXTURE`範囲であり、`Codex Adapter`は未対応のままで、実`Agent`起動、OSの`process-tree`終了、実証済み`sandbox`・独立書込隔離、結果本文／`diff`表示、実動作失敗試験、比較・`Handoff`は未成立。過去のWindows Application Control拒否記録は`docs/REV2_PROGRESS.md`に履歴として保持する。 |
+| `Phase 7` | `Agent`比較・`AgentTask`要求契約・`Session`／`Workspace`結合 | `C1`の作業領域登録、`C30`の比較時混線回帰と関連する。`Broker`登録IDと`Session`の結合、`Adapter`固定`root`と登録`root`の物理識別子照合、Task専用`Workspace Permission`／別`Owner Approval`、実行直前の原子的再検証・一回消費、専用`bounded`状態・取消・開始／`terminal Audit`はBroker接続済み。Codex CLI `0.158.0-alpha.2.1`の実helpを確認し、固定`sandbox=workspace-write`起動・Workspace内TEMP/TMP scratch・Windows Job Object監督・cleanupのAdapter実装を追加したが、能力metadataは`unsupported`のままでBrokerから実行されない。Rust全target 358件の試験は合格。これは実Agent／Broker Taskの`LIVE_RUNTIME`証拠ではなく、Workspace内秘密file読取の拒否、実書込隔離・外部path拒否、crash後scratch回収・結果／`diff`表示・`Content Exposure`・cross-agent contamination・比較／`Handoff`は未成立。過去のWindows Application Control拒否記録は`docs/REV2_PROGRESS.md`に履歴として保持する。 |
 | `Phase 8` | `Agent`引継ぎ | `C30`の回帰対応と関連する。成果物の受渡しと権限の非継承は別途検証する。 |
 | `Phase 9` | 実行履歴 | `C2`。 |
 | `Phase 10` | 再実行・分岐 | `C2`。履歴を承認へ昇格しない。 |

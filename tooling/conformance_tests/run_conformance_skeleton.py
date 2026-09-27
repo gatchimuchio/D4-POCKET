@@ -6008,6 +6008,17 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         for token in required
         if token not in adapter
     ]
+    task_required = (
+        "workspace-write",
+        "WorkspaceTaskScratch",
+        "exec_interface_present",
+        "workspace_write_interface_present",
+        "remove_open_dir_all",
+        'task_execution", "support": {"status": "unsupported"',
+    )
+    for token in task_required:
+        if token not in adapter:
+            errors.append(f"Codex Agent Task境界または未検証gateがない: {token}")
     forbidden = [
         "--dangerously-bypass-approvals-and-sandbox",
         "--worktree",
