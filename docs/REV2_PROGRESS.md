@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Rust全target Windows検証の追補（2026-09-28）
+
+`b12aeb8e2ecf852bd2f5f8341f16355e6e711e0a`で全targetを実行した。Rust library 302件とCLI unit 9件は成功した。一方、`broker_ipc` integration 10件のうち1件は成功、9件は失敗した。失敗testは共通してBroker子processの`Command::spawn()`でWindows Application Control `OS error 4551`を受け、対象IPC挙動へ到達していない。integration test sourceの該当spawn箇所と例外を照合した。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 1。302 library + 9 main unit合格、`broker_ipc`は1合格／9失敗。9失敗はtest executableからBroker processを起動できない同一host制約。
+- `Microsoft-Windows-CodeIntegrity/Operational`のevent 3077／3033を確認。`broker_ipc-…exe`が生成した`gui_shell_rust_helper.exe`はPolicy ID `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`のEnterprise signing levelを満たさず拒否された。これは試験hostの実行制約の特定であり、Broker IPC挙動の実測ではない。
+- 実行fileの移動、Application Control弱体化、別実行pathによる回避は行っていない。失敗を製品回帰の証拠にはしない一方、process境界のLIVE_RUNTIME検証を合格へ昇格させない。
+- Cargoは`broker_ipc`失敗後に終了したため、後続の全integration targetが実行済みとは扱わない。`--lib` 302件の成功はBroker子processの起動・IPC統合証拠を代替しない。
+- `release_blocker`: Windows実Broker process、認証IPC、再起動・replay等のintegration証拠は未成立。Enterprise signing levelを満たすOwner承認済みの開発署名経路または管理者のpolicy decisionが必要な場合は、その承認待ちとする。policy・署名鍵を変更せず、processを起動しないunit／Schema／Conformance検証と実装は続行する。
+
 ## D4 Pocket Phase 7 WindowsローカルRust検証の再確認（2026-09-28）
 
 現在のcleanな`main`（`25524638df0eccdb87bf14e00b4ef4b59199ed7b`）で、以前はWindows Application Controlにより起動を拒否されたRust test executableが、短い`C:\D4Pocket` checkout上で実行できることを確認した。これは本checkout・現在のtest構成に対するローカル検証結果であり、OneDrive checkoutのACL、installed product、全targetまたは他OSの証拠へ一般化しない。
