@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Windows permission profile deny-read実測失敗（2026-09-28）
+
+前節で組み立てた`d4p-agent-task`をCodex sandbox helperへ明示指定し、秘密値を含まない合成marker `D4P_DENY_PROBE=NON_SECRET_SYNTHETIC_MARKER`を`tooling/.codex-profile-probe/probe.env`へ置いて読取拒否を検証した。OneDrive配下の製品checkoutと`C:\Users\ohira\.codex\worktrees\windows-release-clean\D4ポケット`の非OneDrive managed worktreeの両方で、`cmd.exe /d /c type ...probe.env`がmarker本文を出力しexit 0となった。検証後、両markerは削除した。
+
+- 非OneDrive側のfile attributesは`Archive`のみでCloud Files reparse pointではなかった。`icacls`は`CodexSandboxUsers`の継承`Modify`／`Read & execute`許可の後ろに継承`DENY(Read)`を示した。helper childはsandbox user `intelitin\codexsandboxoffline`だったが実際の読取は成功した。ACE順序が読取成功に関与するという説明は推定であり、OS access checkの因果は確定していない。
+- `C:\Windows\win.ini`をexact denyにした同helper probeは、読取前に`windows sandbox failed: helper_unknown_error: apply deny-read ACLs`で終了した。過去のprofile付きhelperから同fileを読めた結果と合わせ、外部path拒否は成立していない。
+- これはCodex sandbox helperの実行証拠であり、`codex exec`のproduction Agent TaskやBroker経路の証明ではない。有料資格・model実行は使用していない。profile denyの効果が現環境で成立しなかったため、Codex Adapter `task_execution=unsupported`を維持し、このprofileをTaskの安全境界として扱わない。
+- 次の検証はdeny ACL生成・適用順序の原因を特定し、OneDrive Cloud Filesと通常NTFS双方で`.env` marker拒否、外部read拒否、workspace内の許可操作をLIVE_RUNTIMEで対照確認すること。Broker統治Task、cleanup、失敗Recovery、実Agent差分表示も未成立で、各々`release_blocker`のまま。
+
 ## D4 Pocket Phase 7 Codex Task専用permission profile（2026-09-28）
 
 Codexの新permission profile仕様（[公式Permissions文書](https://learn.chatgpt.com/docs/permissions)）を使い、既存のread-only Dialogueへ影響させずTask commandだけへ固定`d4p-agent-task` profileを与えるcommand構成を追加した。profileは`:workspace`を継承し、glob走査深度8までのWorkspace内`**/*.env`、`**/.ssh/**`、`**/secrets/**`をdeny、networkを無効にする。深度8超や別名のsecret path全体を包括的に拒否するものではない。従来のTask TEMP/TMP scratchとJob Object process群監督は維持する。

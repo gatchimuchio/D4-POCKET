@@ -9,13 +9,19 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### Phase 7 Windows permission profile deny-read実測失敗（2026-09-28）
+
+Codex sandbox helperへ`d4p-agent-task` profileを明示し、非秘密の合成`probe.env`を読む負例を、OneDrive配下と非OneDriveの短いmanaged worktreeの両方で実行した。どちらもmarker本文が読めた。非OneDrive fileのACLには`CodexSandboxUsers`の継承`Modify`／`Read & execute`許可より後に`DENY(Read)`があり、読取denyは実効していない。OneDrive側fileはCloud Filesの`ReparsePoint`でもあり、別の証拠境界として扱う。
+
+`C:\Windows\win.ini`へのexact denyはhelperが`apply deny-read ACLs`で失敗した。従って、現環境でpermission profileが秘密file読取を防ぐとは主張できず、実Codex Taskへは使用しない。`task_execution=unsupported`を維持し、deny ACL生成・適用順序と非OneDrive／OneDrive双方のLIVE_RUNTIME負例を解決するまで本項目を`release_blocker`とする。詳細は`docs/REV2_PROGRESS.md`の本節。
+
 ### Phase 7 Codex Agent Task専用permission profile（2026-09-28）
 
 実インストール済みCodex CLI `0.158.0-alpha.2.1`の`version`／`exec --help`を確認し、read-only Dialogueは従来どおり`--sandbox read-only`、Taskだけは固定`d4p-agent-task` permission profileで起動する構成にした。profileは`:workspace`を継承し、glob走査深度8までのWorkspace内`**/*.env`、`**/.ssh/**`、`**/secrets/**`をdenyし、networkを無効にする。深度8超や別名の秘密fileを包括的に拒否するものではない。JSONL応答上限、Task専用Workspace内TEMP／TMP scratch、Windows Job Objectによるprocess群監督と通常終端cleanupは維持する。Task専用profileの構成testは追加したが、実Codex `exec`でdenyを試していない。
 
 Task runnerとBroker Consumerは接続済みでも、Adapter capability metadataは`task_execution=unsupported`のままであり、Brokerから実Taskを起動できない。permission profileを指定したsandbox helperから`C:\Windows\win.ini`を読み取れたため、外部path拒否は未成立である。Workspace内deny globの実効性、Broker crash／電源断後のscratch回収、実Agent隔離書込、失敗／取消／期限の実runtime証拠、結果／diffの`Content Exposure`表示は未成立の`release_blocker`。有料資格によるModel実行は行っていない。Windows Job Objectはprocess群停止でありfilesystem sandboxではない。
 
-- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：358件成功。後続のfixture文字列変更に対するCodex CLI interface test 1件と`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1`：対象のRust単体試験1件が成功。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`成功。最新の`--all-targets`実行はRustライブラリ試験313件、`CLI`試験9件、`Broker IPC`試験10件の後、`canonical_decimal_hash`の結合試験実行ファイルがWindowsの`Application Control`にOSエラー4551で起動前に拒否され、終了値1。全対象試験成功とは記録しない。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。strict日本語監査、Schema 144／144／178、Conformance 224、Manifest、release gate、packaging portability、release smoke等10検査が合格。development validatorの結果は`release_ready=false`、`release_blocker` 31件であり、正式releaseを意味しない。
 - 詳細な実装範囲・検証・証拠限界は`docs/REV2_PROGRESS.md`の本節、契約は`docs/specs/agent-runtime.md`および`docs/specs/process-supervision.md`を参照する。
 
