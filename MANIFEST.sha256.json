@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9dfc32b60f871a283416ccaf5b868ff206949e65d19b2f58bebb10e65b8e0a5b"
+      "sha256": "431f22e722245186529ec39ea05d44906fb022386eb79f39ad672c410e8bc355"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a9d252162f08d78cfa363c87b7a75a1a2c445af2ac0581cf88ae8fdd8b1137c6"
+      "sha256": "eb6a7ebcf066987eec7f0b4d7d4f8085dc227dcd30a4eea5dab804d039727fe7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "c34447c006c942813e10baf0b9dccbebc967bcc253e8fb5cb3e2088dfa29c034"
+      "sha256": "0c367d660232641c5f23625abec642929151cc85c25506d0914eae3761837d33"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -2797,7 +2797,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "301fb94d9931553c6c4270ba8b3673cf4ad82faa184331fdf3e1172d68ab56a5"
+      "sha256": "1f6c22d9ba2dd519f31bf5e921ff54746397bf8d3898d715178d1d20fcaed468"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
-      "sha256": "d33d1bf57f2a492c5e32af5ea2c6bf57135eedbd8add4feb0cb3ba2b6b5f715c"
+      "sha256": "3315cfe812cbf6f5a407da4b37d31c135222f217647b5c4e9d3108d9e9c2f164"
     },
     {
       "path": "native/rust_helper/src/checkpoint.rs",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1c0afaea31197dd51053645bb6808061023a8055b1707ef4e4e45d6a628a66b9"
+      "sha256": "d4d16bcd8a19a2673aa3834b7552078713cdecb8f1cb6cd5dc071d4c3c09f571"
     },
     {
       "path": "requirements-dev.txt",

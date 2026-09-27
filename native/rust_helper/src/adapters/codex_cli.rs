@@ -37,6 +37,7 @@ const SAFE_ENVIRONMENT: &[&str] = &[
 pub struct CodexCliAdapter {
     executable: PathBuf,
     workspace: PathBuf,
+    workspace_identity: crate::broker::workspace_root::DirectoryIdentity,
     version: String,
 }
 
@@ -45,6 +46,9 @@ impl CodexCliAdapter {
     pub fn new(executable: &Path, workspace: &Path) -> Result<Self, String> {
         let executable = canonical_executable(executable)?;
         let workspace = canonical_workspace(workspace)?;
+        let workspace_guard = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .map_err(|_| "Codexのworkspaceを安全に固定できない")?;
+        let workspace_identity = workspace_guard.identity;
         if secret_component(&workspace) {
             return Err("Codexのworkspaceがsecret pathに該当する".into());
         }
@@ -62,6 +66,7 @@ impl CodexCliAdapter {
         Ok(Self {
             executable,
             workspace,
+            workspace_identity,
             version: version_output
                 .split_whitespace()
                 .nth(1)
@@ -75,6 +80,10 @@ impl CodexCliAdapter {
         Self {
             executable,
             workspace,
+            workspace_identity: crate::broker::workspace_root::DirectoryIdentity {
+                device: 1,
+                file_id: 1,
+            },
             version: "test".into(),
         }
     }
@@ -126,7 +135,12 @@ impl 実行系Adapter for CodexCliAdapter {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗> {
-        let mut child = spawn_task(&self.executable, &self.workspace, &要求.入力)?;
+        let mut child = spawn_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &要求.入力,
+        )?;
         let stdout = child.stdout.take().ok_or(対話失敗::通信失敗)?;
         let stderr = child.stderr.take().ok_or(対話失敗::通信失敗)?;
         let stdout_reader = thread::spawn(move || bounded_read(stdout));
@@ -296,8 +310,14 @@ fn run_probe(executable: &Path, workspace: &Path, args: &[&str]) -> Result<Probe
     }
 }
 
-fn spawn_task(executable: &Path, workspace: &Path, input: &str) -> Result<Child, 対話失敗> {
-    let mut child = command(executable, workspace)
+fn spawn_task(
+    executable: &Path,
+    workspace: &Path,
+    expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
+    input: &str,
+) -> Result<Child, 対話失敗> {
+    let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
+    let child_result = command(executable, workspace)
         .args([
             "exec",
             "--json",
@@ -314,14 +334,28 @@ fn spawn_task(executable: &Path, workspace: &Path, input: &str) -> Result<Child,
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|_| 対話失敗::通信失敗)?;
+        .spawn();
+    // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
+    drop(workspace_guard);
+    let mut child = child_result.map_err(|_| 対話失敗::通信失敗)?;
     let mut stdin = child.stdin.take().ok_or(対話失敗::通信失敗)?;
     stdin
         .write_all(input.as_bytes())
         .map_err(|_| 対話失敗::通信失敗)?;
     drop(stdin);
     Ok(child)
+}
+
+fn pin_registered_workspace(
+    workspace: &Path,
+    expected: crate::broker::workspace_root::DirectoryIdentity,
+) -> Result<crate::broker::workspace_root::WorkspacePathGuard, 対話失敗> {
+    let guard = crate::broker::workspace_root::pin_workspace_path(workspace)
+        .map_err(|_| 対話失敗::通信失敗)?;
+    if guard.identity != expected {
+        return Err(対話失敗::通信失敗);
+    }
+    Ok(guard)
 }
 
 fn terminate(child: &mut Child) {
@@ -463,12 +497,17 @@ mod tests {
             PathBuf::from("C:\\codex.exe"),
             PathBuf::from("C:\\workspace"),
         );
-        let metadata = adapter.agent_metadata().expect("CodexはAgent Adapterとして投影する");
+        let metadata = adapter
+            .agent_metadata()
+            .expect("CodexはAgent Adapterとして投影する");
         assert_eq!(metadata["agent_id"], "codex");
         assert_eq!(metadata["status"], "degraded");
         assert_eq!(metadata["evidence_source"], "LIVE_RUNTIME");
         assert_eq!(metadata["authentication"]["secret_value_present"], false);
-        assert_eq!(metadata["host_requirements"]["process_spawn"]["status"], "unsupported");
+        assert_eq!(
+            metadata["host_requirements"]["process_spawn"]["status"],
+            "unsupported"
+        );
         assert!(metadata.get("executable").is_none());
         assert!(metadata.get("workspace").is_none());
     }
@@ -478,5 +517,61 @@ mod tests {
         assert!(secret_component(Path::new("C:\\workspace\\secrets")));
         assert!(secret_component(Path::new("C:\\workspace\\.ssh")));
         assert!(!secret_component(Path::new("C:\\workspace\\src")));
+    }
+
+    #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn task起動時に登録後のWorkspace差し替えを拒否する() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-codex-workspace-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        let moved = root.join("workspace-original");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let original = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("登録時のWorkspace identity");
+        let identity = original.identity;
+        drop(original);
+
+        std::fs::rename(&workspace, &moved).expect("元Workspaceを退避");
+        std::fs::create_dir(&workspace).expect("同じpathへ別Workspaceを作成");
+        assert!(matches!(
+            pin_registered_workspace(&workspace, identity),
+            Err(対話失敗::通信失敗)
+        ));
+
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn spawn中のpath_guardはWorkspaceと親directoryのrenameを阻止する() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-codex-workspace-guard-{}-{nonce}",
+            std::process::id()
+        ));
+        let parent = root.join("parent");
+        let workspace = parent.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let guard =
+            crate::broker::workspace_root::pin_workspace_path(&workspace).expect("作業領域の固定");
+
+        assert!(std::fs::rename(&workspace, parent.join("renamed-workspace")).is_err());
+        assert!(std::fs::rename(&parent, root.join("renamed-parent")).is_err());
+        drop(guard);
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
 }

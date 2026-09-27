@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Codex task spawn時Workspace path guard（2026-09-27）
+
+Codex Adapter登録時に、nofollowで開いたWorkspaceのdevice ID／file IDを記録し、version／help probe中はdirectory handleを保持する。各task process spawnの直前に同じ固定pathを開き直し、登録identityと違うWorkspaceを通信失敗として拒否する。Windowsではvolume rootからWorkspaceまでの各handleを`Command::spawn`完了まで保持する。既存cap-std Windows directory handleは`FILE_SHARE_DELETE`を許可しないため、通常NTFS pathで対象Workspaceと祖先directoryのrename／deleteを拒否する。guardはchild process生成後に解放し、Broker稼働中ずっとWorkspaceをロックしない。
+
+この限定対策は、別名path／管理者mount等を網羅しない。Unixではhandle保持だけでrenameを防げず、identity再確認からchild processのcwd解決までのraceが残る。実Codex CLI task、Agent専用Session、実Workspace分離、cross-agent contamination、比較・Handoffの証拠ではなく、これらのrelease blockerと`release_ready=false`を維持する。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli -- --nocapture`：7件成功。登録後に同じpathへ別directoryを置く負例を拒否し、WindowsではWorkspaceと祖先directoryのrenameがguard保持中に拒否されることを確認した。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：Rust library 298件成功。
+- `cargo test --no-run --locked --manifest-path native/rust_helper/Cargo.toml`：Rust全12 test executableをcompileできた。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --test workspace_startup -- --test-threads=1`：process-level Workspace startup 7件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：初回は既存A2A loopback fixture 1件が応答読取失敗となった。対象testの単独再実行は成功し、次の全target再実行でもRust library 298件すべて成功したが、次の`gui_shell_desktop_launcher` test executableはWindows Application ControlのOS error 4551で起動前に拒否された。launcherおよび後続integration executableはその全target実行では未実行であり、test failureへ読み替えない。policy変更・test fileの移動や再配置はしていない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：登録済み10検査すべて合格。`schema_check`は138 Schema／138 example／170 negative fixture、Conformanceは217 check。release gate整合性checkはpassだが、release evidence blocker 5件と`release_ready=false`を維持する。
+- `python -X utf8 tooling/manifest.py --write`および`--check`、`rustfmt --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs`、`git diff --check`：すべて合格。日本語基底監査の初回はtest診断文1件を検出したため日本語へ修正し、上記最終検証ではfinding 0となった。
+- 検証証拠はWindows上のRust test processと一時NTFS directoryによる`FIXTURE`。Codex CLI実起動／実task、Unix path race、mount aliasは未検証。既存Windows Application Controlのtarget別4551制約を回避していない。
+
 ## D4 Pocket Phase 7 Agent Sessionと登録WorkspaceのBroker結合（2026-09-27）
 
 Agent Adapterの対話開始にWorkspace IDを明示させ、既存Rust BrokerのWorkspace registryが同一Runtime IDで現在保持する登録だけを受理する。未指定・未登録・別RuntimeのWorkspaceはSessionを作らず拒否する。通常RuntimeのWorkspaceなしSessionは従来どおり許可し、登録Workspaceの任意指定もmetadataとして結合するだけでPermissionにはしない。Desktop共有対話画面は既存Broker一覧からRuntimeごとのWorkspace IDを選び、選択値を通常要求へ渡す。Session作成Auditの既存hash射影は維持し、Session ID・Runtime ID・Workspace ID・登録hashの関係を別AuditEventへ記録する。Agent Session一覧は作成Audit IDと結合Audit IDを別々に返し、DesktopはBroker登録上のmetadata対応として表示する。

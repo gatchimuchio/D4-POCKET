@@ -19,7 +19,9 @@ Agent Adapterの対話開始にWorkspace IDの明示選択を必須化し、Rust
 
 Rust Workspace registryは、異なるRuntime ID間の同一物理rootと通常pathで観測できる親子rootの重複をfail-closedで拒否する。起動時にnofollowで開いたdirectory identity列を二度のpath解決で照合し、負例は親→子・子→親の両順、識別範囲不明のhandle-only登録、Broker拒否Auditを確認する。独立rootは登録できる。証拠は一時directoryと試験Brokerによる`FIXTURE`であり、bind mount等の別名範囲や実Agentの同時書込み・比較・Handoff隔離を示さない。比較は未接続のまま維持する。仕様と残存境界は`docs/specs/workspace-inspection.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
-同Phaseの先行単位として、owner起動設定内のCodex runtimeと同じruntime IDを持つWorkspace rootを、Codex Adapterの固定作業pathと物理directory identityで照合する。不一致や識別不能rootはRuntime probe前に拒否する。今回、Agent対話Session開始時には現在登録Workspaceを明示選択してID対応を結合する。両者を合わせても、検査後のpath差替え防止、Agent専用実行Session、実書込み隔離、Agent比較・Handoff・cross-agent isolationの完成ではない。詳細と検査証拠は`docs/REV2_PROGRESS.md`の対応追補を参照する。
+同Phaseの先行単位として、owner起動設定内のCodex runtimeと同じruntime IDを持つWorkspace rootを、Codex Adapterの固定作業pathと物理directory identityで照合する。不一致や識別不能rootはRuntime probe前に拒否する。Agent対話Session開始時には現在登録Workspaceを明示選択してID対応を結合する。後続の追補で通常Windows NTFS pathのtask spawn中に限る差し替え対策を加えたが、Unixのraceとmount等の別名範囲、Agent専用実行Session、実書込み隔離、Agent比較・Handoff・cross-agent isolationは未成立である。詳細と検査証拠は`docs/REV2_PROGRESS.md`の対応追補を参照する。
+
+Phase 7のpath差替え対策追補では、Codex Adapter登録時のWorkspace directory identityをtask spawn直前に再照合し、Windowsではnofollowで開いたvolume rootからWorkspaceまでのdirectory handleをprocess spawn完了まで保持する。通常のNTFS path上でのrename／delete競合を防ぐ範囲に限る。Unixのcheck-to-spawn race、mount等の別名範囲、実Agent隔離は未成立で、`comprehensive_extension_rev1_completion`のrelease blockerを維持する。試験証拠・制約は`docs/REV2_PROGRESS.md`に記録する。
 
 ### Phase 32 Windows Export build tool追加（2026-09-26）
 

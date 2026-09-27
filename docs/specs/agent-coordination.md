@@ -44,13 +44,14 @@ Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合�
 
 Workspace registryは、異なる実行系ID間の同一rootと通常pathで観測した親子rootの登録を拒否する。起動登録ではnofollowで開いた各directoryの(device ID, file ID)列を二度のpath解決間で照合し、別runtimeとの範囲交差を確認する。Rust試験は親→子・子→親の拒否、独立rootの許可、root identityだけの不完全列と識別列を持たないhandle-only登録の拒否、およびBroker起動登録での拒否Auditを確認する。これらは一時directoryと試験Brokerを使う`FIXTURE`証拠であり、bind mount等の別path aliasを網羅せず、実Agent間の書込み隔離も証明しない。独立Workspace比較とcross-agent contaminationの実行試験は引き続き未成立である。
 
-owner起動設定でCodex runtimeと同じ`runtime_id`を持つWorkspaceについては、Broker起動前にAdapter固定作業pathとWorkspace rootをnofollowで開き、device ID／file IDが一致しない設定を拒否する。設定拒否は`CONFIG`として監査する。対話開始ではAgent AdapterにWorkspace IDを明示させ、Workspace registryが現在保持する登録とruntime IDの一致をRust Brokerで確認した後、Sessionへ結合し、別AuditEventへ登録hashを含む関係を記録する。これは起動時pathと登録rootのidentity照合、および開始時のBroker登録ID対応までであり、後続path差替え防止、実Agentの別Workspace書込隔離、Task実行、比較・Handoffの許可には使わない。Mobile Device LinkにはWorkspace選択面がないため、Agent対話開始をBroker側で拒否する。
+owner起動設定でCodex runtimeと同じ`runtime_id`を持つWorkspaceについては、Broker起動前にAdapter固定作業pathとWorkspace rootをnofollowで開き、device ID／file IDが一致しない設定を拒否する。設定拒否は`CONFIG`として監査する。対話開始ではAgent AdapterにWorkspace IDを明示させ、Workspace registryが現在保持する登録とruntime IDの一致をRust Brokerで確認した後、Sessionへ結合し、別AuditEventへ登録hashを含む関係を記録する。Codex Adapterは登録時に固定rootの(device ID, file ID)を保持し、各taskのprocess spawn直前にnofollowで開き直して一致しないrootを拒否する。Windowsではvolume rootからworkspaceまでのdirectory handleをprocess spawn完了まで保持し、通常のNTFS path上でのdirectory rename／deleteによる差し替えを防ぐ。これはpath alias全般、管理者が作るmount等、Unixのcheck-to-spawn raceを網羅しない。実Agentの別Workspace書込隔離、Taskの成功、比較・Handoffの許可にも使わない。Mobile Device LinkにはWorkspace選択面がないため、Agent対話開始をBroker側で拒否する。
 
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
 
 ## 未成立範囲
 
 - `release_blocker`: 実Agentを複数起動して同一Taskを独立Workspaceで実行するBroker経路
+- `release_blocker`: Windows以外のtask spawnに残るpath identity再確認とprocess起動間のrace、および通常path identity列で観測できないmount等の別名範囲。Windowsの通常NTFS pathに対するdirectory handle guardは差し替え範囲を限定するだけで、別名範囲や実Agent隔離の証拠ではない
 - `release_blocker`: 実結果のdiff／test／duration／tool／token／cost／resource／approval／audit比較
 - `release_blocker`: target Agentへの実Handoff、再評価、取消、失敗隔離、Recovery
 - `known_limitation`: Desktopの比較可否はsnapshot文字列の検査に限り、実Workspace隔離や別pathから同一領域へ到達する別名関係を証明しない

@@ -105,8 +105,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではAgent対話Sessionから同一RuntimeのBroker登録Workspaceへの明示ID結合と別AuditEvent、異なるRuntime間の同一rootおよび通常pathで観測できる親子root拒否を実装・fixture検査したが、Agent専用実行Session、実Agentの独立実行、実書込み隔離、bind mount等の別名範囲、cross-agent contamination、実比較・Handoff、Mobile Workspace選択は未成立。",
-      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Phase 7ではpath差替えとmount等の別名範囲を扱い、実Agent専用Session／独立Workspace実行／cross-agent contamination負例／実比較・HandoffをBroker統治経路で実証する。MobileのWorkspace選択はnative Device Link境界内に接続する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではAgent対話Sessionから同一RuntimeのBroker登録Workspaceへの明示ID結合と別AuditEvent、異なるRuntime間の同一rootおよび通常pathで観測できる親子root拒否を実装・fixture検査した。Codex Adapterは各task spawn直前に固定rootのdevice ID／file IDを再照合し、Windowsではnofollow directory handleを保持して通常NTFS pathのrename／delete差し替えを防ぐfixture testを追加した。ただしUnixのcheck-to-spawn race、bind mount等の別名範囲、実Agentの独立実行・書込み隔離・cross-agent contamination、実比較・Handoff、Mobile Workspace選択は未成立。",
+      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Unixのpath identity再確認とprocess起動間race、および通常path identity列で観測できないmount等の別名範囲を扱う。実Agent専用Session／独立Workspace実行／cross-agent contamination負例／実比較・HandoffをBroker統治経路で実証する。MobileのWorkspace選択はnative Device Link境界内に接続する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
     },
     {
       "name": "rev2_desktop_product_distribution",
@@ -155,7 +155,7 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "前回clean sourceでRust全対象試験335件が成功し、一度解消した。2026-09-27の今回確認では、Rust library 296件、main.rs試験9件、broker_ipc 10件、canonical_decimal_hash 1件、checkpoint 8件、protected_data 2件、protected_startup 1件の計327件が成功した後、protected_store試験実行file自体がWindows Application ControlのOS error 4551で起動拒否され、全対象実行は停止した。protected_storeの3件は未実行である。workspace_diff 2件とworkspace_reader 2件は個別試験で成功したが、workspace_startup 7件は同errorで試験実行fileの起動前に拒否された。個別実行分を含めRust試験331件は成功し、10件は未実行である。別の全対象実行におけるA2A loopback試験の間欠失敗291/292件と、今回のRust library 296件の成功も履歴として保持する。policy変更、実行fileの移動・再配置、試験除外は行っていない。ローカルRust全対象試験は未完了であり、導入済み製品やrelease readinessの証拠でもない。",
+      "reason": "前回clean sourceでRust全対象試験335件が成功し、一度解消した。2026-09-27の今回確認では、Rust library 296件、main.rs試験9件、broker_ipc 10件、canonical_decimal_hash 1件、checkpoint 8件、protected_data 2件、protected_startup 1件の計327件が成功した後、protected_store試験実行file自体がWindows Application ControlのOS error 4551で起動拒否され、全対象実行は停止した。protected_storeの3件は未実行である。workspace_diff 2件とworkspace_reader 2件は個別試験で成功したが、workspace_startup 7件は同errorで試験実行fileの起動前に拒否された。個別実行分を含めRust試験331件は成功し、10件は未実行である。2026-09-27の後続実行ではRust全targetのcompileが12 executableすべて成功し、workspace_startup 7件も個別target実行で成功した。一方、初回full実行のA2A loopback 1件は接続応答読取に失敗し、単独再実行と次のfull runでは成功した。次のfull runはRust library 298件すべて成功した後、gui_shell_desktop_launcher test executableが同じOS error 4551で起動前に拒否され、後続targetを実行できなかった。policy変更、実行fileの移動・再配置、試験除外は行っていない。ローカルRust全target実行は未完了であり、導入済み製品やrelease readinessの証拠でもない。",
       "required_action": "Windows Application Controlを変更・回避せず、承認済み条件でRust全targetを再実行する。process起動を含むworkspace／Broker integration suiteを含む全target successを確認するまでresolvedへ戻さない。"
     },
     {

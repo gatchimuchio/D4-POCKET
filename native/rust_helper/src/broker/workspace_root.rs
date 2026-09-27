@@ -52,6 +52,31 @@ fn directory_identity(dir: &Dir) -> Result<DirectoryIdentity, &'static str> {
     if identity.file_id==0 {return Err("作業領域pathのfile IDが未観測");}
     Ok(identity)
 }
+
+/// Codexのchild processを起動する間、rootまでのdirectory handleを保持する。
+/// Windowsではcap-stdがFILE_SHARE_DELETEなしで各directoryを開くため、
+/// CreateProcessがcurrent_dirを解決する間のrename／deleteを防ぐ。
+pub(crate) struct WorkspacePathGuard {
+    _handles: Vec<Dir>,
+    pub(crate) identity: DirectoryIdentity,
+}
+
+pub(crate) fn pin_workspace_path(path: &Path) -> Result<WorkspacePathGuard, &'static str> {
+    let (handles, filesystem, ancestry) = open_path_handles(path)?;
+    let root = handles.last().ok_or("root handleがない")?;
+    let identity = directory_identity(root)?;
+    let (current, current_fs, current_ancestry) = open_path(path)?;
+    if filesystem != current_fs || ancestry != current_ancestry {
+        return Err("確認中のroot範囲置換を拒否");
+    }
+    if identity != directory_identity(&current)? {
+        return Err("確認中のroot置換を拒否");
+    }
+    Ok(WorkspacePathGuard {
+        _handles: handles,
+        identity,
+    })
+}
 fn safe_directory(dir: &Dir) -> Result<(), &'static str> {
     let meta=dir.dir_metadata().map_err(|_| "root metadataを確認できない")?;
     if !meta.is_dir() {return Err("rootはdirectoryに限る");}
@@ -85,6 +110,13 @@ fn parts(path: &Path) -> Result<Vec<String>, &'static str> {
 
 #[cfg(windows)]
 fn open_path(path: &Path) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
+    let (mut handles, filesystem, ancestry) = open_path_handles(path)?;
+    let root = handles.pop().ok_or("root handleがない")?;
+    Ok((root, filesystem, ancestry))
+}
+
+#[cfg(windows)]
+fn open_path_handles(path: &Path) -> Result<(Vec<Dir>, &'static str, Vec<DirectoryIdentity>), &'static str> {
     use std::path::Prefix;
     let components=parts(path)?;
     let letter=match path.components().next() {
@@ -95,36 +127,49 @@ fn open_path(path: &Path) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>),
         _ => return Err("rootのdriveが不正"),
     };
     let drive=format!("{}:\\",char::from(letter).to_ascii_uppercase());
-    let mut root=Dir::open_ambient_dir(&drive,cap_std::ambient_authority()).map_err(|_| "root driveを開けない")?;
+    let root=Dir::open_ambient_dir(&drive,cap_std::ambient_authority()).map_err(|_| "root driveを開けない")?;
     safe_directory(&root)?;
     let mut ancestry=vec![directory_identity(&root)?];
+    let mut handles=vec![root];
     let serial=ancestry[0].device;
     let mut observed_serial=0u32;let mut filesystem=String::new();
     if winsafe::GetDriveType(Some(&drive))!=winsafe::co::DRIVE::FIXED {return Err("rootは固定diskに限る");}
     winsafe::GetVolumeInformation(Some(&drive),None,Some(&mut observed_serial),None,None,Some(&mut filesystem)).map_err(|_| "root filesystemを確認できない")?;
     if filesystem!="NTFS" || serial!=u64::from(observed_serial) {return Err("rootは同一volumeのNTFSに限る");}
     for component in components {
-        root=root.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
-        safe_directory(&root)?;
-        let identity=directory_identity(&root)?;
+        let parent=handles.last().ok_or("root handleがない")?;
+        let child=parent.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
+        safe_directory(&child)?;
+        let identity=directory_identity(&child)?;
         if identity.device!=serial {return Err("root途中の別volumeを拒否");}
         ancestry.push(identity);
+        handles.push(child);
     }
-    Ok((root,"NTFS",ancestry))
+    Ok((handles,"NTFS",ancestry))
 }
 
 #[cfg(unix)]
 fn open_path(path: &Path) -> Result<(Dir, &'static str, Vec<DirectoryIdentity>), &'static str> {
+    let (mut handles, filesystem, ancestry) = open_path_handles(path)?;
+    let root = handles.pop().ok_or("root handleがない")?;
+    Ok((root, filesystem, ancestry))
+}
+
+#[cfg(unix)]
+fn open_path_handles(path: &Path) -> Result<(Vec<Dir>, &'static str, Vec<DirectoryIdentity>), &'static str> {
     let components=parts(path)?;
-    let mut root=Dir::open_ambient_dir("/",cap_std::ambient_authority()).map_err(|_| "root directoryを開けない")?;
+    let root=Dir::open_ambient_dir("/",cap_std::ambient_authority()).map_err(|_| "root directoryを開けない")?;
     let mut ancestry=vec![directory_identity(&root)?];
+    let mut handles=vec![root];
     for component in components {
-        root=root.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
-        safe_directory(&root)?;
-        ancestry.push(directory_identity(&root)?);
+        let parent=handles.last().ok_or("root handleがない")?;
+        let child=parent.open_dir_nofollow(component).map_err(|_| "rootのlinkまたは不在directoryを拒否")?;
+        safe_directory(&child)?;
+        ancestry.push(directory_identity(&child)?);
+        handles.push(child);
     }
-    let filesystem=unix_filesystem(&root)?;
-    Ok((root,filesystem,ancestry))
+    let filesystem=unix_filesystem(handles.last().ok_or("root handleがない")?)?;
+    Ok((handles,filesystem,ancestry))
 }
 #[cfg(target_os="linux")]
 fn unix_filesystem(root: &Dir) -> Result<&'static str, &'static str> {
