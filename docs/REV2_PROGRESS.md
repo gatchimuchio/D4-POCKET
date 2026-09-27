@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Windows Broker smokeのLIVE_RUNTIME再確認（2026-09-28）
+
+cleanで`origin/main`と一致するsource commit `25978d20b57ef0ac34cf4fe3c10aed3104891511`からRust Broker Release helperをビルドし、`installer/windows/collect_broker_smoke.ps1`を分離scratch store／session fileへ実行した。Buildは成功し、`native/rust_helper/src/adapters/minidora.rs`の未使用`C28_DIAGNOSTIC_LIMIT`／`c28_route_label` warning 2件が出た。collectorはexit 0、status `passed`であり、authenticated loopback IPC、durable store、再起動後の同一nonce拒否（`broker_replay_detected`）、新規health受理、強制終了後の接続拒否、一時session資格fileの作成・削除を実Broker processで観測した。
+
+- Build: `cargo build --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket-agent-task-test-target --release --bin gui_shell_rust_helper`。出力helper SHA-256は`F10DD9BD0124169DC9EC176E09732B8BAD2817AE37BCAF619CB93E9DD27D2164`。
+- Collector: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer\\windows\\collect_broker_smoke.ps1 -BrokerHelperExe C:\\D4Pocket-agent-task-test-target\\release\\gui_shell_rust_helper.exe -OutputPath C:\\D4Pocket-broker-smoke-25978d2\\windows_broker_smoke.json -StoreDir C:\\D4Pocket-broker-smoke-25978d2\\store -SessionFile C:\\D4Pocket-broker-smoke-25978d2\\broker_session.json`。結果JSON SHA-256は`2D95894E2E73EFE5977A6DAA3F8F749E815EBF91F66E54F1A08591C440434071`。session fileはcollector終了後に不在。
+- Evidence: Broker単体processの`LIVE_RUNTIME`とsession file削除の`EXTERNAL_EVIDENCE`。この結果はRust起動器、Flutter child、installed product、別Windows user profile、正式配布の証拠ではなく、`windows_broker_installed_smoke`／`rev2_flutter_broker_channel_boundary`のrelease blockerを解除しない。結果と生成storeはOneDrive外の`C:\\D4Pocket-broker-smoke-25978d2`へ隔離して保持した。
+
 ## D4 Pocket Phase 7 Task ApprovalのWorkspace登録hash差替負例（2026-09-28）
 
 Rust Broker対話制御のFIXTURE testへ、同じRuntime／Session／Workspace IDでも登録hashが変わった場合、既発行Workspace PermissionとOwner Approvalをpreflightで再利用できない負例を追加した。発行時のhashなら両状態が有効、異なる登録hashを渡すとSession不一致で拒否される。production挙動は変更していない。この試験は内部状態の境界検査であり、実Registry差替、原子的Task消費、Task実行、LIVE_RUNTIME隔離の証拠ではない。
