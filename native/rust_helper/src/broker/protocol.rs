@@ -3732,6 +3732,7 @@ fn normalize_key(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cap_fs_ext::DirExt;
     use serde_json::json;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -3839,6 +3840,105 @@ mod tests {
         request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
         request.refresh_payload_hash();
         request
+    }
+
+    #[test]
+    fn broker再起動後の作業領域登録で永続scratchを監査付き回収する() {
+        let root = temp_store_dir("agent-task-scratch-startup-recovery");
+        let store_root = root.join("store");
+        let workspace_root = root.join("workspace");
+        fs::create_dir(&workspace_root).expect("作業領域を作成");
+        let protected = vec![store_root.clone()];
+        let workspace_config = || super::super::workspace_root::WorkspaceStartup {
+            runtime_id: "fixture-runtime".into(),
+            workspace_id: "fixture-workspace".into(),
+            root_path: workspace_root.to_string_lossy().into_owned(),
+            secret_paths: Vec::new(),
+        };
+
+        let mut first = Broker::new_persistent("scratch-session-first", &store_root).unwrap();
+        first
+            .実行系登録(
+                "fixture-runtime",
+                Arc::new(
+                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
+                ),
+            )
+            .unwrap();
+        first
+            .作業領域起動登録(&workspace_config(), &protected)
+            .expect("最初のBrokerでWorkspaceを登録");
+        let binding = first
+            .作業領域
+            .dialogue_binding("fixture-runtime", "fixture-workspace")
+            .expect("登録Workspace binding");
+        let recovery_binding_hash = binding.recovery_binding_hash().to_owned();
+        let root_identity = binding.root_directory_identity();
+        let journal = first.agent_task_scratch.clone().expect("永続回復journal");
+        let scratch_name = format!(".d4p-tmp-{}", "a".repeat(32));
+        let record_id = journal
+            .reserve(
+                "fixture-task",
+                "fixture-runtime",
+                "fixture-workspace",
+                &recovery_binding_hash,
+                root_identity,
+                &scratch_name,
+            )
+            .expect("scratch作成前に回復記録を予約");
+        let workspace = cap_std::fs::Dir::open_ambient_dir(
+            &workspace_root,
+            cap_std::ambient_authority(),
+        )
+        .expect("Workspaceを開く");
+        workspace
+            .create_dir(&scratch_name)
+            .expect("scratchを作成");
+        let scratch = workspace
+            .open_dir_nofollow(&scratch_name)
+            .expect("nofollowでscratchを開く");
+        let metadata = scratch.dir_metadata().expect("scratch属性");
+        journal
+            .activate(
+                &record_id,
+                super::super::workspace_root::DirectoryIdentity {
+                    device: cap_fs_ext::MetadataExt::dev(&metadata),
+                    file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+                },
+            )
+            .expect("実体識別後に回復記録を有効化");
+        drop(scratch);
+        drop(workspace);
+        drop(first);
+
+        let mut restarted = Broker::new_persistent("scratch-session-restarted", &store_root)
+            .expect("同じ永続storeからBrokerを再起動");
+        restarted
+            .実行系登録(
+                "fixture-runtime",
+                Arc::new(
+                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
+                ),
+            )
+            .unwrap();
+        restarted
+            .作業領域起動登録(&workspace_config(), &protected)
+            .expect("再起動時Workspace登録とscratch回復");
+
+        assert!(!workspace_root.join(&scratch_name).exists());
+        assert!(!restarted
+            .agent_task_scratch
+            .as_ref()
+            .expect("再読込した回復journal")
+            .has_pending_workspace("fixture-workspace"));
+        assert!(restarted.audit_events().iter().any(|event| {
+            event.request_id == "agent-task-scratch-recovery:0"
+                && event.operation == "Agent Task scratch回復"
+                && event.decision == "recorded"
+                && event.evidence_source == EVIDENCE_SOURCE_LIVE_RUNTIME
+        }));
+        drop(restarted);
+        fs::remove_dir_all(root).expect("試験用Broker storeとWorkspaceを除去");
     }
 
     #[test]

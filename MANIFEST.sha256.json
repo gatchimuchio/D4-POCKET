@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "6c34f42eaa913de4c5e7fda99e777825c83434eb64bcb6e836c147817e1f0f20"
+      "sha256": "ff553501797e10baa51394820d9bd063fa33ed697e62f1f2116fa82741066c1a"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "59c67a5cd409f41bbe40e4d04a62871c2ae50056b4a876f948472f0fd046b8da"
+      "sha256": "593808196c34847d3afbe685922e5ee029c77724ff68f31fab595022c12fed4b"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "d3d21809b6a1988f8d1643b79ffd803dc65049d069738c43d3ba0ac2bcd72126"
+      "sha256": "390c976371f411150d54d87ea36dc852f252f9c7bb4a2ddd01ca8d9e0e4b141e"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "1513ed9ccd45c663ad67ff73cf02544cf130863658fad4bb8a8dbd006406b72f"
+      "sha256": "c39bfe4fc521a59613a48b8eeba6a85b33e5b7d86cba7db75cc3aef01d884652"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "50c86f9cc8178fabc42a3bb4c1cc359b5ab1dccb990182113283d300981af3b0"
+      "sha256": "38850b68f3b15d88c4be8a064f74a5339603ec9a9c50f6230870bec37b5d4f25"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -3037,7 +3037,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "aa48aa6998f30e0b8b1f0ed289903b0e184b14cc6dc3a66fe83321debc8230fb"
+      "sha256": "cc8c1242b4c685bd66f9df50ff93b943bac70248c72079f6a19abb98a564194a"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3605,7 +3605,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "4ab43b04e276764dd2ebd7de482045682069afb1efb824f759b31a5f6416b377"
+      "sha256": "d6c655a8f1206114e4022e9bf677e73cf2ae691a1fe1b9da910e84e0017f3360"
     },
     {
       "path": "requirements-dev.txt",
@@ -4237,7 +4237,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8641a5fc036304f33e5bed06b82b680dd6744abf3daf5c8fa1c53405684b690f"
+      "sha256": "56f4665f0ab7ddca6ee0bfa547e30baf8ef12758e5afd2341cef84e42b73ead2"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

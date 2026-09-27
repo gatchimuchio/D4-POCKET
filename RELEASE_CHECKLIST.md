@@ -381,9 +381,9 @@ known limitation を認める条件は、次のとおりである。
 - item: Windows Rust全target試験の実行gate
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
-  status: unresolved
-  reason: 過去のclean sourceで全target成功した記録は履歴として保持する。2026-09-28の本作業sourceでは`cargo check --all-targets`とscratch focused Rust 7件が成功し、最新の`cargo test --all-targets -- --test-threads=1`はlibrary 320件が成功した後、`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）に起動前拒否されて停止した。全target完了ではない。直前の実行も別test executableが同errorで起動拒否された。さらにOneDrive外の短いmanaged worktreeと別Cargo target directoryでも過去の現行source build script起動が拒否された記録がある。policy変更、拒否fileの移動・再配置、試験除外は行っていない。
-  required_action: Windows Application Controlを変更・回避せず、承認済み条件で全target試験を再実行する。process起動を含むworkspace／Broker integration suiteを含め全件成功するまでresolvedへ戻さない。過去commit、focused test、compile成功を現行sourceの全target成功へ読み替えない。
+  status: resolved
+  reason: 過去のclean sourceと2026-09-28の別試行でWindows Application Control（OS error 4551）による実行file／build scriptの起動拒否が発生した記録は履歴として保持する。最新sourceでは`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`と`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`が成功し、library 321件、CLI 9件、Broker IPC 10件、integration 26件を含む合計366件すべて成功した。このsourceのRust全target実行gateは解消済み。
+  required_action: 将来Rust sourceを変更した作業blockで全target試験を再実行し、失敗またはApplication Control拒否が起きた場合はgateを再開する。
   blocks_release: yes
 
 - item: Windows loopback HTTP fixture試験のConnectionReset揺らぎ

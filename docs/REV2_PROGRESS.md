@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Broker再起動後のscratch回収接続試験（2026-09-28）
+
+永続journal単体試験に加え、最初の`Broker`でRuntime／Workspaceを登録してAgent Task scratchをjournalへ予約・有効化し、同一永続storeから新しい`Broker` instanceを生成して、実際の`作業領域起動登録`経路で回収するRust試験を追加した。試験はscratch directoryの削除、journal記録の解消、回復AuditEventを確認する。Conformanceにも、起動時回復呼出しがIPC listener bindより前にあることの接続順検査を加えた。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`: 321件合格、失敗0件。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0。library 321、CLI 9、Broker IPC 10、integration 26の計366件すべて成功。desktop launcher targetは0 testsで正常起動した。
+
+これは同一試験プロセス内で`Broker`を再生成し、永続store・実filesystem・Brokerの起動登録経路を通した試験である。Windows上でBrokerプロセスを強制終了した場合や電源断後の回復を示す`LIVE_RUNTIME`証拠ではなく、Agent Taskの製品環境での一時領域後始末保証は未成立。過去の`Windows Application Control`／`OS error 4551`による起動拒否は履歴として保持するが、最新コードのRust全対象試験関門は解消済み。`task_execution=unsupported`、Agent Taskの`release_blocker`、`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 7 Broker crash後scratch回復の実装（2026-09-28）
 
 Codex Agent Taskのscratch directoryをBroker再起動後に限定回収するため、HMAC認証・bounded永続journal、`reserved`／`active`状態、stable `recovery_binding_hash`、Workspace登録後かつIPC listener開始前のreaperを追加した。権限用の揮発registration hashは再起動ごとに変化するためjournalへ流用せず、recovery bindingをRuntime／Workspace ID、secret除外指定、rootと祖先のdevice/file identityから再計算する。削除条件は現在登録とのbinding一致、root identity一致、scratch直接子名の固定形式、nofollow open、active recordの実directory identity一致である。予約だけでidentity未確認、別登録、reparse、identity不一致、破損journalは削除せず保持し、Workspaceに未解決記録がある間はAgent Taskを拒否する。本文、absolute path、Credential、Permission、Approval、出力はjournalへ保存しない。

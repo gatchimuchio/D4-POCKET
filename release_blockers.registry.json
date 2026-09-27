@@ -105,7 +105,7 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker crash後scratch回復用にHMAC認証bounded journalと起動時reaperを追加し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、`cargo check --all-targets`は成功した。最新`cargo test --all-targets -- --test-threads=1`はlibrary 320件が成功後、`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）で起動前拒否され全target未完了。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構の`apply deny-read ACLs`で失敗し、profileを安全境界として扱わない。回復journalのunit試験はBroker異常終了後cleanupの`LIVE_RUNTIME`証拠ではなく、Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・crash recovery実動作・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseとrelease blockerを維持する。",
+      "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、Broker起動登録回復試験1件、`cargo check --all-targets`、最新`cargo test --all-targets -- --test-threads=1`の366件すべてが成功した。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持するが、最新sourceの全target実行gateは解消した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構の`apply deny-read ACLs`で失敗し、profileを安全境界として扱わない。Brokerの再生成試験は同一test process内であり、OS process kill／電源断後cleanupの`LIVE_RUNTIME`証拠ではない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・crash recovery実動作・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
       "required_action": "Windowsの読取拒否ACL生成・適用が実効しない原因を特定し、OneDrive Cloud Files／通常NTFS双方で合成秘密目印の読取拒否、Workspace外の読み書き拒否、`Workspace`内で許可した操作を`LIVE_RUNTIME`で検証する。これらの否定試験とTEMP／TMP隔離、通常終了／失敗／取消／期限超過のprocess群停止・scratch cleanupを確認するまでは`Capability`を`unsupported`のまま維持する。検証成立後、`Owner`承認済み有料Codex資格を用いるBroker統治Taskで実行前後AuditとRecoveryを検証し、全証拠が揃う前に`Capability`を`supported`へ変更しない。Broker crash／電源断後scratchのRecovery/reaper、実結果／diffのContent Exposure画面、cross-agent contamination・比較・Handoff、Unix path race／mount等、Device Link TLS／lifecycle、およびC0〜C34の要求／実行証拠監査を継続する。C34実機・運用署名・正式配布・owner GOは独立条件として維持する。"
     },
     {
@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "過去commitでRust全target 348件が成功した履歴と、別の現行source実行で依存crate build scriptがWindows Application Control（OS error 4551）に拒否された履歴は保持する。2026-09-28の本作業sourceでは`cargo check --all-targets`とscratch回復focused Rust試験7件が成功し、最新`cargo test --all-targets -- --test-threads=1`はlibrary 320件成功後、`gui_shell_desktop_launcher` test executableが同じOS error 4551で起動前に拒否された。全target試験は未完了である。過去commitのPASS、focused test、compile成功を現行sourceの全target成功へ転用せず、全target完遂を確認するまで未解決とする。",
-      "required_action": "Windows Application Controlを変更・回避せず、現行source commitをcleanな承認済みWindows条件で全target実行する。Cargo build scriptと全test executableを含む全targetの成功を確認するまでresolvedへ戻さない。過去commitのPASSや別target directoryでの試験を現行sourceのPASSへ読み替えない。"
+      "reason": "過去commitおよび2026-09-28の別試行でWindows Application Control（OS error 4551）による実行file／build scriptの起動拒否が発生した記録は履歴として保持する。最新sourceでは`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`と`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`が成功し、library 321件、CLI 9件、Broker IPC 10件、integration 26件（desktop launcher 0件を含む）を実行し、合計366件すべて成功した。このsourceに対するWindows全target実行gateは解消済み。将来Rust変更後の試験失敗は新しい現行状態として再評価する。",
+      "required_action": "将来Rust sourceを変更した作業blockで同じWindows all-target試験を実行し、失敗やApplication Control拒否が再発した場合はgateを再開する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",
