@@ -1,0 +1,15 @@
+{
+  "permission_id": "0123456789abcdef0123456789abcdef",
+  "agent_runtime_id": "codex-local",
+  "session_id": "agent-session-01",
+  "workspace_id": "workspace-agent-01",
+  "workspace_registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "operation": "agent_task.execute",
+  "scope": "session_workspace_once",
+  "decision": "allow",
+  "source": "owner",
+  "expires_at_epoch_seconds": 1790000300,
+  "use_limit": 1,
+  "uses_remaining": 1,
+  "status": "active"
+}

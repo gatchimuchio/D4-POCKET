@@ -374,6 +374,23 @@ struct Agent作業要求 {
     instruction: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskWorkspacePermission要求 {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+}
+
+struct AgentTaskWorkspacePermission記録 {
+    permission_id: String,
+    agent_runtime_id: String,
+    workspace_id: String,
+    workspace_registration_hash: String,
+    expires_at_epoch_seconds: i64,
+    monotonic_expiry: Instant,
+}
+
 fn Agent作業要求識別子妥当(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
@@ -483,6 +500,7 @@ pub struct 対話制御 {
     セッション: BTreeMap<String, セッション>,
     作業: BTreeMap<String, 作業>,
     失効セッション: BTreeSet<String>,
+    agent_task_permissions: BTreeMap<String, AgentTaskWorkspacePermission記録>,
 }
 impl std::fmt::Debug for 対話制御 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -744,6 +762,9 @@ impl 対話制御 {
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
     pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
         self.失効セッション.extend(sessions.iter().cloned());
+        for session in sessions {
+            self.agent_task_permissions.remove(session);
+        }
         for work in self.作業.values_mut() {
             if sessions.contains(&work.要求.対話セッションID) {
                 work.取消.store(true, Ordering::SeqCst);
@@ -905,6 +926,91 @@ impl 対話制御 {
                     "対話セッションID": request.session_id,
                     "作業領域ID": request.workspace_id,
                     "指示hash": instruction_hash,
+                }))
+            }
+            "AgentTaskWorkspacePermissionGrant" => {
+                if !owner {
+                    return Err(対話失敗::権限拒否);
+                }
+                let request: AgentTaskWorkspacePermission要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.agent_runtime_id)
+                    || !Agent作業要求識別子妥当(&request.session_id)
+                    || !Agent作業要求識別子妥当(&request.workspace_id)
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let adapter = self
+                    .実行系
+                    .get(&request.agent_runtime_id)
+                    .ok_or(対話失敗::実行系不在)?;
+                let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
+                AgentAdapterMetadata::read(&metadata)?;
+                let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
+                if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
+                    return Err(対話失敗::作業領域不在);
+                }
+                let session = self
+                    .セッション
+                    .get(&request.session_id)
+                    .ok_or(対話失敗::セッション不一致)?;
+                if session.状態 != "利用中"
+                    || session.実行系ID != request.agent_runtime_id
+                    || session.作業領域ID.as_deref() != Some(request.workspace_id.as_str())
+                    || session.作業領域登録hash.as_deref() != Some(binding.registration_hash())
+                    || self.失効セッション.contains(&request.session_id)
+                {
+                    return Err(対話失敗::セッション不一致);
+                }
+                if self
+                    .agent_task_permissions
+                    .get(&request.session_id)
+                    .is_some_and(|grant| {
+                        Instant::now() < grant.monotonic_expiry
+                            && 現在 < grant.expires_at_epoch_seconds
+                            && grant.permission_id.len() == 32
+                            && grant.agent_runtime_id == request.agent_runtime_id
+                            && grant.workspace_id == request.workspace_id
+                            && grant.workspace_registration_hash == binding.registration_hash()
+                    })
+                {
+                    return Err(対話失敗::権限拒否);
+                }
+                let permission_id = 識別子生成()?;
+                let expires_at_epoch_seconds = 現在.saturating_add(300);
+                let registration_hash = binding.registration_hash().to_owned();
+                self.agent_task_permissions.insert(
+                    request.session_id.clone(),
+                    AgentTaskWorkspacePermission記録 {
+                        permission_id: permission_id.clone(),
+                        agent_runtime_id: request.agent_runtime_id.clone(),
+                        workspace_id: request.workspace_id.clone(),
+                        workspace_registration_hash: registration_hash.clone(),
+                        expires_at_epoch_seconds,
+                        monotonic_expiry: Instant::now() + Duration::from_secs(300),
+                    },
+                );
+                if let Err(error) = 監査(
+                    "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）",
+                    &request.session_id,
+                    &sha256_tagged(permission_id.as_bytes()),
+                ) {
+                    self.agent_task_permissions.remove(&request.session_id);
+                    return Err(error);
+                }
+                Ok(json!({
+                    "permission_id": permission_id,
+                    "agent_runtime_id": request.agent_runtime_id,
+                    "session_id": request.session_id,
+                    "workspace_id": request.workspace_id,
+                    "workspace_registration_hash": registration_hash,
+                    "operation": "agent_task.execute",
+                    "scope": "session_workspace_once",
+                    "decision": "allow",
+                    "source": "owner",
+                    "expires_at_epoch_seconds": expires_at_epoch_seconds,
+                    "use_limit": 1,
+                    "uses_remaining": 1,
+                    "status": "active"
                 }))
             }
             "対話開始" => {
@@ -1194,6 +1300,7 @@ impl 対話制御 {
                 )?;
                 self.作業
                     .retain(|_, v| v.要求.対話セッションID != 指定.対話セッションID);
+                self.agent_task_permissions.remove(&指定.対話セッションID);
                 self.セッション.remove(&指定.対話セッションID);
                 Ok(json!({"対話セッションID": 指定.対話セッションID, "状態": "終了"}))
             }

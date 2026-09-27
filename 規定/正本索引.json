@@ -136,6 +136,14 @@
       "責任": "Agent Task要求のRuntime／Session／Workspace参照と指示本文。Authority・Permission・Approval・Audit・実行pathを内包しない"
     },
     {
+      "path": "specs/agent_task_workspace_permission_request.schema.json",
+      "責任": "Ownerが付与判断するAgent Task用Workspace Permission要求。Runtime／Session／Workspace識別子だけを入力し、期限・権限・path・commandを要求から決定しない"
+    },
+    {
+      "path": "specs/agent_task_workspace_permission.schema.json",
+      "責任": "Brokerが発行するSession・現在Workspace登録hashへ結合した5分・一回限りのAgent Task用書込Permission receipt"
+    },
+    {
       "path": "tooling/conformance_tests/",
       "責任": "契約適合と拒否経路の検証"
     },

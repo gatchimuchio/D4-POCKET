@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4ffdc25b18afa6ee690265cfe4bf499167e0e94582b7f9a4b89d356b96dcc486"
+      "sha256": "d2754577d7e218510543f3de3e4933a367185e2b68613392d8b80adafb9a6990"
     },
     {
       "path": "SECURITY.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a9828d2d9be98a10e3a41b764f4fc077a71409b35e0731d9f9909bc70a8cbc30"
+      "sha256": "1c4ae1e5dfba7c3cc595308a930548807f02ceeffed9d8197bda0671bfb15f9c"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "63345fd1270c2635b91e2938203ce552951762734894936d7cbd22d982c03236"
+      "sha256": "ae32835a392e128f60063360f7a147545f90b8c1fc8774474e98728fc5240db5"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1550,6 +1550,14 @@
     {
       "path": "examples/contracts/agent_task_request.valid.json",
       "sha256": "9bfca7bbacb41d7a0212a226745aa03ae37932a6a3f14ddda87914c9c17c2492"
+    },
+    {
+      "path": "examples/contracts/agent_task_workspace_permission.valid.json",
+      "sha256": "5029df82c27cdb206bd4d1e3051a4ce096fbf0564be623c8e2c7befbf57564b4"
+    },
+    {
+      "path": "examples/contracts/agent_task_workspace_permission_request.valid.json",
+      "sha256": "ec933ec0243ac9c8014d8650f3457b6e6d61d3ea0960c63e4c074bdd7dd511ca"
     },
     {
       "path": "examples/contracts/agent_tool_call.valid.json",
@@ -1846,6 +1854,14 @@
     {
       "path": "examples/contracts/invalid/agent_task_request_authority_escalation.invalid.json",
       "sha256": "255f0da6f1843303adcb4f54d8b801331a30f8da7364163c4f6e929079339c29"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_workspace_permission_escalation.invalid.json",
+      "sha256": "c619fc0cd30cacdb1e968b78c6cdc86e73ecf8bf85a9043777859312101ed0f5"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_workspace_permission_request_escalation.invalid.json",
+      "sha256": "e86bf62dd46d697762e80c0b1ac240d60bd06588dbaec6531f3bc24923cad718"
     },
     {
       "path": "examples/contracts/invalid/agent_tool_call_missing_permission.invalid.json",
@@ -2909,7 +2925,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "bf146437089b5eb81e2fe1865ef5a9bd809c680782ac77016ab078794e7ec8ac"
+      "sha256": "ec00139913b9538c89f5f0120c69300358683bf458f2b269ebd37f1aca337212"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -2969,7 +2985,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "1f3daa8b4c22e51e626290c1c815b16e07f8ad2ba4981cb8d227f9ad42383cf4"
+      "sha256": "71fac161e841eb518bc6ddb999b6961390f2c2e0d491435aeb5326517c234354"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3013,7 +3029,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "137805abfa6384cd8c2c30c1f335e58d24650d1270681b5e08825c49f51aeea8"
+      "sha256": "78bcfd7b09bec5b219520c0c924a74473bad143443097db02da1809ea41c029e"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3537,7 +3553,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "94a3bfa48ae9b0693c434de7bf38d04785084635e3b9aca05cbf01c73e8779c6"
+      "sha256": "299fce043e5ff4c884c37c8af0896416cae33ef6f19b5cefc3c96cb41c89b1a4"
     },
     {
       "path": "requirements-dev.txt",
@@ -3626,6 +3642,14 @@
     {
       "path": "specs/agent_task_request.schema.json",
       "sha256": "4aea8447aa8fcc270c6f304f7025fa0ec783ab3d2f90b51555795b9e68808d8e"
+    },
+    {
+      "path": "specs/agent_task_workspace_permission.schema.json",
+      "sha256": "0475a1dce97c5f4ff67113217a5e6dfafb6fe1df72e45adeb90dda343ffb783d"
+    },
+    {
+      "path": "specs/agent_task_workspace_permission_request.schema.json",
+      "sha256": "8ca5eee1bab375a082c07924fdff0c82861bd0d798b6b75734f3f8bee435e84b"
     },
     {
       "path": "specs/agent_tool_call.schema.json",
@@ -4149,7 +4173,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "8ce70c40d816423b9bebd9e53be3d5e22415a5550fd8d6a2463b20a9cfe7aa23"
+      "sha256": "723176f53ac650da94ec6e850705f54d9a4ed2e31fd4a4535b58d0c3cbb94531"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4233,7 +4257,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "5808c1ea591690aab9c1b3fcd9598ae40f59ec0ae0c1921898219cb09455ddd9"
+      "sha256": "bbdde7a950537dbf55319e75eaa5265b08b15efce682a4374b6c581123042a80"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4269,7 +4293,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "0e9d697ab22bc9486fb571b8a1bd62360dfeab48aacba2f89edaadba31245401"
+      "sha256": "7bae32c9b4ad4510251f18c69ee40d2fe726b202e2a38f2ef0d51c16919c7b0b"
     }
   ]
 }

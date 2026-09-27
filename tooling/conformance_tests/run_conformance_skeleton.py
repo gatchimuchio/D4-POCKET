@@ -171,6 +171,8 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_workspace",
     "agent_task",
     "agent_task_request",
+    "agent_task_workspace_permission_request",
+    "agent_task_workspace_permission",
     "agent_tool_call",
     "agent_diff",
     "agent_comparison",
@@ -7012,6 +7014,40 @@ def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> lis
     return errors
 
 
+def test_agent_task_workspace_permission_is_owner_scoped_and_one_use() -> list[str]:
+    request_schema = load_schema("agent_task_workspace_permission_request.schema.json")
+    permission_schema = load_schema("agent_task_workspace_permission.schema.json")
+    request = load_contract_fixture("agent_task_workspace_permission_request.valid.json")
+    permission = load_contract_fixture("agent_task_workspace_permission.valid.json")
+    errors = validate_instance(request, request_schema)
+    errors.extend(validate_instance(permission, permission_schema))
+
+    if set(request) != {"agent_runtime_id", "session_id", "workspace_id"}:
+        errors.append("Workspace Permission要求が識別子以外を受け付ける")
+    for field in ("permission_id", "approval_id", "expires_at", "workspace_path", "sandbox", "command"):
+        if validate_instance({**request, field: "untrusted"}, request_schema) == []:
+            errors.append(f"Workspace Permission要求が禁止fieldを受け付けた: {field}")
+
+    invalid_request = load_contract_fixture(
+        "invalid/agent_task_workspace_permission_request_escalation.invalid.json"
+    )
+    invalid_permission = load_contract_fixture(
+        "invalid/agent_task_workspace_permission_escalation.invalid.json"
+    )
+    if validate_instance(invalid_request, request_schema) == []:
+        errors.append("Workspace Permission要求がrequest側Authorityを受け付ける")
+    if validate_instance(invalid_permission, permission_schema) == []:
+        errors.append("Workspace Permissionがscope／operation／source escalationを受け付ける")
+
+    if permission.get("use_limit") != 1 or permission.get("uses_remaining") != 1:
+        errors.append("Workspace Permission正常例が一回限りではない")
+    contract_text = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
+    for required in ("Task固有のOwner Approvalではない", "5分期限", "Task保存、process起動"):
+        if required not in contract_text:
+            errors.append(f"Agent Runtime正本にWorkspace Permission境界がない: {required}")
+    return errors
+
+
 def test_agent_secret_path_read_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -8873,6 +8909,7 @@ def main() -> int:
         test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
+        test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,

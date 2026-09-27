@@ -2053,3 +2053,22 @@ OneDrive配下の長い日本語pathで確認されたFlutter解析・test clean
 - `flutter test --no-pub`：113件中111件合格、2件失敗。`runtime_lifecycle_test.dart`と`workspace_inspector_test.dart`の失敗は実Broker連携に必要なRust helperがbuildできず起動できないためで、helper未生成を検出した。これはDesktop suite全体の合格ではない。
 - `cargo test --locked`（`C:\D4Pocket\native\rust_helper`）：exit 1。`generic-array`および`io-extras` build script executableがWindows Application ControlにOS error 4551で起動拒否され、Rust全target試験へ到達しなかった。実行fileの移動・再配置、policy変更、試験除外はしていない。
 - 証拠境界: Pythonの統合検査はCONFIG／FIXTUREを中心とする開発検査であり、Rust全target実行、installed product、実Agentの書込み隔離、release readinessを証明しない。Windows Rust全targetの`release_blocker`は未解決のまま維持する。短縮cloneはOneDrive checkoutのACL修復や移行ではない。
+
+## Agent Task用Workspace PermissionのOwner発行経路（2026-09-27）
+
+Agent Task用Workspace Permission要求／receipt Schemaと正常・権限昇格負例を追加し、正本索引、Schema検査、Conformanceへ登録した。Rust BrokerはTask専用PermissionをRuntime／現行Session／Workspace登録hashへ束縛し、Rust Desktopのnative Owner確認経路からのみ、固定operation `agent_task.execute`、Session・Workspace限定、5分、1回で発行する。通常IPCやrequest由来のpath／command／Permission scope／期限は拒否する。active grantの重複発行を拒否し、Session終了・隔離とBroker再起動で揮発Permissionを失効させる。発行Auditに失敗した場合はPermissionを取り消す。
+
+この作業単位はPermission発行までであり、Task executorはまだ未接続である。Permission発行だけではTask本文を承認せず、保存、process起動、Workspace書込を行わない。実行時の本文hash・条件へ結合する独立Owner Approval、実行前後AuditEvent、RecoveryAction、diff保存、read-only Codex Adapterの書込化は未成立で、`comprehensive_extension_rev1_completion`を`release_blocker`のまま維持する。
+
+検証証拠:
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 142件、正常example 142件、negative fixture 176件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：219件合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：全targetのcompile確認に成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する -- --test-threads=1`：1件合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib AgentTaskPermissionのnative確認は固定範囲を示しTask本文と追加権限を拒否する -- --test-threads=1`：1件合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：library 300件は全件合格。その後の`gui_shell_desktop_launcher` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、Cargo全targetは未完了。policy変更、試験除外、実行fileの移動・再配置はしていない。
+- `python -X utf8 tooling/manifest.py --write`：追跡source 1059件を収録。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0で登録済み10検査を通過し、portable source、Manifest、release gateも合格。Evidence bundleは5件のrelease blockerを保持し、`release_ready=false`。
+
+静的compile、fixture、focused test、library testはそれぞれの範囲だけを証明する。全Rust target、Windows installed product、実Agent Taskの書込隔離・失敗回復・cross-agent contamination、正式releaseは証明していない。

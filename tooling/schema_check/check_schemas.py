@@ -141,6 +141,8 @@ REQUIRED = {
     "agent_workspace.schema.json",
     "agent_task.schema.json",
     "agent_task_request.schema.json",
+    "agent_task_workspace_permission_request.schema.json",
+    "agent_task_workspace_permission.schema.json",
     "agent_tool_call.schema.json",
     "agent_diff.schema.json",
     "agent_comparison.schema.json",

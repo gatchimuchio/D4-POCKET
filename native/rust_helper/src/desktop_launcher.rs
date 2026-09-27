@@ -12,6 +12,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use zeroize::Zeroize;
+use serde::Deserialize;
 
 use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
 use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
@@ -54,6 +55,12 @@ const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
     GuiShellExport(ExportConfirmationSummary),
+    AgentTaskWorkspacePermission {
+        runtime_id: String,
+        session_id: String,
+        workspace_id: String,
+        payload_hash: String,
+    },
     RegressionCaseDelete {
         summary: OwnerDeleteConfirmationSummary,
         payload_hash: String,
@@ -66,6 +73,23 @@ enum DesktopOwnerOperationSummary {
         summary: OwnerRegistrationConfirmationSummary,
         payload_hash: String,
     },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskWorkspacePermissionRequest {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+}
+
+fn agent_task_permission_identifier_is_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -738,6 +762,22 @@ fn owner_operation_candidate(
         BrokerOperation::GuiShell書出し => DesktopOwnerOperationSummary::GuiShellExport(
             export_center::owner_confirmation_summary(payload, &payload_hash).ok()?,
         ),
+        BrokerOperation::AgentTaskWorkspacePermissionGrant => {
+            let request: AgentTaskWorkspacePermissionRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_permission_identifier_is_valid(&request.agent_runtime_id)
+                || !agent_task_permission_identifier_is_valid(&request.session_id)
+                || !agent_task_permission_identifier_is_valid(&request.workspace_id)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                runtime_id: request.agent_runtime_id,
+                session_id: request.session_id,
+                workspace_id: request.workspace_id,
+                payload_hash,
+            }
+        }
         BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary: owner_delete_confirmation_summary(payload).ok()?,
             payload_hash,
@@ -881,6 +921,15 @@ fn owner_confirmation_text_for_identity(
                 summary.payload_hash
             )
         }
+        DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+            runtime_id,
+            session_id,
+            workspace_id,
+            payload_hash,
+        } => format!(
+            "このAgent Sessionに限定したTask用Workspace Permissionを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n許可operation: agent_task.execute\n範囲: このSession・Workspaceで1回、5分以内\n\nこの確認はTask本文を承認せず、Taskを実行・保存・変更しません。実行時にはTask本文と条件を示す別のOwner Approvalが必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            runtime_id, session_id, workspace_id, payload_hash
+        ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -2204,6 +2253,67 @@ mod tests {
         assert!(!text.contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
         assert!(owner_confirmation_text(&summary)
             .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTaskPermissionのnative確認は固定範囲を示しTask本文と追加権限を拒否する() {
+        let payload = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace"
+        });
+        let payload_hash = canonical_payload_hash(Some(&payload));
+        let input = serde_json::json!({
+            "request_id": "desktop-agent-permission",
+            "operation": "AgentTaskWorkspacePermissionGrant",
+            "payload": payload,
+            "payload_hash": payload_hash,
+            "nonce": "desktop-agent-permission-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (normalized, summary) =
+            owner_operation_candidate(input.to_string().as_bytes(), &endpoint).unwrap();
+        assert_eq!(
+            BrokerRequestEnvelope::from_json_str(&normalized)
+                .unwrap()
+                .session_id
+                .as_deref(),
+            Some("desktop-session")
+        );
+        let text = owner_confirmation_text(&summary);
+        assert!(text.contains("agent_task.execute"));
+        assert!(text.contains("1回、5分以内"));
+        assert!(text.contains("別のOwner Approvalが必要"));
+        assert!(!text.contains("instruction"));
+
+        let escalated = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace",
+            "command": "arbitrary-command"
+        });
+        let escalated_hash = canonical_payload_hash(Some(&escalated));
+        let request = serde_json::json!({
+            "request_id": "desktop-agent-permission-escalated",
+            "operation": "AgentTaskWorkspacePermissionGrant",
+            "payload": escalated,
+            "payload_hash": escalated_hash,
+            "nonce": "desktop-agent-permission-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]

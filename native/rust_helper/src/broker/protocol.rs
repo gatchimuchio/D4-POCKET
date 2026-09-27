@@ -407,6 +407,8 @@ pub enum BrokerOperation {
     Agent一覧,
     #[serde(rename = "Agent作業要求検査")]
     Agent作業要求検査,
+    #[serde(rename = "AgentTaskWorkspacePermissionGrant")]
+    AgentTaskWorkspacePermissionGrant,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -596,6 +598,7 @@ impl BrokerOperation {
             BrokerOperation::対話セッション一覧 => "対話セッション一覧",
             BrokerOperation::Agent一覧 => "Agent一覧",
             BrokerOperation::Agent作業要求検査 => "Agent作業要求検査",
+            BrokerOperation::AgentTaskWorkspacePermissionGrant => "AgentTaskWorkspacePermissionGrant",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::回帰Case一覧 => "回帰Case一覧",
@@ -1216,6 +1219,7 @@ impl Broker {
             envelope.operation,
             Some(
                 BrokerOperation::GuiShell書出し
+                    | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
                     | BrokerOperation::回帰Case登録
@@ -1283,6 +1287,19 @@ impl Broker {
                 "broker_request_malformed",
                 "broker request envelope is missing required fields",
                 true,
+            );
+        }
+
+        if envelope.operation == Some(BrokerOperation::AgentTaskWorkspacePermissionGrant)
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "Agent Task PermissionはRust Desktopのnative Owner確認経路だけで発行できます",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
             );
         }
 
@@ -1432,7 +1449,7 @@ impl Broker {
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::Agent作業要求検査 | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -2458,7 +2475,7 @@ impl Broker {
             Ok(event) => event.event_id,
             Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
         };
-        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査) {
+        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant) {
             let (runtime, workspace) = if operation == BrokerOperation::対話開始 {
                 (payload.get("実行系ID"), payload.get("作業領域ID"))
             } else {
@@ -5781,6 +5798,71 @@ mod 端末統治試験 {
         let audit = serde_json::to_string(e.broker.audit_events()).unwrap();
         assert!(!output.contains(instruction));
         assert!(!audit.contains(instruction));
+
+        let permission_payload = json!({
+            "agent_runtime_id":"fixture-agent",
+            "session_id":session_id,
+            "workspace_id":"fixture-task-workspace"
+        });
+        let ordinary_permission = 通常要求(
+            &mut e.broker,
+            BrokerOperation::AgentTaskWorkspacePermissionGrant,
+            permission_payload.clone(),
+        );
+        assert_eq!(ordinary_permission.status, BrokerStatus::Rejected);
+        assert_eq!(
+            ordinary_permission.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let native_permission_request = |request_id: &str, nonce: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "device-test",
+                "operation": "AgentTaskWorkspacePermissionGrant",
+                "payload": permission_payload,
+                "payload_hash": canonical_payload_hash(Some(&permission_payload)),
+                "nonce": nonce,
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"}
+            })
+        };
+        let native_request = native_permission_request(
+            "agent-task-permission-native",
+            "agent-task-permission-native-nonce",
+        );
+        let permission = e
+            .broker
+            .desktop_owner_operation_json(&native_request.to_string());
+        assert_eq!(permission.status, BrokerStatus::Accepted);
+        let receipt = permission.body.as_ref().unwrap();
+        assert_eq!(receipt["operation"], "agent_task.execute");
+        assert_eq!(receipt["scope"], "session_workspace_once");
+        assert_eq!(receipt["source"], "owner");
+        assert_eq!(receipt["use_limit"], 1);
+        assert_eq!(receipt["uses_remaining"], 1);
+        assert_eq!(receipt["status"], "active");
+        assert_eq!(
+            receipt["expires_at_epoch_seconds"].as_i64().unwrap(),
+            e.broker.current_epoch_seconds() + 300
+        );
+        assert!(e.broker.audit_events().iter().any(|event| {
+            event.operation == "AgentTaskWorkspacePermissionGrant"
+                && event.reason.contains("Task未実行")
+        }));
+
+        let duplicate_native_request = native_permission_request(
+            "agent-task-permission-native-duplicate",
+            "agent-task-permission-native-duplicate-nonce",
+        );
+        let duplicate = e
+            .broker
+            .desktop_owner_operation_json(&duplicate_native_request.to_string());
+        assert_eq!(duplicate.status, BrokerStatus::Rejected);
+        assert_eq!(
+            duplicate.error.as_ref().map(|error| error.code.as_str()),
+            Some("権限拒否")
+        );
 
         let mut stale_session = payload.clone();
         stale_session["session_id"] = json!("stale-agent-session");
