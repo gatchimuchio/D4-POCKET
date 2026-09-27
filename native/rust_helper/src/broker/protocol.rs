@@ -914,6 +914,7 @@ pub struct Broker {
     pub(super) shutdown_requested: bool,
     pub(super) current_epoch_seconds_override: Option<i64>,
     pub(super) state_store: BrokerStateStore,
+    agent_task_scratch: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_install_path_verified: bool,
     desktop_loopback_bind_verified: bool,
@@ -950,6 +951,7 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::in_memory_skeleton(),
+            agent_task_scratch: None,
             desktop_export_root: None,
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
@@ -975,6 +977,8 @@ impl Broker {
     ) -> Result<Self, BrokerStoreError> {
         let (persistent_store, persistent_state) =
             BrokerPersistentStore::open_or_create(store_root, session_id)?;
+        let agent_task_scratch =
+            super::agent_task_scratch::AgentTaskScratchJournal::open(persistent_store.clone())?;
         let profiles = super::profile_center::load_persistent_profiles(&persistent_store)?;
         let updates = super::update_center::load_persistent_updates(&persistent_store)?;
         let update_trust = super::update_center::load_persistent_trust(&persistent_store)?;
@@ -1018,6 +1022,7 @@ impl Broker {
             shutdown_requested: false,
             current_epoch_seconds_override: None,
             state_store: BrokerStateStore::durable_file_store(persistent_store),
+            agent_task_scratch: Some(agent_task_scratch),
             desktop_export_root: None,
             desktop_install_path_verified: false,
             desktop_loopback_bind_verified: false,
@@ -1658,13 +1663,84 @@ impl Broker {
             if !self.authority_registry.runtime_registered(&config.runtime_id) && !self.対話.登録済み(&config.runtime_id) {return Err("実行系が未登録");}
             let (root,filesystem,ancestry)=super::workspace_root::open_registered_root_with_ancestry(config,protected)?;
             self.append_audit("作業領域起動", "作業領域登録", "verified", "rootの対応filesystemと内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &sha256_tagged(format!("{hash}:{filesystem}").as_bytes())).map_err(|_| "root検査の監査失敗")?;
-            self.作業領域登録範囲付き(&config.runtime_id,&config.workspace_id,root,&config.secret_paths,Some(ancestry))
+            self.作業領域登録範囲付き(&config.runtime_id,&config.workspace_id,root,&config.secret_paths,Some(ancestry))?;
+            self.recover_agent_task_scratch(config, protected)?;
+            Ok(())
         })();
         if let Err(reason)=result {
             self.作業領域=Default::default();
             self.append_audit("作業領域起動", "作業領域登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "登録拒否の監査失敗")?;
         }
         result
+    }
+
+    fn recover_agent_task_scratch(
+        &mut self,
+        config: &super::workspace_root::WorkspaceStartup,
+        protected: &[std::path::PathBuf],
+    ) -> Result<(), &'static str> {
+        let Some(journal) = self.agent_task_scratch.clone() else {
+            return Err("Agent Task scratch回復記録が利用不能");
+        };
+        if !journal.has_pending_workspace(&config.workspace_id) {
+            return Ok(());
+        }
+        let binding = self
+            .作業領域
+            .dialogue_binding(&config.runtime_id, &config.workspace_id)
+            .ok_or("scratch回復対象のWorkspace登録が不在")?;
+        let (root, _, _) = super::workspace_root::open_registered_root_with_ancestry(config, protected)?;
+        let metadata = root
+            .dir_metadata()
+            .map_err(|_| "scratch回復rootのidentityを確認できない")?;
+        let actual_root = super::workspace_root::DirectoryIdentity {
+            device: cap_fs_ext::MetadataExt::dev(&metadata),
+            file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+        };
+        let bound_root = binding.root_directory_identity();
+        if actual_root.file_id == 0 || actual_root != bound_root {
+            return Err("scratch回復rootが登録時の実体と一致しない");
+        }
+        let request_hash = sha256_tagged(
+            format!(
+                "agent-task-scratch-recovery|{}|{}|{}",
+                config.runtime_id,
+                config.workspace_id,
+                binding.recovery_binding_hash()
+            )
+            .as_bytes(),
+        );
+        self.append_audit(
+            "agent-task-scratch-recovery:start",
+            "Agent Task scratch回復",
+            "received",
+            "Capability=Broker管理scratch回復 Permission=現在登録Workspaceの直接子で実体identityが一致するBroker記録対象だけを削除 Approval=新しい権限を付与せず過去Taskの実行許可を再利用しない RecoveryAction=不一致・予約のみ・unsafe pathは保持してWorkspace Taskを拒否",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &request_hash,
+        )
+        .map_err(|_| "Agent Task scratch回復の開始監査を確定できない")?;
+        let outcomes = journal.recover_workspace(
+            &config.runtime_id,
+            &config.workspace_id,
+            binding.recovery_binding_hash(),
+            &root,
+            actual_root,
+        );
+        for (index, outcome) in outcomes.iter().enumerate() {
+            let outcome_hash = sha256_tagged(
+                format!("{}|{}|{:?}", request_hash, index, outcome).as_bytes(),
+            );
+            self.append_audit(
+                &format!("agent-task-scratch-recovery:{index}"),
+                "Agent Task scratch回復",
+                if matches!(outcome, super::agent_task_scratch::RecoveryOutcome::Removed | super::agent_task_scratch::RecoveryOutcome::MissingReconciled | super::agent_task_scratch::RecoveryOutcome::ReservedMissingReconciled) { "recorded" } else { "suspended" },
+                "Broker回復journalと現在Workspace bindingに対する限定回復結果。path・Task本文・資格は監査へ含めない",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+                &outcome_hash,
+            )
+            .map_err(|_| "Agent Task scratch回復結果の監査を確定できない")?;
+        }
+        Ok(())
     }
 
     /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
@@ -2540,7 +2616,7 @@ impl Broker {
         };
         let mut 対話 = std::mem::take(&mut self.対話);
         let now = self.current_epoch_seconds();
-        let result = 対話.操作_作業領域結合済み(operation.as_str(), payload, owner, now, workspace_binding.as_ref(), &mut |reason, id, hash| {
+        let result = 対話.操作_作業領域結合済み_scratch(operation.as_str(), payload, owner, now, workspace_binding.as_ref(), self.agent_task_scratch.clone(), &mut |reason, id, hash| {
             let event = self.append_audit(id, operation.as_str(), "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash).map_err(|_| 対話失敗::監査失敗)?;
             last_event = event.event_id.clone(); Ok(event.event_id)
         });

@@ -9,6 +9,12 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### Phase 7 Broker crash後のAgent Task scratch回復（2026-09-28）
+
+Agent Task専用scratchを、作成前にBroker永続storeへ予約し、nofollow open後のroot／scratch identity取得を経て`active`へ進めるbounded HMAC-authenticated journalを追加した。再起動ごとに変わる権限用registration hashとは分離した安定`recovery_binding_hash`を、Runtime／Workspace ID・除外指定・root／祖先identityからBrokerが再計算する。起動時はWorkspace登録後・IPC listener開始前に、現在のbindingとidentityがすべて一致する直接子scratchだけをhandle経由で削除し、欠損pathは記録のみ解消する。予約だけで実体identityがないpath、別登録、reparse、identity不一致、破損journalは削除せず保持し、未解決WorkspaceのTaskを拒否する。本文、絶対path、Credential、Permission、Approval、出力はjournalへ保存しない。
+
+局所契約・Schema・負例・Rust試験を追加した。Schema 145件、正常例145件、negative fixture 179件、Conformance 225 checks、厳格日本語監査、開発validator登録済み10検査、`cargo check --all-targets`、回復journalのfocused Rust試験7件は成功。最新`cargo test --all-targets -- --test-threads=1`ではライブラリ試験320件が成功した後、CLI用試験実行fileがWindows Application ControlのOS error 4551で起動前に拒否され、全対象試験は未完了。Windows全target gateを維持する。`task_execution=unsupported`、release blocker 31件、`release_ready=false`も維持する。回復処理のWindows Broker crash・power-loss `LIVE_RUNTIME`検証は未成立であり、Agent Taskの実環境cleanup保証を主張しない。
+
 ### Phase 7 Windows permission profile deny-read実測失敗（2026-09-28）
 
 Codex sandbox helperへ`d4p-agent-task` profileを明示し、非秘密の合成`probe.env`を読む負例を、OneDrive配下と非OneDriveの短いmanaged worktreeの両方で実行した。どちらもmarker本文が読めた。非OneDrive fileのACLには`CodexSandboxUsers`の継承`Modify`／`Read & execute`許可より後に`DENY(Read)`があり、読取denyは実効していない。OneDrive側fileはCloud Filesの`ReparsePoint`でもあり、別の証拠境界として扱う。

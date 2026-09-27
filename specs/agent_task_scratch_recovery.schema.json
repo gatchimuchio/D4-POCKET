@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_scratch_recovery.schema.json",
+  "title": "Agent Task scratch回復記録",
+  "description": "Broker専用のbounded回復journal。Task本文、絶対path、Permission、Approval、Credential、出力本文を含めない。",
+  "type": "object",
+  "required": ["version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "entries": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "required": [
+          "record_id", "task_id", "runtime_id", "workspace_id",
+          "recovery_binding_hash", "root_device", "root_file_id",
+          "scratch_name", "scratch_device", "scratch_file_id", "state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "record_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+          "task_id": {"$ref": "#/$defs/identifier"},
+          "runtime_id": {"$ref": "#/$defs/identifier"},
+          "workspace_id": {"$ref": "#/$defs/identifier"},
+          "recovery_binding_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "root_device": {"type": "integer", "minimum": 0},
+          "root_file_id": {"type": "integer", "minimum": 1},
+          "scratch_name": {"type": "string", "pattern": "^\\.d4p-tmp-[a-f0-9]{32}$"},
+          "scratch_device": {"type": ["integer", "null"], "minimum": 0},
+          "scratch_file_id": {"type": ["integer", "null"], "minimum": 1},
+          "state": {"type": "string", "enum": ["reserved", "active"]}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"state": {"const": "active"}}, "required": ["state"]},
+            "then": {
+              "properties": {
+                "scratch_device": {"type": "integer", "minimum": 0},
+                "scratch_file_id": {"type": "integer", "minimum": 1}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"state": {"const": "reserved"}}, "required": ["state"]},
+            "then": {"properties": {"scratch_device": {"type": "null"}, "scratch_file_id": {"type": "null"}}}
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    }
+  }
+}

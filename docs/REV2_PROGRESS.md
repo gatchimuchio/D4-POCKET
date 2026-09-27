@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Broker crash後scratch回復の実装（2026-09-28）
+
+Codex Agent Taskのscratch directoryをBroker再起動後に限定回収するため、HMAC認証・bounded永続journal、`reserved`／`active`状態、stable `recovery_binding_hash`、Workspace登録後かつIPC listener開始前のreaperを追加した。権限用の揮発registration hashは再起動ごとに変化するためjournalへ流用せず、recovery bindingをRuntime／Workspace ID、secret除外指定、rootと祖先のdevice/file identityから再計算する。削除条件は現在登録とのbinding一致、root identity一致、scratch直接子名の固定形式、nofollow open、active recordの実directory identity一致である。予約だけでidentity未確認、別登録、reparse、identity不一致、破損journalは削除せず保持し、Workspaceに未解決記録がある間はAgent Taskを拒否する。本文、absolute path、Credential、Permission、Approval、出力はjournalへ保存しない。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: 成功。Schema 145、正常例145、negative fixture179。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 成功。225 checks。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 成功。負債file 0、finding 0。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済み10検査が成功。これは開発検証であり、release_ready=false、release blocker 31件を維持する。
+- `cargo check --all-targets`: 成功。
+- `cargo test --lib broker::agent_task_scratch::tests -- --test-threads=1`: 7件成功。永続journal再読込・一致identity回収、binding／root identity不一致の保護、reserved path保護、scratch名再利用後のidentity不一致保護、HMAC改竄拒否、消失path記録の照合解消を検査。
+- 最新`cargo test --all-targets -- --test-threads=1`: library 320件は全件成功。その後`gui_shell_desktop_launcher` test executableがWindows Application ControlのOS error 4551で起動前に拒否され、全targetは未完了。これより前の実行も別targetの起動拒否で停止しており、成功へ読み替えない。
+
+7件のunit testと225件のConformanceは局所実装／Contractの証拠で、Windows上のBroker強制終了／電源断を伴う`LIVE_RUNTIME` cleanup証拠ではない。Codex metadata `task_execution=unsupported`、`release_ready=false`、release blockerを維持し、有料資格による実Agent実行はしていない。
+
 ## D4 Pocket Phase 7 Windows permission profile deny-read実測失敗（2026-09-28）
 
 前節で組み立てた`d4p-agent-task`をCodex sandbox helperへ明示指定し、秘密値を含まない合成marker `D4P_DENY_PROBE=NON_SECRET_SYNTHETIC_MARKER`を`tooling/.codex-profile-probe/probe.env`へ置いて読取拒否を検証した。OneDrive配下の製品checkoutと`C:\Users\ohira\.codex\worktrees\windows-release-clean\D4ポケット`の非OneDrive managed worktreeの両方で、`cmd.exe /d /c type ...probe.env`がmarker本文を出力しexit 0となった。検証後、両markerは削除した。

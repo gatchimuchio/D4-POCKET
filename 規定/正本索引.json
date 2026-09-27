@@ -156,6 +156,10 @@
       "責任": "本文hashとBroker計算の実行条件hashへ結合した、未実行・5分期限・未消費Agent Task Owner Approval receipt"
     },
     {
+      "path": "specs/agent_task_scratch_recovery.schema.json",
+      "責任": "Broker専用scratch回復journalのbounded記録。作業本文・絶対path・資格・Authorityを含めない"
+    },
+    {
       "path": "tooling/conformance_tests/",
       "責任": "契約適合と拒否経路の検証"
     },

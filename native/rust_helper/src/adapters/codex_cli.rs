@@ -161,11 +161,17 @@ impl 実行系Adapter for CodexCliAdapter {
         instruction: &str,
         cancel: &AtomicBool,
         deadline: Instant,
+        context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
     ) -> Result<String, 対話失敗> {
         if !self.AgentTask実行対応() {
             return Err(対話失敗::AgentTask非対応);
         }
-        let mut scratch = WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity)?;
+        let context = context.ok_or(対話失敗::AgentTask非対応)?;
+        let mut scratch = WorkspaceTaskScratch::create(
+            &self.workspace,
+            self.workspace_identity,
+            &context,
+        )?;
         let result = run_agent_task(
             &self.executable,
             &self.workspace,
@@ -405,13 +411,19 @@ struct WorkspaceTaskScratch {
     _workspace_dir: Dir,
     scratch_dir: Option<Dir>,
     path: PathBuf,
+    journal: crate::broker::agent_task_scratch::AgentTaskScratchJournal,
+    record_id: String,
 }
 
 impl WorkspaceTaskScratch {
     fn create(
         workspace: &Path,
         expected: crate::broker::workspace_root::DirectoryIdentity,
+        context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
     ) -> Result<Self, 対話失敗> {
+        if context.root_identity != expected {
+            return Err(対話失敗::作業領域不在);
+        }
         let workspace_guard = pin_registered_workspace(workspace, expected)?;
         let workspace_dir = Dir::open_ambient_dir(workspace, cap_std::ambient_authority())
             .map_err(|_| 対話失敗::通信失敗)?;
@@ -430,23 +442,49 @@ impl WorkspaceTaskScratch {
             let mut nonce = [0u8; 16];
             getrandom::getrandom(&mut nonce).map_err(|_| 対話失敗::通信失敗)?;
             let name = format!(".d4p-tmp-{}", hex::encode(nonce));
+            let record_id = context
+                .journal
+                .reserve(
+                    &context.task_id,
+                    &context.runtime_id,
+                    &context.workspace_id,
+                    &context.recovery_binding_hash,
+                    expected,
+                    &name,
+                )
+                .map_err(|_| 対話失敗::通信失敗)?;
             match workspace_dir.create_dir(&name) {
                 Ok(()) => {
-                    let scratch_dir = match workspace_dir.open_dir_nofollow(&name) {
-                        Ok(dir) => dir,
-                        Err(_) => {
-                            let _ = workspace_dir.remove_dir_all(&name);
-                            return Err(対話失敗::通信失敗);
-                        }
+                    let scratch_dir = workspace_dir
+                        .open_dir_nofollow(&name)
+                        .map_err(|_| 対話失敗::通信失敗)?;
+                    let metadata = scratch_dir
+                        .dir_metadata()
+                        .map_err(|_| 対話失敗::通信失敗)?;
+                    let scratch_identity = crate::broker::workspace_root::DirectoryIdentity {
+                        device: cap_fs_ext::MetadataExt::dev(&metadata),
+                        file_id: cap_fs_ext::MetadataExt::ino(&metadata),
                     };
+                    context
+                        .journal
+                        .activate(&record_id, scratch_identity)
+                        .map_err(|_| 対話失敗::通信失敗)?;
                     return Ok(Self {
                         _workspace_guard: workspace_guard,
                         _workspace_dir: workspace_dir,
                         scratch_dir: Some(scratch_dir),
                         path: workspace.join(name),
+                        journal: context.journal.clone(),
+                        record_id,
                     });
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    context
+                        .journal
+                        .complete(&record_id)
+                        .map_err(|_| 対話失敗::通信失敗)?;
+                    continue;
+                }
                 Err(_) => return Err(対話失敗::通信失敗),
             }
         }
@@ -462,6 +500,9 @@ impl WorkspaceTaskScratch {
             .take()
             .ok_or(対話失敗::通信失敗)?
             .remove_open_dir_all()
+            .map_err(|_| 対話失敗::通信失敗)?;
+        self.journal
+            .complete(&self.record_id)
             .map_err(|_| 対話失敗::通信失敗)
     }
 }
@@ -469,7 +510,9 @@ impl WorkspaceTaskScratch {
 impl Drop for WorkspaceTaskScratch {
     fn drop(&mut self) {
         if let Some(dir) = self.scratch_dir.take() {
-            let _ = dir.remove_open_dir_all();
+            if dir.remove_open_dir_all().is_ok() {
+                let _ = self.journal.complete(&self.record_id);
+            }
         }
     }
 }
@@ -701,6 +744,19 @@ mod tests {
     use super::*;
     use std::fs;
 
+    fn scratch_context(
+        identity: crate::broker::workspace_root::DirectoryIdentity,
+    ) -> crate::broker::agent_task_scratch::AgentTaskScratchContext {
+        crate::broker::agent_task_scratch::AgentTaskScratchContext {
+            task_id: "task-fixture".into(),
+            runtime_id: "runtime-fixture".into(),
+            workspace_id: "workspace-fixture".into(),
+            recovery_binding_hash: format!("sha256:{}", "a".repeat(64)),
+            root_identity: identity,
+            journal: crate::broker::agent_task_scratch::AgentTaskScratchJournal::in_memory(),
+        }
+    }
+
     #[test]
     fn 実物jsonlのfinal_messageだけを本文へ射影する() {
         let output =
@@ -795,7 +851,7 @@ mod tests {
         };
         assert!(!adapter.AgentTask実行対応());
         assert_eq!(
-            adapter.AgentTask実行("test", &AtomicBool::new(false), Instant::now()),
+            adapter.AgentTask実行("test", &AtomicBool::new(false), Instant::now(), None),
             Err(対話失敗::AgentTask非対応)
         );
         let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config";
@@ -821,13 +877,15 @@ mod tests {
             .expect("Workspaceを固定")
             .identity;
 
-        let mut scratch =
-            WorkspaceTaskScratch::create(&workspace, identity).expect("Workspace内scratchを作成");
+        let context = scratch_context(identity);
+        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
+            .expect("Workspace内scratchを作成");
         let scratch_path = scratch.path().to_path_buf();
         assert_eq!(scratch_path.parent(), Some(workspace.as_path()));
         fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
         scratch.cleanup().expect("scratchを明示削除");
         assert!(!scratch_path.exists());
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         drop(scratch);
         std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
@@ -850,12 +908,14 @@ mod tests {
         let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
             .expect("Workspaceを固定")
             .identity;
-        let scratch =
-            WorkspaceTaskScratch::create(&workspace, identity).expect("Workspace内scratchを作成");
+        let context = scratch_context(identity);
+        let scratch = WorkspaceTaskScratch::create(&workspace, identity, &context)
+            .expect("Workspace内scratchを作成");
         let scratch_path = scratch.path().to_path_buf();
         fs::write(scratch_path.join("fixture.tmp"), b"bounded").expect("scratch内file");
         drop(scratch);
         assert!(!scratch_path.exists());
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
 

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "record_id": "0123456789abcdef0123456789abcdef",
+      "task_id": "agent-task-1",
+      "runtime_id": "codex-runtime-1",
+      "workspace_id": "workspace-1",
+      "recovery_binding_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "root_device": 1,
+      "root_file_id": 10,
+      "scratch_name": ".d4p-tmp-0123456789abcdef0123456789abcdef",
+      "scratch_device": 1,
+      "scratch_file_id": 11,
+      "state": "active"
+    },
+    {
+      "record_id": "1123456789abcdef0123456789abcdef",
+      "task_id": "agent-task-2",
+      "runtime_id": "codex-runtime-1",
+      "workspace_id": "workspace-1",
+      "recovery_binding_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "root_device": 1,
+      "root_file_id": 10,
+      "scratch_name": ".d4p-tmp-1123456789abcdef0123456789abcdef",
+      "scratch_device": null,
+      "scratch_file_id": null,
+      "state": "reserved"
+    }
+  ]
+}

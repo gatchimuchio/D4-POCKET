@@ -14,6 +14,7 @@ const MAX_REPLAY_NONCE_RECORDS: usize = 100_000;
 const MAX_A2A_STATE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HOST_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_AGENT_TASK_SCRATCH_STATE_BYTES: usize = 512 * 1024;
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
 
@@ -31,6 +32,8 @@ pub enum BrokerStoreError {
     MalformedA2aState(String),
     MalformedHostState(String),
     MalformedAdapterState(String),
+    MalformedAgentTaskScratchState(String),
+    TamperedAgentTaskScratchState(String),
     MalformedFirstRunConfiguration(String),
     MissingFirstRunConfiguration,
 }
@@ -50,6 +53,8 @@ impl BrokerStoreError {
             | BrokerStoreError::MalformedA2aState(message)
             | BrokerStoreError::MalformedHostState(message)
             | BrokerStoreError::MalformedAdapterState(message) => message.clone(),
+            BrokerStoreError::MalformedAgentTaskScratchState(message)
+            | BrokerStoreError::TamperedAgentTaskScratchState(message) => message.clone(),
             BrokerStoreError::MalformedFirstRunConfiguration(message) => message.clone(),
             BrokerStoreError::MissingFirstRunConfiguration => "初回設定fileが存在しない".to_string(),
         }
@@ -77,6 +82,7 @@ pub struct BrokerPersistentStore {
     a2a_path: PathBuf,
     host_path: PathBuf,
     adapter_path: PathBuf,
+    agent_task_scratch_path: PathBuf,
     setup_doctor_report_path: PathBuf,
     first_run_configuration_path: PathBuf,
     audit_anchor_key: Vec<u8>,
@@ -101,6 +107,14 @@ struct AuditAnchorRecord {
     event_count: usize,
     head_event_hash: Option<String>,
     anchor_hmac: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SignedAgentTaskScratchState {
+    version: u8,
+    state: Value,
+    hmac: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -142,6 +156,7 @@ impl BrokerPersistentStore {
             a2a_path: root.join("a2a_connections.json"),
             host_path: root.join("hosts.json"),
             adapter_path: root.join("adapters.json"),
+            agent_task_scratch_path: root.join("agent_task_scratch_recovery.json"),
             setup_doctor_report_path: root.join("setup_doctor_report.json"),
             first_run_configuration_path: root.join("first_run_configuration.json"),
             audit_anchor_key: load_or_create_anchor_key(&root.join("audit_anchor.key"))?,
@@ -431,6 +446,90 @@ impl BrokerPersistentStore {
         }
         atomic_write(&self.adapter_path, serialized.as_bytes()).map_err(|error| {
             BrokerStoreError::Io(format!("broker Adapter stateの書込みに失敗: {error}"))
+        })
+    }
+
+    /// Broker Task scratch回復記録を既存store keyで認証して読む。
+    /// 未作成時だけ空記録を初期化し、破損・改竄を空状態へ読み替えない。
+    pub(crate) fn load_agent_task_scratch_state(&self) -> Result<Value, BrokerStoreError> {
+        let metadata = match fs::symlink_metadata(&self.agent_task_scratch_path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let state = serde_json::json!({"version": 1, "entries": []});
+                self.write_agent_task_scratch_state(&state)?;
+                return Ok(state);
+            }
+            Err(error) => {
+                return Err(BrokerStoreError::MalformedAgentTaskScratchState(format!(
+                    "Agent Task scratch回復記録のmetadataを確認できない: {error}"
+                )));
+            }
+        };
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || is_reparse_point(&metadata)
+        {
+            return Err(BrokerStoreError::MalformedAgentTaskScratchState(
+                "Agent Task scratch回復記録は通常fileに限る".to_string(),
+            ));
+        }
+        if metadata.len() > MAX_AGENT_TASK_SCRATCH_STATE_BYTES as u64 {
+            return Err(BrokerStoreError::MalformedAgentTaskScratchState(
+                "Agent Task scratch回復記録がbounded上限を超過".to_string(),
+            ));
+        }
+        let raw = fs::read_to_string(&self.agent_task_scratch_path).map_err(|error| {
+            BrokerStoreError::MalformedAgentTaskScratchState(format!(
+                "Agent Task scratch回復記録を読めない: {error}"
+            ))
+        })?;
+        let value = crate::broker::json_input::read_unique(&raw).map_err(|error| {
+            BrokerStoreError::MalformedAgentTaskScratchState(format!(
+                "Agent Task scratch回復記録のJSONが不正: {error}"
+            ))
+        })?;
+        let signed: SignedAgentTaskScratchState = serde_json::from_value(value).map_err(|_| {
+            BrokerStoreError::MalformedAgentTaskScratchState(
+                "Agent Task scratch回復記録の構造が不正".to_string(),
+            )
+        })?;
+        if signed.version != 1 {
+            return Err(BrokerStoreError::MalformedAgentTaskScratchState(
+                "Agent Task scratch回復記録の版が非対応".to_string(),
+            ));
+        }
+        let expected = agent_task_scratch_state_hmac(&self.audit_anchor_key, &signed.state);
+        if !constant_time_equal(expected.as_bytes(), signed.hmac.as_bytes()) {
+            return Err(BrokerStoreError::TamperedAgentTaskScratchState(
+                "Agent Task scratch回復記録の認証に失敗".to_string(),
+            ));
+        }
+        Ok(signed.state)
+    }
+
+    pub(crate) fn write_agent_task_scratch_state(
+        &self,
+        state: &Value,
+    ) -> Result<(), BrokerStoreError> {
+        let signed = SignedAgentTaskScratchState {
+            version: 1,
+            state: state.clone(),
+            hmac: agent_task_scratch_state_hmac(&self.audit_anchor_key, state),
+        };
+        let serialized = serde_json::to_vec(&signed).map_err(|error| {
+            BrokerStoreError::MalformedAgentTaskScratchState(format!(
+                "Agent Task scratch回復記録を正本化できない: {error}"
+            ))
+        })?;
+        if serialized.len() > MAX_AGENT_TASK_SCRATCH_STATE_BYTES {
+            return Err(BrokerStoreError::MalformedAgentTaskScratchState(
+                "Agent Task scratch回復記録がbounded上限を超過".to_string(),
+            ));
+        }
+        atomic_write(&self.agent_task_scratch_path, &serialized).map_err(|error| {
+            BrokerStoreError::Io(format!(
+                "Agent Task scratch回復記録を耐久保存できない: {error}"
+            ))
         })
     }
 
@@ -930,6 +1029,21 @@ fn append_jsonl_line(path: &Path, serialized: &str) -> std::io::Result<()> {
     file.write_all(serialized.as_bytes())?;
     file.write_all(b"\n")?;
     file.sync_data()
+}
+
+fn agent_task_scratch_state_hmac(key: &[u8], state: &Value) -> String {
+    let input = format!("version=1|state={state}");
+    hmac_sha256_tagged(key, input.as_bytes())
+}
+
+fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0u8, |difference, (left, right)| difference | (left ^ right))
+        == 0
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {

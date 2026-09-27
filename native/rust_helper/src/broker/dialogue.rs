@@ -123,6 +123,7 @@ pub trait 実行系Adapter: Send + Sync {
         _instruction: &str,
         _cancel: &AtomicBool,
         _deadline: Instant,
+        _context: Option<super::agent_task_scratch::AgentTaskScratchContext>,
     ) -> Result<String, 対話失敗> {
         Err(対話失敗::AgentTask非対応)
     }
@@ -1039,6 +1040,31 @@ impl 対話制御 {
         作業領域結合: Option<&super::workspace::DialogueWorkspaceBinding>,
         監査: &mut 監査器<'_>,
     ) -> Result<Value, 対話失敗> {
+        #[cfg(test)]
+        let scratch_journal = Some(super::agent_task_scratch::AgentTaskScratchJournal::in_memory());
+        #[cfg(not(test))]
+        let scratch_journal = None;
+        self.操作_作業領域結合済み_scratch(
+            操作,
+            値,
+            owner,
+            現在,
+            作業領域結合,
+            scratch_journal,
+            監査,
+        )
+    }
+
+    pub(crate) fn 操作_作業領域結合済み_scratch(
+        &mut self,
+        操作: &str,
+        値: &Value,
+        owner: bool,
+        現在: i64,
+        作業領域結合: Option<&super::workspace::DialogueWorkspaceBinding>,
+        scratch_journal: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
+        監査: &mut 監査器<'_>,
+    ) -> Result<Value, 対話失敗> {
         if matches!(操作, "対話承認" | "対話承認待ち") && !owner {
             return Err(対話失敗::権限拒否);
         }
@@ -1352,6 +1378,12 @@ impl 対話制御 {
                 {
                     return Err(対話失敗::作業領域不在);
                 }
+                let scratch_journal = scratch_journal
+                    .clone()
+                    .ok_or(対話失敗::AgentTask非対応)?;
+                if scratch_journal.has_pending_workspace(&request.workspace_id) {
+                    return Err(対話失敗::権限拒否);
+                }
                 let session = self
                     .セッション
                     .get(&request.session_id)
@@ -1442,6 +1474,14 @@ impl 対話制御 {
                 let cancel = Arc::new(AtomicBool::new(false));
                 let worker_cancel = Arc::clone(&cancel);
                 let instruction = request.instruction;
+                let execution_context = super::agent_task_scratch::AgentTaskScratchContext {
+                    task_id: task_id.clone(),
+                    runtime_id: request.agent_runtime_id.clone(),
+                    workspace_id: request.workspace_id.clone(),
+                    recovery_binding_hash: binding.recovery_binding_hash().to_string(),
+                    root_identity: binding.root_directory_identity(),
+                    journal: scratch_journal,
+                };
                 let (send, receive) = mpsc::sync_channel(1);
                 let spawn_result = std::thread::Builder::new()
                     .name("AgentTask実行".into())
@@ -1452,7 +1492,12 @@ impl 対話制御 {
                             Err(対話失敗::期限超過)
                         } else {
                             AgentTask結果hash化(
-                                adapter.AgentTask実行(&instruction, &worker_cancel, deadline),
+                                adapter.AgentTask実行(
+                                    &instruction,
+                                    &worker_cancel,
+                                    deadline,
+                                    Some(execution_context),
+                                ),
                                 &worker_cancel,
                                 deadline,
                             )
@@ -2376,6 +2421,7 @@ mod tests {
             _: &str,
             cancel: &AtomicBool,
             deadline: Instant,
+            _: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
         ) -> Result<String, 対話失敗> {
             self.回数.fetch_add(1, Ordering::SeqCst);
             if self.遅延 {

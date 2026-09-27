@@ -170,6 +170,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_session",
     "agent_workspace",
     "agent_task",
+    "agent_task_scratch_recovery",
     "agent_task_request",
     "agent_task_workspace_permission_request",
     "agent_task_workspace_permission",
@@ -7261,6 +7262,45 @@ def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[
     return errors
 
 
+def test_agent_task_scratch_recovery_journal_is_bounded_and_content_free() -> list[str]:
+    schema = load_schema("agent_task_scratch_recovery.schema.json")
+    valid = load_contract_fixture("agent_task_scratch_recovery.valid.json")
+    invalid = load_contract_fixture(
+        "invalid/agent_task_scratch_recovery_absolute_path.invalid.json"
+    )
+    errors = validate_instance(valid, schema)
+    if validate_instance(invalid, schema) == []:
+        errors.append("Agent Task scratch回復Schemaが絶対pathを拒否しない")
+    entry = valid["entries"][0]
+    for field in (
+        "instruction",
+        "agent_output",
+        "credential",
+        "permission_id",
+        "approval_id",
+        "workspace_path",
+    ):
+        if validate_instance({**valid, "entries": [{**entry, field: "untrusted"}]}, schema) == []:
+            errors.append(f"Agent Task scratch回復記録が秘密／authority fieldを受理した: {field}")
+    active_without_identity = {**entry, "scratch_file_id": None}
+    if validate_instance({**valid, "entries": [active_without_identity]}, schema) == []:
+        errors.append("active scratch記録が実体identity欠落を受理した")
+    if validate_instance({**valid, "entries": valid["entries"] * 129}, schema) == []:
+        errors.append("Agent Task scratch回復記録が256件上限を超過した")
+
+    contract = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
+    journal_source = (RUST_HELPER / "src" / "broker" / "agent_task_scratch.rs").read_text(
+        encoding="utf-8"
+    )
+    for required in ("recovery_binding_hash", "reserved", "active", "HMAC", "unsupported"):
+        if required not in contract:
+            errors.append(f"Agent Runtime正本がscratch回復境界を規定しない: {required}")
+    for required in ("recover_workspace", "remove_open_dir_all", "open_dir_nofollow"):
+        if required not in journal_source:
+            errors.append(f"scratch回復journalが必要な限定処理を持たない: {required}")
+    return errors
+
+
 def test_agent_secret_path_read_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -9128,6 +9168,7 @@ def main() -> int:
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed,
         test_agent_task_state_record_is_versioned_scoped_and_content_free,
+        test_agent_task_scratch_recovery_journal_is_bounded_and_content_free,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,

@@ -8,6 +8,7 @@ pub(crate) mod credential_vault;
 pub mod audit;
 pub(crate) mod workspace;
 pub(crate) mod workspace_root;
+pub(crate) mod agent_task_scratch;
 pub(crate) mod json_input;
 pub mod dialogue;
 pub(crate) mod device_link;

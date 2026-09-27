@@ -34,6 +34,7 @@ struct RegisteredWorkspace {
     root_ancestry: Vec<super::workspace_root::DirectoryIdentity>,
     root_ancestry_complete: bool,
     registration_hash: String,
+    recovery_binding_hash: String,
     reader: WorkspaceReader,
     grant: Option<Grant>,
     baseline: Option<Baseline>,
@@ -45,6 +46,7 @@ pub(crate) struct DialogueWorkspaceBinding {
     runtime: String,
     workspace_id: String,
     registration_hash: String,
+    recovery_binding_hash: String,
     root_identity: super::workspace_root::DirectoryIdentity,
 }
 
@@ -61,8 +63,16 @@ impl DialogueWorkspaceBinding {
         &self.registration_hash
     }
 
+    pub(crate) fn recovery_binding_hash(&self) -> &str {
+        &self.recovery_binding_hash
+    }
+
     pub(crate) fn root_identity(&self) -> super::dialogue::AgentTaskWorkspaceIdentity {
         super::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(self.root_identity)
+    }
+
+    pub(crate) fn root_directory_identity(&self) -> super::workspace_root::DirectoryIdentity {
+        self.root_identity
     }
 
     pub(crate) fn audit_hash(&self, session_id: &str) -> String {
@@ -107,6 +117,7 @@ impl DialogueWorkspaceBinding {
             runtime: runtime.to_owned(),
             workspace_id: workspace_id.to_owned(),
             registration_hash: registration_hash.to_owned(),
+            recovery_binding_hash: format!("sha256:{}", "b".repeat(64)),
             root_identity,
         }
     }
@@ -180,6 +191,7 @@ impl WorkspaceRegistry {
             runtime: runtime.to_owned(),
             workspace_id: workspace_id.to_owned(),
             registration_hash: entry.registration_hash.clone(),
+            recovery_binding_hash: entry.recovery_binding_hash.clone(),
             root_identity: super::workspace_root::DirectoryIdentity {
                 device: entry.root_device,
                 file_id: entry.root_file_id,
@@ -249,13 +261,16 @@ impl WorkspaceRegistry {
             return Err("別Agentとの親子Workspace範囲重複を拒否");
         }
         let reader = WorkspaceReader::from_registered_dir(root, secrets).map_err(|_| "作業領域の除外指定が不正")?;
+        let recovery_binding_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"除外":secrets,
+            "root_device":root_device,"root_file_id":root_file_id,
+            "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}));
         let nonce = 識別子生成().map_err(|_| "登録識別子を生成できない")?;
         let registration_hash = digest(&json!({"実行系ID":runtime,"作業領域ID":id,"登録識別子":nonce,"除外":secrets,
             "root_device":root_device,"root_file_id":root_file_id,
             "root_ancestry":root_ancestry.iter().map(|identity|json!({"device":identity.device,"file_id":identity.file_id})).collect::<Vec<_>>()}));
         audit("作業領域登録・Permission拒否", &registration_hash)?;
         self.entries.insert(id.into(), RegisteredWorkspace {
-            runtime:runtime.into(),root_device,root_file_id,root_ancestry,root_ancestry_complete,registration_hash,reader,grant:None,baseline:None,
+            runtime:runtime.into(),root_device,root_file_id,root_ancestry,root_ancestry_complete,registration_hash,recovery_binding_hash,reader,grant:None,baseline:None,
         });
         Ok(())
     }

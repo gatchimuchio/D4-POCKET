@@ -382,8 +382,8 @@ known limitation を認める条件は、次のとおりである。
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
   status: unresolved
-  reason: 前回clean sourceでは全335件が成功し一度解消したが、2026-09-27の最新再確認ではRust library 296件、main.rs 9件、broker_ipc 10件、canonical_decimal_hash 1件、checkpoint 8件、protected_data 2件、protected_startup 1件が成功した後、protected_storeの試験実行fileがWindows Application Control（OS error 4551）に起動拒否され、全対象実行が停止した。protected_store 3件は未実行。同日の個別実行でworkspace_diff 2件とworkspace_reader 2件は成功したが、workspace_startup 7件は同errorで起動前に拒否された。合計331件は成功、10件は未実行であり、全対象完了ではない。別実行のA2A接続loopback試験の間欠失敗291/292件も履歴に保持する。さらにOneDrive外の`C:\D4Pocket`での`cargo test --locked`でも`generic-array`／`io-extras` build scriptが同じOS error 4551で拒否されたため、短縮pathだけでは解消しないことを確認した。2026-09-28の現行source commit `f4bf6b0e65e751da8b662595f2e9865970c6f460`でも、非OneDriveの短いmanaged worktreeでの`--all-targets`が`io-lifetimes` build scriptの起動前に拒否され、別target directory `C:\D4Pocket\codex-f4-target`での再実行も`generic-array`／`io-extras` build scriptで同じOS error 4551となった。いずれもtest executableは完遂していない。policy変更、拒否fileの移動・再配置、試験除外は行っていない。
-  required_action: Windows Application Controlを変更・回避せず、承認済み条件で全target試験を再実行する。process起動を含むworkspace／Broker integration suiteの全件成功を確認するまでresolvedへ戻さない。
+  reason: 過去のclean sourceで全target成功した記録は履歴として保持する。2026-09-28の本作業sourceでは`cargo check --all-targets`とscratch focused Rust 7件が成功し、最新の`cargo test --all-targets -- --test-threads=1`はlibrary 320件が成功した後、`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）に起動前拒否されて停止した。全target完了ではない。直前の実行も別test executableが同errorで起動拒否された。さらにOneDrive外の短いmanaged worktreeと別Cargo target directoryでも過去の現行source build script起動が拒否された記録がある。policy変更、拒否fileの移動・再配置、試験除外は行っていない。
+  required_action: Windows Application Controlを変更・回避せず、承認済み条件で全target試験を再実行する。process起動を含むworkspace／Broker integration suiteを含め全件成功するまでresolvedへ戻さない。過去commit、focused test、compile成功を現行sourceの全target成功へ読み替えない。
   blocks_release: yes
 
 - item: Windows loopback HTTP fixture試験のConnectionReset揺らぎ
