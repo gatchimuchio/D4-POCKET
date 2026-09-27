@@ -7009,8 +7009,8 @@ def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> lis
     contract_text = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
     if "対話Approval" not in contract_text:
         errors.append("Agent Runtime正本が対話Approvalと作業Task Approvalの分離を定義しない")
-    if "未接続" not in contract_text:
-        errors.append("Agent Runtime正本が要求Schemaの未接続状態を明示しない")
+    if "Agent TaskのBroker実行Consumer" not in contract_text:
+        errors.append("Agent Runtime正本がTask requestのBroker consumerを示さない")
     return errors
 
 
@@ -7027,6 +7027,9 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
         "Agent作業要求検査",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
+        "AgentTask実行",
+        "AgentTask状態",
+        "AgentTask取消",
     )
     errors: list[str] = []
     for operation in required_operations:
@@ -7036,6 +7039,33 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
             errors.append(f"Agent Broker操作がIPC応答Schemaにない: {operation}")
         if operation not in broker_source:
             errors.append(f"Agent Broker操作がRust protocolへ接続されていない: {operation}")
+    return errors
+
+
+def test_agent_task_id_operations_are_content_free_and_declared() -> list[str]:
+    schema = load_schema("agent_task_id_request.schema.json")
+    valid = load_contract_fixture("agent_task_id_request.valid.json")
+    errors = validate_instance(valid, schema)
+    escalation = load_contract_fixture(
+        "invalid/agent_task_id_request_escalation.invalid.json"
+    )
+    if validate_instance(escalation, schema) == []:
+        errors.append("Agent Task識別子要求が追加のscope fieldを受け入れる")
+    broker = (ROOT / "native/rust_helper/src/broker/dialogue.rs").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        "AgentTask実行対応",
+        "AgentTask実行",
+        "AgentTask進捗反映",
+        "AgentTask結果hash化",
+        "AGENT_TASK_RECORD_LIMIT",
+        "AgentTask状態射影",
+    ):
+        if required not in broker:
+            errors.append(f"Agent Task consumerが必須のbounded経路を欠く: {required}")
+    if '"description": "Agent作業Task（内容は別のWorkspace差分経路で確認）"' not in broker:
+        errors.append("Agent Task状態projectionのdescriptionが固定labelではない")
     return errors
 
 
@@ -9035,6 +9065,7 @@ def main() -> int:
         test_agent_workspace_outside_access_default_deny,
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_broker_operations_are_declared_in_ipc_contracts,
+        test_agent_task_id_operations_are_content_free_and_declared,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed,
         test_agent_task_state_record_is_versioned_scoped_and_content_free,

@@ -113,6 +113,19 @@ pub trait 実行系Adapter: Send + Sync {
     fn agent_metadata(&self) -> Option<Value> {
         None
     }
+    /// Agent Taskを実行する固定Adapter経路。既定では非対応とし、metadataだけで
+    /// 実行能力を追加できない。実装は期限・取消を守り、本文を外部へ記録しない。
+    fn AgentTask実行対応(&self) -> bool {
+        false
+    }
+    fn AgentTask実行(
+        &self,
+        _instruction: &str,
+        _cancel: &AtomicBool,
+        _deadline: Instant,
+    ) -> Result<String, 対話失敗> {
+        Err(対話失敗::AgentTask非対応)
+    }
     /// OS資源観測のためにBrokerだけが読むloopback接続先。権限や操作対象を生成しない。
     fn 観測対象(&self) -> Option<SocketAddr> {
         None
@@ -435,7 +448,56 @@ struct AgentTaskOwnerApproval記録 {
     monotonic_expiry: Instant,
 }
 
-const AGENT_TASK_EXECUTION_POLICY: &str = "gui-shell-agent-task-sandbox-v1";
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTask識別子要求 {
+    task_id: String,
+}
+
+struct AgentTask受信結果 {
+    result: Result<String, 対話失敗>,
+}
+
+struct AgentTask作業 {
+    task_id: String,
+    runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+    workspace_root_identity: AgentTaskWorkspaceIdentity,
+    instruction_hash: String,
+    status: &'static str,
+    audit_event_id: String,
+    result_hash: Option<String>,
+    cancel: Arc<AtomicBool>,
+    receiver: Option<mpsc::Receiver<AgentTask受信結果>>,
+    created_at: Instant,
+    deadline: Instant,
+}
+
+const AGENT_TASK_RECORD_LIMIT: usize = 128;
+const AGENT_TASK_EXECUTION_LIMIT: Duration = Duration::from_secs(900);
+
+const AGENT_TASK_EXECUTION_POLICY: &str = "gui-shell-agent-task-sandbox-v1-max-runtime-900s";
+
+fn AgentTask結果hash化(
+    result: Result<String, 対話失敗>,
+    cancel: &AtomicBool,
+    deadline: Instant,
+) -> Result<String, 対話失敗> {
+    if cancel.load(Ordering::SeqCst) {
+        return Err(対話失敗::取消);
+    }
+    if Instant::now() >= deadline {
+        return Err(対話失敗::期限超過);
+    }
+    result.and_then(|output| {
+        if output.len() > 1_048_576 {
+            Err(対話失敗::応答不正)
+        } else {
+            Ok(sha256_tagged(output.as_bytes()))
+        }
+    })
+}
 
 fn AgentTask実行条件hash(
     runtime_id: &str,
@@ -560,6 +622,7 @@ pub struct 対話制御 {
     作業: BTreeMap<String, 作業>,
     失効セッション: BTreeSet<String>,
     agent_task_permissions: BTreeMap<String, AgentTaskWorkspacePermission記録>,
+    agent_tasks: BTreeMap<String, AgentTask作業>,
 }
 impl std::fmt::Debug for 対話制御 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -573,6 +636,9 @@ impl Drop for 対話制御 {
     fn drop(&mut self) {
         for 作業 in self.作業.values() {
             作業.取消.store(true, Ordering::SeqCst);
+        }
+        for 作業 in self.agent_tasks.values() {
+            作業.cancel.store(true, Ordering::SeqCst);
         }
     }
 }
@@ -886,6 +952,13 @@ impl 対話制御 {
                 work.単調応答Millis = None;
             }
         }
+        for task in self.agent_tasks.values_mut() {
+            if sessions.contains(&task.session_id)
+                && matches!(task.status, "pending" | "running")
+            {
+                task.cancel.store(true, Ordering::SeqCst);
+            }
+        }
         for id in sessions {
             if let Some(session) = self.セッション.get_mut(id) {
                 session.状態 = "中止後隔離".into();
@@ -970,6 +1043,7 @@ impl 対話制御 {
             return Err(対話失敗::権限拒否);
         }
         self.進捗反映(現在, 監査)?;
+        self.AgentTask進捗反映(現在, 監査)?;
         let result = match 操作 {
             "実行系列挙" => {
                 空入力(値)?;
@@ -1250,6 +1324,237 @@ impl 対話制御 {
                     "uses_remaining": 1,
                     "status": "issued_unconsumed"
                 }))
+            }
+            "AgentTask実行" => {
+                let request: Agent作業要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.agent_runtime_id)
+                    || !Agent作業要求識別子妥当(&request.session_id)
+                    || !Agent作業要求識別子妥当(&request.workspace_id)
+                    || request.instruction.trim().is_empty()
+                    || request.instruction.chars().count() > 32_768
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let adapter = Arc::clone(
+                    self.実行系
+                        .get(&request.agent_runtime_id)
+                        .ok_or(対話失敗::実行系不在)?,
+                );
+                let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
+                if !AgentAdapterMetadata::read(&metadata)?.task_execution_supported()
+                    || !adapter.AgentTask実行対応()
+                {
+                    return Err(対話失敗::AgentTask非対応);
+                }
+                let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
+                if !binding.matches(&request.agent_runtime_id, &request.workspace_id)
+                    || adapter.作業領域実体識別子() != Some(binding.root_identity())
+                {
+                    return Err(対話失敗::作業領域不在);
+                }
+                let session = self
+                    .セッション
+                    .get(&request.session_id)
+                    .ok_or(対話失敗::セッション不一致)?;
+                if session.状態 != "利用中"
+                    || session.実行系ID != request.agent_runtime_id
+                    || session.作業領域ID.as_deref() != Some(request.workspace_id.as_str())
+                    || session.作業領域登録hash.as_deref() != Some(binding.registration_hash())
+                    || self.失効セッション.contains(&request.session_id)
+                {
+                    return Err(対話失敗::セッション不一致);
+                }
+                if self.agent_tasks.values().any(|task| {
+                    matches!(task.status, "pending" | "running")
+                        && (task.session_id == request.session_id
+                            || task.workspace_id == request.workspace_id
+                            || task.workspace_root_identity == binding.root_identity())
+                }) {
+                    return Err(対話失敗::権限拒否);
+                }
+                let instruction_hash = sha256_tagged(request.instruction.as_bytes());
+                if !self.agent_task_owner_approval_is_active(
+                    &request.session_id,
+                    &request.agent_runtime_id,
+                    &request.workspace_id,
+                    binding.registration_hash(),
+                    &instruction_hash,
+                    現在,
+                ) {
+                    return Err(対話失敗::権限拒否);
+                }
+                let grant = self
+                    .agent_task_permissions
+                    .get(&request.session_id)
+                    .ok_or(対話失敗::権限拒否)?;
+                // Grant期限は開始許可の期限。消費後の実行時間は別の固定上限でboundedにする。
+                let deadline = Instant::now() + AGENT_TASK_EXECUTION_LIMIT;
+                let permission_id = grant.permission_id.clone();
+                if Instant::now() >= deadline
+                    || self
+                        .agent_tasks
+                        .values()
+                        .filter(|task| task.status == "running")
+                        .count()
+                        >= 4
+                {
+                    return Err(対話失敗::権限拒否);
+                }
+                while self.agent_tasks.len() >= AGENT_TASK_RECORD_LIMIT {
+                    let oldest_terminal = self
+                        .agent_tasks
+                        .iter()
+                        .filter(|(_, task)| !matches!(task.status, "pending" | "running"))
+                        .min_by_key(|(_, task)| task.created_at)
+                        .map(|(task_id, _)| task_id.clone());
+                    if let Some(task_id) = oldest_terminal {
+                        self.agent_tasks.remove(&task_id);
+                    } else {
+                        return Err(対話失敗::要求不正);
+                    }
+                }
+                let task_id = 識別子生成()?;
+                let start_hash = sha256_tagged(
+                    json!({
+                        "task_id": task_id,
+                        "agent_runtime_id": request.agent_runtime_id,
+                        "session_id": request.session_id,
+                        "workspace_id": request.workspace_id,
+                        "instruction_hash": instruction_hash,
+                        "execution_conditions_hash": AgentTask実行条件hash(
+                            &request.agent_runtime_id,
+                            &request.session_id,
+                            &request.workspace_id,
+                            binding.registration_hash(),
+                            &permission_id,
+                        ),
+                    })
+                    .to_string()
+                    .as_bytes(),
+                );
+                let start_audit_id = 監査(
+                    "Agent Task実行開始（Permission／Owner Approval一回消費）",
+                    &task_id,
+                    &start_hash,
+                )?;
+                // Audit確定後、同じBroker排他区間内でgrantを消費してからworkerを起動する。
+                self.agent_task_permissions.remove(&request.session_id);
+                let cancel = Arc::new(AtomicBool::new(false));
+                let worker_cancel = Arc::clone(&cancel);
+                let instruction = request.instruction;
+                let (send, receive) = mpsc::sync_channel(1);
+                let spawn_result = std::thread::Builder::new()
+                    .name("AgentTask実行".into())
+                    .spawn(move || {
+                        let result = if worker_cancel.load(Ordering::SeqCst) {
+                            Err(対話失敗::取消)
+                        } else if Instant::now() >= deadline {
+                            Err(対話失敗::期限超過)
+                        } else {
+                            AgentTask結果hash化(
+                                adapter.AgentTask実行(&instruction, &worker_cancel, deadline),
+                                &worker_cancel,
+                                deadline,
+                            )
+                        };
+                        let _ = send.send(AgentTask受信結果 { result });
+                    });
+                let (status, receiver, audit_event_id) = match spawn_result {
+                    Ok(_) => ("running", Some(receive), start_audit_id),
+                    Err(_) => {
+                        let failure_hash = sha256_tagged(
+                            json!({"task_id": task_id, "status": "failed", "reason": "worker_start_failed"})
+                                .to_string()
+                                .as_bytes(),
+                        );
+                        let failure_audit = 監査(
+                            "Agent Task worker起動失敗 RecoveryAction=再試行前にRuntime状態確認",
+                            &task_id,
+                            &failure_hash,
+                        );
+                        let failure_audit_id = match failure_audit {
+                            Ok(event_id) => event_id,
+                            Err(error) => {
+                                self.agent_tasks.insert(
+                                    task_id.clone(),
+                                    AgentTask作業 {
+                                        task_id: task_id.clone(),
+                                        runtime_id: request.agent_runtime_id,
+                                        session_id: request.session_id,
+                                        workspace_id: request.workspace_id,
+                                        workspace_root_identity: binding.root_identity(),
+                                        instruction_hash,
+                                        status: "quarantined",
+                                        audit_event_id: start_audit_id,
+                                        result_hash: None,
+                                        cancel,
+                                        receiver: None,
+                                        created_at: Instant::now(),
+                                        deadline,
+                                    },
+                                );
+                                return Err(error);
+                            }
+                        };
+                        ("failed", None, failure_audit_id)
+                    }
+                };
+                let task = AgentTask作業 {
+                    task_id: task_id.clone(),
+                    runtime_id: request.agent_runtime_id,
+                    session_id: request.session_id,
+                    workspace_id: request.workspace_id,
+                    workspace_root_identity: binding.root_identity(),
+                    instruction_hash,
+                    status,
+                    audit_event_id,
+                    result_hash: None,
+                    cancel,
+                    receiver,
+                    created_at: Instant::now(),
+                    deadline,
+                };
+                let body = AgentTask状態射影(&task);
+                self.agent_tasks.insert(task_id, task);
+                Ok(body)
+            }
+            "AgentTask状態" => {
+                let request: AgentTask識別子要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.task_id) {
+                    return Err(対話失敗::要求不正);
+                }
+                let task = self
+                    .agent_tasks
+                    .get(&request.task_id)
+                    .ok_or(対話失敗::要求不正)?;
+                Ok(AgentTask状態射影(task))
+            }
+            "AgentTask取消" => {
+                let request: AgentTask識別子要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.task_id) {
+                    return Err(対話失敗::要求不正);
+                }
+                let task = self
+                    .agent_tasks
+                    .get(&request.task_id)
+                    .filter(|task| matches!(task.status, "pending" | "running"))
+                    .ok_or(対話失敗::要求不正)?;
+                let event_hash = sha256_tagged(
+                    json!({"task_id": request.task_id, "instruction_hash": task.instruction_hash})
+                        .to_string()
+                        .as_bytes(),
+                );
+                監査(
+                    "Agent Task取消要求（Adapter終了確認待ち）",
+                    &request.task_id,
+                    &event_hash,
+                )?;
+                let task = self
+                    .agent_tasks
+                    .get_mut(&request.task_id)
+                    .ok_or(対話失敗::要求不正)?;
+                task.cancel.store(true, Ordering::SeqCst);
+                Ok(AgentTask状態射影(task))
             }
             "対話開始" => {
                 let 指定: 実行系指定 = 読取(値)?;
@@ -1532,6 +1837,10 @@ impl 対話制御 {
                     .作業
                     .values()
                     .any(|v| v.要求.対話セッションID == 指定.対話セッションID && v.受信.is_some())
+                    || self.agent_tasks.values().any(|task| {
+                        task.session_id == 指定.対話セッションID
+                            && matches!(task.status, "pending" | "running")
+                    })
                 {
                     return Err(対話失敗::セッション不一致);
                 }
@@ -1742,6 +2051,101 @@ impl 対話制御 {
         self.失効資源解放();
         Ok(())
     }
+
+    fn AgentTask進捗反映(
+        &mut self,
+        現在: i64,
+        監査: &mut 監査器<'_>,
+    ) -> Result<(), 対話失敗> {
+        let task_ids = self.agent_tasks.keys().cloned().collect::<Vec<_>>();
+        for task_id in task_ids {
+            let completed = {
+                let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                    continue;
+                };
+                if task.status != "running" {
+                    continue;
+                }
+                if Instant::now() >= task.deadline {
+                    task.cancel.store(true, Ordering::SeqCst);
+                }
+                match task.receiver.as_ref().map(mpsc::Receiver::try_recv) {
+                    Some(Ok(result)) => Some(result.result),
+                    Some(Err(mpsc::TryRecvError::Disconnected)) => Some(Err(対話失敗::通信失敗)),
+                    Some(Err(mpsc::TryRecvError::Empty)) | None => None,
+                }
+            };
+            let Some(result) = completed else {
+                continue;
+            };
+            let (status, result_hash, failure) = match result {
+                Ok(hash) if hash.starts_with("sha256:") && hash.len() == 71 => {
+                    ("completed", Some(hash), None)
+                }
+                Ok(_) => ("failed", None, Some(対話失敗::応答不正)),
+                Err(error) if error == 対話失敗::取消 => ("cancelled", None, Some(error)),
+                Err(error) => ("failed", None, Some(error)),
+            };
+            let event_hash = sha256_tagged(
+                json!({
+                    "task_id": task_id,
+                    "status": status,
+                    "instruction_hash": self.agent_tasks[&task_id].instruction_hash,
+                    "result_hash": result_hash,
+                    "failure_class": failure.map(対話失敗::分類),
+                    "completed_at": 現在,
+                })
+                .to_string()
+                .as_bytes(),
+            );
+            let event_id = match 監査(
+                if status == "completed" {
+                    "Agent Task完了（結果本文非保存・hashのみ）"
+                } else {
+                    "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）"
+                },
+                &task_id,
+                &event_hash,
+            ) {
+                Ok(event_id) => event_id,
+                Err(error) => {
+                    let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                        return Err(対話失敗::要求不正);
+                    };
+                    task.cancel.store(true, Ordering::SeqCst);
+                    task.receiver = None;
+                    task.status = "quarantined";
+                    return Err(error);
+                }
+            };
+            let Some(task) = self.agent_tasks.get_mut(&task_id) else {
+                return Err(対話失敗::要求不正);
+            };
+            task.receiver = None;
+            task.status = status;
+            task.result_hash = result_hash;
+            task.audit_event_id = event_id;
+        }
+        Ok(())
+    }
+}
+
+fn AgentTask状態射影(task: &AgentTask作業) -> Value {
+    let mut projection = json!({
+        "task_id": task.task_id,
+        "record_version": 2,
+        "agent_runtime_id": task.runtime_id,
+        "session_id": task.session_id,
+        "workspace_id": task.workspace_id,
+        "description": "Agent作業Task（内容は別のWorkspace差分経路で確認）",
+        "instruction_hash": task.instruction_hash,
+        "status": task.status,
+        "audit_event_id": task.audit_event_id,
+    });
+    if let Some(result_hash) = &task.result_hash {
+        projection["result_hash"] = json!(result_hash);
+    }
+    projection
 }
 
 fn 実行記録(work: &作業) -> Value {
@@ -1964,6 +2368,36 @@ mod tests {
             }));
             Some(metadata)
         }
+        fn AgentTask実行対応(&self) -> bool {
+            true
+        }
+        fn AgentTask実行(
+            &self,
+            _: &str,
+            cancel: &AtomicBool,
+            deadline: Instant,
+        ) -> Result<String, 対話失敗> {
+            self.回数.fetch_add(1, Ordering::SeqCst);
+            if self.遅延 {
+                let end = Instant::now() + Duration::from_secs(1);
+                while Instant::now() < end {
+                    if cancel.load(Ordering::SeqCst) {
+                        return Err(対話失敗::取消);
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(対話失敗::期限超過);
+                    }
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            }
+            if cancel.load(Ordering::SeqCst) {
+                return Err(対話失敗::取消);
+            }
+            if self.失敗 {
+                return Err(対話失敗::通信失敗);
+            }
+            Ok("TASK_PRIVATE_OUTPUT_SENTINEL".into())
+        }
         fn 応答(
             &self,
             r: &対話要求,
@@ -2043,11 +2477,175 @@ mod tests {
             &mut |_, _, _| Ok("fixture-audit".into()),
         )
     }
+    fn AgentTask操作(
+        c: &mut 対話制御,
+        op: &str,
+        payload: Value,
+        owner: bool,
+    ) -> Result<Value, 対話失敗> {
+        let binding = payload
+            .get("agent_runtime_id")
+            .and_then(Value::as_str)
+            .zip(payload.get("workspace_id").and_then(Value::as_str))
+            .map(|(runtime, workspace)| {
+                super::super::workspace::DialogueWorkspaceBinding::for_test(runtime, workspace)
+            });
+        c.操作_作業領域結合済み(
+            op,
+            &payload,
+            owner,
+            100,
+            binding.as_ref(),
+            &mut |_, _, _| Ok("fixture-task-audit".into()),
+        )
+    }
+
+    fn AgentTask要求(session_id: &str, instruction: &str) -> Value {
+        json!({
+            "agent_runtime_id": "left",
+            "session_id": session_id,
+            "workspace_id": "fixture-workspace-left",
+            "instruction": instruction,
+        })
+    }
+
+    fn AgentTask権限とApprovalを発行(
+        c: &mut 対話制御, session_id: &str, instruction: &str
+    ) {
+        let request = AgentTask要求(session_id, instruction);
+        AgentTask操作(
+            c,
+            "AgentTaskWorkspacePermissionGrant",
+            json!({
+                "agent_runtime_id": request["agent_runtime_id"],
+                "session_id": request["session_id"],
+                "workspace_id": request["workspace_id"],
+            }),
+            true,
+        )
+        .unwrap();
+        AgentTask操作(c, "AgentTaskOwnerApprovalGrant", request, true).unwrap();
+    }
     fn 開始(c: &mut 対話制御, id: &str) -> String {
         操作(c, "対話開始", json!({"実行系ID":id}), false).unwrap()["対話セッションID"]
             .as_str()
             .unwrap()
             .into()
+    }
+
+    #[test]
+    fn AgentTask取消後または期限後に届いた成功応答を採用しない() {
+        let cancelled = AtomicBool::new(true);
+        assert_eq!(
+            AgentTask結果hash化(
+                Ok("遅延応答試験用秘密本文".into()),
+                &cancelled,
+                Instant::now() + Duration::from_secs(60),
+            ),
+            Err(対話失敗::取消)
+        );
+
+        let not_cancelled = AtomicBool::new(false);
+        assert_eq!(
+            AgentTask結果hash化(
+                Ok("遅延応答試験用秘密本文".into()),
+                &not_cancelled,
+                Instant::now() - Duration::from_secs(1),
+            ),
+            Err(対話失敗::期限超過)
+        );
+    }
+
+    #[test]
+    fn AgentTask実行はPermissionとApprovalを再検証して一回消費し出力本文を残さない() {
+        let (mut c, calls) = 準備(false, false, false);
+        let session_id = 開始(&mut c, "left");
+        let instruction = "workspace内の安全な変更を行う";
+        AgentTask権限とApprovalを発行(&mut c, &session_id, instruction);
+
+        let altered = AgentTask要求(&session_id, "別の指示へ差し替える");
+        assert_eq!(
+            AgentTask操作(&mut c, "AgentTask実行", altered, false),
+            Err(対話失敗::権限拒否)
+        );
+        assert!(c.agent_task_permissions.contains_key(&session_id));
+
+        let started = AgentTask操作(
+            &mut c,
+            "AgentTask実行",
+            AgentTask要求(&session_id, instruction),
+            false,
+        )
+        .unwrap();
+        assert_eq!(started["record_version"], 2);
+        assert_eq!(started["status"], "running");
+        assert!(!c.agent_task_permissions.contains_key(&session_id));
+        assert_eq!(
+            AgentTask操作(
+                &mut c,
+                "AgentTask実行",
+                AgentTask要求(&session_id, instruction),
+                false,
+            ),
+            Err(対話失敗::権限拒否)
+        );
+
+        let task_id = started["task_id"].as_str().unwrap().to_owned();
+        let mut state = Value::Null;
+        for _ in 0..50 {
+            state =
+                AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false).unwrap();
+            if state["status"] != "running" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert_eq!(state["status"], "completed");
+        assert!(state["result_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert!(!state.to_string().contains("TASK_PRIVATE_OUTPUT_SENTINEL"));
+        assert!(!state.as_object().unwrap().contains_key("instruction"));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn AgentTask取消はworker終了までrunningを保ちterminal監査後だけcancelledとなる() {
+        let (mut c, calls) = 準備(false, false, true);
+        let session_id = 開始(&mut c, "left");
+        let instruction = "取消境界の試験";
+        AgentTask権限とApprovalを発行(&mut c, &session_id, instruction);
+        let started = AgentTask操作(
+            &mut c,
+            "AgentTask実行",
+            AgentTask要求(&session_id, instruction),
+            false,
+        )
+        .unwrap();
+        let task_id = started["task_id"].as_str().unwrap().to_owned();
+        for _ in 0..2_000 {
+            if calls.load(Ordering::SeqCst) == 1 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "Task workerの開始を確認する");
+        let cancelling =
+            AgentTask操作(&mut c, "AgentTask取消", json!({"task_id": task_id}), false).unwrap();
+        assert_eq!(cancelling["status"], "running");
+
+        let mut state = Value::Null;
+        for _ in 0..100 {
+            state =
+                AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false).unwrap();
+            if state["status"] != "running" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert_eq!(state["status"], "cancelled");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
     #[test]
     fn 対話セッション一覧は開始監査に結合した有界metadataだけを返す() {

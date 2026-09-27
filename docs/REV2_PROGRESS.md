@@ -2,6 +2,24 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket統合 Phase 7 作業TaskのBroker実行経路（2026-09-28）
+
+Rust Brokerに独立した`AgentTask実行`／`AgentTask状態`／`AgentTask取消`経路を追加した。実行開始では、構造検査済みAdapter metadataとRust Adapter実装の双方がTask対応を示すこと、現行Session、Workspace登録hash、Adapter固定root identity、Task本文hash、Owner Approvalの実行条件hash、およびWorkspace Permission／Owner Approvalの壁時計・単調時計期限を同一Broker排他区間で再照合する。開始Auditを確定した後、揮発PermissionとApprovalを不可分に取り除いてからworkerを起動し、同じgrantの再利用を拒否する。Owner Approvalの有効期間は発行後5分、Taskは開始後15分を上限とする固定実行policyをnative確認文とhash結合条件へ明示した。
+
+Task状態は版2の固定label・Runtime／Session／Workspace・Broker計算指示hash・Audit参照・任意result hashだけを投影する。worker出力本文はBroker側でhash化後に破棄し、監査本文・状態・errorへ保存しない。取消要求後または期限後に返った成功応答もBrokerで拒否する。Taskは同一Session／Workspace物理rootにつき同時1件、Broker全体4件、Task状態record合計128件を上限とし、取消要求を受けてもAdapterの停止応答前にterminal状態へしない。Session終端・資格隔離・Broker Drop時はCancellationを要求するが、flagだけではOS process群の停止証明にならない。現在のCodex AdapterはこのTask経路を実装せずmetadataも`unsupported`のままなので、production実行されない。
+
+Schema／IPC／ConformanceにTask ID要求と実行・状態・取消操作を登録した。Workspace差分・結果本文UI、Codexの`workspace-write`実行、Workspace内TEMP／TMP専用scratchと全終端cleanup、OS process-tree supervision、実Agent実行、別Agent間隔離、LIVE_RUNTIME失敗注入は引き続き`release_blocker`であり、Consumerの`FIXTURE` testやcompileをsandbox・製品実行の証拠へ昇格しない。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\D4Pocket-agent-task-test-target --all-targets`：成功、warningなし。testを含む全Rust targetのcompile確認。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\D4Pocket-agent-task-test-target --lib AgentTask -- --test-threads=1`：9件合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\D4Pocket-agent-task-test-target --all-targets -- --test-threads=1`：初回は308件中、取消fixtureがworker開始前に取消した競合で1件失敗。fixtureをworker開始後に取消するよう同期し、focused 9件と全target計353件（library 308、CLI 9、Broker IPC 10、その他integration 26）が再実行ですべて合格した。過去の別実行でWindows Application Controlに拒否された履歴は各時点の記録として保持し、今回成功で遡及上書きしない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema／正常example 144件、negative fixture 178件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：223 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：初回はManifest生成時に新規fileがGit indexへ未登録だったためManifest checkと依存検査3件が失敗。staged source 1065件でManifestを再生成した後の再実行はexit 0で登録済み10検査すべて合格。これはdevelopment検査であり、`release_ready=false`とCONFIG／FIXTURE証拠境界を維持する。
+- Codex CLI `--version`／`exec --help`で現行の`workspace-write` optionを確認した。モデルは起動せず、課金・外部Agent起動・Workspace書込試験は行っていない。このinterface確認は実Task隔離の証拠ではない。
+- release blockerは維持し、`release_ready=false`。残作業・失敗・検証範囲は最新正本と次回検証時に再照合する。
+
 ## D4 Pocket Phase 7 Windows Codex sandboxの作業領域境界probe（2026-09-28）
 
 installed `codex-cli 0.158.0-alpha.2.1` の `codex sandbox --permission-profile :workspace` を使い、モデルを起動せず、固有名を付けたscratch fileの作成可否をWindowsで実測した。通常processとsandbox childは異なるWindows userで実行され、現在のRepository root内のfile作成は成功し、`LOCALAPPDATA`下の別scratch rootへのfile作成は`UnauthorizedAccessException`で拒否された。これはCodex CLI sandbox helperの`LIVE_RUNTIME`証拠であり、D4 Broker経由のAgent Taskや`codex exec` production pathの証拠ではない。

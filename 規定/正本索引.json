@@ -140,6 +140,10 @@
       "責任": "Agent Taskの状態投影。版2はRuntime／Session／WorkspaceとBroker計算指示hashへ結合し、本文・実行path・Permission／Approval識別子・出力本文を含めない"
     },
     {
+      "path": "specs/agent_task_id_request.schema.json",
+      "責任": "Broker内Agent Task状態参照・取消要求。Task識別子だけを受け、権限・実行条件を内包しない"
+    },
+    {
       "path": "specs/agent_task_workspace_permission_request.schema.json",
       "責任": "Ownerが付与判断するAgent Task用Workspace Permission要求。Runtime／Session／Workspace識別子だけを入力し、期限・権限・path・commandを要求から決定しない"
     },

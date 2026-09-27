@@ -976,7 +976,7 @@ fn owner_confirmation_text_for_identity(
             instruction_hash,
             payload_hash,
         } => format!(
-            "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1\n範囲: このSession・Workspace・指示hash・実行条件に限定、5分以内\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             runtime_id, session_id, workspace_id, instruction_characters, instruction_hash, payload_hash
         ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
@@ -2397,7 +2397,8 @@ mod tests {
             .expect("Task Owner Approvalはnative確認候補");
         let text = owner_confirmation_text(&summary);
         assert!(text.contains(&sha256_tagged(instruction.as_bytes())));
-        assert!(text.contains("gui-shell-agent-task-sandbox-v1"));
+        assert!(text.contains("gui-shell-agent-task-sandbox-v1-max-runtime-900s"));
+        assert!(text.contains("開始後の最大実行時間15分"));
         assert!(text.contains("Taskを保存・変更・実行せず"));
         assert!(!text.contains(instruction));
 

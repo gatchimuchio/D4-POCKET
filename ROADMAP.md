@@ -5,7 +5,13 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行D4 Pocket統合単位（2026-09-27）
+## 現行D4 Pocket統合単位（2026-09-28）
+
+### Phase 7 Agent Task Broker Consumerの一回消費・bounded状態（2026-09-28）
+
+Rust Brokerに独立した`AgentTask実行`／`AgentTask状態`／`AgentTask取消`を接続した。実行要求ごとにmetadataとAdapter実装双方の対応、現行Session、Workspace登録hash・固定root identity、Permission／Owner Approvalの本文hash・条件hash・wall／monotonic期限を再照合し、開始Audit確定後にPermissionとApprovalを同じBroker排他区間で一回消費してworkerを開始する。Task状態は独立projectionで、出力本文を保存せずBroker側でhash化し、同一Session／Workspaceの並行Task、全体同時4件、状態履歴128件へboundedとした。取消応答はworker停止を保証せず、terminal応答までrunningを維持する。
+
+Codex Adapterは引き続き`task_execution=unsupported`であり、このConsumerから起動されない。実Codex `workspace-write`、Workspace内TEMP／TMP scratch隔離・cleanup、process-tree終了、実Agentの隔離書込、結果/diff表示・LIVE_RUNTIME失敗試験は`release_blocker`。Rust `cargo check --all-targets`は成功したが、今回のdynamic test executableはWindows Application ControlのOS error 4551で起動拒否されassertion未実行。Conformance・Schema・manifest・strict日本語監査の最新結果は作業進捗へ記録し、未実行testを成功に昇格しない。
 
 ### Phase 7 Agent Task未対応Runtimeへの権限発行拒否（2026-09-28）
 
@@ -15,7 +21,7 @@ Rust BrokerのTask要求検査、Task Workspace Permission発行、Task Owner Ap
 
 Agent Adapterの対話開始にWorkspace IDの明示選択を必須化し、Rust Brokerが現在登録中のWorkspace IDとRuntime IDを照合してからSessionを作る。Desktop対話面は既存のBroker Workspace一覧から同一RuntimeのIDを選び、通常要求へ渡す。作成Audit hashの既存射影は維持し、Session・Runtime・Workspace・登録hashの関係を別AuditEventへ記録する。通常Desktop一覧は作成Audit参照とWorkspace結合Audit参照を区別して返し、UIはBroker登録のmetadata対応として表示する。MobileはDevice Link TLS上の既存Rust Broker Workspace一覧handlerを利用し、応答をWorkspace ID／Runtime IDだけへ限定して対話画面の選択に使う。Desktop Agent Centerはproduct modeでBroker session metadataだけを表示し、local／mock fixtureのTask・diff・Tool・commandを実結果として表示しない。Handoffは未接続の固定状態とし、regex redactionから公開概要を合成しない。Agent専用実行Session、実際の作業directory、書込み隔離、Task実行、比較・Handoffは未成立で、実Agent実行、独立Workspace隔離、実機TLS統合を`release_blocker`として維持し、`release_ready=false`を保つ。
 
-Phase 7のTask要求境界は`agent_task_request.schema.json`をRust Brokerの`Agent作業要求検査`へ接続し、現在Agent Adapter・利用中Session・Session作成時と同じWorkspace登録hashを照合して、指示本文を返さずBroker計算hashだけを返す。Task検査とPermission／Approval発行はAdapterの固定root識別子とBroker登録Workspaceの物理root識別子も照合し、欠落・不一致を拒否する。Permission状態はBroker内の現行grantと二つの期限、Session／Workspace登録hashを再照合して示し、Permission IDは露出しない。別のowner-native confirmation経路はRuntime／Session／Workspaceに結合したTask用Workspace Permissionを5分・1回で発行し、通常IPC、request由来の権限値、重複active grantを拒否してAuditする。追加の`AgentTaskOwnerApprovalGrant`はRust Desktop native確認だけで受け付け、本文hashとWorkspace登録・Permission内部識別子・固定実行条件policyからBrokerが計算した条件hashへ結合した揮発Approvalを5分発行する。Task preflightは本文・条件・二つの期限を再照合する。発行receiptは専用Schema・fixture・negative Conformanceに固定した。Session隔離やWorkspace Permission置換ではApprovalも破棄される。四つのAgent Broker操作はIPC要求／応答SchemaとConformanceで同期を検査する。このroot照合は登録関係の内部状態検査であり、sandbox・隔離書込実行の証明ではない。この発行・検査はTaskを保存・起動せず、Approval／Permissionを実行直前に一回消費するTask実行consumer、sandboxの実証、実行前後Audit／Recovery、隔離書込実行・結果保存は未成立。Codex Adapterはread-only、実Agent Task／書込み隔離は`release_blocker`のまま。
+Phase 7のTask要求境界は`agent_task_request.schema.json`をRust Brokerの`Agent作業要求検査`へ接続し、現在Agent Adapter・利用中Session・Session作成時と同じWorkspace登録hashを照合して、指示本文を返さずBroker計算hashだけを返す。Task検査とPermission／Approval発行はAdapterの固定root識別子とBroker登録Workspaceの物理root識別子も照合し、欠落・不一致を拒否する。Permission状態はBroker内の現行grantと二つの期限、Session／Workspace登録hashを再照合して示し、Permission IDは露出しない。別のowner-native confirmation経路はRuntime／Session／Workspaceに結合したTask用Workspace Permissionを5分・1回で発行し、通常IPC、request由来の権限値、重複active grantを拒否してAuditする。追加の`AgentTaskOwnerApprovalGrant`はRust Desktop native確認だけで受け付け、本文hashとWorkspace登録・Permission内部識別子・固定実行条件policyからBrokerが計算した条件hashへ結合した揮発Approvalを5分発行する。Task preflightは本文・条件・二つの期限を再照合する。発行receiptは専用Schema・fixture・negative Conformanceに固定した。Session隔離やWorkspace Permission置換ではApprovalも破棄される。四つのAgent Broker操作はIPC要求／応答SchemaとConformanceで同期を検査する。このroot照合は登録関係の内部状態検査であり、sandbox・隔離書込実行の証明ではない。この段落はconsumer実装前の2026-09-27時点の履歴であり、現在は冒頭の2026-09-28追補でBroker consumerを追加した。sandboxの実証、実行前後Audit／Recovery、隔離書込実行・結果保存はなお未成立。Codex Adapterはread-only、実Agent Task／書込み隔離は`release_blocker`のまま。
 
 ### Phase 7 Agent対話セッションmetadata投影の先行単位（2026-09-27）
 

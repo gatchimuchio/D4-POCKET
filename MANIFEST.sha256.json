@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "2790204afd39f99f8610a48d7d54ce7eed0ed21cf5e2f8f869f8f362b0862837"
+      "sha256": "7d1f684e63983b19a07ca7f4d9d7ebeb812490a55ea43a6f85535cbaec65c79c"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b731bdb593fb5cb759c3dfb883198c9f101bc0776dac1d99f04f6dd121e02256"
+      "sha256": "a41ae2e2be8ca7375fba4f721499e0939b55fef1e4a3d8250d2e77d34a280c16"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "757cd73f519668e04d399c37ddd9f55a75905ea383400ae6c21c01a8f5b78156"
+      "sha256": "1083adf892c6a0bc5d0cf7591605924cf283e89b4550205eba97bf4975f4fc2d"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a2047f742be58f0d8af85b9674b569ca1bd1bc80dff1204d45b5c47e1775233f"
+      "sha256": "22934e7a6860011c541f0f9e7de4482ae4b77216e02aeb92d4bb0b058810d2ef"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "d82320b7fce17210912e0becdd021ddc7247e9709dc61891c38b67caf80feb72"
+      "sha256": "e891b60ea51c91481a87c96db69525acf3f5c4cd605c6d08023b859630b82223"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1546,6 +1546,10 @@
     {
       "path": "examples/contracts/agent_task.valid.json",
       "sha256": "b2beb7a9f5dfcc027059c5de36e9b74d1fabdeeb0fa37182b897d341fa627c3f"
+    },
+    {
+      "path": "examples/contracts/agent_task_id_request.valid.json",
+      "sha256": "f6ce0fe58a117a845252da08b9f70b3a1165d30a8c907a98dff9ad0204953462"
     },
     {
       "path": "examples/contracts/agent_task_owner_approval.valid.json",
@@ -1850,6 +1854,10 @@
     {
       "path": "examples/contracts/invalid/agent_session_missing_audit.invalid.json",
       "sha256": "0bc5ff5dee7a016c35c96005fdf34342e23386084911588fae089660fa78b359"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_id_request_escalation.invalid.json",
+      "sha256": "d28b384a66f68a7f319921e0f8bf77c8d36d7dba75256283e20e7b32504ba91f"
     },
     {
       "path": "examples/contracts/invalid/agent_task_missing_audit.invalid.json",
@@ -2933,7 +2941,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "5567ca72d3bccfbf0f1ef95f1f9726e411a873fd990a7bc016476e908bd00a02"
+      "sha256": "75cb72c882ea7dcf6f5890a5b9b36db91cc0812dd56d7e8ef2402c0bc8c1476a"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -2993,7 +3001,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "80ce4835a505587d22384cfea6f2091ab775b7e17c3f45411d5939cd2d93e24b"
+      "sha256": "4ddda5d9a52aba2d0aa51b0140a86b69678d79e051e519395ca5956daa8a61ac"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3037,7 +3045,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "893466c5f0847196177f2b30c9c2599a4f9ea3b68a000fa08bddc997ddca5daa"
+      "sha256": "1d6d75f1d42bde2889669b1741e2080f94f8dc739f0aca04f2719bbe4489b79b"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3561,7 +3569,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "5405bd3ed7f0992cc46bd7924eddf90bf1b94626f180a6a5c406190e44d7f246"
+      "sha256": "fffc655bee11a9b4f829c2d889b4d6857bed62753e9199e0b5288819a5f529d5"
     },
     {
       "path": "requirements-dev.txt",
@@ -3646,6 +3654,10 @@
     {
       "path": "specs/agent_task.schema.json",
       "sha256": "d1d9c31adeba71d7f3c2beb100abfeee4d2d502a9a0e76a372afba493d85b981"
+    },
+    {
+      "path": "specs/agent_task_id_request.schema.json",
+      "sha256": "802790e6ef83c55ee4c067e64af3951609ab6fe07694996658a63598e12b1069"
     },
     {
       "path": "specs/agent_task_owner_approval.schema.json",
@@ -3873,11 +3885,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "92e0b924d44cffe9b5d85f6a142178791669cf594ba79f45f0b428a87ad4c199"
+      "sha256": "3453f13c78877ac83659fc0b4fa5432b7643e0e9d1ec3157beea9e6cf7187b26"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "def2095d626046f2fc5b0da0ac221ce13cd392879926a5349f235f3b31e34910"
+      "sha256": "9cfd944f4a0141f8b7c1fa9276b1588b440c692e17411520313486fe5ea4879b"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -4185,7 +4197,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "96362c8866b10032507726b5ac619ba0c718d8bcd09ea67035613407fedd752a"
+      "sha256": "51ab99380cc9f47d7054c3631210965a2ad6f21ff097a03cd209229957cc49c8"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4269,7 +4281,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "cedff939c95948d6add2117ae7944fa1e6d936ef9afaf30b3664de2f6b2c637c"
+      "sha256": "13c96708297a70dd20a0acccf072c7ea75d421c1546549cfba169fd2aade272b"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4305,7 +4317,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "e0e216423769a14fab82612ce8d3269b361beb4e672cfa288a0708a68e1e995f"
+      "sha256": "c5c437d929df281359c8355dafc21dfca01dc5a91e7f29e268fe5c7869ca4826"
     }
   ]
 }

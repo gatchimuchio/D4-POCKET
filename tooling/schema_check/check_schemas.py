@@ -140,6 +140,7 @@ REQUIRED = {
     "agent_session.schema.json",
     "agent_workspace.schema.json",
     "agent_task.schema.json",
+    "agent_task_id_request.schema.json",
     "agent_task_request.schema.json",
     "agent_task_workspace_permission_request.schema.json",
     "agent_task_workspace_permission.schema.json",

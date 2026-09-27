@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_id_request.schema.json",
+  "title": "Agent Task識別子要求（AgentTaskIdRequest）",
+  "description": "Broker内のAgent Task状態参照または取消の識別子だけを表す。識別子はAuthorityや所有権を生成しない。",
+  "type": "object",
+  "required": ["task_id"],
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    }
+  }
+}

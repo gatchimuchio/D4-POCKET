@@ -411,6 +411,12 @@ pub enum BrokerOperation {
     AgentTaskWorkspacePermissionGrant,
     #[serde(rename = "AgentTaskOwnerApprovalGrant")]
     AgentTaskOwnerApprovalGrant,
+    #[serde(rename = "AgentTask実行")]
+    AgentTask実行,
+    #[serde(rename = "AgentTask状態")]
+    AgentTask状態,
+    #[serde(rename = "AgentTask取消")]
+    AgentTask取消,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -602,6 +608,9 @@ impl BrokerOperation {
             BrokerOperation::Agent作業要求検査 => "Agent作業要求検査",
             BrokerOperation::AgentTaskWorkspacePermissionGrant => "AgentTaskWorkspacePermissionGrant",
             BrokerOperation::AgentTaskOwnerApprovalGrant => "AgentTaskOwnerApprovalGrant",
+            BrokerOperation::AgentTask実行 => "AgentTask実行",
+            BrokerOperation::AgentTask状態 => "AgentTask状態",
+            BrokerOperation::AgentTask取消 => "AgentTask取消",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::回帰Case一覧 => "回帰Case一覧",
@@ -1455,7 +1464,30 @@ impl Broker {
             operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
             operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::実行系列挙 | BrokerOperation::対話セッション一覧 | BrokerOperation::Agent一覧 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant | BrokerOperation::AgentTaskOwnerApprovalGrant | BrokerOperation::対話開始 | BrokerOperation::対話送信 | BrokerOperation::対話取得 | BrokerOperation::対話中止 | BrokerOperation::対話終了 | BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) => self.対話要求処理(&request_id, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (
+                BrokerOperation::実行系列挙
+                | BrokerOperation::対話セッション一覧
+                | BrokerOperation::Agent一覧
+                | BrokerOperation::Agent作業要求検査
+                | BrokerOperation::AgentTaskWorkspacePermissionGrant
+                | BrokerOperation::AgentTaskOwnerApprovalGrant
+                | BrokerOperation::AgentTask実行
+                | BrokerOperation::AgentTask状態
+                | BrokerOperation::AgentTask取消
+                | BrokerOperation::対話開始
+                | BrokerOperation::対話送信
+                | BrokerOperation::対話取得
+                | BrokerOperation::対話中止
+                | BrokerOperation::対話終了
+                | BrokerOperation::対話承認
+                | BrokerOperation::対話承認待ち
+            ) => self.対話要求処理(
+                &request_id,
+                operation,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -2481,7 +2513,7 @@ impl Broker {
             Ok(event) => event.event_id,
             Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
         };
-        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant | BrokerOperation::AgentTaskOwnerApprovalGrant) {
+        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant | BrokerOperation::AgentTaskOwnerApprovalGrant | BrokerOperation::AgentTask実行) {
             let (runtime, workspace) = if operation == BrokerOperation::対話開始 {
                 (payload.get("実行系ID"), payload.get("作業領域ID"))
             } else {
