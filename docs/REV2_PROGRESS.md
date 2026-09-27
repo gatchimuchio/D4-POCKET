@@ -2,6 +2,19 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Windows Codex sandboxの作業領域境界probe（2026-09-28）
+
+installed `codex-cli 0.158.0-alpha.2.1` の `codex sandbox --permission-profile :workspace` を使い、モデルを起動せず、固有名を付けたscratch fileの作成可否をWindowsで実測した。通常processとsandbox childは異なるWindows userで実行され、現在のRepository root内のfile作成は成功し、`LOCALAPPDATA`下の別scratch rootへのfile作成は`UnauthorizedAccessException`で拒否された。これはCodex CLI sandbox helperの`LIVE_RUNTIME`証拠であり、D4 Broker経由のAgent Taskや`codex exec` production pathの証拠ではない。
+
+標準`:workspace` permission profileはOS Temp directoryへの書込みも許す。TEMP/TMPをprocess-scopedでWorkspace内の専用scratch directoryへ向けた再試験では、そのdirectory内の作成が成功し、元のTemp siblingへの作成は拒否された。したがって将来のTask launchは、Owner Approval後のTask専用scratchをWorkspace内に作り、child processのTEMP/TMPをそこへ限定し、終了・失敗・取消時に監査可能なcleanupを行う必要がある。標準profileだけを指定してsandbox境界がWorkspaceへ完全限定されたとは扱わない。
+
+- `codex --version`: `codex-cli 0.158.0-alpha.2.1`。
+- `codex sandbox --help`／`codex exec --help`: 現行CLIが必要とするpermission profileと `workspace-write` sandbox optionを確認。modelは起動していない。
+- `codex sandbox --permission-profile :workspace --cd <Repository> powershell.exe ...`: Repository root内marker作成成功、`LOCALAPPDATA`下の別rootへの作成拒否、sandbox child userの相違を確認。
+- 同sandbox helperをprocess-scoped TEMP/TMPで再実行: Workspace内Task scratchへの作成成功、元Temp siblingへの作成拒否。
+- machine config、ACL、Windows policyは変更していない。試験用Repository markerは除去済み。試験専用Temp scratchの削除commandはCodex実行環境のcommand policyに拒否され、`%TEMP%\d4pocket-sandbox-probe-20260928` と空の `%LOCALAPPDATA%\D4PocketSandboxProbe-20260928` が残存する。
+- `release_blocker`: `codex exec` AdapterのTask実行、TEMP/TMP分離とcleanupのproduction接続、Permission／Approvalの実行直前原子的再検証・一回消費、実行前後Audit／Recovery、Agent Task結果/diff保存および実Agentの隔離試験は未成立。`release_ready=false`を維持。
+
 ## D4 Pocket Phase 7 AgentTask実体Workspace照合（2026-09-28）
 
 AgentTaskの要求検査、Workspace Permission発行、Owner Approval発行で、Broker登録Workspaceの物理root識別子とAdapterが固定したroot識別子を照合する。識別子の欠落・不一致は拒否し、同じWorkspace IDの宣言だけでは代替できない。Codex Adapterは起動時に捕捉したroot識別子を返すが、Task実行能力は引き続き`unsupported`である。この照合は`INTERNAL_STATE`の束縛確認であり、OS sandbox、実書込隔離、Task実行の証拠ではない。
