@@ -2567,6 +2567,78 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
+    fn AgentTaskOwnerApprovalはWorkspace登録hash差替後に再利用できない() {
+        const OWNER_APPROVAL_GRANT_OPERATION: &str = "AgentTaskOwnerApprovalGrant";
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let workspace_id = "fixture-workspace-left";
+        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            workspace_id,
+        );
+        let permission_request = json!({
+            "agent_runtime_id": "left",
+            "session_id": session.clone(),
+            "workspace_id": workspace_id,
+        });
+        let task_request = json!({
+            "agent_runtime_id": "left",
+            "session_id": session.clone(),
+            "workspace_id": workspace_id,
+            "instruction": "登録hash差替後に承認を再利用しない試験",
+        });
+
+        c.操作_作業領域結合済み(
+            "AgentTaskWorkspacePermissionGrant",
+            &permission_request,
+            true,
+            100,
+            Some(&binding),
+            &mut |_, _, _| Ok("試験Task監査".into()),
+        )
+        .expect("現在のWorkspace登録hashへTask Permissionを結合できる");
+        c.操作_作業領域結合済み(
+            OWNER_APPROVAL_GRANT_OPERATION,
+            &task_request,
+            true,
+            100,
+            Some(&binding),
+            &mut |_, _, _| Ok("試験Task監査".into()),
+        )
+        .expect("現在のPermissionと登録hashへOwner Approvalを結合できる");
+
+        let current = c
+            .操作_作業領域結合済み(
+                "Agent作業要求検査",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("試験Task監査".into()),
+            )
+            .expect("発行時と同じ登録hashのpreflight");
+        assert_eq!(current["Permission状態"], "有効");
+        assert_eq!(current["Approval状態"], "有効");
+
+        let replacement_binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test_with_registration_hash(
+                "left",
+                workspace_id,
+                "sha256:replacement-registration",
+            );
+        let after_registration_change = c.操作_作業領域結合済み(
+            "Agent作業要求検査",
+            &task_request,
+            false,
+            100,
+            Some(&replacement_binding),
+            &mut |_, _, _| Ok("試験Task監査".into()),
+        );
+        assert_eq!(after_registration_change, Err(対話失敗::セッション不一致));
+    }
+
+    #[test]
     fn 保存対象は全文の完了と確定記録を要求する() {
         for (scope, fail) in [
             ("none", false),

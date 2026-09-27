@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Task ApprovalのWorkspace登録hash差替負例（2026-09-28）
+
+Rust Broker対話制御のFIXTURE testへ、同じRuntime／Session／Workspace IDでも登録hashが変わった場合、既発行Workspace PermissionとOwner Approvalをpreflightで再利用できない負例を追加した。発行時のhashなら両状態が有効、異なる登録hashを渡すとSession不一致で拒否される。production挙動は変更していない。この試験は内部状態の境界検査であり、実Registry差替、原子的Task消費、Task実行、LIVE_RUNTIME隔離の証拠ではない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket-agent-task-test-target --lib AgentTaskOwnerApprovalはWorkspace登録hash差替後に再利用できない -- --test-threads=1`：初回は試験callback closureのlifetime推論でcompile失敗。callbackを各呼出しの局所closureへ変更後、再実行で1件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket-agent-task-test-target --all-targets -- --test-threads=1`：exit 0。Rust library 304件、CLI unit 9件、Broker IPC integration 10件、その他integration 26件、計349件成功。試験生成物はOneDrive外の固定短縮pathへ出し、sourceはこのcheckoutから読んだ。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema／正常example各143件、negative fixture 177件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：221 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。`python -X utf8 tooling/manifest.py --write`／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`も、この単位の最終差分で合格。
+- `release_blocker`: Task実行Consumer、Workspaceの実書込隔離、実行直前の原子的Permission／Approval再検証・一回消費は未成立。
+
 ## D4 Pocket Phase 7 Rust全target Windows検証の再確認（2026-09-28）
 
 cleanな`main` commit `2da5fd370382f2fe5acc032b8f26ac25880048ee`と一致する`C:\D4Pocket` checkoutでRust全targetを再実行し、全件成功した。試験開始時のbranchは`main`、working treeはcleanで、`origin/main`も同commitだった。

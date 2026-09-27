@@ -71,10 +71,23 @@ impl DialogueWorkspaceBinding {
 
     #[cfg(test)]
     pub(crate) fn for_test(runtime: &str, workspace_id: &str) -> Self {
+        Self::for_test_with_registration_hash(
+            runtime,
+            workspace_id,
+            "sha256:fixture-registration",
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_with_registration_hash(
+        runtime: &str,
+        workspace_id: &str,
+        registration_hash: &str,
+    ) -> Self {
         Self {
             runtime: runtime.to_owned(),
             workspace_id: workspace_id.to_owned(),
-            registration_hash: "sha256:fixture-registration".to_owned(),
+            registration_hash: registration_hash.to_owned(),
         }
     }
 }
