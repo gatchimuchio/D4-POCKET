@@ -2444,6 +2444,86 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
+    fn AgentTask発行監査失敗ではPermissionを残さずApprovalを発行しない() {
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let workspace_id = "fixture-workspace-left";
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", workspace_id);
+        let permission_request = json!({
+            "agent_runtime_id": "left",
+            "session_id": session.clone(),
+            "workspace_id": workspace_id,
+        });
+
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Err(対話失敗::監査失敗),
+            ),
+            Err(対話失敗::監査失敗)
+        );
+        assert!(
+            !c.agent_task_permissions.contains_key(&session),
+            "発行監査が確定しないPermissionは失効させる"
+        );
+
+        c.操作_作業領域結合済み(
+            "AgentTaskWorkspacePermissionGrant",
+            &permission_request,
+            true,
+            100,
+            Some(&binding),
+            &mut |_, _, _| Ok("permission-audit".into()),
+        )
+        .expect("監査可能になればPermissionを発行できる");
+
+        let instruction = "この本文は監査へ出さない試験用Task";
+        let owner_approval_request = json!({
+            "agent_runtime_id": "left",
+            "session_id": session.clone(),
+            "workspace_id": workspace_id,
+            "instruction": instruction.to_owned(),
+        });
+        let mut audit_reason = String::new();
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                "AgentTaskOwnerApprovalGrant",
+                &owner_approval_request,
+                true,
+                100,
+                Some(&binding),
+                &mut |reason, _, _| {
+                    audit_reason = reason.to_owned();
+                    Err(対話失敗::監査失敗)
+                },
+            ),
+            Err(対話失敗::監査失敗)
+        );
+        assert!(!audit_reason.contains(instruction));
+        assert!(c.agent_task_permissions[&session].owner_approval.is_none());
+
+        let preflight = c
+            .操作_作業領域結合済み(
+                "Agent作業要求検査",
+                &owner_approval_request,
+                false,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("preflight-audit".into()),
+            )
+            .expect("発行失敗後も状態を安全に再検査できる");
+        assert_eq!(preflight["Permission状態"], "有効");
+        assert_eq!(preflight["Approval状態"], "未取得");
+        assert_eq!(preflight["実行状態"], "未実行");
+    }
+
+    #[test]
     fn 保存対象は全文の完了と確定記録を要求する() {
         for (scope, fail) in [
             ("none", false),

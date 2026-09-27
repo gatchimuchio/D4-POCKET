@@ -2138,3 +2138,12 @@ Codex Adapterの`task_execution`能力宣言も`unknown`から`unsupported`へ�
 - Rustの該当unit testは新しい`unsupported` assertionを含め未実行。Windows Application ControlのOS error 4551によりtest executable起動が阻止される既知制約のため、再試行・回避は行っていない。
 
 この訂正はTask実行経路やsandboxの成立を意味せず、release blockerと`release_ready=false`を維持する。
+
+## Agent Task Permission／Owner Approval発行の監査失敗負例（2026-09-27）
+
+対話制御の単体試験へ監査callback故障を注入する負例を追加した。試験は、Agent Task用Workspace Permissionの発行監査が失敗した場合に揮発Permissionを残さないこと、Permission発行後のOwner Approval監査失敗ではApprovalを保存しないことを検査する。さらにApproval監査理由へTask本文を含めず、失敗後preflightが`Permission=有効`、`Approval=未取得`、`実行=未実行`となることを検査対象とする。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：合格。追加したRust試験を含む全targetのcompileを確認。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib AgentTask発行監査失敗ではPermissionを残さずApprovalを発行しない -- --test-threads=1`：試験実行fileのcompile後、Windows Application ControlがOS error 4551で起動を拒否。追加試験のassertionは未実行。
+
+この試験の証拠源は`FIXTURE`であり、永続Audit storeの故障注入やBrokerのLIVE_RUNTIME障害処理を実証しない。実Task consumer、一回限りの原子的消費、sandbox・独立書込隔離、実行前後Audit／Recovery、Agent Task実行のrelease blockerは維持する。
