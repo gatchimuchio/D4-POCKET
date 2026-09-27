@@ -15,7 +15,9 @@ class AgentCenter extends StatelessWidget {
   Widget build(BuildContext context) {
     final snapshot = client.getSnapshot();
     final adapters = snapshot.agentAdapters;
-    final sessions = snapshot.agentSessions;
+    final sessions = client.mode == 'broker'
+        ? snapshot.agentSessions
+        : const <AgentSessionRecord>[];
     final comparison = AgentComparisonProjection.fromSessions(sessions);
     return ShellPage(
       title: 'エージェントセンター',
@@ -52,7 +54,17 @@ class AgentCenter extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              SectionList(title: '状態', rows: [comparison.statusMessage]),
+              SectionList(
+                title: '状態',
+                rows: [
+                  if (client.mode != 'broker')
+                    'Local／mock snapshotはAgent実行結果ではないため比較対象にしません。'
+                  else if (comparison.available)
+                    'Broker metadata上の識別子重複はありませんが、実Agent比較・実行時隔離は未接続です。'
+                  else
+                    comparison.statusMessage,
+                ],
+              ),
               SectionList(
                 title: '対象セッション',
                 rows: comparison.sessionIds.isEmpty
@@ -71,72 +83,75 @@ class AgentCenter extends StatelessWidget {
             ],
           ),
         ),
-        for (final session in sessions)
-          if (session.workspace.trim().isNotEmpty)
-            BorderedPanel(
-              child: _HandoffPanel(
-                projection: AgentHandoffProjection.fromSession(session),
-              ),
+        const BorderedPanel(
+          child: SectionList(
+            title: 'Agent引き継ぎ',
+            rows: [
+              '未接続です。Task成果・diff・試験結果のBroker経路が成立するまで引き継ぎ概要を生成しません。',
+              '接続後もAuthority・Permission・Approval・Credential・hidden contextは引き継がず、target条件で再評価します。',
+            ],
+          ),
+        ),
+        if (client.mode != 'broker' && snapshot.agentSessions.isNotEmpty)
+          const BorderedPanel(
+            child: SectionList(
+              title: 'エージェント実行',
+              rows: ['ローカルの模擬データは、Broker上のエージェント実行として表示しません。'],
             ),
+          ),
         for (final session in sessions)
           BorderedPanel(
-            child: session.task.trim().isEmpty
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        session.sessionId,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      SectionList(
-                          title: 'Agent実行系ID', rows: [session.agentRuntimeId]),
-                      SectionList(title: '対話状態', rows: [session.status]),
-                      SectionList(
-                          title: '証拠種別', rows: [session.evidenceSource]),
-                      SectionList(
-                          title: '作成監査ID', rows: [session.auditEventId]),
-                      if (session.workspace.trim().isEmpty)
-                        const Text('Workspace結合は未確認です。')
-                      else ...[
-                        SectionList(
-                            title: 'Broker登録Workspace ID',
-                            rows: [session.workspace]),
-                        SectionList(
-                            title: 'Workspace結合監査ID',
-                            rows: [session.workspaceAuditEventId]),
-                        const Text(
-                          'Runtime一致はBroker内で検証済みです。実Agentの実行Session・書込み隔離は未検証です。',
-                        ),
-                      ],
-                      const Text('比較・Handoff・Task内容は利用できません。'),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        session.sessionId,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      SectionList(title: '作業領域', rows: [session.workspace]),
-                      SectionList(title: 'タスク', rows: [session.task]),
-                      SectionList(title: '変更ファイル', rows: session.changedFiles),
-                      SectionList(title: '道具呼出し', rows: session.toolCalls),
-                      SectionList(
-                          title: 'シェルコマンド', rows: session.shellCommands),
-                      SectionList(title: '試験状態', rows: [session.testStatus]),
-                      SectionList(title: '差分概要', rows: [session.diffSummary]),
-                      SectionList(
-                        title: '保留中の承認',
-                        rows: ['${session.pendingApprovalCount}'],
-                      ),
-                      SectionList(
-                          title: '巻戻し候補', rows: [session.rollbackCandidate]),
-                      SectionList(title: '監査リンク', rows: [session.auditEventId]),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.sessionId,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                SectionList(
+                    title: 'Agent実行系ID', rows: [session.agentRuntimeId]),
+                SectionList(title: '対話状態', rows: [session.status]),
+                const SectionList(
+                  title: '証拠種別',
+                  rows: ['INTERNAL_STATE（Broker対話Session一覧）'],
+                ),
+                SectionList(title: '作成監査ID', rows: [session.auditEventId]),
+                if (session.workspace.trim().isEmpty)
+                  const Text('Workspace結合は未確認です。')
+                else ...[
+                  SectionList(
+                    title: 'Broker登録Workspace ID',
+                    rows: [session.workspace],
                   ),
+                  SectionList(
+                    title: 'Workspace結合監査ID',
+                    rows: [session.workspaceAuditEventId],
+                  ),
+                  const Text(
+                    'Runtime一致はBroker内で検証済みです。実Agentの実行Session・書込み隔離は未検証です。',
+                  ),
+                ],
+                const Text(
+                  'Task・diff・Tool・command内容は現在のBroker contractにないため表示しません。',
+                ),
+                const SectionList(
+                  title: '未接続の実行情報',
+                  rows: [
+                    '作業領域: 実行directoryは未確認',
+                    'タスク: Brokerから未取得',
+                    '変更ファイル: Brokerから未取得',
+                    '道具呼出し: Brokerから未取得',
+                    'シェルコマンド: Brokerから未取得',
+                    '試験状態: Brokerから未取得',
+                    '差分概要: Brokerから未取得',
+                    '保留中の承認: Brokerから未取得（承認がないことを意味しません）',
+                    '巻戻し候補: Brokerから未取得',
+                    '監査リンク: 上記の監査ID参照のみ',
+                  ],
+                ),
+              ],
+            ),
           ),
       ],
     );
@@ -183,30 +198,6 @@ class _AgentAdapterPanel extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HandoffPanel extends StatelessWidget {
-  const _HandoffPanel({required this.projection});
-
-  final AgentHandoffProjection projection;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Agent Handoff投影: ${projection.sessionId}',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        SectionList(title: '状態', rows: [projection.statusMessage]),
-        SectionList(title: 'Task概要', rows: [projection.taskSummary]),
-        SectionList(title: '差分概要', rows: [projection.diffSummary]),
-        SectionList(title: '試験状態', rows: [projection.testStatus]),
-      ],
     );
   }
 }

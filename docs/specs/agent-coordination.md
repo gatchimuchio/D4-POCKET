@@ -38,7 +38,7 @@ target Agentの条件でAuthorityを再評価することを必須とする。Ha
 
 ## UI責任
 
-Desktop Agent Centerは、現在のsnapshotから比較可否と公開Handoff概要を読み取り表示するだけである。FlutterはAgentを起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Workspaceを検出した場合はfail-closedで比較を止める。
+Desktop Agent Centerは、product modeではBrokerが返したAgent対話SessionのID・状態・監査参照・登録Workspace IDだけを実値として表示する。`local`／`mock` snapshotのAgent sessionは実行結果として表示しない。Task、diff、Tool、command情報は現在のBroker一覧contractにないため表示しない。従来の実行情報surfaceは項目名と「Brokerから未取得」等の明示状態に限り残し、fixture値、架空の0件、実値らしい合成内容を表示しない。保留中のApprovalが未取得であることをApprovalがない証拠として扱わない。比較の識別子重複検査は比較機能そのものではなく、実Agent実行・隔離結果も示さない。Handoffは常に未接続表示とし、fixtureやregex redactionで公開概要を合成しない。FlutterはAgentを起動せず、Workspace、Permission、Approval、Credential、process、networkを直接操作しない。同一Workspaceを検出した場合はfail-closedで比較候補を拒否する。
 
 Rust Brokerの`対話セッション一覧`は、Agent metadataがSchema適合したAgent Adapterに結び付き、同一Runtimeの登録WorkspaceへSession開始時に明示結合した現在対話sessionのID、実行系ID、状態、作成監査ID、Workspace ID、結合監査IDだけを`INTERNAL_STATE`としてDesktopへ渡す。Agent metadata適合は分類に限り、Trust・Permission・Approval・Authorityを与えず、実Agentの稼働証明でもない。Workspace結合は登録IDの対応だけであり、Agent専用実行Session、実行directory、書込み分離を証明しない。実Agent Sessionと実結果がまだないため比較・Handoffは未接続のまま、Task、差分、Tool、コマンド内容を表示しない。ローカル／mock snapshotのサンプル情報をBroker観測へ読み替えない。
 

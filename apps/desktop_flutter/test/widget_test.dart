@@ -610,8 +610,42 @@ void main() {
     expect(find.text('codex-workspace'), findsOneWidget);
     expect(find.text('audit-workspace-bound'), findsOneWidget);
     expect(find.textContaining('書込み隔離は未検証'), findsOneWidget);
-    expect(find.textContaining('比較・Handoff・Task内容は利用できません。'), findsOneWidget);
+    expect(
+      find.textContaining('Task・diff・Tool・command内容は現在のBroker contractにない'),
+      findsOneWidget,
+    );
+    expect(find.text('タスク: Brokerから未取得'), findsOneWidget);
+    expect(
+      find.textContaining('保留中の承認: Brokerから未取得（承認がないことを意味しません）'),
+      findsOneWidget,
+    );
     expect(find.textContaining('文書を更新する'), findsNothing);
+  });
+
+  testWidgets('mock AgentのTask・diff・Tool・command fixtureを実行結果として表示しない',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: ShellCoreClient.mock())),
+    ));
+
+    expect(
+      find.textContaining('Local／mock snapshotはAgent実行結果ではない'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('ローカルの模擬データは、Broker上のエージェント実行として表示しません'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Agent引き継ぎ'), findsOneWidget);
+    expect(find.textContaining('未接続です。Task成果'), findsOneWidget);
+    expect(find.text('文書を更新する'), findsNothing);
+    expect(find.text('README.md'), findsNothing);
+    expect(find.text('git.diff'), findsNothing);
+    expect(
+      find.text(
+          'python3 tooling/conformance_tests/run_conformance_skeleton.py'),
+      findsNothing,
+    );
   });
 
   test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {

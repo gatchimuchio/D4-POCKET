@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4712d38d2b34f8260a4a7cb56a9b4b6ee7ed3029f1c78ad98e87331645dcf733"
+      "sha256": "bf9c19c8e13b2e50be66594ccdfd3a48a66f3f99e96dcbad46064b722635fd0e"
     },
     {
       "path": "SECURITY.md",
@@ -193,7 +193,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "61f98d37a33eb223437c7ac9791bb290dc540ba55b8f1ee04f703570fc742efd"
+      "sha256": "9d37ce5ef56dd29c80cd3a18a7129a4f18263619f921d22cf69d158171a2cb8a"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -293,7 +293,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_coordination.dart",
-      "sha256": "c80f3a3628d5569247070fa87350b3b031e5c64aaad4282365c68c460ff5bbc1"
+      "sha256": "b470ac08073d6c3711705aa802e89248e6bda042e21983a3d0e1e4d1a4cc6d8f"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -525,7 +525,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_coordination_test.dart",
-      "sha256": "6cc37e98658a944eeb3c9f96218261495ab3973a2ed20fd7f7629b3c0a5647c7"
+      "sha256": "c0a8c64acb34b55fe8547a7a1f91c38f479e46c3be46ecd33baca7f239896c5d"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -601,7 +601,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "889053121cc10a98e8f82069af56c3d6fb386227d5d8857ba0bf3ecbd22a1edd"
+      "sha256": "b64aa4d4e01a03da9af0b1c62177361c0fcdd1892160794db684394a7097e2ab"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "60a74f996f4646218cef2bcf563961dbc9ae3922194654fca75edbe70dfe25b2"
+      "sha256": "e449e1f3623a383fcb0f9926bd30d7f9fdec1b088eaf53939a6858b714ec59a0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "b73ca53a99204be43c8c8218f9938ee0318e6eca11179614f2b00da1a5be683f"
+      "sha256": "06b6fdd9c82232365d9ea03ca3343b0763ff0722ceb7580ccde331208c04375e"
     },
     {
       "path": "docs/specs/agent-runtime.md",
@@ -1928,6 +1928,10 @@
       "sha256": "6dadb91cf504712fce91762ebb9bc6ee2c7756a330854854830e2821d601361d"
     },
     {
+      "path": "examples/contracts/invalid/device_link_request_workspace_payload.invalid.json",
+      "sha256": "f785cf29a71120610b07c3bfb2000219cd754b1733fcce9d7ed8e3706599f2ce"
+    },
+    {
       "path": "examples/contracts/invalid/diagnostic_bad_check_status.invalid.json",
       "sha256": "fadaa4a765bdedca6b804b11a709585c1075c06215160f79135504a625d6d491"
     },
@@ -2136,6 +2140,10 @@
       "sha256": "a007fe6f6daf839e68382755f8c1c4e4c236ac9f1c2370cdc21cc8ceff0bf5bc"
     },
     {
+      "path": "examples/contracts/invalid/mobile_device_link_channel_request_workspace_payload.invalid.json",
+      "sha256": "9a92ea1dadf1b138c58e658fe2744ccdb52dd985c9c22d98a2263e925f3ae515"
+    },
+    {
       "path": "examples/contracts/invalid/mobile_local_recovery_audit_invalid_calendar_date.invalid.json",
       "sha256": "f6f5c598f0f658a0df283eea94f6a486dbc6119af822b19025a1debe2dea2d38"
     },
@@ -2146,6 +2154,10 @@
     {
       "path": "examples/contracts/invalid/mobile_local_recovery_audit_secret.invalid.json",
       "sha256": "3d8846dc5e5354054bbab4d636641b9207488a2e4e0e64140a2745c9bfb13f1a"
+    },
+    {
+      "path": "examples/contracts/invalid/mobile_workspace_selection_internal_metadata.invalid.json",
+      "sha256": "3b2b0fabaab33ca71be8863e405cc0b04de02b4be4e39e296fdd6b67bccdc7ba"
     },
     {
       "path": "examples/contracts/invalid/notification.invalid.json",
@@ -2470,6 +2482,10 @@
     {
       "path": "examples/contracts/mobile_local_recovery_audit.valid.json",
       "sha256": "477bef8c5d7b38bb3fa1ef83ce08217a60a3301106378b591a87139980a8519e"
+    },
+    {
+      "path": "examples/contracts/mobile_workspace_selection.valid.json",
+      "sha256": "6e1ab911670488e1bdec9ad04df8b473858e690fb0cf03fc32c7916f40f40104"
     },
     {
       "path": "examples/contracts/notification.valid.json",
@@ -3513,7 +3529,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "7853ab825e138bf15987f6a8731eebfb352e8f20793d0e0f0a7fa1608971eef0"
+      "sha256": "fae9e36adb2f3257a18eb5de2ecf9612b384bb2ccd8248a1a74952ba3f2fb662"
     },
     {
       "path": "requirements-dev.txt",
@@ -3842,6 +3858,10 @@
     {
       "path": "specs/mobile_local_recovery_audit.schema.json",
       "sha256": "3e6c3e9a7868a3b6781ce8ace4ddaf96cf4cc4287b0471245972c02a412014c3"
+    },
+    {
+      "path": "specs/mobile_workspace_selection.schema.json",
+      "sha256": "4e1d1f83c7f0f7a26ec6a8472f3bc89d74b6c500b2b951715a1b252a7b104546"
     },
     {
       "path": "specs/notification.schema.json",

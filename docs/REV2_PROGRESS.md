@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Agent Centerのfixture内容非表示（2026-09-27）
+
+現行Agent CenterはBrokerの`対話セッション一覧`が返すmetadataだけを実値として表示し、実AgentのTask結果・diff・Tool・command内容は取得しない。一方、画面はlocal／mock snapshotに含まれるTask例を描画でき、識別markerを一部regexで置換しただけのHandoff概要も生成していた。Client modeが実Brokerの`broker`である場合だけSession metadataを表示し、`local`／`mock`のSession例は隠してfixtureである旨を示す。Broker対話Sessionでは従来の実行情報欄を「未取得」と明示し、承認情報が未取得でもApprovalなしとは解釈しない。実Handoff経路がない間は固定の未接続状態を表示し、regex redactionから概要を合成しない。Broker sessionの重複ID／未知field拒否、Workspace対応表示、比較metadata検査は維持し、実Agent比較・Handoff完了とは扱わない。
+
+- `dart format --output=none --set-exit-if-changed`：変更したDesktop画面・比較service・testで成功（0 file changed）。
+- ASCII検証copy `C:\d4nativecheck3`：`flutter analyze --no-pub`成功。`flutter test --no-pub --reporter expanded test/widget_test.dart`は最新sourceで42件成功。Broker metadata表示とmock fixture非表示の専用widget testも成功し、`test/agent_coordination_test.dart`は3件成功。
+- Desktop全suiteのscratch実行は、修正前に111成功・2失敗だった。Workspace metadata widget assertionはClient modeを`product`と誤認した本変更の不具合で、実際のmode`broker`へ修正した。fixture表示文言のtest期待値も画面表示へ揃え、最新widget suiteは42件成功。Rust全suiteではRust lifecycle Broker process testがWindows Application Controlにより子process起動前に拒否（OS error 4551）されており、全suite合格とは扱わない。policyは変更せず、拒否後の再配置・再試行はしていない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 139件、example 139件、negative fixture 173件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217件成功。`python -X utf8 tooling/release_gate_check.py`：成功、ただしこれはrelease blockerが残る状態を正しく維持するgate検査であり、release readinessの証明ではない。strict日本語監査・Manifest検査・`git diff --check`も成功。
+- 実OneDrive workspaceではDesktop Flutter analyze時に日本語pathを含むLSP JSON応答が`FormatException: Unterminated string`で異常終了した。Desktop Flutter試験準備も`build\\unit_test_assets`の削除拒否で起動前に失敗していた。ACLは変更せず、ASCII copyで解析・試験した。これはWindows開発hostの`known_limitation`である。
+- Task結果、独立Workspace上のAgent実行、比較、実Handoff、再評価・取消・失敗隔離・Recoveryは依然`release_blocker`。本単位は誤認表示を抑止するUI境界であり、これらの機能を実装・実証していない。
+
 ## D4 Pocket Phase 7 Mobile登録Workspace選択のID投影（2026-09-27）
 
 Mobile対話画面から登録済みWorkspaceを選択できるよう、既存Device Linkの許可操作へ空payload限定の一覧要求を追加した。Rust Brokerは既存のowner登録Workspace要求・監査経路を使い、返答をWorkspace IDとRuntime IDだけへ限定してから端末向け監査・応答へ渡す。Android Kotlin、iOS Swift、Flutterは同じ固定projectionを検証し、内部登録hash、Approval metadata、path等の追加fieldを拒否する。Mobileは選択したIDを通常の対話開始要求へ渡すだけであり、選択・Agent metadata・端末表示はPermissionやApprovalを生成しない。

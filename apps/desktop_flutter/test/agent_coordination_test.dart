@@ -110,12 +110,4 @@ void main() {
     expect(duplicateRuntime.available, isFalse);
     expect(duplicateRuntime.statusMessage, contains('同一Agent実行系'));
   });
-
-  test('Handoff投影は公開概要と権限再評価だけを示す', () {
-    final projection = AgentHandoffProjection.fromSession(
-      _session('a', 'workspace-a', task: 'token=do-not-display'),
-    );
-    expect(projection.taskSummary, '[redacted]');
-    expect(projection.statusMessage, contains('再評価'));
-  });
 }
