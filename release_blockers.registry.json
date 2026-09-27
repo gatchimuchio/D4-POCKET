@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "unresolved",
+      "status": "resolved",
       "status_source": "manual",
-      "active": true,
+      "active": false,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "前回clean sourceでRust全対象試験335件が成功し、一度解消した。2026-09-27の今回確認では、Rust library 296件、main.rs試験9件、broker_ipc 10件、canonical_decimal_hash 1件、checkpoint 8件、protected_data 2件、protected_startup 1件の計327件が成功した後、protected_store試験実行file自体がWindows Application ControlのOS error 4551で起動拒否され、全対象実行は停止した。protected_storeの3件は未実行である。workspace_diff 2件とworkspace_reader 2件は個別試験で成功したが、workspace_startup 7件は同errorで試験実行fileの起動前に拒否された。個別実行分を含めRust試験331件は成功し、10件は未実行である。2026-09-27の後続実行ではRust全targetのcompileが12 executableすべて成功し、workspace_startup 7件も個別target実行で成功した。一方、初回full実行のA2A loopback 1件は接続応答読取に失敗し、単独再実行と次のfull runでは成功した。次のfull runはRust library 298件すべて成功した後、gui_shell_desktop_launcher test executableが同じOS error 4551で起動前に拒否され、後続targetを実行できなかった。policy変更、実行fileの移動・再配置、試験除外は行っていない。ローカルRust全target実行は未完了であり、導入済み製品やrelease readinessの証拠でもない。2026-09-27にDesktop Flutter全suite scratch実行でも、Rust lifecycle Broker child processがApplication Controlにより起動前拒否された（OS error 4551）。helperを元のRust build outputからtestの期待位置へコピーした試行も同じ拒否であり、policy変更・拒否後のpath変更・再実行による回避は行っていない。加えてOneDrive外のASCII短縮checkoutでも`cargo test --locked`の`generic-array`／`io-extras` build scriptが同じOS error 4551で起動拒否され、短縮pathだけでは解消しないことを確認した。同checkoutで`flutter analyze --no-pub`は成功したが、`flutter test --no-pub`は113件中111件成功・実Broker helper依存2件失敗で、Desktop全suite完了とprocess integrationは未確認。",
-      "required_action": "Windows Application Controlを変更・回避せず、承認済み条件でRust全targetを再実行する。process起動を含むworkspace／Broker integration suiteを含む全target successを確認するまでresolvedへ戻さない。"
+      "reason": "2026-09-28、検証開始時にcleanでorigin/mainと一致したmain commit 2da5fd370382f2fe5acc032b8f26ac25880048eeのsourceを、短いC:\\D4Pocket checkoutで実行した。Rust全target試験は終了code 0となった。実行commandは`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`。Rust library 303件、CLI単体試験9件、Broker IPC統合試験10件、その他の統合試験26件、計348件がすべて成功した。Broker子process起動とWorkspace startup 7件を含む全targetが実行され、過去にWindows Application Control（OS error 4551）で拒否された試験対象も今回成功した。失敗履歴はdocs/REV2_PROGRESS.mdに保持する。本解消が示すのは当該Windows環境と短縮checkoutでRust全target試験を完了できたことに限る。OneDrive上のcheckoutのpath長／同期、Desktop Flutter全suite、installed product、正式releaseの証拠ではない。",
+      "required_action": "この試験実行阻害への追加作業なし。Rustの試験対象、toolchain、または検証Windows環境を変えた場合は全targetを再実行する。OneDrive checkout固有のpath長／同期と製品release証拠は、別の未解決事項として扱う。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

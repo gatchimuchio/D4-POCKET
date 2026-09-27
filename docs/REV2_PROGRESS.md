@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Rust全target Windows検証の再確認（2026-09-28）
+
+cleanな`main` commit `2da5fd370382f2fe5acc032b8f26ac25880048ee`と一致する`C:\D4Pocket` checkoutでRust全targetを再実行し、全件成功した。試験開始時のbranchは`main`、working treeはcleanで、`origin/main`も同commitだった。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`（`C:\D4Pocket`）：exit 0。Rust library 303件、CLI unit 9件、Broker IPC integration 10件、その他integration 26件、計348件が成功。
+- Broker IPC process起動試験とWorkspace startup 7件を含む全integration targetが実行された。過去にOS error 4551で起動拒否された試験targetも今回成功した。過去の失敗記録は削除せず、履歴として保持する。
+- 証拠源は当該checkout上のRust試験（ローカル一時状態を用いる`FIXTURE`を含む）。この結果は同checkoutのRust test executable実行を確認するもので、OneDrive checkoutのpath長／同期挙動、Desktop Flutter全suite、installed product、実Agent／Task、他OS、release readinessを証明しない。
+- `windows_rust_integration_test_execution_policy`は、Rust全target試験実行阻害について解消とする。OneDrive固有のpath／同期制約および製品release blockerは別範囲として維持する。
+
 ## D4 Pocket Phase 7 Agent Task未対応Runtimeへの権限発行拒否（2026-09-28）
 
 Rust BrokerのTask要求検査、Task Workspace Permission発行、Task Owner Approval発行に、構造検査済みAdapter metadataの`task_execution=supported`を必須とするfail-closed gateを追加した。capabilityが欠落、`unknown`、`unsupported`の場合は`AgentTask実行非対応`で拒否する。Adapter metadataは拒否条件としてだけ参照し、Permission／Approval／Trustを付与しない。Codex Adapterの現行宣言は`unsupported`のため、既知のread-only経路へTask用Owner権限を発行しない。対応を宣言する試験AdapterはBroker権限経路試験専用であり、実Task実行・隔離の証拠ではない。
