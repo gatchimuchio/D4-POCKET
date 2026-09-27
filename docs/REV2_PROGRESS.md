@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Windows Flutter検証のOneDrive ACL分離（2026-09-28）
+
+cleanな`main`／`origin/main` commit `917e075d8b151b48ee465e6a6fa16755cd370d43`のtracked sourceを`git archive`でOneDrive外の短縮scratchへ展開し、Flutter Desktop／Mobileの解析とtestを実行した。元OneDrive checkoutでは両appの`flutter analyze`が`Flutter/ephemeral/Packages/.packages`の削除拒否で失敗した。該当fileの継承ACLに`CodexSandboxUsers`のread／delete denyおよび`Everyone`の子directory削除denyを観測した。ACLは変更していない。
+
+- Clean source archive: `C:\D4Pocket-agent-task-test-target\validation\flutter-917e075.zip`、SHA-256 `F62F04478AA3D9B6D987999F845F55E02B39E00D42BE3F0FFD901345E1FDA429`。source commitは上記`917e075`。OneDrive外のscratchで`flutter analyze`はDesktop 14.7秒、Mobile 7.8秒、双方`No issues found`。
+- Mobile: `flutter test`は18件すべて成功。
+- Desktop: clean archiveだけで行った初回`flutter test`は、`native/rust_helper/target/debug/gui_shell_rust_helper.exe`未buildを前提とする2 integration testが失敗し、+107件時点で停止した。scratch内で`cargo build --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper`を成功させた後、`flutter test`を再実行し113件すべて成功。実行されたRust helperは当該clean source commitから生成。
+- `git status --short --branch`は作業開始・終了時ともclean。OneDrive内Flutter解析のACL失敗は再現済み`known_limitation`として扱い、scratch検証PASSを元pathのACL修復やinstalled productの証拠へ昇格しない。`rev2_flutter_broker_channel_boundary`、Windows installed smokeおよびrelease gateは未解除。
+
 ## D4 Pocket Phase 7 Windows Broker smokeのLIVE_RUNTIME再確認（2026-09-28）
 
 cleanで`origin/main`と一致するsource commit `25978d20b57ef0ac34cf4fe3c10aed3104891511`からRust Broker Release helperをビルドし、`installer/windows/collect_broker_smoke.ps1`を分離scratch store／session fileへ実行した。Buildは成功し、`native/rust_helper/src/adapters/minidora.rs`の未使用`C28_DIAGNOSTIC_LIMIT`／`c28_route_label` warning 2件が出た。collectorはexit 0、status `passed`であり、authenticated loopback IPC、durable store、再起動後の同一nonce拒否（`broker_replay_detected`）、新規health受理、強制終了後の接続拒否、一時session資格fileの作成・削除を実Broker processで観測した。
