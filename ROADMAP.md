@@ -11,7 +11,7 @@
 
 Rust Brokerに独立した`AgentTask実行`／`AgentTask状態`／`AgentTask取消`を接続した。実行要求ごとにmetadataとAdapter実装双方の対応、現行Session、Workspace登録hash・固定root identity、Permission／Owner Approvalの本文hash・条件hash・wall／monotonic期限を再照合し、開始Audit確定後にPermissionとApprovalを同じBroker排他区間で一回消費してworkerを開始する。Task状態は独立projectionで、出力本文を保存せずBroker側でhash化し、同一Session／Workspaceの並行Task、全体同時4件、状態履歴128件へboundedとした。取消応答はworker停止を保証せず、terminal応答までrunningを維持する。
 
-Codex Adapterは引き続き`task_execution=unsupported`であり、このConsumerから起動されない。実Codex `workspace-write`、Workspace内TEMP／TMP scratch隔離・cleanup、process-tree終了、実Agentの隔離書込、結果/diff表示・LIVE_RUNTIME失敗試験は`release_blocker`。Rust `cargo check --all-targets`は成功したが、今回のdynamic test executableはWindows Application ControlのOS error 4551で起動拒否されassertion未実行。Conformance・Schema・manifest・strict日本語監査の最新結果は作業進捗へ記録し、未実行testを成功に昇格しない。
+Codex Adapterは引き続き`task_execution=unsupported`であり、このConsumerから起動されない。実Codex `workspace-write`、Workspace内TEMP／TMP scratch隔離・cleanup、process-tree終了、実Agentの隔離書込、結果/diff表示・LIVE_RUNTIME失敗試験は`release_blocker`。Rust `cargo check --all-targets`と、短縮checkout上の全target 353件は成功した。以前の実行でWindows Application ControlのOS error 4551により起動拒否された履歴は進捗記録に残すが、現行のRust試験結果とは区別する。Conformance・Schema・manifest・strict日本語監査の最新結果は作業進捗へ記録し、未実行testを成功に昇格しない。
 
 ### Phase 7 Agent Task未対応Runtimeへの権限発行拒否（2026-09-28）
 
