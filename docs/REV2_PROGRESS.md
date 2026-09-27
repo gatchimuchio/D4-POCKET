@@ -2,6 +2,19 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 WindowsローカルRust検証の再確認（2026-09-28）
+
+現在のcleanな`main`（`25524638df0eccdb87bf14e00b4ef4b59199ed7b`）で、以前はWindows Application Controlにより起動を拒否されたRust test executableが、短い`C:\D4Pocket` checkout上で実行できることを確認した。これは本checkout・現在のtest構成に対するローカル検証結果であり、OneDrive checkoutのACL、installed product、全targetまたは他OSの証拠へ一般化しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`: 302件成功。Agent作業要求のBroker検査testを含む。
+- `python tooling/schema_check/check_schemas.py`: Schema 143件、正常example 143件、negative fixture 177件で合格。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`: 221件のcheckが合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。`python -X utf8 tooling/manifest.py --write`／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`も合格。
+- `cargo test --all-targets`、Flutter/Desktop/Mobile、実Agent／実Task、installed Windows product、実端末、他OSの検証は今回実行していない。
+- `codex exec --help`は成功し、導入済みCLIがJSON event、sandbox選択肢、worktree等のoptionを列挙することだけを確認した。optionの組合せ、隔離、task結果の回収、process-tree停止、Credential／費用挙動は実証していない。Codex AdapterからモデルTaskを起動しておらず、CLI helpはTask実行機能の証拠ではない。
+- 証拠境界: Schema／fixtureは`FIXTURE`、Broker unit testは試験adapter・一時状態での検査。`LIVE_RUNTIME`や製品実行の証拠ではない。
+- `release_blocker`: Agent Task実行consumer、一回消費、実行直前の再検証、実証済み隔離、実行前後Audit／Recovery、結果／diff、比較／Handoffは未成立。全target Rust、Flutter、installed product、実Agentおよび実端末の未実行範囲もrelease evidenceとして未確認のまま維持する。
+
 ## D4 Pocket Phase 7 隔離SessionのTask Permission即時失効（2026-09-27）
 
 Task用Workspace Permissionの揮発記録を、対話Sessionが中止・期限超過・監査失敗・worker障害で`中止後隔離`へ遷移する全経路から直ちに除去する。Sessionが非利用状態のためTask要求検査自体も拒否するが、状態照合だけに頼らずAuthority記録を消去する。対話のread-only実行経路とTask実行未接続状態は変更しない。
