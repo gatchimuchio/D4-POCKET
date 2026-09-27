@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "46ad2402db5b47fe89caeefacb05247863fc5ed17e487baecf26c2489b8c2005"
+      "sha256": "a73afc51d9c156c628ef57aa6f4beecbf345d6b96e9e4b0e2436932f3e8ed51a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2817,7 +2817,7 @@
     },
     {
       "path": "native/rust_helper/src/a2a.rs",
-      "sha256": "c1fc8be10424e114739ba2431edd58a1790b667133ca54ff42b24a753a93c6f9"
+      "sha256": "dc2083d57a08db5028b9ad5bbdaf8374efd8f1b46dd5715ee06d3489cbbab5e6"
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
@@ -2829,7 +2829,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
-      "sha256": "074ea8d5540838124a72c5bcdf7eacf4e900563141d22846903e0162ece90e64"
+      "sha256": "84756c85b38b7e7d2de59dd99b4589c7f733edad0675a5432452d517565e6260"
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
@@ -2845,7 +2845,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
-      "sha256": "e4a0a4245a9c671adace6c7564dd5f50270d6d996d7af548aef0717e37d4a600"
+      "sha256": "b44b0aa396b7e8bbe65ad2d7cbd4c0facfeaade91bb5aecc2e9281950e18524c"
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",

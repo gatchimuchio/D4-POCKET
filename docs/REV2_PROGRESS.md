@@ -11,6 +11,15 @@ Agent作業要求の機械契約として`specs/agent_task_request.schema.json`�
 - `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。
 - 証拠境界: Schema／fixtureの`FIXTURE`と日本語意味契約のみ。Rust Broker consumer、task専用Permission／Approval経路、監査・Recovery、実Agent起動、書込み隔離、比較・Handoffは未接続・未実証であり、既存Codex Adapterのread-only境界と`release_blocker`は維持する。
 
+## D4 Pocket Phase 7 Windows loopback fixture待ち時間の追補（2026-09-27）
+
+試験用loopback serverが suite 負荷時に早く閉じる可能性へ対処し、A2A／Broker fixtureのread timeoutとMINIDORA fixtureのread timeout・当該unit test期限を2秒から10秒へ延ばした。製品側HTTP timeout、retry、Authority、process経路は変更していない。検査を重ねた初回にはMINIDORA unit testが`通信失敗`となったが、単独試験と検査を重ねずに実行した全targetでは再現せず成功したため、host負荷が原因との因果は未確定であり、loopback resetの`known_limitation`を解消扱いしない。
+
+- `cargo test --all-targets -- --test-threads=1`: library 298件、main 9件、integration 36件、launcher test binary 0件、合計343件成功。
+- Schema 140件／example 140件／negative fixture 174件、Conformance 218件、strict日本語監査（負債0／finding 0）も成功。
+- crate全体の`cargo fmt --check`は変更対象外を含む既存Rust fileの差分を検出して不合格。一括整形はせず、今回変更した3 fileへの`rustfmt --check`だけは成功。
+- 証拠境界: fixture安定性の`FIXTURE`とWindows local Rust testのみ。実Agent接続、production transportの性能、loopback reset原因、release readinessは証明しない。AgentTaskのBroker実行・task専用Permission／Owner Approval・Audit／Recovery・書込み隔離は引き続き`release_blocker`。
+
 ## Windows開発checkoutをOneDrive外へ確立（2026-09-27）
 
 OneDrive配下の日本語・長pathでFlutter Analysis ServerのLSP JSONが壊れ、test準備時には`build/unit_test_assets`の削除もACL拒否される既存host制約に対し、remote `main`のcommit `1f3049abef858c0bd4a6220c8de0af15f7226bec`から`C:\D4Pocket`へ独立したASCII短path checkoutを作った。既存OneDrive checkout、ACL、同期設定は変更・削除していない。以後のWindows開発・検証ではこのcheckoutを使用できる。

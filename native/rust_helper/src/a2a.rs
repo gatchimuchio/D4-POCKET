@@ -599,8 +599,9 @@ mod tests {
         let response_length = response_body.len();
         let worker = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("Agent Card要求");
+            // 全suite負荷時にもfixture serverがclient要求の到着前に閉じないようにする。
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
+                .set_read_timeout(Some(Duration::from_secs(10)))
                 .expect("要求読取期限");
             let mut request = Vec::new();
             let mut chunk = [0u8; 512];

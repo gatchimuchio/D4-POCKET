@@ -340,8 +340,10 @@ mod tests {
         let adapter = MinidoraAdapter::new(&listener.local_addr().unwrap().to_string()).unwrap();
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
+            // 全suite負荷時にもclientが要求を送る前にfixture serverが閉じないよう、
+            // 試験用待受だけ十分な余裕を持たせる。production期限は変更しない。
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
+                .set_read_timeout(Some(Duration::from_secs(10)))
                 .unwrap();
             let mut request = Vec::new();
             let mut buffer = [0; 512];
@@ -381,7 +383,7 @@ mod tests {
                 "/health",
                 None,
                 &AtomicBool::new(false),
-                Instant::now() + Duration::from_secs(2)
+                Instant::now() + Duration::from_secs(10)
             )
             .unwrap(),
             b"{}"
