@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Agent作業要求Contractと権限非内包境界（2026-09-27）
+
+Agent作業要求の機械契約として`specs/agent_task_request.schema.json`を追加し、登録Agent Runtime ID・Session ID・Workspace ID・最大32,768文字の指示本文だけを受け付ける。Permission／Approval／Audit ID、authority、sandbox、実path、executable、command、credential fieldを拒否するpositive／negative contract exampleとConformanceを追加した。意味正本では、対話送信のApprovalと書込みTaskのPermission／Owner Approvalを別物と定義し、要求本文のhashはBroker側が計算する責任を定めた。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 140件、正常example 140件、negative fixture 174件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 218件のcheckが合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。
+- 証拠境界: Schema／fixtureの`FIXTURE`と日本語意味契約のみ。Rust Broker consumer、task専用Permission／Approval経路、監査・Recovery、実Agent起動、書込み隔離、比較・Handoffは未接続・未実証であり、既存Codex Adapterのread-only境界と`release_blocker`は維持する。
+
 ## Windows開発checkoutをOneDrive外へ確立（2026-09-27）
 
 OneDrive配下の日本語・長pathでFlutter Analysis ServerのLSP JSONが壊れ、test準備時には`build/unit_test_assets`の削除もACL拒否される既存host制約に対し、remote `main`のcommit `1f3049abef858c0bd4a6220c8de0af15f7226bec`から`C:\D4Pocket`へ独立したASCII短path checkoutを作った。既存OneDrive checkout、ACL、同期設定は変更・削除していない。以後のWindows開発・検証ではこのcheckoutを使用できる。

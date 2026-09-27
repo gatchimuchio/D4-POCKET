@@ -141,7 +141,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "93fb75a9eea49ca6f94c1fb02ce790638b9dd09f4d70ee4a949c82086f30dfc7"
+      "sha256": "2790204afd39f99f8610a48d7d54ce7eed0ed21cf5e2f8f869f8f362b0862837"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "bf9c19c8e13b2e50be66594ccdfd3a48a66f3f99e96dcbad46064b722635fd0e"
+      "sha256": "cefc6bc768ff366f166a3d56f6f86a1d75e6f57d9bedbe4a79dcd38f7eaa1724"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "f21b84103a4775686b32d58b7b2413b5d86d66a60eafb44fa0cff83e10af831f"
+      "sha256": "f4606547093107ca1d4dd62b1d04948124eb6b675524be4f3a31bac54f276a96"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "877d0b75910dcbccfdf56156e49bdc0d231a1d5bc1e15a2edb0a9477af0964ef"
+      "sha256": "46ad2402db5b47fe89caeefacb05247863fc5ed17e487baecf26c2489b8c2005"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1265,11 +1265,11 @@
     },
     {
       "path": "docs/specs/agent-coordination.md",
-      "sha256": "06b6fdd9c82232365d9ea03ca3343b0763ff0722ceb7580ccde331208c04375e"
+      "sha256": "7f40d84734851f3afba1141e71e4e22123a8b739fc767fc20e1c5a7e4a4d3135"
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "a12658e3c3c650c4871937f6f29bce233b6c22aba127557abe3d0748e9967af4"
+      "sha256": "01a02846c44cbbdbea07fc8d62846f4979d624b8667f4e29815531a89f424823"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1546,6 +1546,10 @@
     {
       "path": "examples/contracts/agent_task.valid.json",
       "sha256": "5f8b2c902c1f271f161f85b224b8187a664c5c97d4bc9c193f1a09f2ead1abd0"
+    },
+    {
+      "path": "examples/contracts/agent_task_request.valid.json",
+      "sha256": "9bfca7bbacb41d7a0212a226745aa03ae37932a6a3f14ddda87914c9c17c2492"
     },
     {
       "path": "examples/contracts/agent_tool_call.valid.json",
@@ -1838,6 +1842,10 @@
     {
       "path": "examples/contracts/invalid/agent_task_missing_audit.invalid.json",
       "sha256": "58059c9f19172828ec7f8f91bc950f7b6468c0e7785823721fee4edfa6af7dfa"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_request_authority_escalation.invalid.json",
+      "sha256": "255f0da6f1843303adcb4f54d8b801331a30f8da7364163c4f6e929079339c29"
     },
     {
       "path": "examples/contracts/invalid/agent_tool_call_missing_permission.invalid.json",
@@ -3529,7 +3537,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "4ee4209cdcb7944769f6874b5f886d83351c6d846db38ca8b089749fd9f58a85"
+      "sha256": "3799e9d88a1d9e293e56d1d46123ec69a6151024a9d443884c219cfcb10b1194"
     },
     {
       "path": "requirements-dev.txt",
@@ -3614,6 +3622,10 @@
     {
       "path": "specs/agent_task.schema.json",
       "sha256": "97ace680a5b0365fa1084752b0be4f1756d53de26b6e2fe73977f62d79ec6f13"
+    },
+    {
+      "path": "specs/agent_task_request.schema.json",
+      "sha256": "4aea8447aa8fcc270c6f304f7025fa0ec783ab3d2f90b51555795b9e68808d8e"
     },
     {
       "path": "specs/agent_tool_call.schema.json",
@@ -4137,7 +4149,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0ab47b540d596f74904c3b2f7359d983d50e2bdf345a152f5bc86d26391d97e4"
+      "sha256": "8ce70c40d816423b9bebd9e53be3d5e22415a5550fd8d6a2463b20a9cfe7aa23"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4221,7 +4233,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "7d5118b0f6ffbd42dabbf5f1693aefa6d866243412192299a9d27fd2ee66fd4d"
+      "sha256": "5808c1ea591690aab9c1b3fcd9598ae40f59ec0ae0c1921898219cb09455ddd9"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4257,7 +4269,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "bc07731942b7a51eecd384d58827386e10d03fb47c20613761c50fbc018f4e59"
+      "sha256": "0e9d697ab22bc9486fb571b8a1bd62360dfeab48aacba2f89edaadba31245401"
     }
   ]
 }

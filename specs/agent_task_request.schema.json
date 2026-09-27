@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_request.schema.json",
+  "title": "Agent作業要求（AgentTaskRequest）",
+  "type": "object",
+  "required": ["agent_runtime_id", "session_id", "workspace_id", "instruction"],
+  "additionalProperties": false,
+  "properties": {
+    "agent_runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "登録済みAgent Runtimeの識別子。識別子だけでは信頼や権限を生成しない。"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "Brokerが管理するAgent Sessionの識別子。"
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "Brokerへ登録済みの作業領域識別子。pathは受け取らない。"
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768,
+      "pattern": "\\S",
+      "description": "Agentへ渡す要求本文。権限・承認・監査識別子・実行path・commandを含めない。"
+    }
+  }
+}

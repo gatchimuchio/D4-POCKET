@@ -1,0 +1,9 @@
+{
+  "agent_runtime_id": "codex-local",
+  "session_id": "agent-session-01",
+  "workspace_id": "workspace-agent-01",
+  "instruction": "ファイルを更新してください。",
+  "permission_id": "permission-owner",
+  "approval_id": "dialogue-approval-01",
+  "audit_event_id": "audit-owner"
+}

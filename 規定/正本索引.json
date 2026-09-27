@@ -132,6 +132,10 @@
       "責任": "Mobile Device Linkへ開示するWorkspace／Runtime識別子限定投影と非権限性"
     },
     {
+      "path": "specs/agent_task_request.schema.json",
+      "責任": "Agent Task要求のRuntime／Session／Workspace参照と指示本文。Authority・Permission・Approval・Audit・実行pathを内包しない"
+    },
+    {
       "path": "tooling/conformance_tests/",
       "責任": "契約適合と拒否経路の検証"
     },
@@ -154,6 +158,10 @@
     {
       "path": "docs/specs/agent-coordination.md",
       "責任": "Agent Adapter metadataの検証、複数Agent比較のWorkspace分離、Handoff時のAuthority再評価"
+    },
+    {
+      "path": "docs/specs/agent-runtime.md",
+      "責任": "Agent Runtimeの日本語意味、Task要求と対話Approval／作業Permissionの分離、未接続実行境界"
     },
     {
       "path": "docs/specs/gui-shell-export.md",

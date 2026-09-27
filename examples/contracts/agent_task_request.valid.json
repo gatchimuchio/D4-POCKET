@@ -1,0 +1,6 @@
+{
+  "agent_runtime_id": "codex-local",
+  "session_id": "agent-session-01",
+  "workspace_id": "workspace-agent-01",
+  "instruction": "src/README.mdの説明を日本語で読みやすく整えてください。"
+}

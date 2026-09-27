@@ -170,6 +170,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_session",
     "agent_workspace",
     "agent_task",
+    "agent_task_request",
     "agent_tool_call",
     "agent_diff",
     "agent_comparison",
@@ -6964,6 +6965,53 @@ def test_agent_workspace_outside_access_default_deny() -> list[str]:
     return []
 
 
+def test_agent_task_request_cannot_carry_authority_or_dialogue_approval() -> list[str]:
+    schema = load_schema("agent_task_request.schema.json")
+    valid = load_contract_fixture("agent_task_request.valid.json")
+    errors = validate_instance(valid, schema)
+    if errors:
+        return [f"Agent作業要求の正常例が契約に適合しない: {errors}"]
+
+    expected_fields = {"agent_runtime_id", "session_id", "workspace_id", "instruction"}
+    if set(valid) != expected_fields:
+        return ["Agent作業要求fixtureのfield集合が固定されていない"]
+
+    invalid = load_contract_fixture(
+        "invalid/agent_task_request_authority_escalation.invalid.json"
+    )
+    if validate_instance(invalid, schema) == []:
+        errors.append("Agent作業要求がPermission／Approval／Audit識別子を受け入れた")
+
+    forbidden_fields = (
+        "permission_id",
+        "approval_id",
+        "audit_event_id",
+        "authority",
+        "sandbox",
+        "workspace_path",
+        "cwd",
+        "executable",
+        "command",
+        "credential",
+    )
+    for field in forbidden_fields:
+        candidate = {**valid, field: "untrusted"}
+        if validate_instance(candidate, schema) == []:
+            errors.append(f"Agent作業要求が禁止fieldを受け入れた: {field}")
+
+    for instruction in ("", " \n\t ", "x" * 32769):
+        candidate = {**valid, "instruction": instruction}
+        if validate_instance(candidate, schema) == []:
+            errors.append("Agent作業要求の空白または上限超過instructionを拒否しない")
+
+    contract_text = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
+    if "対話Approval" not in contract_text:
+        errors.append("Agent Runtime正本が対話Approvalと作業Task Approvalの分離を定義しない")
+    if "未接続" not in contract_text:
+        errors.append("Agent Runtime正本が要求Schemaの未接続状態を明示しない")
+    return errors
+
+
 def test_agent_secret_path_read_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -8824,6 +8872,7 @@ def main() -> int:
         作業領域応答の露出境界を検査する,
         test_workspace_diff_content_shape,
         test_agent_workspace_outside_access_default_deny,
+        test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,
