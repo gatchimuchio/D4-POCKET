@@ -2332,3 +2332,13 @@ Mobileの画面・Android／iOS表示名とWindows実行fileの製品表示を`D
 - `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
 
 この表示名変更はplatform build、Mobile native Device Linkの実機安全性、正式配布、製品完成、owner GOを証明しない。既存のrelease blockerと`release_ready=false`を維持する。
+
+## 現行sourceのWindows Cargo build script起動拒否（2026-09-28）
+
+現行`origin/main`と一致するsource commit `f4bf6b0e65e751da8b662595f2e9865970c6f460`で、OneDrive外の短いmanaged worktreeからRust全target試験を再確認した。通常のCargo target出力先では`io-lifetimes` build scriptがWindows Application ControlのOS error 4551で起動前に拒否された。別のCargo target出力先`C:\D4Pocket\codex-f4-target`を指定しても、`generic-array`と`io-extras`のbuild scriptが同じerrorで拒否された。依存build scriptの実行に至らずtest executableも完遂していないため、test結果は未取得である。短いsource pathと別target directoryだけでは回復しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`（非OneDrive managed worktree）：exit 1。build script起動がOS error 4551で拒否され、全target未完了。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\D4Pocket\codex-f4-target --all-targets -- --test-threads=1`：exit 1。`generic-array`／`io-extras` build scriptがOS error 4551で起動拒否され、全target未完了。
+- 2つの失敗したCargo生成物だけを、それぞれ`cargo clean`で削除した。既存の`C:\D4Pocket` checkout内容、Windows Application Control設定、拒否された実行fileは変更していない。
+
+過去のsource commit `2da5fd370382f2fe5acc032b8f26ac25880048ee`に対する全target 348件成功記録は履歴として維持し、現行sourceへ転用しない。最新sourceの全target検証が完遂していないため、`windows_rust_integration_test_execution_policy`を`release_blocker`／unresolvedへ戻し、registryとRelease Checklistを同期する。これは開発停止を意味せず、Rust全target試験実行環境を必要とする検証上の阻害である。`task_execution=unsupported`と`release_ready=false`を維持する。

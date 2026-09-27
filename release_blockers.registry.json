@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "resolved",
+      "status": "unresolved",
       "status_source": "manual",
-      "active": false,
+      "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "2026-09-28、検証開始時にcleanでorigin/mainと一致したmain commit 2da5fd370382f2fe5acc032b8f26ac25880048eeのsourceを、短いC:\\D4Pocket checkoutで実行した。Rust全target試験は終了code 0となった。実行commandは`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`。Rust library 303件、CLI単体試験9件、Broker IPC統合試験10件、その他の統合試験26件、計348件がすべて成功した。Broker子process起動とWorkspace startup 7件を含む全targetが実行され、過去にWindows Application Control（OS error 4551）で拒否された試験対象も今回成功した。失敗履歴はdocs/REV2_PROGRESS.mdに保持する。本解消が示すのは当該Windows環境と短縮checkoutでRust全target試験を完了できたことに限る。OneDrive上のcheckoutのpath長／同期、Desktop Flutter全suite、installed product、正式releaseの証拠ではない。",
-      "required_action": "この試験実行阻害への追加作業なし。Rustの試験対象、toolchain、または検証Windows環境を変えた場合は全targetを再実行する。OneDrive checkout固有のpath長／同期と製品release証拠は、別の未解決事項として扱う。"
+      "reason": "過去のmain commit 2da5fd370382f2fe5acc032b8f26ac25880048eeでは、短いC:\\D4Pocket checkoutでRust全target 348件が成功した履歴を保持する。一方、現行source commit f4bf6b0e65e751da8b662595f2e9865970c6f460では、非OneDriveの短いmanaged worktree上の全target実行が依存crate build scriptの起動時にWindows Application Control（OS error 4551）で拒否され、試験まで到達しなかった。別のCargo target directory C:\\D4Pocket\\codex-f4-targetを指定した再実行でもgeneric-array／io-extrasのbuild scriptが同じerrorで拒否された。過去commitのPASSは現行sourceの検証証拠へ転用せず、現行commitの全target完遂を確認するまで未解決とする。",
+      "required_action": "Windows Application Controlを変更・回避せず、現行source commitをcleanな承認済みWindows条件で全target実行する。Cargo build scriptと全test executableを含む全targetの成功を確認するまでresolvedへ戻さない。過去commitのPASSや別target directoryでの試験を現行sourceのPASSへ読み替えない。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",
