@@ -152,6 +152,9 @@ internal class DeviceLinkTlsClient {
                 setOf(credential.secret),
             )
         }
+        if (operation == "作業領域一覧" && status == "accepted") {
+            DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(body)
+        }
         if (operation == "端末確認" && status == "accepted") {
             require(body == mapOf("状態" to "接続中"))
         }

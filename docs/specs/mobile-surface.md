@@ -39,9 +39,15 @@ Mobile Flutter → Device Link TLS → Desktop Rust Broker → 既存の読み�
 
 MobileのAgent状態画面は、選択されたときにだけDevice Link TLS上の既存`Agent一覧` Broker handlerを読み取り専用で呼び出し、常駐pollingしない。Brokerが返すAgentAdapter metadataは`specs/mobile_agent_list.schema.json`および`specs/agent_adapter.schema.json`で検証し、Agent ID、provider、version、model、状態、Capabilityの識別子と対応状態だけを表示する。拒否応答、未知field、重複Agent ID、資格実値の存在、permission等の追加metadataは拒否し、理由文字列、Workspace path／secret path、Credential referenceは画面へ投影しない。
 
-表示はBrokerが保持するAdapter metadataの観測であり、実task実行可能性、Trust、Permission、Approval、Credential、MCP／Tool接続を表さない。`ready`も実task成功の証拠ではない。MobileからAgentを起動、選択、変更、比較、承認する操作は追加しない。Agent一覧なし・応答不正・未接続は未観測のまま表示する。
+表示はBrokerが保持するAdapter metadataの観測であり、実task実行可能性、Trust、Permission、Approval、Credential、MCP／Tool接続を表さない。`ready`も実task成功の証拠ではない。Agent状態画面自体は読み取り専用で、Agent metadataから起動可否や権限を推定しない。Agent一覧なし・応答不正・未接続は未観測のまま表示する。
 
-Device Linkの許可操作へ`Agent一覧`を追加するが、owner操作・対話承認・任意commandは許可しない。Brokerの既存認証、TLS証明書照合、nonce、監査、通常Agent metadata投影を再利用し、Mobile専用のbridgeやauthority判定を作らない。
+## Mobile対話面のWorkspace選択
+
+対話画面は、ownerがDesktop Brokerへ登録したRuntime ID／Workspace IDの一覧から選択し、既存の`対話開始`へIDだけを渡す。`作業領域一覧`は認証済みDevice Link要求として既存Rust Brokerの読み取り専用Workspace handlerへ接続し、TLS応答は`specs/mobile_workspace_selection.schema.json`の形へRust側で限定する。Mobileへ返すのはWorkspace IDとRuntime IDだけであり、path、登録hash、Approval識別子・状態、Credentialは返さない。要求payloadは空objectに限定する。
+
+選択IDはBrokerが現在保持するWorkspace登録とRuntime IDの対応を照合するための入力であり、Permission、Approval、Trust、実際のprocess working directory、書込み隔離を証明しない。Workspace IDはowner定義の識別子であり、秘密・path・個人情報を含めない。対話送信は従来どおりowner Approval待ちのTask要求を作るだけで、MobileはApprovalを発行・編集・承認しない。Agent比較表示は独立Workspace実行やcross-agent isolationの証拠にしない。
+
+Device Linkは既存TLS、資格照合、nonce、Audit、Broker handlerを再利用する。Native adapterは固定allowlist・空payload制約・secret保管／transportだけを担い、Workspace選択、Runtime一致、Authorityの判定はRust Brokerに残す。専用bridgeやMobile固有Authority経路を作らない。
 
 ## セキュリティ・内容境界
 
@@ -55,6 +61,7 @@ Device Linkの許可操作へ`Agent一覧`を追加するが、owner操作・対
 ## 現在の未成立範囲
 
 - MCPのlive一覧はowner専用Desktop操作面のためMobileでは未観測とする。
+- Workspace選択とAgent対話要求はsource／fixture経路に接続済みだが、Windows hostではAndroid/iOS実機を用いたDevice Link TLSからinstalled Desktop Brokerまでのend-to-end証拠は未成立である。
 - Mobile実機、Android/iOSの安全保管、TLS実接続、長時間運用、障害注入はこのWindows hostでは未検証である。
 - Windows installed productでのMobile連携実証、owner GO、C0-C34全数完成、正式releaseはrelease_blockerである。
 - MINIDORAの内部実装はMobileまたはShell Coreへ輸入しない。

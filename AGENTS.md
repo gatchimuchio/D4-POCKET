@@ -672,6 +672,8 @@ Product UI完成をcontract完成として扱わない。
 
 日本語の意味正本については`規定/00_日本語基底規定.md`、正本の所在と責任については`規定/正本索引.json`を併せて確認する。これらは、上記実装contractの安全要件を弱めない。
 
+作業時点の現行状態は、編集開始前にfetchしてremoteと照合した最新Repositoryの正本・Contract・Code・Testで確定する。添付文書、過去会話、過去進捗記録は要求・履歴として参照できるが、現行状態の証拠や現行正本を置き換えない。remote更新または正本間の矛盾を検出した場合は、古い状態を前提に続行せず、最新側を読み直して適用範囲を確認する。
+
 衝突がある場合は、Shell Core authority boundary、Schema integrity、conformance coverage、operator safetyを保持する、より厳格な規則を選ぶ。
 
 ### 25. 必須作業順序

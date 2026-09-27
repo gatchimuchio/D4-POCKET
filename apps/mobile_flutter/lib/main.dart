@@ -126,7 +126,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
             key: ValueKey(c.connectionGeneration),
             connect: () async => c.dialogue,
             active: c.ready && c.foreground && _selected == 7,
-            workspaceSelectionSupported: false,
+            workspaceSelectionSupported: true,
           )
         else
           const SizedBox.shrink(),

@@ -1724,6 +1724,39 @@ impl Broker {
         BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:evidence_source.into(),audit_event_id:audit_id,error:None,health:None,body:Some(body),shutdown_requested:false}
     }
 
+    fn 端末作業領域選択投影(body: &Value) -> Result<Value, &'static str> {
+        let object = body.as_object().filter(|value| {
+            value.len() == 1 && value.contains_key("作業領域")
+        }).ok_or("Workspace一覧の応答不正")?;
+        let entries = object.get("作業領域").and_then(Value::as_array)
+            .filter(|entries| entries.len() <= 16).ok_or("Workspace一覧の上限または形式不正")?;
+        let required = ["作業領域ID", "実行系ID", "登録hash", "承認状態", "有効期限", "表示範囲", "approval_id"];
+        let valid_id = |value: &str| {
+            let bytes = value.as_bytes();
+            !bytes.is_empty()
+                && bytes.len() <= 128
+                && bytes[0].is_ascii_alphanumeric()
+                && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.' | b'-'))
+        };
+        let mut seen = Vec::with_capacity(entries.len());
+        let mut projected = Vec::with_capacity(entries.len());
+        for entry in entries {
+            let fields = entry.as_object().filter(|fields| {
+                fields.len() == required.len() && required.iter().all(|key| fields.contains_key(*key))
+            }).ok_or("Workspace一覧項目の形式不正")?;
+            let id = fields.get("作業領域ID").and_then(Value::as_str).filter(|id| valid_id(id))
+                .ok_or("Workspace ID不正")?;
+            let runtime = fields.get("実行系ID").and_then(Value::as_str).filter(|id| valid_id(id))
+                .ok_or("Runtime ID不正")?;
+            if seen.iter().any(|known| known == id) {
+                return Err("Workspace ID重複");
+            }
+            seen.push(id.to_owned());
+            projected.push(serde_json::json!({"作業領域ID": id, "実行系ID": runtime}));
+        }
+        Ok(serde_json::json!({"作業領域": projected}))
+    }
+
     pub(crate) fn 端末要求処理(&mut self, raw: &str) -> BrokerResponse {
         self.端末期限処理();
         let hash = sha256_tagged(raw.as_bytes());
@@ -1758,6 +1791,7 @@ impl Broker {
                     "全Runtime停止要求" => self.全Runtime停止要求処理(id, &r.内容, &hash),
                     "通知一覧" => super::notification_center::dispatch(self, BrokerOperation::通知一覧, &r.内容, id, &hash),
                     "対話履歴閲覧状態" | "対話履歴閲覧" => self.履歴閲覧処理(id, op, &r.内容, false, &hash),
+                    "作業領域一覧" => self.作業領域要求処理(id, op, &r.内容, false, &hash),
                     _ => {
                         let operation: BrokerOperation = serde_json::from_value(Value::String(op.into())).map_err(|_|"操作不正")?;
                         self.対話要求処理(id, operation, &r.内容, false, &hash)
@@ -1765,6 +1799,11 @@ impl Broker {
                 };
                 if response.status != BrokerStatus::Accepted {return Err("対話操作拒否");}
                 let body = response.body.ok_or("対話応答不正")?;
+                let body = if op == "作業領域一覧" {
+                    Self::端末作業領域選択投影(&body)?
+                } else {
+                    body
+                };
                 let evidence_source = response.evidence_source;
                 self.端末.as_mut().ok_or("端末経路が未設定")?.所有記録(&r.資格ID,op,&body)?;
                 Ok((body, evidence_source))
@@ -5723,6 +5762,7 @@ mod 端末統治試験 {
         let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
         for (operation,payload) in [
             ("Agent一覧",json!({})),
+            ("作業領域一覧",json!({})),
             ("実行系ライフサイクル状態",json!({"版":1,"実行系ID":"local"})),
             ("実行系資源観測",json!({"版":1,"実行系ID":"local"})),
             ("通知一覧",json!({"版":1,"未読のみ":false,"上限":64})),
@@ -5738,6 +5778,15 @@ mod 端末統治試験 {
         assert_eq!(agent_body.as_object().map(serde_json::Map::len),Some(1));
         assert!(agent_body.get("Agent").is_some_and(Value::is_array));
         assert_eq!(agent_body["Agent"], json!([agent_fixture]));
+        let workspace_list=通信(&mut e.broker,&credential,"作業領域一覧",json!({}));
+        assert_eq!(workspace_list.status,BrokerStatus::Accepted);
+        assert_eq!(workspace_list.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
+        let workspace_entries=workspace_list.body.as_ref().unwrap()["作業領域"].as_array().unwrap();
+        assert_eq!(workspace_entries.len(),1);
+        assert_eq!(workspace_entries[0],json!({"作業領域ID":"mobile-fixture-workspace","実行系ID":"fixture-agent"}));
+        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("登録hash"));
+        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("approval_id"));
+        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("mobile-agent-workspace"));
         assert_eq!(通信(&mut e.broker,&credential,"対話セッション一覧",json!({})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話開始",json!({"実行系ID":"fixture-agent"})).status,BrokerStatus::Rejected);
         let started=制御(&mut e.broker,"対話開始",json!({"実行系ID":"fixture-agent","作業領域ID":"mobile-fixture-workspace"}));
@@ -5755,6 +5804,7 @@ mod 端末統治試験 {
         assert_eq!(listed_body["対話セッション"][0].as_object().unwrap().len(),6);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
+        assert_eq!(通信(&mut e.broker,&credential,"作業領域一覧",json!({"実行系ID":"fixture-agent"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"MCP接続一覧",json!({"版":1})).status,BrokerStatus::Rejected);
     }

@@ -204,7 +204,7 @@ internal data class DeviceLinkSnapshot(
 
 internal object DeviceLinkPayloadPolicy {
     private val operations = setOf(
-        "実行系列挙", "Agent一覧", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了",
+        "実行系列挙", "Agent一覧", "作業領域一覧", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了",
         "実行系ライフサイクル状態", "実行系資源観測", "通知一覧", "全Runtime停止要求",
         "対話履歴閲覧状態", "対話履歴閲覧",
     )
@@ -212,12 +212,30 @@ internal object DeviceLinkPayloadPolicy {
 
     fun validate(operation: String, payload: Map<String, Any?>) {
         require(operation in operations)
-        if (operation == "対話履歴閲覧") {
+        if (operation == "作業領域一覧") {
+            require(payload.isEmpty())
+        } else if (operation == "対話履歴閲覧") {
             validateHistory(payload)
         } else {
             validateTree(payload, 0)
         }
         require(StrictJson.encode(payload).toByteArray(Charsets.UTF_8).size <= 64 * 1024)
+    }
+
+    fun validateWorkspaceSelectionResponse(value: Any?) {
+        val response = value as? Map<*, *> ?: throw IllegalArgumentException("workspace response")
+        require(response.keys == setOf("作業領域"))
+        val items = response["作業領域"] as? List<*> ?: throw IllegalArgumentException("workspace list")
+        require(items.size <= 16)
+        val seen = mutableSetOf<String>()
+        val identifier = Regex("^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+        items.forEach { raw ->
+            val item = raw as? Map<*, *> ?: throw IllegalArgumentException("workspace item")
+            require(item.keys == setOf("作業領域ID", "実行系ID"))
+            val workspace = item["作業領域ID"] as? String ?: throw IllegalArgumentException("workspace id")
+            val runtime = item["実行系ID"] as? String ?: throw IllegalArgumentException("runtime id")
+            require(identifier.matches(workspace) && identifier.matches(runtime) && seen.add(workspace))
+        }
     }
 
     fun validateResponseTree(value: Any?, secrets: Set<String>, depth: Int = 0) {

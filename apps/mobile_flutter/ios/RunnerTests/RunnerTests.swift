@@ -51,6 +51,15 @@ class RunnerTests: XCTestCase {
     XCTAssertThrowsError(try DeviceLinkPayloadPolicy.validate("対話開始", payload: ["token": "x"]))
   }
 
+  func testWorkspaceSelectionIsAnEmptyReadOnlyRequest() {
+    XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validate("作業領域一覧", payload: [:]))
+    XCTAssertThrowsError(try DeviceLinkPayloadPolicy.validate("作業領域一覧", payload: ["実行系ID": "runtime-a"]))
+    XCTAssertNoThrow(try DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(
+      ["作業領域": [["作業領域ID": "workspace-a", "実行系ID": "runtime-a"]]]))
+    XCTAssertThrowsError(try DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(
+      ["作業領域": [["作業領域ID": "workspace-a", "approval_id": "grant"]]]))
+  }
+
   func testLocalRecoveryAuditIsClosedSecretFreeAndBounded() throws {
     let first = DeviceLinkLocalRecoveryAudit.localCredentialDeleted(
       eventID: String(repeating: "a", count: 32), timestamp: "2026-09-25T12:00:00Z")

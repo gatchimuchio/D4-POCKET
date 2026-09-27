@@ -53,6 +53,7 @@
         "端末離脱",
         "実行系列挙",
         "Agent一覧",
+        "作業領域一覧",
         "実行系ライフサイクル状態",
         "実行系資源観測",
         "通知一覧",
@@ -239,6 +240,16 @@
           "required": [],
           "additionalProperties": false,
           "properties": {}
+        }
+      }
+    },
+    {
+      "properties": {
+        "操作": { "const": "作業領域一覧" },
+        "内容": {
+          "type": "object",
+          "maxProperties": 0,
+          "additionalProperties": false
         }
       }
     },

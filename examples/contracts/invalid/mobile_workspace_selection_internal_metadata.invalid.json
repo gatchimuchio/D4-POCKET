@@ -1,0 +1,9 @@
+{
+  "作業領域": [
+    {
+      "作業領域ID": "workspace-a",
+      "実行系ID": "codex-local",
+      "登録hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

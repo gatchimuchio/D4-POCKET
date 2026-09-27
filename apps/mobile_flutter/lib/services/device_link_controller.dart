@@ -23,7 +23,8 @@ class DeviceLinkController extends ChangeNotifier implements BrokerTransport {
   String status = 'native安全保管を確認中';
   final List<String> events = [];
   List<String> runtimes = [];
-  RuntimeDialogueClient get dialogue => RuntimeDialogueClient(this);
+  RuntimeDialogueClient get dialogue =>
+      RuntimeDialogueClient(this, deviceLinkWorkspaceProjection: true);
 
   void _report(String message) {
     status = message;

@@ -128,6 +128,10 @@
       "責任": "runtime、Adapter、Capability、Permission、Approval、Audit、Recovery等の機械契約"
     },
     {
+      "path": "specs/mobile_workspace_selection.schema.json",
+      "責任": "Mobile Device Linkへ開示するWorkspace／Runtime識別子限定投影と非権限性"
+    },
+    {
       "path": "tooling/conformance_tests/",
       "責任": "契約適合と拒否経路の検証"
     },
@@ -265,7 +269,7 @@
     },
     {
       "path": "docs/specs/mobile-surface.md",
-      "責任": "C24 Mobileの通知、Runtime状態、資源概要、履歴metadata、Host、MCP、停止receipt、Recoveryの選択的投影と権限非生成境界"
+      "責任": "C24 Mobileの選択的状態投影、Workspace ID選択・Agent対話要求、Device Link・Approval・非権限境界"
     },
     {
       "path": "docs/specs/performance-validation.md",

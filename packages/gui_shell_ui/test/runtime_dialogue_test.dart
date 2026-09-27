@@ -199,6 +199,36 @@ void main() {
     expect(f.calls, ['作業領域一覧']);
   });
 
+  test('Device Link Workspace一覧はIDとRuntime IDだけを受け入れる', () async {
+    final transport = _WorkspaceSelectionProjectionTransport();
+    final result = await RuntimeDialogueClient(
+      transport,
+      deviceLinkWorkspaceProjection: true,
+    ).workspaceIdsByRuntime();
+    expect(result, {
+      'agent-a': ['workspace-a']
+    });
+    expect(transport.calls, ['作業領域一覧']);
+
+    transport.includeInternalMetadata = true;
+    await expectLater(
+      RuntimeDialogueClient(
+        transport,
+        deviceLinkWorkspaceProjection: true,
+      ).workspaceIdsByRuntime(),
+      throwsA(isA<BrokerClientException>()),
+    );
+    transport.includeInternalMetadata = false;
+    transport.workspaceId = 'workspace-a\n';
+    await expectLater(
+      RuntimeDialogueClient(
+        transport,
+        deviceLinkWorkspaceProjection: true,
+      ).workspaceIdsByRuntime(),
+      throwsA(isA<BrokerClientException>()),
+    );
+  });
+
   test('対話開始は選択したWorkspace IDだけを追加し未指定Runtimeの互換性を保つ', () async {
     final f = DialogueFixture();
     final client = RuntimeDialogueClient(f);
@@ -784,4 +814,30 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });
+}
+
+class _WorkspaceSelectionProjectionTransport implements BrokerTransport {
+  final calls = <String>[];
+  bool includeInternalMetadata = false;
+  String workspaceId = 'workspace-a';
+
+  @override
+  Future<Map<String, Object?>> request(String operation,
+      {Map<String, Object?>? payload}) async {
+    calls.add(operation);
+    final entry = <String, Object?>{
+      '作業領域ID': workspaceId,
+      '実行系ID': 'agent-a',
+      if (includeInternalMetadata) '登録hash': 'sha256:${'a' * 64}',
+    };
+    return {
+      'operation': operation,
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-workspace-selection',
+      'body': {
+        '作業領域': [entry]
+      },
+    };
+  }
 }

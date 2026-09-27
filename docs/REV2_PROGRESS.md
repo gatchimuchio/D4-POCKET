@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Mobile登録Workspace選択のID投影（2026-09-27）
+
+Mobile対話画面から登録済みWorkspaceを選択できるよう、既存Device Linkの許可操作へ空payload限定の一覧要求を追加した。Rust Brokerは既存のowner登録Workspace要求・監査経路を使い、返答をWorkspace IDとRuntime IDだけへ限定してから端末向け監査・応答へ渡す。Android Kotlin、iOS Swift、Flutterは同じ固定projectionを検証し、内部登録hash、Approval metadata、path等の追加fieldを拒否する。Mobileは選択したIDを通常の対話開始要求へ渡すだけであり、選択・Agent metadata・端末表示はPermissionやApprovalを生成しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：Rust library 298件成功（当該Rust変更を含む実行）。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter expanded test`（`packages/gui_shell_ui`）：56件成功。`flutter test --no-pub --no-test-assets --concurrency 1 --reporter expanded test`（`apps/mobile_flutter`）：17件成功。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：139 Schema／139 example／173 negative fixtureで成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217 check成功。
+- ASCII検証copy `C:\d4nativecheck3` で`flutter pub get`と`apps/mobile_flutter/android/gradlew.bat testDebugUnitTest --no-daemon`が成功し、Android Kotlin実装・JUnitをcompile／実行した。これはsource-level Windows検証であり、端末TLS接続・実機動作の証拠ではない。
+- Flutter analyzeはOneDrive配下の日本語pathで3 projectともAnalysis ServerのLSP JSON `FormatException: Unterminated string`により終了した。同じ最新sourceのASCII検証copyでは共有UI・Mobile・Desktopすべて`flutter analyze --no-pub`が`No issues found!`。path依存のhost制約とsource診断結果を分けて記録する。
+- iOS native XCTest、Desktop Rust Brokerへの実端末TLS、端末foreground/background・失効を含むLIVE_RUNTIME証拠は未実施。Workspace一覧・ID投影は`INTERNAL_STATE`であり、実Agent隔離／実行の証拠ではない。これらのrelease blockerと`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 7 Codex task spawn時Workspace path guard（2026-09-27）
 
 Codex Adapter登録時に、nofollowで開いたWorkspaceのdevice ID／file IDを記録し、version／help probe中はdirectory handleを保持する。各task process spawnの直前に同じ固定pathを開き直し、登録identityと違うWorkspaceを通信失敗として拒否する。Windowsではvolume rootからWorkspaceまでの各handleを`Command::spawn`完了まで保持する。既存cap-std Windows directory handleは`FILE_SHARE_DELETE`を許可しないため、通常NTFS pathで対象Workspaceと祖先directoryのrename／deleteを拒否する。guardはchild process生成後に解放し、Broker稼働中ずっとWorkspaceをロックしない。

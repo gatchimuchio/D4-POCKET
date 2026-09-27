@@ -200,6 +200,10 @@ final class DeviceLinkTLSClient {
       guard let body else { throw DeviceLinkTransportError.failed }
       try DeviceLinkPayloadPolicy.validateResponseTree(body, secrets: [credential.secret])
     }
+    if operation == "作業領域一覧", status == "accepted" {
+      guard let body else { throw DeviceLinkTransportError.failed }
+      try DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(body)
+    }
     if operation == "端末確認", status == "accepted" {
       guard NSDictionary(dictionary: body as? [String: Any] ?? [:]).isEqual(to: ["状態": "接続中"]) else {
         throw DeviceLinkTransportError.failed

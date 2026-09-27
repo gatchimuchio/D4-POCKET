@@ -2,8 +2,10 @@ import 'broker_transport.dart';
 
 /// 実行系対話の表示用client。承認・表示資格の発行や実行系への通信は行わない。
 class RuntimeDialogueClient {
-  RuntimeDialogueClient(this.transport);
+  RuntimeDialogueClient(this.transport,
+      {this.deviceLinkWorkspaceProjection = false});
   final BrokerTransport transport;
+  final bool deviceLinkWorkspaceProjection;
 
   Future<Map<String, Object?>> _request(
       String operation, Map<String, Object?> payload) async {
@@ -54,7 +56,7 @@ class RuntimeDialogueClient {
     final items = body['実行系'];
     if (items is! List ||
         items.length > 128 ||
-        items.any((v) => v is! String || !_runtime.hasMatch(v)) ||
+        items.any((v) => v is! String || !_validRuntimeIdentifier(v)) ||
         items.toSet().length != items.length) {
       throw const BrokerClientException('実行系列挙の形式が不正です');
     }
@@ -83,7 +85,7 @@ class RuntimeDialogueClient {
         throw const BrokerClientException('登録Workspace項目の形式が不正です');
       }
       final item = Map<String, Object?>.from(raw);
-      const keys = {
+      const fullKeys = {
         '作業領域ID',
         '実行系ID',
         '登録hash',
@@ -92,35 +94,41 @@ class RuntimeDialogueClient {
         '表示範囲',
         'approval_id'
       };
+      const deviceLinkKeys = {'作業領域ID', '実行系ID'};
+      final expectedKeys =
+          deviceLinkWorkspaceProjection ? deviceLinkKeys : fullKeys;
       final id = item['作業領域ID'];
       final runtime = item['実行系ID'];
-      final hash = item['登録hash'];
-      final status = item['承認状態'];
-      final visibility = item['表示範囲'];
-      if (item.length != keys.length ||
-          !keys.every(item.containsKey) ||
+      if (item.length != expectedKeys.length ||
+          !expectedKeys.every(item.containsKey) ||
           id is! String ||
-          !_runtime.hasMatch(id) ||
+          !_validRuntimeIdentifier(id) ||
           runtime is! String ||
-          !_runtime.hasMatch(runtime) ||
-          hash is! String ||
-          !_hash.hasMatch(hash) ||
+          !_validRuntimeIdentifier(runtime) ||
           !seenWorkspaceIds.add(id)) {
         throw const BrokerClientException('登録Workspace識別情報が不正です');
       }
-      if (status == 'approved') {
-        if (item['approval_id'] is! String ||
-            (item['approval_id'] as String).isEmpty ||
-            item['有効期限'] is! int ||
-            (item['有効期限'] as int) <= 0 ||
-            !_workspaceVisibilities.contains(visibility)) {
-          throw const BrokerClientException('Workspace承認metadataが不正です');
+      if (!deviceLinkWorkspaceProjection) {
+        final hash = item['登録hash'];
+        final status = item['承認状態'];
+        final visibility = item['表示範囲'];
+        if (hash is! String || !_hash.hasMatch(hash)) {
+          throw const BrokerClientException('登録Workspace識別情報が不正です');
         }
-      } else if (status != 'denied' ||
-          item['approval_id'] != null ||
-          item['有効期限'] != null ||
-          visibility != 'none') {
-        throw const BrokerClientException('Workspace登録状態が不正です');
+        if (status == 'approved') {
+          if (item['approval_id'] is! String ||
+              (item['approval_id'] as String).isEmpty ||
+              item['有効期限'] is! int ||
+              (item['有効期限'] as int) <= 0 ||
+              !_workspaceVisibilities.contains(visibility)) {
+            throw const BrokerClientException('Workspace承認metadataが不正です');
+          }
+        } else if (status != 'denied' ||
+            item['approval_id'] != null ||
+            item['有効期限'] != null ||
+            visibility != 'none') {
+          throw const BrokerClientException('Workspace登録状態が不正です');
+        }
       }
       if (result[runtime] == null) result[runtime] = <String>[];
       result[runtime]!.add(id);
@@ -220,6 +228,11 @@ class RuntimeDialogueClient {
     'full'
   };
   static final _runtime = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$');
+  static bool _validRuntimeIdentifier(String value) {
+    final match = _runtime.firstMatch(value);
+    return match != null && match.start == 0 && match.end == value.length;
+  }
+
   static bool validId(Object? value) =>
       value is String && value.length == 32 && _id.hasMatch(value);
   static bool _safeInteger(Object? value) =>

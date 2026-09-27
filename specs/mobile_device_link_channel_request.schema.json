@@ -30,6 +30,7 @@
       "enum": [
         "実行系列挙",
         "Agent一覧",
+        "作業領域一覧",
         "対話開始",
         "対話送信",
         "対話取得",
@@ -220,6 +221,25 @@
         },
         "payload": {
           "$ref": "#/$defs/safe_object"
+        }
+      },
+      "required": [
+        "version",
+        "method",
+        "broker_operation",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "properties": {
+        "version": { "const": 1 },
+        "method": { "const": "broker_request" },
+        "broker_operation": { "const": "作業領域一覧" },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0,
+          "additionalProperties": false
         }
       },
       "required": [

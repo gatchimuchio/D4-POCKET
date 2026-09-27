@@ -217,7 +217,7 @@ struct DeviceLinkSnapshot {
 
 enum DeviceLinkPayloadPolicy {
   private static let operations: Set<String> = [
-    "実行系列挙", "Agent一覧", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了",
+    "実行系列挙", "Agent一覧", "作業領域一覧", "対話開始", "対話送信", "対話取得", "対話中止", "対話終了",
     "実行系ライフサイクル状態", "実行系資源観測", "通知一覧", "全Runtime停止要求",
     "対話履歴閲覧状態", "対話履歴閲覧",
   ]
@@ -225,9 +225,37 @@ enum DeviceLinkPayloadPolicy {
 
   static func validate(_ operation: String, payload: [String: Any]) throws {
     guard operations.contains(operation) else { throw DeviceLinkJSONError.invalid }
-    if operation == "対話履歴閲覧" { try validateHistory(payload) }
+    if operation == "作業領域一覧" {
+      guard payload.isEmpty else { throw DeviceLinkJSONError.invalid }
+    } else if operation == "対話履歴閲覧" { try validateHistory(payload) }
     else { try validateTree(payload, depth: 0) }
     _ = try DeviceLinkStrictJSON.encodeObject(payload, maximumBytes: 64 * 1024)
+  }
+
+  static func validateWorkspaceSelectionResponse(_ value: Any) throws {
+    guard let response = value as? [String: Any], Set(response.keys) == ["作業領域"],
+          let items = response["作業領域"] as? [Any], items.count <= 16 else {
+      throw DeviceLinkJSONError.invalid
+    }
+    var seen = Set<String>()
+    func validIdentifier(_ value: String) -> Bool {
+      let bytes = Array(value.utf8)
+      guard (1...128).contains(bytes.count),
+            (65...90).contains(bytes[0]) || (97...122).contains(bytes[0]) || (48...57).contains(bytes[0]) else {
+        return false
+      }
+      return bytes.allSatisfy {
+        (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || [95, 46, 45].contains($0)
+      }
+    }
+    for raw in items {
+      guard let item = raw as? [String: Any], Set(item.keys) == ["作業領域ID", "実行系ID"],
+            let workspace = item["作業領域ID"] as? String,
+            let runtime = item["実行系ID"] as? String,
+            validIdentifier(workspace), validIdentifier(runtime), seen.insert(workspace).inserted else {
+        throw DeviceLinkJSONError.invalid
+      }
+    }
   }
 
   static func validateResponseTree(_ value: Any, secrets: Set<String>, depth: Int = 0) throws {

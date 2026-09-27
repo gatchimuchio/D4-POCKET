@@ -119,6 +119,16 @@ class _FakeNativePort implements DeviceLinkNativePort {
         '実行系': ['runtime-a'],
       });
     }
+    if (operation == '作業領域一覧') {
+      return {
+        ..._accepted(operation, {
+          '作業領域': [
+            {'作業領域ID': 'workspace-a', '実行系ID': 'runtime-a'},
+          ],
+        }),
+        'evidence_source': 'INTERNAL_STATE',
+      };
+    }
     return _accepted(operation);
   }
 }
@@ -155,6 +165,19 @@ void main() {
     expect(controller.runtimes, ['runtime-a']);
     expect(native.calls, ['read_state', 'pair']);
     expect(native.requests, ['実行系列挙']);
+  });
+
+  test('Mobile対話clientはnative Device Link経由の選択用Workspace投影を使う', () async {
+    final native = _FakeNativePort();
+    final controller = DeviceLinkController(nativePort: native);
+    addTearDown(controller.dispose);
+    await controller.initialize();
+    await controller.pair();
+
+    expect(await controller.dialogue.workspaceIdsByRuntime(), {
+      'runtime-a': ['workspace-a'],
+    });
+    expect(native.requests, ['実行系列挙', '作業領域一覧']);
   });
 
   test('local-only削除はnative回復記録を要求しDesktop失効を主張しない', () async {

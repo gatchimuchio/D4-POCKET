@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mobile_workspace_selection.schema.json",
+  "title": "Mobile Device Link Workspace選択投影",
+  "description": "認証済みDevice Link経由でWorkspace選択に必要な識別子だけをMobileへ返す。path、登録hash、Approval、Permission、Credentialは含まず、選択結果はAuthorityを生成しない。",
+  "type": "object",
+  "required": ["作業領域"],
+  "additionalProperties": false,
+  "properties": {
+    "作業領域": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": ["作業領域ID", "実行系ID"],
+        "additionalProperties": false,
+        "properties": {
+          "作業領域ID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+          },
+          "実行系ID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\\s\\S])"
+          }
+        }
+      }
+    }
+  }
+}

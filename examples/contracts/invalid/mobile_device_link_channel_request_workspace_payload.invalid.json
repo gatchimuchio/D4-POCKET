@@ -2,5 +2,7 @@
   "version": 1,
   "method": "broker_request",
   "broker_operation": "作業領域一覧",
-  "payload": {}
+  "payload": {
+    "実行系ID": "codex-local"
+  }
 }

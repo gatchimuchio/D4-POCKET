@@ -105,8 +105,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではAgent対話Sessionから同一RuntimeのBroker登録Workspaceへの明示ID結合と別AuditEvent、異なるRuntime間の同一rootおよび通常pathで観測できる親子root拒否を実装・fixture検査した。Codex Adapterは各task spawn直前に固定rootのdevice ID／file IDを再照合し、Windowsではnofollow directory handleを保持して通常NTFS pathのrename／delete差し替えを防ぐfixture testを追加した。ただしUnixのcheck-to-spawn race、bind mount等の別名範囲、実Agentの独立実行・書込み隔離・cross-agent contamination、実比較・Handoff、Mobile Workspace選択は未成立。",
-      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Unixのpath identity再確認とprocess起動間race、および通常path identity列で観測できないmount等の別名範囲を扱う。実Agent専用Session／独立Workspace実行／cross-agent contamination負例／実比較・HandoffをBroker統治経路で実証する。MobileのWorkspace選択はnative Device Link境界内に接続する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
+      "reason": "owner追加要求のC1以降の全機能・性能・長時間運用・障害注入・全数監査は未完成。Phase 7ではAgent対話Sessionから同一RuntimeのBroker登録Workspaceへの明示ID結合と別AuditEvent、異なるRuntime間の同一rootおよび通常pathで観測できる親子root拒否を実装・fixture検査した。Codex Adapterは各task spawn直前に固定rootのdevice ID／file IDを再照合し、Windowsではnofollow directory handleを保持して通常NTFS pathのrename／delete差し替えを防ぐfixture testを追加した。Unixのcheck-to-spawn race、bind mount等の別名範囲、実Agentの独立実行・書込み隔離・cross-agent contamination、実比較・Handoffは未成立。2026-09-27、Mobile Workspace一覧を既存Device Linkとowner登録Broker経路へ接続し、RustでWorkspace ID／Runtime IDだけを投影するsource pathを実装・Schema／Conformance／Rust／Flutter／Android native testで検査したが、実端末TLS・実行・隔離のLIVE_RUNTIME証拠は未成立。",
+      "required_action": "docs/総合機能拡張_rev1/進捗.mdでC0からC33の要求と実装・実行証拠を全数対応させ、完成を監査する。Unixのpath identity再確認とprocess起動間race、および通常path identity列で観測できないmount等の別名範囲を扱う。実Agent専用Session／独立Workspace実行／cross-agent contamination負例／実比較・HandoffをBroker統治経路で実証する。実端末でDevice Link TLS、Workspace projection、対話開始時のID結合、権限否定、foreground/background、失効をLIVE_RUNTIMEで検証する。C34の実機・運用署名・正式配布・owner GOは独立した条件として維持する。"
     },
     {
       "name": "rev2_desktop_product_distribution",
@@ -165,8 +165,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。Flutterの16試験と解析は成功。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。iOSはApple環境で未検証。Rust Brokerとの実接続試験と実機証拠もない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。",
-      "required_action": "workflow_dispatch限定のApple補助手順でiOS compile・native XCTestを実行し、失敗を修正する。その後、招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さず、同じDesktop Rust BrokerへのTLS結合・拒否・失効・background停止を検証するplatform-native LIVE_RUNTIME harnessを成立させる。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。Android実機凍結と各platformのrelease evidenceは別途維持する。"
+      "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。Flutterの16試験と解析は成功。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。iOSはApple環境で未検証。Rust Brokerとの実接続試験と実機証拠もない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。2026-09-27、登録Workspace選択をnative Device Linkの空payload要求・ID／Runtime ID限定応答としてRust／Flutter／Android native testへ追加し、ASCII検証copyでAndroid unit testと3面のFlutter analyzeを確認した。実端末TLSとiOS XCTestは未検証で、Flutter analyzeのOneDrive日本語path上のLSP失敗も残る。",
+      "required_action": "workflow_dispatch限定のApple補助手順でiOS compile・native XCTestを実行し、失敗を修正する。招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さず、同じDesktop Rust BrokerへのTLS結合、Workspace選択・対話ID結合、拒否・失効・background停止を検証するplatform-native LIVE_RUNTIME harnessを成立させる。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。Android実機凍結と各platformのrelease evidenceは別途維持する。"
     }
   ]
 }

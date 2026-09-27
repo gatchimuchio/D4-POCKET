@@ -3161,7 +3161,7 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
         if len(rust_operations) != len(set(rust_operations)) or set(rust_operations) != schema_runtime_operations:
             errors.append("Device Link Schemaの通常操作集合がRust Broker allowlistと一致しない")
     operations = {"端末結合": {}, "端末確認": {}, "端末離脱": {}, "実行系列挙": {},
-                  "Agent一覧": {},
+                  "Agent一覧": {}, "作業領域一覧": {},
                   "実行系ライフサイクル状態": {"版": 1, "実行系ID": "local"},
                   "実行系資源観測": {"版": 1, "実行系ID": "local"},
                   "通知一覧": {"版": 1, "未読のみ": False, "上限": 64},
@@ -3183,6 +3183,7 @@ def 端末契約の構造と禁止操作を検査する() -> list[str]:
         ("実行系ライフサイクル状態", {"版": 2, "実行系ID": "local"}),
         ("実行系資源観測", {"版": 1, "実行系ID": "../runtime"}),
         ("通知一覧", {"版": 1, "上限": 257}),
+        ("作業領域一覧", {"実行系ID": "local"}),
         ("全Runtime停止要求", {"版": 1, "owner": True}),
         ("対話履歴閲覧状態", {"approval_id": "a" * 32}),
         ("対話履歴閲覧", {"approval_id": "a" * 32, "query": {"after": 0, "limit": 20, "filter": {"owner": "true"}}}),
@@ -3202,6 +3203,7 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "read_recovery_audit"},
         {"version": 1, "method": "pair"},
         {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {}},
+        {"version": 1, "method": "broker_request", "broker_operation": "作業領域一覧", "payload": {}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "latest_per_request": True, "include_audit_context": True, "include_result_evidence": True, "include_content_receipt": True, "filter": {"実行系ID": "local"}}}},
         {"version": 1, "method": "disconnect"},
         {"version": 1, "method": "local_delete"},
@@ -3223,6 +3225,7 @@ def Mobile_native_Device_Link_channelを秘密非通過に制限する() -> list
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"credential": {"value": "e" * 64}}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話送信", "payload": {"内容": {"authority": "owner"}}},
         {"version": 1, "method": "broker_request", "broker_operation": "Agent一覧", "payload": {"approval_id": "a" * 32}},
+        {"version": 1, "method": "broker_request", "broker_operation": "作業領域一覧", "payload": {"実行系ID": "local"}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "owner": True}}},
         {"version": 1, "method": "broker_request", "broker_operation": "対話履歴閲覧", "payload": {"approval_id": "a" * 32, "query": {"after": 0, "limit": 50, "filter": {"authority": "owner"}}}},
         {"version": 1, "method": "pair", "authority": "owner"},

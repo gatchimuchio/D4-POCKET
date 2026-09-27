@@ -7,6 +7,7 @@ const _deviceLinkChannel = MethodChannel('gui_shell/mobile_device_link');
 const _operations = <String>{
   '実行系列挙',
   'Agent一覧',
+  '作業領域一覧',
   '対話開始',
   '対話送信',
   '対話取得',
@@ -230,6 +231,9 @@ class MethodChannelDeviceLink implements DeviceLinkNativePort {
   }) async {
     if (!_operations.contains(operation)) throw _channelFailure;
     final body = payload ?? const <String, Object?>{};
+    if (operation == '作業領域一覧' && body.isNotEmpty) {
+      throw _channelFailure;
+    }
     if (operation == '対話履歴閲覧') {
       _validateHistoryPayload(body);
     } else {

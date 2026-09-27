@@ -20,6 +20,7 @@ pub(crate) fn 要求読取(raw: &str) -> Result<端末要求, &'static str> {
 pub(crate) const 許可操作: &[&str] = &[
     "実行系列挙",
     "Agent一覧",
+    "作業領域一覧",
     "実行系ライフサイクル状態",
     "実行系資源観測",
     "通知一覧",
@@ -265,7 +266,7 @@ impl 端末制御 {
             return Err("nonce再使用または上限");
         }
         match r.操作.as_str() {
-            "実行系列挙" | "Agent一覧" | "端末確認" | "端末離脱"
+            "実行系列挙" | "Agent一覧" | "作業領域一覧" | "端末確認" | "端末離脱"
                 if !fields(&r.内容, &[]) =>
             {
                 return Err("要求不正")

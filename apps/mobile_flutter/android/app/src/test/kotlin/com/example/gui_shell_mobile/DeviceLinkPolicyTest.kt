@@ -7,6 +7,22 @@ import org.junit.Test
 
 class DeviceLinkPolicyTest {
     @Test
+    fun workspaceSelectionAllowsOnlyAnEmptyReadRequest() {
+        DeviceLinkPayloadPolicy.validate("作業領域一覧", emptyMap())
+        assertThrows(IllegalArgumentException::class.java) {
+            DeviceLinkPayloadPolicy.validate("作業領域一覧", mapOf("実行系ID" to "runtime-a"))
+        }
+        DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(
+            mapOf("作業領域" to listOf(mapOf("作業領域ID" to "workspace-a", "実行系ID" to "runtime-a"))),
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            DeviceLinkPayloadPolicy.validateWorkspaceSelectionResponse(
+                mapOf("作業領域" to listOf(mapOf("作業領域ID" to "workspace-a", "approval_id" to "grant"))),
+            )
+        }
+    }
+
+    @Test
     fun acceptsOnlyBoundedHistoryGrantReferenceException() {
         val payload = mapOf(
             "approval_id" to "a".repeat(32),

@@ -7,5 +7,7 @@
   "nonce": "ffffffffffffffffffffffffffffffff",
   "発行時刻": 1999999900,
   "操作": "作業領域一覧",
-  "内容": {}
+  "内容": {
+    "実行系ID": "local"
+  }
 }
