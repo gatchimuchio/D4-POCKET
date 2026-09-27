@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 隔離SessionのTask Permission即時失効（2026-09-27）
+
+Task用Workspace Permissionの揮発記録を、対話Sessionが中止・期限超過・監査失敗・worker障害で`中止後隔離`へ遷移する全経路から直ちに除去する。Sessionが非利用状態のためTask要求検査自体も拒否するが、状態照合だけに頼らずAuthority記録を消去する。対話のread-only実行経路とTask実行未接続状態は変更しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 中止後にworker応答を回収しても評価遅延を残さない -- --test-threads=1`: 成功。owner発行済みTask Permissionが中止によるSession隔離時に即時消去されることを確認。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`: library 300件成功、Desktop launcher harness 0件成功。その後`gui_shell_rust_helper` test executableはWindows Application Control `os error 4551`で起動前に拒否されたため、all-targetは不成立。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema／example 142件、negative fixture 176件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 219件で合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。`git diff --check`も合格。
+- `python -X utf8 tooling/manifest.py --write`（tracked source 1059件）／`--check`と`python -X utf8 tooling/release_gate_check.py`は合格。release blockerは残り、`release_ready=false`。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。Python側統合validationは合格、Windows installed-product evidenceを含むrelease blockerは保持。
+- `release_blocker`: Task実行consumerとPermission消費、Task本文・実行条件へ結合する別Owner Approval、実行前後AuditEvent、実行可能なRecoveryAction、隔離書込実行、結果/diff保存、比較／Handoffは未接続。今回の変更はTask実行やrelease readinessを証明しない。Windows Application Controlによる全target試験の起動拒否も未解決。
+
 ## D4 Pocket Phase 7 Agent作業要求のBroker照合経路（2026-09-27）
 
 既存`agent_task_request.schema.json`をRust Brokerの`Agent作業要求検査`へ接続した。要求ごとにAgent metadata、利用中Session、Session作成時のWorkspace登録hashを現在のBroker状態と照合する。指示本文は応答・Auditへ出さずBroker計算hashだけを返し、成功応答にも未実行・Permission未付与・Approval未取得を明示する。これは登録関係の`INTERNAL_STATE`検査のみで、実Agent稼働、Workspace隔離、Task保存・実行は証明しない。既存対話ApprovalをTask権限へ流用せず、Codex Adapterのread-only境界を維持する。

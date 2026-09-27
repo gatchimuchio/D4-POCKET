@@ -1252,6 +1252,8 @@ impl 対話制御 {
                 {
                     work.状態 = "完了";
                     work.結果 = Some(Err(対話失敗::通信失敗));
+                    self.agent_task_permissions
+                        .remove(&work.要求.対話セッションID);
                     if let Some(s) = self.セッション.get_mut(&work.要求.対話セッションID)
                     {
                         s.状態 = "中止後隔離".into();
@@ -1305,6 +1307,8 @@ impl 対話制御 {
                     .get_mut(&work.要求.対話セッションID)
                     .ok_or(対話失敗::セッション不一致)?
                     .状態 = "中止後隔離".into();
+                self.agent_task_permissions
+                    .remove(&work.要求.対話セッションID);
                 Ok(json!({"要求ID": 指定.要求ID, "状態": "中止"}))
             }
             "対話終了" => {
@@ -1354,6 +1358,8 @@ impl 対話制御 {
                         work.取消.store(true, Ordering::SeqCst);
                         work.状態 = "監査失敗";
                         work.結果 = Some(Err(対話失敗::監査失敗));
+                        self.agent_task_permissions
+                            .remove(&work.要求.対話セッションID);
                         if let Some(session) = self.セッション.get_mut(&work.要求.対話セッションID)
                         {
                             session.状態 = "中止後隔離".into();
@@ -1387,6 +1393,8 @@ impl 対話制御 {
                 work.取消.store(true, Ordering::SeqCst);
                 work.状態 = "監査失敗";
                 work.結果 = Some(Err(対話失敗::監査失敗));
+                self.agent_task_permissions
+                    .remove(&work.要求.対話セッションID);
                 if let Some(session) = self.セッション.get_mut(&work.要求.対話セッションID)
                 {
                     session.状態 = "中止後隔離".into();
@@ -1437,6 +1445,8 @@ impl 対話制御 {
                 work.結果 = Some(Err(対話失敗::期限超過));
                 work.状態 = "完了";
                 work.単調応答Millis = None;
+                self.agent_task_permissions
+                    .remove(&work.要求.対話セッションID);
                 if let Some(s) = self.セッション.get_mut(&work.要求.対話セッションID)
                 {
                     s.状態 = "中止後隔離".into();
@@ -1492,6 +1502,8 @@ impl 対話制御 {
                     work.取消.store(true, Ordering::SeqCst);
                     work.状態 = "監査失敗";
                     work.結果 = Some(Err(対話失敗::監査失敗));
+                    self.agent_task_permissions
+                        .remove(&work.要求.対話セッションID);
                     if let Some(s) = self.セッション.get_mut(&work.要求.対話セッションID)
                     {
                         s.状態 = "中止後隔離".into();
@@ -1502,6 +1514,8 @@ impl 対話制御 {
                     work.終了時刻 = Some(現在);
                     work.終了監査ID = 終了監査.ok();
                     if 結果.is_err() {
+                        self.agent_task_permissions
+                            .remove(&work.要求.対話セッションID);
                         if let Some(s) = self.セッション.get_mut(&work.要求.対話セッションID)
                         {
                             s.状態 = "中止後隔離".into();
@@ -2228,6 +2242,26 @@ mod tests {
     fn 中止後にworker応答を回収しても評価遅延を残さない() {
         let (mut c, calls) = 準備(false, false, true);
         let session = 開始(&mut c, "left");
+        let workspace_id = "fixture-workspace-left";
+        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            workspace_id,
+        );
+        let task_permission = json!({
+            "agent_runtime_id":"left",
+            "session_id":session,
+            "workspace_id":workspace_id,
+        });
+        c.操作_作業領域結合済み(
+            "AgentTaskWorkspacePermissionGrant",
+            &task_permission,
+            true,
+            100,
+            Some(&binding),
+            &mut |_, _, _| Ok("fixture-task-permission-audit".into()),
+        )
+        .expect("中止前はSession結合Permissionを発行できる");
+        assert!(c.agent_task_permissions.contains_key(&session));
         let pending = 要求(&mut c, &session);
         let request_id = pending["要求ID"].as_str().unwrap();
         c.評価隔離(request_id).unwrap();
@@ -2238,6 +2272,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(1));
         }
         操作(&mut c, "対話中止", json!({"要求ID": request_id}), false).unwrap();
+        assert!(
+            !c.agent_task_permissions.contains_key(&session),
+            "隔離されたSessionのTask Permissionは直ちに失効する"
+        );
         std::thread::sleep(Duration::from_millis(150));
 
         let progress = c
