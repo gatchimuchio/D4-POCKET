@@ -269,6 +269,7 @@ class AgentSessionRecord {
     required this.pendingApprovalCount,
     required this.rollbackCandidate,
     required this.auditEventId,
+    this.workspaceAuditEventId = '',
   });
 
   final String sessionId;
@@ -285,6 +286,7 @@ class AgentSessionRecord {
   final int pendingApprovalCount;
   final String rollbackCandidate;
   final String auditEventId;
+  final String workspaceAuditEventId;
 
   factory AgentSessionRecord.fromJson(Map<String, Object?> json) {
     return AgentSessionRecord(
@@ -303,6 +305,7 @@ class AgentSessionRecord {
       pendingApprovalCount: json['pending_approval_count'] as int? ?? 0,
       rollbackCandidate: json['rollback_candidate'] as String? ?? '',
       auditEventId: json['audit_event_id'] as String? ?? '',
+      workspaceAuditEventId: json['workspace_audit_event_id'] as String? ?? '',
     );
   }
 }

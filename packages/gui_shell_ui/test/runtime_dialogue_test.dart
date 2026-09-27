@@ -30,6 +30,27 @@ class DialogueFixture implements BrokerTransport {
   final sessions = <String, String>{};
   final requests = <String, String>{};
   final inputs = <String>[];
+  final startPayloads = <Map<String, Object?>>[];
+  List<Map<String, Object?>> workspaceRegistrations = [
+    {
+      '作業領域ID': 'workspace-left',
+      '実行系ID': 'left',
+      '登録hash': 'sha256:${'a' * 64}',
+      '承認状態': 'denied',
+      '有効期限': null,
+      '表示範囲': 'none',
+      'approval_id': null,
+    },
+    {
+      '作業領域ID': 'workspace-right',
+      '実行系ID': 'right',
+      '登録hash': 'sha256:${'b' * 64}',
+      '承認状態': 'approved',
+      '有効期限': 1780000300,
+      '表示範囲': 'full',
+      'approval_id': 'approval-workspace-right',
+    },
+  ];
   List<String> runtimeNames = ['left', 'right'];
   int counter = 0;
   bool complete = false;
@@ -58,7 +79,10 @@ class DialogueFixture implements BrokerTransport {
     switch (operation) {
       case '実行系列挙':
         body = {'実行系': runtimeNames};
+      case '作業領域一覧':
+        body = {'作業領域': workspaceRegistrations};
       case '対話開始':
+        startPayloads.add(Map<String, Object?>.from(p));
         final id = (++counter).toRadixString(16).padLeft(32, '0');
         sessions[id] = p['実行系ID']! as String;
         body = {'実行系ID': p['実行系ID'], '対話セッションID': id, '状態': '利用中'};
@@ -163,6 +187,66 @@ void main() {
         90);
     expect(() => DialogueExecutionRecord.parse(null, request, 'left', session),
         throwsA(isA<BrokerClientException>()));
+  });
+
+  test('Workspace一覧はBrokerの登録metadataだけをRuntime別に限定して返す', () async {
+    final f = DialogueFixture();
+    final workspaces = await RuntimeDialogueClient(f).workspaceIdsByRuntime();
+    expect(workspaces, {
+      'left': ['workspace-left'],
+      'right': ['workspace-right'],
+    });
+    expect(f.calls, ['作業領域一覧']);
+  });
+
+  test('対話開始は選択したWorkspace IDだけを追加し未指定Runtimeの互換性を保つ', () async {
+    final f = DialogueFixture();
+    final client = RuntimeDialogueClient(f);
+    await client.start('left');
+    await client.start('right', workspaceId: 'workspace-right');
+    expect(f.startPayloads, [
+      {'実行系ID': 'left'},
+      {'実行系ID': 'right', '作業領域ID': 'workspace-right'},
+    ]);
+  });
+
+  testWidgets('選択した登録Workspace IDを新規Session開始へ渡す', (tester) async {
+    final f = DialogueFixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+                connect: () async => RuntimeDialogueClient(f)))));
+    await tester.pumpAndSettle();
+    final workspacePicker =
+        find.byKey(const ValueKey('dialogue-workspace-left'));
+    expect(workspacePicker, findsOneWidget);
+    await tester.ensureVisible(workspacePicker);
+    await tester.tap(workspacePicker);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-left').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('新規セッション'));
+    await tester.tap(find.text('新規セッション').first);
+    await tester.pumpAndSettle();
+    expect(f.startPayloads, [
+      {'実行系ID': 'left', '作業領域ID': 'workspace-left'},
+    ]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Workspace選択に未対応の接続面はWorkspace一覧を要求しない', (tester) async {
+    final f = DialogueFixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RuntimeDialogueScreen(
+      connect: () async => RuntimeDialogueClient(f),
+      workspaceSelectionSupported: false,
+    ))));
+    await tester.pumpAndSettle();
+    expect(f.calls, ['実行系列挙']);
+    expect(find.byKey(const ValueKey('dialogue-workspace-left')), findsNothing);
+    expect(find.textContaining('Workspace選択に未対応'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('実行記録をUTCと監査参照で表示し新規セッションで破棄する', (tester) async {
@@ -584,10 +668,10 @@ void main() {
     expect(f.calls, isEmpty);
     await tester.pumpWidget(screen(true));
     await tester.pumpAndSettle();
-    expect(f.calls, ['実行系列挙']);
+    expect(f.calls, ['実行系列挙', '作業領域一覧']);
     await tester.pumpWidget(screen(false));
     await tester.pump(const Duration(seconds: 2));
-    expect(f.calls, ['実行系列挙']);
+    expect(f.calls, ['実行系列挙', '作業領域一覧']);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('デモ表示は対話を送信しない', (tester) async {
@@ -604,7 +688,7 @@ void main() {
             .widget<FilledButton>(find.byKey(const ValueKey('dialogue-send')))
             .onPressed,
         isNull);
-    expect(f.calls, ['実行系列挙']);
+    expect(f.calls, ['実行系列挙', '作業領域一覧']);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });

@@ -2416,9 +2416,32 @@ impl Broker {
             Ok(event) => event.event_id,
             Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
         };
+        let workspace_binding = if operation == BrokerOperation::対話開始 {
+            match (
+                payload.get("実行系ID").and_then(Value::as_str),
+                payload.get("作業領域ID").and_then(Value::as_str),
+            ) {
+                (Some(runtime_id), Some(workspace_id)) => {
+                    let Some(binding) = self.作業領域.dialogue_binding(runtime_id, workspace_id) else {
+                        return self.reject_with_payload_hash(
+                            request_id,
+                            operation.as_str(),
+                            "作業領域不在",
+                            "指定Runtimeに結合できる登録済みWorkspaceがありません",
+                            true,
+                            payload_hash,
+                        );
+                    };
+                    Some(binding)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         let mut 対話 = std::mem::take(&mut self.対話);
         let now = self.current_epoch_seconds();
-        let result = 対話.操作(operation.as_str(), payload, owner, now, &mut |reason, id, hash| {
+        let result = 対話.操作_作業領域結合済み(operation.as_str(), payload, owner, now, workspace_binding.as_ref(), &mut |reason, id, hash| {
             let event = self.append_audit(id, operation.as_str(), "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash).map_err(|_| 対話失敗::監査失敗)?;
             last_event = event.event_id.clone(); Ok(event.event_id)
         });
@@ -5589,9 +5612,53 @@ mod 端末統治試験 {
         ))
         .expect("Agent接続例を読み込む");
         e.broker
-            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata)))
+            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata.clone())))
             .unwrap();
-        let started=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent"}));
+        let workspace_root=e.path.join("fixture-agent-workspace");
+        std::fs::create_dir(&workspace_root).unwrap();
+        for workspace_id in ["fixture-workspace", "second-fixture-workspace"] {
+            let (root, _, ancestry) =
+                super::super::workspace_root::open_isolated_root_with_ancestry(
+                    &workspace_root,
+                    &[],
+                )
+                .unwrap();
+            e.broker.作業領域登録範囲付き(
+                "fixture-agent",
+                workspace_id,
+                root,
+                &[],
+                Some(ancestry),
+            ).unwrap();
+        }
+        let unbound=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent"}));
+        assert_eq!(unbound.status,BrokerStatus::Rejected);
+        assert_eq!(unbound.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
+        let unregistered=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"not-registered"}));
+        assert_eq!(unregistered.status,BrokerStatus::Rejected);
+        assert_eq!(unregistered.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
+        let other_runtime_root=e.path.join("other-runtime-workspace");
+        std::fs::create_dir(&other_runtime_root).unwrap();
+        e.broker
+            .実行系登録("other-fixture-agent", Arc::new(AgentMetadataAdapter(metadata.clone())))
+            .unwrap();
+        let (other_root, _, other_ancestry) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(
+                &other_runtime_root,
+                &[],
+            )
+            .unwrap();
+        e.broker.作業領域登録範囲付き(
+            "other-fixture-agent",
+            "other-runtime-workspace",
+            other_root,
+            &[],
+            Some(other_ancestry),
+        ).unwrap();
+        let cross_runtime=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"other-runtime-workspace"}));
+        assert_eq!(cross_runtime.status,BrokerStatus::Rejected);
+        assert_eq!(cross_runtime.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
+        let started=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"fixture-workspace"}));
         assert_eq!(started.status,BrokerStatus::Accepted);
         let listed=通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({}));
         assert_eq!(listed.status,BrokerStatus::Accepted);
@@ -5599,8 +5666,12 @@ mod 端末統治試験 {
         let body=listed.body.as_ref().expect("対話セッション一覧");
         assert_eq!(body["版"],1);
         assert_eq!(body["対話セッション"].as_array().unwrap().len(),1);
-        assert_eq!(body["対話セッション"][0]["作成監査ID"],started.audit_event_id);
-        assert_eq!(body["対話セッション"][0].as_object().unwrap().len(),4);
+        assert_eq!(body["対話セッション"][0]["作業領域ID"],"fixture-workspace");
+        assert_eq!(body["対話セッション"][0]["作業領域結合監査ID"],started.audit_event_id);
+        assert_ne!(body["対話セッション"][0]["作成監査ID"],started.audit_event_id);
+        assert_eq!(body["対話セッション"][0].as_object().unwrap().len(),6);
+        assert!(e.broker.audit_events().iter().any(|event|
+            event.event_id==started.audit_event_id && event.reason=="対話Sessionと登録済みWorkspaceの明示結合"));
         assert_eq!(
             通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({"authority":"owner"})).status,
             BrokerStatus::Rejected
@@ -5640,6 +5711,14 @@ mod 端末統治試験 {
         e.broker
             .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(agent_fixture.clone())))
             .unwrap();
+        let agent_workspace=e.path.join("mobile-agent-workspace");
+        std::fs::create_dir(&agent_workspace).unwrap();
+        e.broker.作業領域登録(
+            "fixture-agent",
+            "mobile-fixture-workspace",
+            cap_std::fs::Dir::open_ambient_dir(&agent_workspace,cap_std::ambient_authority()).unwrap(),
+            &[],
+        ).unwrap();
         let invitation=制御(&mut e.broker,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
         let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
         for (operation,payload) in [
@@ -5660,7 +5739,8 @@ mod 端末統治試験 {
         assert!(agent_body.get("Agent").is_some_and(Value::is_array));
         assert_eq!(agent_body["Agent"], json!([agent_fixture]));
         assert_eq!(通信(&mut e.broker,&credential,"対話セッション一覧",json!({})).status,BrokerStatus::Rejected);
-        let started=制御(&mut e.broker,"対話開始",json!({"実行系ID":"fixture-agent"}));
+        assert_eq!(通信(&mut e.broker,&credential,"対話開始",json!({"実行系ID":"fixture-agent"})).status,BrokerStatus::Rejected);
+        let started=制御(&mut e.broker,"対話開始",json!({"実行系ID":"fixture-agent","作業領域ID":"mobile-fixture-workspace"}));
         assert_eq!(started.status,BrokerStatus::Accepted);
         let created_audit_id=started.audit_event_id.clone();
         let listed=制御(&mut e.broker,"対話セッション一覧",json!({}));
@@ -5669,8 +5749,10 @@ mod 端末統治試験 {
         let listed_body=listed.body.as_ref().expect("対話セッション一覧");
         assert_eq!(listed_body["版"],1);
         assert_eq!(listed_body["対話セッション"].as_array().unwrap().len(),1);
-        assert_eq!(listed_body["対話セッション"][0]["作成監査ID"],created_audit_id);
-        assert_eq!(listed_body["対話セッション"][0].as_object().unwrap().len(),4);
+        assert_eq!(listed_body["対話セッション"][0]["作業領域ID"],"mobile-fixture-workspace");
+        assert_eq!(listed_body["対話セッション"][0]["作業領域結合監査ID"],created_audit_id);
+        assert_ne!(listed_body["対話セッション"][0]["作成監査ID"],created_audit_id);
+        assert_eq!(listed_body["対話セッション"][0].as_object().unwrap().len(),6);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
         assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);

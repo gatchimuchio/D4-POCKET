@@ -522,6 +522,8 @@ List<Map<String, Object?>> _agentSessionSnapshotJson(
     '実行系ID',
     '状態',
     '作成監査ID',
+    '作業領域ID',
+    '作業領域結合監査ID',
   };
   const allowedStatuses = {'利用中', '終了', '中止後隔離'};
   final seenSessionIds = <String>{};
@@ -539,6 +541,8 @@ List<Map<String, Object?>> _agentSessionSnapshotJson(
     final runtimeId = raw['実行系ID'];
     final status = raw['状態'];
     final auditId = raw['作成監査ID'];
+    final workspaceId = raw['作業領域ID'];
+    final workspaceAuditId = raw['作業領域結合監査ID'];
     if (sessionId is! String || !_isLowerHexSessionId(sessionId)) {
       throw const BrokerClientException('対話セッションIDが不正です');
     }
@@ -554,12 +558,20 @@ List<Map<String, Object?>> _agentSessionSnapshotJson(
     if (auditId is! String || !_isSafeAuditIdentifier(auditId)) {
       throw const BrokerClientException('作成監査IDが不正です');
     }
+    if (workspaceId is! String || !_isRuntimeIdentifier(workspaceId)) {
+      throw const BrokerClientException('Broker登録Workspace IDが不正です');
+    }
+    if (workspaceAuditId is! String ||
+        !_isSafeAuditIdentifier(workspaceAuditId)) {
+      throw const BrokerClientException('Workspace結合監査IDが不正です');
+    }
     result.add({
       'session_id': sessionId,
       'agent_runtime_id': runtimeId,
       'status': status,
       'evidence_source': 'INTERNAL_STATE',
-      'workspace': '',
+      'workspace': workspaceId,
+      'workspace_audit_event_id': workspaceAuditId,
       'task': '',
       'changed_files': const <String>[],
       'tool_calls': const <String>[],

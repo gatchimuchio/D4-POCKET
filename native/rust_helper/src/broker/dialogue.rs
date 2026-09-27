@@ -25,6 +25,7 @@ pub enum 対話失敗 {
     監査失敗,
     取消,
     隔離済み,
+    作業領域不在,
 }
 impl 対話失敗 {
     pub fn 分類(self) -> &'static str {
@@ -39,6 +40,7 @@ impl 対話失敗 {
             Self::監査失敗 => "監査失敗",
             Self::取消 => "取消",
             Self::隔離済み => "実行系隔離済み",
+            Self::作業領域不在 => "作業領域不在",
         }
     }
     pub fn 復旧(self) -> &'static str {
@@ -50,6 +52,7 @@ impl 対話失敗 {
             Self::セッション不一致 | Self::取消 | Self::期限超過 => "新規セッション",
             Self::通信失敗 | Self::応答不正 => "接続再確認",
             Self::隔離済み => "RecoveryActionによる隔離判断を確認",
+            Self::作業領域不在 => "RuntimeとWorkspaceの登録対応を再確認",
         }
     }
 }
@@ -354,6 +357,10 @@ struct セッション {
     実行系ID: String,
     状態: String,
     作成監査ID: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    作業領域ID: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    作業領域結合監査ID: Option<String>,
 }
 
 fn Agent実行系ID取得(
@@ -479,6 +486,8 @@ type 監査器<'a> = dyn FnMut(&str, &str, &str) -> Result<String, 対話失敗>
 #[serde(deny_unknown_fields)]
 struct 実行系指定 {
     実行系ID: String,
+    #[serde(default)]
+    作業領域ID: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -791,6 +800,18 @@ impl 対話制御 {
         現在: i64,
         監査: &mut 監査器<'_>,
     ) -> Result<Value, 対話失敗> {
+        self.操作_作業領域結合済み(操作, 値, owner, 現在, None, 監査)
+    }
+
+    pub(crate) fn 操作_作業領域結合済み(
+        &mut self,
+        操作: &str,
+        値: &Value,
+        owner: bool,
+        現在: i64,
+        作業領域結合: Option<&super::workspace::DialogueWorkspaceBinding>,
+        監査: &mut 監査器<'_>,
+    ) -> Result<Value, 対話失敗> {
         if matches!(操作, "対話承認" | "対話承認待ち") && !owner {
             return Err(対話失敗::権限拒否);
         }
@@ -803,13 +824,19 @@ impl 対話制御 {
             "対話セッション一覧" => {
                 空入力(値)?;
                 let agent_runtime_ids = Agent実行系ID取得(&self.実行系, &self.セッション)?;
+                let agent_sessions = self
+                    .セッション
+                    .values()
+                    .filter(|session| agent_runtime_ids.contains(&session.実行系ID))
+                    .collect::<Vec<_>>();
+                if agent_sessions.iter().any(|session| {
+                    session.作業領域ID.is_none() || session.作業領域結合監査ID.is_none()
+                }) {
+                    return Err(対話失敗::応答不正);
+                }
                 Ok(json!({
                     "版": 1,
-                    "対話セッション": self
-                        .セッション
-                        .values()
-                        .filter(|session| agent_runtime_ids.contains(&session.実行系ID))
-                        .collect::<Vec<_>>(),
+                    "対話セッション": agent_sessions,
                 }))
             }
             "Agent一覧" => {
@@ -818,9 +845,35 @@ impl 対話制御 {
             }
             "対話開始" => {
                 let 指定: 実行系指定 = 読取(値)?;
-                if !self.実行系.contains_key(&指定.実行系ID) {
-                    return Err(対話失敗::実行系不在);
-                }
+                let adapter = self
+                    .実行系
+                    .get(&指定.実行系ID)
+                    .ok_or(対話失敗::実行系不在)?;
+                let agent = adapter
+                    .agent_metadata()
+                    .map(|metadata| AgentAdapterMetadata::read(&metadata))
+                    .transpose()?;
+                let workspace_id = if agent.is_some() {
+                    let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
+                    let workspace_id = 指定
+                        .作業領域ID
+                        .as_deref()
+                        .ok_or(対話失敗::作業領域不在)?;
+                    if !binding.matches(&指定.実行系ID, workspace_id) {
+                        return Err(対話失敗::作業領域不在);
+                    }
+                    Some(binding.workspace_id().to_owned())
+                } else {
+                    match (指定.作業領域ID.as_deref(), 作業領域結合) {
+                        (None, None) => None,
+                        (Some(workspace_id), Some(binding))
+                            if binding.matches(&指定.実行系ID, workspace_id) =>
+                        {
+                            Some(binding.workspace_id().to_owned())
+                        }
+                        _ => return Err(対話失敗::作業領域不在),
+                    }
+                };
                 if self.セッション.len() >= 64 {
                     return Err(対話失敗::要求不正);
                 }
@@ -830,6 +883,8 @@ impl 対話制御 {
                     実行系ID: 指定.実行系ID,
                     状態: "利用中".into(),
                     作成監査ID: String::new(),
+                    作業領域ID: workspace_id,
+                    作業領域結合監査ID: None,
                 };
                 let body = 対話開始監査射影(&session.対話セッションID, &session.実行系ID);
                 let 作成監査ID = 監査(
@@ -838,6 +893,13 @@ impl 対話制御 {
                     &対話開始監査hash(&session.対話セッションID, &session.実行系ID),
                 )?;
                 session.作成監査ID = 作成監査ID;
+                if let Some(binding) = 作業領域結合 {
+                    session.作業領域結合監査ID = Some(監査(
+                        "対話Sessionと登録済みWorkspaceの明示結合",
+                        &ID,
+                        &binding.audit_hash(&ID),
+                    )?);
+                }
                 self.セッション.insert(ID, session);
                 Ok(body)
             }
@@ -1413,6 +1475,8 @@ mod tests {
             実行系ID: "runtime-fixture".into(),
             状態: "利用中".into(),
             作成監査ID: "audit-fixture".into(),
+            作業領域ID: None,
+            作業領域結合監査ID: None,
         };
         let legacy_body = json!({
             "対話セッションID": &session.対話セッションID,
@@ -1499,11 +1563,31 @@ mod tests {
     fn 操作(
         c: &mut 対話制御, op: &str, v: Value, owner: bool
     ) -> Result<Value, 対話失敗> {
-        c.操作(
+        let mut payload = v;
+        let binding = if op == "対話開始" {
+            let runtime = payload
+                .get("実行系ID")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            runtime.and_then(|runtime| {
+                let adapter = c.実行系.get(&runtime)?;
+                adapter.agent_metadata()?;
+                let workspace_id = format!("fixture-workspace-{runtime}");
+                payload["作業領域ID"] = json!(workspace_id);
+                Some(super::super::workspace::DialogueWorkspaceBinding::for_test(
+                    &runtime,
+                    &workspace_id,
+                ))
+            })
+        } else {
+            None
+        };
+        c.操作_作業領域結合済み(
             op,
-            &v,
+            &payload,
             owner,
             100,
+            binding.as_ref(),
             &mut |_, _, _| Ok("fixture-audit".into()),
         )
     }
@@ -1526,7 +1610,9 @@ mod tests {
         assert_eq!(listing["対話セッション"][0]["実行系ID"], "left");
         assert_eq!(listing["対話セッション"][0]["状態"], "利用中");
         assert_eq!(listing["対話セッション"][0]["作成監査ID"], "fixture-audit");
-        assert_eq!(listing["対話セッション"][0].as_object().unwrap().len(), 4);
+        assert_eq!(listing["対話セッション"][0]["作業領域ID"], "fixture-workspace-left");
+        assert_eq!(listing["対話セッション"][0]["作業領域結合監査ID"], "fixture-audit");
+        assert_eq!(listing["対話セッション"][0].as_object().unwrap().len(), 6);
         assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
         assert!(操作(&mut c, "対話セッション一覧", json!({"authority":"owner"}), false).is_err());
 
@@ -1537,6 +1623,119 @@ mod tests {
         assert_eq!(操作(&mut c, "対話セッション一覧", json!({}), false).unwrap()["対話セッション"].as_array().unwrap().len(), 64);
         assert_eq!(操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false), Err(対話失敗::要求不正));
     }
+
+    #[test]
+    fn Agent対話Sessionは同一RuntimeへのBroker検証済みWorkspace結合を必須とする() {
+        let (mut c, adapter_calls) = 準備(false, false, false);
+        let mut audit_reasons = Vec::new();
+        let mut audit = |reason: &str, _: &str, _: &str| {
+            audit_reasons.push(reason.to_owned());
+            Ok(format!("audit-{}", audit_reasons.len()))
+        };
+        let payload = json!({"実行系ID":"left","作業領域ID":"workspace-left"});
+        assert_eq!(
+            c.操作_作業領域結合済み("対話開始", &payload, false, 100, None, &mut audit),
+            Err(対話失敗::作業領域不在)
+        );
+        let wrong_runtime = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "other-runtime",
+            "workspace-left",
+        );
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                "対話開始",
+                &payload,
+                false,
+                100,
+                Some(&wrong_runtime),
+                &mut audit,
+            ),
+            Err(対話失敗::作業領域不在)
+        );
+        assert!(c.セッション.is_empty());
+
+        let valid = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            "workspace-left",
+        );
+        let result = c
+            .操作_作業領域結合済み(
+                "対話開始",
+                &payload,
+                false,
+                100,
+                Some(&valid),
+                &mut audit,
+            )
+            .unwrap();
+        assert!(result["対話セッションID"].is_string());
+        drop(audit);
+        assert_eq!(audit_reasons, [
+            "対話開始",
+            "対話Sessionと登録済みWorkspaceの明示結合",
+        ]);
+        let session = c.セッション.values().next().unwrap();
+        assert_eq!(session.作業領域ID.as_deref(), Some("workspace-left"));
+        assert!(session.作業領域結合監査ID.is_some());
+        assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn 通常RuntimeはWorkspaceなしで開始でき登録Workspace指定時はmetadataだけを結合する() {
+        let (mut c, _) = 準備(false, false, false);
+        assert!(操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false).is_ok());
+
+        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            "workspace-left",
+        );
+        let result = c
+            .操作_作業領域結合済み(
+                "対話開始",
+                &json!({"実行系ID":"left","作業領域ID":"workspace-left"}),
+                false,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("workspace-audit".into()),
+            )
+            .unwrap();
+        assert!(result["対話セッションID"].is_string());
+        let session = c
+            .セッション
+            .values()
+            .find(|session| session.作業領域ID.as_deref() == Some("workspace-left"))
+            .expect("選択Workspaceへのmetadata対応");
+        assert!(session.作業領域結合監査ID.is_some());
+    }
+
+    #[test]
+    fn AgentSessionはWorkspace結合監査に失敗したら登録されない() {
+        let (mut c, _) = 準備(false, false, false);
+        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            "workspace-left",
+        );
+        let mut audit_count = 0;
+        let result = c.操作_作業領域結合済み(
+            "対話開始",
+            &json!({"実行系ID":"left","作業領域ID":"workspace-left"}),
+            false,
+            100,
+            Some(&binding),
+            &mut |_, _, _| {
+                audit_count += 1;
+                if audit_count == 2 {
+                    Err(対話失敗::監査失敗)
+                } else {
+                    Ok("dialogue-start-audit".into())
+                }
+            },
+        );
+        assert_eq!(result, Err(対話失敗::監査失敗));
+        assert_eq!(audit_count, 2);
+        assert!(c.セッション.is_empty());
+    }
+
     #[test]
     fn 対話セッション一覧は一般Runtimeと未知実行系をAgent表示へ混ぜない() {
         let (mut c, _) = 準備(false, false, false);
@@ -1560,6 +1759,8 @@ mod tests {
                 実行系ID: "unregistered-runtime".into(),
                 状態: "利用中".into(),
                 作成監査ID: "audit-unregistered-runtime".into(),
+                作業領域ID: None,
+                作業領域結合監査ID: None,
             },
         );
 

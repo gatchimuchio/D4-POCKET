@@ -2,6 +2,22 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Agent Sessionと登録WorkspaceのBroker結合（2026-09-27）
+
+Agent Adapterの対話開始にWorkspace IDを明示させ、既存Rust BrokerのWorkspace registryが同一Runtime IDで現在保持する登録だけを受理する。未指定・未登録・別RuntimeのWorkspaceはSessionを作らず拒否する。通常RuntimeのWorkspaceなしSessionは従来どおり許可し、登録Workspaceの任意指定もmetadataとして結合するだけでPermissionにはしない。Desktop共有対話画面は既存Broker一覧からRuntimeごとのWorkspace IDを選び、選択値を通常要求へ渡す。Session作成Auditの既存hash射影は維持し、Session ID・Runtime ID・Workspace ID・登録hashの関係を別AuditEventへ記録する。Agent Session一覧は作成Audit IDと結合Audit IDを別々に返し、DesktopはBroker登録上のmetadata対応として表示する。
+
+この結合はAgent専用実行Session、Runtimeが実際に使うdirectory、書込み隔離、Task実行、独立Agent比較・Handoffの証拠ではない。Mobile Device LinkにWorkspace選択面はなく、Agent対話開始はfail-closedで拒否する。PermissionやApprovalは生成しない。Release blockerと`release_ready=false`を維持する。
+
+- `cargo test --no-run --locked --manifest-path native/rust_helper/Cargo.toml`：Rust全12 test executableをcompileできた。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1`：Rust library 296件、`main.rs` 9件、`broker_ipc` 10件、`canonical_decimal_hash` 1件、`checkpoint` 8件、`protected_data` 2件、`protected_startup` 1件が成功。その後`protected_store` test executable自体がWindows Application ControlのOS error 4551で起動拒否され、全target commandは停止した。同targetの3件は未実行でassertion failureではない。`workspace_diff` 2件と`workspace_reader` 2件は個別target実行で成功した。`workspace_startup`は7件すべてexecutable起動前に同じ4551で拒否された。実行できたRust testは合計331件であり、全target成功とは扱わない。policy変更・test fileの移動や再配置・test除外は行っていない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 通常要求経路で監査済み内部状態だけを返す -- --test-threads=1`：1件成功。通常IPCでWorkspace未指定・未登録・他Runtime所属を拒否し、同一Runtimeの登録IDだけで開始する境界を検査した。異Runtime fixtureは既存Workspace範囲検査が要求する完全なdirectory ancestry付きで登録した。
+- `flutter test --no-pub --no-test-assets --concurrency 1 --reporter expanded test`（`packages/gui_shell_ui`）：55件成功。Workspace登録一覧のRuntime別厳格parse、未承認の読取grantを権限化せずWorkspace IDを選択する経路、選択IDだけをSession開始へ送るClient／widget試験、Mobile向け未対応面ではWorkspace一覧要求を送らない試験を含む。`flutter analyze --no-pub`（共有UI package、Desktop、Mobile）はすべて指摘なし。
+- 同じDesktop全test commandは初回109/111件で、実Broker childを起動する2件が一時4551で拒否された。対象2 fileの個別再実行は3件と16件が成功し、その後のDesktop全test再実行は113件すべて成功した。
+- 最新変更後のDesktop全testは同じ直列commandで113件成功し、Mobile全testは16件成功した。Mobile画面が未対応のWorkspace一覧操作を発行しないことは共有UIのwidget試験でも確認した。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 138件、正常example 138件、negative fixture 170件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：217 checksで合格。`python -X utf8 tooling/日本語基底監査.py --strict`：負債0／finding 0で合格。
+- `python -X utf8 tooling/manifest.py --write`（tracked source 1045件）と`--check`は合格。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0で登録済み10検査すべて成功し、`python -X utf8 tooling/packaging_portability_check.py`を含む。release gate検査は整合passだが、release blocker 5件と`release_ready=false`を維持する。Release smoke／evidence bundle／runtime assertion／C32監査は開発・fixture範囲であり、製品実証へ読み替えない。
+- 証拠境界：Broker結合試験はBroker-owned registryと監査を通る`INTERNAL_STATE`／試験Broker証拠。実Agentのdirectory使用、同時書込み隔離、実Task、Windows installed product、`protected_store`と`workspace_startup`の実行挙動は未検証。Windows Application Controlの間欠・target別起動拒否を既存`windows_rust_integration_test_execution_policy` release blockerとして保持する。
+
 ## D4 Pocket Phase 7 Codex Workspace root設定の物理identity照合（2026-09-27）
 
 Codex Adapterの固定作業pathと、owner起動設定で同じruntime IDへ登録するWorkspace rootが独立指定であり、食い違いを検知する起動preflightがなかった。Workspace設定をCodex CLIのversion／help probe前に一度読み、同じruntime IDの全Workspace rootとAdapter作業pathを既存のnofollow・filesystem・保護path検査で開いてdevice ID／file IDを比較する。不一致・未観測・保護領域重複は`CONFIG`拒否Auditを残し、IPC endpointを作る前に起動を止める。読み取った同じ設定objectを後続のWorkspace登録へ渡す。

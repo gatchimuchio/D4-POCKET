@@ -3,6 +3,23 @@ fn open_scoped(path:&std::path::Path)->(Dir,Vec<super::super::workspace_root::Di
     let (root,_,ancestry)=super::super::workspace_root::open_isolated_root_with_ancestry(path,&[]).unwrap();
     (root,ancestry)
 }
+
+#[test]
+fn dialogue_binding_exposes_only_registered_workspace_for_exact_runtime() {
+    let path=std::env::temp_dir().join(format!("gui-shell-dialogue-binding-{}",識別子生成().unwrap()));
+    std::fs::create_dir(&path).unwrap();
+    let mut registry=WorkspaceRegistry::default();
+    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],None,&mut |_,_|Ok(())).unwrap();
+    let binding=registry.dialogue_binding("runtime-a","workspace-a").expect("登録済みの同一Runtime");
+    assert!(binding.matches("runtime-a","workspace-a"));
+    assert!(!binding.matches("runtime-b","workspace-a"));
+    assert!(registry.dialogue_binding("runtime-b","workspace-a").is_none());
+    assert!(registry.dialogue_binding("runtime-a","unknown-workspace").is_none());
+    assert!(binding.audit_hash("session-a").starts_with("sha256:"));
+    drop(registry);
+    std::fs::remove_dir_all(path).unwrap();
+}
+
 #[test]
 fn 別Agentの同一rootと親子rootを拒否し独立rootを許可する() {
     let shared=std::env::temp_dir().join(format!("gui-shell-agent-shared-root-{}",識別子生成().unwrap()));

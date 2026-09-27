@@ -5,9 +5,9 @@ class RuntimeDialogueClient {
   RuntimeDialogueClient(this.transport);
   final BrokerTransport transport;
 
-  Future<Map<String, Object?>> operation(
+  Future<Map<String, Object?>> _request(
       String operation, Map<String, Object?> payload) async {
-    const allowed = {'実行系列挙', '対話開始', '対話送信', '対話取得', '対話中止', '対話終了'};
+    const allowed = {'実行系列挙', '作業領域一覧', '対話開始', '対話送信', '対話取得', '対話中止', '対話終了'};
     if (!allowed.contains(operation)) {
       throw const BrokerClientException('この操作面では承認操作を送信できません');
     }
@@ -17,6 +17,12 @@ class RuntimeDialogueClient {
         (response['audit_event_id'] as String).isEmpty) {
       throw const BrokerClientException('対話応答の対応または監査IDが不正です');
     }
+    return response;
+  }
+
+  Future<Map<String, Object?>> operation(
+      String operation, Map<String, Object?> payload) async {
+    final response = await _request(operation, payload);
     if (response['status'] != 'accepted') {
       final error = response['error'];
       final code = error is Map ? error['code'] : null;
@@ -24,6 +30,7 @@ class RuntimeDialogueClient {
       const failures = {
         '要求不正',
         '実行系不在',
+        '作業領域不在',
         '権限拒否',
         'セッション不一致',
         '通信失敗',
@@ -54,8 +61,84 @@ class RuntimeDialogueClient {
     return List<String>.unmodifiable(items.cast<String>());
   }
 
-  Future<String> start(String runtime) async {
-    final body = await operation('対話開始', {'実行系ID': runtime});
+  Future<Map<String, List<String>>> workspaceIdsByRuntime() async {
+    final response = await _request('作業領域一覧', const {});
+    if (response['status'] != 'accepted' ||
+        response['error'] != null ||
+        response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('登録Workspace一覧を確認できません');
+    }
+    final body = response['body'];
+    if (body is! Map ||
+        body.length != 1 ||
+        !body.containsKey('作業領域') ||
+        body['作業領域'] is! List ||
+        (body['作業領域'] as List).length > 16) {
+      throw const BrokerClientException('登録Workspace一覧の形式が不正です');
+    }
+    final result = <String, List<String>>{};
+    final seenWorkspaceIds = <String>{};
+    for (final raw in body['作業領域'] as List) {
+      if (raw is! Map || raw.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('登録Workspace項目の形式が不正です');
+      }
+      final item = Map<String, Object?>.from(raw);
+      const keys = {
+        '作業領域ID',
+        '実行系ID',
+        '登録hash',
+        '承認状態',
+        '有効期限',
+        '表示範囲',
+        'approval_id'
+      };
+      final id = item['作業領域ID'];
+      final runtime = item['実行系ID'];
+      final hash = item['登録hash'];
+      final status = item['承認状態'];
+      final visibility = item['表示範囲'];
+      if (item.length != keys.length ||
+          !keys.every(item.containsKey) ||
+          id is! String ||
+          !_runtime.hasMatch(id) ||
+          runtime is! String ||
+          !_runtime.hasMatch(runtime) ||
+          hash is! String ||
+          !_hash.hasMatch(hash) ||
+          !seenWorkspaceIds.add(id)) {
+        throw const BrokerClientException('登録Workspace識別情報が不正です');
+      }
+      if (status == 'approved') {
+        if (item['approval_id'] is! String ||
+            (item['approval_id'] as String).isEmpty ||
+            item['有効期限'] is! int ||
+            (item['有効期限'] as int) <= 0 ||
+            !_workspaceVisibilities.contains(visibility)) {
+          throw const BrokerClientException('Workspace承認metadataが不正です');
+        }
+      } else if (status != 'denied' ||
+          item['approval_id'] != null ||
+          item['有効期限'] != null ||
+          visibility != 'none') {
+        throw const BrokerClientException('Workspace登録状態が不正です');
+      }
+      if (result[runtime] == null) result[runtime] = <String>[];
+      result[runtime]!.add(id);
+    }
+    return Map.unmodifiable({
+      for (final entry in result.entries)
+        entry.key: List<String>.unmodifiable(entry.value)
+    });
+  }
+
+  Future<String> start(String runtime, {String? workspaceId}) async {
+    if (workspaceId != null && !_runtime.hasMatch(workspaceId)) {
+      throw const BrokerClientException('Workspace IDの形式が不正です');
+    }
+    final body = await operation('対話開始', {
+      '実行系ID': runtime,
+      if (workspaceId != null) '作業領域ID': workspaceId,
+    });
     if (body['実行系ID'] != runtime ||
         body['状態'] != '利用中' ||
         !validId(body['対話セッションID'])) {
@@ -129,6 +212,13 @@ class RuntimeDialogueClient {
 
   static final _id = RegExp(r'^[a-f0-9]{32}$');
   static final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
+  static const _workspaceVisibilities = {
+    'none',
+    'hash_only',
+    'summary',
+    'redacted',
+    'full'
+  };
   static final _runtime = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$');
   static bool validId(Object? value) =>
       value is String && value.length == 32 && _id.hasMatch(value);

@@ -11,18 +11,21 @@ class RuntimeDialogueScreen extends StatefulWidget {
       this.client,
       this.connectOwnerRegistration,
       this.readOnly = false,
-      this.active = true});
+      this.active = true,
+      this.workspaceSelectionSupported = true});
   final Future<RuntimeDialogueClient> Function() connect;
   final RuntimeDialogueClient? client;
   final Future<RegressionCaseOwnerClient> Function()? connectOwnerRegistration;
   final bool readOnly;
   final bool active;
+  final bool workspaceSelectionSupported;
   @override
   State<RuntimeDialogueScreen> createState() => _RuntimeDialogueScreenState();
 }
 
 class _Conversation {
   String? runtime;
+  String? workspaceId;
   String? session;
   String? request;
   String? requestHash;
@@ -42,6 +45,8 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
   final _left = _Conversation();
   final _right = _Conversation();
   List<String> _runtimes = [];
+  Map<String, List<String>> _workspaceIdsByRuntime = const {};
+  String? _workspaceLoadWarning;
   String? _connectionError;
   bool _connecting = false;
   bool _compare = false;
@@ -65,10 +70,23 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
     try {
       final client = widget.client ?? await widget.connect();
       final runtimes = await client.runtimes();
+      Map<String, List<String>> workspaceIds = const {};
+      String? workspaceWarning;
+      if (widget.workspaceSelectionSupported) {
+        try {
+          workspaceIds = await client.workspaceIdsByRuntime();
+        } catch (_) {
+          workspaceWarning = 'Workspace一覧を検証できません。Agent開始はBroker側で拒否されます。';
+        }
+      } else {
+        workspaceWarning = 'この接続面はWorkspace選択に未対応です。Agent対話開始はBrokerが拒否します。';
+      }
       if (!mounted) return;
       setState(() {
         _client = client;
         _runtimes = runtimes;
+        _workspaceIdsByRuntime = workspaceIds;
+        _workspaceLoadWarning = workspaceWarning;
         _left.runtime ??= runtimes.firstOrNull;
         _right.runtime ??= runtimes.length > 1 ? runtimes[1] : null;
       });
@@ -103,7 +121,8 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         side.state = '未開始';
       });
       if (!widget.active) return;
-      final session = await client.start(runtime);
+      final session =
+          await client.start(runtime, workspaceId: side.workspaceId);
       if (!mounted) {
         await client.close(session);
         return;
@@ -365,6 +384,12 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
         if (!widget.active) const Text('接続確認または画面復帰まで通信を停止しています。'),
         const SizedBox(height: 8),
         const Text('送信後はownerの承認を待ちます。中止は応答の採用を止めますが、実行系の処理停止や巻戻しを保証しません。'),
+        if (widget.workspaceSelectionSupported)
+          const Text(
+              'Agent Runtimeでは同じRuntimeに登録されたWorkspace IDを選択してください。IDの結合は実行directory・権限・書込み隔離の証明ではなく、二実行系表示も実Agent隔離比較ではありません。'),
+        if (_workspaceLoadWarning != null)
+          Text(_workspaceLoadWarning!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error)),
         if (_connectionError != null)
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -434,7 +459,38 @@ class _RuntimeDialogueScreenState extends State<RuntimeDialogueScreen> {
                         .toList(),
                     onChanged: active || side.session != null
                         ? null
-                        : (v) => setState(() => side.runtime = v)),
+                        : (v) => setState(() {
+                              side.runtime = v;
+                              side.workspaceId = null;
+                            })),
+                if (widget.workspaceSelectionSupported &&
+                    side.runtime != null) ...[
+                  if ((_workspaceIdsByRuntime[side.runtime] ?? []).isEmpty)
+                    const Text(
+                        'このRuntimeに登録されたWorkspaceはありません。Agent Adapterは未指定で開始できません。')
+                  else
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('dialogue-workspace-${side.runtime}'),
+                      initialValue: (_workspaceIdsByRuntime[side.runtime] ?? [])
+                              .contains(side.workspaceId)
+                          ? side.workspaceId
+                          : '',
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                          labelText: '対話Sessionへ結合するWorkspace ID'),
+                      items: [
+                        const DropdownMenuItem(
+                            value: '', child: Text('指定しない（Agentでは不可）')),
+                        for (final id
+                            in _workspaceIdsByRuntime[side.runtime] ?? [])
+                          DropdownMenuItem(value: id, child: Text(id)),
+                      ],
+                      onChanged: active || side.session != null
+                          ? null
+                          : (value) => setState(() => side.workspaceId =
+                              value == null || value.isEmpty ? null : value),
+                    ),
+                ],
                 Wrap(spacing: 8, children: [
                   OutlinedButton(
                       onPressed: active || side.runtime == null

@@ -470,6 +470,8 @@ void main() {
           '実行系ID': 'runtime-codex',
           '状態': '利用中',
           '作成監査ID': 'audit-session-created',
+          '作業領域ID': 'codex-workspace',
+          '作業領域結合監査ID': 'audit-workspace-bound',
         },
       ]),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
@@ -499,7 +501,9 @@ void main() {
     expect(snapshot.agentSessions.single.agentRuntimeId, 'runtime-codex');
     expect(snapshot.agentSessions.single.status, '利用中');
     expect(snapshot.agentSessions.single.evidenceSource, 'INTERNAL_STATE');
-    expect(snapshot.agentSessions.single.workspace, isEmpty);
+    expect(snapshot.agentSessions.single.workspace, 'codex-workspace');
+    expect(snapshot.agentSessions.single.workspaceAuditEventId,
+        'audit-workspace-bound');
     expect(snapshot.agentSessions.single.task, isEmpty);
     expect(snapshot.agentSessions.single.auditEventId, 'audit-session-created');
     expect(
@@ -572,7 +576,7 @@ void main() {
     );
   });
 
-  testWidgets('Broker対話sessionはWorkspace未結合のmetadataだけを表示する',
+  testWidgets('Broker対話sessionは検証済みWorkspace参照と隔離未検証を区別して表示する',
       (WidgetTester tester) async {
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
@@ -586,6 +590,8 @@ void main() {
           '実行系ID': 'runtime-codex',
           '状態': '利用中',
           '作成監査ID': 'audit-session-created',
+          '作業領域ID': 'codex-workspace',
+          '作業領域結合監査ID': 'audit-workspace-bound',
         },
       ]),
       _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
@@ -601,7 +607,9 @@ void main() {
 
     expect(find.text('runtime-codex'), findsOneWidget);
     expect(find.text('audit-session-created'), findsOneWidget);
-    expect(find.textContaining('Workspace結合は未確認'), findsOneWidget);
+    expect(find.text('codex-workspace'), findsOneWidget);
+    expect(find.text('audit-workspace-bound'), findsOneWidget);
+    expect(find.textContaining('書込み隔離は未検証'), findsOneWidget);
     expect(find.textContaining('比較・Handoff・Task内容は利用できません。'), findsOneWidget);
     expect(find.textContaining('文書を更新する'), findsNothing);
   });
@@ -612,9 +620,20 @@ void main() {
       '実行系ID': 'runtime-codex',
       '状態': '利用中',
       '作成監査ID': 'audit-session-created',
+      '作業領域ID': 'codex-workspace',
+      '作業領域結合監査ID': 'audit-workspace-bound',
     };
     final invalidSessionLists = <List<Map<String, Object?>>>[
       [valid, valid],
+      [
+        {...valid}..remove('作業領域結合監査ID'),
+      ],
+      [
+        {...valid, '作業領域ID': '../outside'},
+      ],
+      [
+        {...valid, '作業領域結合監査ID': ''},
+      ],
       <Map<String, Object?>>[
         {...valid, '入力': 'PRIVATE_TASK_MARKER'},
       ],
@@ -625,6 +644,8 @@ void main() {
           '実行系ID': 'runtime-$index',
           '状態': '利用中',
           '作成監査ID': 'audit-session-$index',
+          '作業領域ID': 'workspace-$index',
+          '作業領域結合監査ID': 'audit-workspace-$index',
         },
       ),
     ];

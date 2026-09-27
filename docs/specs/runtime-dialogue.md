@@ -14,7 +14,9 @@
 
 `対話送信`の受付receiptはBrokerが生成した`要求ID`、`要求hash`、`状態=承認待ち`、Unix秒の`期限`だけを返す。受付receiptの構造は`runtime_dialogue_submission_receipt.schema.json`で検証する。要求hashは現在要求との相関値であり、ownerの再確認やC6登録の候補特定に使えても、Approval、Permission、Owner資格、実行許可を生成しない。期限の到来だけで状態を成功へ読み替えない。
 
-実行系IDは登録済み識別子を参照する。要求中の任意 URL、port、Adapter 名、Permission、Approval、authority_source、metadata から実行先や権限を作らない。未知の追加fieldは拒否する。セッションは作成後に実行系を変更しない。別実行系への切替は別セッションを作る。同一セッションの同時送信は拒否し、再送は新しい要求として操作者が判断する。
+実行系IDは登録済み識別子を参照する。要求中の任意 URL、port、Adapter 名、Permission、Approval、authority_source、metadata から実行先や権限を作らない。未知の追加fieldは拒否する。Agent Adapterに対する`対話開始`は`作業領域ID`を明示し、Rust BrokerのWorkspace registryに同一実行系IDで現在登録されたWorkspaceであることを照合する。登録関係がない、別Runtimeに属する、または選択が欠落する場合は`作業領域不在`で拒否し、Sessionを作らない。Agent metadataは信頼せず、Agent Adapterとして識別された接続を一律にWorkspace必須へ狭めるためだけに使う。通常RuntimeはWorkspaceなしで開始でき、指定した場合は同じRuntimeに現在登録されたWorkspace IDだけをmetadataとして結合できる。どちらの経路もPermissionや読取Approvalを生成しない。セッションは作成後に実行系またはWorkspace参照を変更しない。別実行系・別Workspaceへの切替は別セッションを作る。同一セッションの同時送信は拒否し、再送は新しい要求として操作者が判断する。
+
+このWorkspace参照はBroker登録とのID対応であり、Agent専用実行Session、Runtimeが実際に使用した作業directory、読み書き権限、Workspace分離・書込み隔離、Task実行を証明しない。Session開始Audit hashの既存射影は互換維持し、別AuditEventへSession ID、Runtime ID、Workspace ID、登録hashを結合する。通常IPC一覧は作成監査IDとWorkspace結合監査IDを別fieldで返す。Session一覧からroot path、secret path、Permission、Approvalは返さない。Workspace結合は読取Approvalや実行権限を生成しない。
 
 実行系列挙は一意な実行系IDの一覧とする。消費側は重複IDを選択欄へ渡さず応答不正として拒否し、黙って重複排除して正常応答にしない。空一覧を許容し、一意な一覧の返却順序を保持する。
 
@@ -22,11 +24,11 @@
 
 ### 対話セッション一覧
 
-通常の認証済みDesktop IPCに限り、`対話セッション一覧`はRust Brokerに登録されたAgent Adapterのうち、Agent metadataが既存Schemaに適合する実行系に結び付いたsessionだけを最大64件返す。metadata適合は一覧の分類だけに使い、Trust、Permission、Approval、Authorityを生成しない。通常の要求処理が既存workの受信済み進捗を先に反映することはあるが、この一覧操作自体は新しいAdapter呼出し、Task実行、権限操作を開始しない。これはBroker内部状態（`INTERNAL_STATE`）の観測であり、外部Agentの稼働、過去履歴の完全性、現在のRuntime healthを証明しない。返却順は対話セッションIDの昇順とする。
+通常の認証済みDesktop IPCに限り、`対話セッション一覧`はRust Brokerに登録されたAgent Adapterのうち、Agent metadataが既存Schemaに適合し、作成時に同一RuntimeのBroker登録Workspaceへ結合されたsessionだけを最大64件返す。metadata適合は一覧の分類だけに使い、Trust、Permission、Approval、Authorityを生成しない。通常の要求処理が既存workの受信済み進捗を先に反映することはあるが、この一覧操作自体は新しいAdapter呼出し、Task実行、権限操作を開始しない。これはBroker内部状態（`INTERNAL_STATE`）の観測であり、外部Agentの稼働、過去履歴の完全性、現在のRuntime healthを証明しない。返却順は対話セッションIDの昇順とする。
 
-各項目は対話セッションID、実行系ID、状態、作成監査IDだけを含む。Task、入力・応答本文、Tool出力、Credential、Permission、Approval、Authority、Workspace参照は返さない。作成監査IDは対応する監査記録への参照であり、それ単独では監査鎖の完全性や承認を証明しない。未知field、重複セッションID、64件超過、未対応版は消費側で拒否する。Mobile Device Linkの操作許可集合には追加しない。
+各項目は対話セッションID、実行系ID、状態、作成監査ID、作業領域ID、作業領域結合監査IDだけを含む。作業領域IDと結合監査IDは登録済みWorkspaceとのmetadata関係を示すが、Agent実行Sessionや実Workspace隔離の証拠ではない。Task、入力・応答本文、Tool出力、Credential、Permission、Approval、Authority、root pathは返さない。各監査IDは対応する監査記録への参照であり、それ単独では監査鎖の完全性や承認を証明しない。未知field、重複セッションID、64件超過、未対応版、Workspace参照またはその監査参照の欠落は消費側で拒否する。Mobile Device Linkの操作許可集合には一覧を追加しない。MobileはWorkspace選択面を持たないため、Agent Adapterの対話開始はWorkspace未指定としてBrokerが拒否する。
 
-Desktopはこの一覧をAgent操作面の状態表示にだけ用いる。Workspace bindingが別の統治経路で検証されるまではWorkspaceを空のまま保ち、Agent比較とHandoffを有効にせず、Task・差分等の内容を推定または表示しない。
+Desktop対話面は既存の`作業領域一覧`からRuntime IDごとの登録Workspace IDを読み、Agent対話開始時に操作者が選択したIDを通常Broker経路へ渡す。選択表示はIDだけであり、root path、Permission、Approval状態を対話面へ複製しない。Mobile Device Linkは一覧操作とWorkspace選択に未対応であり、未対応操作を要求しない。Agent対話開始要求もWorkspace IDなしでBrokerが拒否する。Session一覧のWorkspace参照は同一Runtimeの登録関係と監査IDを表示するために使う。実Agentの書込み隔離・Task実行・結果が未接続なので、Agent比較とHandoffを有効にせず、Task・差分等の内容を推定または表示しない。
 
 ## 統治経路
 
@@ -56,7 +58,7 @@ UIの応答照会に伴う遅延例外も元の要求に結合する。中止済
 
 新規セッションへの切替では、旧セッションの終了成功時に旧要求・応答・完了表示を現在の操作面から外す。次の開始が失敗しても旧応答を現在の結果として残さない。旧セッションの終了自体が失敗した場合は終了したと推定せず、旧セッションと結果を保持して失敗を表示する。監査記録の削除を意味しない。
 
-失敗分類は `要求不正`、`実行系不在`、`権限拒否`、`セッション不一致`、`通信失敗`、`期限超過`、`応答不正`、`監査失敗`、`取消`。復旧は入力修正、実行系再確認、権限再確認、新規セッション、接続再確認、監査修復のいずれかを明示し、自動の権限拡大や再送を行わない。
+失敗分類は `要求不正`、`実行系不在`、`権限拒否`、`セッション不一致`、`作業領域不在`、`通信失敗`、`期限超過`、`応答不正`、`監査失敗`、`取消`。復旧は入力修正、実行系再確認、権限再確認、RuntimeとWorkspaceの登録対応再確認、新規セッション、接続再確認、監査修復のいずれかを明示し、自動の権限拡大や再送を行わない。
 
 ## 比較
 

@@ -5,7 +5,9 @@
       "対話セッションID": "22222222222222222222222222222222",
       "実行系ID": "runtime-a",
       "状態": "利用中",
-      "作成監査ID": "audit-dialogue-session-created"
+      "作成監査ID": "audit-dialogue-session-created",
+      "作業領域ID": "runtime-a-workspace",
+      "作業領域結合監査ID": "audit-workspace-bound"
     }
   ]
 }

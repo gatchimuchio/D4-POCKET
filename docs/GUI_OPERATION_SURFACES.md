@@ -99,8 +99,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket Agent Launcher（Codex current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。DesktopはRust Brokerの`対話セッション一覧`から、Schema適合したAgent Adapterに結び付く現在sessionのID、実行系ID、状態、作成監査IDだけを受け取る。
-  authority_boundary: Flutterはexecutable、workspace、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。実taskのwrite実行、MCP、実Agentの複数比較、実Handoff、Claude／Gemini接続は未成立として扱う。session一覧は`INTERNAL_STATE`であり、実Agentの稼働やWorkspace隔離を証明しない。Workspace binding未確認の間は比較・Handoff・Task内容を表示しない。比較projectionのsnapshot参照は同一Agent runtime ID／Workspace参照をfail-closedで拒否し、異なる宣言値を実Agent identityや実Workspace隔離の証明へ昇格しない。
+  evidence: ownerがBroker起動時に絶対executableとworkspaceを明示したCodex CLIだけをRust Adapterへ登録できる。登録時にversionと`codex exec --help`をLIVE_RUNTIMEで確認し、既存の実行系対話面から固定read-only JSONL実行、bounded output、取消、期限超過、失敗射影を通す。Windows実Brokerの認証付き通常IPCで`codex`実行系の列挙を確認した。Agent Adapterへの対話開始ではWorkspace IDを必須とし、Brokerが同じRuntime IDのWorkspace登録と照合してからSessionを作る。Desktop対話面は既存BrokerのWorkspace一覧から同一RuntimeのIDを表示し、操作者が選択した値を通常要求へ渡す。開始Audit hashは維持しつつ登録hashを含むWorkspace結合Auditを追加し、Desktopの`対話セッション一覧`はSession／Runtime／状態／作成Audit／Workspace ID／結合Auditを受け取る。
+  authority_boundary: Flutterはexecutable、workspace path、argv、environment、Permissionを指定せず、Approvalを自己承認しない。Adapterは`--sandbox read-only`、`--ephemeral`、environment allowlist、secret path拒否を強制し、汎用command dispatchを有効化しない。Session-to-Workspace対応はBroker metadataの登録対応に限られ、Agent専用実行Session、実行directory、書込み隔離、実taskのwrite実行を証明しない。MCP、実Agentの複数比較、実Handoff、Claude／Gemini接続は未成立として扱う。session一覧は`INTERNAL_STATE`であり、実Agentの稼働やWorkspace隔離を証明しない。Mobile Device LinkにはWorkspace選択面がないためAgent対話開始は拒否する。比較projectionのsnapshot参照は同一Agent runtime ID／Workspace参照をfail-closedで拒否し、異なる宣言値を実Agent identityや実Workspace隔離の証明へ昇格しない。
 
 - item: D4 Pocket GUI Shell Compose（Phase 29 current scope）
   classification: required_for_v1
@@ -190,7 +190,7 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   classification: required_for_v1
   status: implemented_for_current_scope
   evidence: Mobileは既存Device Link TLSから、Agent Adapterの表示専用metadata、Runtime lifecycle状態、資源観測、通知summary、owner再承認待ち停止receipt、現在owner承認に結合した履歴metadataを既存Rust Brokerへ要求する。資源概要はunknownを0へ変換せず、MCPはowner専用Desktop管理面として未観測を表示する。
-  authority_boundary: MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。Agent metadataを実task実行性・Trust・Permissionへ昇格させず、対話本文、Approval payload、Audit raw reason、Credential実値、Workspace pathを投影しない。既存Broker handler以外のbridgeを追加しない。Mobile実機、TLS実接続、Android/iOS安全保管、Windows installed product証拠、長時間運用、障害注入は未成立として扱う。
+  authority_boundary: MobileはApproval、Permission、Authority、Credential、MCP接続、Tool実行、実停止を所有しない。Agent metadataを実task実行性・Trust・Permissionへ昇格させず、対話本文、Approval payload、Audit raw reason、Credential実値、Workspace pathを投影しない。Workspace選択面がない間、Agent Adapterの対話開始はBrokerがWorkspace未指定として拒否する。既存Broker handler以外のbridgeを追加しない。Mobile実機、TLS実接続、Android/iOS安全保管、Windows installed product証拠、長時間運用、障害注入は未成立として扱う。
 
 - item: Release runtime assertions
   classification: required_for_v1

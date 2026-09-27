@@ -7,15 +7,19 @@
 
 ## 現行D4 Pocket統合単位（2026-09-27）
 
-### Phase 7 Agent対話セッションのmetadata投影（2026-09-27）
+### Phase 7 Agent対話SessionとWorkspace登録の明示結合（2026-09-27）
 
-Rust Brokerの通常認証IPCへ`対話セッション一覧`を追加し、Schema適合Agent Adapterに結び付く現在sessionから、session ID・runtime ID・状態・開始監査IDだけを上限64件でDesktopへ投影する。Adapter metadataはAgent表示の分類にだけ使い、AuthorityやTrustを与えない。証拠は`INTERNAL_STATE`であり、実Agent稼働・Workspace隔離・Task実行を示さない。DesktopはWorkspace未結合sessionのTask内容、比較、Handoffを表示しない。Mobile経路は増やさず、Agent本体の起動・実行も追加していない。直前の試行ではdesktop launcher試験実行fileがWindows Application ControlのOS error 4551で拒否されたが、後続の現source全target直列試験はfile移動・再配置やpolicy変更なしに335件すべて成功し、`windows_rust_integration_test_execution_policy`を解消した。並列loopback fixtureの揺らぎは別known limitationとして維持する。別のrelease blockerも継続し、`release_ready=false`を維持する。詳細は`docs/specs/runtime-dialogue.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
+Agent Adapterの対話開始にWorkspace IDの明示選択を必須化し、Rust Brokerが現在登録中のWorkspace IDとRuntime IDを照合してからSessionを作る。Desktop対話面は既存のBroker Workspace一覧から同一RuntimeのIDを選び、通常要求へ渡す。作成Audit hashの既存射影は維持し、Session・Runtime・Workspace・登録hashの関係を別AuditEventへ記録する。通常Desktop一覧は作成Audit参照とWorkspace結合Audit参照を区別して返し、UIはBroker登録のmetadata対応として表示する。これはAgent専用実行Session、実際の作業directory、書込み隔離、Task実行、比較・Handoffの成立ではない。Mobile Device LinkはWorkspace選択面がないため、Agent対話開始をfail-closedで拒否する。Rust負例・Broker通常IPC・Workspace registry試験とDesktop client表示検査を追加し、検証結果は`docs/REV2_PROGRESS.md`の最新追補へ記録する。実Agent実行、独立Workspace隔離、Mobile Workspace選択は`release_blocker`として維持し、`release_ready=false`を保つ。
+
+### Phase 7 Agent対話セッションmetadata投影の先行単位（2026-09-27）
+
+先行単位ではRust Brokerの通常認証IPCに`対話セッション一覧`を追加し、Schema適合Agent Adapterの現在sessionからmetadataを上限64件でDesktopへ投影した。今回の追補で、Workspace IDと結合監査参照を追加する統治経路へ進んだ。Agent metadataは分類に限り、AuthorityやTrustを与えない。証拠は`INTERNAL_STATE`であり、実Agent稼働・Workspace隔離・Task実行を示さない。以前の検証失敗・回復と証拠範囲は`docs/REV2_PROGRESS.md`の該当履歴に保持する。
 
 ### Phase 7 Agent間Workspace root範囲重複の拒否（2026-09-27）
 
 Rust Workspace registryは、異なるRuntime ID間の同一物理rootと通常pathで観測できる親子rootの重複をfail-closedで拒否する。起動時にnofollowで開いたdirectory identity列を二度のpath解決で照合し、負例は親→子・子→親の両順、識別範囲不明のhandle-only登録、Broker拒否Auditを確認する。独立rootは登録できる。証拠は一時directoryと試験Brokerによる`FIXTURE`であり、bind mount等の別名範囲や実Agentの同時書込み・比較・Handoff隔離を示さない。比較は未接続のまま維持する。仕様と残存境界は`docs/specs/workspace-inspection.md`、`docs/specs/agent-coordination.md`、`docs/REV2_PROGRESS.md`を参照する。
 
-同Phaseの追加単位として、owner起動設定内のCodex runtimeと同じruntime IDを持つWorkspace rootを、Codex Adapterの固定作業pathと物理directory identityで照合する。不一致や識別不能rootはRuntime probe前に拒否し、未設定のWorkspace bindingは推定しない。これは起動設定の取り違え防止だけであり、Session binding、実行時path差替え防止、Agent比較・Handoff・cross-agent isolationの完成ではない。詳細と検査証拠は`docs/REV2_PROGRESS.md`の対応追補を参照する。
+同Phaseの先行単位として、owner起動設定内のCodex runtimeと同じruntime IDを持つWorkspace rootを、Codex Adapterの固定作業pathと物理directory identityで照合する。不一致や識別不能rootはRuntime probe前に拒否する。今回、Agent対話Session開始時には現在登録Workspaceを明示選択してID対応を結合する。両者を合わせても、検査後のpath差替え防止、Agent専用実行Session、実書込み隔離、Agent比較・Handoff・cross-agent isolationの完成ではない。詳細と検査証拠は`docs/REV2_PROGRESS.md`の対応追補を参照する。
 
 ### Phase 32 Windows Export build tool追加（2026-09-26）
 

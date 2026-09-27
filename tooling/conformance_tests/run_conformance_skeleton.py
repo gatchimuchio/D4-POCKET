@@ -3393,6 +3393,12 @@ def 対話操作の分岐と未知fieldを検査する() -> list[str]:
             errors.append("対話操作が未知の権限fieldを受理した")
         if payload and not validate_instance({"operation": operation, "payload": {}}, schema):
             errors.append("対話操作が必須fieldの欠落を受理した")
+    bound_start = {"operation": "対話開始", "payload": {"実行系ID": "codex-local", "作業領域ID": "workspace-local"}}
+    if validate_instance(bound_start, schema):
+        errors.append("対話開始が明示Workspace参照を受理しない")
+    invalid_bound_start = {"operation": "対話開始", "payload": {"実行系ID": "codex-local", "作業領域ID": "../workspace"}}
+    if validate_instance(invalid_bound_start, schema) == []:
+        errors.append("対話開始が不正Workspace識別子を拒否しない")
     for value in ({"operation": "未知操作", "payload": {}}, {"operation": "対話取得", "payload": {"実行系ID": "local"}}):
         if not validate_instance(value, schema):
             errors.append("操作とpayloadの不整合を受理した")
@@ -3436,6 +3442,8 @@ def 対話セッション一覧の有界投影を検査する() -> list[str]:
                 "実行系ID": f"runtime-{index}",
                 "状態": "利用中",
                 "作成監査ID": f"audit-dialogue-{index}",
+                "作業領域ID": f"workspace-{index}",
+                "作業領域結合監査ID": f"audit-workspace-{index}",
             }
             for index in range(64)
         ],
@@ -3450,6 +3458,8 @@ def 対話セッション一覧の有界投影を検査する() -> list[str]:
         {**fixture, "版": 2},
         {**fixture, "authority": "owner"},
         {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "Workspace": "workspace-a"}]},
+        {"版": 1, "対話セッション": [{key: value for key, value in fixture["対話セッション"][0].items() if key != "作業領域ID"}]},
+        {"版": 1, "対話セッション": [{key: value for key, value in fixture["対話セッション"][0].items() if key != "作業領域結合監査ID"}]},
         {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "状態": "trusted"}]},
         {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "実行系ID": "../runtime"}]},
         {"版": 1, "対話セッション": [{**fixture["対話セッション"][0], "作成監査ID": ""}]},
@@ -4266,7 +4276,16 @@ def 対話契約の関係と表示境界を検査する() -> list[str]:
     送信受付schema = load_schema("runtime_dialogue_submission_receipt.schema.json")
     セッション = load_contract_fixture("runtime_dialogue_session.valid.json")
     応答 = load_contract_fixture("runtime_dialogue_response.valid.json")
+    応答schema = load_schema("runtime_dialogue_response.schema.json")
     不整合 = 要求関係検査(要求, セッション) + 応答関係検査(要求, 応答, "none")
+    workspace_rejection = {
+        **応答,
+        "状態": "失敗",
+        "失敗分類": "作業領域不在",
+        "復旧": "RuntimeとWorkspaceの登録対応を再確認",
+    }
+    if validate_instance(workspace_rejection, 応答schema):
+        不整合.append("Workspace結合拒否の失敗・復旧分類がresponse schemaにない")
     if validate_instance(送信受付, 送信受付schema):
         不整合.append("Broker送信受付receiptのvalid fixtureがschemaに適合しない")
     for 変更 in (

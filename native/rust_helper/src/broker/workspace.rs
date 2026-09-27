@@ -38,6 +38,42 @@ struct RegisteredWorkspace {
     grant: Option<Grant>,
     baseline: Option<Baseline>,
 }
+
+/// Broker内で照合済みのSession-to-Workspace参照。
+/// Permissionやfilesystem accessを保持せず、登録関係の監査相関にだけ使う。
+pub(crate) struct DialogueWorkspaceBinding {
+    runtime: String,
+    workspace_id: String,
+    registration_hash: String,
+}
+
+impl DialogueWorkspaceBinding {
+    pub(crate) fn matches(&self, runtime: &str, workspace_id: &str) -> bool {
+        self.runtime == runtime && self.workspace_id == workspace_id
+    }
+
+    pub(crate) fn workspace_id(&self) -> &str {
+        &self.workspace_id
+    }
+
+    pub(crate) fn audit_hash(&self, session_id: &str) -> String {
+        digest(&json!({
+            "対話セッションID": session_id,
+            "実行系ID": self.runtime,
+            "作業領域ID": self.workspace_id,
+            "登録hash": self.registration_hash,
+        }))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(runtime: &str, workspace_id: &str) -> Self {
+        Self {
+            runtime: runtime.to_owned(),
+            workspace_id: workspace_id.to_owned(),
+            registration_hash: "sha256:fixture-registration".to_owned(),
+        }
+    }
+}
 struct Baseline {
     whole: bool,
     hash: String,
@@ -96,6 +132,20 @@ fn digest(value: &Value) -> String {
 }
 
 impl WorkspaceRegistry {
+    /// 指定Runtimeに属する現在登録だけから、内容・root path・Permissionを含まない結合参照を作る。
+    pub(crate) fn dialogue_binding(
+        &self,
+        runtime: &str,
+        workspace_id: &str,
+    ) -> Option<DialogueWorkspaceBinding> {
+        let entry = self.entries.get(workspace_id)?;
+        (entry.runtime == runtime).then(|| DialogueWorkspaceBinding {
+            runtime: runtime.to_owned(),
+            workspace_id: workspace_id.to_owned(),
+            registration_hash: entry.registration_hash.clone(),
+        })
+    }
+
     /// terminal lifecycle隔離後に、同じ実行系へ結合した作業領域root、承認、基準点を残さない。
     pub(crate) fn remove_runtime(&mut self, runtime: &str) {
         self.entries.retain(|_, entry| entry.runtime != runtime);

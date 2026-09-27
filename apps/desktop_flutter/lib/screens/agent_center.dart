@@ -80,7 +80,7 @@ class AgentCenter extends StatelessWidget {
             ),
         for (final session in sessions)
           BorderedPanel(
-            child: session.workspace.trim().isEmpty
+            child: session.task.trim().isEmpty
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -96,9 +96,20 @@ class AgentCenter extends StatelessWidget {
                           title: '証拠種別', rows: [session.evidenceSource]),
                       SectionList(
                           title: '作成監査ID', rows: [session.auditEventId]),
-                      const Text(
-                        'Workspace結合は未確認です。比較・Handoff・Task内容は利用できません。',
-                      ),
+                      if (session.workspace.trim().isEmpty)
+                        const Text('Workspace結合は未確認です。')
+                      else ...[
+                        SectionList(
+                            title: 'Broker登録Workspace ID',
+                            rows: [session.workspace]),
+                        SectionList(
+                            title: 'Workspace結合監査ID',
+                            rows: [session.workspaceAuditEventId]),
+                        const Text(
+                          'Runtime一致はBroker内で検証済みです。実Agentの実行Session・書込み隔離は未検証です。',
+                        ),
+                      ],
+                      const Text('比較・Handoff・Task内容は利用できません。'),
                     ],
                   )
                 : Column(

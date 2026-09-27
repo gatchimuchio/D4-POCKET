@@ -35,8 +35,8 @@ Windows-first product path と LLM-readable substrate の demonstration path を
 - item: D4 Pocket rev2 Mobile Device Link Flutter境界が未成立
   classification: release_blocker
   registry_id: rev2_mobile_flutter_native_device_link_boundary
-  reason: Dart直接経路は廃止し、Android Kotlin unit testとAPK/AAB buildはPASSしたが、実OS保管・実TLS・lifecycleの証拠がなく、iOS native handlerは未実装。Schema／fixture／unit test／buildだけではproduction経路の成立を証明しない。
-  required_action: iOS native招待UI・Keychain・TLS経路を実装する。秘密をDart/debug VM/log/artifactへ渡さないtest harnessでBroker到達・拒否・失効・background停止を検証する。
+  reason: Dart直接経路は廃止し、Android Kotlin unit testとAPK/AAB buildはPASSしたが、実OS保管・実TLS・lifecycleの証拠がなく、iOS native handlerは未実装。さらにMobile Device LinkにWorkspace選択面がないため、Agent Adapterの対話開始はWorkspace未指定としてBrokerが拒否する。Schema／fixture／unit test／buildだけではproduction経路の成立を証明しない。
+  required_action: iOS native招待UI・Keychain・TLS経路を実装する。秘密をDart/debug VM/log/artifactへ渡さないtest harnessでBroker到達・拒否・失効・background停止を検証する。Workspace識別子の開示範囲と選択をnative Device Link境界内で定義・検証し、Brokerが登録Runtime対応を再照合するまでMobile Agent startを有効化しない。
   blocks_release: yes
 
 - item: language policy runtime convergence gate
@@ -382,7 +382,7 @@ known limitation を認める条件は、次のとおりである。
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
   status: unresolved
-  reason: 直前のclean sourceでは全335件が成功して一度解消したが、2026-09-27の今回実行では<code>cargo test --locked --manifest-path native/rust_helper/Cargo.toml --test workspace_startup -- --test-threads=1</code>の7件すべてがtest assertion前の子process起動時にWindows Application ControlのOS error 4551で拒否された。後続の全target直列実行もtest harness自体が同じOS error 4551で起動できなかった。別の全target runではA2A loopback試験が間欠失敗した一方、Rust library 292件だけの直列runは成功した。policy変更、拒否fileの移動・再配置、test除外は行っていない。
+  reason: 前回clean sourceでは全335件が成功し一度解消したが、2026-09-27の最新再確認ではRust library 296件、main.rs 9件、broker_ipc 10件、canonical_decimal_hash 1件、checkpoint 8件、protected_data 2件、protected_startup 1件が成功した後、protected_storeの試験実行fileがWindows Application Control（OS error 4551）に起動拒否され、全対象実行が停止した。protected_store 3件は未実行。同日の個別実行でworkspace_diff 2件とworkspace_reader 2件は成功したが、workspace_startup 7件は同errorで起動前に拒否された。合計331件は成功、10件は未実行であり、全対象完了ではない。別実行のA2A接続loopback試験の間欠失敗291/292件も履歴に保持する。policy変更、拒否fileの移動・再配置、試験除外は行っていない。
   required_action: Windows Application Controlを変更・回避せず、承認済み条件で全target試験を再実行する。process起動を含むworkspace／Broker integration suiteの全件成功を確認するまでresolvedへ戻さない。
   blocks_release: yes
 
