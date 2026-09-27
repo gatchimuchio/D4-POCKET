@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Codex Task専用permission profile（2026-09-28）
+
+Codexの新permission profile仕様（[公式Permissions文書](https://learn.chatgpt.com/docs/permissions)）を使い、既存のread-only Dialogueへ影響させずTask commandだけへ固定`d4p-agent-task` profileを与えるcommand構成を追加した。profileは`:workspace`を継承し、glob走査深度8までのWorkspace内`**/*.env`、`**/.ssh/**`、`**/secrets/**`をdeny、networkを無効にする。深度8超や別名のsecret path全体を包括的に拒否するものではない。従来のTask TEMP/TMP scratchとJob Object process群監督は維持する。
+
+- `codex --help`／`codex exec --help`：global `-c key=value` config overrideとTaskに必要なJSONL、ephemeral、user-config無視optionを確認した。
+- `codex sandbox --permission-profile d4p-task ... cmd.exe /c type C:\Windows\win.ini`：同等の`:workspace`継承・`.env` deny glob設定を与えたsandbox helperがprofileを受理し、外部system fileの内容を出力した。これはhelperのprofile読み込みと外部read可を示すだけで、`codex exec` production Task経路やworkspace deny glob実効性の証拠ではない。
+- Rust command構成testとConformanceに、Taskだけへprofileを与えること、Dialogueのread-only維持、secret deny pattern、network無効、sandbox bypassの不在を検査する条件を追加した。実Codex `exec`、secret marker読取拒否、workspace書込／外部read境界は未実行。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1`: 成功。続く`--all-targets`はlibrary 313件、CLI 9件、Broker IPC 10件が成功した後、次のintegration test executable `canonical_decimal_hash-091b16c7c8c9c9d6.exe`がWindows Application Controlに起動前拒否され、exit 1。policy変更・実行file移動等の回避はしていない。
+- 実モデル呼出し・有料資格は使用していない。Codex Adapter metadataは`task_execution=unsupported`のまま。Workspace外read、deny glob実効性、Broker crash後scratch recovery、実Agent failure／cancellation／deadline、結果・diff Content Exposureは`release_blocker`として維持する。
+
 ## D4 Pocket Phase 7 Codex Agent Taskの固定workspace-write Adapter（2026-09-28）
 
 実インストール済みCodex CLI `0.158.0-alpha.2.1`で`codex exec --help`を確認し、`--json`、`--ephemeral`、`--ignore-user-config`、`--sandbox workspace-write`、`--cd`とstdin promptの実物interfaceを固定した。Adapter登録は従来read-only Dialogueに必要なexec optionだけを検査し、`workspace-write`の有無はTask対応probeとして別に記録する。古いCLIがTask optionを持たなくてもread-only Dialogueの登録を妨げない。既存Dialogueは引き続き`read-only`で起動し、Task専用経路だけを`sandbox=workspace-write`にする。`--add-dir`、worktree切替、dangerous bypass、任意command／pathは追加していない。

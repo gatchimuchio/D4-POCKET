@@ -9,11 +9,11 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
-### Phase 7 Codex Agent Task固定workspace-write Adapter（2026-09-28）
+### Phase 7 Codex Agent Task専用permission profile（2026-09-28）
 
-実インストール済みCodex CLI `0.158.0-alpha.2.1`の`version`／`exec --help`を確認し、固定`workspace-write`起動、JSONL応答上限、Task専用Workspace内TEMP／TMP scratch、Windows Job Objectによるprocess群監督と通常終端cleanupをCodex Adapterへ実装した。従来のread-only Dialogueは独立した必須interface検査のまま維持し、古いCLIが`workspace-write`を備えなくてもDialogue登録を妨げない。
+実インストール済みCodex CLI `0.158.0-alpha.2.1`の`version`／`exec --help`を確認し、read-only Dialogueは従来どおり`--sandbox read-only`、Taskだけは固定`d4p-agent-task` permission profileで起動する構成にした。profileは`:workspace`を継承し、glob走査深度8までのWorkspace内`**/*.env`、`**/.ssh/**`、`**/secrets/**`をdenyし、networkを無効にする。深度8超や別名の秘密fileを包括的に拒否するものではない。JSONL応答上限、Task専用Workspace内TEMP／TMP scratch、Windows Job Objectによるprocess群監督と通常終端cleanupは維持する。Task専用profileの構成testは追加したが、実Codex `exec`でdenyを試していない。
 
-Task runnerとBroker Consumerは接続済みでも、Adapter capability metadataは`task_execution=unsupported`のままであり、Brokerから実Taskを起動できない。`workspace-write`がWorkspace内`.env`等の秘密file読取を拒否する境界、Broker crash／電源断後のscratch回収、実Agent隔離書込・外部path拒否、失敗／取消／期限の実runtime証拠、結果／diffの`Content Exposure`表示は未成立の`release_blocker`。有料資格によるModel実行は行っていない。Windows Job Objectはprocess群停止でありfilesystem sandboxではない。
+Task runnerとBroker Consumerは接続済みでも、Adapter capability metadataは`task_execution=unsupported`のままであり、Brokerから実Taskを起動できない。permission profileを指定したsandbox helperから`C:\Windows\win.ini`を読み取れたため、外部path拒否は未成立である。Workspace内deny globの実効性、Broker crash／電源断後のscratch回収、実Agent隔離書込、失敗／取消／期限の実runtime証拠、結果／diffの`Content Exposure`表示は未成立の`release_blocker`。有料資格によるModel実行は行っていない。Windows Job Objectはprocess群停止でありfilesystem sandboxではない。
 
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：358件成功。後続のfixture文字列変更に対するCodex CLI interface test 1件と`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。strict日本語監査、Schema 144／144／178、Conformance 224、Manifest、release gate、packaging portability、release smoke等10検査が合格。development validatorの結果は`release_ready=false`、`release_blocker` 31件であり、正式releaseを意味しない。

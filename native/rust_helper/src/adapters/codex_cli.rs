@@ -2,7 +2,7 @@
 //!
 //! このAdapterはIPCからcommand、argv、environment、workspaceを受け取らない。
 //! 起動時に明示登録された実行fileとworkspaceだけを使用する。Dialogueはread-only、
-//! Owner承認済みAgent Taskは固定`workspace-write` protocolを使う。
+//! Owner承認済みAgent Taskは固定permission profileを使う。
 #![allow(non_snake_case)]
 
 use super::process_tree;
@@ -21,6 +21,13 @@ use std::time::{Duration, Instant};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
+const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
+    "default_permissions=\"d4p-agent-task\"",
+    "permissions.d4p-agent-task.extends=\":workspace\"",
+    "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=8",
+    "permissions.d4p-agent-task.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"}}",
+    "permissions.d4p-agent-task.network.enabled=false",
+];
 
 const SAFE_ENVIRONMENT: &[&str] = &[
     "PATH",
@@ -120,7 +127,7 @@ impl 実行系Adapter for CodexCliAdapter {
             "model": "unknown",
             "status": "degraded",
             "capabilities": [
-                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "workspace-write実Task、隔離、後始末を実Agentで検証していない"}},
+                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "専用permission profileの実Task、隔離、後始末を実Agentで検証していない"}},
                 {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
             ],
             "workspace_requirements": {
@@ -393,15 +400,6 @@ enum CodexSandbox {
     WorkspaceWrite,
 }
 
-impl CodexSandbox {
-    fn as_arg(self) -> &'static str {
-        match self {
-            Self::ReadOnly => "read-only",
-            Self::WorkspaceWrite => "workspace-write",
-        }
-    }
-}
-
 struct WorkspaceTaskScratch {
     _workspace_guard: crate::broker::workspace_root::WorkspacePathGuard,
     _workspace_dir: Dir,
@@ -511,20 +509,17 @@ fn build_codex_command(
 ) -> Result<Command, 対話失敗> {
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
+    if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
+        for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
+            task_command.arg("-c").arg(setting);
+        }
+    }
+    task_command.args(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
+    if let CodexSandbox::ReadOnly = sandbox {
+        task_command.args(["--sandbox", "read-only"]);
+    }
     task_command
-        .args([
-            "exec",
-            "--json",
-            "--ephemeral",
-            "--ignore-user-config",
-            "--sandbox",
-            sandbox.as_arg(),
-            "--color",
-            "never",
-            "--cd",
-            workspace_path,
-            "-",
-        ])
+        .args(["--color", "never", "--cd", workspace_path, "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -733,29 +728,33 @@ mod tests {
     }
 
     #[test]
-    fn DialogueとAgentTaskは固定sandboxを使い追加書込先を持たない() {
+    fn Dialogueはread_onlyのままTaskだけ専用permission_profileを使う() {
         let executable = Path::new(r"C:\codex.exe");
         let workspace = Path::new(r"C:\workspace");
         let scratch = Path::new(r"C:\workspace\.d4p-tmp-test");
-        for (sandbox, expected) in [
-            (CodexSandbox::ReadOnly, "read-only"),
-            (CodexSandbox::WorkspaceWrite, "workspace-write"),
-        ] {
-            let command = build_codex_command(
-                executable,
-                workspace,
-                sandbox,
-                (expected == "workspace-write").then_some(scratch),
-            )
-            .expect("固定Codex command");
+        for sandbox in [CodexSandbox::ReadOnly, CodexSandbox::WorkspaceWrite] {
+            let is_task = matches!(sandbox, CodexSandbox::WorkspaceWrite);
+            let command =
+                build_codex_command(executable, workspace, sandbox, is_task.then_some(scratch))
+                    .expect("固定Codex command");
             let args: Vec<_> = command
                 .get_args()
                 .map(|arg| arg.to_string_lossy().to_string())
                 .collect();
-            assert!(args.windows(2).any(|pair| pair == ["--sandbox", expected]));
             assert!(args
                 .windows(2)
                 .any(|pair| pair == ["--cd", r"C:\workspace"]));
+            if is_task {
+                assert!(!args.iter().any(|arg| arg == "--sandbox"));
+                for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
+                    assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
+                }
+            } else {
+                assert!(args
+                    .windows(2)
+                    .any(|pair| pair == ["--sandbox", "read-only"]));
+                assert!(!args.iter().any(|arg| arg == "-c"));
+            }
             let worktree_flag = format!("{}{}", "--", "worktree");
             let add_dir_flag = format!("{}{}", "--", "add-dir");
             assert!(!args.iter().any(|arg| {
@@ -767,8 +766,8 @@ mod tests {
             let has_tmp = command
                 .get_envs()
                 .any(|(key, value)| key == "TMP" && value == Some(scratch.as_os_str()));
-            assert_eq!(has_temp, expected == "workspace-write");
-            assert_eq!(has_tmp, expected == "workspace-write");
+            assert_eq!(has_temp, is_task);
+            assert_eq!(has_tmp, is_task);
         }
         assert!(build_codex_command(
             executable,
