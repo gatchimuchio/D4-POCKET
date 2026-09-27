@@ -35,6 +35,7 @@
         "Agent一覧",
         "Agent作業要求検査",
         "AgentTaskWorkspacePermissionGrant",
+        "AgentTaskOwnerApprovalGrant",
         "実行系列挙",
         "対話セッション一覧",
         "実行系資源観測",

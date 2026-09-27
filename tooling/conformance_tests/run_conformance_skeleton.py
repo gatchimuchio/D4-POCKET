@@ -7026,6 +7026,7 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
         "Agent一覧",
         "Agent作業要求検査",
         "AgentTaskWorkspacePermissionGrant",
+        "AgentTaskOwnerApprovalGrant",
     )
     errors: list[str] = []
     for operation in required_operations:
@@ -7069,6 +7070,45 @@ def test_agent_task_workspace_permission_is_owner_scoped_and_one_use() -> list[s
     for required in ("Task固有のOwner Approvalではない", "5分期限", "Task保存、process起動"):
         if required not in contract_text:
             errors.append(f"Agent Runtime正本にWorkspace Permission境界がない: {required}")
+    return errors
+
+
+def test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed() -> list[str]:
+    schema = load_schema("agent_task_owner_approval.schema.json")
+    receipt = load_contract_fixture("agent_task_owner_approval.valid.json")
+    errors = validate_instance(receipt, schema)
+    execution_claim = load_contract_fixture(
+        "invalid/agent_task_owner_approval_execution_claim.invalid.json"
+    )
+    if validate_instance(execution_claim, schema) == []:
+        errors.append("Owner Approval receiptがTask実行済み状態を受け入れる")
+    for field in ("approval_id", "permission_id", "instruction", "command", "workspace_path"):
+        if validate_instance({**receipt, field: "untrusted"}, schema) == []:
+            errors.append(f"Owner Approval receiptが秘密／権限／実行fieldを受け入れる: {field}")
+    if receipt.get("use_limit") != 1 or receipt.get("uses_remaining") != 1:
+        errors.append("Owner Approval receiptが未消費一回限りを示さない")
+    broker = (ROOT / "native/rust_helper/src/broker/dialogue.rs").read_text(
+        encoding="utf-8"
+    )
+    launcher = (ROOT / "native/rust_helper/src/desktop_launcher.rs").read_text(
+        encoding="utf-8"
+    )
+    protocol = (ROOT / "native/rust_helper/src/broker/protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        "AgentTaskOwnerApprovalGrant",
+        "AgentTask実行条件hash",
+        "agent_task_owner_approval_is_active",
+        "実行条件hash",
+    ):
+        if required not in broker:
+            errors.append(f"Owner Approval Broker経路に必須結合がない: {required}")
+    for required in ("AgentTaskOwnerApprovalGrant", "指示hash"):
+        if required not in launcher:
+            errors.append(f"Owner Approval native確認経路に必須表示／制限がない: {required}")
+    if "AgentTaskOwnerApprovalGrant" not in protocol or "DesktopNativeConfirmation" not in protocol:
+        errors.append("Owner Approval operationがRust Desktop native confirmationへ限定されない")
     return errors
 
 
@@ -8935,6 +8975,7 @@ def main() -> int:
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_broker_operations_are_declared_in_ipc_contracts,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
+        test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,

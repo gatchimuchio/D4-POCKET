@@ -389,6 +389,29 @@ struct AgentTaskWorkspacePermission記録 {
     workspace_registration_hash: String,
     expires_at_epoch_seconds: i64,
     monotonic_expiry: Instant,
+    owner_approval: Option<AgentTaskOwnerApproval記録>,
+}
+
+struct AgentTaskOwnerApproval記録 {
+    instruction_hash: String,
+    execution_conditions_hash: String,
+    expires_at_epoch_seconds: i64,
+    monotonic_expiry: Instant,
+}
+
+const AGENT_TASK_EXECUTION_POLICY: &str = "gui-shell-agent-task-sandbox-v1";
+
+fn AgentTask実行条件hash(
+    runtime_id: &str,
+    session_id: &str,
+    workspace_id: &str,
+    registration_hash: &str,
+    permission_id: &str,
+) -> String {
+    let material = format!(
+        "gui-shell-agent-task-execution-conditions-v1\0{runtime_id}\0{session_id}\0{workspace_id}\0{registration_hash}\0{permission_id}\0{AGENT_TASK_EXECUTION_POLICY}"
+    );
+    sha256_tagged(material.as_bytes())
 }
 
 fn Agent作業要求識別子妥当(value: &str) -> bool {
@@ -779,6 +802,40 @@ impl 対話制御 {
             })
     }
 
+    fn agent_task_owner_approval_is_active(
+        &self,
+        session_id: &str,
+        runtime_id: &str,
+        workspace_id: &str,
+        registration_hash: &str,
+        instruction_hash: &str,
+        now: i64,
+    ) -> bool {
+        self.agent_task_permissions
+            .get(session_id)
+            .is_some_and(|grant| {
+                self.agent_task_permission_is_active(
+                    session_id,
+                    runtime_id,
+                    workspace_id,
+                    registration_hash,
+                    now,
+                ) && grant.owner_approval.as_ref().is_some_and(|approval| {
+                    now < approval.expires_at_epoch_seconds
+                        && Instant::now() < approval.monotonic_expiry
+                        && approval.instruction_hash == instruction_hash
+                        && approval.execution_conditions_hash
+                            == AgentTask実行条件hash(
+                                runtime_id,
+                                session_id,
+                                workspace_id,
+                                registration_hash,
+                                &grant.permission_id,
+                            )
+                })
+            })
+    }
+
     /// 資格失効は監査障害時も採用停止を優先する。外部計算の停止は保証しない。
     pub(crate) fn 資格隔離(&mut self, sessions: &[String]) {
         self.失効セッション.extend(sessions.iter().cloned());
@@ -947,12 +1004,24 @@ impl 対話制御 {
                     "未付与"
                 };
                 let instruction_hash = sha256_tagged(request.instruction.as_bytes());
+                let approval_state = if self.agent_task_owner_approval_is_active(
+                    &request.session_id,
+                    &request.agent_runtime_id,
+                    &request.workspace_id,
+                    binding.registration_hash(),
+                    &instruction_hash,
+                    現在,
+                ) {
+                    "有効"
+                } else {
+                    "未取得"
+                };
                 Ok(json!({
                     "版": 1,
                     "状態": "要求検査済み",
                     "実行状態": "未実行",
                     "Permission状態": permission_state,
-                    "Approval状態": "未取得",
+                    "Approval状態": approval_state,
                     "実行系ID": request.agent_runtime_id,
                     "対話セッションID": request.session_id,
                     "作業領域ID": request.workspace_id,
@@ -1013,6 +1082,7 @@ impl 対話制御 {
                         workspace_registration_hash: registration_hash.clone(),
                         expires_at_epoch_seconds,
                         monotonic_expiry: Instant::now() + Duration::from_secs(300),
+                        owner_approval: None,
                     },
                 );
                 if let Err(error) = 監査(
@@ -1037,6 +1107,94 @@ impl 対話制御 {
                     "use_limit": 1,
                     "uses_remaining": 1,
                     "status": "active"
+                }))
+            }
+            "AgentTaskOwnerApprovalGrant" => {
+                if !owner {
+                    return Err(対話失敗::権限拒否);
+                }
+                let request: Agent作業要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.agent_runtime_id)
+                    || !Agent作業要求識別子妥当(&request.session_id)
+                    || !Agent作業要求識別子妥当(&request.workspace_id)
+                    || request.instruction.trim().is_empty()
+                    || request.instruction.chars().count() > 32_768
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let adapter = self
+                    .実行系
+                    .get(&request.agent_runtime_id)
+                    .ok_or(対話失敗::実行系不在)?;
+                let metadata = adapter.agent_metadata().ok_or(対話失敗::実行系不在)?;
+                AgentAdapterMetadata::read(&metadata)?;
+                let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
+                if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
+                    return Err(対話失敗::作業領域不在);
+                }
+                let session = self
+                    .セッション
+                    .get(&request.session_id)
+                    .ok_or(対話失敗::セッション不一致)?;
+                if session.状態 != "利用中"
+                    || session.実行系ID != request.agent_runtime_id
+                    || session.作業領域ID.as_deref() != Some(request.workspace_id.as_str())
+                    || session.作業領域登録hash.as_deref() != Some(binding.registration_hash())
+                    || self.失効セッション.contains(&request.session_id)
+                {
+                    return Err(対話失敗::セッション不一致);
+                }
+                let permission = self
+                    .agent_task_permissions
+                    .get(&request.session_id)
+                    .filter(|grant| {
+                        self.agent_task_permission_is_active(
+                            &request.session_id,
+                            &request.agent_runtime_id,
+                            &request.workspace_id,
+                            binding.registration_hash(),
+                            現在,
+                        ) && grant.agent_runtime_id == request.agent_runtime_id
+                            && grant.workspace_id == request.workspace_id
+                    })
+                    .ok_or(対話失敗::権限拒否)?;
+                let instruction_hash = sha256_tagged(request.instruction.as_bytes());
+                let execution_conditions_hash = AgentTask実行条件hash(
+                    &request.agent_runtime_id,
+                    &request.session_id,
+                    &request.workspace_id,
+                    binding.registration_hash(),
+                    &permission.permission_id,
+                );
+                let expires_at_epoch_seconds = 現在.saturating_add(300);
+                監査(
+                    "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）",
+                    &request.session_id,
+                    &execution_conditions_hash,
+                )?;
+                let approval = AgentTaskOwnerApproval記録 {
+                    instruction_hash: instruction_hash.clone(),
+                    execution_conditions_hash: execution_conditions_hash.clone(),
+                    expires_at_epoch_seconds,
+                    monotonic_expiry: Instant::now() + Duration::from_secs(300),
+                };
+                self.agent_task_permissions
+                    .get_mut(&request.session_id)
+                    .ok_or(対話失敗::権限拒否)?
+                    .owner_approval = Some(approval);
+                Ok(json!({
+                    "状態": "Owner Approval発行済み",
+                    "実行状態": "未実行",
+                    "実行系ID": request.agent_runtime_id,
+                    "対話セッションID": request.session_id,
+                    "作業領域ID": request.workspace_id,
+                    "指示hash": instruction_hash,
+                    "実行条件hash": execution_conditions_hash,
+                    "適用ポリシー": AGENT_TASK_EXECUTION_POLICY,
+                    "expires_at_epoch_seconds": expires_at_epoch_seconds,
+                    "use_limit": 1,
+                    "uses_remaining": 1,
+                    "status": "issued_unconsumed"
                 }))
             }
             "対話開始" => {

@@ -144,6 +144,10 @@
       "責任": "Brokerが発行するSession・現在Workspace登録hashへ結合した5分・一回限りのAgent Task用書込Permission receipt"
     },
     {
+      "path": "specs/agent_task_owner_approval.schema.json",
+      "責任": "本文hashとBroker計算の実行条件hashへ結合した、未実行・5分期限・未消費Agent Task Owner Approval receipt"
+    },
+    {
       "path": "tooling/conformance_tests/",
       "責任": "契約適合と拒否経路の検証"
     },

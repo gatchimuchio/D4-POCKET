@@ -2107,3 +2107,12 @@ Permission発行後もAgent Task検査が常に「未付与」を返す不整合
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済み開発検査は合格。Evidence bundleは対象範囲のWindows release evidence不足5件を報告し、`release_blockers.registry.json`のactive blocker 15件は未解消、`release_ready=false`を維持。
 
 これはIPC Contractとの同期を示し、Agent稼働、Task実行、Workspace隔離、Owner Approval、release readinessを証明しない。これらの既存`release_blocker`と`release_ready=false`は維持する。
+
+## Agent Task Owner Approvalのnative発行・preflight結合（2026-09-27）
+
+`AgentTaskOwnerApprovalGrant`をBroker IPC operation、Rust Desktop native Owner確認allowlist、IPC要求／応答Schemaへ追加した。発行は既存Workspace Permissionが有効な現行Runtime／Session／Workspace結合に限定し、Brokerが指示本文hashと、登録hash・Permission内部識別子・固定実行条件policyを含む条件hashを計算して揮発状態に5分保持する。native確認文は本文を表示せず、文字数・本文hash・対象ID・policy・未実行境界を示す。Task preflightは本文hash・条件hash・wall／monotonic期限を再照合し、一致時だけApprovalを有効表示する。要求本文、Approval ID、Permission IDは応答／Auditへ出さない。
+
+- Rust Protocol／Broker試験で通常IPC拒否、Permission未付与時のnative発行拒否、native発行、本文・Audit非露出、preflight一致／本文差替え不一致／期限切れ、未実行状態を検査する。
+- Desktop native確認候補testで本文非表示、hash／固定policy表示、request側Approval ID注入拒否を検査する。
+- 発行receipt専用Schema、正常／実行済みnegative fixture、正本索引、本文・権限・pathなど禁止fieldのConformanceを追加し、`AgentTaskOwnerApprovalGrant`をIPC Schema三面同期Conformanceへ含める。
+- この単位はApprovalの発行と照合のみ。consumerによる一回消費、実行直前の原子的再検証、sandbox・独立書込隔離、実行前後Audit／Recovery、結果保存は未成立で`release_blocker`を維持する。固定policy IDはsandboxの実在証拠ではない。

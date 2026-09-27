@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use zeroize::Zeroize;
 use serde::Deserialize;
+use crate::audit_hash::sha256_tagged;
 
 use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
 use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
@@ -61,6 +62,14 @@ enum DesktopOwnerOperationSummary {
         workspace_id: String,
         payload_hash: String,
     },
+    AgentTaskOwnerApproval {
+        runtime_id: String,
+        session_id: String,
+        workspace_id: String,
+        instruction_characters: usize,
+        instruction_hash: String,
+        payload_hash: String,
+    },
     RegressionCaseDelete {
         summary: OwnerDeleteConfirmationSummary,
         payload_hash: String,
@@ -81,6 +90,15 @@ struct AgentTaskWorkspacePermissionRequest {
     agent_runtime_id: String,
     session_id: String,
     workspace_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskOwnerApprovalRequest {
+    agent_runtime_id: String,
+    session_id: String,
+    workspace_id: String,
+    instruction: String,
 }
 
 fn agent_task_permission_identifier_is_valid(value: &str) -> bool {
@@ -778,6 +796,26 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::AgentTaskOwnerApprovalGrant => {
+            let request: AgentTaskOwnerApprovalRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_permission_identifier_is_valid(&request.agent_runtime_id)
+                || !agent_task_permission_identifier_is_valid(&request.session_id)
+                || !agent_task_permission_identifier_is_valid(&request.workspace_id)
+                || request.instruction.trim().is_empty()
+                || request.instruction.chars().count() > 32_768
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                runtime_id: request.agent_runtime_id,
+                session_id: request.session_id,
+                workspace_id: request.workspace_id,
+                instruction_characters: request.instruction.chars().count(),
+                instruction_hash: sha256_tagged(request.instruction.as_bytes()),
+                payload_hash,
+            }
+        }
         BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary: owner_delete_confirmation_summary(payload).ok()?,
             payload_hash,
@@ -929,6 +967,17 @@ fn owner_confirmation_text_for_identity(
         } => format!(
             "このAgent Sessionに限定したTask用Workspace Permissionを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n許可operation: agent_task.execute\n範囲: このSession・Workspaceで1回、5分以内\n\nこの確認はTask本文を承認せず、Taskを実行・保存・変更しません。実行時にはTask本文と条件を示す別のOwner Approvalが必要です。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             runtime_id, session_id, workspace_id, payload_hash
+        ),
+        DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+            runtime_id,
+            session_id,
+            workspace_id,
+            instruction_characters,
+            instruction_hash,
+            payload_hash,
+        } => format!(
+            "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1\n範囲: このSession・Workspace・指示hash・実行条件に限定、5分以内\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            runtime_id, session_id, workspace_id, instruction_characters, instruction_hash, payload_hash
         ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
@@ -2314,6 +2363,61 @@ mod tests {
             "metadata": {"client": "desktop_flutter"}
         });
         assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTaskOwnerApprovalのnative確認は本文を表示せずhashと未実行境界を示す() {
+        let instruction = "秘密を含まないTask本文のfixture";
+        let payload = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace",
+            "instruction": instruction
+        });
+        let input = serde_json::json!({
+            "request_id": "desktop-agent-task-approval",
+            "operation": "AgentTaskOwnerApprovalGrant",
+            "payload": payload,
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "desktop-agent-task-approval-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (_, summary) = owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+            .expect("Task Owner Approvalはnative確認候補");
+        let text = owner_confirmation_text(&summary);
+        assert!(text.contains(&sha256_tagged(instruction.as_bytes())));
+        assert!(text.contains("gui-shell-agent-task-sandbox-v1"));
+        assert!(text.contains("Taskを保存・変更・実行せず"));
+        assert!(!text.contains(instruction));
+
+        let escalated = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace",
+            "instruction": instruction,
+            "approval_id": "caller-controlled"
+        });
+        let invalid = serde_json::json!({
+            "request_id": "desktop-agent-task-approval-escalated",
+            "operation": "AgentTaskOwnerApprovalGrant",
+            "payload": escalated,
+            "payload_hash": canonical_payload_hash(Some(&escalated)),
+            "nonce": "desktop-agent-task-approval-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]

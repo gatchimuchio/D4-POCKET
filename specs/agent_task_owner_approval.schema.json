@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_owner_approval.schema.json",
+  "title": "Broker発行Agent Task Owner Approval receipt",
+  "type": "object",
+  "required": [
+    "状態",
+    "実行状態",
+    "実行系ID",
+    "対話セッションID",
+    "作業領域ID",
+    "指示hash",
+    "実行条件hash",
+    "適用ポリシー",
+    "expires_at_epoch_seconds",
+    "use_limit",
+    "uses_remaining",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "状態": {"const": "Owner Approval発行済み"},
+    "実行状態": {"const": "未実行"},
+    "実行系ID": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "対話セッションID": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "作業領域ID": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "指示hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "実行条件hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "適用ポリシー": {"const": "gui-shell-agent-task-sandbox-v1"},
+    "expires_at_epoch_seconds": {"type": "integer", "minimum": 1},
+    "use_limit": {"const": 1},
+    "uses_remaining": {"const": 1},
+    "status": {"const": "issued_unconsumed"}
+  }
+}

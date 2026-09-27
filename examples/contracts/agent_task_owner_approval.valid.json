@@ -1,0 +1,14 @@
+{
+  "状態": "Owner Approval発行済み",
+  "実行状態": "未実行",
+  "実行系ID": "fixture-agent",
+  "対話セッションID": "fixture-session",
+  "作業領域ID": "fixture-workspace",
+  "指示hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "実行条件hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "適用ポリシー": "gui-shell-agent-task-sandbox-v1",
+  "expires_at_epoch_seconds": 1790000000,
+  "use_limit": 1,
+  "uses_remaining": 1,
+  "status": "issued_unconsumed"
+}
