@@ -2,14 +2,62 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/agent_task.schema.json",
   "title": "エージェントタスク（AgentTask）",
+  "description": "版なし旧形は履歴読取用。版2はBrokerが管理する状態投影であり、実行経路の完成証拠ではない。",
   "type": "object",
   "required": ["task_id", "session_id", "description", "status", "audit_event_id"],
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": ["record_version"],
+        "properties": {"record_version": {"const": 2}}
+      },
+      "then": {
+        "required": ["agent_runtime_id", "workspace_id", "instruction_hash"]
+      }
+    }
+  ],
   "properties": {
-    "task_id": {"type": "string", "minLength": 1},
-    "session_id": {"type": "string", "minLength": 1},
-    "description": {"type": "string", "minLength": 1},
-    "status": {"type": "string", "enum": ["pending", "running", "blocked", "completed", "failed"]},
-    "audit_event_id": {"type": "string", "minLength": 1}
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "record_version": {"const": 2},
+    "agent_runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "画面表示用の非機密label。作業指示本文、Agent出力、Credential実値を保存しない。"
+    },
+    "instruction_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Brokerが要求本文から計算したhash。本文そのものではない。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "running", "blocked", "completed", "failed", "cancelled", "quarantined"]
+    },
+    "audit_event_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "result_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "任意の本文hash参照。結果本文や実行成功の証拠ではない。"
+    }
   }
 }

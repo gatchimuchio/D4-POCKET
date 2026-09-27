@@ -7112,6 +7112,67 @@ def test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed() -> lis
     return errors
 
 
+def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[str]:
+    schema = load_schema("agent_task.schema.json")
+    current = load_contract_fixture("agent_task.valid.json")
+    errors = validate_instance(current, schema)
+    expected = {
+        "task_id",
+        "record_version",
+        "agent_runtime_id",
+        "session_id",
+        "workspace_id",
+        "description",
+        "instruction_hash",
+        "status",
+        "audit_event_id",
+    }
+    if set(current) != expected:
+        errors.append("AgentTask版2のfield集合が実行範囲へ過不足なく固定されていない")
+
+    legacy = {
+        "task_id": "legacy-task",
+        "session_id": "legacy-session",
+        "description": "旧形式の記録",
+        "status": "running",
+        "audit_event_id": "legacy-audit",
+    }
+    if validate_instance(legacy, schema):
+        errors.append("版なしAgentTaskの履歴互換形を読み取れない")
+
+    for field in ("agent_runtime_id", "workspace_id", "instruction_hash"):
+        candidate = {**current}
+        candidate.pop(field)
+        if validate_instance(candidate, schema) == []:
+            errors.append(f"AgentTask版2が必須の結合field欠落を受理した: {field}")
+
+    for field in (
+        "instruction",
+        "agent_output",
+        "permission_id",
+        "approval_id",
+        "workspace_path",
+        "command",
+        "credential",
+    ):
+        if validate_instance({**current, field: "untrusted"}, schema) == []:
+            errors.append(f"AgentTask状態recordが本文・権限・実行情報を受理した: {field}")
+
+    for status in ("approved", "executed", "success"):
+        if validate_instance({**current, "status": status}, schema) == []:
+            errors.append(f"AgentTask状態recordが許可外statusを受理した: {status}")
+    if validate_instance({**current, "result_hash": "raw-output"}, schema) == []:
+        errors.append("AgentTask状態recordが不正なresult hashを受理した")
+    if validate_instance({**current, "description": "x" * 161}, schema) == []:
+        errors.append("AgentTask状態recordが表示labelの上限超過を受理した")
+
+    contract_text = (DOC_SPECS / "agent-runtime.md").read_text(encoding="utf-8")
+    for required in ("履歴互換", "実行状態の証拠", "Content Exposure Boundary"):
+        if required not in contract_text:
+            errors.append(f"Agent Runtime正本が版2／履歴投影の境界を定義しない: {required}")
+    return errors
+
+
 def test_agent_secret_path_read_default_deny() -> list[str]:
     workspace = load_contract_fixture("agent_workspace.valid.json")
     contract = AgentRuntimeContract(workspace)
@@ -8976,6 +9037,7 @@ def main() -> int:
         test_agent_broker_operations_are_declared_in_ipc_contracts,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed,
+        test_agent_task_state_record_is_versioned_scoped_and_content_free,
         test_agent_secret_path_read_default_deny,
         test_agent_secret_path_symlink_default_deny,
         test_agent_shell_command_requires_permission_mapping,

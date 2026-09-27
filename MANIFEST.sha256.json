@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "f9aec9f4c8a3d25d262bfb5940ac43aba5d3bcaa20d095c037916d99adc0cb40"
+      "sha256": "70e4b8d8a046fd0581d2da84f4cb409df77d262c00a6fb8dc5b28860efe659ac"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "1075b46469f3f1a02f2d904238dfb663966ebdeae53bb72cfdf8f8c8d7a0f5d3"
+      "sha256": "896bb756aa2a11d8b785b3e1ec895a813ed792e4b287416d39bf3cec7b834e5f"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1545,7 +1545,7 @@
     },
     {
       "path": "examples/contracts/agent_task.valid.json",
-      "sha256": "5f8b2c902c1f271f161f85b224b8187a664c5c97d4bc9c193f1a09f2ead1abd0"
+      "sha256": "b2beb7a9f5dfcc027059c5de36e9b74d1fabdeeb0fa37182b897d341fa627c3f"
     },
     {
       "path": "examples/contracts/agent_task_owner_approval.valid.json",
@@ -1853,7 +1853,7 @@
     },
     {
       "path": "examples/contracts/invalid/agent_task_missing_audit.invalid.json",
-      "sha256": "58059c9f19172828ec7f8f91bc950f7b6468c0e7785823721fee4edfa6af7dfa"
+      "sha256": "a8ba823442541d4bca019a493de103becf024ae8d3708dd03d42e241d05634bf"
     },
     {
       "path": "examples/contracts/invalid/agent_task_owner_approval_execution_claim.invalid.json",
@@ -3645,7 +3645,7 @@
     },
     {
       "path": "specs/agent_task.schema.json",
-      "sha256": "97ace680a5b0365fa1084752b0be4f1756d53de26b6e2fe73977f62d79ec6f13"
+      "sha256": "d1d9c31adeba71d7f3c2beb100abfeee4d2d502a9a0e76a372afba493d85b981"
     },
     {
       "path": "specs/agent_task_owner_approval.schema.json",
@@ -4185,7 +4185,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "c037be4f47af7a9555d05cbcfd522708c46f4c365a93643ae08779411f51eca3"
+      "sha256": "96362c8866b10032507726b5ac619ba0c718d8bcd09ea67035613407fedd752a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4305,7 +4305,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "888c390221551802969a319ab694793102ab969dcda7c8766c8ac528bf5ee716"
+      "sha256": "80208dbea523a245df87d984d2513930f6d949ac83fcdaa17142aea7134338b0"
     }
   ]
 }

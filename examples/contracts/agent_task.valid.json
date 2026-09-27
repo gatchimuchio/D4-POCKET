@@ -1,7 +1,11 @@
 {
   "task_id": "agent-task-1",
+  "record_version": 2,
+  "agent_runtime_id": "codex-runtime-1",
   "session_id": "agent-session-1",
-  "description": "文書を更新する",
+  "workspace_id": "workspace-1",
+  "description": "Agent作業",
+  "instruction_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "status": "running",
   "audit_event_id": "audit-1"
 }

@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 AgentTask版2状態Contract（2026-09-28）
+
+既存の未versioned `agent_task.schema.json`を壊さず、`record_version=2`の状態projectionを追加した。版2はBroker計算の指示hashとAgent Runtime／Session／Workspaceを必須結合し、監査参照・Task状態・任意のresult hashだけを持つ。旧shapeは履歴互換として受理するがRuntime／Workspace結合や実行の証拠には使わない。permission／approval ID、instruction本文、Agent出力、command、filesystem path、Credential実値はSchemaで拒否し、descriptionは非機密の固定labelに限定する意味を日本語正本へ追加した。ただしSchemaは自由文字列の機密性を判定しないため、将来Consumerが固定label以外を生成しない保証は未実装。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema・example各143件、negative fixture 177件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 222件のcheckが合格。版2の必須結合field、旧shape履歴互換、禁止情報、状態enum、hash形式、label上限を検査。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0、finding 0で合格。
+- `python -X utf8 tooling/manifest.py --write`／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`: 合格。manifest更新前のrelease gateは変更file hash不一致で失敗し、再生成・再検査後に合格した。
+- Schema／fixture／Conformanceは`FIXTURE`範囲。Rust Broker runtime consumer、実Task起動、one-shot Permission／Approval消費、隔離、実行前後Audit／Recovery、出力・diff保存は今回未実装・未検証。
+- `release_blocker`: Agent Task実行Consumerと実証済み隔離を含むPhase 7の残作業。`release_ready=false`を維持。
+
 ## D4 Pocket Phase 7 Windows Flutter検証のOneDrive ACL分離（2026-09-28）
 
 cleanな`main`／`origin/main` commit `917e075d8b151b48ee465e6a6fa16755cd370d43`のtracked sourceを`git archive`でOneDrive外の短縮scratchへ展開し、Flutter Desktop／Mobileの解析とtestを実行した。元OneDrive checkoutでは両appの`flutter analyze`が`Flutter/ephemeral/Packages/.packages`の削除拒否で失敗した。該当fileの継承ACLに`CodexSandboxUsers`のread／delete denyおよび`Everyone`の子directory削除denyを観測した。ACLは変更していない。
