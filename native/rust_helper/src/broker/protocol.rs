@@ -5923,6 +5923,14 @@ mod 端末統治試験 {
             event.operation == "AgentTaskOwnerApprovalGrant"
                 && event.reason.contains("Task未実行")
         }));
+        let replayed_approval = e
+            .broker
+            .desktop_owner_operation_json(&native_approval_request.to_string());
+        assert_eq!(replayed_approval.status, BrokerStatus::Rejected);
+        assert_eq!(
+            replayed_approval.error.as_ref().map(|error| error.code.as_str()),
+            Some("broker_replay_detected")
+        );
 
         let permission_preflight = 通常要求(
             &mut e.broker,
@@ -5966,7 +5974,30 @@ mod 端末統治試験 {
             expired_permission_preflight.body.as_ref().unwrap()["Approval状態"],
             "未取得"
         );
+        let replacement_permission_request = native_permission_request(
+            "agent-task-permission-native-replacement",
+            "agent-task-permission-native-replacement-nonce",
+        );
+        let replacement_permission = e
+            .broker
+            .desktop_owner_operation_json(&replacement_permission_request.to_string());
+        assert_eq!(replacement_permission.status, BrokerStatus::Accepted);
         e.broker.current_epoch_seconds_override = None;
+
+        let after_permission_replacement = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload.clone(),
+        );
+        assert_eq!(after_permission_replacement.status, BrokerStatus::Accepted);
+        assert_eq!(
+            after_permission_replacement.body.as_ref().unwrap()["Permission状態"],
+            "有効"
+        );
+        assert_eq!(
+            after_permission_replacement.body.as_ref().unwrap()["Approval状態"],
+            "未取得"
+        );
 
         let duplicate_native_request = native_permission_request(
             "agent-task-permission-native-duplicate",
@@ -5994,7 +6025,7 @@ mod 端末統治試験 {
             Some("セッション不一致")
         );
 
-        let mut authority_injection = payload;
+        let mut authority_injection = payload.clone();
         authority_injection["permission_id"] = json!("attacker-controlled");
         let rejected = 通常要求(
             &mut e.broker,
@@ -6005,6 +6036,24 @@ mod 端末統治試験 {
         assert_eq!(
             rejected.error.as_ref().map(|error| error.code.as_str()),
             Some("要求不正")
+        );
+
+        let ended_session = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話終了,
+            json!({"対話セッションID": session_id}),
+        );
+        assert_eq!(ended_session.status, BrokerStatus::Accepted);
+        assert_eq!(ended_session.body.as_ref().unwrap()["状態"], "終了");
+        let after_session_end = 通常要求(
+            &mut e.broker,
+            BrokerOperation::Agent作業要求検査,
+            payload,
+        );
+        assert_eq!(after_session_end.status, BrokerStatus::Rejected);
+        assert_eq!(
+            after_session_end.error.as_ref().map(|error| error.code.as_str()),
+            Some("セッション不一致")
         );
     }
     #[test]

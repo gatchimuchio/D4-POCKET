@@ -2116,3 +2116,13 @@ Permission発行後もAgent Task検査が常に「未付与」を返す不整合
 - Desktop native確認候補testで本文非表示、hash／固定policy表示、request側Approval ID注入拒否を検査する。
 - 発行receipt専用Schema、正常／実行済みnegative fixture、正本索引、本文・権限・pathなど禁止fieldのConformanceを追加し、`AgentTaskOwnerApprovalGrant`をIPC Schema三面同期Conformanceへ含める。
 - この単位はApprovalの発行と照合のみ。consumerによる一回消費、実行直前の原子的再検証、sandbox・独立書込隔離、実行前後Audit／Recovery、結果保存は未成立で`release_blocker`を維持する。固定policy IDはsandboxの実在証拠ではない。
+
+## Agent Task失効・再送・Session終端の回帰試験補強（2026-09-27）
+
+既存Rust Broker挙動の回帰試験へ、Owner Approval要求の再送拒否、失効Workspace Permissionのnative再発行、Permission置換時にApprovalを継承しないこと、Session終了後のTask preflight拒否を追加した。production挙動は変更していない。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：合格。追加試験を含む全targetのcompileを確認。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する -- --test-threads=1`：test executableの生成後、Windows Application ControlがOS error 4551で起動を拒否。追加assertionの実行結果は未確認。policy変更、実行fileの移動、alternate targetによる回避は行っていない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。Schema 143件、example 143件、negative fixture 177件、Conformance 221 checks、manifest、release gate、packaging portability、release smoke等の登録検査は合格。release evidence不足を含み`release_ready=false`を維持。
+
+この試験補強はTask consumer、Approvalの一回消費、sandbox・独立書込隔離、実行前後Audit／Recovery、実Agent実行を証明しない。Rust動的試験の今回追加分は未実行であり、Windows Application Controlによる検証制約を維持する。

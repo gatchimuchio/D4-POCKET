@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "39051f7472084f9559be8f57aad432a40856329290ad2427e609b01c43bc537a"
+      "sha256": "8a96bfbc2a4a7bca04c566dfdc5fd12468dac456d1f8eebe7e495a45493838ae"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2993,7 +2993,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "2791bd10f3d27438004baa99f72a088d06e2ae92258c80062291db5b73a6565e"
+      "sha256": "41a865c10abcd4cb35ede7df8bc85318ff9d9a25a4b77349b8b1c4b82c6557c9"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
