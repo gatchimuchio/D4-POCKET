@@ -94,6 +94,16 @@ impl 実行系Adapter for CodexCliAdapter {
         "codex-cli://broker-governed-read-only".into()
     }
 
+    fn 作業領域実体識別子(
+        &self,
+    ) -> Option<crate::broker::dialogue::AgentTaskWorkspaceIdentity> {
+        Some(
+            crate::broker::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(
+                self.workspace_identity,
+            ),
+        )
+    }
+
     fn agent_metadata(&self) -> Option<Value> {
         Some(json!({
             "adapter_id": "codex-cli",

@@ -177,7 +177,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "責任": "Agent Runtimeの日本語意味、Task要求と対話Approval／作業Permissionの分離、未接続実行境界"
+      "責任": "Agent Runtimeの日本語意味、Task要求と対話Approval／作業Permissionの分離、物理Workspace root照合、未接続実行境界"
     },
     {
       "path": "docs/specs/gui-shell-export.md",

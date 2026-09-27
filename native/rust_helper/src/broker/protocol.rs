@@ -5604,10 +5604,39 @@ mod 端末統治試験 {
         b.端末要求処理(&json!({"版":1,"HostID":c["HostID"],"端末ID":c["端末ID"],"資格ID":c.get("結合ID").unwrap_or(&c["招待ID"]),
             "資格秘密":c.get("端末秘密").unwrap_or(&c["招待秘密"]),"nonce":識別子生成().unwrap(),"発行時刻":b.current_epoch_seconds(),"操作":op,"内容":p}).to_string())
     }
-    struct AgentMetadataAdapter(Value);
+    struct AgentMetadataAdapter {
+        metadata: Value,
+        workspace_identity: Option<crate::broker::dialogue::AgentTaskWorkspaceIdentity>,
+    }
+    impl AgentMetadataAdapter {
+        fn new(metadata: Value) -> Self {
+            Self {
+                metadata,
+                workspace_identity: None,
+            }
+        }
+        fn bound_to_workspace(
+            metadata: Value,
+            workspace_identity: crate::broker::dialogue::AgentTaskWorkspaceIdentity,
+        ) -> Self {
+            Self {
+                metadata,
+                workspace_identity: Some(workspace_identity),
+            }
+        }
+    }
     impl 実行系Adapter for AgentMetadataAdapter {
-        fn 接続対象(&self) -> String { "agent-metadata-test://read-only".into() }
-        fn agent_metadata(&self) -> Option<Value> { Some(self.0.clone()) }
+        fn 接続対象(&self) -> String {
+            "agent-metadata-test://read-only".into()
+        }
+        fn agent_metadata(&self) -> Option<Value> {
+            Some(self.metadata.clone())
+        }
+        fn 作業領域実体識別子(
+            &self,
+        ) -> Option<crate::broker::dialogue::AgentTaskWorkspaceIdentity> {
+            self.workspace_identity
+        }
         fn 応答(
             &self,
             _: &crate::broker::dialogue::対話要求,
@@ -5647,7 +5676,10 @@ mod 端末統治試験 {
             let mut environment = 環境生成();
             environment
                 .broker
-                .実行系登録("hostile-agent", Arc::new(AgentMetadataAdapter(metadata)))
+                .実行系登録(
+                    "hostile-agent",
+                    Arc::new(AgentMetadataAdapter::new(metadata)),
+                )
                 .unwrap();
             let mut request = BrokerRequestEnvelope::health(
                 &format!("agent-list-request-{index}"),
@@ -5679,7 +5711,10 @@ mod 端末統治試験 {
         ))
         .expect("Agent接続例を読み込む");
         e.broker
-            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata.clone())))
+            .実行系登録(
+                "fixture-agent",
+                Arc::new(AgentMetadataAdapter::new(metadata.clone())),
+            )
             .unwrap();
         let workspace_root=e.path.join("fixture-agent-workspace");
         std::fs::create_dir(&workspace_root).unwrap();
@@ -5707,7 +5742,10 @@ mod 端末統治試験 {
         let other_runtime_root=e.path.join("other-runtime-workspace");
         std::fs::create_dir(&other_runtime_root).unwrap();
         e.broker
-            .実行系登録("other-fixture-agent", Arc::new(AgentMetadataAdapter(metadata.clone())))
+            .実行系登録(
+                "other-fixture-agent",
+                Arc::new(AgentMetadataAdapter::new(metadata.clone())),
+            )
             .unwrap();
         let (other_root, _, other_ancestry) =
             super::super::workspace_root::open_isolated_root_with_ancestry(
@@ -5756,11 +5794,22 @@ mod 端末統治試験 {
             "capability_id":"task_execution",
             "support":{"status":"supported","reason":"Broker Task権限経路の試験fixture。実Task実行の証拠ではない"}
         }));
-        e.broker
-            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(metadata)))
-            .unwrap();
         let root = e.path.join("agent-task-workspace");
         std::fs::create_dir(&root).unwrap();
+        let root_identity = super::super::workspace_root::pin_workspace_path(&root)
+            .expect("登録対象Workspace rootを固定")
+            .identity;
+        e.broker
+            .実行系登録(
+                "fixture-agent",
+                Arc::new(AgentMetadataAdapter::bound_to_workspace(
+                    metadata,
+                    crate::broker::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(
+                        root_identity,
+                    ),
+                )),
+            )
+            .unwrap();
         let (workspace_root, _, ancestry) =
             super::super::workspace_root::open_isolated_root_with_ancestry(&root, &[]).unwrap();
         e.broker
@@ -6074,7 +6123,10 @@ mod 端末統治試験 {
             "support":{"status":"unsupported","reason":"Broker統治済み書込Task経路なし"}
         }));
         e.broker
-            .実行系登録("unsupported-task-agent", Arc::new(AgentMetadataAdapter(metadata)))
+            .実行系登録(
+                "unsupported-task-agent",
+                Arc::new(AgentMetadataAdapter::new(metadata)),
+            )
             .unwrap();
         let root = e.path.join("unsupported-task-workspace");
         std::fs::create_dir(&root).unwrap();
@@ -6195,7 +6247,10 @@ mod 端末統治試験 {
         ))
         .expect("正常Agent Adapter fixture");
         e.broker
-            .実行系登録("fixture-agent", Arc::new(AgentMetadataAdapter(agent_fixture.clone())))
+            .実行系登録(
+                "fixture-agent",
+                Arc::new(AgentMetadataAdapter::new(agent_fixture.clone())),
+            )
             .unwrap();
         let agent_workspace=e.path.join("mobile-agent-workspace");
         std::fs::create_dir(&agent_workspace).unwrap();

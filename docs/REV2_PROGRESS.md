@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 AgentTask実体Workspace照合（2026-09-28）
+
+AgentTaskの要求検査、Workspace Permission発行、Owner Approval発行で、Broker登録Workspaceの物理root識別子とAdapterが固定したroot識別子を照合する。識別子の欠落・不一致は拒否し、同じWorkspace IDの宣言だけでは代替できない。Codex Adapterは起動時に捕捉したroot識別子を返すが、Task実行能力は引き続き`unsupported`である。この照合は`INTERNAL_STATE`の束縛確認であり、OS sandbox、実書込隔離、Task実行の証拠ではない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket --lib -- --test-threads=1`: 最終実行で305件成功。実root不一致時の要求・Permission・Approval拒否と一致時のPermission発行を含む。先行suite実行ではMINIDORA通信testが一度`通信失敗`となったが、単独再実行と次の全library suiteで成功した。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket --all-targets -- --test-threads=1`: Rust library 305件、CLI unit 9件、Broker IPC integration 10件は成功。その後`canonical_decimal_hash`のtest executable起動をWindows Application Controlが`OS error 4551`で拒否し、全体は未完了。OneDrive外の別target pathではlibrary test executable自体も同errorで起動拒否された。OS policyは変更していない。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\\D4Pocket --all-targets`: 成功。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema／正常example各143件、negative fixture 177件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 222 checksで合格。`python -X utf8 tooling/日本語基底監査.py --strict`: 合格。
+- `python -X utf8 tooling/manifest.py --write`／`--check`、`python -X utf8 tooling/release_gate_check.py`、`git diff --check`: 合格。
+- `cargo fmt --manifest-path native/rust_helper/Cargo.toml --all --check`: 失敗。既存ファイルを含むworkspace全体に未整形差分が多数あり、一括整形による無関係変更は行わない。変更箇所の新規整形差分は個別確認して修正。
+- `release_blocker`: AgentTask実行Consumer、実証済みsandbox／隔離Workspace、実行直前の原子的再検証と一回消費、結果・diff保存、実行前後Audit／Recoveryは未成立。`release_ready=false`を維持。
+
 ## D4 Pocket Phase 7 AgentTask版2状態Contract（2026-09-28）
 
 既存の未versioned `agent_task.schema.json`を壊さず、`record_version=2`の状態projectionを追加した。版2はBroker計算の指示hashとAgent Runtime／Session／Workspaceを必須結合し、監査参照・Task状態・任意のresult hashだけを持つ。旧shapeは履歴互換として受理するがRuntime／Workspace結合や実行の証拠には使わない。permission／approval ID、instruction本文、Agent出力、command、filesystem path、Credential実値はSchemaで拒否し、descriptionは非機密の固定labelに限定する意味を日本語正本へ追加した。ただしSchemaは自由文字列の機密性を判定しないため、将来Consumerが固定label以外を生成しない保証は未実装。

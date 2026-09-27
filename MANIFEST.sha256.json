@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a9a111289fe547172dd0fbf655751e3f94c18b37c50cf74da1b2f37cb25fc7a2"
+      "sha256": "b731bdb593fb5cb759c3dfb883198c9f101bc0776dac1d99f04f6dd121e02256"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "85542d52f32f1dd0b0e580734e24d678405988a158026b15f14202ee53632427"
+      "sha256": "757cd73f519668e04d399c37ddd9f55a75905ea383400ae6c21c01a8f5b78156"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "70e4b8d8a046fd0581d2da84f4cb409df77d262c00a6fb8dc5b28860efe659ac"
+      "sha256": "384cc86ee3ed2ac8e96c09266bf78eeb52616e73eeeb7af26e5f4955812a7d91"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "896bb756aa2a11d8b785b3e1ec895a813ed792e4b287416d39bf3cec7b834e5f"
+      "sha256": "d82320b7fce17210912e0becdd021ddc7247e9709dc61891c38b67caf80feb72"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2845,7 +2845,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "e5afefe9b79a36a8b8080a4b73d769d80c9c31342af1450c5765cae7347e9c61"
+      "sha256": "f2031a77f33918b4d24055c90b26d6a020fe82a9b1566cb0200881f6f1289c0e"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -2933,7 +2933,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "96c8a25473917b50abead794bbf4ff63183bbd2a0263c2bcdfe573faef6eec3a"
+      "sha256": "5567ca72d3bccfbf0f1ef95f1f9726e411a873fd990a7bc016476e908bd00a02"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -2993,7 +2993,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "b8d7b7d84e242be69a02c7506c3ca2e6be2b545ffd0eba56c1bbb26f424ef0c8"
+      "sha256": "80ce4835a505587d22384cfea6f2091ab775b7e17c3f45411d5939cd2d93e24b"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3021,7 +3021,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
-      "sha256": "88ad83a322adba3721d1f03e926a294ca233f9c931170761fdb4ee297f15ad95"
+      "sha256": "282f19466fc2309e57a64d49567904d70bac4bb5b0f1052a16860b3ed33867b8"
     },
     {
       "path": "native/rust_helper/src/broker/workspace_root.rs",
@@ -4305,7 +4305,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "80208dbea523a245df87d984d2513930f6d949ac83fcdaa17142aea7134338b0"
+      "sha256": "e0e216423769a14fab82612ce8d3269b361beb4e672cfa288a0708a68e1e995f"
     }
   ]
 }

@@ -45,6 +45,7 @@ pub(crate) struct DialogueWorkspaceBinding {
     runtime: String,
     workspace_id: String,
     registration_hash: String,
+    root_identity: super::workspace_root::DirectoryIdentity,
 }
 
 impl DialogueWorkspaceBinding {
@@ -60,6 +61,10 @@ impl DialogueWorkspaceBinding {
         &self.registration_hash
     }
 
+    pub(crate) fn root_identity(&self) -> super::dialogue::AgentTaskWorkspaceIdentity {
+        super::dialogue::AgentTaskWorkspaceIdentity::from_directory_identity(self.root_identity)
+    }
+
     pub(crate) fn audit_hash(&self, session_id: &str) -> String {
         digest(&json!({
             "対話セッションID": session_id,
@@ -71,11 +76,7 @@ impl DialogueWorkspaceBinding {
 
     #[cfg(test)]
     pub(crate) fn for_test(runtime: &str, workspace_id: &str) -> Self {
-        Self::for_test_with_registration_hash(
-            runtime,
-            workspace_id,
-            "sha256:fixture-registration",
-        )
+        Self::for_test_with_registration_hash(runtime, workspace_id, "sha256:fixture-registration")
     }
 
     #[cfg(test)]
@@ -84,10 +85,29 @@ impl DialogueWorkspaceBinding {
         workspace_id: &str,
         registration_hash: &str,
     ) -> Self {
+        Self::for_test_with_root_identity(
+            runtime,
+            workspace_id,
+            registration_hash,
+            super::workspace_root::DirectoryIdentity {
+                device: 1,
+                file_id: 1,
+            },
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_with_root_identity(
+        runtime: &str,
+        workspace_id: &str,
+        registration_hash: &str,
+        root_identity: super::workspace_root::DirectoryIdentity,
+    ) -> Self {
         Self {
             runtime: runtime.to_owned(),
             workspace_id: workspace_id.to_owned(),
             registration_hash: registration_hash.to_owned(),
+            root_identity,
         }
     }
 }
@@ -160,6 +180,10 @@ impl WorkspaceRegistry {
             runtime: runtime.to_owned(),
             workspace_id: workspace_id.to_owned(),
             registration_hash: entry.registration_hash.clone(),
+            root_identity: super::workspace_root::DirectoryIdentity {
+                device: entry.root_device,
+                file_id: entry.root_file_id,
+            },
         })
     }
 

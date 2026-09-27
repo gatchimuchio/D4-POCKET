@@ -81,8 +81,33 @@ pub struct 実行結果 {
     pub 生応答: Vec<u8>,
 }
 
+/// Agent Adapterが起動時に固定したWorkspace directoryの実体識別子。
+/// Broker登録rootとの一致照合にのみ使い、Permissionやpathアクセスを表さない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgentTaskWorkspaceIdentity {
+    device: u64,
+    file_id: u64,
+}
+
+impl AgentTaskWorkspaceIdentity {
+    pub const fn new(device: u64, file_id: u64) -> Self {
+        Self { device, file_id }
+    }
+
+    pub(crate) const fn from_directory_identity(
+        identity: super::workspace_root::DirectoryIdentity,
+    ) -> Self {
+        Self::new(identity.device, identity.file_id)
+    }
+}
+
 pub trait 実行系Adapter: Send + Sync {
     fn 接続対象(&self) -> String;
+    /// Agent Taskの対象WorkspaceとAdapterが固定した実体rootを照合する。
+    /// 未提供はTask操作の拒否条件とし、metadata宣言で代替しない。
+    fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
+        None
+    }
     /// Agent Adapterとして表示できる宣言だけを返す。Noneは通常Runtimeであり、
     /// Runtime metadataをAgent authorityへ昇格させない。
     fn agent_metadata(&self) -> Option<Value> {
@@ -995,6 +1020,9 @@ impl 対話制御 {
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
                     return Err(対話失敗::作業領域不在);
                 }
+                if adapter.作業領域実体識別子() != Some(binding.root_identity()) {
+                    return Err(対話失敗::作業領域不在);
+                }
                 let session = self
                     .セッション
                     .get(&request.session_id)
@@ -1064,6 +1092,9 @@ impl 対話制御 {
                 }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
+                    return Err(対話失敗::作業領域不在);
+                }
+                if adapter.作業領域実体識別子() != Some(binding.root_identity()) {
                     return Err(対話失敗::作業領域不在);
                 }
                 let session = self
@@ -1150,6 +1181,9 @@ impl 対話制御 {
                 }
                 let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
                 if !binding.matches(&request.agent_runtime_id, &request.workspace_id) {
+                    return Err(対話失敗::作業領域不在);
+                }
+                if adapter.作業領域実体識別子() != Some(binding.root_identity()) {
                     return Err(対話失敗::作業領域不在);
                 }
                 let session = self
@@ -1911,6 +1945,9 @@ mod tests {
         fn 接続対象(&self) -> String {
             "試験専用".into()
         }
+        fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
+            Some(AgentTaskWorkspaceIdentity::new(1, 1))
+        }
         fn agent_metadata(&self) -> Option<Value> {
             if !self.Agentmetadata有効 {
                 return None;
@@ -2636,6 +2673,85 @@ mod tests {
             &mut |_, _, _| Ok("試験Task監査".into()),
         );
         assert_eq!(after_registration_change, Err(対話失敗::セッション不一致));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTask操作は同じWorkspaceIDでもAdapter実体rootが異なれば拒否する() {
+        const OWNER_APPROVAL_GRANT_OPERATION: &str = "AgentTaskOwnerApprovalGrant";
+        let (mut c, _) = 準備(false, false, false);
+        let session = 開始(&mut c, "left");
+        let workspace_id = "fixture-workspace-left";
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test_with_root_identity(
+                "left",
+                workspace_id,
+                "sha256:fixture-registration",
+                super::super::workspace_root::DirectoryIdentity {
+                    device: 1,
+                    file_id: 2,
+                },
+            );
+        let request = json!({
+            "agent_runtime_id":"left",
+            "session_id":session.clone(),
+            "workspace_id":workspace_id,
+            "instruction":"別rootへのPermission発行を拒否する"
+        });
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                "Agent作業要求検査",
+                &request,
+                false,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("fixture-audit".into()),
+            ),
+            Err(対話失敗::作業領域不在)
+        );
+        assert!(!c.agent_task_permissions.contains_key(&session));
+
+        let permission_request = json!({
+            "agent_runtime_id":"left",
+            "session_id":session.clone(),
+            "workspace_id":workspace_id
+        });
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("fixture-audit".into()),
+            ),
+            Err(対話失敗::作業領域不在)
+        );
+        assert!(!c.agent_task_permissions.contains_key(&session));
+
+        let matching_binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", workspace_id);
+        c.操作_作業領域結合済み(
+            "AgentTaskWorkspacePermissionGrant",
+            &permission_request,
+            true,
+            100,
+            Some(&matching_binding),
+            &mut |_, _, _| Ok("fixture-audit".into()),
+        )
+        .expect("一致するrootだけでPermissionを発行する");
+        assert_eq!(
+            c.操作_作業領域結合済み(
+                OWNER_APPROVAL_GRANT_OPERATION,
+                &request,
+                true,
+                100,
+                Some(&binding),
+                &mut |_, _, _| Ok("fixture-audit".into()),
+            ),
+            Err(対話失敗::作業領域不在)
+        );
+        assert!(c.agent_task_permissions[&session].owner_approval.is_none());
     }
 
     #[test]
