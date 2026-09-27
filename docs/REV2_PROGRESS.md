@@ -2104,6 +2104,6 @@ Permission発行後もAgent Task検査が常に「未付与」を返す不整合
 - 追加した`test_agent_broker_operations_are_declared_in_ipc_contracts`：合格。
 - `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0、finding 0で合格。
 - `python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`：合格。
-- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済み開発検査は合格し、release blocker 5件と`release_ready=false`を維持。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録済み開発検査は合格。Evidence bundleは対象範囲のWindows release evidence不足5件を報告し、`release_blockers.registry.json`のactive blocker 15件は未解消、`release_ready=false`を維持。
 
 これはIPC Contractとの同期を示し、Agent稼働、Task実行、Workspace隔離、Owner Approval、release readinessを証明しない。これらの既存`release_blocker`と`release_ready=false`は維持する。
