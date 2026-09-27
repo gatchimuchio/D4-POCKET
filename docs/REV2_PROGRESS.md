@@ -2,6 +2,19 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 9 履歴承認の期限監視を期限駆動へ変更（2026-09-28）
+
+実行履歴画面の100ms周期timerを廃止し、履歴承認の残り時間について壁時計と単調時計の早い方で一度限りの期限timerを設定する。承認の再確認後にtimerを更新し、従来の2秒ごとの承認・履歴再取得、期限切れ時の表示消去、背景化・画面離脱時の破棄は維持する。承認の意味、Broker権限、履歴取得頻度は変更しない。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 145件、正常例145件、negative fixture179件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 厳格監査合格、負債file 0、finding 0。
+- `python -X utf8 tooling/manifest.py --write`／`--check`、`python -X utf8 tooling/release_gate_check.py`: 合格。
+- 最新`origin/main`の変更前commit `686a2a4e3e043d79e07b6d2bca248bcfccdfd18a`から作成した非OneDrive managed worktreeへ同じDart差分を適用し、`flutter test test/history_screen_test.dart test/history_content_test.dart`: 18件すべて成功。期限timer発火後の表示消去を含む。これは対象画面と共有clientのtestであり、Desktop製品全体の試験ではない。
+- OneDrive内の元checkoutで同じFlutter testを起動した場合は、Flutterが`apps/desktop_flutter/macos/Flutter/ephemeral/Packages/.packages`を削除できず終了した。ACLや生成物は変更・削除していない。
+- Desktop／Mobileの`flutter analyze`と両appの`dart analyze`は、分析サーバー異常終了でexit 1。`dart analyze`は`%LOCALAPPDATA%\\Dart\\perf\\<pid>`の削除でOS error 1920となり、対象は`ReparsePoint`でACL照会・reparse照会も同じOS errorになった。Flutter analyzeはLSP初期化JSONの途中終了を報告した。類似するDart SDKの公開報告（[dart-lang/sdk #63343](https://github.com/dart-lang/sdk/issues/63343)）があるが、本環境の原因が同一とは断定しない。OS policy・ACLの回避は行っていない。
+- この局所変更でPhase 9完了やrelease readinessを主張しない。登録済みrelease blockerと`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 7 Task用Windows sandbox方式の明示（2026-09-28）
 
 現行Codex CLI `0.158.0-alpha.2.1`とTask command構成を照合した。Task commandは`--ignore-user-config`を指定する一方、Windows sandbox方式をCLI overrideで固定していなかった。現環境のCodex user configには`[windows] sandbox = "elevated"`があるが、このTask commandはその設定fileを読まないため、製品Taskが同じ強い方式を選ぶことは保証されていなかった。

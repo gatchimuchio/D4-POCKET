@@ -18,7 +18,7 @@ class Fixture implements BrokerTransport {
   String state = '成功';
   Completer<void>? gate;
   final operations = <String>[];
-  final expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
+  int expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 290;
   Map<String, Object?> get grant =>
       {'approval_id': 'a' * 32, 'runtime_id': 'local', 'expires_at': expiry};
 
@@ -155,6 +155,12 @@ class Fixture implements BrokerTransport {
 }
 
 void main() {
+  test('履歴承認の残り時間は壁時計と単調時計の早い方に制限する', () async {
+    final grant = (await HistoryClient(Fixture()).status())!;
+    expect(grant.untilExpiry, greaterThan(Duration.zero));
+    expect(grant.untilExpiry, lessThanOrEqualTo(const Duration(minutes: 5)));
+  });
+
   test('入力概要は版2のhash_only metadataだけを受理する', () async {
     final f = Fixture()..withInputSummary = true;
     final c = HistoryClient(f);
@@ -387,7 +393,8 @@ void main() {
     expect(find.textContaining('新Session: ${'1' * 32}'), findsOneWidget);
     expect(find.textContaining('作成種別: 対話分岐'), findsOneWidget);
     expect(find.textContaining('参照元監査: history-1'), findsOneWidget);
-    expect(find.textContaining('参照元監査hash: sha256:${'c' * 64}'), findsOneWidget);
+    expect(
+        find.textContaining('参照元監査hash: sha256:${'c' * 64}'), findsOneWidget);
     expect(f.operations.contains('対話承認'), false);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pumpAndSettle();
@@ -422,6 +429,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('成功 ／'), findsNothing);
     expect(f.operations.any((op) => op == '対話履歴承認'), false);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('履歴承認期限の到来で表示を破棄する', (tester) async {
+    final f = Fixture()
+      ..expiry = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: HistoryScreen(client: HistoryClient(f)))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('成功 ／'), findsOneWidget);
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('成功 ／'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets('背景化と遅延応答は履歴を再表示しない', (tester) async {

@@ -9,6 +9,10 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### Phase 9 実行履歴の期限監視を期限駆動へ変更（2026-09-28）
+
+履歴画面の100ms周期監視を廃止し、承認の壁時計・単調時計の早い方で一度限りの期限timerを設定する。2秒ごとの承認／履歴再確認と失効時の表示消去は維持し、権限・承認意味は変更しない。変更前commit `686a2a4e3e043d79e07b6d2bca248bcfccdfd18a`を基点にした非OneDrive managed worktreeで対象Flutter test 18件成功。元OneDrive checkoutではephemeral `.packages`への削除アクセス拒否、両appのFlutter/Dart analyzeは環境側analysis server異常で終了したため、これらを成功扱いしない。詳細は`docs/REV2_PROGRESS.md`の本項を参照する。Phase 9の他の未実装範囲と既存release blockerは維持し、`release_ready=false`。
+
 ### Phase 7 Task用Windows sandbox方式の明示（2026-09-28）
 
 Codex Task commandは`--ignore-user-config`によりuser configを読み込まないため、Task専用`-c windows.sandbox="elevated"` overrideを追加し、Task時だけ強いWindows sandbox方式を明示する。read-only Dialogueへのoverride追加や一般権限の拡張は行わない。これは方式選択の固定であり、deny-read ACLの実効、外部path拒否、`codex exec`実Agentを証明しない。helperでの合成`.env`読取成功・外部path deny失敗を踏まえ、`task_execution=unsupported`とrelease blockerは維持する。詳細は`docs/REV2_PROGRESS.md`の最新Phase 7追補を参照する。

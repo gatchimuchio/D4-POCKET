@@ -299,6 +299,16 @@ class HistoryGrant {
   final int expires;
   final Stopwatch _clock;
   final int _remaining;
+  Duration get untilExpiry {
+    final wallClockRemaining =
+        expires * 1000 - DateTime.now().millisecondsSinceEpoch;
+    final monotonicRemaining = _remaining - _clock.elapsedMilliseconds;
+    final remaining = wallClockRemaining < monotonicRemaining
+        ? wallClockRemaining
+        : monotonicRemaining;
+    return Duration(milliseconds: remaining > 0 ? remaining : 0);
+  }
+
   bool get current =>
       DateTime.now().millisecondsSinceEpoch < expires * 1000 &&
       _clock.elapsedMilliseconds < _remaining;

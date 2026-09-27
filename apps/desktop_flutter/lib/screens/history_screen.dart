@@ -15,7 +15,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     with WidgetsBindingObserver {
   HistoryClient? _client;
   HistoryPage? _page;
-  Timer? _timer, _refreshTimer;
+  Timer? _expiryTimer, _refreshTimer;
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _requestFilter = TextEditingController();
@@ -39,17 +39,6 @@ class _HistoryScreenState extends State<HistoryScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (mounted && _page != null && !_page!.grant.current) {
-        _generation++;
-        setState(() {
-          _page = null;
-          _busy = false;
-          _clearSelection();
-          _message = '閲覧期限を過ぎました。';
-        });
-      }
-    });
     _load();
   }
 
@@ -57,6 +46,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _active = state == AppLifecycleState.resumed;
     _generation++;
+    _expiryTimer?.cancel();
     _refreshTimer?.cancel();
     setState(() {
       _page = null;
@@ -69,7 +59,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   void dispose() {
     _generation++;
-    _timer?.cancel();
+    _expiryTimer?.cancel();
     _refreshTimer?.cancel();
     _input.dispose();
     _requestFilter.dispose();
@@ -81,6 +71,7 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   Future<void> _load({int after = 0}) async {
     if (!_active) return;
+    _expiryTimer?.cancel();
     _refreshTimer?.cancel();
     final generation = ++_generation;
     final previousGrant = _page?.grant;
@@ -110,6 +101,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         _page = page;
         _message = '要求ごとの最後の観測です。現在の稼働・実行許可を示しません。';
       });
+      _scheduleExpiry(page.grant);
       if (restoreInputFocus && _selected != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
@@ -137,6 +129,26 @@ class _HistoryScreenState extends State<HistoryScreen>
     } finally {
       if (mounted && generation == _generation) setState(() => _busy = false);
     }
+  }
+
+  void _scheduleExpiry(HistoryGrant grant) {
+    _expiryTimer?.cancel();
+    if (!mounted || _page == null || !_page!.grant.same(grant)) return;
+    _expiryTimer = Timer(grant.untilExpiry, () {
+      if (!mounted || _page == null || !_page!.grant.same(grant)) return;
+      if (_page!.grant.current) {
+        _scheduleExpiry(_page!.grant);
+        return;
+      }
+      _generation++;
+      _refreshTimer?.cancel();
+      setState(() {
+        _page = null;
+        _busy = false;
+        _clearSelection();
+        _message = '閲覧期限を過ぎました。';
+      });
+    });
   }
 
   Future<void> _replay(bool branch) async {
