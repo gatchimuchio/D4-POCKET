@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Windows開発checkoutをOneDrive外へ確立（2026-09-27）
+
+OneDrive配下の日本語・長pathでFlutter Analysis ServerのLSP JSONが壊れ、test準備時には`build/unit_test_assets`の削除もACL拒否される既存host制約に対し、remote `main`のcommit `1f3049abef858c0bd4a6220c8de0af15f7226bec`から`C:\D4Pocket`へ独立したASCII短path checkoutを作った。既存OneDrive checkout、ACL、同期設定は変更・削除していない。以後のWindows開発・検証ではこのcheckoutを使用できる。
+
+- 新checkoutの`HEAD`と`origin/main`は上記commitで一致。backup branchはremote tag `codex/backup-main`と`codex/backup-main-prev`から初期化し、作業treeはclean。
+- `flutter pub get`：成功。`flutter analyze --no-pub`（`apps/desktop_flutter`）：`No issues found!`。
+- `flutter test --no-pub --reporter expanded test/widget_test.dart`（`apps/desktop_flutter`）：42件成功。OneDrive側の削除deny ACLを変更せず、同じFlutter試験を非同期対象pathで実行できる。
+- このcheckoutはOneDrive同期対象外の別cloneであり、Git remoteを共有する。各checkoutの未commit変更は共有されないため、編集前に使用checkoutとremote HEADを確認する。このsource-level Flutter検証はWindows installed product、Rust child-process integration、release readinessを証明しない。
+
 ## D4 Pocket Phase 7 Agent Centerのfixture内容非表示（2026-09-27）
 
 現行Agent CenterはBrokerの`対話セッション一覧`が返すmetadataだけを実値として表示し、実AgentのTask結果・diff・Tool・command内容は取得しない。一方、画面はlocal／mock snapshotに含まれるTask例を描画でき、識別markerを一部regexで置換しただけのHandoff概要も生成していた。Client modeが実Brokerの`broker`である場合だけSession metadataを表示し、`local`／`mock`のSession例は隠してfixtureである旨を示す。Broker対話Sessionでは従来の実行情報欄を「未取得」と明示し、承認情報が未取得でもApprovalなしとは解釈しない。実Handoff経路がない間は固定の未接続状態を表示し、regex redactionから概要を合成しない。Broker sessionの重複ID／未知field拒否、Workspace対応表示、比較metadata検査は維持し、実Agent比較・Handoff完了とは扱わない。
