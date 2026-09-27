@@ -7306,6 +7306,13 @@ def test_agent_task_scratch_recovery_journal_is_bounded_and_content_free() -> li
             errors.append(f"scratch回復journalが必要な限定処理を持たない: {required}")
     if "self.recover_agent_task_scratch(config, protected)?" not in broker_source:
         errors.append("Workspace起動登録がBroker scratch reaperへ接続されない")
+    for required in (
+        "fn broker強制終了後の別process起動登録で永続scratchを監査付き回収する",
+        "current_exe()",
+        "child.0.kill()",
+    ):
+        if required not in broker_source:
+            errors.append(f"Broker scratch回復にprocess境界の強制終了試験がない: {required}")
     startup_registration = server_source.find(
         "broker.作業領域起動登録(workspace, &protected)"
     )

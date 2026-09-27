@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "593808196c34847d3afbe685922e5ee029c77724ff68f31fab595022c12fed4b"
+      "sha256": "750e0c338af5b8d1b5fd09dc1b072dce7e99a0692f110d11969d252dcbfd7381"
     },
     {
       "path": "SECURITY.md",
@@ -1109,7 +1109,7 @@
     },
     {
       "path": "docs/D4_POCKET_PHASE_MAPPING.md",
-      "sha256": "390c976371f411150d54d87ea36dc852f252f9c7bb4a2ddd01ca8d9e0e4b141e"
+      "sha256": "75ab2a5aaf435a8108a58042f9ea5866de825287c0bbd0fa05b8e813ae07a46c"
     },
     {
       "path": "docs/DESKTOP_BUILD_SMOKE.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "c39bfe4fc521a59613a48b8eeba6a85b33e5b7d86cba7db75cc3aef01d884652"
+      "sha256": "96450d7ab5dd9f0b8d520c0bb6958b68b9785ddd99db39c94425507381bc40f5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "38850b68f3b15d88c4be8a064f74a5339603ec9a9c50f6230870bec37b5d4f25"
+      "sha256": "98c9854275dd61701c93e73f749e3f7c749ef308c0e398054d1e5eb1120fe3e5"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -3037,7 +3037,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "cc8c1242b4c685bd66f9df50ff93b943bac70248c72079f6a19abb98a564194a"
+      "sha256": "c29eb292de7d54d9bd9546b44279749de8a0784432f8849c361b4b0bc396c901"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3605,7 +3605,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "d6c655a8f1206114e4022e9bf677e73cf2ae691a1fe1b9da910e84e0017f3360"
+      "sha256": "5d7b6976f37d7d6e6c9f0b3c5f929d00c82ce5d9fb398c0d5342729661064f17"
     },
     {
       "path": "requirements-dev.txt",
@@ -4237,7 +4237,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "56f4665f0ab7ddca6ee0bfa547e30baf8ef12758e5afd2341cef84e42b73ead2"
+      "sha256": "64b45f855cbd6976b10c02b282fe151685019eb2d3386e6a29863df987a90c63"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

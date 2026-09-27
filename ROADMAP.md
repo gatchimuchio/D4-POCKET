@@ -15,6 +15,8 @@ Agent Task専用scratchを、作成前にBroker永続storeへ予約し、nofollo
 
 回復契約、Schema、否定用例およびRust試験を追加した。`Broker`の別instanceを同一の永続storeから再生成し、実`Workspace`起動登録経路でscratch削除・journal解消・回復`Audit`を確認する試験と、IPC listener受付開始前に回復処理が行われることを確認する適合検査を追加した。スキーマ145件、正常例145件、否定用例179件、適合検査225件、日本語厳格監査、開発検証10項目、`cargo check --all-targets`は成功。最新Rust全対象試験は合計366件（単体321件、`CLI` 9件、`IPC` 10件、結合試験26件、Desktop起動器0件）すべて成功した。先行実行で発生した`Windows Application Control`の`OS error 4551`による起動拒否は、最新コードの実行では再現せず、この検証関門を解消した。過去の拒否記録は履歴に保持する。`task_execution=unsupported`、有効な未解決release blocker 14件、`release_ready=false`を維持する。この回復試験は同一試験プロセス内で`Broker`を再生成したもので、Windows上のBrokerプロセス強制終了／電源断後の`LIVE_RUNTIME`回復証拠ではない。Agent Taskの製品環境での一時領域後始末保証は主張しない。
 
+追補: Rust test harnessの子processでBroker libraryと永続storeを起動し、scratchをjournalへ有効化後、親からそのOS processを強制終了する試験を追加した。親processが新BrokerのWorkspace起動登録を通じてscratch削除・journal解消・回復Auditを確認し、focused試験1件と全target 366件が成功した。これはprocess-boundaryを含む`FIXTURE`証拠であり、production `broker-server`／IPC、実Agent Task、電源断後の製品回復を証明しない。旧試験の同一process内再生成記録は履歴として保持する。詳細は`docs/REV2_PROGRESS.md`の最新Phase 7追補を参照する。
+
 ### Phase 7 Windows permission profile deny-read実測失敗（2026-09-28）
 
 Codex sandbox helperへ`d4p-agent-task` profileを明示し、非秘密の合成`probe.env`を読む負例を、OneDrive配下と非OneDriveの短いmanaged worktreeの両方で実行した。どちらもmarker本文が読めた。非OneDrive fileのACLには`CodexSandboxUsers`の継承`Modify`／`Read & execute`許可より後に`DENY(Read)`があり、読取denyは実効していない。OneDrive側fileはCloud Filesの`ReparsePoint`でもあり、別の証拠境界として扱う。

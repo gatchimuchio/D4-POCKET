@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 7 Broker強制終了後scratch回復の別プロセス試験（2026-09-28）
+
+直前の同一test process内Broker再生成試験を強化し、Rust test harnessの子process内で永続Brokerを起動し、Runtime／Workspace登録とscratch journalの予約・有効化後に準備完了PIDを通知させ、親processから子Broker processを強制終了する試験へ変更した。親は同じ永続storeを使う新Brokerで`作業領域起動登録`を実行し、実scratch directory削除、journal記録解消、回復AuditEventを確認する。試験終了時にはfixture storeとWorkspaceも削除する。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker強制終了後の別process起動登録で永続scratchを監査付き回収する -- --nocapture --test-threads=1`：1件成功。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 0。library 321、CLI 9、Broker IPC 10、integration 26の計366件が成功。Desktop launcher test targetは0件で正常起動。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225件合格。Conformanceはprocess-boundary試験の存在・子process起動・明示killを静的に検査する。
+
+この試験は別OS processの強制終了と永続storeを介した実Broker library／filesystem回復を検証する`FIXTURE`であり、production `broker-server`／IPC listenerを起動しての回復、実Agent Task、電源断、製品導入後のcleanupを証明しない。AuditEvent内の`LIVE_RUNTIME`分類値も、この試験全体の証拠分類を変更しない。`task_execution=unsupported`、Agent Taskの`release_blocker`、`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 7 Broker再起動後のscratch回収接続試験（2026-09-28）
 
 永続journal単体試験に加え、最初の`Broker`でRuntime／Workspaceを登録してAgent Task scratchをjournalへ予約・有効化し、同一永続storeから新しい`Broker` instanceを生成して、実際の`作業領域起動登録`経路で回収するRust試験を追加した。試験はscratch directoryの削除、journal記録の解消、回復AuditEventを確認する。Conformanceにも、起動時回復呼出しがIPC listener bindより前にあることの接続順検査を加えた。

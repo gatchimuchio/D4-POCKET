@@ -3736,7 +3736,19 @@ mod tests {
     use serde_json::json;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::process::{Child, Command, Stdio};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+    struct TestChildProcess(Child);
+
+    impl Drop for TestChildProcess {
+        fn drop(&mut self) {
+            if self.0.try_wait().ok().flatten().is_none() {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+    }
 
     fn test_broker() -> Broker {
         Broker::new_with_current_epoch_seconds(
@@ -3812,6 +3824,72 @@ mod tests {
         path
     }
 
+    fn seed_agent_task_scratch_for_crash(root: &Path, session_id: &str) -> (Broker, String) {
+        let store_root = root.join("store");
+        let workspace_root = root.join("workspace");
+        fs::create_dir_all(&workspace_root).expect("作業領域を作成");
+        let protected = vec![store_root.clone()];
+        let workspace_config = super::super::workspace_root::WorkspaceStartup {
+            runtime_id: "fixture-runtime".into(),
+            workspace_id: "fixture-workspace".into(),
+            root_path: workspace_root.to_string_lossy().into_owned(),
+            secret_paths: Vec::new(),
+        };
+
+        let mut broker = Broker::new_persistent(session_id, &store_root).unwrap();
+        broker
+            .実行系登録(
+                "fixture-runtime",
+                Arc::new(
+                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
+                ),
+            )
+            .unwrap();
+        broker
+            .作業領域起動登録(&workspace_config, &protected)
+            .expect("BrokerでWorkspaceを登録");
+        let binding = broker
+            .作業領域
+            .dialogue_binding("fixture-runtime", "fixture-workspace")
+            .expect("登録Workspace binding");
+        let journal = broker.agent_task_scratch.clone().expect("永続回復journal");
+        let scratch_name = format!(".d4p-tmp-{}", "a".repeat(32));
+        let record_id = journal
+            .reserve(
+                "fixture-task",
+                "fixture-runtime",
+                "fixture-workspace",
+                binding.recovery_binding_hash(),
+                binding.root_directory_identity(),
+                &scratch_name,
+            )
+            .expect("scratch作成前に回復記録を予約");
+        let workspace = cap_std::fs::Dir::open_ambient_dir(
+            &workspace_root,
+            cap_std::ambient_authority(),
+        )
+        .expect("Workspaceを開く");
+        workspace
+            .create_dir(&scratch_name)
+            .expect("scratchを作成");
+        let scratch = workspace
+            .open_dir_nofollow(&scratch_name)
+            .expect("nofollowでscratchを開く");
+        let metadata = scratch.dir_metadata().expect("scratch属性");
+        journal
+            .activate(
+                &record_id,
+                super::super::workspace_root::DirectoryIdentity {
+                    device: cap_fs_ext::MetadataExt::dev(&metadata),
+                    file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+                },
+            )
+            .expect("実体識別後に回復記録を有効化");
+        drop(scratch);
+        drop(workspace);
+        (broker, scratch_name)
+    }
+
     pub(super) fn persistent_test_broker(store_dir: &Path) -> Broker {
         let mut broker = Broker::new_persistent("session-1", store_dir).unwrap();
         broker.current_epoch_seconds_override =
@@ -3842,8 +3920,24 @@ mod tests {
         request
     }
 
+    // 子processはBroker library試験用fixtureであり、production broker-server／IPCの証拠ではない。
     #[test]
-    fn broker再起動後の作業領域登録で永続scratchを監査付き回収する() {
+    fn broker強制終了後の別process起動登録で永続scratchを監査付き回収する() {
+        const CHILD_ROOT_ENV: &str = "GUI_SHELL_AGENT_TASK_SCRATCH_CRASH_TEST_ROOT";
+        if let Some(root) = std::env::var_os(CHILD_ROOT_ENV).map(PathBuf::from) {
+            let (broker, _) =
+                seed_agent_task_scratch_for_crash(&root, "scratch-session-crash-child");
+            fs::write(
+                root.join("child-ready.pid"),
+                std::process::id().to_string(),
+            )
+            .expect("journal保存後の準備完了札");
+            loop {
+                std::hint::black_box(&broker);
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
+
         let root = temp_store_dir("agent-task-scratch-startup-recovery");
         let store_root = root.join("store");
         let workspace_root = root.join("workspace");
@@ -3855,61 +3949,38 @@ mod tests {
             root_path: workspace_root.to_string_lossy().into_owned(),
             secret_paths: Vec::new(),
         };
-
-        let mut first = Broker::new_persistent("scratch-session-first", &store_root).unwrap();
-        first
-            .実行系登録(
-                "fixture-runtime",
-                Arc::new(
-                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
-                ),
-            )
-            .unwrap();
-        first
-            .作業領域起動登録(&workspace_config(), &protected)
-            .expect("最初のBrokerでWorkspaceを登録");
-        let binding = first
-            .作業領域
-            .dialogue_binding("fixture-runtime", "fixture-workspace")
-            .expect("登録Workspace binding");
-        let recovery_binding_hash = binding.recovery_binding_hash().to_owned();
-        let root_identity = binding.root_directory_identity();
-        let journal = first.agent_task_scratch.clone().expect("永続回復journal");
         let scratch_name = format!(".d4p-tmp-{}", "a".repeat(32));
-        let record_id = journal
-            .reserve(
-                "fixture-task",
-                "fixture-runtime",
-                "fixture-workspace",
-                &recovery_binding_hash,
-                root_identity,
-                &scratch_name,
-            )
-            .expect("scratch作成前に回復記録を予約");
-        let workspace = cap_std::fs::Dir::open_ambient_dir(
-            &workspace_root,
-            cap_std::ambient_authority(),
-        )
-        .expect("Workspaceを開く");
-        workspace
-            .create_dir(&scratch_name)
-            .expect("scratchを作成");
-        let scratch = workspace
-            .open_dir_nofollow(&scratch_name)
-            .expect("nofollowでscratchを開く");
-        let metadata = scratch.dir_metadata().expect("scratch属性");
-        journal
-            .activate(
-                &record_id,
-                super::super::workspace_root::DirectoryIdentity {
-                    device: cap_fs_ext::MetadataExt::dev(&metadata),
-                    file_id: cap_fs_ext::MetadataExt::ino(&metadata),
-                },
-            )
-            .expect("実体識別後に回復記録を有効化");
-        drop(scratch);
-        drop(workspace);
-        drop(first);
+
+        let child = Command::new(std::env::current_exe().expect("現在の試験実行file"))
+            .arg("broker強制終了後の別process起動登録で永続scratchを監査付き回収する")
+            .arg("--nocapture")
+            .env(CHILD_ROOT_ENV, &root)
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("Broker fixture子processを起動");
+        let mut child = TestChildProcess(child);
+        let child_pid = child.0.id();
+        let ready_path = root.join("child-ready.pid");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Ok(contents) = fs::read_to_string(&ready_path) {
+                let ready_pid = contents.parse::<u32>().expect("子processの準備完了PID");
+                assert_eq!(ready_pid, child_pid, "別processの準備完了札を拒否する");
+                break;
+            }
+            if let Some(status) = child.0.try_wait().expect("子process状態") {
+                panic!("子Brokerはscratchを有効化する前に終了した: {status}");
+            }
+            assert!(
+                Instant::now() < deadline,
+                "子Brokerのscratch準備が期限内に完了しない"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        child.0.kill().expect("Broker子processを強制終了");
+        let status = child.0.wait().expect("強制終了したBroker子processを回収");
+        assert!(!status.success(), "子Brokerが通常終了しておりcrash試験になっていない");
 
         let mut restarted = Broker::new_persistent("scratch-session-restarted", &store_root)
             .expect("同じ永続storeからBrokerを再起動");
