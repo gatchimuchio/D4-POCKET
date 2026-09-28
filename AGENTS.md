@@ -61,7 +61,7 @@
 
 開発、試験、差分監査、品質判定の正本はローカル作業ツリーに置く。GitHub は完成した局所成果を順次還元する記録・共有面とする。自動 CI、push / pull_request / merge_group trigger、CI 必須 status check、CI green による完成判定は禁止する。
 
-GitHub Actions は、ローカルに存在しない OS の build、artifact 生成、重い手動検証の補助に限り、`workflow_dispatch` のみで使用できる。workflow は品質基準面ではなく、実機起動、製品完成、release readiness の証拠を代替しない。必要性、対象 commit、trigger、結果、artifact、証明する範囲としない範囲を記録する。workflow を追加する場合は active ROADMAP または phase instruction に目的を置き、ローカルの conformance で手動起動限定を検査する。
+GitHub Actions は、ローカルに存在しない OS の build、artifact 生成、重い検査・testの補助に限り、`workflow_dispatch` のみで使用できる。ownerは検査・test目的の手動Actions使用を許可しており、ローカル検証の不足を補うために必要な場合は、一時的な検証branchを作成・pushしてよい。branchは検査対象commitの固定に限り、PRや自動triggerを作らない。失敗時は同branch上で修正して再検査し、対象blockの検証が閉じたら、成功した正確なcommitを`main`へfast-forwardし、remote HEADを照合してから一時branchをlocal／remote双方で削除する。検査が失敗中のcommitを`main`へ統合しない。Actions結果は対象commit上で実行した検査だけの証拠であり、workflowは品質基準面ではなく、実機起動、製品完成、release readinessの証拠を代替しない。必要性、対象commit、trigger、結果、artifact、証明する範囲としない範囲を記録する。workflowを追加する場合はactive ROADMAPまたはphase instructionに目的を置き、local conformanceで手動起動限定を検査する。
 
 品質基準面は owner / Codex が実行する local validation、smoke、release verification、Windows 実機 evidence とする。Codex は要求から正常・境界・失敗・権限否定・回帰試験を導出して実行し、未試験を成功へ昇格しない。完成した作業単位ごとに試験、監査、commit、push、remote HEAD 確認を閉じてから次単位へ進む。検査の削除・弱体化には owner 承認を必須とし、Authority、Approval、Audit、Recovery、Content Exposure Boundary、owner GO、release gate を弱めない。
 
@@ -504,7 +504,7 @@ validationを実行できない場合は、理由を報告する。
 標準workflow:
 
 1. `main`で作業する
-2. オーナーが明示要求しない限り、feature branchまたはpull requestを作らない
+2. `main`への直接作業を標準とし、通常のfeature branchまたはpull requestはオーナーが明示要求しない限り作らない。前項のowner許可済み手動Actions検査に限り、一時`codex/`検証branchを例外として使用できる。検査対象commitを記録し、検証が閉じた後は成功した正確なcommitだけを`main`へfast-forwardし、remote HEAD確認後に一時branchをlocal／remote双方で削除する
 3. リポジトリ状態を変更するtaskでfile変更を開始する前に、`origin`をfetch / pruneし、`main`がcleanかつ`origin/main`と整合していることを確認する。不整合なら、編集前に解消するかblockerを報告する
 4. localの2世代backup pairをrotateし、現在push済みの変更前状態を保存する
    - `codex/backup-main`が存在する場合、`codex/backup-main-prev`を`codex/backup-main`へforce-updateする
@@ -512,8 +512,8 @@ validationを実行できない場合は、理由を報告する。
 5. 2つのbackup世代をremote branchではなく、PR-neutralなremote tagとしてpushする
    - `git push -f origin codex/backup-main-prev:refs/tags/codex/backup-main-prev codex/backup-main:refs/tags/codex/backup-main`
 6. 境界付き実装と必須validationを行う
-7. 完了した作業blockを`main`へ直接commitする
-8. commit直後に`main`をpushする
+7. 完了した作業blockを`main`へ直接commitする。手動Actions検証branchを使用した場合は、検証が成功した正確なcommitだけを`main`へfast-forwardする
+8. commitまたはfast-forward直後に`main`をpushする
 9. `git ls-remote origin refs/heads/main`がlocal `HEAD`と一致することを確認する
 10. remote backup tagの存在を確認してhashを記録する
     - `refs/tags/codex/backup-main`
