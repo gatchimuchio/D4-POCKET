@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 Windows hosted Rust検証とC29再確認（2026-09-28）
+
+ローカルWindowsのApplication Controlを変更せず、既存の手動検証workflowで現行`main` commitのRust Windows全targetを検証した。検証対象`c606b78ccd5bed0c68ea6535a15c8a304ed51497`はworkflow起動時点ですでに`main`／`origin/main`と一致していたため、一時branchは同じcommitを指す検証用refとしてのみ使用し、merge対象の差分はなかった。run終了後、一時branchをremote／localから削除し、`main`へ戻した。
+
+- GitHub Actions [`Windows Rust manual validation #8`](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36409450712)：`workflow_dispatch`、一時branch `codex/mcp-credential-injection`、対象commit `c606b78ccd5bed0c68ea6535a15c8a304ed51497`、Windows Server 2025 image `win25-vs2026/20260922.246.2`、Rust／Cargo 1.95.0。rustfmt、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認がすべて成功。12 test targetで385 passed／0 failed／0 ignored。workflow artifactはなし。証拠は対象commitと結合したWindows hosted Rust compile／test結果であり、installed product起動、Owner実操作、外部MCP実接続、非Windows動作、release readinessは証明しない。
+- ローカル`python -X utf8 tooling/schema_check/check_schemas.py`：Schema 149／正常example 149／negative fixture 191でPASS。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksでPASS。
+- C29障害注入は最初の試行でRuntime crash相当fixtureが`C28ValidationError`となったが、当該case単独の再実行と、同じ正規command `python -X utf8 tooling/failure_injection_validation.py`の全件再実行はいずれもPASSし、9 casesすべて成功した。別途`-X utf8`を省いた試行ではCredential未設定caseが`ConnectionResetError`となったため、その試行をPASS証拠へ含めない。製品Rust codeは変更していない。
+- hosted workflowはこのRepositoryのローカルhost制約を回避して対象Rust試験を実行したが、ローカルWindowsのApplication Controlを修復・変更したものではない。Actions結果はworkflow内の補助検証に限り、release blockerと`release_ready=false`を変更しない。
+
 ## D4 Pocket C9／C29 MCP障害fixtureの現行Contract同期（2026-09-28）
 
 変更前の`python -X utf8 tooling/failure_injection_validation.py`はexit 1となり、`MCP timeout`と`credential unavailable`が失敗した。Brokerへ渡したCredential refの`purpose=C29障害注入`／`target=development-fixture`が現行MCP接続Contractの`mcp_transport`／対象Server IDと一致せず、両ケースとも実際のtimeout／Credential拒否へ到達せず`mcp_credential_ref_invalid`で終了していた。これは既存Product挙動の失敗ではなく、検証fixtureと現行Contractのずれである。
