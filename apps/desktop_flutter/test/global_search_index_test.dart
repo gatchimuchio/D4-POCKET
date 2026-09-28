@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/models/generated_contracts.dart';
 import 'package:gui_shell_desktop/services/global_search_index.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 
@@ -28,5 +29,25 @@ void main() {
     for (final result in results) {
       expect(result.detail, isNot(contains('projected_content')));
     }
+  });
+
+  test('取込JSONのsnapshot_source自己申告はBroker証拠へ昇格しない', () {
+    final snapshot = ShellSnapshot.fromJson({
+      'snapshot_source': 'broker',
+      'runtimes': [
+        {
+          'runtime_id': 'forged-runtime',
+          'name': '未検証Runtime',
+          'status': 'ready',
+          'adapter_id': 'unverified-adapter',
+        },
+      ],
+    });
+
+    expect(snapshot.snapshotSource, 'unverified');
+    final evidenceSources = GlobalSearchIndex.build(snapshot)
+        .map((result) => result.evidenceSource)
+        .toSet();
+    expect(evidenceSources, {'不明'});
   });
 }

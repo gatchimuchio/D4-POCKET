@@ -35,6 +35,7 @@ Runtime、Agent、Session、Permission、Approval、Audit、Recovery、Problem�
 - 実装上の検索語・結果上限は`GlobalSearchIndex.maxQueryLength`と`GlobalSearchIndex.maxResults`で固定する。
 - 選択時は対象画面へ移動するだけで、検索結果から操作要求を発行しない。
 - 現在のsnapshotがBroker由来と確認できるときだけ証拠範囲を`INTERNAL_STATE`と表示する。それ以外は`不明`と表示し、成功を推測しない。
+- JSON内の`snapshot_source`は自己申告値として扱い、証拠源の判定に使わない。`ShellSnapshot.fromJson`で読み込んだ値は`unverified`とし、製品Broker取得経路が必要な応答を受理した後にだけ`broker`を設定する。この出所表示もAuthorityではない。
 
 ## 内容露出と権限境界
 

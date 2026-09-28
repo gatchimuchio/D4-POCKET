@@ -72,6 +72,10 @@
       "sha256": "f5749e5e4c91a6c2fcf52ac90b4ec29e1556727b9f75e0ac26e064a80db53cb7"
     },
     {
+      "path": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
+      "sha256": "1b01b890c5ee08493dae5c158615ed0e4baa2b96eb13398ba68f3c77b90945df"
+    },
+    {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
       "sha256": "e7f02c426c2495e5140375e665c443d71e79d3c7868fe59173753748395861e2"
     },

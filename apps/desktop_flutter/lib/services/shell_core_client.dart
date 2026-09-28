@@ -1119,11 +1119,10 @@ ShellSnapshot _brokerSnapshot({
       'owner_go': 'missing',
     },
     'recovery_playbook': recoveryPlaybook,
-    'snapshot_source': 'broker',
     'snapshot_path': 'broker://127.0.0.1/health',
     'snapshot_generated_at': now,
     'snapshot_freshness': now,
-  });
+  }).copyWith(snapshotSource: 'broker');
 }
 
 ShellSnapshot _brokerUnavailableSnapshot(String reason) {
@@ -1261,11 +1260,10 @@ ShellSnapshot _brokerUnavailableSnapshot(String reason) {
       'owner_go': 'missing',
     },
     'recovery_playbook': [_problemToRecoveryPlaybookJson(problem)],
-    'snapshot_source': 'broker_unavailable',
     'snapshot_path': 'broker://127.0.0.1/connect',
     'snapshot_generated_at': now,
     'snapshot_freshness': 'unavailable',
-  });
+  }).copyWith(snapshotSource: 'broker_unavailable');
 }
 
 Map<String, Object?> _brokerProjectionProbeApproval() {

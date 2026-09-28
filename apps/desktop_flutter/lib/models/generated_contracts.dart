@@ -1038,7 +1038,9 @@ class ShellSnapshot {
           _records(json['host_capabilities'], HostCapabilityRecord.fromJson),
       agentAdapters:
           _records(json['agent_adapters'], AgentAdapterRecord.fromJson),
-      snapshotSource: json['snapshot_source'] as String? ?? 'local',
+      // Serialized JSON is not provenance evidence. The product Broker path
+      // assigns its source only after the required responses are accepted.
+      snapshotSource: 'unverified',
       snapshotPath: json['snapshot_path'] as String? ?? '',
       snapshotGeneratedAt: json['snapshot_generated_at'] as String? ??
           json['generated_at'] as String? ??
