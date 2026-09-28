@@ -210,11 +210,11 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 
 </details>
 
-期待する成功時の出力:
+2026-09-28の現行測定値:
 
 ~~~text
-schema checkが合格: schema 26件、example 26件、negative fixture 28件
-conformance skeletonが合格: 141 件のcheck
+schema checkが合格: schema 149件、example 149件、negative fixture 192件
+conformance skeletonが合格: 225 件のcheck
 ~~~
 
 ➡️ **[QUICKSTART.md](QUICKSTART.md)** も参照すること。

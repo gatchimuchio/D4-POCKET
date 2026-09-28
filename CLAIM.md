@@ -42,7 +42,7 @@ LLM-readable substrate の定義、範囲を限定した Reference Extension の
 ~~~yaml
 - item: schema と conformance skeleton
   classification: required_for_v1
-  status: 現在の development validation は 188 の conformance check とともに通過している。過去の check count は <code>VALIDATION.txt</code> に履歴として保持する。Conformance の tautology は production の Authority Strip と ApprovalQueue の挙動を検査することで解消した。ghost invariant は production の InvariantEvaluator が測定する。Normalization Firewall の Conformance は PolicyEvaluator と Adapter metadata ingress を対象に含む。Broker IPC Contract、static な no-FFI / no-Python-spawn assertion、構造化された release blocker registry、release-facing blocker と文書の同期、packaging portability、および範囲を限定した LLM-readable extension の Contract / Conformance check を対象に含む。
+  status: 2026-09-28のdevelopment validationはSchema 149件、正常example 149件、negative fixture 192件、Conformance 225件で通過した。対象commandと変更前MANIFEST不整合を含む正確な結果は <code>VALIDATION.txt</code> に追記し、過去の件数は履歴として保持する。Conformance の tautology は production の Authority Strip と ApprovalQueue の挙動を検査することで解消した。ghost invariant は production の InvariantEvaluator が測定する。Normalization Firewall の Conformance は PolicyEvaluator と Adapter metadata ingress を対象に含む。Broker IPC Contract、static な no-FFI / no-Python-spawn assertion、構造化された release blocker registry、release-facing blocker と文書の同期、packaging portability、および範囲を限定した LLM-readable extension の Contract / Conformance check を対象に含む。この結果はdevelopment validationであり、installed productまたはrelease readinessの証拠ではない。
 
 - item: 範囲を限定した cross-agent LLM-readable extension reproduction
   classification: required_for_v1

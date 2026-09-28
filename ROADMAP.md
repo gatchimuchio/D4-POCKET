@@ -5,6 +5,10 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
+## 現行C0 validation baseline（2026-09-28）
+
+最新ローカル再検査はSchema 149件、正常example 149件、negative fixture 192件、Conformance 225件で合格した。変更前のclean `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c`ではMANIFESTのhash不一致25件と必須source file欠落2件を検出したため、MANIFESTを正規toolで1103件再生成し、manifest checkとrelease gateを合格させた。Evidence bundleもdevelopment evidenceとして合格し、release blocker 5件、`release_ready=false`を維持する。development evidenceをrelease readinessへ昇格しない。個別commandと失敗履歴は`VALIDATION.txt`に記録する。
+
 ## Windows Rust手動補助検証（2026-09-28）
 
 Windows runnerでRustのbuild／test／検査が必要な作業では、`.github/workflows/windows-manual-rust-validation.yml`をownerが`workflow_dispatch`で起動できる。ローカルWindowsのApplication ControlがCargo生成executableをOS error 4551で拒否する場合も、端末保護を変更せず検証を継続する。選択ref上のRust 1.95.0に対して変更Rust fileの整形、Rust全targetのcheck／test、試験後作業treeのcleanを検査する。自動trigger、書込権限、artifact uploadは設けない。この結果はRunner上の対象commitに対するRust検査だけを示し、installed製品挙動、ローカルWindowsでの実行可否、release readinessを証明しない。現在sourceのRust結果は`docs/REV2_PROGRESS.md`と`release_blockers.registry.json`に対象commitと結合して記録し、未成功の全target試験を成功に読み替えない。

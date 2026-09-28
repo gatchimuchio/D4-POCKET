@@ -49,13 +49,11 @@ GUI Shell は汎用であり続け、BLUE-TANUKI 固有にはしない。BLUE-TA
 
 現在の C0 validation evidence:
 
-- `python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py`: `python3` fallback により合格し、結果は `schema check passed: 26 schemas, 26 examples, 28 negative fixtures` だった。
-- `python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py`: `python3` fallback により合格し、結果は `conformance skeleton passed: 139 checks` だった。
-- `python3 tooling/manifest.py --check`: `manifest check passed` で合格した。
-- `python3 tooling/release_gate_check.py`: `release gate check passed` で合格した。
-- `python3 tooling/evidence_bundle.py --check`: 構造化された release blocker metadata、`release_ready=False`、`classification=development_evidence` を維持して合格した。
+- 2026-09-28に変更前 `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c` を対象として再検査し、Schema 149件、正常 example 149件、negative fixture 192件、Conformance 225件が合格した。
+- 同じ開始状態での最初の `python -X utf8 tooling/manifest.py --check` と `python -X utf8 tooling/release_gate_check.py` は、MANIFESTの追跡済みfile hash 25件不一致とsource file 2件の欠落により失敗した。これは変更前に観測した既存状態として記録し、MANIFESTを再生成した後に両検査を再実行する。
+- `python -X utf8 tooling/manifest.py --write` はtracked source 1103件を再生成した。修正後のmanifest check、release gate、evidence bundleは合格し、evidence bundleはrelease blocker 5件、`release_ready=False`、`classification=development_evidence` を維持した。個別commandと終了値は `VALIDATION.txt` に記録した。
 
-`96 checks` を記録した過去の validation entry は、以前の証拠として維持する。現在の証拠へ書き換えてはならない。
+過去の `96 checks` entry は以前の証拠として維持する。以前のロードマップ草稿が現在値として記載した `139 checks` は、今回の再計測値と異なるため現行証拠として使わない。履歴の値を現在の値へ書き換えてはならない。
 
 引き続き未完了 / 可視のまま維持する blocker:
 
@@ -134,8 +132,9 @@ repository state を変更する各 block は、二世代 backup 規約により
 期待成果物:
 
 - 正本 roadmap 文書が存在する。
-- 現在の validation evidence が139件の conformance check を記録する。
+- 対象commit上で再実行した最新のSchema／Conformance結果を、正確な出力とともに記録する。check数は固定値を正本にせず、毎回の実行結果を記録する。
 - 過去の96件 check evidence を履歴として維持する。
+- manifest、release gate、evidence bundle の結果を再生成後に記録する。
 - release blocker を open のまま維持する。
 - manifest が合格する。
 
@@ -144,11 +143,11 @@ repository state を変更する各 block は、二世代 backup 規約により
 検証:
 
 ```bash
-python tooling/schema_check/check_schemas.py || python3 tooling/schema_check/check_schemas.py
-python tooling/conformance_tests/run_conformance_skeleton.py || python3 tooling/conformance_tests/run_conformance_skeleton.py
-python3 tooling/manifest.py --check
-python3 tooling/release_gate_check.py
-python3 tooling/evidence_bundle.py --check
+python -X utf8 tooling/schema_check/check_schemas.py
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+python -X utf8 tooling/manifest.py --check
+python -X utf8 tooling/release_gate_check.py
+python -X utf8 tooling/evidence_bundle.py --check
 ```
 
 終了条件: 現在の validation evidence が追記され内部で整合する。過去の evidence を偽装しない。既存 release blocker が open のままである。commit/push/remote verification/backup verification が完了する。

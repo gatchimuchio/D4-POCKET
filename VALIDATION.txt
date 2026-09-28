@@ -8,6 +8,58 @@ validation_log_notice_2026_06_06:
     - use the latest completion report for exact commands and results
   required_action: Treat earlier counts as historical evidence for their recorded commits, not as current validation totals.
 
+validation_update_2026_09_28_c0_evidence_refresh:
+  scope: C0 current Schema and Conformance evidence refresh plus manifest synchronization
+  base_commit: 31df760ae5085bf5ddc18c4f3eceb375cbae4f6c
+  source_state: clean main matching origin/main before this documentation-only update
+  initial_observation_before_manifest_regeneration:
+    - command: python -X utf8 tooling/manifest.py --check
+      status: failed_existing_state
+      exit: 1
+      result: 25 tracked-file hashes differed and 2 required tracked source files were absent from MANIFEST.sha256.json
+    - command: python -X utf8 tooling/release_gate_check.py
+      status: failed_due_to_manifest
+      exit: 1
+    - command: python -X utf8 tooling/release_gate_check.py
+      status: failed_expected_during_evidence_authoring
+      classification: required_for_v1
+      reason: The first post-regeneration run detected two provisional evidence-record statuses; they were replaced with completed results before the final rerun.
+  checks:
+    - name: schema_check
+      command: python -X utf8 tooling/schema_check/check_schemas.py
+      status: passed
+      exit: 0
+      stdout: "schema checkが合格: schema 149件、example 149件、negative fixture 192件"
+      evidence_classification: FIXTURE
+    - name: conformance_skeleton
+      command: python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      exit: 0
+      stdout: "conformance skeletonが合格: 225 件のcheck"
+      evidence_classification: FIXTURE | INTERNAL_STATE
+    - name: manifest_check_after_regeneration
+      command: python -X utf8 tooling/manifest.py --check
+      status: passed
+      exit: 0
+      stdout: manifest checkが合格
+    - name: release_gate_check_after_regeneration
+      command: python -X utf8 tooling/release_gate_check.py
+      status: passed_after_evidence_record_closed
+      exit: 0
+      stdout: release gate checkが合格
+    - name: evidence_bundle
+      command: python -X utf8 tooling/evidence_bundle.py --check
+      status: passed_after_documentation_update
+      exit: 0
+      stdout_summary: release blocker 5件を保持、release_ready=False、classification=development_evidence
+      evidence_classification: CONFIG | INTERNAL_STATE
+  release_gate_impact:
+    - item: Existing release blockers
+      classification: release_blocker
+      reason: This documentation and manifest refresh does not provide installed-product or owner-GO evidence.
+      required_action: Keep the existing registry blockers open until their own required evidence is collected.
+      blocks_release: yes
+
 validation_update_2026_06_05_ci_broker_parity_startup_timeout:
   scope: GitHub Actions core-validation broker parity startup reliability
   commit: pre_commit_validation_from_40d6605540b850134e4ca56329e172bc0076f54b

@@ -2,15 +2,17 @@
 
 ## 現行 conformance
 
+現行値の最終測定: 2026-09-28。詳細な対象commit、変更前MANIFESTの失敗記録、再生成後の最終結果は `VALIDATION.txt` を参照する。
+
 - item: schema 検査
   classification: required_for_v1
   status: 通過
-  evidence: `schema checkが合格: schema 26件、example 26件、negative fixture 28件`
+  evidence: `schema checkが合格: schema 149件、example 149件、negative fixture 192件`
 
 - item: conformance 検査
   classification: required_for_v1
   status: 通過
-  evidence: `conformance skeletonが合格: 141 件のcheck`
+  evidence: `conformance skeletonが合格: 225 件のcheck`
 
 - item: conformance の同義反復検査を修正
   classification: required_for_v1
