@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9／C29 MCP障害fixtureの現行Contract同期（2026-09-28）
+
+変更前の`python -X utf8 tooling/failure_injection_validation.py`はexit 1となり、`MCP timeout`と`credential unavailable`が失敗した。Brokerへ渡したCredential refの`purpose=C29障害注入`／`target=development-fixture`が現行MCP接続Contractの`mcp_transport`／対象Server IDと一致せず、両ケースとも実際のtimeout／Credential拒否へ到達せず`mcp_credential_ref_invalid`で終了していた。これは既存Product挙動の失敗ではなく、検証fixtureと現行Contractのずれである。
+
+fixtureを現行Contractへ合わせ、次の統合負例を追加・強化した。
+
+- MCP timeout: fake stdio Serverの起動markerを確認し、実Broker経路が実際に応答期限切れまで到達して`mcp_timeout`でrejectする。
+- MCP malformed inputSchema: fake stdio ServerがDraft 7 URIを返し、Brokerが未対応dialectをCatalogへ受理せず`mcp_tool_schema_dialect_unsupported`でrejectする。
+- Credential unavailable: `mcp_transport`・対象Server一致のrequired/missing refを送信し、`mcp_credential_unavailable`でrejectしたうえ、起動markerが期限内に現れないことを確認してprocess未起動を検証する。
+
+- `python -X utf8 tooling/failure_injection_validation.py`: 9 casesすべて`passed`。MCP timeout、malformed inputSchema、Credential未設定の3件はローカルRust Broker IPCと一時fake stdio Serverを通した`LIVE_RUNTIME`／`FIXTURE`証拠。Credential未設定の未起動判定はBroker内部処理も含む。
+- 修正前の失敗記録は履歴として保持し、PASSへ書き換えない。Rust product code、Permission、Approval、Audit、Runtime接続能力は変更していない。
+- これはC29開発用failure injectionとPhase 18のstdio fixture範囲である。HTTP／OAuth fake Server、外部MCP Server適合、installed product、AgentへのTool結果handoff、正式releaseは証明しない。MCP外部Harnessを含む既存`release_blocker`と`release_ready=false`を維持する。
+
 ## D4 Pocket C9 MCP Owner確認付きTool呼出し（2026-09-28）
 
 操作者がDesktop上でJSON arguments全文を確認し、Rust Desktop native Owner確認（default No）を通した場合に限り、Brokerが現在のMCP Catalog／Tool ID／inputSchema／引数を再検証して同一stdio childへ`tools/call`を一度だけ送る経路を実装した。一回限りPermissionをServer／Tool／arguments hashへ結合して消費し、Approval／Auditへ記録する。Credentialを注入せず、結果本文をUI／Audit／logへ公開せずhash-only receiptだけを返す。結果不明・timeout・応答不正・Audit失敗時は接続をquarantineし、自動再送しない。Agentへの結果引渡し・Content Exposure・外部MCP Server運用・正式releaseは未成立の`release_blocker`である。

@@ -153,7 +153,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8dc35712716a63a8df0bc77137ebbd1a75f100ff6f07a1614475dbee23c1b7ae"
+      "sha256": "bb9b59f76cce9af78695b3a9569ccdc542b5665df51f1ef98996ac02d21fec06"
     },
     {
       "path": "SECURITY.md",
@@ -1181,7 +1181,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "89968522c6beef1ad893c77f49e9a889079f0ef08007ef33aaed04a01fa269b5"
+      "sha256": "51a2f11c3e104605782d47d9933897ba80561772e96bdd833b2a64a3561f7173"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1489,7 +1489,7 @@
     },
     {
       "path": "docs/\u7dcf\u5408\u6a5f\u80fd\u62e1\u5f35_rev1/\u9032\u6357.md",
-      "sha256": "64c03753414fea0cb4a59d3a2cac3c7151da57c817427ea993df00871656b30b"
+      "sha256": "7276272fdaca8e35a0ca0b57562ba61a1ed2c19fe7075ea691aff72144bbadfb"
     },
     {
       "path": "examples/adapter/blue_tanuki_reference_adapter.json",
@@ -4377,7 +4377,7 @@
     },
     {
       "path": "tooling/failure_injection_validation.py",
-      "sha256": "33b580da247bc5a1f0d92d93a654a649ffd7afb519b01fde650bebe1174f7cb1"
+      "sha256": "1154632cc97b1b3f159df9f82778131ae071a60714b840c1d649d41ca8e86462"
     },
     {
       "path": "tooling/final_development_audit.py",

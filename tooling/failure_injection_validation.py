@@ -65,26 +65,41 @@ def error_code(response: dict[str, Any]) -> str | None:
     return error.get("code") if isinstance(error, dict) else None
 
 
-def credential_ref(required: bool = False) -> dict[str, Any]:
+def credential_ref(
+    required: bool = False,
+    *,
+    purpose: str = "C29障害注入",
+    target: str = "development-fixture",
+) -> dict[str, Any]:
     return {
         "credential_id": "a" * 32,
-        "purpose": "C29障害注入",
-        "target": "development-fixture",
+        "purpose": purpose,
+        "target": target,
         "required": required,
         "status": "missing",
     }
 
 
-def mcp_payload(executable: Path, fixture: Path, required: bool = False) -> dict[str, Any]:
+def mcp_payload(
+    executable: Path,
+    fixture: Path,
+    server_id: str,
+    required: bool = False,
+    fixture_mode: str = "timeout",
+) -> dict[str, Any]:
     return {
         "版": 1,
         "操作": "接続",
-        "ServerID": "c29-mcp-timeout" if not required else "c29-mcp-credential",
+        "ServerID": server_id,
         "実行file": str(executable),
-        "引数": [str(fixture), "timeout"],
+        "引数": [str(fixture), fixture_mode],
         "workspace": str(fixture.parent),
         "Transport": "stdio",
-        "Credential ref": credential_ref(required),
+        "Credential ref": credential_ref(
+            required,
+            purpose="mcp_transport",
+            target=server_id,
+        ),
     }
 
 
@@ -160,11 +175,15 @@ def case_broker_crash() -> dict[str, Any]:
         close_harness(harness)
 
 
-def write_mcp_fixture(path: Path) -> None:
-    path.write_text(
-        """import json
+def write_mcp_fixture(path: Path, startup_marker: Path) -> None:
+    marker_literal = json.dumps(str(startup_marker), ensure_ascii=True)
+    source = """import json
+from pathlib import Path
 import sys
 import time
+
+Path(__MCP_STARTUP_MARKER__).write_text("started", encoding="ascii")
+mode = sys.argv[1] if len(sys.argv) == 2 else ""
 
 for line in sys.stdin:
     request = json.loads(line)
@@ -177,13 +196,30 @@ for line in sys.stdin:
                 "capabilities": {"tools": {}},
             },
         }
-        sys.stdout.write(json.dumps(response) + "\\n")
-        sys.stdout.flush()
+    elif mode == "malformed_schema" and request.get("method") == "tools/list":
+        response = {
+            "jsonrpc": "2.0",
+            "id": request.get("id"),
+            "result": {
+                "resultType": "complete",
+                "tools": [
+                    {
+                        "name": "malformed-schema",
+                        "inputSchema": {
+                            "$schema": "https://json-schema.org/draft-07/schema#",
+                            "type": "object",
+                        },
+                    }
+                ],
+            },
+        }
     else:
         time.sleep(6)
-""",
-        encoding="utf-8",
-    )
+        continue
+    sys.stdout.write(json.dumps(response) + "\\n")
+    sys.stdout.flush()
+"""
+    path.write_text(source.replace("__MCP_STARTUP_MARKER__", marker_literal), encoding="utf-8")
 
 
 def case_mcp_timeout() -> dict[str, Any]:
@@ -191,13 +227,52 @@ def case_mcp_timeout() -> dict[str, Any]:
     try:
         harness = start_harness()
         fixture = harness.temp_root / "mcp_timeout.py"
-        write_mcp_fixture(fixture)
+        startup_marker = harness.temp_root / "mcp_timeout.started"
+        write_mcp_fixture(fixture, startup_marker)
         response = harness.owner_request(
-            "MCP接続", mcp_payload(Path(sys.executable), fixture)
+            "MCP接続",
+            mcp_payload(
+                Path(sys.executable),
+                fixture,
+                server_id="c29-mcp-timeout",
+            ),
         )
         if response.get("status") != "rejected" or error_code(response) != "mcp_timeout":
             raise RuntimeError("MCP timeoutが拒否へ射影されない")
+        if not startup_marker.is_file():
+            raise RuntimeError("MCP timeout fixtureがBrokerから起動されていない")
         return {"観測": "MCP timeoutをrejectedへ射影", "証拠": "LIVE_RUNTIME/FIXTURE"}
+    finally:
+        close_harness(harness)
+
+
+def case_mcp_malformed_schema() -> dict[str, Any]:
+    harness: LongRun | None = None
+    try:
+        harness = start_harness()
+        fixture = harness.temp_root / "mcp_malformed_schema.py"
+        startup_marker = harness.temp_root / "mcp_malformed_schema.started"
+        write_mcp_fixture(fixture, startup_marker)
+        response = harness.owner_request(
+            "MCP接続",
+            mcp_payload(
+                Path(sys.executable),
+                fixture,
+                server_id="c29-mcp-malformed-schema",
+                fixture_mode="malformed_schema",
+            ),
+        )
+        if (
+            response.get("status") != "rejected"
+            or error_code(response) != "mcp_tool_schema_dialect_unsupported"
+        ):
+            raise RuntimeError("未対応dialectのMCP Tool Schemaがfail-closedにならない")
+        if not startup_marker.is_file():
+            raise RuntimeError("malformed-schema fixtureがBrokerから起動されていない")
+        return {
+            "観測": "未対応MCP Tool Schema dialectを接続前に拒否",
+            "証拠": "LIVE_RUNTIME/FIXTURE",
+        }
     finally:
         close_harness(harness)
 
@@ -223,13 +298,33 @@ def case_credential_unavailable() -> dict[str, Any]:
     try:
         harness = start_harness()
         fixture = harness.temp_root / "mcp_credential.py"
-        fixture.write_text("", encoding="utf-8")
+        startup_marker = harness.temp_root / "mcp_credential.started"
+        marker_literal = json.dumps(str(startup_marker), ensure_ascii=True)
+        fixture.write_text(
+            "from pathlib import Path\n"
+            f"Path({marker_literal}).write_text('started', encoding='ascii')\n",
+            encoding="utf-8",
+        )
         response = harness.owner_request(
-            "MCP接続", mcp_payload(Path(sys.executable), fixture, required=True)
+            "MCP接続",
+            mcp_payload(
+                Path(sys.executable),
+                fixture,
+                server_id="c29-mcp-credential",
+                required=True,
+            ),
         )
         if response.get("status") != "rejected" or error_code(response) != "mcp_credential_unavailable":
             raise RuntimeError("credential unavailableが拒否へ射影されない")
-        return {"観測": "Credential unavailableを拒否", "証拠": "LIVE_RUNTIME/INTERNAL_STATE"}
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline and not startup_marker.exists():
+            time.sleep(0.01)
+        if startup_marker.exists():
+            raise RuntimeError("Credential unavailable要求でMCP processが起動した")
+        return {
+            "観測": "Credential unavailableをprocess起動前に拒否",
+            "証拠": "LIVE_RUNTIME/INTERNAL_STATE/FIXTURE",
+        }
     finally:
         close_harness(harness)
 
@@ -322,6 +417,7 @@ def main() -> int:
         ("Runtime crash相当", case_runtime_crash),
         ("Broker crash", case_broker_crash),
         ("MCP timeout", case_mcp_timeout),
+        ("MCP malformed inputSchema", case_mcp_malformed_schema),
         ("A2A timeout", case_a2a_timeout),
         ("credential unavailable", case_credential_unavailable),
         ("disk full simulation", case_disk_full_simulation),

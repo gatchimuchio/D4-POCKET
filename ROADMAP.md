@@ -19,6 +19,10 @@ Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`�
 
 MCP stdio childは既存Rust Job Object監督経路で起動し、Desktop設定にmetadata-only接続一覧、新規stdio接続設定、Owner専用切断を実装した。接続開始・切断・Tool呼出しは既存Windows Rust起動器のdefault No native Owner確認を経てBrokerへ届き、Brokerが現在Catalogと要求を再検証する。接続は固定missing Credential refでdiscovery／catalogまで、Tool呼出しは操作者が画面上でJSON arguments全文を確認した後に限り、一回限りPermissionを消費して同一stdio childへ`tools/call`を一度だけ送る。結果本文を保存・表示せずhash-only receiptを返し、応答不明・不正・Audit失敗は接続をquarantineして自動再送しない。切断はprocess群停止・永続`LIVE_RUNTIME` Audit後に記録解消する。2026-07-28形式、legacy fallback条件、256 KiB逐次stdout上限、Tool inputSchema Draft 2020-12検証を維持する。Tool一覧等はmetadata-onlyで、Resource／Prompt本文取得を行わない。この単位はOwner向けWindows Tool呼出し経路であり、Agentへの結果引渡し、Credential実値注入、Resource／Prompt内容取得、Streamable HTTP、OAuth、外部MCP Server適合、非Windows process群監督は未接続の`release_blocker`。Rust／Flutterのローカル検証と手動Windows Actionsの対象commit・結果は`docs/REV2_PROGRESS.md`に記録する。ActionsはRust check/testの補助証拠に限り、Windows installed product、外部Server、release readinessを証明しない。`release_ready=false`を維持する。
 
+### Phase 18／C29 MCP stdio failure fixtureの現行Contract同期（2026-09-28）
+
+現行Brokerへ接続する開発用障害注入器のCredential refが旧値のままで、MCP timeoutとCredential未設定の試験はどちらも`mcp_credential_ref_invalid`で早期終了していた。refを`purpose=mcp_transport`・対象Server IDへ同期し、timeout fixtureが実起動したmarker、Draft 7 inputSchemaの拒否、およびrequired/missing Credentialでprocess未起動を確認する3ケースへ修正した。`python -X utf8 tooling/failure_injection_validation.py`は全9ケース成功。これは一時fake stdio Serverを使う開発Broker／FIXTURE証拠であり、HTTP／OAuth harness、外部MCP Server適合、installed product、C9全体の完成を証明しない。MCP HarnessとAgent結果handoff等の`release_blocker`、`release_ready=false`を保持する。詳細は`docs/REV2_PROGRESS.md`の本節を参照する。
+
 ### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
 
 `IndexedStack`内の非表示Mobile資源画面がbuild時にBroker観測を開始していたため、選択中・接続中だけ一度観測し、離脱・接続変更で表示と遅延結果を無効化する。複数Runtimeは逐次最大16件、同時1件とし、再入場後に新規観測する。非OneDrive managed worktreeでMobile test全20件が成功した。Desktop/Mobileの`flutter analyze`はLSP初期化JSON欠損によるanalysis server異常で終了し、成功扱いしない。実機・Device Link統合・release evidenceは未成立。詳細は`docs/REV2_PROGRESS.md`の本項を参照。
