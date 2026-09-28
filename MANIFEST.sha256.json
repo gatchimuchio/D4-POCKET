@@ -65,7 +65,7 @@
     },
     {
       "path": ".github/workflows/android-manual-emulator.yml",
-      "sha256": "abe71ea7d80afeff1309328bfe8f0788d319e32d7b554fbe9157bca44c0016b1"
+      "sha256": "a04e38cb7108fcdc314db910885a42a8fa68420493abe072e3203ab90a32055a"
     },
     {
       "path": ".github/workflows/apple-manual-build.yml",
