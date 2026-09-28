@@ -50,6 +50,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $testTemp = Join-Path $env:RUNNER_TEMP 'gui-shell-test-temp'
+          New-Item -ItemType Directory -Force -Path $testTemp | Out-Null
+          if ($testTemp.Contains('~')) {
+            throw "Rust test TEMP/TMP must not contain a DOS short-name marker: $testTemp"
+          }
+          $env:TEMP = $testTemp
+          $env:TMP = $testTemp
+          @("test_temp=$testTemp", "test_tmp=$testTemp") | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-rust-test-temp.txt"
+          "Rust test TEMP/TMP: ``$testTemp``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
