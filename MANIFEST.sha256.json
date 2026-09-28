@@ -73,7 +73,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "4e53f4318b8fa9f5f07988270fc5472cb44f9780a276d6e313a8a8a605f76233"
+      "sha256": "e7f02c426c2495e5140375e665c443d71e79d3c7868fe59173753748395861e2"
     },
     {
       "path": ".gitignore",
@@ -153,7 +153,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f1b1430ba2d1453b4c053a0ad8ac0467ca7fcfb9f0ea874ac7b97771fc0e52e8"
+      "sha256": "abdc8062b499f8570477df751121a79fa1b748175c3a9e0f932aec52e2a2cb1b"
     },
     {
       "path": "SECURITY.md",
@@ -169,7 +169,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "657d129c285782e265f07d0614125893beda8dc70f14fe8d9084f955a703cfdd"
+      "sha256": "f2b3b30aa70e40c0ff51f4c2b52fcf904a20404a5a57d6bce3cbf6e4e2d41422"
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
@@ -1181,7 +1181,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "fafde55494e2b4e9d1d0ca3cd6ef21d4bfb4c4cec2ca9ecf90bc387b41ca0e47"
+      "sha256": "6a99abbaf5a4d60afa9bd16432cac67a9e93402dbb151ea3bd7cc0abcccd70e1"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1289,7 +1289,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "516573906464321a99a51000c431fe0783fd42aa59ff206c8c0c514499a0ce78"
+      "sha256": "625ed76da631fed5391aa4fceebbed5b23d5f68b3b80df13837c0316cdd5d45e"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2973,7 +2973,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "54aae5eeaf297d12ff76fa80e58b278707cbe00eafe35974123b5bd9389674e2"
+      "sha256": "3e21950224853f358b2da543416610148d372bf214196f043a473e0eacb8c7a7"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3701,7 +3701,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "7028baef177d38470e4e62d09ccadd35a8e1d90f635b25f3bd102d5b0c73b2a4"
+      "sha256": "d355c89e008eab991b5037c438c04a4baa4ca85eebcdd2808102235710c6f4f0"
     },
     {
       "path": "requirements-dev.txt",
@@ -4349,7 +4349,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b14296c5c8c5ce2f2d4b0a1c29998d97ce29ac7fd8a40cabdbbbf67db4180bd2"
+      "sha256": "5be80786e741805373f7f752ae03c96376d8c692fc1f81c16bda6464946105e9"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

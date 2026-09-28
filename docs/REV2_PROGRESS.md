@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Phase 7 Codex Task permission profileの上書き修正とWindows境界再検査（2026-09-28）
+
+Task用Codex設定で`filesystem.glob_scan_max_depth=8`を先に個別指定し、その後にfilesystem table全体を設定していたため、後続tableが先行値を置き換える構成になっていた。走査深度を`:minimal=read`およびWorkspace root内deny globと同じ単一table overrideへ統合した。Conformance 225件のうちCodex Adapter検査は、単一tableへの集約、有界深度、`.env`／`.ssh`／`secrets` deny、`root deny`不使用、および旧個別指定の不在を検査する。Windows manual validation workflowも今回変更した`codex_cli.rs`をrustfmt対象へ加えた。
+
+Codex CLI `0.158.0-alpha.2.1`に対する`--strict-config`の設定読込は成功し、modelまたは`codex exec`実行は行っていない。sandbox helperの合成marker再検査は、通常NTFSでWorkspace内`.env`読取拒否、Workspace内書込許可、Workspace外書込拒否を観測した。一方、UserProfile／LocalAppData内の外部file読取は許可され、OneDrive配下の`ReparsePoint` `.env`も読めた。`:root=deny`はelevated backendがeffective root readを必要として拒否し、unelevated backendもread-only accessを拒否した。先行試験と今回の結果を混同せず、profileは広域read隔離の証拠として扱わない。
+
+ローカルではSchema 149／正常example 149／negative fixture 192、Conformance 225、strict日本語監査、Manifest、release gate、packaging portability、Rust全target check、対象Rust test 1件、対象file rustfmt、Codex strict config読込、`git diff --check`が合格した。作業中の一括`validate_all.py`は編集直後のManifest hash不一致で一度失敗したが、正規toolで再生成後、Manifest・release gate・packaging portabilityを個別に再実行して合格した。日本語監査がtest内のCLI機械語literalを検出した途中結果もあり、機械語の検査をConformanceへ集約して、監査器や例外台帳を弱めず最終strict監査を合格させた。
+
+作業branch `codex/task-profile-boundary` のexact commitに対する`workflow_dispatch` Windows Rust全target検査は実行予定であり、この追補時点では未完了。helper検査は実Broker経由Agent Taskではない。`task_execution=unsupported`、`comprehensive_extension_rev1_completion` release blocker、`release_ready=false`を維持する。端末のWindows Application Controlその他OS保護設定は変更していない。
+
 ## Rust試験診断文の日本語化とWindows全target検証（2026-09-28）
 
 日本語基底のstrict監査がRust test内の英語`expect`診断文を2件検出したため、`credential_vault.rs`の`Audit`を`監査記録の取得`へ、`mcp_center.rs`の`test executable`を`試験用実行ファイルの取得`へ変更した。変更はtest failure時の説明文字列だけで、production runtime、Authority、Permission、Approval、Audit挙動は変更していない。

@@ -100,6 +100,7 @@
     },
     {
       "name": "comprehensive_extension_rev1_completion",
+      "current_observation": "2026-09-28のCodex sandbox helper再検査では、`:root=deny`はelevated backendがeffective `:root` readを要求して拒否し、unelevated backendもread-only accessにelevated backendが必要として拒否した。root denyを除いた有界profileでは通常NTFSの合成`.env`読取は拒否された一方、Workspace内書込は許可され、Workspace外書込も拒否された。しかしLocalAppDataとUserProfile直下の合成外部file読取は許可され、OneDrive配下のReparsePoint `.env`も読めた。よって広域read隔離は未成立で、Codex Agent Taskは`unsupported`のまま。これらはsandbox helperの観測であり、Broker経由の実Agent Task証拠ではない。Windows Application Control等のOS設定は変更していない。",
       "status": "unresolved",
       "status_source": "manual",
       "active": true,

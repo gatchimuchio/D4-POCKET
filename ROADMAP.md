@@ -17,6 +17,10 @@ Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`�
 
 最新の手動run [Windows Rust manual validation #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)は一時branch `codex/japanese-diagnostic`のcommit `84d402a930af48a6d29ce5075ba8692b02bddfd4`をWindows Server 2025／Rust 1.95.0で検査し、全target check／test、試験後clean確認が成功した（12 target、389 passed）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはWindows hosted Rust検査の補助証拠だけであり、installed product、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
 
+## Phase 7 Codex Task permission profileの現行観測（2026-09-28）
+
+Codex Task filesystem overrideを単一tableへ統合し、`glob_scan_max_depth=8`が後続設定に置き換えられないことをConformanceで固定した。Windows sandbox helperの最新合成marker観測では、通常NTFSのWorkspace内`.env`読取とWorkspace外書込は拒否、Workspace内書込は許可されたが、UserProfile／LocalAppData内の外部readとOneDrive `ReparsePoint` `.env`読取は許可された。`:root=deny`は現行Windows helperのelevated／unelevated両backendで起動不可だった。従って広域read隔離は未成立であり、Adapterの`task_execution=unsupported`を維持する。helper検査は実Broker Agent Taskではなく、Windows Application Control等の保護設定も変更していない。手動Windows Actions結果と対象commitは`VALIDATION.txt`および`docs/REV2_PROGRESS.md`の本追補を更新して記録する。
+
 ## 現行D4 Pocket統合単位（2026-09-28）
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。

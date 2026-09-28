@@ -26,8 +26,8 @@ const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
     // user設定を無視するTaskでもWindowsの強いsandbox方式を固定する。
     "windows.sandbox=\"elevated\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
-    "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=8",
-    "permissions.d4p-agent-task.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"}}",
+    // elevatedはeffective :root readを要求する。広域readをTask安全境界として扱わず、実証まではTaskをunsupportedに保つ。
+    "permissions.d4p-agent-task.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=8}",
     "permissions.d4p-agent-task.network.enabled=false",
 ];
 
@@ -169,11 +169,8 @@ impl 実行系Adapter for CodexCliAdapter {
             return Err(対話失敗::AgentTask非対応);
         }
         let context = context.ok_or(対話失敗::AgentTask非対応)?;
-        let mut scratch = WorkspaceTaskScratch::create(
-            &self.workspace,
-            self.workspace_identity,
-            &context,
-        )?;
+        let mut scratch =
+            WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
         let result = run_agent_task(
             &self.executable,
             &self.workspace,
@@ -460,9 +457,8 @@ impl WorkspaceTaskScratch {
                     let scratch_dir = workspace_dir
                         .open_dir_nofollow(&name)
                         .map_err(|_| 対話失敗::通信失敗)?;
-                    let metadata = scratch_dir
-                        .dir_metadata()
-                        .map_err(|_| 対話失敗::通信失敗)?;
+                    let metadata =
+                        scratch_dir.dir_metadata().map_err(|_| 対話失敗::通信失敗)?;
                     let scratch_identity = crate::broker::workspace_root::DirectoryIdentity {
                         device: cap_fs_ext::MetadataExt::dev(&metadata),
                         file_id: cap_fs_ext::MetadataExt::ino(&metadata),
@@ -808,9 +804,24 @@ mod tests {
                 for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
                     assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
                 }
-                assert!(args.windows(2).any(|pair| {
-                    pair == ["-c", "windows.sandbox=\"elevated\""]
-                }));
+                let filesystem_override = TASK_PERMISSION_PROFILE_OVERRIDES
+                    .iter()
+                    .find(|setting| setting.starts_with("permissions.d4p-agent-task.filesystem={"))
+                    .expect("glob走査深度を含む固定filesystem設定");
+                assert!(filesystem_override.starts_with("permissions.d4p-agent-task.filesystem={"));
+                assert_eq!(
+                    TASK_PERMISSION_PROFILE_OVERRIDES
+                        .iter()
+                        .filter(
+                            |setting| setting.starts_with("permissions.d4p-agent-task.filesystem")
+                        )
+                        .count(),
+                    1,
+                    "filesystem policyは単一overrideにまとめて後続tableに潰されない"
+                );
+                assert!(args
+                    .windows(2)
+                    .any(|pair| { pair == ["-c", "windows.sandbox=\"elevated\""] }));
             } else {
                 assert!(args
                     .windows(2)

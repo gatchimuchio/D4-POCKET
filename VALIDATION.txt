@@ -2169,3 +2169,79 @@ validation_update_2026_06_05_r2_windows_evidence_trust_reset:
       reason: The WSL-visible Flutter SDK shell scripts currently fail with CRLF line endings in this host.
       required_action: Validate Flutter through a usable Flutter toolchain host before using full current-host validation as release evidence.
       blocks_release: yes
+
+validation_update_2026_09_28_codex_task_profile_boundary:
+  scope: Correct Codex Task filesystem override composition and re-evaluate Windows sandbox helper boundaries without changing OS policy
+  base_commit: 2af9a6b8cb98023a1111ecabd8ec45a9f7f324db
+  temporary_branch: codex/task-profile-boundary
+  source_changes:
+    - Put minimal read, bounded glob depth 8, and Workspace secret deny-globs in one filesystem table override so a later table does not replace the earlier depth setting.
+    - Conformance asserts the serialized profile fields, rejects the former standalone depth override, and rejects unsupported root deny.
+    - Windows manual Rust workflow rustfmt now includes native/rust_helper/src/adapters/codex_cli.rs.
+  helper_observations:
+    classification: LIVE_RUNTIME
+    synthetic_data_only: true
+    results:
+      - Ordinary NTFS Workspace .env read was denied.
+      - Workspace write was allowed.
+      - Write outside Workspace was denied.
+      - Read outside Workspace under LocalAppData and UserProfile was allowed.
+      - OneDrive Workspace .env with ReparsePoint was readable.
+      - root deny failed in elevated mode because effective root read is required; unelevated mode also refused read-only access.
+    limitation: Sandbox helper observations do not exercise the production Broker Agent Task path.
+  checks:
+    - name: schema_check
+      command: python -X utf8 tooling/schema_check/check_schemas.py
+      status: passed
+      exit: 0
+      result: 149 schemas, 149 normal examples, 192 negative fixtures
+    - name: conformance
+      command: python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      exit: 0
+      result: 225 checks
+    - name: japanese_strict_audit
+      command: python -X utf8 tooling/日本語基底監査.py --strict
+      status: passed
+      exit: 0
+      result: 0 debt files, 0 findings
+    - name: rust_check
+      command: cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+      status: passed
+      exit: 0
+    - name: rustfmt
+      command: rustfmt --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs
+      status: passed
+      exit: 0
+    - name: focused_rust_test
+      command: cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1
+      status: passed
+      exit: 0
+      result: 1 passed
+    - name: codex_cli_strict_config
+      command: codex --strict-config -c 'windows.sandbox="elevated"' -c 'permissions.d4p-agent-task.extends=":workspace"' -c 'permissions.d4p-agent-task.filesystem={":minimal"="read",":workspace_roots"={"**/*.env"="deny","**/.ssh/**"="deny","**/secrets/**"="deny"},"glob_scan_max_depth"=8}' -c 'permissions.d4p-agent-task.network.enabled=false' exec --ignore-user-config --help
+      status: passed
+      exit: 0
+      scope: Configuration parse only; no model or Task execution.
+    - name: manifest_release_gate_packaging
+      status: passed_after_manifest_regeneration
+      commands:
+        - python -X utf8 tooling/manifest.py --check
+        - python -X utf8 tooling/release_gate_check.py
+        - python -X utf8 tooling/packaging_portability_check.py
+      exit: 0
+    - name: git_diff_check
+      command: git diff --check
+      status: passed
+      exit: 0
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+    os_security_policy_changed: false
+    paid_model_or_production_agent_task_run: false
+  release_gate_impact:
+    - item: Agent Task filesystem isolation
+      classification: release_blocker
+      reason: External reads remain allowed and OneDrive ReparsePoint deny behavior is not established; helper test is not the Broker production path.
+      required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
+      blocks_release: yes
