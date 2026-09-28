@@ -15,6 +15,8 @@ Windows runnerでRustのbuild／test／検査が必要な作業では、`.github
 
 Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`のDOS短縮名となり、Workspace rootの短縮名迂回防止規則がtest fixtureを拒否した。製品側のtilde拒否は維持し、workflowのRust検査step内だけ`TEMP`／`TMP`を`RUNNER_TEMP`配下の通常pathへ向ける。これはtest環境設定であり、製品rootの検査規則を緩和しない。
 
+最新の手動run [Windows Rust manual validation #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)は一時branch `codex/japanese-diagnostic`のcommit `84d402a930af48a6d29ce5075ba8692b02bddfd4`をWindows Server 2025／Rust 1.95.0で検査し、全target check／test、試験後clean確認が成功した（12 target、389 passed）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはWindows hosted Rust検査の補助証拠だけであり、installed product、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
+
 ## 現行D4 Pocket統合単位（2026-09-28）
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。

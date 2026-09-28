@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Rust試験診断文の日本語化とWindows全target検証（2026-09-28）
+
+日本語基底のstrict監査がRust test内の英語`expect`診断文を2件検出したため、`credential_vault.rs`の`Audit`を`監査記録の取得`へ、`mcp_center.rs`の`test executable`を`試験用実行ファイルの取得`へ変更した。変更はtest failure時の説明文字列だけで、production runtime、Authority、Permission、Approval、Audit挙動は変更していない。
+
+- 変更前の`python -X utf8 tooling/日本語基底監査.py --strict`は2 files／2 findingsで失敗。変更後の同一commandはrepository全体の負債file 0／finding 0で合格した。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/mcp_center.rs`は合格。`credential_vault.rs`全体の同条件checkは行内変更と無関係な既存整形差分を検出して失敗し、一括整形はしていない。`rustfmt --emit stdout`上で変更した当該行はformat結果と一致する。
+- 対象commit `84d402a930af48a6d29ce5075ba8692b02bddfd4`、一時branch `codex/japanese-diagnostic`に対し、手動`workflow_dispatch` Windows Actions [run #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)を実行。Windows Server 2025 image `win25-vs2026/20260922.246.2`、Rust／Cargo 1.95.0。対象SHA照合、workflow内rustfmt step、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認は全て成功した。12 test targetで389 passed／0 failed／0 ignored。Artifact uploadはなく、証拠はActions runとjob log。
+- Runner内のRust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`へ設定。Actionの成功はこのcommitのWindows hosted Rust検査だけを証明し、ローカルWindows Application Control、installed product、Owner実操作、非Windows実行、release readinessを証明しない。端末保護設定は変更せず、既存release blockerと`release_ready=false`を維持する。
+
 ## D4 Pocket C9 MCP stdio Credential限定注入とWindows hosted検証（2026-09-28）
 
 C9のWindows MCP stdio接続に限り、ProtectedStoreへ登録済みでMCP用途・対象Server IDが完全一致するCredentialを、FlutterやIPC応答へ返さず、native Owner確認後に対象stdio processの指定環境変数へ渡す経路を追加した。環境変数名はallowlist外の危険名・予約名を拒否する。接続後の使用AuditはCredential ID、対象Server、変数名、時刻だけを記録し秘密値を含めない。Credentialを受け取るServer processと子孫processは値を読取り外部送信でき、Windows Job Objectはsandboxではない。OAuth／HTTP、MCP以外、installed product運用、外部Server適合を実装・実証したものではなく、`release_ready=false`を維持する。

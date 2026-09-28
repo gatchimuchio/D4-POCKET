@@ -60,6 +60,62 @@ validation_update_2026_09_28_c0_evidence_refresh:
       required_action: Keep the existing registry blockers open until their own required evidence is collected.
       blocks_release: yes
 
+validation_update_2026_09_28_rust_test_diagnostic_japanese_and_windows_runner:
+  scope: Localize two Rust test failure diagnostics and validate the exact source commit on a manual Windows runner
+  source_commit: 84d402a930af48a6d29ce5075ba8692b02bddfd4
+  temporary_branch: codex/japanese-diagnostic
+  initial_observation:
+    command: python -X utf8 tooling/日本語基底監査.py --strict
+    status: failed_before_fix
+    exit: 1
+    result: 2 files and 2 diagnostic-string findings in Rust test code
+  checks:
+    - name: japanese_strict_audit_after_fix
+      command: python -X utf8 tooling/日本語基底監査.py --strict
+      status: passed
+      exit: 0
+      stdout_summary: debt files 0, findings 0
+      evidence_classification: INTERNAL_STATE
+    - name: rustfmt_mcp_center
+      command: rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/mcp_center.rs
+      status: passed
+      exit: 0
+    - name: rustfmt_credential_vault_full_file
+      command: rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/credential_vault.rs
+      status: failed_existing_format_drift
+      classification: known_limitation
+      blocks_release: no
+      reason: Existing formatting differences elsewhere in the file remain; the edited diagnostic line itself matches rustfmt output, and unrelated lines were not reformatted.
+      required_action: Keep changes bounded; handle whole-file formatting only in a separately scoped cleanup.
+    - name: windows_manual_rust_validation
+      workflow: .github/workflows/windows-manual-rust-validation.yml
+      trigger: workflow_dispatch
+      run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077
+      job: rust-validation
+      status: passed
+      target_commit: 84d402a930af48a6d29ce5075ba8692b02bddfd4
+      runner_os: Windows Server 2025
+      runner_image: win25-vs2026/20260922.246.2
+      rust: rustc 1.95.0 (59807616e 2026-04-14)
+      cargo: cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+      checks:
+        - checkout SHA matched workflow commit
+        - workflow rustfmt step passed
+        - cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+        - cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed
+        - 12 test targets: 389 passed, 0 failed, 0 ignored
+        - post-test working tree clean
+      test_temp: D:\a\_temp\gui-shell-test-temp
+      evidence_classification: FIXTURE | LIVE_RUNTIME
+      artifact: none
+  scope_limit: Windows hosted Rust compile/test only; no installed-product, local Application Control, non-Windows, or release-readiness proof.
+  release_gate_impact:
+    - item: Existing release blockers
+      classification: release_blocker
+      reason: Test-only diagnostic wording does not satisfy installed-product evidence or owner GO.
+      required_action: Keep the existing registry blockers open until their independent evidence is collected.
+      blocks_release: yes
+
 validation_update_2026_06_05_ci_broker_parity_startup_timeout:
   scope: GitHub Actions core-validation broker parity startup reliability
   commit: pre_commit_validation_from_40d6605540b850134e4ca56329e172bc0076f54b
