@@ -42,6 +42,7 @@ class BrokerClient implements BrokerTransport {
         '回帰Case登録',
         '回帰Case削除',
         '回帰Case削除中断確認',
+        'MCP切断',
       }.contains(operation);
       final response = await _channel
           .invokeMethod<String>('request', jsonEncode(request))

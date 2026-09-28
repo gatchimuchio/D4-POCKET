@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 Desktop MCP接続センターとOwner切断（2026-09-28）
+
+先行するRust Brokerのstdio discovery／一覧／Windows Owner切断へ、Desktop設定画面のMCP接続センターを接続した。一覧は利用者の明示操作で通常Broker IPCから取得し、Broker保持projectionを`INTERNAL_STATE`として扱う。表示はServer ID、表示名、stdio種別、Tool／Resource／Prompt件数に限定し、Tool説明本文、Credential ref、接続設定、秘密値は画面へ出さない。切断要求は既存Windows Broker channelから厳密な固定payloadで送り、Rust起動器のdefault No native Owner確認を通す。Owner確認後もBrokerが要求を再検証し、Job Objectのprocess群停止、永続`LIVE_RUNTIME` Audit確定、接続記録解消の順を維持する。FlutterはOwner資格、session file、Approvalを保持せず、新しいauthority経路は追加していない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib MCP切断 -- --test-threads=1 --nocapture`：2件成功。Brokerの切断統治とnative Owner確認候補の固定範囲・余分field拒否を確認した。確認候補testはインストール済製品上のOwner操作証拠ではない。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。library 324件、main 10件、`broker_ipc` 10件、`canonical_decimal_hash` 1件、`checkpoint` 8件、`protected_data` 2件は成功した。次の`protected_startup` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetを含む全target試験は未完了。拒否fileの移動・再配置、test除外、policy変更はしていない。
+- Flutter focused MCP client／widget testはTemp source copyで2件成功し、`flutter analyze --no-pub`も同copyで指摘なし。OneDrive workspaceでのFlutter testは`build\\unit_test_assets` cleanup拒否によりtest前に失敗した。full Desktop Flutter suiteはTemp copyからRust helperを実行した段階で同じOS error 4551により完遂できず、全suite成功とは扱わない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常example 147件、negative fixture 183件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで成功。`python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で成功。`python -X utf8 tooling/manifest.py --check`：成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。開発用10検査が成功し、evidence bundleはWindows release blocker 5件を保持して`release_ready=false`。Rust全target／Flutter全suite、installed product、実外部MCP Server、正式releaseの証拠へ昇格しない。
+- Registryのactive unresolved release blocker 15件と`release_ready=false`を維持する。画面widget／fake transport／native確認候補はinstalled productのOwner操作証拠ではない。新規MCP接続設定画面、Tool実行、Credential実値注入、Resource／Prompt実取得、Streamable HTTP、OAuth、consent、quarantine、外部MCP Harness、非Windows process群監督は未成立の`release_blocker`として維持する。
+
 ## D4 Pocket C9 MCP stdio Owner切断のBroker実装（2026-09-28）
 
 既存Rust Brokerのowner-control経路に`MCP切断`を追加した。Owner CLIは既存のBroker認証経路へ厳密な切断要求を送り、Brokerは登録済みServerだけを対象にする。Windowsでは既存Job Object監督下のprocess群停止を確認し、`LIVE_RUNTIME`として分類した永続accepted Auditの確定後に限って接続記録を削除する。停止確認またはAudit確定が失敗した場合は記録を残して再確認を要求する。非Windowsではprocess群停止保証がないためfail-closedで拒否する。通常IPC、未知field、未知Serverを拒否し、receiptとAuditへ実行path、argv、workspace、credential実値を含めない。Permission・Approvalを生成しない。

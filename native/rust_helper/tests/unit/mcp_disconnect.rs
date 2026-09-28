@@ -173,6 +173,26 @@ echo {"jsonrpc":"2.0","id":1,"result":{"supportedVersions":["__PROTOCOL_VERSION_
     );
     assert!(broker.mcp_connections.contains_key("mcp-fixture"));
 
+    let listed_before_disconnect = normal_request(
+        &mut broker,
+        "list-before-disconnect",
+        BrokerOperation::MCP接続一覧,
+        json!({"版":1}),
+    );
+    assert_eq!(listed_before_disconnect.status, BrokerStatus::Accepted);
+    assert_eq!(
+        listed_before_disconnect.evidence_source,
+        EVIDENCE_SOURCE_INTERNAL_STATE
+    );
+    let list_body = listed_before_disconnect.body.as_ref().expect("MCP一覧");
+    assert_eq!(list_body["証拠種別"], "INTERNAL_STATE");
+    assert_eq!(list_body["件数"], 1);
+    assert_eq!(list_body["MCP接続一覧"][0]["証拠種別"], "INTERNAL_STATE");
+    assert_eq!(
+        list_body["MCP接続一覧"][0]["Server"]["server_id"],
+        "mcp-fixture"
+    );
+
     let disconnected = owner_request(&mut broker, "owner-disconnect-request", "MCP切断", payload);
     assert_eq!(disconnected.status, BrokerStatus::Accepted, "owner切断");
     assert_eq!(disconnected.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);

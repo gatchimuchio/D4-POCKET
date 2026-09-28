@@ -82,6 +82,10 @@ enum DesktopOwnerOperationSummary {
         summary: OwnerRegistrationConfirmationSummary,
         payload_hash: String,
     },
+    McpDisconnect {
+        server_id: String,
+        payload_hash: String,
+    },
 }
 
 #[derive(Deserialize)]
@@ -99,6 +103,17 @@ struct AgentTaskOwnerApprovalRequest {
     session_id: String,
     workspace_id: String,
     instruction: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct McpDisconnectOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "ServerID")]
+    server_id: String,
 }
 
 fn agent_task_permission_identifier_is_valid(value: &str) -> bool {
@@ -816,6 +831,22 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::MCP切断 => {
+            let request: McpDisconnectOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || request.operation != "切断"
+                || request.server_id.is_empty()
+                || request.server_id.len() > 128
+                || request.server_id.chars().any(char::is_control)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::McpDisconnect {
+                server_id: request.server_id,
+                payload_hash,
+            }
+        }
         BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary: owner_delete_confirmation_summary(payload).ok()?,
             payload_hash,
@@ -978,6 +1009,14 @@ fn owner_confirmation_text_for_identity(
         } => format!(
             "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             runtime_id, session_id, workspace_id, instruction_characters, instruction_hash, payload_hash
+        ),
+        DesktopOwnerOperationSummary::McpDisconnect {
+            server_id,
+            payload_hash,
+        } => format!(
+            "指定したMCP Serverの接続を切断しますか？\n\nServer ID: {}\n対象: このBrokerが保持する指定stdio process群だけ\n処理: Windows Job Objectによるprocess群停止確認後、永続Auditを確定して接続記録を解消\n\nCredential、他Server、Permission、Approvalを変更せず、Toolを実行しません。停止またはAudit確定に失敗した場合は成功扱いしません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            server_id.escape_debug(),
+            payload_hash
         ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
@@ -2302,6 +2341,83 @@ mod tests {
         assert!(!text.contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
         assert!(owner_confirmation_text(&summary)
             .contains(r"%LOCALAPPDATA%\GUI-Shell\broker\desktop\exports"));
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn MCP切断はServer固定のnativeOwner確認を要求し余分なfieldを拒否する() {
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "切断",
+            "ServerID": "mcp-fixture"
+        });
+        let payload_hash = canonical_payload_hash(Some(&payload));
+        let input = serde_json::json!({
+            "request_id": "desktop-mcp-disconnect",
+            "operation": "MCP切断",
+            "payload": payload.clone(),
+            "payload_hash": payload_hash,
+            "nonce": "desktop-mcp-disconnect-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (normalized, summary) = owner_operation_candidate(
+            input.to_string().as_bytes(),
+            &endpoint,
+        )
+        .expect("MCP切断はnative Owner確認候補");
+        assert_eq!(
+            BrokerRequestEnvelope::from_json_str(&normalized)
+                .unwrap()
+                .session_id
+                .as_deref(),
+            Some("desktop-session")
+        );
+        let confirmation = owner_confirmation_text(&summary);
+        assert!(confirmation.contains("mcp-fixture"));
+        assert!(confirmation.contains("Windows Job Object"));
+        assert!(confirmation.contains("永続Audit"));
+        assert!(confirmation.contains("payload hash"));
+        assert!(!confirmation.contains("credential_value"));
+        assert!(!confirmation.contains("実行file"));
+
+        let mut escalated = payload.clone();
+        escalated["credential_value"] = serde_json::json!("secret-marker");
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-disconnect-escalated",
+            "operation": "MCP切断",
+            "payload_hash": canonical_payload_hash(Some(&escalated)),
+            "payload": escalated,
+            "nonce": "desktop-mcp-disconnect-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+
+        let malformed = serde_json::json!({
+            "版": 1,
+            "操作": "切断",
+            "ServerID": "mcp\nfixture"
+        });
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-disconnect-malformed",
+            "operation": "MCP切断",
+            "payload_hash": canonical_payload_hash(Some(&malformed)),
+            "payload": malformed,
+            "nonce": "desktop-mcp-disconnect-malformed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]

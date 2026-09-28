@@ -9,6 +9,7 @@ import '../services/export_client.dart';
 import '../services/profile_client.dart';
 import '../services/shell_core_client.dart';
 import '../services/update_client.dart';
+import 'mcp_connection_center.dart';
 import 'shared.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -170,6 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '危険または権限関連の設定には、操作者確認用の印を付けます。',
           ],
         ),
+        McpConnectionCenterPanel(transport: widget.client.brokerTransport),
         _profilePanel(),
         _composePanel(),
         _exportPanel(),
@@ -396,8 +398,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed:
-                _exportInProgress ? null : () => _runExport(client),
+            onPressed: _exportInProgress ? null : () => _runExport(client),
             icon: _exportInProgress
                 ? const SizedBox.square(
                     dimension: 18,

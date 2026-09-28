@@ -11,7 +11,7 @@
 
 ### C9 MCP stdio監督とOwner切断（2026-09-28）
 
-MCP stdio childは既存Rust Job Object監督経路で起動し、Owner専用`MCP切断`はBrokerからprocess群停止を確認した後、永続`LIVE_RUNTIME` Auditを確定して接続記録を解消する。未知Server・通常IPCからの要求は拒否し、停止またはAudit確定に失敗した場合は記録を保持する。Windows fake-serverを使うfocused Broker試験1件が成功した。`cargo check --all-targets`は成功したが、現行sourceの全target試験はlibrary 323件・CLI 10件成功後、`broker_ipc.exe`がWindows Application Control（OS error 4551）で起動前に拒否され未完了。実外部MCP Server、installed product、GUI切断面の証拠ではなく、GUI接続・Tool実行等は`release_blocker`である。Rust全target実行gateを未解決へ再開し、active unresolved blockerは15件。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
+MCP stdio childは既存Rust Job Object監督経路で起動し、Owner専用`MCP切断`はBrokerからprocess群停止を確認した後、永続`LIVE_RUNTIME` Auditを確定して接続記録を解消する。Desktop設定にmetadata-only接続一覧と個別切断を追加し、切断要求は既存Windows Rust起動器のdefault No native Owner確認へ通す。停止またはAudit確定に失敗した場合は記録を保持し、未知Server・通常IPCからの要求を拒否する。Windows fake-serverを使うfocused Broker試験、native確認候補、Dart client／widget試験を追加した。`cargo check --all-targets`は成功したが、現行sourceの全target試験はlibrary 324件、main 10件、複数integration target成功後、`protected_startup` test executableがWindows Application Control（OS error 4551）で起動前に拒否され未完了。Flutter widgetとnative確認candidateは実installed productのOwner操作証拠ではない。新規接続設定UI、Tool実行等は`release_blocker`である。Rust全target実行gateを未解決へ再開し、active unresolved blockerは15件。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
 
 ### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
 

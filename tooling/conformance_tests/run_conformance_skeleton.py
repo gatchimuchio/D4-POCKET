@@ -5209,6 +5209,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_connection_unknown_authority.invalid.json",
         "mcp_connection_receipt_full_content.invalid.json",
         "mcp_connection_list_wrong_evidence.invalid.json",
+        "mcp_connection_list_entry_live_evidence.invalid.json",
         "mcp_disconnect_authority.invalid.json",
         "mcp_disconnect_receipt_not_stopped.invalid.json",
         "mcp_disconnect_receipt_wrong_evidence.invalid.json",
@@ -5239,6 +5240,16 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         不整合.append("C9 MCP切断receiptがLIVE_RUNTIMEまたは権限非生成ではない")
     if any(token in json.dumps(disconnect, ensure_ascii=False) for token in ("実行file", "workspace", "credential_value", "secret_value")):
         不整合.append("C9 MCP切断receiptへ接続設定または秘密値が混入している")
+
+    connection_list = load_contract_fixture("mcp_connection_list.valid.json")
+    listed_connections = connection_list.get("MCP接続一覧")
+    if (
+        connection_list.get("証拠種別") != "INTERNAL_STATE"
+        or not isinstance(listed_connections, list)
+        or len(listed_connections) != connection_list.get("件数")
+        or any(item.get("証拠種別") != "INTERNAL_STATE" for item in listed_connections)
+    ):
+        不整合.append("C9 MCP接続一覧の保存状態証拠と件数が正本に一致しない")
 
     rust_mcp = (RUST_HELPER / "src" / "mcp.rs").read_text(encoding="utf-8")
     rust_stdio = (RUST_HELPER / "src" / "adapters" / "mcp_stdio.rs").read_text(encoding="utf-8")

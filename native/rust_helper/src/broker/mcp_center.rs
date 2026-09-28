@@ -285,7 +285,17 @@ pub(super) fn list(
     let connections: Vec<Value> = broker
         .mcp_connections
         .values()
-        .map(|entry| entry.projection.clone())
+        .map(|entry| {
+            let mut projection = entry.projection.clone();
+            projection
+                .as_object_mut()
+                .expect("MCP接続projectionはobject")
+                .insert(
+                    "証拠種別".to_string(),
+                    Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()),
+                );
+            projection
+        })
         .collect();
     let body = json!({
         "版": VERSION,

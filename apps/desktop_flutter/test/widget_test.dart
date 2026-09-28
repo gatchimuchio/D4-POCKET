@@ -263,7 +263,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('MCP接続の設定面を開く'), findsOneWidget);
+    expect(find.text('MCP接続一覧とOwner確認付き切断を開く'), findsOneWidget);
   });
 
   testWidgets('全体検索がCtrl+Shift+Fで開き画面遷移だけを行う', (WidgetTester tester) async {

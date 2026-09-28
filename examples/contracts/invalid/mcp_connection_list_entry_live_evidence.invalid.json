@@ -14,7 +14,7 @@
       "Capability diff": {},
       "権限生成": "なし",
       "公開範囲": "metadata_only",
-      "証拠種別": "INTERNAL_STATE",
+      "証拠種別": "LIVE_RUNTIME",
       "接続状態": "connected",
       "能力ID": "mcp.connection.connect",
       "権限ID": "permission.mcp.connection.connect",

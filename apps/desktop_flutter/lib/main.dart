@@ -885,7 +885,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
         ),
       const _CommandEntry(
         title: 'MCP接続',
-        subtitle: 'MCP接続の設定面を開く',
+        subtitle: 'MCP接続一覧とOwner確認付き切断を開く',
         pageIndex: 11,
         icon: Icons.extension_outlined,
         keywords: 'MCP 接続 道具 資源 提示',
