@@ -2683,3 +2683,48 @@ validation_update_2026_09_29_codex_adapter_task_fixture:
       reason: The test uses a fake process outside the Broker Task consumer and does not prove real Agent sandbox isolation.
       required_action: Prove the production Broker-to-Agent path, isolation, cancellation, audit, recovery, and cleanup under the applicable owner authorization.
       blocks_release: yes
+
+validation_update_2026_09_29_codex_adapter_descendant_process_fixture:
+  scope: Verify timeout termination of a fake Codex CLI child process tree and Adapter scratch cleanup without production Agent credentials or model requests
+  target_branch: codex/agent-task-descendant-check
+  target_commit: 6441ae8b2827d2afa01f9963ff2472fd2b889ce2
+  trigger: workflow_dispatch
+  run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538
+  status: passed
+  runner_os: Windows Server 2025
+  runner_image: win25-vs2026/20260922.246.2
+  rust_toolchain: 1.95.0
+  rust_test_temp: D:\a\_temp\gui-shell-test-temp
+  checks:
+    - checkout HEAD matched GITHUB_SHA
+    - workflow-selected rustfmt checks passed
+    - cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+    - cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed: 12 test targets, 391 passed, 0 failed, 0 ignored
+    - fake Codex CLI child heartbeat stopped after Adapter timeout; workspace scratch and recovery journal were clear
+    - post-test working tree clean
+  local_checks:
+    cargo_check_all_targets: passed
+    focused_descendant_fixture_test: failed_before_assertions
+    focused_descendant_fixture_test_observation: Codex CLI version probe could not start; this run did not expose an OS error code
+    integrated_development_validation: passed
+    integrated_development_validation_command: python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+    integrated_development_validation_result: exit 0, 10 registered checks; schemas 149, examples 149, negative fixtures 192, conformance 225, strict Japanese audit 1110 files and 0 findings
+  evidence_source: FIXTURE
+  evidence_scope: Direct CodexCliAdapter calls using a test-only fake executable; no Broker Task consumer, real Codex Agent, model request, production sandbox enforcement, or filesystem isolation claim.
+  authority_and_release:
+    task_execution: unsupported
+    production_agent_run: false
+    paid_credential_used: false
+    os_security_policy_changed: false
+    release_ready: false
+  integration:
+    target_branch: main
+    commit: 6441ae8b2827d2afa01f9963ff2472fd2b889ce2
+    main_remote_head_verified: true
+    temporary_branch_deleted_local_and_remote: true
+  release_gate_impact:
+    - item: Production Agent Task isolation and execution
+      classification: release_blocker
+      reason: The test is a direct Adapter fixture and does not prove the production Broker-to-Agent path or filesystem sandbox enforcement.
+      required_action: Prove the production Broker-to-Agent path, outside-path and secret-file denials, cancellation, audit, recovery, and cleanup under the applicable owner authorization.
+      blocks_release: yes

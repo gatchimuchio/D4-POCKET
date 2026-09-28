@@ -184,12 +184,12 @@
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36465355560",
-        "target_commit": "33787c35ea26bdbb2bae3ad0376bb5c8baa9792b",
-        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testに成功し、12 test target、390 passed、0 failed、0 ignored。rustfmtと試験後cleanも成功。",
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538",
+        "target_commit": "6441ae8b2827d2afa01f9963ff2472fd2b889ce2",
+        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testに成功し、12 test target、391 passed、0 failed、0 ignored。rustfmtと試験後cleanも成功。",
         "scope_limit": "hosted Rust検査のみ。実Agent Task、production runtime、installed product、release readinessを証明しない。"
       },
-      "reason": "2026-09-29の現行main commit `c770680e1868675d710657a11f300f9b38197578`に対する手動Windows Actions [run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)は、Windows Server 2025／Rust 1.95.0でcargo check／test全targetに成功し、12 test target／389件が通過した。変更Rust fileのrustfmtと試験後cleanも成功した。過去のrun #3、#10、#12およびローカルOS error 4551は履歴として保持する。証拠はhosted WindowsのRust検査に限り、実Agent Task、installed product、production runtime、release readinessを証明しない。先行run #9のtest compile failureと修正はdocs/REV2_PROGRESS.mdに履歴として保持する。",
+      "reason": "Rust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`に対する手動Windows Actions [run #17](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538)は、Windows Server 2025／Rust 1.95.0でcargo check／test全targetに成功し、12 test target／391件が通過した。変更Rust fileのrustfmtと試験後cleanも成功した。過去のrun #3、#10、#12およびローカルOS error 4551は履歴として保持する。証拠はhosted WindowsのRust検査に限り、実Agent Task、installed product、production runtime、release readinessを証明しない。先行run #9のtest compile failureと修正はdocs/REV2_PROGRESS.mdに履歴として保持する。",
       "required_action": "後続のRust変更も必要に応じて.github/workflows/windows-manual-rust-validation.ymlをworkflow_dispatchで対象commitへ実行する。ローカルWindowsのApplication Controlを緩和せず、拒否file移動やtest除外で回避しない。"
     },
     {

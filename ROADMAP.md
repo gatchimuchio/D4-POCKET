@@ -11,6 +11,8 @@
 
 この基準後の`main`には、Codex Adapterの成功・期限超過後cleanupを偽CLIで検査する`FIXTURE` testを含むcommit `bd36dab45eb8da9d76caeebcd3a0b97fe29579b4`を統合した。作業treeでの統合開発検査はexit 0、Windows Actions #16は同commitに対して12 target／391 passedで成功した。これはCodex実Agent、Broker consumer経由起動、実sandbox隔離を証明せず、`task_execution=unsupported`とrelease blockerを維持する。
 
+Windows Rust手動補助検証 [run #17](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538)は、一時branch上のRust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査した。checkout SHA、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、391 passed／0 failed／0 ignored）、試験後cleanが成功し、子孫process停止を検査する偽CLI fixtureも通過した。同じcommitを`main`へfast-forward pushし、remote HEAD一致後に一時branchをlocal／remoteから削除した。追加証拠は直接Adapter呼出しの`FIXTURE`であり、production Broker Task、実Agent sandbox／Workspace隔離を証明しない。ローカルの新fixture focused testはCLI probe起動前に失敗し、OS error番号は採取できなかった。`task_execution=unsupported`、Agent隔離等の`release_blocker`、`release_ready=false`を維持する。
+
 履歴: 2026-09-28の基準更新では、変更前のclean `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c`にMANIFESTのhash不一致25件と必須source file欠落2件があったため、正規toolで1103件を再生成し、manifest checkとrelease gateを合格させた。この記録は当時の観測であり、現行`main`の状態を示すものではない。
 
 ## Windows Rust手動補助検証（2026-09-29追補）

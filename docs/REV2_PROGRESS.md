@@ -2688,3 +2688,17 @@ Codex AdapterのTask経路はproduction metadataで`unsupported`のままであ�
 - Windows Actions [run #16](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36471921842)：一時branch `codex/codex-adapter-fixture`のcommit `bd36dab45eb8da9d76caeebcd3a0b97fe29579b4`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査。checkout SHA、rustfmt、全target `cargo check`／`cargo test`、試験後cleanが成功し、12 targetで391 passed／0 failed／0 ignored。偽CLI fixture testも成功した。
 
 この結果は指定commit上のhosted Windows Rust compile／testおよび偽CLIを使うAdapter `FIXTURE`だけの証拠である。installed product、production Broker Task、実Agent、実sandbox隔離、ローカルWindows Application Controlの生成executable起動、release readinessは証明しない。一時branchは`main`へのfast-forward後に削除し、`main`が作業commitへ同期した。
+
+## Codex Adapter期限超過時の子孫process停止fixtureとWindows Actions #17（2026-09-29）
+
+前回の偽Codex CLI Adapter fixtureを拡張し、期限超過時に偽CLIが別processの子孫を生成し、Workspace外に置いたtest markerへ周期的にheartbeatを書き込むケースを加えた。Adapterがtimeoutを返した後にmarker byte数が増えないこと、Workspace Task scratchが残らないこと、recovery journalに未解決entryがないことを検査する。childはtest専用executableであり、実Codex CLIやBroker Task consumerは使わない。
+
+証拠源は`FIXTURE`で、直接`CodexCliAdapter`を呼び出すWindows単体試験である。Job Objectのprocess群停止とfixture cleanupだけを示し、実Agent、production Broker consumer、mxc sandboxの実効性、Workspace外／秘密fileのread拒否、実Agent書込隔離、cancel、Agent間contamination、結果表示を証明しない。`task_execution=unsupported`、Agent実行・隔離等の`release_blocker`、`release_ready=false`を維持する。実Credential、課金、Model request、Windows security policy変更は行っていない。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：ローカルで合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る -- --test-threads=1 --nocapture`：ローカルでは偽CLIのversion probe起動前に失敗し、`Codex CLI probeを起動できない`を観測。assertionには到達せず、この実行のOS error番号は取得できなかった。Application Controlの変更、生成fileの移動、試験除外、回避経路は行わなかった。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済み10検査合格。Schema 149件、正常example 149件、negative fixture 192件、Conformance 225 checks、厳格日本語監査1110 file／finding 0件。これはRust実行試験を含まない。release blocker 5件、`release_ready=false`を維持。
+- Windows Actions [run #17](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538)：一時branch `codex/agent-task-descendant-check`上の正確なRust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査。checkout HEADと対象SHAの一致、workflow指定Rust fileのrustfmt、全target `cargo check`、全target `cargo test -- --test-threads=1`、試験後clean確認が成功した。12 test targetで391 passed／0 failed／0 ignored。拡張した子孫process停止fixtureも成功。Rust test用`TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。artifactなし。
+- 同じRust source commitを`main`へfast-forward pushし、`git ls-remote origin refs/heads/main`が`6441ae8b2827d2afa01f9963ff2472fd2b889ce2`と一致することを確認した。目的を終えた一時branchはlocal／remote双方から削除した。
+
+このActions結果は対象commit上のhosted Windows Rust build／testだけを証明し、ローカルWindowsでの生成executable起動可否、installed product、production Agent Task、release readinessを証明しない。`windows_rust_integration_test_execution_policy`のhosted検査gateは解消状態を維持する一方、実Agent隔離のrelease blockerは解消しない。

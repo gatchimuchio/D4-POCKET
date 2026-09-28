@@ -382,7 +382,7 @@ known limitation を認める条件は、次のとおりである。
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
   status: resolved
-  reason: 現行main commit `c770680e1868675d710657a11f300f9b38197578`に対する手動run [36445136387](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387) で、Windows Server 2025／Rust 1.95.0の`cargo check --all-targets`と12 target／389件の`cargo test --all-targets`が成功し、rustfmtと試験後cleanも確認した。証拠はこのcommitのhosted Windows検査に限り、installed product、実Agent Task、ローカルApplication Control、release readinessを示さない。過去commitの失敗・成功記録は`docs/REV2_PROGRESS.md`に保持する。
+  reason: Rust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`に対する手動run [36475650538](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538) で、Windows Server 2025／Rust 1.95.0の`cargo check --all-targets`と12 target／391件の`cargo test --all-targets`が成功し、rustfmtと試験後cleanも確認した。commitは`main`へ統合済み。証拠はこのcommitのhosted Windows検査に限り、installed product、実Agent Task、ローカルApplication Control、release readinessを示さない。過去commitの失敗・成功記録は`docs/REV2_PROGRESS.md`に保持する。
   required_action: 後続のRust変更も必要に応じて`.github/workflows/windows-manual-rust-validation.yml`をworkflow_dispatchで対象commitへ実行する。ローカルWindowsのApplication Controlは弱めず、拒否file移動やtest除外で回避しない。
   blocks_release: yes
 
