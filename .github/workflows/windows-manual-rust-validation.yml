@@ -31,13 +31,16 @@ jobs:
             "ref=$env:GITHUB_REF"
             "runner_os=$env:RUNNER_OS"
             "runner_image=$env:ImageOS/$env:ImageVersion"
+            "temp=$env:TEMP"
+            "tmp=$env:TMP"
+            "runner_temp=$env:RUNNER_TEMP"
             "rustup=$(rustup --version)"
           ) | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-rust-environment.txt"
           rustup toolchain install 1.95.0 --profile minimal
           rustup component add rustfmt --toolchain 1.95.0
           rustc +1.95.0 --version
           cargo +1.95.0 --version
-          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``; TEMP: ``$env:TEMP``; TMP: ``$env:TMP``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP 'gui-shell-rust-target'
           "CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: 変更Rust fileの整形を検査

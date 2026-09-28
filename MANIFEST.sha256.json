@@ -73,7 +73,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "60e760987bf7de7dbe08657e9b8e5164d2225b662bfda36abee5d8161bf96e71"
+      "sha256": "dc1a17dd19a30427b3dea0aa7b61c80a237e349351043001290e89ad8f139d13"
     },
     {
       "path": ".gitignore",
