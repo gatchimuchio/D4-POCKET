@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP Tool引数preflightとWindows Rust全target検証（2026-09-28）
+
+MCP catalogに登録されたTool名とその`inputSchema`に対し、引数をJSON Schema Draft 2020-12で事前検査する`McpCatalog.validate_tool_call`を追加した。引数はobjectに限定し、正本化後32 KiB以下、2048 JSON node以下、深さ32以下とする。Permission、Approval、Credential等のauthority fieldはnested位置も拒否し、schema不適合・未登録Tool・上限超過は固定error codeでfail-closedにする。raw arguments、schema本文、validator詳細はmetadata projectionへ出さない。
+
+- Production path／Authority境界: この関数はRust catalogの事前検査であり、Broker／stdio production経路からは未接続である。`tools/call`を送らず、Toolを実行せず、Permission、Approval、AuditEvent、RecoveryAction、結果本文のContent Exposureを生成しない。したがってTool executionは引き続き`unsupported`／`release_blocker`であり、metadataや検査成功を実行許可へ昇格させない。
+- 対象commit `e02b3d2eae48cfb5c4ddbdbee97cc95feaea4bd0`をbranch `codex/mcp-tool-input-validation`へpushし、手動`workflow_dispatch` run [36389650114](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36389650114)でWindows Server 2025 runner image `win25-vs2026/20260922.246.2`にcheckoutした。workflowのcheckout SHA照合、`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/mcp.rs`、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認がすべて成功した。Rust/Cargoは1.95.0。12 test executable合計380 passed／0 failed／0 ignored。workflow全体は5分35秒。artifact uploadはworkflowに存在せず、証拠はrun statusとlogである。
+- Local Windowsでは同じRust全target試験を起動しようとしたが、依存crate `io-lifetimes`のbuild scriptがApplication ControlのOS error 4551で実行前に阻止され、testまで到達しなかった。OS security policy、registry、SACは変更せず、このhost失敗を製品test失敗またはPASSへ読み替えない。
+- Source候補のローカル検査: Schema 147件／正常例147件／negative fixture 187件、Conformance 225 checks、日本語基底strict監査（debt file 0／finding 0）、対象fileのrustfmt、Manifest、Release Gate、Evidence bundle、`git diff --check`は成功。進捗追記とManifest更新後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0で10検査すべて成功した。Evidence bundleはactive release blocker 14件を維持して`release_ready=false`を返し、C32開発監査は未完成機能の証拠ではない`post_v1_scope`分類で成功した。
+- このActions runは上記のRust source commitだけをWindows runnerで検証し、installed productの起動・Owner操作、外部MCP Server、Toolのproduction実行、非Windows挙動、正式release readinessを証明しない。C9接続経路、Credential実値注入、Tool実行とそのAuthority／Approval／Audit／Recovery／Content Exposure統治、Resource／Prompt本文取得、外部MCP実物Test Harness、非Windows process群監督は既存の`release_blocker`分類を保持する。
+
 ## D4 Pocket Windows Rust全target再検証と秒境界試験の安定化（2026-09-28）
 
 最新`main` commit `6b5e63b21b6571474682a9b05be09dd361893901`を対象にしたWindows手動run [36384181554](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36384181554) は、Rust全targetのcheck後にtest 332件中331件成功・1件失敗となった。失敗は`broker::protocol::端末統治試験::Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する`のPermission期限assertionで、発行応答のUnix秒 `1790575630` と、応答後に再取得した現在時刻から算出した期待値 `1790575631` が秒境界を跨いで1秒ずれた。Permissionの300秒有効期間やproduction挙動の失敗ではなく、秒精度の時刻を別時点で比較した試験不安定性と判定した。失敗runは履歴として保持し、成功へ書き換えない。
