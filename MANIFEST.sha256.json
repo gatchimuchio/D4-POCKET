@@ -77,7 +77,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "e7f02c426c2495e5140375e665c443d71e79d3c7868fe59173753748395861e2"
+      "sha256": "867d38c9b0c05f32543dd7ffba084f2208caf79c9d73bb50666e39d6aa8b6321"
     },
     {
       "path": ".gitignore",
@@ -3073,7 +3073,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "b34baa92d89337909f44c518929bf08b5cfd32efcef2a18253eb3c57ee177b09"
+      "sha256": "d01d8ee2c67d4d6380daa4bba520ab257bfa3fbbf7f4f46dea875d338e224d5f"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3258,6 +3258,10 @@
     {
       "path": "native/rust_helper/tests/protected_store.rs",
       "sha256": "effff09941e3ba0c370425f0164fbfbe7af5e056de316b2d274311a119e91d36"
+    },
+    {
+      "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
+      "sha256": "9f029c981310a0796110beddb01614f65b984f9a57389da411a1322285ac2558"
     },
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",

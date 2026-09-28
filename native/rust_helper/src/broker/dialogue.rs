@@ -213,8 +213,7 @@ impl AgentAdapterMetadata {
     /// Adapter宣言は実行許可を与えない。未対応・不明な経路へOwner権限を発行しないための拒否条件にだけ使う。
     fn task_execution_supported(&self) -> bool {
         self.capabilities.iter().any(|capability| {
-            capability.capability_id == "task_execution"
-                && capability.support.status == "supported"
+            capability.capability_id == "task_execution" && capability.support.status == "supported"
         })
     }
 
@@ -779,7 +778,9 @@ impl 対話制御 {
 
     /// C4のterminal隔離後、評価対話のworker受信側とsessionの双方が実際に
     /// 解放されたことだけをC5が確認する。外部実行の停止やC4の成功は示さない。
-    pub(crate) fn 評価対話回収済み(&self, 要求ID: &str, 対話セッションID: &str) -> bool {
+    pub(crate) fn 評価対話回収済み(
+        &self, 要求ID: &str, 対話セッションID: &str
+    ) -> bool {
         !self.作業.contains_key(要求ID) && !self.セッション.contains_key(対話セッションID)
     }
 
@@ -838,18 +839,13 @@ impl 対話制御 {
                 match receiver.try_recv() {
                     Ok(value) => Some(value),
                     Err(mpsc::TryRecvError::Empty) => None,
-                    Err(mpsc::TryRecvError::Disconnected) => {
-                        return Err(対話失敗::通信失敗)
-                    }
+                    Err(mpsc::TryRecvError::Disconnected) => return Err(対話失敗::通信失敗),
                 }
             };
             if let Some(value) = received {
                 let (sender, receiver) = mpsc::sync_channel(1);
                 sender.send(value).map_err(|_| 対話失敗::通信失敗)?;
-                self.作業
-                    .get_mut(要求ID)
-                    .ok_or(対話失敗::要求不正)?
-                    .受信 = Some(receiver);
+                self.作業.get_mut(要求ID).ok_or(対話失敗::要求不正)?.受信 = Some(receiver);
                 return Ok(());
             }
             if Instant::now() >= deadline {
@@ -954,9 +950,7 @@ impl 対話制御 {
             }
         }
         for task in self.agent_tasks.values_mut() {
-            if sessions.contains(&task.session_id)
-                && matches!(task.status, "pending" | "running")
-            {
+            if sessions.contains(&task.session_id) && matches!(task.status, "pending" | "running") {
                 task.cancel.store(true, Ordering::SeqCst);
             }
         }
@@ -1378,9 +1372,7 @@ impl 対話制御 {
                 {
                     return Err(対話失敗::作業領域不在);
                 }
-                let scratch_journal = scratch_journal
-                    .clone()
-                    .ok_or(対話失敗::AgentTask非対応)?;
+                let scratch_journal = scratch_journal.clone().ok_or(対話失敗::AgentTask非対応)?;
                 if scratch_journal.has_pending_workspace(&request.workspace_id) {
                     return Err(対話失敗::権限拒否);
                 }
@@ -1613,10 +1605,7 @@ impl 対話制御 {
                     .transpose()?;
                 let workspace_id = if agent.is_some() {
                     let binding = 作業領域結合.ok_or(対話失敗::作業領域不在)?;
-                    let workspace_id = 指定
-                        .作業領域ID
-                        .as_deref()
-                        .ok_or(対話失敗::作業領域不在)?;
+                    let workspace_id = 指定.作業領域ID.as_deref().ok_or(対話失敗::作業領域不在)?;
                     if !binding.matches(&指定.実行系ID, workspace_id) {
                         return Err(対話失敗::作業領域不在);
                     }
@@ -2287,6 +2276,10 @@ fn 表示射影(work: &作業, 結果: &Result<実行結果, 対話失敗>) -> V
 }
 
 #[cfg(test)]
+#[path = "../../tests/unit/agent_task_fixture_fs.rs"]
+mod agent_task_fixture_fs;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
@@ -2301,19 +2294,25 @@ mod tests {
         assert!(!parsed.task_execution_supported(), "宣言の欠落は未対応扱い");
 
         let mut task_unknown = valid.clone();
-        task_unknown["capabilities"].as_array_mut().unwrap().push(json!({
-            "capability_id": "task_execution",
-            "support": {"status": "unknown", "reason": "実装未確認"}
-        }));
+        task_unknown["capabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "capability_id": "task_execution",
+                "support": {"status": "unknown", "reason": "実装未確認"}
+            }));
         assert!(!AgentAdapterMetadata::read(&task_unknown)
             .unwrap()
             .task_execution_supported());
 
         let mut task_supported = valid.clone();
-        task_supported["capabilities"].as_array_mut().unwrap().push(json!({
-            "capability_id": "task_execution",
-            "support": {"status": "supported", "reason": "試験用宣言"}
-        }));
+        task_supported["capabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "capability_id": "task_execution",
+                "support": {"status": "supported", "reason": "試験用宣言"}
+            }));
         assert!(AgentAdapterMetadata::read(&task_supported)
             .unwrap()
             .task_execution_supported());
@@ -2476,6 +2475,94 @@ mod tests {
             })
         }
     }
+
+    struct AgentTask隔離FixtureAdapter {
+        runtime_id: String,
+        workspace_id: String,
+        adapter_identity: AgentTaskWorkspaceIdentity,
+        root_identity: super::super::workspace_root::DirectoryIdentity,
+        recovery_binding_hash: String,
+        marker_path: std::path::PathBuf,
+        marker_content: &'static str,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl 実行系Adapter for AgentTask隔離FixtureAdapter {
+        fn 接続対象(&self) -> String {
+            self.runtime_id.clone()
+        }
+
+        fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
+            Some(self.adapter_identity)
+        }
+
+        fn agent_metadata(&self) -> Option<Value> {
+            let mut metadata: Value = serde_json::from_str(include_str!(
+                "../../../../examples/contracts/agent_adapter.valid.json"
+            ))
+            .expect("Agent接続例を読み込む");
+            metadata["adapter_id"] = json!(format!("fixture-{}", self.runtime_id));
+            metadata["agent_id"] = json!(format!("agent-{}", self.runtime_id));
+            metadata["capabilities"].as_array_mut()?.push(json!({
+                "capability_id": "task_execution",
+                "support": {"status": "supported", "reason": "分離routing fixture専用。実Agent実行の証拠ではない"}
+            }));
+            Some(metadata)
+        }
+
+        fn AgentTask実行対応(&self) -> bool {
+            true
+        }
+
+        fn AgentTask実行(
+            &self,
+            _: &str,
+            cancel: &AtomicBool,
+            deadline: Instant,
+            context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        ) -> Result<String, 対話失敗> {
+            if cancel.load(Ordering::SeqCst) {
+                return Err(対話失敗::取消);
+            }
+            if Instant::now() >= deadline {
+                return Err(対話失敗::期限超過);
+            }
+            let context = context.ok_or(対話失敗::作業領域不在)?;
+            if context.runtime_id != self.runtime_id
+                || context.workspace_id != self.workspace_id
+                || context.root_identity != self.root_identity
+                || context.recovery_binding_hash != self.recovery_binding_hash
+            {
+                return Err(対話失敗::作業領域不在);
+            }
+            super::agent_task_fixture_fs::write_marker(&self.marker_path, self.marker_content)
+                .map_err(|_| 対話失敗::通信失敗)?;
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(self.marker_content.to_owned())
+        }
+
+        fn 応答(
+            &self,
+            request: &対話要求,
+            _: &AtomicBool,
+            _: Instant,
+            raw: &mut Vec<Vec<u8>>,
+        ) -> Result<実行結果, 対話失敗> {
+            raw.push(Vec::new());
+            Ok(実行結果 {
+                対話セッションID: request.対話セッションID.clone(),
+                本文: String::new(),
+                参照: Vec::new(),
+                能力: Vec::new(),
+                経路: "fixture".into(),
+                追跡ID: "a".repeat(32),
+                追跡hash: format!("sha256:{}", "b".repeat(64)),
+                保留: false,
+                生応答: Vec::new(),
+            })
+        }
+    }
+
     fn 準備(失敗: bool, 別session: bool, 遅延: bool) -> (対話制御, Arc<AtomicUsize>) {
         let mut c = 対話制御::default();
         let n = Arc::new(AtomicUsize::new(0));
@@ -2544,6 +2631,18 @@ mod tests {
             binding.as_ref(),
             &mut |_, _, _| Ok("fixture-task-audit".into()),
         )
+    }
+
+    fn AgentTask操作結合済み(
+        c: &mut 対話制御,
+        op: &str,
+        payload: Value,
+        owner: bool,
+        binding: Option<&super::super::workspace::DialogueWorkspaceBinding>,
+    ) -> Result<Value, 対話失敗> {
+        c.操作_作業領域結合済み(op, &payload, owner, 100, binding, &mut |_, _, _| {
+            Ok("fixture-bound-task-audit".into())
+        })
     }
 
     fn AgentTask要求(session_id: &str, instruction: &str) -> Value {
@@ -2657,6 +2756,220 @@ mod tests {
     }
 
     #[test]
+    fn AgentTaskは登録Workspace結合とAdapterをAgent間で混同しない_fixture() {
+        let base = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-isolation-{}",
+            識別子生成().unwrap()
+        ));
+        let root_a = base.join("workspace-a");
+        let root_b = base.join("workspace-b");
+        std::fs::create_dir_all(&root_a).unwrap();
+        std::fs::create_dir(&root_b).unwrap();
+
+        let mut workspaces = super::super::workspace::WorkspaceRegistry::default();
+        let (handle_a, _, ancestry_a) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(&root_a, &[]).unwrap();
+        workspaces
+            .register(
+                "agent-a",
+                "workspace-a",
+                handle_a,
+                &[],
+                Some(ancestry_a),
+                &mut |_, _| Ok(()),
+            )
+            .unwrap();
+        let (handle_b, _, ancestry_b) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(&root_b, &[]).unwrap();
+        workspaces
+            .register(
+                "agent-b",
+                "workspace-b",
+                handle_b,
+                &[],
+                Some(ancestry_b),
+                &mut |_, _| Ok(()),
+            )
+            .unwrap();
+        let binding_a = workspaces
+            .dialogue_binding("agent-a", "workspace-a")
+            .expect("Agent Aの現行登録結合");
+        let binding_b = workspaces
+            .dialogue_binding("agent-b", "workspace-b")
+            .expect("Agent Bの現行登録結合");
+        assert_ne!(binding_a.root_identity(), binding_b.root_identity());
+
+        let calls_a = Arc::new(AtomicUsize::new(0));
+        let calls_b = Arc::new(AtomicUsize::new(0));
+        let mut control = 対話制御::default();
+        control
+            .登録(
+                "agent-a",
+                Arc::new(AgentTask隔離FixtureAdapter {
+                    runtime_id: "agent-a".into(),
+                    workspace_id: "workspace-a".into(),
+                    adapter_identity: binding_a.root_identity(),
+                    root_identity: binding_a.root_directory_identity(),
+                    recovery_binding_hash: binding_a.recovery_binding_hash().into(),
+                    marker_path: root_a.join("agent-a.marker"),
+                    marker_content: "AGENT_A_ONLY_SENTINEL",
+                    calls: calls_a.clone(),
+                }),
+            )
+            .unwrap();
+        control
+            .登録(
+                "agent-b",
+                Arc::new(AgentTask隔離FixtureAdapter {
+                    runtime_id: "agent-b".into(),
+                    workspace_id: "workspace-b".into(),
+                    adapter_identity: binding_b.root_identity(),
+                    root_identity: binding_b.root_directory_identity(),
+                    recovery_binding_hash: binding_b.recovery_binding_hash().into(),
+                    marker_path: root_b.join("agent-b.marker"),
+                    marker_content: "AGENT_B_ONLY_SENTINEL",
+                    calls: calls_b.clone(),
+                }),
+            )
+            .unwrap();
+
+        let start_session =
+            |control: &mut 対話制御,
+             runtime: &str,
+             workspace: &str,
+             binding: &super::super::workspace::DialogueWorkspaceBinding| {
+                control
+                    .操作_作業領域結合済み(
+                        "対話開始",
+                        &json!({"実行系ID": runtime, "作業領域ID": workspace}),
+                        false,
+                        100,
+                        Some(binding),
+                        &mut |_, _, _| Ok("fixture-session-audit".into()),
+                    )
+                    .unwrap()["対話セッションID"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            };
+        let session_a = start_session(&mut control, "agent-a", "workspace-a", &binding_a);
+        let session_b = start_session(&mut control, "agent-b", "workspace-b", &binding_b);
+        let request_a = json!({
+            "agent_runtime_id":"agent-a",
+            "session_id":session_a,
+            "workspace_id":"workspace-a",
+            "instruction":"fixture task A",
+        });
+        let request_b = json!({
+            "agent_runtime_id":"agent-b",
+            "session_id":session_b,
+            "workspace_id":"workspace-b",
+            "instruction":"fixture task B",
+        });
+        for (request, binding) in [(&request_a, &binding_a), (&request_b, &binding_b)] {
+            AgentTask操作結合済み(
+                &mut control,
+                "AgentTaskWorkspacePermissionGrant",
+                json!({
+                    "agent_runtime_id": request["agent_runtime_id"],
+                    "session_id": request["session_id"],
+                    "workspace_id": request["workspace_id"],
+                }),
+                true,
+                Some(binding),
+            )
+            .unwrap();
+            AgentTask操作結合済み(
+                &mut control,
+                "AgentTaskOwnerApprovalGrant",
+                request.clone(),
+                true,
+                Some(binding),
+            )
+            .unwrap();
+        }
+
+        assert_eq!(
+            AgentTask操作結合済み(
+                &mut control,
+                "AgentTask実行",
+                request_a.clone(),
+                false,
+                Some(&binding_b),
+            ),
+            Err(対話失敗::作業領域不在),
+            "他Agentの実Workspace結合ではTaskを開始しない"
+        );
+        assert_eq!(calls_a.load(Ordering::SeqCst), 0);
+        assert_eq!(calls_b.load(Ordering::SeqCst), 0);
+        assert!(!root_a.join("agent-a.marker").exists());
+        assert!(!root_b.join("agent-b.marker").exists());
+
+        let started_a = AgentTask操作結合済み(
+            &mut control,
+            "AgentTask実行",
+            request_a,
+            false,
+            Some(&binding_a),
+        )
+        .unwrap();
+        let started_b = AgentTask操作結合済み(
+            &mut control,
+            "AgentTask実行",
+            request_b,
+            false,
+            Some(&binding_b),
+        )
+        .unwrap();
+        let task_a = started_a["task_id"].as_str().unwrap().to_owned();
+        let task_b = started_b["task_id"].as_str().unwrap().to_owned();
+
+        let wait_terminal = |control: &mut 対話制御, task_id: &str| {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                let state = AgentTask操作結合済み(
+                    control,
+                    "AgentTask状態",
+                    json!({"task_id": task_id}),
+                    false,
+                    None,
+                )
+                .unwrap();
+                if state["status"] != "running" {
+                    return state;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "AgentTask terminal状態の待機期限"
+                );
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        let state_a = wait_terminal(&mut control, &task_a);
+        let state_b = wait_terminal(&mut control, &task_b);
+        assert_eq!(state_a["status"], "completed");
+        assert_eq!(state_b["status"], "completed");
+        assert!(!state_a.to_string().contains("AGENT_A_ONLY_SENTINEL"));
+        assert!(!state_b.to_string().contains("AGENT_B_ONLY_SENTINEL"));
+        assert_eq!(
+            super::agent_task_fixture_fs::read_marker(&root_a.join("agent-a.marker")).unwrap(),
+            "AGENT_A_ONLY_SENTINEL"
+        );
+        assert_eq!(
+            super::agent_task_fixture_fs::read_marker(&root_b.join("agent-b.marker")).unwrap(),
+            "AGENT_B_ONLY_SENTINEL"
+        );
+        assert!(!root_a.join("agent-b.marker").exists());
+        assert!(!root_b.join("agent-a.marker").exists());
+        assert_eq!(calls_a.load(Ordering::SeqCst), 1);
+        assert_eq!(calls_b.load(Ordering::SeqCst), 1);
+
+        drop(control);
+        drop(workspaces);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn AgentTask取消はworker終了までrunningを保ちterminal監査後だけcancelledとなる() {
         let (mut c, calls) = 準備(false, false, true);
         let session_id = 開始(&mut c, "left");
@@ -2676,7 +2989,11 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "Task workerの開始を確認する");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "Task workerの開始を確認する"
+        );
         let cancelling =
             AgentTask操作(&mut c, "AgentTask取消", json!({"task_id": task_id}), false).unwrap();
         assert_eq!(cancelling["status"], "running");
@@ -2706,18 +3023,39 @@ mod tests {
         assert_eq!(listing["対話セッション"][0]["実行系ID"], "left");
         assert_eq!(listing["対話セッション"][0]["状態"], "利用中");
         assert_eq!(listing["対話セッション"][0]["作成監査ID"], "fixture-audit");
-        assert_eq!(listing["対話セッション"][0]["作業領域ID"], "fixture-workspace-left");
-        assert_eq!(listing["対話セッション"][0]["作業領域結合監査ID"], "fixture-audit");
+        assert_eq!(
+            listing["対話セッション"][0]["作業領域ID"],
+            "fixture-workspace-left"
+        );
+        assert_eq!(
+            listing["対話セッション"][0]["作業領域結合監査ID"],
+            "fixture-audit"
+        );
         assert_eq!(listing["対話セッション"][0].as_object().unwrap().len(), 6);
         assert_eq!(adapter_calls.load(Ordering::SeqCst), 0);
-        assert!(操作(&mut c, "対話セッション一覧", json!({"authority":"owner"}), false).is_err());
+        assert!(操作(
+            &mut c,
+            "対話セッション一覧",
+            json!({"authority":"owner"}),
+            false
+        )
+        .is_err());
 
         for index in 1..64 {
             let _ = 開始(&mut c, "left");
             assert_eq!(index, c.セッション.len() - 1);
         }
-        assert_eq!(操作(&mut c, "対話セッション一覧", json!({}), false).unwrap()["対話セッション"].as_array().unwrap().len(), 64);
-        assert_eq!(操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false), Err(対話失敗::要求不正));
+        assert_eq!(
+            操作(&mut c, "対話セッション一覧", json!({}), false).unwrap()["対話セッション"]
+                .as_array()
+                .unwrap()
+                .len(),
+            64
+        );
+        assert_eq!(
+            操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false),
+            Err(対話失敗::要求不正)
+        );
     }
 
     #[test]
@@ -2750,10 +3088,8 @@ mod tests {
         );
         assert!(c.セッション.is_empty());
 
-        let valid = super::super::workspace::DialogueWorkspaceBinding::for_test(
-            "left",
-            "workspace-left",
-        );
+        let valid =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", "workspace-left");
         let result = c
             .操作_作業領域結合済み(
                 "対話開始",
@@ -2766,10 +3102,10 @@ mod tests {
             .unwrap();
         assert!(result["対話セッションID"].is_string());
         drop(audit);
-        assert_eq!(audit_reasons, [
-            "対話開始",
-            "対話Sessionと登録済みWorkspaceの明示結合",
-        ]);
+        assert_eq!(
+            audit_reasons,
+            ["対話開始", "対話Sessionと登録済みWorkspaceの明示結合",]
+        );
         let session = c.セッション.values().next().unwrap();
         assert_eq!(session.作業領域ID.as_deref(), Some("workspace-left"));
         assert!(session.作業領域結合監査ID.is_some());
@@ -2781,10 +3117,8 @@ mod tests {
         let (mut c, _) = 準備(false, false, false);
         assert!(操作(&mut c, "対話開始", json!({"実行系ID":"left"}), false).is_ok());
 
-        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
-            "left",
-            "workspace-left",
-        );
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", "workspace-left");
         let result = c
             .操作_作業領域結合済み(
                 "対話開始",
@@ -2807,10 +3141,8 @@ mod tests {
     #[test]
     fn AgentSessionはWorkspace結合監査に失敗したら登録されない() {
         let (mut c, _) = 準備(false, false, false);
-        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
-            "left",
-            "workspace-left",
-        );
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", "workspace-left");
         let mut audit_count = 0;
         let result = c.操作_作業領域結合済み(
             "対話開始",
@@ -2863,7 +3195,10 @@ mod tests {
 
         let listing = 操作(&mut c, "対話セッション一覧", json!({}), false).unwrap();
         assert_eq!(listing["対話セッション"].as_array().unwrap().len(), 1);
-        assert_eq!(listing["対話セッション"][0]["対話セッションID"], agent_session);
+        assert_eq!(
+            listing["対話セッション"][0]["対話セッションID"],
+            agent_session
+        );
         assert_eq!(listing["対話セッション"][0]["実行系ID"], "left");
     }
     fn 要求(c: &mut 対話制御, s: &str) -> Value {
@@ -2912,9 +3247,7 @@ mod tests {
     #[test]
     fn 対話終了はsession上限を回復する() {
         let (mut c, _) = 準備(false, false, false);
-        let sessions = (0..64)
-            .map(|_| 開始(&mut c, "left"))
-            .collect::<Vec<_>>();
+        let sessions = (0..64).map(|_| 開始(&mut c, "left")).collect::<Vec<_>>();
 
         assert_eq!(c.評価要求可能数(), 0);
         assert_eq!(
@@ -3125,10 +3458,8 @@ mod tests {
         let (mut c, calls) = 準備(false, false, true);
         let session = 開始(&mut c, "left");
         let workspace_id = "fixture-workspace-left";
-        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
-            "left",
-            workspace_id,
-        );
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", workspace_id);
         let task_permission = json!({
             "agent_runtime_id":"left",
             "session_id":session,
@@ -3254,10 +3585,8 @@ mod tests {
         let (mut c, _) = 準備(false, false, false);
         let session = 開始(&mut c, "left");
         let workspace_id = "fixture-workspace-left";
-        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
-            "left",
-            workspace_id,
-        );
+        let binding =
+            super::super::workspace::DialogueWorkspaceBinding::for_test("left", workspace_id);
         let permission_request = json!({
             "agent_runtime_id": "left",
             "session_id": session.clone(),
@@ -3445,7 +3774,10 @@ mod tests {
         let session = 開始(&mut c, "left");
         let pending = 要求(&mut c, &session);
         assert!(c
-            .回帰Case情報(pending["要求ID"].as_str().unwrap(), pending["要求hash"].as_str().unwrap())
+            .回帰Case情報(
+                pending["要求ID"].as_str().unwrap(),
+                pending["要求hash"].as_str().unwrap()
+            )
             .is_err());
         操作(&mut c, "対話承認", 承認(&pending, "full"), true).unwrap();
         完了(&mut c, &pending);
@@ -3461,7 +3793,10 @@ mod tests {
         assert!(source.応答hash.starts_with("sha256:"));
         assert!(!source.終了監査ID.is_empty());
         assert!(c
-            .回帰Case情報(pending["要求ID"].as_str().unwrap(), &format!("{}x", pending["要求hash"]))
+            .回帰Case情報(
+                pending["要求ID"].as_str().unwrap(),
+                &format!("{}x", pending["要求hash"])
+            )
             .is_err());
     }
     #[test]
