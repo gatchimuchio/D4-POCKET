@@ -29,6 +29,8 @@ Codex Taskだけが使うWindows sandbox方式を`mxc`に固定し、同じ一�
 
 2026-09-29の追試では、同CLIのfilesystem tableを`:minimal=deny`へ変更しても`C:\Windows\win.ini`の`type`は成功し、同fileにexact denyを追加すると拒否された。この結果は当該一fileと直接`codex sandbox`呼出しだけの観測で、`:minimal` denialが他のpathに与える効果やBroker経由Taskの挙動を証明しない。`task_execution=unsupported`を維持する。
 
+同日の候補検査で`C:/Windows="deny"`は`win.ini`を拒否しWorkspace fileを読めたが、同sandbox内の`codex --version`も起動拒否となったためTask profileへ採用しない。より狭い限定試験であり、Agent Taskの実行隔離は未成立のまま維持する。
+
 対象Rust変更commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)は成功した。Windows Server 2025／Rust 1.95.0でcheckout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、389 passed／0 failed／0 ignored）、試験後clean確認が成功した。これは当該commitのhosted Windows Rust検査であり、実Agent Task、Broker隔離、ローカルApplication Controlまたはrelease readinessを証明しない。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）

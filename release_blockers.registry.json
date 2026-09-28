@@ -107,11 +107,17 @@
         "path": "C:/Windows/win.ini",
         "minimal_deny": "direct mxc sandbox read succeeded (exit 0)",
         "exact_path_deny": "same read was rejected (exit 1)",
+        "windows_directory_deny_candidate": {
+          "system_file_read": "rejected (exit 1)",
+          "workspace_file_read": "succeeded (exit 0)",
+          "codex_version_start": "rejected (exit 1)",
+          "disposition": "not adopted because the Codex CLI could not start under the broad directory denial"
+        },
         "scope_limit": "single public system file through codex sandbox; not Broker, codex exec, or Agent Task evidence",
         "configuration_persisted": false,
         "os_protection_changed": false
       },
-      "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。後者は一つの公開system fileに限る直接CLI証拠であり、Broker、`codex exec`、実Agent Taskを通していない。広域read隔離や秘密file全般の拒否を主張せず、Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
+      "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。`C:/Windows=deny`候補はsystem fileを拒否したが、sandbox内の`codex --version`も起動拒否となったため採用しない。個別file／directoryのprobeは広域read隔離を証明せず、Broker、`codex exec`、実Agent Taskも通していない。広域read隔離や秘密file全般の拒否を主張せず、Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",

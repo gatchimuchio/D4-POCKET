@@ -8,6 +8,7 @@ installed Codex CLI `0.158.0-alpha.2.1`で、モデルを起動せず`codex sand
 
 - `:minimal="deny"`を含むfilesystem tableで`cmd.exe /c type C:\Windows\win.ini`を実行するとexit 0となり、file本文が出力された。これはこの一fileについて、`:minimal="deny"`だけでは読取を止めなかった観測であり、他のWindows path全体へ一般化しない。
 - 同じfilesystem tableに`"C:/Windows/win.ini"="deny"`を加えると、同じreadがexit 1となり拒否された。従ってこの一fileへの明示denyは当該直接sandbox経路で実効した。
+- `C:/Windows="deny"`を加えた候補では、`C:\Windows\win.ini`のreadはexit 1で拒否され、Workspace内`ROADMAP.md`のreadはexit 0だった。しかし、同じprofile内で`codex --version`もexit 1となり、Codex CLI自身が起動できなかった。従ってWindows directory全体denyは製品設定に採用しない。限定的なpath denyの観測であって、代替の広域隔離策を成立させたものではない。
 - 両試験はCLIが適用した`LIVE_RUNTIME`の限定観測であり、Rust Broker、`codex exec`、Owner Approval、実Agent Task、Task scratch lifecycleを通していない。秘密file隔離やTask安全性の証拠へ昇格しない。`task_execution=unsupported`とAgent Taskの`release_blocker`、`release_ready=false`を維持する。
 
 ## Phase 7 Codex Task mxc sandbox直接CLI probeとroot deny（2026-09-29）
