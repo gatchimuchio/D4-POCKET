@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "637e3847865bef413f758a2cde9a0f4eb548aac1d2a8c5f7e372677776ea534c"
+      "sha256": "5e3d09fdd34f67db2f2d3e28a3b7f5587ee0afedc348450c35c9dde6167a9bfc"
     },
     {
       "path": "SECURITY.md",
@@ -237,7 +237,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "c2e7cb442a53691db9aa87dd3b4dd179443cb3b8273bd709dfa522a60b4f338d"
+      "sha256": "cd6f153f86828813bcf740d640f008bf3196382664f3abc4eca83623a7a264c1"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "f22a14da628a5df866816704b324cfadff7e39c08f457a8e5e52d3d268de2fe4"
+      "sha256": "6c6e7ddd45bd3fe66ebc43d5c7ef72f77c6ad6659e0f673537b20cf448143eae"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -573,7 +573,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "612a486c716ec5ad3322b98e6996941cd82b8e0a7662e3f22936f5a6e4808c1e"
+      "sha256": "4997b76512de52457f203f7df35cc51a8847bf9cdb7154be63411d3b09853314"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1141,7 +1141,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "100ae3d0c893f74fdcf8ac2bb7781c4b1831a3e3b819bd858942810ecac3d4a6"
+      "sha256": "d12dabbd003abbb4668c4ca79719d928f6db6252f2a05450888511c88542b2a0"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1177,7 +1177,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a856c51351397d656094642dbe42fd2e35b3c586585b15b3c0d0c8386293ea46"
+      "sha256": "faf95d14e49ab139ba10d4f926b4e6c54c887b94c564c106f4f6e0b204c5bc59"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1385,7 +1385,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "9cdccc5f45f000c4d89487a11f372bfb03f872a9c6202369a2b7f033578b9be9"
+      "sha256": "b65822e6a24ca718a3bc70845fe38d4f0a6f62e7679ed47d5dda31237a1a360a"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -2184,8 +2184,16 @@
       "sha256": "e1301f27979703ea367f58a01eeafc45d209b79dfce8c4730e8360b0dfcb2b62"
     },
     {
+      "path": "examples/contracts/invalid/mcp_connection_prompt_description.invalid.json",
+      "sha256": "6088d09e6af139dca1ac52e5fdeda0b623fd604afa033c700a40444c383a168f"
+    },
+    {
       "path": "examples/contracts/invalid/mcp_connection_receipt_full_content.invalid.json",
       "sha256": "966a0db0dc541b08c3412de42b0f66eb678da6e14bd81693ca0957b94c0768be"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_connection_resource_uri_leak.invalid.json",
+      "sha256": "76e834f984de09d140758a651e974bd1cba55c0ec1ab3022e97aa11af7f9af6a"
     },
     {
       "path": "examples/contracts/invalid/mcp_connection_tool_unknown_field.invalid.json",
@@ -2553,11 +2561,11 @@
     },
     {
       "path": "examples/contracts/mcp_connection_list.valid.json",
-      "sha256": "f44ff92b4d671d3b1cf547e4bef5ce01a668f90f443230f978cda7d016ce843b"
+      "sha256": "3900da5ed3cfb0ed86d61c87a98ace5c794d8a770062c6bea3843e7626f49453"
     },
     {
       "path": "examples/contracts/mcp_connection_receipt.valid.json",
-      "sha256": "2e04ace92e19c43747f9240d96de1e09f90ac103fd7816e00613bc1e4df59490"
+      "sha256": "55bbd4dd46c6e2cd68a9c57462310715fa311b8391c1746ba21f6958019dbded"
     },
     {
       "path": "examples/contracts/mcp_contract.valid.json",
@@ -3989,11 +3997,11 @@
     },
     {
       "path": "specs/mcp_connection_list.schema.json",
-      "sha256": "bfdc4c2a1c883c25334ef665884ade5ee2a31c9680800ccda10cf97ef883e3d6"
+      "sha256": "9d014afdbb0a404e86645c1d63f470710464d2cfd8975c88d8c7f1326243caeb"
     },
     {
       "path": "specs/mcp_connection_receipt.schema.json",
-      "sha256": "44cd826f8945a8151509a6bc25177bba0d838a162e3a5615d9ff4b27d452488b"
+      "sha256": "0d7eeef3a7d4a1d298439e13f76645537d70387155c0eb032c5ee2a840c8559c"
     },
     {
       "path": "specs/mcp_contract.schema.json",
@@ -4297,7 +4305,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "485c12ac01d4d7dfb575a6e9da29d62b8abc31458788a379622e9c8704487136"
+      "sha256": "515c529cc2ee9ec68c332faa1ed706285746d3e67623de2020aeaa9949c66679"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 Desktop MCP Resource／Prompt metadata閲覧（2026-09-28）
+
+DesktopのMCP接続一覧からResource／Prompt欄を展開し、Resource名・ID・URI hash、Prompt名・ID・引数Schema hashを読めるようにした。URI実値、Resource本文、Prompt説明・引数・本文は取得・表示しない。JSON SchemaはResource／Prompt各projectionを未知field拒否のnested contractへ具体化し、URI実値fieldと非空Prompt descriptionを拒否するnegative fixtureを追加した。Flutter clientはID／hash、status、表示名の境界を再検証し、`INTERNAL_STATE` metadataのみをUIへ渡す。Resource read／Prompt getのMCP要求、Permission、Approval、本文表示は追加していない。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常example 147件、negative fixture 187件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で合格。
+- `python -X utf8 tooling/manifest.py --check`、`git diff --check`：合格。
+- Flutter MCP client／widget focused test 4件、`flutter analyze --no-pub`は最新index sourceの隔離Temp copyで合格。UI testはResource URI実値とPrompt説明markerが表示されないことを含む。installed productや外部MCP Serverの運用証拠ではない。
+- Rust補助機能は本作業で変更していないためRust試験は未実施。全対象試験は既存の阻害状態を引き継ぎ、ライブラリ試験326件の後、Windowsのアプリケーション実行制御が起動用試験実行ファイルを拒否（OS error 4551）。
+- Resource／Prompt実取得、Tool実行、Credential実値注入、外部MCP Harness、installed product、正式releaseは`release_blocker`。active unresolved blocker 15件、`release_ready=false`を維持する。
+
 ## D4 Pocket C9 Desktop MCP Toolカタログのmetadata閲覧（2026-09-28）
 
 MCP接続ごとにTool一覧を展開表示し、Rust Brokerの既存projectionからTool名、Tool ID、入力Schema hash、危険度`unknown`だけを確認できるようにした。Tool descriptionと入力Schema本文は画面へ出さず、接続一覧の`INTERNAL_STATE`境界を維持する。Tool receiptのJSON Schemaをnested strict objectへ具体化し、未知field、非空description summary、既知以外のrisk/status形状を拒否するnegative fixtureを追加した。Flutter clientもID/hash形式、Tool名のcontrol/bidi文字、未知fieldを再検証してからUIへ渡す。新しい権限・Approval・Tool実行経路は追加していない。

@@ -11,7 +11,7 @@
   },
   "Transport": {
     "kind": "stdio",
-    "status": {"status": "supported", "reason": "wireを検証済み"},
+    "status": { "status": "supported", "reason": "wireを検証済み" },
     "接続先hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "reason": "接続先実値を射影しない"
   },
@@ -25,24 +25,20 @@
       "status": { "status": "supported", "reason": "wire schemaを検証済み" }
     }
   ],
-  "Resource": [
-    {
-      "resource_id": "resource-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "name": "fixture-resource",
-      "uri_template_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "mime_type": "application/octet-stream",
-      "status": { "status": "supported", "reason": "resource metadataを検証済み" }
-    }
-  ],
-  "Prompt": [
-    {
-      "prompt_id": "prompt-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "name": "fixture-prompt",
-      "description_summary": "",
-      "argument_schema_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "status": { "status": "supported", "reason": "prompt metadataを検証済み" }
-    }
-  ],
+  "Resource": [{
+  "resource_id": "resource-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "name": "fixture-resource",
+  "uri_template_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "mime_type": "application/octet-stream",
+  "status": { "status": "supported", "reason": "resource metadataを検証済み" }
+}],
+  "Prompt": [{
+  "prompt_id": "prompt-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "name": "fixture-prompt",
+  "description_summary": "private-prompt-marker",
+  "argument_schema_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "status": { "status": "supported", "reason": "prompt metadataを検証済み" }
+}],
   "Credential ref": {
     "credential_id": "11111111111111111111111111111111",
     "purpose": "mcp_transport",
@@ -50,8 +46,8 @@
     "required": false,
     "status": "missing"
   },
-  "Trust": {"state": "unverified", "evidence_source": "LIVE_RUNTIME", "reason": "metadataはTrustではない"},
-  "Capability diff": {"status": "no_change", "added": [], "removed": [], "changed": [], "requires_operator_review": false, "evidence_source": "LIVE_RUNTIME"},
+  "Trust": { "state": "unverified", "evidence_source": "LIVE_RUNTIME", "reason": "metadataはTrustではない" },
+  "Capability diff": { "status": "no_change", "added": [], "removed": [], "changed": [], "requires_operator_review": false, "evidence_source": "LIVE_RUNTIME" },
   "権限生成": "なし",
   "公開範囲": "metadata_only",
   "証拠種別": "INTERNAL_STATE",
@@ -60,5 +56,5 @@
   "権限ID": "permission.mcp.connection.connect",
   "承認状態": "owner_control_approved",
   "復旧ID": "recover-mcp-connection",
-  "接続監査ID": "audit-mcp-connection-1"
+  "接続監査ID": "audit-mcp-prompt-description"
 }

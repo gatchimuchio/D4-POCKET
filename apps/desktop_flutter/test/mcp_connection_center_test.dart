@@ -22,6 +22,26 @@ class _McpTransport implements BrokerTransport {
       'reason': 'MCP wire schemaを検証済み',
     },
   };
+  final resourceMetadata = <String, Object?>{
+    'resource_id': 'resource-${List<String>.filled(64, "c").join()}',
+    'name': 'fixture-resource',
+    'uri_template_hash': 'sha256:${List<String>.filled(64, "d").join()}',
+    'mime_type': 'application/octet-stream',
+    'status': {
+      'status': 'supported',
+      'reason': 'MCP resource metadataを検証済み',
+    },
+  };
+  final promptMetadata = <String, Object?>{
+    'prompt_id': 'prompt-${List<String>.filled(64, "e").join()}',
+    'name': 'fixture-prompt',
+    'description_summary': '',
+    'argument_schema_hash': 'sha256:${List<String>.filled(64, "f").join()}',
+    'status': {
+      'status': 'supported',
+      'reason': 'MCP prompt metadataを検証済み',
+    },
+  };
 
   Map<String, Object?> _receipt({
     String evidence = 'INTERNAL_STATE',
@@ -33,8 +53,8 @@ class _McpTransport implements BrokerTransport {
         'Server': {'server_id': serverId, '表示名': displayName},
         'Transport': {'kind': 'stdio'},
         'Tool': [toolMetadata],
-        'Resource': <Object?>[],
-        'Prompt': <Object?>[],
+        'Resource': [resourceMetadata],
+        'Prompt': [promptMetadata],
         'Credential ref': <String, Object?>{},
         'Trust': <String, Object?>{},
         'Capability diff': <String, Object?>{},
@@ -156,6 +176,9 @@ void main() {
     expect(connections.single.tools.single.name, 'tool-fixture');
     expect(
         connections.single.tools.single.inputSchemaHash, startsWith('sha256:'));
+    expect(connections.single.resourceCount, 1);
+    expect(connections.single.resources.single.name, 'fixture-resource');
+    expect(connections.single.prompts.single.name, 'fixture-prompt');
     expect(transport.operations, ['MCP接続一覧']);
     expect(transport.payloads.single, {'版': 1});
 
@@ -198,6 +221,20 @@ void main() {
       McpConnectionClient(malformedSchemaHash).list(),
       throwsA(isA<BrokerClientException>()),
     );
+
+    final leakedResourceUri = _McpTransport()
+      ..resourceMetadata['uri'] = 'file:///secret/resource';
+    await expectLater(
+      McpConnectionClient(leakedResourceUri).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final unredactedPrompt = _McpTransport()
+      ..promptMetadata['description_summary'] = 'secret-marker';
+    await expectLater(
+      McpConnectionClient(unredactedPrompt).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 
   testWidgets('Desktop panelは一覧後にOwner確認付きBroker接続と切断を要求する', (tester) async {
@@ -220,6 +257,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('tool-fixture'), findsOneWidget);
     expect(find.textContaining('入力仕様hash: sha256:'), findsOneWidget);
+    expect(find.textContaining('secret-marker'), findsNothing);
+
+    await tester.ensureVisible(find.text('Resource一覧：1件'));
+    await tester.tap(find.text('Resource一覧：1件'));
+    await tester.pumpAndSettle();
+    expect(find.text('fixture-resource'), findsOneWidget);
+    expect(find.textContaining('URIのhash: sha256:'), findsOneWidget);
+    expect(find.textContaining('file:///secret/resource'), findsNothing);
+
+    await tester.ensureVisible(find.text('Prompt一覧：1件'));
+    await tester.tap(find.text('Prompt一覧：1件'));
+    await tester.pumpAndSettle();
+    expect(find.text('fixture-prompt'), findsOneWidget);
+    expect(find.textContaining('引数仕様hash: sha256:'), findsOneWidget);
     expect(find.textContaining('secret-marker'), findsNothing);
 
     await tester.ensureVisible(find.text('切断'));

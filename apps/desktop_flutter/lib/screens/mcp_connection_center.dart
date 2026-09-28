@@ -213,6 +213,46 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                 ),
               ],
             ),
+            ExpansionTile(
+              title: Text('Resource一覧：${connection.resources.length}件'),
+              subtitle: const Text('URIと本文は取得しません。'),
+              children: [
+                if (connection.resources.isEmpty)
+                  const ListTile(title: Text('Resourceはありません。')),
+                for (final resource in connection.resources)
+                  ListTile(
+                    title: Text(
+                      resource.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '識別子: ${resource.resourceId}\n'
+                      'URIのhash: ${resource.uriTemplateHash}',
+                    ),
+                  ),
+              ],
+            ),
+            ExpansionTile(
+              title: Text('Prompt一覧：${connection.prompts.length}件'),
+              subtitle: const Text('説明文・引数・本文は取得しません。'),
+              children: [
+                if (connection.prompts.isEmpty)
+                  const ListTile(title: Text('Promptはありません。')),
+                for (final prompt in connection.prompts)
+                  ListTile(
+                    title: Text(
+                      prompt.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '識別子: ${prompt.promptId}\n'
+                      '引数仕様hash: ${prompt.argumentSchemaHash}',
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

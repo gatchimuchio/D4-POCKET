@@ -5209,6 +5209,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_connection_unknown_authority.invalid.json",
         "mcp_connection_credential_secret.invalid.json",
         "mcp_connection_tool_unknown_field.invalid.json",
+        "mcp_connection_resource_uri_leak.invalid.json",
+        "mcp_connection_prompt_description.invalid.json",
         "mcp_connection_receipt_full_content.invalid.json",
         "mcp_connection_list_wrong_evidence.invalid.json",
         "mcp_connection_list_entry_live_evidence.invalid.json",
@@ -5221,7 +5223,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         schema_name = (
             "mcp_connection" if name.startswith(("mcp_connection_unknown", "mcp_connection_credential")) else
             "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else
-            "mcp_connection_receipt" if name.startswith("mcp_connection_tool") else
+            "mcp_connection_receipt" if name.startswith(("mcp_connection_tool", "mcp_connection_resource", "mcp_connection_prompt")) else
             "mcp_connection_list" if name.startswith("mcp_connection_list") else
             "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
             "mcp_disconnect_receipt"
@@ -5246,6 +5248,22 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         for tool in tools
     ):
         不整合.append("C9 Tool receiptがmetadata-only固定fieldではない")
+    resources = receipt.get("Resource")
+    if not isinstance(resources, list) or any(
+        not isinstance(resource, dict)
+        or set(resource) != {"resource_id", "name", "uri_template_hash", "mime_type", "status"}
+        or "uri" in resource
+        for resource in resources
+    ):
+        不整合.append("C9 Resource receiptへURI実値または未知fieldが混入している")
+    prompts = receipt.get("Prompt")
+    if not isinstance(prompts, list) or any(
+        not isinstance(prompt, dict)
+        or set(prompt) != {"prompt_id", "name", "description_summary", "argument_schema_hash", "status"}
+        or prompt.get("description_summary") != ""
+        for prompt in prompts
+    ):
+        不整合.append("C9 Prompt receiptへ説明本文または未知fieldが混入している")
 
     disconnect = load_contract_fixture("mcp_disconnect_receipt.valid.json")
     if disconnect.get("証拠種別") != "LIVE_RUNTIME" or disconnect.get("権限生成") != "なし":
@@ -5308,9 +5326,15 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("Future<McpConnectionSummary> connect", mcp_client),
         ("class McpToolSummary", mcp_client),
         ("_toolSummaries", mcp_client),
+        ("class McpResourceSummary", mcp_client),
+        ("_resourceSummaries", mcp_client),
+        ("class McpPromptSummary", mcp_client),
+        ("_promptSummaries", mcp_client),
         ("MCP接続を開始", mcp_screen),
         ("Tool一覧：", mcp_screen),
         ("入力仕様hash:", mcp_screen),
+        ("Resource一覧：", mcp_screen),
+        ("Prompt一覧：", mcp_screen),
     ):
         if token not in source:
             不整合.append(f"C9 MCP接続／切断の統治済み経路がない: {token}")

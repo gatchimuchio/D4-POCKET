@@ -15,24 +15,50 @@ class McpToolSummary {
   final String inputSchemaHash;
 }
 
+class McpResourceSummary {
+  const McpResourceSummary({
+    required this.resourceId,
+    required this.name,
+    required this.uriTemplateHash,
+  });
+
+  final String resourceId;
+  final String name;
+  final String uriTemplateHash;
+}
+
+class McpPromptSummary {
+  const McpPromptSummary({
+    required this.promptId,
+    required this.name,
+    required this.argumentSchemaHash,
+  });
+
+  final String promptId;
+  final String name;
+  final String argumentSchemaHash;
+}
+
 class McpConnectionSummary {
   const McpConnectionSummary({
     required this.serverId,
     required this.displayName,
     required this.transport,
     required this.tools,
-    required this.resourceCount,
-    required this.promptCount,
+    required this.resources,
+    required this.prompts,
   });
 
   final String serverId;
   final String displayName;
   final String transport;
   final List<McpToolSummary> tools;
-  final int resourceCount;
-  final int promptCount;
+  final List<McpResourceSummary> resources;
+  final List<McpPromptSummary> prompts;
 
   int get toolCount => tools.length;
+  int get resourceCount => resources.length;
+  int get promptCount => prompts.length;
 }
 
 class McpConnectionClient {
@@ -219,13 +245,15 @@ class McpConnectionClient {
       throw const BrokerClientException('MCP接続metadataの表示項目が不正です');
     }
     final toolSummaries = _toolSummaries(tools);
+    final resourceSummaries = _resourceSummaries(resources);
+    final promptSummaries = _promptSummaries(prompts);
     return McpConnectionSummary(
       serverId: serverId,
       displayName: displayName,
       transport: transportKind as String,
       tools: toolSummaries,
-      resourceCount: resources.length,
-      promptCount: prompts.length,
+      resources: resourceSummaries,
+      prompts: promptSummaries,
     );
   }
 
@@ -256,22 +284,13 @@ class McpConnectionClient {
       if (toolId is! String ||
           !RegExp(r'^tool-[a-f0-9]{1,251}$').hasMatch(toolId) ||
           name is! String ||
-          !_safeToolName(name) ||
+          !_safeMetadataName(name) ||
           description != '' ||
           schemaHash is! String ||
           !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(schemaHash) ||
           risk != 'unknown' ||
-          status is! Map ||
-          status.keys.any((key) => key is! String)) {
+          !_supportedMetadataStatus(status)) {
         throw const BrokerClientException('MCP Tool metadata値が不正です');
-      }
-      final statusFields = status.cast<String, Object?>();
-      if (statusFields.length != 2 ||
-          statusFields['status'] != 'supported' ||
-          statusFields['reason'] is! String ||
-          utf8.encode(statusFields['reason']! as String).length > 256 ||
-          _containsControl(statusFields['reason']! as String)) {
-        throw const BrokerClientException('MCP Tool metadata状態が不正です');
       }
       return McpToolSummary(
         toolId: toolId,
@@ -281,7 +300,91 @@ class McpConnectionClient {
     }));
   }
 
-  bool _safeToolName(String value) =>
+  List<McpResourceSummary> _resourceSummaries(List<Object?> values) {
+    return List.unmodifiable(values.map((raw) {
+      if (raw is! Map || raw.keys.any((key) => key is! String)) {
+        throw const BrokerClientException(
+            'MCP Resource metadataがobjectではありません');
+      }
+      final resource = raw.cast<String, Object?>();
+      const fields = {
+        'resource_id',
+        'name',
+        'uri_template_hash',
+        'mime_type',
+        'status',
+      };
+      final resourceId = resource['resource_id'];
+      final name = resource['name'];
+      final uriHash = resource['uri_template_hash'];
+      if (resource.length != fields.length ||
+          !resource.keys.toSet().containsAll(fields) ||
+          resourceId is! String ||
+          !RegExp(r'^resource-[a-f0-9]{1,247}$').hasMatch(resourceId) ||
+          name is! String ||
+          !_safeMetadataName(name) ||
+          uriHash is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(uriHash) ||
+          resource['mime_type'] != 'application/octet-stream' ||
+          !_supportedMetadataStatus(resource['status'])) {
+        throw const BrokerClientException('MCP Resource metadata値が不正です');
+      }
+      return McpResourceSummary(
+        resourceId: resourceId,
+        name: name,
+        uriTemplateHash: uriHash,
+      );
+    }));
+  }
+
+  List<McpPromptSummary> _promptSummaries(List<Object?> values) {
+    return List.unmodifiable(values.map((raw) {
+      if (raw is! Map || raw.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('MCP Prompt metadataがobjectではありません');
+      }
+      final prompt = raw.cast<String, Object?>();
+      const fields = {
+        'prompt_id',
+        'name',
+        'description_summary',
+        'argument_schema_hash',
+        'status',
+      };
+      final promptId = prompt['prompt_id'];
+      final name = prompt['name'];
+      final schemaHash = prompt['argument_schema_hash'];
+      if (prompt.length != fields.length ||
+          !prompt.keys.toSet().containsAll(fields) ||
+          promptId is! String ||
+          !RegExp(r'^prompt-[a-f0-9]{1,249}$').hasMatch(promptId) ||
+          name is! String ||
+          !_safeMetadataName(name) ||
+          prompt['description_summary'] != '' ||
+          schemaHash is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(schemaHash) ||
+          !_supportedMetadataStatus(prompt['status'])) {
+        throw const BrokerClientException('MCP Prompt metadata値が不正です');
+      }
+      return McpPromptSummary(
+        promptId: promptId,
+        name: name,
+        argumentSchemaHash: schemaHash,
+      );
+    }));
+  }
+
+  bool _supportedMetadataStatus(Object? value) {
+    if (value is! Map || value.keys.any((key) => key is! String)) return false;
+    final status = value.cast<String, Object?>();
+    final reason = status['reason'];
+    return status.length == 2 &&
+        status['status'] == 'supported' &&
+        reason is String &&
+        utf8.encode(reason).length <= 256 &&
+        !_containsControl(reason);
+  }
+
+  bool _safeMetadataName(String value) =>
       value.isNotEmpty &&
       utf8.encode(value).length <= 256 &&
       !_containsControl(value) &&

@@ -27,8 +27,8 @@
         "Server": { "type": "object" },
         "Transport": { "type": "object" },
         "Tool": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/tool_projection" } },
-        "Resource": { "type": "array" },
-        "Prompt": { "type": "array" },
+        "Resource": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/resource_projection" } },
+        "Prompt": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/prompt_projection" } },
         "Credential ref": { "type": "object" },
         "Trust": { "type": "object" },
         "Capability diff": { "type": "object" },
@@ -53,6 +53,46 @@
         "description_summary": { "const": "" },
         "input_schema_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "risk": { "const": "unknown" },
+        "status": {
+          "type": "object",
+          "required": ["status", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "supported" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        }
+      }
+    },
+    "resource_projection": {
+      "type": "object",
+      "required": ["resource_id", "name", "uri_template_hash", "mime_type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "resource_id": { "type": "string", "pattern": "^resource-[a-f0-9]{1,247}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "uri_template_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "mime_type": { "const": "application/octet-stream" },
+        "status": {
+          "type": "object",
+          "required": ["status", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "supported" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        }
+      }
+    },
+    "prompt_projection": {
+      "type": "object",
+      "required": ["prompt_id", "name", "description_summary", "argument_schema_hash", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "prompt_id": { "type": "string", "pattern": "^prompt-[a-f0-9]{1,249}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description_summary": { "const": "" },
+        "argument_schema_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
         "status": {
           "type": "object",
           "required": ["status", "reason"],

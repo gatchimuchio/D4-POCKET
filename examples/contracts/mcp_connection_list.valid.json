@@ -16,8 +16,24 @@
           "status": { "status": "supported", "reason": "wire schemaを検証済み" }
         }
       ],
-      "Resource": [],
-      "Prompt": [],
+      "Resource": [
+        {
+          "resource_id": "resource-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "name": "fixture-resource",
+          "uri_template_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "mime_type": "application/octet-stream",
+          "status": { "status": "supported", "reason": "resource metadataを検証済み" }
+        }
+      ],
+      "Prompt": [
+        {
+          "prompt_id": "prompt-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "name": "fixture-prompt",
+          "description_summary": "",
+          "argument_schema_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "status": { "status": "supported", "reason": "prompt metadataを検証済み" }
+        }
+      ],
       "Credential ref": {},
       "Trust": {},
       "Capability diff": {},

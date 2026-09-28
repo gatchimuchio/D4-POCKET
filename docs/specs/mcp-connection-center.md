@@ -24,7 +24,7 @@ Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対
 
 接続要求は既存Windows Rust起動器のBroker channelから厳密に検査され、default Noのnative Owner確認を通る。確認はServer ID、実行file、workspace、引数件数・hash、request payload hashを示すが、引数本文は秘密値を含み得るため表示しない。操作者はnative確認前のDesktop入力を確認する。未知field、非絶対path、制御文字、上限外入力、Credential refの不一致・required・missing以外の状態はnative確認候補またはBrokerで拒否する。OwnerのYes後もBrokerが要求を再検証し、既存Windows Job Object下でprocess群を起動してMCP discoveryを行い、監査確定後にmetadata-only receiptを返す。通常IPCとnative Owner確認を通らないplatform経路では接続しない。
 
-一覧更新は利用者の明示操作で行い、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。Tool欄は展開操作でTool名、Tool ID、入力Schema hashを表示できる。Tool IDとhashは外部metadataであり、実行権や信頼を示さない。Tool description／description_summaryと入力Schema本文は表示せず、危険度は`unknown`のまま示す。接続先、実行file、引数、Credential refは一覧へ表示しない。Tool一覧を読むだけの画面から`tools/call`を送信しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。
+一覧更新は利用者の明示操作で行い、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。Tool欄は展開操作でTool名、Tool ID、入力Schema hashを表示できる。Resource欄は名前、Resource ID、URI template hash、Prompt欄は名前、Prompt ID、引数Schema hashだけを表示できる。各IDとhashは外部metadataであり、実行権や信頼を示さない。Tool description／description_summary、入力Schema本文、Resource URI／本文、Prompt description／引数／本文は表示・取得しない。Tool危険度は`unknown`のまま示す。接続先、実行file、引数、Credential refは一覧へ表示しない。Tool一覧を読むだけの画面から`tools/call`を送信せず、Resource／Promptの内容取得要求も送信しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。
 
 ownerは`MCP切断`で対象Server IDを明示できる。要求はowner controlだけで受け、未知field、未知Server、通常IPCからの切断は拒否する。Windows Job Objectのprocess群停止確認後に`LIVE_RUNTIME`の結果Auditを永続化し、その後に限ってBrokerの接続記録を消す。停止または結果Auditを確定できない場合は成功を返さず記録を保持する。停止済みだがAuditに失敗した場合は、ownerの明示再試行で停止を再確認して監査確定する。receipt／Auditに実行path、引数、workspace、Credential実値を含めない。切断はPermissionを生成しない。
 
