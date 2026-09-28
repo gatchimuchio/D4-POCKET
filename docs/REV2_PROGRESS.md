@@ -12,9 +12,10 @@ Android手動検証workflowでは、Android 17 preview compile platformのpackag
 
 - `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。382件は成功した後、`workspace_reader`のtest executableがWindows Application ControlのOS error 4551で起動前に拒否された。test除外、生成物の移動、保護設定変更は行っていない。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/protocol.rs`：exit 1。変更行以外を含む既存file全体の整形差分を検出したため、無関係な一括整形は行わなかった。Windows workflowの登録済みrustfmt対象にも`protocol.rs`は含まれておらず、このfileの整形検査成功は主張しない。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。開発用10検査が成功し、Schema 149件／example 149件／negative fixture 192件、Conformance 225件を含む。`release_ready=false`と既存release blockerは維持する。
 
-手動Windows Rust Actions [run #18](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36483187255)は、正確な実装commit `13735a90aa0005edd49d827fe00562fe48e8da9e`をWindows Server 2025／Rust・Cargo 1.95.0で検証し成功した。12 test targetで389 passed／0 failed／0 ignored。checkout SHA、rustfmt、全target check／test、試験後cleanを確認した。証拠はhosted Windows上のRust検査に限り、ローカルApplication Controlやinstalled productの証拠ではない。
+手動Windows Rust Actions [run #18](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36483187255)は、正確な実装commit `13735a90aa0005edd49d827fe00562fe48e8da9e`をWindows Server 2025／Rust・Cargo 1.95.0で検証し成功した。12 test targetで391 passed／0 failed／0 ignored。checkout SHA、workflowに登録済みfileのrustfmt、全target check／test、試験後cleanを確認した。`protocol.rs`の整形は確認していない。証拠はhosted Windows上のRust検査に限り、ローカルApplication Controlやinstalled productの証拠ではない。
 
 Android手動Actionsの失敗履歴を保持する。 [run #9](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36480716266)は元のLinux compile errorを再現した。[run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36483182425)はRust build後、存在しないSDK package名で停止した。[run #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36484108581)と[run #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36485002704)も`android-37`というpackage IDを解決できず停止した。[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36485633039)ではSDK／仮想端末、Flutter analyze・21 tests、APK／AAB build、install、activity startまで成功したが、旧foreground matcherで失敗し、activity dumpとprocessの診断証拠が不足していた。
 
