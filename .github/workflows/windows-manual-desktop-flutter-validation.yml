@@ -1,0 +1,98 @@
+name: Windows Desktop Flutter manual validation
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-flutter-manual-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  desktop-validation:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 対象とrunnerを照合
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne $env:GITHUB_SHA) {
+            throw "checkout HEAD ($head) does not match workflow commit ($env:GITHUB_SHA)"
+          }
+          @(
+            "commit=$head"
+            "ref=$env:GITHUB_REF"
+            "runner_os=$env:RUNNER_OS"
+            "runner_image=$env:ImageOS/$env:ImageVersion"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-desktop-flutter-environment.txt"
+          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: 固定Flutterを導入
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
+            throw "Flutter checkout mismatch: $flutterCommit"
+          }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & "$flutterRoot\bin\flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "Flutter commit: ``$flutterCommit``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: Rust helperをbuild
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --bins
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $helper = Resolve-Path native/rust_helper/target/debug/gui_shell_rust_helper.exe
+          "Rust helper: ``$helper``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: Desktop Flutterを解析・全test
+        working-directory: apps/desktop_flutter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter analyze --no-pub
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testTemp = Join-Path $env:RUNNER_TEMP 'gui-shell-flutter-test-temp'
+          New-Item -ItemType Directory -Force -Path $testTemp | Out-Null
+          if ($testTemp.Contains('~')) {
+            throw "Flutter integration-test TEMP/TMP must not contain a DOS short-name marker: $testTemp"
+          }
+          $env:TEMP = $testTemp
+          $env:TMP = $testTemp
+          "Flutter test TEMP/TMP: ``$testTemp``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          flutter test --no-pub --reporter expanded
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Mobile Flutterを解析
+        working-directory: apps/mobile_flutter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter analyze --no-pub
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: 検査後に作業treeがcleanなことを確認
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes.Count -gt 0) {
+            $changes | Write-Output
+            throw '検査後に作業treeへ変更が残った'
+          }

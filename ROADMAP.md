@@ -19,6 +19,10 @@ Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`�
 
 最新の手動run [Windows Rust manual validation #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263)は一時branch `codex/task-profile-boundary`のcommit `3bcec331f66ae9664ab8a86e6efe8558649f0e8a`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査し、checkout SHA照合、変更Rust fileを含むrustfmt、全target check／test、試験後clean確認が成功した（12 target、389 passed／0 failed／0 ignored）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはhosted Windows Rust検査の補助証拠だけであり、installed product、実Agent Task、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
 
+## Windows Desktop Flutter手動補助検証（2026-09-28）
+
+OneDrive外のmanaged worktreeでも、Desktop Flutter全testはRust helper未buildを前提にする2件が失敗した。helperを同worktreeでbuildすると、Cargo build script executableがWindows Application ControlのOS error 4551で拒否された。Desktop／Mobileの`flutter analyze`もanalysis serverが途中で切れたJSON応答を受けてexit 1となった。これらの端末保護・test前提を緩和せず検証するため、`.github/workflows/windows-manual-desktop-flutter-validation.yml`を`workflow_dispatch`限定で追加する。対象commitを照合し、Flutter 3.44.0の固定commitとRust 1.95.0を使い、Rust helper build、Desktop analyze／全test、Mobile analyze、test後cleanを同一Windows Server 2025 runnerで実行する。自動trigger、repository書込権限、artifact uploadは設けない。これはhosted Windows上の指定commitのbuild／test補助証拠であり、ローカルApplication Control、installed product、実Agent隔離、release readinessを証明しない。実行結果は`VALIDATION.txt`で対象commitへ結合して記録する。
+
 ## Phase 7 Codex Task permission profileの現行観測（2026-09-28）
 
 Codex Task filesystem overrideを単一tableへ統合し、`glob_scan_max_depth=8`が後続設定に置き換えられないことをConformanceで固定した。Windows sandbox helperの最新合成marker観測では、通常NTFSのWorkspace内`.env`読取とWorkspace外書込は拒否、Workspace内書込は許可されたが、UserProfile／LocalAppData内の外部readとOneDrive `ReparsePoint` `.env`読取は許可された。`:root=deny`は現行Windows helperのelevated／unelevated両backendで起動不可だった。手動Windows Actions run #12はRust全target検査に成功したが、この結果はhelper境界の欠陥や実Broker Task経路を解消しない。従って広域read隔離は未成立であり、Adapterの`task_execution=unsupported`を維持する。helper検査は実Broker Agent Taskではなく、Windows Application Control等の保護設定も変更していない。
