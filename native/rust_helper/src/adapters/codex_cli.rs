@@ -737,6 +737,10 @@ fn trace_id(request_id: &str) -> String {
         .collect()
 }
 
+#[cfg(all(test, windows))]
+#[path = "../../tests/unit/codex_cli_fixture.rs"]
+mod codex_cli_fixture;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -935,6 +939,44 @@ mod tests {
         assert!(!scratch_path.exists());
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 偽CodexCLIはAdapterのTask成功と期限超過後cleanupを通る() {
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let fixture_directory = root.path().join("fixture");
+        let workspace = root.path().join("workspace");
+        fs::create_dir(&fixture_directory).expect("偽CLI用領域");
+        fs::create_dir(&workspace).expect("登録作業領域");
+        let executable = codex_cli_fixture::compile_fake_codex_cli(&fixture_directory);
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("登録Workspace identity")
+            .identity;
+        let adapter =
+            CodexCliAdapter::new(&executable, &workspace).expect("偽CLIのversion/help検査が成功");
+        assert!(adapter.AgentTask実行対応());
+
+        let context = scratch_context(identity);
+        let completed = adapter.AgentTask実行(
+            "fixture success",
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(5),
+            Some(context.clone()),
+        );
+        assert_eq!(completed, Ok("fixture-task-completed".into()));
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+
+        let timed_out = adapter.AgentTask実行(
+            "FIXTURE_TIMEOUT",
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(1),
+            Some(context.clone()),
+        );
+        assert_eq!(timed_out, Err(対話失敗::期限超過));
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
     #[test]

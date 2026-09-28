@@ -77,7 +77,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "867d38c9b0c05f32543dd7ffba084f2208caf79c9d73bb50666e39d6aa8b6321"
+      "sha256": "65d9a1e362c007ef897dbb90250d8d113ce0ee1d3ef0d4d3e6586d86048eaf1b"
     },
     {
       "path": ".gitignore",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "c100e4b30199a9d892e667c7297614b4ef6ec9ed2cd87a9e95c14d59376b3bcb"
+      "sha256": "bcc90af3dd2c963d0e7e2d48c656cf70f6b99cac46e407064e22242adea890fa"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
