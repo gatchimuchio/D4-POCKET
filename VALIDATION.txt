@@ -2399,6 +2399,42 @@ validation_update_2026_09_28_codex_task_profile_boundary:
       required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
       blocks_release: yes
 
+validation_update_2026_09_29_agent_workspace_binding_windows_actions_run15:
+  scope: Verify the exact Rust change on hosted Windows while preserving local Windows protection settings
+  target_branch: codex/agent-workspace-isolation-verify
+  target_commit: 33787c35ea26bdbb2bae3ad0376bb5c8baa9792b
+  integrated_main_commit: 33787c35ea26bdbb2bae3ad0376bb5c8baa9792b
+  trigger: workflow_dispatch
+  run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36465355560
+  job: rust-validation
+  status: passed
+  runner_os: Windows Server 2025
+  runner_image: win25-vs2026/20260922.246.2
+  rust_toolchain: 1.95.0
+  rust_test_temp: D:\a\_temp\gui-shell-test-temp
+  checks:
+    - checkout HEAD matched GITHUB_SHA
+    - rustfmt check passed for workflow-listed Rust files
+    - cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+    - cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed: 12 test targets, 390 passed, 0 failed, 0 ignored
+    - post-test working tree clean
+  artifact: none
+  evidence_source: EXTERNAL_EVIDENCE for the hosted run result; FIXTURE for the new workspace-binding and distinct fixture-root behavior
+  evidence_scope: Hosted Windows compile/test for this exact commit. Fixture coverage rejects a mismatched Workspace binding before adapter invocation and exercises separate fixture roots; it is not production Broker/IPC, codex exec, OS filesystem isolation, or live cross-agent contamination evidence.
+  local_host:
+    status: known_limitation
+    details: Local all-target cargo test stopped when Windows Application Control denied gui_shell_desktop_launcher test executable startup with OS error 4551 after the 344-test library target passed. No protection policy or denied file was changed.
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+    os_security_policy_changed: false
+  release_gate_impact:
+    - item: Agent Task execution and filesystem isolation
+      classification: release_blocker
+      reason: The new Agent binding test uses fixture adapters and does not establish production Task execution or OS-level filesystem isolation.
+      required_action: Validate the complete Broker-governed Agent Task path, real filesystem boundary, audit/recovery, and cross-agent contamination before enabling task_execution.
+      blocks_release: yes
+
 validation_update_2026_09_29_codex_task_mxc_direct_cli_probe:
   scope: Record the exact Codex Task sandbox source change and bounded direct CLI smoke evidence; do not claim Broker Agent Task support
   base_main_commit: bd061d7f2f4a6eb43f2649c93bbde5dd7e35bbb9

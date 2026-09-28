@@ -2661,3 +2661,17 @@ Mobileの画面・Android／iOS表示名とWindows実行fileの製品表示を`D
 - ローカルWindows Application ControlのOS error 4551は修正・緩和していない。今回のhosted検査は現行mainのRust全target実行gateを解消するが、ローカルhost上でのCargo生成file実行、実Agent Task、filesystem隔離、installed product、production runtime、release readinessを証明しない。
 
 この新しい結果で`windows_rust_integration_test_execution_policy`はresolved／inactiveとする。前回のローカル失敗記録は当時の観測として保持する。`comprehensive_extension_rev1_completion`は、実Agentの秘密file拒否・Workspace隔離・process後始末等が未成立のため引き続きunresolved／`release_blocker`であり、`task_execution=unsupported`、`release_ready=false`を維持する。
+
+## Agent Task Workspace binding・cross-agent fixture検証とWindows Actions #15（2026-09-29）
+
+2つの登録Workspace／rootに対し、Agent TaskのbindingとAdapterの割当を混同しないことを対話制御経路の試験へ追加した。異なるWorkspace bindingをAgent Aの要求へ差し込む負例は、Adapter呼出し前に拒否され、誤ったrootへの書込が起きない。正しいbindingでは各Agent用fixture adapterが自分の一時rootに固有markerを書き、Task状態へmarker本文を露出しないことを確認する。PermissionとOwner Approvalは各Session単位で別々に発行した。
+
+この試験の証拠源は`FIXTURE`である。実Agent process、`codex exec`、production Broker IPC、OS filesystem sandbox、実Workspace外read拒否、実Agent間contaminationの`LIVE_RUNTIME`証拠ではない。Codex Agent Task capabilityは`unsupported`のままとし、Agent実行・隔離・比較・Handoffを含む`comprehensive_extension_rev1_completion`の`release_blocker`と`release_ready=false`を維持する。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib AgentTaskは登録Workspace結合とAdapterをAgent間で混同しない_fixture -- --test-threads=1`：1件合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：ローカルではApplication ControlのOS error 4551により`gui_shell_desktop_launcher` test executableが起動前に拒否され、全target完了せず。先行library targetの344件は通過し、assertion failureではない。保護設定は変更していない。
+- Windows Actions [run #15](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36465355560)：temporary branch `codex/agent-workspace-isolation-verify`上の正確なcommit `33787c35ea26bdbb2bae3ad0376bb5c8baa9792b`をWindows Server 2025／Rust 1.95.0で検査。checkout SHA照合、workflow対象Rust fileのrustfmt、全target `cargo check`／`cargo test`、試験後cleanが成功し、12 test targetで390 passed／0 failed／0 ignored。
+- `python tooling/schema_check/check_schemas.py`：schema 149、example 149、negative fixture 192で合格。`python tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで合格。`python tooling/日本語基底監査.py --strict`：repo file 1108、finding 0で合格。`python tooling/manifest.py --check`：合格。`python tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済みdevelopment check 10件合格。release blocker 5件と`release_ready=false`は維持。
+
+このWindows Actions結果は当該commitのhosted Rust compile／test証拠であり、ローカルWindowsの実行可否、実Agent／Broker経路、installed product、filesystem隔離、release readinessを証明しない。Actions目的を満たしたtemporary branchは、`main`へfast-forward統合・pushした後に削除する。

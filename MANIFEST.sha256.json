@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "444682d8e69eccdcb36fe907782ee67440f4f335c1b8e34a72152884b4649e44"
+      "sha256": "7c6ed4372ec45b07bc4deb6001f190131da663d1ea7ca7e34eed64c1707721a6"
     },
     {
       "path": "SECURITY.md",
@@ -173,7 +173,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "100ee0dad034d445e7fc741073b5782e725e8f05ef5b359a0895f2e0420a094c"
+      "sha256": "cc8b46ef85767b577dbf952874e61df29a030a2a53ae3f6b73c1a611dacbff30"
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
@@ -1185,7 +1185,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "af3c4d1fc8ed2e730d5e6a71341de81f0c0b71721aefc57a911f872c44e183ac"
+      "sha256": "21c5a2bd98e4aaedaf7a0490438c2250c7105a68eb279c718b0ac274dac366a2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3709,7 +3709,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9396dc20d0691b220d74b270abc1525ad429eaae2a73e313bdac81ce850d9e96"
+      "sha256": "aaa53175161fe342c191b1ddc3b4f71ca309eaed06a3cfde2366325d8e99b6be"
     },
     {
       "path": "requirements-dev.txt",
