@@ -943,7 +943,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn 偽CodexCLIはAdapterのTask成功と期限超過後cleanupを通る() {
+    fn 偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る() {
         let root = codex_cli_fixture::FixtureTempDirectory::create();
         let fixture_directory = root.path().join("fixture");
         let workspace = root.path().join("workspace");
@@ -975,6 +975,37 @@ mod tests {
             Some(context.clone()),
         );
         assert_eq!(timed_out, Err(対話失敗::期限超過));
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+
+        let descendant_heartbeat = root.path().join("descendant-heartbeat");
+        let instruction = format!(
+            "FIXTURE_TIMEOUT_WITH_DESCENDANT {}",
+            descendant_heartbeat.display()
+        );
+        let timed_out_with_descendant = adapter.AgentTask実行(
+            &instruction,
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(2),
+            Some(context.clone()),
+        );
+        assert_eq!(
+            timed_out_with_descendant,
+            Err(対話失敗::期限超過),
+            "親CLIが生存中の子孫を生成してもTaskは期限超過で終了する"
+        );
+        let heartbeat_before = fs::metadata(&descendant_heartbeat)
+            .expect("期限超過前に子孫が稼働markerを書き込む")
+            .len();
+        assert!(heartbeat_before > 1, "子孫が複数回heartbeatを記録する");
+        thread::sleep(Duration::from_millis(150));
+        let heartbeat_after = fs::metadata(&descendant_heartbeat)
+            .expect("停止確認中も子孫のmarkerを保持する")
+            .len();
+        assert_eq!(
+            heartbeat_after, heartbeat_before,
+            "Adapterの期限超過後にJob Object配下の子孫が追加書込しない"
+        );
         codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }

@@ -2977,7 +2977,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "bcc90af3dd2c963d0e7e2d48c656cf70f6b99cac46e407064e22242adea890fa"
+      "sha256": "351d19cb4bd6f2646e2dd7caceceb1dc0b5621e09e09d1c573f786bc6516eb31"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3249,7 +3249,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "6f5082f17adbc93e0a7540a8bfce2a228bf019d7830be0edadbb77f31d1a2fff"
+      "sha256": "0042b3271d5f217ea584a0ff05f2390495171c9850077fa646ea5a5031333048"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",

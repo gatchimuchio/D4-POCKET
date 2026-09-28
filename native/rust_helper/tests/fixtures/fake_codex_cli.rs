@@ -1,8 +1,8 @@
 use std::env;
-use std::fs;
-use std::io::{self, Read};
+use std::fs::{self, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process;
+use std::process::{self, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
@@ -20,6 +20,9 @@ const TASK_PERMISSION_PROFILE: [&str; 5] = [
 
 fn main() {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
+    if arguments.len() == 2 && arguments[0] == "--fixture-descendant" {
+        persistent_descendant(Path::new(&arguments[1]));
+    }
     if arguments.len() == 1 && arguments[0] == "--version" {
         println!("{VERSION_OUTPUT}");
         return;
@@ -50,6 +53,19 @@ fn main() {
     if io::stdin().read_to_string(&mut instruction).is_err() || instruction.trim().is_empty() {
         process::exit(46);
     }
+    if let Some(heartbeat_path) = instruction.strip_prefix("FIXTURE_TIMEOUT_WITH_DESCENDANT ") {
+        let executable = env::current_exe().unwrap_or_else(|_| process::exit(48));
+        let _descendant = Command::new(executable)
+            .arg("--fixture-descendant")
+            .arg(heartbeat_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap_or_else(|_| process::exit(48));
+        thread::sleep(Duration::from_secs(30));
+        return;
+    }
     if instruction.contains("FIXTURE_TIMEOUT") {
         thread::sleep(Duration::from_secs(30));
         return;
@@ -63,6 +79,20 @@ fn main() {
         r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"fixture-task-completed"}}}}"#
     );
     println!(r#"{{"type":"turn.completed"}}"#);
+}
+
+fn persistent_descendant(heartbeat_path: &Path) -> ! {
+    loop {
+        let write_result = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(heartbeat_path)
+            .and_then(|mut file| file.write_all(b"x"));
+        if write_result.is_err() {
+            process::exit(49);
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
 }
 
 fn valid_task_arguments(arguments: &[String]) -> bool {
