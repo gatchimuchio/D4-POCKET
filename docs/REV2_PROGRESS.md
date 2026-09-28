@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 Desktop MCP Toolカタログのmetadata閲覧（2026-09-28）
+
+MCP接続ごとにTool一覧を展開表示し、Rust Brokerの既存projectionからTool名、Tool ID、入力Schema hash、危険度`unknown`だけを確認できるようにした。Tool descriptionと入力Schema本文は画面へ出さず、接続一覧の`INTERNAL_STATE`境界を維持する。Tool receiptのJSON Schemaをnested strict objectへ具体化し、未知field、非空description summary、既知以外のrisk/status形状を拒否するnegative fixtureを追加した。Flutter clientもID/hash形式、Tool名のcontrol/bidi文字、未知fieldを再検証してからUIへ渡す。新しい権限・Approval・Tool実行経路は追加していない。
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常example 147件、negative fixture 185件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で合格。
+- `python -X utf8 tooling/manifest.py --check`、`git diff --check`：合格。
+- FlutterのMCP client／widget focused test 4件、`flutter analyze --no-pub`は、最新index sourceの隔離Temp copyで合格。WidgetはTool名・ID・Schema hashの表示、説明marker非露出、一覧操作がTool実行を起こさないことを確認する。インストール済み製品や外部MCP Serverの証拠ではない。
+- Rust helperはこの単位で変更していないためRust testを再実行していない。直前の同一Rust sourceでは全target compileが成功し、全target testはlibrary 326件成功後に`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）で起動拒否され未完了。Rust全target gateはactive `release_blocker`のまま。
+- Tool execution、Credential実値注入、Resource／Prompt実取得、外部MCP Harness、installed product、正式releaseは引き続き`release_blocker`。active unresolved blocker 15件、`release_ready=false`を維持する。
+
 ## D4 Pocket C9 Desktop MCP stdio接続作成・Owner確認（2026-09-28）
 
 既存のMCP metadata一覧／切断画面へstdio Serverの新規接続設定を追加し、Desktop Flutterから既存Broker channel、Windows Rust起動器のdefault No native Owner確認、Rust Broker、既存Job Object監督下のMCP child起動／discoveryへ接続した。入力はServer ID、Windows絶対実行path、Workspace path、1行1項目の起動引数で、Flutterはfilesystem・process・Credentialへ直接アクセスしない。Broker要求とnative確認候補は全階層を型検証し、Credential refは対象Serverに一致する固定missing値だけを受理する。Owner確認にはServer ID、実行path、Workspace、引数件数・hash、payload hashを表示し、引数本文は秘密を含む可能性があるため表示しない。Credential実値注入、Tool実行、Resource／Prompt取得、Trust付与は行わない。

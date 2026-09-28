@@ -5208,6 +5208,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     invalid_names = (
         "mcp_connection_unknown_authority.invalid.json",
         "mcp_connection_credential_secret.invalid.json",
+        "mcp_connection_tool_unknown_field.invalid.json",
         "mcp_connection_receipt_full_content.invalid.json",
         "mcp_connection_list_wrong_evidence.invalid.json",
         "mcp_connection_list_entry_live_evidence.invalid.json",
@@ -5220,6 +5221,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         schema_name = (
             "mcp_connection" if name.startswith(("mcp_connection_unknown", "mcp_connection_credential")) else
             "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else
+            "mcp_connection_receipt" if name.startswith("mcp_connection_tool") else
             "mcp_connection_list" if name.startswith("mcp_connection_list") else
             "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
             "mcp_disconnect_receipt"
@@ -5235,6 +5237,15 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     encoded_receipt = json.dumps(receipt, ensure_ascii=False)
     if any(token in encoded_receipt for token in ("secret_value", "credential_value", "password", "token")):
         不整合.append("C9 receiptへCredential実値が混入している")
+    tools = receipt.get("Tool")
+    if not isinstance(tools, list) or any(
+        not isinstance(tool, dict)
+        or tool.get("description_summary") != ""
+        or tool.get("risk") != "unknown"
+        or set(tool) != {"tool_id", "name", "description_summary", "input_schema_hash", "risk", "status"}
+        for tool in tools
+    ):
+        不整合.append("C9 Tool receiptがmetadata-only固定fieldではない")
 
     disconnect = load_contract_fixture("mcp_disconnect_receipt.valid.json")
     if disconnect.get("証拠種別") != "LIVE_RUNTIME" or disconnect.get("権限生成") != "なし":
@@ -5295,7 +5306,11 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("McpConnectOwnerRequest", desktop_launcher),
         ("'MCP接続',", desktop_broker_client),
         ("Future<McpConnectionSummary> connect", mcp_client),
+        ("class McpToolSummary", mcp_client),
+        ("_toolSummaries", mcp_client),
         ("MCP接続を開始", mcp_screen),
+        ("Tool一覧：", mcp_screen),
+        ("入力仕様hash:", mcp_screen),
     ):
         if token not in source:
             不整合.append(f"C9 MCP接続／切断の統治済み経路がない: {token}")

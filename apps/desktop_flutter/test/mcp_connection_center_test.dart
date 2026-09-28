@@ -11,6 +11,17 @@ class _McpTransport implements BrokerTransport {
   bool connected = true;
   String listedEvidence = 'INTERNAL_STATE';
   String displayName = 'fixture server';
+  final toolMetadata = <String, Object?>{
+    'tool_id': 'tool-${List<String>.filled(64, "a").join()}',
+    'name': 'tool-fixture',
+    'description_summary': '',
+    'input_schema_hash': 'sha256:${List<String>.filled(64, "b").join()}',
+    'risk': 'unknown',
+    'status': {
+      'status': 'supported',
+      'reason': 'MCP wire schemaを検証済み',
+    },
+  };
 
   Map<String, Object?> _receipt({
     String evidence = 'INTERNAL_STATE',
@@ -21,9 +32,7 @@ class _McpTransport implements BrokerTransport {
         '契約種別': 'MCP外部概念射影',
         'Server': {'server_id': serverId, '表示名': displayName},
         'Transport': {'kind': 'stdio'},
-        'Tool': [
-          {'name': 'tool-fixture', 'description_summary': 'secret-marker'}
-        ],
+        'Tool': [toolMetadata],
         'Resource': <Object?>[],
         'Prompt': <Object?>[],
         'Credential ref': <String, Object?>{},
@@ -144,6 +153,9 @@ void main() {
     expect(connections.single.displayName, 'fixture server');
     expect(connections.single.transport, 'stdio');
     expect(connections.single.toolCount, 1);
+    expect(connections.single.tools.single.name, 'tool-fixture');
+    expect(
+        connections.single.tools.single.inputSchemaHash, startsWith('sha256:'));
     expect(transport.operations, ['MCP接続一覧']);
     expect(transport.payloads.single, {'版': 1});
 
@@ -156,6 +168,34 @@ void main() {
     final bidiMetadata = _McpTransport()..displayName = 'mcp\u202efixture';
     await expectLater(
       McpConnectionClient(bidiMetadata).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final untrustedDescription = _McpTransport()
+      ..toolMetadata['description_summary'] = 'secret-marker';
+    await expectLater(
+      McpConnectionClient(untrustedDescription).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final injectedMetadata = _McpTransport()
+      ..toolMetadata['untrusted_summary'] = 'secret-marker';
+    await expectLater(
+      McpConnectionClient(injectedMetadata).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final bidiToolName = _McpTransport()
+      ..toolMetadata['name'] = 'tool\u202efixt';
+    await expectLater(
+      McpConnectionClient(bidiToolName).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
+
+    final malformedSchemaHash = _McpTransport()
+      ..toolMetadata['input_schema_hash'] = 'not-a-hash';
+    await expectLater(
+      McpConnectionClient(malformedSchemaHash).list(),
       throwsA(isA<BrokerClientException>()),
     );
   });
@@ -174,6 +214,13 @@ void main() {
     expect(find.text('fixture server'), findsOneWidget);
     expect(find.textContaining('secret-marker'), findsNothing);
     expect(find.textContaining('サーバーID: mcp-fixture'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Tool一覧：1件'));
+    await tester.tap(find.text('Tool一覧：1件'));
+    await tester.pumpAndSettle();
+    expect(find.text('tool-fixture'), findsOneWidget);
+    expect(find.textContaining('入力仕様hash: sha256:'), findsOneWidget);
+    expect(find.textContaining('secret-marker'), findsNothing);
 
     await tester.ensureVisible(find.text('切断'));
     await tester.tap(find.text('切断'));

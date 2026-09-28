@@ -6,7 +6,16 @@
       "契約種別": "MCP外部概念射影",
       "Server": {"server_id": "mcp-fixture", "表示名": "fixture"},
       "Transport": {"kind": "stdio"},
-      "Tool": [],
+      "Tool": [
+        {
+          "tool_id": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "fixture-tool",
+          "description_summary": "",
+          "input_schema_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "risk": "unknown",
+          "status": { "status": "supported", "reason": "wire schemaを検証済み" }
+        }
+      ],
       "Resource": [],
       "Prompt": [],
       "Credential ref": {},

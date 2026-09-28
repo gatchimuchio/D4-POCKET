@@ -3,12 +3,24 @@ import 'dart:convert';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
+class McpToolSummary {
+  const McpToolSummary({
+    required this.toolId,
+    required this.name,
+    required this.inputSchemaHash,
+  });
+
+  final String toolId;
+  final String name;
+  final String inputSchemaHash;
+}
+
 class McpConnectionSummary {
   const McpConnectionSummary({
     required this.serverId,
     required this.displayName,
     required this.transport,
-    required this.toolCount,
+    required this.tools,
     required this.resourceCount,
     required this.promptCount,
   });
@@ -16,9 +28,11 @@ class McpConnectionSummary {
   final String serverId;
   final String displayName;
   final String transport;
-  final int toolCount;
+  final List<McpToolSummary> tools;
   final int resourceCount;
   final int promptCount;
+
+  int get toolCount => tools.length;
 }
 
 class McpConnectionClient {
@@ -204,15 +218,74 @@ class McpConnectionClient {
         transportKind != 'stdio') {
       throw const BrokerClientException('MCP接続metadataの表示項目が不正です');
     }
+    final toolSummaries = _toolSummaries(tools);
     return McpConnectionSummary(
       serverId: serverId,
       displayName: displayName,
       transport: transportKind as String,
-      toolCount: tools.length,
+      tools: toolSummaries,
       resourceCount: resources.length,
       promptCount: prompts.length,
     );
   }
+
+  List<McpToolSummary> _toolSummaries(List<Object?> values) {
+    return List.unmodifiable(values.map((raw) {
+      if (raw is! Map || raw.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('MCP Tool metadataがobjectではありません');
+      }
+      final tool = raw.cast<String, Object?>();
+      const toolFields = {
+        'tool_id',
+        'name',
+        'description_summary',
+        'input_schema_hash',
+        'risk',
+        'status',
+      };
+      if (tool.length != toolFields.length ||
+          !tool.keys.toSet().containsAll(toolFields)) {
+        throw const BrokerClientException('MCP Tool metadataのfieldが不正です');
+      }
+      final toolId = tool['tool_id'];
+      final name = tool['name'];
+      final description = tool['description_summary'];
+      final schemaHash = tool['input_schema_hash'];
+      final risk = tool['risk'];
+      final status = tool['status'];
+      if (toolId is! String ||
+          !RegExp(r'^tool-[a-f0-9]{1,251}$').hasMatch(toolId) ||
+          name is! String ||
+          !_safeToolName(name) ||
+          description != '' ||
+          schemaHash is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(schemaHash) ||
+          risk != 'unknown' ||
+          status is! Map ||
+          status.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('MCP Tool metadata値が不正です');
+      }
+      final statusFields = status.cast<String, Object?>();
+      if (statusFields.length != 2 ||
+          statusFields['status'] != 'supported' ||
+          statusFields['reason'] is! String ||
+          utf8.encode(statusFields['reason']! as String).length > 256 ||
+          _containsControl(statusFields['reason']! as String)) {
+        throw const BrokerClientException('MCP Tool metadata状態が不正です');
+      }
+      return McpToolSummary(
+        toolId: toolId,
+        name: name,
+        inputSchemaHash: schemaHash,
+      );
+    }));
+  }
+
+  bool _safeToolName(String value) =>
+      value.isNotEmpty &&
+      utf8.encode(value).length <= 256 &&
+      !_containsControl(value) &&
+      !_containsBidiControl(value);
 
   Map<String, Object?> _objectField(Map<String, Object?> source, String key) {
     final value = source[key];

@@ -141,8 +141,8 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
 - item: D4 Pocket MCP Connection Center（C9 current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: C8のMCP外部概念射影契約をRust Brokerのowner専用`MCP接続`／`MCP切断`へ接続した。Desktop設定のMCP接続センターはWindows絶対pathとstdio引数から接続要求を作り、既存Rust起動器のdefault No native Owner確認後にBrokerへ送る。通常IPCでmetadata一覧を明示取得し、Server ID・表示名・stdio種別・catalog件数だけを表示する。個別切断もnative Owner確認後にBrokerへ届き、停止確認・永続Audit後に接続記録を解消する。
-  authority_boundary: MCP接続と切断はBroker認証とWindows native Owner確認を通し、FlutterはOwner資格・session・Approval・Credential実値を保持しない。Credential入力とTool実行は未対応。MCP一覧は`INTERNAL_STATE`であり、現在接続・Trustの保証へ昇格させない。MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。Resource／Prompt実取得、Streamable HTTP、OAuth、consent、quarantine、非Windows process群停止は未成立として扱う。
+  evidence: C8のMCP外部概念射影契約をRust Brokerのowner専用`MCP接続`／`MCP切断`へ接続した。Desktop設定のMCP接続センターはWindows絶対pathとstdio引数から接続要求を作り、既存Rust起動器のdefault No native Owner確認後にBrokerへ送る。通常IPCでmetadata一覧を明示取得し、Server ID・表示名・stdio種別・catalog件数を表示する。展開したTool一覧はBrokerの検証済みmetadataからTool名・Tool ID・入力Schema hashだけを表示し、説明文・Schema本文・実行操作は表示しない。個別切断もnative Owner確認後にBrokerへ届き、停止確認・永続Audit後に接続記録を解消する。
+  authority_boundary: MCP接続と切断はBroker認証とWindows native Owner確認を通し、FlutterはOwner資格・session・Approval・Credential実値を保持しない。Tool catalogは`INTERNAL_STATE` metadataだけで、Trust・Permission・実行権を生成しない。MCP一覧は現在接続・Trustの保証へ昇格させない。MCP metadata、Tool description、Trust、Capability diff、Credential refはAuthority、Permission、Approval、Credential実値を生成しない。Credential入力とTool実行、Resource／Prompt実取得、Streamable HTTP、OAuth、consent、quarantine、非Windows process群停止は未成立として扱う。
 
 - item: D4 Pocket 運用プロファイル（C10 current scope）
   classification: required_for_v1

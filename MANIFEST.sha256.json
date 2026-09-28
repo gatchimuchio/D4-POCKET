@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9382a632fa49665cfd03344d37615818eec420a04e755b88a41d2949f2495185"
+      "sha256": "637e3847865bef413f758a2cde9a0f4eb548aac1d2a8c5f7e372677776ea534c"
     },
     {
       "path": "SECURITY.md",
@@ -237,7 +237,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/mcp_connection_center.dart",
-      "sha256": "6604c93c694e2a538c10caa42c785e069b2928eaa0da61c7a062880a6a6440ee"
+      "sha256": "c2e7cb442a53691db9aa87dd3b4dd179443cb3b8273bd709dfa522a60b4f338d"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/notifications.dart",
@@ -325,7 +325,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/mcp_connection_client.dart",
-      "sha256": "93fe2fca5e624fe220d5e8a8ec616bb442a81fcf4cecc30a8c00bb84c9342a73"
+      "sha256": "f22a14da628a5df866816704b324cfadff7e39c08f457a8e5e52d3d268de2fe4"
     },
     {
       "path": "apps/desktop_flutter/lib/services/notification_client.dart",
@@ -573,7 +573,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/mcp_connection_center_test.dart",
-      "sha256": "925e3354cd21dacb917f5b78d9d482ca493dbbd6d711c2082624473eb6786f68"
+      "sha256": "612a486c716ec5ad3322b98e6996941cd82b8e0a7662e3f22936f5a6e4808c1e"
     },
     {
       "path": "apps/desktop_flutter/test/module_pruning_test.dart",
@@ -1141,7 +1141,7 @@
     },
     {
       "path": "docs/GUI_OPERATION_SURFACES.md",
-      "sha256": "a4043dc3e3d7795d7f95c067d1ebc5ea483d49f2fedb97ca359d2ede3fb06637"
+      "sha256": "100ae3d0c893f74fdcf8ac2bb7781c4b1831a3e3b819bd858942810ecac3d4a6"
     },
     {
       "path": "docs/INSTALLER_BOUNDARY.md",
@@ -1177,7 +1177,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "0965186f3edc1fc1aa42ec80e51f074d0cd3da5ab9f541547faf697a04402ae2"
+      "sha256": "a856c51351397d656094642dbe42fd2e35b3c586585b15b3c0d0c8386293ea46"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1385,7 +1385,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "2b3adf80de1ad99f842ecadec3bf7bb14e14b56967bd53311d86404ca9022a37"
+      "sha256": "9cdccc5f45f000c4d89487a11f372bfb03f872a9c6202369a2b7f033578b9be9"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -2188,6 +2188,10 @@
       "sha256": "966a0db0dc541b08c3412de42b0f66eb678da6e14bd81693ca0957b94c0768be"
     },
     {
+      "path": "examples/contracts/invalid/mcp_connection_tool_unknown_field.invalid.json",
+      "sha256": "06014859187ff1420e9cd7557833b98d96b2b1ab4fb2b150b1db075551e63267"
+    },
+    {
       "path": "examples/contracts/invalid/mcp_connection_unknown_authority.invalid.json",
       "sha256": "4a18f36fa39fc9945750a4af13e42733705744b6b1b90cba163e7979d427d54b"
     },
@@ -2549,11 +2553,11 @@
     },
     {
       "path": "examples/contracts/mcp_connection_list.valid.json",
-      "sha256": "f35acc3cbed914092beb1b578653737c5cb360ae6ae641663e98716dcbe699cb"
+      "sha256": "f44ff92b4d671d3b1cf547e4bef5ce01a668f90f443230f978cda7d016ce843b"
     },
     {
       "path": "examples/contracts/mcp_connection_receipt.valid.json",
-      "sha256": "4ed68a3eca917f442ef67cbefba1d8d9975665bf3c79b5b63392743d3980582a"
+      "sha256": "2e04ace92e19c43747f9240d96de1e09f90ac103fd7816e00613bc1e4df59490"
     },
     {
       "path": "examples/contracts/mcp_contract.valid.json",
@@ -3985,11 +3989,11 @@
     },
     {
       "path": "specs/mcp_connection_list.schema.json",
-      "sha256": "c0bc717dfb2a4c23c7764be5210fd0413de2dd29cccf1f49771bacf9c6219f9f"
+      "sha256": "bfdc4c2a1c883c25334ef665884ade5ee2a31c9680800ccda10cf97ef883e3d6"
     },
     {
       "path": "specs/mcp_connection_receipt.schema.json",
-      "sha256": "00a3740d11f88204a6c65d1582b1e86afc91661c5e2c757844851b07a7849175"
+      "sha256": "44cd826f8945a8151509a6bc25177bba0d838a162e3a5615d9ff4b27d452488b"
     },
     {
       "path": "specs/mcp_contract.schema.json",
@@ -4293,7 +4297,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "0ef154309b58c2e075a2b4b6a61df331c6e10bb514e71adff767fe4137105b3e"
+      "sha256": "485c12ac01d4d7dfb575a6e9da29d62b8abc31458788a379622e9c8704487136"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

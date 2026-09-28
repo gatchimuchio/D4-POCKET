@@ -26,7 +26,7 @@
         "契約種別": { "const": "MCP外部概念射影" },
         "Server": { "type": "object" },
         "Transport": { "type": "object" },
-        "Tool": { "type": "array" },
+        "Tool": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/tool_projection" } },
         "Resource": { "type": "array" },
         "Prompt": { "type": "array" },
         "Credential ref": { "type": "object" },
@@ -41,6 +41,27 @@
         "承認状態": { "const": "owner_control_approved" },
         "復旧ID": { "const": "recover-mcp-connection" },
         "接続監査ID": { "type": "string", "minLength": 1 }
+      }
+    },
+    "tool_projection": {
+      "type": "object",
+      "required": ["tool_id", "name", "description_summary", "input_schema_hash", "risk", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "tool_id": { "type": "string", "pattern": "^tool-[a-f0-9]{1,251}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "description_summary": { "const": "" },
+        "input_schema_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "risk": { "const": "unknown" },
+        "status": {
+          "type": "object",
+          "required": ["status", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "supported" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        }
       }
     }
   }

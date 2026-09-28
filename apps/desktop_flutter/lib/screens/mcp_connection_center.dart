@@ -157,32 +157,63 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: ListTile(
-          title: Text(
-            connection.displayName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            'サーバーID: ${connection.serverId}\n'
-            '通信方式: ${connection.transport} ・ '
-            'ツール ${connection.toolCount} / リソース ${connection.resourceCount} / プロンプト ${connection.promptCount}',
-          ),
-          isThreeLine: true,
-          trailing: disconnecting
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : OutlinedButton.icon(
-                  onPressed:
-                      _loading || _connecting || _disconnectingServerId != null
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              title: Text(
+                connection.displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                'サーバーID: ${connection.serverId}\n'
+                '通信方式: ${connection.transport} ・ '
+                'ツール ${connection.toolCount} / リソース ${connection.resourceCount} / プロンプト ${connection.promptCount}',
+              ),
+              isThreeLine: true,
+              trailing: disconnecting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _loading ||
+                              _connecting ||
+                              _disconnectingServerId != null
                           ? null
                           : () => _disconnect(client, connection),
-                  icon: const Icon(Icons.link_off),
-                  label: const Text('切断'),
+                      icon: const Icon(Icons.link_off),
+                      label: const Text('切断'),
+                    ),
+            ),
+            ExpansionTile(
+              title: Text('Tool一覧：${connection.tools.length}件'),
+              subtitle: const Text('metadata_only。実行権や信頼を示しません。'),
+              children: [
+                if (connection.tools.isEmpty)
+                  const ListTile(title: Text('Toolはありません。')),
+                for (final tool in connection.tools)
+                  ListTile(
+                    title: Text(
+                      tool.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '識別子: ${tool.toolId}\n'
+                      '入力仕様hash: ${tool.inputSchemaHash}',
+                    ),
+                    trailing: const Text('危険度: 未評価'),
+                  ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Text('説明文と入力Schema本文は表示しません。Tool実行は未対応です。'),
                 ),
+              ],
+            ),
+          ],
         ),
       ),
     );
