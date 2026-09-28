@@ -110,12 +110,20 @@ jobs:
           flutter build appbundle --debug --no-pub 2>&1 | tee ../../evidence/android-appbundle-build.txt
           timeout 60 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r build/app/outputs/flutter-apk/app-debug.apk 2>&1 | tee ../../evidence/android-install.txt
           timeout 30 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am start -W -n com.example.gui_shell_mobile/.MainActivity 2>&1 | tee ../../evidence/android-start.txt
+          # Android版差による前景Activity項目名の差を許容し、画面状態と起動中processを別々に記録する。
           deadline=$((SECONDS + 60))
-          until timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell dumpsys activity activities | grep -F 'mResumedActivity' | grep -F 'com.example.gui_shell_mobile/.MainActivity' > ../../evidence/android-resumed.txt; do
-            test "$SECONDS" -lt "$deadline"
+          while true; do
+            timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell dumpsys activity activities | tr -d '\r' | tee ../../evidence/android-activities.txt > /dev/null
+            grep -E 'mResumedActivity|topResumedActivity|Resumed(Activity)?:' ../../evidence/android-activities.txt | grep -F 'com.example.gui_shell_mobile' > ../../evidence/android-resumed.txt || true
+            timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell pidof com.example.gui_shell_mobile > ../../evidence/android-process.txt || true
+            if [ -s ../../evidence/android-resumed.txt ] && [ -s ../../evidence/android-process.txt ]; then break; fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 logcat -d -t 1000 -s AndroidRuntime:E > ../../evidence/android-runtime-errors.txt || true
+              echo 'Android前景画面とprocessの確認期限を超過' >&2
+              exit 1
+            fi
             sleep 2
           done
-          timeout 10 "$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell pidof com.example.gui_shell_mobile | tee ../../evidence/android-process.txt
           cd ../..
           python3 tooling/minidora_live_check.py --reference "$RUNNER_TEMP/minidora-reference" --mobile-client 2>&1 | tee evidence/device-link-rust-live-test.txt
       - name: 追跡差分を検査
