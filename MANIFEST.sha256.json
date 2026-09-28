@@ -3057,7 +3057,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/credential_vault.rs",
-      "sha256": "82de3dd887bfde2cd8ee5e454e91d0babd65f4b08fc55cc875566319f32dd2a8"
+      "sha256": "ff22aeefa1998f7ea9e1be64d7706fe1cea10c4d54128d98108b988533fc821e"
     },
     {
       "path": "native/rust_helper/src/broker/device_link.rs",
@@ -3109,7 +3109,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "800235a4cc63ec0e1e278b82c12d395c25bd0746b0d2e8fe64a6672d96e0c633"
+      "sha256": "aad178460b731af3583ef7cdaf0c337c300779bcd61a0c335bef11fcf6e62dee"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",

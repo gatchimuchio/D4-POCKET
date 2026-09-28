@@ -1072,7 +1072,7 @@ mod tests {
             "版": 1,
             "操作": "接続",
             "ServerID": "fixture-mcp-server",
-            "実行file": std::env::current_exe().expect("test executable").to_string_lossy(),
+            "実行file": std::env::current_exe().expect("試験用実行ファイルの取得").to_string_lossy(),
             "引数": [],
             "workspace": std::env::temp_dir().to_string_lossy(),
             "Transport": "stdio",

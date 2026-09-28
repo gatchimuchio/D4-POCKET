@@ -860,7 +860,7 @@ mod tests {
         );
         assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
         let output = serde_json::to_string(&listed.body).expect("公開metadata");
-        let audit = serde_json::to_string(&broker.audit_events()).expect("Audit");
+        let audit = serde_json::to_string(&broker.audit_events()).expect("監査記録の取得");
         let body = listed.body.expect("資格情報一覧receipt");
         assert!(!output.contains(secret_marker));
         assert!(!audit.contains(secret_marker));
