@@ -9,6 +9,8 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart';
 class _Transport implements BrokerTransport {
   final calls = <String>[];
   Completer<void>? gate;
+  int activeRequests = 0;
+  int maxConcurrentRequests = 0;
 
   @override
   Future<Map<String, Object?>> request(
@@ -17,8 +19,16 @@ class _Transport implements BrokerTransport {
   }) async {
     final runtime = payload?['実行系ID'] as String;
     calls.add(runtime);
-    if (gate != null) await gate!.future;
-    return _response(runtime);
+    activeRequests++;
+    if (activeRequests > maxConcurrentRequests) {
+      maxConcurrentRequests = activeRequests;
+    }
+    try {
+      if (gate != null) await gate!.future;
+      return _response(runtime);
+    } finally {
+      activeRequests--;
+    }
   }
 }
 
@@ -168,5 +178,38 @@ void main() {
 
     expect(transport.calls, ['local']);
     expect(find.textContaining('CPU: 12.5'), findsNothing);
+  });
+
+  testWidgets('Runtime scope変更後も進行中要求の完了まで次の観測を待つ', (tester) async {
+    final transport = _Transport()..gate = Completer<void>();
+    final controller = _Controller(transport);
+    addTearDown(controller.dispose);
+    Widget page(List<String> runtimes) => MaterialApp(
+      home: Scaffold(
+        body: ResourceOverview(
+          controller: controller,
+          runtimes: runtimes,
+          connected: true,
+          active: true,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(page(const ['local', 'other']));
+    await tester.pump();
+    expect(transport.calls, ['local']);
+    expect(transport.activeRequests, 1);
+
+    await tester.pumpWidget(page(const ['replacement']));
+    await tester.pump();
+    expect(transport.calls, ['local']);
+    expect(transport.activeRequests, 1);
+
+    transport.gate!.complete();
+    await tester.pumpAndSettle();
+
+    expect(transport.calls, ['local', 'replacement']);
+    expect(transport.maxConcurrentRequests, 1);
+    expect(find.textContaining('CPU: 12.5'), findsOneWidget);
   });
 }

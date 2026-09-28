@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 11 Mobile資源観測scope変更時の直列化追補（2026-09-28）
+
+先行変更後の追試で、観測中にRuntime scopeが変わると、古い応答を破棄できても新scopeの要求を旧要求完了前に始め得ることを確認した。Mobile資源画面に画面instance内の要求直列化を追加し、旧要求の完了後に限って現scopeの要求を送る。Permission、Approval、Broker統治経路、他画面の要求は変更しない。
+
+- 変更前の最新push済みcommit `866a254243cc00382e03c64a6f020e33fad19492`から作成した非OneDrive managed worktreeへ同じMobile source/test差分を適用し、両Dart fileのSHA-256一致を確認した。
+- `apps/mobile_flutter`で`flutter test test/resource_overview_test.dart`: 3件成功。Runtime scopeを遅延要求中に置換し、旧要求の完了までは新要求が送信されないこと、観測中要求の最大数が1であることを確認した。
+- `apps/mobile_flutter`で`flutter test`: 21件すべて成功。これはFlutter testであり、Android実機、installed product、TLS/Device LinkのLIVE_RUNTIME結合証拠ではない。
+- DesktopとMobileの`flutter analyze`は両方exit 1。analysis serverがLSP初期化JSONの途中切れで`FormatException: Unexpected end of input`を出して異常終了したため、analyze成功とは扱わない。Dart formatterと`git diff --check`は成功。
+- Registry上のactive release blocker 14件、Android実機凍結、`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 11 Mobile資源観測を表示中に限定（2026-09-28）
 
 MobileHomeは全画面を`IndexedStack`で保持するため、資源画面のbuild時自動観測が非表示でも走っていた。選択中かつ接続中に限り一度観測し、Runtimeごと逐次・最大16件・同時要求1件に制限する。画面離脱または接続scope変更で表示を破棄し、in-flight結果を採用せず、後続Runtimeへの要求を止める。再選択時は新しい観測を行う。Permission、Approval、Broker統治経路は変更しない。

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/runtime_resource_client.dart';
 
@@ -24,6 +26,7 @@ class ResourceOverview extends StatefulWidget {
 
 class _ResourceOverviewState extends State<ResourceOverview> {
   Future<List<_ResourceResult>>? _future;
+  Future<void>? _requestTail;
   int _generation = 0;
   bool _loading = false;
 
@@ -98,8 +101,9 @@ class _ResourceOverviewState extends State<ResourceOverview> {
     for (final runtime in runtimes) {
       if (!_current(generation)) return results;
       try {
-        final observation = await client.observe(runtime);
+        final observation = await _observe(client, generation, runtime);
         if (!_current(generation)) return results;
+        if (observation == null) return results;
         results.add(_ResourceResult(runtime, observation));
       } on Object catch (error) {
         if (!_current(generation)) return results;
@@ -107,6 +111,26 @@ class _ResourceOverviewState extends State<ResourceOverview> {
       }
     }
     return results;
+  }
+
+  Future<RuntimeResourceObservation?> _observe(
+    RuntimeResourceClient client,
+    int generation,
+    String runtime,
+  ) async {
+    final previous = _requestTail;
+    final requestFinished = Completer<void>();
+    _requestTail = requestFinished.future;
+    try {
+      if (previous != null) await previous;
+      if (!_current(generation)) return null;
+      return await client.observe(runtime);
+    } finally {
+      requestFinished.complete();
+      if (identical(_requestTail, requestFinished.future)) {
+        _requestTail = null;
+      }
+    }
   }
 
   @override

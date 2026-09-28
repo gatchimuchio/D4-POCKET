@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "34e8fd2504ba5ccce9d3f9200eb276b7ec900cda0c2023a13c295e34e7aa57c3"
+      "sha256": "b1a21619642f941e6e989ad41c95e7e089f4149a3144f59c0984fe21e7865958"
     },
     {
       "path": "SECURITY.md",
@@ -1057,7 +1057,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/resource_overview.dart",
-      "sha256": "98a7c3a8b2970b1e8770099d6a01d7dc3330ac7a79ab4563d70472e4a065f1fb"
+      "sha256": "0cfbb4f846224e184e92212b5252edf93bc406163408ab79ace5cc94d57eb90c"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/runtime_status.dart",
@@ -1090,6 +1090,10 @@
     {
       "path": "apps/mobile_flutter/test/mobile_projection_client_test.dart",
       "sha256": "c3165abae3a804100fbb7b307941a0c23cb9adf2781e296a3db4fe2bb91ff606"
+    },
+    {
+      "path": "apps/mobile_flutter/test/resource_overview_test.dart",
+      "sha256": "9c7d6b7ddc95c977bc1a3c1c15b4813a5add6d30361360a46bb5b0cc49b29280"
     },
     {
       "path": "config/audit_signing_trust.json",
@@ -1161,7 +1165,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "e4e46ff7004a790450658845d1450ec1d97dedba99664e823bde4ec92b9a0cb0"
+      "sha256": "d51037b8f399424ba5aeeeef55aad9cdc1d056d0abb5dfafec90d9b5aca8b0f5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1417,7 +1421,7 @@
     },
     {
       "path": "docs/specs/runtime-resource-observation.md",
-      "sha256": "71ac50c64eab82151b8a2ff73cf0ac27eec9fc8316850b81dfc27a4609a09d7f"
+      "sha256": "6e7192e2749b61afcd707aca41ce3e3fd99a789c3cfecbfbd5e50add60d50dac"
     },
     {
       "path": "docs/specs/trace-inspector.md",
