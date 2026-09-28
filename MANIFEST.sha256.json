@@ -197,7 +197,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
-      "sha256": "166cf16cceb720c7369d682ceccb4ebe2b578c47e2f6aa03abc48d67540abb20"
+      "sha256": "ce1377b85a40ecc6463b80b62ce509672376bd63ad3f2cb633dea17cc5d12ebb"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
@@ -365,7 +365,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "b78bae57e2619dd6f1831c5a4a7d22982df218de2736f4ac1c089ddc26e2ef8b"
+      "sha256": "e640ecfaf1b555156bc07b093d00be147a7c28a2bf8e1e049637c697529a074d"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -569,7 +569,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/global_search_index_test.dart",
-      "sha256": "ca1abb6a5472d340ffc1b9607e7a9ec9e73ed6e9e2a5123bbedc23d8db9f3938"
+      "sha256": "eff91aafc581c9115a5361378c7d95f5a65acbfafb0dfd205bc8a7887ed3263d"
     },
     {
       "path": "apps/desktop_flutter/test/history_content_test.dart",
@@ -1353,7 +1353,7 @@
     },
     {
       "path": "docs/specs/global-search-surface.md",
-      "sha256": "a21ad4f625c828387168620ed286f7e41e111a56bba352e95f28ec724a6ea7f5"
+      "sha256": "1de65d9dbc84b1c49aeb1f06e6deda1b48792204ab19149a427f04162c9179aa"
     },
     {
       "path": "docs/specs/gui-shell-ai-edit.md",
