@@ -1,8 +1,8 @@
 # 互換性対応表
 
-## C31現行互換性要約（2026-09-24）
+## C31現行互換性要約（2026-09-28）
 
-現行の開発検証対象はWindows host上のRust Broker、共有／Desktop／Mobile Flutter、Schema、Conformance、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrixである。Schema 108件、正常example 108件、negative fixture 129件、Conformance 179件、厳格日本語監査、manifest検査はPASSしている。
+現行の開発検証対象はWindows Rust Broker、共有／Desktop／Mobile Flutter、Schema、Conformance、C29障害注入である。Schema 149件／normal example 149件／negative fixture 192件、Conformance 225 checks、C29 9/9 casesがPASS。Desktop FlutterはASCII一時copyで124 testsと`flutter analyze`、Mobile Flutterも`flutter analyze`がPASSした。Windows Actions [`Windows Rust manual validation #10`](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)は対象commit `9c841a5`のRust全target checkと12 test target／389件をPASSした。これらは開発検証であり、installed product・外部MCP実接続・release proofではない。C0〜C31の監査対応表は構造PASS、C32〜C34は未監査、active release blocker 31件、`release_ready=false`。
 
 | 領域 | 現行成立範囲 | 未成立・分類 |
 | --- | --- | --- |

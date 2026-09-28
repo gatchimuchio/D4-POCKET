@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP stdio Credential限定注入とWindows hosted検証（2026-09-28）
+
+C9のWindows MCP stdio接続に限り、ProtectedStoreへ登録済みでMCP用途・対象Server IDが完全一致するCredentialを、FlutterやIPC応答へ返さず、native Owner確認後に対象stdio processの指定環境変数へ渡す経路を追加した。環境変数名はallowlist外の危険名・予約名を拒否する。接続後の使用AuditはCredential ID、対象Server、変数名、時刻だけを記録し秘密値を含めない。Credentialを受け取るServer processと子孫processは値を読取り外部送信でき、Windows Job Objectはsandboxではない。OAuth／HTTP、MCP以外、installed product運用、外部Server適合を実装・実証したものではなく、`release_ready=false`を維持する。
+
+- Windows Actions [`Windows Rust manual validation #10`](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)を`workflow_dispatch`で一時branch `codex/mcp-credential-injection`へ実行した。対象commit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`、Windows Server 2025 image `win25-vs2026/20260922.246.2`、Rust／Cargo 1.95.0。checkout SHA照合、workflow内rustfmt検査、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認が成功し、12 test targetで389 passed／0 failed／0 ignored。Artifactはなし。これは対象commitのWindows hosted Rust compile／test証拠であり、installed productのLIVE_RUNTIME・Owner実操作・外部MCP適合・release readinessを証明しない。
+- 先行run [#9](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36418765054)はtest内の`expect_err`が秘密値wrapperの`Debug`を要求するcompile errorで失敗した。秘密値型へ`Debug`を追加せず、拒否結果をmatchで検査する修正と日本語Broker methodの既存lint規約反映を行い、commit `9c841a5`でrun #10に成功した。このFAIL履歴は保持する。
+- ローカル検証: `python -X utf8 tooling/schema_check/check_schemas.py`はSchema 149／normal example 149／negative fixture 192でPASS、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は225 checksでPASS、`python -X utf8 tooling/failure_injection_validation.py`は9/9 PASS、開発監査はC0〜C31の対応表構造PASS・31 release blocker・C32〜C34未監査・`release_ready=false`。Desktop FlutterはASCII一時copyで124 testと`flutter analyze`がPASSし、Mobile Flutter `flutter analyze`もPASS。OneDrive workspace内Flutter build outputのcleanup ACL制約に対する一時copy検証であり、製品architectureやACLを変更していない。
+- ローカルWindows Application Control（OS error 4551）は変更・緩和していない。Actionsの成功はローカル実行制御を修復せず、local hostの製品bundle build、Windows installed product、正式配布の検証を代替しない。先行のローカル失敗記録とrelease blockerは維持する。
+
 ## D4 Pocket C9 Windows hosted Rust検証とC29再確認（2026-09-28）
 
 ローカルWindowsのApplication Controlを変更せず、既存の手動検証workflowで現行`main` commitのRust Windows全targetを検証した。検証対象`c606b78ccd5bed0c68ea6535a15c8a304ed51497`はworkflow起動時点ですでに`main`／`origin/main`と一致していたため、一時branchは同じcommitを指す検証用refとしてのみ使用し、merge対象の差分はなかった。run終了後、一時branchをremote／localから削除し、`main`へ戻した。
