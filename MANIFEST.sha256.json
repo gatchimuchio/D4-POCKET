@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "d63b4e04fe71b4a14c62019e63ffef39d5af5910cd6d151a4f2d93a3f2b14572"
+      "sha256": "6f53101cc3fb83c2f6ff6cc1c6765570fb4d9994255b4cb299a7e33c6194d737"
     },
     {
       "path": "SECURITY.md",
@@ -173,7 +173,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "b609109f0deb0e44c552fd1d14c6c9e69aaee69033a3da95b549935ab4bd8e35"
+      "sha256": "151221e71ae8b529bea8689c55c5d3e119690bf1a27aef3edd30acba20a4dc09"
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
@@ -1185,7 +1185,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "81efdc0face885bce232933c5603bcdcf23e060d4a75200af710bb27f884feda"
+      "sha256": "e0dc8c9c37e85c26d03657203c536b3a052e4b188784a3b1af7b5e32c3f26c4a"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

@@ -2269,3 +2269,84 @@ validation_update_2026_09_28_codex_task_profile_boundary:
       reason: External reads remain allowed and OneDrive ReparsePoint deny behavior is not established; helper test is not the Broker production path.
       required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
       blocks_release: yes
+
+validation_update_2026_09_29_global_search_snapshot_provenance:
+  scope: Prevent imported snapshot_source self-assertion from becoming Broker provenance and verify the changed Flutter path on hosted Windows without changing local OS protections
+  base_commit: 5fea434f8f5e7e30c854a950bdc977c857a93bc7
+  temporary_branch: codex/global-search-provenance
+  source_changes:
+    - ShellSnapshot.fromJson always marks imported serialized snapshots as unverified; self-reported snapshot_source is ignored.
+    - The controlled Broker composition path assigns provenance labels only after its own responses are accepted, and uses a distinct failure label when the Broker cannot be reached.
+    - Add a negative Global Search test for snapshot_source=broker spoofing and document the evidence-source rule.
+    - Add a workflow_dispatch-only Windows Desktop Flutter validation workflow with read-only repository permission.
+  local_checks:
+    - name: schema_check
+      command: python tooling/schema_check/check_schemas.py
+      status: passed
+      exit: 0
+      result: 149 schemas, 149 normal examples, 192 negative fixtures
+    - name: conformance
+      command: python tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      exit: 0
+      result: 225 checks
+    - name: manifest_check
+      command: python -X utf8 tooling/manifest.py --check
+      status: passed
+      exit: 0
+    - name: focused_flutter_test
+      command: flutter test --no-pub test/global_search_index_test.dart
+      working_directory: apps/desktop_flutter
+      status: passed
+      exit: 0
+      result: 3 passed
+    - name: dart_format_check
+      command: dart format --output=none --set-exit-if-changed apps/desktop_flutter/lib/models/generated_contracts.dart apps/desktop_flutter/lib/services/shell_core_client.dart apps/desktop_flutter/test/global_search_index_test.dart
+      status: passed
+      exit: 0
+    - name: initial_integrated_document_lint_attempt
+      command: python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+      status: failed
+      exit: 1
+      cause: release gate detected an English explanatory term in the new validation history as an unclassified item.
+      resolution: Reworded that explanation in Japanese; direct release gate and the subsequent full integrated validator passed.
+    - name: integrated_development_validation
+      command: python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+      status: passed
+      exit: 0
+      result: Schema, Conformance, Japanese audit, Manifest, release gate, packaging portability, release smoke, evidence bundle, runtime assertions, and C32 development audit passed; release_ready=false retained.
+    - name: local_windows_host_failures
+      status: observed_environment_limited
+      details:
+        - Cargo helper build was denied by Windows Application Control with OS error 4551.
+        - Desktop and Mobile flutter analyze received truncated JSON from the local analysis server and exited nonzero.
+        - The first full Desktop Flutter suite, before helper build, had 123 passed and 2 helper-dependent failures.
+      handling: These local host constraints were not weakened or represented as product regressions; hosted Windows runner repeated the required checks with the helper built.
+  windows_manual_flutter_validation:
+    workflow: .github/workflows/windows-manual-desktop-flutter-validation.yml
+    trigger: workflow_dispatch
+    run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36440922358
+    job: desktop-validation
+    status: passed
+    duration: 6m 49s
+    target_branch: codex/global-search-provenance
+    target_commit: 33d0287b861f500d636904e4a2a0edfbeea576eb
+    runner_os: Windows Server 2025
+    runner_image: win25-vs2026/20260922.246.2
+    flutter_commit: 559ffa3f75e7402d65a8def9c28389a9b2e6fe42
+    rust_toolchain: 1.95.0
+    checks:
+      - checkout HEAD matched GITHUB_SHA
+      - Rust helper cargo build passed
+      - Desktop flutter analyze --no-pub passed with no issues
+      - Desktop flutter test --no-pub --reporter expanded passed: 125 passed, 0 failed
+      - Mobile flutter analyze --no-pub passed with no issues
+      - post-test working tree clean
+    test_temp: D:\a\_temp\gui-shell-flutter-test-temp
+    artifact: none
+    evidence_scope: Hosted Windows compile and test for the exact source commit only; no installed-product, local Application Control, live Agent isolation, or release-readiness proof.
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+    os_security_policy_changed: false
+    paid_model_or_production_agent_task_run: false

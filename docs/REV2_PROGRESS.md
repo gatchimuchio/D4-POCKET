@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## 全体検索のsnapshot出所を自己申告から分離しWindows Flutter全testを検証（2026-09-29）
+
+`ShellSnapshot.fromJson`はJSON内の`snapshot_source`を証拠として採用せず、出所を`unverified`に固定する。製品Broker取得経路は必要な応答を受理した後にだけ`broker`または`broker_unavailable`を設定する。全体検索はBroker由来と確認できないsnapshotを`不明`と表示し、出所自体はAuthorityとして使わない。回帰testは外部JSONが`snapshot_source=broker`を自己申告してもBroker証拠へ昇格しないことを確認する。
+
+ローカルでは`python -X utf8 tooling/manifest.py --check`、Schema 149／正常example 149／negative fixture 192、Conformance 225件、Dart format check、`flutter test --no-pub test/global_search_index_test.dart`（3 passed）、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`（修正後exit 0）が成功した。初回の統合検査は、追加した検証履歴の英語説明語をrelease gateが未分類itemとして検出して失敗したため、日本語表現へ直して再実行した。OneDrive外worktreeでの初回Desktop全testはhelper未buildにより2件失敗し、ローカルCargo helper buildはWindows Application ControlのOS error 4551、Desktop／Mobile analyzeはanalysis serverのJSON切断で失敗した。これらはhost制約として分離し、保護設定は変更していない。
+
+Windows manual Actions [run #1](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36440922358)は一時branch `codex/global-search-provenance`、対象commit `33d0287b861f500d636904e4a2a0edfbeea576eb`、Windows Server 2025 image `win25-vs2026/20260922.246.2`でSuccess。Flutter 3.44.0 commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`とRust 1.95.0を使用し、Rust helper build、Desktop analyze（問題なし）、Desktop全test（125 passed／0 failed）、Mobile analyze（問題なし）、試験後working tree cleanを確認した。run時間6分49秒、artifactなし。証拠範囲はhosted Windows上の当該commitのcompile／testだけで、installed product、ローカルApplication Control、実Agent隔離、release readinessは証明しない。`task_execution=unsupported`と`release_ready=false`を維持する。
+
 ## Phase 7 Codex Task permission profileの上書き修正とWindows境界再検査（2026-09-28）
 
 Task用Codex設定で`filesystem.glob_scan_max_depth=8`を先に個別指定し、その後にfilesystem table全体を設定していたため、後続tableが先行値を置き換える構成になっていた。走査深度を`:minimal=read`およびWorkspace root内deny globと同じ単一table overrideへ統合した。Conformance 225件のうちCodex Adapter検査は、単一tableへの集約、有界深度、`.env`／`.ssh`／`secrets` deny、`root deny`不使用、および旧個別指定の不在を検査する。Windows manual validation workflowも今回変更した`codex_cli.rs`をrustfmt対象へ加えた。
