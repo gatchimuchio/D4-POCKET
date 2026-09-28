@@ -8,6 +8,71 @@ validation_log_notice_2026_06_06:
     - use the latest completion report for exact commands and results
   required_action: Treat earlier counts as historical evidence for their recorded commits, not as current validation totals.
 
+validation_update_2026_09_29_codex_minimal_and_exact_path_deny_probe:
+  scope: Direct installed Codex CLI Windows sandbox read probe; no model invocation
+  source_commit: 8af989346a640daed483c4959fa0e4d959d3e9c6
+  cli_version: codex-cli 0.158.0-alpha.2.1
+  sandbox: Windows mxc, task-profile-equivalent command-local -c overrides
+  checks:
+    - name: minimal_deny_win_ini_read
+      executable: codex
+      argument_vector:
+        - sandbox
+        - -P
+        - d4p-agent-task
+        - -C
+        - C:\Users\ohira\OneDrive\ドキュメント\ChatGPT\D4ポケット
+        - -c
+        - 'default_permissions="d4p-agent-task"'
+        - -c
+        - 'windows.sandbox="mxc"'
+        - -c
+        - 'permissions.d4p-agent-task.extends=":workspace"'
+        - -c
+        - 'permissions.d4p-agent-task.filesystem={":root"="deny",":minimal"="deny",":workspace_roots"={"**/*.env"="deny","**/.ssh/**"="deny","**/secrets/**"="deny"},"glob_scan_max_depth"=8}'
+        - -c
+        - 'permissions.d4p-agent-task.network.enabled=false'
+        - --
+        - cmd.exe
+        - /c
+        - type
+        - C:\Windows\win.ini
+      status: read_succeeded
+      exit: 0
+      result: The public system file contents were emitted; this does not generalize to other paths.
+      evidence_classification: LIVE_RUNTIME
+    - name: exact_path_deny_win_ini_read
+      executable: codex
+      argument_vector:
+        - sandbox
+        - -P
+        - d4p-agent-task
+        - -C
+        - C:\Users\ohira\OneDrive\ドキュメント\ChatGPT\D4ポケット
+        - -c
+        - 'default_permissions="d4p-agent-task"'
+        - -c
+        - 'windows.sandbox="mxc"'
+        - -c
+        - 'permissions.d4p-agent-task.extends=":workspace"'
+        - -c
+        - 'permissions.d4p-agent-task.filesystem={":root"="deny",":minimal"="deny","C:/Windows/win.ini"="deny",":workspace_roots"={"**/*.env"="deny","**/.ssh/**"="deny","**/secrets/**"="deny"},"glob_scan_max_depth"=8}'
+        - -c
+        - 'permissions.d4p-agent-task.network.enabled=false'
+        - --
+        - cmd.exe
+        - /c
+        - type
+        - C:\Windows\win.ini
+      status: denied
+      exit: 1
+      result: The same read was rejected by the direct sandbox invocation.
+      evidence_classification: LIVE_RUNTIME
+  boundaries:
+    - No codex exec, Broker, Owner Approval, Agent Task, or model was used.
+    - No persistent Codex configuration, Windows Application Control, Registry, or OS protection setting was changed.
+    - Keep task_execution unsupported; this probe does not establish filesystem isolation or release readiness.
+
 validation_update_2026_09_28_c0_evidence_refresh:
   scope: C0 current Schema and Conformance evidence refresh plus manifest synchronization
   base_commit: 31df760ae5085bf5ddc18c4f3eceb375cbae4f6c

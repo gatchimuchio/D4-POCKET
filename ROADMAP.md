@@ -27,6 +27,8 @@ Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`�
 
 Codex Taskだけが使うWindows sandbox方式を`mxc`に固定し、同じ一つのfilesystem override tableに`:root=deny`を含めた。`codex sandbox`直接実行による合成path smokeでは、OneDrive `.env` ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込が拒否され、Workspace通常fileおよびTask scratch相当pathの読書込は許可された。一方、`:minimal=read`の範囲では`C:/Windows/win.ini`が読めたため、全外部read denyとは主張しない。証拠は直接CLIと合成pathに限り、Rust Broker、`codex exec`、Owner Approval、実Agent Taskのproduction経路を通していない。Task実行能力は`unsupported`のまま、Agent隔離等の`release_blocker`と`release_ready=false`を維持する。対象commit、試験、手動Actions結果は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`に記録する。
 
+2026-09-29の追試では、同CLIのfilesystem tableを`:minimal=deny`へ変更しても`C:\Windows\win.ini`の`type`は成功し、同fileにexact denyを追加すると拒否された。この結果は当該一fileと直接`codex sandbox`呼出しだけの観測で、`:minimal` denialが他のpathに与える効果やBroker経由Taskの挙動を証明しない。`task_execution=unsupported`を維持する。
+
 対象Rust変更commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)は成功した。Windows Server 2025／Rust 1.95.0でcheckout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、389 passed／0 failed／0 ignored）、試験後clean確認が成功した。これは当該commitのhosted Windows Rust検査であり、実Agent Task、Broker隔離、ローカルApplication Controlまたはrelease readinessを証明しない。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）

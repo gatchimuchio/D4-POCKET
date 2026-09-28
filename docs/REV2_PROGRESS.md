@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Phase 7 Codex Task `:minimal` denyと個別path denyの直接CLI確認（2026-09-29）
+
+installed Codex CLI `0.158.0-alpha.2.1`で、モデルを起動せず`codex sandbox`を直接実行した。Task profile相当の設定を各呼出しの`-c`へ渡し、`windows.sandbox="mxc"`、`:root="deny"`、Workspace継承、network無効を固定した。永続設定、Windows Application Control、Registry、他のOS保護設定は変更していない。
+
+- `:minimal="deny"`を含むfilesystem tableで`cmd.exe /c type C:\Windows\win.ini`を実行するとexit 0となり、file本文が出力された。これはこの一fileについて、`:minimal="deny"`だけでは読取を止めなかった観測であり、他のWindows path全体へ一般化しない。
+- 同じfilesystem tableに`"C:/Windows/win.ini"="deny"`を加えると、同じreadがexit 1となり拒否された。従ってこの一fileへの明示denyは当該直接sandbox経路で実効した。
+- 両試験はCLIが適用した`LIVE_RUNTIME`の限定観測であり、Rust Broker、`codex exec`、Owner Approval、実Agent Task、Task scratch lifecycleを通していない。秘密file隔離やTask安全性の証拠へ昇格しない。`task_execution=unsupported`とAgent Taskの`release_blocker`、`release_ready=false`を維持する。
+
 ## Phase 7 Codex Task mxc sandbox直接CLI probeとroot deny（2026-09-29）
 
 Codex Task専用sandbox方式をWindowsで`mxc`に固定し、単一filesystem override tableへ`:root=deny`、`:minimal=read`、Workspace内の有界secret denyを設定した。ユーザー設定からbackend選択を変えられない既存起動経路を維持し、Dialogueはread-onlyのままにした。旧elevated設定下で`:root=deny`が起動不能だった履歴は当時の事実として保持する。

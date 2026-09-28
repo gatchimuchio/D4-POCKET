@@ -100,13 +100,24 @@
     },
     {
       "name": "comprehensive_extension_rev1_completion",
-      "current_observation": "2026-09-28のCodex sandbox helper再検査では、`:root=deny`はelevated backendがeffective `:root` readを要求して拒否し、unelevated backendもread-only accessにelevated backendが必要として拒否した。root denyを除いた有界profileでは通常NTFSの合成`.env`読取は拒否された一方、Workspace内書込は許可され、Workspace外書込も拒否された。しかしLocalAppDataとUserProfile直下の合成外部file読取は許可され、OneDrive配下のReparsePoint `.env`も読めた。よって広域read隔離は未成立で、Codex Agent Taskは`unsupported`のまま。これらはsandbox helperの観測であり、Broker経由の実Agent Task証拠ではない。Windows Application Control等のOS設定は変更していない。",
+      "latest_sandbox_probe": {
+        "date": "2026-09-29",
+        "cli_version": "0.158.0-alpha.2.1",
+        "evidence_source": "LIVE_RUNTIME",
+        "path": "C:/Windows/win.ini",
+        "minimal_deny": "direct mxc sandbox read succeeded (exit 0)",
+        "exact_path_deny": "same read was rejected (exit 1)",
+        "scope_limit": "single public system file through codex sandbox; not Broker, codex exec, or Agent Task evidence",
+        "configuration_persisted": false,
+        "os_protection_changed": false
+      },
+      "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。後者は一つの公開system fileに限る直接CLI証拠であり、Broker、`codex exec`、実Agent Taskを通していない。広域read隔離や秘密file全般の拒否を主張せず、Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387",
-        "target_commit": "c770680e1868675d710657a11f300f9b38197578",
-        "result": "現行mainをWindows Server 2025／Rust 1.95.0で全target cargo check／test実行し、12 test target、389 passed、0 failed、0 ignored。rustfmtと試験後cleanも成功。",
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841",
+        "target_commit": "8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9",
+        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／test実行し、12 test target、389 passed、0 failed、0 ignored。checkout SHA照合、rustfmt、試験後cleanも成功。",
         "scope_limit": "hosted Rust検査のみ。実Agent Task、filesystem隔離、installed product、release readinessを証明しない。"
       },
       "status": "unresolved",
