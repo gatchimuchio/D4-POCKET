@@ -2,6 +2,26 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Phase 11 ProtectedStoreのWindows条件修正とAndroid手動検証（2026-09-29）
+
+Linux targetでRust helperをbuildしたとき、Windows専用field `protected_store`をWindows条件外から参照していたためcompileに失敗した。重複登録検査を既存の`cfg(windows)`内へ移し、非Windowsのunsupported応答は維持した。Permission、Approval、Authorityの意味やWindows production経路は変更していない。実装commitは`13735a90aa0005edd49d827fe00562fe48e8da9e`。
+
+Android手動検証workflowでは、Android 17 preview compile platformのpackage IDを実際の`platforms;android-37.0`へ修正し、canary channelから取得する。仮想端末は安定版API 35のGoogle APIs x86_64 imageを使う。Android前景確認は`dumpsys`の`topResumedActivity`／`Resumed`表記差を吸収しつつ、対象Activityの前景状態とprocess存在の両方を要求する。期限超過時にはactivity dumpと限定したAndroidRuntime error logをartifactへ残す。
+
+ローカル検証は次のとおり。
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。382件は成功した後、`workspace_reader`のtest executableがWindows Application ControlのOS error 4551で起動前に拒否された。test除外、生成物の移動、保護設定変更は行っていない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。開発用10検査が成功し、Schema 149件／example 149件／negative fixture 192件、Conformance 225件を含む。`release_ready=false`と既存release blockerは維持する。
+
+手動Windows Rust Actions [run #18](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36483187255)は、正確な実装commit `13735a90aa0005edd49d827fe00562fe48e8da9e`をWindows Server 2025／Rust・Cargo 1.95.0で検証し成功した。12 test targetで389 passed／0 failed／0 ignored。checkout SHA、rustfmt、全target check／test、試験後cleanを確認した。証拠はhosted Windows上のRust検査に限り、ローカルApplication Controlやinstalled productの証拠ではない。
+
+Android手動Actionsの失敗履歴を保持する。 [run #9](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36480716266)は元のLinux compile errorを再現した。[run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36483182425)はRust build後、存在しないSDK package名で停止した。[run #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36484108581)と[run #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36485002704)も`android-37`というpackage IDを解決できず停止した。[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36485633039)ではSDK／仮想端末、Flutter analyze・21 tests、APK／AAB build、install、activity startまで成功したが、旧foreground matcherで失敗し、activity dumpとprocessの診断証拠が不足していた。
+
+修正後のAndroid手動Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36488270184)は、workflow対象commit `c91643f5b2ec444a5e22f166bacb12dcac1fa8f5`でsuccessした。Ubuntu 24.04.5、Flutter 3.44.0、Android compile platform 37.0、API 35 emulatorを使用した。Rust helper build、Flutter analyze（指摘なし）、Mobile test 21件、debug APK／AAB build、APK install、追跡差分検査が成功した。`am start -W`の出力は`Status: timeout`／`LaunchState: UNKNOWN (-1)`だったが、後続の実行時観測では対象`MainActivity`の`topResumedActivity`と`Resumed`、process ID 4334を確認した。したがってlauncherの同期応答成功とは主張せず、後続の前景／process観測で実行中状態を確認したものとして記録する。
+
+同runのDevice Link live checkは`evidence_source=LIVE_RUNTIME`、`mobile_tls_path=PASS`、`result=PASS`を返した。一方、`dart_product_client`は未実行で、protected content deleteおよび強制process終了後の状態確認も未実行。Windows専用resource observationは当該Linux runnerではskipされた。証拠artifactはID `11001096510`、SHA-256 `84a0ca49e7414d3c41d9ab3487b2de2bfc0bbd6a5b7d0328f581f94dc7baed35`で、2026-10-01 UTCに期限切れとなる。仮想端末と限定Device Link検査の結果をAndroid実機またはinstalled productの保証へ昇格しない。Android実機凍結、既存release blocker、`release_ready=false`を維持する。
+
 ## Phase 7 Codex Task `:minimal` denyと個別path denyの直接CLI確認（2026-09-29）
 
 installed Codex CLI `0.158.0-alpha.2.1`で、モデルを起動せず`codex sandbox`を直接実行した。Task profile相当の設定を各呼出しの`-c`へ渡し、`windows.sandbox="mxc"`、`:root="deny"`、Workspace継承、network無効を固定した。永続設定、Windows Application Control、Registry、他のOS保護設定は変更していない。
