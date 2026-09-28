@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Windows Rust全target再検証と秒境界試験の安定化（2026-09-28）
+
+最新`main` commit `6b5e63b21b6571474682a9b05be09dd361893901`を対象にしたWindows手動run [36384181554](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36384181554) は、Rust全targetのcheck後にtest 332件中331件成功・1件失敗となった。失敗は`broker::protocol::端末統治試験::Agent作業要求検査は現行SessionとWorkspaceだけを照合し本文を露出せず未実行を明示する`のPermission期限assertionで、発行応答のUnix秒 `1790575630` と、応答後に再取得した現在時刻から算出した期待値 `1790575631` が秒境界を跨いで1秒ずれた。Permissionの300秒有効期間やproduction挙動の失敗ではなく、秒精度の時刻を別時点で比較した試験不安定性と判定した。失敗runは履歴として保持し、成功へ書き換えない。
+
+試験ではOwner発行要求の直前・直後にBroker時刻を取得し、その区間のどこで発行された場合も期限が正確に300秒であることを検査するよう修正した。Production code、Authority、Permission、Approval、期限値は変更していない。修正commit `64a950277f7cfe0d11c8fedbe9761498e6e24b54`を一時branch `codex/windows-rust-time-test`へpushし、同一commitを対象に手動Windows run [36385799854](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36385799854) を実施した。
+
+- Windows Server 2025 hosted runner `win25-vs2026/20260922.246.2`、Rust／Cargo 1.95.0。Triggerは`workflow_dispatch`。checkout SHA照合、workflowの既存rustfmt検査、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認がすべて成功。testは12 targetで合計378 passed／0 failed／0 ignored。test用`TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。
+- Local `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`（`CARGO_TARGET_DIR`はsystem temp下）も378 passed／0 failed。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、対象test単独実行、Schema 147／147／187、Conformance 225 checks、`git diff --check`が成功した。
+- `rustfmt --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/protocol.rs`はファイル全体の既存整形差分を報告した。task範囲外の大量整形は行っていない。rustfmtのstdout射影では今回の変更hunkに追加差分がないことを確認した。
+- Workflowはartifact uploadを定義していないためartifactはない。証拠はrun logs、step summary、対象SHA照合。これはWindows runner上のRust compile／testだけを証明し、Desktop製品の起動、installed product、production runtime、release readinessを証明しない。既存release blockerと`release_ready=false`は変更していない。
+
 ## D4 Pocket C9 MCPツール入力Schema（Draft 2020-12）検証（2026-09-28）
 
 MCP Toolの`inputSchema`をroot objectだけの確認からJSON Schema Draft 2020-12のmeta-schema検証とvalidator構築へ強化した。`$schema`省略時も2020-12を使い、既知URIだけを受け付け、参照は同一文書内fragmentに限定する。外部HTTP／file resolver featureは無効であり、URIを取得しない。入力は128 KiB／4096 node／深さ64でboundedにし、超過・不正・未対応dialect・外部参照をfail-closedに拒否する。検証済みcatalogもmetadata-onlyであり、Tool実行やPermission／Approvalを追加しない。
