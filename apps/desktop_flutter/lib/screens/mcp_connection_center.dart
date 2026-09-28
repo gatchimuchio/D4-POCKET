@@ -15,9 +15,14 @@ class McpConnectionCenterPanel extends StatefulWidget {
 }
 
 class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
+  final _serverIdController = TextEditingController();
+  final _executableController = TextEditingController();
+  final _workspaceController = TextEditingController();
+  final _argumentsController = TextEditingController();
   late final McpConnectionClient? _client;
   List<McpConnectionSummary>? _connections;
   bool _loading = false;
+  bool _connecting = false;
   String? _disconnectingServerId;
   String? _message;
 
@@ -29,6 +34,15 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   }
 
   @override
+  void dispose() {
+    _serverIdController.dispose();
+    _executableController.dispose();
+    _workspaceController.dispose();
+    _argumentsController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final client = _client;
     if (client == null) {
@@ -37,37 +51,95 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       );
     }
     return BorderedPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('MCP接続センター', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
-          const Text(
-            'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断はWindows native Owner確認の後にBrokerが実行します。',
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _loading || _disconnectingServerId != null
-                ? null
-                : () => _load(client),
-            icon: const Icon(Icons.refresh),
-            label: const Text('接続一覧を取得'),
-          ),
-          if (_loading) ...[
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('MCP接続センター', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text(
+              'Brokerが保持するstdio接続のmetadataだけを表示します。MCP metadataは信頼・権限ではありません。切断はWindows native Owner確認の後にBrokerが実行します。',
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '新しい接続はこのPC上のMCP stdioプロセスを起動します。資格情報の設定とTool実行は未対応です。起動引数へ秘密値を入れず、Windows native確認の前に入力内容を確認してください。',
+            ),
             const SizedBox(height: 8),
-            const LinearProgressIndicator(),
-          ],
-          if (_message != null) ...[
+            TextField(
+              controller: _serverIdController,
+              enabled: !_connecting && _disconnectingServerId == null,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'サーバー識別子',
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(_message!),
-          ],
-          if (_connections != null && _connections!.isEmpty) ...[
+            TextField(
+              controller: _executableController,
+              enabled: !_connecting && _disconnectingServerId == null,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '実行ファイルの絶対パス',
+              ),
+            ),
             const SizedBox(height: 8),
-            const Text('Brokerが保持するMCP接続はありません。'),
+            TextField(
+              controller: _workspaceController,
+              enabled: !_connecting && _disconnectingServerId == null,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '作業フォルダーの絶対パス',
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _argumentsController,
+              enabled: !_connecting && _disconnectingServerId == null,
+              minLines: 2,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '起動引数（1行に1項目、最大32項目）',
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed:
+                  _connecting || _loading || _disconnectingServerId != null
+                      ? null
+                      : () => _connect(client),
+              icon: const Icon(Icons.link),
+              label: const Text('MCP接続を開始'),
+            ),
+            if (_connecting) ...[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(),
+            ],
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed:
+                  _loading || _connecting || _disconnectingServerId != null
+                      ? null
+                      : () => _load(client),
+              icon: const Icon(Icons.refresh),
+              label: const Text('接続一覧を取得'),
+            ),
+            if (_loading) ...[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(),
+            ],
+            if (_message != null) ...[
+              const SizedBox(height: 8),
+              Text(_message!),
+            ],
+            if (_connections != null && _connections!.isEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('Brokerが保持するMCP接続はありません。'),
+            ],
+            for (final connection in _connections ?? const [])
+              _connectionTile(client, connection),
           ],
-          for (final connection in _connections ?? const [])
-            _connectionTile(client, connection),
-        ],
+        ),
       ),
     );
   }
@@ -104,9 +176,10 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : OutlinedButton.icon(
-                  onPressed: _loading || _disconnectingServerId != null
-                      ? null
-                      : () => _disconnect(client, connection),
+                  onPressed:
+                      _loading || _connecting || _disconnectingServerId != null
+                          ? null
+                          : () => _disconnect(client, connection),
                   icon: const Icon(Icons.link_off),
                   label: const Text('切断'),
                 ),
@@ -132,6 +205,37 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _connect(McpConnectionClient client) async {
+    setState(() {
+      _connecting = true;
+      _message = null;
+    });
+    try {
+      final connection = await client.connect(
+        serverId: _serverIdController.text,
+        executable: _executableController.text,
+        workspace: _workspaceController.text,
+        argumentsText: _argumentsController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _connections = [
+          ...?_connections
+              ?.where((item) => item.serverId != connection.serverId),
+          connection,
+        ];
+        _message = '接続receiptを受理しました。表示はBroker内部状態であり、TrustやTool実行を示しません。';
+      });
+    } on Object {
+      if (mounted) {
+        setState(() => _message =
+            'MCP接続は確定していません。Windows native Owner確認とBroker状態を確認してください。');
+      }
+    } finally {
+      if (mounted) setState(() => _connecting = false);
     }
   }
 

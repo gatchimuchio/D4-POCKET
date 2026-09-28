@@ -2,6 +2,17 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 Desktop MCP stdio接続作成・Owner確認（2026-09-28）
+
+既存のMCP metadata一覧／切断画面へstdio Serverの新規接続設定を追加し、Desktop Flutterから既存Broker channel、Windows Rust起動器のdefault No native Owner確認、Rust Broker、既存Job Object監督下のMCP child起動／discoveryへ接続した。入力はServer ID、Windows絶対実行path、Workspace path、1行1項目の起動引数で、Flutterはfilesystem・process・Credentialへ直接アクセスしない。Broker要求とnative確認候補は全階層を型検証し、Credential refは対象Serverに一致する固定missing値だけを受理する。Owner確認にはServer ID、実行path、Workspace、引数件数・hash、payload hashを表示し、引数本文は秘密を含む可能性があるため表示しない。Credential実値注入、Tool実行、Resource／Prompt取得、Trust付与は行わない。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib MCP接続 -- --test-threads=1 --nocapture`：2件成功。未知Credential ref field／対象不一致のprocess起動前拒否と、native Owner確認候補が起動範囲を示し引数本文を出さないことを確認した。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。Rust library 326件は成功したが、次の`gui_shell_desktop_launcher` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetを含む全target試験は未完了。拒否fileの移動・再配置、test除外、policy変更はしていない。
+- Flutterの新規接続client／widget focused test 4件と`flutter analyze --no-pub`は、index化した最新sourceの隔離Temp copyで成功した。Temp copyで`flutter pub get --offline`も成功。OneDrive workspace内実行やinstalled product上のOwner操作ではない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常example 147件、negative fixture 184件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで成功。`python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で成功。`python -X utf8 tooling/manifest.py --check`：成功。
+- これによりDesktop接続設定面の実装は存在するが、focused widget／Broker試験は外部Serverとのinstalled product運用・実環境のOwner操作を証明しない。Tool実行、Credential実値注入、Resource／Prompt実取得、Streamable HTTP、OAuth、consent、quarantine、外部MCP Harness、非Windows process群監督およびinstalled product証拠は`release_blocker`のまま。Registryのactive unresolved blocker 15件、`release_ready=false`を維持する。
+
 ## D4 Pocket C9 Desktop MCP接続センターとOwner切断（2026-09-28）
 
 先行するRust Brokerのstdio discovery／一覧／Windows Owner切断へ、Desktop設定画面のMCP接続センターを接続した。一覧は利用者の明示操作で通常Broker IPCから取得し、Broker保持projectionを`INTERNAL_STATE`として扱う。表示はServer ID、表示名、stdio種別、Tool／Resource／Prompt件数に限定し、Tool説明本文、Credential ref、接続設定、秘密値は画面へ出さない。切断要求は既存Windows Broker channelから厳密な固定payloadで送り、Rust起動器のdefault No native Owner確認を通す。Owner確認後もBrokerが要求を再検証し、Job Objectのprocess群停止、永続`LIVE_RUNTIME` Audit確定、接続記録解消の順を維持する。FlutterはOwner資格、session file、Approvalを保持せず、新しいauthority経路は追加していない。

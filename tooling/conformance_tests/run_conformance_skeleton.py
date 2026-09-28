@@ -5207,6 +5207,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
             不整合.extend(f"C9 {name} valid fixtureが拒否された: {failure}" for failure in failures)
     invalid_names = (
         "mcp_connection_unknown_authority.invalid.json",
+        "mcp_connection_credential_secret.invalid.json",
         "mcp_connection_receipt_full_content.invalid.json",
         "mcp_connection_list_wrong_evidence.invalid.json",
         "mcp_connection_list_entry_live_evidence.invalid.json",
@@ -5217,7 +5218,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     for name in invalid_names:
         invalid = load_contract_fixture("invalid/" + name)
         schema_name = (
-            "mcp_connection" if name.startswith("mcp_connection_unknown") else
+            "mcp_connection" if name.startswith(("mcp_connection_unknown", "mcp_connection_credential")) else
             "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else
             "mcp_connection_list" if name.startswith("mcp_connection_list") else
             "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
@@ -5281,14 +5282,23 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     rust_protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     main = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
+    desktop_launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
+    desktop_broker_client = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "broker_client.dart").read_text(encoding="utf-8")
+    mcp_client = (ROOT / "apps" / "desktop_flutter" / "lib" / "services" / "mcp_connection_client.dart").read_text(encoding="utf-8")
+    mcp_screen = (ROOT / "apps" / "desktop_flutter" / "lib" / "screens" / "mcp_connection_center.dart").read_text(encoding="utf-8")
     for token, source in (
         ("BrokerOperation::MCP切断", rust_protocol),
         ("mcp_center::disconnect", rust_protocol),
         ("pub fn MCP切断", owner_cli),
         ("owner_cli::MCP切断", main),
+        ("BrokerOperation::MCP接続", desktop_launcher),
+        ("McpConnectOwnerRequest", desktop_launcher),
+        ("'MCP接続',", desktop_broker_client),
+        ("Future<McpConnectionSummary> connect", mcp_client),
+        ("MCP接続を開始", mcp_screen),
     ):
         if token not in source:
-            不整合.append(f"C9 MCP切断のBroker／Owner CLI接続がない: {token}")
+            不整合.append(f"C9 MCP接続／切断の統治済み経路がない: {token}")
     return 不整合
 
 

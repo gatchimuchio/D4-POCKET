@@ -10,11 +10,16 @@ class _McpTransport implements BrokerTransport {
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
   String listedEvidence = 'INTERNAL_STATE';
+  String displayName = 'fixture server';
 
-  Map<String, Object?> _receipt({String evidence = 'INTERNAL_STATE'}) => {
+  Map<String, Object?> _receipt({
+    String evidence = 'INTERNAL_STATE',
+    String serverId = 'mcp-fixture',
+  }) =>
+      {
         '版': 1,
         '契約種別': 'MCP外部概念射影',
-        'Server': {'server_id': 'mcp-fixture', '表示名': 'fixture server'},
+        'Server': {'server_id': serverId, '表示名': displayName},
         'Transport': {'kind': 'stdio'},
         'Tool': [
           {'name': 'tool-fixture', 'description_summary': 'secret-marker'}
@@ -58,6 +63,14 @@ class _McpTransport implements BrokerTransport {
         },
       };
     }
+    if (operation == 'MCP接続') {
+      connected = true;
+      return {
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'body': _receipt(serverId: payload!['ServerID']! as String),
+      };
+    }
     if (operation == 'MCP切断') {
       connected = false;
       return {
@@ -83,6 +96,46 @@ class _McpTransport implements BrokerTransport {
 }
 
 void main() {
+  test('MCP clientは接続設定を固定Broker payloadへ射影する', () async {
+    final transport = _McpTransport()..connected = false;
+    final connection = await McpConnectionClient(transport).connect(
+      serverId: 'mcp-fixture',
+      executable: r'C:\Program Files\D4 Pocket\mcp-fixture.exe',
+      workspace: r'C:\Users\Public\D4PocketWorkspace',
+      argumentsText: '--stdio\n--mode local',
+    );
+
+    expect(connection.serverId, 'mcp-fixture');
+    expect(transport.operations, ['MCP接続']);
+    expect(transport.payloads.single, {
+      '版': 1,
+      '操作': '接続',
+      'ServerID': 'mcp-fixture',
+      '実行file': r'C:\Program Files\D4 Pocket\mcp-fixture.exe',
+      '引数': ['--stdio', '--mode local'],
+      'workspace': r'C:\Users\Public\D4PocketWorkspace',
+      'Transport': 'stdio',
+      'Credential ref': {
+        'credential_id': '00000000000000000000000000000000',
+        'purpose': 'mcp_transport',
+        'target': 'mcp-fixture',
+        'required': false,
+        'status': 'missing',
+      },
+    });
+
+    await expectLater(
+      McpConnectionClient(transport).connect(
+        serverId: 'mcp-fixture',
+        executable: 'relative.exe',
+        workspace: r'C:\Users\Public\D4PocketWorkspace',
+        argumentsText: '',
+      ),
+      throwsA(isA<BrokerClientException>()),
+    );
+    expect(transport.operations, ['MCP接続']);
+  });
+
   test('MCP clientは内部状態一覧だけを限定metadataへ射影する', () async {
     final transport = _McpTransport();
     final connections = await McpConnectionClient(transport).list();
@@ -99,9 +152,15 @@ void main() {
       McpConnectionClient(transport).list(),
       throwsA(isA<BrokerClientException>()),
     );
+
+    final bidiMetadata = _McpTransport()..displayName = 'mcp\u202efixture';
+    await expectLater(
+      McpConnectionClient(bidiMetadata).list(),
+      throwsA(isA<BrokerClientException>()),
+    );
   });
 
-  testWidgets('Desktop panelは一覧後にOwner確認付きBroker切断を要求する', (tester) async {
+  testWidgets('Desktop panelは一覧後にOwner確認付きBroker接続と切断を要求する', (tester) async {
     final transport = _McpTransport();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -109,12 +168,14 @@ void main() {
       ),
     ));
 
+    await tester.ensureVisible(find.text('接続一覧を取得'));
     await tester.tap(find.text('接続一覧を取得'));
     await tester.pumpAndSettle();
     expect(find.text('fixture server'), findsOneWidget);
     expect(find.textContaining('secret-marker'), findsNothing);
     expect(find.textContaining('サーバーID: mcp-fixture'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('切断'));
     await tester.tap(find.text('切断'));
     await tester.pumpAndSettle();
     expect(transport.operations, ['MCP接続一覧', 'MCP切断', 'MCP接続一覧']);
@@ -124,5 +185,43 @@ void main() {
       'ServerID': 'mcp-fixture',
     });
     expect(find.text('Brokerが保持するMCP接続はありません。'), findsOneWidget);
+  });
+
+  testWidgets('Desktop panelは秘密値を求めず接続設定をBrokerへ送る', (tester) async {
+    final transport = _McpTransport()..connected = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: McpConnectionCenterPanel(transport: transport),
+      ),
+    ));
+
+    await tester.ensureVisible(find.byType(TextField).at(0));
+    await tester.enterText(find.byType(TextField).at(0), 'mcp-fixture');
+    await tester.ensureVisible(find.byType(TextField).at(1));
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      r'C:\Program Files\D4 Pocket\mcp-fixture.exe',
+    );
+    await tester.ensureVisible(find.byType(TextField).at(2));
+    await tester.enterText(
+      find.byType(TextField).at(2),
+      r'C:\Users\Public\D4PocketWorkspace',
+    );
+    await tester.ensureVisible(find.byType(TextField).at(3));
+    await tester.enterText(find.byType(TextField).at(3), '--stdio');
+    await tester.ensureVisible(find.text('MCP接続を開始'));
+    await tester.tap(find.text('MCP接続を開始'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['MCP接続']);
+    expect(transport.payloads.single?['Credential ref'], {
+      'credential_id': '00000000000000000000000000000000',
+      'purpose': 'mcp_transport',
+      'target': 'mcp-fixture',
+      'required': false,
+      'status': 'missing',
+    });
+    expect(find.text('fixture server'), findsOneWidget);
+    expect(find.textContaining('secret-marker'), findsNothing);
   });
 }

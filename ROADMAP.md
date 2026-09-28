@@ -11,7 +11,7 @@
 
 ### C9 MCP stdio監督とOwner切断（2026-09-28）
 
-MCP stdio childは既存Rust Job Object監督経路で起動し、Owner専用`MCP切断`はBrokerからprocess群停止を確認した後、永続`LIVE_RUNTIME` Auditを確定して接続記録を解消する。Desktop設定にmetadata-only接続一覧と個別切断を追加し、切断要求は既存Windows Rust起動器のdefault No native Owner確認へ通す。停止またはAudit確定に失敗した場合は記録を保持し、未知Server・通常IPCからの要求を拒否する。Windows fake-serverを使うfocused Broker試験、native確認候補、Dart client／widget試験を追加した。`cargo check --all-targets`は成功したが、現行sourceの全target試験はlibrary 324件、main 10件、複数integration target成功後、`protected_startup` test executableがWindows Application Control（OS error 4551）で起動前に拒否され未完了。Flutter widgetとnative確認candidateは実installed productのOwner操作証拠ではない。新規接続設定UI、Tool実行等は`release_blocker`である。Rust全target実行gateを未解決へ再開し、active unresolved blockerは15件。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
+MCP stdio childは既存Rust Job Object監督経路で起動し、Desktop設定にmetadata-only接続一覧、新規stdio接続設定、Owner専用切断を実装した。接続開始と切断は既存Windows Rust起動器のdefault No native Owner確認を経てBrokerへ届き、Brokerは要求を再検証する。接続は固定missing Credential refでdiscovery／catalogまで、切断はprocess群停止・永続`LIVE_RUNTIME` Audit後に記録解消までに限定する。Windows fake-serverを使うBroker試験、native確認候補、Flutter client／widget試験を追加した。現行`cargo check --all-targets`は成功し、focused MCP接続Rust 2件、隔離Temp copyでのFlutter focused 4件とanalyzeは成功した。一方、現行sourceの全target試験はlibrary 326件成功後、`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）で起動前に拒否され未完了であり、Rust全target実行gateを維持する。接続UI・widget・native確認候補はinstalled productのOwner操作や外部MCP Server運用証拠ではない。Tool実行、Credential実値注入、Resource／Prompt取得等は`release_blocker`である。active unresolved blockerは15件、`release_ready=false`。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
 
 ### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
 

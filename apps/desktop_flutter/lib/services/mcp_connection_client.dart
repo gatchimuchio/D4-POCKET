@@ -26,6 +26,46 @@ class McpConnectionClient {
 
   final BrokerTransport _transport;
 
+  Future<McpConnectionSummary> connect({
+    required String serverId,
+    required String executable,
+    required String workspace,
+    required String argumentsText,
+  }) async {
+    final arguments = _arguments(argumentsText);
+    if (!_validIdentifier(serverId) ||
+        !_validWindowsPath(executable) ||
+        !_validWindowsPath(workspace)) {
+      throw const BrokerClientException('MCP接続設定の識別子または絶対pathが不正です');
+    }
+    final payload = <String, Object?>{
+      '版': 1,
+      '操作': '接続',
+      'ServerID': serverId,
+      '実行file': executable,
+      '引数': arguments,
+      'workspace': workspace,
+      'Transport': 'stdio',
+      'Credential ref': {
+        'credential_id': '00000000000000000000000000000000',
+        'purpose': 'mcp_transport',
+        'target': serverId,
+        'required': false,
+        'status': 'missing',
+      },
+    };
+    final response = await _transport.request('MCP接続', payload: payload);
+    final body = _acceptedBody(response, 'MCP接続');
+    if (response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('MCP接続の証拠範囲が不正です');
+    }
+    final connection = _connectionSummary(body);
+    if (connection.serverId != serverId) {
+      throw const BrokerClientException('MCP接続receiptが要求対象と一致しません');
+    }
+    return connection;
+  }
+
   Future<List<McpConnectionSummary>> list() async {
     final response = await _transport.request(
       'MCP接続一覧',
@@ -58,7 +98,7 @@ class McpConnectionClient {
   }
 
   Future<void> disconnect(String serverId) async {
-    if (serverId.isEmpty || utf8.encode(serverId).length > 128) {
+    if (!_validIdentifier(serverId)) {
       throw const BrokerClientException('MCP Server識別子の形式が不正です');
     }
     final response = await _transport.request(
@@ -156,10 +196,11 @@ class McpConnectionClient {
     final displayName = server['表示名'];
     final transportKind = transport['kind'];
     if (serverId is! String ||
-        serverId.isEmpty ||
-        utf8.encode(serverId).length > 128 ||
+        !_validIdentifier(serverId) ||
         displayName is! String ||
         displayName.length > 512 ||
+        _containsControl(displayName) ||
+        _containsBidiControl(displayName) ||
         transportKind != 'stdio') {
       throw const BrokerClientException('MCP接続metadataの表示項目が不正です');
     }
@@ -188,6 +229,43 @@ class McpConnectionClient {
     }
     return value.cast<Object?>();
   }
+
+  List<String> _arguments(String value) {
+    if (value.isEmpty) return const [];
+    final arguments = const LineSplitter().convert(value);
+    if (arguments.length > 32 ||
+        arguments.any((argument) =>
+            argument.isEmpty ||
+            utf8.encode(argument).length > 1024 ||
+            _containsControl(argument))) {
+      throw const BrokerClientException('MCP接続引数は1行1項目で最大32件です');
+    }
+    return arguments;
+  }
+
+  bool _validIdentifier(String value) =>
+      value.isNotEmpty &&
+      utf8.encode(value).length <= 128 &&
+      !_containsControl(value);
+
+  bool _validWindowsPath(String value) =>
+      value.isNotEmpty &&
+      utf8.encode(value).length <= 1024 &&
+      !_containsControl(value) &&
+      RegExp(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)').hasMatch(value);
+
+  bool _containsControl(String value) => value.runes.any(
+        (rune) => rune <= 0x1f || (rune >= 0x7f && rune <= 0x9f),
+      );
+
+  bool _containsBidiControl(String value) => value.runes.any(
+        (rune) =>
+            rune == 0x061c ||
+            rune == 0x200e ||
+            rune == 0x200f ||
+            (rune >= 0x202a && rune <= 0x202e) ||
+            (rune >= 0x2066 && rune <= 0x206f),
+      );
 }
 
 Map<String, Object?> _acceptedBody(

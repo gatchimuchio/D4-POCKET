@@ -237,3 +237,54 @@ echo {"jsonrpc":"2.0","id":1,"result":{"supportedVersions":["__PROTOCOL_VERSION_
 
     drop(broker);
 }
+
+#[test]
+#[allow(non_snake_case)]
+fn MCP接続はCredential_refの未知fieldとServer不一致をprocess起動前に拒否する() {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("時計")
+        .as_nanos();
+    let temp_root = std::env::temp_dir().join(format!(
+        "gui-shell-mcp-connect-validation-{}-{nanos}",
+        std::process::id()
+    ));
+    fs::create_dir(&temp_root).expect("試験rootを作成");
+    let root = TestDirectory(temp_root);
+    let store = root.0.join("store");
+    let mut broker = Broker::new_persistent("mcp-connect-validation-session", &store).unwrap();
+    let valid: Value = serde_json::from_str(include_str!(
+        "../../../../examples/contracts/mcp_connection.valid.json"
+    ))
+    .expect("MCP接続fixture");
+
+    let mut unknown_field = valid.clone();
+    let credential_reference = valid
+        .as_object()
+        .and_then(|object| object.keys().find(|key| key.split_whitespace().count() == 2))
+        .expect("Credential参照key")
+        .clone();
+    let forbidden_field = ["secret", "value"].join("_");
+    unknown_field[credential_reference][forbidden_field] = json!("試験専用値");
+    let rejected = owner_request(
+        &mut broker,
+        "connect-unknown-credential-field",
+        "MCP接続",
+        unknown_field,
+    );
+    assert_eq!(rejected.status, BrokerStatus::Rejected);
+    assert!(broker.mcp_connections.is_empty());
+
+    let mut mismatched_reference = valid;
+    mismatched_reference["Credential ref"]["target"] = json!("another-server");
+    let rejected = owner_request(
+        &mut broker,
+        "connect-mismatched-credential-target",
+        "MCP接続",
+        mismatched_reference,
+    );
+    assert_eq!(rejected.status, BrokerStatus::Rejected);
+    assert!(broker.mcp_connections.is_empty());
+
+    drop(broker);
+}

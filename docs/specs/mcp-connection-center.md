@@ -20,7 +20,11 @@ owner control
 
 `MCP接続一覧`は通常IPCの読み取り専用経路であり、owner channelからは拒否する。接続開始、受信、受理、一覧返却には永続Auditを要求する。child processは環境変数をallowlistへ制限し、stderrを取り込まず、response timeout、line上限、終了状態をfail-closedで扱う。
 
-Desktop設定のMCP接続センターは一覧更新を明示要求し、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。接続先、実行file、引数、Credential ref、説明本文は表示しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。新規接続設定を行うGUIはこの単位に含めない。
+Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対実行file、Windows絶対workspace、1行1項目のstdio引数を受け取る接続設定面を持つ。Flutterはpath、process、Credentialへ直接アクセスせず、Credential入力欄も持たない。接続要求には`Credential ref`の固定missing値だけを含め、Credential実値やAuthority fieldを送らない。引数へ秘密値を入力しないよう画面に警告する。
+
+接続要求は既存Windows Rust起動器のBroker channelから厳密に検査され、default Noのnative Owner確認を通る。確認はServer ID、実行file、workspace、引数件数・hash、request payload hashを示すが、引数本文は秘密値を含み得るため表示しない。操作者はnative確認前のDesktop入力を確認する。未知field、非絶対path、制御文字、上限外入力、Credential refの不一致・required・missing以外の状態はnative確認候補またはBrokerで拒否する。OwnerのYes後もBrokerが要求を再検証し、既存Windows Job Object下でprocess群を起動してMCP discoveryを行い、監査確定後にmetadata-only receiptを返す。通常IPCとnative Owner確認を通らないplatform経路では接続しない。
+
+一覧更新は利用者の明示操作で行い、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。接続先、実行file、引数、Credential ref、説明本文は一覧へ表示しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。
 
 ownerは`MCP切断`で対象Server IDを明示できる。要求はowner controlだけで受け、未知field、未知Server、通常IPCからの切断は拒否する。Windows Job Objectのprocess群停止確認後に`LIVE_RUNTIME`の結果Auditを永続化し、その後に限ってBrokerの接続記録を消す。停止または結果Auditを確定できない場合は成功を返さず記録を保持する。停止済みだがAuditに失敗した場合は、ownerの明示再試行で停止を再確認して監査確定する。receipt／Auditに実行path、引数、workspace、Credential実値を含めない。切断はPermissionを生成しない。
 

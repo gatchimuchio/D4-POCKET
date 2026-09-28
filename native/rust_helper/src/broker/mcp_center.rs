@@ -10,7 +10,7 @@ use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTE
 use super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME;
 use crate::adapters::mcp_stdio::McpStdioConnection;
 use crate::mcp::McpError;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
 
@@ -25,6 +25,16 @@ const MAX_ARGUMENT_BYTES: usize = 1024;
 pub(super) struct McpConnectionEntry {
     pub(super) connection: McpStdioConnection,
     pub(super) projection: Value,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CredentialReference {
+    credential_id: String,
+    purpose: String,
+    target: String,
+    required: bool,
+    status: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,7 +55,7 @@ struct ConnectionRequest {
     #[serde(rename = "Transport")]
     transport: String,
     #[serde(rename = "Credential ref")]
-    credential_ref: Value,
+    credential_ref: CredentialReference,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,7 +159,8 @@ pub(super) fn connect(
         &request.server_id,
         &request.transport,
         &endpoint_hash,
-        request.credential_ref.clone(),
+        serde_json::to_value(&request.credential_ref)
+            .expect("検証済みCredential refはJSON値へ変換できる"),
     ) {
         Ok(value) => value,
         Err(error) => return reject_mcp_error(broker, request_id, error, payload_hash),
@@ -503,9 +514,14 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, McpError> {
         || request.operation != "接続"
         || request.server_id.is_empty()
         || request.server_id.as_bytes().len() > 128
+        || request.server_id.chars().any(char::is_control)
         || request.executable.is_empty()
+        || request.executable.as_bytes().len() > 1024
+        || request.executable.chars().any(char::is_control)
         || !Path::new(&request.executable).is_absolute()
         || request.workspace.is_empty()
+        || request.workspace.as_bytes().len() > 1024
+        || request.workspace.chars().any(char::is_control)
         || !Path::new(&request.workspace).is_absolute()
         || request.transport != "stdio"
         || request.arguments.len() > MAX_ARGUMENTS
@@ -520,34 +536,24 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, McpError> {
             "MCP接続payloadの値またはstdio境界が不正",
         ));
     }
-    let credential = request.credential_ref.as_object().ok_or_else(|| {
-        McpError::new(
+    if request.credential_ref.credential_id.len() != 32
+        || !request
+            .credential_ref
+            .credential_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || request.credential_ref.purpose != "mcp_transport"
+        || request.credential_ref.target != request.server_id
+    {
+        return Err(McpError::new(
             "mcp_credential_ref_invalid",
-            "MCP Credential refがobjectではない",
-        )
-    })?;
-    let required = credential
-        .get("required")
-        .and_then(Value::as_bool)
-        .ok_or_else(|| {
-            McpError::new(
-                "mcp_credential_ref_invalid",
-                "MCP Credential ref requiredが不正",
-            )
-        })?;
-    let status = credential
-        .get("status")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            McpError::new(
-                "mcp_credential_ref_invalid",
-                "MCP Credential ref statusが不正",
-            )
-        })?;
-    if required || status != "missing" {
+            "MCP Credential refの識別または対象が不正",
+        ));
+    }
+    if request.credential_ref.required || request.credential_ref.status != "missing" {
         return Err(McpError::new(
             "mcp_credential_unavailable",
-            "現行C9 stdio接続はCredential実値注入を未接続のため資格情報必須Serverを接続しない",
+            "現行C9 stdio接続はCredential実値注入を未接続のためmissing参照だけを受理する",
         ));
     }
     Ok(request)
