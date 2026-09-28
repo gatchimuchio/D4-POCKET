@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "ff553501797e10baa51394820d9bd063fa33ed697e62f1f2116fa82741066c1a"
+      "sha256": "d9b271f7b8f3ccc07e4d517a8f809fa99081573755bdf372da7e2bcddca0459e"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1624b0a59e908a413025349ec1d1413aba567db92a29e2fe02216491a8c09e47"
+      "sha256": "03773139a4e6e61672e75e7387e157696dcde2f24f75b1246fa30fa7f3c12d81"
     },
     {
       "path": "SECURITY.md",
@@ -1165,7 +1165,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "5c3b21de310cccfa0f23e0e07d4c643d4407f2df81de46377ce5887960bbf919"
+      "sha256": "fc959e424fff4a1aec65cf14686650056983f9c414f6b4305f30c1264af9a8f7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1373,11 +1373,11 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "4c597fd2d4bc55613a80302af266a7239cae44b2a23093f31a8cd4e54ca3bca8"
+      "sha256": "3116be6b3aed9bf9c59c39a9c3555235162387c87f3d358fe312741d324c9e33"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "32f184bf7b79eebe67e9177b75d100888cf8965aa9aaff144d7752639cb710bd"
+      "sha256": "8bf7d6b6ca36e36cca5677dc86de0f9e8b01f68ba5d0dfb4169d6ffeeb1e3381"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -2184,6 +2184,18 @@
       "sha256": "678c63d1c27e28d507d368810ed528384530b83d214134bcfc0464da108a41e3"
     },
     {
+      "path": "examples/contracts/invalid/mcp_disconnect_authority.invalid.json",
+      "sha256": "e2237241fb9d55b32d064fd3b864fb93463d1c2425e951c744455dc90982491f"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_disconnect_receipt_not_stopped.invalid.json",
+      "sha256": "e7d2d6c6c5588875c1ea62fa5161fc67bfd8ced33d87f89c00580a31be21409c"
+    },
+    {
+      "path": "examples/contracts/invalid/mcp_disconnect_receipt_wrong_evidence.invalid.json",
+      "sha256": "4c7bd22c190a66c63d67eb84fcfb78f94cbc360a93b2314d774ebc8250b3ea2a"
+    },
+    {
       "path": "examples/contracts/invalid/mobile_agent_list_authority.invalid.json",
       "sha256": "320e6737c0600da6b46d25b472f577cf1c4caa202387c6f89749f851de3322b2"
     },
@@ -2526,6 +2538,14 @@
     {
       "path": "examples/contracts/mcp_contract.valid.json",
       "sha256": "87e81e161da530d6df8dc1bad85b055c8daa4c41d1a95d01211e45b2d9a6019c"
+    },
+    {
+      "path": "examples/contracts/mcp_disconnect.valid.json",
+      "sha256": "5b00f0919a7d887130ff51b423d25ef6d59b89f0b1bc3a37e667ff313da390e5"
+    },
+    {
+      "path": "examples/contracts/mcp_disconnect_receipt.valid.json",
+      "sha256": "b3ad1f200848e7897772ad33d2260b0f5117940996a8542c368952c8efbd0966"
     },
     {
       "path": "examples/contracts/mobile_agent_list.valid.json",
@@ -2889,7 +2909,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
-      "sha256": "2f3cb23fb0e4fb26737afbcaf34cf81bf4340a380d604d834d011bd3bdd3fe09"
+      "sha256": "595b2c518d035df2f64ae86c1bab485cf31b9a09b35700f58181cba2b46ab72d"
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
@@ -3021,7 +3041,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mcp_center.rs",
-      "sha256": "b8c499f171648e3dfeb4b39528ccb6d6e82a806e116e624d3b087df171c92428"
+      "sha256": "22802d0f7119586b123f638545a56ba734e31fe22c410f5c9414c4eb3035bbcb"
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
@@ -3041,7 +3061,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "c29eb292de7d54d9bd9546b44279749de8a0784432f8849c361b4b0bc396c901"
+      "sha256": "2c93937a188d8205e2682be2688d83ff4e1dd8f8124e38396ebea9a71a7234c5"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3109,7 +3129,7 @@
     },
     {
       "path": "native/rust_helper/src/main.rs",
-      "sha256": "cb90733f4afc270419808db47e96c03600f7e3db6ad885941b8aee2fa0d465e7"
+      "sha256": "cf3d3715a12c9077b0f6e7c936e430e2e2cd2e4417062f4d4b9e552b26969917"
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
@@ -3121,7 +3141,7 @@
     },
     {
       "path": "native/rust_helper/src/owner_cli.rs",
-      "sha256": "ac10f344fd8c62d7e251b2119d53886dc9ef009f8f255bf254442be183ea23df"
+      "sha256": "6ed1f4f8860553f22a602498ad377b9f784861fcf627a80ef05000e50d037701"
     },
     {
       "path": "native/rust_helper/src/process.rs",
@@ -3170,6 +3190,10 @@
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",
       "sha256": "d673350ee05a828f646f16022b6200ad79e66a0c519f9898dc546917a9c1ff81"
+    },
+    {
+      "path": "native/rust_helper/tests/unit/mcp_disconnect.rs",
+      "sha256": "b9718cb04f8147ea363c760d73f31483b3e88fa0b1cb9c5789d0215a065cf49b"
     },
     {
       "path": "native/rust_helper/tests/unit/workspace_protocol.rs",
@@ -3609,7 +3633,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "403e1c44c690449b9e6b7fc0b5ef8e0219d79fa1d62d3401737e9a44f52eefd7"
+      "sha256": "3e4b1ad69a59575761187d97391fb46588a9572f6493b821e785d3a4fbdac359"
     },
     {
       "path": "requirements-dev.txt",
@@ -3929,11 +3953,11 @@
     },
     {
       "path": "specs/ipc_request.schema.json",
-      "sha256": "3453f13c78877ac83659fc0b4fa5432b7643e0e9d1ec3157beea9e6cf7187b26"
+      "sha256": "203933a0b3ad3534ed7a4b2062a2b38bcec51356f4d54fa36975dd3beff58dfe"
     },
     {
       "path": "specs/ipc_response.schema.json",
-      "sha256": "9cfd944f4a0141f8b7c1fa9276b1588b440c692e17411520313486fe5ea4879b"
+      "sha256": "3c7f633ffc4b1ec7ce0628321ac1158058bb7a92ccb5bd29cf5ec9bc1cfd7465"
     },
     {
       "path": "specs/mcp_connection.schema.json",
@@ -3950,6 +3974,14 @@
     {
       "path": "specs/mcp_contract.schema.json",
       "sha256": "dc3595755e55d0b230de515890348520278e447efc62efaf1f9d3cf390bee657"
+    },
+    {
+      "path": "specs/mcp_disconnect.schema.json",
+      "sha256": "b55cccf726bc5c7ff425475b1e84e8b4ac3956289ff3aa0a5b2c102670c4269e"
+    },
+    {
+      "path": "specs/mcp_disconnect_receipt.schema.json",
+      "sha256": "54f7e7c594e5577c2bdd72ba7ca3d6977b127ffe7fc21d84b514ae84885e2407"
     },
     {
       "path": "specs/mobile_agent_list.schema.json",
@@ -4241,7 +4273,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "d36b909584a6e49d92b5d2187dba66186b3ab8ea85508b59168e1f73d06c0196"
+      "sha256": "791633cb648d6a5252693eff45c732bcd81287c252b2fe4fe7ea0017d7bdca8b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4325,7 +4357,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "e71e2532c3133b2dc6fcbbdae8423df97937af19c854724170db5cf00674f98e"
+      "sha256": "742ae7741865e0873d8d0a299c24b934ef626dc955b8732406522a90176f8211"
     },
     {
       "path": "tooling/shell_snapshot.py",

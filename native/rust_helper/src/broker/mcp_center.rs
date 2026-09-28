@@ -6,6 +6,8 @@
 #![allow(non_snake_case)]
 
 use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
+#[cfg(windows)]
+use super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME;
 use crate::adapters::mcp_stdio::McpStdioConnection;
 use crate::mcp::McpError;
 use serde::Deserialize;
@@ -13,6 +15,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 const OP_CONNECT: &str = "MCP接続";
+const OP_DISCONNECT: &str = "MCP切断";
 const OP_LIST: &str = "MCP接続一覧";
 const VERSION: u64 = 1;
 const MAX_ARGUMENTS: usize = 32;
@@ -43,6 +46,17 @@ struct ConnectionRequest {
     transport: String,
     #[serde(rename = "Credential ref")]
     credential_ref: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DisconnectRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "ServerID")]
+    server_id: String,
 }
 
 pub(super) fn connect(
@@ -311,6 +325,163 @@ pub(super) fn list(
     }
 }
 
+pub(super) fn disconnect(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if !owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_DISCONNECT,
+            "mcp_owner_required",
+            "MCP切断にはowner controlが必要",
+            true,
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_DISCONNECT,
+            "broker_persistence_unavailable",
+            "MCP切断には永続Auditが必要",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_disconnect_request(payload) {
+        Ok(request) => request,
+        Err(error) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_DISCONNECT,
+                error.code,
+                error.message,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if !broker.mcp_connections.contains_key(&request.server_id) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_DISCONNECT,
+            "mcp_connection_unknown",
+            "指定MCP Server IDの接続が存在しない",
+            true,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_DISCONNECT,
+            "received",
+            &format!(
+                "Capability=mcp.connection.disconnect Permission=permission.mcp.connection.disconnect Approval=Ownerの明示切断 RecoveryAction=retry-mcp-disconnect; ServerID={}",
+                request.server_id
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_DISCONNECT,
+            "mcp_audit_append_failed",
+            "MCP切断の受信Auditを確定できない",
+        );
+    }
+
+    #[cfg(not(windows))]
+    {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_DISCONNECT,
+            "mcp_process_tree_supervision_unsupported",
+            "現行環境ではMCP process群の停止を保証できないため切断を拒否し、接続記録を保持する",
+            true,
+            payload_hash,
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        let termination = broker
+            .mcp_connections
+            .get_mut(&request.server_id)
+            .expect("MCP接続の存在を直前に確認済み")
+            .connection
+            .terminate();
+        if let Err(error) = termination {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_DISCONNECT,
+                error.code,
+                "MCP process群の終了を確認できない。接続状態を保持しowner切断の再試行を要求する",
+                true,
+                payload_hash,
+            );
+        }
+
+        let mut body = json!({
+            "版": VERSION,
+            "ServerID": request.server_id,
+            "接続状態": "disconnected",
+            "能力ID": "mcp.connection.disconnect",
+            "権限ID": "permission.mcp.connection.disconnect",
+            "承認状態": "owner_control_approved",
+            "復旧ID": "retry-mcp-disconnect",
+            "権限生成": "なし",
+            "公開範囲": "metadata_only",
+            "証拠種別": EVIDENCE_SOURCE_LIVE_RUNTIME,
+        });
+        let accepted = match broker.append_audit(
+            request_id,
+            OP_DISCONNECT,
+            "accepted",
+            &format!(
+                "Windows Job Objectのprocess群終了確認後にMCP切断。ServerID={}",
+                request.server_id
+            ),
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &super::protocol::canonical_payload_hash(Some(&body)),
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_DISCONNECT,
+                    "mcp_audit_append_failed",
+                    "切断後の結果Auditを確定できない。接続記録を保持してowner再確認を要求する",
+                )
+            }
+        };
+        body.as_object_mut()
+            .expect("MCP切断receiptはobject")
+            .insert(
+                "切断監査ID".to_string(),
+                Value::String(accepted.event_id.clone()),
+            );
+        broker.mcp_connections.remove(&request.server_id);
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: OP_DISCONNECT.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+            audit_event_id: accepted.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
+            shutdown_requested: broker.shutdown_requested,
+        }
+    }
+}
+
 fn parse_request(payload: &Value) -> Result<ConnectionRequest, McpError> {
     let request: ConnectionRequest = serde_json::from_value(payload.clone()).map_err(|_| {
         McpError::new(
@@ -367,6 +538,27 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, McpError> {
         return Err(McpError::new(
             "mcp_credential_unavailable",
             "現行C9 stdio接続はCredential実値注入を未接続のため資格情報必須Serverを接続しない",
+        ));
+    }
+    Ok(request)
+}
+
+fn parse_disconnect_request(payload: &Value) -> Result<DisconnectRequest, McpError> {
+    let request: DisconnectRequest = serde_json::from_value(payload.clone()).map_err(|_| {
+        McpError::new(
+            "mcp_disconnect_request_invalid",
+            "MCP切断payloadの構造が不正",
+        )
+    })?;
+    if request.version != VERSION
+        || request.operation != "切断"
+        || request.server_id.is_empty()
+        || request.server_id.as_bytes().len() > 128
+        || request.server_id.chars().any(char::is_control)
+    {
+        return Err(McpError::new(
+            "mcp_disconnect_request_invalid",
+            "MCP切断payloadの値が不正",
         ));
     }
     Ok(request)

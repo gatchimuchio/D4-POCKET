@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_disconnect_receipt.schema.json",
+  "title": "MCP切断receipt（McpDisconnectReceipt）",
+  "description": "Brokerがprocess群停止を確認して永続Auditへ確定した切断結果。権限を生成せず、接続先実値を含めない。",
+  "type": "object",
+  "required": [
+    "版", "ServerID", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID",
+    "権限生成", "公開範囲", "証拠種別", "切断監査ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "ServerID": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "接続状態": { "const": "disconnected" },
+    "能力ID": { "const": "mcp.connection.disconnect" },
+    "権限ID": { "const": "permission.mcp.connection.disconnect" },
+    "承認状態": { "const": "owner_control_approved" },
+    "復旧ID": { "const": "retry-mcp-disconnect" },
+    "権限生成": { "const": "なし" },
+    "公開範囲": { "const": "metadata_only" },
+    "証拠種別": { "const": "LIVE_RUNTIME" },
+    "切断監査ID": { "type": "string", "minLength": 1, "maxLength": 128 }
+  }
+}

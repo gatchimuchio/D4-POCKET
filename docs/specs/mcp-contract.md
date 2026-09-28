@@ -39,4 +39,4 @@ Serverの`origin`と各`証拠種別`は、観測範囲を表す。`server_metad
 
 ## 実装範囲
 
-この作業単位はSchema、正常／負例fixture、Conformanceだけを追加する。MCP discovery、connect、list、consent、Tool実行、timeout、disconnect、quarantineはC9のBroker経路で実装するまで未接続であり、`release_blocker`として保持する。外部MCPサービスの実物interfaceを推測して実装しない。
+C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。後続C9は、実物interfaceを推測せずBroker経路でstdio discovery、connect、metadata list、timeout処理およびWindows owner切断を接続した。consent、Tool実行、Credential実値注入、Streamable HTTP、OAuth、quarantine、外部MCP実物Test Harnessは未接続であり、`release_blocker`として保持する。

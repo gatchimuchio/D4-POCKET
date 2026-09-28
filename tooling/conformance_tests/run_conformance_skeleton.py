@@ -123,6 +123,8 @@ REQUIRED_SCHEMA_NAMES = {
     "mcp_connection",
     "mcp_connection_receipt",
     "mcp_connection_list",
+    "mcp_disconnect",
+    "mcp_disconnect_receipt",
     "a2a_connection",
     "a2a_connection_receipt",
     "a2a_connection_list",
@@ -5174,6 +5176,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "Credential実値",
         "Tool実行",
         "MCP接続一覧",
+        "MCP切断",
+        "Windows Job Object",
+        "LIVE_RUNTIME",
+        "mcp_process_tree_supervision_unsupported",
         "mcp_server_unavailable",
         "mcp_timeout",
         "release_blocker",
@@ -5190,7 +5196,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         if not any(item.get("path") == "docs/specs/mcp-connection-center.md" for item in current_sources if isinstance(item, dict)):
             不整合.append("C9 MCP接続センター正本が正本索引へ登録されていない")
 
-    for name in ("mcp_connection", "mcp_connection_receipt", "mcp_connection_list"):
+    for name in (
+        "mcp_connection", "mcp_connection_receipt", "mcp_connection_list",
+        "mcp_disconnect", "mcp_disconnect_receipt",
+    ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
         failures = validate_instance(valid, schema)
@@ -5200,11 +5209,18 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_connection_unknown_authority.invalid.json",
         "mcp_connection_receipt_full_content.invalid.json",
         "mcp_connection_list_wrong_evidence.invalid.json",
+        "mcp_disconnect_authority.invalid.json",
+        "mcp_disconnect_receipt_not_stopped.invalid.json",
+        "mcp_disconnect_receipt_wrong_evidence.invalid.json",
     )
     for name in invalid_names:
         invalid = load_contract_fixture("invalid/" + name)
-        schema_name = "mcp_connection" if name.startswith("mcp_connection_unknown") else (
-            "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else "mcp_connection_list"
+        schema_name = (
+            "mcp_connection" if name.startswith("mcp_connection_unknown") else
+            "mcp_connection_receipt" if name.startswith("mcp_connection_receipt") else
+            "mcp_connection_list" if name.startswith("mcp_connection_list") else
+            "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
+            "mcp_disconnect_receipt"
         )
         if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
             不整合.append(f"C9 {name}を受理している")
@@ -5217,6 +5233,12 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     encoded_receipt = json.dumps(receipt, ensure_ascii=False)
     if any(token in encoded_receipt for token in ("secret_value", "credential_value", "password", "token")):
         不整合.append("C9 receiptへCredential実値が混入している")
+
+    disconnect = load_contract_fixture("mcp_disconnect_receipt.valid.json")
+    if disconnect.get("証拠種別") != "LIVE_RUNTIME" or disconnect.get("権限生成") != "なし":
+        不整合.append("C9 MCP切断receiptがLIVE_RUNTIMEまたは権限非生成ではない")
+    if any(token in json.dumps(disconnect, ensure_ascii=False) for token in ("実行file", "workspace", "credential_value", "secret_value")):
+        不整合.append("C9 MCP切断receiptへ接続設定または秘密値が混入している")
 
     rust_mcp = (RUST_HELPER / "src" / "mcp.rs").read_text(encoding="utf-8")
     rust_stdio = (RUST_HELPER / "src" / "adapters" / "mcp_stdio.rs").read_text(encoding="utf-8")
@@ -5237,9 +5259,25 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("super::process_tree::spawn", rust_stdio),
         ("terminate_tree", rust_stdio),
         ("mcp_process_termination_failed", rust_stdio),
+        ("OP_DISCONNECT", rust_center),
+        ("mcp_process_tree_supervision_unsupported", rust_center),
+        ("EVIDENCE_SOURCE_LIVE_RUNTIME", rust_center),
+        ("terminate()", rust_center),
+        ("mcp_connections.remove", rust_center),
     ):
         if token not in source:
             不整合.append(f"C9実装に統治境界tokenがない: {token}")
+    rust_protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
+    main = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")
+    for token, source in (
+        ("BrokerOperation::MCP切断", rust_protocol),
+        ("mcp_center::disconnect", rust_protocol),
+        ("pub fn MCP切断", owner_cli),
+        ("owner_cli::MCP切断", main),
+    ):
+        if token not in source:
+            不整合.append(f"C9 MCP切断のBroker／Owner CLI接続がない: {token}")
     return 不整合
 
 

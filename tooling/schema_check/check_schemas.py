@@ -87,6 +87,8 @@ REQUIRED = {
     "mcp_connection.schema.json",
     "mcp_connection_receipt.schema.json",
     "mcp_connection_list.schema.json",
+    "mcp_disconnect.schema.json",
+    "mcp_disconnect_receipt.schema.json",
     "a2a_connection.schema.json",
     "a2a_connection_receipt.schema.json",
     "a2a_connection_list.schema.json",

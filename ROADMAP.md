@@ -9,9 +9,9 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
-### C9 MCP stdio ServerをWindows process群監督へ接続（2026-09-28）
+### C9 MCP stdio監督とOwner切断（2026-09-28）
 
-MCP stdio childを既存Rust Job Object監督経路で起動し、停止失敗とdiscovery後のServer終了を成功扱いしない。Windows fake-server試験でroot・孫processの起動とJob単位停止を確認した。Rust全target試験は単体322件・CLI 9件成功後、`broker_ipc`実行fileがWindows Application Control（OS error 4551）で起動前に拒否され、全体をPASS扱いしない。全target checkは成功。実外部MCP Serverやinstalled product証拠ではなく、MCPのTool実行等も未接続のままrelease blockerとする。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
+MCP stdio childは既存Rust Job Object監督経路で起動し、Owner専用`MCP切断`はBrokerからprocess群停止を確認した後、永続`LIVE_RUNTIME` Auditを確定して接続記録を解消する。未知Server・通常IPCからの要求は拒否し、停止またはAudit確定に失敗した場合は記録を保持する。Windows fake-serverを使うfocused Broker試験1件が成功した。`cargo check --all-targets`は成功したが、現行sourceの全target試験はlibrary 323件・CLI 10件成功後、`broker_ipc.exe`がWindows Application Control（OS error 4551）で起動前に拒否され未完了。実外部MCP Server、installed product、GUI切断面の証拠ではなく、GUI接続・Tool実行等は`release_blocker`である。Rust全target実行gateを未解決へ再開し、active unresolved blockerは15件。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
 
 ### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
 

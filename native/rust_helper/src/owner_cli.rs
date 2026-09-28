@@ -290,6 +290,43 @@ pub fn MCP接続(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// ownerがServer IDを明示したMCP接続だけを切断し、安全な結果fieldだけを表示する。
+pub fn MCP切断(args: &[String]) -> Result<(), String> {
+    if args.len() != 4 || args[0] != "--session-file" || args[2] != "切断" {
+        return Err("使用法: MCP切断 --session-file <owner資格file> 切断 <ServerID>".into());
+    }
+    let server_id = &args[3];
+    if server_id.is_empty()
+        || server_id.as_bytes().len() > 128
+        || server_id.chars().any(char::is_control)
+    {
+        return Err("MCP切断対象の識別子形式が不正".into());
+    }
+    let payload = serde_json::to_value(MCP切断要求 {
+        version: 1,
+        operation: "切断",
+        server_id,
+    })
+    .map_err(|_| "MCP切断要求を構成できない")?;
+    let body = owner操作送信(&args[1], "MCP切断", payload)?;
+    let receipt = MCP切断公開投影(&body, server_id)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).map_err(|_| "MCP切断公開receiptの表示に失敗")?
+    );
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+struct MCP切断要求<'a> {
+    #[serde(rename = "版")]
+    version: u8,
+    #[serde(rename = "操作")]
+    operation: &'static str,
+    #[serde(rename = "ServerID")]
+    server_id: &'a str,
+}
+
 /// ownerが明示したA2A Agent Card接続設定だけをBrokerへ渡す。
 /// Agent Card URI、Credential実値、外部Agentのraw contentはCLI出力へ戻さない。
 pub fn A2A接続(args: &[String]) -> Result<(), String> {
@@ -468,6 +505,35 @@ fn MCP接続公開投影(body: &Value) -> Result<Value, String> {
         || object.get("権限生成").and_then(Value::as_str) != Some("なし")
     {
         return Err("MCP接続公開receiptの公開境界が不正".into());
+    }
+    Ok(body.clone())
+}
+
+fn MCP切断公開投影(body: &Value, expected_server_id: &str) -> Result<Value, String> {
+    let object = body
+        .as_object()
+        .ok_or_else(|| "MCP切断公開receiptの形式が不正".to_string())?;
+    let required = [
+        "版", "ServerID", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID",
+        "権限生成", "公開範囲", "証拠種別", "切断監査ID",
+    ];
+    if object.len() != required.len() || required.iter().any(|key| !object.contains_key(*key)) {
+        return Err("MCP切断公開receiptの形式が不正".into());
+    }
+    if object.get("版").and_then(Value::as_u64) != Some(1)
+        || object.get("ServerID").and_then(Value::as_str) != Some(expected_server_id)
+        || object.get("接続状態").and_then(Value::as_str) != Some("disconnected")
+        || object.get("能力ID").and_then(Value::as_str) != Some("mcp.connection.disconnect")
+        || object.get("権限ID").and_then(Value::as_str)
+            != Some("permission.mcp.connection.disconnect")
+        || object.get("承認状態").and_then(Value::as_str) != Some("owner_control_approved")
+        || object.get("復旧ID").and_then(Value::as_str) != Some("retry-mcp-disconnect")
+        || object.get("権限生成").and_then(Value::as_str) != Some("なし")
+        || object.get("公開範囲").and_then(Value::as_str) != Some("metadata_only")
+        || object.get("証拠種別").and_then(Value::as_str) != Some("LIVE_RUNTIME")
+        || !safe_audit_id(&body["切断監査ID"])
+    {
+        return Err("MCP切断公開receiptの固定値またはAuthority境界が不正".into());
     }
     Ok(body.clone())
 }
@@ -1088,6 +1154,27 @@ mod tests {
         assert!(MCP接続設定に禁止fieldがある(&json!({
             "nested": [{"permission_id": "permission.injected"}]
         })));
+    }
+
+    #[test]
+    fn MCP切断公開receiptは固定範囲だけを受理する() {
+        let body: Value = serde_json::from_str(include_str!(
+            "../../../examples/contracts/mcp_disconnect_receipt.valid.json"
+        ))
+        .expect("正常MCP切断receipt fixture");
+        assert_eq!(
+            MCP切断公開投影(&body, "mcp-fixture").expect("切断receipt"),
+            body
+        );
+        assert!(MCP切断公開投影(&body, "other-server").is_err());
+
+        let mut wrong_evidence = body.clone();
+        wrong_evidence["証拠種別"] = json!("INTERNAL_STATE");
+        assert!(MCP切断公開投影(&wrong_evidence, "mcp-fixture").is_err());
+
+        let mut extra_secret = body;
+        extra_secret["credential_value"] = json!("must-not-display");
+        assert!(MCP切断公開投影(&extra_secret, "mcp-fixture").is_err());
     }
 
     #[test]

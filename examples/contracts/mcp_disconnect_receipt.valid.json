@@ -1,0 +1,13 @@
+{
+  "版": 1,
+  "ServerID": "mcp-fixture",
+  "接続状態": "disconnected",
+  "能力ID": "mcp.connection.disconnect",
+  "権限ID": "permission.mcp.connection.disconnect",
+  "承認状態": "owner_control_approved",
+  "復旧ID": "retry-mcp-disconnect",
+  "権限生成": "なし",
+  "公開範囲": "metadata_only",
+  "証拠種別": "LIVE_RUNTIME",
+  "切断監査ID": "audit-mcp-disconnect-1"
+}

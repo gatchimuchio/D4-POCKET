@@ -51,6 +51,9 @@ fn main() {
     if args.first().is_some_and(|v| v == "MCP接続") {
         match owner_cli::MCP接続(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
+    if args.first().is_some_and(|v| v == "MCP切断") {
+        match owner_cli::MCP切断(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
+    }
     if args.first().is_some_and(|v| v == "A2A接続") {
         match owner_cli::A2A接続(&args[1..]) { Ok(()) => return, Err(error) => { eprintln!("{error}"); std::process::exit(1); } }
     }
@@ -87,6 +90,7 @@ fn main() {
     eprintln!("回帰Case削除: 回帰Case削除 --session-file <owner資格file> 削除 <CaseID> <定義hash> <暗号文hash> 削除確認 | 中断照合 <CaseID>");
     eprintln!("資格情報登録: 資格情報登録 --session-file <owner資格file> 登録 <資格情報登録JSONファイル>");
     eprintln!("MCP接続: MCP接続 --session-file <owner資格file> 接続 <MCP接続JSONファイル>");
+    eprintln!("MCP切断: MCP切断 --session-file <owner資格file> 切断 <ServerID>");
     eprintln!("A2A接続: A2A接続 --session-file <owner資格file> 接続 <A2A接続JSONファイル>");
     eprintln!("Host登録: Host登録 --session-file <owner資格file> 登録 <Host登録JSONファイル>");
     eprintln!("作業領域: 作業領域制御 --session-file <owner資格file> 作業領域一覧 | 作業領域承認 <作業領域ID> <登録hash> <表示範囲> | 作業領域失効 <作業領域ID> <登録hash>");

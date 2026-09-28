@@ -2,6 +2,16 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP stdio Owner切断のBroker実装（2026-09-28）
+
+既存Rust Brokerのowner-control経路に`MCP切断`を追加した。Owner CLIは既存のBroker認証経路へ厳密な切断要求を送り、Brokerは登録済みServerだけを対象にする。Windowsでは既存Job Object監督下のprocess群停止を確認し、`LIVE_RUNTIME`として分類した永続accepted Auditの確定後に限って接続記録を削除する。停止確認またはAudit確定が失敗した場合は記録を残して再確認を要求する。非Windowsではprocess群停止保証がないためfail-closedで拒否する。通常IPC、未知field、未知Serverを拒否し、receiptとAuditへ実行path、argv、workspace、credential実値を含めない。Permission・Approvalを生成しない。
+
+- Owner CLI→既存Rust Broker→MCP connection center→Windows Job Object停止→永続Audit→接続記録解消が、この局所実装の実行経路である。確認済みの実Windows動作は、Windows上のBroker library試験内でfake stdio Serverを用いた範囲に限る。正式installed Broker／製品UI／実外部MCP Serverの証拠ではない。Desktop／Mobileの切断操作面は未接続であり、`release_blocker`。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib "MCP切断はowner専用でprocess群停止後に永続Auditと記録解消を確定する" -- --test-threads=1 --nocapture`：1件成功。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。library 323件とCLI 10件は成功したが、`tests/broker_ipc.exe`はWindows Application ControlのOS error 4551で起動前に拒否された。以後の全targetは未実行。testの除外、拒否fileの移動、Application Control変更はしていない。`windows_rust_integration_test_execution_policy`をunresolved／activeへ戻した。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常例147件、negative fixture 182件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで成功。`python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件、finding 0件で成功。
+- 未完了のMCP機能はTool実行、Credential実値注入、Resource／Prompt取得、Streamable HTTP、OAuth、consent、quarantine、外部Harness適合および非Windows process群監督で、すべて`release_blocker`。この局所実装はC9または製品releaseの完成を意味しない。
+
 ## D4 Pocket C9 MCP stdio process群監督のWindows実証（2026-09-28）
 
 MCP stdio childを`native/rust_helper/src/adapters/process_tree.rs`の既存Job Object経路から起動するよう変更した。Windowsではchild初期threadを停止状態で生成しJob割当後に再開する。MCP stdio停止はJob内processが0件になったことを確認し、停止失敗・discovery後のServer終了を接続成功へ昇格しない。legacy fallbackも先行process群の終了確認後だけ起動する。`SupervisedChild`のDebug表示はprocess IDだけに限定した。

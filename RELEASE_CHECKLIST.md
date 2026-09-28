@@ -381,9 +381,9 @@ known limitation を認める条件は、次のとおりである。
 - item: Windows Rust全target試験の実行gate
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
-  status: resolved
-  reason: 過去のclean sourceと2026-09-28の別試行でWindows Application Control（OS error 4551）による実行file／build scriptの起動拒否が発生した記録は履歴として保持する。最新sourceでは`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`と`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`が成功し、library 321件、CLI 9件、Broker IPC 10件、integration 26件を含む合計366件すべて成功した。このsourceのRust全target実行gateは解消済み。
-  required_action: 将来Rust sourceを変更した作業blockで全target試験を再実行し、失敗またはApplication Control拒否が起きた場合はgateを再開する。
+  status: unresolved
+  reason: 現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`ではlibrary 323件とCLI 10件が成功した後、`tests/broker_ipc.exe`がWindows Application ControlのOS error 4551で起動前に拒否され、全target試験は未完了である。過去sourceの全target成功記録は履歴として保持し、今回sourceの成功へ転用しない。
+  required_action: Windows Application Controlを弱めず、test除外や拒否file移動もせずに全Rust targetを実行できる承認済みWindows環境で、現行sourceの全target試験を完遂する。
   blocks_release: yes
 
 - item: Windows loopback HTTP fixture試験のConnectionReset揺らぎ

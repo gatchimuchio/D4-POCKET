@@ -150,13 +150,13 @@
     },
     {
       "name": "windows_rust_integration_test_execution_policy",
-      "status": "resolved",
+      "status": "unresolved",
       "status_source": "manual",
-      "active": false,
+      "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "過去commitおよび2026-09-28の別試行でWindows Application Control（OS error 4551）による実行file／build scriptの起動拒否が発生した記録は履歴として保持する。最新sourceでは`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`と`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`が成功し、library 321件、CLI 9件、Broker IPC 10件、integration 26件（desktop launcher 0件を含む）を実行し、合計366件すべて成功した。このsourceに対するWindows全target実行gateは解消済み。将来Rust変更後の試験失敗は新しい現行状態として再評価する。",
-      "required_action": "将来Rust sourceを変更した作業blockで同じWindows all-target試験を実行し、失敗やApplication Control拒否が再発した場合はgateを再開する。"
+      "reason": "現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`ではlibrary 323件とCLI 10件が成功した後、`tests/broker_ipc.exe`がWindows Application ControlのOS error 4551で起動前に拒否され、全target試験は未完了である。過去sourceの全target成功記録は履歴として保持し、今回sourceの成功へ転用しない。",
+      "required_action": "Windows Application Controlを弱めず、test除外や拒否file移動もせずに全Rust targetを実行できる承認済みWindows環境で、現行sourceの全target試験を完遂する。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

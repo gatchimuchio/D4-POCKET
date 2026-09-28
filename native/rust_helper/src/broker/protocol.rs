@@ -39,7 +39,7 @@ pub(crate) use regression_case::{
     OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
 };
 
-const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
+pub(super) const EVIDENCE_SOURCE_LIVE_RUNTIME: &str = "LIVE_RUNTIME";
 pub(super) const EVIDENCE_SOURCE_INTERNAL_STATE: &str = "INTERNAL_STATE";
 const BROKER_ID: &str = "gui-shell-rust-broker";
 const REQUEST_FRESHNESS_WINDOW_SECONDS: u64 = 300;
@@ -433,6 +433,8 @@ pub enum BrokerOperation {
     資格情報一覧,
     #[serde(rename = "MCP接続")]
     MCP接続,
+    #[serde(rename = "MCP切断")]
+    MCP切断,
     #[serde(rename = "MCP接続一覧")]
     MCP接続一覧,
     #[serde(rename = "A2A接続")]
@@ -619,6 +621,7 @@ impl BrokerOperation {
             BrokerOperation::資格情報登録 => "資格情報登録",
             BrokerOperation::資格情報一覧 => "資格情報一覧",
             BrokerOperation::MCP接続 => "MCP接続",
+            BrokerOperation::MCP切断 => "MCP切断",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
@@ -1453,6 +1456,7 @@ impl Broker {
             #[cfg(not(windows))]
             BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(&request_id, "資格情報一覧", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
             BrokerOperation::MCP接続 => super::mcp_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::MCP切断 => super::mcp_center::disconnect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::MCP接続一覧 => super::mcp_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続 => super::a2a_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続一覧 => super::a2a_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -6619,3 +6623,7 @@ mod content_discard;
 
 #[path = "content_discard_recovery.rs"]
 mod content_discard_recovery;
+
+#[cfg(all(test, windows))]
+#[path = "../../tests/unit/mcp_disconnect.rs"]
+mod mcp_disconnect_tests;

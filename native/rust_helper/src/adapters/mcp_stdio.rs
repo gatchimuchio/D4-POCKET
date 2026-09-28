@@ -258,7 +258,7 @@ impl McpStdioConnection {
             .map_err(|_| McpError::new("mcp_server_unavailable", "MCP stdio requestを送信できない"))
     }
 
-    fn terminate(&mut self) -> Result<(), McpError> {
+    pub(crate) fn terminate(&mut self) -> Result<(), McpError> {
         self.child.terminate_tree().map_err(|_| {
             McpError::new(
                 "mcp_process_termination_failed",

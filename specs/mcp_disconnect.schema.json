@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_disconnect.schema.json",
+  "title": "MCP切断要求（McpDisconnect）",
+  "description": "Owner controlが指定済みstdio MCP process群を停止し、停止確認後に接続記録を解消する。",
+  "type": "object",
+  "required": ["版", "操作", "ServerID"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "切断" },
+    "ServerID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    }
+  }
+}
