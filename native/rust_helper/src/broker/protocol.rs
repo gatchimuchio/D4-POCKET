@@ -1621,9 +1621,6 @@ impl Broker {
         )
         .map_err(|_| "Desktop ProtectedStore起動監査に失敗")?;
         let result = (|| {
-            if self.protected_store.is_some() {
-                return Err("ProtectedStoreは既に起動登録されている");
-            }
             #[cfg(not(windows))]
             {
                 let _ = protected;
@@ -1631,6 +1628,9 @@ impl Broker {
             }
             #[cfg(windows)]
             {
+                if self.protected_store.is_some() {
+                    return Err("ProtectedStoreは既に起動登録されている");
+                }
                 let (root, _) = super::workspace_root::open_isolated_root(path, protected)?;
                 self.append_audit(
                     "desktop-protected-store:verified",

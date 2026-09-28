@@ -3133,7 +3133,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "ffa9230c89c89c895c6d55f468334c6e19171a7aa286f0c57819cf7a5f31ff5a"
+      "sha256": "66cf809684ef6cc63a362e972e577599ec2b304bc4fbcb5386db8aa52c427336"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
