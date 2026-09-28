@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "7c6ed4372ec45b07bc4deb6001f190131da663d1ea7ca7e34eed64c1707721a6"
+      "sha256": "6389667471b1eb7163792556d05364e1f3511e0b9e0b2d8796723ffbae532848"
     },
     {
       "path": "SECURITY.md",
@@ -173,7 +173,7 @@
     },
     {
       "path": "VALIDATION.txt",
-      "sha256": "cc8b46ef85767b577dbf952874e61df29a030a2a53ae3f6b73c1a611dacbff30"
+      "sha256": "5fd987e3e251b788b3455b79584896b1f84296fbb4654368fca136f4368116fe"
     },
     {
       "path": "apps/desktop_flutter/.gitignore",
@@ -1185,7 +1185,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "21c5a2bd98e4aaedaf7a0490438c2250c7105a68eb279c718b0ac274dac366a2"
+      "sha256": "f33259aaeb60e56e666a4197c0cd5c8b72a5a6643eb79063b333f41c28aa3fdf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3248,6 +3248,10 @@
       "sha256": "392a6018f404ec5b5b65f2f97aecc821e7f87b6cdfe6bc7e5cac2674a1fd6c25"
     },
     {
+      "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
+      "sha256": "6f5082f17adbc93e0a7540a8bfce2a228bf019d7830be0edadbb77f31d1a2fff"
+    },
+    {
       "path": "native/rust_helper/tests/protected_data.rs",
       "sha256": "b1a3489e67906b45a6a48114928363ab6c35c6022db2609f0797e0735ca60ce9"
     },
@@ -3262,6 +3266,10 @@
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
       "sha256": "9f029c981310a0796110beddb01614f65b984f9a57389da411a1322285ac2558"
+    },
+    {
+      "path": "native/rust_helper/tests/unit/codex_cli_fixture.rs",
+      "sha256": "6f103db07a03b3c67b927d032183b221f2feb55df41518a6fb1a45142a28f608"
     },
     {
       "path": "native/rust_helper/tests/unit/content_save.rs",

@@ -5,9 +5,11 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行C0 validation baseline（2026-09-29）
+## C0 validation baseline履歴と最新Rust gate（2026-09-29）
 
 2026-09-29、`main` commit `c770680e1868675d710657a11f300f9b38197578`を基点とする作業ツリーで、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`がexit 0となり、厳格日本語監査、Schema 149件／正常example 149件／negative fixture 192件、Conformance 225件を含む登録済み10検査が合格した。Evidence bundleはdevelopment evidenceとして合格し、release blocker 5件と`release_ready=false`を維持する。同commitへのWindows Actions #13ではRust全target check／testも成功したが、hosted Windows上のRust検査に限る。いずれの結果もrelease readinessへ昇格しない。個別commandと失敗履歴は`VALIDATION.txt`に記録する。
+
+この基準後の`main`には、Codex Adapterの成功・期限超過後cleanupを偽CLIで検査する`FIXTURE` testを含むcommit `bd36dab45eb8da9d76caeebcd3a0b97fe29579b4`を統合した。作業treeでの統合開発検査はexit 0、Windows Actions #16は同commitに対して12 target／391 passedで成功した。これはCodex実Agent、Broker consumer経由起動、実sandbox隔離を証明せず、`task_execution=unsupported`とrelease blockerを維持する。
 
 履歴: 2026-09-28の基準更新では、変更前のclean `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c`にMANIFESTのhash不一致25件と必須source file欠落2件があったため、正規toolで1103件を再生成し、manifest checkとrelease gateを合格させた。この記録は当時の観測であり、現行`main`の状態を示すものではない。
 
@@ -34,6 +36,8 @@ Codex Taskだけが使うWindows sandbox方式を`mxc`に固定し、同じ一�
 対象Rust変更commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)は成功した。Windows Server 2025／Rust 1.95.0でcheckout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、389 passed／0 failed／0 ignored）、試験後clean確認が成功した。これは当該commitのhosted Windows Rust検査であり、実Agent Task、Broker隔離、ローカルApplication Controlまたはrelease readinessを証明しない。
 
 最新のWindows Rust手動補助検証 [run #15](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36465355560)はtemporary branch上のcommit `33787c35ea26bdbb2bae3ad0376bb5c8baa9792b`を検査した。Windows Server 2025／Rust 1.95.0でcheckout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、390 passed／0 failed／0 ignored）、試験後cleanが成功し、この同じcommitを`main`へfast-forward統合した。追加されたAgent Workspace binding／cross-agent試験は`FIXTURE`に限り、実Agent隔離・production Task実行を証明しない。ローカルApplication Controlと`task_execution=unsupported`、release blocker、`release_ready=false`は維持する。
+
+最新のWindows Rust手動補助検証 [run #16](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36471921842)は一時branch `codex/codex-adapter-fixture`上のcommit `bd36dab45eb8da9d76caeebcd3a0b97fe29579b4`を検査した。Windows Server 2025／Rust 1.95.0でcheckout SHA照合、Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、391 passed／0 failed／0 ignored）、試験後cleanがすべて成功し、`main`へfast-forward統合後に一時branchをlocal／remoteから削除した。追加testは偽Codex CLI processを実Adapterへ接続する`FIXTURE`であり、実Codex Agent、Broker consumer、実Windows sandbox／filesystem隔離の証拠ではない。`task_execution=unsupported`、release blocker、`release_ready=false`を維持する。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）
 

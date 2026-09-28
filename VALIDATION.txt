@@ -2640,3 +2640,46 @@ validation_update_2026_09_29_current_main_windows_rust_validation:
       reason: External reads remain allowed and OneDrive ReparsePoint deny behavior is not established; helper test is not the Broker production path.
       required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
       blocks_release: yes
+
+validation_update_2026_09_29_codex_adapter_task_fixture:
+  scope: Exercise CodexCliAdapter Task process and scratch lifecycle with a deterministic fake executable, without production Agent credentials or model requests
+  target_branch: codex/codex-adapter-fixture
+  target_commit: bd36dab45eb8da9d76caeebcd3a0b97fe29579b4
+  trigger: workflow_dispatch
+  run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36471921842
+  status: passed
+  runner_os: Windows Server 2025
+  runner_image: win25-vs2026/20260922.246.2
+  rust_toolchain: 1.95.0
+  checks:
+    - checkout HEAD matched GITHUB_SHA
+    - rustfmt check passed, including the fixture helper and fake CLI source
+    - cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+    - cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed: 12 test targets, 391 passed, 0 failed, 0 ignored
+    - fake Codex CLI Adapter Task success and timeout cleanup fixture passed
+    - post-test working tree clean
+  local_checks:
+    cargo_check_all_targets: passed
+    focused_fake_cli_adapter_test: passed
+    integrated_development_validation: passed
+    integrated_development_validation_command: python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+    integrated_development_validation_result: exit 0, 10 registered checks; schemas 149, examples 149, negative fixtures 192, conformance 225, strict Japanese audit 1110 files and 0 findings
+  evidence_source: FIXTURE
+  evidence_scope: Direct CodexCliAdapter calls using a test-only fake executable; no Broker consumer, real Codex Agent, model request, production sandbox enforcement, or filesystem isolation claim.
+  authority_and_release:
+    task_execution: unsupported
+    production_agent_run: false
+    paid_credential_used: false
+    os_security_policy_changed: false
+    release_ready: false
+  integration:
+    target_branch: main
+    commit: bd36dab45eb8da9d76caeebcd3a0b97fe29579b4
+    main_remote_head_verified: true
+    temporary_branch_deleted_local_and_remote: true
+  release_gate_impact:
+    - item: Production Agent Task isolation and execution
+      classification: release_blocker
+      reason: The test uses a fake process outside the Broker Task consumer and does not prove real Agent sandbox isolation.
+      required_action: Prove the production Broker-to-Agent path, isolation, cancellation, audit, recovery, and cleanup under the applicable owner authorization.
+      blocks_release: yes

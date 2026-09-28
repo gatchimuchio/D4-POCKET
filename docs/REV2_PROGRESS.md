@@ -2675,3 +2675,16 @@ Mobileの画面・Android／iOS表示名とWindows実行fileの製品表示を`D
 - `python tooling/schema_check/check_schemas.py`：schema 149、example 149、negative fixture 192で合格。`python tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで合格。`python tooling/日本語基底監査.py --strict`：repo file 1108、finding 0で合格。`python tooling/manifest.py --check`：合格。`python tooling/validate_all.py --python-only --desktop-platform windows`：exit 0、登録済みdevelopment check 10件合格。release blocker 5件と`release_ready=false`は維持。
 
 このWindows Actions結果は当該commitのhosted Rust compile／test証拠であり、ローカルWindowsの実行可否、実Agent／Broker経路、installed product、filesystem隔離、release readinessを証明しない。Actions目的を満たしたtemporary branchは、`main`へfast-forward統合・pushした後に削除する。
+
+## Codex Adapter Task process／scratch fixtureとWindows Actions #16（2026-09-29）
+
+Codex AdapterのTask経路はproduction metadataで`unsupported`のままであり、実Agent資格を使うrunもOwner GOがないため実施しない。資格・network requestなしでAdapter自身のprocess監督境界を試験するため、test専用の偽Codex CLI executableをRust fixtureから生成し、`CodexCliAdapter::new`のversion／help probeと`AgentTask実行`へ接続した。偽CLIは固定Task argv／permission profile、登録Workspaceを指す`--cd`、一致する`TEMP`／`TMP`がWorkspace直下のTask scratchであることを検証する。成功時はscratch内だけにmarkerを書き、JSONL完了応答を返す。期限超過時は偽childを待機させ、Adapterのprocess終了要求、scratch削除、回復journal解消を検査する。
+
+証拠源は`FIXTURE`であり、Broker Task consumerを通さない直接Adapter呼出しである。実Codex CLI／Model、Owner Approvalからのproduction起動、mxcの実効隔離、外部path／秘密file拒否、子孫processの実Agent終了、cancel操作、Agent間contamination、結果表示を証明しない。`task_execution=unsupported`、Agent実行・隔離等の`release_blocker`、`release_ready=false`は変更しない。実資格、課金、外部Agent request、Windows Application Control変更はなかった。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：合格。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib 偽CodexCLIはAdapterのTask成功と期限超過後cleanupを通る -- --test-threads=1`：1件合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。登録10検査合格。Schema 149件／example 149件／negative fixture 192件、Conformance 225件、strict日本語監査1110 file・finding 0件。release blocker 5件、`release_ready=false`を保持。
+- Windows Actions [run #16](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36471921842)：一時branch `codex/codex-adapter-fixture`のcommit `bd36dab45eb8da9d76caeebcd3a0b97fe29579b4`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査。checkout SHA、rustfmt、全target `cargo check`／`cargo test`、試験後cleanが成功し、12 targetで391 passed／0 failed／0 ignored。偽CLI fixture testも成功した。
+
+この結果は指定commit上のhosted Windows Rust compile／testおよび偽CLIを使うAdapter `FIXTURE`だけの証拠である。installed product、production Broker Task、実Agent、実sandbox隔離、ローカルWindows Application Controlの生成executable起動、release readinessは証明しない。一時branchは`main`へのfast-forward後に削除し、`main`が作業commitへ同期した。
