@@ -155,8 +155,8 @@
       "active": true,
       "classification": "release_blocker",
       "blocks_release": true,
-      "reason": "現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。最新の`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はexit 1。library 331件、main 10件、Broker IPC 10件、canonical hash 1件、checkpoint 8件、protected data 2件、protected startup 1件（計363件）が成功し、Desktop launcher targetは0件で正常起動した。その次の`protected_store` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetは未実行。全target試験は成功していない。拒否実行fileの移動、test除外、Application Control変更は行っていない。過去sourceおよび今回の先行試行結果は`docs/REV2_PROGRESS.md`に履歴として保持し、現行全target成功へ転用しない。",
-      "required_action": "Windows Application Controlを弱めず、test除外や拒否file移動もせずに全Rust targetを実行できる承認済みWindows環境で、現行sourceの全target試験を完遂する。"
+      "reason": "現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。MCP Tool入力Schemaの個別検証1件も成功した。最新の`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はexit 1。library 332件、main 10件、Broker IPC 10件、canonical hash 1件、checkpoint 8件の計361件が成功し、Desktop launcher target 0件も起動した。次の`protected_data` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetは未実行。全target試験は成功していない。拒否実行fileの移動、test除外、Application Control変更は行っていない。過去sourceおよび今回の先行試行結果は`docs/REV2_PROGRESS.md`に履歴として保持し、現行全target成功へ転用しない。",
+      "required_action": "default branchから手動起動する`.github/workflows/windows-manual-rust-validation.yml`で、検証branchの正確なcommitに対するRust all-target checkとtestを実行し、ログで対象commit・runner・全target結果を確認する。Windows Application Controlの緩和、test除外、拒否file移動は行わない。"
     },
     {
       "name": "rev2_mobile_flutter_native_device_link_boundary",

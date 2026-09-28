@@ -145,7 +145,7 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "2e4646c5a2c74b9d25fd7e08319aceda082f9273d5cbe546c5e7c65275ee44b9"
+      "sha256": "f0eefa025073c3b7b21791c63ca093fdc6c83a58ec1fde012fe3cce4029278ba"
     },
     {
       "path": "ROADMAP.md",
@@ -1177,7 +1177,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "a3bc8453e82d67c504001960bea711a44cd63edd6dcf4889060146c800346b66"
+      "sha256": "254d1f2fcae293c965afee80a0ab70cb9f59d7bb40ee88fab66b54c1963bb470"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1385,11 +1385,11 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "810773c71c7feb2ca5df2623246fea37c531ec7a61f6ab7cae7a0812e27e200d"
+      "sha256": "0300bec58b08ef50004feccfe5fdb5d0846542b3a7a30da4764d67f8faa01ddd"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "8bf7d6b6ca36e36cca5677dc86de0f9e8b01f68ba5d0dfb4169d6ffeeb1e3381"
+      "sha256": "2c56634c6a9b52b6545aca545983ed31cb94b676683f8ad698376854425c1392"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -2897,11 +2897,11 @@
     },
     {
       "path": "native/rust_helper/Cargo.lock",
-      "sha256": "f33cb36c2679cebfbd02b43e01595c1c600103573e24bbdbabd86d6052448058"
+      "sha256": "98477ddc35ab82615ee4f4cbcdb5696fb24846753f352cc83f30fde365c0b906"
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "24f7804f38162ca766e701fe78ce674090a95aa29248f8f11da4fd2777f6f9e3"
+      "sha256": "b6868f79161f304793562ea7e8162e2c17bc5d5453e2abb6576a6f5bee44c28f"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3165,7 +3165,7 @@
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
-      "sha256": "9a1997dc59b8494081f91e74a6fc64242cd54b4d8c4e3e5f1e3536c51b54de1c"
+      "sha256": "906c5753fa0c705c11c533182350379f198049d058d3904edc361a74f5fefb64"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -3665,7 +3665,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "d9f1bb71f0b825cfd9d880fae7e4d9a0715a933b1d19a2c1f916ff68a4654072"
+      "sha256": "fb69f3e7ac09395a818a1d9933015a0bae8ec337afd6a68e2081ce37855c2660"
     },
     {
       "path": "requirements-dev.txt",
