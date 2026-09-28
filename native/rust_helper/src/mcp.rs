@@ -15,6 +15,21 @@ pub const LEGACY_PROTOCOL_VERSION: &str = "2025-11-25";
 const MAX_WIRE_LINE_BYTES: usize = 256 * 1024;
 const MAX_CATALOG_ITEMS: usize = 256;
 const MAX_NAME_BYTES: usize = 256;
+const MAX_TOOL_SCHEMA_BYTES: usize = 128 * 1024;
+const MAX_TOOL_SCHEMA_NODES: usize = 4096;
+const MAX_TOOL_SCHEMA_DEPTH: usize = 64;
+#[cfg(test)]
+const MCP_JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+
+fn is_mcp_json_schema_dialect(value: &str) -> bool {
+    matches!(
+        value,
+        "https://json-schema.org/draft/2020-12/schema"
+            | "https://json-schema.org/draft/2020-12/schema#"
+            | "http://json-schema.org/draft/2020-12/schema"
+            | "http://json-schema.org/draft/2020-12/schema#"
+    )
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum McpProtocolEra {
@@ -483,7 +498,7 @@ impl McpCatalog {
                 "description_summary": "",
                 "input_schema_hash": tool.input_schema_hash,
                 "risk": "unknown",
-                "status": {"status": "supported", "reason": "MCP wire schemaを検証済み"}
+                "status": {"status": "supported", "reason": "JSON Schema 2020-12を検証済み"}
             }));
         }
         let resource_projection: Vec<Value> = self
@@ -597,21 +612,11 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
                 "MCP Tool nameが重複した",
             ));
         }
-        let input_schema = object
-            .get("inputSchema")
-            .and_then(Value::as_object)
-            .ok_or_else(|| {
-                McpError::new(
-                    "mcp_tool_schema_invalid",
-                    "MCP Tool inputSchemaがobjectではない",
-                )
-            })?;
-        if input_schema.get("type") != Some(&Value::String("object".to_string())) {
-            return Err(McpError::new(
-                "mcp_tool_schema_invalid",
-                "MCP Tool inputSchemaのroot型がobjectではない",
-            ));
-        }
+        let input_schema = object.get("inputSchema").ok_or_else(|| {
+            McpError::new("mcp_tool_schema_invalid", "MCP Tool inputSchemaがない")
+        })?;
+        validate_tool_input_schema(input_schema)?;
+        let input_schema = input_schema.as_object().expect("Schema検証済みobject");
         let tool_id = format!(
             "tool-{}",
             hex::encode(sha256_tagged(name.as_bytes()).as_bytes())
@@ -623,6 +628,123 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
         });
     }
     Ok(tools)
+}
+
+fn validate_tool_input_schema(schema: &Value) -> Result<(), McpError> {
+    let invalid = || {
+        McpError::new(
+            "mcp_tool_schema_invalid",
+            "MCP Tool inputSchemaがJSON Schema 2020-12として不正",
+        )
+    };
+    let object = schema.as_object().ok_or_else(invalid)?;
+    if object.get("type") != Some(&Value::String("object".to_string())) {
+        return Err(McpError::new(
+            "mcp_tool_schema_invalid",
+            "MCP Tool inputSchemaのroot型がobjectではない",
+        ));
+    }
+    if let Some(dialect) = object.get("$schema") {
+        if !dialect.as_str().is_some_and(is_mcp_json_schema_dialect) {
+            return Err(McpError::new(
+                "mcp_tool_schema_dialect_unsupported",
+                "MCP Tool inputSchemaのJSON Schema dialectは未対応",
+            ));
+        }
+    }
+
+    let encoded = serde_json::to_vec(schema).map_err(|_| invalid())?;
+    if encoded.len() > MAX_TOOL_SCHEMA_BYTES {
+        return Err(McpError::new(
+            "mcp_tool_schema_oversized",
+            "MCP Tool inputSchemaが上限を超過した",
+        ));
+    }
+
+    let mut pending = vec![(schema, 1usize)];
+    let mut nodes = 0usize;
+    while let Some((value, depth)) = pending.pop() {
+        nodes += 1;
+        if nodes > MAX_TOOL_SCHEMA_NODES || depth > MAX_TOOL_SCHEMA_DEPTH {
+            return Err(McpError::new(
+                "mcp_tool_schema_complexity_exceeded",
+                "MCP Tool inputSchemaの複雑度が上限を超過した",
+            ));
+        }
+        match value {
+            Value::Object(properties) => {
+                for reference_keyword in ["$ref", "$dynamicRef"] {
+                    if let Some(reference) = properties.get(reference_keyword) {
+                        let reference = reference.as_str().ok_or_else(invalid)?;
+                        if !reference.starts_with('#') {
+                            return Err(McpError::new(
+                                "mcp_tool_schema_external_reference_unsupported",
+                                "MCP Tool inputSchemaの外部参照は取得しない",
+                            ));
+                        }
+                    }
+                }
+                if properties.contains_key("$recursiveRef") {
+                    return Err(McpError::new(
+                        "mcp_tool_schema_dialect_unsupported",
+                        "MCP Tool inputSchemaに旧dialect専用参照がある",
+                    ));
+                }
+                for keyword in [
+                    "additionalProperties",
+                    "contains",
+                    "contentSchema",
+                    "else",
+                    "if",
+                    "items",
+                    "not",
+                    "propertyNames",
+                    "then",
+                    "unevaluatedItems",
+                    "unevaluatedProperties",
+                ] {
+                    if let Some(child) = properties.get(keyword) {
+                        if keyword == "items" {
+                            if let Some(items) = child.as_array() {
+                                pending.extend(items.iter().map(|item| (item, depth + 1)));
+                            } else {
+                                pending.push((child, depth + 1));
+                            }
+                        } else {
+                            pending.push((child, depth + 1));
+                        }
+                    }
+                }
+                for keyword in [
+                    "$defs",
+                    "definitions",
+                    "dependentSchemas",
+                    "patternProperties",
+                    "properties",
+                ] {
+                    if let Some(children) = properties.get(keyword).and_then(Value::as_object) {
+                        pending.extend(children.values().map(|child| (child, depth + 1)));
+                    }
+                }
+                for keyword in ["allOf", "anyOf", "oneOf", "prefixItems"] {
+                    if let Some(children) = properties.get(keyword).and_then(Value::as_array) {
+                        pending.extend(children.iter().map(|child| (child, depth + 1)));
+                    }
+                }
+            }
+            Value::Array(values) => {
+                pending.extend(values.iter().map(|child| (child, depth + 1)));
+            }
+            _ => {}
+        }
+    }
+
+    jsonschema::draft202012::meta::validate(schema).map_err(|_| invalid())?;
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .build(schema)
+        .map_err(|_| invalid())?;
+    Ok(())
 }
 
 pub fn parse_resources_response(message: &McpJsonRpcMessage) -> Result<Vec<McpResource>, McpError> {
@@ -986,6 +1108,155 @@ mod tests {
                 .expect_err("未知Tool")
                 .code,
             "mcp_unknown_tool"
+        );
+    }
+
+    #[test]
+    fn tool_input_schema_is_meta_validated_bounded_and_never_fetches_external_refs() {
+        let valid = response(
+            1,
+            json!({"tools": [{
+                "name": "read",
+                "inputSchema": {
+                    "$schema": MCP_JSON_SCHEMA_DIALECT,
+                    "type": "object",
+                    "properties": {"path": {"$ref": "#/$defs/nonempty"}},
+                    "$defs": {"nonempty": {"type": "string", "minLength": 1}},
+                    "default": {"$ref": "https://example.invalid/ordinary-data.json"},
+                    "required": ["path"],
+                    "additionalProperties": false
+                }
+            }]}),
+        );
+        assert_eq!(parse_tools_response(&valid).expect("正しいSchema").len(), 1);
+
+        let default_dialect = response(
+            7,
+            json!({"tools": [{
+                "name": "default-dialect",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string", "minLength": 1}}
+                }
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&default_dialect)
+                .expect("$schema省略時はDraft 2020-12")
+                .len(),
+            1
+        );
+
+        let standard_http_alias = response(
+            6,
+            json!({"tools": [{
+                "name": "http-alias",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft/2020-12/schema#",
+                    "type": "object"
+                }
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&standard_http_alias)
+                .expect("既知の2020-12 URI表記")
+                .len(),
+            1
+        );
+
+        let malformed = response(
+            2,
+            json!({"tools": [{
+                "name": "bad",
+                "inputSchema": {"type": "object", "properties": {"x": {"type": "not-a-type"}}}
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&malformed)
+                .expect_err("不正なJSON Schema")
+                .code,
+            "mcp_tool_schema_invalid"
+        );
+
+        let external_ref = response(
+            3,
+            json!({"tools": [{
+                "name": "remote",
+                "inputSchema": {"type": "object", "$ref": "https://example.invalid/schema.json"}
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&external_ref)
+                .expect_err("外部参照は取得しない")
+                .code,
+            "mcp_tool_schema_external_reference_unsupported"
+        );
+
+        let nested_external_ref = response(
+            5,
+            json!({"tools": [{
+                "name": "nested-remote",
+                "inputSchema": {"type": "object", "properties": {"value": {
+                    "$ref": "https://example.invalid/schema.json"
+                }}}
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&nested_external_ref)
+                .expect_err("Schema内の外部参照")
+                .code,
+            "mcp_tool_schema_external_reference_unsupported"
+        );
+
+        let unsupported_dialect = response(
+            4,
+            json!({"tools": [{
+                "name": "legacy",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object"
+                }
+            }]}),
+        );
+        assert_eq!(
+            parse_tools_response(&unsupported_dialect)
+                .expect_err("未対応dialect")
+                .code,
+            "mcp_tool_schema_dialect_unsupported"
+        );
+
+        let mut deep_schema = json!({"type": "object"});
+        for _ in 0..MAX_TOOL_SCHEMA_DEPTH {
+            deep_schema = json!({"type": "object", "properties": {"nested": deep_schema}});
+        }
+        assert_eq!(
+            validate_tool_input_schema(&deep_schema)
+                .expect_err("複雑度上限")
+                .code,
+            "mcp_tool_schema_complexity_exceeded"
+        );
+
+        let oversized = json!({
+            "type": "object",
+            "description": "x".repeat(MAX_TOOL_SCHEMA_BYTES)
+        });
+        assert_eq!(
+            validate_tool_input_schema(&oversized)
+                .expect_err("byte上限")
+                .code,
+            "mcp_tool_schema_oversized"
+        );
+
+        let mut properties = Map::new();
+        for index in 0..MAX_TOOL_SCHEMA_NODES {
+            properties.insert(format!("p{index}"), Value::Bool(true));
+        }
+        let too_many_nodes = json!({"type": "object", "properties": properties});
+        assert_eq!(
+            validate_tool_input_schema(&too_many_nodes)
+                .expect_err("node上限")
+                .code,
+            "mcp_tool_schema_complexity_exceeded"
         );
     }
 

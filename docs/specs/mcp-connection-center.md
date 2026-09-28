@@ -10,7 +10,7 @@ C9は、owner controlから明示されたMCP stdio ServerをRust Brokerのproce
 
 版2026-07-28の応答では、結果種別`resultType`が`complete`の場合だけを受け付ける。旧版互換として、結果種別の欠落は許容する。`server/discover`がJSON-RPCのmethod未対応（`-32601`）を返すか、対応protocol versionがない場合だけ、旧`initialize`／`notifications/initialized`へ切り替える。
 
-通信期限切れ、応答形式不正、要求ID不一致、parameter不正その他の失敗では、再起動や旧protocolでの再試行を行わない。外部Serverの実装を推測せず、JSON-RPC応答、capability、一覧、重複、pagination、秘密値・権限fieldをBroker側で検証する。receiptの公開範囲は`metadata_only`に固定する。
+通信期限切れ、応答形式不正、要求ID不一致、parameter不正その他の失敗では、再起動や旧protocolでの再試行を行わない。外部Serverの実装を推測せず、JSON-RPC応答、capability、一覧、重複、pagination、秘密値・権限fieldをBroker側で検証する。Tool `inputSchema`はJSON Schema Draft 2020-12のmeta-schema検証とvalidator構築に成功したものだけをCatalogへ入れる。外部`$ref`を取得せず、128 KiB／4096 node／深さ64の上限を適用する。receiptの公開範囲は`metadata_only`に固定する。
 
 ## 実行経路
 

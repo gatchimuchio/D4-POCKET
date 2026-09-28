@@ -31,13 +31,16 @@ jobs:
             "ref=$env:GITHUB_REF"
             "runner_os=$env:RUNNER_OS"
             "runner_image=$env:ImageOS/$env:ImageVersion"
+            "temp=$env:TEMP"
+            "tmp=$env:TMP"
+            "runner_temp=$env:RUNNER_TEMP"
             "rustup=$(rustup --version)"
           ) | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-rust-environment.txt"
           rustup toolchain install 1.95.0 --profile minimal
           rustup component add rustfmt --toolchain 1.95.0
           rustc +1.95.0 --version
           cargo +1.95.0 --version
-          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``; TEMP: ``$env:TEMP``; TMP: ``$env:TMP``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP 'gui-shell-rust-target'
           "CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: 変更Rust fileの整形を検査
@@ -47,6 +50,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $testTemp = Join-Path $env:RUNNER_TEMP 'gui-shell-test-temp'
+          New-Item -ItemType Directory -Force -Path $testTemp | Out-Null
+          if ($testTemp.Contains('~')) {
+            throw "Rust test TEMP/TMP must not contain a DOS short-name marker: $testTemp"
+          }
+          $env:TEMP = $testTemp
+          $env:TMP = $testTemp
+          @("test_temp=$testTemp", "test_tmp=$testTemp") | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-rust-test-temp.txt"
+          "Rust test TEMP/TMP: ``$testTemp``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1

@@ -2,6 +2,26 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCPツール入力Schema（Draft 2020-12）検証（2026-09-28）
+
+MCP Toolの`inputSchema`をroot objectだけの確認からJSON Schema Draft 2020-12のmeta-schema検証とvalidator構築へ強化した。`$schema`省略時も2020-12を使い、既知URIだけを受け付け、参照は同一文書内fragmentに限定する。外部HTTP／file resolver featureは無効であり、URIを取得しない。入力は128 KiB／4096 node／深さ64でboundedにし、超過・不正・未対応dialect・外部参照をfail-closedに拒否する。検証済みcatalogもmetadata-onlyであり、Tool実行やPermission／Approvalを追加しない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib mcp::tests::tool_input_schema_is_meta_validated_bounded_and_never_fetches_external_refs -- --test-threads=1`：最新sourceで1件成功。Draft 2020-12 URI、`$schema`省略、local `$defs`参照、壊れたSchema、未対応Draft、nested／root外部参照、複雑度・byte上限を検査した。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：最新sourceで成功。
+- 最新sourceの`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。library 332件、CLI 10件、Broker IPC 10件、canonical hash 1件、checkpoint 8件の計361件が成功し、Desktop launcherの0件targetも起動した。次の`protected_data` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetは未実行。Rust test失敗とは分類せず、全target成功にも昇格しない。SAC／policy変更、拒否binary移動、test除外はしていない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。strict日本語監査、Schema 147／147／187、Conformance 225 checks、Manifest、Release Gate、packaging portability、release smoke、evidence bundle等10検査が成功。Evidence bundleはrelease blocker 5件、`release_ready=false`を保持する。
+- Windows hosted runnerの`workflow_dispatch`検証は未実行であり、成功を主張しない。workflow追加後に検証ブランチの正確なcommitで実施し、結果をこの記録へ追記する。
+
+この単位はMCP Toolのmetadata catalog validationに限り、外部MCP Serverの信頼、Tool実行、Credential実値注入、Resource／Prompt本文取得、installed product運用を証明しない。
+
+## D4 Pocket C9 Windows Rust全target手動検証（2026-09-28）
+
+先行する手動Windows runner run `36380633052`（commit `d43ab390eda39544a831953c8232eae3c0fae51c`）と診断run `36381508834`（commit `1ab6c0692b00727b62b77d908090865530f90f6e`）は、それぞれRust test 289件成功・43件失敗だった。43件はWorkspace root登録前提で共通して拒否された。runnerのsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\AppData\Local\Temp`を指しており、Workspace path contractがDOS短縮名迂回を防ぐため`~`を拒否することが原因と確定した。これはtest用一時directoryの環境不整合であり、production側のtilde拒否を緩めない。
+
+workflowのRust検査step内だけ`TEMP`／`TMP`を`D:\a\_temp\gui-shell-test-temp`へ設定し、短縮名を検出した場合は試験前にfail-closedとした。更新後の手動run [36382603423](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36382603423) は正確なcommit `21bdf344cd42b5e5cc514fbb667a23e6df7846c0`をWindows Server 2025 runner image `win25-vs2026/20260922.246.2`へcheckoutし、rustfmt、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、試験後clean確認がすべて成功した。12 test targetの合計は378 passed／0 failed／0 ignored。test processへ渡った実TEMP／TMPは記録済みの`D:\a\_temp\gui-shell-test-temp`である。
+
+この証拠でWindows runner上のRust全target開発検証は成立し、`windows_rust_integration_test_execution_policy`を解消した。先行runの失敗履歴とローカルWindowsのApplication Control制約は履歴として保持する。端末のApplication Controlは変更していない。本runは指定commitのWindows runnerでのRust compile／testだけを示し、ローカルhostでの実行可否、installed product、production runtime、正式配布、release readinessの証拠ではない。ほかのrelease blockerおよび`release_ready=false`を維持する。
+
 ## D4 Pocket C9 MCP stdio応答行の事前上限（2026-09-28）
 
 stdout readerは改行を待って`read_until`で行全体を蓄積してから長さを確認していたため、改行を返さないServerが256 KiBを超えてメモリを消費できた。`fill_buf`／`consume`による逐次readerへ置き換え、行の蓄積上限を超えた時点で`mcp_wire_oversized`を返し、接続をfail-closedに終了する。正常な複数行とEOF直前の改行なし行は従来どおり読む。stdout channelは既存の有界容量32を維持する。MCP Authority、接続許可、外部公開範囲は変更していない。
