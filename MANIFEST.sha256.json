@@ -1293,7 +1293,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "625ed76da631fed5391aa4fceebbed5b23d5f68b3b80df13837c0316cdd5d45e"
+      "sha256": "2953d31d9b0f26c6cc88841397a3dbe8e877050e9ef97a9ace972af4ac5b3568"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "3e21950224853f358b2da543416610148d372bf214196f043a473e0eacb8c7a7"
+      "sha256": "c100e4b30199a9d892e667c7297614b4ef6ec9ed2cd87a9e95c14d59376b3bcb"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -4353,7 +4353,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "5be80786e741805373f7f752ae03c96376d8c692fc1f81c16bda6464946105e9"
+      "sha256": "92c834b1862b72d16983732c3e38ecaec6be1c6920f070785c84453585c0cea4"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

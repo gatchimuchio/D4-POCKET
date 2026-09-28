@@ -23,11 +23,11 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
     "default_permissions=\"d4p-agent-task\"",
-    // user設定を無視するTaskでもWindowsの強いsandbox方式を固定する。
-    "windows.sandbox=\"elevated\"",
+    // user設定を無視するTaskでもmxcを固定し、backend選択をuser configへ委ねない。
+    "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
-    // elevatedはeffective :root readを要求する。広域readをTask安全境界として扱わず、実証まではTaskをunsupportedに保つ。
-    "permissions.d4p-agent-task.filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=8}",
+    // root accessは閉じ、必要なruntime読取とWorkspace内deny globだけを明示する。
+    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=8}",
     "permissions.d4p-agent-task.network.enabled=false",
 ];
 
@@ -821,7 +821,8 @@ mod tests {
                 );
                 assert!(args
                     .windows(2)
-                    .any(|pair| { pair == ["-c", "windows.sandbox=\"elevated\""] }));
+                    .any(|pair| { pair == ["-c", "windows.sandbox=\"mxc\""] }));
+                assert!(filesystem_override.contains("\":root\"=\"deny\""));
             } else {
                 assert!(args
                     .windows(2)
