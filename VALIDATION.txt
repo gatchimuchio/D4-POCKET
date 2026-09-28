@@ -2262,7 +2262,7 @@ validation_update_2026_09_28_codex_task_profile_boundary:
     task_execution: unsupported
     release_ready: false
     os_security_policy_changed: false
-    paid_model_or_production_agent_task_run: false
+  paid_model_or_production_agent_task_run: false
   release_gate_impact:
     - item: Agent Task filesystem isolation
       classification: release_blocker
@@ -2350,3 +2350,36 @@ validation_update_2026_09_29_global_search_snapshot_provenance:
     release_ready: false
     os_security_policy_changed: false
     paid_model_or_production_agent_task_run: false
+
+validation_update_2026_09_29_current_main_windows_rust_validation:
+  scope: Validate the exact current main commit on the manual hosted Windows runner without weakening local OS protections
+  target_branch: main
+  target_commit: c770680e1868675d710657a11f300f9b38197578
+  trigger: workflow_dispatch
+  run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387
+  job: rust-validation
+  status: passed
+  runner_os: Windows Server 2025
+  runner_image: win25-vs2026/20260922.246.2
+  rust_toolchain: 1.95.0
+  rust_test_temp: D:\a\_temp\gui-shell-test-temp
+  checks:
+    - checkout HEAD matched GITHUB_SHA
+    - rustfmt check passed
+    - cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+    - cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed: 12 test targets, 389 passed, 0 failed, 0 ignored
+    - post-test working tree clean
+  artifact: none
+  evidence_scope: Hosted Windows validation for this exact source commit only; it does not prove installed-product behavior, live Agent Task isolation, local Application Control behavior, or release readiness.
+  local_host:
+    status: known_limitation
+    details: Local Windows Application Control OS error 4551 remains unchanged; no protection policy or denied file was modified.
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+  release_gate_impact:
+    - item: Agent Task filesystem isolation
+      classification: release_blocker
+      reason: External reads remain allowed and OneDrive ReparsePoint deny behavior is not established; helper test is not the Broker production path.
+      required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
+      blocks_release: yes

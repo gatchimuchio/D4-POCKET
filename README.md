@@ -14,8 +14,8 @@
   <img alt="Status" src="https://img.shields.io/badge/status-v1.0%20in%20progress-orange.svg">
   <img alt="Release" src="https://img.shields.io/badge/release-not%20yet%20claimed-lightgrey.svg">
   <img alt="Contract" src="https://img.shields.io/badge/contract-schema--first-informational.svg">
-  <img alt="Schemas" src="https://img.shields.io/badge/schemas-121%20validated-success.svg">
-  <img alt="Conformance" src="https://img.shields.io/badge/conformance-190%20checks-success.svg">
+  <img alt="Schemas" src="https://img.shields.io/badge/schemas-149%20validated-success.svg">
+  <img alt="Conformance" src="https://img.shields.io/badge/conformance-225%20checks-success.svg">
 </p>
 <p>
   <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white">
@@ -51,7 +51,7 @@
 D4 PocketはGUI Shellを技術基盤とする製品表面であり、GUI Shellは通常の app templateでもBLUE-TANUKI専用 GUIでもない。
 
 - 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
-- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行基準検査は136 schema、136正常example、168 negative fixture、215 Conformance checkである。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行基準検査は149 schema、149正常example、192 negative fixture、225 Conformance checkである。
 - 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
 - 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 
@@ -210,7 +210,7 @@ python3 tooling/conformance_tests/run_conformance_skeleton.py
 
 </details>
 
-2026-09-28の現行測定値:
+2026-09-29の現行測定値:
 
 ~~~text
 schema checkが合格: schema 149件、example 149件、negative fixture 192件
@@ -305,9 +305,11 @@ tooling/    schema_check · conformance_tests · broker_parity · ...
 
 ## 📊 現状
 
-### 2026-09-28 の現況
+### 2026-09-29 の現況
 
 D4 Pocket統合rev2は、C33のWindows最大到達点とGUI Shell構成Manifest／Preview／編集提案の開発検証まで実装・検証済みである。Rust Broker、共有Flutter、Desktop Flutter、Mobile Flutter、Evidence assertion、C27性能smoke、C28短時間運用smoke、C29障害注入smoke、C30回帰matrix、C33のrelease buildおよびBroker smokeは開発環境でPASSしている。GUI Shell構成はManifest-only、Previewは読み取り専用、編集提案は審査待ちである。Windows書出しはOwner確認後に独立Manifest JSON fileをBroker固定保存先へ生成し、hash付きReceipt／Auditを返す段階まで成立したが、実行可能App package、独立Runtime、binary pruning、Installerや配布は未成立である。C28の8時間実測、Windows installed productの総合証拠、外部Runtime／Agent／MCP／A2A、実端末、正式署名、owner GOは未成立であり、PASSを製品releaseへ昇格させない。
+
+2026-09-29、最新main `c770680e1868675d710657a11f300f9b38197578`に対する手動Windows Actions #13で、Rust全target checkと12 test target／389件が成功した。これはhosted Windows上の指定commitに対する検査であり、installed product、実Agent隔離、ローカルApplication Control、release readinessを証明しない。
 
 現行基準検査数と実行日時点の証拠は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) を参照する。Agent Adapterの対話開始ではWorkspace IDを必須とし、Rust Brokerが同一Runtimeの登録Workspaceとの対応を監査してDesktopへ投影する。Desktop共有対話画面はBrokerの登録一覧から対象RuntimeのWorkspace IDを明示選択して通常要求へ渡す。Agent Task要求Schema、別Owner Approval、Workspace Permission、実行前の原子的再検証・一回消費、Brokerのbounded Task状態／取消経路は接続済みである。ただしCodex Adapterはread-onlyのままTask実行非対応であり、実Agent起動、OS process-treeの終了保証、隔離Workspace書込み、結果本文／diff表示、実Agent比較、Handoffは未成立である。対話ApprovalはWorkspace書込みPermissionやTask専用Approvalではない。C30のAgent probeもPATH上のCodex CLI version/help interfaceだけを観測し、実task、credential、workspace書込を証明しない。GUI Shell構成のCapability requirementはPermissionを生成せず、Previewもrollback実行可能性を生成しない。編集提案は`proposal_only`であり、自動applyや自己承認を行わない。Manifest fileのApp ID／Audit store IDは将来用の新規識別子であり、実packageや物理storeではない。Developer専用のFlutter画面選択Windows Release buildは独立製品、Owner権限、binary除去完了の証拠ではない。独立製品Export、pruning、Installer、署名、Distribution、実起動は未成立である。詳細な証拠範囲と残存分類は [docs/REV2_PROGRESS.md](docs/REV2_PROGRESS.md) と [総合機能拡張rev1の進捗](docs/総合機能拡張_rev1/進捗.md)を正本とする。
 
@@ -334,7 +336,7 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 誇張せずに述べた現在の事実:
 
 - ✅ **Phase A/B は owner-use の範囲で完了している。** owner は desktop shell を日常の local operation に使え、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。
-- ✅ development slice として **schema + conformance が通過**している（138 schema、138正常example、170 negative fixture、217 check）。Windows書出しはOwner確認後にManifest JSON fileを新規生成するが、実行可能App、独立Runtime、binary pruning、Installer、配布は成立していない。
+- ✅ development slice として **schema + conformance が通過**している（149 schema、149正常example、192 negative fixture、225 check）。Windows書出しはOwner確認後にManifest JSON fileを新規生成するが、実行可能App、独立Runtime、binary pruning、Installer、配布は成立していない。
 - 🧪 C33ではWindows release buildと、clean isolated runにおけるRust Broker smoke（認証IPC、永続store、replay拒否、再起動後health、crash fail-closed）がPASSした。ただしinstalled productの総合evidence validatorは、UI Automation surface不足、Setup Doctorのinstalled path不一致、外部Audit anchorが未取得のため失敗しており、Windows正式証拠は成立していない。
 - ✅ **LLM が読む基盤は definition-locked** であり、範囲を限定した Reference Extension が一つ、cross-agent reproduction report が一つある。
 - ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。

@@ -5,11 +5,13 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
-## 現行C0 validation baseline（2026-09-28）
+## 現行C0 validation baseline（2026-09-29）
 
-最新ローカル再検査はSchema 149件、正常example 149件、negative fixture 192件、Conformance 225件で合格した。変更前のclean `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c`ではMANIFESTのhash不一致25件と必須source file欠落2件を検出したため、MANIFESTを正規toolで1103件再生成し、manifest checkとrelease gateを合格させた。Evidence bundleもdevelopment evidenceとして合格し、release blocker 5件、`release_ready=false`を維持する。development evidenceをrelease readinessへ昇格しない。個別commandと失敗履歴は`VALIDATION.txt`に記録する。
+2026-09-29、`main` commit `c770680e1868675d710657a11f300f9b38197578`を基点とする作業ツリーで、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`がexit 0となり、厳格日本語監査、Schema 149件／正常example 149件／negative fixture 192件、Conformance 225件を含む登録済み10検査が合格した。Evidence bundleはdevelopment evidenceとして合格し、release blocker 5件と`release_ready=false`を維持する。同commitへのWindows Actions #13ではRust全target check／testも成功したが、hosted Windows上のRust検査に限る。いずれの結果もrelease readinessへ昇格しない。個別commandと失敗履歴は`VALIDATION.txt`に記録する。
 
-## Windows Rust手動補助検証（2026-09-28）
+履歴: 2026-09-28の基準更新では、変更前のclean `main` `31df760ae5085bf5ddc18c4f3eceb375cbae4f6c`にMANIFESTのhash不一致25件と必須source file欠落2件があったため、正規toolで1103件を再生成し、manifest checkとrelease gateを合格させた。この記録は当時の観測であり、現行`main`の状態を示すものではない。
+
+## Windows Rust手動補助検証（2026-09-29追補）
 
 Windows runnerでRustのbuild／test／検査が必要な作業では、`.github/workflows/windows-manual-rust-validation.yml`をownerが`workflow_dispatch`で起動できる。ローカルWindowsのApplication ControlがCargo生成executableをOS error 4551で拒否する場合も、端末保護を変更せず検証を継続する。選択ref上のRust 1.95.0に対して変更Rust fileの整形、Rust全targetのcheck／test、試験後作業treeのcleanを検査する。自動trigger、書込権限、artifact uploadは設けない。この結果はRunner上の対象commitに対するRust検査だけを示し、installed製品挙動、ローカルWindowsでの実行可否、release readinessを証明しない。現在sourceのRust結果は`docs/REV2_PROGRESS.md`と`release_blockers.registry.json`に対象commitと結合して記録し、未成功の全target試験を成功に読み替えない。
 
@@ -17,7 +19,9 @@ Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`�
 
 前回の手動run [Windows Rust manual validation #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)は一時branch `codex/japanese-diagnostic`のcommit `84d402a930af48a6d29ce5075ba8692b02bddfd4`に対する検査履歴として保持する。Windows Server 2025／Rust 1.95.0、全target check／testと試験後clean確認が成功（12 target、389 passed）。
 
-最新の手動run [Windows Rust manual validation #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263)は一時branch `codex/task-profile-boundary`のcommit `3bcec331f66ae9664ab8a86e6efe8558649f0e8a`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査し、checkout SHA照合、変更Rust fileを含むrustfmt、全target check／test、試験後clean確認が成功した（12 target、389 passed／0 failed／0 ignored）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはhosted Windows Rust検査の補助証拠だけであり、installed product、実Agent Task、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
+前回の手動run [Windows Rust manual validation #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263)は一時branch `codex/task-profile-boundary`のcommit `3bcec331f66ae9664ab8a86e6efe8558649f0e8a`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査し、checkout SHA照合、変更Rust fileを含むrustfmt、全target check／test、試験後clean確認が成功した（12 target、389 passed／0 failed／0 ignored）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。この過去記録は当該commitの証拠として保持する。
+
+最新の手動run [Windows Rust manual validation #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)は`main`のcommit `c770680e1868675d710657a11f300f9b38197578`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査し、checkout SHA照合、rustfmt、`cargo check --all-targets`、全target test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認が成功した。これによりWindows Rust全target試験の実行gateは現行mainに対して解消した。これはhosted Windows Rust検査の補助証拠だけであり、installed product、実Agent Task、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）
 
@@ -76,7 +80,7 @@ Codex sandbox helperへ`d4p-agent-task` profileを明示し、非秘密の合成
 Task runnerとBroker Consumerは接続済みでも、Adapter capability metadataは`task_execution=unsupported`のままであり、Brokerから実Taskを起動できない。permission profileを指定したsandbox helperから`C:\Windows\win.ini`を読み取れたため、外部path拒否は未成立である。Workspace内deny globの実効性、Broker crash／電源断後のscratch回収、実Agent隔離書込、失敗／取消／期限の実runtime証拠、結果／diffの`Content Exposure`表示は未成立の`release_blocker`。有料資格によるModel実行は行っていない。Windows Job Objectはprocess群停止でありfilesystem sandboxではない。
 
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1`：対象のRust単体試験1件が成功。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`成功。最新の`--all-targets`実行はRustライブラリ試験313件、`CLI`試験9件、`Broker IPC`試験10件の後、`canonical_decimal_hash`の結合試験実行ファイルがWindowsの`Application Control`にOSエラー4551で起動前に拒否され、終了値1。全対象試験成功とは記録しない。
-- その後、現行source commit `f4bf6b0e65e751da8b662595f2e9865970c6f460`を非OneDriveの短いmanaged worktreeから`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`で再検証したが、`io-lifetimes` build scriptがOS error 4551で起動前に拒否された。さらに`--target-dir C:\\D4Pocket\\codex-f4-target`を指定した同全target試験でも`generic-array`／`io-extras` build scriptが同errorで拒否された。どちらもtest executableまで到達せず、Cargo出力先の変更では解消しない。Application Control変更・test除外・拒否file移動は行わず、`windows_rust_integration_test_execution_policy`を未解決へ戻す。
+- その時点では、現行source commit `f4bf6b0e65e751da8b662595f2e9865970c6f460`を非OneDriveの短いmanaged worktreeから`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`で再検証したが、`io-lifetimes` build scriptがOS error 4551で起動前に拒否された。さらに`--target-dir C:\\D4Pocket\\codex-f4-target`を指定した同全target試験でも`generic-array`／`io-extras` build scriptが同errorで拒否された。どちらもtest executableまで到達せず、Cargo出力先の変更では解消しなかった。Application Control変更・test除外・拒否file移動は行わず、その時点で`windows_rust_integration_test_execution_policy`を未解決へ戻した。この判断は後続の現行mainに対するrun #13で更新された。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。strict日本語監査、Schema 144／144／178、Conformance 224、Manifest、release gate、packaging portability、release smoke等10検査が合格。development validatorの結果は`release_ready=false`、`release_blocker` 31件であり、正式releaseを意味しない。
 - 詳細な実装範囲・検証・証拠限界は`docs/REV2_PROGRESS.md`の本節、契約は`docs/specs/agent-runtime.md`および`docs/specs/process-supervision.md`を参照する。
 

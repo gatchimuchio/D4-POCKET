@@ -2630,4 +2630,17 @@ Mobileの画面・Android／iOS表示名とWindows実行fileの製品表示を`D
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --target-dir C:\D4Pocket\codex-f4-target --all-targets -- --test-threads=1`：exit 1。`generic-array`／`io-extras` build scriptがOS error 4551で起動拒否され、全target未完了。
 - 2つの失敗したCargo生成物だけを、それぞれ`cargo clean`で削除した。既存の`C:\D4Pocket` checkout内容、Windows Application Control設定、拒否された実行fileは変更していない。
 
-過去のsource commit `2da5fd370382f2fe5acc032b8f26ac25880048ee`に対する全target 348件成功記録は履歴として維持し、現行sourceへ転用しない。最新sourceの全target検証が完遂していないため、`windows_rust_integration_test_execution_policy`を`release_blocker`／unresolvedへ戻し、registryとRelease Checklistを同期する。これは開発停止を意味せず、Rust全target試験実行環境を必要とする検証上の阻害である。`task_execution=unsupported`と`release_ready=false`を維持する。
+過去のsource commit `2da5fd370382f2fe5acc032b8f26ac25880048ee`に対する全target 348件成功記録は履歴として維持し、現行sourceへ転用しない。当時の最新sourceでは全target検証が完遂していなかったため、`windows_rust_integration_test_execution_policy`を`release_blocker`／unresolvedへ戻し、registryとRelease Checklistを同期した。これは開発停止ではなく、その時点のRust全target試験実行上の阻害だった。後続の現行mainに対する手動Windows Actions run #13は、後段の記録に示す。`task_execution=unsupported`と`release_ready=false`を維持する。
+
+## 現行mainのWindows Rust手動検証 #13（2026-09-29）
+
+現在の`main` commit `c770680e1868675d710657a11f300f9b38197578`を、workflow_dispatch限定のWindows Rust検証へ投入した。checkout SHA照合、Rust 1.95.0、変更Rust fileのrustfmt、全target `cargo check`／`cargo test`、試験後clean確認がすべて成功した。
+
+- 実行記録: [Windows Rust手動検証 #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)。対象は`main`のcommit `c770680e1868675d710657a11f300f9b38197578`。
+- 実行環境: `Windows Server 2025`上の`win25-vs2026/20260922.246.2`、`Rust 1.95.0`。試験用の`TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：12個の試験対象で389件が成功し、失敗・無視はいずれも0件。
+- `rustfmt --check`：workflowで指定されたRust fileの整形検査が成功。試験後の作業ツリーに変更はなく、生成物なし。
+- ローカルWindows Application ControlのOS error 4551は修正・緩和していない。今回のhosted検査は現行mainのRust全target実行gateを解消するが、ローカルhost上でのCargo生成file実行、実Agent Task、filesystem隔離、installed product、production runtime、release readinessを証明しない。
+
+この新しい結果で`windows_rust_integration_test_execution_policy`はresolved／inactiveとする。前回のローカル失敗記録は当時の観測として保持する。`comprehensive_extension_rev1_completion`は、実Agentの秘密file拒否・Workspace隔離・process後始末等が未成立のため引き続きunresolved／`release_blocker`であり、`task_execution=unsupported`、`release_ready=false`を維持する。
