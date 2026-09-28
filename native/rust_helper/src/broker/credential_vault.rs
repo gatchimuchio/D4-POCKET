@@ -3,6 +3,7 @@
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
 //! MCP以外への注入、更新、失効、削除、接続先変更は未接続に保つ。
 #![cfg(windows)]
+#![allow(non_snake_case)]
 
 use super::*;
 use crate::broker::protocol::{canonical_payload_hash, EVIDENCE_SOURCE_INTERNAL_STATE};
@@ -825,10 +826,11 @@ mod tests {
             "another-mcp-server",
             &canonical_payload_hash(None),
         );
-        assert_eq!(
-            wrong_target.expect_err("別Serverへの再利用を拒否").error.unwrap().code,
-            "credential_not_available"
-        );
+        let wrong_target_code = match wrong_target {
+            Err(response) => response.error.expect("拒否応答のerror").code,
+            Ok(_) => panic!("別ServerへのCredential再利用を拒否する"),
+        };
+        assert_eq!(wrong_target_code, "credential_not_available");
 
         let secret = broker
             .資格情報MCP使用処理(
