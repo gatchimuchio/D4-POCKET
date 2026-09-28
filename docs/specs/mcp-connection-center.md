@@ -44,9 +44,9 @@ OwnerがDesktop上でTool入力を確認
 
 `MCP接続一覧`は通常IPCの読み取り専用経路であり、owner channelからは拒否する。接続開始、受信、受理、一覧返却には永続Auditを要求する。child processは環境変数をallowlistへ制限し、stderrを取り込まず、response timeout、line上限、終了状態をfail-closedで扱う。stdoutの各行は改行到着前から256 KiBを上限として逐次読取り、超過時は残りを無制限に蓄積せず接続を失敗させる。
 
-Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対実行file、Windows絶対workspace、1行1項目のstdio引数を受け取る接続設定面を持つ。Flutterはpath、process、Credentialへ直接アクセスせず、Credential入力欄も持たない。接続要求には`Credential ref`の固定missing値だけを含め、Credential実値やAuthority fieldを送らない。引数へ秘密値を入力しないよう画面に警告する。
+Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対実行file、Windows絶対workspace、1行1項目のstdio引数を受け取る接続設定面を持つ。Flutterはpath、process、Credential保管fileへ直接アクセスせず、秘密値の入力欄・取得API・snapshot保持を持たない。通常IPCのCredential metadata一覧から用途と対象Serverが一致する有効Credential IDだけを選択し、子processへ渡す環境変数名を指定できる。接続要求の`Credential ref`はID、用途、対象、required、status、環境変数名だけを含み、実値やAuthority fieldを送らない。引数へ秘密値を入力しないよう画面に警告する。
 
-接続要求は既存Windows Rust起動器のBroker channelから厳密に検査され、default Noのnative Owner確認を通る。確認はServer ID、実行file、workspace、引数件数・hash、request payload hashを示すが、引数本文は秘密値を含み得るため表示しない。操作者はnative確認前のDesktop入力を確認する。未知field、非絶対path、制御文字、上限外入力、Credential refの不一致・required・missing以外の状態はnative確認候補またはBrokerで拒否する。OwnerのYes後もBrokerが要求を再検証し、既存Windows Job Object下でprocess群を起動してMCP discoveryを行い、監査確定後にmetadata-only receiptを返す。通常IPCとnative Owner確認を通らないplatform経路では接続しない。
+接続要求は既存Windows Rust起動器のBroker channelから厳密に検査され、default Noのnative Owner確認を通る。確認はServer ID、実行file、workspace、引数件数・hash、Credential ID、環境変数名、request payload hashを示すが、引数本文とCredential実値は表示しない。Credentialを選択した場合、対象Server processと子孫processが値を読取り・外部送信でき、Windows Job Objectはsandboxではないことを表示する。protocol fallback時に同じ対象へCredentialを渡したchildを再起動する場合も説明する。操作者はnative確認前のDesktop入力とCredentialの対象を確認する。未知field、非絶対path、制御文字、上限外入力、Credential refの不一致・unsupported state・危険な環境変数名はnative確認候補またはBrokerで拒否する。OwnerのYes後もBrokerが要求を再検証し、登録Audit／対象／用途／状態／ProtectedStore hashを照合してDPAPIから秘密値を読み、指定された環境変数だけを既存Windows Job Object監督下のstdio childへ渡してMCP discoveryを行う。Credential使用と接続を別々にAudit確定し、metadata-only receipt後も実値を返さない。通常IPCとnative Owner確認を通らないplatform経路では接続しない。
 
 一覧更新は利用者の明示操作で行い、Server ID、表示名、stdio種別、Tool／Resource／Prompt件数だけを表示する。Tool欄は展開操作でTool名、Tool ID、入力Schema hashを表示できる。Resource欄は名前、Resource ID、URI template hash、Prompt欄は名前、Prompt ID、引数Schema hashだけを表示できる。各IDとhashは外部metadataであり、実行権や信頼を示さない。Tool description／description_summary、入力Schema本文、Resource URI／本文、Prompt description／引数／本文は表示・取得しない。Tool危険度は`unknown`のまま示す。接続先、実行file、起動引数、Credential refは一覧へ表示しない。Tool呼出しは個別の入力確認とWindows native Owner確認が必要で、一覧取得だけでは呼び出さない。Resource／Prompt本文取得要求も送信しない。一覧の外側と格納済み接続projectionは`INTERNAL_STATE`であり、MCP Serverとの現在接続やTrustの保証へ昇格させない。
 
@@ -69,8 +69,9 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 - `Trust ≠ Approval`
 - `Capability diff ≠ Permission grant`
 - `Credential ref ≠ Credential value`
+- `Credential available ≠ Server trusted`
 - Agent metadata、MCP metadata、履歴、Profile、Tool schemaから権限を生成しない。
-- Credential実値の注入、AgentへのTool結果引渡し、Resource／Prompt実取得、Streamable HTTP、OAuth、Tool出力redaction／full content approvalは未接続である。
+- Windows stdioを除くCredential実値の注入、AgentへのTool結果引渡し、Resource／Prompt実取得、Streamable HTTP、OAuth、Tool出力redaction／full content approvalは未接続である。
 - 非Windowsではprocess群停止を保証する既存監督がないため、`mcp_process_tree_supervision_unsupported`として`MCP切断`をfail-closedで拒否する。WindowsのJob Object試験を他OSのprocess群停止証拠へ流用しない。
 - Windowsのfake MCP stdio child／descendant process fixtureはJob Objectによる起動・停止だけを検証する。外部MCP Serverの適合やinstalled product経路の証拠ではない。Windows以外のprocess群監督は別途検証を要する。
 - `server/discover`またはlegacy `initialize`の応答は、Serverが信頼済みまたは承認済みであることを証明しない。
@@ -79,4 +80,4 @@ WindowsではMCP stdio Serverも既存のRust process群監督経路から起動
 
 未知Server、応答id不一致、malformed JSON-RPC、authority／secret field、未処理pagination、応答timeout、child終了、必須Credentialの不足は接続または一覧を拒否する。`mcp_server_unavailable`と`mcp_timeout`を成功へ変換しない。
 
-Agentへ結果を渡すMCP Tool実行経路、Credential実値注入、Tool結果のContent Exposure、外部MCP実物Test Harness、非Windows process群監督が未成立であることは`release_blocker`である。操作者向けの一回限りWindows呼出しreceiptだけで、Agent統合、外部MCP全体、D4 Pocket全体または正式releaseの完成を主張しない。
+Agentへ結果を渡すMCP Tool実行経路、Windows stdio以外のCredential実値注入、Tool結果のContent Exposure、外部MCP実物Test Harness、非Windows process群監督、installed product上のOwner Credential利用証拠が未成立であることは`release_blocker`である。操作者向けの一回限りWindows呼出しreceiptとstdio Credential injectionだけで、Agent統合、外部MCP全体、D4 Pocket全体または正式releaseの完成を主張しない。

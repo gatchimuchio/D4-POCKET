@@ -19,7 +19,7 @@ UI code が所有すべきでない操作の native helper 境界。
 - `src/broker/audit.rs`: accepted、rejected、suspended request 用の broker 局所追記専用 audit hash chain。各 event hash に request `payload_hash` を含める。
 - `src/broker/store.rs`: `broker-server` mode で使う audit hash-chain、HMAC audit anchor、圧縮 replay nonce state、session state の永続 file store。
 - `src/broker/authority.rs`: Rust 権限評価、正規化/quarantine、approval 編集、内容射影、audit-chain 検証、command 適格性評価。
-- `src/broker/credential_vault.rs`: C7 owner資格情報登録と通常IPCのmetadata一覧。秘密値はWindows DPAPIへ保管し、Runtime／Tool／MCP／A2Aへの注入経路は未接続。
+- `src/broker/credential_vault.rs`: C7 owner資格情報登録と通常IPCのmetadata一覧。秘密値はWindows DPAPIへ保管し、C9のnative Owner確認後に対象が一致するWindows MCP stdio childへだけ環境変数として渡す。Runtime／一般Tool／Agent／A2Aへの注入は未接続。
 
 Rust helper は、明示的な IPC または FFI 境界を通じて呼び出せる状態を保つ。
 
@@ -72,6 +72,6 @@ Codexの応答はJSONLの `thread.started`、`item.completed` の `agent_message
 
 ### C7 資格情報保管庫のowner登録
 
-`資格情報登録`はowner資格fileからだけ実行し、`specs/credential_registration.schema.json`に従うJSON fileを受け取る。Brokerは秘密値を`ProtectedStore::Purpose::Credential`へWindows DPAPI保管し、CLIには`credential_receipt.schema.json`のmetadata_only receiptだけを表示する。通常IPCの`資格情報一覧`は保管fileのhash照合後にmetadataだけを返し、秘密値、owner資格、Permission、Approval、Authorityを返さない。資格情報の取得・Runtime／Tool／MCP／A2A注入、更新、失効、削除、接続先変更、Recovery、GUI管理面は未接続である。
+`資格情報登録`はowner資格fileからだけ実行し、`specs/credential_registration.schema.json`に従うJSON fileを受け取る。Brokerは秘密値を`ProtectedStore::Purpose::Credential`へWindows DPAPI保管し、CLIには`credential_receipt.schema.json`のmetadata_only receiptだけを表示する。通常IPCの`資格情報一覧`は保管fileのhash照合後にmetadataだけを返し、秘密値、owner資格、Permission、Approval、Authorityを返さない。Windows MCP stdio childへの注入だけは、対象Server一致のCredential metadata選択とnative Owner確認後、Brokerが用途・対象・保管hashを再検証して接続中processへ環境変数として限定注入し、値を通常応答やAuditへ投影せず使用Auditを記録する。Credentialを受け取るServer processは値を読み取り・外部送信でき、Job Objectはsandboxではない。MCP以外への取得・Runtime／一般Tool／Agent／A2A注入、更新、失効、削除、接続先変更、Recovery、GUI管理面は未接続である。
 
 開発検証は `cargo test --manifest-path native/rust_helper/Cargo.toml`。実物参照版との統合は `python tooling/minidora_live_check.py --reference <MINIDORA参照clone>`。このPythonは試験用process管理であり、製品依存ではない。固定commitとclean状態を検査し、基本会話・保留・失敗分離・資格拒否・監査chain再読取を実行する。外部検索や基礎Coreの能力を保証する試験ではない。

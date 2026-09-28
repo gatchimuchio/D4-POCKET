@@ -9,6 +9,40 @@ class _McpTransport implements BrokerTransport {
   final operations = <String>[];
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
+  final credentialMetadata = <Map<String, Object?>>[
+    {
+      '版': 1,
+      '資格情報ID': '0123456789abcdef0123456789abcdef',
+      '用途': 'mcp_transport',
+      '接続対象': 'mcp-fixture',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1000,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+      '作成監査ID': 'audit-credential-created',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+    {
+      '版': 1,
+      '資格情報ID': 'abcdef0123456789abcdef0123456789',
+      '用途': 'mcp_transport',
+      '接続対象': 'other-server',
+      '種類': 'oauth',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1001,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'b').join()}',
+      '作成監査ID': 'audit-credential-other',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+  ];
   String listedEvidence = 'INTERNAL_STATE';
   String executionState = 'ready';
   String displayName = 'fixture server';
@@ -78,6 +112,19 @@ class _McpTransport implements BrokerTransport {
   }) async {
     operations.add(operation);
     payloads.add(payload);
+    if (operation == '資格情報一覧') {
+      return {
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'body': {
+          '版': 1,
+          '資格情報一覧': credentialMetadata,
+          '件数': credentialMetadata.length,
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      };
+    }
     if (operation == 'MCP接続一覧') {
       final connections = connected
           ? [_receipt(evidence: listedEvidence)]
@@ -193,6 +240,38 @@ void main() {
       throwsA(isA<BrokerClientException>()),
     );
     expect(transport.operations, ['MCP接続']);
+  });
+
+  test('MCP clientは対象一致するCredential metadataだけを選択し値を要求しない', () async {
+    final transport = _McpTransport()..connected = false;
+    final client = McpConnectionClient(transport);
+    final credentials = await client.listCredentials(
+      targetServerId: 'mcp-fixture',
+    );
+    expect(credentials.map((entry) => entry.credentialId), [
+      '0123456789abcdef0123456789abcdef',
+    ]);
+    expect(transport.operations, ['資格情報一覧']);
+    expect(transport.payloads.single, {'版': 1});
+
+    await client.connect(
+      serverId: 'mcp-fixture',
+      executable: r'C:\Program Files\D4 Pocket\mcp-fixture.exe',
+      workspace: r'C:\Users\Public\D4PocketWorkspace',
+      argumentsText: '',
+      credentialId: credentials.single.credentialId,
+      credentialEnvironmentVariable: 'MCP_API_KEY',
+    );
+    final reference = transport.payloads.last!['Credential ref']! as Map;
+    expect(reference, {
+      'credential_id': '0123456789abcdef0123456789abcdef',
+      'purpose': 'mcp_transport',
+      'target': 'mcp-fixture',
+      'required': true,
+      'status': 'configured',
+      'environment_variable': 'MCP_API_KEY',
+    });
+    expect(transport.payloads.toString(), isNot(contains('secret-marker')));
   });
 
   test('MCP clientは内部状態一覧だけを限定metadataへ射影する', () async {
@@ -410,5 +489,83 @@ void main() {
     });
     expect(find.text('fixture server'), findsOneWidget);
     expect(find.textContaining('secret-marker'), findsNothing);
+  });
+
+  testWidgets('Desktop panelは対象Credential metadataと環境変数名だけを接続要求へ送る',
+      (tester) async {
+    final transport = _McpTransport()..connected = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: McpConnectionCenterPanel(transport: transport),
+      ),
+    ));
+
+    await tester.enterText(find.byType(TextField).at(0), 'mcp-fixture');
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      r'C:\Program Files\D4 Pocket\mcp-fixture.exe',
+    );
+    await tester.enterText(
+      find.byType(TextField).at(2),
+      r'C:\Users\Public\D4PocketWorkspace',
+    );
+    await tester.tap(find.text('対象ServerのCredential metadata一覧を取得'));
+    await tester.pumpAndSettle();
+
+    final dropdown = find.byKey(const ValueKey('mcp-credential-selection'));
+    await tester.ensureVisible(dropdown);
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.textContaining('0123456789abcdef0123456789abcdef').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('mcp-credential-environment-variable')),
+      'MCP_API_KEY',
+    );
+    await tester.tap(find.text('MCP接続を開始'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['資格情報一覧', 'MCP接続']);
+    expect(transport.payloads.last!['Credential ref'], {
+      'credential_id': '0123456789abcdef0123456789abcdef',
+      'purpose': 'mcp_transport',
+      'target': 'mcp-fixture',
+      'required': true,
+      'status': 'configured',
+      'environment_variable': 'MCP_API_KEY',
+    });
+    expect(transport.payloads.toString(), isNot(contains('secret-marker')));
+    expect(find.textContaining('synthetic'), findsNothing);
+  });
+
+  testWidgets('Desktop panelはServer ID変更後に旧対象Credentialを再利用しない',
+      (tester) async {
+    final transport = _McpTransport()..connected = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: McpConnectionCenterPanel(transport: transport),
+      ),
+    ));
+
+    await tester.enterText(find.byType(TextField).at(0), 'mcp-fixture');
+    await tester.tap(find.text('対象ServerのCredential metadata一覧を取得'));
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const ValueKey('mcp-credential-selection')), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), 'other-server');
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const ValueKey('mcp-credential-selection')), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('mcp-credential-environment-variable')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(transport.operations, ['資格情報一覧']);
   });
 }

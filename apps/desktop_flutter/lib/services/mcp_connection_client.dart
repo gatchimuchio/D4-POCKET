@@ -39,6 +39,20 @@ class McpPromptSummary {
   final String argumentSchemaHash;
 }
 
+class McpCredentialSummary {
+  const McpCredentialSummary({
+    required this.credentialId,
+    required this.purpose,
+    required this.target,
+    required this.kind,
+  });
+
+  final String credentialId;
+  final String purpose;
+  final String target;
+  final String kind;
+}
+
 class McpConnectionSummary {
   const McpConnectionSummary({
     required this.serverId,
@@ -99,11 +113,18 @@ class McpConnectionClient {
     required String executable,
     required String workspace,
     required String argumentsText,
+    String? credentialId,
+    String? credentialEnvironmentVariable,
   }) async {
     final arguments = _arguments(argumentsText);
     if (!_validIdentifier(serverId) ||
         !_validWindowsPath(executable) ||
-        !_validWindowsPath(workspace)) {
+        !_validWindowsPath(workspace) ||
+        (credentialId == null) != (credentialEnvironmentVariable == null) ||
+        (credentialId != null &&
+            (!_validCredentialId(credentialId) ||
+                !_safeCredentialEnvironmentVariable(
+                    credentialEnvironmentVariable!)))) {
       throw const BrokerClientException('MCP接続設定の識別子または絶対pathが不正です');
     }
     final payload = <String, Object?>{
@@ -114,13 +135,22 @@ class McpConnectionClient {
       '引数': arguments,
       'workspace': workspace,
       'Transport': 'stdio',
-      'Credential ref': {
-        'credential_id': '00000000000000000000000000000000',
-        'purpose': 'mcp_transport',
-        'target': serverId,
-        'required': false,
-        'status': 'missing',
-      },
+      'Credential ref': credentialId == null
+          ? {
+              'credential_id': '00000000000000000000000000000000',
+              'purpose': 'mcp_transport',
+              'target': serverId,
+              'required': false,
+              'status': 'missing',
+            }
+          : {
+              'credential_id': credentialId,
+              'purpose': 'mcp_transport',
+              'target': serverId,
+              'required': true,
+              'status': 'configured',
+              'environment_variable': credentialEnvironmentVariable,
+            },
     };
     final response = await _transport.request('MCP接続', payload: payload);
     final body = _acceptedBody(response, 'MCP接続');
@@ -132,6 +162,99 @@ class McpConnectionClient {
       throw const BrokerClientException('MCP接続receiptが要求対象と一致しません');
     }
     return connection;
+  }
+
+  Future<List<McpCredentialSummary>> listCredentials({
+    required String targetServerId,
+  }) async {
+    if (!_validIdentifier(targetServerId)) {
+      throw const BrokerClientException('MCP Server識別子の形式が不正です');
+    }
+    final response = await _transport.request(
+      '資格情報一覧',
+      payload: const {'版': 1},
+    );
+    final body = _acceptedBody(response, '資格情報一覧');
+    const bodyFields = {'版', '資格情報一覧', '件数', '公開範囲', '証拠種別'};
+    if (body.length != bodyFields.length ||
+        !body.keys.toSet().containsAll(bodyFields) ||
+        body['版'] != 1 ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('資格情報一覧の公開境界が不正です');
+    }
+    final rawEntries = body['資格情報一覧'];
+    if (rawEntries is! List ||
+        rawEntries.length > 256 ||
+        body['件数'] != rawEntries.length) {
+      throw const BrokerClientException('資格情報一覧の件数が不正です');
+    }
+    final entries = rawEntries.map((raw) {
+      if (raw is! Map || raw.keys.any((key) => key is! String)) {
+        throw const BrokerClientException('資格情報metadataがobjectではありません');
+      }
+      final entry = raw.cast<String, Object?>();
+      const fields = {
+        '版',
+        '資格情報ID',
+        '用途',
+        '接続対象',
+        '種類',
+        '保管方式',
+        '状態',
+        '作成時刻UnixMillis',
+        '最終使用時刻UnixMillis',
+        '失効時刻UnixMillis',
+        '暗号文hash',
+        '作成監査ID',
+        '公開範囲',
+        '証拠種別',
+      };
+      final id = entry['資格情報ID'];
+      final purpose = entry['用途'];
+      final target = entry['接続対象'];
+      final kind = entry['種類'];
+      if (entry.length != fields.length ||
+          !entry.keys.toSet().containsAll(fields) ||
+          entry['版'] != 1 ||
+          id is! String ||
+          !_validCredentialId(id) ||
+          purpose is! String ||
+          purpose.isEmpty ||
+          purpose.length > 256 ||
+          _containsControl(purpose) ||
+          target is! String ||
+          target.isEmpty ||
+          target.length > 256 ||
+          _containsControl(target) ||
+          kind is! String ||
+          !const {'api_key', 'oauth', 'basic', 'ssh', 'custom'}
+              .contains(kind) ||
+          entry['保管方式'] != 'windows_dpapi' ||
+          entry['状態'] != '有効' ||
+          entry['作成時刻UnixMillis'] is! int ||
+          (entry['最終使用時刻UnixMillis'] != null &&
+              entry['最終使用時刻UnixMillis'] is! int) ||
+          entry['失効時刻UnixMillis'] != null ||
+          entry['暗号文hash'] is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$')
+              .hasMatch(entry['暗号文hash'] as String) ||
+          entry['作成監査ID'] is! String ||
+          (entry['作成監査ID'] as String).isEmpty ||
+          entry['公開範囲'] != 'metadata_only' ||
+          entry['証拠種別'] != 'INTERNAL_STATE') {
+        throw const BrokerClientException('資格情報metadataのfieldまたは境界が不正です');
+      }
+      return McpCredentialSummary(
+        credentialId: id,
+        purpose: purpose,
+        target: target,
+        kind: kind,
+      );
+    }).where((entry) =>
+        entry.purpose == 'mcp_transport' && entry.target == targetServerId);
+    return List.unmodifiable(entries);
   }
 
   Future<List<McpConnectionSummary>> list() async {
@@ -555,6 +678,33 @@ class McpConnectionClient {
       value.isNotEmpty &&
       utf8.encode(value).length <= 128 &&
       !_containsControl(value);
+
+  bool _validCredentialId(String value) =>
+      RegExp(r'^[a-f0-9]{32}$').hasMatch(value);
+
+  bool _safeCredentialEnvironmentVariable(String value) {
+    if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_]{0,127}$').hasMatch(value)) {
+      return false;
+    }
+    final normalized = value.toUpperCase();
+    return !{
+          'PATH',
+          'SYSTEMROOT',
+          'WINDIR',
+          'TEMP',
+          'TMP',
+          'USERPROFILE',
+          'HOME',
+          'APPDATA',
+          'LOCALAPPDATA',
+          'PROGRAMDATA',
+          'SYSTEMDRIVE',
+          'COMSPEC',
+          'PATHEXT',
+          'PSMODULEPATH',
+        }.contains(normalized) &&
+        !normalized.startsWith('GUI_SHELL_');
+  }
 
   bool _validWindowsPath(String value) =>
       value.isNotEmpty &&

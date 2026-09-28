@@ -1,7 +1,7 @@
-//! C7 資格情報保管庫のowner登録と安全な公開metadata一覧。
+//! C7 資格情報保管庫のowner登録、metadata一覧、統治済みMCP利用。
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
-//! 実行系注入、更新、失効、削除、接続先変更は別の統治操作として未接続に保つ。
+//! MCP以外への注入、更新、失効、削除、接続先変更は未接続に保つ。
 #![cfg(windows)]
 
 use super::*;
@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 
 const VERSION: u64 = 1;
 const RECORD_PREFIX: &str = "資格情報記録:";
+const MCP_USE_PREFIX: &str = "MCP資格情報使用:";
 const MAX_TEXT_BYTES: usize = 256;
 const MAX_SECRET_BYTES: usize = 65_536;
 
@@ -82,7 +83,168 @@ struct StoredCredential {
     public: PublicCredential,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct McpCredentialUseRecord {
+    version: u64,
+    credential_id: String,
+    purpose: String,
+    target: String,
+    environment_variable: String,
+    used_at: i64,
+}
+
 impl Broker {
+    pub(super) fn 資格情報MCP使用処理(
+        &mut self,
+        request_id: &str,
+        credential_id: &str,
+        target: &str,
+        payload_hash: &str,
+    ) -> Result<gui_shell_windows_protection::Secret, BrokerResponse> {
+        const OPERATION: &str = "MCP Credential使用";
+        if !self.state_store.persistence_ready() {
+            return Err(self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "broker_persistence_unavailable",
+                "MCP Credential使用には永続Auditが必要",
+                true,
+                payload_hash,
+            ));
+        }
+        if !hex_identifier(credential_id) || !safe_text(target, MAX_TEXT_BYTES) {
+            return Err(self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_reference_invalid",
+                "MCP Credential参照の識別または対象が不正",
+                true,
+                payload_hash,
+            ));
+        }
+        let entries = match stored_credentials(&self.audit_log) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "資格情報Auditを検証できないため使用を停止しました",
+                    true,
+                    payload_hash,
+                ));
+            }
+        };
+        let Some(entry) = entries.into_iter().find(|entry| {
+            entry.public.credential_id == credential_id
+                && entry.public.purpose == "mcp_transport"
+                && entry.public.target == target
+                && entry.public.status == "有効"
+                && entry.public.revoked_at.is_none()
+        }) else {
+            return Err(self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_not_available",
+                "対象Serverに結び付く有効なMCP Credentialを確認できません",
+                true,
+                payload_hash,
+            ));
+        };
+        if self.protected_store.is_none() {
+            return Err(self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_storage_unregistered",
+                "MCP Credentialの保管先を確認できません",
+                true,
+                payload_hash,
+            ));
+        }
+        if self
+            .append_audit(
+                request_id,
+                OPERATION,
+                "received",
+                &format!(
+                    "MCP stdio childへのCredential使用を要求。資格情報ID={} 対象={}。秘密値は記録しない",
+                    credential_id, target
+                ),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
+            .is_err()
+        {
+            return Err(self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "credential_audit_append_failed",
+                "MCP Credential使用の受信Auditを確定できません",
+            ));
+        }
+        let secret = self
+            .protected_store
+            .as_ref()
+            .expect("ProtectedStore登録確認済み")
+            .read(
+                crate::protected_store::Purpose::Credential,
+                &entry.storage_id,
+                &entry.public.ciphertext_hash,
+            );
+        match secret {
+            Ok(secret) => Ok(secret),
+            Err(_) => Err(self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_storage_unavailable",
+                "MCP Credentialを安全に読み出せません",
+                true,
+                payload_hash,
+            )),
+        }
+    }
+
+    pub(super) fn 資格情報MCP使用確定処理(
+        &mut self,
+        request_id: &str,
+        credential_id: &str,
+        target: &str,
+        environment_variable: &str,
+        payload_hash: &str,
+    ) -> Result<(), ()> {
+        let entries = stored_credentials(&self.audit_log)?;
+        if !entries.iter().any(|entry| {
+            entry.public.credential_id == credential_id
+                && entry.public.purpose == "mcp_transport"
+                && entry.public.target == target
+                && entry.public.status == "有効"
+                && entry.public.revoked_at.is_none()
+        }) || !super::mcp_center::safe_credential_environment_name(environment_variable)
+        {
+            return Err(());
+        }
+        let record = McpCredentialUseRecord {
+            version: VERSION,
+            credential_id: credential_id.to_string(),
+            purpose: "mcp_transport".to_string(),
+            target: target.to_string(),
+            environment_variable: environment_variable.to_string(),
+            used_at: self.current_epoch_millis(),
+        };
+        let encoded = serde_json::to_string(&record).map_err(|_| ())?;
+        self.append_audit(
+            request_id,
+            "MCP Credential使用",
+            "accepted",
+            &format!("{MCP_USE_PREFIX}{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .map(|_| ())
+        .map_err(|_| ())
+    }
+
     pub(super) fn 資格情報登録処理(
         &mut self,
         request_id: &str,
@@ -313,7 +475,7 @@ impl Broker {
                 payload_hash,
             );
         }
-        let entries = match stored_credentials(&self.audit_log) {
+        let mut entries = match stored_credentials(&self.audit_log) {
             Ok(value) => value,
             Err(_) => {
                 return self.audit_store_failed_response(
@@ -324,6 +486,22 @@ impl Broker {
                 )
             }
         };
+        let last_use = match credential_last_use(&self.audit_log, &entries) {
+            Ok(value) => value,
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "資格情報使用Auditを検証できないため一覧を停止しました",
+                    true,
+                    payload_hash,
+                );
+            }
+        };
+        for entry in &mut entries {
+            entry.public.last_used_at = last_use.get(&entry.public.credential_id).copied();
+        }
         if self
             .append_audit(
                 request_id,
@@ -470,6 +648,39 @@ fn stored_credentials(log: &BrokerAuditLog) -> Result<Vec<StoredCredential>, ()>
     Ok(by_id.into_values().collect())
 }
 
+fn credential_last_use(
+    log: &BrokerAuditLog,
+    entries: &[StoredCredential],
+) -> Result<BTreeMap<String, i64>, ()> {
+    let mut last_use = BTreeMap::new();
+    for event in log.events() {
+        if event.operation != "MCP Credential使用" || event.decision != "accepted" {
+            continue;
+        }
+        let encoded = event.reason.strip_prefix(MCP_USE_PREFIX).ok_or(())?;
+        let record: McpCredentialUseRecord = serde_json::from_str(encoded).map_err(|_| ())?;
+        if record.version != VERSION
+            || !hex_identifier(&record.credential_id)
+            || record.purpose != "mcp_transport"
+            || !safe_text(&record.target, MAX_TEXT_BYTES)
+            || !super::mcp_center::safe_credential_environment_name(&record.environment_variable)
+            || record.used_at <= 0
+            || !entries.iter().any(|entry| {
+                entry.public.credential_id == record.credential_id
+                    && entry.public.purpose == record.purpose
+                    && entry.public.target == record.target
+            })
+        {
+            return Err(());
+        }
+        last_use
+            .entry(record.credential_id)
+            .and_modify(|used_at: &mut i64| *used_at = (*used_at).max(record.used_at))
+            .or_insert(record.used_at);
+    }
+    Ok(last_use)
+}
+
 fn safe_text(value: &str, max_bytes: usize) -> bool {
     !value.is_empty() && value.as_bytes().len() <= max_bytes && !value.chars().any(char::is_control)
 }
@@ -502,6 +713,21 @@ mod tests {
             "登録者種別": "owner",
             "登録経路": "owner_control",
             "秘密値": "synthetic-secret-not-operational",
+        })
+    }
+
+    fn mcp_fixture_payload(id: &str, target: &str, secret: &str) -> Value {
+        json!({
+            "版": 1,
+            "操作": "追加",
+            "資格情報ID": id,
+            "用途": "mcp_transport",
+            "接続対象": target,
+            "種類": "api_key",
+            "保管方式": "windows_dpapi",
+            "登録者種別": "owner",
+            "登録経路": "owner_control",
+            "秘密値": secret,
         })
     }
 
@@ -575,6 +801,71 @@ mod tests {
         let listed_json = serde_json::to_string(&listed.body).expect("一覧JSON");
         assert!(!listed_json.contains(secret));
         assert_eq!(listed.body.expect("list")["件数"], 1);
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn mcp_credential_use_is_bound_to_registered_target_and_only_audit_metadata_is_projected() {
+        let (mut broker, root) = broker_with_vault("mcp-use");
+        let id = "f".repeat(32);
+        let target = "fixture-mcp-server";
+        let secret_marker = "synthetic-mcp-secret-never-project";
+        let added = call(
+            &mut broker,
+            BrokerOperation::資格情報登録,
+            mcp_fixture_payload(&id, target, secret_marker),
+            true,
+        );
+        assert_eq!(added.status, BrokerStatus::Accepted, "{added:?}");
+
+        let wrong_target = broker.資格情報MCP使用処理(
+            "mcp-use-wrong-target",
+            &id,
+            "another-mcp-server",
+            &canonical_payload_hash(None),
+        );
+        assert_eq!(
+            wrong_target.expect_err("別Serverへの再利用を拒否").error.unwrap().code,
+            "credential_not_available"
+        );
+
+        let secret = broker
+            .資格情報MCP使用処理(
+                "mcp-use-correct-target",
+                &id,
+                target,
+                &canonical_payload_hash(None),
+            )
+            .expect("対象と用途が一致するMCP接続だけが復号");
+        assert_eq!(secret.as_bytes(), secret_marker.as_bytes());
+        broker
+            .資格情報MCP使用確定処理(
+                "mcp-use-correct-target",
+                &id,
+                target,
+                "MCP_API_KEY",
+                &canonical_payload_hash(None),
+            )
+            .expect("成功した注入を監査へ記録");
+        drop(secret);
+
+        let listed = call(
+            &mut broker,
+            BrokerOperation::資格情報一覧,
+            json!({"版": 1}),
+            false,
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        let output = serde_json::to_string(&listed.body).expect("公開metadata");
+        let audit = serde_json::to_string(&broker.audit_events()).expect("Audit");
+        let body = listed.body.expect("資格情報一覧receipt");
+        assert!(!output.contains(secret_marker));
+        assert!(!audit.contains(secret_marker));
+        assert_eq!(body["資格情報一覧"][0]["接続対象"], target);
+        assert!(body["資格情報一覧"][0]["最終使用時刻UnixMillis"]
+            .as_i64()
+            .is_some());
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
     }

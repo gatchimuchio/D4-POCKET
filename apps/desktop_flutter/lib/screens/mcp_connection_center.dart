@@ -21,8 +21,12 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   final _executableController = TextEditingController();
   final _workspaceController = TextEditingController();
   final _argumentsController = TextEditingController();
+  final _credentialEnvironmentController = TextEditingController();
   late final McpConnectionClient? _client;
   List<McpConnectionSummary>? _connections;
+  List<McpCredentialSummary>? _credentials;
+  String? _credentialTargetServerId;
+  String? _selectedCredentialId;
   bool _loading = false;
   bool _connecting = false;
   String? _disconnectingServerId;
@@ -42,6 +46,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     _executableController.dispose();
     _workspaceController.dispose();
     _argumentsController.dispose();
+    _credentialEnvironmentController.dispose();
     super.dispose();
   }
 
@@ -68,9 +73,15 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               'Tool実行はWindows native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
             ),
             const SizedBox(height: 8),
+            const Text(
+              'MCP CredentialはFlutterへ入力しません。登録済みmetadataから対象Server専用のものを選びます。選択すると値を対象Server processへ渡し、そのprocessは読み取り・外部送信できます。Windows Job Objectはsandboxではありません。',
+            ),
+            const SizedBox(height: 8),
             TextField(
               controller: _serverIdController,
+              onChanged: (_) => setState(() {}),
               enabled: !_connecting &&
+                  !_loading &&
                   _disconnectingServerId == null &&
                   _callingToolServerId == null,
               decoration: const InputDecoration(
@@ -111,6 +122,66 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: '起動引数（1行に1項目、最大32項目）',
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const ValueKey('mcp-credential-list'),
+              onPressed: _connecting ||
+                      _loading ||
+                      _disconnectingServerId != null ||
+                      _callingToolServerId != null
+                  ? null
+                  : () => _loadCredentials(client),
+              icon: const Icon(Icons.key_outlined),
+              label: const Text('対象ServerのCredential metadata一覧を取得'),
+            ),
+            if (_credentials != null &&
+                _credentialTargetServerId == _serverIdController.text) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('mcp-credential-selection'),
+                initialValue: _credentials!.any(
+                        (entry) => entry.credentialId == _selectedCredentialId)
+                    ? _selectedCredentialId
+                    : null,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: '対象ServerのCredential（任意）',
+                ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('使用しない'),
+                  ),
+                  for (final credential in _credentials!)
+                    DropdownMenuItem<String>(
+                      value: credential.credentialId,
+                      child: Text(
+                          '${credential.kind} ・ ${credential.credentialId}'),
+                    ),
+                ],
+                onChanged: _connecting || _loading
+                    ? null
+                    : (value) => setState(() {
+                          _selectedCredentialId = value;
+                          if (value == null) {
+                            _credentialEnvironmentController.clear();
+                          }
+                        }),
+              ),
+            ],
+            const SizedBox(height: 8),
+            TextField(
+              key: const ValueKey('mcp-credential-environment-variable'),
+              controller: _credentialEnvironmentController,
+              enabled: _selectedCredentialId != null &&
+                  _credentialTargetServerId == _serverIdController.text &&
+                  !_connecting,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '子processへ渡す環境変数名',
+                helperText: '例: MCP_API_KEY。秘密値ではなく名前だけを指定します。',
               ),
             ),
             const SizedBox(height: 8),
@@ -308,6 +379,42 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
     }
   }
 
+  Future<void> _loadCredentials(McpConnectionClient client) async {
+    final targetServerId = _serverIdController.text;
+    setState(() {
+      _loading = true;
+      _credentials = null;
+      _credentialTargetServerId = null;
+      _selectedCredentialId = null;
+      _credentialEnvironmentController.clear();
+      _message = null;
+    });
+    try {
+      final credentials = await client.listCredentials(
+        targetServerId: targetServerId,
+      );
+      if (mounted) {
+        setState(() {
+          _credentials = credentials;
+          _credentialTargetServerId = targetServerId;
+          _message = credentials.isEmpty
+              ? 'このServer向けに利用可能なCredential metadataはありません。値は読み出していません。'
+              : '${credentials.length}件の対象Credential metadataを取得しました。秘密値は取得していません。';
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _credentials = null;
+          _credentialTargetServerId = null;
+          _message = 'Credential metadataを取得できません。秘密値は要求していません。';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _connect(McpConnectionClient client) async {
     setState(() {
       _connecting = true;
@@ -319,6 +426,19 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         executable: _executableController.text,
         workspace: _workspaceController.text,
         argumentsText: _argumentsController.text,
+        credentialId: _credentialTargetServerId == _serverIdController.text &&
+                _credentials?.any((entry) =>
+                        entry.credentialId == _selectedCredentialId) ==
+                    true
+            ? _selectedCredentialId
+            : null,
+        credentialEnvironmentVariable:
+            _credentialTargetServerId == _serverIdController.text &&
+                    _credentials?.any((entry) =>
+                            entry.credentialId == _selectedCredentialId) ==
+                        true
+                ? _credentialEnvironmentController.text
+                : null,
       );
       if (!mounted) return;
       setState(() {

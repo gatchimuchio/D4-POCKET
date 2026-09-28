@@ -257,11 +257,11 @@
     },
     {
       "path": "docs/specs/credential-vault.md",
-      "責任": "C7資格情報保管庫のowner登録、Windows DPAPI保管、公開metadata、秘密値非投影、未接続操作の境界"
+      "責任": "C7資格情報保管庫のowner登録、Windows DPAPI保管、公開metadata、C9 Windows MCP stdioへの対象限定利用、秘密値非投影、MCP以外の未接続操作の境界"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diff射影と権限非生成境界"
+      "責任": "C8 MCP外部概念のServer、Tool、Resource、Prompt、Transport、Credential ref、Trust、Capability diff射影、接続時Credential metadataと権限非生成境界"
     },
     {
       "path": "docs/specs/a2a-contract.md",
@@ -345,11 +345,11 @@
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "責任": "C8 MCP metadataの意味射影・Authority非生成とC9 Tool引数Schema検査、native Owner確認、一回Permission、Audit、hash-only結果境界"
+      "責任": "C8 MCP metadataの意味射影・Authority非生成とC9 Windows stdio対象限定Credential利用、Tool引数Schema検査、native Owner確認、一回Permission、Audit、hash-only結果境界"
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Owner Tool実行とhash-only結果、quarantine、Broker接続一覧、切断、timeout・secret・authority拒否"
+      "責任": "C9 MCP stdio discovery、legacy fallback、対象限定Credential利用、metadata catalog、Owner Tool実行とhash-only結果、quarantine、Broker接続一覧、切断、timeout・secret・authority拒否"
     },
     {
       "path": "docs/specs/operation-profile.md",

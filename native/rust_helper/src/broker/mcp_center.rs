@@ -1,8 +1,9 @@
 //! C9 MCP接続センターのBroker経路。
 //!
 //! 現行単位はowner起動設定からstdio Serverを接続し、discoveryとTool/Resource/Prompt
-//! catalogを検証してmetadata-only receiptへ射影する。Tool実行、Credential実値注入、
-//! OAuth、Streamable HTTPはこの単位では接続しない。
+//! catalogを検証してmetadata-only receiptへ射影する。Tool実行とWindows stdio childへの
+//! Credential実値注入は、それぞれのnative Owner確認とBroker統治に限定する。OAuthと
+//! Streamable HTTPはこの単位では接続しない。
 #![allow(non_snake_case)]
 
 use super::protocol::{
@@ -38,6 +39,8 @@ struct CredentialReference {
     target: String,
     required: bool,
     status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    environment_variable: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,14 +183,90 @@ pub(super) fn connect(
         );
     }
 
-    let connection = match McpStdioConnection::connect(
+    let mut credential_environment = Vec::new();
+    if request.credential_ref.status == "configured" {
+        #[cfg(windows)]
+        {
+            let secret = match broker.資格情報MCP使用処理(
+                request_id,
+                &request.credential_ref.credential_id,
+                &request.server_id,
+                payload_hash,
+            ) {
+                Ok(secret) => secret,
+                Err(response) => return response,
+            };
+            let secret_value = match String::from_utf8(secret.as_bytes().to_vec()) {
+                Ok(value) => zeroize::Zeroizing::new(value),
+                Err(error) => {
+                    let _invalid_secret_bytes = zeroize::Zeroizing::new(error.into_bytes());
+                    return broker.reject_with_payload_hash(
+                        request_id,
+                        OP_CONNECT,
+                        "mcp_credential_encoding_invalid",
+                        "保管Credentialの文字encodingが不正",
+                        true,
+                        payload_hash,
+                    );
+                }
+            };
+            credential_environment.push((
+                request
+                    .credential_ref
+                    .environment_variable
+                    .as_deref()
+                    .expect("configured Credentialは環境変数名検証済み")
+                    .to_string(),
+                secret_value,
+            ));
+        }
+        #[cfg(not(windows))]
+        {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_CONNECT,
+                "credential_platform_unsupported",
+                "MCP Credential注入はWindows DPAPI環境だけに対応しています",
+                true,
+                payload_hash,
+            );
+        }
+    }
+
+    let mut connection = match McpStdioConnection::connect_with_environment(
         Path::new(&request.executable),
         &request.arguments,
         Path::new(&request.workspace),
+        &credential_environment,
     ) {
         Ok(connection) => connection,
         Err(error) => return reject_mcp_error(broker, request_id, error, payload_hash),
     };
+    if request.credential_ref.status == "configured" {
+        #[cfg(windows)]
+        if broker
+            .資格情報MCP使用確定処理(
+                request_id,
+                &request.credential_ref.credential_id,
+                &request.server_id,
+                request
+                    .credential_ref
+                    .environment_variable
+                    .as_deref()
+                    .expect("configured Credentialは環境変数名検証済み"),
+                payload_hash,
+            )
+            .is_err()
+        {
+            let _ = connection.terminate();
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_CONNECT,
+                "credential_audit_append_failed",
+                "MCP Credential使用Auditを確定できず、process群を停止しました",
+            );
+        }
+    }
     let endpoint_hash = crate::audit_hash::sha256_tagged(
         format!(
             "{}\n{}\n{}",
@@ -913,13 +992,144 @@ fn parse_request(payload: &Value) -> Result<ConnectionRequest, McpError> {
             "MCP Credential refの識別または対象が不正",
         ));
     }
-    if request.credential_ref.required || request.credential_ref.status != "missing" {
-        return Err(McpError::new(
-            "mcp_credential_unavailable",
-            "現行C9 stdio接続はCredential実値注入を未接続のためmissing参照だけを受理する",
-        ));
+    match request.credential_ref.status.as_str() {
+        "missing" if request.credential_ref.required => {
+            return Err(McpError::new(
+                "mcp_credential_unavailable",
+                "必須MCP Credentialが未構成のためstdio childを起動しない",
+            ));
+        }
+        "missing"
+            if request.credential_ref.environment_variable.is_some()
+                || request.credential_ref.required =>
+        {
+            return Err(McpError::new(
+                "mcp_credential_ref_invalid",
+                "missing Credential refに環境変数名またはrequiredを指定できない",
+            ));
+        }
+        "configured"
+            if !request.credential_ref.required
+                || request
+                    .credential_ref
+                    .environment_variable
+                    .as_deref()
+                    .is_none_or(|name| !safe_credential_environment_name(name)) =>
+        {
+            return Err(McpError::new(
+                "mcp_credential_ref_invalid",
+                "MCP Credential refの状態または子process環境変数名が不正",
+            ));
+        }
+        "missing" | "configured" => {}
+        _ => {
+            return Err(McpError::new(
+                "mcp_credential_ref_invalid",
+                "MCP Credential refの状態が未対応",
+            ));
+        }
     }
     Ok(request)
+}
+
+pub(super) fn safe_credential_environment_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == b'_')
+        || !bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        || name.len() > 128
+    {
+        return false;
+    }
+    let normalized = name.to_ascii_uppercase();
+    !matches!(
+        normalized.as_str(),
+        "PATH"
+            | "SYSTEMROOT"
+            | "WINDIR"
+            | "TEMP"
+            | "TMP"
+            | "USERPROFILE"
+            | "HOME"
+            | "APPDATA"
+            | "LOCALAPPDATA"
+            | "PROGRAMDATA"
+            | "SYSTEMDRIVE"
+            | "COMSPEC"
+            | "PATHEXT"
+            | "PSMODULEPATH"
+    ) && !normalized.starts_with("GUI_SHELL_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(credential_ref: Value) -> Value {
+        json!({
+            "版": 1,
+            "操作": "接続",
+            "ServerID": "fixture-mcp-server",
+            "実行file": std::env::current_exe().expect("test executable").to_string_lossy(),
+            "引数": [],
+            "workspace": std::env::temp_dir().to_string_lossy(),
+            "Transport": "stdio",
+            "Credential ref": credential_ref,
+        })
+    }
+
+    fn missing_reference() -> Value {
+        json!({
+            "credential_id": "00000000000000000000000000000000",
+            "purpose": "mcp_transport",
+            "target": "fixture-mcp-server",
+            "required": false,
+            "status": "missing",
+        })
+    }
+
+    #[test]
+    fn mcp_credential_reference_requires_exact_target_and_safe_child_environment_name() {
+        let configured = json!({
+            "credential_id": "0123456789abcdef0123456789abcdef",
+            "purpose": "mcp_transport",
+            "target": "fixture-mcp-server",
+            "required": true,
+            "status": "configured",
+            "environment_variable": "MCP_API_KEY",
+        });
+        assert!(parse_request(&request(configured.clone())).is_ok());
+        assert!(parse_request(&request(missing_reference())).is_ok());
+
+        for name in [
+            "PATH",
+            "SystemRoot",
+            "GUI_SHELL_BROKER_CHANNEL_PIPE",
+            "MCP-KEY",
+            "1TOKEN",
+            "",
+            "秘密",
+        ] {
+            assert!(!safe_credential_environment_name(name), "{name:?}");
+            let mut invalid = configured.clone();
+            invalid["environment_variable"] = Value::String(name.to_string());
+            assert!(parse_request(&request(invalid)).is_err(), "{name:?}");
+        }
+
+        let mut cross_target = configured.clone();
+        cross_target["target"] = json!("different-server");
+        assert!(parse_request(&request(cross_target)).is_err());
+
+        let mut optional_configured = configured;
+        optional_configured["required"] = json!(false);
+        assert!(parse_request(&request(optional_configured)).is_err());
+
+        let mut missing_with_variable = missing_reference();
+        missing_with_variable["environment_variable"] = json!("MCP_API_KEY");
+        assert!(parse_request(&request(missing_with_variable)).is_err());
+    }
 }
 
 fn parse_disconnect_request(payload: &Value) -> Result<DisconnectRequest, McpError> {

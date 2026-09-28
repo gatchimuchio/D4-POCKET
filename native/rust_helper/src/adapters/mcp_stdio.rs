@@ -17,6 +17,7 @@ use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
+use zeroize::Zeroizing;
 
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_STDIO_LINE_BYTES: usize = 256 * 1024;
@@ -51,6 +52,17 @@ impl McpStdioConnection {
         arguments: &[String],
         workspace: &Path,
     ) -> Result<Self, McpError> {
+        Self::connect_with_environment(executable, arguments, workspace, &[])
+    }
+
+    /// Brokerが認証・監査済みの接続限定環境値だけをstdio childへ渡す。
+    /// 値はBroker応答やMCP projectionへ返さず、呼出し側とこのclientで短命化する。
+    pub(crate) fn connect_with_environment(
+        executable: &Path,
+        arguments: &[String],
+        workspace: &Path,
+        environment: &[(String, Zeroizing<String>)],
+    ) -> Result<Self, McpError> {
         let executable = canonical_executable(executable)?;
         let workspace = canonical_workspace(workspace)?;
         if secret_component(&workspace) {
@@ -59,7 +71,7 @@ impl McpStdioConnection {
                 "MCP workspaceがsecret pathに該当する",
             ));
         }
-        let mut connection = Self::spawn(&executable, arguments, &workspace)?;
+        let mut connection = Self::spawn(&executable, arguments, &workspace, environment)?;
         let modern_message = connection.request(1, modern_discover_request(1)?)?;
         match parse_discovery(&modern_message, McpProtocolEra::Modern) {
             Ok(discovery) => connection.finish_catalog(discovery, 2, McpProtocolEra::Modern)?,
@@ -69,7 +81,7 @@ impl McpStdioConnection {
             {
                 // 旧protocolへの切替は未対応methodまたは版交渉に限定し、その他の失敗は停止する。
                 connection.terminate()?;
-                connection = Self::spawn(&executable, arguments, &workspace)?;
+                connection = Self::spawn(&executable, arguments, &workspace, environment)?;
                 connection.era = McpProtocolEra::Legacy;
                 let discovery = connection
                     .request(1, legacy_initialize_request(1)?)
@@ -93,13 +105,21 @@ impl McpStdioConnection {
         &self.catalog
     }
 
-    fn spawn(executable: &Path, arguments: &[String], workspace: &Path) -> Result<Self, McpError> {
+    fn spawn(
+        executable: &Path,
+        arguments: &[String],
+        workspace: &Path,
+        credential_environment: &[(String, Zeroizing<String>)],
+    ) -> Result<Self, McpError> {
         let mut command = Command::new(executable);
         command.args(arguments).current_dir(workspace).env_clear();
         for name in SAFE_ENVIRONMENT {
             if let Some(value) = env::var_os(name) {
                 command.env(name, value);
             }
+        }
+        for (name, value) in credential_environment {
+            command.env(name, value.as_str());
         }
         command
             .stdin(Stdio::piped())
@@ -502,6 +522,69 @@ if errorlevel 1 exit /b 23
 echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type":"text","text":"SENSITIVE_OUTPUT_MARKER"}],"isError":false}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#;
+    const MCP_CREDENTIAL_FIXTURE: &str = r#"@echo off
+if not "%MCP_TEST_CREDENTIAL%"=="synthetic-only-mcp-secret" exit /b 41
+setlocal EnableDelayedExpansion
+set /p request=
+echo !request! | findstr /c:"server/discover" > nul
+if errorlevel 1 exit /b 42
+echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"credential-fixture","version":"1"}}}
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#;
+
+    #[test]
+    fn broker_scoped_credential_environment_reaches_only_the_supervised_stdio_child() {
+        use zeroize::Zeroizing;
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-mcp-credential-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&workspace).expect("試験用作業領域を作成");
+        let system_root =
+            PathBuf::from(env::var_os(SYSTEM_ROOT_ENVIRONMENT_KEY).expect("システム領域を取得"));
+        let executable = system_root.join("System32").join("cmd.exe");
+        let script_path = workspace.join("mcp-credential-server.cmd");
+        fs::write(
+            &script_path,
+            MCP_CREDENTIAL_FIXTURE
+                .replace("__PROTOCOL_VERSION__", crate::mcp::MODERN_PROTOCOL_VERSION),
+        )
+        .expect("資格情報環境fixtureを作成");
+        let arguments = vec![
+            "/D".to_string(),
+            "/C".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ];
+        let mut environment = vec![(
+            "MCP_TEST_CREDENTIAL".to_string(),
+            Zeroizing::new("synthetic-only-mcp-secret".to_string()),
+        )];
+
+        let mut connection = McpStdioConnection::connect_with_environment(
+            &executable,
+            &arguments,
+            &workspace,
+            &environment,
+        )
+        .expect("合成資格情報を受け取ったfixture childがdiscoveryへ応答");
+        assert_eq!(
+            connection.catalog().discovery.server_name.as_deref(),
+            Some("credential-fixture")
+        );
+        assert!(!format!("{connection:?}").contains("synthetic-only-mcp-secret"));
+        connection.terminate().expect("fixture process群を停止");
+        environment.clear();
+
+        let absent = McpStdioConnection::connect(&executable, &arguments, &workspace)
+            .expect_err("環境値がないfixtureは接続を拒否");
+        assert!(!format!("{absent:?}").contains("synthetic-only-mcp-secret"));
+        fs::remove_dir_all(workspace).expect("試験用作業領域を除去");
+    }
 
     #[test]
     fn tool_call_uses_catalog_and_returns_only_a_bounded_hash_summary() {

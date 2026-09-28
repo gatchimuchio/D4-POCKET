@@ -29,7 +29,7 @@ Capability diff ≠ Permission grant
 Credential ref ≠ Credential value
 ```
 
-契約の`権限生成`は常に`なし`である。Permission、Approval、Audit identity、secret value、実Credential値を入力へ含めず、公開範囲は`metadata_only`に固定する。`Credential ref`は保管庫のID、用途、接続対象、必要性、状態だけを持つ。
+契約の`権限生成`は常に`なし`である。Permission、Approval、Audit identity、secret value、実Credential値を入力へ含めず、公開範囲は`metadata_only`に固定する。`Credential ref`は保管庫のID、用途、接続対象、必要性、状態を持ち、MCP stdio限定で環境変数名を追加できる。環境変数名は接続先processへの値の渡し先を指定するmetadataであり、Credentialの許可やTrustを意味しない。
 
 ## Transportと証拠
 
@@ -51,7 +51,9 @@ Schema検証済みの`status=supported`はToolの実行可能性、Permission、
 
 Rust Brokerは、Windows Desktopのdefault No native Owner確認を通過した`MCP Tool実行`だけを受け付ける。通常IPC、Owner資格だけの要求、Agent／LLM要求から直接実行しない。確認対象は現在接続中のServer ID、Catalog内のTool ID／名前、引数objectの件数とhash、Broker要求hashである。引数本文はDesktop画面で操作者が確認し、native確認では表示しない。Tool危険度は`unknown`として毎回確認する。
 
-Brokerは、受信payloadのraw hashを保持し、未知field、接続／Toolの識別不一致、再帰的なAuthority／Credential field、上限超過、現在Catalogの`inputSchema`不適合を拒否する。`McpCatalog.validate_tool_identity_and_call`を送信直前に呼び、現在CatalogのTool ID／名前・Schemaを再照合する。metadata、履歴、Permission ID、Approval IDを要求から受け取らない。native Owner確認に結び付くPermissionは呼出し対象Server／Tool／引数hashだけの一回限りで、Broker内で生成・即時消費し再利用しない。Credential実値の注入は行わない。
+接続時のCredential利用は、Windows stdioに限定した別のOwner確認操作である。Flutterは検証付きnormal IPC一覧から、用途`mcp_transport`・対象Server ID・有効状態が一致するmetadataだけを選び、Credential IDと環境変数名を送る。Brokerは登録AuditとProtectedStoreのhashを照合し、target・purpose・状態の完全一致を再検証した後でのみ秘密値を読み出す。値はRustから対象childの指定環境変数へ渡し、Broker response、snapshot、Audit内容、error、log、traceへ出さない。許可環境変数名は予約OS名・`GUI_SHELL_*`と衝突してはならない。別Serverへの再利用、無効・欠落・改変Credential、環境変数名不正、永続Audit不在はprocess起動前にfail-closedとする。使用AuditにはID、target、変数名、時刻だけを記録する。対象Serverと子孫は秘密値を読取り・送信でき、Windows Job Objectはsandboxを提供しない。legacy protocol fallbackは同じ実行対象へCredentialを再度渡す可能性をOwner確認に表示する。
+
+Brokerは、受信payloadのraw hashを保持し、未知field、接続／Toolの識別不一致、再帰的なAuthority／Credential field、上限超過、現在Catalogの`inputSchema`不適合を拒否する。`McpCatalog.validate_tool_identity_and_call`を送信直前に呼び、現在CatalogのTool ID／名前・Schemaを再照合する。metadata、履歴、Permission ID、Approval IDを要求から受け取らない。native Owner確認に結び付くPermissionは呼出し対象Server／Tool／引数hashだけの一回限りで、Broker内で生成・即時消費し再利用しない。Tool-call payloadや`tools/call`引数へCredential実値を含めない。Windows stdio childの接続時注入は前述の独立したCredential統治経路に限る。
 
 送信は現接続のMCP stdio childに`tools/call`を一度だけ行う。response ID、JSON-RPC形状、結果型、結果上限を検査する。呼出し後のtimeout、応答ID不一致、malformed／unsupported result、結果Audit確定失敗は結果不明として接続を隔離し、自動再送しない。Ownerが結果を照合した後、明示切断・再接続するまで次のTool呼出しを拒否する。
 
@@ -59,4 +61,4 @@ Tool出力本文は、text・image・audio・resource link・embedded resource�
 
 ## 実装範囲
 
-C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Tool結果本文をAgentへ渡すContent Exposure経路、Credential実値注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。
+C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Windows stdioへの限定Credential注入は別Owner確認・保管庫照合・Auditを経て接続する。Tool結果本文をAgentへ渡すContent Exposure経路、MCP以外のCredential注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。

@@ -34,7 +34,13 @@
           "status": { "status": "supported", "reason": "prompt metadataを検証済み" }
         }
       ],
-      "Credential ref": {},
+      "Credential ref": {
+        "credential_id": "00000000000000000000000000000000",
+        "purpose": "mcp_transport",
+        "target": "mcp-fixture",
+        "required": false,
+        "status": "missing"
+      },
       "Trust": {},
       "Capability diff": {},
       "権限生成": "なし",

@@ -5217,9 +5217,13 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         failures = validate_instance(valid, schema)
         if failures:
             不整合.extend(f"C9 {name} valid fixtureが拒否された: {failure}" for failure in failures)
+    configured_credential = load_contract_fixture("mcp_connection_credential.valid.json")
+    if validate_instance(configured_credential, load_schema("mcp_connection.schema.json")):
+        不整合.append("C9 configured Credential接続要求fixtureが拒否された")
     invalid_names = (
         "mcp_connection_unknown_authority.invalid.json",
         "mcp_connection_credential_secret.invalid.json",
+        "mcp_connection_credential_missing_environment.invalid.json",
         "mcp_connection_tool_unknown_field.invalid.json",
         "mcp_connection_resource_uri_leak.invalid.json",
         "mcp_connection_prompt_description.invalid.json",
@@ -5332,6 +5336,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("mcp_owner_required", rust_center),
         ("mcp_normal_channel_required", rust_center),
         ("mcp_credential_unavailable", rust_center),
+        ("資格情報MCP使用処理", rust_center),
+        ("資格情報MCP使用確定処理", rust_center),
+        ("safe_credential_environment_name", rust_center),
+        ("connect_with_environment", rust_center),
         ("append_audit", rust_center),
         ("metadata_only", rust_center),
         ("super::process_tree::spawn", rust_stdio),
@@ -5371,6 +5379,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("'MCP接続',", desktop_broker_client),
         ("'MCP Tool実行',", desktop_broker_client),
         ("Future<McpConnectionSummary> connect", mcp_client),
+        ("Future<List<McpCredentialSummary>> listCredentials", mcp_client),
         ("Future<McpToolCallReceipt> callTool", mcp_client),
         ("class McpToolSummary", mcp_client),
         ("_toolSummaries", mcp_client),
@@ -5379,6 +5388,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("class McpPromptSummary", mcp_client),
         ("_promptSummaries", mcp_client),
         ("MCP接続を開始", mcp_screen),
+        ("対象ServerのCredential metadata一覧を取得", mcp_screen),
         ("確認して実行", mcp_screen),
         ("Tool一覧：", mcp_screen),
         ("入力仕様hash:", mcp_screen),

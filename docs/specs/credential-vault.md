@@ -4,7 +4,7 @@
 
 資格情報保管庫は、Runtime、Tool、MCP、A2Aなどの接続に使う秘密値を、D4 Pocket / GUI-ShellのBrokerが管理するための境界である。資格情報の存在や参照はPermissionを生成せず、資格情報ID、接続対象、種類、保管方式だけを通常画面へ投影する。
 
-この作業単位で接続するのは、owner control経路からの新規追加と、通常IPCからの安全なmetadata一覧である。秘密値の取得、Runtimeへの注入、更新、失効、削除、接続先変更はこの登録契約へ未接続であり、未完成のまま保管庫完成とは扱わない。
+この契約で接続済みの範囲は、owner control経路からの新規追加、通常IPCからの安全なmetadata一覧、およびWindows MCP stdio接続への限定利用である。Runtime一般、Agent、Tool、A2Aへの注入、更新、失効、削除、接続先変更は未接続であり、未完成のまま保管庫完成とは扱わない。
 
 ## 登録境界
 
@@ -54,4 +54,8 @@ normal IPC、Flutter、Adapter metadata、Profile、History、MCP metadata、A2A
 
 実装済み範囲は、Windows DPAPIへ秘密値を暗号化して保存するowner登録、秘密値を含まない公開receipt、通常IPCの検証付き一覧、normal channelからのowner操作拒否、保管先未登録・永続Audit未使用・秘密値混入をfail-closedで拒否する経路である。
 
-未接続範囲は、秘密値のRuntime / Tool / MCP / A2A使用、GUI管理面、更新、失効、削除、接続先変更、Recovery操作、Windows実機でのowner登録証拠、macOS/iOS KeychainおよびAndroid Keystoreである。これらは`release_blocker`として残し、登録成功を製品完成やrelease readinessへ昇格させない。
+C9のMCP利用はWindows stdioだけに限定する。Flutterは通常IPCからmetadata-only一覧を取得し、用途`mcp_transport`・接続対象Server ID・有効状態が一致するCredential IDを選ぶ。接続要求とdefault No native Owner確認へ渡すのはCredential ID、用途、対象、環境変数名だけであり、秘密値は渡さない。Brokerは永続Audit、現在の登録Audit、ID、用途、対象、状態、保管file hashを照合してからDPAPIで読み出し、Rust内の短命値を対象stdio childの指定環境変数へ渡す。OS必須環境変数や`GUI_SHELL_*`は上書きできない。Credential使用は別AuditEventへID、対象、環境変数名、時刻だけを確定し、一覧の最終使用時刻をその検証済みeventから導出する。
+
+native確認では相手Server processとその子孫が値を読取り・外部送信できること、Job Objectはprocess寿命管理であってsandboxではないことを明示する。MCP stdio Serverは未信頼実行物であり、この機能はCredentialの安全な委譲先であることを証明しない。protocol version negotiationで既定のlegacy fallbackが必要な場合、同じ実行file／引数へCredentialを渡したchildを再起動する可能性も確認画面に示す。Credential実値はBroker response、通常IPC、Flutter、Audit reason、error、log、traceへ複写しない。
+
+未接続範囲は、MCP以外のRuntime／Agent／Tool／A2A使用、GUI上でのCredential登録・更新・失効・削除・接続先変更・Recovery操作、Windows installed productでの登録／注入証拠、macOS/iOS KeychainおよびAndroid Keystoreである。これらは`release_blocker`として残し、登録成功またはMCP用への注入成功を製品完成やrelease readinessへ昇格させない。

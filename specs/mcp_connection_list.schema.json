@@ -29,7 +29,7 @@
         "Tool": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/tool_projection" } },
         "Resource": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/resource_projection" } },
         "Prompt": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/prompt_projection" } },
-        "Credential ref": { "type": "object" },
+        "Credential ref": { "$ref": "#/$defs/credential_reference" },
         "Trust": { "type": "object" },
         "Capability diff": { "type": "object" },
         "権限生成": { "const": "なし" },
@@ -84,6 +84,29 @@
           }
         }
       }
+    },
+    "credential_reference": {
+      "type": "object",
+      "required": ["credential_id", "purpose", "target", "required", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "credential_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "purpose": { "const": "mcp_transport" },
+        "target": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["configured", "missing"] },
+        "environment_variable": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "configured" } }, "required": ["status"] },
+          "then": { "required": ["environment_variable"], "properties": { "required": { "const": true } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "missing" } }, "required": ["status"] },
+          "then": { "properties": { "required": { "const": false } }, "not": { "required": ["environment_variable"] } }
+        }
+      ]
     },
     "prompt_projection": {
       "type": "object",

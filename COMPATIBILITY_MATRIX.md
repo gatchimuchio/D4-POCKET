@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Windows開発環境 | Rust／Flutterの解析・試験、debug build、local Broker／fixture検証 | installed-pathのprovenance、first-run、Setup Doctor、Broker、Audit anchor外部改変証拠は`release_blocker`（aggregate_of=windows_evidence_provenance_isolation,windows_installer_first_run_smoke,windows_setup_doctor_smoke,windows_broker_installed_smoke,audit_anchor_external_tamper_evidence_proof） |
 | モバイル | 9画面、Device Link projection、contract／失効／背景遷移fixture、Android debug APK／AAB | 実端末、native secure storage、TLS実接続、Windows installed連携、正式署名・配布は`release_blocker`（aggregate_of=rev2_mobile_device_evidence,rev2_mobile_distribution） |
-| 外部Runtime／Agent／MCP／A2A | metadata／contract／loopbackまたはfixtureのbounded検証 | 外部接続、実task、Tool実行、credential注入、複数Agent比較、handoffは`release_blocker`（registry_id=comprehensive_extension_rev1_completion） |
+| 外部Runtime／Agent／MCP／A2A | metadata／contract／loopbackまたはfixtureのbounded検証。C9はWindowsでnative Owner確認後のstdio接続、対象限定Credential注入、操作者向け一回Tool呼出しまでを実装対象とする | 実外部Server適合、AgentへのTool結果handoff、installed product上のCredential利用、複数Agent比較、A2A実接続・handoffは`release_blocker`（registry_id=comprehensive_extension_rev1_completion） |
 | 長時間・障害・性能 | C27、C29、C30のlocal検証とC28の短時間smoke | C28の8時間実測、installed product負荷、外部サービス負荷は`release_blocker`（registry_id=comprehensive_extension_rev1_completion） |
 | 非Windows platform | 文書・一部補助build／過去の補助結果を証拠範囲付きで保持 | 現行commitの実機・正式配布・Mac hostの総合証拠は`known_limitation`または`release_blocker`（aggregate_of=rev2_mobile_device_evidence,comprehensive_extension_rev1_completion） |
 

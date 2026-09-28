@@ -89,6 +89,8 @@ enum DesktopOwnerOperationSummary {
         workspace: String,
         argument_count: usize,
         arguments_hash: String,
+        credential_id: Option<String>,
+        credential_environment_variable: Option<String>,
         payload_hash: String,
     },
     McpDisconnect {
@@ -131,6 +133,8 @@ struct McpConnectCredentialReference {
     target: String,
     required: bool,
     status: String,
+    #[serde(default)]
+    environment_variable: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -904,8 +908,7 @@ fn owner_operation_candidate(
                     .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
                 || reference.purpose != "mcp_transport"
                 || reference.target != request.server_id
-                || reference.required
-                || reference.status != "missing"
+                || !valid_mcp_credential_reference(reference)
             {
                 return None;
             }
@@ -916,6 +919,9 @@ fn owner_operation_candidate(
                 workspace: request.workspace,
                 argument_count: request.arguments.len(),
                 arguments_hash,
+                credential_id: (reference.status == "configured")
+                    .then(|| reference.credential_id.clone()),
+                credential_environment_variable: reference.environment_variable.clone(),
                 payload_hash,
             }
         }
@@ -1030,6 +1036,55 @@ fn owner_operation_candidate(
         return None;
     }
     Some((normalized, summary))
+}
+
+fn valid_mcp_credential_reference(reference: &McpConnectCredentialReference) -> bool {
+    match reference.status.as_str() {
+        "missing" => {
+            !reference.required
+                && reference.credential_id == "00000000000000000000000000000000"
+                && reference.environment_variable.is_none()
+        }
+        "configured" => {
+            reference.required
+                && reference
+                    .environment_variable
+                    .as_deref()
+                    .is_some_and(valid_mcp_credential_environment_name)
+        }
+        _ => false,
+    }
+}
+
+fn valid_mcp_credential_environment_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == b'_')
+        || !bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        || name.len() > 128
+    {
+        return false;
+    }
+    let normalized = name.to_ascii_uppercase();
+    !matches!(
+        normalized.as_str(),
+        "PATH"
+            | "SYSTEMROOT"
+            | "WINDIR"
+            | "TEMP"
+            | "TMP"
+            | "USERPROFILE"
+            | "HOME"
+            | "APPDATA"
+            | "LOCALAPPDATA"
+            | "PROGRAMDATA"
+            | "SYSTEMDRIVE"
+            | "COMSPEC"
+            | "PATHEXT"
+            | "PSMODULEPATH"
+    ) && !normalized.starts_with("GUI_SHELL_")
 }
 
 fn mcp_arguments_within_limits(value: &Value) -> bool {
@@ -1242,16 +1297,29 @@ fn owner_confirmation_text_for_identity(
             workspace,
             argument_count,
             arguments_hash,
+            credential_id,
+            credential_environment_variable,
             payload_hash,
-        } => format!(
-            "指定したMCP stdio Serverを起動し、検証済みmetadataを取得しますか？\n\nServer ID: {}\n実行file: {}\n作業folder: {}\n起動引数: {}件（引数本文は秘密値を含む可能性があるため表示しません）\n引数hash: {}\nCredential ref: status=missing（Credential実値は送られません）\n\n前画面で実行file、作業folder、引数を確認してください。秘密値を引数へ含めないでください。ServerのTrustを成立させず、Tool実行、Permission、Approvalを付与しません。Windows Job Object監督下でprocess群を起動し、接続metadataとAuditをBrokerが確定します。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
-            owner_confirmation_value(server_id),
-            owner_confirmation_value(executable),
-            owner_confirmation_value(workspace),
-            argument_count,
-            arguments_hash,
-            payload_hash
-        ),
+        } => {
+            let credential_summary = match (credential_id, credential_environment_variable) {
+                (Some(id), Some(name)) => format!(
+                    "Credential ID: {}\n子process環境変数名: {}\n秘密値はこの確認画面・Flutter・Auditへ返しません。",
+                    owner_confirmation_value(id),
+                    owner_confirmation_value(name),
+                ),
+                _ => "Credential: 未選択（秘密値を渡しません）".to_string(),
+            };
+            format!(
+                "指定したMCP stdio Serverを起動し、検証済みmetadataを取得しますか？\n\nServer ID: {}\n実行file: {}\n作業folder: {}\n起動引数: {}件（引数本文は秘密値を含む可能性があるため表示しません）\n引数hash: {}\n{}\n\n前画面で実行file、作業folder、引数、Credentialの対象を確認してください。Credentialを選んだ場合、対象MCP processとその子孫processは値を読み取り、外部送信できます。Windows Job Objectはprocess寿命を監督しますがsandboxではありません。protocol fallback時は同じ対象processを再起動して同じCredentialを渡す場合があります。ServerのTrust、Tool実行権、追加Permissionは付与しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+                owner_confirmation_value(server_id),
+                owner_confirmation_value(executable),
+                owner_confirmation_value(workspace),
+                argument_count,
+                arguments_hash,
+                credential_summary,
+                payload_hash
+            )
+        }
         DesktopOwnerOperationSummary::McpToolCall {
             server_id,
             tool_id,
@@ -2797,7 +2865,7 @@ mod tests {
         assert!(confirmation.contains(&sha256_tagged(
             &serde_json::to_vec(&arguments).expect("引数hash対象")
         )));
-        assert!(confirmation.contains("Credential実値は送られません"));
+        assert!(confirmation.contains("Credential: 未選択（秘密値を渡しません）"));
         assert!(confirmation.contains("payload hash"));
         assert!(!confirmation.contains("--token"));
         assert!(!confirmation.contains("secret-marker"));
@@ -2823,6 +2891,91 @@ mod tests {
             "payload_hash": canonical_payload_hash(Some(&required_credential)),
             "payload": required_credential,
             "nonce": "desktop-mcp-connect-required-credential-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    fn mcp_credential_confirmation_shows_only_reference_and_warns_about_server_access() {
+        let mut payload = serde_json::json!({
+            "版": 1,
+            "操作": "接続",
+            "ServerID": "mcp-fixture",
+            "実行file": r"C:\Program Files\D4 Pocket\mcp-fixture.exe",
+            "引数": ["--stdio"],
+            "workspace": r"C:\Users\Public\D4PocketWorkspace",
+            "Transport": "stdio",
+            "Credential ref": {
+                "credential_id": "00000000000000000000000000000000",
+                "purpose": "mcp_transport",
+                "target": "mcp-fixture",
+                "required": false,
+                "status": "missing"
+            }
+        });
+        payload["Credential ref"] = serde_json::json!({
+            "credential_id": "abcdef0123456789abcdef0123456789",
+            "purpose": "mcp_transport",
+            "target": "mcp-fixture",
+            "required": true,
+            "status": "configured",
+            "environment_variable": "MCP_API_KEY"
+        });
+        let payload_hash = canonical_payload_hash(Some(&payload));
+        let input = serde_json::json!({
+            "request_id": "desktop-mcp-connect-credential",
+            "operation": "MCP接続",
+            "payload": payload,
+            "payload_hash": payload_hash,
+            "nonce": "desktop-mcp-connect-credential-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (_, summary) = owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+            .expect("configured Credentialはnative Owner確認必須");
+        let confirmation = owner_confirmation_text(&summary);
+        assert!(confirmation.contains("abcdef0123456789abcdef0123456789"));
+        assert!(confirmation.contains("MCP_API_KEY"));
+        assert!(confirmation.contains("外部送信できます"));
+        assert!(confirmation.contains("sandboxではありません"));
+        assert!(!confirmation.contains("secret-marker"));
+
+        let mut unsafe_name = serde_json::json!({
+            "版": 1,
+            "操作": "接続",
+            "ServerID": "mcp-fixture",
+            "実行file": r"C:\Program Files\D4 Pocket\mcp-fixture.exe",
+            "引数": ["--stdio"],
+            "workspace": r"C:\Users\Public\D4PocketWorkspace",
+            "Transport": "stdio",
+            "Credential ref": {
+                "credential_id": "abcdef0123456789abcdef0123456789",
+                "purpose": "mcp_transport",
+                "target": "mcp-fixture",
+                "required": true,
+                "status": "configured",
+                "environment_variable": "MCP_API_KEY"
+            }
+        });
+        unsafe_name["Credential ref"]["environment_variable"] = serde_json::json!("PATH");
+        let unsafe_hash = canonical_payload_hash(Some(&unsafe_name));
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-connect-credential-unsafe-env",
+            "operation": "MCP接続",
+            "payload": unsafe_name,
+            "payload_hash": unsafe_hash,
+            "nonce": "desktop-mcp-connect-credential-unsafe-env-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });
