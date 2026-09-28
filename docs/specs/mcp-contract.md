@@ -43,6 +43,12 @@ MCP Toolの`inputSchema`はJSON Schema Draft 2020-12としてmeta-schema検証�
 
 Schema検証済みの`status=supported`はToolの実行可能性、Permission、Approvalを意味しない。現行接続経路は依然metadata-onlyであり、`tools/call`を送らない。
 
+## Tool引数の事前適合検査
+
+`McpCatalog.validate_tool_call`は、現在のcatalogにあるTool名だけを対象に、引数がobjectであること、JSON化後32 KiB以下・2048 node以下・深さ32以下であること、Permission／Approval／Credential等のauthority fieldを再帰的に含まないことを検査する。その後、catalogに保持した当該Toolの`inputSchema`をJSON Schema Draft 2020-12として適用し、適合しない引数を固定error codeで拒否する。外部参照はSchema受入時点で禁止し、引数内容やSchemaのvalidation error詳細をAuditへ出さない。
+
+このRust検査関数はTool呼出しに先行させるための境界であり、現行Broker／stdio production経路からはまだ呼ばれない。`tools/call`、Permission、Approval、AuditEvent、結果本文のContent Exposureを実行・生成する契約ではない。これらが接続するまではTool実行を未対応として扱う。
+
 ## 実装範囲
 
 C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。後続C9は、実物interfaceを推測せずBroker経路でstdio discovery、connect、metadata list、timeout処理およびWindows owner切断を接続した。consent、Tool実行、Credential実値注入、Streamable HTTP、OAuth、quarantine、外部MCP実物Test Harnessは未接続であり、`release_blocker`として保持する。

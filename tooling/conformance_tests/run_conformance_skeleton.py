@@ -5183,6 +5183,9 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_server_unavailable",
         "mcp_timeout",
         "改行到着前から256 KiBを上限として逐次読取り",
+        "Tool引数の事前適合検査",
+        "32 KiB以下・2048 node以下・深さ32以下",
+        "現行Broker／stdio production経路からはまだ呼ばれない",
         "release_blocker",
     )
     for token in required_tokens:
@@ -5290,6 +5293,11 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("mcp_metadata_authority_injection", rust_mcp),
         ("mcp_list_pagination_unhandled", rust_mcp),
         ("validate_tool_call", rust_mcp),
+        ("MAX_TOOL_ARGUMENT_BYTES", rust_mcp),
+        ("MAX_TOOL_ARGUMENT_NODES", rust_mcp),
+        ("MAX_TOOL_ARGUMENT_DEPTH", rust_mcp),
+        ("mcp_tool_arguments_schema_invalid", rust_mcp),
+        ("validator.is_valid(arguments)", rust_mcp),
         ("env_clear", rust_stdio),
         ("mcp_timeout", rust_stdio),
         ("read_bounded_line", rust_stdio),

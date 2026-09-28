@@ -8,6 +8,8 @@ C9は、owner controlから明示されたMCP stdio ServerをRust Brokerのproce
 
 現行の接続対象は`stdio`だけである。現行`server/discover`を先に試し、各新protocol要求の`_meta`へ版、client情報、機能を宣言しない空の`clientCapabilities`を付ける。
 
+RustのTool引数の事前適合検査はcatalogの`inputSchema`適合と32 KiB以下・2048 node以下・深さ32以下の上限を検査する。ただし現行Broker／stdio production経路からはまだ呼ばれないため、`tools/call`は送信しない。Tool実行は引き続き未対応の`release_blocker`であり、引数検査だけを実行許可や完成証拠へ昇格させない。詳細は`mcp-contract.md`を参照する。
+
 版2026-07-28の応答では、結果種別`resultType`が`complete`の場合だけを受け付ける。旧版互換として、結果種別の欠落は許容する。`server/discover`がJSON-RPCのmethod未対応（`-32601`）を返すか、対応protocol versionがない場合だけ、旧`initialize`／`notifications/initialized`へ切り替える。
 
 通信期限切れ、応答形式不正、要求ID不一致、parameter不正その他の失敗では、再起動や旧protocolでの再試行を行わない。外部Serverの実装を推測せず、JSON-RPC応答、capability、一覧、重複、pagination、秘密値・権限fieldをBroker側で検証する。Tool `inputSchema`はJSON Schema Draft 2020-12のmeta-schema検証とvalidator構築に成功したものだけをCatalogへ入れる。外部`$ref`を取得せず、128 KiB／4096 node／深さ64の上限を適用する。receiptの公開範囲は`metadata_only`に固定する。

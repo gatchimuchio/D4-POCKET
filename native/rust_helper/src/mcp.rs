@@ -18,6 +18,9 @@ const MAX_NAME_BYTES: usize = 256;
 const MAX_TOOL_SCHEMA_BYTES: usize = 128 * 1024;
 const MAX_TOOL_SCHEMA_NODES: usize = 4096;
 const MAX_TOOL_SCHEMA_DEPTH: usize = 64;
+const MAX_TOOL_ARGUMENT_BYTES: usize = 32 * 1024;
+const MAX_TOOL_ARGUMENT_NODES: usize = 2048;
+const MAX_TOOL_ARGUMENT_DEPTH: usize = 32;
 #[cfg(test)]
 const MCP_JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 
@@ -438,6 +441,7 @@ pub struct McpTool {
     pub name: String,
     pub tool_id: String,
     pub input_schema_hash: String,
+    input_schema: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -568,22 +572,54 @@ impl McpCatalog {
     }
 
     pub fn validate_tool_call(&self, name: &str, arguments: &Value) -> Result<(), McpError> {
-        if !self.tools.iter().any(|tool| tool.name == name) {
-            return Err(McpError::new(
-                "mcp_unknown_tool",
-                "MCP Toolがcatalogへ未登録",
-            ));
-        }
+        let tool = self
+            .tools
+            .iter()
+            .find(|tool| tool.name == name)
+            .ok_or_else(|| McpError::new("mcp_unknown_tool", "MCP Toolがcatalogへ未登録"))?;
         if !arguments.is_object() {
             return Err(McpError::new(
                 "mcp_tool_arguments_invalid",
                 "MCP Tool argumentsがobjectではない",
             ));
         }
+        if !json_value_within_limits(arguments, MAX_TOOL_ARGUMENT_NODES, MAX_TOOL_ARGUMENT_DEPTH) {
+            return Err(McpError::new(
+                "mcp_tool_arguments_complexity_exceeded",
+                "MCP Tool argumentsが構造上限を超過した",
+            ));
+        }
+        let encoded = serde_json::to_vec(arguments).map_err(|_| {
+            McpError::new(
+                "mcp_tool_arguments_invalid",
+                "MCP Tool argumentsを正本化できない",
+            )
+        })?;
+        if encoded.len() > MAX_TOOL_ARGUMENT_BYTES {
+            return Err(McpError::new(
+                "mcp_tool_arguments_complexity_exceeded",
+                "MCP Tool argumentsがbyte上限を超過した",
+            ));
+        }
         if contains_authority_key(arguments) {
             return Err(McpError::new(
                 "mcp_tool_authority_injection",
                 "MCP Tool argumentsへ権限fieldを持ち込めない",
+            ));
+        }
+        let validator = jsonschema::options()
+            .with_draft(jsonschema::Draft::Draft202012)
+            .build(&tool.input_schema)
+            .map_err(|_| {
+                McpError::new(
+                    "mcp_tool_schema_invalid",
+                    "MCP Tool inputSchema validatorを再構築できない",
+                )
+            })?;
+        if !validator.is_valid(arguments) {
+            return Err(McpError::new(
+                "mcp_tool_arguments_schema_invalid",
+                "MCP Tool argumentsがCatalogのinputSchemaに適合しない",
             ));
         }
         Ok(())
@@ -616,7 +652,6 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
             McpError::new("mcp_tool_schema_invalid", "MCP Tool inputSchemaがない")
         })?;
         validate_tool_input_schema(input_schema)?;
-        let input_schema = input_schema.as_object().expect("Schema検証済みobject");
         let tool_id = format!(
             "tool-{}",
             hex::encode(sha256_tagged(name.as_bytes()).as_bytes())
@@ -624,7 +659,8 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
         tools.push(McpTool {
             name: name.to_string(),
             tool_id,
-            input_schema_hash: hash_value(&Value::Object(input_schema.clone()))?,
+            input_schema_hash: hash_value(input_schema)?,
+            input_schema: input_schema.clone(),
         });
     }
     Ok(tools)
@@ -917,6 +953,27 @@ fn contains_authority_key(value: &Value) -> bool {
     }
 }
 
+fn json_value_within_limits(root: &Value, maximum_nodes: usize, maximum_depth: usize) -> bool {
+    let mut pending = vec![(root, 1usize)];
+    let mut nodes = 0usize;
+    while let Some((value, depth)) = pending.pop() {
+        nodes += 1;
+        if nodes > maximum_nodes || depth > maximum_depth {
+            return false;
+        }
+        match value {
+            Value::Object(object) => {
+                pending.extend(object.values().map(|child| (child, depth + 1)));
+            }
+            Value::Array(values) => {
+                pending.extend(values.iter().map(|child| (child, depth + 1)));
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
 fn hash_value(value: &Value) -> Result<String, McpError> {
     let bytes = serde_json::to_vec(value).map_err(|_| {
         McpError::new(
@@ -975,6 +1032,25 @@ mod tests {
         .expect("応答解析")
     }
 
+    fn catalog_with_tools(tools: Value) -> McpCatalog {
+        McpCatalog {
+            discovery: parse_discovery(
+                &response(
+                    1,
+                    json!({
+                        "supportedVersions": [MODERN_PROTOCOL_VERSION],
+                        "capabilities": {"tools": {}}
+                    }),
+                ),
+                McpProtocolEra::Modern,
+            )
+            .expect("discovery"),
+            tools: parse_tools_response(&response(2, tools)).expect("Tool一覧"),
+            resources: Vec::new(),
+            prompts: Vec::new(),
+        }
+    }
+
     #[test]
     fn modern_discovery_and_catalog_are_metadata_only() {
         let discovered = response(
@@ -995,7 +1071,11 @@ mod tests {
             json!({"tools": [{
                 "name": "read",
                     "description": "表示してはいけない説明",
-                "inputSchema": {"type": "object", "properties": {}}
+                "inputSchema": {
+                    "type": "object",
+                    "description": "表示してはいけないSchema本文",
+                    "properties": {}
+                }
             }]}),
         ))
         .expect("tools");
@@ -1021,6 +1101,7 @@ mod tests {
             .expect("射影");
         let encoded = serde_json::to_string(&projection).expect("射影JSON");
         assert!(!encoded.contains("表示してはいけない説明"));
+        assert!(!encoded.contains("表示してはいけないSchema本文"));
         assert_eq!(projection["権限生成"], "なし");
         assert_eq!(projection["Trust"]["state"], "unverified");
     }
@@ -1108,6 +1189,90 @@ mod tests {
                 .expect_err("未知Tool")
                 .code,
             "mcp_unknown_tool"
+        );
+    }
+
+    #[test]
+    fn tool_arguments_must_match_the_registered_input_schema() {
+        let catalog = catalog_with_tools(json!({"tools": [{
+            "name": "search",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "minLength": 1},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20}
+                },
+                "required": ["query"],
+                "additionalProperties": false
+            }
+        }]}));
+
+        assert!(catalog
+            .validate_tool_call("search", &json!({"query": "needle", "limit": 5}))
+            .is_ok());
+        for (arguments, expected_code) in [
+            (json!({}), "mcp_tool_arguments_schema_invalid"),
+            (json!({"query": 7}), "mcp_tool_arguments_schema_invalid"),
+            (
+                json!({"query": "needle", "limit": 21}),
+                "mcp_tool_arguments_schema_invalid",
+            ),
+            (
+                json!({"query": "needle", "extra": true}),
+                "mcp_tool_arguments_schema_invalid",
+            ),
+            (
+                json!({"query": "needle", "context": {"credential_value": "marker"}}),
+                "mcp_tool_authority_injection",
+            ),
+        ] {
+            assert_eq!(
+                catalog
+                    .validate_tool_call("search", &arguments)
+                    .expect_err("Schema不適合または権限field注入")
+                    .code,
+                expected_code
+            );
+        }
+    }
+
+    #[test]
+    fn tool_arguments_are_bounded_before_schema_validation() {
+        let catalog = catalog_with_tools(json!({"tools": [{
+            "name": "accept",
+            "inputSchema": {"type": "object"}
+        }]}));
+        let oversized = json!({"value": "x".repeat(MAX_TOOL_ARGUMENT_BYTES)});
+        assert_eq!(
+            catalog
+                .validate_tool_call("accept", &oversized)
+                .expect_err("byte上限")
+                .code,
+            "mcp_tool_arguments_complexity_exceeded"
+        );
+
+        let mut deeply_nested = Value::Null;
+        for _ in 0..MAX_TOOL_ARGUMENT_DEPTH {
+            deeply_nested = json!([deeply_nested]);
+        }
+        assert_eq!(
+            catalog
+                .validate_tool_call("accept", &json!({"value": deeply_nested}))
+                .expect_err("深さ上限")
+                .code,
+            "mcp_tool_arguments_complexity_exceeded"
+        );
+
+        let mut many_values = Map::new();
+        for index in 0..MAX_TOOL_ARGUMENT_NODES {
+            many_values.insert(format!("p{index}"), Value::Null);
+        }
+        assert_eq!(
+            catalog
+                .validate_tool_call("accept", &Value::Object(many_values))
+                .expect_err("node上限")
+                .code,
+            "mcp_tool_arguments_complexity_exceeded"
         );
     }
 

@@ -153,7 +153,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "18c3f057f534173730cdceccf8c4b7126588ee54880f32aeff196535ac3b9ebd"
+      "sha256": "56304f0d7d577dda5833454acd885a3c307e8764bd9801c156101f1510a706ce"
     },
     {
       "path": "SECURITY.md",
@@ -1389,11 +1389,11 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "0300bec58b08ef50004feccfe5fdb5d0846542b3a7a30da4764d67f8faa01ddd"
+      "sha256": "6d2e19153395d8f04bc29b90a0e9242474ff69cff236b861541071da33d69ad4"
     },
     {
       "path": "docs/specs/mcp-contract.md",
-      "sha256": "2c56634c6a9b52b6545aca545983ed31cb94b676683f8ad698376854425c1392"
+      "sha256": "eafc87ef5a8d1fb9385102c2b7e0282f86be35d1b58d707dd56c691011d9beba"
     },
     {
       "path": "docs/specs/mobile-surface.md",
@@ -3169,7 +3169,7 @@
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
-      "sha256": "906c5753fa0c705c11c533182350379f198049d058d3904edc361a74f5fefb64"
+      "sha256": "676f535973ad01d08ce586da8425fc8706902548ae1e8b39f585765b7730c3f3"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -4309,7 +4309,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "b3a898b5197af8e06d9eccd21eb62180a11f551a7002b404f964f63813243e59"
+      "sha256": "6e817f394ce4f59f7f1e3dca10e945708de24bb22d4be886837dfd8abcc6a1db"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
