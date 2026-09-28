@@ -9,6 +9,10 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
+
+`IndexedStack`内の非表示Mobile資源画面がbuild時にBroker観測を開始していたため、選択中・接続中だけ一度観測し、離脱・接続変更で表示と遅延結果を無効化する。複数Runtimeは逐次最大16件、同時1件とし、再入場後に新規観測する。非OneDrive managed worktreeでMobile test全20件が成功した。Desktop/Mobileの`flutter analyze`はLSP初期化JSON欠損によるanalysis server異常で終了し、成功扱いしない。実機・Device Link統合・release evidenceは未成立。詳細は`docs/REV2_PROGRESS.md`の本項を参照。
+
 ### Phase 9 実行履歴の期限監視を期限駆動へ変更（2026-09-28）
 
 履歴画面の100ms周期監視を廃止し、承認の壁時計・単調時計の早い方で一度限りの期限timerを設定する。2秒ごとの承認／履歴再確認と失効時の表示消去は維持し、権限・承認意味は変更しない。変更前commit `686a2a4e3e043d79e07b6d2bca248bcfccdfd18a`を基点にした非OneDrive managed worktreeで対象Flutter test 18件成功。元OneDrive checkoutではephemeral `.packages`への削除アクセス拒否、両appのFlutter/Dart analyzeは環境側analysis server異常で終了したため、これらを成功扱いしない。詳細は`docs/REV2_PROGRESS.md`の本項を参照する。Phase 9の他の未実装範囲と既存release blockerは維持し、`release_ready=false`。

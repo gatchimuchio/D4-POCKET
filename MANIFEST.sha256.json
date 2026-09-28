@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3f9c9115dff353af6412c51106ca4f2d7c8988472cd9db17ddb236b7ccfb64d5"
+      "sha256": "34e8fd2504ba5ccce9d3f9200eb276b7ec900cda0c2023a13c295e34e7aa57c3"
     },
     {
       "path": "SECURITY.md",
@@ -1017,7 +1017,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/main.dart",
-      "sha256": "4b34bf07282d081b8676db70be52e1065300b94ce36f3bb692862be676f6e5ad"
+      "sha256": "51fbd728208fa52e70344937ebc017a5ee9bfb4e4421afa49192f83f13868288"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/agent_status.dart",
@@ -1057,7 +1057,7 @@
     },
     {
       "path": "apps/mobile_flutter/lib/screens/resource_overview.dart",
-      "sha256": "7e044fa7004fa8b9a5dac4e86e5ed301821560e1887fd369aa913f861d3f3040"
+      "sha256": "98a7c3a8b2970b1e8770099d6a01d7dc3330ac7a79ab4563d70472e4a065f1fb"
     },
     {
       "path": "apps/mobile_flutter/lib/screens/runtime_status.dart",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "8c18e1681f94ecb5b77dc93f1006d70bf9f7254a8d73753b7e3e25ad67ffeb95"
+      "sha256": "e4e46ff7004a790450658845d1450ec1d97dedba99664e823bde4ec92b9a0cb0"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1417,7 +1417,7 @@
     },
     {
       "path": "docs/specs/runtime-resource-observation.md",
-      "sha256": "6377ab7eaa67bbef7b62e08ac9e445da31b01e944598ad454f9ede2de2fb8e28"
+      "sha256": "71ac50c64eab82151b8a2ff73cf0ac27eec9fc8316850b81dfc27a4609a09d7f"
     },
     {
       "path": "docs/specs/trace-inspector.md",

@@ -10,11 +10,13 @@ class ResourceOverview extends StatefulWidget {
     required this.controller,
     required this.runtimes,
     required this.connected,
+    required this.active,
   });
 
   final DeviceLinkController controller;
   final List<String> runtimes;
   final bool connected;
+  final bool active;
 
   @override
   State<ResourceOverview> createState() => _ResourceOverviewState();
@@ -22,14 +24,34 @@ class ResourceOverview extends StatefulWidget {
 
 class _ResourceOverviewState extends State<ResourceOverview> {
   Future<List<_ResourceResult>>? _future;
+  int _generation = 0;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active && widget.connected && widget.runtimes.isNotEmpty) {
+      _future = _startLoad();
+    }
+  }
 
   @override
   void didUpdateWidget(ResourceOverview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.connected != widget.connected ||
+    final scopeChanged =
+        oldWidget.connected != widget.connected ||
         oldWidget.runtimes.length != widget.runtimes.length ||
-        !_same(oldWidget.runtimes, widget.runtimes)) {
+        !_same(oldWidget.runtimes, widget.runtimes);
+    if (scopeChanged || (oldWidget.active && !widget.active)) {
+      _generation++;
       _future = null;
+      _loading = false;
+    }
+    if (widget.active &&
+        widget.connected &&
+        widget.runtimes.isNotEmpty &&
+        (scopeChanged || !oldWidget.active)) {
+      _future = _startLoad();
     }
   }
 
@@ -42,17 +64,45 @@ class _ResourceOverviewState extends State<ResourceOverview> {
   }
 
   void _refresh() {
-    _future = _load();
-    setState(() {});
+    if (!widget.active ||
+        !widget.connected ||
+        _loading ||
+        widget.controller.busy) {
+      return;
+    }
+    setState(() => _future = _startLoad());
   }
 
-  Future<List<_ResourceResult>> _load() async {
+  Future<List<_ResourceResult>> _startLoad() async {
+    final generation = ++_generation;
+    final runtimes = List<String>.unmodifiable(widget.runtimes.take(16));
+    _loading = true;
+    try {
+      return await _load(generation, runtimes);
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  bool _current(int generation) =>
+      mounted && generation == _generation && widget.active && widget.connected;
+
+  Future<List<_ResourceResult>> _load(
+    int generation,
+    List<String> runtimes,
+  ) async {
     final client = RuntimeResourceClient(widget.controller);
     final results = <_ResourceResult>[];
-    for (final runtime in widget.runtimes.take(16)) {
+    for (final runtime in runtimes) {
+      if (!_current(generation)) return results;
       try {
-        results.add(_ResourceResult(runtime, await client.observe(runtime)));
+        final observation = await client.observe(runtime);
+        if (!_current(generation)) return results;
+        results.add(_ResourceResult(runtime, observation));
       } on Object catch (error) {
+        if (!_current(generation)) return results;
         results.add(_ResourceResult(runtime, null, error: error));
       }
     }
@@ -61,8 +111,17 @@ class _ResourceOverviewState extends State<ResourceOverview> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.connected && _future == null && widget.runtimes.isNotEmpty) {
-      _future = _load();
+    if (!widget.active) {
+      return const MobilePage(
+        title: '資源概要',
+        children: [
+          StatusTile(
+            icon: Icons.help_outline,
+            title: '未観測',
+            subtitle: '資源画面を開いている間だけ観測します。画面を離れると表示を破棄します。',
+          ),
+        ],
+      );
     }
     return MobilePage(
       title: '資源概要',
@@ -84,7 +143,7 @@ class _ResourceOverviewState extends State<ResourceOverview> {
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
-              onPressed: widget.controller.busy ? null : _refresh,
+              onPressed: widget.controller.busy || _loading ? null : _refresh,
               icon: const Icon(Icons.refresh),
               label: const Text('資源を更新'),
             ),

@@ -136,6 +136,7 @@ class _MobileHomeState extends State<MobileHome> with WidgetsBindingObserver {
           controller: c,
           runtimes: c.runtimes,
           connected: c.ready && c.foreground,
+          active: _selected == 10,
         ),
         MobileHistory(controller: c, connected: c.ready && c.foreground),
         const MobileMcpStatus(),

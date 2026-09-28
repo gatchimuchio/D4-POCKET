@@ -46,6 +46,8 @@ boundのIPC応答は evidence_source=LIVE_RUNTIME とする。unbound、binding_
 
 Flutterは検証済みのRuntimeResourceObservationを表示するだけであり、既存Shell snapshot、固定diagnostic値、fixture、前回表示からC3の実測値を作らない。unknownは理由とともに未観測として表示する。
 
+Mobileの資源画面は`IndexedStack`の非表示中やDevice Link切断中に観測要求を開始しない。接続中に画面を選択した場合だけ観測し、画面離脱・接続断で現在表示と進行中応答を無効化する。画面へ戻った後は現在接続で新規観測する。Runtimeごとの要求は逐次・上限16件で、一度に一回だけ実行し、周期pollingは行わない。
+
 ## 契約と検証範囲
 
 構造contractは runtime_resource_query.schema.json と runtime_resource_observation.schema.json、IPC operationは「実行系資源観測」とする。conformanceはPID入力拒否、strict metric union、現在C3で接続済みのmetricごとの状態・証拠種別の組合せ、binding不成立時の全unknown/短期履歴空、短期履歴60件上限、固定統治field、IPC enumを検査する。

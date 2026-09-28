@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket Phase 11 Mobile資源観測を表示中に限定（2026-09-28）
+
+MobileHomeは全画面を`IndexedStack`で保持するため、資源画面のbuild時自動観測が非表示でも走っていた。選択中かつ接続中に限り一度観測し、Runtimeごと逐次・最大16件・同時要求1件に制限する。画面離脱または接続scope変更で表示を破棄し、in-flight結果を採用せず、後続Runtimeへの要求を止める。再選択時は新しい観測を行う。Permission、Approval、Broker統治経路は変更しない。
+
+- 最新`origin/main`の変更前commit `e78c12230872cd834b9ce0478db70a7e9917584f`から作成した非OneDrive managed worktreeへ同じMobile source/test差分を適用した。`flutter test test/resource_overview_test.dart`: 2件成功。画面選択・離脱・再入場と遅延応答後の後続Runtime要求抑止を検査する。
+- 同worktreeの`apps/mobile_flutter`で`flutter test`: 20件すべて成功。これはFlutter widget/client testであり、Android実機・installed product・TLS/Device Link LIVE_RUNTIME結合の証拠ではない。
+- `apps/mobile_flutter`と`apps/desktop_flutter`の`flutter analyze`は、分析serverから途中で切れたLSP初期化JSONを受けた`FormatException`でexit 1。成功・警告なしとは扱わない。Dart formatterは変更3 fileに成功した。
+- Release blocker 14件、Android実機凍結、`release_ready=false`を維持する。Flutter画面試験はDevice Link native境界または正式製品の実機証拠を代替しない。
+
 ## D4 Pocket Phase 9 履歴承認の期限監視を期限駆動へ変更（2026-09-28）
 
 実行履歴画面の100ms周期timerを廃止し、履歴承認の残り時間について壁時計と単調時計の早い方で一度限りの期限timerを設定する。承認の再確認後にtimerを更新し、従来の2秒ごとの承認・履歴再取得、期限切れ時の表示消去、背景化・画面離脱時の破棄は維持する。承認の意味、Broker権限、履歴取得頻度は変更しない。
