@@ -2234,6 +2234,30 @@ validation_update_2026_09_28_codex_task_profile_boundary:
       command: git diff --check
       status: passed
       exit: 0
+    - name: windows_manual_rust_validation
+      workflow: .github/workflows/windows-manual-rust-validation.yml
+      trigger: workflow_dispatch
+      run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263
+      job: rust-validation
+      status: passed
+      target_branch: codex/task-profile-boundary
+      target_commit: 3bcec331f66ae9664ab8a86e6efe8558649f0e8a
+      runner_os: Windows Server 2025
+      runner_image: win25-vs2026/20260922.246.2
+      rust: rustc 1.95.0 (59807616e 2026-04-14)
+      cargo: cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+      checks:
+        - checkout SHA matched workflow commit
+        - rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/mcp.rs passed
+        - rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs passed
+        - cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+        - cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed
+        - 12 test targets: 389 passed, 0 failed, 0 ignored
+        - post-test working tree clean
+      test_temp: D:\a\_temp\gui-shell-test-temp
+      evidence_classification: FIXTURE | LIVE_RUNTIME
+      artifact: none
+      scope_limit: Hosted Windows Rust validation only; no installed-product, local Application Control, Agent Task sandbox, or release-readiness proof.
   authority_and_release:
     task_execution: unsupported
     release_ready: false

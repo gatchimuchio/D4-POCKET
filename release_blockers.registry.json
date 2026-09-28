@@ -101,6 +101,14 @@
     {
       "name": "comprehensive_extension_rev1_completion",
       "current_observation": "2026-09-28のCodex sandbox helper再検査では、`:root=deny`はelevated backendがeffective `:root` readを要求して拒否し、unelevated backendもread-only accessにelevated backendが必要として拒否した。root denyを除いた有界profileでは通常NTFSの合成`.env`読取は拒否された一方、Workspace内書込は許可され、Workspace外書込も拒否された。しかしLocalAppDataとUserProfile直下の合成外部file読取は許可され、OneDrive配下のReparsePoint `.env`も読めた。よって広域read隔離は未成立で、Codex Agent Taskは`unsupported`のまま。これらはsandbox helperの観測であり、Broker経由の実Agent Task証拠ではない。Windows Application Control等のOS設定は変更していない。",
+      "current_validation": {
+        "workflow": ".github/workflows/windows-manual-rust-validation.yml",
+        "trigger": "workflow_dispatch",
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263",
+        "target_commit": "3bcec331f66ae9664ab8a86e6efe8558649f0e8a",
+        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／test成功。12 test target、389 passed、0 failed、0 ignored。変更Rust fileのrustfmtと試験後cleanも成功。",
+        "scope_limit": "hosted Rust検査のみ。実Agent Task、filesystem隔離、installed product、release readinessを証明しない。"
+      },
       "status": "unresolved",
       "status_source": "manual",
       "active": true,

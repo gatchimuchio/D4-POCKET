@@ -15,11 +15,13 @@ Windows runnerでRustのbuild／test／検査が必要な作業では、`.github
 
 Windows runner初回試験ではsystem `TEMP`／`TMP`が`C:\Users\RUNNER~1\...`のDOS短縮名となり、Workspace rootの短縮名迂回防止規則がtest fixtureを拒否した。製品側のtilde拒否は維持し、workflowのRust検査step内だけ`TEMP`／`TMP`を`RUNNER_TEMP`配下の通常pathへ向ける。これはtest環境設定であり、製品rootの検査規則を緩和しない。
 
-最新の手動run [Windows Rust manual validation #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)は一時branch `codex/japanese-diagnostic`のcommit `84d402a930af48a6d29ce5075ba8692b02bddfd4`をWindows Server 2025／Rust 1.95.0で検査し、全target check／test、試験後clean確認が成功した（12 target、389 passed）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはWindows hosted Rust検査の補助証拠だけであり、installed product、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
+前回の手動run [Windows Rust manual validation #11](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36424314077)は一時branch `codex/japanese-diagnostic`のcommit `84d402a930af48a6d29ce5075ba8692b02bddfd4`に対する検査履歴として保持する。Windows Server 2025／Rust 1.95.0、全target check／testと試験後clean確認が成功（12 target、389 passed）。
+
+最新の手動run [Windows Rust manual validation #12](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36433328263)は一時branch `codex/task-profile-boundary`のcommit `3bcec331f66ae9664ab8a86e6efe8558649f0e8a`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査し、checkout SHA照合、変更Rust fileを含むrustfmt、全target check／test、試験後clean確認が成功した（12 target、389 passed／0 failed／0 ignored）。Rust test `TEMP`／`TMP`は`D:\a\_temp\gui-shell-test-temp`。これはhosted Windows Rust検査の補助証拠だけであり、installed product、実Agent Task、ローカルApplication Control、release readinessは証明しない。詳細は`docs/REV2_PROGRESS.md`と`VALIDATION.txt`。
 
 ## Phase 7 Codex Task permission profileの現行観測（2026-09-28）
 
-Codex Task filesystem overrideを単一tableへ統合し、`glob_scan_max_depth=8`が後続設定に置き換えられないことをConformanceで固定した。Windows sandbox helperの最新合成marker観測では、通常NTFSのWorkspace内`.env`読取とWorkspace外書込は拒否、Workspace内書込は許可されたが、UserProfile／LocalAppData内の外部readとOneDrive `ReparsePoint` `.env`読取は許可された。`:root=deny`は現行Windows helperのelevated／unelevated両backendで起動不可だった。従って広域read隔離は未成立であり、Adapterの`task_execution=unsupported`を維持する。helper検査は実Broker Agent Taskではなく、Windows Application Control等の保護設定も変更していない。手動Windows Actions結果と対象commitは`VALIDATION.txt`および`docs/REV2_PROGRESS.md`の本追補を更新して記録する。
+Codex Task filesystem overrideを単一tableへ統合し、`glob_scan_max_depth=8`が後続設定に置き換えられないことをConformanceで固定した。Windows sandbox helperの最新合成marker観測では、通常NTFSのWorkspace内`.env`読取とWorkspace外書込は拒否、Workspace内書込は許可されたが、UserProfile／LocalAppData内の外部readとOneDrive `ReparsePoint` `.env`読取は許可された。`:root=deny`は現行Windows helperのelevated／unelevated両backendで起動不可だった。手動Windows Actions run #12はRust全target検査に成功したが、この結果はhelper境界の欠陥や実Broker Task経路を解消しない。従って広域read隔離は未成立であり、Adapterの`task_execution=unsupported`を維持する。helper検査は実Broker Agent Taskではなく、Windows Application Control等の保護設定も変更していない。
 
 ## 現行D4 Pocket統合単位（2026-09-28）
 
