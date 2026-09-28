@@ -2,6 +2,14 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## Phase 7 Codex Task mxc sandbox直接CLI probeとroot deny（2026-09-29）
+
+Codex Task専用sandbox方式をWindowsで`mxc`に固定し、単一filesystem override tableへ`:root=deny`、`:minimal=read`、Workspace内の有界secret denyを設定した。ユーザー設定からbackend選択を変えられない既存起動経路を維持し、Dialogueはread-onlyのままにした。旧elevated設定下で`:root=deny`が起動不能だった履歴は当時の事実として保持する。
+
+installed Codex CLI `0.158.0-alpha.2.1`の`codex sandbox`をモデルなしで直接起動し、合成markerに対する局所probeを実施した。Workspace内通常fileとTask scratch相当pathの読書込は許可され、OneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部pathへのwriteは拒否された。一方、`:minimal=read`の範囲で`C:/Windows/win.ini`はread可能だった。従って広域read隔離や秘密file全般の拒否は主張しない。この`LIVE_RUNTIME`証拠は直接CLIと合成pathだけで、Rust Broker、`codex exec`、Owner Approval、実Agent Task、Credentialを使う処理を通していない。
+
+source変更commitは一時branch `codex/agent-task-mxc-sandbox`の`8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`としてpush済み。focused Rust試験、Rust全target check／test（389 passed）、Schema 149／example 149／negative fixture 192、Conformance 225、厳格日本語監査、登録済み開発validatorはローカルで成功した。手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)も当該commitで成功し、checkout SHA、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後cleanを確認した。証拠はhosted Windows Rust検査に限る。`task_execution=unsupported`、Agent Task隔離の`release_blocker`、`release_ready=false`を維持し、実Broker経路での実証まではsupportedへ変更しない。
+
 ## 全体検索のsnapshot出所を自己申告から分離しWindows Flutter全testを検証（2026-09-29）
 
 `ShellSnapshot.fromJson`はJSON内の`snapshot_source`を証拠として採用せず、出所を`unverified`に固定する。製品Broker取得経路は必要な応答を受理した後にだけ`broker`または`broker_unavailable`を設定する。全体検索はBroker由来と確認できないsnapshotを`不明`と表示し、出所自体はAuthorityとして使わない。回帰testは外部JSONが`snapshot_source=broker`を自己申告してもBroker証拠へ昇格しないことを確認する。

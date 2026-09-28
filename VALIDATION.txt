@@ -2270,6 +2270,98 @@ validation_update_2026_09_28_codex_task_profile_boundary:
       required_action: Establish and prove the complete Workspace boundary and production Task path before changing task_execution from unsupported.
       blocks_release: yes
 
+validation_update_2026_09_29_codex_task_mxc_direct_cli_probe:
+  scope: Record the exact Codex Task sandbox source change and bounded direct CLI smoke evidence; do not claim Broker Agent Task support
+  base_main_commit: bd061d7f2f4a6eb43f2649c93bbde5dd7e35bbb9
+  source_branch: codex/agent-task-mxc-sandbox
+  source_commit: 8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9
+  implementation:
+    - Codex Task pins windows.sandbox=mxc; Dialogue remains read-only
+    - The single Task filesystem override includes :root=deny, :minimal=read, bounded Workspace secret globs, and network disabled
+    - Conformance requires the fixed mxc and root-deny policy
+  direct_cli_probe:
+    command: codex sandbox -P d4p-agent-task -C <repository>
+    cli_version: 0.158.0-alpha.2.1
+    evidence_classification: LIVE_RUNTIME
+    result:
+      - synthetic OneDrive .env ReparsePoint read denied
+      - synthetic path outside Workspace read denied
+      - arbitrary external write denied
+      - ordinary Workspace file and Task-scratch-like path read/write allowed
+      - C:/Windows/win.ini remained readable through :minimal=read
+    evidence_scope: Direct Codex sandbox process with synthetic paths only; no Rust Broker, codex exec, Owner Approval, production Agent Task, or credential use
+  local_checks:
+    - command: python -X utf8 tooling/schema_check/check_schemas.py
+      status: passed
+      result: 149 schemas, 149 positive examples, 192 negative fixtures
+      evidence_classification: FIXTURE
+    - command: python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+      status: passed
+      result: 225 checks
+      evidence_classification: FIXTURE | INTERNAL_STATE
+    - command: python -X utf8 tooling/日本語基底監査.py --strict
+      status: passed
+      result: 0 debt files, 0 findings
+      evidence_classification: CONFIG
+    - command: rustfmt --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs
+      status: passed
+      evidence_classification: FIXTURE
+    - command: cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1
+      status: passed
+      evidence_classification: FIXTURE
+    - command: cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+      status: passed
+      evidence_classification: FIXTURE
+    - command: cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+      status: passed
+      result: 12 test targets, 389 passed, 0 failed, 0 ignored
+      evidence_classification: FIXTURE
+  host_policy:
+    windows_application_control: unchanged
+    registry_or_WDAC_changes: none
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+    paid_model_or_production_agent_task_run: false
+  release_gate_impact:
+    - item: Broker-governed Agent Task filesystem isolation and lifecycle
+      classification: release_blocker
+      reason: Direct CLI synthetic-path smoke does not prove the Rust Broker production execution path, complete secret denial, recovery, audit, or Agent isolation.
+      required_action: Prove these properties through the actual Windows Broker Task path before marking task_execution supported.
+      blocks_release: yes
+
+validation_update_2026_09_29_codex_task_windows_actions_run14:
+  scope: Hosted Windows Rust validation for the exact Codex Task mxc/root-deny source commit
+  workflow: .github/workflows/windows-manual-rust-validation.yml
+  trigger: workflow_dispatch
+  run: https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841
+  job_id: 109035308014
+  job: rust-validation
+  status: passed
+  target_branch: codex/agent-task-mxc-sandbox
+  target_commit: 8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9
+  runner_os: Windows Server 2025
+  runner_image: win25-vs2026/20260922.246.2
+  rust_toolchain: 1.95.0
+  checks:
+    - checkout HEAD matched GITHUB_SHA
+    - rustfmt check passed for native/rust_helper/src/mcp.rs and native/rust_helper/src/adapters/codex_cli.rs
+    - cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets passed
+    - cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed: 12 targets, 389 passed, 0 failed, 0 ignored
+    - post-test working tree clean
+  artifact: none
+  evidence_scope: Hosted Windows Rust test/build evidence for this exact commit only; does not prove local Application Control behavior, Broker-governed Agent Task isolation, installed-product behavior, or release readiness.
+  authority_and_release:
+    task_execution: unsupported
+    release_ready: false
+    local_windows_security_policy_changed: false
+  release_gate_impact:
+    - item: Broker-governed Agent Task filesystem isolation and lifecycle
+      classification: release_blocker
+      reason: Rust build/test success and direct Codex sandbox synthetic-path smoke do not establish the production Broker Task path, complete secret denial, recovery, audit, or Agent isolation.
+      required_action: Keep task_execution unsupported until these properties pass through the actual Windows Broker Task path.
+      blocks_release: yes
+
 validation_update_2026_09_29_global_search_snapshot_provenance:
   scope: Prevent imported snapshot_source self-assertion from becoming Broker provenance and verify the changed Flutter path on hosted Windows without changing local OS protections
   base_commit: 5fea434f8f5e7e30c854a950bdc977c857a93bc7
