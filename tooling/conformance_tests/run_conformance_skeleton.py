@@ -5182,6 +5182,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_process_tree_supervision_unsupported",
         "mcp_server_unavailable",
         "mcp_timeout",
+        "改行到着前から256 KiBを上限として逐次読取り",
         "release_blocker",
     )
     for token in required_tokens:
@@ -5291,6 +5292,9 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("validate_tool_call", rust_mcp),
         ("env_clear", rust_stdio),
         ("mcp_timeout", rust_stdio),
+        ("read_bounded_line", rust_stdio),
+        ("fill_buf", rust_stdio),
+        ("mcp_wire_oversized", rust_stdio),
         ("McpProtocolEra::Legacy", rust_stdio),
         ("mcp_owner_required", rust_center),
         ("mcp_normal_channel_required", rust_center),
@@ -5308,6 +5312,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     ):
         if token not in source:
             不整合.append(f"C9実装に統治境界tokenがない: {token}")
+    if "read_until(b'\\n'" in rust_stdio or 'read_until(b"\\n"' in rust_stdio:
+        不整合.append("C9 MCP stdio readerが行上限前に無制限蓄積するread_untilを使用している")
     rust_protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
     main = (RUST_HELPER / "src" / "main.rs").read_text(encoding="utf-8")

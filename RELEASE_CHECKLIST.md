@@ -382,7 +382,7 @@ known limitation を認める条件は、次のとおりである。
   classification: release_blocker
   registry_id: windows_rust_integration_test_execution_policy
   status: unresolved
-  reason: 現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`ではRust library 326件が成功した後、次の`gui_shell_desktop_launcher` test executableがWindows Application ControlのOS error 4551で起動前に拒否され、後続targetを含む全target試験は未完了である。過去sourceの全target成功記録は履歴として保持し、今回sourceの成功へ転用しない。
+  reason: 現行sourceで`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。最新の`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はexit 1。library 331件、main 10件、Broker IPC 10件、canonical hash 1件、checkpoint 8件、protected data 2件、protected startup 1件（計363件）が成功し、Desktop launcher targetは0件で正常起動した。その次の`protected_store` test executableはWindows Application ControlのOS error 4551で起動前に拒否され、後続targetを含む全target試験は未完了である。MCP stdio focused試験5件も成功したが、全target試験の代替ではない。過去sourceの全target成功記録は履歴として保持し、今回sourceの成功へ転用しない。
   required_action: Windows Application Controlを弱めず、test除外や拒否file移動もせずに全Rust targetを実行できる承認済みWindows環境で、現行sourceの全target試験を完遂する。
   blocks_release: yes
 

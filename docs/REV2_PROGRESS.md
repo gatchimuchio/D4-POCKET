@@ -2,6 +2,20 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP stdio応答行の事前上限（2026-09-28）
+
+stdout readerは改行を待って`read_until`で行全体を蓄積してから長さを確認していたため、改行を返さないServerが256 KiBを超えてメモリを消費できた。`fill_buf`／`consume`による逐次readerへ置き換え、行の蓄積上限を超えた時点で`mcp_wire_oversized`を返し、接続をfail-closedに終了する。正常な複数行とEOF直前の改行なし行は従来どおり読む。stdout channelは既存の有界容量32を維持する。MCP Authority、接続許可、外部公開範囲は変更していない。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib bounded_line_tests -- --test-threads=1`：2件成功。複数の改行終端行、EOF直前の行、256 KiB境界値の受理、改行なし上限超過を確認。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::mcp_stdio:: -- --test-threads=1`：5件成功。上記に加えてWindows fake-serverのprocess群監督と、method-not-found限定fallback／invalid-params時no-fallbackを確認。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- 先行する同一sourceの全target試行ではlibrary 331件の後、`gui_shell_desktop_launcher` test executableがWindows Application Control（OS error 4551）で起動前にblockされた。続く試行で同targetは0件起動し、`protected_store`で阻止された。実行制御の揺らぎを含む履歴であり、いずれも全target test成功ではない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。library 331件、main 10件、Broker IPC 10件、canonical hash 1件、checkpoint 8件、protected data 2件、protected startup 1件（計363件）が成功し、Desktop launcher targetも0件で正常起動した。次の`protected_store` test executableはWindows Application Control（OS error 4551）で起動前にblockされ、後続targetは未実行。policy変更、test除外、拒否file移動はしていない。全target test成功とは扱わず、`windows_rust_integration_test_execution_policy`をunresolved／activeのまま維持する。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：Manifest更新後exit 0。strict日本語監査、Schema 147／147／187、Conformance 225 checks、Manifest、Release Gate、packaging portability、release smoke、evidence bundle等の開発検査は成功。Windows release blocker 5件を保持し`release_ready=false`。formal installed product、外部MCP Server、release証拠ではない。
+- `rustfmt --edition 2021 --config skip_children=true native/rust_helper/src/adapters/mcp_stdio.rs`、`git diff --check`：成功。Manifestは1092 file hashで再生成。
+
+この修正はreaderの上限処理を単体および既存fake-server経路で検証する。MCP Server一般の信用、Tool実行、Resource／Prompt本文取得や正式製品での運用を証明しない。C9の未成立範囲と`release_ready=false`を維持する。
+
 ## D4 Pocket C9 MCP modern要求metadataとlegacy fallbackの境界修正（2026-09-28）
 
 公式MCP 2026-07-28仕様との照合で、新protocol要求に必須の`clientCapabilities`欠落と、discoveryの失敗全般で旧protocolへ再起動する問題を修正した。全要求に固定client識別と、追加機能を宣言しない空の能力objectを付す。応答`resultType`は`complete`以外を拒否し、旧応答との互換のため欠落だけを許容する。旧protocolへの切替はJSON-RPCのmethod not found（`-32601`）または対応版なしの場合に限り、通信期限切れ・parameter不正・応答形式不正などでは再試行しない。公式版と適用範囲は`規定/正本索引.json`へ固定した。

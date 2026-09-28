@@ -24,7 +24,7 @@ owner control
   → metadata-only receipt
 ```
 
-`MCP接続一覧`は通常IPCの読み取り専用経路であり、owner channelからは拒否する。接続開始、受信、受理、一覧返却には永続Auditを要求する。child processは環境変数をallowlistへ制限し、stderrを取り込まず、response timeout、line上限、終了状態をfail-closedで扱う。
+`MCP接続一覧`は通常IPCの読み取り専用経路であり、owner channelからは拒否する。接続開始、受信、受理、一覧返却には永続Auditを要求する。child processは環境変数をallowlistへ制限し、stderrを取り込まず、response timeout、line上限、終了状態をfail-closedで扱う。stdoutの各行は改行到着前から256 KiBを上限として逐次読取り、超過時は残りを無制限に蓄積せず接続を失敗させる。
 
 Desktop設定のMCP接続センターは、サーバー識別子、Windows絶対実行file、Windows絶対workspace、1行1項目のstdio引数を受け取る接続設定面を持つ。Flutterはpath、process、Credentialへ直接アクセスせず、Credential入力欄も持たない。接続要求には`Credential ref`の固定missing値だけを含め、Credential実値やAuthority fieldを送らない。引数へ秘密値を入力しないよう画面に警告する。
 

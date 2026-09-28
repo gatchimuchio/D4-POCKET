@@ -37,7 +37,7 @@ const SAFE_ENVIRONMENT: &[&str] = &[
 pub struct McpStdioConnection {
     child: super::process_tree::SupervisedChild,
     stdin: ChildStdin,
-    lines: Receiver<Vec<u8>>,
+    lines: Receiver<Result<Vec<u8>, McpError>>,
     era: McpProtocolEra,
     catalog: McpCatalog,
 }
@@ -129,15 +129,17 @@ impl McpStdioConnection {
             .spawn(move || {
                 let mut reader = BufReader::new(stdout);
                 loop {
-                    let mut line = Vec::new();
-                    match reader.read_until(b'\n', &mut line) {
-                        Ok(0) => break,
-                        Ok(_) => {
-                            if line.len() > MAX_STDIO_LINE_BYTES || sender.send(line).is_err() {
+                    match read_bounded_line(&mut reader) {
+                        Ok(Some(line)) => {
+                            if sender.send(Ok(line)).is_err() {
                                 break;
                             }
                         }
-                        Err(_) => break,
+                        Ok(None) => break,
+                        Err(error) => {
+                            let _ = sender.send(Err(error));
+                            break;
+                        }
                     }
                 }
             });
@@ -227,7 +229,8 @@ impl McpStdioConnection {
                 ));
             }
             let line = match self.lines.recv_timeout(remaining) {
-                Ok(line) => line,
+                Ok(Ok(line)) => line,
+                Ok(Err(error)) => return Err(error),
                 Err(RecvTimeoutError::Timeout) => {
                     return Err(McpError::new(
                         "mcp_timeout",
@@ -295,6 +298,36 @@ impl Drop for McpStdioConnection {
     }
 }
 
+fn read_bounded_line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, McpError> {
+    let mut line = Vec::with_capacity(8 * 1024);
+    loop {
+        let available = reader.fill_buf().map_err(|_| {
+            McpError::new("mcp_server_unavailable", "MCP stdio responseを読み取れない")
+        })?;
+        if available.is_empty() {
+            return if line.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(line))
+            };
+        }
+
+        let newline = available.iter().position(|byte| *byte == b'\n');
+        let consumed = newline.map_or(available.len(), |index| index + 1);
+        if line.len().saturating_add(consumed) > MAX_STDIO_LINE_BYTES {
+            return Err(McpError::new(
+                "mcp_wire_oversized",
+                "MCP stdio response lineが上限を超過した",
+            ));
+        }
+        line.extend_from_slice(&available[..consumed]);
+        reader.consume(consumed);
+        if newline.is_some() {
+            return Ok(Some(line));
+        }
+    }
+}
+
 fn json_object() -> serde_json::Value {
     serde_json::json!({})
 }
@@ -342,6 +375,48 @@ fn secret_component(path: &Path) -> bool {
         let value = component.as_os_str().to_string_lossy().to_ascii_lowercase();
         matches!(value.as_str(), ".env" | ".ssh" | ".gnupg" | "secrets")
     })
+}
+
+#[cfg(test)]
+mod bounded_line_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn reads_newline_terminated_and_final_unterminated_lines() {
+        let mut terminated = BufReader::new(Cursor::new(b"{}\nnext\n".to_vec()));
+        assert_eq!(
+            read_bounded_line(&mut terminated).unwrap(),
+            Some(b"{}\n".to_vec())
+        );
+        assert_eq!(
+            read_bounded_line(&mut terminated).unwrap(),
+            Some(b"next\n".to_vec())
+        );
+
+        let mut final_line = BufReader::new(Cursor::new(b"{}".to_vec()));
+        assert_eq!(
+            read_bounded_line(&mut final_line).unwrap(),
+            Some(b"{}".to_vec())
+        );
+        assert_eq!(read_bounded_line(&mut final_line).unwrap(), None);
+    }
+
+    #[test]
+    fn rejects_a_line_that_exceeds_the_limit_before_newline() {
+        let mut exact_limit = vec![b'x'; MAX_STDIO_LINE_BYTES - 1];
+        exact_limit.push(b'\n');
+        let mut reader = BufReader::new(Cursor::new(exact_limit));
+        assert_eq!(
+            read_bounded_line(&mut reader).unwrap().unwrap().len(),
+            MAX_STDIO_LINE_BYTES
+        );
+
+        let input = vec![b'x'; MAX_STDIO_LINE_BYTES + 1];
+        let mut reader = BufReader::new(Cursor::new(input));
+        let error = read_bounded_line(&mut reader).expect_err("超過行を拒否");
+        assert_eq!(error.code, "mcp_wire_oversized");
+    }
 }
 
 #[cfg(all(test, windows))]

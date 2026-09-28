@@ -145,11 +145,11 @@
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "sha256": "c25f7543836c403e7c5171cb91f56de76dd930d2e442de30ec0a4dd103fe32e7"
+      "sha256": "2e4646c5a2c74b9d25fd7e08319aceda082f9273d5cbe546c5e7c65275ee44b9"
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "97e7327db8bd318d81094022ad7351e7779e80a4a19fc5cd347792230ffb3174"
+      "sha256": "53c4e124abf26b336ca6b2736bfa4d68bbbcfb629f977ead67d9d20ef711eacb"
     },
     {
       "path": "SECURITY.md",
@@ -1177,7 +1177,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "5e7b1698f6d0775dc7d3580d9e354db14c3f8ae750d4adc901d62be5bb1790a2"
+      "sha256": "a3bc8453e82d67c504001960bea711a44cd63edd6dcf4889060146c800346b66"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1385,7 +1385,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "504200ce89c4ecfea4e73e77f5e14bf3ccb3053767720aa79820c42547ac5555"
+      "sha256": "810773c71c7feb2ca5df2623246fea37c531ec7a61f6ab7cae7a0812e27e200d"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -2941,7 +2941,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
-      "sha256": "c73c72e7f96be5bc6feee2b1ccaf94609af0f68e8f969b68b15ea3215754d7f5"
+      "sha256": "8daa4e81ef9d0ae8bc42cc853e4016545e4b06c303fd0985eb46162674d0cdd8"
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
@@ -3665,7 +3665,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "f315b842596b27cbcfbdea9d1b5dd4d526d15831691c72e64c4056158fcb5ea9"
+      "sha256": "d9f1bb71f0b825cfd9d880fae7e4d9a0715a933b1d19a2c1f916ff68a4654072"
     },
     {
       "path": "requirements-dev.txt",
@@ -4305,7 +4305,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "515c529cc2ee9ec68c332faa1ed706285746d3e67623de2020aeaa9949c66679"
+      "sha256": "b3a898b5197af8e06d9eccd21eb62180a11f551a7002b404f964f63813243e59"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
