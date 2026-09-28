@@ -466,6 +466,13 @@ pub struct McpCatalog {
     pub prompts: Vec<McpPrompt>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct McpToolCallSummary {
+    pub result_hash: String,
+    pub is_error: bool,
+    pub content_types: Vec<String>,
+}
+
 impl McpCatalog {
     pub fn to_metadata_projection(
         &self,
@@ -571,6 +578,25 @@ impl McpCatalog {
         }))
     }
 
+    pub fn validate_tool_identity_and_call(
+        &self,
+        tool_id: &str,
+        name: &str,
+        arguments: &Value,
+    ) -> Result<(), McpError> {
+        let tool = self
+            .tools
+            .iter()
+            .find(|tool| tool.tool_id == tool_id && tool.name == name)
+            .ok_or_else(|| {
+                McpError::new(
+                    "mcp_tool_identity_mismatch",
+                    "現在CatalogのTool IDと名前が一致しない",
+                )
+            })?;
+        self.validate_tool_call(&tool.name, arguments)
+    }
+
     pub fn validate_tool_call(&self, name: &str, arguments: &Value) -> Result<(), McpError> {
         let tool = self
             .tools
@@ -664,6 +690,227 @@ pub fn parse_tools_response(message: &McpJsonRpcMessage) -> Result<Vec<McpTool>,
         });
     }
     Ok(tools)
+}
+
+pub fn summarize_tool_call_result(
+    message: &McpJsonRpcMessage,
+) -> Result<McpToolCallSummary, McpError> {
+    if message.error.is_some() {
+        return Err(McpError::new(
+            "mcp_tool_remote_error",
+            "MCP Tool応答がJSON-RPC errorで終了した",
+        ));
+    }
+    let result = message
+        .result
+        .as_ref()
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            McpError::new("mcp_tool_result_invalid", "Tool応答resultがobjectではない")
+        })?;
+    if result
+        .get("resultType")
+        .is_some_and(|value| value != "complete")
+    {
+        return Err(McpError::new(
+            "mcp_tool_result_type_unsupported",
+            "MCP Tool結果がcompleteではない",
+        ));
+    }
+    if result.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "resultType" | "content" | "structuredContent" | "isError" | "_meta"
+        )
+    }) {
+        return Err(McpError::new(
+            "mcp_tool_result_unknown_field",
+            "Tool応答resultに未対応fieldがある",
+        ));
+    }
+    if result
+        .get("structuredContent")
+        .is_some_and(|value| !value.is_object())
+        || result
+            .get("isError")
+            .is_some_and(|value| !value.is_boolean())
+        || result.get("_meta").is_some_and(|value| !value.is_object())
+    {
+        return Err(McpError::new(
+            "mcp_tool_result_invalid",
+            "Tool応答のstructuredContent、isErrorまたは_metaが不正",
+        ));
+    }
+    let blocks = result
+        .get("content")
+        .and_then(Value::as_array)
+        .filter(|blocks| blocks.len() <= 128)
+        .ok_or_else(|| {
+            McpError::new(
+                "mcp_tool_result_invalid",
+                "Tool応答contentがないか件数上限を超過した",
+            )
+        })?;
+    let mut content_types = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        let object = block.as_object().ok_or_else(|| {
+            McpError::new(
+                "mcp_tool_result_invalid",
+                "Tool応答content blockがobjectではない",
+            )
+        })?;
+        let content_type = object
+            .get("type")
+            .and_then(Value::as_str)
+            .filter(|kind| {
+                matches!(
+                    *kind,
+                    "text" | "image" | "audio" | "resource_link" | "resource"
+                )
+            })
+            .ok_or_else(|| {
+                McpError::new(
+                    "mcp_tool_result_type_unsupported",
+                    "Tool応答content typeが未対応",
+                )
+            })?;
+        if object.keys().any(|key| {
+            !matches!(
+                key.as_str(),
+                "type"
+                    | "text"
+                    | "data"
+                    | "mimeType"
+                    | "uri"
+                    | "name"
+                    | "title"
+                    | "description"
+                    | "annotations"
+                    | "_meta"
+                    | "resource"
+                    | "icons"
+            )
+        }) {
+            return Err(McpError::new(
+                "mcp_tool_result_unknown_field",
+                "Tool応答contentに未対応fieldがある",
+            ));
+        }
+        if object.get("_meta").is_some_and(|value| !value.is_object())
+            || object
+                .get("annotations")
+                .is_some_and(|value| !valid_tool_annotations(value))
+        {
+            return Err(McpError::new(
+                "mcp_tool_result_invalid",
+                "Tool応答content metadataが不正",
+            ));
+        }
+        let valid_content = match content_type {
+            "text" => object.get("text").is_some_and(Value::is_string),
+            "image" | "audio" => {
+                object.get("data").is_some_and(Value::is_string)
+                    && object.get("mimeType").is_some_and(Value::is_string)
+            }
+            "resource_link" => {
+                object.get("uri").is_some_and(Value::is_string)
+                    && object.get("name").is_some_and(Value::is_string)
+                    && ["title", "description", "mimeType"]
+                        .iter()
+                        .all(|key| object.get(*key).is_none_or(Value::is_string))
+                    && object
+                        .get("icons")
+                        .is_none_or(|icons| valid_tool_icons(icons))
+            }
+            "resource" => object
+                .get("resource")
+                .is_some_and(valid_embedded_tool_resource),
+            _ => false,
+        };
+        if !valid_content {
+            return Err(McpError::new(
+                "mcp_tool_result_invalid",
+                "Tool応答content blockの必須fieldまたは型が不正",
+            ));
+        }
+        content_types.push(content_type.to_string());
+    }
+    let result_hash = sha256_tagged(
+        &serde_json::to_vec(&Value::Object(result.clone())).map_err(|_| {
+            McpError::new("mcp_tool_result_invalid", "Tool応答resultをhash化できない")
+        })?,
+    );
+    Ok(McpToolCallSummary {
+        result_hash,
+        is_error: result.get("isError") == Some(&Value::Bool(true)),
+        content_types,
+    })
+}
+
+fn valid_tool_annotations(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    !object
+        .keys()
+        .any(|key| !matches!(key.as_str(), "audience" | "priority" | "lastModified"))
+        && object.get("audience").is_none_or(|audience| {
+            audience
+                .as_array()
+                .is_some_and(|values| values.len() <= 8 && values.iter().all(Value::is_string))
+        })
+        && object.get("priority").is_none_or(|priority| {
+            priority
+                .as_f64()
+                .is_some_and(|value| (0.0..=1.0).contains(&value))
+        })
+        && object
+            .get("lastModified")
+            .is_none_or(|value| value.is_string())
+}
+
+fn valid_tool_icons(value: &Value) -> bool {
+    let Some(icons) = value.as_array() else {
+        return false;
+    };
+    icons.len() <= 16
+        && icons.iter().all(|icon| {
+            let Some(object) = icon.as_object() else {
+                return false;
+            };
+            !object
+                .keys()
+                .any(|key| !matches!(key.as_str(), "src" | "mimeType" | "sizes" | "theme"))
+                && object.get("src").is_some_and(Value::is_string)
+                && object.get("mimeType").is_none_or(Value::is_string)
+                && object.get("sizes").is_none_or(|sizes| {
+                    sizes.as_array().is_some_and(|values| {
+                        values.len() <= 16 && values.iter().all(Value::is_string)
+                    })
+                })
+                && object.get("theme").is_none_or(|theme| {
+                    theme
+                        .as_str()
+                        .is_some_and(|value| matches!(value, "light" | "dark"))
+                })
+        })
+}
+
+fn valid_embedded_tool_resource(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    !object.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "uri" | "mimeType" | "text" | "blob" | "annotations" | "_meta"
+        )
+    }) && object.get("uri").is_some_and(Value::is_string)
+        && object.get("mimeType").is_some_and(Value::is_string)
+        && (object.get("text").is_some_and(Value::is_string)
+            ^ object.get("blob").is_some_and(Value::is_string))
+        && object.get("annotations").is_none_or(valid_tool_annotations)
+        && object.get("_meta").is_none_or(Value::is_object)
 }
 
 fn validate_tool_input_schema(schema: &Value) -> Result<(), McpError> {
@@ -933,18 +1180,30 @@ fn contains_authority_key(value: &Value) -> bool {
     match value {
         Value::Object(object) => {
             object.keys().any(|key| {
+                let key = key.to_ascii_lowercase();
                 matches!(
                     key.as_str(),
                     "authority"
                         | "authority_id"
+                        | "permission"
                         | "permission_id"
+                        | "approval"
                         | "approval_id"
+                        | "capability"
                         | "capability_grant"
                         | "secret"
                         | "secret_value"
+                        | "secretvalue"
                         | "token"
+                        | "access_token"
+                        | "refresh_token"
                         | "password"
+                        | "credential"
+                        | "credentials"
                         | "credential_value"
+                        | "api_key"
+                        | "apikey"
+                        | "authorization"
                 )
             }) || object.values().any(contains_authority_key)
         }
@@ -1225,6 +1484,10 @@ mod tests {
                 json!({"query": "needle", "context": {"credential_value": "marker"}}),
                 "mcp_tool_authority_injection",
             ),
+            (
+                json!({"query": "needle", "context": {"CrEdEnTiAl_Value": "marker"}}),
+                "mcp_tool_authority_injection",
+            ),
         ] {
             assert_eq!(
                 catalog
@@ -1234,6 +1497,65 @@ mod tests {
                 expected_code
             );
         }
+    }
+
+    #[test]
+    fn tool_call_requires_catalog_identity_and_hashes_but_never_projects_result_content() {
+        let catalog = catalog_with_tools(json!({"tools": [{
+            "name": "search",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                "additionalProperties": false
+            }
+        }]}));
+        let tool = &catalog.tools[0];
+        assert_eq!(tool.tool_id.len(), 147);
+        assert!(catalog
+            .validate_tool_identity_and_call(&tool.tool_id, "search", &json!({"query":"ok"}))
+            .is_ok());
+        assert_eq!(
+            catalog
+                .validate_tool_identity_and_call("tool-deadbeef", "search", &json!({"query":"ok"}))
+                .expect_err("異なるTool IDを拒否")
+                .code,
+            "mcp_tool_identity_mismatch"
+        );
+
+        let result = response(
+            3,
+            json!({
+                "content": [{"type":"text", "text":"SENSITIVE_OUTPUT_MARKER"}],
+                "isError": false
+            }),
+        );
+        let summary = summarize_tool_call_result(&result).expect("出力をhash-only射影");
+        assert_eq!(summary.content_types, ["text"]);
+        assert!(!summary.is_error);
+        assert!(summary.result_hash.starts_with("sha256:"));
+        assert!(!serde_json::to_string(&summary)
+            .expect("要約JSON")
+            .contains("SENSITIVE_OUTPUT_MARKER"));
+    }
+
+    #[test]
+    fn tool_call_rejects_unknown_content_and_jsonrpc_error_without_exposing_details() {
+        let unknown = response(3, json!({"content": [{"type":"video", "data":"PRIVATE"}]}));
+        assert_eq!(
+            summarize_tool_call_result(&unknown)
+                .expect_err("未対応content typeを拒否")
+                .code,
+            "mcp_tool_result_type_unsupported"
+        );
+
+        let remote_error = McpJsonRpcMessage::parse_line(
+            br#"{"jsonrpc":"2.0","id":3,"error":{"code":-32000,"message":"PRIVATE_REMOTE_ERROR"}}"#,
+        )
+        .expect("JSON-RPC errorの形状");
+        let error = summarize_tool_call_result(&remote_error).expect_err("JSON-RPC errorを拒否");
+        assert_eq!(error.code, "mcp_tool_remote_error");
+        assert!(!error.message.contains("PRIVATE_REMOTE_ERROR"));
     }
 
     #[test]

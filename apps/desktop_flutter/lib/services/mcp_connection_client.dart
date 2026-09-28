@@ -47,6 +47,8 @@ class McpConnectionSummary {
     required this.tools,
     required this.resources,
     required this.prompts,
+    required this.connectionState,
+    required this.executionState,
   });
 
   final String serverId;
@@ -55,10 +57,36 @@ class McpConnectionSummary {
   final List<McpToolSummary> tools;
   final List<McpResourceSummary> resources;
   final List<McpPromptSummary> prompts;
+  final String connectionState;
+  final String executionState;
 
   int get toolCount => tools.length;
   int get resourceCount => resources.length;
   int get promptCount => prompts.length;
+}
+
+class McpToolCallReceipt {
+  const McpToolCallReceipt({
+    required this.serverId,
+    required this.toolId,
+    required this.name,
+    required this.argumentsHash,
+    required this.resultHash,
+    required this.toolError,
+    required this.contentTypes,
+    required this.connectionState,
+    required this.auditId,
+  });
+
+  final String serverId;
+  final String toolId;
+  final String name;
+  final String argumentsHash;
+  final String resultHash;
+  final bool toolError;
+  final List<String> contentTypes;
+  final String connectionState;
+  final String auditId;
 }
 
 class McpConnectionClient {
@@ -182,6 +210,104 @@ class McpConnectionClient {
     }
   }
 
+  Future<McpToolCallReceipt> callTool({
+    required String serverId,
+    required McpToolSummary tool,
+    required Map<String, Object?> arguments,
+  }) async {
+    if (!_validIdentifier(serverId) ||
+        !RegExp(r'^tool-[a-f0-9]{142}$').hasMatch(tool.toolId) ||
+        !_safeMetadataName(tool.name) ||
+        utf8.encode(jsonEncode(arguments)).length > 32 * 1024) {
+      throw const BrokerClientException('MCP Tool実行要求が不正または上限超過です');
+    }
+    final response = await _transport.request(
+      'MCP Tool実行',
+      payload: {
+        '版': 1,
+        '操作': '実行',
+        'ServerID': serverId,
+        'ToolID': tool.toolId,
+        '名前': tool.name,
+        'arguments': arguments,
+      },
+    );
+    final body = _acceptedBody(response, 'MCP Tool実行');
+    const fields = {
+      '版',
+      '契約種別',
+      'ServerID',
+      'ToolID',
+      '名前',
+      'arguments_hash',
+      'result_hash',
+      'Tool error',
+      'content_count',
+      'content_types',
+      '接続状態',
+      '能力ID',
+      '権限ID',
+      '承認状態',
+      '承認監査ID',
+      '復旧ID',
+      '権限生成',
+      '公開範囲',
+      '証拠種別',
+      '監査ID',
+    };
+    final contentTypes = body['content_types'];
+    final contentCount = body['content_count'];
+    if (body.length != fields.length ||
+        !body.keys.toSet().containsAll(fields) ||
+        body['版'] != 1 ||
+        body['契約種別'] != 'MCP Tool実行receipt' ||
+        body['ServerID'] != serverId ||
+        body['ToolID'] != tool.toolId ||
+        body['名前'] != tool.name ||
+        body['arguments_hash'] is! String ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$')
+            .hasMatch(body['arguments_hash'] as String) ||
+        body['result_hash'] is! String ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$')
+            .hasMatch(body['result_hash'] as String) ||
+        body['Tool error'] is! bool ||
+        contentCount is! int ||
+        contentCount < 0 ||
+        contentCount > 128 ||
+        contentTypes is! List ||
+        contentTypes.length != contentCount ||
+        contentTypes.any((value) =>
+            value is! String ||
+            !const {'text', 'image', 'audio', 'resource_link', 'resource'}
+                .contains(value)) ||
+        !const {'connected', 'quarantined'}.contains(body['接続状態']) ||
+        body['能力ID'] != 'mcp.tool.call' ||
+        body['権限ID'] != 'permission.mcp.tool.call.one_shot' ||
+        body['承認状態'] != 'native_owner_confirmed' ||
+        body['承認監査ID'] is! String ||
+        (body['承認監査ID'] as String).isEmpty ||
+        body['復旧ID'] != 'inspect-mcp-tool-side-effect' ||
+        body['権限生成'] != 'Broker内一回限りPermissionを消費' ||
+        body['公開範囲'] != 'hash_only' ||
+        body['証拠種別'] != 'LIVE_RUNTIME' ||
+        response['evidence_source'] != 'LIVE_RUNTIME' ||
+        body['監査ID'] is! String ||
+        (body['監査ID'] as String).isEmpty) {
+      throw const BrokerClientException('MCP Tool実行receiptの境界が不正です');
+    }
+    return McpToolCallReceipt(
+      serverId: serverId,
+      toolId: tool.toolId,
+      name: tool.name,
+      argumentsHash: body['arguments_hash'] as String,
+      resultHash: body['result_hash'] as String,
+      toolError: body['Tool error'] as bool,
+      contentTypes: List.unmodifiable(contentTypes.cast<String>()),
+      connectionState: body['接続状態'] as String,
+      auditId: body['監査ID'] as String,
+    );
+  }
+
   McpConnectionSummary _connectionSummary(Object? raw) {
     if (raw is! Map) {
       throw const BrokerClientException('MCP接続receiptがobjectではありません');
@@ -207,6 +333,7 @@ class McpConnectionClient {
       '承認状態',
       '復旧ID',
       '接続監査ID',
+      '実行状態',
     };
     if (receipt.length != receiptFields.length ||
         !receipt.keys.toSet().containsAll(receiptFields) ||
@@ -215,7 +342,10 @@ class McpConnectionClient {
         receipt['権限生成'] != 'なし' ||
         receipt['公開範囲'] != 'metadata_only' ||
         receipt['証拠種別'] != 'INTERNAL_STATE' ||
-        receipt['接続状態'] != 'connected' ||
+        !const {'connected', 'quarantined'}.contains(receipt['接続状態']) ||
+        (receipt['接続状態'] == 'connected' && receipt['実行状態'] != 'ready') ||
+        (receipt['接続状態'] == 'quarantined' &&
+            receipt['実行状態'] != 'quarantined') ||
         receipt['能力ID'] != 'mcp.connection.connect' ||
         receipt['権限ID'] != 'permission.mcp.connection.connect' ||
         receipt['承認状態'] != 'owner_control_approved' ||
@@ -254,6 +384,8 @@ class McpConnectionClient {
       tools: toolSummaries,
       resources: resourceSummaries,
       prompts: promptSummaries,
+      connectionState: receipt['接続状態'] as String,
+      executionState: receipt['実行状態'] as String,
     );
   }
 

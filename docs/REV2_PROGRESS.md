@@ -2,6 +2,15 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP Owner確認付きTool呼出し（2026-09-28）
+
+操作者がDesktop上でJSON arguments全文を確認し、Rust Desktop native Owner確認（default No）を通した場合に限り、Brokerが現在のMCP Catalog／Tool ID／inputSchema／引数を再検証して同一stdio childへ`tools/call`を一度だけ送る経路を実装した。一回限りPermissionをServer／Tool／arguments hashへ結合して消費し、Approval／Auditへ記録する。Credentialを注入せず、結果本文をUI／Audit／logへ公開せずhash-only receiptだけを返す。結果不明・timeout・応答不正・Audit失敗時は接続をquarantineし、自動再送しない。Agentへの結果引渡し・Content Exposure・外部MCP Server運用・正式releaseは未成立の`release_blocker`である。
+
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib -- --test-threads=1`：339 passed／0 failed／0 ignored。初回は既存Minidora loopback HTTP試験が1件だけ`通信失敗`となったが、同試験の単独再実行と全339件再実行はいずれも成功した。
+- Windows OneDrive作業path上のFlutter試験は`build\unit_test_assets`削除時のACL errorで起動できなかった。最新のDesktop Flutter sourceとlocal `gui_shell_ui` packageをrepo相対配置のままASCII一時copyへ移し、`flutter pub get --offline`、`flutter test test/mcp_connection_center_test.dart`（6件）、`flutter analyze --no-pub`を実行し、全て成功した。一時copyのWidget試験はnative installed product運用を証明しない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 149件／正常example 149件／negative fixture 191件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225 checksで合格。`python -X utf8 tooling/日本語基底監査.py --strict`：負債file 0件／finding 0件で合格。対象Rust整形検査も合格。
+- Local Windowsの全target Rust試験はApplication Control OS error 4551により一部test executableの起動前に停止するhost制約がある。端末のsecurity policyは変更しない。`workflow_dispatch`のみのWindows hosted runnerで、検証用branch上の確定commitを対象に全target check／testを実施後、この節へrun／commit／結果を追記する。ActionsはRust test補助証拠であり、installed product・外部MCP Server・release readinessの証拠ではない。
+
 ## D4 Pocket C9 MCP Tool引数preflightとWindows Rust全target検証（2026-09-28）
 
 MCP catalogに登録されたTool名とその`inputSchema`に対し、引数をJSON Schema Draft 2020-12で事前検査する`McpCatalog.validate_tool_call`を追加した。引数はobjectに限定し、正本化後32 KiB以下、2048 JSON node以下、深さ32以下とする。Permission、Approval、Credential等のauthority fieldはnested位置も拒否し、schema不適合・未登録Tool・上限超過は固定error codeでfail-closedにする。raw arguments、schema本文、validator詳細はmetadata projectionへ出さない。

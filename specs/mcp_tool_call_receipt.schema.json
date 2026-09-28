@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_tool_call_receipt.schema.json",
+  "title": "MCP Tool実行receipt（McpToolCallReceipt）",
+  "description": "LIVE_RUNTIME実行結果の存在とhashだけを返し、Tool結果本文を返さない。",
+  "type": "object",
+  "required": [
+    "版", "契約種別", "ServerID", "ToolID", "名前", "arguments_hash", "result_hash",
+    "Tool error", "content_count", "content_types", "接続状態", "能力ID", "権限ID",
+    "承認状態", "承認監査ID", "復旧ID", "権限生成", "公開範囲", "証拠種別", "監査ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "契約種別": { "const": "MCP Tool実行receipt" },
+    "ServerID": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "ToolID": { "type": "string", "pattern": "^tool-[a-f0-9]{142}$" },
+    "名前": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "arguments_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "Tool error": { "type": "boolean" },
+    "content_count": { "type": "integer", "minimum": 0, "maximum": 128 },
+    "content_types": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "enum": ["text", "image", "audio", "resource_link", "resource"] }
+    },
+    "接続状態": { "enum": ["connected", "quarantined"] },
+    "能力ID": { "const": "mcp.tool.call" },
+    "権限ID": { "const": "permission.mcp.tool.call.one_shot" },
+    "承認状態": { "const": "native_owner_confirmed" },
+    "承認監査ID": { "type": "string", "minLength": 1 },
+    "復旧ID": { "const": "inspect-mcp-tool-side-effect" },
+    "権限生成": { "const": "Broker内一回限りPermissionを消費" },
+    "公開範囲": { "const": "hash_only" },
+    "証拠種別": { "const": "LIVE_RUNTIME" },
+    "監査ID": { "type": "string", "minLength": 1 }
+  }
+}

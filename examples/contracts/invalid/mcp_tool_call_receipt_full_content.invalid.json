@@ -1,0 +1,23 @@
+{
+  "版": 1,
+  "契約種別": "MCP Tool実行receipt",
+  "ServerID": "mcp-fixture",
+  "ToolID": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "名前": "search",
+  "arguments_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "result_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "Tool error": false,
+  "content_count": 1,
+  "content_types": ["text"],
+  "content": [{"type": "text", "text": "SECRET_RESULT_MARKER"}],
+  "接続状態": "connected",
+  "能力ID": "mcp.tool.call",
+  "権限ID": "permission.mcp.tool.call.one_shot",
+  "承認状態": "native_owner_confirmed",
+  "承認監査ID": "audit-mcp-tool-approval-1",
+  "復旧ID": "inspect-mcp-tool-side-effect",
+  "権限生成": "Broker内一回限りPermissionを消費",
+  "公開範囲": "hash_only",
+  "証拠種別": "LIVE_RUNTIME",
+  "監査ID": "audit-mcp-tool-call-1"
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/mcp_tool_call.schema.json",
+  "title": "MCP Tool実行要求（McpToolCallRequest）",
+  "description": "native Owner確認後に限るTool呼出し。authority fieldやCredential実値を要求へ含めない。",
+  "type": "object",
+  "required": ["版", "操作", "ServerID", "ToolID", "名前", "arguments"],
+  "additionalProperties": false,
+  "properties": {
+    "版": { "const": 1 },
+    "操作": { "const": "実行" },
+    "ServerID": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "ToolID": { "type": "string", "pattern": "^tool-[a-f0-9]{142}$" },
+    "名前": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "arguments": {
+      "type": "object",
+      "maxProperties": 256,
+      "propertyNames": { "not": { "pattern": "(?i)(authority|permission|approval|capability|credential|secret|password|token|api[_-]?key|authorization)" } },
+      "additionalProperties": true
+    }
+  }
+}

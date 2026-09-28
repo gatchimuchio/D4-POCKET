@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use zeroize::Zeroize;
 use serde::Deserialize;
+use serde_json::Value;
 use crate::audit_hash::sha256_tagged;
 
 use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
@@ -94,6 +95,14 @@ enum DesktopOwnerOperationSummary {
         server_id: String,
         payload_hash: String,
     },
+    McpToolCall {
+        server_id: String,
+        tool_id: String,
+        name: String,
+        argument_count: usize,
+        arguments_hash: String,
+        payload_hash: String,
+    },
 }
 
 #[derive(Deserialize)]
@@ -154,6 +163,23 @@ struct McpDisconnectOwnerRequest {
     operation: String,
     #[serde(rename = "ServerID")]
     server_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct McpToolCallOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "ServerID")]
+    server_id: String,
+    #[serde(rename = "ToolID")]
+    tool_id: String,
+    #[serde(rename = "名前")]
+    name: String,
+    #[serde(rename = "arguments")]
+    arguments: Value,
 }
 
 fn owner_confirmation_value(value: &str) -> String {
@@ -948,6 +974,37 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::MCPTool実行 => {
+            let request: McpToolCallOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || request.operation != "実行"
+                || request.server_id.is_empty()
+                || request.server_id.len() > 128
+                || request.server_id.chars().any(char::is_control)
+                || request.tool_id.len() != 147
+                || !request.tool_id.starts_with("tool-")
+                || !request.tool_id[5..]
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                || request.name.is_empty()
+                || request.name.len() > 256
+                || request.name.chars().any(char::is_control)
+                || !mcp_arguments_within_limits(&request.arguments)
+            {
+                return None;
+            }
+            let arguments = request.arguments.as_object()?;
+            let arguments_hash = sha256_tagged(&serde_json::to_vec(&request.arguments).ok()?);
+            DesktopOwnerOperationSummary::McpToolCall {
+                server_id: request.server_id,
+                tool_id: request.tool_id,
+                name: request.name,
+                argument_count: arguments.len(),
+                arguments_hash,
+                payload_hash,
+            }
+        }
         BrokerOperation::回帰Case削除 => DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary: owner_delete_confirmation_summary(payload).ok()?,
             payload_hash,
@@ -973,6 +1030,66 @@ fn owner_operation_candidate(
         return None;
     }
     Some((normalized, summary))
+}
+
+fn mcp_arguments_within_limits(value: &Value) -> bool {
+    if !value.is_object()
+        || serde_json::to_vec(value)
+            .ok()
+            .is_none_or(|encoded| encoded.len() > 32 * 1024)
+        || mcp_argument_contains_sensitive_field(value)
+    {
+        return false;
+    }
+    let mut pending = vec![(value, 1usize)];
+    let mut nodes = 0usize;
+    while let Some((current, depth)) = pending.pop() {
+        nodes += 1;
+        if nodes > 2048 || depth > 32 {
+            return false;
+        }
+        match current {
+            Value::Object(object) => pending.extend(object.values().map(|child| (child, depth + 1))),
+            Value::Array(values) => pending.extend(values.iter().map(|child| (child, depth + 1))),
+            _ => {}
+        }
+    }
+    true
+}
+
+fn mcp_argument_contains_sensitive_field(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.keys().any(|key| {
+                matches!(
+                    key.to_ascii_lowercase().as_str(),
+                    "authority"
+                        | "authority_id"
+                        | "permission"
+                        | "permission_id"
+                        | "approval"
+                        | "approval_id"
+                        | "capability"
+                        | "capability_grant"
+                        | "secret"
+                        | "secret_value"
+                        | "secretvalue"
+                        | "token"
+                        | "access_token"
+                        | "refresh_token"
+                        | "password"
+                        | "credential"
+                        | "credentials"
+                        | "credential_value"
+                        | "api_key"
+                        | "apikey"
+                        | "authorization"
+                )
+            }) || object.values().any(mcp_argument_contains_sensitive_field)
+        }
+        Value::Array(values) => values.iter().any(mcp_argument_contains_sensitive_field),
+        _ => false,
+    }
 }
 
 fn relay_channel_frame_with_owner_operations<F>(
@@ -1131,6 +1248,22 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(server_id),
             owner_confirmation_value(executable),
             owner_confirmation_value(workspace),
+            argument_count,
+            arguments_hash,
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::McpToolCall {
+            server_id,
+            tool_id,
+            name,
+            argument_count,
+            arguments_hash,
+            payload_hash,
+        } => format!(
+            "このMCP Toolを指定Serverへ一度だけ実行しますか？\n\nServer ID: {}\nTool: {} ({})\narguments: {}項目\narguments hash: {}\n\n前画面でJSON arguments全文と対象Server／Toolを確認してから判断してください。ここでは引数本文もTool結果本文も表示しません。秘密値をargumentsへ含めないでください。Brokerは現在CatalogとJSON Schemaを再検査し、この呼出しだけの一回限りPermissionを消費してAuditを記録します。MCP Server側の外部副作用は取り消せません。送信後に結果を確定できない場合は接続を隔離し、自動再送しません。ownerが外部状態を確認してから切断・再接続してください。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            owner_confirmation_value(server_id),
+            owner_confirmation_value(name),
+            owner_confirmation_value(tool_id),
             argument_count,
             arguments_hash,
             payload_hash
@@ -2531,6 +2664,76 @@ mod tests {
             "payload_hash": canonical_payload_hash(Some(&malformed)),
             "payload": malformed,
             "nonce": "desktop-mcp-disconnect-malformed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn MCP_Tool実行のnative確認は対象とhashを示し引数本文や秘密fieldを拒否する() {
+        let tool_id = format!("tool-{}", "a".repeat(142));
+        let payload = serde_json::json!({
+            "版": 1,
+            "操作": "実行",
+            "ServerID": "mcp-fixture",
+            "ToolID": tool_id,
+            "名前": "search",
+            "arguments": {"query": "SENSITIVE_ARGUMENT_MARKER"}
+        });
+        let input = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call",
+            "operation": "MCP Tool実行",
+            "payload": payload.clone(),
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "desktop-mcp-tool-call-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (_, summary) = owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+            .expect("Tool呼出しはnative Owner確認候補");
+        let confirmation = owner_confirmation_text(&summary);
+        assert!(confirmation.contains("mcp-fixture"));
+        assert!(confirmation.contains("search"));
+        assert!(confirmation.contains(&tool_id));
+        assert!(confirmation.contains(&sha256_tagged(
+            &serde_json::to_vec(&payload["arguments"]).expect("引数hash")
+        )));
+        assert!(confirmation.contains("一回限りPermission"));
+        assert!(confirmation.contains("自動再送しません"));
+        assert!(!confirmation.contains("SENSITIVE_ARGUMENT_MARKER"));
+
+        let mut escalated = payload.clone();
+        escalated["arguments"]["nested"] = serde_json::json!({"Credential_Value":"secret-marker"});
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-escalated",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&escalated)),
+            "payload": escalated,
+            "nonce": "desktop-mcp-tool-call-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+
+        let mut unknown = payload;
+        unknown["extra"] = serde_json::json!(true);
+        let request = serde_json::json!({
+            "request_id": "desktop-mcp-tool-call-unknown",
+            "operation": "MCP Tool実行",
+            "payload_hash": canonical_payload_hash(Some(&unknown)),
+            "payload": unknown,
+            "nonce": "desktop-mcp-tool-call-unknown-nonce",
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "desktop_flutter"}
         });

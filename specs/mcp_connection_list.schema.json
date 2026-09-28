@@ -19,7 +19,7 @@
   "$defs": {
     "receipt": {
       "type": "object",
-      "required": ["版", "契約種別", "Server", "Transport", "Tool", "Resource", "Prompt", "Credential ref", "Trust", "Capability diff", "権限生成", "公開範囲", "証拠種別", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID", "接続監査ID"],
+      "required": ["版", "契約種別", "Server", "Transport", "Tool", "Resource", "Prompt", "Credential ref", "Trust", "Capability diff", "権限生成", "公開範囲", "証拠種別", "接続状態", "能力ID", "権限ID", "承認状態", "復旧ID", "接続監査ID", "実行状態"],
       "additionalProperties": false,
       "properties": {
         "版": { "const": 1 },
@@ -35,7 +35,8 @@
         "権限生成": { "const": "なし" },
         "公開範囲": { "const": "metadata_only" },
         "証拠種別": { "const": "INTERNAL_STATE" },
-        "接続状態": { "const": "connected" },
+        "接続状態": { "enum": ["connected", "quarantined"] },
+        "実行状態": { "enum": ["ready", "quarantined"] },
         "能力ID": { "const": "mcp.connection.connect" },
         "権限ID": { "const": "permission.mcp.connection.connect" },
         "承認状態": { "const": "owner_control_approved" },

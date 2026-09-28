@@ -1,13 +1,14 @@
 //! MCP stdio clientのprocess境界。
 //!
 //! このclientはowner起動設定から固定されたexecutable/workspaceだけを使う。受信した
-//! Server metadataは`crate::mcp`で検証し、Tool実行やCredential実値の注入は行わない。
+//! Server metadataは`crate::mcp`で検証し、Tool実行はBrokerから渡された一回限り要求だけを扱う。
 #![allow(non_snake_case)]
 
 use crate::mcp::{
     legacy_initialize_request, modern_discover_request, notification_line, parse_discovery,
-    parse_prompts_response, parse_resources_response, parse_tools_response, McpCatalog, McpError,
-    McpJsonRpcMessage, McpProtocolEra,
+    parse_prompts_response, parse_resources_response, parse_tools_response,
+    summarize_tool_call_result, McpCatalog, McpError, McpJsonRpcMessage, McpProtocolEra,
+    McpToolCallSummary,
 };
 use std::env;
 use std::io::{BufRead, BufReader, Write};
@@ -40,6 +41,7 @@ pub struct McpStdioConnection {
     lines: Receiver<Result<Vec<u8>, McpError>>,
     era: McpProtocolEra,
     catalog: McpCatalog,
+    next_request_id: u64,
 }
 
 impl McpStdioConnection {
@@ -168,6 +170,7 @@ impl McpStdioConnection {
                 resources: Vec::new(),
                 prompts: Vec::new(),
             },
+            next_request_id: 1,
         })
     }
 
@@ -184,7 +187,9 @@ impl McpStdioConnection {
                 id,
                 crate::mcp::request_line(id, era, "tools/list", json_object())?,
             )?;
-            id = id.saturating_add(1);
+            id = id.checked_add(1).ok_or_else(|| {
+                McpError::new("mcp_request_id_exhausted", "MCP request IDを更新できない")
+            })?;
             parse_tools_response(&response)?
         } else {
             Vec::new()
@@ -194,7 +199,9 @@ impl McpStdioConnection {
                 id,
                 crate::mcp::request_line(id, era, "resources/list", json_object())?,
             )?;
-            id = id.saturating_add(1);
+            id = id.checked_add(1).ok_or_else(|| {
+                McpError::new("mcp_request_id_exhausted", "MCP request IDを更新できない")
+            })?;
             parse_resources_response(&response)?
         } else {
             Vec::new()
@@ -208,13 +215,41 @@ impl McpStdioConnection {
         } else {
             Vec::new()
         };
+        if discovery.capabilities.get("prompts").is_some() {
+            id = id.checked_add(1).ok_or_else(|| {
+                McpError::new("mcp_request_id_exhausted", "MCP request IDを更新できない")
+            })?;
+        }
         self.catalog = McpCatalog {
             discovery,
             tools,
             resources,
             prompts,
         };
+        self.next_request_id = id;
         Ok(())
+    }
+
+    pub(crate) fn call_tool(
+        &mut self,
+        tool_id: &str,
+        name: &str,
+        arguments: &serde_json::Value,
+    ) -> Result<McpToolCallSummary, McpError> {
+        self.catalog
+            .validate_tool_identity_and_call(tool_id, name, arguments)?;
+        let id = self.next_request_id;
+        self.next_request_id = id.checked_add(1).ok_or_else(|| {
+            McpError::new("mcp_request_id_exhausted", "MCP request IDを更新できない")
+        })?;
+        let line = crate::mcp::request_line(
+            id,
+            self.era,
+            "tools/call",
+            serde_json::json!({"name": name, "arguments": arguments}),
+        )?;
+        let response = self.request(id, line)?;
+        summarize_tool_call_result(&response)
     }
 
     fn request(&mut self, expected_id: u64, line: Vec<u8>) -> Result<McpJsonRpcMessage, McpError> {
@@ -451,6 +486,65 @@ set /p request=
 echo {"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid params"}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#;
+    const MCP_TOOL_FIXTURE: &str = r#"@echo off
+setlocal EnableDelayedExpansion
+set /p request=
+echo !request! | findstr /c:"server/discover" > nul
+if errorlevel 1 exit /b 21
+echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{"tools":{}}}}
+set /p request=
+echo !request! | findstr /c:"tools/list" > nul
+if errorlevel 1 exit /b 22
+echo {"jsonrpc":"2.0","id":2,"result":{"resultType":"complete","tools":[{"name":"echo","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}}]}}
+set /p request=
+echo !request! | findstr /c:"tools/call" > nul
+if errorlevel 1 exit /b 23
+echo {"jsonrpc":"2.0","id":3,"result":{"resultType":"complete","content":[{"type":"text","text":"SENSITIVE_OUTPUT_MARKER"}],"isError":false}}
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#;
+
+    #[test]
+    fn tool_call_uses_catalog_and_returns_only_a_bounded_hash_summary() {
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-mcp-tool-call-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("時計")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&workspace).expect("試験用作業領域を作成");
+        let system_root =
+            PathBuf::from(env::var_os(SYSTEM_ROOT_ENVIRONMENT_KEY).expect("システム領域を取得"));
+        let executable = system_root.join("System32").join("cmd.exe");
+        let script =
+            MCP_TOOL_FIXTURE.replace("__PROTOCOL_VERSION__", crate::mcp::MODERN_PROTOCOL_VERSION);
+        let script_path = workspace.join("mcp-tool-server.cmd");
+        fs::write(&script_path, script).expect("Tool試験Server scriptを作成");
+        let arguments = vec![
+            "/D".to_string(),
+            "/C".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ];
+        let mut connection = McpStdioConnection::connect(&executable, &arguments, &workspace)
+            .expect("Tool試験Serverの接続");
+        let tool = connection
+            .catalog()
+            .tools
+            .first()
+            .expect("Tool一覧")
+            .tool_id
+            .clone();
+        let summary = connection
+            .call_tool(&tool, "echo", &serde_json::json!({"text":"request"}))
+            .expect("一回限りtools/call");
+        assert_eq!(summary.content_types, vec!["text".to_string()]);
+        assert!(!summary.is_error);
+        assert!(summary.result_hash.starts_with("sha256:"));
+        assert!(!format!("{summary:?}").contains("SENSITIVE_OUTPUT_MARKER"));
+        connection.terminate().expect("試験Server process群を終了");
+        fs::remove_dir_all(workspace).expect("試験用作業領域を除去");
+    }
 
     #[test]
     fn MCP_stdio_Serverのprocess群をBroker監督下で起動し終了する() {

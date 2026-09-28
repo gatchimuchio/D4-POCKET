@@ -45,7 +45,8 @@
       "権限ID": "permission.mcp.connection.connect",
       "承認状態": "owner_control_approved",
       "復旧ID": "recover-mcp-connection",
-      "接続監査ID": "audit-mcp-connection-1"
+      "接続監査ID": "audit-mcp-connection-1",
+      "実行状態": "ready"
     }
   ],
   "件数": 1,

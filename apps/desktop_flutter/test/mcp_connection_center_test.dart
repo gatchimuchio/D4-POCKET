@@ -10,9 +10,10 @@ class _McpTransport implements BrokerTransport {
   final payloads = <Map<String, Object?>?>[];
   bool connected = true;
   String listedEvidence = 'INTERNAL_STATE';
+  String executionState = 'ready';
   String displayName = 'fixture server';
   final toolMetadata = <String, Object?>{
-    'tool_id': 'tool-${List<String>.filled(64, "a").join()}',
+    'tool_id': 'tool-${List<String>.filled(142, "a").join()}',
     'name': 'tool-fixture',
     'description_summary': '',
     'input_schema_hash': 'sha256:${List<String>.filled(64, "b").join()}',
@@ -62,6 +63,7 @@ class _McpTransport implements BrokerTransport {
         '公開範囲': 'metadata_only',
         '証拠種別': evidence,
         '接続状態': 'connected',
+        '実行状態': executionState,
         '能力ID': 'mcp.connection.connect',
         '権限ID': 'permission.mcp.connection.connect',
         '承認状態': 'owner_control_approved',
@@ -117,6 +119,34 @@ class _McpTransport implements BrokerTransport {
           '公開範囲': 'metadata_only',
           '証拠種別': 'LIVE_RUNTIME',
           '切断監査ID': 'audit-mcp-disconnect',
+        },
+      };
+    }
+    if (operation == 'MCP Tool実行') {
+      return {
+        'status': 'accepted',
+        'evidence_source': 'LIVE_RUNTIME',
+        'body': {
+          '版': 1,
+          '契約種別': 'MCP Tool実行receipt',
+          'ServerID': payload!['ServerID'],
+          'ToolID': payload['ToolID'],
+          '名前': payload['名前'],
+          'arguments_hash': 'sha256:${List<String>.filled(64, "a").join()}',
+          'result_hash': 'sha256:${List<String>.filled(64, "b").join()}',
+          'Tool error': false,
+          'content_count': 1,
+          'content_types': ['text'],
+          '接続状態': 'connected',
+          '能力ID': 'mcp.tool.call',
+          '権限ID': 'permission.mcp.tool.call.one_shot',
+          '承認状態': 'native_owner_confirmed',
+          '承認監査ID': 'audit-mcp-tool-approval',
+          '復旧ID': 'inspect-mcp-tool-side-effect',
+          '権限生成': 'Broker内一回限りPermissionを消費',
+          '公開範囲': 'hash_only',
+          '証拠種別': 'LIVE_RUNTIME',
+          '監査ID': 'audit-mcp-tool-call',
         },
       };
     }
@@ -237,6 +267,32 @@ void main() {
     );
   });
 
+  test('MCP clientはnative確認後のTool receiptをhash-onlyで検証する', () async {
+    final transport = _McpTransport();
+    final client = McpConnectionClient(transport);
+    final receipt = await client.callTool(
+      serverId: 'mcp-fixture',
+      tool: McpToolSummary(
+        toolId: transport.toolMetadata['tool_id']! as String,
+        name: transport.toolMetadata['name']! as String,
+        inputSchemaHash: transport.toolMetadata['input_schema_hash']! as String,
+      ),
+      arguments: const {'query': 'needle'},
+    );
+
+    expect(receipt.resultHash, startsWith('sha256:'));
+    expect(receipt.contentTypes, ['text']);
+    expect(transport.operations, ['MCP Tool実行']);
+    expect(transport.payloads.single, {
+      '版': 1,
+      '操作': '実行',
+      'ServerID': 'mcp-fixture',
+      'ToolID': transport.toolMetadata['tool_id'],
+      '名前': 'tool-fixture',
+      'arguments': {'query': 'needle'},
+    });
+  });
+
   testWidgets('Desktop panelは一覧後にOwner確認付きBroker接続と切断を要求する', (tester) async {
     final transport = _McpTransport();
     await tester.pumpWidget(MaterialApp(
@@ -283,6 +339,39 @@ void main() {
       'ServerID': 'mcp-fixture',
     });
     expect(find.text('Brokerが保持するMCP接続はありません。'), findsOneWidget);
+  });
+
+  testWidgets('Desktop panelは入力全表示の確認後だけTool要求を送り結果本文を表示しない', (tester) async {
+    final transport = _McpTransport();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: McpConnectionCenterPanel(transport: transport),
+      ),
+    ));
+
+    await tester.ensureVisible(find.text('接続一覧を取得'));
+    await tester.tap(find.text('接続一覧を取得'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tool一覧：1件'));
+    await tester.tap(find.text('Tool一覧：1件'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('確認して実行'));
+    await tester.tap(find.text('確認して実行'));
+    await tester.pumpAndSettle();
+    final argumentEditor = find.byType(TextField).last;
+    await tester.enterText(argumentEditor, '{"query":"needle"}');
+    await tester.tap(find.text('入力内容を確認'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('"query": "needle"'), findsOneWidget);
+    expect(transport.operations, ['MCP接続一覧']);
+    await tester.tap(find.text('Windows確認へ進む'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['MCP接続一覧', 'MCP Tool実行']);
+    expect(find.textContaining('result hash: sha256:'), findsOneWidget);
+    expect(find.textContaining('SECRET_RESULT_MARKER'), findsNothing);
+    expect(find.textContaining('needle'), findsNothing);
   });
 
   testWidgets('Desktop panelは秘密値を求めず接続設定をBrokerへ送る', (tester) async {

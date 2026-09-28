@@ -437,6 +437,8 @@ pub enum BrokerOperation {
     MCP切断,
     #[serde(rename = "MCP接続一覧")]
     MCP接続一覧,
+    #[serde(rename = "MCP Tool実行")]
+    MCPTool実行,
     #[serde(rename = "A2A接続")]
     A2A接続,
     #[serde(rename = "A2A接続一覧")]
@@ -623,6 +625,7 @@ impl BrokerOperation {
             BrokerOperation::MCP接続 => "MCP接続",
             BrokerOperation::MCP切断 => "MCP切断",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
+            BrokerOperation::MCPTool実行 => "MCP Tool実行",
             BrokerOperation::A2A接続 => "A2A接続",
             BrokerOperation::A2A接続一覧 => "A2A接続一覧",
             BrokerOperation::Host登録 => "Host登録",
@@ -1241,6 +1244,7 @@ impl Broker {
                 BrokerOperation::GuiShell書出し
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
+                    | BrokerOperation::MCPTool実行
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
                     | BrokerOperation::回帰Case登録
@@ -1313,13 +1317,14 @@ impl Broker {
 
         if envelope.operation == Some(BrokerOperation::AgentTaskWorkspacePermissionGrant)
             || envelope.operation == Some(BrokerOperation::AgentTaskOwnerApprovalGrant)
+            || envelope.operation == Some(BrokerOperation::MCPTool実行)
         {
             if export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
                 return self.reject_with_payload_hash(
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Taskの権限・ApprovalはRust Desktopのnative Owner確認経路だけで発行できます",
+                    "Agent Task権限・ApprovalとMCP Tool実行はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -1458,6 +1463,7 @@ impl Broker {
             BrokerOperation::MCP接続 => super::mcp_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::MCP切断 => super::mcp_center::disconnect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::MCP接続一覧 => super::mcp_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::MCPTool実行 => super::mcp_center::call_tool(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続 => super::a2a_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::A2A接続一覧 => super::a2a_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
             BrokerOperation::Host登録 => super::host_center::register(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
@@ -5811,6 +5817,67 @@ mod tests {
         assert_eq!(body["dispatch_decision"], "suspended");
         assert_eq!(body["execution_gate"]["dispatch"], "suspended");
         assert_eq!(broker.audit_events()[0].decision, "suspended");
+    }
+
+    #[test]
+    fn mcp_tool_execution_requires_the_desktop_native_confirmation_path() {
+        let payload = json!({
+            "版": 1,
+            "操作": "実行",
+            "ServerID": "mcp-fixture",
+            "ToolID": format!("tool-{}", "a".repeat(142)),
+            "名前": "search",
+            "arguments": {"query": "needle"}
+        });
+        let mut normal_broker = test_broker();
+        let mut normal = BrokerRequestEnvelope::health("mcp-tool-normal", "mcp-tool-normal-nonce");
+        normal.session_id = Some("session-1".to_string());
+        normal.operation = Some(BrokerOperation::MCPTool実行);
+        normal.payload = Some(payload.clone());
+        normal.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        normal.refresh_payload_hash();
+        let response = normal_broker.handle(normal);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "mcp-tool-owner-credential",
+            "session_id": "session-1",
+            "operation": "MCP Tool実行",
+            "payload": payload.clone(),
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "mcp-tool-owner-credential-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {}
+        });
+        let mut credential_broker = test_broker();
+        let response = credential_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let desktop_envelope = json!({
+            "request_id": "mcp-tool-desktop-confirmed",
+            "session_id": "session-1",
+            "operation": "MCP Tool実行",
+            "payload": payload.clone(),
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "mcp-tool-desktop-confirmed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let mut desktop_broker = test_broker();
+        let response = desktop_broker.desktop_owner_operation_json(&desktop_envelope.to_string());
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_ne!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
     }
 
     #[test]

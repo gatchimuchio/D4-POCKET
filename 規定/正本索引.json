@@ -344,8 +344,12 @@
       "責任": "C32監査器が読むC0〜C31の意味正本・Contract・Code・Production path・Test・Negative・Recovery・Audit・UI・Evidence対応データ"
     },
     {
+      "path": "docs/specs/mcp-contract.md",
+      "責任": "C8 MCP metadataの意味射影・Authority非生成とC9 Tool引数Schema検査、native Owner確認、一回Permission、Audit、hash-only結果境界"
+    },
+    {
       "path": "docs/specs/mcp-connection-center.md",
-      "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Broker接続一覧、timeout・secret・authority拒否、owner／normal channel境界"
+      "責任": "C9 MCP stdio discovery、legacy fallback、metadata catalog、Owner Tool実行とhash-only結果、quarantine、Broker接続一覧、切断、timeout・secret・authority拒否"
     },
     {
       "path": "docs/specs/operation-profile.md",

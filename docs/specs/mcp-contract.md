@@ -41,14 +41,22 @@ Serverの`origin`と各`証拠種別`は、観測範囲を表す。`server_metad
 
 MCP Toolの`inputSchema`はJSON Schema Draft 2020-12としてmeta-schema検証し、Broker内でvalidatorを構築できた場合だけcatalogへ受け入れる。`$schema`省略時もDraft 2020-12として扱い、明示dialectは既知の2020-12 URI表記だけを受け付ける。`$ref`と`$dynamicRef`は同一文書内fragment参照だけを許可し、HTTP／fileを含む外部参照は取得しない。入力Schemaは128 KiB、4096 JSON node、深さ64を上限とし、超過・不正・未対応dialectは接続をfail-closedにする。
 
-Schema検証済みの`status=supported`はToolの実行可能性、Permission、Approvalを意味しない。現行接続経路は依然metadata-onlyであり、`tools/call`を送らない。
+Schema検証済みの`status=supported`はToolの実行可能性、Permission、Approvalを意味しない。操作者向けTool実行はRust Desktopのnative Owner確認、現在Catalog再照合、一回限りPermission、Auditを経た独立操作だけであり、Agentへの結果引渡しやTool結果本文の公開はしない。
 
-## Tool引数の事前適合検査
+## Tool引数の検査と呼出し
 
-`McpCatalog.validate_tool_call`は、現在のcatalogにあるTool名だけを対象に、引数がobjectであること、JSON化後32 KiB以下・2048 node以下・深さ32以下であること、Permission／Approval／Credential等のauthority fieldを再帰的に含まないことを検査する。その後、catalogに保持した当該Toolの`inputSchema`をJSON Schema Draft 2020-12として適用し、適合しない引数を固定error codeで拒否する。外部参照はSchema受入時点で禁止し、引数内容やSchemaのvalidation error詳細をAuditへ出さない。
+`McpCatalog.validate_tool_identity_and_call`は、現在catalog内のTool IDと名前の一致を確認し、引数がobjectであること、JSON化後32 KiB以下・2048 node以下・深さ32以下であること、大小文字を正本化してPermission／Approval／Authority／Credential／secret fieldを再帰的に含まないことを検査する。その後、catalogに保持した当該Toolの`inputSchema`をJSON Schema Draft 2020-12として適用し、適合しない引数を固定error codeで拒否する。外部参照はSchema受入時点で禁止し、引数内容やSchemaのvalidation error詳細をAuditへ出さない。
 
-このRust検査関数はTool呼出しに先行させるための境界であり、現行Broker／stdio production経路からはまだ呼ばれない。`tools/call`、Permission、Approval、AuditEvent、結果本文のContent Exposureを実行・生成する契約ではない。これらが接続するまではTool実行を未対応として扱う。
+現行Rust実装のTool IDは`tool-`に続く142桁の小文字16進数である。呼出し要求はこの形だけを受け付け、Brokerが現在Catalog内のIDと名前の完全一致を再検査する。
+
+Rust Brokerは、Windows Desktopのdefault No native Owner確認を通過した`MCP Tool実行`だけを受け付ける。通常IPC、Owner資格だけの要求、Agent／LLM要求から直接実行しない。確認対象は現在接続中のServer ID、Catalog内のTool ID／名前、引数objectの件数とhash、Broker要求hashである。引数本文はDesktop画面で操作者が確認し、native確認では表示しない。Tool危険度は`unknown`として毎回確認する。
+
+Brokerは、受信payloadのraw hashを保持し、未知field、接続／Toolの識別不一致、再帰的なAuthority／Credential field、上限超過、現在Catalogの`inputSchema`不適合を拒否する。`McpCatalog.validate_tool_identity_and_call`を送信直前に呼び、現在CatalogのTool ID／名前・Schemaを再照合する。metadata、履歴、Permission ID、Approval IDを要求から受け取らない。native Owner確認に結び付くPermissionは呼出し対象Server／Tool／引数hashだけの一回限りで、Broker内で生成・即時消費し再利用しない。Credential実値の注入は行わない。
+
+送信は現接続のMCP stdio childに`tools/call`を一度だけ行う。response ID、JSON-RPC形状、結果型、結果上限を検査する。呼出し後のtimeout、応答ID不一致、malformed／unsupported result、結果Audit確定失敗は結果不明として接続を隔離し、自動再送しない。Ownerが結果を照合した後、明示切断・再接続するまで次のTool呼出しを拒否する。
+
+Tool出力本文は、text・image・audio・resource link・embedded resource・structured contentのいずれもBrokerが保存・返却せず、snapshot、Audit reason、error、log、traceへ複写しない。Receiptは結果hash、`isError`相当の成否、content件数／型だけを`hash_only`で返す。したがって、この経路は操作者の一回限りTool実行と実行結果の存在確認までであり、結果本文をAgentへ渡す経路ではない。結果の安全な取得・redaction・Content Exposure承認が成立するまで、AgentによるMCP Tool利用と結果本文表示は未対応の`release_blocker`とする。
 
 ## 実装範囲
 
-C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。後続C9は、実物interfaceを推測せずBroker経路でstdio discovery、connect、metadata list、timeout処理およびWindows owner切断を接続した。consent、Tool実行、Credential実値注入、Streamable HTTP、OAuth、quarantine、外部MCP実物Test Harnessは未接続であり、`release_blocker`として保持する。
+C8の作業単位はSchema、正常／負例fixture、Conformanceを追加した。C9はstdio discovery、connect、metadata list、Windows owner切断に加え、native Owner確認・一回Permission・Catalog preflight・stdio `tools/call`・hash-only result receiptをRust Broker経路へ接続する。Tool結果本文をAgentへ渡すContent Exposure経路、Credential実値注入、Resource／Prompt本文取得、Streamable HTTP、OAuth、外部MCP実物Test Harness、非Windows process群監督は未接続であり、`release_blocker`として保持する。

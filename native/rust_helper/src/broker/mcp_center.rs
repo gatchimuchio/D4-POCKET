@@ -5,9 +5,10 @@
 //! OAuth、Streamable HTTPはこの単位では接続しない。
 #![allow(non_snake_case)]
 
-use super::protocol::{Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE};
-#[cfg(windows)]
-use super::protocol::EVIDENCE_SOURCE_LIVE_RUNTIME;
+use super::protocol::{
+    Broker, BrokerResponse, BrokerStatus, EVIDENCE_SOURCE_INTERNAL_STATE,
+    EVIDENCE_SOURCE_LIVE_RUNTIME,
+};
 use crate::adapters::mcp_stdio::McpStdioConnection;
 use crate::mcp::McpError;
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ use std::path::Path;
 const OP_CONNECT: &str = "MCP接続";
 const OP_DISCONNECT: &str = "MCP切断";
 const OP_LIST: &str = "MCP接続一覧";
+const OP_TOOL_CALL: &str = "MCP Tool実行";
 const VERSION: u64 = 1;
 const MAX_ARGUMENTS: usize = 32;
 const MAX_ARGUMENT_BYTES: usize = 1024;
@@ -25,6 +27,7 @@ const MAX_ARGUMENT_BYTES: usize = 1024;
 pub(super) struct McpConnectionEntry {
     pub(super) connection: McpStdioConnection,
     pub(super) projection: Value,
+    pub(super) quarantined: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,6 +70,45 @@ struct DisconnectRequest {
     operation: String,
     #[serde(rename = "ServerID")]
     server_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ToolCallRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "操作")]
+    operation: String,
+    #[serde(rename = "ServerID")]
+    server_id: String,
+    #[serde(rename = "ToolID")]
+    tool_id: String,
+    #[serde(rename = "名前")]
+    name: String,
+    #[serde(rename = "arguments")]
+    arguments: Value,
+}
+
+struct OneShotMcpPermission {
+    id: String,
+    server_id: String,
+    tool_id: String,
+    arguments_hash: String,
+    consumed: bool,
+}
+
+impl OneShotMcpPermission {
+    fn consume(&mut self, request: &ToolCallRequest, arguments_hash: &str) -> bool {
+        if self.consumed
+            || self.server_id != request.server_id
+            || self.tool_id != request.tool_id
+            || self.arguments_hash != arguments_hash
+        {
+            return false;
+        }
+        self.consumed = true;
+        true
+    }
 }
 
 pub(super) fn connect(
@@ -171,6 +213,7 @@ pub(super) fn connect(
             "接続状態".to_string(),
             Value::String("connected".to_string()),
         );
+        object.insert("実行状態".to_string(), Value::String("ready".to_string()));
         object.insert(
             "能力ID".to_string(),
             Value::String("mcp.connection.connect".to_string()),
@@ -219,6 +262,7 @@ pub(super) fn connect(
         McpConnectionEntry {
             connection,
             projection: projection.clone(),
+            quarantined: false,
         },
     );
     BrokerResponse {
@@ -282,7 +326,7 @@ pub(super) fn list(
     if broker
         .mcp_connections
         .values_mut()
-        .any(|entry| !entry.connection.is_alive())
+        .any(|entry| !entry.quarantined && !entry.connection.is_alive())
     {
         return broker.reject_with_payload_hash(
             request_id,
@@ -304,6 +348,20 @@ pub(super) fn list(
                 .insert(
                     "証拠種別".to_string(),
                     Value::String(EVIDENCE_SOURCE_INTERNAL_STATE.to_string()),
+                );
+            projection
+                .as_object_mut()
+                .expect("MCP接続projectionはobject")
+                .insert(
+                    "実行状態".to_string(),
+                    Value::String(
+                        if entry.quarantined {
+                            "quarantined"
+                        } else {
+                            "ready"
+                        }
+                        .to_string(),
+                    ),
                 );
             projection
         })
@@ -344,6 +402,311 @@ pub(super) fn list(
         body: Some(body),
         shutdown_requested: broker.shutdown_requested,
     }
+}
+
+#[cfg(not(windows))]
+pub(super) fn call_tool(
+    broker: &mut Broker,
+    request_id: &str,
+    _payload: &Value,
+    _owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    broker.reject_with_payload_hash(
+        request_id,
+        OP_TOOL_CALL,
+        "mcp_tool_call_platform_unsupported",
+        "MCP Tool実行はWindows native Owner確認経路だけに対応しています",
+        true,
+        payload_hash,
+    )
+}
+
+#[cfg(windows)]
+pub(super) fn call_tool(
+    broker: &mut Broker,
+    request_id: &str,
+    payload: &Value,
+    owner: bool,
+    payload_hash: &str,
+) -> BrokerResponse {
+    if !owner {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_owner_required",
+            "MCP Tool実行にはWindows native Owner確認が必要",
+            true,
+            payload_hash,
+        );
+    }
+    if !broker.state_store.persistence_ready() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_CALL,
+            "broker_persistence_unavailable",
+            "MCP Tool実行には永続Auditが必要",
+            true,
+            payload_hash,
+        );
+    }
+    let request = match parse_tool_call_request(payload) {
+        Ok(request) => request,
+        Err(error) => {
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_CALL,
+                error.code,
+                error.message,
+                true,
+                payload_hash,
+            )
+        }
+    };
+    if broker
+        .append_audit(
+            request_id,
+            OP_TOOL_CALL,
+            "received",
+            "Rust起動器のnative Owner確認後にTool要求を受信。引数本文は記録しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_audit_append_failed",
+            "MCP Tool要求の受信Auditを確定できない",
+        );
+    }
+
+    let arguments_hash = crate::audit_hash::sha256_tagged(
+        &serde_json::to_vec(&request.arguments).expect("JSON Valueは直列化可能"),
+    );
+    let preflight = match broker.mcp_connections.get_mut(&request.server_id) {
+        None => Err(McpError::new(
+            "mcp_connection_unknown",
+            "指定MCP Serverの接続が存在しない",
+        )),
+        Some(entry) => {
+            if entry.quarantined {
+                Err(McpError::new(
+                    "mcp_connection_quarantined",
+                    "MCP接続は隔離中のためTool実行できない。ownerが切断・再接続する",
+                ))
+            } else if !entry.connection.is_alive() {
+                quarantine(entry);
+                Err(McpError::new(
+                    "mcp_server_unavailable",
+                    "MCP Serverが終了したためTool実行できない",
+                ))
+            } else {
+                entry.connection.catalog().validate_tool_identity_and_call(
+                    &request.tool_id,
+                    &request.name,
+                    &request.arguments,
+                )
+            }
+        }
+    };
+    if let Err(error) = preflight {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_CALL,
+            error.code,
+            error.message,
+            true,
+            payload_hash,
+        );
+    }
+
+    let mut permission_random = [0u8; 16];
+    if getrandom::getrandom(&mut permission_random).is_err() {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_permission_unavailable",
+            "一回限りPermissionの識別値を生成できないため送信しない",
+            true,
+            payload_hash,
+        );
+    }
+    let mut permission = OneShotMcpPermission {
+        id: format!("mcp-tool-{}", hex::encode(permission_random)),
+        server_id: request.server_id.clone(),
+        tool_id: request.tool_id.clone(),
+        arguments_hash: arguments_hash.clone(),
+        consumed: false,
+    };
+    let approval_event = match broker.append_audit(
+        request_id,
+        OP_TOOL_CALL,
+        "approved",
+        &format!(
+            "Capability=mcp.tool.call Permission={} Approval=Rust Desktop native Ownerが現在のServer／Tool／arguments hashを確認 RecoveryAction=inspect-mcp-tool-side-effect; ServerID={} ToolID={} arguments_hash={}",
+            permission.id, request.server_id, request.tool_id, arguments_hash
+        ),
+        EVIDENCE_SOURCE_INTERNAL_STATE,
+        payload_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_TOOL_CALL,
+                "mcp_audit_append_failed",
+                "MCP ToolのApproval／Permission Auditを確定できないため送信しない",
+            )
+        }
+    };
+    if !permission.consume(&request, &arguments_hash) {
+        return broker.reject_with_payload_hash(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_permission_binding_invalid",
+            "一回限りPermissionが現在のServer／Tool／argumentsへ結合されていない",
+            true,
+            payload_hash,
+        );
+    }
+    if broker
+        .append_audit(
+            request_id,
+            OP_TOOL_CALL,
+            "started",
+            &format!(
+                "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; MCP tools/callを同一接続へ一度だけ送信",
+                permission.id, approval_event.event_id
+            ),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .is_err()
+    {
+        return broker.audit_store_failed_response(
+            request_id,
+            OP_TOOL_CALL,
+            "mcp_audit_append_failed",
+            "MCP Tool実行開始Auditを確定できないため送信しない",
+        );
+    }
+
+    let call_result = broker
+        .mcp_connections
+        .get_mut(&request.server_id)
+        .expect("事前検査済みのMCP接続")
+        .connection
+        .call_tool(&request.tool_id, &request.name, &request.arguments);
+    let summary = match call_result {
+        Ok(summary) => summary,
+        Err(_error) => {
+            if let Some(entry) = broker.mcp_connections.get_mut(&request.server_id) {
+                quarantine(entry);
+            }
+            return broker.reject_with_payload_hash(
+                request_id,
+                OP_TOOL_CALL,
+                "mcp_tool_result_unknown",
+                "送信後の結果を確定できない。接続を隔離し、外部副作用をownerが確認してから切断・再接続する",
+                true,
+                payload_hash,
+            );
+        }
+    };
+    let connection_alive = broker
+        .mcp_connections
+        .get_mut(&request.server_id)
+        .is_some_and(|entry| entry.connection.is_alive());
+    if !connection_alive {
+        if let Some(entry) = broker.mcp_connections.get_mut(&request.server_id) {
+            quarantine(entry);
+        }
+    }
+    let connection_state = if connection_alive {
+        "connected"
+    } else {
+        "quarantined"
+    };
+    let content_count = summary.content_types.len();
+    let content_types = summary.content_types.clone();
+    let result_hash = summary.result_hash.clone();
+    let is_error = summary.is_error;
+    let body = json!({
+        "版": VERSION,
+        "契約種別": "MCP Tool実行receipt",
+        "ServerID": request.server_id,
+        "ToolID": request.tool_id,
+        "名前": request.name,
+        "arguments_hash": arguments_hash,
+        "result_hash": result_hash.clone(),
+        "Tool error": is_error,
+        "content_count": content_count,
+        "content_types": content_types,
+        "接続状態": connection_state,
+        "能力ID": "mcp.tool.call",
+        "権限ID": "permission.mcp.tool.call.one_shot",
+        "承認状態": "native_owner_confirmed",
+        "承認監査ID": approval_event.event_id.clone(),
+        "復旧ID": "inspect-mcp-tool-side-effect",
+        "権限生成": "Broker内一回限りPermissionを消費",
+        "公開範囲": "hash_only",
+        "証拠種別": EVIDENCE_SOURCE_LIVE_RUNTIME,
+    });
+    let accepted = match broker.append_audit(
+        request_id,
+        OP_TOOL_CALL,
+        "accepted",
+        &format!(
+            "Capability=mcp.tool.call Permission={} consumed=true Approval={} RecoveryAction=inspect-mcp-tool-side-effect; 結果本文を保持せずhash-only receiptを確定; result_hash={} content_count={} isError={}",
+            permission.id,
+            approval_event.event_id,
+            result_hash,
+            content_count,
+            is_error
+        ),
+        EVIDENCE_SOURCE_LIVE_RUNTIME,
+        &result_hash,
+    ) {
+        Ok(event) => event,
+        Err(_) => {
+            if let Some(entry) = broker.mcp_connections.get_mut(&request.server_id) {
+                quarantine(entry);
+            }
+            return broker.audit_store_failed_response(
+                request_id,
+                OP_TOOL_CALL,
+                "mcp_audit_append_failed",
+                "Tool応答後のAuditを確定できない。接続を隔離し結果を未確定としてowner確認を要求する",
+            );
+        }
+    };
+    let mut body = body;
+    body.as_object_mut()
+        .expect("MCP Tool実行receiptはobject")
+        .insert(
+            "監査ID".to_string(),
+            Value::String(accepted.event_id.clone()),
+        );
+    BrokerResponse {
+        request_id: request_id.to_string(),
+        operation: OP_TOOL_CALL.to_string(),
+        status: BrokerStatus::Accepted,
+        evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_string(),
+        audit_event_id: accepted.event_id,
+        error: None,
+        health: None,
+        body: Some(body),
+        shutdown_requested: broker.shutdown_requested,
+    }
+}
+
+#[cfg(windows)]
+fn quarantine(entry: &mut McpConnectionEntry) {
+    entry.quarantined = true;
+    entry.projection["接続状態"] = Value::String("quarantined".to_string());
+    entry.projection["実行状態"] = Value::String("quarantined".to_string());
 }
 
 pub(super) fn disconnect(
@@ -575,6 +938,36 @@ fn parse_disconnect_request(payload: &Value) -> Result<DisconnectRequest, McpErr
         return Err(McpError::new(
             "mcp_disconnect_request_invalid",
             "MCP切断payloadの値が不正",
+        ));
+    }
+    Ok(request)
+}
+
+fn parse_tool_call_request(payload: &Value) -> Result<ToolCallRequest, McpError> {
+    let request: ToolCallRequest = serde_json::from_value(payload.clone()).map_err(|_| {
+        McpError::new(
+            "mcp_tool_call_request_invalid",
+            "MCP Tool実行payloadの構造が不正",
+        )
+    })?;
+    if request.version != VERSION
+        || request.operation != "実行"
+        || request.server_id.is_empty()
+        || request.server_id.as_bytes().len() > 128
+        || request.server_id.chars().any(char::is_control)
+        || request.tool_id.len() != 147
+        || !request.tool_id.starts_with("tool-")
+        || !request.tool_id[5..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || request.name.is_empty()
+        || request.name.as_bytes().len() > 256
+        || request.name.chars().any(char::is_control)
+        || !request.arguments.is_object()
+    {
+        return Err(McpError::new(
+            "mcp_tool_call_request_invalid",
+            "MCP Tool実行payloadの識別子または値が不正",
         ));
     }
     Ok(request)

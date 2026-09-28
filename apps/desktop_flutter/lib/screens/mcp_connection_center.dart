@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
@@ -24,6 +26,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   bool _loading = false;
   bool _connecting = false;
   String? _disconnectingServerId;
+  String? _callingToolServerId;
   String? _message;
 
   @override
@@ -62,12 +65,14 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '新しい接続はこのPC上のMCP stdioプロセスを起動します。資格情報の設定とTool実行は未対応です。起動引数へ秘密値を入れず、Windows native確認の前に入力内容を確認してください。',
+              'Tool実行はWindows native Owner確認を毎回要求し、結果本文ではなくhash receiptだけを返します。実行前にJSON argumentsを確認してください。秘密値をargumentsへ入力しないでください。Agentへの結果引渡しとResource／Prompt本文取得は未対応です。',
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _serverIdController,
-              enabled: !_connecting && _disconnectingServerId == null,
+              enabled: !_connecting &&
+                  _disconnectingServerId == null &&
+                  _callingToolServerId == null,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: 'サーバー識別子',
@@ -76,7 +81,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             const SizedBox(height: 8),
             TextField(
               controller: _executableController,
-              enabled: !_connecting && _disconnectingServerId == null,
+              enabled: !_connecting &&
+                  _disconnectingServerId == null &&
+                  _callingToolServerId == null,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: '実行ファイルの絶対パス',
@@ -85,7 +92,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             const SizedBox(height: 8),
             TextField(
               controller: _workspaceController,
-              enabled: !_connecting && _disconnectingServerId == null,
+              enabled: !_connecting &&
+                  _disconnectingServerId == null &&
+                  _callingToolServerId == null,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: '作業フォルダーの絶対パス',
@@ -94,7 +103,9 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             const SizedBox(height: 8),
             TextField(
               controller: _argumentsController,
-              enabled: !_connecting && _disconnectingServerId == null,
+              enabled: !_connecting &&
+                  _disconnectingServerId == null &&
+                  _callingToolServerId == null,
               minLines: 2,
               maxLines: 6,
               decoration: const InputDecoration(
@@ -104,10 +115,12 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed:
-                  _connecting || _loading || _disconnectingServerId != null
-                      ? null
-                      : () => _connect(client),
+              onPressed: _connecting ||
+                      _loading ||
+                      _disconnectingServerId != null ||
+                      _callingToolServerId != null
+                  ? null
+                  : () => _connect(client),
               icon: const Icon(Icons.link),
               label: const Text('MCP接続を開始'),
             ),
@@ -117,10 +130,12 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed:
-                  _loading || _connecting || _disconnectingServerId != null
-                      ? null
-                      : () => _load(client),
+              onPressed: _loading ||
+                      _connecting ||
+                      _disconnectingServerId != null ||
+                      _callingToolServerId != null
+                  ? null
+                  : () => _load(client),
               icon: const Icon(Icons.refresh),
               label: const Text('接続一覧を取得'),
             ),
@@ -169,6 +184,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
               subtitle: Text(
                 'サーバーID: ${connection.serverId}\n'
                 '通信方式: ${connection.transport} ・ '
+                '実行状態: ${connection.executionState} ・ '
                 'ツール ${connection.toolCount} / リソース ${connection.resourceCount} / プロンプト ${connection.promptCount}',
               ),
               isThreeLine: true,
@@ -181,6 +197,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                   : OutlinedButton.icon(
                       onPressed: _loading ||
                               _connecting ||
+                              _callingToolServerId != null ||
                               _disconnectingServerId != null
                           ? null
                           : () => _disconnect(client, connection),
@@ -190,7 +207,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
             ),
             ExpansionTile(
               title: Text('Tool一覧：${connection.tools.length}件'),
-              subtitle: const Text('metadata_only。実行権や信頼を示しません。'),
+              subtitle: const Text('metadata_only。毎回のOwner確認後のみ実行。結果本文は返しません。'),
               children: [
                 if (connection.tools.isEmpty)
                   const ListTile(title: Text('Toolはありません。')),
@@ -205,11 +222,23 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                       '識別子: ${tool.toolId}\n'
                       '入力仕様hash: ${tool.inputSchemaHash}',
                     ),
-                    trailing: const Text('危険度: 未評価'),
+                    trailing: OutlinedButton(
+                      onPressed: connection.executionState != 'ready' ||
+                              _loading ||
+                              _connecting ||
+                              _disconnectingServerId != null ||
+                              _callingToolServerId != null
+                          ? null
+                          : () => _callTool(client, connection, tool),
+                      child: Text(_callingToolServerId == connection.serverId
+                          ? '実行中…'
+                          : '確認して実行'),
+                    ),
                   ),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Text('説明文と入力Schema本文は表示しません。Tool実行は未対応です。'),
+                  child:
+                      Text('説明文と入力Schema本文は表示しません。結果本文も画面へ返さず、hashと型だけを記録します。'),
                 ),
               ],
             ),
@@ -307,6 +336,174 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       }
     } finally {
       if (mounted) setState(() => _connecting = false);
+    }
+  }
+
+  Future<void> _callTool(
+    McpConnectionClient client,
+    McpConnectionSummary connection,
+    McpToolSummary tool,
+  ) async {
+    final controller = TextEditingController(text: '{}');
+    try {
+      final raw = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('${tool.name} のarguments'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('秘密値を入力しないでください。入力は保存されません。'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  minLines: 5,
+                  maxLines: 14,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'JSON形式のobject',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('入力内容を確認'),
+            ),
+          ],
+        ),
+      );
+      if (raw == null || !mounted) return;
+
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        setState(() =>
+            _message = 'argumentsは正しいJSON objectで入力してください。Toolは送信していません。');
+        return;
+      }
+      if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
+        setState(
+            () => _message = 'argumentsはJSON objectで入力してください。Toolは送信していません。');
+        return;
+      }
+      final arguments = Map<String, Object?>.from(decoded);
+      if (utf8.encode(jsonEncode(arguments)).length > 32 * 1024) {
+        setState(() => _message = 'argumentsが32 KiBを超えています。Toolは送信していません。');
+        return;
+      }
+      final preview = const JsonEncoder.withIndent('  ').convert(arguments);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('送信する引数を確認'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('接続先MCP識別子: ${connection.serverId}'),
+                Text('Tool名・ID: ${tool.name} (${tool.toolId})'),
+                const SizedBox(height: 8),
+                const Text('以下の全文を確認してください。次にWindows native Owner確認が表示されます。'),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 300),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      preview,
+                      style: const TextStyle(fontFamily: 'monospace'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                    'Tool結果本文は返却されず、hashとcontent型だけを表示します。実行後に自動再送はしません。'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('戻る'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Windows確認へ進む'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      setState(() {
+        _callingToolServerId = connection.serverId;
+        _message = null;
+      });
+      try {
+        final receipt = await client.callTool(
+          serverId: connection.serverId,
+          tool: tool,
+          arguments: arguments,
+        );
+        if (!mounted) return;
+        setState(() {
+          final executionState =
+              receipt.connectionState == 'connected' ? 'ready' : 'quarantined';
+          _connections = _connections
+              ?.map((item) => item.serverId == connection.serverId
+                  ? McpConnectionSummary(
+                      serverId: item.serverId,
+                      displayName: item.displayName,
+                      transport: item.transport,
+                      tools: item.tools,
+                      resources: item.resources,
+                      prompts: item.prompts,
+                      connectionState: receipt.connectionState,
+                      executionState: executionState,
+                    )
+                  : item)
+              .toList(growable: false);
+          _message =
+              'Tool応答receiptを受理しました。本文は返却されていません。result hash: ${receipt.resultHash} ・ content: ${receipt.contentTypes.join(', ')} ・ Audit: ${receipt.auditId}${receipt.toolError ? ' ・ Tool側error=true' : ''}${executionState == 'quarantined' ? ' ・ 接続隔離中' : ''}';
+        });
+      } on Object {
+        if (mounted) {
+          setState(() {
+            _connections = _connections
+                ?.map((item) => item.serverId == connection.serverId
+                    ? McpConnectionSummary(
+                        serverId: item.serverId,
+                        displayName: item.displayName,
+                        transport: item.transport,
+                        tools: item.tools,
+                        resources: item.resources,
+                        prompts: item.prompts,
+                        connectionState: 'quarantined',
+                        executionState: 'quarantined',
+                      )
+                    : item)
+                .toList(growable: false);
+            _message =
+                'Tool結果を確定できません。自動再送していません。外部副作用とBroker状態を確認し、必要なら切断・再接続してください。';
+          });
+        }
+      } finally {
+        if (mounted) setState(() => _callingToolServerId = null);
+      }
+    } finally {
+      controller.dispose();
     }
   }
 

@@ -122,6 +122,8 @@ REQUIRED_SCHEMA_NAMES = {
     "a2a_contract",
     "mcp_connection",
     "mcp_connection_receipt",
+    "mcp_tool_call",
+    "mcp_tool_call_receipt",
     "mcp_connection_list",
     "mcp_disconnect",
     "mcp_disconnect_receipt",
@@ -5183,9 +5185,14 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_server_unavailable",
         "mcp_timeout",
         "改行到着前から256 KiBを上限として逐次読取り",
-        "Tool引数の事前適合検査",
+        "Tool引数の検査と呼出し",
+        "142桁",
         "32 KiB以下・2048 node以下・深さ32以下",
-        "現行Broker／stdio production経路からはまだ呼ばれない",
+        "Rust Desktop native Owner確認",
+        "tools/call",
+        "一回限りPermission",
+        "hash-only",
+        "quarantined",
         "release_blocker",
     )
     for token in required_tokens:
@@ -5202,7 +5209,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
 
     for name in (
         "mcp_connection", "mcp_connection_receipt", "mcp_connection_list",
-        "mcp_disconnect", "mcp_disconnect_receipt",
+        "mcp_disconnect", "mcp_disconnect_receipt", "mcp_tool_call",
+        "mcp_tool_call_receipt",
     ):
         schema = load_schema(name + ".schema.json")
         valid = load_contract_fixture(name + ".valid.json")
@@ -5221,6 +5229,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         "mcp_disconnect_authority.invalid.json",
         "mcp_disconnect_receipt_not_stopped.invalid.json",
         "mcp_disconnect_receipt_wrong_evidence.invalid.json",
+        "mcp_tool_call_authority.invalid.json",
+        "mcp_tool_call_bad_tool_id.invalid.json",
+        "mcp_tool_call_unknown_field.invalid.json",
+        "mcp_tool_call_receipt_full_content.invalid.json",
     )
     for name in invalid_names:
         invalid = load_contract_fixture("invalid/" + name)
@@ -5230,6 +5242,8 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
             "mcp_connection_receipt" if name.startswith(("mcp_connection_tool", "mcp_connection_resource", "mcp_connection_prompt")) else
             "mcp_connection_list" if name.startswith("mcp_connection_list") else
             "mcp_disconnect" if name.startswith("mcp_disconnect_authority") else
+            "mcp_tool_call" if name.startswith("mcp_tool_call_") and not name.startswith("mcp_tool_call_receipt") else
+            "mcp_tool_call_receipt" if name.startswith("mcp_tool_call_receipt") else
             "mcp_disconnect_receipt"
         )
         if not validate_instance(invalid, load_schema(schema_name + ".schema.json")):
@@ -5243,6 +5257,13 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     encoded_receipt = json.dumps(receipt, ensure_ascii=False)
     if any(token in encoded_receipt for token in ("secret_value", "credential_value", "password", "token")):
         不整合.append("C9 receiptへCredential実値が混入している")
+    tool_call_request = load_contract_fixture("mcp_tool_call.valid.json")
+    if (
+        not isinstance(tool_call_request.get("ToolID"), str)
+        or len(tool_call_request["ToolID"]) != 147
+        or not tool_call_request["ToolID"].startswith("tool-")
+    ):
+        不整合.append("C9 MCP Tool実行要求のTool ID形式が現行Catalog生成形式と一致しない")
     tools = receipt.get("Tool")
     if not isinstance(tools, list) or any(
         not isinstance(tool, dict)
@@ -5297,6 +5318,10 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("MAX_TOOL_ARGUMENT_NODES", rust_mcp),
         ("MAX_TOOL_ARGUMENT_DEPTH", rust_mcp),
         ("mcp_tool_arguments_schema_invalid", rust_mcp),
+        ("validate_tool_identity_and_call", rust_mcp),
+        ("mcp_tool_identity_mismatch", rust_mcp),
+        ("summarize_tool_call_result", rust_mcp),
+        ("mcp_tool_result_type_unsupported", rust_mcp),
         ("validator.is_valid(arguments)", rust_mcp),
         ("env_clear", rust_stdio),
         ("mcp_timeout", rust_stdio),
@@ -5317,6 +5342,9 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("EVIDENCE_SOURCE_LIVE_RUNTIME", rust_center),
         ("terminate()", rust_center),
         ("mcp_connections.remove", rust_center),
+        ("MCP tools/callを同一接続へ一度だけ送信", rust_center),
+        ("mcp_tool_result_unknown", rust_center),
+        ("quarantine(entry)", rust_center),
     ):
         if token not in source:
             不整合.append(f"C9実装に統治境界tokenがない: {token}")
@@ -5332,12 +5360,18 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
     for token, source in (
         ("BrokerOperation::MCP切断", rust_protocol),
         ("mcp_center::disconnect", rust_protocol),
+        ("BrokerOperation::MCPTool実行", rust_protocol),
+        ("mcp_center::call_tool", rust_protocol),
         ("pub fn MCP切断", owner_cli),
         ("owner_cli::MCP切断", main),
         ("BrokerOperation::MCP接続", desktop_launcher),
+        ("BrokerOperation::MCPTool実行", desktop_launcher),
+        ("McpToolCallOwnerRequest", desktop_launcher),
         ("McpConnectOwnerRequest", desktop_launcher),
         ("'MCP接続',", desktop_broker_client),
+        ("'MCP Tool実行',", desktop_broker_client),
         ("Future<McpConnectionSummary> connect", mcp_client),
+        ("Future<McpToolCallReceipt> callTool", mcp_client),
         ("class McpToolSummary", mcp_client),
         ("_toolSummaries", mcp_client),
         ("class McpResourceSummary", mcp_client),
@@ -5345,6 +5379,7 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("class McpPromptSummary", mcp_client),
         ("_promptSummaries", mcp_client),
         ("MCP接続を開始", mcp_screen),
+        ("確認して実行", mcp_screen),
         ("Tool一覧：", mcp_screen),
         ("入力仕様hash:", mcp_screen),
         ("Resource一覧：", mcp_screen),

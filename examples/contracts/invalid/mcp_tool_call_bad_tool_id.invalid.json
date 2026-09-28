@@ -1,0 +1,8 @@
+{
+  "版": 1,
+  "操作": "実行",
+  "ServerID": "mcp-fixture",
+  "ToolID": "tool-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "名前": "search",
+  "arguments": {"query": "needle"}
+}
