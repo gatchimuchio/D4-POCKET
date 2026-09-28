@@ -1,0 +1,63 @@
+name: Windows Rust manual validation
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-rust-manual-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rust-validation:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 対象とWindows環境を記録
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne $env:GITHUB_SHA) {
+            throw "checkout HEAD ($head) does not match workflow commit ($env:GITHUB_SHA)"
+          }
+          @(
+            "commit=$head"
+            "ref=$env:GITHUB_REF"
+            "runner_os=$env:RUNNER_OS"
+            "runner_image=$env:ImageOS/$env:ImageVersion"
+            "rustup=$(rustup --version)"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-windows-rust-environment.txt"
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup component add rustfmt --toolchain 1.95.0
+          rustc +1.95.0 --version
+          cargo +1.95.0 --version
+          "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP 'gui-shell-rust-target'
+          "CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: 変更Rust fileの整形を検査
+        shell: pwsh
+        run: rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/mcp.rs
+      - name: Rust全targetを検査・試験
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: 試験後に作業treeがcleanなことを確認
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes.Count -gt 0) {
+            $changes | Write-Output
+            throw '試験後に作業treeへ変更が残った'
+          }

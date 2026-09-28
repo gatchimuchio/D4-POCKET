@@ -5,6 +5,10 @@
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
 
+## Windows Rust手動補助検証（2026-09-28）
+
+ローカルWindowsのWindows Application ControlがCargo生成test executableをOS error 4551で起動前に拒否する場合に限り、`.github/workflows/windows-manual-rust-validation.yml`をownerが`workflow_dispatch`で起動できる。選択ref上のRust 1.95.0に対して変更Rust fileの整形、Rust全targetのcheck／test、試験後作業treeのcleanを検査する。自動trigger、書込権限、artifact uploadは設けない。この結果はRunner上の対象commitに対するRust検査だけを示し、installed製品挙動、ローカルWindowsでの実行可否、release readinessを証明しない。現在sourceのRust結果は`docs/REV2_PROGRESS.md`と`release_blockers.registry.json`に対象commitと結合して記録し、未成功の全target試験を成功に読み替えない。
+
 ## 現行D4 Pocket統合単位（2026-09-28）
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
