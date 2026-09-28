@@ -61,7 +61,9 @@ jobs:
           grep -F 'ndkVersion = flutter.ndkVersion' apps/mobile_flutter/android/app/build.gradle.kts
           "$sdkmanager" --uninstall "ndk;27.3.13750724" "ndk;29.0.14206865" </dev/null 2>&1 | tee evidence/sdk-unused-ndk-removal.txt
           test -d "$ANDROID_HOME/ndk/28.2.13676358"
-          "$sdkmanager" "platforms;android-37" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
+          # Android 17 / API 37 is preview-only; request that platform from the canary channel while keeping emulator and API 35 image on stable.
+          "$sdkmanager" --channel=3 "platforms;android-37" </dev/null 2>&1 | tee evidence/sdk-preview-platform-install.txt
+          "$sdkmanager" "emulator" "system-images;android-35;google_apis;x86_64" </dev/null 2>&1 | tee evidence/sdk-install.txt
           "$sdkmanager" --list_installed > evidence/sdk-installed.txt
           "$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee evidence/emulator-acceleration.txt
           mkdir -p "$ANDROID_AVD_HOME"
