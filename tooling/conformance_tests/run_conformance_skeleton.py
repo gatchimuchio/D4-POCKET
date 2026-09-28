@@ -5234,6 +5234,9 @@ def MCP接続センターの統治経路と境界を検査する() -> list[str]:
         ("mcp_credential_unavailable", rust_center),
         ("append_audit", rust_center),
         ("metadata_only", rust_center),
+        ("super::process_tree::spawn", rust_stdio),
+        ("terminate_tree", rust_stdio),
+        ("mcp_process_termination_failed", rust_stdio),
     ):
         if token not in source:
             不整合.append(f"C9実装に統治境界tokenがない: {token}")

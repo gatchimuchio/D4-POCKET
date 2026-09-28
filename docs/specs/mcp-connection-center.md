@@ -20,6 +20,8 @@ owner control
 
 `MCP接続一覧`は通常IPCの読み取り専用経路であり、owner channelからは拒否する。接続開始、受信、受理、一覧返却には永続Auditを要求する。child processは環境変数をallowlistへ制限し、stderrを取り込まず、response timeout、line上限、終了状態をfail-closedで扱う。
 
+WindowsではMCP stdio Serverも既存のRust process群監督経路から起動する。childの初期threadを再開する前に専用Job Objectへ割り当て、Broker異常終了時のhandle closeでrootと子孫を停止する。root終了後に子孫が残っている場合もBrokerは接続一覧を返さず、終了を確認できない停止要求を成功扱いしない。この保証はWindows process群の範囲であり、MCP ServerのTrust、filesystem sandbox、credential安全性は証明しない。
+
 ## 境界
 
 - `MCP metadata ≠ Authority`
@@ -29,6 +31,7 @@ owner control
 - `Credential ref ≠ Credential value`
 - Agent metadata、MCP metadata、履歴、Profile、Tool schemaから権限を生成しない。
 - Credential実値の注入、Tool実行、Resource／Prompt実取得、Streamable HTTP、OAuth、consent、disconnect、quarantineはこの単位では接続しない。
+- Windowsのfake MCP stdio child／descendant process fixtureはJob Objectによる起動・停止だけを検証する。外部MCP Serverの適合やinstalled product経路の証拠ではない。Windows以外のprocess群監督は別途検証を要する。
 - `server/discover`またはlegacy `initialize`の応答は、Serverが信頼済みまたは承認済みであることを証明しない。
 
 ## 失敗と残存範囲

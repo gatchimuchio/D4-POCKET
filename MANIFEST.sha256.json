@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b1a21619642f941e6e989ad41c95e7e089f4149a3144f59c0984fe21e7865958"
+      "sha256": "1624b0a59e908a413025349ec1d1413aba567db92a29e2fe02216491a8c09e47"
     },
     {
       "path": "SECURITY.md",
@@ -1165,7 +1165,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "d51037b8f399424ba5aeeeef55aad9cdc1d056d0abb5dfafec90d9b5aca8b0f5"
+      "sha256": "5c3b21de310cccfa0f23e0e07d4c643d4407f2df81de46377ce5887960bbf919"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1373,7 +1373,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "2c11459ea0aca8749dff989a8bf7a195a4ed5033a652192f604025c9ca3b92a4"
+      "sha256": "4c597fd2d4bc55613a80302af266a7239cae44b2a23093f31a8cd4e54ca3bca8"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -1401,7 +1401,7 @@
     },
     {
       "path": "docs/specs/process-supervision.md",
-      "sha256": "0d2da11263e6a23033cf133bf035b3557f1419d6bf61667b0d8d93bd7006472d"
+      "sha256": "40ffa50e4b44aafae4afc8ff16a3fc59297c683bc5bf44968b2c4b8c7ece8d6a"
     },
     {
       "path": "docs/specs/regression-case.md",
@@ -2889,7 +2889,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
-      "sha256": "8aa7cad4310c3459b22f5035d165e13babd6107b6d667f42128ef55bfc9d6232"
+      "sha256": "2f3cb23fb0e4fb26737afbcaf34cf81bf4340a380d604d834d011bd3bdd3fe09"
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
@@ -2901,7 +2901,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
-      "sha256": "1b40a1d0dc7486d7d302b166ffcec15d142b1d8ad9e6dab7936af2c554e57931"
+      "sha256": "b9468afe071e5b2f7d4541bf00b08d4ec580315d90835029715d7c22009fa3f0"
     },
     {
       "path": "native/rust_helper/src/audit_hash.rs",
@@ -4241,7 +4241,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "30604a781698700b0bc1ebb85bc4498e40d449189c80400a3387b1c38b306874"
+      "sha256": "d36b909584a6e49d92b5d2187dba66186b3ab8ea85508b59168e1f73d06c0196"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

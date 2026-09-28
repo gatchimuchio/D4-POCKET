@@ -9,6 +9,10 @@
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### C9 MCP stdio ServerをWindows process群監督へ接続（2026-09-28）
+
+MCP stdio childを既存Rust Job Object監督経路で起動し、停止失敗とdiscovery後のServer終了を成功扱いしない。Windows fake-server試験でroot・孫processの起動とJob単位停止を確認した。Rust全target試験は単体322件・CLI 9件成功後、`broker_ipc`実行fileがWindows Application Control（OS error 4551）で起動前に拒否され、全体をPASS扱いしない。全target checkは成功。実外部MCP Serverやinstalled product証拠ではなく、MCPのTool実行等も未接続のままrelease blockerとする。詳細は`docs/REV2_PROGRESS.md`の最新追補を参照。
+
 ### Phase 11 Mobile資源観測の表示・要求を選択中に限定（2026-09-28）
 
 `IndexedStack`内の非表示Mobile資源画面がbuild時にBroker観測を開始していたため、選択中・接続中だけ一度観測し、離脱・接続変更で表示と遅延結果を無効化する。複数Runtimeは逐次最大16件、同時1件とし、再入場後に新規観測する。非OneDrive managed worktreeでMobile test全20件が成功した。Desktop/Mobileの`flutter analyze`はLSP初期化JSON欠損によるanalysis server異常で終了し、成功扱いしない。実機・Device Link統合・release evidenceは未成立。詳細は`docs/REV2_PROGRESS.md`の本項を参照。

@@ -2,6 +2,18 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP stdio process群監督のWindows実証（2026-09-28）
+
+MCP stdio childを`native/rust_helper/src/adapters/process_tree.rs`の既存Job Object経路から起動するよう変更した。Windowsではchild初期threadを停止状態で生成しJob割当後に再開する。MCP stdio停止はJob内processが0件になったことを確認し、停止失敗・discovery後のServer終了を接続成功へ昇格しない。legacy fallbackも先行process群の終了確認後だけ起動する。`SupervisedChild`のDebug表示はprocess IDだけに限定した。
+
+- Windows fake-server process fixtureは固定MCP discovery応答を返し、rootの子として`ping.exe`を起動する。Focused試験でMCP接続、孫process起動marker、root存続、Job内全process終了、root回収を確認した。fixtureはProtocol形状と実Windows process群監督の証拠であり、外部MCP Server適合、installed Broker、Broker異常終了時のMCP専用挙動は証明しない。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib "MCP_stdio_Serverのprocess群をBroker監督下で起動し終了する" -- --test-threads=1 --nocapture`: 1件成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: lib 322件、main 9件成功後、`broker_ipc` test executableがWindows Application ControlのOS error 4551により起動前に拒否され、commandはexit 1。全target成功とは扱わない。拒否回避・test除外は行わない。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 145件、正常例145件、negative fixture179件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225件で成功。`python -X utf8 tooling/日本語基底監査.py --strict`: 負債file 0件・finding 0件で成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。日本語厳格監査、Schema、Conformance、Manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertion、C32対応表監査の開発用10検査が成功。検査結果は`release_ready=false`で、registryのactive unresolved blocker 14件を維持する。この開発validatorは正式release gate合格、installed product、実外部MCP接続を証明しない。
+- 対象fileは`native/rust_helper/src/adapters/mcp_stdio.rs`、`native/rust_helper/src/adapters/process_tree.rs`、`docs/specs/mcp-connection-center.md`、`docs/specs/process-supervision.md`、Conformance検査、進捗・ROADMAPである。Tool実行、credential実値注入、Resource／Prompt取得、Streamable HTTP、OAuth、consent、disconnect、quarantine、実外部MCP Server検証は引き続き`release_blocker`。registry上のactive blockerと`release_ready=false`を維持する。
+
 ## D4 Pocket Phase 11 Mobile資源観測scope変更時の直列化追補（2026-09-28）
 
 先行変更後の追試で、観測中にRuntime scopeが変わると、古い応答を破棄できても新scopeの要求を旧要求完了前に始め得ることを確認した。Mobile資源画面に画面instance内の要求直列化を追加し、旧要求の完了後に限って現scopeの要求を送る。Permission、Approval、Broker統治経路、他画面の要求は変更しない。

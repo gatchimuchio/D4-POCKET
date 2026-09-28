@@ -16,6 +16,6 @@ processは初期threadを停止した状態で生成し、実行を再開する�
 
 ## 適用範囲と証拠
 
-Codex Adapterのread-only対話と、固定`sandbox=workspace-write`を使うAgent Task実装は、どちらもこのJob Object経路でprocess群を監督する。Agent Task実装はBrokerへ接続済みだが、CLI実Task、Workspace隔離、失敗・取消時cleanupのLIVE_RUNTIME証拠が揃うまでAdapter metadataを`task_execution=unsupported`に保ち、Brokerから起動できない。Job Objectはprocess群の終了管理であり、filesystem／network sandbox、Workspace書込隔離、Runtime trust、Permission、Approvalの証拠ではない。
+Codex Adapterのread-only対話、固定`sandbox=workspace-write`を使うAgent Task実装、およびWindowsのMCP stdio childは、このJob Object経路でprocess群を監督する。Agent Task実装はBrokerへ接続済みだが、CLI実Task、Workspace隔離、失敗・取消時cleanupのLIVE_RUNTIME証拠が揃うまでAdapter metadataを`task_execution=unsupported`に保ち、Brokerから起動できない。MCP childのfake protocol fixtureは実Windows process群の起動・停止に対する`LIVE_RUNTIME`証拠であり、実外部MCP Serverやinstalled Brokerの証拠ではない。Job Objectはprocess群の終了管理であり、filesystem／network sandbox、Workspace書込隔離、Runtime trust、Permission、Approvalの証拠ではない。Windows以外のMCP process群停止は本単位で検証していない。
 
 Windows実process fixtureによるowner強制終了・child停止、およびAdapter接続後のchild取消・回収試験は、このprocess群監督機構に対する`LIVE_RUNTIME`証拠である。実Codex CLIのversion／help確認はinterface証拠に限り、モデル実行、Broker Task、Task Workspace隔離・scratch cleanup、Broker異常終了後のcleanup、Agent間隔離の証拠ではない。固定`sandbox=workspace-write`ではWorkspace内の`.env`等の秘密fileをAgentから読めないことも証明されず、Broker crash／強制終了／電源断後のscratch回収機構もない。process群の停止確認をこの2つのfilesystem保証へ転用してはならない。

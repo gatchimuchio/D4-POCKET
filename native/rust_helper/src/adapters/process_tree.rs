@@ -7,6 +7,15 @@ pub(super) struct SupervisedChild {
     job: gui_shell_process_supervision::Job,
 }
 
+impl std::fmt::Debug for SupervisedChild {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SupervisedChild")
+            .field("process_id", &self.child.id())
+            .finish()
+    }
+}
+
 pub(super) fn spawn(mut command: Command) -> io::Result<SupervisedChild> {
     #[cfg(windows)]
     {
