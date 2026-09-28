@@ -75,6 +75,22 @@
         "src/minidora/製品版/監査.py"
       ],
       "責任": "外部APIの入出力確認。既存の日本語基底参照commitを置換せず、GUI-Shellの権限源にしない"
+    },
+    "Model Context Protocol": {
+      "仕様版": "2026-07-28",
+      "取得日": "2026-09-28",
+      "公式参照": [
+        "https://modelcontextprotocol.io/specification/2026-07-28/basic",
+        "https://modelcontextprotocol.io/specification/2026-07-28/server/tools"
+      ],
+      "GUI-Shellへの適用射程": [
+        "JSON-RPC要求の版・client capabilities metadataと応答形式",
+        "Tools一覧・呼出しwire形式と入出力Schema"
+      ],
+      "GUI-Shellへの非適用": [
+        "Authority、Permission、Approval、Trustの決定",
+        "資格情報の取得・注入と秘密値の露出"
+      ]
     }
   },
   "版差境界": {

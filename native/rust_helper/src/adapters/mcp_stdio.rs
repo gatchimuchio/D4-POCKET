@@ -58,21 +58,25 @@ impl McpStdioConnection {
             ));
         }
         let mut connection = Self::spawn(&executable, arguments, &workspace)?;
-        let modern = connection
-            .request(1, modern_discover_request(1)?)
-            .and_then(|message| parse_discovery(&message, McpProtocolEra::Modern));
-        if modern.is_err() {
-            connection.terminate()?;
-            connection = Self::spawn(&executable, arguments, &workspace)?;
-            let discovery = connection
-                .request(1, legacy_initialize_request(1)?)
-                .and_then(|message| parse_discovery(&message, McpProtocolEra::Legacy))?;
-            let initialized = notification_line("notifications/initialized", json_object())?;
-            connection.write_line(&initialized)?;
-            connection.finish_catalog(discovery, 2, McpProtocolEra::Legacy)?;
-        } else {
-            let discovery = modern.expect("modern discoveryのErr確認済み");
-            connection.finish_catalog(discovery, 2, McpProtocolEra::Modern)?;
+        let modern_message = connection.request(1, modern_discover_request(1)?)?;
+        match parse_discovery(&modern_message, McpProtocolEra::Modern) {
+            Ok(discovery) => connection.finish_catalog(discovery, 2, McpProtocolEra::Modern)?,
+            Err(error)
+                if modern_message.is_method_not_found_error()
+                    || error.code == "mcp_protocol_unsupported" =>
+            {
+                // 旧protocolへの切替は未対応methodまたは版交渉に限定し、その他の失敗は停止する。
+                connection.terminate()?;
+                connection = Self::spawn(&executable, arguments, &workspace)?;
+                connection.era = McpProtocolEra::Legacy;
+                let discovery = connection
+                    .request(1, legacy_initialize_request(1)?)
+                    .and_then(|message| parse_discovery(&message, McpProtocolEra::Legacy))?;
+                let initialized = notification_line("notifications/initialized", json_object())?;
+                connection.write_line(&initialized)?;
+                connection.finish_catalog(discovery, 2, McpProtocolEra::Legacy)?;
+            }
+            Err(error) => return Err(error),
         }
         if !connection.is_alive() {
             return Err(McpError::new(
@@ -247,6 +251,9 @@ impl McpStdioConnection {
                     "MCP response idが要求と一致しない",
                 ));
             }
+            if self.era == McpProtocolEra::Modern {
+                message.validate_complete_result()?;
+            }
             return Ok(message);
         }
     }
@@ -349,7 +356,24 @@ mod tests {
     const MCP_FIXTURE: &str = r#"@echo off
 start "" /b "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 echo ready>"__READY_PATH__"
-echo {"jsonrpc":"2.0","id":1,"result":{"supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"process-supervision-fixture","version":"1"}}}
+echo {"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","supportedVersions":["__PROTOCOL_VERSION__"],"capabilities":{}},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"process-supervision-fixture","version":"1"}}}
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#;
+    const MCP_METHOD_FALLBACK_FIXTURE: &str = r#"@echo off
+echo started>>"__STARTS_PATH__"
+set /p request=
+echo %request% | findstr /c:"server/discover" > nul
+if errorlevel 1 (
+  echo {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{}}}
+) else (
+  echo {"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"method not found"}}
+)
+"%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
+"#;
+    const MCP_NON_FALLBACK_FIXTURE: &str = r#"@echo off
+echo started>>"__STARTS_PATH__"
+set /p request=
+echo {"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid params"}}
 "%SystemRoot%\System32\ping.exe" -t 127.0.0.1 > nul
 "#;
 
@@ -402,6 +426,84 @@ echo {"jsonrpc":"2.0","id":1,"result":{"supportedVersions":["__PROTOCOL_VERSION_
             "MCP root processが終了している"
         );
         drop(connection);
+        fs::remove_dir_all(workspace).expect("fixture workspace削除");
+    }
+
+    #[test]
+    fn legacy_fallback_only_runs_for_method_not_found() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-mcp-fallback-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&workspace).expect("試験用作業領域を作成");
+        let system_root =
+            PathBuf::from(env::var_os(SYSTEM_ROOT_ENVIRONMENT_KEY).expect("システム領域を取得"));
+        let executable = system_root.join("System32").join("cmd.exe");
+        let starts_path = workspace.join("starts.txt");
+        let script_path = workspace.join("mcp-server.cmd");
+        let script =
+            MCP_METHOD_FALLBACK_FIXTURE.replace("__STARTS_PATH__", &starts_path.to_string_lossy());
+        fs::write(&script_path, script).expect("legacy fallback fixtureを作成");
+        let arguments = vec![
+            "/D".to_string(),
+            "/C".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ];
+
+        let mut connection = McpStdioConnection::connect(&executable, &arguments, &workspace)
+            .expect("method-not-foundだけlegacyへfallback");
+        assert_eq!(connection.catalog().discovery.era, McpProtocolEra::Legacy);
+        assert_eq!(
+            fs::read_to_string(&starts_path)
+                .expect("spawn記録")
+                .lines()
+                .count(),
+            2
+        );
+        connection.terminate().expect("fixture process群を停止");
+        drop(connection);
+        fs::remove_dir_all(workspace).expect("fixture workspace削除");
+    }
+
+    #[test]
+    fn invalid_params_does_not_restart_as_legacy() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-mcp-no-fallback-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&workspace).expect("試験用作業領域を作成");
+        let system_root =
+            PathBuf::from(env::var_os(SYSTEM_ROOT_ENVIRONMENT_KEY).expect("システム領域を取得"));
+        let executable = system_root.join("System32").join("cmd.exe");
+        let starts_path = workspace.join("starts.txt");
+        let script_path = workspace.join("mcp-server.cmd");
+        let script =
+            MCP_NON_FALLBACK_FIXTURE.replace("__STARTS_PATH__", &starts_path.to_string_lossy());
+        fs::write(&script_path, script).expect("fallback拒否fixtureを作成");
+        let arguments = vec![
+            "/D".to_string(),
+            "/C".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ];
+
+        let error = McpStdioConnection::connect(&executable, &arguments, &workspace)
+            .expect_err("invalid paramsはlegacy fallbackしない");
+        assert_eq!(error.code, "mcp_discovery_failed");
+        assert_eq!(
+            fs::read_to_string(&starts_path)
+                .expect("spawn記録")
+                .lines()
+                .count(),
+            1
+        );
         fs::remove_dir_all(workspace).expect("fixture workspace削除");
     }
 }

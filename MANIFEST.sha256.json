@@ -149,7 +149,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5e3d09fdd34f67db2f2d3e28a3b7f5587ee0afedc348450c35c9dde6167a9bfc"
+      "sha256": "97e7327db8bd318d81094022ad7351e7779e80a4a19fc5cd347792230ffb3174"
     },
     {
       "path": "SECURITY.md",
@@ -1177,7 +1177,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "faf95d14e49ab139ba10d4f926b4e6c54c887b94c564c106f4f6e0b204c5bc59"
+      "sha256": "5e7b1698f6d0775dc7d3580d9e354db14c3f8ae750d4adc901d62be5bb1790a2"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1385,7 +1385,7 @@
     },
     {
       "path": "docs/specs/mcp-connection-center.md",
-      "sha256": "b65822e6a24ca718a3bc70845fe38d4f0a6f62e7679ed47d5dda31237a1a360a"
+      "sha256": "504200ce89c4ecfea4e73e77f5e14bf3ccb3053767720aa79820c42547ac5555"
     },
     {
       "path": "docs/specs/mcp-contract.md",
@@ -2941,7 +2941,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
-      "sha256": "595b2c518d035df2f64ae86c1bab485cf31b9a09b35700f58181cba2b46ab72d"
+      "sha256": "c73c72e7f96be5bc6feee2b1ccaf94609af0f68e8f969b68b15ea3215754d7f5"
     },
     {
       "path": "native/rust_helper/src/adapters/minidora.rs",
@@ -3165,7 +3165,7 @@
     },
     {
       "path": "native/rust_helper/src/mcp.rs",
-      "sha256": "5c4008c463b612530c7f4485a9cc94981dc58bd4d81bb7f6c8b687428079567c"
+      "sha256": "9a1997dc59b8494081f91e74a6fc64242cd54b4d8c4e3e5f1e3536c51b54de1c"
     },
     {
       "path": "native/rust_helper/src/network.rs",
@@ -3665,7 +3665,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "85b276fe101fd44fce05360091fb93b86c3a2e5b1d19fc5eb8ccce79dba923bd"
+      "sha256": "f315b842596b27cbcfbdea9d1b5dd4d526d15831691c72e64c4056158fcb5ea9"
     },
     {
       "path": "requirements-dev.txt",
@@ -4425,7 +4425,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "907143296480840a6da80ef34f7017a2553ca46c62979191615e3e8b26da7c43"
+      "sha256": "7b2f438c841cdbc5110fa3dacbcbae8676e3dcd74e5ed48dc29b3ca73c41abd8"
     }
   ]
 }

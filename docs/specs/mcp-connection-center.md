@@ -1,10 +1,16 @@
 # MCP接続センター
 
+本書の外部wire仕様固定点は、公式MCP仕様2026-07-28版の[基本protocol](https://modelcontextprotocol.io/specification/2026-07-28/basic)と[Tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)である。外部仕様はwire形式の根拠に限り、Authority、Permission、Approval、TrustはGUI-Shellの正本だけが定める。
+
 ## 対象
 
 C9は、owner controlから明示されたMCP stdio ServerをRust Brokerのprocess境界へ接続し、MCPのdiscoveryとTool／Resource／Prompt一覧を検証済みmetadataへ射影する。MCPの外部metadataはC8と同じくAuthority、Permission、Approval、Trustを生成しない。
 
-現行の接続対象は`stdio`だけである。現行MCP lifecycleの`server/discover`を先に試し、旧`initialize`／`notifications/initialized`はlegacy protocolとしてだけfallbackする。外部Serverの実interfaceを推測せず、JSON-RPC wire、response id、capability、list結果、重複、pagination、secret／authority fieldをBroker側で検証する。receiptの公開範囲は`metadata_only`に固定する。
+現行の接続対象は`stdio`だけである。現行`server/discover`を先に試し、各新protocol要求の`_meta`へ版、client情報、機能を宣言しない空の`clientCapabilities`を付ける。
+
+版2026-07-28の応答では、結果種別`resultType`が`complete`の場合だけを受け付ける。旧版互換として、結果種別の欠落は許容する。`server/discover`がJSON-RPCのmethod未対応（`-32601`）を返すか、対応protocol versionがない場合だけ、旧`initialize`／`notifications/initialized`へ切り替える。
+
+通信期限切れ、応答形式不正、要求ID不一致、parameter不正その他の失敗では、再起動や旧protocolでの再試行を行わない。外部Serverの実装を推測せず、JSON-RPC応答、capability、一覧、重複、pagination、秘密値・権限fieldをBroker側で検証する。receiptの公開範囲は`metadata_only`に固定する。
 
 ## 実行経路
 

@@ -183,6 +183,34 @@ impl McpJsonRpcMessage {
     pub fn response_for(&self, id: u64) -> bool {
         self.id.as_ref().and_then(Value::as_u64) == Some(id) && self.method.is_none()
     }
+
+    pub fn is_method_not_found_error(&self) -> bool {
+        self.error
+            .as_ref()
+            .and_then(Value::as_object)
+            .and_then(|error| error.get("code"))
+            .and_then(Value::as_i64)
+            == Some(-32601)
+    }
+
+    pub fn validate_complete_result(&self) -> Result<(), McpError> {
+        let Some(result) = self.result.as_ref() else {
+            return Ok(());
+        };
+        let result = result
+            .as_object()
+            .ok_or_else(|| McpError::new("mcp_result_invalid", "MCP resultがobjectではない"))?;
+        if result
+            .get("resultType")
+            .is_some_and(|result_type| result_type != "complete")
+        {
+            return Err(McpError::new(
+                "mcp_result_type_unsupported",
+                "MCP resultTypeが未対応",
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub fn request_line(
@@ -218,6 +246,10 @@ pub fn request_line(
             metadata.insert(
                 "io.modelcontextprotocol/clientInfo".to_string(),
                 json!({"name": "gui-shell", "version": "0.1.0"}),
+            );
+            metadata.insert(
+                "io.modelcontextprotocol/clientCapabilities".to_string(),
+                json!({}),
             );
             Value::Object(object)
         }
@@ -869,6 +901,48 @@ mod tests {
         assert!(!encoded.contains("表示してはいけない説明"));
         assert_eq!(projection["権限生成"], "なし");
         assert_eq!(projection["Trust"]["state"], "unverified");
+    }
+
+    #[test]
+    fn modern_request_declares_required_client_capabilities_and_classifies_fallback_error() {
+        let request = modern_discover_request(7).expect("新protocol要求");
+        let request: Value = serde_json::from_slice(&request).expect("要求JSON");
+        assert_eq!(
+            request["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"],
+            MODERN_PROTOCOL_VERSION
+        );
+        assert_eq!(
+            request["params"]["_meta"]["io.modelcontextprotocol/clientInfo"]["name"],
+            "gui-shell"
+        );
+        assert_eq!(
+            request["params"]["_meta"]["io.modelcontextprotocol/clientCapabilities"],
+            json!({})
+        );
+
+        let unsupported = McpJsonRpcMessage::parse_line(
+            br#"{"jsonrpc":"2.0","id":7,"error":{"code":-32601,"message":"method not found"}}"#,
+        )
+        .expect("未対応method応答");
+        assert!(unsupported.is_method_not_found_error());
+
+        let invalid_params = McpJsonRpcMessage::parse_line(
+            br#"{"jsonrpc":"2.0","id":7,"error":{"code":-32602,"message":"invalid params"}}"#,
+        )
+        .expect("parameter不正応答");
+        assert!(!invalid_params.is_method_not_found_error());
+
+        let unknown_result_type = McpJsonRpcMessage::parse_line(
+            br#"{"jsonrpc":"2.0","id":7,"result":{"resultType":"input_required"}}"#,
+        )
+        .expect("未対応resultType応答");
+        assert_eq!(
+            unknown_result_type
+                .validate_complete_result()
+                .expect_err("unsupported resultType")
+                .code,
+            "mcp_result_type_unsupported"
+        );
     }
 
     #[test]

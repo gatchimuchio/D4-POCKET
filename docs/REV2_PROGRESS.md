@@ -2,6 +2,22 @@
 
 各節は作業時点の履歴である。現在状態は次の現況節と対象commitに結合した実証拠で確認し、過去の未実装記述を現在の状態へ読み替えない。
 
+## D4 Pocket C9 MCP modern要求metadataとlegacy fallbackの境界修正（2026-09-28）
+
+公式MCP 2026-07-28仕様との照合で、新protocol要求に必須の`clientCapabilities`欠落と、discoveryの失敗全般で旧protocolへ再起動する問題を修正した。全要求に固定client識別と、追加機能を宣言しない空の能力objectを付す。応答`resultType`は`complete`以外を拒否し、旧応答との互換のため欠落だけを許容する。旧protocolへの切替はJSON-RPCのmethod not found（`-32601`）または対応版なしの場合に限り、通信期限切れ・parameter不正・応答形式不正などでは再試行しない。公式版と適用範囲は`規定/正本索引.json`へ固定した。
+
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib mcp -- --test-threads=1`：9件成功。Windows fake-serverでmethod not found時のlegacy fallbackと、invalid params時に起動回数1回のまま拒否することを確認。
+- `cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`：成功。
+- `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：exit 1。Library 329件、CLI 10件、Broker IPC統合試験9件は成功。統合試験1件は`tests/broker_ipc.rs:370`のBroker子process起動がWindows Application Control（OS error 4551）で拒否され失敗した。今回のMCP 9件は全件成功しているが、全target試験成功へ昇格しない。`windows_rust_integration_test_execution_policy` release blockerを保持する。
+- その後、診断文だけを日本語化した最終差分で同じfocused試験を再実行したが、test executableが起動前にWindows Application Control（OS error 4551）で拒否され、現行fileの再実行結果は未取得。test binaryの移動や実行制御の変更はしていない。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 147件、正常例147件、負例187件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：225件で成功。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：負債0件・指摘0件で成功。
+- `python -X utf8 tooling/release_gate_check.py`と`python -X utf8 tooling/evidence_bundle.py --check`：成功。evidence bundleはrelease blocker 5件を保持し`release_ready=false`。
+- `rustfmt --check --edition 2021 --config skip_children=true native/rust_helper/src/mcp.rs native/rust_helper/src/adapters/mcp_stdio.rs`：変更したRust 2 fileの形式検査に成功。
+- `cargo fmt --manifest-path native/rust_helper/Cargo.toml -- --check`：変更範囲外を含むcrate全体に既存の整形差分があり不合格。無関係なfileを一括変更せず、今回変更したRust fileだけ整形・再検査する。
+- MCP要求metadataとfallback以外の機能、Credential注入、Tool実行、Resource／Prompt本文取得はこの単位で追加していない。active unresolved blocker 15件、`release_ready=false`を維持する。
+
 ## D4 Pocket C9 Desktop MCP Resource／Prompt metadata閲覧（2026-09-28）
 
 DesktopのMCP接続一覧からResource／Prompt欄を展開し、Resource名・ID・URI hash、Prompt名・ID・引数Schema hashを読めるようにした。URI実値、Resource本文、Prompt説明・引数・本文は取得・表示しない。JSON SchemaはResource／Prompt各projectionを未知field拒否のnested contractへ具体化し、URI実値fieldと非空Prompt descriptionを拒否するnegative fixtureを追加した。Flutter clientはID／hash、status、表示名の境界を再検証し、`INTERNAL_STATE` metadataのみをUIへ渡す。Resource read／Prompt getのMCP要求、Permission、Approval、本文表示は追加していない。
