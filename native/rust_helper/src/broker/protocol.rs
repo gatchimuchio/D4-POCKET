@@ -6191,9 +6191,11 @@ mod 端末統治試験 {
             "agent-task-permission-native",
             "agent-task-permission-native-nonce",
         );
+        let permission_grant_started_at = e.broker.current_epoch_seconds();
         let permission = e
             .broker
             .desktop_owner_operation_json(&native_request.to_string());
+        let permission_grant_completed_at = e.broker.current_epoch_seconds();
         assert_eq!(permission.status, BrokerStatus::Accepted);
         let receipt = permission.body.as_ref().unwrap();
         assert_eq!(receipt["operation"], "agent_task.execute");
@@ -6202,10 +6204,11 @@ mod 端末統治試験 {
         assert_eq!(receipt["use_limit"], 1);
         assert_eq!(receipt["uses_remaining"], 1);
         assert_eq!(receipt["status"], "active");
-        assert_eq!(
-            receipt["expires_at_epoch_seconds"].as_i64().unwrap(),
-            e.broker.current_epoch_seconds() + 300
-        );
+        let expires_at = receipt["expires_at_epoch_seconds"].as_i64().unwrap();
+        // Unix秒精度のため、発行処理の前後で期限を挟み秒境界を許容する。
+        assert!((permission_grant_started_at.saturating_add(300)
+            ..=permission_grant_completed_at.saturating_add(300))
+            .contains(&expires_at));
         assert!(e.broker.audit_events().iter().any(|event| {
             event.operation == "AgentTaskWorkspacePermissionGrant"
                 && event.reason.contains("Task未実行")
