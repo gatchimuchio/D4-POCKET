@@ -576,3 +576,24 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --check`: 合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 最終作業状態で終了値0。厳格日本語監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録済みdevelopment check 10件が合格した。release blocker 5件と`release_ready=false`は維持された。
 - Windows Actionsは未使用。対象Rustの全target検査を現行Windows上で完了可能だった。
+
+## R2追補 scratch journal有効化失敗時の未起動領域回収（2026-09-30）
+
+### 成立した変更
+
+- Agent Task scratch journalの`activate`は、耐久保存に失敗した場合もメモリ上のentryを`active`へ変えたままにしていた。永続store側はatomic write失敗前の`reserved`を保持するため、稼働中Brokerと再起動後で記録状態がずれ得る。失敗時に変更前のbounded stateへ戻す。
+- scratch directoryを開いた後のmetadata取得またはjournal有効化が失敗した場合、Task process起動前に、directory handleから当該未起動scratchを回収する。削除を確認できた場合だけ予約記録を完了する。回収不能時はrecordを保持し、未知のpathを推測削除しない。
+- Adapter metadataは`task_execution=unsupported`のまま。MxC childのTEMP／TMP不一致、実BrokerからCodex CLIを起動する`LIVE_RUNTIME`検証およびrelease blockerは解消していない。
+
+### 検証
+
+- persistent journalのactivate耐久保存失敗fixtureで、メモリ状態と再読込後の永続状態がともに`reserved`へ戻ることを検査する。
+- 未起動scratchのjournal有効化失敗fixtureで、handle経由のdirectory回収と記録解消を検査する。証拠classは`FIXTURE`であり、process crash後やinstalled productのRecovery証拠ではない。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 合格、404 passed／0 failed／1 ignored。対象はRust helperのunit・integration testであり、Codex CLIの実broker起動やchild process isolationの`LIVE_RUNTIME`証拠ではない。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 合格。
+- adapter focused testの初回は、test fixtureが開いたworkspace handleをroot削除前に閉じておらず、Windows sharing violationで終了した。fixtureを修正して再実行し合格。製品処理の失敗ではない。
+- 初回の統合検査は追加試験の英語diagnostic 5箇所を厳格日本語監査が検出して失敗した。5箇所を日本語化し、`python -X utf8 tooling/日本語基底監査.py --strict`を再実行して1113 file／0 findingsで合格した。日本語fixture内容はRustのUTF-8文字列からbytesへ渡す形にし、focused Rust tests 2件も再合格。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs native/rust_helper/src/broker/agent_task_scratch.rs`: 合格。既存assertion 1箇所の改行だけをrustfmt準拠にした。
+- `python -X utf8 tooling/manifest.py --check`および`git diff --check`: 合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 合格。日本語基底監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録development check 10件。証拠bundleはrelease blocker 5件と`release_ready=false`を保持した。Windows installed-app evidenceは未収集であり、release gateは閉じない。
+- Windows GitHub Actionsは未使用。local Windows Rust all-target検査を実行できたため、検査branchやActions artifactは作成していない。

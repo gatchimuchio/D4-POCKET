@@ -183,6 +183,7 @@ impl AgentTaskScratchJournal {
             .state
             .lock()
             .map_err(|_| "Agent Task scratch回復記録が利用不能")?;
+        let previous = state.clone();
         let record = state
             .entries
             .iter_mut()
@@ -194,7 +195,11 @@ impl AgentTaskScratchJournal {
         record.scratch_device = Some(scratch_identity.device);
         record.scratch_file_id = Some(scratch_identity.file_id);
         record.state = ScratchState::Active;
-        self.persist(&state)
+        if let Err(error) = self.persist(&state) {
+            *state = previous;
+            return Err(error);
+        }
+        Ok(())
     }
 
     pub(crate) fn complete(&self, record_id: &str) -> Result<(), &'static str> {
@@ -501,6 +506,44 @@ mod tests {
     }
 
     #[test]
+    fn activateの耐久保存失敗はメモリと永続状態を予約へ戻す() {
+        let fixture = Fixture::new();
+        let journal = AgentTaskScratchJournal::open(fixture.store.clone()).expect("回復記録を開く");
+        let name = scratch_name('8');
+        let record_id = fixture.reserve(&journal, &name);
+
+        let blocked_temp = fixture.store.root().join("agent_task_scratch_recovery.tmp");
+        fs::create_dir(&blocked_temp).expect("atomic writeの一時file名をdirectoryで塞ぐ");
+        assert!(journal
+            .activate(
+                &record_id,
+                DirectoryIdentity {
+                    device: fixture.root_identity.device,
+                    file_id: fixture.root_identity.file_id + 1,
+                },
+            )
+            .is_err());
+
+        let current = journal.inner.state.lock().expect("回復記録の同期").clone();
+        assert_eq!(current.entries.len(), 1);
+        assert_eq!(current.entries[0].state, ScratchState::Reserved);
+        assert_eq!(current.entries[0].scratch_device, None);
+        assert_eq!(current.entries[0].scratch_file_id, None);
+
+        fs::remove_dir(&blocked_temp).expect("一時file名の阻害を解除");
+        let reopened = AgentTaskScratchJournal::open(fixture.store.clone())
+            .expect("失敗前の永続予約状態を再読込");
+        let persisted = reopened
+            .inner
+            .state
+            .lock()
+            .expect("再読込後の回復記録の同期");
+        assert_eq!(persisted.entries.len(), 1);
+        assert_eq!(persisted.entries[0].state, ScratchState::Reserved);
+        assert_eq!(persisted.entries[0].record_id, record_id);
+    }
+
+    #[test]
     fn 永続journalは再起動後も認証され一致するscratchだけを回収する() {
         let fixture = Fixture::new();
         let journal = AgentTaskScratchJournal::open(fixture.store.clone()).expect("回復記録を開く");
@@ -537,7 +580,10 @@ mod tests {
             &fixture.open_workspace(),
             fixture.root_identity,
         );
-        assert_eq!(outcomes, vec![RecoveryOutcome::RegistrationMismatchPreserved]);
+        assert_eq!(
+            outcomes,
+            vec![RecoveryOutcome::RegistrationMismatchPreserved]
+        );
         assert!(fixture.workspace_path.join(&active_name).exists());
         assert!(journal.has_pending_workspace("workspace-1"));
     }

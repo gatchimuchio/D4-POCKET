@@ -426,6 +426,33 @@ struct WorkspaceTaskScratch {
     record_id: String,
 }
 
+fn discard_unactivated_task_scratch(
+    scratch_dir: Dir,
+    context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
+    record_id: &str,
+) {
+    if scratch_dir.remove_open_dir_all().is_ok() {
+        let _ = context.journal.complete(record_id);
+    }
+}
+
+fn activate_task_scratch_directory(
+    scratch_dir: Dir,
+    scratch_identity: crate::broker::workspace_root::DirectoryIdentity,
+    context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
+    record_id: &str,
+) -> Result<Dir, 対話失敗> {
+    if context
+        .journal
+        .activate(record_id, scratch_identity)
+        .is_err()
+    {
+        discard_unactivated_task_scratch(scratch_dir, context, record_id);
+        return Err(対話失敗::通信失敗);
+    }
+    Ok(scratch_dir)
+}
+
 impl WorkspaceTaskScratch {
     fn create(
         workspace: &Path,
@@ -469,16 +496,23 @@ impl WorkspaceTaskScratch {
                     let scratch_dir = workspace_dir
                         .open_dir_nofollow(&name)
                         .map_err(|_| 対話失敗::通信失敗)?;
-                    let metadata =
-                        scratch_dir.dir_metadata().map_err(|_| 対話失敗::通信失敗)?;
+                    let metadata = match scratch_dir.dir_metadata() {
+                        Ok(metadata) => metadata,
+                        Err(_) => {
+                            discard_unactivated_task_scratch(scratch_dir, context, &record_id);
+                            return Err(対話失敗::通信失敗);
+                        }
+                    };
                     let scratch_identity = crate::broker::workspace_root::DirectoryIdentity {
                         device: cap_fs_ext::MetadataExt::dev(&metadata),
                         file_id: cap_fs_ext::MetadataExt::ino(&metadata),
                     };
-                    context
-                        .journal
-                        .activate(&record_id, scratch_identity)
-                        .map_err(|_| 対話失敗::通信失敗)?;
+                    let scratch_dir = activate_task_scratch_directory(
+                        scratch_dir,
+                        scratch_identity,
+                        context,
+                        &record_id,
+                    )?;
                     return Ok(Self {
                         _workspace_guard: workspace_guard,
                         _workspace_dir: workspace_dir,
@@ -1375,6 +1409,66 @@ mod tests {
         assert!(!scratch_path.exists());
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         drop(scratch);
+        std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[test]
+    fn scratchのjournal有効化失敗では未起動directoryを回収する() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-agent-task-scratch-activation-failure-{}-{nonce}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("Workspace試験root");
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("Workspaceを固定")
+            .identity;
+        let context = scratch_context(identity);
+        let name = format!(".d4p-tmp-{}", "8".repeat(32));
+        let record_id = context
+            .journal
+            .reserve(
+                &context.task_id,
+                &context.runtime_id,
+                &context.workspace_id,
+                &context.recovery_binding_hash,
+                identity,
+                &name,
+            )
+            .expect("scratch回復予約");
+        let workspace_dir = Dir::open_ambient_dir(&workspace, cap_std::ambient_authority())
+            .expect("作業領域directoryの操作口を開く");
+        workspace_dir.create_dir(&name).expect("未起動scratch");
+        fs::write(
+            workspace.join(&name).join("fixture.tmp"),
+            "試験用一時領域の内容".as_bytes(),
+        )
+        .expect("未起動scratch内fixture");
+        let scratch_dir = workspace_dir
+            .open_dir_nofollow(&name)
+            .expect("一時領域の操作口を開く");
+
+        assert!(matches!(
+            activate_task_scratch_directory(
+                scratch_dir,
+                crate::broker::workspace_root::DirectoryIdentity {
+                    device: identity.device,
+                    file_id: 0,
+                },
+                &context,
+                &record_id,
+            ),
+            Err(対話失敗::通信失敗)
+        ));
+        assert!(!workspace.join(&name).exists());
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+        drop(workspace_dir);
         std::fs::remove_dir_all(root).expect("試験rootを削除");
     }
 
