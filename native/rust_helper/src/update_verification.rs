@@ -98,12 +98,12 @@ pub fn verify_update_signature(
         );
     }
 
-    helper_ok(
+    // 互換入口は署名対象byteとBroker所有信頼鍵を持たないため、署名の存在だけで真正性を確立しない。
+    helper_error(
         "update.verify_signature",
-        UpdateVerificationResult {
-            update_id: candidate.update_id.clone(),
-            signature_present: true,
-        },
+        "update_signer_untrusted",
+        "Broker所有の信頼鍵がない署名確認要求を拒否した",
+        true,
         vec![],
     )
 }
@@ -124,6 +124,16 @@ mod tests {
         });
         assert!(!response.ok);
         assert_eq!(response.error.unwrap().code, "update_signature_required");
+    }
+
+    #[test]
+    fn nonempty_signature_without_broker_owned_trust_is_not_verified() {
+        let response = verify_update_signature(&UpdateCandidate {
+            update_id: "update-1".to_string(),
+            signature: Some("not-a-verified-signature".to_string()),
+        });
+        assert!(!response.ok);
+        assert_eq!(response.error.unwrap().code, "update_signer_untrusted");
     }
 
     #[test]

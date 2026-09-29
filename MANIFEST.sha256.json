@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "1c23d5823f4bf7e5cfb9b30f91c895a875a9935a87a664e040e31678bf0065d9"
+      "sha256": "b1fbf258ce6d0e2b31d569abc90637a8a169b1cd03cf55f4fe2af7272a38e198"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "59321f75fde934962aec1bc98a9e07def299da9a72157b0a2d4970355f3b7966"
+      "sha256": "fcc3911bcf29d040b9c24e86b9e8286f75d75a12d6cccab85c94037bfbc942d3"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3229,7 +3229,7 @@
     },
     {
       "path": "native/rust_helper/src/update_verification.rs",
-      "sha256": "6f193fefdf3914ef8a6fd7a28f50650bcc602aa006ebc0038c26438ee81f988a"
+      "sha256": "179df0c06b88cfa208d983f842a13939625a0ddcd8d8df91e16269acf1699909"
     },
     {
       "path": "native/rust_helper/src/workspace_diff.rs",

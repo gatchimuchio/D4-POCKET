@@ -12,6 +12,8 @@ R2追補（2026-09-30）: 起動前に作成した合成secretのhardlink alias�
 
 R2追補（2026-09-30）: Agent Task scratch journalの`activate`耐久保存失敗時にmemory stateを永続`reserved`と整合させ、Task未起動のscratch metadata／activation failureでは開いたdirectory handleを使って回収するfixtureを追加した。削除成功時だけ予約を完了し、回収不能ならjournalを保持する。証拠classは`FIXTURE`で、実Broker経由Agent Task、MxC TEMP／TMP管理、installed product Recoveryの証拠ではない。`task_execution=unsupported`とrelease blockerは維持する。詳細と試験結果は`docs/REV3_PROGRESS.md`。
 
+R2追補（2026-09-30）: Rust公開APIの旧更新署名入口は署名値が空でないだけで成功していたため、Broker所有の信頼鍵・署名対象byteを受け取らない限り拒否するよう変更し、否定試験を追加した。実Broker経路のEd25519検証は維持する。これは安全な署名検証入口の補強であり、Download／Install／Update／Rollback経路や`rev2_desktop_product_distribution`のblockerを閉じない。検証記録は`docs/REV3_PROGRESS.md`。
+
 2026-09-29に受領したrev3統合仕様・工程表を現行開発基準とする。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に追記する。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。
 
 rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。

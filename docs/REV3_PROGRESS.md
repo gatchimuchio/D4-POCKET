@@ -611,3 +611,22 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - [Codex CLI 0.158.0-alpha.2.1のMxC policy実装](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/policy.rs)、[Windows起動処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/windows.rs)、[native実行処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/native.rs)。
 - [Microsoft LearnのAppContainer起動手順](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)。
 - source読解は`EXTERNAL_EVIDENCE`。前項の直接CLI probeは合成入力の`LIVE_RUNTIME`のままであり、Rust Broker、Owner Approval、Rust生成scratch、実Agent Task、process群停止、Audit／Recoveryの証拠へ昇格しない。製品code・Windows設定・Task capabilityは変更していない。
+
+## R2追補 信頼鍵を持たない更新署名入口のfail-closed化（2026-09-30）
+
+### 成立した変更
+
+- 公開Rust API `verify_update_signature`は更新IDと署名文字列しか受け取らず、署名対象byteもBroker所有信頼鍵も持たないのに、以前は署名文字列が空でなければ成功を返していた。Repository内のBroker本線からは呼ばれていないが、public moduleから利用できるため、署名の存在を真正性と誤認させる入口だった。
+- 互換入口は空署名を`update_signature_required`で拒否し、非空署名も`update_signer_untrusted`で拒否する。署名真正性を成功にできるのは、Broker所有公開鍵とfingerprint、署名対象byte、Ed25519署名を照合する`verify_signed_update_signature`だけである。非空の任意文字列が成功にならない否定試験を追加した。
+- これはRust APIの誤用防止であり、download、install、process起動、update適用、rollbackを追加しない。更新信頼鍵のproduction provisioning、Windows installed product、`rev2_desktop_product_distribution`、`release_ready=false`は未解決のまま保持する。
+
+### 検証
+
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/update_verification.rs`: 合格。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0。12 targetで395 passed／0 failed／1 ignored。追加した非空署名・信頼鍵なしの否定試験を含む。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 149件、正常example 149件、negative fixture 192件で合格。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksで合格。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 1113 file／0 findingsで合格。
+- `python -X utf8 tooling/manifest.py --write`および`--check`、`git diff --check`: 合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。10 development checksは全件合格。Windows installed evidenceの不足5件はrelease blockerとして残り、release gateの合格表示はdevelopment validation自体の判定であってrelease readinessではない。
+- Windows Actionsは未使用。現行Windows hostでRust全targetと統合validationを実行できたため、追加hosted検査は不要だった。
