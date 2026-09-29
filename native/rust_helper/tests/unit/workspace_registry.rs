@@ -5,6 +5,48 @@ fn open_scoped(path:&std::path::Path)->(Dir,Vec<super::super::workspace_root::Di
 }
 
 #[test]
+fn Broker_workspace登録はsecret_hardlink_aliasを拒否して登録と成功Auditを残さない() {
+    let path = std::env::temp_dir().join(format!(
+        "gui-shell-workspace-secret-hardlink-{}",
+        識別子生成().unwrap()
+    ));
+    std::fs::create_dir(&path).unwrap();
+    std::fs::create_dir(path.join("private")).unwrap();
+    std::fs::write(path.join("private/secret.txt"), b"synthetic secret").unwrap();
+    std::fs::hard_link(
+        path.join("private/secret.txt"),
+        path.join("public-alias.txt"),
+    )
+    .unwrap();
+
+    let mut registry = WorkspaceRegistry::default();
+    let mut successful_registration_audit_calls = 0;
+    let result = registry.register(
+        "runtime-a",
+        "workspace-a",
+        Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap(),
+        &["private/secret.txt".to_owned()],
+        None,
+        &mut |_, _| {
+            successful_registration_audit_calls += 1;
+            Ok(())
+        },
+    );
+
+    assert_eq!(result, Err("作業領域の除外指定が不正"));
+    assert!(
+        registry.entries.is_empty(),
+        "拒否されたWorkspaceはregistryへ残らない"
+    );
+    assert_eq!(
+        successful_registration_audit_calls, 0,
+        "成功登録Auditは拒否時に確定しない"
+    );
+    drop(registry);
+    std::fs::remove_dir_all(path).unwrap();
+}
+
+#[test]
 fn dialogue_binding_exposes_only_registered_workspace_for_exact_runtime() {
     let path = std::env::temp_dir().join(format!(
         "gui-shell-dialogue-binding-{}",

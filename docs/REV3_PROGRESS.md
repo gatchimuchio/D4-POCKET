@@ -539,3 +539,22 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - 同probe `--runs 3`: 2回の試行はいずれも最初のCLI invocationでturn stream decode失敗。tool childはexit 0して報告fileを書いたが、turn完了要件を満たさないためprobe全体はexit 1。これらは成功反復へ含めない。
 - `git diff --check`: 成功。統合validatorとManifest確認は編集完了前に実行する。
 - Windows Actionsは未使用。local Windows上の実CLI／MxC childを限定実行でき、Rust sourceを変更していないため。
+
+## R2追補 Broker Workspace登録入口でsecret hardlink aliasを拒否（2026-09-30）
+
+### 成立した確認
+
+- `WorkspaceRegistry::register`へ、登録対象の合成secret fileと同一NTFS fileを指す事前作成hardlink aliasを渡すRust fixtureを追加した。Broker登録入口が`WorkspaceReader::from_registered_dir`の検査結果を登録拒否へ変換し、登録entryを残さず、成功登録Audit callbackも呼ばないことを確認する。
+- これは`WorkspaceReader`単独とCodex AdapterのTask事前検査だけでなく、Broker registry登録関数を直接通した`FIXTURE`証拠である。合成本文は試験だけで使用し、実秘密、実Codex CLI、Broker IPC、Owner Approval、製品Taskは使用しない。
+- 既存のTask事前検査fixtureとWorkspaceReader登録検査も同じfocused実行で再通過した。MxC直接`codex exec` childでの起動前alias読取可能性は、登録／preflightを通さない別の`LIVE_RUNTIME`観測として維持し、両者を混同しない。
+- このfixtureはhardlinkを含む登録対象secretについてfail-closed経路を確認するが、登録後に生じるfile差替・別alias形式の網羅、Task実行時のAdapter起動阻止、production IPC／Audit永続化、process lifecycle、Recovery、実Agent隔離を証明しない。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib secret_hardlink_alias -- --test-threads=1`: 2件合格、0件失敗。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 402件合格、0件失敗、1件は明示除外。全test targetを実行し、明示除外された実Codex CLI probeだけは実行していない。
+- リポジトリ全体の`cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check`: 失敗。今回のtest fileを含む広範な既存Rust fileの整形差分を検出したため、無関係な全体整形は適用しない。今回追加した関数はrustfmt出力に合わせて整形した。手動Windows Rust workflowの固定rustfmt対象にもこの既存test fileは含まれない。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 終了値0。
+- `python -X utf8 tooling/manifest.py --check`: 合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 最終状態で終了値0。厳格日本語監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録済みdevelopment check 10件が合格した。release blocker 5件と`release_ready=false`は維持された。初回実行ではこの記録中の英語検証結果表記を日本語化する検出が1件あり、修正後の再実行で解消した。
+- Windows Actionsは未使用。現行Windows上でRust全target試験が実行可能であり、hosted runnerによる追加証拠は本作業範囲に必要ない。

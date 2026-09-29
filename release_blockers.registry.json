@@ -299,6 +299,13 @@
             "evidence_source": "FIXTURE",
             "result": "WorkspaceReader rejects registered secret files or secret trees containing multiply-linked files; Task preflight repeats the bounded check against the pinned Workspace before spawn."
           },
+          "broker_registration_fixture": {
+            "date": "2026-09-30",
+            "evidence_source": "FIXTURE",
+            "command": "cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib secret_hardlink_alias -- --test-threads=1",
+            "result": "2 passed, 0 failed. WorkspaceRegistry::register rejects a registered secret file with a pre-existing hardlink alias; no registry entry or successful-registration audit callback remains.",
+            "scope_limit": "Rust unit fixture invoking the Broker registry method directly; does not exercise production IPC, Owner Approval, Codex exec, Agent Task, process lifecycle, Audit persistence, or Recovery."
+          },
           "direct_mxc_child_creation": {
             "evidence_source": "LIVE_RUNTIME",
             "cli_version": "0.158.0-alpha.2.1",
