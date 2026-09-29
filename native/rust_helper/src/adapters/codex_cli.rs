@@ -2,7 +2,7 @@
 //!
 //! このAdapterはIPCからcommand、argv、environment、workspaceを受け取らない。
 //! 起動時に明示登録された実行fileとworkspaceだけを使用する。Dialogueはread-only、
-//! Owner承認済みAgent Taskは固定permission profileを使う。
+//! Owner承認済みAgent Taskは登録Workspaceから導出した限定permission profileを使う。
 #![allow(non_snake_case)]
 
 use super::process_tree;
@@ -21,15 +21,19 @@ use std::time::{Duration, Instant};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
-const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
+const TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES: &[&str] = &[
     "default_permissions=\"d4p-agent-task\"",
     // user設定を無視するTaskでもmxcを固定し、backend選択をuser configへ委ねない。
     "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
-    // root accessは閉じ、必要なruntime読取とWorkspace内deny globだけを明示する。
-    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.env.*\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=32}",
-    "permissions.d4p-agent-task.network.enabled=false",
 ];
+const TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES: &[&str] =
+    &["permissions.d4p-agent-task.network.enabled=false"];
+const TASK_BASE_DENY_GLOBS: &[&str] = &["**/*.env", "**/.env.*", "**/.ssh/**", "**/secrets/**"];
+const MAX_TASK_FILESYSTEM_OVERRIDE_BYTES: usize = 12 * 1024;
+const MAX_REGISTERED_SECRET_PATHS: usize = 256;
+const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
+    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={";
 
 const SAFE_ENVIRONMENT: &[&str] = &[
     "PATH",
@@ -176,6 +180,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &self.workspace,
             self.workspace_identity,
             &scratch,
+            &context.secret_paths,
             instruction,
             cancel,
             deadline,
@@ -200,6 +205,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &要求.入力,
             CodexSandbox::ReadOnly,
             None,
+            &[],
         )?;
         let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
         let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
@@ -522,6 +528,7 @@ fn spawn_codex_task(
     input: &str,
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
+    secret_paths: &[String],
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
     let task_command = build_codex_command(
@@ -529,6 +536,7 @@ fn spawn_codex_task(
         workspace,
         sandbox,
         scratch.map(WorkspaceTaskScratch::path),
+        secret_paths,
     )?;
     let child_result = process_tree::spawn(task_command);
     // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
@@ -547,13 +555,22 @@ fn build_codex_command(
     workspace: &Path,
     sandbox: CodexSandbox,
     scratch: Option<&Path>,
+    secret_paths: &[String],
 ) -> Result<Command, 対話失敗> {
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
-        for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
+        for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
         }
+        task_command
+            .arg("-c")
+            .arg(task_filesystem_override(secret_paths)?);
+        for setting in TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES {
+            task_command.arg("-c").arg(setting);
+        }
+    } else if !secret_paths.is_empty() {
+        return Err(対話失敗::要求不正);
     }
     task_command.args(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
     if let CodexSandbox::ReadOnly = sandbox {
@@ -576,11 +593,60 @@ fn build_codex_command(
     Ok(task_command)
 }
 
+fn task_filesystem_override(secret_paths: &[String]) -> Result<String, 対話失敗> {
+    if secret_paths.len() > MAX_REGISTERED_SECRET_PATHS {
+        return Err(対話失敗::要求不正);
+    }
+    let mut deny_globs = std::collections::BTreeSet::new();
+    deny_globs.extend(
+        TASK_BASE_DENY_GLOBS
+            .iter()
+            .map(|pattern| (*pattern).to_owned()),
+    );
+    for path in secret_paths {
+        crate::workspace_reader::WorkspaceReader::validate_registered_secret_path(path)
+            .map_err(|_| 対話失敗::要求不正)?;
+        let literal = escape_codex_glob_literal(path);
+        deny_globs.insert(literal.clone());
+        deny_globs.insert(format!("{literal}/**"));
+    }
+
+    let mut setting = String::from(TASK_FILESYSTEM_OVERRIDE_PREFIX);
+    for (index, pattern) in deny_globs.iter().enumerate() {
+        if index > 0 {
+            setting.push(',');
+        }
+        setting.push('"');
+        setting.push_str(pattern);
+        setting.push_str("\"=\"deny\"");
+    }
+    setting.push_str("},\"glob_scan_max_depth\"=32}");
+    if setting.len() > MAX_TASK_FILESYSTEM_OVERRIDE_BYTES {
+        return Err(対話失敗::要求不正);
+    }
+    Ok(setting)
+}
+
+fn escape_codex_glob_literal(path: &str) -> String {
+    let mut escaped = String::with_capacity(path.len());
+    for character in path.chars() {
+        match character {
+            '[' => escaped.push_str("[[]"),
+            ']' => escaped.push_str("[]]"),
+            '{' => escaped.push_str("[{]"),
+            '}' => escaped.push_str("[}]"),
+            _ => escaped.push(character),
+        }
+    }
+    escaped
+}
+
 fn run_agent_task(
     executable: &Path,
     workspace: &Path,
     expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
     scratch: &WorkspaceTaskScratch,
+    secret_paths: &[String],
     instruction: &str,
     cancel: &AtomicBool,
     deadline: Instant,
@@ -598,6 +664,7 @@ fn run_agent_task(
         instruction,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
+        secret_paths,
     )?;
     let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
     let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
@@ -746,6 +813,17 @@ mod tests {
     use super::*;
     use std::fs;
 
+    const BRACKET_SECRET_GLOB: &str = "private/vault[[]ab[]].json";
+    const BRACKET_SECRET_SUBTREE_GLOB: &str = "private/vault[[]ab[]].json/**";
+    const BRACE_SECRET_GLOB: &str = "private/x[{]y[}].json";
+    const BRACE_SECRET_SUBTREE_GLOB: &str = "private/x[{]y[}].json/**";
+
+    fn debug_task_context(
+        context: &crate::broker::agent_task_scratch::AgentTaskScratchContext,
+    ) -> String {
+        format!("{context:?}")
+    }
+
     fn scratch_context(
         identity: crate::broker::workspace_root::DirectoryIdentity,
     ) -> crate::broker::agent_task_scratch::AgentTaskScratchContext {
@@ -755,6 +833,7 @@ mod tests {
             workspace_id: "workspace-fixture".into(),
             recovery_binding_hash: format!("sha256:{}", "a".repeat(64)),
             root_identity: identity,
+            secret_paths: vec!["private/credential-backup.txt".into()],
             journal: crate::broker::agent_task_scratch::AgentTaskScratchJournal::in_memory(),
         }
     }
@@ -792,9 +871,19 @@ mod tests {
         let scratch = Path::new(r"C:\workspace\.d4p-tmp-test");
         for sandbox in [CodexSandbox::ReadOnly, CodexSandbox::WorkspaceWrite] {
             let is_task = matches!(sandbox, CodexSandbox::WorkspaceWrite);
-            let command =
-                build_codex_command(executable, workspace, sandbox, is_task.then_some(scratch))
-                    .expect("固定Codex command");
+            let secret_paths = if is_task {
+                vec!["private/credential-backup.txt".to_owned()]
+            } else {
+                Vec::new()
+            };
+            let command = build_codex_command(
+                executable,
+                workspace,
+                sandbox,
+                is_task.then_some(scratch),
+                &secret_paths,
+            )
+            .expect("固定Codex command");
             let args: Vec<_> = command
                 .get_args()
                 .map(|arg| arg.to_string_lossy().to_string())
@@ -805,22 +894,31 @@ mod tests {
             if is_task {
                 assert!(!args.iter().any(|arg| arg == "--sandbox"));
                 assert!(args.iter().any(|arg| arg == "--ignore-user-config"));
-                for setting in TASK_PERMISSION_PROFILE_OVERRIDES {
+                for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES
+                    .iter()
+                    .chain(TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES.iter())
+                {
                     assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
                 }
-                let filesystem_override = TASK_PERMISSION_PROFILE_OVERRIDES
-                    .iter()
-                    .find(|setting| setting.starts_with("permissions.d4p-agent-task.filesystem={"))
-                    .expect("glob走査深度を含む固定filesystem設定");
+                let filesystem_override = args
+                    .windows(2)
+                    .find(|pair| {
+                        pair[0] == "-c"
+                            && pair[1].starts_with("permissions.d4p-agent-task.filesystem={")
+                    })
+                    .map(|pair| pair[1].as_str())
+                    .expect("登録secret pathを含む生成filesystem設定");
                 assert!(filesystem_override.starts_with("permissions.d4p-agent-task.filesystem={"));
                 assert!(filesystem_override.contains("**/.env.*"));
+                assert!(filesystem_override.contains("private/credential-backup.txt"));
+                assert!(filesystem_override.contains("private/credential-backup.txt/**"));
                 assert!(filesystem_override.contains(r#""glob_scan_max_depth"=32"#));
                 assert_eq!(
-                    TASK_PERMISSION_PROFILE_OVERRIDES
-                        .iter()
-                        .filter(
-                            |setting| setting.starts_with("permissions.d4p-agent-task.filesystem")
-                        )
+                    args.windows(2)
+                        .filter(|pair| {
+                            pair[0] == "-c"
+                                && pair[1].starts_with("permissions.d4p-agent-task.filesystem")
+                        })
                         .count(),
                     1,
                     "filesystem policyは単一overrideにまとめて後続tableに潰されない"
@@ -854,8 +952,57 @@ mod tests {
             workspace,
             CodexSandbox::WorkspaceWrite,
             Some(Path::new(r"C:\outside-temp")),
+            &[],
         )
         .is_err());
+    }
+
+    #[test]
+    fn 登録secret_globはliteral_escapeされ完全一致と子孫をdenyする() {
+        let paths = ["private/vault[ab].json".into(), "private/x{y}.json".into()];
+        let result = task_filesystem_override(&paths);
+        assert!(result.is_ok(), "登録secret globの生成が成功する");
+        let setting = result.unwrap_or_default();
+        assert!(setting.contains(BRACKET_SECRET_GLOB));
+        assert!(setting.contains(BRACKET_SECRET_SUBTREE_GLOB));
+        assert!(setting.contains(BRACE_SECRET_GLOB));
+        assert!(setting.contains(BRACE_SECRET_SUBTREE_GLOB));
+        assert!(setting.contains("\":root\"=\"deny\""));
+        assert!(setting.contains("\":minimal\"=\"read\""));
+        assert!(setting.contains("\"glob_scan_max_depth\"=32"));
+    }
+
+    #[test]
+    fn 登録secret_globは不正pathと上限超過を拒否する() {
+        for invalid in ["../outside", "private/*.txt", "private/has\\slash"] {
+            assert_eq!(
+                task_filesystem_override(&[invalid.into()]),
+                Err(対話失敗::要求不正)
+            );
+        }
+        let too_many = (0..=MAX_REGISTERED_SECRET_PATHS)
+            .map(|index| format!("private/secret-{index}.txt"))
+            .collect::<Vec<_>>();
+        assert_eq!(task_filesystem_override(&too_many), Err(対話失敗::要求不正));
+
+        let too_large = (0..64)
+            .map(|index| format!("private/{index:03}-{}", "x".repeat(240)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            task_filesystem_override(&too_large),
+            Err(対話失敗::要求不正)
+        );
+    }
+
+    #[test]
+    fn TaskContextのDebugは登録secretのpath名を隠す() {
+        let context = scratch_context(crate::broker::workspace_root::DirectoryIdentity {
+            device: 1,
+            file_id: 1,
+        });
+        let debug = debug_task_context(&context);
+        assert!(debug.contains("secret_path_count: 1"));
+        assert!(!debug.contains("credential-backup"));
     }
 
     #[test]

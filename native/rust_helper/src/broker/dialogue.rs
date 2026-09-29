@@ -1472,6 +1472,7 @@ impl 対話制御 {
                     workspace_id: request.workspace_id.clone(),
                     recovery_binding_hash: binding.recovery_binding_hash().to_string(),
                     root_identity: binding.root_directory_identity(),
+                    secret_paths: binding.secret_paths().to_vec(),
                     journal: scratch_journal,
                 };
                 let (send, receive) = mpsc::sync_channel(1);

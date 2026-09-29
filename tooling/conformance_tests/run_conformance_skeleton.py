@@ -6235,10 +6235,18 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
 def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     adapter_path = RUST_HELPER / "src" / "adapters" / "codex_cli.rs"
     broker_path = RUST_HELPER / "src" / "broker" / "ipc_server.rs"
+    workspace_path = RUST_HELPER / "src" / "broker" / "workspace.rs"
+    dialogue_path = RUST_HELPER / "src" / "broker" / "dialogue.rs"
+    scratch_path = RUST_HELPER / "src" / "broker" / "agent_task_scratch.rs"
+    reader_path = RUST_HELPER / "src" / "workspace_reader.rs"
     if not adapter_path.is_file():
         return ["Codex CLI Adapter sourceが存在しない"]
     adapter = adapter_path.read_text(encoding="utf-8")
     broker = broker_path.read_text(encoding="utf-8")
+    workspace = workspace_path.read_text(encoding="utf-8")
+    dialogue = dialogue_path.read_text(encoding="utf-8")
+    scratch = scratch_path.read_text(encoding="utf-8")
+    reader = reader_path.read_text(encoding="utf-8")
     required = [
         "--json",
         "--ephemeral",
@@ -6270,6 +6278,12 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         r'\":root\"=\"deny\"',
         r'\"glob_scan_max_depth\"=32',
         "network.enabled=false",
+        "TASK_BASE_DENY_GLOBS",
+        "task_filesystem_override(secret_paths)?",
+        "MAX_TASK_FILESYSTEM_OVERRIDE_BYTES",
+        "MAX_REGISTERED_SECRET_PATHS",
+        "escape_codex_glob_literal",
+        'format!("{literal}/**")',
         "WorkspaceTaskScratch",
         "exec_interface_present",
         "workspace_write_interface_present",
@@ -6279,21 +6293,24 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     for token in task_required:
         if token not in adapter:
             errors.append(f"Codex Agent Task境界または未検証gateがない: {token}")
-    filesystem_overrides = [
-        line.strip()
-        for line in adapter.splitlines()
-        if line.strip().startswith('"permissions.d4p-agent-task.filesystem={')
-    ]
-    if (
-        len(filesystem_overrides) != 1
-        or r'\":minimal\"=\"read\"' not in filesystem_overrides[0]
-        or r'\"glob_scan_max_depth\"=32' not in filesystem_overrides[0]
-    ):
-        errors.append("Codex Task permission profileはminimal読取と32段の有界glob走査を同じfilesystem overrideへ固定しない")
-    if len(filesystem_overrides) == 1 and r'\":root\"=\"deny\"' not in filesystem_overrides[0]:
-        errors.append("Codex Task profileがroot denyをfilesystem overrideへ固定しない")
+    if adapter.count("task_filesystem_override(secret_paths)?") != 1:
+        errors.append("Codex Taskが登録secretから単一のfilesystem overrideを生成しない")
     if "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=" in adapter:
         errors.append("後続filesystem table overrideで走査深度を上書きするCodex設定を受理した")
+    propagation = (
+        "registered_secret_paths",
+        "secret_paths: entry.reader.registered_secret_paths().to_vec()",
+        "pub(crate) fn secret_paths(&self) -> &[String]",
+    )
+    for token in propagation:
+        if token not in workspace:
+            errors.append(f"Workspace登録除外pathのbinding接続がない: {token}")
+    if "secret_paths: binding.secret_paths().to_vec()" not in dialogue:
+        errors.append("Task contextへ現在のWorkspace登録除外pathを渡さない")
+    if "pub(crate) secret_paths: Vec<String>" not in scratch or "secret_path_count" not in scratch:
+        errors.append("Task contextがsecret pathをredacted in-memory fieldとして保持しない")
+    if "validate_registered_secret_path" not in reader:
+        errors.append("Task sandboxへ渡すWorkspace相対pathの再検証がない")
     forbidden = [
         "--dangerously-bypass-approvals-and-sandbox",
         "--worktree",

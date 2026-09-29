@@ -48,6 +48,7 @@ pub(crate) struct DialogueWorkspaceBinding {
     registration_hash: String,
     recovery_binding_hash: String,
     root_identity: super::workspace_root::DirectoryIdentity,
+    secret_paths: Vec<String>,
 }
 
 impl DialogueWorkspaceBinding {
@@ -73,6 +74,10 @@ impl DialogueWorkspaceBinding {
 
     pub(crate) fn root_directory_identity(&self) -> super::workspace_root::DirectoryIdentity {
         self.root_identity
+    }
+
+    pub(crate) fn secret_paths(&self) -> &[String] {
+        &self.secret_paths
     }
 
     pub(crate) fn audit_hash(&self, session_id: &str) -> String {
@@ -119,6 +124,7 @@ impl DialogueWorkspaceBinding {
             registration_hash: registration_hash.to_owned(),
             recovery_binding_hash: format!("sha256:{}", "b".repeat(64)),
             root_identity,
+            secret_paths: Vec::new(),
         }
     }
 }
@@ -196,6 +202,7 @@ impl WorkspaceRegistry {
                 device: entry.root_device,
                 file_id: entry.root_file_id,
             },
+            secret_paths: entry.reader.registered_secret_paths().to_vec(),
         })
     }
 

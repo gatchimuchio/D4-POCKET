@@ -63,6 +63,12 @@ Task状態recordはBroker processの揮発状態で、再起動後に照会で�
 
 候補profileへWorkspace内`**/.env.*` denyとglob走査上限32を追加して再試験した結果、`.env.production`と深さ10の`.env`は拒否され、Task scratchを指定したWorkspace外markerも拒否された。別名marker `config/credential-backup.txt`は引き続き許可される。深さ32を超えるpath、実`codex exec`、Broker／Owner Approval経由、WorkspaceへのAgent書込、Task取消・crash・回復、Audit／result hash、diff／test結果／Content Exposureはこの直接sandbox試験では確認していない。この観測は`LIVE_RUNTIME`だが証明範囲は当該CLIのWindows sandboxと合成pathだけであり、`task_execution=unsupported`を維持する。
 
+### Workspace登録secret pathのCodex Taskへの伝播（2026-09-29）
+
+OwnerがWorkspace登録で指定したsecret pathは、登録時に正規化・保持された現在値をBrokerの`DialogueWorkspaceBinding`からTask専用contextへ渡し、Codex Taskの単一filesystem overrideへ射影する。各登録pathはWorkspace相対pathとして再検証し、完全一致と`path/**`の両方をdenyする。登録path中のglob文字として解釈され得る`[`、`]`、`{`、`}`はliteral patternへescapeする。登録数256件、生成override 12 KiBを上限とし、超過・不正pathはCLI spawn前にfail-closedで拒否する。既定deny glob、`:root=deny`、`:minimal=read`、glob走査深度32、network無効を維持する。Task contextのDebug表示はpath名でなく件数だけを出し、回復journalにはpath名を保存しない。生成したglob文字列はCodex CLIの起動引数に渡るため、ローカルのprocess command lineからpath名が見える可能性は残る。Credential実値を含めてはならない。
+
+この接続のRust unit／Fake CLI／Conformance testは、登録値の伝播、glob生成、literal escape、上限、Debug redactionを検査する。手動構成した同等globを使うWindows mxc直接probeは合成登録secretの完全一致・子孫と深さ64の拒否を観測したが、Rust生成設定・`codex exec`・Broker／Owner Approval・実Agent Taskの連続経路証拠ではない。したがってこの追補も`LIVE_RUNTIME` sandbox probeと`FIXTURE`接続testを越えて主張せず、`task_execution=unsupported`および関連`release_blocker`を維持する。
+
 ### Broker crash後のscratch回復
 
 未検証の予約状態を`reserved`、nofollow open後にdirectory identityを得た状態を`active`として記録上も分離する。

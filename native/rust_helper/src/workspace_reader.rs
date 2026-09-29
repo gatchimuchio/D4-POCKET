@@ -142,9 +142,17 @@ fn read_options() -> OpenOptions {
 }
 
 impl WorkspaceReader {
+    pub(crate) fn registered_secret_paths(&self) -> &[String] {
+        &self.secrets
+    }
+
     pub(crate) fn validate_relative_path(&self, path: &str, allow_root: bool) -> Result<(), ReadError> {
         if path.is_empty() && allow_root {return Ok(());}
         self.allowed(path).map(|_| ())
+    }
+
+    pub(crate) fn validate_registered_secret_path(path: &str) -> Result<(), ReadError> {
+        path_parts(path).map(|_| ())
     }
     /// dirはowner登録経路が開いたhandle。通常要求からambient pathを開かない。
     pub fn from_registered_dir(root: Dir, secrets: &[String]) -> Result<Self, ReadError> {

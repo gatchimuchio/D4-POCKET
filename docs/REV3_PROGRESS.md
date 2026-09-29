@@ -130,3 +130,27 @@ resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration
 ### 次工程
 
 R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owner controlled Yes／No／stale／replay、実`codex exec`を通るBroker production path、取消／crash後回復、diff／test結果／Content Exposureの接続を検証する。これらのLIVE_RUNTIME証拠が成立するまで`task_execution=unsupported`と関連release blockerを維持する。
+
+## R2追補 Workspace登録secret pathのTask sandbox伝播（2026-09-29）
+
+### 成立した変更
+
+- `WorkspaceReader`が保持する正規化済み登録secret pathを、Brokerの`DialogueWorkspaceBinding`からAgent Task専用揮発contextへ渡し、Codex Taskの単一filesystem overrideへ決定的に追加する。
+- 各登録pathの完全一致と子孫をdenyし、登録可能なglob構文記号`[`、`]`、`{`、`}`はliteral globへescapeする。pathを再検証し、256件または12 KiBを超える設定をprocess spawn前にfail-closedで拒否する。
+- 既存の`.env`等の固定deny、`:root=deny`、`:minimal=read`、glob深度32、network無効を保つ。context Debugはpath名でなく件数だけを示し、回復journalへpath名を保存しない。CLI引数にglob設定を渡すため、ローカルprocess command lineからpath名が見える可能性は残る。
+- Codex fake CLI fixtureは登録secret pathと固定denyの両方を含む正確なfilesystem overrideを要求する。Adapter metadataは引き続き`task_execution=unsupported`。
+
+### 証拠・検証履歴
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 最終実装で成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 最終実装で394件成功（lib 348、helper binary 10、統合test 36）。Task実行はWindows fake CLI fixtureであり、実Codex `exec`／Broker経路ではない。
+- 登録pathを通すWorkspace bindingのfocused Rust testは、テスト整形後の最終実行でも1件成功。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs native/rust_helper/tests/fixtures/fake_codex_cli.rs`: 成功。補助のcrate全体／複数legacy file形式checkは既存未整形箇所を多数検出したため不成功。広範な無関係再整形は行わず、変更したAdapterとfake CLIのcheckを個別に成立させた。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 初回は新規Rustの3文字列を機械識別子の誤検出として検出。設定templateを分離し、test assertionの近接文字列を整理後、1111 repository files／findings 0で成功。初回失敗はこの履歴に保持する。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 最初の単独試行はOneDrive上のSchema読込で一時的な`OSError [Errno 22]`。file単体読込を確認後の統合validatorではConformance 225件すべて成功し、Codex Adapter固有Conformanceも空errorで成功した。
+- strict監査修正前の初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は、日本語監査3件と変更後manifest未再生成を検出した。Schema 149／example 149／negative fixture 192、Conformance 225、release smoke、evidence bundle、runtime assertion、開発監査は成功していた。strict監査を0件へ修正し、`python -X utf8 tooling/manifest.py --write`で1108件を再生成した後、同じ統合validatorを再実行してexit 0。登録済みdevelopment check 10件すべて成功し、Schema 149／example 149／negative fixture 192、Conformance 225、release smoke、evidence bundle、runtime assertion、C32開発監査も成功した。別のfinal development auditは既存release blocker 5件と`release_ready=false`を報告し、これらを解除しない。
+- 合成pathのWindows mxc直接probeは手動構成した候補globで実施し、登録pathの完全一致・子孫・深さ64、およびliteral bracket／brace pathのread拒否と、非登録decoyのread成功を観測した。この`LIVE_RUNTIME`結果はRust生成argv、実`codex exec`、Broker、Owner Approval、Agent Taskを検証しない。
+
+### 次工程と残存gate
+
+本追補で登録除外path伝播とsandbox globの局所単位を閉じた。Owner Yes／No／stale／replay、実`codex exec`を通るBroker production path、実行失敗・取消・crash後回復、diff／test結果のContent Exposure接続は未成立であり、関連項目を`release_blocker`として保持する。Windows実機のCodex Taskは未実行で、`task_execution=unsupported`を維持する。

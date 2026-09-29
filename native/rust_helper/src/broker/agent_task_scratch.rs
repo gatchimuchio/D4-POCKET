@@ -66,14 +66,30 @@ pub(crate) enum RecoveryOutcome {
     JournalUpdateFailed,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AgentTaskScratchContext {
     pub(crate) task_id: String,
     pub(crate) runtime_id: String,
     pub(crate) workspace_id: String,
     pub(crate) recovery_binding_hash: String,
     pub(crate) root_identity: DirectoryIdentity,
+    /// 現在登録中の除外pathをTask sandboxへ渡す。永続journal・Audit・logへ保存しない。
+    pub(crate) secret_paths: Vec<String>,
     pub(crate) journal: AgentTaskScratchJournal,
+}
+
+impl std::fmt::Debug for AgentTaskScratchContext {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AgentTaskScratchContext")
+            .field("task_id", &self.task_id)
+            .field("runtime_id", &self.runtime_id)
+            .field("workspace_id", &self.workspace_id)
+            .field("recovery_binding_hash", &self.recovery_binding_hash)
+            .field("root_identity", &self.root_identity)
+            .field("secret_path_count", &self.secret_paths.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl AgentTaskScratchJournal {

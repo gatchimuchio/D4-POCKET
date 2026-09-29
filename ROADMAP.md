@@ -1,6 +1,6 @@
 # GUI Shell ロードマップ
 
-状態: D4 Pocket / GUI-Shell統合rev3に基づく開発中。R0現行状態再固定を完了し、次工程はR1正本・Blocker体系再編。Technical Completeおよび正式releaseは未成立。
+状態: D4 Pocket / GUI-Shell統合rev3に基づく開発中。R0現行状態再固定とR1正本・Blocker体系再編を完了し、R2 Agent Task本番経路を進行中。Technical Completeおよび正式releaseは未成立。
 
 ## D4 Pocket統合 rev3 現行工程
 
@@ -116,6 +116,12 @@ Codex sandbox helperへ`d4p-agent-task` profileを明示し、非秘密の合成
 Task runnerとBroker Consumerは接続済みでも、Adapter capability metadataは`task_execution=unsupported`のままであり、Brokerから実Taskを起動できない。permission profileを指定したsandbox helperから`C:\Windows\win.ini`を読み取れたため、外部path拒否は未成立である。Workspace内deny globの実効性、Broker crash／電源断後のscratch回収、実Agent隔離書込、失敗／取消／期限の実runtime証拠、結果／diffの`Content Exposure`表示は未成立の`release_blocker`。有料資格によるModel実行は行っていない。Windows Job Objectはprocess群停止でありfilesystem sandboxではない。
 
 - `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1`：対象のRust単体試験1件が成功。`cargo check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`成功。最新の`--all-targets`実行はRustライブラリ試験313件、`CLI`試験9件、`Broker IPC`試験10件の後、`canonical_decimal_hash`の結合試験実行ファイルがWindowsの`Application Control`にOSエラー4551で起動前に拒否され、終了値1。全対象試験成功とは記録しない。
+
+### R2追補 Workspace登録secret pathのTask sandbox伝播（2026-09-29）
+
+Workspace登録時に保持する`secret_paths`をBrokerの`DialogueWorkspaceBinding`からTask専用の揮発contextへ渡し、Codex `workspace-write`のfilesystem overrideへ完全一致と子孫globのdenyとして決定的に射影する。pathはWorkspace相対形式を再検証し、glob metacharacterのうち登録可能な`[`、`]`、`{`、`}`はliteral escapeする。登録数256件・生成設定12 KiBを超える場合は起動前に拒否する。既存の`.env`等のdeny、`:root=deny`、`:minimal=read`、glob走査深度32、network無効は維持する。secret path名はTask contextのDebugと回復journalへ含めない。
+
+ローカルmxc直接sandbox probeでは、候補規則の手動設定で登録した合成secretの完全一致・子孫および深さ64のpathが拒否され、隣接decoyは読めた。`[]`／`{}`を含むliteral pathも拒否対象とし、glob wildcard扱いのdecoyは許可された。これは手動設定を用いたCLI sandboxの限定`LIVE_RUNTIME`証拠であり、Rust生成値、`codex exec`、Broker、Owner Approval、実Agent Taskは通していない。Rust全target 394件、Conformance 225件、strict日本語監査1111 files／findings 0、および統合validatorの登録済みdevelopment check 10件はすべて成功した。global `release_ready=false`、既存release blocker、Codex Taskのunsupportedは維持する。
 - その時点では、現行source commit `f4bf6b0e65e751da8b662595f2e9865970c6f460`を非OneDriveの短いmanaged worktreeから`cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`で再検証したが、`io-lifetimes` build scriptがOS error 4551で起動前に拒否された。さらに`--target-dir C:\\D4Pocket\\codex-f4-target`を指定した同全target試験でも`generic-array`／`io-extras` build scriptが同errorで拒否された。どちらもtest executableまで到達せず、Cargo出力先の変更では解消しなかった。Application Control変更・test除外・拒否file移動は行わず、その時点で`windows_rust_integration_test_execution_policy`を未解決へ戻した。この判断は後続の現行mainに対するrun #13で更新された。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`：exit 0。strict日本語監査、Schema 144／144／178、Conformance 224、Manifest、release gate、packaging portability、release smoke等10検査が合格。development validatorの結果は`release_ready=false`、`release_blocker` 31件であり、正式releaseを意味しない。
 - 詳細な実装範囲・検証・証拠限界は`docs/REV2_PROGRESS.md`の本節、契約は`docs/specs/agent-runtime.md`および`docs/specs/process-supervision.md`を参照する。

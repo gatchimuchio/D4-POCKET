@@ -6,15 +6,38 @@ fn open_scoped(path:&std::path::Path)->(Dir,Vec<super::super::workspace_root::Di
 
 #[test]
 fn dialogue_binding_exposes_only_registered_workspace_for_exact_runtime() {
-    let path=std::env::temp_dir().join(format!("gui-shell-dialogue-binding-{}",識別子生成().unwrap()));
+    let path = std::env::temp_dir().join(format!(
+        "gui-shell-dialogue-binding-{}",
+        識別子生成().unwrap()
+    ));
     std::fs::create_dir(&path).unwrap();
-    let mut registry=WorkspaceRegistry::default();
-    registry.register("runtime-a","workspace-a",Dir::open_ambient_dir(&path,cap_std::ambient_authority()).unwrap(),&[],None,&mut |_,_|Ok(())).unwrap();
-    let binding=registry.dialogue_binding("runtime-a","workspace-a").expect("登録済みの同一Runtime");
-    assert!(binding.matches("runtime-a","workspace-a"));
-    assert!(!binding.matches("runtime-b","workspace-a"));
-    assert!(registry.dialogue_binding("runtime-b","workspace-a").is_none());
-    assert!(registry.dialogue_binding("runtime-a","unknown-workspace").is_none());
+    let mut registry = WorkspaceRegistry::default();
+    let secret_paths = vec!["private/credential-backup.txt".to_owned()];
+    registry
+        .register(
+            "runtime-a",
+            "workspace-a",
+            Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap(),
+            &secret_paths,
+            None,
+            &mut |_, _| Ok(()),
+        )
+        .unwrap();
+    let binding = registry
+        .dialogue_binding("runtime-a", "workspace-a")
+        .expect("登録済みの同一Runtime");
+    assert!(binding.matches("runtime-a", "workspace-a"));
+    assert_eq!(
+        binding.secret_paths(),
+        &["private/credential-backup.txt".to_owned()]
+    );
+    assert!(!binding.matches("runtime-b", "workspace-a"));
+    assert!(registry
+        .dialogue_binding("runtime-b", "workspace-a")
+        .is_none());
+    assert!(registry
+        .dialogue_binding("runtime-a", "unknown-workspace")
+        .is_none());
     assert!(binding.audit_hash("session-a").starts_with("sha256:"));
     drop(registry);
     std::fs::remove_dir_all(path).unwrap();
