@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "27760e7724047909ef290ee7d501c8e389b11901729be2be9d1ba3367a129051"
+      "sha256": "f4c738fc7c95911b46e8a7882d9643b71070de89a4ce7b42f2fdec404fb6a450"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "be41bad6c316b2bb4c6ae27aa5c547648632a08783d0607388bf008abd03fa4e"
+      "sha256": "b0a1786af68240c640826c99b2d09fa39cf31c42bea8b9631197b8d5633e4e68"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "01651c721d3bd14c4778a6f69a56216cf46a2b3f9d0a4e7c7879e2dd5c5653cd"
+      "sha256": "1ec85ab20ce40d60226b9e87ab2d8b5c711402f28fcf185dba93b6dea95ae906"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -3721,7 +3721,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9e27c32f17ef0bfee5156fa73ee674af8fe8aa8a9f5fd59029940b745b67c5d4"
+      "sha256": "e83b98bbf86805c73361484445fb4e6e0bdf4897cbe32ab89a75e4c2dd4b8f9b"
     },
     {
       "path": "requirements-dev.txt",
@@ -4362,6 +4362,10 @@
     {
       "path": "tooling/codegen/generate_contracts.py",
       "sha256": "5e53252d86e52f57e4ce2ae9d6f6c2e6a7da463605e744ed76a3ef6476cb0e92"
+    },
+    {
+      "path": "tooling/codex_mxc_exec_temp_probe.py",
+      "sha256": "a6bbcbd6aef7469d1e27e2e5e6af4540a1150232002c95ca03bc3cbd9077a340"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

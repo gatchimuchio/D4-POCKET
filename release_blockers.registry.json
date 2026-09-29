@@ -160,6 +160,27 @@
         "os_protection_changed": false,
         "scope_limit": "candidate glob semantics only; not Rust-generated argv, codex exec, Broker, Owner Approval, Agent Task, or general path isolation"
       },
+      "codex_exec_mxc_temp_probe": {
+        "date": "2026-09-29",
+        "cli_version": "0.158.0-alpha.2.1",
+        "evidence_source": "LIVE_RUNTIME",
+        "method": "development-only Python probe invokes the owner-specified Codex CLI with a loopback fake Responses API and a fixed exec_command; uses an isolated CODEX_HOME and synthetic workspace with Rust-equivalent mxc Task permission overrides",
+        "host_process_elevated": false,
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "runs": 3,
+        "observations": {
+          "codex_exec_turn": "3/3 completed normally; each had 2 loopback Responses API requests",
+          "exec_command": "3/3 offered and completed with exit 0",
+          "workspace_task_scratch_write": "3/3 succeeded",
+          "child_TEMP_TMP": "equal to each other in 3/3 runs; unequal to WorkspaceTaskScratch in 3/3 runs",
+          "child_TEMP_path_shape": "under Packages and ended in AC/Temp in 3/3 runs; absolute path not retained",
+          "MxC_TEMP_marker": "written and visible inside child in 3/3 runs; not host-visible after Codex CLI exit in 3/3 runs",
+          "non_loopback_requests": "12 intercepted and rejected by the local loopback proxy"
+        },
+        "scope_limit": "direct Codex CLI and MxC shell child only. Host non-visibility is not proof of physical deletion or general cleanup. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, or Recovery"
+      },
       "rust_generated_secret_path_probe": {
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",

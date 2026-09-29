@@ -197,3 +197,12 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - 最初の統合validator実行は、編集5 fileのMANIFEST hash未更新を検出した。`python -X utf8 tooling/manifest.py --write`で1108 fileを再生成後、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。厳格日本語監査1111 file／finding 0、Schema 149／example 149／negative fixture 192、Conformance 225、登録development check 10件すべて成功した。
 - 同validatorの製品証拠面はWindows installed evidenceが未収集でrelease gateとrelease readinessを解除していない。`release_ready=false`と既存`release_blocker`を維持する。
 - Broker／Owner Approval／production `codex exec`／実Agent tool、Taskの正常終了・取消・crash cleanup、Audit／Recovery、結果のContent Exposureは通していない。scratch有効性を主張せず、`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 実`codex exec` MxC shell childのTEMP／TMP・終了時可視性（2026-09-29）
+
+- `tooling/codex_mxc_exec_temp_probe.py`を明示実行専用のdevelopment probeとして追加した。Owner指定の実CLIを一時`CODEX_HOME`・合成Workspaceから起動し、loopback偽Responses APIだけをmodel providerとして使い、偽応答から実`exec_command`を実行する。Rust AdapterのTask permission設定相当として`windows.sandbox="mxc"`、`:root=deny`、network無効、Workspace内secret denyを設定する。Adapterやproduction pathの設定は変更しない。
+- 実行command: `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定のcodex.exe絶対path> --runs 3`。Codex CLI `0.158.0-alpha.2.1`で3/3回、実`codex exec`と実MxC shell tool child、合成Task scratchへの書込、TEMP marker書込、Codex turn正常終端を確認した。各runでResponses API要求2回、shell command exit 0。
+- 3/3回、tool childのTEMPとTMPは互いに一致したが、Rust生成WorkspaceTaskScratchとは一致しなかった。値や絶対pathを保存・出力せず比較した結果、TEMP pathは`Packages…\AC\Temp`形式だった。shell child内で一意TEMP markerが存在した一方、Codex CLI終了後はmarkerとTEMP directoryの双方がhostから見えなかった。これは「終了後にhost可視で残っていない」という`LIVE_RUNTIME`観測であり、物理削除・一般的なcleanup保証へ昇格しない。
+- 現在のCodex process tokenは非管理者（`IsUserAnAdmin=false`）。資格情報環境変数を子環境から除去し、実model／有料資格を使わず、非loopback通信はloopback proxyで拒否した（3 run合計12要求）。Codex設定、OS保護設定、Repository外の恒久データは変更していない。試験workspace／CODEX_HOMEは各run後に破棄した。
+- 最初の試行はGit管理外の一時WorkspaceをCodexがuntrustedとしてmodel request前に拒否した。probe内の`--skip-git-repo-check`で一時Workspaceだけを対象化して解消し、製品command builderには追加していない。
+- この証拠は直接Codex CLI＋MxCの正常終端に限る。Rust Broker consumer、Owner Approval、production Task、実model、取消／期限／crash、process群停止、Audit／Recovery、Content Exposureは通していない。TEMP/TMP scratch mismatchの扱いと異常終端時cleanupを含むrelease blockerを保持し、`task_execution=unsupported`、`release_ready=false`を維持する。

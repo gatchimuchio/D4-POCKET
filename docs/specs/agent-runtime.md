@@ -73,6 +73,8 @@ OwnerがWorkspace登録で指定したsecret pathは、登録時に正規化・�
 
 明示指定した実Codex CLI `0.158.0-alpha.2.1`に対するignored Rust testを追加した。testは`build_codex_command`が生成するconfig overrideをそのまま抽出し、そこからpermission profile名を取り出して必須の`codex sandbox --permission-profile`へ渡す。隔離した一時`CODEX_HOME`と合成Workspaceだけを使い、実Agent、`codex exec`、認証情報、model requestは起動しない。合成の登録file完全一致、登録directoryの子file、literal `[]`／`{}` pathのreadは拒否され、glob decoyのreadとWorkspace内writeは成功した。初回呼出しはsandbox helper必須の`--permission-profile`欠落でusage errorとなったためtestを修正した。初回のTEMP scratch補助probeはRust生成環境値をhelper commandへ正確に伝えたかを記録しておらず、期待scratchにmarkerがなかったことだけでは環境伝播を判定できなかった。後続probeでは`build_codex_command`が設定するTEMP／TMPだけを直接`sandbox`起動へ渡し、子process内の値がどちらもWorkspaceTaskScratchと一致しないことを確認した。この結果は直接`sandbox`子processの限定的な`LIVE_RUNTIME`観測であり、実`codex exec`内のAgentやそのtool childのTEMP／TMP挙動、scratch cleanupを証明しない。Broker、Owner Approval、Agent Task、process lifecycle、scratch隔離は未成立で、`task_execution=unsupported`を維持する。
 
+2026-09-29の追補では、`tooling/codex_mxc_exec_temp_probe.py`がloopback偽Responses APIから固定`exec_command`を返し、実Codex CLI `exec`と実MxC shell childを3回実行した。現行Task permission設定相当の直接CLI probeでは、3/3回ともtool childのTEMP／TMPは互いに一致するがRust生成WorkspaceTaskScratchとは一致せず、TEMP markerはchild内で書込後、CLI終了時にはhostから見えなくなった。Workspace内scratchへの書込も3/3回成功した。これは実model、Rust Broker、Owner Approval、production Task経路、取消／期限／crashを通さない限定`LIVE_RUNTIME`証拠であり、host非可視を削除保証と扱わない。TEMP/TMPのscratch mismatchの設計上の意味と異常終端時cleanupは未解決で、Adapterの`task_execution=unsupported`およびrelease blockerを維持する。
+
 ### Broker crash後のscratch回復
 
 未検証の予約状態を`reserved`、nofollow open後にdirectory identityを得た状態を`active`として記録上も分離する。
