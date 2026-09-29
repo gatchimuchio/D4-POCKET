@@ -597,3 +597,17 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --check`および`git diff --check`: 合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 合格。日本語基底監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録development check 10件。証拠bundleはrelease blocker 5件と`release_ready=false`を保持した。Windows installed-app evidenceは未収集であり、release gateは閉じない。
 - Windows GitHub Actionsは未使用。local Windows Rust all-target検査を実行できたため、検査branchやActions artifactは作成していない。
+
+## R2追補 MxC child TEMP／TMP経路の一次資料照合（2026-09-30）
+
+### 成立した確認
+
+- 実測対象Codex CLIと同じ`rust-v0.158.0-alpha.2.1`の公開sourceを確認した。`mxc-sandbox/src/windows.rs`はfilter済みlauncher環境を読み、`TEMP`／`TMP`を含むenvironmentをpolicy builderへ渡す。`policy.rs`はこの値を`:tmpdir`のfilesystem grantへ射影し、同じenvironmentを`ExecutionRequest`へ載せる。`native.rs`は`BaseContainerRunner`へ実行要求を渡す。これは当該CLI版の実装sourceに対する`EXTERNAL_EVIDENCE`であり、起動後childの実環境が渡した値を維持することの証明ではない。
+- Microsoft LearnのAppContainer資料は、AppContainer profileにおける`TEMP`／`TMP`の配置例として`Packages\<profile>\AC\Temp`へのredirectを説明する。これは2026-09-29の直接CLI `LIVE_RUNTIME`観測（指定したWorkspace scratchとは異なるPackages配下`AC\Temp`）と整合する候補要因だが、当該Codex／MxC実行でそのOS動作が不一致の原因であること、実Tempのprofile単位・task単位の寿命、物理cleanupを確定しない。
+- したがって、原因はなお未確定で、shell environment overrideがWorkspaceTaskScratchをchildの実Tempへ固定する契約として使えるとは扱わない。Adapterの`task_execution=unsupported`、scratch隔離／cleanupを含む`release_blocker`、`release_ready=false`を維持する。追加runtime probeは行わず、AppContainer tempへ合成markerを残す恐れのある同型試験も反復していない。
+
+### 参照と証拠境界
+
+- [Codex CLI 0.158.0-alpha.2.1のMxC policy実装](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/policy.rs)、[Windows起動処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/windows.rs)、[native実行処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/native.rs)。
+- [Microsoft LearnのAppContainer起動手順](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)。
+- source読解は`EXTERNAL_EVIDENCE`。前項の直接CLI probeは合成入力の`LIVE_RUNTIME`のままであり、Rust Broker、Owner Approval、Rust生成scratch、実Agent Task、process群停止、Audit／Recoveryの証拠へ昇格しない。製品code・Windows設定・Task capabilityは変更していない。
