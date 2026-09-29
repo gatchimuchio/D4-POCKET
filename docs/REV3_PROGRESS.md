@@ -312,3 +312,21 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 ### 残存gate
 
 Owner Approval期限の否定試験追加はAgent Task本番経路完成を意味しない。実Agent実行隔離、production Broker／IPC、Audit／Recovery、結果のContent Exposure、Windows installed product等の既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 有効Owner Approvalが期限切れPermissionを補完しない否定試験（2026-09-29）
+
+### 成立した局所証拠
+
+- `native/rust_helper/src/broker/dialogue.rs`へ、Owner Approvalの本文hash・実行条件hash・二期限が有効でも、Workspace Permissionの期限切れを補完しない否定試験を追加した。
+- 2つの独立fixtureでPermissionのwall-clock期限だけ、またはmonotonic期限だけを失効させ、Approval自体は本文・条件・二期限とも有効なことを照合する。Brokerは実行を拒否し、Adapter呼出し0回、Permissionと未消費Approvalの記録保持を確認する。
+- 証拠範囲はBroker対話制御のRust `FIXTURE`に限る。実Adapter Task、Owner native UI、production IPC、実Workspace隔離の証拠ではない。`task_execution=unsupported`と既存`release_blocker`を維持する。
+
+### 検証と履歴
+
+- focused試験 `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::AgentTask実行は有効OwnerApprovalを期限切れPermissionから分離して拒否する' -- --exact --nocapture`: 1 passed。
+- 初回`rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs`は新規assertionの折返し差だけを検出したため修正し、再実行は成功。`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功。
+- local全target testは前追補の通信系間欠失敗履歴を踏まえ、本追補commitを固定した手動Windows Actionsで実施する。hosted結果と統合validator結果は完了後に記録する。
+
+### 残存gate
+
+有効Approvalと期限切れPermissionの分離試験は、Task実行隔離・production runtime・release readinessを証明しない。Codex Adapter metadataの`unsupported`、R2のTask／sandbox／Audit／Recovery／Content ExposureおよびWindows installed productの既存`release_blocker`、`release_ready=false`を維持する。

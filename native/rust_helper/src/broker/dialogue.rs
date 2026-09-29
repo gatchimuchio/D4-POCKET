@@ -2872,6 +2872,88 @@ mod tests {
         }
     }
 
+    #[test]
+    fn AgentTask実行は有効OwnerApprovalを期限切れPermissionから分離して拒否する() {
+        for wall_clock_expired in [true, false] {
+            let (mut c, calls) = 準備(false, false, false);
+            let session_id = 開始(&mut c, "left");
+            let instruction = "期限切れPermissionでは実行しない";
+            AgentTask権限とApprovalを発行(&mut c, &session_id, instruction);
+
+            let (registration_hash, instruction_hash) = {
+                let grant = c.agent_task_permissions.get(&session_id).unwrap();
+                (
+                    grant.workspace_registration_hash.clone(),
+                    sha256_tagged(instruction.as_bytes()),
+                )
+            };
+            assert!(c.agent_task_owner_approval_is_active(
+                &session_id,
+                "left",
+                "fixture-workspace-left",
+                &registration_hash,
+                &instruction_hash,
+                100,
+            ));
+
+            {
+                let grant = c.agent_task_permissions.get_mut(&session_id).unwrap();
+                assert!(grant.expires_at_epoch_seconds > 100);
+                assert!(Instant::now() < grant.monotonic_expiry);
+                let approval = grant.owner_approval.as_ref().unwrap();
+                assert!(approval.expires_at_epoch_seconds > 100);
+                assert!(Instant::now() < approval.monotonic_expiry);
+                assert_eq!(approval.instruction_hash, instruction_hash);
+                assert_eq!(
+                    approval.execution_conditions_hash,
+                    AgentTask実行条件hash(
+                        "left",
+                        &session_id,
+                        "fixture-workspace-left",
+                        &grant.workspace_registration_hash,
+                        &grant.permission_id,
+                    ),
+                );
+
+                if wall_clock_expired {
+                    grant.expires_at_epoch_seconds = 100;
+                } else {
+                    grant.monotonic_expiry = Instant::now() - Duration::from_secs(1);
+                }
+            }
+
+            assert!(!c.agent_task_permission_is_active(
+                &session_id,
+                "left",
+                "fixture-workspace-left",
+                &registration_hash,
+                100,
+            ));
+            assert!(!c.agent_task_owner_approval_is_active(
+                &session_id,
+                "left",
+                "fixture-workspace-left",
+                &registration_hash,
+                &instruction_hash,
+                100,
+            ));
+            assert_eq!(
+                AgentTask操作(
+                    &mut c,
+                    "AgentTask実行",
+                    AgentTask要求(&session_id, instruction),
+                    false,
+                ),
+                Err(対話失敗::権限拒否),
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+            assert!(c
+                .agent_task_permissions
+                .get(&session_id)
+                .is_some_and(|grant| grant.owner_approval.is_some()));
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     fn Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費し正常完了・取消後にscratchを片付ける_fixture(
