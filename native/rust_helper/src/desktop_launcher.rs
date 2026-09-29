@@ -2426,6 +2426,116 @@ mod tests {
         assert_eq!(declined["status"], "rejected");
         assert_eq!(declined["error"]["code"], "owner_required");
 
+        let task_permission_payload = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace"
+        });
+        let task_permission = desktop_owner_request(
+            "AgentTaskWorkspacePermissionGrant",
+            "desktop-agent-task-permission-declined",
+            "desktop-agent-task-permission-declined-nonce",
+            task_permission_payload,
+        );
+        let mut task_permission_prompt_count = 0;
+        let declined_task_permission = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&task_permission).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                task_permission_prompt_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("Agent Task Permissionは固定範囲のnative確認を使う")
+                };
+                assert_eq!(runtime_id, "fixture-agent");
+                assert_eq!(session_id, "fixture-session");
+                assert_eq!(workspace_id, "fixture-workspace");
+                assert_eq!(
+                    payload_hash,
+                    task_permission["payload_hash"].as_str().unwrap()
+                );
+                false
+            },
+        )
+        .unwrap();
+        let declined_task_permission: serde_json::Value =
+            serde_json::from_slice(&declined_task_permission).unwrap();
+        assert_eq!(task_permission_prompt_count, 1);
+        assert_eq!(declined_task_permission["status"], "rejected");
+        assert_eq!(
+            declined_task_permission["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
+
+        let declined_instruction = "Ownerが拒否したTask本文";
+        let task_approval_payload = serde_json::json!({
+            "agent_runtime_id": "fixture-agent",
+            "session_id": "fixture-session",
+            "workspace_id": "fixture-workspace",
+            "instruction": declined_instruction
+        });
+        let task_approval = desktop_owner_request(
+            "AgentTaskOwnerApprovalGrant",
+            "desktop-agent-task-approval-declined",
+            "desktop-agent-task-approval-declined-nonce",
+            task_approval_payload,
+        );
+        let mut task_approval_prompt_count = 0;
+        let declined_task_approval = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&task_approval).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                task_approval_prompt_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    instruction_hash,
+                    payload_hash,
+                    ..
+                } = summary
+                else {
+                    panic!("Agent Task Approvalは本文を表示しないnative確認を使う")
+                };
+                assert_eq!(runtime_id, "fixture-agent");
+                assert_eq!(session_id, "fixture-session");
+                assert_eq!(workspace_id, "fixture-workspace");
+                assert_eq!(
+                    instruction_hash,
+                    &sha256_tagged(declined_instruction.as_bytes())
+                );
+                assert_eq!(
+                    payload_hash,
+                    task_approval["payload_hash"].as_str().unwrap()
+                );
+                assert!(!owner_confirmation_text(summary).contains(declined_instruction));
+                false
+            },
+        )
+        .unwrap();
+        let declined_task_approval: serde_json::Value =
+            serde_json::from_slice(&declined_task_approval).unwrap();
+        assert_eq!(task_approval_prompt_count, 1);
+        assert_eq!(declined_task_approval["status"], "rejected");
+        assert_eq!(
+            declined_task_approval["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
+        assert!(!declined_task_approval
+            .to_string()
+            .contains(declined_instruction));
+
         let mut changed_hash = desktop_export_request("desktop-export-changed-hash", "desktop-export-changed-hash-nonce");
         changed_hash["payload_hash"] = serde_json::Value::String("sha256:forged".into());
         let mut invalid_prompt_count = 0;
@@ -2495,6 +2605,9 @@ mod tests {
         assert!(audit.contains("Rust Desktop起動器のネイティブ確認"));
         assert!(audit.contains("Desktop固定ProtectedStore起動"));
         assert!(audit.contains("owner_required"));
+        assert!(audit.contains("AgentTaskWorkspacePermissionGrant"));
+        assert!(audit.contains("AgentTaskOwnerApprovalGrant"));
+        assert!(audit.contains("desktop_native_owner_confirmation_required"));
         assert!(audit.contains("broker_payload_hash_invalid"));
         broker_endpoint.session_secret.zeroize();
         session_bytes.zeroize();

@@ -332,3 +332,21 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 ### 残存gate
 
 有効Approvalと期限切れPermissionの分離試験は、Task実行隔離・production runtime・release readinessを証明しない。Codex Adapter metadataの`unsupported`、R2のTask／sandbox／Audit／Recovery／Content ExposureおよびWindows installed productの既存`release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 Owner拒否時にAgent Task権限を発行しないnative relay否定試験（2026-09-29）
+
+### 成立した局所証拠
+
+- Rust Desktop launcherのloopback Broker縦断fixtureへ、Agent Task Workspace PermissionとOwner Approvalそれぞれのnative確認に対するOwner拒否を追加した。
+- Permission拒否と、本文を含まないhash表示のApproval拒否は、Owner専用IPCへ転送されず通常Broker要求へ戻り、どちらも`desktop_native_owner_confirmation_required`で拒否される。Broker Auditに両operationと拒否codeが残り、Approval拒否のTask本文は確認表示・responseへ出ない。
+- 証拠はtest用loopback Brokerと合成Owner確認callbackを使う`FIXTURE`である。実Windows確認dialog、認証済みinstalled Desktop、実Agent Task、sandbox、release readinessを証明しない。`task_execution=unsupported`と既存`release_blocker`を維持する。
+
+### 検証と履歴
+
+- 対象を絞った試験 `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'desktop_launcher::tests::desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes' -- --exact --nocapture --test-threads=1`: 1件成功。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。追加したRust blockは`rustfmt +1.95.0 --edition 2021 --emit stdout`の該当範囲と一致した。`desktop_launcher.rs`全fileの`rustfmt --check`は変更していない複数箇所の既存整形差も検出してexit 1となったため、一括再整形は行わない。
+- 対象commitを固定した手動Windows Actionsの全target check／testと、本追補後の統合validatorはこれから実施する。
+
+### 残存gate
+
+Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction installed pathの証拠ではない。実Owner Yes／No経路、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productを未成立の`release_blocker`として保持し、`release_ready=false`を維持する。
