@@ -207,6 +207,28 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - 最初の試行はGit管理外の一時WorkspaceをCodexがuntrustedとしてmodel request前に拒否した。probe内の`--skip-git-repo-check`で一時Workspaceだけを対象化して解消し、製品command builderには追加していない。
 - この証拠は直接Codex CLI＋MxCの正常終端に限る。Rust Broker consumer、Owner Approval、production Task、実model、取消／期限／crash、process群停止、Audit／Recovery、Content Exposureは通していない。TEMP/TMP scratch mismatchの扱いと異常終端時cleanupを含むrelease blockerを保持し、`task_execution=unsupported`、`release_ready=false`を維持する。
 
+## R2追補 非Git登録Workspaceに対するCodex CLI起動条件（2026-09-29）
+
+### 原因と局所修正
+
+- 実Codex CLI `0.158.0-alpha.2.1`の`exec --help`は`--skip-git-repo-check`を提示する。これを付けずにGit管理外の合成Workspaceで`codex exec`を起動した実測では、CLIは`Not inside a trusted directory and --skip-git-repo-check was not specified.`をstderrへ出して終了値1となり、Responses API要求は0件だった。これはAdapterの実Workspace書込失敗ではなく、CLI自身のGit前提による起動拒否。
+- DialogueとTaskで共用する`build_codex_command`のargvへ当該optionを固定し、実CLI能力検査でも必須optionとして確認する。Fake CLI、Rust単体試験、Conformanceを同期し、option欠落CLIではAdapter初期化を拒否する。read-only Dialogueは既存の`--sandbox read-only`を保ち、Task専用のPermission profileとApproval条件は変更しない。
+- このoptionはCodex CLI自身のGit repository安全確認をDialogueとTaskの双方で迂回する。OpenAI公式説明は破壊的変更防止の確認であることと、安全な環境だと確信するときに限るoverrideであることを示す（[Non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode?translationFallback=ja-JP)）。GUI-Shellでは登録WorkspaceとBrokerの現行Session照合を維持し、Dialogueはread-only sandbox、TaskはTask専用Workspace Permission・個別Owner Approval・sandbox設定を維持する。これらはGit確認迂回の別個の境界であり、production Agent Taskやfilesystem隔離の成立証拠ではない。
+
+### 証拠・残存gate
+
+- 既存の明示実行`tooling/codex_mxc_exec_temp_probe.py`は、同option付きの実CLI `codex exec`とMxC shell childを合成Workspace／loopback偽Responses APIで3/3回完了させている。前項のTEMP／TMP probeと同じく、real model・credential・Broker・Owner Approvalは用いない。optionなしの拒否比較も実CLI上でResponses API要求前に観測した。途中の通信切断1回は失敗履歴として保持し、後続成功で消去しない。
+- Rust focused test（共通argvへの固定、CLI能力検査、欠落時のAdapter初期化拒否）とFake CLI／Conformanceは後述のコマンドで確認する。実Broker Task起動、Owner承認、Task隔離、secret／外部path拒否、取消・期限・crash後cleanupは未検証である。
+- `--skip-git-repo-check`が回避するCLI側Git確認を明示した上で登録Workspaceに限定して使用する。Codex Agent Taskの`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持し、option追加だけでCapabilityやApprovalを昇格しない。
+
+### 検証
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 全12 targetで398 passed／0 failed／1 ignored。CLI interface検査、Task argv、Fake CLIによるBroker経由Task fixtureを含む。ignoredは所有者指定CLIを使う既存の合成sandbox診断probeで、今回の通常試験では起動しない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録development check 10件成功、厳格日本語監査1113 repository files／0 findings、Schema 149／example 149／negative fixture 192、Conformance 225。Manifest、release gate、package portability（source ZIP内Conformanceを含む）、release smoke、evidence bundle、runtime assertions 12／0、C32開発監査も成功。
+- 同検証は`release_ready=false`を維持。最終development auditは`release_blocker` 31件と`post_v1_scope` 1件を報告し、正式releaseやCodex Task隔離を主張しない。
+- Rust変更はWindowsローカルで全target check／testまで通ったため、この単位では同じ範囲を重ねるGitHub Actionsを起動していない。ActionsやCI status checkを品質基準として追加していない。
+
 ## R2追補 Broker対話制御からCodex Adapter fake Taskまでの縦断fixture（2026-09-29）
 
 ### 成立した局所証拠

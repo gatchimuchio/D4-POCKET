@@ -396,6 +396,7 @@ fn exec_interface_present(output: &[u8]) -> bool {
         "--json",
         "--ephemeral",
         "--ignore-user-config",
+        "--skip-git-repo-check",
     ]
     .iter()
     .all(|required| help.contains(required))
@@ -577,7 +578,14 @@ fn build_codex_command(
         task_command.args(["--sandbox", "read-only"]);
     }
     task_command
-        .args(["--color", "never", "--cd", workspace_path, "-"])
+        .args([
+            "--color",
+            "never",
+            "--skip-git-repo-check",
+            "--cd",
+            workspace_path,
+            "-",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -888,6 +896,7 @@ mod tests {
                 .get_args()
                 .map(|arg| arg.to_string_lossy().to_string())
                 .collect();
+            assert!(args.iter().any(|arg| arg == "--skip-git-repo-check"));
             assert!(args
                 .windows(2)
                 .any(|pair| pair == ["--cd", r"C:\workspace"]));
@@ -1171,9 +1180,12 @@ mod tests {
 
     #[test]
     fn read_onlyは維持しworkspace_writeはTaskだけに要求する() {
-        let help = b"Usage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config";
+        let help = b"Usage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
         assert!(exec_interface_present(help));
         assert!(!workspace_write_interface_present(help));
+        let without_non_git_flag =
+            b"Usage: codex exec [OPTIONS] [PROMPT]\n--json\n--ephemeral\n--ignore-user-config";
+        assert!(!exec_interface_present(without_non_git_flag));
         let adapter = CodexCliAdapter {
             executable: PathBuf::from(r"C:\codex.exe"),
             workspace: PathBuf::from(r"C:\workspace"),
@@ -1189,7 +1201,7 @@ mod tests {
             adapter.AgentTask実行("test", &AtomicBool::new(false), Instant::now(), None),
             Err(対話失敗::AgentTask非対応)
         );
-        let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config";
+        let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
         assert!(exec_interface_present(help.as_bytes()));
         assert!(workspace_write_interface_present(help.as_bytes()));
     }

@@ -89,6 +89,10 @@ Codex Task filesystem overrideを単一tableへ統合し、`glob_scan_max_depth=
 
 以下の最新追補を現況正本とし、それより後ろの同日付Phase 7記録は各作業時点の履歴として保持する。旧記録にある「Task未接続」は、ここに記載する固定Adapter実装前の状態を示す。
 
+### R2追補 Codex CLIの非Git登録Workspace起動（2026-09-29）
+
+実Codex CLIはGit管理外Workspaceを`--skip-git-repo-check`なしで拒否するため、read-only DialogueとTaskが共用する`exec` command builder／CLI interface検査へ固定optionを追加する。これはCLI自身のGit repository安全確認を迂回するため、Dialogueのread-only sandbox、Taskの登録Workspace・Broker Session／Permission／Owner Approval検査を維持する。非対応CLIはfail-closedにする。直接CLIのloopback probeは実行可能性だけを示し、実Broker Task／隔離を証明しない。`task_execution=unsupported`、`release_ready=false`および既存blockerを維持する。詳細・公式根拠・検証履歴は`docs/specs/agent-runtime.md`および`docs/REV3_PROGRESS.md`を参照する。
+
 ### C9 MCP stdio監督とOwner切断（2026-09-28）
 
 MCP stdio childは既存Rust Job Object監督経路で起動し、Desktop設定にmetadata-only接続一覧、新規stdio接続設定、Owner専用切断を実装した。接続開始・切断・Tool呼出しは既存Windows Rust起動器のdefault No native Owner確認を経てBrokerへ届き、Brokerが現在Catalogと要求を再検証する。接続は固定missing Credential refまたは、通常IPCの検証付き一覧で対象Server・用途が一致したCredential IDと環境変数名だけを受け付ける。Brokerは永続登録Audit／DPAPI保管hash／targetを照合し、Owner確認後に選択値を対象stdio childだけへ渡し、使用Auditを記録する。確認画面はServer processが秘密値を読取り・外部送信でき、Job Objectはsandboxではないことを示す。Tool呼出しは操作者が画面上でJSON arguments全文を確認した後に限り、一回限りPermissionを消費して同一stdio childへ`tools/call`を一度だけ送る。結果本文を保存・表示せずhash-only receiptを返し、応答不明・不正・Audit失敗は接続をquarantineして自動再送しない。切断はprocess群停止・永続`LIVE_RUNTIME` Audit後に記録解消する。2026-07-28形式、legacy fallback条件、256 KiB逐次stdout上限、Tool inputSchema Draft 2020-12検証を維持する。Tool一覧等はmetadata-onlyで、Resource／Prompt本文取得を行わない。この単位はOwner向けWindows stdio操作経路であり、Agentへの結果引渡し、MCP以外のCredential実値注入、Resource／Prompt内容取得、Streamable HTTP、OAuth、外部MCP Server適合、installed product Credential運用証拠、非Windows process群監督は未接続の`release_blocker`。Rust／Flutterのローカル検証と手動Windows Actionsの対象commit・結果は`docs/REV2_PROGRESS.md`に記録する。ActionsはRust check/testの補助証拠に限り、Windows installed product、外部Server、release readinessを証明しない。`release_ready=false`を維持する。

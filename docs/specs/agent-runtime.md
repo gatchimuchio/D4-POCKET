@@ -75,6 +75,12 @@ OwnerがWorkspace登録で指定したsecret pathは、登録時に正規化・�
 
 2026-09-29の追補では、`tooling/codex_mxc_exec_temp_probe.py`がloopback偽Responses APIから固定`exec_command`を返し、実Codex CLI `exec`と実MxC shell childを3回実行した。現行Task permission設定相当の直接CLI probeでは、3/3回ともtool childのTEMP／TMPは互いに一致するがRust生成WorkspaceTaskScratchとは一致せず、TEMP markerはchild内で書込後、CLI終了時にはhostから見えなくなった。Workspace内scratchへの書込も3/3回成功した。続く一回の追試では、Codex CLIの`shell_environment_policy.set`にも同じ合成scratch pathを指定したが、MxC childのTEMP／TMPは引き続きscratchと一致せず、Packages配下の`AC/Temp`形式だった。これらは実model、Rust Broker、Owner Approval、production Task経路、取消／期限／crashを通さない限定`LIVE_RUNTIME`証拠であり、host非可視を削除保証と扱わない。MxC child一時領域の物理cleanup、scratch mismatchの設計上の意味は未解決で、Adapterの`task_execution=unsupported`およびrelease blockerを維持する。
 
+### Codex CLIの非Git Workspace起動条件（2026-09-29）
+
+登録済みWorkspaceはGit repositoryであることを必須にしない。実Codex CLI `0.158.0-alpha.2.1`は、Git管理外の合成Workspaceに対して`codex exec`を`--skip-git-repo-check`なしで起動すると、Responses APIへ要求する前に`Not inside a trusted directory and --skip-git-repo-check was not specified.`で終了した。実Codex CLIの`exec --help`は当該optionを提示し、既存の隔離loopback偽Responses API probeは同option付きで3回とも固定tool commandとturnを完了した。実Rust Adapterの共通`exec` command builderはread-only DialogueとTaskの両方へ同optionを固定し、起動時のCLI interface検査で要求する。非対応CLIはAdapter初期化を拒否してfail-closedにする。
+
+`--skip-git-repo-check`はCodex CLI自身が破壊的変更防止のため設けるGit repository確認を迂回するoptionであり、無害な一般設定として扱わない。OpenAI公式説明も、環境の安全性を確信している場合に限って確認を迂回する用途としている（[Non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode?translationFallback=ja-JP)）。本経路ではBroker登録済みWorkspaceと現行Sessionの結合を維持する。read-only Dialogueは従来の`--sandbox read-only`を維持し、TaskはWorkspace write Permission、別個のOwner Approval、Task用sandbox設定を維持する。どちらもCLI option・Workspace内容・Adapter metadataからAuthorityを生成しない。この変更は両`exec`経路でCLI側Git確認を弱める限定的なtrust変更であり、Brokerやsandboxを通る実Taskの隔離成立を証明しない。Owner承認、実BrokerからのTask起動、実Workspaceの秘密file／外部path拒否、process lifecycleとcleanupは未成立であり、`task_execution=unsupported`と関連`release_blocker`を維持する。
+
 ### Broker crash後のscratch回復
 
 未検証の予約状態を`reserved`、nofollow open後にdirectory identityを得た状態を`active`として記録上も分離する。

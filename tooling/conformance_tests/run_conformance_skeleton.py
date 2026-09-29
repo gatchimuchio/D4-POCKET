@@ -6267,6 +6267,7 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         "--json",
         "--ephemeral",
         "--sandbox",
+        "--skip-git-repo-check",
         "read-only",
         "env_clear",
         "SAFE_ENVIRONMENT",

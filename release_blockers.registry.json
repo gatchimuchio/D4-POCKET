@@ -201,6 +201,23 @@
         },
         "scope_limit": "direct codex exec and MxC shell child only. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, Recovery, or physical deletion of the MxC temp area"
       },
+      "codex_exec_non_git_workspace_probe": {
+        "date": "2026-09-29",
+        "cli_version": "0.158.0-alpha.2.1",
+        "evidence_source": "LIVE_RUNTIME",
+        "method": "actual codex exec against a synthetic non-Git workspace; no-flag comparison used the same isolated fake-Responses setup, and the existing loopback probe used --skip-git-repo-check",
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "observations": {
+          "without_skip_git_repo_check": "CLI exited 1 before any Responses API request with Not inside a trusted directory and --skip-git-repo-check was not specified.",
+          "responses_requests_without_flag": 0,
+          "with_skip_git_repo_check": "existing isolated MxC exec probe completed 3/3 fixed tool calls and turns",
+          "probe_model_warning": "fake model metadata was absent; fallback-metadata warning was observed on the explicit shell-environment override probe",
+          "transient_failure_history": "one rerun disconnected before completion; sequential retry completed 3/3 runs"
+        },
+        "scope_limit": "direct installed Codex CLI and synthetic workspace only. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, workspace isolation, cancellation, timeout, crash, process-tree supervision, Audit, or Recovery"
+      },
       "rust_generated_secret_path_probe": {
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 const VERSION_OUTPUT: &str = "codex-cli";
 const EXEC_HELP_OUTPUT: &str =
-    "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config";
+    "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config --skip-git-repo-check";
 
 const TASK_PERMISSION_PROFILE: [&str; 5] = [
     "default_permissions=\"d4p-agent-task\"",
@@ -101,6 +101,9 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         || !contains_pair(arguments, "--json", "--ephemeral")
         || !contains_pair(arguments, "--ignore-user-config", "--color")
         || !contains_pair(arguments, "--color", "never")
+        || !arguments
+            .iter()
+            .any(|argument| argument == "--skip-git-repo-check")
         || arguments.iter().any(|argument| {
             matches!(
                 argument.as_str(),
