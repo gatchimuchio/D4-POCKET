@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "0d1a9c75db43a7bbcedc1f0fe9c1b3e06d4a188e4bf3f18e6d039be1a35c2262"
+      "sha256": "81c5d4fc8806f26c22557b6d9c73eff1654e2b9b0c4dc8fe55ee21b0c6abaaed"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "e8e2df891d85f6bb4158a2bb6db41cdc5ec05090014d28cee364e3ab5e49e3fd"
+      "sha256": "971d93c9d03c60ba7c89c63d127e24f987c3ed6adbac9c7387e4b55d56510caf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3077,7 +3077,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "4f5470df121e1be556361046f58203844b91125fffbe61fe0afa538bd3c00f51"
+      "sha256": "8cfb56cd218b4c63ca95a526db514f45a48bc22fd091faa48abb75e52e7ab09b"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",

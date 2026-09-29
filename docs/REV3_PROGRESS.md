@@ -293,3 +293,21 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - `windows_broker_installed_smoke`: `release_blocker` — standalone smokeはあるが、正式aggregate evidence bundle内のBroker証拠が未成立。
 - `audit_anchor_external_tamper_evidence_proof`: `release_blocker` — external owner-controlled anchor/tamper proofが未成立。
 - `release_ready=false`を維持。installed product総合証拠、owner GO、正式releaseは成立していない。
+
+## R2追補 Owner Approvalの二重期限切れを有効Permissionから分離する否定試験（2026-09-29）
+
+### 成立した局所証拠
+
+- `native/rust_helper/src/broker/dialogue.rs`へ、Task用Owner Approvalの期限切れをWorkspace Permissionの有効状態から独立して拒否する否定試験を追加した。
+- 2つの独立fixtureでApprovalのwall-clock期限だけ、またはmonotonic期限だけを失効させ、Permissionの両期限は有効に保つ。Brokerが実行を拒否し、Adapter呼出しが0回、Permission記録が残ることを確認する。
+- 証拠範囲はBroker対話制御のRust `FIXTURE`に限る。実AdapterのTask実行、Owner native確認画面、production IPC、実Workspace隔離の証拠ではない。製品Adapterの`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 検証と履歴
+
+- 追加したfocused Rust試験は1 passed。変更対象Rust fileの`rustfmt +1.95.0 --edition 2021 --check`と`git diff --check`も成功した。
+- Windows local全target試験は2回とも、変更対象外のloopback通信試験を含むsuiteで断続失敗した。1回目はMINIDORAのContent-Length付き応答試験が通信失敗、2回目はA2A loopbackの2試験が応答読取失敗となった。Rust suite全体はそれぞれ残りのtestが成功したが、全体PASSとは扱わない。MINIDORA試験とA2Aの2試験は個別再実行で各1 passed。失敗原因は確定しておらず、通信系testの間欠性として記録し、製品回帰とも環境障害とも断定しない。
+- 正確な全target試験command、対象commit上のWindows hosted結果、最終統合後のbackup／remote確認は、この追補作業を閉じる際に追記する。Actionsは`.github/workflows/windows-manual-rust-validation.yml`の手動Windows補助検査だけに用い、品質基準面・実機・製品完成の代替にはしない。
+
+### 残存gate
+
+Owner Approval期限の否定試験追加はAgent Task本番経路完成を意味しない。実Agent実行隔離、production Broker／IPC、Audit／Recovery、結果のContent Exposure、Windows installed product等の既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
