@@ -1,4 +1,4 @@
-"""実Codex CLI/MxCの一時領域だけを調べるdevelopment-only probe。
+"""実Codex CLI/MxCの一時領域と合成filesystem境界を調べるdevelopment-only probe。
 
 loopbackの偽Responses APIから固定exec_commandを一度だけ返す。実モデル、資格情報、
 Broker、Owner Approval、製品Task経路は使わず、task_executionを有効化しない。
@@ -42,23 +42,49 @@ _BASE_OVERRIDES = (
     (
         'permissions.d4p-agent-task.filesystem={":root"="deny",":minimal"="read",'
         '":workspace_roots"={"**/*.env"="deny","**/.env.*"="deny",'
-        '"**/.ssh/**"="deny","**/secrets/**"="deny"},"glob_scan_max_depth"=32}'
+        '"**/.ssh/**"="deny","**/secrets/**"="deny",'
+        '"private/registered-marker.txt"="deny",'
+        '"private/registered-write-target.txt"="deny",'
+        '"private/registered-directory"="deny",'
+        '"private/registered-directory/**"="deny"},"glob_scan_max_depth"=32}'
     ),
     "permissions.d4p-agent-task.network.enabled=false",
 )
 _TASK_PROBE_COMMAND_TEMPLATE = (
     "$ErrorActionPreference='Stop'; "
     "$scratch=[IO.Path]::GetFullPath((Join-Path (Get-Location).Path '.d4p-tmp-probe')); "
+    "$workspace=[IO.Path]::GetFullPath((Get-Location).Path); "
+    "$outsideRoot=[IO.Directory]::GetParent($workspace).FullName; "
     "$tempPath=[IO.Path]::GetFullPath($env:TEMP); "
     "$tmpPath=[IO.Path]::GetFullPath($env:TMP); "
     "$tempMatches=[string]::Equals($tempPath,$scratch,[StringComparison]::OrdinalIgnoreCase); "
     "$tmpMatches=[string]::Equals($tmpPath,$scratch,[StringComparison]::OrdinalIgnoreCase); "
     "[IO.Directory]::CreateDirectory($scratch) | Out-Null; "
     "[IO.File]::WriteAllText((Join-Path $scratch 'scratch-marker.txt'),'synthetic'); "
+    "$readProbe={param($path) try {$null=[IO.File]::ReadAllText($path); 'allowed'} "
+    "catch {'blocked:'+$_.Exception.GetType().Name}}; "
+    "$writeProbe={param($path) try {[IO.File]::WriteAllText($path,'synthetic-write'); 'allowed'} "
+    "catch {'blocked:'+$_.Exception.GetType().Name}}; "
+    "$probeStatuses=@{workspaceControlRead=(& $readProbe (Join-Path $workspace 'probe-inputs\\ordinary-marker.txt')); "
+    "envRead=(& $readProbe (Join-Path $workspace 'probe-inputs\\config.env')); "
+    "dotenvRead=(& $readProbe (Join-Path $workspace 'probe-inputs\\.env.production')); "
+    "sshRead=(& $readProbe (Join-Path $workspace '.ssh\\id_ed25519')); "
+    "secretsRead=(& $readProbe (Join-Path $workspace 'secrets\\secret.txt')); "
+    "registeredFileRead=(& $readProbe (Join-Path $workspace 'private\\registered-marker.txt')); "
+    "registeredDirectoryRead=(& $readProbe (Join-Path $workspace 'private\\registered-directory\\read-marker.txt')); "
+    "outsideWorkspaceRead=(& $readProbe (Join-Path $outsideRoot 'outside-read-marker.txt')); "
+    "envWrite=(& $writeProbe (Join-Path $workspace 'probe-inputs\\write-probe.env')); "
+    "dotenvWrite=(& $writeProbe (Join-Path $workspace 'probe-inputs\\.env.write-probe')); "
+    "sshWrite=(& $writeProbe (Join-Path $workspace '.ssh\\write-probe')); "
+    "secretsWrite=(& $writeProbe (Join-Path $workspace 'secrets\\write-probe')); "
+    "registeredFileWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-write-target.txt')); "
+    "registeredDirectoryWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-directory\\write-probe.txt')); "
+    "outsideWorkspaceWrite=(& $writeProbe (Join-Path $outsideRoot 'outside-write-marker.txt'))}; "
     "$markerPath=Join-Path $tempPath 'd4p-probe-__D4P_NONCE__.tmp'; "
     "$reportPath=Join-Path (Get-Location).Path 'probe-report.json'; "
     "$report=@{tempPath=$tempPath;tmpPath=$tmpPath;markerPath=$markerPath;"
     "tempMatchesScratch=$tempMatches;tmpMatchesScratch=$tmpMatches;"
+    "probeStatuses=$probeStatuses;"
     "scratchMarkerExists=[IO.File]::Exists((Join-Path $scratch 'scratch-marker.txt'))}; "
     "[IO.File]::WriteAllText($reportPath,($report | ConvertTo-Json -Compress)); "
     "$markerWrite='failed'; try {[IO.File]::WriteAllText($markerPath,'codex-exec-temp-probe'); "
@@ -434,6 +460,35 @@ def _run_once(
         scratch = workspace / ".d4p-tmp-probe"
         codex_home.mkdir()
         scratch.mkdir(parents=True)
+        probe_files = {
+            "probe-inputs/ordinary-marker.txt": "ordinary synthetic marker",
+            "probe-inputs/config.env": "synthetic env marker",
+            "probe-inputs/.env.production": "synthetic dotenv marker",
+            ".ssh/id_ed25519": "synthetic ssh marker",
+            "secrets/secret.txt": "synthetic secrets marker",
+            "private/registered-marker.txt": "synthetic registered secret marker",
+            "private/registered-directory/read-marker.txt": "synthetic registered child marker",
+        }
+        for relative_path, content in probe_files.items():
+            path = workspace / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        outside_read_marker = root / "outside-read-marker.txt"
+        outside_read_marker.write_text("outside synthetic marker", encoding="utf-8")
+        write_probe_paths = {
+            "env": workspace / "probe-inputs" / "write-probe.env",
+            "dotenv": workspace / "probe-inputs" / ".env.write-probe",
+            "ssh": workspace / ".ssh" / "write-probe",
+            "secrets": workspace / "secrets" / "write-probe",
+            "registered_file": workspace / "private" / "registered-write-target.txt",
+            "registered_directory": workspace
+            / "private"
+            / "registered-directory"
+            / "write-probe.txt",
+            "outside_workspace": root / "outside-write-marker.txt",
+        }
+        if any(path.exists() for path in write_probe_paths.values()):
+            raise RuntimeError("synthetic_write_probe_target_preexists")
         command = _task_probe_command(nonce)
         server.state.begin_run(command, workspace)
         base_url = f"http://127.0.0.1:{server.server_address[1]}/v1"
@@ -463,7 +518,7 @@ def _run_once(
         )
         try:
             stdout, _stderr = process.communicate(
-                b"Run the single bounded synthetic TEMP/TMP probe.",
+                b"Run the single bounded synthetic TEMP/TMP and filesystem probe.",
                 timeout=RUN_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as error:
@@ -508,6 +563,36 @@ def _run_once(
             )
         report = json.loads(report_path.read_text(encoding="utf-8"))
         marker_status = _remove_exact_marker(report, nonce)
+        probe_statuses = report.get("probeStatuses")
+        expected_probe_keys = {
+            "workspaceControlRead",
+            "envRead",
+            "dotenvRead",
+            "sshRead",
+            "secretsRead",
+            "registeredFileRead",
+            "registeredDirectoryRead",
+            "outsideWorkspaceRead",
+            "envWrite",
+            "dotenvWrite",
+            "sshWrite",
+            "secretsWrite",
+            "registeredFileWrite",
+            "registeredDirectoryWrite",
+            "outsideWorkspaceWrite",
+        }
+        if not isinstance(probe_statuses, dict) or not expected_probe_keys.issubset(
+            probe_statuses
+        ):
+            raise RuntimeError("filesystem_boundary_probe_report_invalid")
+        if any(not isinstance(probe_statuses[key], str) for key in expected_probe_keys):
+            raise RuntimeError("filesystem_boundary_probe_status_invalid")
+        if any(
+            probe_statuses[key] != "allowed"
+            and not probe_statuses[key].startswith("blocked:")
+            for key in expected_probe_keys
+        ):
+            raise RuntimeError("filesystem_boundary_probe_status_unclassified")
         temp_path = Path(report["tempPath"])
         normalized_temp_path = str(report["tempPath"]).replace("/", "\\").casefold()
         scratch_marker = scratch / "scratch-marker.txt"
@@ -558,6 +643,43 @@ def _run_once(
             "temp_directory_visible_after_cli_exit": temp_path.is_dir(),
             "workspace_scratch_write_succeeded": report.get("scratchMarkerExists") is True
             and scratch_marker.is_file(),
+            "filesystem_boundary": {
+                "workspace_control_read_allowed": probe_statuses["workspaceControlRead"]
+                == "allowed",
+                "secret_glob_reads_allowed": {
+                    "env": probe_statuses["envRead"] == "allowed",
+                    "dotenv": probe_statuses["dotenvRead"] == "allowed",
+                    "ssh": probe_statuses["sshRead"] == "allowed",
+                    "secrets": probe_statuses["secretsRead"] == "allowed",
+                },
+                "secret_glob_writes_allowed": {
+                    "env": probe_statuses["envWrite"] == "allowed",
+                    "dotenv": probe_statuses["dotenvWrite"] == "allowed",
+                    "ssh": probe_statuses["sshWrite"] == "allowed",
+                    "secrets": probe_statuses["secretsWrite"] == "allowed",
+                },
+                "registered_secret_path_reads_allowed": {
+                    "file": probe_statuses["registeredFileRead"] == "allowed",
+                    "directory_child": probe_statuses["registeredDirectoryRead"]
+                    == "allowed",
+                },
+                "registered_secret_path_writes_allowed": {
+                    "file": probe_statuses["registeredFileWrite"] == "allowed",
+                    "directory_child": probe_statuses["registeredDirectoryWrite"]
+                    == "allowed",
+                },
+                "outside_workspace_read_allowed": probe_statuses[
+                    "outsideWorkspaceRead"
+                ]
+                == "allowed",
+                "outside_workspace_write_allowed": probe_statuses[
+                    "outsideWorkspaceWrite"
+                ]
+                == "allowed",
+                "write_markers_visible_to_host": {
+                    name: path.is_file() for name, path in write_probe_paths.items()
+                },
+            },
             "codex_json_event_summary": event_summary,
         }
         failures = []
@@ -575,6 +697,25 @@ def _run_once(
             failures.append(f"mxc_temp_marker_cleanup_{marker_status}")
         if not observed["workspace_scratch_write_succeeded"]:
             failures.append("workspace_scratch_write_not_observed")
+        filesystem_boundary = observed["filesystem_boundary"]
+        if not filesystem_boundary["workspace_control_read_allowed"]:
+            failures.append("workspace_control_read_not_allowed")
+        if any(filesystem_boundary["secret_glob_reads_allowed"].values()):
+            failures.append("workspace_secret_path_read_allowed")
+        if any(filesystem_boundary["registered_secret_path_reads_allowed"].values()):
+            failures.append("registered_secret_path_read_allowed")
+        if any(filesystem_boundary["registered_secret_path_writes_allowed"].values()):
+            failures.append("registered_secret_path_write_allowed")
+        if filesystem_boundary["outside_workspace_read_allowed"]:
+            failures.append("outside_workspace_read_allowed")
+        if filesystem_boundary["outside_workspace_write_allowed"]:
+            failures.append("outside_workspace_write_allowed")
+        protected_write_markers = {
+            name: filesystem_boundary["write_markers_visible_to_host"][name]
+            for name in ("registered_file", "registered_directory", "outside_workspace")
+        }
+        if any(protected_write_markers.values()):
+            failures.append("protected_write_marker_visible")
         if failures:
             raise RuntimeError(
                 "probe_failed=" + ",".join(failures) + ";観測="

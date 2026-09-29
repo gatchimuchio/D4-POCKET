@@ -464,3 +464,22 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - 同じ最終probeを順次再実行した`python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定のcodex.exe絶対path> --runs 3`はexit 0、3/3回でturnと固定commandが正常完了し、TEMP／TMP不一致とfallback metadata warningを再観測した。非loopback requestは計12件をloopback proxyで拒否。先行probe runおよび後続single-run retryも成功したが、stream断の根本原因は確定していない。
 - `python -X utf8 tooling/manifest.py --write`は1110 fileを再生成し、`python -X utf8 tooling/manifest.py --check`が成功。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0、登録済み全development check成功。strict日本語監査1113 files／0 findings、Schema 149／149・negative fixture 192、Conformance 225 checks、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertion 12成功／0失敗、C32監査が成功。release blocker 5件、`release_ready=false`は維持された。
+
+## R2追補 MxC deny globと登録secret exact pathのread／write境界（2026-09-29）
+
+### 観測
+
+- 実Codex CLI `0.158.0-alpha.2.1`、実MxC `exec_command` child、loopback偽Responses API、資格情報なし、一時`CODEX_HOME`と合成Workspaceだけを使うprobeへ、通常file・`.env`／`.env.production`・`.ssh`・`secrets`・Rust生成相当の登録exact file／directory・Workspace外markerのread／write試験を追加した。初回の試験版はglob denyにもwrite拒否を要求してexit 1となったが、公式仕様と異なる期待値だったため、globとexact登録pathを別の境界として判定するよう補正した。この失敗履歴は保持する。
+- 最終probeは3/3回成功。通常Workspace markerのreadは許可、`.env`、`.env.production`、`.ssh`、`secrets`のsynthetic readは各3/3回拒否された。一方、これらdeny globにmatchするsynthetic writeは各3/3回許可され、hostからmarker fileを確認した。Workspace外markerのread／writeはいずれも3/3回拒否された。
+- Codexの公式`Permissions`仕様は、`:workspace_roots`下のglob `deny`をdeny-read ruleと説明する。従って上記write許可は当該仕様と整合し、既定globだけをwrite隔離として扱ってはならない。Owner登録secret pathをRustがliteral exact `deny`として生成する経路は別であり、synthetic登録fileのread／新規作成、登録directory descendantのread／新規作成を各3/3回拒否し、Workspace通常writeを許可した。
+- 続けてRustの既存ignored Windows live testを拡張し、`build_codex_command`が実際に生成するconfig overridesを直接`codex sandbox`へ渡して、登録exact file／directory descendantのwrite否定を加えた。Windows local testは1 passed／0 failed。これはRust生成設定と実Codex sandbox childの直接`LIVE_RUNTIME`であり、Broker／Owner Approval／production `codex exec` Taskへ接続した証拠ではない。
+- 追加probeはTEMP／TMP mismatchも再観測した。いずれの検査もsynthetic markerだけを使用し、Codex資格・実model・実secret・永続Codex設定・OS保護設定の変更はない。`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- 期待値補正前の`python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定のcodex.exe絶対path> --runs 1`はexit 1。合成glob pathへのwriteをdenyと誤期待した検査不一致であり、Codex CLIの実挙動は観測結果に保存した。
+- 補正後の同probe `--runs 1`と`--runs 3`はexit 0。最終3回では各glob read拒否／glob write許可、登録exact fileとdirectory descendantのread／write拒否、Workspace外read／write拒否が一致した。
+- `GUI_SHELL_CODEX_SANDBOX_TEST_EXE`へOwner指定CLIを設定して実行した`cargo +1.95.0 test --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture`: 1 passed／0 failed。Cargoが他targetも起動したが、対象filter外testは実行していない。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 398件成功／0件失敗／1件は`#[ignore]`指定のため未実行。
+- 外部のWindows Actionsは今回未使用。ローカルWindows上で実CLIと実MxC childを実行できたため、補助hosted検査を必要としなかった。
+- 最終ソースを含む`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1113 files／0 findings、Schema 149／149・negative fixture 192、Conformance 225 checks、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertion 12成功／0失敗、C32監査が成功。release blocker 5件、`release_ready=false`は維持された。

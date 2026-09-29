@@ -190,7 +190,7 @@
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",
         "evidence_source": "LIVE_RUNTIME",
-        "method": "development-only Python probe invokes the owner-specified Codex CLI with a loopback fake Responses API and a fixed exec_command; uses an isolated CODEX_HOME and synthetic workspace with Rust-equivalent mxc Task permission overrides",
+        "method": "development-only Python probe invokes the owner-specified Codex CLI with a loopback fake Responses API and a fixed exec_command; uses an isolated CODEX_HOME and synthetic workspace with Rust-equivalent mxc Task permission overrides, synthetic filesystem read/write probes, and exact owner-registered secret paths",
         "host_process_elevated": false,
         "real_model_or_credential_used": false,
         "configuration_persisted": false,
@@ -203,9 +203,17 @@
           "child_TEMP_TMP": "equal to each other in 3/3 runs; unequal to WorkspaceTaskScratch in 3/3 runs",
           "child_TEMP_path_shape": "under Packages and ended in AC/Temp in 3/3 runs; absolute path not retained",
           "MxC_TEMP_marker": "written and visible inside child in 3/3 runs; not host-visible after Codex CLI exit in 3/3 runs",
+          "filesystem_boundary": {
+            "ordinary_workspace_read": "allowed in 3/3 runs",
+            "default_deny_glob_reads": "synthetic .env, .env.production, .ssh, and secrets reads rejected in 3/3 runs",
+            "default_deny_glob_writes": "synthetic writes to all four matching paths succeeded and were host-visible in 3/3 runs; consistent with documented deny-glob read-only semantics",
+            "owner_registered_exact_secret_file": "synthetic read and create rejected in 3/3 runs",
+            "owner_registered_exact_secret_directory": "synthetic descendant read and create rejected in 3/3 runs",
+            "outside_workspace": "synthetic read and write rejected in 3/3 runs"
+          },
           "non_loopback_requests": "12 intercepted and rejected by the local loopback proxy"
         },
-        "scope_limit": "direct Codex CLI and MxC shell child only. Host non-visibility is not proof of physical deletion or general cleanup. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, or Recovery"
+        "scope_limit": "direct Codex CLI and MxC shell child only. Owner-registered exact paths are synthetic static equivalents, not Broker-produced runtime registration. Host non-visibility is not proof of physical deletion or general cleanup. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, or Recovery"
       },
       "codex_exec_shell_environment_override_probe": {
         "date": "2026-09-29",
@@ -248,19 +256,22 @@
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",
         "evidence_source": "LIVE_RUNTIME",
-        "method": "explicitly invoked ignored Rust test extracts Task config overrides and TEMP/TMP from build_codex_command and passes them to direct codex sandbox with an isolated temporary CODEX_HOME and synthetic workspace",
+        "method": "explicitly invoked ignored Rust test extracts Task config overrides and TEMP/TMP from build_codex_command and passes them to direct codex sandbox with an isolated temporary CODEX_HOME and synthetic workspace; the test attempts both reads and writes against registered file and directory paths",
         "synthetic_results": {
           "registered_exact_file_deny": "read rejected",
+          "registered_exact_file_write": "new synthetic file creation rejected; target remained absent",
           "registered_directory_descendant_deny": "nested file read rejected",
+          "registered_directory_descendant_write": "new synthetic child creation rejected; target remained absent",
           "literal_bracket_and_brace_paths": "literal path reads rejected",
           "unregistered_glob_decoys": "read succeeded",
           "workspace_write": "succeeded",
           "mxc_child_TEMP_equals_workspace_task_scratch": "false",
           "mxc_child_TMP_equals_workspace_task_scratch": "false"
         },
+        "validation": "Windows local Rust ignored live test: 1 passed, 0 failed; exact command and scope recorded in docs/REV3_PROGRESS.md",
         "configuration_persisted": false,
         "os_protection_changed": false,
-        "scope_limit": "direct codex sandbox child only; Rust-generated TEMP/TMP values did not match WorkspaceTaskScratch, but production codex exec tool-child behavior, Broker, Owner Approval, Agent Task, lifecycle, and cleanup remain unverified"
+        "scope_limit": "direct codex sandbox child only; exact registered secret file and directory read/write rules were exercised from Rust-generated configuration. Production codex exec tool-child behavior, Broker, Owner Approval, Agent Task, lifecycle, and cleanup remain unverified"
       },
       "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。`C:/Windows=deny`候補はsystem fileを拒否したが、sandbox内の`codex --version`も起動拒否となったため採用しない。登録secret候補globの直接probeでは合成pathの完全一致・子孫・深さ64とliteral bracket／brace pathが拒否され、非登録decoyは読めたが、configは手動構成でRust Adapter、`codex exec`、Brokerを通していない。Rust生成profile probeでは完全一致・子孫・literal bracket／braceのread拒否、非登録decoyとWorkspace writeを確認した。補正した直接sandbox probeではRust生成TEMP／TMP値をmxc childへ渡した上で、どちらもWorkspaceTaskScratchと不一致だった。これは直接sandbox child限定であり、production `codex exec` tool childの実効temporary pathやcleanupを証明しない。個別file／directoryのprobeは広域read隔離を証明せず、広域read隔離や秘密file全般の拒否を主張しない。Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
       "current_validation": {

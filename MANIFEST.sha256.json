@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "3259ec15d597dba091f0fdcf895d95524760b31ff84cac7cd4c9877a29b4cd72"
+      "sha256": "026d7d818f2a573b9d7ce2f2aa85ab0a904c1004e61f5afe2642a1143503c199"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "6b82320e4ff4e08a013b8c7016673203b134c5ba7d6af1305b0627ff9e9c0deb"
+      "sha256": "2ccbee86d09ea1e039321250a443fc9fe3bbfa73f2c52d5b7faf4229f9fc8899"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "f8d79db35c14e7d45c14880ccbbfba2a14924a879a0176b176fe8a9b1b827df2"
+      "sha256": "c21fba893e11b6f12ee8df18516dc3ed938126dffb7e960b6f7e032b93beaf15"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "33dc658c8353a4fae437126189eef5b30d9a5bc0b9f68f6b35f650d1ec8dcb13"
+      "sha256": "b17a11daaf5261a0b3e333750535126625f722c70d356b1539c145417e01459c"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3725,7 +3725,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "4d37af23f90170e59888fb04bce1bddacd4dff6722ea6920c5b73d58102c9bd1"
+      "sha256": "0803ab895a7309299bdad257e41b120a0c2d2e19695d141db02763b00aa94510"
     },
     {
       "path": "requirements-dev.txt",
@@ -4369,7 +4369,7 @@
     },
     {
       "path": "tooling/codex_mxc_exec_temp_probe.py",
-      "sha256": "438a3544c86592251797ee3f19d1569673477f1e4eca432411fda5e4cd4e58a0"
+      "sha256": "d394c1dc3941cc4ffba3064bdb39e6c3d0def4a1c35614817d1ee92f4d8adb61"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

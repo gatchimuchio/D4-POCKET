@@ -1006,6 +1006,7 @@ mod tests {
         let registered_paths = [
             "private/registered-marker.txt",
             "private/registered-directory",
+            "private/registered-write-target.txt",
             "private/秘密[ab].txt",
             "private/vault{x}.txt",
         ];
@@ -1088,10 +1089,21 @@ mod tests {
             quote_path(&private.join("vaultx.txt")),
         ]
         .join(",");
+        let write_denied = [
+            private.join("registered-write-target.txt"),
+            private.join("registered-directory").join("write-child.txt"),
+        ]
+        .iter()
+        .map(|path| quote_path(path))
+        .collect::<Vec<_>>()
+        .join(",");
         let workspace_output = workspace.join("workspace-write-marker.txt");
         let environment_report = workspace.join("sandbox-environment-report.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({denied_array}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({decoys}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"TEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"TEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            denied_array,
+            decoys,
+            write_denied,
             quote_path(&scratch),
             quote_path(&workspace_output),
             quote_path(&environment_report)
@@ -1132,6 +1144,14 @@ mod tests {
         assert_eq!(
             fs::read(workspace_output).expect("Workspace内write結果"),
             b"workspace-write-marker"
+        );
+        assert!(
+            !private.join("registered-write-target.txt").exists(),
+            "登録secret fileへの書込みを拒否する"
+        );
+        assert!(
+            !registered_directory.join("write-child.txt").exists(),
+            "登録secret directory内への新規書込みを拒否する"
         );
         let environment_report =
             fs::read_to_string(environment_report).expect("sandbox内TEMP／TMP照合結果");
