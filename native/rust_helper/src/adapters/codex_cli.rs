@@ -972,6 +972,147 @@ mod tests {
         assert!(setting.contains("\"glob_scan_max_depth\"=32"));
     }
 
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "明示指定したCodex CLIで合成pathだけを検証するときに実行する"]
+    fn Rust生成Task設定で実Windows隔離の登録secretを拒否する() {
+        use std::ffi::OsString;
+
+        let executable = std::env::var_os("GUI_SHELL_CODEX_SANDBOX_TEST_EXE")
+            .map(PathBuf::from)
+            .expect("GUI_SHELL_CODEX_SANDBOX_TEST_EXEに検証対象CLIの絶対pathを指定する");
+        assert!(executable.is_absolute(), "Codex CLIは絶対pathで指定する");
+        assert!(executable.is_file(), "Codex CLIの実行fileが存在する");
+
+        let root = super::codex_cli_fixture::FixtureTempDirectory::create();
+        let workspace = root.path().join("workspace");
+        let private = workspace.join("private");
+        let scratch = workspace.join(".d4p-tmp-live-probe");
+        let isolated_codex_home = root.path().join("codex-home");
+        fs::create_dir(&workspace).expect("合成Workspace");
+        fs::create_dir(&private).expect("合成secret領域");
+        fs::create_dir(&scratch).expect("Task scratch相当directory");
+        fs::create_dir(&isolated_codex_home).expect("検証専用Codex home");
+
+        let registered_paths = [
+            "private/registered-marker.txt",
+            "private/registered-directory",
+            "private/秘密[ab].txt",
+            "private/vault{x}.txt",
+        ];
+        let denied_paths = [
+            "private/registered-marker.txt",
+            "private/registered-directory/child.txt",
+            "private/秘密[ab].txt",
+            "private/vault{x}.txt",
+        ];
+        fs::write(
+            private.join("registered-marker.txt"),
+            b"synthetic-secret-marker",
+        )
+        .expect("合成登録file");
+        let registered_directory = private.join("registered-directory");
+        fs::create_dir(&registered_directory).expect("合成登録directory");
+        fs::write(
+            registered_directory.join("child.txt"),
+            b"synthetic-child-marker",
+        )
+        .expect("合成登録directory内marker");
+        fs::write(
+            private.join("秘密[ab].txt"),
+            b"synthetic-literal-bracket-marker",
+        )
+        .expect("合成literal bracket marker");
+        fs::write(private.join("vaulta.txt"), b"synthetic-glob-decoy").expect("合成glob decoy");
+        fs::write(
+            private.join("vault{x}.txt"),
+            b"synthetic-literal-brace-marker",
+        )
+        .expect("合成literal brace marker");
+        fs::write(private.join("vaultx.txt"), b"synthetic-brace-decoy").expect("合成brace decoy");
+
+        let secret_paths = registered_paths.map(str::to_owned);
+        let generated = build_codex_command(
+            &executable,
+            &workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&scratch),
+            &secret_paths,
+        )
+        .expect("本番Task command設定");
+        let mut generated_args = generated.get_args();
+        let mut profile_args = Vec::<OsString>::new();
+        while let Some(argument) = generated_args.next() {
+            if argument == "exec" {
+                break;
+            }
+            assert_eq!(argument, "-c", "Task設定はCodex CLIのconfig overrideである");
+            profile_args.push(argument.to_os_string());
+            profile_args.push(
+                generated_args
+                    .next()
+                    .expect("config override値")
+                    .to_os_string(),
+            );
+        }
+        assert!(!profile_args.is_empty(), "Rust生成profile設定がある");
+        let permission_profile = profile_args
+            .windows(2)
+            .find(|pair| {
+                pair[0] == "-c"
+                    && pair[1]
+                        .to_string_lossy()
+                        .starts_with("default_permissions=")
+            })
+            .and_then(|pair| pair[1].to_str())
+            .and_then(|setting| setting.strip_prefix("default_permissions="))
+            .and_then(|value| serde_json::from_str::<String>(value).ok())
+            .expect("Rust生成default_permissionsからsandbox profile名を得る");
+        let quote_path = |path: &Path| format!("'{}'", path.to_string_lossy().replace('\'', "''"));
+        let denied_array = denied_paths
+            .iter()
+            .map(|path| quote_path(&workspace.join(path)))
+            .collect::<Vec<_>>()
+            .join(",");
+        let decoys = [
+            quote_path(&private.join("vaulta.txt")),
+            quote_path(&private.join("vaultx.txt")),
+        ]
+        .join(",");
+        let workspace_output = workspace.join("workspace-write-marker.txt");
+        let script = format!(
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({denied_array}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({decoys}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; [IO.File]::WriteAllText({},'workspace-write-marker'); exit 0",
+            quote_path(&workspace_output)
+        );
+
+        let mut sandbox = command(&executable, &workspace);
+        sandbox
+            .env("CODEX_HOME", &isolated_codex_home)
+            .args(["sandbox"])
+            .args(["--permission-profile", &permission_profile])
+            .args(&profile_args)
+            .args(["--cd"])
+            .arg(&workspace)
+            .args([
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+            ])
+            .arg(script);
+        let output = sandbox.output().expect("実Codex sandboxを起動");
+        assert!(
+            output.status.success(),
+            "Rust生成profileによる合成probeが失敗: code={:?}, stderr={}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            fs::read(workspace_output).expect("Workspace内write結果"),
+            b"workspace-write-marker"
+        );
+    }
+
     #[test]
     fn 登録secret_globは不正pathと上限超過を拒否する() {
         for invalid in ["../outside", "private/*.txt", "private/has\\slash"] {

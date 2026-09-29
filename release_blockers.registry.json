@@ -160,7 +160,23 @@
         "os_protection_changed": false,
         "scope_limit": "candidate glob semantics only; not Rust-generated argv, codex exec, Broker, Owner Approval, Agent Task, or general path isolation"
       },
-      "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。`C:/Windows=deny`候補はsystem fileを拒否したが、sandbox内の`codex --version`も起動拒否となったため採用しない。登録secret候補globの直接probeでは合成pathの完全一致・子孫・深さ64とliteral bracket／brace pathが拒否され、非登録decoyは読めたが、configは手動構成でRust Adapter、`codex exec`、Brokerを通していない。個別file／directoryのprobeは広域read隔離を証明せず、広域read隔離や秘密file全般の拒否を主張しない。Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
+      "rust_generated_secret_path_probe": {
+        "date": "2026-09-29",
+        "cli_version": "0.158.0-alpha.2.1",
+        "evidence_source": "LIVE_RUNTIME",
+        "method": "explicitly invoked ignored Rust test extracts the Task config overrides from build_codex_command and passes them to direct codex sandbox with an isolated temporary CODEX_HOME and synthetic workspace",
+        "synthetic_results": {
+          "registered_exact_file_deny": "read rejected",
+          "registered_directory_descendant_deny": "nested file read rejected",
+          "literal_bracket_and_brace_paths": "literal path reads rejected",
+          "unregistered_glob_decoys": "read succeeded",
+          "workspace_write": "succeeded"
+        },
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "scope_limit": "direct codex sandbox profile semantics only; no codex exec, Broker, Owner Approval, Agent Task, process lifecycle, or confirmed TEMP/TMP propagation"
+      },
+      "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。`C:/Windows=deny`候補はsystem fileを拒否したが、sandbox内の`codex --version`も起動拒否となったため採用しない。登録secret候補globの直接probeでは合成pathの完全一致・子孫・深さ64とliteral bracket／brace pathが拒否され、非登録decoyは読めたが、configは手動構成でRust Adapter、`codex exec`、Brokerを通していない。追加のRust生成profile probeでは完全一致・子孫・literal bracket／braceのread拒否、非登録decoyとWorkspace writeを確認したが、直接sandbox限定でTEMP/TMP scratch伝播は未確認。個別file／directoryのprobeは広域read隔離を証明せず、広域read隔離や秘密file全般の拒否を主張しない。Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",

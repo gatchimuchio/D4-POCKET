@@ -154,3 +154,28 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 ### 次工程と残存gate
 
 本追補で登録除外path伝播とsandbox globの局所単位を閉じた。Owner Yes／No／stale／replay、実`codex exec`を通るBroker production path、実行失敗・取消・crash後回復、diff／test結果のContent Exposure接続は未成立であり、関連項目を`release_blocker`として保持する。Windows実機のCodex Taskは未実行で、`task_execution=unsupported`を維持する。
+
+## R2追補 Rust生成profileのWindows直接sandbox検証（2026-09-29）
+
+### 成立した局所証拠
+
+- Rust Adapter testに明示実行・既定ignoredのWindows probeを追加した。`GUI_SHELL_CODEX_SANDBOX_TEST_EXE`で所有者が指定した絶対pathのCodex CLIだけを使い、一時Workspaceと分離した一時`CODEX_HOME`内の合成markerを読む。Codex model、`codex exec`、credential、network要求は起動しない。
+- `build_codex_command`の出力からTask用`-c`設定を直接抽出し、生成された`default_permissions`値から得たprofile名とともに実CLIの`codex sandbox --permission-profile`へ渡す。登録file完全一致、登録directoryのnested file、literal bracket／brace pathのread拒否、glob decoyのread許可、Workspace内writeを1回の実sandbox processで確認した。
+- 実Codex CLI `0.158.0-alpha.2.1`、Windowsでignored test 1件が成功。これはRustが生成するfilesystem profileの直接sandboxでの適用意味を示す`LIVE_RUNTIME`証拠に限る。
+
+### 失敗履歴と証拠境界
+
+- 初回test実行は`codex sandbox`が必須とする`--permission-profile`未指定のためusage error。生成済み`default_permissions`からprofile名を読み取り明示するようtestを修正した。
+- TEMP scratchにもRust生成のTEMP／TMP値を与える試行はCodex sandbox process自体が成功したが、期待Workspace scratch内のmarkerが見つからなかった。helperから子processへの環境伝播が未確認なので、このassertionはtestから除き、scratch環境伝播の証拠へ昇格しない。これは`codex exec`本番経路のfailureとは判定しない。
+- strict日本語監査の初回は合成bracket pathとinline PowerShell文字列の2箇所を未局所化表記として検出し、統合validatorもこの1検査だけ失敗した。合成file名へ日本語を含め、PowerShell probe labelを日本語化して再監査する。例外台帳や監査条件の緩和は行わない。
+- testは直接`codex sandbox`だけを起動し、Broker、Owner Yes／No／stale／replay、production `codex exec`、Rust生成WorkspaceTaskScratchの実ライフサイクル、process終了、Audit／Recovery、diff／test結果のContent Exposureを通さない。`task_execution=unsupported`、`release_ready=false`と関連`release_blocker`を維持する。
+- 初回profile指定不足の実行と、scratch marker不在の試行は失敗履歴として残し、成功した最終probeと別に扱う。
+
+### 検証
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib --no-run`: 成功。
+- 明示指定Codex CLIで対象ignored testを起動: 1 passed。通常のRust test suiteでは自動起動しない診断probeであり、Ownerが指定したCLI pathでのみ実行する。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。最終のpath例示変更後はignored testを再compile・再実行して1 passed。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 394 passed／0 failed／1 ignored。ignoredは実Codex sandboxの明示実行probeで、別途実行して成功した。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`: 成功。
+- 変更後の統合validatorは初回strict日本語監査だけが失敗し、修正後の再実行はexit 0。登録development check 10件すべて成功し、日本語監査1111 files／findings 0、Schema 149／example 149／negative fixture 192、Conformance 225を確認した。release gateは既存blockerを検出したまま`release_ready=false`を維持する。

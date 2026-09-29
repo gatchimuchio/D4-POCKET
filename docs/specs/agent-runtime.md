@@ -69,6 +69,10 @@ OwnerがWorkspace登録で指定したsecret pathは、登録時に正規化・�
 
 この接続のRust unit／Fake CLI／Conformance testは、登録値の伝播、glob生成、literal escape、上限、Debug redactionを検査する。手動構成した同等globを使うWindows mxc直接probeは合成登録secretの完全一致・子孫と深さ64の拒否を観測したが、Rust生成設定・`codex exec`・Broker／Owner Approval・実Agent Taskの連続経路証拠ではない。したがってこの追補も`LIVE_RUNTIME` sandbox probeと`FIXTURE`接続testを越えて主張せず、`task_execution=unsupported`および関連`release_blocker`を維持する。
 
+### Rust生成Task設定を使うWindows直接probe（2026-09-29）
+
+明示指定した実Codex CLI `0.158.0-alpha.2.1`に対するignored Rust testを追加した。testは`build_codex_command`が生成するconfig overrideをそのまま抽出し、そこからpermission profile名を取り出して必須の`codex sandbox --permission-profile`へ渡す。隔離した一時`CODEX_HOME`と合成Workspaceだけを使い、実Agent、`codex exec`、認証情報、model requestは起動しない。合成の登録file完全一致、登録directoryの子file、literal `[]`／`{}` pathのreadは拒否され、glob decoyのreadとWorkspace内writeは成功した。初回呼出しはsandbox helper必須の`--permission-profile`欠落でusage errorとなったためtestを修正した。TEMP scratchにもRust生成環境値を設定する補助probeでは、helper commandが成功した一方、期待scratchにmarkerを確認できなかった。この直接helperはRust `codex exec` childへのTEMP／TMP伝播を証明しないため、そのassertionをprobeから外し、scratch伝播は未検証として扱う。この直接`codex sandbox`結果は設定の局所的な`LIVE_RUNTIME`証拠に限り、Broker、Owner Approval、Agent Task、process lifecycle、scratch隔離を証明せず、`task_execution=unsupported`を維持する。
+
 ### Broker crash後のscratch回復
 
 未検証の予約状態を`reserved`、nofollow open後にdirectory identityを得た状態を`active`として記録上も分離する。
