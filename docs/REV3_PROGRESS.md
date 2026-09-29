@@ -304,9 +304,10 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 
 ### 検証と履歴
 
-- 追加したfocused Rust試験は1 passed。変更対象Rust fileの`rustfmt +1.95.0 --edition 2021 --check`と`git diff --check`も成功した。
-- Windows local全target試験は2回とも、変更対象外のloopback通信試験を含むsuiteで断続失敗した。1回目はMINIDORAのContent-Length付き応答試験が通信失敗、2回目はA2A loopbackの2試験が応答読取失敗となった。Rust suite全体はそれぞれ残りのtestが成功したが、全体PASSとは扱わない。MINIDORA試験とA2Aの2試験は個別再実行で各1 passed。失敗原因は確定しておらず、通信系testの間欠性として記録し、製品回帰とも環境障害とも断定しない。
-- 正確な全target試験command、対象commit上のWindows hosted結果、最終統合後のbackup／remote確認は、この追補作業を閉じる際に追記する。Actionsは`.github/workflows/windows-manual-rust-validation.yml`の手動Windows補助検査だけに用い、品質基準面・実機・製品完成の代替にはしない。
+- focused試験command `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::AgentTask実行は期限切れOwnerApprovalを有効Permissionから分離して拒否する' -- --exact --nocapture`: 1 passed。変更対象Rust fileの`rustfmt +1.95.0 --edition 2021 --check`と`git diff --check`も成功した。
+- Windows local全target試験command `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は2回とも全体PASSにならなかった。1回目は`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`が通信失敗で終了し、2回目（`GUI_SHELL_C28_DIAGNOSTICS=1`）は`a2a::tests::loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する`と`broker::a2a_center::tests::owner接続をBrokerで受理し通常IPC一覧へbounded射影する`が応答読取失敗となった。各失敗testは個別再実行で成功した。原因は確定していないため、通信系testの断続失敗として記録し、製品回帰・環境障害のいずれとも断定しない。
+- この不確実性を対象commit上で補うため、所有者が許可した一時branchでworkflowを手動起動した。Windows Actions [run #20](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36548519704)はcommit `95921dc549abb7d74386f45dadd98f8478d47b68`とcheckout SHAの一致、Windows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0、対象Rust fileのrustfmt、`cargo check --all-targets`、全Rust target test（12 target、396 passed／0 failed／1 ignored）、試験後cleanをすべて確認した。所要5分28秒、artifactなし。これは当該commitのhosted Windows Rust検査に限り、実Agent Task、実機installed product、production隔離、release readinessを証明しない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。開発validator登録10項目、厳格日本語監査（1113 files／0 findings）、Schema（149／149／192 negative）、Conformance（225 checks）、Manifest、portable性、release smoke、evidence bundle、runtime assertions（12／0）、C32開発監査が成功した。evidence bundleは既存release blocker 5件と`release_ready=false`を保持した。
 
 ### 残存gate
 
