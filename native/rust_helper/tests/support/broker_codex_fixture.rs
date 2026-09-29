@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(super) struct BrokerCodexFixture {
     root: PathBuf,
@@ -52,6 +53,43 @@ impl BrokerCodexFixture {
 
     pub(super) fn executable_path(&self) -> &Path {
         &self.executable
+    }
+
+    pub(super) fn descendant_heartbeat_path(&self) -> PathBuf {
+        self.root.join("descendant-heartbeat")
+    }
+
+    pub(super) fn wait_for_descendant_heartbeat(&self, timeout: Duration) -> u64 {
+        let path = self.descendant_heartbeat_path();
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Ok(metadata) = std::fs::metadata(&path) {
+                if metadata.len() >= 2 {
+                    return metadata.len();
+                }
+            }
+            assert!(Instant::now() < deadline, "子processの稼働marker待ち期限");
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    pub(super) fn descendant_heartbeat_len(&self) -> u64 {
+        std::fs::metadata(self.descendant_heartbeat_path())
+            .expect("子processの稼働marker")
+            .len()
+    }
+
+    pub(super) fn assert_no_workspace_task_scratch(&self) {
+        for entry in std::fs::read_dir(&self.workspace).expect("Workspace内Task scratch確認") {
+            assert!(
+                !entry
+                    .expect("作業領域の項目")
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".d4p-tmp-"),
+                "Task終了後にBroker管理scratchを残さない"
+            );
+        }
     }
 }
 

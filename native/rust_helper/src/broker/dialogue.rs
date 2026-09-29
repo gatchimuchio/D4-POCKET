@@ -2289,6 +2289,9 @@ mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
 
+    #[cfg(windows)]
+    const CANCEL_FIXTURE_OWNER_APPROVAL_OPERATION: &str = "AgentTaskOwnerApprovalGrant";
+
     #[test]
     fn AgentAdapter投影は既存SchemaとAuthority境界を検証する() {
         let valid: Value = serde_json::from_str(include_str!(
@@ -2817,7 +2820,8 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費しscratchを片付ける_fixture() {
+    fn Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費し正常完了・取消後にscratchを片付ける_fixture(
+    ) {
         let fixture = super::broker_codex_fixture_support::BrokerCodexFixture::create();
         let workspace_path = fixture.workspace_path();
 
@@ -3005,15 +3009,6 @@ mod tests {
         assert!(!result.to_string().contains(instruction));
         assert!(!result.to_string().contains("fixture-task-completed"));
 
-        drop(audit);
-        assert!(audit_events
-            .iter()
-            .any(|event| event.0.contains("Owner Approval発行")));
-        assert!(audit_events
-            .iter()
-            .any(|event| event.0.contains("一回消費")));
-        let audit_text = serde_json::to_string(&audit_events).unwrap();
-        assert!(!audit_text.contains(instruction));
         assert!(!workspace_path.join("fixture-canary").exists());
         for entry in std::fs::read_dir(&workspace_path).unwrap() {
             assert!(
@@ -3025,6 +3020,113 @@ mod tests {
                 "正常完了後にBroker管理Task scratchを残さない"
             );
         }
+
+        let heartbeat = fixture.descendant_heartbeat_path();
+        let cancel_instruction = format!("FIXTURE_TIMEOUT_WITH_DESCENDANT {}", heartbeat.display());
+        let cancel_task_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+            "instruction":cancel_instruction.clone(),
+        });
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("取消fixture専用Permission発行");
+        control
+            .操作_作業領域結合済み(
+                CANCEL_FIXTURE_OWNER_APPROVAL_OPERATION,
+                &cancel_task_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("取消fixture専用本文hash結合Approval発行");
+        let cancel_task = control
+            .操作_作業領域結合済み(
+                "AgentTask実行",
+                &cancel_task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("Brokerから偽Codex CLIの停止fixtureを開始");
+        assert_eq!(cancel_task["status"], "running");
+        assert!(
+            fixture.wait_for_descendant_heartbeat(Duration::from_secs(5)) >= 2,
+            "取消要求前にAdapter配下の子孫processが稼働している"
+        );
+        let cancel_task_id = cancel_task["task_id"].as_str().unwrap();
+        let cancelling = control
+            .操作_作業領域結合済み(
+                "AgentTask取消",
+                &json!({"task_id":cancel_task_id}),
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("Broker取消要求を監査して送る");
+        assert_eq!(
+            cancelling["status"], "running",
+            "取消要求だけではprocess終了前にterminal状態へ進めない"
+        );
+        let cancel_deadline = Instant::now() + Duration::from_secs(10);
+        let cancelled = loop {
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":cancel_task_id}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .expect("取消fixtureの状態取得");
+            if state["status"] != "running" {
+                break state;
+            }
+            assert!(
+                Instant::now() < cancel_deadline,
+                "取消後terminal状態への遷移待ち期限"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(cancelled["status"], "cancelled");
+        assert!(cancelled.get("result_hash").is_none());
+        let heartbeat_after_terminal = fixture.descendant_heartbeat_len();
+        std::thread::sleep(Duration::from_millis(150));
+        assert_eq!(
+            fixture.descendant_heartbeat_len(),
+            heartbeat_after_terminal,
+            "terminal取消後に子孫processが稼働を継続しない"
+        );
+        fixture.assert_no_workspace_task_scratch();
+        drop(audit);
+        assert!(audit_events
+            .iter()
+            .any(|event| event.0.contains("Owner Approval発行")));
+        assert!(audit_events
+            .iter()
+            .any(|event| event.0.contains("一回消費")));
+        assert!(audit_events
+            .iter()
+            .any(|event| event.0.contains("取消要求") && event.1 == cancel_task_id));
+        assert!(audit_events
+            .iter()
+            .any(|event| { event.0.contains("失敗・取消") && event.1 == cancel_task_id }));
+        let audit_text = serde_json::to_string(&audit_events).unwrap();
+        assert!(!audit_text.contains(instruction));
+        assert!(!audit_text.contains(&cancel_instruction));
+        assert!(!cancelled.to_string().contains(&cancel_instruction));
 
         drop(control);
         drop(workspaces);

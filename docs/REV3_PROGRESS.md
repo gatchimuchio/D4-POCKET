@@ -232,3 +232,28 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 ### 次工程と残存gate
 
 本追補は`FIXTURE`の局所縦断証拠であり、Ownerの実UI確認、認証済みDesktop IPCからの実`codex exec`、実model、AgentによるWorkspace書込、取消・期限・crash回復、結果diff／testのContent Exposure、Windows installed productを検証しない。これらのR2項目は`release_blocker`のまま保持し、製品Adapterの`task_execution=unsupported`と`release_ready=false`を変更しない。
+
+## R2追補 Broker取消からfake Codex子孫停止・scratch回収（2026-09-29）
+
+### 成立した局所証拠
+
+- 既存Windows Rust縦断fixtureへ取消分岐を追加した。正常fixture Task完了後に新しい一回Permissionと本文hash結合Owner Approvalを発行し、Broker consumerから実`CodexCliAdapter`実装とfake CLIを起動する。
+- fake CLIは試験用子processをspawnし、heartbeat fileを継続更新する。2 byte以上のheartbeatを観測して子孫が稼働中であることを確認後、Brokerへ`AgentTask取消`を要求する。
+- 取消応答は`running`のまま、AdapterがWindows Job Object配下のprocess群を終了してworkerが戻った後だけterminal `cancelled`となる。terminal後にresult hashはなく、150 msの観測窓でheartbeatが増えず、Broker管理Task scratchもなく、開始・取消・terminal監査へ指示本文やheartbeat pathが露出しないことを確認する。
+- 証拠源は合成metadata wrapper、fake CLI、unit test内Broker、in-memory scratch journalを使う`FIXTURE`である。実Codex CLI／model、production認証IPC、永続Audit／crash recovery、実Workspace変更、installed productを示さない。製品Codex Adapterの`task_execution=unsupported`は維持する。
+
+### 検証・履歴
+
+- 初回focused compileは既存監査callbackをtest途中でdropした後に再利用していたためRust借用検査で失敗。callbackを両Task終了後まで保持し、監査assertionを末尾へ移動して修正した。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費し正常完了・取消後にscratchを片付ける_fixture' -- --exact --nocapture`: 成功、1 passed。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功。Windows Rust全targetでlibrary 349 passed／0 failed／1 ignored、helper binary 10 passed、integration 36 passed（合計395 passed／0 failed／1 ignored）。以前から記録済みのA2A間欠失敗履歴は原因未確定のまま保持する。
+- 初回strict日本語監査はprotocol operation識別子と短いtest診断語の2件を検出した。operation識別子はtest専用定数へ分離してwire値を保持し、診断語を日本語化した。再実行した`python -X utf8 tooling/日本語基底監査.py --strict`は1113 files／負債0で成功。
+- `python -X utf8 tooling/manifest.py --write`で1110件を生成し、`python -X utf8 tooling/manifest.py --check`: 成功。`python -X utf8 tooling/schema_check/check_schemas.py`: Schema 149件、正常example 149件、negative fixture 192件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksで成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment check 10件、日本語監査、Schema、Conformance、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions、C32開発監査が成功。validatorは`release_ready=false`と既存release blockerを報告し、解除していない。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs native/rust_helper/tests/support/broker_codex_fixture.rs`、`git diff --check`: 成功。初回focused compileの借用検査失敗は監査callbackの寿命を整理して解消した。現行Windowsで全target検証が成立したためGitHub Actionsは使用していない。
+- Windows installed／Owner／production runtime証拠など既存release blockerを維持し、`release_ready=false`。GitHub Actionsは使っていない。今回必要なRust検査は現行Windows localで実行できた。
+
+### 次工程と残存gate
+
+本fixtureはAdapter経由のBroker取消・process群停止・scratch cleanupをfake CLI上で縦断確認したに過ぎない。production `codex exec`とreal Agent tool、Owner native UI、実model、実Filesystem隔離、deadline／crash／強制Broker終了、永続Audit／Recovery、Workspace diffとtest結果のContent Exposure、Windows installed productは未検証の`release_blocker`。`task_execution=unsupported`、`release_ready=false`を維持する。
