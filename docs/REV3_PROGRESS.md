@@ -521,3 +521,21 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - 同probe `--runs 3`: exit 0、3/3でCLI turn／固定command完了、hardlink createはnative error 5、aliasなし。非loopback要求12件拒否。
 - `git diff --check`: 成功。統合validator、manifest確認は変更完了前に実行する。
 - Windows Actionsは未使用。Rust sourceを変更せず、実CLI/MxC childのWindows局所probeを実行可能だったため hosted Rust検査の追加は不要。
+
+## R2追補 実`codex exec` tool childにおける起動前hardlink alias読取（2026-09-30）
+
+### 観測
+
+- 同じloopback偽Responses API／実Codex CLI `0.158.0-alpha.2.1`／実MxC child probeに、起動前alias read検査を追加した。合成登録secret fileをPython `os.link`でCLI起動前にhardlink化し、`samefile`とlink count 2を確認する。alias pathは静的permission設定でdenyされていない。secret本文はprobe内で読み捨て、出力しない。
+- 個別`--runs 1`の完了turn 3件すべてで、登録exact path readは拒否された一方、起動前alias readは`allowed`、host aliasも存在した。動的hardlink作成は別の登録exact-deny synthetic targetに対して3/3回 `Win32Exception`／HRESULT `0x80004005`／Win32 `NativeErrorCode 5`（アクセス拒否）で失敗し、dynamic aliasは作成されなかった。通常Workspace read／writeも成功した。
+- これはpath完全一致denyだけでは既存hardlink aliasを塞がず、Rust `WorkspaceReader`登録時とTask起動直前のlink-count検査が実shell child前に必要であることを確認する限定`LIVE_RUNTIME`観測である。直接CLI probeは合成hardlinkを事前作成し、Rust registration／preflightを意図的に通さずにMxCだけを検査する。従って、登録／preflightを含むproduction Broker Taskでread可能になる証拠ではない。先行Rust fixtureの複数link拒否と、この直接child結果は別証拠として保持する。
+- `--runs 3` batch実行は2回とも、その最初のCodex invocationでshell command自体はexit 0となった後、Responses streamが`error decoding response body`で切れてCLI turnは失敗した。これらを正常turn数へ加算しない。個別`--runs 1`を3回行い、3件ともturnまで正常完了した。全試行で実model／資格情報なし、非loopback要求はproxyで拒否、Codex processは非管理者。TEMP／TMP mismatchとhost非可視をphysical cleanupとしない制約は継続する。
+- `task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。Rust Broker、Owner Approval、Rust生成config、production Agent Task、取消／deadline／crash、Audit／Recoveryは本probeに含まれない。
+
+### 検証
+
+- `python -X utf8 -c "from pathlib import Path; p=Path('tooling/codex_mxc_exec_temp_probe.py'); compile(p.read_text(encoding='utf-8'), str(p), 'exec')"`: 成功。
+- `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定codex.exe絶対path> --runs 1`: exit 0、正常turn 3/3。各回で起動前alias read許可、registered exact read拒否、dynamic creationはnative error 5。
+- 同probe `--runs 3`: 2回の試行はいずれも最初のCLI invocationでturn stream decode失敗。tool childはexit 0して報告fileを書いたが、turn完了要件を満たさないためprobe全体はexit 1。これらは成功反復へ含めない。
+- `git diff --check`: 成功。統合validatorとManifest確認は編集完了前に実行する。
+- Windows Actionsは未使用。local Windows上の実CLI／MxC childを限定実行でき、Rust sourceを変更していないため。

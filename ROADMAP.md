@@ -8,6 +8,8 @@ R2追補（2026-09-29）: 登録secret pathのliteral denyが事前作成hardlin
 
 R2追補（2026-09-30）: 実Codex CLI `exec`とMxC shell tool childをloopback偽Responses APIから3回起動し、合成登録secretへのhardlink作成が3/3回Win32 NativeErrorCode 5（access denied）で失敗、alias不在、通常Workspace read／write許可を観測した。これは手動構成したRust相当profileによる直接`LIVE_RUNTIME`であり、Rust生成profile・Broker・Owner Approval・production Agent Taskを通した証拠ではない。TEMP／TMPとWorkspaceTaskScratchの不一致等も残るため、`task_execution=unsupported`と関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`、`docs/specs/agent-runtime.md`、`release_blockers.registry.json`。
 
+R2追補（2026-09-30）: 起動前に作成した合成secretのhardlink aliasは、実`codex exec`のMxC childから3/3回readできた一方、登録exact pathのreadは拒否され、別targetへの動的hardlink作成も3/3回access deniedとなった。これはRust WorkspaceReaderの複数link登録／Task直前検査が必要な理由を直接tool childで再確認した結果であり、probe自体はその登録preflightを意図的に迂回している。Rust Broker・Owner Approval・production Agent TaskのLIVE_RUNTIME証拠ではなく、`task_execution=unsupported`とrelease blockerを維持する。Responses stream decode failureを含む試験履歴と正確なscopeは`docs/REV3_PROGRESS.md`、`docs/specs/agent-runtime.md`、`release_blockers.registry.json`に記録する。
+
 2026-09-29に受領したrev3統合仕様・工程表を現行開発基準とする。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に追記する。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。
 
 rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。

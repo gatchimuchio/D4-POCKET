@@ -215,14 +215,19 @@
           "registered_secret_hardlink_child_probe": {
             "date": "2026-09-30",
             "evidence_source": "LIVE_RUNTIME",
-            "method": "same loopback fake-Responses codex exec probe; the fixed MxC exec_command attempts New-Item hardlink creation from a synthetic registered secret file to a workspace alias and never emits file contents",
+            "method": "same loopback fake-Responses codex exec probe; creates a hardlink to a synthetic registered secret before CLI startup, reads only through the unregistered alias, and separately attempts dynamic New-Item hardlink creation; never emits file contents",
             "runs": 3,
             "observations": {
-              "creation": "3/3 failed with Win32Exception HRESULT 0x80004005 and NativeErrorCode 5 (access denied)",
-              "alias_read": "not attempted because creation failed in 3/3 runs",
-              "alias_visible_to_host": "false in 3/3 runs",
+              "preexisting_alias_setup": "host-created before Codex startup; same file identity confirmed and target link count was 2",
+              "preexisting_alias_read": "allowed in 3/3 individually completed turns while the exact registered path read was rejected",
+              "preexisting_alias_still_visible_to_host": "true in 3/3 runs",
+              "dynamic_creation": "3/3 failed with Win32Exception HRESULT 0x80004005 and NativeErrorCode 5 (access denied)",
+              "dynamic_alias_read": "not attempted because creation failed in 3/3 runs",
+              "dynamic_alias_visible_to_host": "false in 3/3 runs",
               "ordinary_workspace_read_and_write": "allowed in 3/3 runs"
             },
+            "registration_preflight": "intentionally bypassed in this direct CLI probe; Rust WorkspaceReader registration and Task preflight independently reject multiply-linked secret files",
+            "turn_transport_failures": "two separate --runs 3 attempts failed on their first Codex invocation after the shell command exited 0, with stream disconnected before completion: error decoding response body; these were not counted among the 3 completed-turn repetitions",
             "host_process_elevated": false,
             "real_model_or_credential_used": false,
             "non_loopback_requests": "12 intercepted and rejected by local loopback proxy",

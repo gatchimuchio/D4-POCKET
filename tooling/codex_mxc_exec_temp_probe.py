@@ -44,6 +44,7 @@ _BASE_OVERRIDES = (
         '":workspace_roots"={"**/*.env"="deny","**/.env.*"="deny",'
         '"**/.ssh/**"="deny","**/secrets/**"="deny",'
         '"private/registered-marker.txt"="deny",'
+        '"private/registered-hardlink-create-target.txt"="deny",'
         '"private/registered-write-target.txt"="deny",'
         '"private/registered-directory"="deny",'
         '"private/registered-directory/**"="deny"},"glob_scan_max_depth"=32}'
@@ -71,6 +72,7 @@ _TASK_PROBE_COMMAND_TEMPLATE = (
     "sshRead=(& $readProbe (Join-Path $workspace '.ssh\\id_ed25519')); "
     "secretsRead=(& $readProbe (Join-Path $workspace 'secrets\\secret.txt')); "
     "registeredFileRead=(& $readProbe (Join-Path $workspace 'private\\registered-marker.txt')); "
+    "registeredAliasRead=(& $readProbe (Join-Path $workspace 'private\\registered-hardlink-preexisting-alias.txt')); "
     "registeredDirectoryRead=(& $readProbe (Join-Path $workspace 'private\\registered-directory\\read-marker.txt')); "
     "outsideWorkspaceRead=(& $readProbe (Join-Path $outsideRoot 'outside-read-marker.txt')); "
     "envWrite=(& $writeProbe (Join-Path $workspace 'probe-inputs\\write-probe.env')); "
@@ -80,10 +82,10 @@ _TASK_PROBE_COMMAND_TEMPLATE = (
     "registeredFileWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-write-target.txt')); "
     "registeredDirectoryWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-directory\\write-probe.txt')); "
     "outsideWorkspaceWrite=(& $writeProbe (Join-Path $outsideRoot 'outside-write-marker.txt'))}; "
-    "$hardlinkAlias=Join-Path $workspace 'private\\registered-hardlink-alias.txt'; "
+    "$hardlinkAlias=Join-Path $workspace 'private\\registered-hardlink-dynamic-alias.txt'; "
     "$hardlinkCreateStatus='not_attempted'; "
     "try {$null=New-Item -ItemType HardLink -Path $hardlinkAlias "
-    "-Target (Join-Path $workspace 'private\\registered-marker.txt') -ErrorAction Stop; "
+    "-Target (Join-Path $workspace 'private\\registered-hardlink-create-target.txt') -ErrorAction Stop; "
     "$hardlinkCreateStatus='created'} catch {$hardlinkError=$_.Exception; "
     "$hardlinkHresult=[Convert]::ToString([BitConverter]::ToUInt32("
     "[BitConverter]::GetBytes([int]$hardlinkError.HResult),0),16).PadLeft(8,'0').ToUpperInvariant(); "
@@ -479,12 +481,21 @@ def _run_once(
             ".ssh/id_ed25519": "synthetic ssh marker",
             "secrets/secret.txt": "synthetic secrets marker",
             "private/registered-marker.txt": "synthetic registered secret marker",
+            "private/registered-hardlink-create-target.txt": "synthetic hardlink creation target",
             "private/registered-directory/read-marker.txt": "synthetic registered child marker",
         }
         for relative_path, content in probe_files.items():
             path = workspace / relative_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+        preexisting_alias = workspace / "private" / "registered-hardlink-preexisting-alias.txt"
+        preexisting_target = workspace / "private" / "registered-marker.txt"
+        os.link(preexisting_target, preexisting_alias)
+        if (
+            not os.path.samefile(preexisting_target, preexisting_alias)
+            or preexisting_target.stat().st_nlink != 2
+        ):
+            raise RuntimeError("synthetic_preexisting_hardlink_alias_identity_invalid")
         outside_read_marker = root / "outside-read-marker.txt"
         outside_read_marker.write_text("outside synthetic marker", encoding="utf-8")
         write_probe_paths = {
@@ -499,7 +510,7 @@ def _run_once(
             / "write-probe.txt",
             "registered_hardlink_alias": workspace
             / "private"
-            / "registered-hardlink-alias.txt",
+            / "registered-hardlink-dynamic-alias.txt",
             "outside_workspace": root / "outside-write-marker.txt",
         }
         if any(path.exists() for path in write_probe_paths.values()):
@@ -586,6 +597,7 @@ def _run_once(
             "sshRead",
             "secretsRead",
             "registeredFileRead",
+            "registeredAliasRead",
             "registeredDirectoryRead",
             "outsideWorkspaceRead",
             "envWrite",
@@ -684,6 +696,14 @@ def _run_once(
                     "directory_child": probe_statuses["registeredDirectoryRead"]
                     == "allowed",
                 },
+                "registered_secret_preexisting_hardlink_alias_read_status": probe_statuses[
+                    "registeredAliasRead"
+                ],
+                "registered_secret_preexisting_hardlink_alias_read_allowed": probe_statuses[
+                    "registeredAliasRead"
+                ]
+                == "allowed",
+                "registered_secret_preexisting_hardlink_alias_still_host_visible": preexisting_alias.is_file(),
                 "registered_secret_path_writes_allowed": {
                     "file": probe_statuses["registeredFileWrite"] == "allowed",
                     "directory_child": probe_statuses["registeredDirectoryWrite"]
@@ -735,6 +755,14 @@ def _run_once(
             failures.append("workspace_secret_path_read_allowed")
         if any(filesystem_boundary["registered_secret_path_reads_allowed"].values()):
             failures.append("registered_secret_path_read_allowed")
+        if not filesystem_boundary[
+            "registered_secret_preexisting_hardlink_alias_read_allowed"
+        ]:
+            failures.append("registered_secret_preexisting_hardlink_alias_not_readable")
+        if not filesystem_boundary[
+            "registered_secret_preexisting_hardlink_alias_still_host_visible"
+        ]:
+            failures.append("registered_secret_preexisting_hardlink_alias_disappeared")
         if any(filesystem_boundary["registered_secret_path_writes_allowed"].values()):
             failures.append("registered_secret_path_write_allowed")
         if not filesystem_boundary["registered_secret_hardlink_creation_denied"]:
