@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "def897bd08160f00142153d710b9c419e91ec56c9095c83f109b3512b898d18f"
+      "sha256": "066679b597faa7ca0995649fc60ca48e215465dc7d807aada871a75191d5a0c7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "2953d31d9b0f26c6cc88841397a3dbe8e877050e9ef97a9ace972af4ac5b3568"
+      "sha256": "79532ae4390fd7286622918f9347e6ad0b80a9912295c5e90c325abb67b06cb6"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "351d19cb4bd6f2646e2dd7caceceb1dc0b5621e09e09d1c573f786bc6516eb31"
+      "sha256": "a62a7fb68cbcadc1302a69bd903769c141c1eb9255355ce644dc7c12959fb3b3"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3253,7 +3253,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "0042b3271d5f217ea584a0ff05f2390495171c9850077fa646ea5a5031333048"
+      "sha256": "7f660f709e84f1de1f025ade518be699f8119f6e0464b90d2870713392497821"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",
@@ -4369,7 +4369,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "96fd622640533f949d100a8621c2784bacb50e71414c816d4babf1a6ea0ce675"
+      "sha256": "9bcd8ae8f3f92a9054271725d9c479ccc437c93548e0b8b7ffd4357a39cde4f7"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

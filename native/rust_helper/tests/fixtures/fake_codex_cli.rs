@@ -14,7 +14,7 @@ const TASK_PERMISSION_PROFILE: [&str; 5] = [
     "default_permissions=\"d4p-agent-task\"",
     "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
-    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=8}",
+    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.env.*\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=32}",
     "permissions.d4p-agent-task.network.enabled=false",
 ];
 

@@ -27,7 +27,7 @@ const TASK_PERMISSION_PROFILE_OVERRIDES: &[&str] = &[
     "windows.sandbox=\"mxc\"",
     "permissions.d4p-agent-task.extends=\":workspace\"",
     // root accessは閉じ、必要なruntime読取とWorkspace内deny globだけを明示する。
-    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=8}",
+    "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\"**/*.env\"=\"deny\",\"**/.env.*\"=\"deny\",\"**/.ssh/**\"=\"deny\",\"**/secrets/**\"=\"deny\"},\"glob_scan_max_depth\"=32}",
     "permissions.d4p-agent-task.network.enabled=false",
 ];
 
@@ -813,6 +813,8 @@ mod tests {
                     .find(|setting| setting.starts_with("permissions.d4p-agent-task.filesystem={"))
                     .expect("glob走査深度を含む固定filesystem設定");
                 assert!(filesystem_override.starts_with("permissions.d4p-agent-task.filesystem={"));
+                assert!(filesystem_override.contains("**/.env.*"));
+                assert!(filesystem_override.contains(r#""glob_scan_max_depth"=32"#));
                 assert_eq!(
                     TASK_PERMISSION_PROFILE_OVERRIDES
                         .iter()

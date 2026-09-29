@@ -6263,11 +6263,12 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         "d4p-agent-task",
         r'windows.sandbox=\"mxc\"',
         "**/*.env",
+        "**/.env.*",
         "**/.ssh/**",
         "**/secrets/**",
         r'\":minimal\"=\"read\"',
         r'\":root\"=\"deny\"',
-        r'\"glob_scan_max_depth\"=8',
+        r'\"glob_scan_max_depth\"=32',
         "network.enabled=false",
         "WorkspaceTaskScratch",
         "exec_interface_present",
@@ -6286,12 +6287,12 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     if (
         len(filesystem_overrides) != 1
         or r'\":minimal\"=\"read\"' not in filesystem_overrides[0]
-        or r'\"glob_scan_max_depth\"=8' not in filesystem_overrides[0]
+        or r'\"glob_scan_max_depth\"=32' not in filesystem_overrides[0]
     ):
-        errors.append("Codex Task permission profileはminimal読取と有界glob走査深度を同じfilesystem overrideへ固定しない")
+        errors.append("Codex Task permission profileはminimal読取と32段の有界glob走査を同じfilesystem overrideへ固定しない")
     if len(filesystem_overrides) == 1 and r'\":root\"=\"deny\"' not in filesystem_overrides[0]:
         errors.append("Codex Task profileがroot denyをfilesystem overrideへ固定しない")
-    if "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=8" in adapter:
+    if "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=" in adapter:
         errors.append("後続filesystem table overrideで走査深度を上書きするCodex設定を受理した")
     forbidden = [
         "--dangerously-bypass-approvals-and-sandbox",

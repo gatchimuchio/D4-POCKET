@@ -102,6 +102,31 @@ resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration
 - 修正後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済み10 development checksが全件合格。strict日本語監査は1111 repository files／findings 0、Schema 149／正常example 149／negative fixture 192、Conformance 225。manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions、既存C32開発監査も合格。`release_ready=false`とblockerは維持。
 - 修正後の`python -X utf8 tooling/manifest.py --check`: PASS。`git diff --check`もPASS。
 
-## 次工程
+## R2 Codexエージェント作業実行の本番経路 — Windows隔離規則の初回是正（2026-09-29）
 
-R2 Codex Agent Task Production Loopへ進む。R1で確立したtrack scopeとOwner境界を保ち、実Broker production pathを実装・検証する。
+### 再確認で観測した差
+
+- 実インストール済みCodex CLIは`codex-cli 0.158.0-alpha.2.1`。`codex exec --help`でJSONL、ephemeral、`--ignore-user-config`、`--cd`、`workspace-write`を含む現行interfaceを確認した。
+- Adapterの現行設定をCodex Windows restricted-token sandboxへ直接適用した合成marker試験では、Task時の`TEMP`／`TMP`をWorkspace scratchへ向けると`.env`、`.ssh`、`secrets/`およびWorkspace外markerを拒否した。ただし`.env.production`と深さ10の`.env`は許可された。TEMP／TMPをscratchへ向けない比較ではTEMP配下の外部markerも許可された。
+- Adapterの固定profileを更新し、Workspace root内`**/.env.*` denyと`glob_scan_max_depth=32`を追加した。同じ直接sandboxで`.env.production`、深さ10の`.env`、scratch外のmarkerは拒否された。一方、任意別名として用いた`config/credential-backup.txt`は許可された。
+- この再検査はCodex CLI Windows sandboxの`LIVE_RUNTIME`証拠に限る。`codex exec`実Task、Rust Broker、Owner Approval、Agentによる書込、Task lifecycleを通しておらず、能力宣言を`supported`へ変更していない。深さ32超と未列挙secret名も未保証。
+
+### 変更した実装境界
+
+- `CodexCliAdapter`のTask専用filesystem profileへ`.env.*` denyを追加し、glob走査上限を8から32へ変更。Network無効、`:root=deny`、`:minimal=read`、Workspace scratch固定は維持。
+- Rust unit testとConformanceでprofile内の追加pattern、走査上限、filesystem overrideの単一table条件を検査する。
+- `docs/specs/agent-runtime.md`の現行設定と直接sandboxで観測した範囲を更新。過去のR0／rev2検証履歴は変更していない。
+
+### この作業単位の検証結果
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: PASS。lib 345件、helper binary 10件、統合test 36件、合計391件成功。初回全体実行では旧profileを固定期待するFake CLI fixture 1件が失敗したためfixtureを現行契約へ更新し、該当test単独と全targetを再実行した。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs native/rust_helper/tests/fixtures/fake_codex_cli.rs`: 成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: PASS。日本語基底監査1111 files／findings 0、Schema 149／example 149／negative fixture 192、Conformance 225、登録済み10 development checks全件pass。`release_ready=false`およびWindows installed-path等の既存release blockerは維持。
+- 記録追記後にmanifestを再生成し、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`を再実行して登録済み10項目すべて成功。`python -X utf8 tooling/manifest.py --check`と`git diff --check`も成功。
+- 補助確認の`cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check`は、変更対象外の既存Rust file群に対するformat差分でFAIL。`--check`のためfile変更なし。変更した2 Rust fileの個別checkは上記の通りPASS。
+- 初回の厳格日本語監査はこの節の見出しに英語語順が残りFAILしたため、日本語見出しへ修正して再実行しPASS。FAIL履歴は隠さず記録した。
+
+### 次工程
+
+R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owner controlled Yes／No／stale／replay、実`codex exec`を通るBroker production path、取消／crash後回復、diff／test結果／Content Exposureの接続を検証する。これらのLIVE_RUNTIME証拠が成立するまで`task_execution=unsupported`と関連release blockerを維持する。
