@@ -80,11 +80,23 @@ _TASK_PROBE_COMMAND_TEMPLATE = (
     "registeredFileWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-write-target.txt')); "
     "registeredDirectoryWrite=(& $writeProbe (Join-Path $workspace 'private\\registered-directory\\write-probe.txt')); "
     "outsideWorkspaceWrite=(& $writeProbe (Join-Path $outsideRoot 'outside-write-marker.txt'))}; "
+    "$hardlinkAlias=Join-Path $workspace 'private\\registered-hardlink-alias.txt'; "
+    "$hardlinkCreateStatus='not_attempted'; "
+    "try {$null=New-Item -ItemType HardLink -Path $hardlinkAlias "
+    "-Target (Join-Path $workspace 'private\\registered-marker.txt') -ErrorAction Stop; "
+    "$hardlinkCreateStatus='created'} catch {$hardlinkError=$_.Exception; "
+    "$hardlinkHresult=[Convert]::ToString([BitConverter]::ToUInt32("
+    "[BitConverter]::GetBytes([int]$hardlinkError.HResult),0),16).PadLeft(8,'0').ToUpperInvariant(); "
+    "$hardlinkNativeCode=''; if ($hardlinkError -is [ComponentModel.Win32Exception]) "
+    "{$hardlinkNativeCode=':native:'+$hardlinkError.NativeErrorCode}; "
+    "$hardlinkCreateStatus='blocked:'+$hardlinkError.GetType().Name+':0x'+$hardlinkHresult+$hardlinkNativeCode}; "
+    "if ($hardlinkCreateStatus -eq 'created') {try {$null=[IO.File]::ReadAllText($hardlinkAlias); "
+    "$hardlinkCreateStatus='created:read_allowed'} catch {$hardlinkCreateStatus='created:read_blocked'}}; "
     "$markerPath=Join-Path $tempPath 'd4p-probe-__D4P_NONCE__.tmp'; "
     "$reportPath=Join-Path (Get-Location).Path 'probe-report.json'; "
     "$report=@{tempPath=$tempPath;tmpPath=$tmpPath;markerPath=$markerPath;"
     "tempMatchesScratch=$tempMatches;tmpMatchesScratch=$tmpMatches;"
-    "probeStatuses=$probeStatuses;"
+    "probeStatuses=$probeStatuses;hardlinkCreateStatus=$hardlinkCreateStatus;"
     "scratchMarkerExists=[IO.File]::Exists((Join-Path $scratch 'scratch-marker.txt'))}; "
     "[IO.File]::WriteAllText($reportPath,($report | ConvertTo-Json -Compress)); "
     "$markerWrite='failed'; try {[IO.File]::WriteAllText($markerPath,'codex-exec-temp-probe'); "
@@ -485,6 +497,9 @@ def _run_once(
             / "private"
             / "registered-directory"
             / "write-probe.txt",
+            "registered_hardlink_alias": workspace
+            / "private"
+            / "registered-hardlink-alias.txt",
             "outside_workspace": root / "outside-write-marker.txt",
         }
         if any(path.exists() for path in write_probe_paths.values()):
@@ -593,6 +608,12 @@ def _run_once(
             for key in expected_probe_keys
         ):
             raise RuntimeError("filesystem_boundary_probe_status_unclassified")
+        hardlink_create_status = report.get("hardlinkCreateStatus")
+        if not isinstance(hardlink_create_status, str) or not (
+            hardlink_create_status.startswith("blocked:")
+            or hardlink_create_status in ("created:read_allowed", "created:read_blocked")
+        ):
+            raise RuntimeError("hardlink_creation_probe_status_invalid")
         temp_path = Path(report["tempPath"])
         normalized_temp_path = str(report["tempPath"]).replace("/", "\\").casefold()
         scratch_marker = scratch / "scratch-marker.txt"
@@ -668,6 +689,16 @@ def _run_once(
                     "directory_child": probe_statuses["registeredDirectoryWrite"]
                     == "allowed",
                 },
+                "registered_secret_hardlink_creation_status": hardlink_create_status,
+                "registered_secret_hardlink_creation_denied": (
+                    hardlink_create_status.endswith(":0x80070005")
+                    or hardlink_create_status.endswith(":native:5")
+                ),
+                "registered_secret_hardlink_alias_read_allowed": hardlink_create_status
+                == "created:read_allowed",
+                "registered_secret_hardlink_alias_visible_to_host": write_probe_paths[
+                    "registered_hardlink_alias"
+                ].is_file(),
                 "outside_workspace_read_allowed": probe_statuses[
                     "outsideWorkspaceRead"
                 ]
@@ -706,13 +737,24 @@ def _run_once(
             failures.append("registered_secret_path_read_allowed")
         if any(filesystem_boundary["registered_secret_path_writes_allowed"].values()):
             failures.append("registered_secret_path_write_allowed")
+        if not filesystem_boundary["registered_secret_hardlink_creation_denied"]:
+            failures.append("registered_secret_hardlink_creation_not_access_denied")
+        if filesystem_boundary["registered_secret_hardlink_alias_read_allowed"]:
+            failures.append("registered_secret_hardlink_alias_read_allowed")
+        if filesystem_boundary["registered_secret_hardlink_alias_visible_to_host"]:
+            failures.append("registered_secret_hardlink_alias_visible_to_host")
         if filesystem_boundary["outside_workspace_read_allowed"]:
             failures.append("outside_workspace_read_allowed")
         if filesystem_boundary["outside_workspace_write_allowed"]:
             failures.append("outside_workspace_write_allowed")
         protected_write_markers = {
             name: filesystem_boundary["write_markers_visible_to_host"][name]
-            for name in ("registered_file", "registered_directory", "outside_workspace")
+            for name in (
+                "registered_file",
+                "registered_directory",
+                "registered_hardlink_alias",
+                "outside_workspace",
+            )
         }
         if any(protected_write_markers.values()):
             failures.append("protected_write_marker_visible")
@@ -748,7 +790,7 @@ def _version(executable: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="実Codex CLI/MxCのTask shell child temp挙動をローカル偽APIで観測する"
+        description="実Codex CLI/MxCのTask shell child一時領域・filesystem挙動をローカル偽APIで観測する"
     )
     parser.add_argument("--exe", required=True, type=Path, help="Ownerが指定する絶対codex.exe path")
     parser.add_argument("--runs", type=int, default=MAX_RUNS, help=f"連続実行数（1..{MAX_RUNS}、既定{MAX_RUNS}）")

@@ -503,3 +503,21 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - validator初回は記録文2件の日本語監査指摘と、新規fixtureの`std::fs::write`禁止patternで失敗した。文面を日本語基底へ直し、fixtureをFile作成と`write_all`へ変更後、厳格監査1113 files／0 findings、Conformance 225 checksを個別再実行して合格した。
 - 統合validatorは初回に記録文と診断表示文の日本語監査、および新規fixtureの禁止patternを検出した。修正後はManifestが古く停止したため再生成し、最終の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了コード0で合格した。これは開発検証であり、release blocker 5件と`release_ready=false`を変更しない。
 - Windows Actionsは未使用。現Windows hostでRust全targetと限定MxC実測を実行できたため、hosted補助検査は追加しなかった。
+
+## R2追補 実`codex exec` MxC childで登録secretのhardlink作成を検査（2026-09-30）
+
+### 観測
+
+- 既存のdevelopment-only loopback偽Responses API probeを拡張し、実Codex CLI `0.158.0-alpha.2.1`の`exec`が固定`exec_command`を実MxC shell childで実行する間に、合成Workspaceの登録secret fileから未登録aliasへの`New-Item -ItemType HardLink`を試みた。隔離`CODEX_HOME`、合成Workspace、資格情報なしで実行し、偽API以外への通信要求12件はloopback proxyが拒否した。Codex processは非管理者として動作した。
+- 3回の連続実行はすべて正常終端し、hardlink作成は3/3回 `Win32Exception`／HRESULT `0x80004005`／Win32 `NativeErrorCode 5`（アクセス拒否）で失敗した。alias経由readは作成失敗のため未実行で、alias fileは3/3回host側に存在しなかった。通常Workspace read／writeは許可された。hardlink作成中に合成secret本文を出力・保存していない。
+- 初回matcherはHRESULT `0x80070005`のみを認識し、MxCが返したHRESULT wrapper `0x80004005`とNativeErrorCode 5の組を誤って未分類として1回目をfailにした。例外のnative codeも限定記録するよう補正後、single run 1/1および連続run 3/3が同じアクセス拒否で成立した。この初回は観測欠落であって、alias作成成功を意味しない。
+- 既存probeのTEMP／TMPは引き続き互いには一致するがWorkspaceTaskScratchとは一致しない。child内TEMP markerは書け、CLI終了後hostから見えなかった。host非可視を物理削除保証へ昇格しない。
+- これは手動構成したRust相当permission profileを使う直接Codex CLI／MxC childの`LIVE_RUNTIME`証拠である。Rust Adapterの生成値、Broker、Owner Approval、production Agent Task、実Workspace登録、cancel／deadline／crash、Audit／Recovery、他CLI版と別alias形式は通していない。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- `python -X utf8 -c "from pathlib import Path; p=Path('tooling/codex_mxc_exec_temp_probe.py'); compile(p.read_text(encoding='utf-8'), str(p), 'exec')"`: 成功。
+- `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定codex.exe絶対path> --runs 1`: 初回は過度に狭いHRESULT matcherでexit 1。native error記録を加えた後は1/1成功、アクセス拒否・alias不在。
+- 同probe `--runs 3`: exit 0、3/3でCLI turn／固定command完了、hardlink createはnative error 5、aliasなし。非loopback要求12件拒否。
+- `git diff --check`: 成功。統合validator、manifest確認は変更完了前に実行する。
+- Windows Actionsは未使用。Rust sourceを変更せず、実CLI/MxC childのWindows局所probeを実行可能だったため hosted Rust検査の追加は不要。
