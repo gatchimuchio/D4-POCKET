@@ -325,7 +325,9 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 
 - focused試験 `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::AgentTask実行は有効OwnerApprovalを期限切れPermissionから分離して拒否する' -- --exact --nocapture`: 1 passed。
 - 初回`rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs`は新規assertionの折返し差だけを検出したため修正し、再実行は成功。`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功。
-- local全target testは前追補の通信系間欠失敗履歴を踏まえ、本追補commitを固定した手動Windows Actionsで実施する。hosted結果と統合validator結果は完了後に記録する。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。開発validator登録10項目、日本語厳格監査（1113 files／0 findings）、Schema（149／149／192 negative）、Conformance（225 checks）、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions（12／0）、C32開発監査が成功した。Windows installed evidence等のrelease blocker 5件と`release_ready=false`を保持した。
+- Owner許可に基づくWindows Actions [run #21](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36552280495)は、一時branch上の正確なcommit `dc2ec0960421442f34e3c229451b1f4a76c105f5`をWindows Server 2025 image `win25-vs2026/20260922.246.2`／Rust 1.95.0で検査した。checkout SHA照合、対象Rust fileのrustfmt、全target `cargo check`／`cargo test`（12 target、397 passed／0 failed／1 ignored）、試験後cleanが成功した。所要6分24秒、artifactなし。成功した同一SHAを`main`へfast-forwardしてpushし、remote HEAD一致後に一時branchをlocal／remote双方から削除した。
+- hosted Rust検査とfixture試験は、実Codex Agent Task、production Broker／IPC、Owner native UI、実Workspace隔離、installed product、release readinessを証明しない。
 
 ### 残存gate
 

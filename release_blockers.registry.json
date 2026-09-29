@@ -203,10 +203,10 @@
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36465355560",
-        "target_commit": "33787c35ea26bdbb2bae3ad0376bb5c8baa9792b",
-        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testを実行し、12 test target、390 passed、0 failed、0 ignored。checkout SHA照合、rustfmt、試験後cleanも成功。Agent Workspace binding／別fixture root試験を含む。",
-        "scope_limit": "hosted Rust検査のみ。Workspace binding／fixture root試験はFIXTUREであり、実Agent Task、production Broker、OS filesystem隔離、installed product、release readinessを証明しない。"
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36552280495",
+        "target_commit": "dc2ec0960421442f34e3c229451b1f4a76c105f5",
+        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testを実行し、12 test target、397 passed、0 failed、1 ignored。checkout SHA照合、対象Rust fileのrustfmt、試験後cleanも成功。所要6分24秒、artifactなし。",
+        "scope_limit": "hosted Rust検査のみ。この変更はBroker対話制御のFIXTURE否定試験であり、実Agent Task、production Broker／IPC、OS filesystem隔離、installed product、release readinessを証明しない。"
       },
       "status": "unresolved",
       "status_source": "manual",
