@@ -7,6 +7,18 @@
 2026-09-29に受領したrev3統合仕様・工程表を現行開発基準とする。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に追記する。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。
 
 rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。
+
+`release_blockers.registry.json`は互換性のため全体の`classification: release_blocker`と`blocks_release`を保持する。原因は`cause_category`、対象は`release_tracks`で別に示し、Windows技術完成への影響は`blocks_windows_technical_complete`で独立判定する。Mobile実機・配布blockerをWindows 1.0 gateへ混ぜず、global `release_ready=false`も維持する。
+
+~~~yaml
+- item: Windows production distribution identity
+  classification: release_blocker
+  registry_id: windows_distribution_identity
+  reason: 正式Publisher、Windows package／app identity、production code-signing identityはOwner決定を要する。これはR0–R14のTechnical Completeを止めず、正式配布を阻止する。
+  required_action: R0–R14のTechnical Complete後にOwnerが正式identityを確定する。それまではtest identityまたはunsigned artifactで技術検証する。
+  blocks_release: yes
+~~~
+
 プロジェクト: GUI Shell / Runtime Operation Shell / `LLM-readable application responsibility substrate`（LLM が読むアプリケーション責任基盤）
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。

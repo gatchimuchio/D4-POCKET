@@ -64,6 +64,44 @@
 
 resolved inactiveの`rev2_desktop_launch_regression`と`windows_rust_integration_test_execution_policy`は履歴として保持する。Windows ActionsによるRust test実行確認は、実Agent Task、production Broker経路、installed product、正式配布、release readinessを証明しない。
 
+## R1 正本・Blocker体系再編（2026-09-29）
+
+### registry契約
+
+- 既存互換の`classification: release_blocker`と`blocks_release: true`は全項目で保持し、release全体のgateを弱めていない。
+- rev3の`cause_category`を全17項目へ追加し、原因とrelease分類を別fieldにした。許可値は`technical_blocker`、`interoperability_evidence`、`platform_evidence`、`physical_device_evidence`、`distribution_identity`、`production_secret`、`owner_decision`。
+- `release_tracks`は`windows_v1`、`mobile`、`non_windows`を表す。`blocks_windows_technical_complete`はOwner最終化とWindows技術完成を分離する。
+- 現行値はactive unresolved 15件、resolved inactive 2件、全体`release_ready=false`。Windows release scopeは12件、Windows Technical Completeを阻む項目は9件、Mobile release scopeは6件。
+
+| 原因分類 | Active unresolved項目 |
+| --- | --- |
+| `technical_blocker` | `comprehensive_extension_rev1_completion`, `rev2_desktop_product_distribution`, `rev2_flutter_broker_channel_boundary`, `rev2_export_owner_ui_authority_path`, `rev2_module_pruning_binary_and_measurement`, `rev2_mobile_flutter_native_device_link_boundary` |
+| `platform_evidence` | Windows installed／first-run／Setup Doctor／Broker evidenceの4項目。解決済みのWindows起動回帰とRust test実行方針も同分類で履歴保持。 |
+| `physical_device_evidence` | `rev2_mobile_device_evidence` |
+| `distribution_identity` | `rev2_mobile_distribution`, `windows_distribution_identity` |
+| `production_secret` | `audit_anchor_external_tamper_evidence_proof` |
+| `owner_decision` | `owner_go` |
+| `interoperability_evidence` | 単独原因として分類すべきactive項目は現registryにはない。未検証の相互運用を合格扱いした意味ではない。 |
+
+### Track境界・Owner待ち再監査
+
+- Windows専用ではないMobile実機・配布・native Device Linkの3 blockerは`mobile`だけに割当て、Windows 1.0 strict releaseとTechnical Completeから除外した。Android実機凍結指示は変更していない。
+- Windows正式配布identityは技術的Installer／Update作業から`windows_distribution_identity`へ分離した。test identity／unsigned artifactでR0–R14を進め、正式identityはTechnical Complete後のR16 Owner Finalizationまで要求しない。
+- ExportのOwner No／Yes経路は隔離test identityで検証可能とし、Final GOをroutine試験条件から外した。
+- Agent Task／Compare／Handoffの制御試験は非課金identity・multi-instance Codex・決定論的fixtureで進める。実Agent／provider相互運用の証拠をfixtureへ昇格させない。有料資格を使う試験をR0–R14のOwner待ち条件にしない。
+- Offline Audit production keyと署名は真の`production_secret`、Final GOは真の`owner_decision`としてrelease gateに保持する。いずれもWindows Technical Completeを阻止しない。
+- Windows Rust test方針のresolved項目は、古いrun #17を過去記録に残し、`current_validation`をR0のWindows Actions #19／commit `ec9b11a1330c3626fe7e7c25ef5c4068241b1d28`へ更新した。
+
+### R1検証
+
+- Registry構文・全項目cause／track scope検査: PASS。未知cause、未知track、非boolean Technical Complete flagはnegative testで拒否する。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 149件、正常example 149件、negative fixture 192件でPASS。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksでPASS。Windows／Mobile trackの分離、Owner-only blockerのTechnical Complete除外、strict Windows releaseのtrack選択を検査する。
+- `python -X utf8 tooling/release_gate_check.py`: PASS。strict Windows releaseは未解決Windows blockerのため失敗し、Mobile専用項目を列挙しない。Windows Technical Complete gateは9件が未解決で、Owner-onlyとMobile項目を列挙しない。
+- 先行した統合validatorはstrict日本語監査が新しい例外診断文1件を検出してexit 1。診断文を日本語化し、失敗を隠さず修正履歴として保持した。
+- 修正後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済み10 development checksが全件合格。strict日本語監査は1111 repository files／findings 0、Schema 149／正常example 149／negative fixture 192、Conformance 225。manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions、既存C32開発監査も合格。`release_ready=false`とblockerは維持。
+- 修正後の`python -X utf8 tooling/manifest.py --check`: PASS。`git diff --check`もPASS。
+
 ## 次工程
 
-R1では全blockerへrev3原因分類を加え、Owner待ちと記述された項目を一件ずつ再審査する。Codexが実施できるroutine検証・技術作業はOwner専任扱いにしない。既存release gate互換fieldと既存履歴は維持する。
+R2 Codex Agent Task Production Loopへ進む。R1で確立したtrack scopeとOwner境界を保ち、実Broker production pathを実装・検証する。

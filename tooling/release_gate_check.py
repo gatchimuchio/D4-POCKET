@@ -13,6 +13,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 RELEASE_BLOCKERS_REGISTRY = ROOT / "release_blockers.registry.json"
 WINDOWS_EVIDENCE_STATUS_SOURCE = "windows_release_evidence"
+BLOCKER_CAUSE_CATEGORIES = frozenset(
+    {
+        "technical_blocker",
+        "interoperability_evidence",
+        "platform_evidence",
+        "physical_device_evidence",
+        "distribution_identity",
+        "production_secret",
+        "owner_decision",
+    }
+)
+RELEASE_TRACKS = frozenset({"windows_v1", "mobile", "non_windows"})
 
 SCAN_FILES = [
     "README.md",
@@ -155,6 +167,29 @@ def manifest_check_errors() -> list[str]:
     return [f"manifest checkが失敗: {line}" for line in output.splitlines()]
 
 
+def blocker_cause_category_errors(blocker: dict) -> list[str]:
+    name = blocker.get("name", "unknown")
+    category = blocker.get("cause_category")
+    if not isinstance(category, str) or category not in BLOCKER_CAUSE_CATEGORIES:
+        return [f"release blocker {name}のcause_categoryが不明または無効"]
+    return []
+
+
+def blocker_scope_errors(blocker: dict) -> list[str]:
+    name = blocker.get("name", "unknown")
+    tracks = blocker.get("release_tracks")
+    errors: list[str] = []
+    if not isinstance(tracks, list) or not tracks:
+        errors.append(f"release blocker {name}のrelease_tracksが空または無効")
+    elif any(not isinstance(track, str) or track not in RELEASE_TRACKS for track in tracks):
+        errors.append(f"release blocker {name}のrelease_tracksに未知または無効なtrackがある")
+    elif len(set(tracks)) != len(tracks):
+        errors.append(f"release blocker {name}のrelease_tracksが重複")
+    if not isinstance(blocker.get("blocks_windows_technical_complete"), bool):
+        errors.append(f"release blocker {name}のblocks_windows_technical_completeがbooleanではない")
+    return errors
+
+
 def registry_errors() -> list[str]:
     try:
         registry = json.loads(RELEASE_BLOCKERS_REGISTRY.read_text(encoding="utf-8"))
@@ -174,7 +209,10 @@ def registry_errors() -> list[str]:
         "status_source",
         "active",
         "classification",
+        "cause_category",
+        "release_tracks",
         "blocks_release",
+        "blocks_windows_technical_complete",
         "reason",
         "required_action",
     }
@@ -186,6 +224,8 @@ def registry_errors() -> list[str]:
         missing = sorted(required_fields - set(blocker))
         if missing:
                 errors.append(f"リリース阻止事項の登録項目 {index} にfieldがない: {', '.join(missing)}")
+        errors.extend(blocker_cause_category_errors(blocker))
+        errors.extend(blocker_scope_errors(blocker))
         name = blocker.get("name")
         if not isinstance(name, str) or not name:
             errors.append(f"リリース阻止事項の登録項目 {index} のnameが無効")
@@ -229,12 +269,22 @@ def registry_blocker_names() -> set[str]:
     }
 
 
-def unresolved_active_blockers() -> list[dict]:
+def unresolved_active_blockers(release_track: str | None = None) -> list[dict]:
+    if release_track is not None and release_track not in RELEASE_TRACKS:
+        raise ValueError(f"未登録のrelease track: {release_track}")
     registry = load_release_blocker_registry()
     blockers = registry.get("blockers", [])
-    windows_results = _windows_evidence_results_by_name(blockers)
-    unresolved: list[dict] = []
+    selected = []
     for blocker in blockers:
+        if not isinstance(blocker, dict):
+            continue
+        tracks = blocker.get("release_tracks")
+        if release_track is not None and (not isinstance(tracks, list) or release_track not in tracks):
+            continue
+        selected.append(blocker)
+    windows_results = _windows_evidence_results_by_name(selected)
+    unresolved: list[dict] = []
+    for blocker in selected:
         if not isinstance(blocker, dict):
             continue
         effective = effective_release_blocker(blocker, windows_results)
@@ -246,6 +296,14 @@ def unresolved_active_blockers() -> list[dict]:
         ):
             unresolved.append(effective)
     return unresolved
+
+
+def unresolved_windows_technical_complete_blockers() -> list[dict]:
+    return [
+        blocker
+        for blocker in unresolved_active_blockers("windows_v1")
+        if blocker.get("blocks_windows_technical_complete") is True
+    ]
 
 
 def _windows_evidence_results_by_name(blockers: list) -> dict[str, object]:
@@ -384,8 +442,13 @@ def release_blocker_doc_sync_errors() -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--strict-release", action="store_true")
+    gate_mode = parser.add_mutually_exclusive_group()
+    gate_mode.add_argument("--strict-release", action="store_true")
+    parser.add_argument("--release-track", choices=sorted(RELEASE_TRACKS | {"all"}), default="all")
+    gate_mode.add_argument("--technical-complete", action="store_true")
     args = parser.parse_args()
+    if args.technical_complete and args.release_track != "windows_v1":
+        parser.error("--technical-completeには--release-track windows_v1が必要")
 
     errors: list[str] = []
     combined = ""
@@ -398,10 +461,17 @@ def main() -> int:
     errors.extend(registry_errors())
     if not errors:
         errors.extend(release_blocker_doc_sync_errors())
-    if args.strict_release and not errors:
-        for blocker in unresolved_active_blockers():
+    if args.technical_complete and not errors:
+        for blocker in unresolved_windows_technical_complete_blockers():
             errors.append(
-            "strict releaseのactive blockerが未解決: "
+                "Windows Technical Completeのblockerが未解決: "
+                f"{blocker['name']} - {blocker['reason']}"
+            )
+    elif args.strict_release and not errors:
+        track = None if args.release_track == "all" else args.release_track
+        for blocker in unresolved_active_blockers(track):
+            errors.append(
+                "strict releaseのactive blockerが未解決: "
                 f"{blocker['name']} - {blocker['reason']}"
             )
     if release_claim_exists_without_classification(combined):
@@ -415,7 +485,10 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    print("release gate checkが合格")
+    if args.technical_complete:
+        print("Windows Technical Complete gateが合格")
+    else:
+        print("release gate checkが合格")
     return 0
 
 

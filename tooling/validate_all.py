@@ -354,6 +354,10 @@ def run_step(step: ValidationStep, strict_release: bool, desktop_platform: str) 
     step_command = resolve_step_command(step.command)
     if strict_release and step.name == "release_gate_check":
         step_command.append("--strict-release")
+        if desktop_platform == "windows" or (
+            desktop_platform == "current" and current_desktop_platform() == "windows"
+        ):
+            step_command.extend(["--release-track", "windows_v1"])
     command = " ".join(step_command)
     if step.required_tool and find_tool(step.required_tool) is None:
         classification, blocks_release, reason, required_action = classify_not_run(step, strict_release)

@@ -51,9 +51,15 @@ from tooling.evidence_bundle import build_evidence_bundle, validate_evidence_bun
 from tooling.manifest import build_manifest, matches_forbidden, working_tree_eol_errors
 from tooling.packaging_portability_check import portable_path_errors, run_check
 from tooling.release_gate_check import (
+    BLOCKER_CAUSE_CATEGORIES,
     CURRENT_FACING_RELEASE_DOCS,
+    RELEASE_TRACKS,
+    blocker_cause_category_errors,
+    blocker_scope_errors,
     release_blocker_doc_sync_errors,
     registry_blocker_names,
+    unresolved_active_blockers,
+    unresolved_windows_technical_complete_blockers,
 )
 from tooling.shell_snapshot import build_shell_snapshot
 from tooling.validate_all import (
@@ -3013,6 +3019,8 @@ def test_validate_all_strict_release_runs_release_gate_strict_scan() -> list[str
     errors = []
     if "--strict-release" not in result.get("command", ""):
         errors.append("validate_allのstrict Windows releaseが--strict-releaseをrelease_gate_checkへ渡さなかった")
+    if "--release-track windows_v1" not in result.get("command", ""):
+        errors.append("validate_allのstrict Windows releaseがWindows 1.0 trackを指定しなかった")
     if result.get("status") != "failed":
         errors.append("activeなrelease blockerが残る間、validate_allのstrict release gate scanは失敗しなければならない")
     if result.get("classification") != "release_blocker":
@@ -3040,13 +3048,93 @@ def test_release_blocker_registry_controls_strict_release() -> list[str]:
     ]
     if not active:
         errors.append("release blocker registryにactiveかunresolvedのblockerがない")
+    for index, blocker in enumerate(blockers):
+        if not isinstance(blocker, dict):
+            continue
+        errors.extend(blocker_cause_category_errors(blocker))
+        category = blocker.get("cause_category")
+        if not isinstance(category, str) or category not in BLOCKER_CAUSE_CATEGORIES:
+            errors.append(f"blocker {blocker.get('name', index)}にrev3原因分類がない")
+    if not blocker_cause_category_errors({"name": "missing-cause-category"}):
+        errors.append("原因分類のないblockerをvalidatorが受理する")
+    if not blocker_cause_category_errors(
+        {"name": "unknown-cause-category", "cause_category": "owner_wait"}
+    ):
+        errors.append("未知の原因分類をvalidatorが受理する")
+    if blocker_cause_category_errors(
+        {"name": "valid-cause-category", "cause_category": "technical_blocker"}
+    ):
+        errors.append("有効なrev3原因分類をvalidatorが拒否する")
+    for index, blocker in enumerate(blockers):
+        if isinstance(blocker, dict):
+            errors.extend(blocker_scope_errors(blocker))
+            if not isinstance(blocker.get("blocks_windows_technical_complete"), bool):
+                errors.append(f"blocker {blocker.get('name', index)}のTechnical Complete scopeがbooleanでない")
+    if blocker_scope_errors(
+        {
+            "name": "valid-scope",
+            "release_tracks": ["windows_v1"],
+            "blocks_windows_technical_complete": True,
+        }
+    ):
+        errors.append("有効なrelease track scopeをvalidatorが拒否する")
+    if not blocker_scope_errors(
+        {
+            "name": "unknown-scope",
+            "release_tracks": ["windows_mobile"],
+            "blocks_windows_technical_complete": False,
+        }
+    ):
+        errors.append("未知のrelease trackをvalidatorが受理する")
+    if not blocker_scope_errors(
+        {
+            "name": "invalid-technical-complete-flag",
+            "release_tracks": ["windows_v1"],
+            "blocks_windows_technical_complete": "false",
+        }
+    ):
+        errors.append("booleanでないTechnical Complete scopeをvalidatorが受理する")
+    windows_release_names = {item["name"] for item in unresolved_active_blockers("windows_v1")}
+    mobile_release_names = {item["name"] for item in unresolved_active_blockers("mobile")}
+    windows_technical_names = {
+        item["name"] for item in unresolved_windows_technical_complete_blockers()
+    }
+    mobile_only = {
+        "rev2_mobile_device_evidence",
+        "rev2_mobile_distribution",
+        "rev2_mobile_flutter_native_device_link_boundary",
+    }
+    if windows_release_names & mobile_only:
+        errors.append("Mobile専用blockerがWindows 1.0 release判定へ混入する")
+    if not mobile_only.issubset(mobile_release_names):
+        errors.append("Mobile専用blockerがMobile release scopeから欠落している")
+    if not {
+        "comprehensive_extension_rev1_completion",
+        "windows_installer_first_run_smoke",
+    }.issubset(windows_technical_names):
+        errors.append("Windows Technical Complete gateから技術／Windows証拠blockerが欠落している")
+    if windows_technical_names & {
+        "owner_go",
+        "audit_anchor_external_tamper_evidence_proof",
+        "windows_distribution_identity",
+        *mobile_only,
+    }:
+        errors.append("Owner／production identity／Mobile blockerがWindows Technical Complete gateへ混入する")
+    if RELEASE_TRACKS != {"windows_v1", "mobile", "non_windows"}:
+        errors.append("release gateのrev3 platform track定義が想定と異なる")
     for blocker in active:
         if blocker.get("classification") != "release_blocker":
             errors.append(f"active blocker {blocker.get('name')} がrelease_blockerに分類されていない")
         if blocker.get("blocks_release") is not True:
             errors.append(f"active blocker {blocker.get('name')} がreleaseを阻止していない")
     release_gate = (ROOT / "tooling" / "release_gate_check.py").read_text(encoding="utf-8")
-    for token in ["RELEASE_BLOCKERS_REGISTRY", "unresolved_active_blockers", "strict releaseのactive blockerが未解決"]:
+    for token in [
+        "RELEASE_BLOCKERS_REGISTRY",
+        "unresolved_active_blockers",
+        "strict releaseのactive blockerが未解決",
+        "--release-track",
+        "blocks_windows_technical_complete",
+    ]:
         if token not in release_gate:
             errors.append(f"release_gate_check.pyに構造化registry tokenがない: {token}")
     if '"release_blocker" in combined' in release_gate:
@@ -3064,6 +3152,7 @@ def test_release_facing_docs_sync_release_blockers_to_registry() -> list[str]:
         "windows_broker_installed_smoke",
         "audit_anchor_external_tamper_evidence_proof",
         "owner_go",
+        "windows_distribution_identity",
     ]:
         if expected not in registry_names:
             errors.append(f"release blocker registryにcanonical blockerがない: {expected}")

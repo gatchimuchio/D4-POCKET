@@ -10,7 +10,10 @@
       "evidence_result": "windows_evidence_provenance_isolation",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "分離したWindowsソース・成果物・証拠の由来が、リリース前に機械検証へ合格する必要があります。",
       "required_action": "正確なソースcommitと成果物ハッシュに結び付く分離済みネイティブWindows実行からrelease_evidence/windows_installed_smoke.jsonを作成し、tooling/windows_release_evidence.pyへ合格させてください。"
     },
@@ -21,7 +24,10 @@
       "evidence_result": "windows_installer_first_run_smoke",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "現行sourceのDiagnosticOnly installed runでは、起動器経由起動・初回設定生成・read-only取得accepted Auditと設定hash一致を観測したが、stage時と異なるWindows user profileによるformal証拠はなく、strict release evidenceにも未収録です。",
       "required_action": "stage時と異なるSIDのWindows user profileからcollect_installed_smoke.ps1を実行し、Rust Desktop起動器の直接child、run固有LOCALAPPDATA内の実Broker runtime、endpoint cleanup、起動・終了AuditEvent、通常資格で受理されたhealth要求AuditEvent、可視画面をclean-source証拠として収集してください。health要求AuditはBrokerによる認証済み要求の受理・記録を示しますが、client応答受信や呼出し元PIDを証明しません。初回設定について起動前不存在、固定既定値、初回設定取得accepted AuditEventのpayload hashと実config byte hash一致も収集し、別profileのclean-source evidenceをtooling/windows_release_evidence.pyへ通してください。Flutter exe直接起動、stage manifestのcollector scratch path、独立Broker smoke、endpoint role metadataだけで代替しないでください。"
     },
@@ -32,7 +38,10 @@
       "evidence_result": "windows_setup_doctor_smoke",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "Flutter 3.44.0のRelease診断では明示的IAccessibleEx選択後にWindows UIAutomation tree 121 node、必須4 surface、通常tray終了を観測した。ただしDiagnosticOnlyの同一SID実行であり、Setup Doctor画面そのもののoperator readability、別profileのformal evidence、strict validator合格は未成立です。",
       "required_action": "IAccessibleExを使うWindows Releaseをstage時と異なるuser profileからformal collectorへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集してtooling/windows_release_evidence.pyへ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。"
     },
@@ -43,7 +52,10 @@
       "evidence_result": "windows_broker_installed_smoke",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "インストール済みRustブローカーの起動・接続・再起動・異常終了証拠が、リリース前に機械検証へ合格する必要があります。",
       "required_action": "installer/windows/collect_broker_smoke.ps1を実行し、IPC／再起動／異常終了と一時session資格fileの削除を実測したブローカー証拠をrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyへ合格させてください。"
     },
@@ -54,7 +66,10 @@
       "evidence_result": "audit_anchor_external_tamper_evidence_proof",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "production_secret",
+      "release_tracks": ["windows_v1", "mobile"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "オフラインEd25519署名checkpointの実検証経路は実装したが、owner公開鍵固定・実署名・独立した最新継続性記録は未取得。",
       "required_action": "ownerが外部媒体上で鍵生成・署名し、公開鍵fingerprintをRepositoryへ固定する。実installed状態と署名checkpointをCollectorおよびrelease検証器で再検証する。"
     },
@@ -64,7 +79,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "owner_decision",
+      "release_tracks": ["windows_v1", "mobile"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "所有者の明示GOが記録されていません。",
       "required_action": "インストール先のリリース実測証拠と厳格検証が合格した後に限り、所有者の明示GOを記録してください。"
     },
@@ -74,7 +92,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "physical_device_evidence",
+      "release_tracks": ["mobile"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "Android実機検証は2026-09-11のowner指示で凍結中。iOSを含む実機のinstall・起動・結合・対話・安全保管・lifecycleの実測は未取得。",
       "required_action": "Androidはownerの再開指示後に実機検証を行う。凍結を合格とせず、iOSを含む未検証の実機証拠を取得する。"
     },
@@ -84,7 +105,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "distribution_identity",
+      "release_tracks": ["mobile"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "Mobileの正式配布識別子・署名・配布経路が未確定。",
       "required_action": "owner指定の正式識別子と署名で配布経路を検証する。"
     },
@@ -94,7 +118,10 @@
       "status_source": "manual",
       "active": false,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "2026-09-11にWindows開発appの13画面表示、実MINIDORA二系統の承認待ち・応答・個別中止・新規session・片側失敗の隔離を実測した。Linux起動証拠と合わせた開発回帰の範囲。詳細はdocs/REV2_PROGRESS.md。",
       "required_action": "この開発回帰項目の追加作業はない。Windows installed-path、実機、正式配布の独立したrelease blockerは保持する。"
     },
@@ -130,9 +157,12 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["windows_v1", "mobile", "non_windows"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、`--ignore-user-config`後もTaskだけに固定する`windows.sandbox`のmxc overrideと`:root=deny`、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、別OS process強制終了後のBroker library回復fixture 1件、`cargo check --all-targets`、前回実行した`cargo test --all-targets -- --test-threads=1`では366件が成功した。先行したローカル再実行はlib 321件ほか計355件が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、全体成功ではない。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持する。先行したローカルsource/build gateでは`cargo check --all-targets`が成功した一方、ローカル全target testはOS error 4551で起動できなかった。2026-09-28の手動Windows Actions [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)はcommit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`を検査し、2026-09-29の現行mainに対する[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)もWindows Server 2025／Rust 1.95.0で全target check／testに成功した（12 target、389 passed／0 failed／0 ignored、rustfmtと試験後cleanも成功）。これらのActions証拠はRust検査範囲に限られ、ローカルApplication Control、installed productのLIVE_RUNTIME、release readinessを証明しない。先行run #9のcompile失敗はtest-onlyの`expect_err`が`Secret: Debug`を要求した問題で、秘密値型へDebugを追加せず修正した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構で失敗し、profileを安全境界として扱わない。2026-09-29の現行mxc直接CLI probeではOneDrive .env ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込を拒否し、Workspace通常file／Task scratch相当の読書込を許可した一方、:minimal=readの範囲としてC:/Windows/win.iniは読めた。同じsource commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)はWindows Server 2025／Rust 1.95.0でcheckout SHA照合、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認に成功した。このhosted証拠はRust test／buildに限る。直接CLIのLIVE_RUNTIME証拠は合成path probeに限り、codex exec、Rust Broker、Owner Approval、実Agent Taskを通していない。別process強制終了試験はRust test harness内のBroker libraryと永続storeを使う`FIXTURE`であり、production `broker-server`／IPCや電源断後cleanupの`LIVE_RUNTIME`証拠ではない。windows.sandbox overrideは方式選択を固定するだけで、実Codex Task、秘密file拒否、外部path拒否を証明しない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・製品経路のcrash recovery・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
-      "required_action": "mxc設定による直接Codex CLI smokeは合成pathの局所証拠に限る。Adapter capabilityはunsupportedのまま維持し、Rust Brokerから実際にcodex execを起動するWindows LIVE_RUNTIME経路で、Owner Task approvalとWorkspace registration、実Rust生成WorkspaceTaskScratch、mxc backend利用可否と:minimal例外、OneDrive Cloud Files／通常NTFS双方の.env等secret読取拒否、任意Workspace外pathの読書込拒否、許可Workspace書込、深度超過・別名secret、失敗・取消・期限時のprocess群停止、通常終了／crash後scratch cleanup、Audit／Recoveryを検証する。これらがBroker経路で全て成立するまでtask_executionをsupportedへ変更しない。有料Codex資格を使う実Agent試験は独立条件としてOwner GO後に行う。"
+      "required_action": "mxc設定による直接Codex CLI smokeは合成pathの局所証拠に限る。Adapter capabilityはunsupportedのまま維持し、Rust Brokerから実際にcodex execを起動するWindows LIVE_RUNTIME経路で、Owner Task approvalとWorkspace registration、実Rust生成WorkspaceTaskScratch、mxc backend利用可否と:minimal例外、OneDrive Cloud Files／通常NTFS双方の.env等secret読取拒否、任意Workspace外pathの読書込拒否、許可Workspace書込、深度超過・別名secret、失敗・取消・期限時のprocess群停止、通常終了／crash後scratch cleanup、Audit／Recoveryを検証する。これらがBroker経路で全て成立するまでtask_executionをsupportedへ変更しない。有料Codex資格やOwner GOを通常の開発検証に要求しない。Agent Task／Compare／Handoffの制御・隔離・失敗系は非課金test identity、multi-instance Codexまたは決定論的fixtureで実装・検証する。これで実Agentのprovider／vendor相互運用を証明したとは扱わない。"
     },
     {
       "name": "rev2_desktop_product_distribution",
@@ -140,9 +170,25 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
-      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器とBroker lifecycleまでであり、正式Installer／Uninstaller、Download→Install→Launch、Signed Update、Rollback、正式package identity／signing identityは未成立。",
-      "required_action": "Ownerがformal app identity・Publisher・signing条件を指定した後、Installer、Uninstaller、download／install／launch、署名済みupdate、rollback、失敗復旧を各Contract・negative test・分離Windows実測へ接続し、Owner GO前のrelease gateを維持する。"
+      "blocks_windows_technical_complete": true,
+      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器とBroker lifecycleまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、失敗復旧の技術経路は未成立。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "Owner待ちにせず、test identityによるInstaller／Uninstaller、download／install／launch、署名検証、update／rollback、失敗復旧を各Contract・negative test・隔離Windows実測へ接続する。production identityはTechnical Complete後の別blockerで扱う。"
+    },
+    {
+      "name": "windows_distribution_identity",
+      "status": "unresolved",
+      "status_source": "manual",
+      "active": true,
+      "classification": "release_blocker",
+      "cause_category": "distribution_identity",
+      "release_tracks": ["windows_v1"],
+      "blocks_release": true,
+      "blocks_windows_technical_complete": false,
+      "reason": "正式Publisher、Windows package／app identity、production code-signing identityはOwnerの確定が必要な配布条件であり、現時点では未固定。これはR0–R14のTechnical Completeを止める条件ではない。",
+      "required_action": "R0–R14のTechnical Complete後に限り、Ownerが正式Publisher／package identity／production signing identityを確定する。それまではtest identityまたはunsigned artifactで技術検証し、production signingを行わない。"
     },
     {
       "name": "rev2_flutter_broker_channel_boundary",
@@ -150,7 +196,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "Flutter BrokerClientのendpoint file・session secret・TCP SocketはRust起動器owned PID-bound named-pipe relayへ移譲され、component試験に加えてdirty worktreeの分離scratch起動でhealth往復とLIVE_RUNTIME永続Auditを確認した。Flutter child環境は起動器で消去し、OS実行allowlistとpipe接続先札だけを渡す境界をRust子process試験とConformanceで検査する。ShellCoreClient.local()のsnapshot file/environment読込、内部Semantics registry出力、およびSetup DoctorのFlutter直接file export/config/audit probeは撤去した。初回設定の固定store create-only生成・read-only IPC取得もBrokerへ接続されRust library testに含む。一方、clean committed productのformal smoke、全negative/failure経路、正常終了、変更後sourceのfirst-run／Setup Doctor product evidenceは未成立。",
       "required_action": "clean commitから分離配置したWindows productをformal collectorで起動し、health/AuditとOwner-only/authority/credential/session拒否、別process・別起動pipe、malformed/oversize/stale/replay、Broker停止・pipe障害no-fallback、正常終了を証拠bundleへ結合する。初回設定の固定store生成・read-only IPC取得contractとSetup Doctor product evidenceのWindows実行をnegative test・LIVE_RUNTIME証拠で確認する。"
     },
@@ -160,9 +209,12 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "Rust起動器の製品別runtime rootとBrokerのcreate-only Manifest／Receipt／Audit結合は実装済み。Schema検査済みReceipt／ManifestからApp／Audit store IDをcompile-timeへ渡すWindows開発build toolも追加した。2026-09-27、OneDrive外の短いprocess-scoped TEMP／TMPからclean pushed commitを再構築し、PubとFlutter Windows Releaseは成功したが、Cargoのio-lifetimes／proc-macro2 build scriptがWindows Application ControlのOS error 4551で拒否されbundle未生成。path長対策後もhost execution policyが阻害要因であり、policy変更・拒否file移動による回避は行わない。toolはReceiptの出所・Owner操作を認証せず、build evidenceはINTERNAL_STATEでCredential artifact scan未実施、runtime Manifest未消費、未署名、未起動を固定する。実際のclean pushed source bundle buildと、clean source由来installed productでOwner No／Audit、Owner Yes／Manifest file／完了Audit、全package hash、分離Runtime／Audit storeを外部収集するformal LIVE_RUNTIME証拠は未成立。",
-      "required_action": "Windows Application Controlを弱めずにCargo build scriptを実行できる承認済みWindows環境で、clean pushed sourceから実際のBroker生成Receipt／Manifestによるunsigned portable bundleを構成し、正確なpackage hashを記録する。別Windows user profileのformal installed-path evidenceで製品間runtime／Audit store分離、Owner No拒否と永続Auditを確認する。Ownerの明示GOが得られた場合だけnative Yes操作を行い、Manifest fileのpath／hash、完了Audit、継承禁止Receiptを検証し、FlutterへOwner資格・privileged IPCがなく、Credential scanの範囲が明示されていることを確認する。"
+      "required_action": "Windows Application Controlを弱めずにCargo build scriptを実行できる検証環境で、clean pushed sourceからBroker生成Receipt／Manifestによるunsigned test bundleを構成し、package hashを記録する。隔離test identityでOwner No／Yes双方を実行し、別Windows profileのinstalled-path testで製品間runtime／Audit store分離、Manifest file／完了Audit／継承禁止Receiptを確認する。production signing identityとFinal GOは要求せず、Technical Complete後のOwner Finalizationへ分離する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
@@ -170,7 +222,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": true,
       "reason": "同一source commit・Flutter toolchain・Windows Release条件のall-enabled baseline／選択UI比較では、6つの選択外Dart surface library nodeがFlutter AOT report上で不在、選択した2 nodeは存在し、artifact差は224 KiBである。新しい開発Export toolは選択Module defineをFlutter／Rust portable bundleへ接続しartifact hashを記録するが、Manifestの選択記録やUI AOT node差、bundle生成はbinary pruningの証拠ではない。最終製品の意味上の除去、安全Core保持、Rust／third-party除去、別Runtime／物理Audit store、cold startupと実行時resourceは未検証。",
       "required_action": "clean sourceから同一Windows／toolchain条件でall-enabled baselineと選択Exportを生成し、hash固定した最終製品artifact上で必須安全Coreの保持と除外対象のpositive／negative／回帰実挙動を検証する。さらに製品cold startupとbounded resourceを測定する。Manifest file、Flutter UI比較、AOT report node差、artifact size差だけではrelease gateを閉じない。"
     },
@@ -180,13 +235,16 @@
       "status_source": "manual",
       "active": false,
       "classification": "release_blocker",
+      "cause_category": "platform_evidence",
+      "release_tracks": ["windows_v1"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538",
-        "target_commit": "6441ae8b2827d2afa01f9963ff2472fd2b889ce2",
-        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testに成功し、12 test target、391 passed、0 failed、0 ignored。rustfmtと試験後cleanも成功。",
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36512064184",
+        "target_commit": "ec9b11a1330c3626fe7e7c25ef5c4068241b1d28",
+        "result": "2026-09-29のWindows Server 2025／Rust 1.95.0で全target cargo check／testに成功し、12 test target、391 passed、0 failed、0 ignored。checkout SHA、rustfmt、試験後cleanも成功。Actions artifactなし。",
         "scope_limit": "hosted Rust検査のみ。実Agent Task、production runtime、installed product、release readinessを証明しない。"
       },
       "reason": "Rust source commit `6441ae8b2827d2afa01f9963ff2472fd2b889ce2`に対する手動Windows Actions [run #17](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36475650538)は、Windows Server 2025／Rust 1.95.0でcargo check／test全targetに成功し、12 test target／391件が通過した。変更Rust fileのrustfmtと試験後cleanも成功した。過去のrun #3、#10、#12およびローカルOS error 4551は履歴として保持する。証拠はhosted WindowsのRust検査に限り、実Agent Task、installed product、production runtime、release readinessを証明しない。先行run #9のtest compile failureと修正はdocs/REV2_PROGRESS.mdに履歴として保持する。",
@@ -198,7 +256,10 @@
       "status_source": "manual",
       "active": true,
       "classification": "release_blocker",
+      "cause_category": "technical_blocker",
+      "release_tracks": ["mobile"],
       "blocks_release": true,
+      "blocks_windows_technical_complete": false,
       "reason": "旧Dart経路は廃止済み。Android Kotlin／iOS SwiftのOS側処理と端末内local_recovery_audit契約・読取画面を追加した。Flutterの16試験と解析は成功。現行Android／共有UI source 117 fileを照合したfresh Temp copyでcleanup除外なしのclean・unit test・APK buildが成功し、JUnit 8件が通過した。元OneDrive workspaceのignored build outputには削除deny ACLが継承されるhost-local limitationが残り、ACLは変更していない。iOSはApple環境で未検証。Rust Brokerとの実接続試験と実機証拠もない。端末内記録の証拠種別はINTERNAL_STATEであり、Desktop Brokerの監査記録・失効・本人性を証明しない。旧Dart経路や前回版Androidの成功は今回の境界証拠ではない。2026-09-27、登録Workspace選択をnative Device Linkの空payload要求・ID／Runtime ID限定応答としてRust／Flutter／Android native testへ追加し、ASCII検証copyでAndroid unit testと3面のFlutter analyzeを確認した。実端末TLSとiOS XCTestは未検証で、Flutter analyzeのOneDrive日本語path上のLSP失敗も残る。",
       "required_action": "workflow_dispatch限定のApple補助手順でiOS compile・native XCTestを実行し、失敗を修正する。招待・資格をDart／debug VM／表示／error／log／trace／artifactへ通さず、同じDesktop Rust BrokerへのTLS結合、Workspace選択・対話ID結合、拒否・失効・background停止を検証するplatform-native LIVE_RUNTIME harnessを成立させる。in-place Android buildが必要な場合はACL管理者の判断を得る。端末内local_recovery_auditはDesktop AuditEventへ昇格させない。Android実機凍結と各platformのrelease evidenceは別途維持する。"
     }
