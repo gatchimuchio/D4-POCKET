@@ -2280,6 +2280,10 @@ fn 表示射影(work: &作業, 結果: &Result<実行結果, 対話失敗>) -> V
 #[path = "../../tests/unit/agent_task_fixture_fs.rs"]
 mod agent_task_fixture_fs;
 
+#[cfg(all(test, windows))]
+#[path = "../../tests/support/broker_codex_fixture.rs"]
+mod broker_codex_fixture_support;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2564,6 +2568,61 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
+    struct Broker統合CodexFixtureAdapter {
+        inner: crate::adapters::codex_cli::CodexCliAdapter,
+    }
+
+    #[cfg(windows)]
+    impl 実行系Adapter for Broker統合CodexFixtureAdapter {
+        fn 接続対象(&self) -> String {
+            self.inner.接続対象()
+        }
+
+        fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
+            self.inner.作業領域実体識別子()
+        }
+
+        fn agent_metadata(&self) -> Option<Value> {
+            let mut metadata = self.inner.agent_metadata()?;
+            let capability = metadata["capabilities"]
+                .as_array_mut()?
+                .iter_mut()
+                .find(|item| item["capability_id"] == "task_execution")?;
+            capability["support"]["status"] = json!("supported");
+            capability["support"]["reason"] =
+                json!("Brokerとfake Codex CLIの縦断試験専用。製品能力の証拠ではない");
+            metadata["evidence_source"] = json!("FIXTURE");
+            metadata["evidence_reason"] = json!("試験専用Adapterが能力宣言を上書きした合成経路");
+            Some(metadata)
+        }
+
+        fn AgentTask実行対応(&self) -> bool {
+            self.inner.AgentTask実行対応()
+        }
+
+        fn AgentTask実行(
+            &self,
+            instruction: &str,
+            cancel: &AtomicBool,
+            deadline: Instant,
+            context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        ) -> Result<String, 対話失敗> {
+            self.inner
+                .AgentTask実行(instruction, cancel, deadline, context)
+        }
+
+        fn 応答(
+            &self,
+            request: &対話要求,
+            cancel: &AtomicBool,
+            deadline: Instant,
+            raw: &mut Vec<Vec<u8>>,
+        ) -> Result<実行結果, 対話失敗> {
+            self.inner.応答(request, cancel, deadline, raw)
+        }
+    }
+
     fn 準備(失敗: bool, 別session: bool, 遅延: bool) -> (対話制御, Arc<AtomicUsize>) {
         let mut c = 対話制御::default();
         let n = Arc::new(AtomicUsize::new(0));
@@ -2754,6 +2813,222 @@ mod tests {
         assert!(!state.to_string().contains("TASK_PRIVATE_OUTPUT_SENTINEL"));
         assert!(!state.as_object().unwrap().contains_key("instruction"));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費しscratchを片付ける_fixture() {
+        let fixture = super::broker_codex_fixture_support::BrokerCodexFixture::create();
+        let workspace_path = fixture.workspace_path();
+
+        let inner = crate::adapters::codex_cli::CodexCliAdapter::new(
+            fixture.executable_path(),
+            workspace_path,
+        )
+        .expect("fake Codex CLI interfaceを登録時検査する");
+        let product_metadata = inner.agent_metadata().expect("製品Adapter metadata");
+        assert_eq!(
+            product_metadata["capabilities"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["capability_id"] == "task_execution")
+                .unwrap()["support"]["status"],
+            "unsupported",
+            "縦断fixtureが製品Adapterの能力宣言を変更してはならない"
+        );
+
+        let runtime_id = "codex-fixture";
+        let workspace_id = "codex-fixture-workspace";
+        let (workspace_handle, _, ancestry) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(&workspace_path, &[])
+                .unwrap();
+        let mut workspaces = super::super::workspace::WorkspaceRegistry::default();
+        let secret_paths = ["private/credential-backup.txt".to_owned()];
+        workspaces
+            .register(
+                runtime_id,
+                workspace_id,
+                workspace_handle,
+                &secret_paths,
+                Some(ancestry),
+                &mut |_, _| Ok(()),
+            )
+            .unwrap();
+        let binding = workspaces
+            .dialogue_binding(runtime_id, workspace_id)
+            .expect("登録WorkspaceとのBroker結合");
+
+        let mut control = 対話制御::default();
+        control
+            .登録(
+                runtime_id,
+                Arc::new(Broker統合CodexFixtureAdapter { inner }),
+            )
+            .unwrap();
+        let mut audit_events = Vec::new();
+        let mut audit = |operation: &str, session: &str, hash: &str| {
+            audit_events.push((operation.to_owned(), session.to_owned(), hash.to_owned()));
+            Ok(format!("fixture-audit-{}", audit_events.len()))
+        };
+
+        let started = control
+            .操作_作業領域結合済み(
+                "対話開始",
+                &json!({"実行系ID":runtime_id,"作業領域ID":workspace_id}),
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .unwrap();
+        let session_id = started["対話セッションID"].as_str().unwrap().to_owned();
+        let instruction = "fixture内の一回限りTask";
+        let task_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+            "instruction":instruction,
+        });
+        let permission_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+        });
+
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Owner No相当ではPermissionを発行しない"
+        );
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "承認なしではAdapterを起動しない"
+        );
+
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("test fixture内のOwner Permission発行");
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "本文ごとのOwner Approvalなしでは起動しない"
+        );
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskOwnerApprovalGrant",
+                &task_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("test fixture内の本文hash結合Approval発行");
+
+        let task = control
+            .操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .unwrap();
+        assert_eq!(task["status"], "running");
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "ApprovalはTask開始時に一回消費する"
+        );
+
+        let task_id = task["task_id"].as_str().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let result = loop {
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":task_id}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .unwrap();
+            if state["status"] != "running" {
+                break state;
+            }
+            assert!(Instant::now() < deadline, "fake Codex Taskの終了待ち期限");
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(result["status"], "completed");
+        assert!(result["result_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert!(!result.to_string().contains(instruction));
+        assert!(!result.to_string().contains("fixture-task-completed"));
+
+        drop(audit);
+        assert!(audit_events
+            .iter()
+            .any(|event| event.0.contains("Owner Approval発行")));
+        assert!(audit_events
+            .iter()
+            .any(|event| event.0.contains("一回消費")));
+        let audit_text = serde_json::to_string(&audit_events).unwrap();
+        assert!(!audit_text.contains(instruction));
+        assert!(!workspace_path.join("fixture-canary").exists());
+        for entry in std::fs::read_dir(&workspace_path).unwrap() {
+            assert!(
+                !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".d4p-tmp-"),
+                "正常完了後にBroker管理Task scratchを残さない"
+            );
+        }
+
+        drop(control);
+        drop(workspaces);
+        drop(fixture);
     }
 
     #[test]

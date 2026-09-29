@@ -206,3 +206,29 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - 現在のCodex process tokenは非管理者（`IsUserAnAdmin=false`）。資格情報環境変数を子環境から除去し、実model／有料資格を使わず、非loopback通信はloopback proxyで拒否した（3 run合計12要求）。Codex設定、OS保護設定、Repository外の恒久データは変更していない。試験workspace／CODEX_HOMEは各run後に破棄した。
 - 最初の試行はGit管理外の一時WorkspaceをCodexがuntrustedとしてmodel request前に拒否した。probe内の`--skip-git-repo-check`で一時Workspaceだけを対象化して解消し、製品command builderには追加していない。
 - この証拠は直接Codex CLI＋MxCの正常終端に限る。Rust Broker consumer、Owner Approval、production Task、実model、取消／期限／crash、process群停止、Audit／Recovery、Content Exposureは通していない。TEMP/TMP scratch mismatchの扱いと異常終端時cleanupを含むrelease blockerを保持し、`task_execution=unsupported`、`release_ready=false`を維持する。
+
+## R2追補 Broker対話制御からCodex Adapter fake Taskまでの縦断fixture（2026-09-29）
+
+### 成立した局所証拠
+
+- Windows専用Rust testで、BrokerのWorkspace登録・対話Session・Task制御から、実`CodexCliAdapter`、fake Codex CLI executable、Broker管理scratchまでを一つの縦断fixtureとして接続した。
+- Permissionなしの拒否、本文hashに結合したOwner Approvalなしの拒否、fixture内でのPermission／Approval発行、Task開始時のApproval一回消費、終端状態のhash-only射影、本文・fake応答の非露出、scratchの正常完了後片付けを確認する。
+- 縦断専用wrapperだけが`task_execution=supported`を返し、証拠源を`FIXTURE`と明記する。wrapperの内側にある製品`CodexCliAdapter` metadataは引き続き`task_execution=unsupported`であることをtest内で確認した。test用Rust CLIは実Codex CLIでも実modelでもない。
+- この結果は、合成Adapter metadataを使ったBroker制御と実Rust Adapter実装の結合fixtureに限る。実Codex CLI、production Broker登録・認証済みIPC、installed product、Owner native確認画面、実Agent Taskの証拠へ昇格しない。
+
+### 失敗履歴と検証
+
+- focused testの初回はWorkspace登録secret pathをfake CLI fixtureの保護対象と一致させておらず失敗した。登録内容をfixtureの固定pathへ合わせて修正した。
+- 次のfocused試行ではAudit assertionが操作IDとAudit callbackの実際の日本語event labelを取り違え失敗した。観測されたevent labelに対するassertionへ修正した。
+- その後のfocused Windows testは1 passed。テスト専用一時directoryのpanic／失敗時残存を避けるRAII cleanupを加えた。修正前の2回の失敗試行が作成した一時directoryはrepository外に残り、実行環境の削除制御によりcleanup commandを実行できなかったため、local test artifactとして未解決である。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費しscratchを片付ける_fixture' -- --exact --nocapture`: 成功、1 passed。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: test support分離後の最終全実行はlib 349 passed／0 failed／1 ignored、helper binary 10 passed、統合test 36 passed（計395 passed）。履歴では全suite 4回のうち2回、変更対象外のA2A loopback test 1件が`a2a_connection_failed`で失敗し、他の2回は全件成功した。同testの単独実行は最初の1回と続く8回連続が成功した。失敗の根本原因は確定していないため、最終全実行のPASSと過去の間欠失敗を両方記録し、原因を推定しない。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs`、`git diff --check`: 成功。
+- 最初の統合validatorは日本語監査とSchema検査を通過した一方、Conformanceがunit test内の`std::process::Command`／`std::fs::write`を`src/**/*.rs`の禁止helper patternとして検出し、package portability検査も同じ違反を検出した。権限pattern検査を弱めず、fake CLI生成とtest一時directory管理を`native/rust_helper/tests/support/broker_codex_fixture.rs`へ移した。Broker制御fixture本体は`#[cfg(test)]`のまま保持し、Conformance／package portabilityは修正後に成功した。
+- test support fileの追加・移動後、package portabilityの初回再実行は`MANIFEST.sha256.json`のdialogue source hash staleで失敗した。`python -X utf8 tooling/manifest.py --write`で1109 source fileを再生成し、`python -X utf8 tooling/manifest.py --check`、`python -X utf8 tooling/packaging_portability_check.py`は成功した。
+- test support追加後の統合validatorは日本語監査が診断文字列1件を検出して失敗した。作業領域作成時の診断を日本語化し、`python -X utf8 tooling/日本語基底監査.py --strict`を1113 files／findings 0で再実行成功した。修正後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。登録済み10 development checks、日本語監査1113 files／0 findings、Schema 149／example 149／negative fixture 192、Conformance 225、package portability、release smoke、evidence bundle、runtime assertions、C32開発監査が成功した。Windows installed evidence等の既存release blockerを保持し、`release_ready=false`を維持した。初回の日本語監査失敗とその修正は上記履歴に残す。
+
+### 次工程と残存gate
+
+本追補は`FIXTURE`の局所縦断証拠であり、Ownerの実UI確認、認証済みDesktop IPCからの実`codex exec`、実model、AgentによるWorkspace書込、取消・期限・crash回復、結果diff／testのContent Exposure、Windows installed productを検証しない。これらのR2項目は`release_blocker`のまま保持し、製品Adapterの`task_execution=unsupported`と`release_ready=false`を変更しない。
