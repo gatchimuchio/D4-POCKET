@@ -24,6 +24,7 @@ pub struct ComparisonInventory {
 }
 pub const MAX_INVENTORY_ENTRIES: usize = 4096;
 const MAX_ENTRIES: usize = 1024;
+const MAX_SECRET_TREE_DEPTH: usize = 64;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadError {
@@ -167,11 +168,76 @@ impl WorkspaceReader {
         let metadata=root.dir_metadata().map_err(|_| ReadError::Unavailable)?;
         if !metadata.is_dir() || reparse(&metadata) {return Err(ReadError::UnsafeFile);}
         let root_device=cap_fs_ext::MetadataExt::dev(&metadata);
-        Ok(Self {
+        let reader = Self {
             root,
             secrets: normalized,
             root_device,
-        })
+        };
+        reader.validate_registered_secret_aliases()?;
+        Ok(reader)
+    }
+
+    fn validate_registered_secret_aliases(&self) -> Result<(), ReadError> {
+        let mut inspected_entries = 0usize;
+        'secrets: for secret in &self.secrets {
+            let parts = path_parts(secret)?;
+            let mut parent = self.root.try_clone().map_err(|_| ReadError::Unavailable)?;
+            for part in &parts[..parts.len() - 1] {
+                match parent.open_dir_nofollow(part) {
+                    Ok(next) => parent = next,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        continue 'secrets;
+                    }
+                    Err(_) => return Err(ReadError::UnsafeFile),
+                }
+            }
+            let name = *parts.last().ok_or(ReadError::InvalidPath)?;
+            let observed = match parent.symlink_metadata(name) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    continue 'secrets;
+                }
+                Err(_) => return Err(ReadError::Unavailable),
+            };
+            if reparse(&observed)
+                || cap_fs_ext::MetadataExt::dev(&observed) != self.root_device
+            {
+                return Err(ReadError::UnsafeFile);
+            }
+            if observed.is_file() {
+                let file = parent
+                    .open_with(name, &read_options())
+                    .map_err(|_| ReadError::Changed)?;
+                let opened = file.metadata().map_err(|_| ReadError::Changed)?;
+                if !same_file(&observed, &opened) {
+                    return Err(ReadError::Changed);
+                }
+                if !regular(&opened) {
+                    return Err(ReadError::UnsafeFile);
+                }
+            } else if observed.is_dir() {
+                let directory = parent
+                    .open_dir_nofollow(name)
+                    .map_err(|_| ReadError::Changed)?;
+                let opened = directory.dir_metadata().map_err(|_| ReadError::Changed)?;
+                if !same_file(&observed, &opened)
+                    || !opened.is_dir()
+                    || reparse(&opened)
+                    || cap_fs_ext::MetadataExt::dev(&opened) != self.root_device
+                {
+                    return Err(ReadError::Changed);
+                }
+                validate_secret_tree(
+                    &directory,
+                    self.root_device,
+                    0,
+                    &mut inspected_entries,
+                )?;
+            } else {
+                return Err(ReadError::UnsafeFile);
+            }
+        }
+        Ok(())
     }
 
     fn allowed<'a>(&self, path: &'a str) -> Result<Vec<&'a str>, ReadError> {
@@ -446,6 +512,76 @@ impl WorkspaceReader {
     }
 }
 
+fn validate_secret_tree(
+    directory: &Dir,
+    root_device: u64,
+    depth: usize,
+    inspected_entries: &mut usize,
+) -> Result<(), ReadError> {
+    if depth >= MAX_SECRET_TREE_DEPTH {
+        return Err(ReadError::TooManyEntries);
+    }
+    let before = directory
+        .dir_metadata()
+        .map_err(|_| ReadError::Unavailable)?;
+    if !before.is_dir()
+        || reparse(&before)
+        || cap_fs_ext::MetadataExt::dev(&before) != root_device
+    {
+        return Err(ReadError::UnsafeFile);
+    }
+    for entry in directory
+        .entries()
+        .map_err(|_| ReadError::Unavailable)?
+    {
+        *inspected_entries = inspected_entries
+            .checked_add(1)
+            .ok_or(ReadError::TooManyEntries)?;
+        if *inspected_entries > MAX_INVENTORY_ENTRIES {
+            return Err(ReadError::TooManyEntries);
+        }
+        let entry = entry.map_err(|_| ReadError::Changed)?;
+        let name = entry.file_name();
+        let name = name.to_str().ok_or(ReadError::InvalidPath)?;
+        let observed = directory
+            .symlink_metadata(name)
+            .map_err(|_| ReadError::Changed)?;
+        if reparse(&observed) || cap_fs_ext::MetadataExt::dev(&observed) != root_device {
+            return Err(ReadError::UnsafeFile);
+        }
+        if observed.is_dir() {
+            let child = directory
+                .open_dir_nofollow(name)
+                .map_err(|_| ReadError::Changed)?;
+            let opened = child.dir_metadata().map_err(|_| ReadError::Changed)?;
+            if !same_file(&observed, &opened) || !opened.is_dir() || reparse(&opened) {
+                return Err(ReadError::Changed);
+            }
+            validate_secret_tree(&child, root_device, depth + 1, inspected_entries)?;
+        } else if observed.is_file() {
+            let file = directory
+                .open_with(name, &read_options())
+                .map_err(|_| ReadError::Changed)?;
+            let opened = file.metadata().map_err(|_| ReadError::Changed)?;
+            if !same_file(&observed, &opened) {
+                return Err(ReadError::Changed);
+            }
+            if !regular(&opened) {
+                return Err(ReadError::UnsafeFile);
+            }
+        } else {
+            return Err(ReadError::UnsafeFile);
+        }
+    }
+    let after = directory
+        .dir_metadata()
+        .map_err(|_| ReadError::Changed)?;
+    if !same_file(&before, &after) || before.modified().ok() != after.modified().ok() {
+        return Err(ReadError::Changed);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,6 +768,49 @@ mod tests {
             reader.read("large"),
             Err(ReadError::TooLarge(MAX_BYTES + 1))
         );
+    }
+
+    #[test]
+    fn registered_secret_file_or_tree_with_hardlink_alias_is_rejected() {
+        let file_fixture = Fixture::new();
+        fs::create_dir(file_fixture.0.join("private")).unwrap();
+        fs::write(file_fixture.0.join("private/secret.txt"), b"synthetic secret").unwrap();
+        fs::hard_link(
+            file_fixture.0.join("private/secret.txt"),
+            file_fixture.0.join("public-alias.txt"),
+        )
+        .unwrap();
+        let file_root = Dir::open_ambient_dir(&file_fixture.0, cap_std::ambient_authority()).unwrap();
+        assert!(matches!(
+            WorkspaceReader::from_registered_dir(file_root, &["private/secret.txt".into()]),
+            Err(ReadError::UnsafeFile)
+        ));
+
+        let tree_fixture = Fixture::new();
+        fs::create_dir_all(tree_fixture.0.join("private/secrets/nested")).unwrap();
+        fs::write(tree_fixture.0.join("private/secrets/nested/token"), b"synthetic secret")
+            .unwrap();
+        fs::hard_link(
+            tree_fixture.0.join("private/secrets/nested/token"),
+            tree_fixture.0.join("public-alias.txt"),
+        )
+        .unwrap();
+        let tree_root = Dir::open_ambient_dir(&tree_fixture.0, cap_std::ambient_authority()).unwrap();
+        assert!(matches!(
+            WorkspaceReader::from_registered_dir(tree_root, &["private/secrets".into()]),
+            Err(ReadError::UnsafeFile)
+        ));
+    }
+
+    #[test]
+    fn missing_registered_secret_path_remains_valid() {
+        let fixture = Fixture::new();
+        let root = Dir::open_ambient_dir(&fixture.0, cap_std::ambient_authority()).unwrap();
+        assert!(WorkspaceReader::from_registered_dir(
+            root,
+            &["future/private/secret.txt".into()]
+        )
+        .is_ok());
     }
 
     #[test]

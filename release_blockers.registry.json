@@ -271,6 +271,28 @@
         "validation": "Windows local Rust ignored live test: 1 passed, 0 failed; exact command and scope recorded in docs/REV3_PROGRESS.md",
         "configuration_persisted": false,
         "os_protection_changed": false,
+        "hardlink_alias_followup": {
+          "date": "2026-09-29",
+          "preexisting_alias_observation": "A synthetic NTFS hardlink created before direct sandbox startup was readable through an unregistered alias; the probe exited 45. This motivated fail-closed registration and preflight checks.",
+          "registration_and_task_preflight": {
+            "evidence_source": "FIXTURE",
+            "result": "WorkspaceReader rejects registered secret files or secret trees containing multiply-linked files; Task preflight repeats the bounded check against the pinned Workspace before spawn."
+          },
+          "direct_mxc_child_creation": {
+            "evidence_source": "LIVE_RUNTIME",
+            "cli_version": "0.158.0-alpha.2.1",
+            "method": "The ignored Windows Rust probe passes build_codex_command permission overrides to direct codex sandbox and asks its PowerShell child to create a hardlink from a synthetic registered secret.",
+            "result": "New-Item hardlink creation was rejected with UnauthorizedAccessException HRESULT 0x80070005 while ordinary Workspace write succeeded.",
+            "additional_checks": {
+              "registered_secret_depth_40_read_write": "both rejected",
+              "registered_secret_case_and_separator_alias_read_write": "both rejected",
+              "mxc_child_TEMP_equals_workspace_task_scratch": false,
+              "mxc_child_TMP_equals_workspace_task_scratch": false
+            },
+            "scope_limit": "Direct codex sandbox child and one synthetic Workspace only; does not establish behavior in production codex exec tool children or through Broker and Owner Approval."
+          },
+          "scope_limit": "Pre-existing aliases, Rust registration/preflight fixtures, and dynamic alias creation in a direct MxC child are distinct evidence. Production Agent Task remains unsupported; Broker-connected codex exec, other alias forms, TEMP/TMP scratch mismatch, lifecycle, Audit, Recovery, and cleanup remain unverified."
+        },
         "scope_limit": "direct codex sandbox child only; exact registered secret file and directory read/write rules were exercised from Rust-generated configuration. Production codex exec tool-child behavior, Broker, Owner Approval, Agent Task, lifecycle, and cleanup remain unverified"
       },
       "current_observation": "2026-09-28のsandbox helper再検査ではUserProfile／LocalAppData外部fileとOneDrive ReparsePoint `.env`が読めたため、広域read隔離は未成立。2026-09-29のmxc直接CLI probeではOneDrive `.env` ReparsePointと合成Workspace外pathのread、および任意外部writeが拒否され、Workspace read/writeが許可された一方、`:minimal=read`のままでは`C:/Windows/win.ini`が読めた。追試で`:minimal=deny`にしても当該fileのreadは成功し、同fileへのexact denyで拒否された。`C:/Windows=deny`候補はsystem fileを拒否したが、sandbox内の`codex --version`も起動拒否となったため採用しない。登録secret候補globの直接probeでは合成pathの完全一致・子孫・深さ64とliteral bracket／brace pathが拒否され、非登録decoyは読めたが、configは手動構成でRust Adapter、`codex exec`、Brokerを通していない。Rust生成profile probeでは完全一致・子孫・literal bracket／braceのread拒否、非登録decoyとWorkspace writeを確認した。補正した直接sandbox probeではRust生成TEMP／TMP値をmxc childへ渡した上で、どちらもWorkspaceTaskScratchと不一致だった。これは直接sandbox child限定であり、production `codex exec` tool childの実効temporary pathやcleanupを証明しない。個別file／directoryのprobeは広域read隔離を証明せず、広域read隔離や秘密file全般の拒否を主張しない。Codex Agent Taskは`unsupported`のまま。Windows Application Control等のOS設定は変更していない。",

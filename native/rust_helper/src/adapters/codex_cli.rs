@@ -173,6 +173,11 @@ impl 実行系Adapter for CodexCliAdapter {
             return Err(対話失敗::AgentTask非対応);
         }
         let context = context.ok_or(対話失敗::AgentTask非対応)?;
+        validate_task_secret_paths(
+            &self.workspace,
+            self.workspace_identity,
+            &context.secret_paths,
+        )?;
         let mut scratch =
             WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
         let result = run_agent_task(
@@ -741,6 +746,27 @@ fn pin_registered_workspace(
     Ok(guard)
 }
 
+fn validate_task_secret_paths(
+    workspace: &Path,
+    expected: crate::broker::workspace_root::DirectoryIdentity,
+    secret_paths: &[String],
+) -> Result<(), 対話失敗> {
+    let _guard = pin_registered_workspace(workspace, expected)?;
+    let root = Dir::open_ambient_dir(workspace, cap_std::ambient_authority())
+        .map_err(|_| 対話失敗::作業領域不在)?;
+    let metadata = root.dir_metadata().map_err(|_| 対話失敗::作業領域不在)?;
+    let observed = crate::broker::workspace_root::DirectoryIdentity {
+        device: cap_fs_ext::MetadataExt::dev(&metadata),
+        file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+    };
+    if observed != expected {
+        return Err(対話失敗::作業領域不在);
+    }
+    crate::workspace_reader::WorkspaceReader::from_registered_dir(root, secret_paths)
+        .map(|_| ())
+        .map_err(|_| 対話失敗::作業領域不在)
+}
+
 fn terminate(child: &mut Child) {
     let _ = child.kill();
     let _ = child.wait();
@@ -1009,7 +1035,13 @@ mod tests {
             "private/registered-write-target.txt",
             "private/秘密[ab].txt",
             "private/vault{x}.txt",
+            "private/deep-secret-root",
         ];
+        let deep_relative = (0..40)
+            .map(|index| format!("d{index:02}"))
+            .collect::<Vec<_>>()
+            .join("/");
+        let deep_secret_relative = format!("private/deep-secret-root/{deep_relative}/secret.txt");
         let denied_paths = [
             "private/registered-marker.txt",
             "private/registered-directory/child.txt",
@@ -1040,6 +1072,11 @@ mod tests {
         )
         .expect("合成literal brace marker");
         fs::write(private.join("vaultx.txt"), b"synthetic-brace-decoy").expect("合成brace decoy");
+
+        let deep_secret = workspace.join(&deep_secret_relative);
+        fs::create_dir_all(deep_secret.parent().expect("深いsecretの親directory"))
+            .expect("深さ40の登録secret directory");
+        fs::write(&deep_secret, b"synthetic-deep-secret-marker").expect("深さ40の登録secret file");
 
         let secret_paths = registered_paths.map(str::to_owned);
         let generated = build_codex_command(
@@ -1084,6 +1121,14 @@ mod tests {
             .map(|path| quote_path(&workspace.join(path)))
             .collect::<Vec<_>>()
             .join(",");
+        let denied_aliases = [
+            workspace.join(r"PRIVATE\REGISTERED-MARKER.TXT"),
+            deep_secret.clone(),
+        ]
+        .iter()
+        .map(|path| quote_path(path))
+        .collect::<Vec<_>>()
+        .join(",");
         let decoys = [
             quote_path(&private.join("vaulta.txt")),
             quote_path(&private.join("vaultx.txt")),
@@ -1092,6 +1137,8 @@ mod tests {
         let write_denied = [
             private.join("registered-write-target.txt"),
             private.join("registered-directory").join("write-child.txt"),
+            workspace.join(r"PRIVATE\REGISTERED-MARKER.TXT"),
+            workspace.join(&deep_secret_relative),
         ]
         .iter()
         .map(|path| quote_path(path))
@@ -1099,11 +1146,16 @@ mod tests {
         .join(",");
         let workspace_output = workspace.join("workspace-write-marker.txt");
         let environment_report = workspace.join("sandbox-environment-report.txt");
+        let hardlink_alias = workspace.join("synthetic-secret-hardlink-alias.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"TEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"hardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
             denied_array,
+            denied_aliases,
             decoys,
             write_denied,
+            quote_path(&hardlink_alias),
+            quote_path(&private.join("registered-marker.txt")),
+            quote_path(&hardlink_alias),
             quote_path(&scratch),
             quote_path(&workspace_output),
             quote_path(&environment_report)
@@ -1153,8 +1205,31 @@ mod tests {
             !registered_directory.join("write-child.txt").exists(),
             "登録secret directory内への新規書込みを拒否する"
         );
+        assert_eq!(
+            fs::read(private.join("registered-marker.txt")).expect("合成secretの再読"),
+            b"synthetic-secret-marker",
+            "case alias probeが元の合成secretを変更しない"
+        );
+        assert_eq!(
+            fs::read(&deep_secret).expect("深さ40の登録secret再読"),
+            b"synthetic-deep-secret-marker",
+            "深い登録secretへのwriteを拒否する"
+        );
         let environment_report =
             fs::read_to_string(environment_report).expect("sandbox内TEMP／TMP照合結果");
+        eprintln!("MxC直接sandboxの合成観測: {environment_report}");
+        assert!(
+            environment_report.contains("hardlinkState=created-read-denied")
+                || environment_report.contains("hardlinkState=creation-denied"),
+            "MxC childが作成したhardlink aliasから登録secretを読めない: {environment_report}"
+        );
+        if environment_report.contains("hardlinkState=creation-denied") {
+            assert!(
+                environment_report.contains("hardlinkErrorType=UnauthorizedAccessException")
+                    && environment_report.contains("hardlinkErrorHResult=-2147024891"),
+                "hardlink作成拒否がWindows access deniedである: {environment_report}"
+            );
+        }
         assert!(
             environment_report.contains("TEMP作業領域一致=False"),
             "MxC子processのTEMPはRust生成Task scratchと異なる: {environment_report}"
@@ -1184,6 +1259,35 @@ mod tests {
         assert_eq!(
             task_filesystem_override(&too_large),
             Err(対話失敗::要求不正)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 登録後に増えたsecret_hardlink_aliasはTask起動前に拒否する() {
+        use std::io::Write;
+
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let workspace = root.path().join("workspace");
+        let private = workspace.join("private");
+        std::fs::create_dir_all(&private).unwrap();
+        let mut secret_file = std::fs::File::create(private.join("secret.txt")).unwrap();
+        secret_file.write_all(b"synthetic secret").unwrap();
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .unwrap()
+            .identity;
+        let secrets = ["private/secret.txt".to_owned()];
+
+        assert!(validate_task_secret_paths(&workspace, identity, &secrets).is_ok());
+        std::fs::hard_link(
+            private.join("secret.txt"),
+            workspace.join("public-alias.txt"),
+        )
+        .unwrap();
+        assert_eq!(
+            validate_task_secret_paths(&workspace, identity, &secrets),
+            Err(対話失敗::作業領域不在),
+            "Task実行直前に追加されたhardlink aliasを拒否する"
         );
     }
 

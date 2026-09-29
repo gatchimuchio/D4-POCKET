@@ -483,3 +483,23 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 398件成功／0件失敗／1件は`#[ignore]`指定のため未実行。
 - 外部のWindows Actionsは今回未使用。ローカルWindows上で実CLIと実MxC childを実行できたため、補助hosted検査を必要としなかった。
 - 最終ソースを含む`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1113 files／0 findings、Schema 149／149・negative fixture 192、Conformance 225 checks、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertion 12成功／0失敗、C32監査が成功。release blocker 5件、`release_ready=false`は維持された。
+
+## R2追補 登録secretのNTFS hardlink alias拒否（2026-09-29）
+
+### 観測と実装
+
+- 完全一致の登録secret pathへMxC denyを設定しても、sandbox起動前に作成したNTFS hardlink aliasから合成secretを読め、旧probeはexit 45となった。path文字列単位のdenyだけでは同一fileの別名を保護しない。
+- `WorkspaceReader::from_registered_dir`は登録secret fileと登録secret directory以下をhandle経由でbounded走査する。hardlink（regular fileのlink countが1以外）、reparse／volume境界等のunsafe entry、走査深さ64または合計4096 entryの上限超過をfail-closedで拒否する。未作成の登録pathは将来作成用として許可する。Codex AdapterはTask起動直前にpin済みroot identityを再照合して同じ検査を行い、登録後・spawn前のalias追加も拒否する。Rust unit testは`FIXTURE`である。
+- 初回の動的作成追試はnested `cmd.exe`を起動できずexit 47で判定不能だった。その後、Rustが生成したTask permission overrideを用いる実Codex CLI `0.158.0-alpha.2.1`の直接MxC sandbox内で、PowerShellから合成secretのhardlink alias作成を試した。`New-Item -ItemType HardLink`は`UnauthorizedAccessException`、HRESULT `0x80070005`で拒否され、通常Workspace writeは成功した。これは直接sandbox childの`LIVE_RUNTIME`観測であり、実`codex exec` tool child／Broker／Owner Approval経路の証拠ではない。
+- 同じ直接probeで登録secretの深さ40 pathおよび大文字・区切りの異なるpath aliasのread／writeを拒否した。MxC childのTEMP／TMPはRust `WorkspaceTaskScratch`と一致しなかった。synthetic markerだけを使用し、資格情報・実model・永続Codex設定・OS保護設定は変更していない。
+- pre-existing alias迂回、Rust registration／Task preflight、直接MxC childでの新規alias作成拒否は異なる証拠である。Broker経由の実Task・tool child隔離、TEMP／TMPの不一致、cancel／deadline／crash、Audit／Recovery、scratch cleanupが未成立のため`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 検証履歴
+
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs`: exit 0。`workspace_reader.rs`全体には既存整形差があり、無関係な大量変更を避けて再整形していない。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功（終了コード0）。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 12対象で391件成功、失敗0件、1件は無効化指定のため未実行。
+- 明示起動したWindows ignored live test `Rust生成Task設定で実Windows隔離の登録secretを拒否する`: 1 passed／0 failed。観測範囲は直接`codex sandbox`と合成Workspaceまで。
+- validator初回は記録文2件の日本語監査指摘と、新規fixtureの`std::fs::write`禁止patternで失敗した。文面を日本語基底へ直し、fixtureをFile作成と`write_all`へ変更後、厳格監査1113 files／0 findings、Conformance 225 checksを個別再実行して合格した。
+- 統合validatorは初回に記録文と診断表示文の日本語監査、および新規fixtureの禁止patternを検出した。修正後はManifestが古く停止したため再生成し、最終の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了コード0で合格した。これは開発検証であり、release blocker 5件と`release_ready=false`を変更しない。
+- Windows Actionsは未使用。現Windows hostでRust全targetと限定MxC実測を実行できたため、hosted補助検査は追加しなかった。
