@@ -1,6 +1,12 @@
 # GUI Shell ロードマップ
 
-状態: rev2先行検証を継続し、総合機能拡張rev1のC0からC34を追加。正式releaseは未成立。
+状態: D4 Pocket / GUI-Shell統合rev3に基づく開発中。R0現行状態再固定を完了し、次工程はR1正本・Blocker体系再編。Technical Completeおよび正式releaseは未成立。
+
+## D4 Pocket統合 rev3 現行工程
+
+2026-09-29に受領したrev3統合仕様・工程表を現行開発基準とする。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に追記する。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。
+
+rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。
 プロジェクト: GUI Shell / Runtime Operation Shell / `LLM-readable application responsibility substrate`（LLM が読むアプリケーション責任基盤）
 参照コンシューマー／Runtime: adapter のみを介した BLUE-TANUKI
 主要実装経路: 権限に関わる本番収束は Flutter UI + Rust Security Broker。Rust helper は、権限の外側にある限定的な native 診断／操作に留める。
