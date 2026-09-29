@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "16b32b6050fa0c026a4d843fe7d8b50c433b84fc913e68127ded9d8eca15a08f"
+      "sha256": "c94bd079210447f427b57028fbe23dcff9883fc5ab3db6b4aa0dc4c3ec8b95fd"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "55be226eba4e93a5389744d322c91f984ba95d48860c2c0bfe96c907c3a37492"
+      "sha256": "c35a1a62c5998e28de92488e3a7ce1c1f657dfe659411ac65482a20b7dc05638"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3725,7 +3725,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "78d917facd9dfa0724313840a73df1b6972ae8a1808915024598fc7b87448c57"
+      "sha256": "0b7ef7020ceb3d55735abc787febcefcb12c10871a09a88b41a5b3f7880a282f"
     },
     {
       "path": "requirements-dev.txt",

@@ -1289,6 +1289,23 @@ mod tests {
             Err(対話失敗::作業領域不在),
             "Task実行直前に追加されたhardlink aliasを拒否する"
         );
+
+        let mut adapter =
+            CodexCliAdapter::for_test(root.path().join("missing-codex.exe"), workspace.clone());
+        adapter.workspace_identity = identity;
+        let mut context = scratch_context(identity);
+        context.secret_paths = secrets.to_vec();
+        assert!(adapter.AgentTask実行対応());
+        assert_eq!(
+            adapter.AgentTask実行(
+                "synthetic fixture task",
+                &AtomicBool::new(false),
+                Instant::now() + Duration::from_secs(30),
+                Some(context),
+            ),
+            Err(対話失敗::作業領域不在),
+            "実Task入口でaliasを拒否し、未存在CLIの起動へ進まない"
+        );
     }
 
     #[test]

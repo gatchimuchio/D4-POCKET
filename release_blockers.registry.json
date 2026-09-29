@@ -306,6 +306,13 @@
             "result": "2 passed, 0 failed. WorkspaceRegistry::register rejects a registered secret file with a pre-existing hardlink alias; no registry entry or successful-registration audit callback remains.",
             "scope_limit": "Rust unit fixture invoking the Broker registry method directly; does not exercise production IPC, Owner Approval, Codex exec, Agent Task, process lifecycle, Audit persistence, or Recovery."
           },
+          "adapter_task_execution_preflight_fixture": {
+            "date": "2026-09-30",
+            "evidence_source": "FIXTURE",
+            "command": "cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib '登録後に増えたsecret_hardlink_alias' -- --test-threads=1",
+            "result": "1件合格、0件失敗。事前検査に合格する合成Workspaceへ後からhardlink aliasを追加すると、CodexCliAdapter::AgentTask実行は、意図的に不存在とした合成CLIへ到達する前に作業領域不在を返す。",
+            "scope_limit": "Windows上のRust単体fixtureであり、試験用Adapter生成器を使用する。production codex exec、Broker consumer／IPC、Owner Approval、実Agent、installed product、LIVE_RUNTIME証拠を含まない。"
+          },
           "direct_mxc_child_creation": {
             "evidence_source": "LIVE_RUNTIME",
             "cli_version": "0.158.0-alpha.2.1",

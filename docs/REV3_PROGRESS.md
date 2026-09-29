@@ -558,3 +558,21 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --check`: 合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 最終状態で終了値0。厳格日本語監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録済みdevelopment check 10件が合格した。release blocker 5件と`release_ready=false`は維持された。初回実行ではこの記録中の英語検証結果表記を日本語化する検出が1件あり、修正後の再実行で解消した。
 - Windows Actionsは未使用。現行Windows上でRust全target試験が実行可能であり、hosted runnerによる追加証拠は本作業範囲に必要ない。
+
+## R2追補 Codex Adapterの実Task入口でhardlink aliasを起動前拒否（2026-09-30）
+
+### 成立した確認
+
+- 登録後に合成secret fileへのhardlink aliasを追加し、既存の事前検査helperに加えて`CodexCliAdapter::AgentTask実行`本体を直接呼ぶWindows Rust fixtureへ拡張した。対応可能な試験用Adapterとsynthetic Task contextを使い、実行結果が`作業領域不在`となることを確認する。
+- Adapterの実行fileには意図的に不存在の合成pathを渡す。期待した拒否結果が返ることで、Task scratch作成後またはCLI起動時の別エラーではなく、AgentTask入口のsecret再検査で停止したことを区別する。合成secret本文はfixture内だけで使用する。
+- 証拠classは`FIXTURE`。これはRust Adapter method内の事前検査接続を示すが、production Broker consumer／IPC、Owner Approval、Codex `exec`、実Agent、installed productの証拠ではない。実MxC childで事前alias読取が可能だった`LIVE_RUNTIME`観測は別記録として保持する。`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib '登録後に増えたsecret_hardlink_alias' -- --test-threads=1`: 1件合格、0件失敗。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 402件合格、0件失敗、1件は明示除外。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 終了値0。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs`: 合格。
+- `python -X utf8 tooling/manifest.py --check`: 合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 最終作業状態で終了値0。厳格日本語監査1113 file／0 findings、Schema 149／正常example 149／negative fixture 192、Conformance 225 checks、登録済みdevelopment check 10件が合格した。release blocker 5件と`release_ready=false`は維持された。
+- Windows Actionsは未使用。対象Rustの全target検査を現行Windows上で完了可能だった。
