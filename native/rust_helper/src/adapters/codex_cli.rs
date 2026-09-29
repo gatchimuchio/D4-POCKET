@@ -1080,14 +1080,27 @@ mod tests {
         ]
         .join(",");
         let workspace_output = workspace.join("workspace-write-marker.txt");
+        let environment_report = workspace.join("sandbox-environment-report.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({denied_array}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({decoys}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; [IO.File]::WriteAllText({},'workspace-write-marker'); exit 0",
-            quote_path(&workspace_output)
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({denied_array}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $decoys=@({decoys}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"TEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            quote_path(&scratch),
+            quote_path(&workspace_output),
+            quote_path(&environment_report)
         );
 
+        let task_environment = generated
+            .get_envs()
+            .filter_map(|(name, value)| {
+                let value = value?;
+                matches!(name.to_str(), Some("TEMP" | "TMP"))
+                    .then(|| (name.to_os_string(), value.to_os_string()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(task_environment.len(), 2, "Rust生成TaskのTEMP／TMP値がある");
         let mut sandbox = command(&executable, &workspace);
         sandbox
             .env("CODEX_HOME", &isolated_codex_home)
+            .envs(task_environment.iter().map(|(name, value)| (name, value)))
             .args(["sandbox"])
             .args(["--permission-profile", &permission_profile])
             .args(&profile_args)
@@ -1110,6 +1123,16 @@ mod tests {
         assert_eq!(
             fs::read(workspace_output).expect("Workspace内write結果"),
             b"workspace-write-marker"
+        );
+        let environment_report =
+            fs::read_to_string(environment_report).expect("sandbox内TEMP／TMP照合結果");
+        assert!(
+            environment_report.contains("TEMP作業領域一致=False"),
+            "MxC子processのTEMPはRust生成Task scratchと異なる: {environment_report}"
+        );
+        assert!(
+            environment_report.contains("TMP作業領域一致=False"),
+            "MxC子processのTMPはRust生成Task scratchと異なる: {environment_report}"
         );
     }
 

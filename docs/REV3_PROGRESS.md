@@ -179,3 +179,21 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 394 passed／0 failed／1 ignored。ignoredは実Codex sandboxの明示実行probeで、別途実行して成功した。
 - `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs`、`python -X utf8 tooling/manifest.py --check`、`git diff --check`: 成功。
 - 変更後の統合validatorは初回strict日本語監査だけが失敗し、修正後の再実行はexit 0。登録development check 10件すべて成功し、日本語監査1111 files／findings 0、Schema 149／example 149／negative fixture 192、Conformance 225を確認した。release gateは既存blockerを検出したまま`release_ready=false`を維持する。
+
+## R2追補 Rust生成TEMP／TMP値のMxC子process照合（2026-09-29）
+
+### 成立した局所証拠
+
+- 前節のmarker不在probeは、`build_codex_command`由来のTEMP／TMPをprobe起動commandへ明示伝達したことを記録していなかった。この結果だけでは子processへの値伝播を判定できないため、診断testを補正した。
+- 補正testは本番command builderのconfig overrideとTEMP／TMPの2値を抽出し、認証・model起動なしで同じ値を実Codex CLI `codex sandbox`の起動environmentへ渡す。mxc配下の合成PowerShell childは値そのものやpathを保存せず、各値がRust生成WorkspaceTaskScratchと一致するかだけを合成Workspace内へ記録する。
+- 明示指定Codex CLI `0.158.0-alpha.2.1`でignored test 1件が成功し、TEMP／TMPはいずれもWorkspaceTaskScratchと一致しなかった。これは直接`codex sandbox` childの`LIVE_RUNTIME`観測であって、production `codex exec`内で起動するAgent tool childの環境やcleanupを証明しない。AppContainer領域のcleanup保証も未確認である。
+- 失敗履歴として、最初の補正test buildは`Command::envs`へ参照tupleを渡した型不一致で失敗し、owned pair iteratorへ直してから実行した。production codeやOS保護設定は変更していない。
+
+### 検証と残存境界
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'adapters::codex_cli::tests::Rust生成Task設定で実Windows隔離の登録secretを拒否する' -- --ignored --exact --nocapture`: 成功、1 passed。これは明示指定されたCLIを使う限定診断probeであり、通常suiteではignored。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 12 targetで394 passed／0 failed／1 ignored。ignoredの直接sandbox probeは別途明示実行して1 passed。
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/adapters/codex_cli.rs`、`git diff --check`: 成功。
+- 最初の統合validator実行は、編集5 fileのMANIFEST hash未更新を検出した。`python -X utf8 tooling/manifest.py --write`で1108 fileを再生成後、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。厳格日本語監査1111 file／finding 0、Schema 149／example 149／negative fixture 192、Conformance 225、登録development check 10件すべて成功した。
+- 同validatorの製品証拠面はWindows installed evidenceが未収集でrelease gateとrelease readinessを解除していない。`release_ready=false`と既存`release_blocker`を維持する。
+- Broker／Owner Approval／production `codex exec`／実Agent tool、Taskの正常終了・取消・crash cleanup、Audit／Recovery、結果のContent Exposureは通していない。scratch有効性を主張せず、`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。

@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "8939adf487131d9645009926001c7e419a385e9fedbab48162b2b2f343784b31"
+      "sha256": "27760e7724047909ef290ee7d501c8e389b11901729be2be9d1ba3367a129051"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "600686209150ad221778682db8b13f16982d65261dd2c77049ed8dc23aa4a0e5"
+      "sha256": "be41bad6c316b2bb4c6ae27aa5c547648632a08783d0607388bf008abd03fa4e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "eb63e6dc9bc5b3418756cc80a61c7e8ee8fc04e060a8e523bbce819c0e95e97f"
+      "sha256": "01651c721d3bd14c4778a6f69a56216cf46a2b3f9d0a4e7c7879e2dd5c5653cd"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "2c7e0d468ede8c45b62bbb8d69efb9834921a172193fdb5902b92e0860afaee2"
+      "sha256": "a1d7393ef9fa71e6558cca037533cfc190d13cedfd4f4a634fe87d6d9515f594"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3721,7 +3721,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "ac0163967d8c9d51ed946b9c0a0a51135d62a84b3a5890cc396aff120f18028b"
+      "sha256": "9e27c32f17ef0bfee5156fa73ee674af8fe8aa8a9f5fd59029940b745b67c5d4"
     },
     {
       "path": "requirements-dev.txt",
