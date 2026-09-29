@@ -1756,7 +1756,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "14",
+            "collector_version": "15",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1889,6 +1889,7 @@ def _valid_windows_installed_evidence() -> dict:
                 "surface_match_requirements_met": True,
                 "diagnostic_tree": {
                     "mode": "full_uiautomation_tree_projection",
+                    "tree_view": "control",
                     "observed_element_count": 5,
                     "observed_elements": [
                         {
@@ -1917,6 +1918,7 @@ def _valid_windows_installed_evidence() -> dict:
                     "tree_edges": [
                         {"child_runtime_id": "1.2.1", "parent_runtime_id": "1.2", "child_element_key": "descendant:1"}
                     ],
+                    "capture_limit": "none",
                 },
             },
             "config_path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\first_run_configuration.json",
@@ -2477,6 +2479,8 @@ def test_windows_surface_geometry_and_identity() -> list[str]:
     if _validate_surface_match_evidence(surface):
         return ["完全な観測treeの正常surfaceを拒否した"]
     cases = {
+        "観測方式": lambda s, ns: s["diagnostic_tree"].update(tree_view="raw"),
+        "観測上限": lambda s, ns: s["diagnostic_tree"].update(capture_limit="max_10000_elements"),
         "画面外": lambda s, ns: ns[1]["bounding_rectangle"].update(x=2000),
         "非表示": lambda s, ns: ns[1].update(is_offscreen=True),
         "状態欠落": lambda s, ns: ns[1].pop("is_offscreen"),
@@ -2800,8 +2804,8 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "14"' not in text:
-        errors.append("collect_installed_smoke.ps1の版識別子がBroker報告のhashと監査照合を表さない")
+    if 'collector_version = "15"' not in text:
+        errors.append("collect_installed_smoke.ps1の版識別子がControl Viewのbounded UIAutomation収集を表さない")
     return errors
 
 
@@ -2884,26 +2888,38 @@ def test_windows_installed_smoke_exit_matches_native_tray_contract() -> list[str
     ):
         if token not in window:
             errors.append(f"Desktop WM_CLOSE hide contractに必要な実装がない: {token}")
-    for token in ('[uint32]0x8029', '[IntPtr]0x0205', '$item.Current.ProcessId -eq $Frontend.Id'):
+    for token in (
+        '[uint32]0x8029',
+        '[IntPtr]0x0205',
+        '$item.Current.ProcessId -eq $Frontend.Id',
+        '[System.Windows.Automation.TreeWalker]::ControlViewWalker',
+        '$topLevelProcessId = [int]$topLevel.Current.ProcessId',
+        'if ($topLevelProcessId -eq $Frontend.Id)',
+    ):
         if token not in collector:
             errors.append(f"installed collectorがnative tray exit callbackを正確に操作しない: {token}")
     return errors
 
 
-def test_windows_installed_smoke_uses_raw_uia_tree() -> list[str]:
+def test_windows_installed_smoke_uses_bounded_control_uia_tree() -> list[str]:
     text = (INSTALLER / "windows" / "collect_installed_smoke.ps1").read_text(encoding="utf-8")
     errors = []
     required_tokens = [
-        "function Get-RawDescendants",
-        "$walker = [System.Windows.Automation.TreeWalker]::RawViewWalker",
-        "Get-RawDescendants -RootElement $RootElement",
-        "Get-RawDescendants -RootElement $window",
+        "function Get-ControlViewDescendants",
+        "$walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker",
+        "Get-ControlViewDescendants -RootElement $RootElement",
+        "Get-ControlViewDescendants -RootElement $window",
+        "[int]$MaximumElements = 10000",
+        "capture_limit = $(if ($script:surfaceTreeCaptureLimitReached)",
+        'tree_view = "control"',
     ]
     for token in required_tokens:
         if token not in text:
-            errors.append(f"collect_installed_smoke.ps1がRaw UIAutomation tree tokenを欠いている: {token}")
+            errors.append(f"collect_installed_smoke.ps1がbounded Control View UIAutomation tokenを欠いている: {token}")
     if ".FindAll(" in text:
-        errors.append("collect_installed_smoke.ps1がRawViewWalkerと異なるFindAll treeを使用している")
+        errors.append("collect_installed_smoke.ps1がtree walkerを迂回するFindAll treeを使用している")
+    if "::RawViewWalker" in text:
+        errors.append("collect_installed_smoke.ps1が可視surfaceにRaw Viewだけを使用する")
     return errors
 
 
@@ -9380,7 +9396,7 @@ def main() -> int:
         test_windows_installed_smoke_reads_json_as_utf8,
         test_windows_installed_smoke_uses_launcher_owned_runtime,
         test_windows_installed_smoke_exit_matches_native_tray_contract,
-        test_windows_installed_smoke_uses_raw_uia_tree,
+        test_windows_installed_smoke_uses_bounded_control_uia_tree,
         test_windows_installed_smoke_automation_names_are_materialized,
         test_windows_installed_smoke_uia_properties_are_stringified,
         test_windows_audit_anchor_proof_collector_is_connected,

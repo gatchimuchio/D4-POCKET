@@ -372,13 +372,21 @@ public static class GuiShellInstalledSmokeWin32 {
   $desktop = [System.Windows.Automation.AutomationElement]::RootElement
   for ($attempt = 0; $attempt -lt 50; $attempt += 1) {
     Start-Sleep -Milliseconds 200
-    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
     $pending = New-Object 'System.Collections.Generic.Stack[object]'
     try {
       $topLevel = $walker.GetFirstChild($desktop)
       $topLevelCount = 0
       while ($null -ne $topLevel -and $topLevelCount -lt 1024) {
-        $pending.Push($topLevel)
+        $topLevelProcessId = -1
+        try {
+          $topLevelProcessId = [int]$topLevel.Current.ProcessId
+        } catch {
+          $topLevelProcessId = -1
+        }
+        if ($topLevelProcessId -eq $Frontend.Id) {
+          $pending.Push($topLevel)
+        }
         $topLevel = $walker.GetNextSibling($topLevel)
         $topLevelCount += 1
       }
@@ -607,7 +615,7 @@ function Collect-VisibleSurfaces {
   function Get-ParentRuntimeIdString {
     param($Element)
     try {
-      $parent = [System.Windows.Automation.TreeWalker]::RawViewWalker.GetParent($Element)
+      $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($Element)
       if ($null -eq $parent) {
         return ""
       }
@@ -617,24 +625,52 @@ function Collect-VisibleSurfaces {
     }
   }
 
-  function Get-RawDescendants {
-    param($RootElement)
+  function Get-ControlViewDescendants {
+    param(
+      $RootElement,
+      [int]$MaximumElements = 10000
+    )
 
+    $script:surfaceTreeCaptureLimitReached = $false
+    $script:surfaceTreeDuplicateRuntimeIdDetected = $false
     $elements = New-Object System.Collections.Generic.List[object]
-    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
-
-    function Add-RawChildren {
-      param($ParentElement)
-
-      $child = $walker.GetFirstChild($ParentElement)
-      while ($null -ne $child) {
-        $null = $elements.Add($child)
-        Add-RawChildren -ParentElement $child
-        $child = $walker.GetNextSibling($child)
-      }
+    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+    $pending = New-Object 'System.Collections.Generic.Stack[object]'
+    $seenRuntimeIds = @{}
+    $child = $walker.GetFirstChild($RootElement)
+    while ($null -ne $child -and ($elements.Count + $pending.Count) -lt $MaximumElements) {
+      $pending.Push($child)
+      $child = $walker.GetNextSibling($child)
+    }
+    if ($null -ne $child) {
+      $script:surfaceTreeCaptureLimitReached = $true
     }
 
-    Add-RawChildren -ParentElement $RootElement
+    while ($pending.Count -gt 0) {
+      if ($elements.Count -ge $MaximumElements) {
+        $script:surfaceTreeCaptureLimitReached = $true
+        break
+      }
+      $element = $pending.Pop()
+      $runtimeId = Get-RuntimeIdString -Element $element
+      if ($runtimeId -ne "") {
+        if ($seenRuntimeIds.ContainsKey($runtimeId)) {
+          $script:surfaceTreeDuplicateRuntimeIdDetected = $true
+          continue
+        }
+        $seenRuntimeIds[$runtimeId] = $true
+      }
+      $null = $elements.Add($element)
+
+      $child = $walker.GetFirstChild($element)
+      while ($null -ne $child -and ($elements.Count + $pending.Count) -lt $MaximumElements) {
+        $pending.Push($child)
+        $child = $walker.GetNextSibling($child)
+      }
+      if ($null -ne $child) {
+        $script:surfaceTreeCaptureLimitReached = $true
+      }
+    }
     return @($elements.ToArray())
   }
 
@@ -734,7 +770,10 @@ function Collect-VisibleSurfaces {
     if ($null -eq $RootElement) {
       return $false
     }
-    $elements = @(Get-RawDescendants -RootElement $RootElement)
+    $elements = @(Get-ControlViewDescendants -RootElement $RootElement)
+    if ($script:surfaceTreeCaptureLimitReached -or $script:surfaceTreeDuplicateRuntimeIdDetected) {
+      return $false
+    }
     $seen = @{}
     foreach ($element in $elements) {
       $name = Get-ElementString -Element $element -PropertyName "Name"
@@ -787,7 +826,7 @@ function Collect-VisibleSurfaces {
   $observedElements = New-Object System.Collections.Generic.List[object]
   if ($null -ne $window) {
     $observedElements.Add((New-ObservedElement -Element $window -ElementKey "root" -IsRoot $true))
-    $elements = @(Get-RawDescendants -RootElement $window)
+    $elements = @(Get-ControlViewDescendants -RootElement $window)
     for ($index = 0; $index -lt $elements.Count; $index += 1) {
       $element = $elements[$index]
       $observedElements.Add(
@@ -884,6 +923,8 @@ function Collect-VisibleSurfaces {
     $aggregateSurfaceShortcutDetected = $true
   }
   $surfaceMatchRequirementsMet = (
+    !$script:surfaceTreeCaptureLimitReached -and
+    !$script:surfaceTreeDuplicateRuntimeIdDetected -and
     $visible.Count -eq $expected.Count -and
     !$aggregateSurfaceShortcutDetected -and
     !$singleAggregateElement
@@ -942,7 +983,8 @@ function Collect-VisibleSurfaces {
       observed_element_count = $observedElementValues.Count
       observed_elements = @($observedElementValues)
       tree_edges = @($treeEdgeValues)
-      capture_limit = "none"
+      tree_view = "control"
+      capture_limit = $(if ($script:surfaceTreeCaptureLimitReached) { "max_10000_elements" } elseif ($script:surfaceTreeDuplicateRuntimeIdDetected) { "duplicate_runtime_id" } else { "none" })
       failure_diagnostic = !$surfaceMatchRequirementsMet
     }
   }
@@ -1471,7 +1513,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "14"
+    collector_version = "15"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }

@@ -290,6 +290,13 @@ def _validate_surface_match_evidence(surface_evidence: dict[str, Any]) -> list[s
     if not isinstance(diagnostic_tree, dict):
         errors.append("可視 surface 証拠に diagnostic_tree がない")
     else:
+        if surface_evidence.get("source") == "uiautomation":
+            if diagnostic_tree.get("mode") != "full_uiautomation_tree_projection":
+                errors.append("可視surfaceの観測方式がWindows UI Automation treeではない")
+            if diagnostic_tree.get("tree_view") != "control":
+                errors.append("可視surfaceの観測treeがControl Viewではない")
+            if diagnostic_tree.get("capture_limit") != "none":
+                errors.append("可視surfaceのUI Automation treeが上限または重複IDで不完全である")
         errors.extend(_surface_tree_errors(diagnostic_tree, surface_matches))
     return errors
 

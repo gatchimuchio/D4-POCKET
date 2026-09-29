@@ -28,7 +28,7 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "現行sourceのDiagnosticOnly installed runでは、起動器経由起動・初回設定生成・read-only取得accepted Auditと設定hash一致を観測したが、stage時と異なるWindows user profileによるformal証拠はなく、strict release evidenceにも未収録です。",
+      "reason": "2026-09-29のcollector v15 DiagnosticOnly runでは、起動器経由・No-Python起動、122 nodeのControl View、必須4 surface、trayの通常終了、起動／終了Audit、初回設定生成とaccepted Audit hash一致を実測した。Setup Doctor reportはpass。surface validatorは合格したが、run statusはdiagnostic_onlyでstage作業者と同じWindows profileのため、strict first-run validatorはこの2条件でrelease_blockerを返した。別profileのformal evidenceは未成立。",
       "required_action": "stage時と異なるSIDのWindows user profileからcollect_installed_smoke.ps1を実行し、Rust Desktop起動器の直接child、run固有LOCALAPPDATA内の実Broker runtime、endpoint cleanup、起動・終了AuditEvent、通常資格で受理されたhealth要求AuditEvent、可視画面をclean-source証拠として収集してください。health要求AuditはBrokerによる認証済み要求の受理・記録を示しますが、client応答受信や呼出し元PIDを証明しません。初回設定について起動前不存在、固定既定値、初回設定取得accepted AuditEventのpayload hashと実config byte hash一致も収集し、別profileのclean-source evidenceをtooling/windows_release_evidence.pyへ通してください。Flutter exe直接起動、stage manifestのcollector scratch path、独立Broker smoke、endpoint role metadataだけで代替しないでください。"
     },
     {
@@ -42,8 +42,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Flutter 3.44.0のRelease診断では明示的IAccessibleEx選択後にWindows UIAutomation tree 121 node、必須4 surface、通常tray終了を観測した。ただしDiagnosticOnlyの同一SID実行であり、Setup Doctor画面そのもののoperator readability、別profileのformal evidence、strict validator合格は未成立です。",
-      "required_action": "IAccessibleExを使うWindows Releaseをstage時と異なるuser profileからformal collectorへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集してtooling/windows_release_evidence.pyへ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。"
+      "reason": "Flutter 3.44.0 Releaseのcollector v15診断専用実行でControl View 122要素、必須4画面領域、tray通常終了、Setup Doctor製品報告の成功を観測した。Setup Doctor画面そのものの操作者向け可読性、別profileでの正式証拠、strict validator合格は未成立です。",
+      "required_action": "v15 collectorをstage時と異なるuser profileからclean-source Windows Releaseへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集してtooling/windows_release_evidence.pyへ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。"
     },
     {
       "name": "windows_broker_installed_smoke",

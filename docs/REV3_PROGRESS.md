@@ -257,3 +257,39 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 ### 次工程と残存gate
 
 本fixtureはAdapter経由のBroker取消・process群停止・scratch cleanupをfake CLI上で縦断確認したに過ぎない。production `codex exec`とreal Agent tool、Owner native UI、実model、実Filesystem隔離、deadline／crash／強制Broker終了、永続Audit／Recovery、Workspace diffとtest結果のContent Exposure、Windows installed productは未検証の`release_blocker`。`task_execution=unsupported`、`release_ready=false`を維持する。
+
+## Windows installed collector v15 Control View追補（2026-09-29）
+
+### 実装と観測範囲
+
+- `installer/windows/collect_installed_smoke.ps1`のtray menu／surface取得をRaw ViewからControl Viewへ変更した。tray探索は対象frontend PIDでtop-level windowを絞り、surface projectionは10,000 element上限とruntime ID重複検出を持つ。上限到達または重複時は完全なsurface証拠と見なさない。collector versionは15。
+- `tooling/windows_release_evidence.py`はUI Automation sourceに`full_uiautomation_tree_projection`、`tree_view=control`、`capture_limit=none`を要求する。`tooling/conformance_tests/run_conformance_skeleton.py`にはControl View／欠落tree拒否とtray PID境界のtestを追加し、既存accessibility-tree sourceの別policyは維持した。
+- `installer/windows/README.md`、`docs/WINDOWS_RELEASE_EVIDENCE.md`、`release_blockers.registry.json`を実測と残存gateに合わせた。ROADMAPのC33失敗履歴は書き換えず、追補を追加した。
+- 製品binaryはclean source commit `ae337eee62074229244fb0502fa498c3daa1a3e3`からstagingしたFlutter Windows Release、Rust Broker helper、launcher。dirtyなcollectorを含む現在の未commit作業treeから製品をbuildした証拠ではない。
+
+### Windows実測（DiagnosticOnly）
+
+- 実起動したfrontendのControl Viewは122 nodeで、Dashboard、NavigationRail、Runtime Status、Invariant Statusの4 surfaceすべてを検証器が受理した。trayからの通常終了、forced exitなし、launcher exit code 0、Broker endpoint除去を確認した。
+- 初回config生成、Setup Doctor報告の成功、通常Broker正常性要求の受理、起動・終了Audit、config Audit hash一致、Pythonを指すPATHから15件を除去し残存0も観測した。これは限定された`LIVE_RUNTIME`実測で、Setup Doctor画面の可読性や全体release保証ではない。
+- first-run結果は`diagnostic_only`で、profileは一時配置に使ったWindows userと同一。`validate_installer_first_run`はこの2条件を理由に拒否した。診断証拠fileのSHA-256: `EF203EB9CB98FC53FF97705113EFE837DA67C57893F49D72BFD7CB7BAACEA9F0`。画面領域投影fileのSHA-256: `5545D3D593248D0D8D214C6C18D19C0BD6ED05EA41ABB128EC0382503A0138D7`。Computer Useによる画面・accessibility観測は原因把握の補助に限り、正式collector証拠へ混ぜていない。
+- Windows release evidence検証器は、profileと実行来歴の分離、完全な証拠一式、Setup Doctorの操作者向け可読性、総合証拠一式内のBroker smoke、外部監査基点が不足として不受理。単独Broker smokeのPASSは総合証拠内の証明に代用しない。
+
+### 検証と履歴
+
+- PowerShell parserでcollector構文を確認: 成功。
+- `python -m py_compile tooling/windows_release_evidence.py tooling/conformance_tests/run_conformance_skeleton.py`: 成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checks成功。初回は新positive fixtureの`capture_limit`欠落と旧Raw View前提の静的testで失敗し、fixtureと期待条件をControl View contractへ合わせた後に成功した。
+- `_validate_surface_match_evidence(...)`: 4 surfaceを受理し、findingなし。first-run validatorは`diagnostic_only`と同一profileをrelease blockerとして正しく拒否した。
+- DiagnosticOnly evidenceに対するfull Windows release evidence validatorは意図どおり不受理。成功したsurface subcheckを総合PASSへ昇格しない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`の初回は、追補した8 fileのmanifest hash未更新でmanifest／release gate／package portabilityが失敗した。失敗履歴を残し、`python -X utf8 tooling/manifest.py --write`で1110 fileを再生成して再実行した。
+- 再実行した統合validatorはexit 0。strict日本語監査（1113 file・finding 0）、Schema（149 schema／149 example／192 negative fixture）、Conformance 225 checks、Manifest、development release gate、package portability、release smoke、evidence bundle、runtime assertions（12成功／0失敗）、C32開発監査がすべて成功した。release evidence bundleは5件のrelease blockerを正しく保持し、`release_ready=false`。development release gateの検査成功を製品release可能の意味へ昇格しない。
+- 文書更新後に再生成したManifestのcheck、strict日本語監査、Schema、Conformance、PowerShell parser、Python compile、`git diff --check`も成功。Windows hostで必要検証を実行できたためGitHub Actionsは使用していない。
+
+### 残存gate
+
+- `windows_installer_first_run_smoke`: `release_blocker` — 別Windows profileでの正式first-run証拠がなく、現artifactは`diagnostic_only`。
+- `windows_evidence_provenance_isolation`: `release_blocker` — run固有provenanceと必須evidence bundleが未成立。
+- `windows_setup_doctor_smoke`: `release_blocker` — Setup Doctor operator readability未確認。
+- `windows_broker_installed_smoke`: `release_blocker` — standalone smokeはあるが、正式aggregate evidence bundle内のBroker証拠が未成立。
+- `audit_anchor_external_tamper_evidence_proof`: `release_blocker` — external owner-controlled anchor/tamper proofが未成立。
+- `release_ready=false`を維持。installed product総合証拠、owner GO、正式releaseは成立していない。

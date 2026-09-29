@@ -29,7 +29,7 @@ staged manifestの`launcher_runtime`は起動器が使う`%LOCALAPPDATA%\GUI-She
 
 正式collectorはstageを実行したWindows user SIDと異なるWindows user profileから起動し、`-UseCurrentWindowsProfile`を指定する。staged manifestにはuser SIDそのものではなく、run固有salt付きSHA-256 digestを保存し、collector内だけで現在userと比較する。対象installed rootとmanifestには読み取り権限、evidence出力先には当該test userの書き込み権限が必要だが、collectorはACLを変更しない。同一profileでの開発確認は`-DiagnosticOnly`に限定し、Temp下に別runtimeを作成する。
 
-Rust BrokerはSetup Doctor reportとfirst-run UI configurationを固定storeへ生成・読取するcontractを実装済みである。通常起動UIは認証済みBroker IPCから両方のprojectionを読み取り、Flutterはfileへ書かない。collector version 14はfirst-run configの起動前不在・既定値・file hashとaccepted AuditEventを照合し、Setup Doctor reportの固定store byte hashとaccepted AuditEventもevidence bundleへ含める。変更後sourceによるWindows installed product runとSetup Doctor画面のoperator readabilityは未実測であり、contract・unit test・collectorの存在だけではrelease blockerを解消しない。
+Rust BrokerはSetup Doctor reportとfirst-run UI configurationを固定storeへ生成・読取するcontractを実装済みである。通常起動UIは認証済みBroker IPCから両方のprojectionを読み取り、Flutterはfileへ書かない。collector version 15はfirst-run configの起動前不在・既定値・file hashとaccepted AuditEventを照合し、Setup Doctor reportの固定store byte hashとaccepted AuditEventもevidence bundleへ含める。可視surface収集とtray終了menu探索にはprocessを限定したWindows UI Automation Control Viewを使い、観測treeは10,000 nodeでboundedにする。上限到達・runtime ID重複・個別surface欠落はfailureとして保持する。2026-09-29のDiagnosticOnly runでは122 node、必須4 surfaceすべて、trayの通常終了、Setup Doctor report `pass`を実測し、surface validatorも合格した。一方、同一Windows profileの診断runであり、別profileのstrict evidenceとSetup Doctor画面のoperator readabilityは未成立である。
 
 `collect_broker_smoke.ps1`は認証IPC、`127.0.0.1`限定bind、`credential_role=normal`、永続store準備、Broker restart後のreplay拒否、crash時のfail-closedを検証する。これはBroker単体のLIVE_RUNTIME証拠であり、Desktop起動器、installed product、正式releaseを証明しない。No-Python／no-FFI値は非正式なstatic declarationに限る。
 
@@ -63,8 +63,8 @@ release再検証は `GUI_SHELL_AUDIT_TRUSTED_HEAD` にowner管理の公開継続
 
 - item: Windows visible surfaceの実観測
   classification: release_blocker
-  reason: Flutter build registryだけでは可視性を証明できず、現環境の外部accessibility観測では個別widgetを取得できていない。
-  required_action: 実配置の現在windowから個別surfaceの可視性を取得し、初回起動と由来の検証へ接続する。Computer Useの画面観測だけを既存collectorの厳格な機械証拠へ付け替えない。
+  reason: v14のRaw View collectorはroot／Flutter viewの2 nodeだけを取得した。v15では実配置Releaseの122-node Control Viewから個別4 surfaceを取得しsurface validatorが合格、tray通常終了も成功した。このrunはDiagnosticOnly・同一profileであり、strict release inputではない。
+  required_action: v15 collectorをclean source／artifact provenanceとstage時と異なるWindows profileで実行し、既にPASSしたsurface／通常終了に加え、同一runのfirst-run、Setup Doctor readability、別profile、bundle全体をstrict validatorへ通す。Computer Useの観測を正式証拠へ付け替えない。
   blocks_release: yes
 
 製品側のbuild registry診断出力も `evidence_class=INTERNAL_STATE`、`visibility_measured=false`、`formal_release_input=false` を明記する。登録履歴は `registered_surfaces` と `registered_identifiers` に残すが、`visible_surfaces`・`surface_matches`・観測nodeは空とし、座標・非表示判定・実Semantics node IDを捏造しない。非表示でbuildされた要素や破棄済みの登録が残り得るため、現在画面の代用にしない。
