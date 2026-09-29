@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "34a228d5e10f3dc1bc12033e5da1fc218b4ca90f73fbf89b2fb83afcd7d27731"
+      "sha256": "b16777eb92a9c05d23f16dc3cb3e5c66db336ff042a44f129ba2954de8b72bdf"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "1ec85ab20ce40d60226b9e87ab2d8b5c711402f28fcf185dba93b6dea95ae906"
+      "sha256": "20247be6c5a9574a81c12733efacd84a1792c4a79382f848f44b61e146ffb9e7"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "a1d7393ef9fa71e6558cca037533cfc190d13cedfd4f4a634fe87d6d9515f594"
+      "sha256": "e7885823334b53a6bbfd67b70920fcefdb677a283506d27e1fc259aa4c26ec5e"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3077,7 +3077,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "cdfc38bc478517e0cb7ac1b984afb4f3e4e2cb4bd3a1c1f3dc745aec8a747480"
+      "sha256": "6e7a01a64c28f6e22f1fa106fa233ed665befd00b78edf8ef96dc63237f025ba"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",

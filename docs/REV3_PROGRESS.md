@@ -371,3 +371,46 @@ Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction i
 ### 残存gate
 
 肯定callbackは実Owner dialogではなく、Workspaceも未登録であり、Brokerがgrantを拒否するfixtureである。run #23はhosted Rust検査の証拠に限る。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productは未成立の`release_blocker`として保持し、`task_execution=unsupported`と`release_ready=false`を維持する。
+
+## R2追補 Agent Task deadline停止をOwner取消と区別する（2026-09-29）
+
+### 成立した局所証拠
+
+- Broker workerの内部受信結果へ単調完了時刻を付け、Brokerが結果をpollした時刻ではなく、Task deadlineに対する実際の完了時刻でterminal結果を判定する。期限到達時には受信済み結果を先に処理し、未着の場合だけ停止を要求する。
+- deadline前に完了したOwner取消結果は`cancelled`として保持し、deadline後に届いた取消応答または成功結果は`failed`／`期限超過`へ分類する。停止を確認できない`通信失敗`はdeadlineで覆い隠さない。Codex CLI Adapterもdeadlineをcancel flagより先に判定する。
+- Rust単体試験は期限前Owner取消、deadline上の取消、期限後成功、期限後の停止不能を区別する。Windows fake CLI Broker縦断fixtureは成功・明示取消・deadline停止を通し、deadline停止時に子孫process停止、結果hash不採用、scratch cleanup、Task本文非露出を確認する。fixtureは内部Broker recordのdeadlineを短縮しており、実時間の900秒deadline、実Codex Task、production隔離の証拠ではない（証拠class: `FIXTURE`）。
+- `task_execution=unsupported`、既存`release_blocker`、`release_ready=false`を維持する。この変更はAgent Taskのproduction execution、OS process群の任意条件下での強制停止、installed product、release readinessを成立させない。
+
+### 検証と履歴
+
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs native/rust_helper/src/adapters/codex_cli.rs`: 成功。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0、398 passed／0 failed／1 ignored。これはWindowsローカル全target試験である。
+- Windows fake CLI Broker縦断fixtureの単独実行: 1 passed。AgentTask focused試験: 13 passed。`git diff --check`: 成功。
+- 最初の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は変更3 fileのManifest hash未更新によりManifest／release gate／package portabilityが失敗した。またpackage portability内のsource ZIP Conformanceが120秒でtimeoutし、そのZIPには`.git`がないためConformanceの`git ls-files` probeが`fatal: not a git repository`を出した。Cargo全target試験との同時実行下だったが、timeoutの根本原因は未確定としてこの失敗履歴を保持する。
+- 1,110 fileのManifestを再生成した後、Cargo試験を並行させず同じ統合validatorを再実行しexit 0。strict日本語監査（1113 files／0 findings）、Schema（149 schema／149 example／192 negative fixture）、Conformance（225 checks）、Manifest、development release gate、package portability（source ZIP内Conformanceを含む）、release smoke、evidence bundle、runtime assertions（12成功／0失敗）、C32開発監査が成功した。source ZIPで`git ls-files` probeが出すfatal文言は残るが、この再実行ではpackage portabilityと統合validatorが成功したため、前回timeoutとの因果は立証していない。evidence bundleは既存release blocker 5件、`release_ready=false`を維持した。
+- Windows Actions [run #3](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36560909604)は変更前の`main` commit `f7c74f014650caf451abc8e8c758ef92e4ebe5fc`に対するbaselineであり、本変更の検証ではない。`workflow_dispatch`のWindows Server 2025 runnerでFlutter Desktop/Rust helper build、Desktop analyze/all tests、Mobile analyze、試験後cleanが成功し、artifactはない。所要7分09秒。今回のRust差分にはActions証拠を付けていない。
+
+### 残存gate
+
+Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline enforcementや全OS process descendantの実環境停止保証ではない。実Codex `exec`／隔離、cancel・deadline・crash後Recovery、production Audit／Content Exposure、Windows installed productの既存`release_blocker`を維持し、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 Owner取消受理と競合するAgent Task成功応答を採用しない（2026-09-29）
+
+### 成立した局所証拠
+
+- 期限完了時刻の再監査で、Owner取消flagをworkerの最終hash化前に検査した後、Brokerが結果を受け取るまでに取消要求が成立する競合を特定した。Broker進捗反映が取消受理時刻を知らないまま成功hashを採用し得る境界だった。
+- BrokerはOwner取消Auditの成功後に単調取消受理時刻を内部Task recordへ記録する。workerの単調完了時刻が取消受理時刻以後なら成功結果を採用せず、worker終端を確認した後に`cancelled`とする。取消受理より前にworkerが完了済みなら、後続poll遅延だけを理由に完了結果を書き換えない。deadline判定を先に適用するため、期限後の結果は引き続き`failed`／`期限超過`となる。
+- 決定論的試験で、Owner取消受理後の成功を取消へ分類し、取消受理前に完了済みの成功を維持する。既存Windows fake CLI Broker縦断fixtureは成功・明示取消・期限停止、子孫process停止、result hash不採用、scratch cleanup、Task本文非露出を検査する。これはRust内の時刻境界試験とfake CLI `FIXTURE`に限り、実Codex Taskやinstalled productの証拠ではない。
+- `task_execution=unsupported`、既存`release_blocker`、`release_ready=false`を維持する。
+
+### 検証と履歴
+
+- `rustfmt +1.95.0 --edition 2021 --check native/rust_helper/src/broker/dialogue.rs native/rust_helper/src/adapters/codex_cli.rs`: 成功。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0、398 passed／0 failed／1 ignored。Windows hostの全target試験であり、実Codex Agent Taskのproduction実行証拠ではない。
+- `python -X utf8 tooling/manifest.py --write`でManifest 1110 fileを再生成し、`python -X utf8 tooling/manifest.py --check`と`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`がいずれもexit 0。この変更を含む統合検査は11項目すべて成功。strict日本語監査（1113 files／0 findings）、Schema（149／149／192 negative）、Conformance（225 checks）、package portability、release smoke、evidence bundle、runtime assertions（12成功／0失敗）、C32開発監査が成功した。既存release blocker 5件と`release_ready=false`を保持。
+
+### 残存gate
+
+時刻境界試験はcancel受理後に成功応答が競合する分類を検証する`FIXTURE`であり、実Codex `exec`、全OS process群の強制停止保証、実Workspace隔離、production Audit／Recovery、Windows installed productを証明しない。関連`release_blocker`、`task_execution=unsupported`および`release_ready=false`を維持する。

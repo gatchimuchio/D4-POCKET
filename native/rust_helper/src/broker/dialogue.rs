@@ -456,6 +456,7 @@ struct AgentTask識別子要求 {
 
 struct AgentTask受信結果 {
     result: Result<String, 対話失敗>,
+    completed_at: Instant,
 }
 
 struct AgentTask作業 {
@@ -469,6 +470,7 @@ struct AgentTask作業 {
     audit_event_id: String,
     result_hash: Option<String>,
     cancel: Arc<AtomicBool>,
+    owner_cancel_requested_at: Option<Instant>,
     receiver: Option<mpsc::Receiver<AgentTask受信結果>>,
     created_at: Instant,
     deadline: Instant,
@@ -484,11 +486,11 @@ fn AgentTask結果hash化(
     cancel: &AtomicBool,
     deadline: Instant,
 ) -> Result<String, 対話失敗> {
-    if cancel.load(Ordering::SeqCst) {
-        return Err(対話失敗::取消);
-    }
     if Instant::now() >= deadline {
         return Err(対話失敗::期限超過);
+    }
+    if cancel.load(Ordering::SeqCst) {
+        return Err(対話失敗::取消);
     }
     result.and_then(|output| {
         if output.len() > 1_048_576 {
@@ -497,6 +499,27 @@ fn AgentTask結果hash化(
             Ok(sha256_tagged(output.as_bytes()))
         }
     })
+}
+
+fn AgentTask結果完了時刻検査(
+    result: Result<String, 対話失敗>,
+    completed_at: Instant,
+    owner_cancel_requested_at: Option<Instant>,
+    deadline: Instant,
+) -> Result<String, 対話失敗> {
+    if completed_at >= deadline {
+        return match result {
+            Ok(_) | Err(対話失敗::取消) => Err(対話失敗::期限超過),
+            Err(error) => Err(error),
+        };
+    }
+    if owner_cancel_requested_at.is_some_and(|requested_at| completed_at >= requested_at) {
+        return match result {
+            Ok(_) => Err(対話失敗::取消),
+            Err(error) => Err(error),
+        };
+    }
+    result
 }
 
 fn AgentTask実行条件hash(
@@ -1479,10 +1502,10 @@ impl 対話制御 {
                 let spawn_result = std::thread::Builder::new()
                     .name("AgentTask実行".into())
                     .spawn(move || {
-                        let result = if worker_cancel.load(Ordering::SeqCst) {
-                            Err(対話失敗::取消)
-                        } else if Instant::now() >= deadline {
+                        let result = if Instant::now() >= deadline {
                             Err(対話失敗::期限超過)
+                        } else if worker_cancel.load(Ordering::SeqCst) {
+                            Err(対話失敗::取消)
                         } else {
                             AgentTask結果hash化(
                                 adapter.AgentTask実行(
@@ -1495,7 +1518,11 @@ impl 対話制御 {
                                 deadline,
                             )
                         };
-                        let _ = send.send(AgentTask受信結果 { result });
+                        let completed_at = Instant::now();
+                        let _ = send.send(AgentTask受信結果 {
+                            result,
+                            completed_at,
+                        });
                     });
                 let (status, receiver, audit_event_id) = match spawn_result {
                     Ok(_) => ("running", Some(receive), start_audit_id),
@@ -1526,6 +1553,7 @@ impl 対話制御 {
                                         audit_event_id: start_audit_id,
                                         result_hash: None,
                                         cancel,
+                                        owner_cancel_requested_at: None,
                                         receiver: None,
                                         created_at: Instant::now(),
                                         deadline,
@@ -1548,6 +1576,7 @@ impl 対話制御 {
                     audit_event_id,
                     result_hash: None,
                     cancel,
+                    owner_cancel_requested_at: None,
                     receiver,
                     created_at: Instant::now(),
                     deadline,
@@ -1591,6 +1620,8 @@ impl 対話制御 {
                     .agent_tasks
                     .get_mut(&request.task_id)
                     .ok_or(対話失敗::要求不正)?;
+                task.owner_cancel_requested_at
+                    .get_or_insert_with(Instant::now);
                 task.cancel.store(true, Ordering::SeqCst);
                 Ok(AgentTask状態射影(task))
             }
@@ -2101,13 +2132,21 @@ impl 対話制御 {
                 if task.status != "running" {
                     continue;
                 }
-                if Instant::now() >= task.deadline {
-                    task.cancel.store(true, Ordering::SeqCst);
-                }
+                let deadline = task.deadline;
                 match task.receiver.as_ref().map(mpsc::Receiver::try_recv) {
-                    Some(Ok(result)) => Some(result.result),
+                    Some(Ok(result)) => Some(AgentTask結果完了時刻検査(
+                        result.result,
+                        result.completed_at,
+                        task.owner_cancel_requested_at,
+                        deadline,
+                    )),
                     Some(Err(mpsc::TryRecvError::Disconnected)) => Some(Err(対話失敗::通信失敗)),
-                    Some(Err(mpsc::TryRecvError::Empty)) | None => None,
+                    Some(Err(mpsc::TryRecvError::Empty)) | None => {
+                        if Instant::now() >= deadline {
+                            task.cancel.store(true, Ordering::SeqCst);
+                        }
+                        None
+                    }
                 }
             };
             let Some(result) = completed else {
@@ -2762,6 +2801,78 @@ mod tests {
             ),
             Err(対話失敗::期限超過)
         );
+
+        assert_eq!(
+            AgentTask結果hash化(
+                Ok("同時期限・取消試験用本文".into()),
+                &cancelled,
+                Instant::now() - Duration::from_secs(1),
+            ),
+            Err(対話失敗::期限超過),
+            "期限到達時にBrokerが取消flagを立てても期限超過を保持する"
+        );
+    }
+
+    #[test]
+    fn AgentTask完了結果は期限前の取消と期限後の停止を区別する() {
+        let deadline = Instant::now();
+        assert_eq!(
+            AgentTask結果完了時刻検査(
+                Err(対話失敗::取消),
+                deadline - Duration::from_millis(1),
+                None,
+                deadline,
+            ),
+            Err(対話失敗::取消),
+            "期限前に完了したOwner取消は取消のまま保持する"
+        );
+        assert_eq!(
+            AgentTask結果完了時刻検査(Err(対話失敗::取消), deadline, None, deadline,),
+            Err(対話失敗::期限超過),
+            "deadlineで停止要求したworkerの遅延取消応答は期限超過へ分類する"
+        );
+        assert_eq!(
+            AgentTask結果完了時刻検査(
+                Ok("sha256:fixture".into()),
+                deadline + Duration::from_millis(1),
+                None,
+                deadline,
+            ),
+            Err(対話失敗::期限超過),
+            "期限後の成功hashを採用しない"
+        );
+        assert_eq!(
+            AgentTask結果完了時刻検査(
+                Err(対話失敗::通信失敗),
+                deadline + Duration::from_millis(1),
+                None,
+                deadline,
+            ),
+            Err(対話失敗::通信失敗),
+            "process終了を確認できない通信失敗を期限超過で隠さない"
+        );
+
+        let cancellation_requested_at = deadline - Duration::from_millis(20);
+        assert_eq!(
+            AgentTask結果完了時刻検査(
+                Ok("sha256:fixture".into()),
+                cancellation_requested_at + Duration::from_millis(1),
+                Some(cancellation_requested_at),
+                deadline,
+            ),
+            Err(対話失敗::取消),
+            "Owner取消の受理後に競合して届いた成功hashを採用しない"
+        );
+        assert_eq!(
+            AgentTask結果完了時刻検査(
+                Ok("sha256:fixture".into()),
+                cancellation_requested_at - Duration::from_millis(1),
+                Some(cancellation_requested_at),
+                deadline,
+            ),
+            Ok("sha256:fixture".into()),
+            "Owner取消受理前に完了したworker結果は後続poll遅延で取消へ書き換えない"
+        );
     }
 
     #[test]
@@ -2956,7 +3067,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn Broker制御からCodexAdapterを通るfakeTaskは承認を一回消費し正常完了・取消後にscratchを片付ける_fixture(
+    fn Broker制御からCodexAdapterを通るfakeTaskは成功・取消・期限後停止を区別してscratchを片付ける_fixture(
     ) {
         let fixture = super::broker_codex_fixture_support::BrokerCodexFixture::create();
         let workspace_path = fixture.workspace_path();
@@ -3246,6 +3357,101 @@ mod tests {
             "terminal取消後に子孫processが稼働を継続しない"
         );
         fixture.assert_no_workspace_task_scratch();
+
+        let deadline_heartbeat = workspace_path.join("deadline-descendant-heartbeat");
+        let deadline_instruction = format!(
+            "FIXTURE_TIMEOUT_WITH_DESCENDANT {}",
+            deadline_heartbeat.display()
+        );
+        let deadline_task_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+            "instruction":deadline_instruction.clone(),
+        });
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("期限fixture専用Permission発行");
+        control
+            .操作_作業領域結合済み(
+                CANCEL_FIXTURE_OWNER_APPROVAL_OPERATION,
+                &deadline_task_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("期限fixture専用本文hash結合Approval発行");
+        let deadline_task = control
+            .操作_作業領域結合済み(
+                "AgentTask実行",
+                &deadline_task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("期限fixtureをBroker Adapter経路で開始");
+        assert_eq!(deadline_task["status"], "running");
+        let heartbeat_deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if std::fs::metadata(&deadline_heartbeat).is_ok_and(|metadata| metadata.len() >= 2) {
+                break;
+            }
+            assert!(
+                Instant::now() < heartbeat_deadline,
+                "期限要求前に子孫processが稼働markerを書く"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let deadline_task_id = deadline_task["task_id"].as_str().unwrap();
+        control
+            .agent_tasks
+            .get_mut(deadline_task_id)
+            .expect("Broker内Task記録")
+            .deadline = Instant::now() - Duration::from_millis(1);
+        let task_completion_deadline = Instant::now() + Duration::from_secs(10);
+        let deadline_failed = loop {
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":deadline_task_id}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .expect("期限fixtureの状態取得");
+            if state["status"] != "running" {
+                break state;
+            }
+            assert!(
+                Instant::now() < task_completion_deadline,
+                "期限停止後terminal状態への遷移待ち期限"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(
+            deadline_failed["status"], "failed",
+            "Broker deadlineによる停止をOwner取消へ分類しない"
+        );
+        assert!(deadline_failed.get("result_hash").is_none());
+        let deadline_heartbeat_after_terminal =
+            std::fs::metadata(&deadline_heartbeat).unwrap().len();
+        std::thread::sleep(Duration::from_millis(150));
+        assert_eq!(
+            std::fs::metadata(&deadline_heartbeat).unwrap().len(),
+            deadline_heartbeat_after_terminal,
+            "deadline terminal後に子孫processが稼働を継続しない"
+        );
+        fixture.assert_no_workspace_task_scratch();
         drop(audit);
         assert!(audit_events
             .iter()
@@ -3259,10 +3465,15 @@ mod tests {
         assert!(audit_events
             .iter()
             .any(|event| { event.0.contains("失敗・取消") && event.1 == cancel_task_id }));
+        assert!(audit_events
+            .iter()
+            .any(|event| { event.0.contains("失敗・取消") && event.1 == deadline_task_id }));
         let audit_text = serde_json::to_string(&audit_events).unwrap();
         assert!(!audit_text.contains(instruction));
         assert!(!audit_text.contains(&cancel_instruction));
+        assert!(!audit_text.contains(&deadline_instruction));
         assert!(!cancelled.to_string().contains(&cancel_instruction));
+        assert!(!deadline_failed.to_string().contains(&deadline_instruction));
 
         drop(control);
         drop(workspaces);

@@ -651,11 +651,11 @@ fn run_agent_task(
     cancel: &AtomicBool,
     deadline: Instant,
 ) -> Result<String, 対話失敗> {
-    if cancel.load(Ordering::SeqCst) {
-        return Err(対話失敗::取消);
-    }
     if Instant::now() >= deadline {
         return Err(対話失敗::期限超過);
+    }
+    if cancel.load(Ordering::SeqCst) {
+        return Err(対話失敗::取消);
     }
     let mut child = spawn_codex_task(
         executable,
@@ -672,14 +672,6 @@ fn run_agent_task(
     let stderr_reader = thread::spawn(move || bounded_read(stderr));
 
     let status = loop {
-        if cancel.load(Ordering::SeqCst) {
-            if child.terminate_tree().is_err() {
-                return Err(対話失敗::通信失敗);
-            }
-            let _ = stdout_reader.join();
-            let _ = stderr_reader.join();
-            return Err(対話失敗::取消);
-        }
         if Instant::now() >= deadline {
             if child.terminate_tree().is_err() {
                 return Err(対話失敗::通信失敗);
@@ -687,6 +679,14 @@ fn run_agent_task(
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
             return Err(対話失敗::期限超過);
+        }
+        if cancel.load(Ordering::SeqCst) {
+            if child.terminate_tree().is_err() {
+                return Err(対話失敗::通信失敗);
+            }
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(対話失敗::取消);
         }
         match child.try_wait() {
             Ok(Some(status)) => {
@@ -1271,6 +1271,21 @@ mod tests {
         assert!(adapter.AgentTask実行対応());
 
         let context = scratch_context(identity);
+        let cancellation_requested = AtomicBool::new(true);
+        let expired_before_start = adapter.AgentTask実行(
+            "同時期限・取消試験用Task",
+            &cancellation_requested,
+            Instant::now() - Duration::from_secs(1),
+            Some(context.clone()),
+        );
+        assert_eq!(
+            expired_before_start,
+            Err(対話失敗::期限超過),
+            "deadline到達時のBroker取消flagをOwner取消へ誤分類しない"
+        );
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+
         let completed = adapter.AgentTask実行(
             "fixture success",
             &AtomicBool::new(false),
