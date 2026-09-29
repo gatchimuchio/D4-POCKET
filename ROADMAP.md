@@ -75,7 +75,7 @@ Codex Taskだけが使うWindows sandbox方式を`mxc`に固定し、同じ一�
 
 Rust Desktop起動器経由でOwnerがAgent Task Workspace Permission／Owner Approvalを拒否した場合、Owner専用IPCへ進まず通常Broker経路で`desktop_native_owner_confirmation_required`として拒否されることをloopback fixtureで検査した。合成確認callbackによる`FIXTURE`であり、実Owner dialogやproduction installed pathではない。Windows Actions [run #22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36556239415)と統合validatorは成功し、`main`反映後に一時branchを削除した。詳細、正確な試験範囲、整形検査の制約は`docs/REV3_PROGRESS.md`の最新追補へ記録する。
 
-追補: native確認callbackが肯定でも、Task Permission／Owner ApprovalがOwner専用process内IPCへ進んだ後、未登録Workspaceを実Brokerが`作業領域不在`で拒否するloopback fixtureを追加した。Task本文のsummary／response／Audit非露出も検査する。合成callbackと未登録Workspaceによる`FIXTURE`であり、実Owner dialogやgrant成功の証拠ではない。統合validatorと対象commit固定Windows Actionsは実行前。
+追補: native確認callbackが肯定でも、Task Permission／Owner ApprovalがOwner専用process内IPCへ進んだ後、未登録Workspaceを実Brokerが`作業領域不在`で拒否するloopback fixtureを追加した。Task本文のsummary／response／Audit非露出も検査する。合成callbackと未登録Workspaceによる`FIXTURE`であり、実Owner dialogやgrant成功の証拠ではない。統合validatorは開発検査10件、strict Japanese audit 1113 file／指摘0、Schema 149/149・negative 192、Conformance 225が成功した。Windows Actions [run #23](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36558967124)は一時branchのcommit `8b31153952d077ef993f46c1e3adc7f9b5189419`に対しWindows Server 2025／Rust 1.95.0で12 test target、397 passed／0 failed／1 ignored、workflow固定rustfmt、checkout SHA照合、試験後cleanに成功した。PASSした同一SHAを`main`へfast-forward・pushし、remote HEADを確認後、一時branchを削除した。`desktop_launcher.rs`はworkflow固定rustfmt対象外で、追加範囲の局所確認を行った。証拠はhosted Rust検査とfixtureに限り、実Owner dialog、実Agent Task、grant成功、release readinessを示さない。`task_execution=unsupported`と`release_ready=false`を維持する。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）
 

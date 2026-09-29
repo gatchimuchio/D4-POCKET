@@ -364,8 +364,10 @@ Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction i
 
 - 対象を絞ったDesktop起動器試験は1件成功、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功した。追加blockは`rustfmt +1.95.0 --edition 2021 --emit stdout`の該当範囲と一致する。全fileの`rustfmt --check`は変更していない既存箇所の整形差で失敗するため、file全体は再整形しない。
 - 初回focused試験では、未登録Agentが先に拒否されるという期待に対し、実際は上位のWorkspace結合検査が先に`作業領域不在`で拒否した。製品実装を変えず、fail-closedの実際の検査順を試験期待値へ反映して再試験成功した。
-- 更新後の統合validatorと対象commit固定の手動Windows Actions全target検証はこれから行う。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は10開発検査すべて成功し、strict Japanese auditは1113 file／指摘0、Schemaは149/149とnegative 192件、Conformanceは225件成功した。release blocker 5件と`release_ready=false`は維持する。
+- Windows Actions [run #23](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36558967124)は一時branch上のcommit `8b31153952d077ef993f46c1e3adc7f9b5189419`をWindows Server 2025 image `windows-2025-vs2026/20260922.246.2`／Rust 1.95.0で検査した。checkout SHA照合、workflow固定対象のrustfmt、全target cargo check／test（12 test target、397 passed／0 failed／1 ignored）、試験後cleanが成功し、artifactなし。run所要6分33秒。`desktop_launcher.rs`はworkflow固定rustfmt対象外であり、新規追加範囲の局所rustfmt照合のみ実施した。PASSした同一SHAを`main`へfast-forward／pushし、remote HEAD一致を確認後、一時branchをlocal／remote双方から削除した。
+- 初回focused testの期待値違いは実装欠陥ではなく、BrokerのWorkspace結合検査がAgent registry検査より先に`作業領域不在`で拒否する実順序だった。期待値を実装のfail-closed順序に合わせた後のfocused testとActions全target testが成功した。
 
 ### 残存gate
 
-肯定callbackは実Owner dialogではなく、Workspaceも未登録である。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productは未成立の`release_blocker`として保持し、`release_ready=false`を維持する。
+肯定callbackは実Owner dialogではなく、Workspaceも未登録であり、Brokerがgrantを拒否するfixtureである。run #23はhosted Rust検査の証拠に限る。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productは未成立の`release_blocker`として保持し、`task_execution=unsupported`と`release_ready=false`を維持する。

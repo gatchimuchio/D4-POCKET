@@ -203,10 +203,10 @@
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36556239415",
-        "target_commit": "364552dfe118ccf5e6a49650bf992712dde74931",
-        "result": "Windows Server 2025系runner windows-2025-vs2026／Rust 1.95.0で全target cargo check／testを実行し、12 test target、397 passed、0 failed、1 ignored。checkout SHA照合、workflow固定rustfmt対象群、試験後cleanも成功。desktop_launcher.rsはworkflow固定rustfmt対象群に含まれず、新規追加範囲のみ局所確認した。所要5分34秒、artifactなし。",
-        "scope_limit": "hosted Rust検査のみ。この変更はDesktop起動器からloopback BrokerへのOwner拒否FIXTUREであり、実Windows確認dialog、実Agent Task、production installed path、OS filesystem隔離、release readinessを証明しない。"
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36558967124",
+        "target_commit": "8b31153952d077ef993f46c1e3adc7f9b5189419",
+        "result": "Windows Server 2025 image windows-2025-vs2026/20260922.246.2／Rust 1.95.0で全target cargo check／testを実行し、12 test target、397 passed、0 failed、1 ignored。checkout SHA照合、workflow固定rustfmt対象群、試験後cleanも成功。desktop_launcher.rsはworkflow固定rustfmt対象群に含まれず、新規追加範囲のみ局所確認した。run所要6分33秒、artifactなし。",
+        "scope_limit": "hosted Rust検査のみ。Owner native確認callback肯定後にOwner専用IPCを経由しても、未登録WorkspaceはBrokerが拒否するloopback FIXTUREの検査である。実Windows確認dialog、登録済みWorkspaceでのPermission／Approval発行、実Agent Task、production installed path、OS filesystem隔離、release readinessを証明しない。"
       },
       "status": "unresolved",
       "status_source": "manual",
