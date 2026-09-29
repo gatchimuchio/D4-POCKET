@@ -345,7 +345,8 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 
 - 対象を絞った試験 `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'desktop_launcher::tests::desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes' -- --exact --nocapture --test-threads=1`: 1件成功。
 - `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。追加したRust blockは`rustfmt +1.95.0 --edition 2021 --emit stdout`の該当範囲と一致した。`desktop_launcher.rs`全fileの`rustfmt --check`は変更していない複数箇所の既存整形差も検出してexit 1となったため、一括再整形は行わない。
-- 対象commitを固定した手動Windows Actionsの全target check／testと、本追補後の統合validatorはこれから実施する。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。開発validator登録10項目、日本語厳格監査（1113 files／0 findings）、Schema（149／149／negative 192）、Conformance（225 checks）、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions（12／0）、C32開発監査が成功した。Windows installed evidence等の既存release blocker 5件と`release_ready=false`を保持した。
+- Owner許可によるWindows Actions [run #22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36556239415)は、一時branch上の正確なcommit `364552dfe118ccf5e6a49650bf992712dde74931`をWindows Server 2025系runner `windows-2025-vs2026`／Rust 1.95.0で検査した。checkout SHA照合、workflowに固定されたrustfmt対象群、全target `cargo check`／`cargo test`（12 target、397件成功／0失敗／1 ignored）、試験後cleanが成功した。所要5分34秒、artifactなし。新規変更箇所の整形は該当範囲で確認済みだが、workflowの固定rustfmt対象群に`desktop_launcher.rs`は含まれず、全fileの`rustfmt --check`は既存差分を含むため成功した扱いにしない。PASSした同一SHAを`main`へfast-forward・pushし、remote HEAD照合後に一時branchをlocal／remote双方から削除した。
 
 ### 残存gate
 

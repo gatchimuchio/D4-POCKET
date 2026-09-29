@@ -203,10 +203,10 @@
       "current_validation": {
         "workflow": ".github/workflows/windows-manual-rust-validation.yml",
         "trigger": "workflow_dispatch",
-        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36552280495",
-        "target_commit": "dc2ec0960421442f34e3c229451b1f4a76c105f5",
-        "result": "Windows Server 2025／Rust 1.95.0で全target cargo check／testを実行し、12 test target、397 passed、0 failed、1 ignored。checkout SHA照合、対象Rust fileのrustfmt、試験後cleanも成功。所要6分24秒、artifactなし。",
-        "scope_limit": "hosted Rust検査のみ。この変更はBroker対話制御のFIXTURE否定試験であり、実Agent Task、production Broker／IPC、OS filesystem隔離、installed product、release readinessを証明しない。"
+        "run": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36556239415",
+        "target_commit": "364552dfe118ccf5e6a49650bf992712dde74931",
+        "result": "Windows Server 2025系runner windows-2025-vs2026／Rust 1.95.0で全target cargo check／testを実行し、12 test target、397 passed、0 failed、1 ignored。checkout SHA照合、workflow固定rustfmt対象群、試験後cleanも成功。desktop_launcher.rsはworkflow固定rustfmt対象群に含まれず、新規追加範囲のみ局所確認した。所要5分34秒、artifactなし。",
+        "scope_limit": "hosted Rust検査のみ。この変更はDesktop起動器からloopback BrokerへのOwner拒否FIXTUREであり、実Windows確認dialog、実Agent Task、production installed path、OS filesystem隔離、release readinessを証明しない。"
       },
       "status": "unresolved",
       "status_source": "manual",

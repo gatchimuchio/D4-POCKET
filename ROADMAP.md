@@ -73,7 +73,7 @@ Codex Taskだけが使うWindows sandbox方式を`mxc`に固定し、同じ一�
 
 追補: Windows Actions [run #21](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36552280495)は一時branch上のcommit `dc2ec0960421442f34e3c229451b1f4a76c105f5`をWindows Server 2025／Rust 1.95.0で検査し、checkout SHA照合、対象Rust fileのrustfmt、全target cargo check／test（12 target、397 passed／0 failed／1 ignored）、試験後cleanに成功した。所要6分24秒、artifactなし。PASSした同一SHAのみを`main`へfast-forward・pushし、remote HEADを照合後、一時branchをlocal／remote双方から削除した。局所`FIXTURE`／hosted Rust証拠の範囲を超えて実Agent Taskやrelease readinessを証明せず、`task_execution=unsupported`と`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`と`release_blockers.registry.json`。
 
-次のR2小単位では、Rust Desktop launcher経由でOwnerがAgent Task Workspace Permission／Owner Approvalを拒否した場合、Owner専用IPCへ進まず通常Broker経路で`desktop_native_owner_confirmation_required`として拒否されることをloopback fixtureで検査する。これは合成確認callbackによる`FIXTURE`であり、実Owner dialogやproduction installed pathではない。詳細と手動Windows全target検証は`docs/REV3_PROGRESS.md`の最新追補へ記録する。
+Rust Desktop起動器経由でOwnerがAgent Task Workspace Permission／Owner Approvalを拒否した場合、Owner専用IPCへ進まず通常Broker経路で`desktop_native_owner_confirmation_required`として拒否されることをloopback fixtureで検査した。合成確認callbackによる`FIXTURE`であり、実Owner dialogやproduction installed pathではない。Windows Actions [run #22](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36556239415)と統合validatorは成功し、`main`反映後に一時branchを削除した。詳細、正確な試験範囲、整形検査の制約は`docs/REV3_PROGRESS.md`の最新追補へ記録する。
 
 ## Windows Desktop Flutter手動補助検証（2026-09-28、09-29追補）
 
