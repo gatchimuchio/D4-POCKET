@@ -56,8 +56,34 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "インストール済みRustブローカーの起動・接続・再起動・異常終了証拠が、リリース前に機械検証へ合格する必要があります。",
-      "required_action": "installer/windows/collect_broker_smoke.ps1を実行し、IPC／再起動／異常終了と一時session資格fileの削除を実測したブローカー証拠をrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyへ合格させてください。"
+      "reason": "現行main commit 75412301dfd7c17c99237fb795b894ffde119b5fからclean Rust Release helperをbuildし、Broker起動・認証IPC・再起動後のnonce replay拒否・新規health・強制終了後fail-closed・session資格file削除をLIVE_RUNTIMEで確認した。ただしこれは一時build領域からのstandalone helper実行であり、正式Windows installed evidence bundleへの取込み、final packageとのartifact同一性、installed product起動経路を示していないため、release gateは未成立。",
+      "required_action": "final Windows Release package内のRust helperをinstaller/windows/collect_broker_smoke.ps1で検査し、source commitとhelper artifact hashへ結合した実測値だけをrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyを通してください。既存の一時buildによるLIVE_RUNTIME probeはinstalled-path証拠へ昇格しない。",
+      "latest_live_runtime_probe": {
+        "date": "2026-09-29",
+        "evidence_source": "LIVE_RUNTIME",
+        "source_commit": "75412301dfd7c17c99237fb795b894ffde119b5f",
+        "source_worktree_clean": true,
+        "collected_at": "2026-09-29T13:00:23.3251845Z",
+        "build_command": "cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir <isolated temporary directory>",
+        "build_result": "成功。変更外のdead_code warningが2件",
+        "artifact_kind": "clean sourceからbuildしたstandalone Rust Release helper。installed application artifactではない",
+        "helper_sha256": "fbc43b584b6e4f75416b7a1931e63fb8e3c4f691d1d03367a94c7ef8af0b92ef",
+        "collector_output_sha256": "253723fcc92df60f78b55ec817f61871a740a139f6d2f604f3cfb4df6a1a26d3",
+        "collector": "installer/windows/collect_broker_smoke.ps1",
+        "collector_version": "5",
+        "collector_result": "passed",
+        "observations": {
+          "helper_exists": true,
+          "normal_credential_role_and_loopback_bind": true,
+          "authenticated_ipc_and_durable_store": true,
+          "restart_replay_rejected": true,
+          "fresh_health_after_restart": true,
+          "forced_crash_fails_closed": true,
+          "session_credential_file_created_then_removed": true,
+          "errors": []
+        },
+        "scope_limit": "隔離temporary store／session／outputを使ったstandalone Rust Release helperの実行に限る。installed product launch、Flutter integration、別user profile smoke、正式release evidence provenance、release readinessは証明しない"
+      }
     },
     {
       "name": "audit_anchor_external_tamper_evidence_proof",

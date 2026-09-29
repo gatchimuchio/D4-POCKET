@@ -229,6 +229,15 @@ R2を継続し、登録済み任意secret pathのTask sandboxへの伝播、Owne
 - 同検証は`release_ready=false`を維持。最終development auditは`release_blocker` 31件と`post_v1_scope` 1件を報告し、正式releaseやCodex Task隔離を主張しない。
 - Rust変更はWindowsローカルで全target check／testまで通ったため、この単位では同じ範囲を重ねるGitHub Actionsを起動していない。ActionsやCI status checkを品質基準として追加していない。
 
+## Windows現行RustブローカーのRelease実測（2026-09-29）
+
+- commit `75412301dfd7c17c99237fb795b894ffde119b5f`時点の変更なし作業treeから、独立した一時Cargo出力先へ`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir <isolated temporary directory>`を実行し成功した。helperのSHA-256は`fbc43b584b6e4f75416b7a1931e63fb8e3c4f691d1d03367a94c7ef8af0b92ef`。release buildは既存`minidora.rs`の`dead_code` warning 2件を出したが、buildは成功した。
+- helperに`installer/windows/collect_broker_smoke.ps1` collector version 5を実行し、通常接続資格とloopback bind、認証済みIPC、永続store準備、Broker再起動後の同nonce再利用拒否、新nonceのhealth受理、強制process終了後のIPC接続拒否、一時session資格file作成・削除をすべて観測した。collector statusは`passed`、errorsは空。
+- build成果物、store、session file、collector出力は一意なsystem temporary directoryへ隔離した。session fileはcollectorが削除した。既存`release_evidence/windows_broker_smoke.json`およびinstalled evidenceは上書きしていない。helperとcollectorのruntime値にCredential実値は含まれない。
+- 証拠classは現行commitのRust Release helper単体に対する`LIVE_RUNTIME`。これは正式Windows installed application、Flutter起動経路、別user profile、完全なsource/artifact provenance bundleの証拠ではないため、`windows_broker_installed_smoke`はunresolvedのまま。helper artifactが最終配布物と一致する実測を`release_evidence/windows_installed_smoke.json`へ統合し、strict validatorに通す必要がある。`release_ready=false`を維持する。
+- 初回の統合validatorは追加した2見出しの英語語句をstrict日本語監査が検出してexit 1となった。見出しを日本語化し、監査器や例外台帳を変更せず`python -X utf8 tooling/日本語基底監査.py --strict`を再実行して1113 files／0 findingsでPASSした。初回FAILはこの履歴に残す。
+- 修正後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。登録development check 10件、Schema 149／example 149／negative fixture 192、Conformance 225、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertions 12／0、C32開発監査が成功した。release evidence bundleは既存blocker 5件と`release_ready=false`を保持し、このstandalone smokeをinstalled evidenceへ昇格していない。
+
 ## R2追補 Broker対話制御からCodex Adapter fake Taskまでの縦断fixture（2026-09-29）
 
 ### 成立した局所証拠
