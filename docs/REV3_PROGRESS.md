@@ -414,3 +414,22 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 ### 残存gate
 
 時刻境界試験はcancel受理後に成功応答が競合する分類を検証する`FIXTURE`であり、実Codex `exec`、全OS process群の強制停止保証、実Workspace隔離、production Audit／Recovery、Windows installed productを証明しない。関連`release_blocker`、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 MxC shell childへscratch環境変数を固定できるか再検査（2026-09-29）
+
+### 観測
+
+- 既存の資格情報なしloopback偽Responses API probeを拡張し、Codex設定`shell_environment_policy.set`にも合成WorkspaceTaskScratch pathを`TEMP`／`TMP`として指定して、明示指定Codex CLI `0.158.0-alpha.2.1`の実`codex exec`とMxC shell childを3回実行した。
+- 3/3回ともturnと固定shell commandは正常終了し、shell childのTEMP／TMPは互いに一致したが、設定したscratchとは一致しなかった。観測された値はPackages配下の`AC/Temp`形式で、絶対pathは保存しない。合成TEMP markerはchild内で書けたが、Codex終了後hostから見えなかった。これは物理削除の証拠ではない。
+- 偽probe用modelはmodel metadata catalogに存在せず、Codexはfallback metadataを使う旨のwarning eventを出した。warningはprobe出力へ残し、固定commandとturnが成功した事実とは区別する。実modelでの挙動やfallback品質を証明しない。
+- 追加設定は診断probe内だけであり、製品Adapter設定や永続Codex設定を変更していない。credential・実model・Rust Broker・Owner Approval・製品Task経路・取消／期限／crashは未使用。loopback以外の通信はproxyで拒否した。
+- 証拠classは当該CLI／当該Windowsでの`LIVE_RUNTIME`限定観測。MxC child TEMP/TMPの設定機構、scratchとの不一致理由、異常終端時のchild一時領域cleanup、Rust Brokerからの連続Task経路は未解決である。Agent Adapterの`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定のcodex.exe絶対path> --runs 3`: 成功、3/3回で同じ不一致を観測。
+- `python -m py_compile tooling/codex_mxc_exec_temp_probe.py`と`python -m json.tool release_blockers.registry.json`: 成功。
+- warning本文をprobe出力へ残す変更後の最初の再実行は、`--runs 3`の1回目でResponses API要求1件の後に`stream disconnected before completion: error sending request`となり、exit 1だった。proxyは非loopback接続を拒否し、server側stream write exceptionは0件。原因は未確定として失敗履歴を保持する。
+- 同じ最終probeを順次再実行した`python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <Owner指定のcodex.exe絶対path> --runs 3`はexit 0、3/3回でturnと固定commandが正常完了し、TEMP／TMP不一致とfallback metadata warningを再観測した。非loopback requestは計12件をloopback proxyで拒否。先行probe runおよび後続single-run retryも成功したが、stream断の根本原因は確定していない。
+- `python -X utf8 tooling/manifest.py --write`は1110 fileを再生成し、`python -X utf8 tooling/manifest.py --check`が成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0、登録済み全development check成功。strict日本語監査1113 files／0 findings、Schema 149／149・negative fixture 192、Conformance 225 checks、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertion 12成功／0失敗、C32監査が成功。release blocker 5件、`release_ready=false`は維持された。

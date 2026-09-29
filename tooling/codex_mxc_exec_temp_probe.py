@@ -309,8 +309,13 @@ def _credential_free_environment() -> dict[str, str]:
     }
 
 
-def _overrides(base_url: str) -> list[str]:
-    return [value.replace("__D4P_BASE_URL__", base_url) for value in _BASE_OVERRIDES]
+def _overrides(base_url: str, scratch: Path) -> list[str]:
+    overrides = [value.replace("__D4P_BASE_URL__", base_url) for value in _BASE_OVERRIDES]
+    scratch_value = json.dumps(str(scratch).replace("\\", "/"), ensure_ascii=False)
+    overrides.append(
+        f"shell_environment_policy.set={{TEMP={scratch_value},TMP={scratch_value}}}"
+    )
+    return overrides
 
 
 def _task_probe_command(nonce: str) -> str:
@@ -388,6 +393,17 @@ def _safe_event_summary(stdout: str, redact_paths: tuple[str, ...] = ()) -> list
         error = item.get("error")
         if isinstance(error, dict):
             details["error_code"] = error.get("code")
+        if item.get("type") == "error" and isinstance(item.get("message"), str):
+            message = item["message"]
+            for path in redact_paths:
+                message = message.replace(path, "<LOCAL_PATH>")
+            message = re.sub(r"https?://\S+", "<URL>", message)
+            message = re.sub(
+                r"(?i)(authorization|api[_ -]?key|token|secret)(\s*[:=]\s*)\S+",
+                r"\1\2<redacted>",
+                message,
+            )
+            details["item_error_message"] = message[:300]
         if event.get("type") == "error" and isinstance(event.get("message"), str):
             message = event["message"]
             for path in redact_paths:
@@ -423,7 +439,7 @@ def _run_once(
         base_url = f"http://127.0.0.1:{server.server_address[1]}/v1"
         environment = _safe_environment(server.server_address[1], codex_home, scratch)
         arguments = [str(executable)]
-        for override in _overrides(base_url):
+        for override in _overrides(base_url, scratch):
             arguments.extend(("-c", override))
         arguments.extend(
             (
@@ -530,6 +546,7 @@ def _run_once(
                 if count - blocked_categories_before.get(category, 0) > 0
             },
             "exec_command_offered": exec_command_offered,
+            "shell_environment_policy_temp_override": True,
             "temp_equals_workspace_task_scratch": report.get("tempMatchesScratch"),
             "tmp_equals_workspace_task_scratch": report.get("tmpMatchesScratch"),
             "temp_equals_tmp": str(report.get("tempPath", "")).casefold()

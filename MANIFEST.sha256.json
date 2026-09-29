@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "b16777eb92a9c05d23f16dc3cb3e5c66db336ff042a44f129ba2954de8b72bdf"
+      "sha256": "6b0a0c14c335b2e6303c953fe252d3e3474a3ad44cbdfd8195d28ca7d2b7c25d"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "20247be6c5a9574a81c12733efacd84a1792c4a79382f848f44b61e146ffb9e7"
+      "sha256": "984600e7bad8943d73b23e38601f07a0613b4b3c47854aef41f6c6bd90125eba"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -3725,7 +3725,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "65f3a249c47ca66df9f5b72f346de2cfe36537612fd08511145185b5953e403c"
+      "sha256": "a6f5e5df9d4a95375afade40048d63475e23337f0a769bed1979298535abf979"
     },
     {
       "path": "requirements-dev.txt",
@@ -4369,7 +4369,7 @@
     },
     {
       "path": "tooling/codex_mxc_exec_temp_probe.py",
-      "sha256": "a6bbcbd6aef7469d1e27e2e5e6af4540a1150232002c95ca03bc3cbd9077a340"
+      "sha256": "438a3544c86592251797ee3f19d1569673477f1e4eca432411fda5e4cd4e58a0"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

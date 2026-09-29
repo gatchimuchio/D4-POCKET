@@ -181,6 +181,26 @@
         },
         "scope_limit": "direct Codex CLI and MxC shell child only. Host non-visibility is not proof of physical deletion or general cleanup. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, or Recovery"
       },
+      "codex_exec_shell_environment_override_probe": {
+        "date": "2026-09-29",
+        "cli_version": "0.158.0-alpha.2.1",
+        "evidence_source": "LIVE_RUNTIME",
+        "method": "development-only loopback fake Responses API probe invokes actual codex exec and MxC shell child; in addition to parent TEMP/TMP, explicitly sets shell_environment_policy.set TEMP and TMP to the synthetic WorkspaceTaskScratch path",
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "real_model_or_credential_used": false,
+        "runs": 3,
+        "observations": {
+          "shell_environment_policy_TEMP_TMP_set_to_scratch": "true",
+          "probe_model_warning": "fake model metadata was absent; Codex emitted a fallback-metadata warning while the fixed command and turn still completed",
+          "child_TEMP_TMP_equal_to_each_other": "3/3",
+          "child_TEMP_TMP_equal_to_scratch": "false in 3/3",
+          "child_TEMP_path_shape": "under Packages and ended in AC/Temp; absolute path not retained",
+          "synthetic_TEMP_marker": "written in child; not host-visible after CLI exit in 3/3",
+          "non_loopback_requests": "intercepted and rejected by local loopback proxy"
+        },
+        "scope_limit": "direct codex exec and MxC shell child only. Does not exercise Rust Broker, Owner Approval, production Agent Task, real model, cancellation, timeout, crash, process-tree supervision, Audit, Recovery, or physical deletion of the MxC temp area"
+      },
       "rust_generated_secret_path_probe": {
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",
