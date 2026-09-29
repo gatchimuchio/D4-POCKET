@@ -351,3 +351,21 @@ Owner Approval期限の否定試験追加はAgent Task本番経路完成を意�
 ### 残存gate
 
 Owner拒否時のloopback relay拒否はnative dialogの実操作やproduction installed pathの証拠ではない。実Owner Yes／No経路、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productを未成立の`release_blocker`として保持し、`release_ready=false`を維持する。
+
+## R2追補 native確認後も未登録WorkspaceへTask権限を発行しないrelay縦断試験（2026-09-29）
+
+### 成立した局所証拠
+
+- Rust Desktop起動器のloopback Broker fixtureで、Agent Task Workspace PermissionとOwner Approvalのnative確認callbackが肯定を返しても、未登録WorkspaceをBrokerが`作業領域不在`として拒否する試験を追加した。Owner専用process内IPCへ進んだ後のBroker再検証まで通す一方、通常request、metadata、native確認だけでは権限を発行しない。
+- Task本文はhashだけをnative確認summaryへ射影し、responseとAuditに現れないことも確認する。先行する同一fixtureのOwner拒否では、両操作がOwner専用IPCへ進まず通常Broker経路で拒否される。
+- 証拠はloopback Brokerと合成確認callbackを使う`FIXTURE`である。Workspace登録、実Windows確認dialog、実Agent Task、Task実行、sandbox、release readinessを証明しない。`task_execution=unsupported`と既存`release_blocker`を維持する。
+
+### 検証と履歴
+
+- 対象を絞ったDesktop起動器試験は1件成功、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`も成功した。追加blockは`rustfmt +1.95.0 --edition 2021 --emit stdout`の該当範囲と一致する。全fileの`rustfmt --check`は変更していない既存箇所の整形差で失敗するため、file全体は再整形しない。
+- 初回focused試験では、未登録Agentが先に拒否されるという期待に対し、実際は上位のWorkspace結合検査が先に`作業領域不在`で拒否した。製品実装を変えず、fail-closedの実際の検査順を試験期待値へ反映して再試験成功した。
+- 更新後の統合validatorと対象commit固定の手動Windows Actions全target検証はこれから行う。
+
+### 残存gate
+
+肯定callbackは実Owner dialogではなく、Workspaceも未登録である。実Owner Yes／No、登録済みsupported AdapterでのPermission／Approval発行、実Codex `exec`と隔離、取消／期限／crash後Recovery、Audit／Content Exposureの製品縦断、Windows installed productは未成立の`release_blocker`として保持し、`release_ready=false`を維持する。

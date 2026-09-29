@@ -2536,6 +2536,114 @@ mod tests {
             .to_string()
             .contains(declined_instruction));
 
+        let confirmed_permission = desktop_owner_request(
+            "AgentTaskWorkspacePermissionGrant",
+            "desktop-agent-task-permission-confirmed-without-runtime",
+            "desktop-agent-task-permission-confirmed-without-runtime-nonce",
+            serde_json::json!({
+                "agent_runtime_id": "unregistered-fixture-agent",
+                "session_id": "fixture-session",
+                "workspace_id": "fixture-workspace"
+            }),
+        );
+        let mut confirmed_permission_prompt_count = 0;
+        let denied_unregistered_permission = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&confirmed_permission).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                confirmed_permission_prompt_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("Permission確認はAgent Task固有のnative確認を使う")
+                };
+                assert_eq!(runtime_id, "unregistered-fixture-agent");
+                assert_eq!(session_id, "fixture-session");
+                assert_eq!(workspace_id, "fixture-workspace");
+                assert_eq!(
+                    payload_hash,
+                    confirmed_permission["payload_hash"].as_str().unwrap()
+                );
+                true
+            },
+        )
+        .unwrap();
+        let denied_unregistered_permission: serde_json::Value =
+            serde_json::from_slice(&denied_unregistered_permission).unwrap();
+        assert_eq!(confirmed_permission_prompt_count, 1);
+        assert_eq!(denied_unregistered_permission["status"], "rejected");
+        assert_eq!(
+            denied_unregistered_permission["error"]["code"],
+            "作業領域不在"
+        );
+
+        let unregistered_instruction = "未登録Agentへ発行しないOwner Approval本文";
+        let confirmed_approval = desktop_owner_request(
+            "AgentTaskOwnerApprovalGrant",
+            "desktop-agent-task-approval-confirmed-without-runtime",
+            "desktop-agent-task-approval-confirmed-without-runtime-nonce",
+            serde_json::json!({
+                "agent_runtime_id": "unregistered-fixture-agent",
+                "session_id": "fixture-session",
+                "workspace_id": "fixture-workspace",
+                "instruction": unregistered_instruction
+            }),
+        );
+        let mut confirmed_approval_prompt_count = 0;
+        let denied_unregistered_approval = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&confirmed_approval).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                confirmed_approval_prompt_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    instruction_hash,
+                    payload_hash,
+                    ..
+                } = summary
+                else {
+                    panic!("Approval確認はTask本文を表示しないnative確認を使う")
+                };
+                assert_eq!(runtime_id, "unregistered-fixture-agent");
+                assert_eq!(session_id, "fixture-session");
+                assert_eq!(workspace_id, "fixture-workspace");
+                assert_eq!(
+                    instruction_hash,
+                    &sha256_tagged(unregistered_instruction.as_bytes())
+                );
+                assert_eq!(
+                    payload_hash,
+                    confirmed_approval["payload_hash"].as_str().unwrap()
+                );
+                assert!(!owner_confirmation_text(summary).contains(unregistered_instruction));
+                true
+            },
+        )
+        .unwrap();
+        let denied_unregistered_approval: serde_json::Value =
+            serde_json::from_slice(&denied_unregistered_approval).unwrap();
+        assert_eq!(confirmed_approval_prompt_count, 1);
+        assert_eq!(denied_unregistered_approval["status"], "rejected");
+        assert_eq!(
+            denied_unregistered_approval["error"]["code"],
+            "作業領域不在"
+        );
+        assert!(!denied_unregistered_approval
+            .to_string()
+            .contains(unregistered_instruction));
+
         let mut changed_hash = desktop_export_request("desktop-export-changed-hash", "desktop-export-changed-hash-nonce");
         changed_hash["payload_hash"] = serde_json::Value::String("sha256:forged".into());
         let mut invalid_prompt_count = 0;
@@ -2608,6 +2716,9 @@ mod tests {
         assert!(audit.contains("AgentTaskWorkspacePermissionGrant"));
         assert!(audit.contains("AgentTaskOwnerApprovalGrant"));
         assert!(audit.contains("desktop_native_owner_confirmation_required"));
+        assert!(audit.contains("作業領域不在"));
+        assert!(!audit.contains("Ownerが拒否したTask本文"));
+        assert!(!audit.contains(unregistered_instruction));
         assert!(audit.contains("broker_payload_hash_invalid"));
         broker_endpoint.session_secret.zeroize();
         session_bytes.zeroize();
