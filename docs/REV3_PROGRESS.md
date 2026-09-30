@@ -734,6 +734,21 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
 
+## R2追補 Setup Doctor操作画面の可読性改善（2026-09-30）
+
+### 成立した変更
+
+- 診断概要、状態別件数、項目別カード、問題時の復旧案内を追加し、画面内の状態値・既知check ID・取得元・鮮度・通信範囲・監査鎖・Runtime状態を日本語表示へ置き換えた。
+- installed-path evidenceは状態だけを表示し、evidence IDや保存先pathを画面へ出さない。診断がPermission／Approvalを生成せず、製品release readinessの判定でもない境界を明示した。`release_state`は既知値だけ表示変換し、未知値は「不明」とする。
+- 変更はFlutter表示面とwidget testだけで、Rust Broker、診断契約、証拠class、権限判定、実測値は変更していない。390×844の狭い画面でwarning／unknownと復旧案内が分かれ、描画例外がないことを検査するtestを追加した。
+- このUI改善は導入済みWindows製品の実証ではない。`windows_setup_doctor_smoke`を含むrelease blockerと`release_ready=false`を維持する。
+
+### ローカル検証とWindows補助検証
+
+- 対象2 Dart fileの`dart format --output=none --set-exit-if-changed`と`git diff --check`は成功した。
+- local `flutter analyze --no-pub`はAnalysis Serverが受信LSP JSONを解析できず`FormatException: Unterminated string`、exit 255で終了し、analyzer findingsを得られなかった。`flutter test --no-pub --reporter expanded`はOneDrive Cloud Filesの`build/unit_test_assets`へのアクセス拒否を受けて開始できなかった。これは実装のPASSではなくhost環境の制約として扱う。
+- この欠損を補うため`.github/workflows/windows-manual-desktop-flutter-validation.yml`を一時`codex/`branchで`workflow_dispatch`し、正確なcommit上のDesktop analyze／全testとMobile analyzeを検証する。結果とrun IDは検証後に追記する。PR、自動trigger、必須status checkは作らない。
+
 ## Phase 21／C12追補 Broker更新package download worker（2026-09-30）
 
 ### 成立した変更

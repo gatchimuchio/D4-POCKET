@@ -1014,10 +1014,59 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('local.ui: pass'), findsOneWidget);
-    expect(find.textContaining('runtime-ui-json: ready'), findsOneWidget);
+    expect(find.text('その他の診断項目'), findsOneWidget);
+    expect(find.text('正常'), findsOneWidget);
+    expect(find.textContaining('製品リリース状態: 未申告'), findsOneWidget);
+    expect(find.text('UI loaded local diagnostic JSON'), findsOneWidget);
+    expect(find.textContaining('runtime-ui-json: 準備完了'), findsOneWidget);
+    expect(find.textContaining('local.ui'), findsNothing);
     expect(find.textContaining(r'C:\Users\ohira\AppData\Local\private'),
         findsNothing);
+  });
+
+  testWidgets('環境診断は確認状態を分けて次の対応を表示する', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final snapshot = ShellSnapshot.fromJson({
+      'snapshot_source': 'broker',
+      'setup_doctor_status': 'warning',
+      'installer_grants_authority': false,
+      'installer_silently_approves_permissions': false,
+      'setup_doctor_checks': [
+        {
+          'check_id': 'setup_doctor.audit_storage',
+          'status': 'warning',
+          'message': '監査保存を確認できません。',
+          'recovery_instruction': 'Brokerの固定storeを確認してください。',
+        },
+        {
+          'check_id': 'setup_doctor.runtime_connection',
+          'status': 'unknown',
+          'message': 'Broker接続状態は不明です。',
+          'recovery_instruction': 'Desktop起動器から再起動してください。',
+        },
+      ],
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SetupDoctor(
+            client: ShellCoreClient.local(snapshot: snapshot),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('診断状態: 確認が必要'), findsOneWidget);
+    expect(find.text('監査保存'), findsOneWidget);
+    expect(find.text('Broker接続'), findsOneWidget);
+    expect(find.text('次に行うこと'), findsNWidgets(2));
+    expect(find.text('Brokerの固定storeを確認してください。'), findsOneWidget);
+    expect(find.textContaining('PermissionやApprovalを作らず'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('承認センターが非表示の完全内容を公開しない', (WidgetTester tester) async {
