@@ -451,6 +451,20 @@
           "legacy_record": "版1はlegacy_unboundとして保持・表示し、新規候補受理と適用要求を拒否した。"
         },
         "scope_limit": "FIXTUREだけ。署名対象に宣言digestとbyte長を結合するが、download済み実byteの照合、archive安全性、install／update／rollback transaction、Windows installed product LIVE_RUNTIMEを示さない。"
+      },
+      "persisted_candidate_revalidation": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Rust全12 targetで413 passed／0 failed／3 ignored、cargo check --all-targets成功、Schema 149／正常example 149／negative fixture 192、Conformance 228 checks成功。Desktop Flutter対象test 2件、短縮一時workspace上のflutter analyze、Dart format checkも成功。",
+        "observations": {
+          "projection": "一覧と延期receiptは現在Broker trustでの署名再検証と候補hash再計算が一致した場合だけverifiedを表示し、それ以外をverification_staleへ降格した。",
+          "trust_rotation": "trust鍵変更後の一覧・延期receiptはstaleとなり、download要求を拒否した。",
+          "trust_unconfigured": "Broker再起動後のtrust未設定では永続候補をstale表示し、適用要求を拒否した。",
+          "persisted_content_tampering": "署名対象content変更を一覧でstale表示し、実行要求を拒否した。",
+          "persisted_hash_tampering": "保存候補hash差替えを一覧でstale表示し、実行要求を拒否した。",
+          "execution_boundary": "一致する現在trustの実行要求も従来どおりAudit付きsuspendedで、download／install／rollbackを実行しない。"
+        },
+        "scope_limit": "Rust Broker libraryとtest用永続storeを使うFIXTURE。外部主体による製品store改変の実環境、Windows installed product、実download byte照合、Installer、update transaction、rollback、LIVE_RUNTIMEを証明しない。release_ready=falseとWindows配布release_blockerを維持する。"
       }
     },
     {

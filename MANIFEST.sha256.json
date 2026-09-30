@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "67054cb613650c32c0a1804adff6ed82b65aa476281fc91300f475be501253bb"
+      "sha256": "f6e65263a7c0bb88479cd9152ebbebc837f8e4e39039f36a48587af3f0eb47ca"
     },
     {
       "path": "SECURITY.md",
@@ -277,7 +277,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "7d40bf172078c697a30fa2934d22549e2ab3e72a856b9988238d3d71071e3290"
+      "sha256": "cca58c4388796b634a14db958c75b960ec39827e49f9cffea1f5fadf16614d92"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -369,7 +369,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "2417abedead564f4c2bcb144fc7ef48e6f658ed00d09a5d6085654648a7d5ab9"
+      "sha256": "46d46ad9c5e3bc946259abc461dc4f4f7342782d5f6988f1cfa0a951cb006319"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -617,7 +617,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "e8adbead41651d960f3abfdbd072f5cc4078f4326c9c1ee4dba69f8b29202c84"
+      "sha256": "29af117ccc3d9e3fdd47c737a0ba2f5eb090357f2f17194be884b4f6bacc82f1"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "e5f247e7811dbeda81b5e8b475093472480d65aee49c3c01ca94996b1cc42628"
+      "sha256": "ea4bc4c74d3cf0b13f0ce883fdc03038c289c06fdd97b8b34b6842549ad5add7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1453,7 +1453,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "3fd91c3a60605ce37e063a6c2318737055ff21b9113e22552e0a9d0264adff39"
+      "sha256": "7f98b1e1d44670ee42d44d8a79fc8f612d06f80023b54a6ec4c0763b449c3749"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3161,7 +3161,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "77e5d2c751e5040128bc9f24102f5b0f8a986a7bc6b12834db509ee81919b4d1"
+      "sha256": "43a7385068f0a82b709c9797d7e95c7ddb3e0006f04c69ac6a4827237c0d4867"
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "d510ce53fa2d2af4d477bc206c8e75738c114c4fa811d01a6a3d6cbaaeaa01f9"
+      "sha256": "1393387cce838cdf7cac71f76ffa4afeb04c6d0c95a0e420ce2d0f2f66a908db"
     },
     {
       "path": "requirements-dev.txt",
@@ -4317,7 +4317,7 @@
     },
     {
       "path": "specs/update_receipt.schema.json",
-      "sha256": "1ec4a04ec5f28324db3f073c1ac2a21dd69501db22993b33db350fd487a16b74"
+      "sha256": "60f22157cf7ccdd9dc7b25ab3f58a197d997a23526e2336e3aac7ac59da9d048"
     },
     {
       "path": "specs/update_trust.schema.json",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "adceb598ba16a6f951ff441fa5d16766bb503f89abc4caedbc6781743d8eb431"
+      "sha256": "4b2081f1e25dab462197efbf9ae98785a681b595881dd91f9c874bebb1383e51"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

@@ -12,6 +12,8 @@
 
 版1の既存保存recordは起動時に保持するが、一覧projectionでは`legacy_unbound`へ降格する。これは旧署名のmetadata検証をpackage真正性と誤認させないためであり、旧recordを新候補として再受理せず、download／適用／rollback要求にも使わせない。新規候補の署名がpackageのdigestとsizeへ結合していることだけを保証し、実際に取得したfileが一致することは、今後download consumerがbyte長・SHA-256を照合して初めて確認できる。
 
+永続recordの`verified`は保存時の結果であり、現在も有効なtrustや実行権限を意味しない。一覧・延期receiptではBrokerが現在保持するtrustでcandidateの署名を再検証し、candidate全体から再計算したhashもrecordと一致するときだけ`verified`を射影する。trust未設定・鍵変更・署名不一致・候補内容または保存hashの不整合は`verification_stale`へ降格する。download／適用／rollback要求の直前にも同じ署名・hash再検証を行い、一致しなければ拒否して実行しない。過去の`verified`記録、履歴、候補hashの呼出元提示は再検証を代替しない。
+
 ## 実行境界
 
 download、install、process起動、rollbackの外部実行経路は本単位では追加していない。`更新download要求`、`更新適用要求`、`更新rollback要求`は、署名検査済み候補とhashを再照合したうえで、Audit付き`suspended` receiptを返す。これによりUIの要求操作と製品の実行完了を混同しない。
@@ -20,9 +22,9 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 
 ## 検証対象
 
-- UpdateCandidate版2、UpdateReceipt、UpdateListのSchemaとnegative fixture。版1の保存済みrecordは未結合表示へ降格する。
+- UpdateCandidate版2、UpdateReceipt、UpdateListのSchemaとnegative fixture。版1の保存済みrecordは未結合表示へ降格し、版2でも現在trustとの再照合ができないrecordは`verification_stale`へ降格する。
 - Broker所有trustによるEd25519検証、署名対象の正本byte一致、package全体のSHA-256・正確なbyte長への署名結合
-- 信頼設定未構成、署名不正、候補hash不一致、未知field、malformed stateのfail-closed
+- 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
 - 更新候補の永続化・再読込、延期のAudit、実行要求のsuspended
 - Desktop設定画面の更新一覧と要求操作
 

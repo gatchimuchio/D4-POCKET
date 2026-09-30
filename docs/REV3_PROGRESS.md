@@ -734,6 +734,47 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
 
+## Phase 21／C11追補 永続候補の現在trust再検証（2026-09-30）
+
+### 成立した変更
+
+- 永続recordの`署名状態=verified`は過去に検査した結果であり、Broker再起動後・trust鍵変更後も現在有効とは限らない。更新一覧と延期receiptでは現在のBroker trustでEd25519署名を再検査し、候補全体から再計算したcanonical hashが保存hashと一致する場合だけ`verified`を表示する。それ以外は`verification_stale`へ降格する。
+- download／適用／rollback要求の直前にも現在trust、署名、候補hashを再検査する。trust未設定、鍵ローテーション、署名後content改変、保存candidate hash差替えを拒否し、成功時も既存どおりAudit付き`suspended`で外部実行しない。
+- この単位はBrokerの永続記録状態を用いたRust試験（証拠種別`FIXTURE`）である。外部攻撃者が製品保存領域を書き換えられる実環境、Windows導入済み製品、配布packageの取得・導入を証明しない。`release_ready=false`とWindows配布`release_blocker`を維持する。
+
+### 検証
+
+- Rust Update Centerの対象試験9件が成功。trust変更・trust未設定後の降格／拒否、候補内容変更、保存候補hash差替えを含む。後続のRust全target試験では全413件成功、失敗0件、無視3件。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests -- --test-threads=1
+```
+- Rust対象fileの整形検査と差分空白検査。
+```powershell
+rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/update_center.rs
+git diff --check
+```
+
+- Rust全target試験と全target検査も成功。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+```
+- Schema 149件／正常例149件／negative fixture 192件、Conformance 228 checksが成功。Desktopの対象Flutter試験2件と、ASCII短縮・正しいworkspace配置の一時copy上での`flutter analyze`も成功。Dart formatterは対象3 fileに差分なし。
+```powershell
+python -X utf8 tooling/schema_check/check_schemas.py
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+flutter test --no-pub --no-test-assets test/update_client_test.dart
+dart format --output=none --set-exit-if-changed lib/screens/settings.dart lib/services/update_client.dart test/update_client_test.dart
+```
+- 元OneDrive作業場所での`flutter analyze`は既存macOS生成物`macos/Flutter/ephemeral/Packages/.packages`をFlutterが削除できず失敗した。ACLや生成物を変更せず、macOS／build生成物を除いた短縮一時workspaceへ必要なFlutter appと`gui_shell_ui` packageを複製して同コマンドを実行し、`No issues found`を確認した。この解析はsourceの静的検査であり、Windows製品起動証拠ではない。
+- 統合validatorの初回実行は、この節の日本語基底監査1件と、編集中9 fileのmanifest hash不一致で失敗した。説明の英語混在表現を日本語化し、厳格監査は1114 file／0 findingsで合格。MANIFESTを1111 fileで再生成した。
+- 修正後の統合validatorは登録済み10検査すべて成功した。release gate検査、packaging portability、release smoke、evidence bundle、runtime assertion、C32構造監査も成功したが、正式Windows実機evidenceの5 release blockerと`release_ready=false`は維持された。初回失敗は履歴として保持し、成功へ書き換えていない。
+```powershell
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+
+- Windows Actionsは未使用。download要求は依然`suspended`であり、現在trust再検証のtest結果をLIVE_RUNTIMEやpackage真正性へ昇格しない。
+
 ## Phase 21／C11追補 配布packageの署名結合（2026-09-30）
 
 ### 成立した変更

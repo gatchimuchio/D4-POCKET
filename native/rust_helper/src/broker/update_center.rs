@@ -246,7 +246,12 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             hash,
         );
     }
-    let updates: Vec<Value> = broker.updates.values().map(project_update_record).collect();
+    let trust = broker.update_trust.as_ref();
+    let updates: Vec<Value> = broker
+        .updates
+        .values()
+        .map(|value| project_update_record(value, trust))
+        .collect();
     accepted(
         broker,
         OP_LIST,
@@ -266,14 +271,27 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
     )
 }
 
-fn project_update_record(value: &Value) -> Value {
+fn project_update_record(value: &Value, trust: Option<&UpdateTrust>) -> Value {
     let mut projected = value.clone();
-    if projected.get("版").and_then(Value::as_u64) == Some(1) {
-        if let Some(object) = projected.as_object_mut() {
-            object.insert("署名状態".into(), Value::String("legacy_unbound".into()));
+    let status = match serde_json::from_value::<UpdateRecord>(value.clone()) {
+        Ok(record) if record.candidate.version == 1 => "legacy_unbound",
+        Ok(record)
+            if record.signature_status == "verified"
+                && current_candidate_verification(trust, &record) =>
+        {
+            "verified"
         }
+        _ => "verification_stale",
+    };
+    if let Some(object) = projected.as_object_mut() {
+        object.insert("署名状態".into(), Value::String(status.into()));
     }
     projected
+}
+
+fn current_candidate_verification(trust: Option<&UpdateTrust>, record: &UpdateRecord) -> bool {
+    verify_candidate_with_trust(trust, record.candidate.clone())
+        .is_ok_and(|current| current.candidate_hash == record.candidate_hash)
 }
 
 fn verify(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> BrokerResponse {
@@ -452,11 +470,15 @@ fn defer(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
             &reason,
         );
     }
+    let projected = project_update_record(
+        &serde_json::to_value(record).unwrap_or(Value::Null),
+        broker.update_trust.as_ref(),
+    );
     accepted(
         broker,
         OP_DEFER,
         request_id,
-        project_update_record(&serde_json::to_value(record).unwrap_or(Value::Null)),
+        projected,
         hash,
         "更新延期を永続化。インストールは実行しない",
     )
@@ -536,6 +558,20 @@ fn execution_request(
             hash,
         );
     }
+    let current_record = match verify_candidate(broker, record.candidate.clone()) {
+        Ok(current) => current,
+        Err((code, message)) => return reject(broker, request_id, operation, code, message, hash),
+    };
+    if current_record.candidate_hash != record.candidate_hash {
+        return reject(
+            broker,
+            request_id,
+            operation,
+            "update_state_tampered",
+            "保存候補の署名・内容・候補hashが現在状態と一致しない",
+            hash,
+        );
+    }
     suspended(
         broker,
         operation,
@@ -550,6 +586,13 @@ fn verify_candidate(
     broker: &Broker,
     candidate: UpdateCandidateDocument,
 ) -> Result<UpdateRecord, (&'static str, &'static str)> {
+    verify_candidate_with_trust(broker.update_trust.as_ref(), candidate)
+}
+
+fn verify_candidate_with_trust(
+    trust: Option<&UpdateTrust>,
+    candidate: UpdateCandidateDocument,
+) -> Result<UpdateRecord, (&'static str, &'static str)> {
     match candidate.version {
         1 => {
             return Err((
@@ -562,7 +605,7 @@ fn verify_candidate(
     }
     validate_candidate(&candidate)
         .map_err(|_| ("update_candidate_invalid", "更新候補の値が不正"))?;
-    let Some(trust) = broker.update_trust.as_ref() else {
+    let Some(trust) = trust else {
         return Err((
             "update_trust_unconfigured",
             "Broker所有の更新署名信頼設定が未構成",
@@ -1105,8 +1148,140 @@ mod tests {
     }
 
     #[test]
+    fn persisted_candidate_is_downgraded_and_rejected_after_trust_rotation() {
+        let (trust, candidate) = trust_and_candidate();
+        let candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &serde_json::to_value(&candidate).unwrap(),
+        ));
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+
+        let (rotated_trust, _) = trust_and_candidate();
+        broker.update_trust = Some(rotated_trust);
+        let listing = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "verification_stale"
+        );
+        let deferred = call(
+            &mut broker,
+            BrokerOperation::更新延期,
+            json!({
+                "版": 1,
+                "更新ID": "update-1",
+                "候補hash": candidate_hash,
+                "延期期限": "2030-01-01T00:00:00Z"
+            }),
+        );
+        assert_eq!(deferred.status, BrokerStatus::Accepted);
+        assert_eq!(deferred.body.unwrap()["署名状態"], "verification_stale");
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新download要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "update_signer_untrusted");
+
+        broker.update_trust = None;
+        let listing = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "verification_stale"
+        );
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新適用要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "update_trust_unconfigured");
+    }
+
+    #[test]
+    fn persisted_candidate_content_and_hash_are_rechecked_before_execution() {
+        let (trust, candidate) = trust_and_candidate();
+        let candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &serde_json::to_value(&candidate).unwrap(),
+        ));
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+        broker.updates.get_mut("update-1").unwrap()["内容概要"] =
+            Value::String("署名後に改変された概要".into());
+        let listing = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "verification_stale"
+        );
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新適用要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_signed_manifest_mismatch"
+        );
+
+        let (trust, candidate) = trust_and_candidate();
+        let candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &serde_json::to_value(&candidate).unwrap(),
+        ));
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+        broker.updates.get_mut("update-1").unwrap()["候補hash"] = Value::String(
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+        );
+        let listing = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "verification_stale"
+        );
+        let tampered_hash = broker.updates["update-1"]["候補hash"].clone();
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新適用要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": tampered_hash}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(response.error.unwrap().code, "update_state_tampered");
+        assert_ne!(candidate_hash, broker.updates["update-1"]["候補hash"]);
+    }
+
+    #[test]
     fn verified_update_state_reloads_without_promoting_trust() {
         let (trust, candidate) = trust_and_candidate();
+        let candidate_hash = crate::broker::protocol::canonical_payload_hash(Some(
+            &serde_json::to_value(&candidate).unwrap(),
+        ));
         let root =
             std::env::temp_dir().join(format!("gui-shell-update-center-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -1127,6 +1302,19 @@ mod tests {
         assert_eq!(restarted.updates.len(), 1);
         assert!(restarted.update_trust.is_none());
         assert!(root.join("updates.json").exists());
+        let mut restarted = restarted;
+        let listing = call(&mut restarted, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "verification_stale"
+        );
+        let execution = call(
+            &mut restarted,
+            BrokerOperation::更新download要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(execution.status, BrokerStatus::Rejected);
+        assert_eq!(execution.error.unwrap().code, "update_trust_unconfigured");
         let _ = std::fs::remove_dir_all(root);
     }
 }

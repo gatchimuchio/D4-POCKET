@@ -665,11 +665,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _updateRow(UpdateClient client, Map<String, Object?> update) {
     final updateId = update['更新ID']?.toString() ?? '';
     final candidateHash = update['候補hash']?.toString() ?? '';
+    final signatureStatus = UpdateClient.signatureStatusLabel(update['署名状態']);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
       subtitle: Text(
-        'channel=${update['channel']} / 署名=${update['署名状態']} / rollback=${update['rollback可能']}',
+        'channel=${update['channel']} / 署名=$signatureStatus / rollback=${update['rollback可能']}',
       ),
       trailing: Wrap(
         spacing: 4,

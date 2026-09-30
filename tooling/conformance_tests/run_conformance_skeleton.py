@@ -956,6 +956,13 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     legacy_verified_receipt["署名状態"] = "verified"
     if validate_instance(legacy_verified_receipt, load_schema("update_receipt.schema.json")) == []:
         errors.append("package未結合の旧更新receiptをverifiedとして表示できた")
+    legacy_stale_receipt = dict(legacy_receipt)
+    legacy_stale_receipt["署名状態"] = "verification_stale"
+    if validate_instance(legacy_stale_receipt, load_schema("update_receipt.schema.json")) == []:
+        errors.append("package未結合の旧更新receiptが現行trust再検証状態を主張できた")
+    current_stale_receipt = dict(receipt)
+    current_stale_receipt["署名状態"] = "verification_stale"
+    errors.extend(validate_instance(current_stale_receipt, load_schema("update_receipt.schema.json")))
     if listing["download実行"] != "suspended" or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
         errors.append("更新実行経路がsuspendedではない")
     for name in ("ipc_request", "ipc_response"):

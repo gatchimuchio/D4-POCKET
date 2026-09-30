@@ -36,6 +36,22 @@ class _UpdateTransport implements BrokerTransport {
 }
 
 void main() {
+  test('署名状態は現在trustの再検証意味を日本語表示する', () {
+    expect(
+      UpdateClient.signatureStatusLabel('verified'),
+      '現在のBroker trustで検証済み',
+    );
+    expect(
+      UpdateClient.signatureStatusLabel('verification_stale'),
+      '現在のBroker trustで未検証',
+    );
+    expect(
+      UpdateClient.signatureStatusLabel('legacy_unbound'),
+      '旧候補（package未結合）',
+    );
+    expect(UpdateClient.signatureStatusLabel('unknown'), '不明');
+  });
+
   test('Update操作はBrokerの監査済みoperationへ限定される', () async {
     final transport = _UpdateTransport();
     final client = UpdateClient(transport);

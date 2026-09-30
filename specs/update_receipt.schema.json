@@ -18,7 +18,7 @@
     "署名": { "type": "string", "pattern": "^[a-f0-9]{128}$" },
     "署名者fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "rollback可能": { "type": "boolean" },
-    "署名状態": { "enum": ["verified", "legacy_unbound"] },
+    "署名状態": { "enum": ["verified", "legacy_unbound", "verification_stale"] },
     "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "延期期限": { "type": ["string", "null"] }
   },
@@ -34,7 +34,7 @@
       "if": { "properties": { "版": { "const": 2 } }, "required": ["版"] },
       "then": {
         "required": ["package_sha256", "package_size_bytes"],
-        "properties": { "署名状態": { "const": "verified" } }
+        "properties": { "署名状態": { "enum": ["verified", "verification_stale"] } }
       }
     }
   ]

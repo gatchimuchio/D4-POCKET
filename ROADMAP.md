@@ -6,6 +6,8 @@
 
 D4 Pocket Phase 21／rev1 C11追補（2026-09-30）: 更新候補Contractを版2へ進め、Broker所有Ed25519署名の正本byteへ配布package全体のSHA-256と正確なbyte長を含める。旧版候補は保存記録として保持しつつ`legacy_unbound`へ降格表示し、新規受理・適用を拒否する。署名検査はpackage実byte取得・照合やdownload／install／rollbackを実装したことを意味しない。Windows配布blockerと`release_ready=false`を維持し、次は取得byte照合とsame-volume導入／rollback／crash Recoveryへ進む。詳細・検証結果は`docs/REV3_PROGRESS.md`、契約は`docs/specs/update-center.md`。
 
+D4 Pocket Phase 21／C11追補（2026-09-30）: 永続候補の`verified`を現在権限として再利用せず、一覧・延期receiptとdownload／適用／rollback要求直前にBroker現在trustでEd25519署名および候補全体hashを再照合する。trust未設定／変更、署名不一致、永続content／hash改変は`verification_stale`へ降格し、要求を拒否する。更新download／install／rollback自体は引き続き未接続・suspended。詳細と試験結果は`docs/REV3_PROGRESS.md`。
+
 R2追補（2026-09-30）: Windows AdapterのWorkspaceWrite spawn経路で、Task scratch作成後かつCLI process生成直前にも登録Workspace／secret hardlink aliasを再検査する。追加したWindows fixtureは実spawn関数でCLI起動前の拒否を確認するが、外部同時変更との原子性、実MxC tool-child隔離、production Task経路の証拠ではない。`task_execution=unsupported`、Agent隔離等の`release_blocker`、`release_ready=false`を維持する。詳細と検証結果は`docs/REV3_PROGRESS.md`。
 
 R2追補（2026-09-30）: Codex Adapter metadataの説明文にある通常語`permission`をAuthority field名として誤検出し、登録済みCodexとのAgent Session開始を`応答不正`で止めていたscannerを修正した。自由文では危険Authority値を引き続き拒否し、構造化objectのAuthority／Permission key拒否を維持する。Windows実Codex CLI登録を伴うBroker経路でSession開始後もWorkspace Permission／Owner Approvalの両grantを`AgentTask実行非対応`として拒否し、永続AuditとTask本文非露出を確認した。native Owner確認UI・実Agent Task・installed製品の証拠ではない。Rust全12 targetで407 passed／0 failed／3 ignored（主libは361 passed／0 failed／3 ignored）。初回はA2A loopback fixture 1件が間欠失敗し、単独再試験と全体再試験は成功した。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`。

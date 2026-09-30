@@ -6,6 +6,13 @@ class UpdateClient {
 
   final BrokerTransport _transport;
 
+  static String signatureStatusLabel(Object? status) => switch (status) {
+        'verified' => '現在のBroker trustで検証済み',
+        'verification_stale' => '現在のBroker trustで未検証',
+        'legacy_unbound' => '旧候補（package未結合）',
+        _ => '不明',
+      };
+
   Future<Map<String, Object?>> list() async {
     final response = await _transport.request('更新一覧', payload: const {'版': 1});
     return _acceptedBody(response, '更新一覧');
