@@ -79,6 +79,10 @@
       "sha256": "1b01b890c5ee08493dae5c158615ed0e4baa2b96eb13398ba68f3c77b90945df"
     },
     {
+      "path": ".github/workflows/windows-manual-export-build.yml",
+      "sha256": "69d1cecf1c68c8e80eb2634cfe66b3b741067de37f36991354c2f177111a6138"
+    },
+    {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
       "sha256": "65d9a1e362c007ef897dbb90250d8d113ce0ee1d3ef0d4d3e6586d86048eaf1b"
     },
@@ -160,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "903234a5ed6f2341024bd5836739ef361a60bb6bd40243d4148a9bd9e3c2ddc0"
+      "sha256": "4d830f42a70def367698f65976baefdd39eb3e0854bb92bd1036b3f90650b654"
     },
     {
       "path": "SECURITY.md",
@@ -1192,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "c3862fcab50d064fc1e2cd8971f50c653a6b804dc7d57aca72c088b0847671c4"
+      "sha256": "b8f10c6316ad54871ef73b845373778d439ba3877aac13437573576240aee370"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3088,7 +3092,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "54bf5c574a51a138f03ea0b4e7e234f7adf434f88c00a903648d5f809b608580"
+      "sha256": "ef648fd12774db97bd9d7aa64c9aca46285a8486be016866f0d6be383605447a"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3132,7 +3136,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/mod.rs",
-      "sha256": "a74837f1f5c30229bc44d10e524acb6ef6c914827ad1f73d017f66bd5526d680"
+      "sha256": "4f82e2f6a3ff6d6ff89fd92750c2c99d55e0a03914dbe46eb019925215e5c6a5"
     },
     {
       "path": "native/rust_helper/src/broker/notification_center.rs",
@@ -3152,7 +3156,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
-      "sha256": "23b43757b6e49a018fe67a068d9c076ac7bfa76d2f65c92f182973d25c0e93b0"
+      "sha256": "19740996ce9ef93473df9855b4ee2bde6b6987509098917f9c61d5ffec8005d8"
     },
     {
       "path": "native/rust_helper/src/broker/replay.rs",

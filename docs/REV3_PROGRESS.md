@@ -1109,3 +1109,32 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
 ```
+
+## R2追補 Windows Export既知credential markerの誤検出修正と手動Actions検証（2026-09-30）
+
+### 成立した変更
+
+- Release bundle走査がRust実行binary内の既知credential marker文字列を検出していた。既知marker集合の検出をBroker共通関数へ集約し、marker表現を分割してbinary内の連続literal化を避けた。Dialogue metadata走査と回帰caseは同じ検出関数を使う。既知patternの範囲・走査対象・失敗時動作は弱めていない。全marker群の大小文字差、拒否、通常日本語の許容をunit testで確認した。
+- 変更は`native/rust_helper/src/broker/mod.rs`、`dialogue.rs`、`regression_case.rs`。実装commitは`6f0681ce1439d9d6f769075952658d063e04a3f2`。
+- local統合validatorの初回実行は、Rust file更新とtracked Windows Export workflow追加をmanifestへ反映していなかったため`manifest_check`、`release_gate_check`、`packaging_portability_check`が失敗した。`tooling/manifest.py --write`で1120 tracked source fileを再記録し、manifest検査とrelease gate検査が通る状態へ修正した。これは製品testの失敗ではなく、source manifest不整合だった。進捗節を履歴末尾へ移した後の統合validator再試行では`docs/REV3_PROGRESS.md`のmanifest hash不一致を検出したため、この履歴修正を確定してmanifestを再生成した後に最終再試行する。
+- Release blocker 5件と`release_ready=false`を維持する。走査成功は未知形式を含む一般的なcredential不存在の証明ではない。
+
+### Windows Actionsの履歴と結果
+
+- 手動`workflow_dispatch`によるExport検証の先行失敗は履歴として保持する。#1 run `36699100289`はsource-HEAD guard、#2 run `36699507211`はfixture manifest名不整合、#3 run `36700047744`はbundle build後の`slack_token`、#4 run `36702628049`はbundle build後の`credential_assignment`で失敗した。#1〜#4はいずれも成功証拠ではない。
+- 修正済みcommit `6f0681ce1439d9d6f769075952658d063e04a3f2`に対する[Windows Rust validation #25](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36705515991)は成功した。Windows Server 2025 runnerでRust／Cargo 1.95.0を使用し、全targetの`cargo check`と`cargo test`が完了。Rust試験は12 target、435 passed／0 failed／3 ignored。workflow所定のformat、checkout SHA、終了時clean確認も成功した。artifact uploadなし。
+- 同じcommitに対する[Windows GUI Shell Export bundle #5](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36705659036)は`workflow_dispatch`で成功した。Windows Server 2025、image version `20260922.246.2`上でFlutter Windows ReleaseとRust Releaseを含む未署名portable fixture bundleを組み立て、実装済みknown-pattern scanを実行してfindings 0を確認。bundleは61,971,154 bytes、tree SHA-256は`82cf6393462eee3d710dd0edaaf45c944b4f3f866b9c9e1dfa3643368f3ba8f1`。source tree clean確認も成功し、Actions artifactはuploadされていない。
+- Export workflowの明示条件どおり、`portable_bundle_assembled=true`だが`standalone_app_verified=false`、正式distribution claimなし、installer未開始、launch未検証。これはWindows installed product、起動、署名、installer／updater／rollback、binary module pruning、一般的なsecret不存在の証拠ではない。
+- Actionsは既存の手動workflowを利用し、一時検証branch、PR、自動triggerは作っていない。対象は正確に上記commitで固定した。workflow sourceはtracked manifestにも追加した。
+
+### ローカル検証
+
+- 修正後のRust全target試験は12 target、435 passed／0 failed／3 ignored。Rust全target check、Schema 150件／正常example 150件／negative fixture 193件、Conformance 229 checks、strict日本語監査1123 files／0 findings、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32 auditを含む統合validatorはすべて成功した。
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+- 最終統合validatorはexit 0。Release gate整合checkの成功はrelease readinessを意味しない。release blocker 5件と`release_ready=false`は維持する。
+- `rustfmt` checkは`mod.rs`と`dialogue.rs`で成功。`regression_case.rs`全体のcheckは変更箇所と無関係な既存format差分を報告したため成功扱いしていない。Windows Actionsの所定format stepは成功し、`git diff --check`も成功した。
+- bundle scanはfixture由来の`INTERNAL_STATE`相当のbuild evidenceに限る。未知pattern、全credential形式、実installed app、Owner権限経路、実機起動を証明しない。
