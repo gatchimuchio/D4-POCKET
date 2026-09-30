@@ -1283,15 +1283,32 @@ mod tests {
         let peer_workspace = root.path().join("workspace-agent-b");
         let private = workspace.join("private");
         let scratch = workspace.join(".d4p-tmp-live-probe");
+        let peer_scratch = peer_workspace.join(".d4p-tmp-live-probe");
         let isolated_codex_home = root.path().join("codex-home");
+        let peer_codex_home = root.path().join("codex-home-agent-b");
         fs::create_dir(&workspace).expect("合成Workspace");
         fs::create_dir(&peer_workspace).expect("別Agent用の合成Workspace");
         fs::create_dir(&private).expect("合成secret領域");
         fs::create_dir(&scratch).expect("Task scratch相当directory");
+        fs::create_dir(&peer_scratch).expect("別Agent用Task scratch相当directory");
         fs::create_dir(&isolated_codex_home).expect("検証専用Codex home");
+        fs::create_dir(&peer_codex_home).expect("別Agent用検証専用Codex home");
         let peer_marker = peer_workspace.join("agent-b-marker.txt");
         let peer_write_target = peer_workspace.join("agent-b-write-marker.txt");
+        let workspace_marker = workspace.join("agent-a-marker.txt");
+        let workspace_write_target = workspace.join("agent-a-write-marker.txt");
+        let workspace_ready = workspace.join(".probe-agent-a-ready");
+        let workspace_start = workspace.join(".probe-agent-a-start");
+        let workspace_checked = workspace.join(".probe-agent-a-checked");
+        let workspace_continue = workspace.join(".probe-agent-a-continue");
+        let peer_ready = peer_workspace.join(".probe-agent-b-ready");
+        let peer_start = peer_workspace.join(".probe-agent-b-start");
+        let peer_checked = peer_workspace.join(".probe-agent-b-checked");
+        let peer_continue = peer_workspace.join(".probe-agent-b-continue");
+        let peer_write_result = peer_workspace.join("agent-b-write-result.txt");
         fs::write(&peer_marker, b"synthetic-agent-b-marker").expect("別Agent Workspace marker");
+        fs::write(&workspace_marker, b"synthetic-agent-a-marker")
+            .expect("Agent Aの作業領域確認file");
 
         let registered_paths = [
             "private/registered-marker.txt",
@@ -1380,6 +1397,58 @@ mod tests {
             .and_then(|setting| setting.strip_prefix("default_permissions="))
             .and_then(|value| serde_json::from_str::<String>(value).ok())
             .expect("Rust生成default_permissionsからsandbox profile名を得る");
+        let peer_generated = build_codex_command(
+            &executable,
+            &peer_workspace,
+            CodexSandbox::WorkspaceWrite,
+            Some(&peer_scratch),
+            &[],
+            None,
+        )
+        .expect("別Agent用Rust生成Task command設定");
+        let mut peer_generated_args = peer_generated.get_args();
+        let mut peer_profile_args = Vec::<OsString>::new();
+        while let Some(argument) = peer_generated_args.next() {
+            if argument == "exec" {
+                break;
+            }
+            assert_eq!(
+                argument, "-c",
+                "別Agent用Task設定はCodex CLIのconfig overrideである"
+            );
+            peer_profile_args.push(argument.to_os_string());
+            peer_profile_args.push(
+                peer_generated_args
+                    .next()
+                    .expect("別Agent用config override値")
+                    .to_os_string(),
+            );
+        }
+        let peer_permission_profile = peer_profile_args
+            .windows(2)
+            .find(|pair| {
+                pair[0] == "-c"
+                    && pair[1]
+                        .to_string_lossy()
+                        .starts_with("default_permissions=")
+            })
+            .and_then(|pair| pair[1].to_str())
+            .and_then(|setting| setting.strip_prefix("default_permissions="))
+            .and_then(|value| serde_json::from_str::<String>(value).ok())
+            .expect("別Agent用Rust生成default_permissionsからsandbox profile名を得る");
+        let peer_task_environment = peer_generated
+            .get_envs()
+            .filter_map(|(name, value)| {
+                let value = value?;
+                matches!(name.to_str(), Some("TEMP" | "TMP"))
+                    .then(|| (name.to_os_string(), value.to_os_string()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            peer_task_environment.len(),
+            2,
+            "別Agent用TEMP／TMP設定がある"
+        );
         let quote_path = |path: &Path| format!("'{}'", path.to_string_lossy().replace('\'', "''"));
         let denied_paths = denied_paths
             .iter()
@@ -1413,14 +1482,18 @@ mod tests {
         let environment_report = workspace.join("sandbox-environment-report.txt");
         let hardlink_alias = workspace.join("synthetic-secret-hardlink-alias.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $peerReadError=0; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop}}catch{{$peerReadError=$_.Exception.HResult}}; if($peerReadError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_read_hresult=$peerReadError\"); exit 44}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $peerWriteError=0; $peerWriteErrorType=''; try{{[IO.File]::WriteAllText({},'synthetic-agent-a-write')}}catch{{$peerWriteError=$_.Exception.InnerException.HResult; $peerWriteErrorType=$_.Exception.InnerException.GetType().Name}}; if($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_write_type=$peerWriteErrorType; peer_write_hresult=$peerWriteError; target_exists=$([IO.File]::Exists({}))\"); exit 45}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"peerReadHResult=$peerReadError`npeerWriteException=$peerWriteErrorType`npeerWriteHResult=$peerWriteError`nhardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; [IO.File]::WriteAllText({},'ready'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 46}}; Start-Sleep -Milliseconds 25}}; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $peerReadError=0; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop}}catch{{$peerReadError=$_.Exception.HResult}}; if($peerReadError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_read_hresult=$peerReadError\"); exit 44}}; $peerWriteError=0; $peerWriteErrorType=''; try{{[IO.File]::WriteAllText({},'synthetic-agent-a-write')}}catch{{$peerWriteError=$_.Exception.InnerException.HResult; $peerWriteErrorType=$_.Exception.InnerException.GetType().Name}}; if($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_write_type=$peerWriteErrorType; peer_write_hresult=$peerWriteError; target_exists=$([IO.File]::Exists({}))\"); exit 45}}; [IO.File]::WriteAllText({},'checked'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 47}}; Start-Sleep -Milliseconds 25}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"peerReadHResult=$peerReadError`npeerWriteException=$peerWriteErrorType`npeerWriteHResult=$peerWriteError`nhardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            quote_path(&workspace_ready),
+            quote_path(&workspace_start),
             denied_array,
             quote_path(&peer_marker),
+            quote_path(&peer_write_target),
+            quote_path(&peer_write_target),
+            quote_path(&workspace_checked),
+            quote_path(&workspace_continue),
             denied_aliases,
             decoys,
             write_denied,
-            quote_path(&peer_write_target),
-            quote_path(&peer_write_target),
             quote_path(&hardlink_alias),
             quote_path(&private.join("registered-marker.txt")),
             quote_path(&hardlink_alias),
@@ -1428,6 +1501,60 @@ mod tests {
             quote_path(&workspace_output),
             quote_path(&environment_report)
         );
+
+        let peer_script = r#"
+$ErrorActionPreference = 'Stop'
+[IO.File]::WriteAllText(__GUI_SHELL_PEER_READY__, 'ready')
+$deadline = [DateTime]::UtcNow.AddSeconds(90)
+while (-not [IO.File]::Exists(__GUI_SHELL_PEER_START__)) {
+    if ([DateTime]::UtcNow -ge $deadline) { exit 56 }
+    Start-Sleep -Milliseconds 25
+}
+$peerReadError = 0
+try { $null = Get-Content -Raw -LiteralPath __GUI_SHELL_WORKSPACE_MARKER__ -ErrorAction Stop }
+catch { $peerReadError = $_.Exception.HResult }
+if ($peerReadError -ne -2147024891) {
+    [Console]::Error.WriteLine("相手Workspace読取HRESULT=$peerReadError")
+    exit 54
+}
+$peerWriteError = 0
+$peerWriteErrorType = ''
+try { [IO.File]::WriteAllText(__GUI_SHELL_WORKSPACE_WRITE_TARGET__, 'synthetic-agent-b-write') }
+catch {
+    $peerWriteError = $_.Exception.InnerException.HResult
+    $peerWriteErrorType = $_.Exception.InnerException.GetType().Name
+}
+if ($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891) {
+    [Console]::Error.WriteLine("相手Workspace書込例外型=$peerWriteErrorType; HRESULT=$peerWriteError; 書込先存在=$([IO.File]::Exists(__GUI_SHELL_WORKSPACE_WRITE_TARGET__))")
+    exit 55
+}
+[IO.File]::WriteAllText(__GUI_SHELL_PEER_OWN_WRITE__, 'agent-b-own-write')
+[IO.File]::WriteAllText(__GUI_SHELL_PEER_CHECKED__, 'checked')
+$deadline = [DateTime]::UtcNow.AddSeconds(90)
+while (-not [IO.File]::Exists(__GUI_SHELL_PEER_CONTINUE__)) {
+    if ([DateTime]::UtcNow -ge $deadline) { exit 57 }
+    Start-Sleep -Milliseconds 25
+}
+[IO.File]::WriteAllText(__GUI_SHELL_PEER_REPORT__, "相手Workspace読取HRESULT=$peerReadError`n相手Workspace書込例外型=$peerWriteErrorType`n相手Workspace書込HRESULT=$peerWriteError")
+exit 0
+"#
+        .replace("__GUI_SHELL_PEER_READY__", &quote_path(&peer_ready))
+        .replace("__GUI_SHELL_PEER_START__", &quote_path(&peer_start))
+        .replace(
+            "__GUI_SHELL_WORKSPACE_MARKER__",
+            &quote_path(&workspace_marker),
+        )
+        .replace(
+            "__GUI_SHELL_WORKSPACE_WRITE_TARGET__",
+            &quote_path(&workspace_write_target),
+        )
+        .replace(
+            "__GUI_SHELL_PEER_OWN_WRITE__",
+            &quote_path(&peer_workspace.join("agent-b-own-write.txt")),
+        )
+        .replace("__GUI_SHELL_PEER_CHECKED__", &quote_path(&peer_checked))
+        .replace("__GUI_SHELL_PEER_CONTINUE__", &quote_path(&peer_continue))
+        .replace("__GUI_SHELL_PEER_REPORT__", &quote_path(&peer_write_result));
 
         let task_environment = generated
             .get_envs()
@@ -1453,14 +1580,170 @@ mod tests {
                 "-NonInteractive",
                 "-Command",
             ])
-            .arg(script);
-        let output = sandbox.output().expect("実Codex sandboxを起動");
+            .arg(script)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut peer_sandbox = command(&executable, &peer_workspace);
+        peer_sandbox
+            .env("CODEX_HOME", &peer_codex_home)
+            .envs(
+                peer_task_environment
+                    .iter()
+                    .map(|(name, value)| (name, value)),
+            )
+            .args(["sandbox"])
+            .args(["--permission-profile", &peer_permission_profile])
+            .args(&peer_profile_args)
+            .args(["--cd"])
+            .arg(&peer_workspace)
+            .args([
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+            ])
+            .arg(peer_script)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        fn terminate_pair(
+            first: &mut super::process_tree::SupervisedChild,
+            second: &mut super::process_tree::SupervisedChild,
+        ) {
+            let _ = first.terminate_tree();
+            let _ = second.terminate_tree();
+        }
+
+        fn process_output(child: &mut super::process_tree::SupervisedChild) -> (String, String) {
+            let mut stdout = String::new();
+            let mut stderr = String::new();
+            if let Some(mut pipe) = child.child.stdout.take() {
+                let _ = pipe.read_to_string(&mut stdout);
+            }
+            if let Some(mut pipe) = child.child.stderr.take() {
+                let _ = pipe.read_to_string(&mut stderr);
+            }
+            (stdout, stderr)
+        }
+
+        fn wait_for_markers(
+            first: &mut super::process_tree::SupervisedChild,
+            second: &mut super::process_tree::SupervisedChild,
+            markers: [&Path; 2],
+            phase: &str,
+        ) {
+            let deadline = Instant::now() + Duration::from_secs(100);
+            loop {
+                match first.try_wait() {
+                    Ok(Some(status)) => {
+                        terminate_pair(first, second);
+                        let (stdout, stderr) = process_output(first);
+                        panic!("同時MxC試験の{phase}前にAgent Aが終了: {status}; stdout={stdout}; stderr={stderr}");
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        terminate_pair(first, second);
+                        panic!("同時MxC試験の{phase}でAgent A状態を読めない: {error}");
+                    }
+                }
+                match second.try_wait() {
+                    Ok(Some(status)) => {
+                        terminate_pair(first, second);
+                        let (stdout, stderr) = process_output(second);
+                        panic!("同時MxC試験の{phase}前にAgent Bが終了: {status}; stdout={stdout}; stderr={stderr}");
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        terminate_pair(first, second);
+                        panic!("同時MxC試験の{phase}でAgent B状態を読めない: {error}");
+                    }
+                }
+                if markers.iter().all(|marker| marker.exists()) {
+                    return;
+                }
+                if Instant::now() >= deadline {
+                    terminate_pair(first, second);
+                    panic!("同時MxC試験の{phase}同期が期限超過");
+                }
+                thread::sleep(Duration::from_millis(25));
+            }
+        }
+
+        let mut sandbox = process_tree::spawn(sandbox).expect("Agent Aの実Codex sandboxを起動");
+        let mut peer_sandbox = match process_tree::spawn(peer_sandbox) {
+            Ok(child) => child,
+            Err(error) => {
+                let _ = sandbox.terminate_tree();
+                panic!("Agent Bの実Codex sandboxを起動できない: {error}");
+            }
+        };
+        wait_for_markers(
+            &mut sandbox,
+            &mut peer_sandbox,
+            [&workspace_ready, &peer_ready],
+            "開始",
+        );
+        fs::write(&workspace_start, b"go").expect("Agent Aへ同時試験開始を通知");
+        fs::write(&peer_start, b"go").expect("Agent Bへ同時試験開始を通知");
+        wait_for_markers(
+            &mut sandbox,
+            &mut peer_sandbox,
+            [&workspace_checked, &peer_checked],
+            "相互Workspace検査",
+        );
+        fs::write(&workspace_continue, b"continue").expect("Agent Aの後続path検査を解放");
+        fs::write(&peer_continue, b"continue").expect("Agent Bの後続path検査を解放");
+
+        let deadline = Instant::now() + Duration::from_secs(100);
+        let (status, peer_status) = loop {
+            let status = sandbox.try_wait().expect("Agent Aのsandbox終了状態");
+            let peer_status = peer_sandbox.try_wait().expect("Agent Bのsandbox終了状態");
+            if let (Some(status), Some(peer_status)) = (status, peer_status) {
+                break (status, peer_status);
+            }
+            if Instant::now() >= deadline {
+                terminate_pair(&mut sandbox, &mut peer_sandbox);
+                panic!("同時MxC試験の終了待ちが期限超過");
+            }
+            thread::sleep(Duration::from_millis(25));
+        };
+        sandbox
+            .stop_descendants()
+            .expect("Agent Aの残存process群を停止");
+        peer_sandbox
+            .stop_descendants()
+            .expect("Agent Bの残存process群を停止");
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        if let Some(mut pipe) = sandbox.child.stdout.take() {
+            pipe.read_to_string(&mut stdout)
+                .expect("Agent Aの標準出力を取得");
+        }
+        if let Some(mut pipe) = sandbox.child.stderr.take() {
+            pipe.read_to_string(&mut stderr)
+                .expect("Agent Aの標準errorを取得");
+        }
+        let mut peer_stdout = String::new();
+        let mut peer_stderr = String::new();
+        if let Some(mut pipe) = peer_sandbox.child.stdout.take() {
+            pipe.read_to_string(&mut peer_stdout)
+                .expect("Agent Bの標準出力を取得");
+        }
+        if let Some(mut pipe) = peer_sandbox.child.stderr.take() {
+            pipe.read_to_string(&mut peer_stderr)
+                .expect("Agent Bの標準errorを取得");
+        }
         assert!(
-            output.status.success(),
-            "Rust生成profileによる合成probeが失敗: code={:?}, stdout={}, stderr={}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            status.success(),
+            "Agent AのRust生成profile probeが失敗: code={:?}, stdout={stdout}, stderr={stderr}",
+            status.code(),
+        );
+        assert!(
+            peer_status.success(),
+            "Agent BのRust生成profile probeが失敗: code={:?}, stdout={peer_stdout}, stderr={peer_stderr}",
+            peer_status.code(),
         );
         assert_eq!(
             fs::read(workspace_output).expect("Workspace内write結果"),
@@ -1474,6 +1757,30 @@ mod tests {
         assert!(
             !peer_write_target.exists(),
             "Task sandboxは隣接する別Agent Workspaceへ書き込めない"
+        );
+        assert_eq!(
+            fs::read(&workspace_marker).expect("Agent Aの作業領域確認file"),
+            b"synthetic-agent-a-marker",
+            "同時実行中のAgent BがAgent A markerを変更しない"
+        );
+        assert!(
+            !workspace_write_target.exists(),
+            "同時実行中のAgent B sandboxはAgent A Workspaceへ書き込めない"
+        );
+        assert_eq!(
+            fs::read(peer_workspace.join("agent-b-own-write.txt"))
+                .expect("Agent B自身のWorkspace書込み"),
+            b"agent-b-own-write",
+            "Agent Bは自身のWorkspaceへ書き込める"
+        );
+        let peer_write_result =
+            fs::read_to_string(peer_write_result).expect("Agent B相互隔離の観測結果");
+        assert!(
+            peer_write_result.contains("相手Workspace読取HRESULT=-2147024891")
+                && peer_write_result
+                    .contains("相手Workspace書込例外型=UnauthorizedAccessException")
+                && peer_write_result.contains("相手Workspace書込HRESULT=-2147024891"),
+            "Agent Bも同時実行中にAgent Aの読取・書込を拒否する: {peer_write_result}"
         );
         assert!(
             !private.join("registered-write-target.txt").exists(),

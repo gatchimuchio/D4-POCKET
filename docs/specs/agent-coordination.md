@@ -46,6 +46,12 @@ Workspace registryは、異なる実行系ID間の同一rootと通常pathで観�
 
 2026-10-01のWindows直接probeは、Rustが生成するTask permission profileを使う実Codex CLI／MxC sandbox processを合成Workspace Aから起動し、隣接する合成Workspace Bのmarker読取と新規file作成がWindows Access Deniedで拒否されることを確認した。証拠は指定した一回のsandbox child・二つの合成pathに対する`LIVE_RUNTIME`であり、markerとWorkspaceは`FIXTURE`である。これは二つのAgentの同時実行、production Broker／IPC、Owner Approval、Audit／Recovery、実Task、installed productを通らず、path alias全般も検査しない。したがってcross-agent contaminationの実行試験全体は未成立であり、独立Workspace比較・複数AgentのBroker実行と隔離は引き続き`release_blocker`である。
 
+### 同時実MxC sandbox間の相互Workspace拒否（2026-10-01）
+
+後続probeでは、Agent A／B相当の異なるWorkspace、scratch、Codex homeを使い、Rust生成Task permission profileによる実Codex CLI／MxC sandbox childを2つ同時起動した。host側は双方の開始完了後に検査を解放し、相互のread／write検査完了までどちらのchildも終了させないbarrierを設けた。両方向で相手Workspace markerのreadと相手側新規file作成がWindows Access Denied（HRESULT `-2147024891`）となり、自身のWorkspace writeは許可された。証拠区分は指定操作の`LIVE_RUNTIME`、Workspace・marker・同期fileの`FIXTURE`である。
+
+これは二つの直接sandbox childの指定された隣接Workspace間隔離だけを示し、production Broker／IPC、Owner確認、Approval／Audit、実Agent Task/model、製品Recovery、MxC内部temporary領域のtask間cleanup、path alias全般、installed productを示さない。cross-agent contamination全体とproduction Agent Taskは引き続き`release_blocker`であり、`task_execution=unsupported`を維持する。
+
 owner起動設定でCodex runtimeと同じ`runtime_id`を持つWorkspaceについては、Broker起動前にAdapter固定作業pathとWorkspace rootをnofollowで開き、device ID／file IDが一致しない設定を拒否する。設定拒否は`CONFIG`として監査する。対話開始ではAgent AdapterにWorkspace IDを明示させ、Workspace registryが現在保持する登録とruntime IDの一致をRust Brokerで確認した後、Sessionへ結合し、別AuditEventへ登録hashを含む関係を記録する。Codex Adapterは登録時に固定rootの(device ID, file ID)を保持し、各taskのprocess spawn直前にnofollowで開き直して一致しないrootを拒否する。Windowsではvolume rootからworkspaceまでのdirectory handleをprocess spawn完了まで保持し、通常のNTFS path上でのdirectory rename／deleteによる差し替えを防ぐ。これはpath alias全般、管理者が作るmount等、Unixのcheck-to-spawn raceを網羅しない。実Agentの別Workspace書込隔離、Taskの成功、比較・Handoffの許可にも使わない。Mobile Device LinkのWorkspace選択は、認証済み一覧からWorkspace ID／Runtime IDのみを返す許可済み経路として実装する。Rust Brokerの通常Workspace一覧handlerでRuntime対応を検査し、Device Link応答ではpath・登録hash・Approval metadataを除去する。Mobile選択値はSession要求に過ぎずAuthorityを与えず、Task実行には作業Task専用の別Owner Approvalが必要である。実機TLS統合とinstalled productでの証拠は未成立。
 
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。

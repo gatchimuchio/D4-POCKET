@@ -2,6 +2,17 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## R2追補 同時実MxC sandbox間の相互Workspace到達拒否（2026-10-01）
+
+- 直前の単一child試験を拡張し、Agent A／B相当の独立Workspace、scratch、Codex homeを使う実Codex CLI `0.158.0-alpha.2.1`のMxC sandboxを2つ同時に起動した。開始前と相互検査後にhost側barrierを設け、双方が検査を完了するまでどちらも解放しない。各childは相手Workspace markerの読取と相手側新規file作成を試し、その間もう一方のchild process群がJob Object内で生存していることを同期状態で確認する。
+- 両方向で相手markerのreadと相手WorkspaceへのwriteがWindows Access Denied（HRESULT `-2147024891`、writeは`.NET UnauthorizedAccessException`）となり、自身のWorkspaceへのwriteは成功した。相手markerの内容は不変、両方向のwrite targetは生成されなかった。Agent Aでは従来の登録secret exact／deep path拒否、hardlink拒否、およびMxC childのTEMP／TMP観測も継続した。試験失敗・期限超過時はJob Objectで両process群を停止・回収する。
+- 試験harnessの中間失敗: 初回はAgent Bが開始barrier前にexit 1となり、stdout／stderrは空だった。調査でpath置換値を既に引用符を含む状態でさらに引用符内へ挿入していたことを特定し、機械実行script内のpath差込点を修正した。最終再試験は成功した。この初回失敗はharness構文不備であり、Productの隔離成功・失敗を示す証拠ではない。
+- 日本語監査の中間失敗: 初回の統合validatorは新規試験診断文字列3件を検出した。診断文を日本語化し、埋込みPowerShellを人間向け`format!`診断文として誤走査させないraw scriptと明示path置換へ整理した。監査規則は変更せず、最終strict監査は1126 files／0 findingsで合格した。
+- 正確な検証: PowerShellで`$env:GUI_SHELL_CODEX_SANDBOX_TEST_EXE = (Get-Command codex -CommandType Application | Select-Object -First 1 -ExpandProperty Source)`を設定後、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib adapters::codex_cli::tests::Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --exact --nocapture --test-threads=1`を実行。最終exit 0、対象ignored test 1 passed／0 failed。回帰は`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`で12 target、438 passed／0 failed／5 ignored。`rustfmt --check --edition 2021 native/rust_helper/src/adapters/codex_cli.rs`と`git diff --check`もpass。
+- 最終統合検証`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1126 files／0 findings、Schema 151／example 151／negative 194、Conformance 230 checks、manifest／release gate／梱包portability／release smoke／evidence bundle／release runtime assertions（12 passed／0 failed）／C32監査が全件passした。release blocker 31件、`post_v1_scope` 2件、`release_ready=false`を維持した。
+- 証拠区分は、2つのRust生成Task permission profileを使う実Codex CLI／MxC processの指定操作が`LIVE_RUNTIME`、Workspace・marker・同期fileが`FIXTURE`。これは同時に生存する直接sandbox child間の指定された隣接Workspace隔離を示すが、production Broker／IPC、Owner確認、Approval／Audit、実Agent Task/model、失敗時の製品Recovery、AppContainer内部temporary領域のtask間cleanup、別path alias全般、installed productは示さない。
+- Agent Taskのproduction隔離全体は未成立の`release_blocker`。Adapter metadataの`task_execution=unsupported`、関連blocker、`release_ready=false`を維持し、本試験をTask実行対応またはcross-agent contamination全体のPASSへ昇格しない。
+
 ## R2追補 実Windows MxC sandboxから別Agent Workspaceへの到達拒否（2026-10-01）
 
 - 既存のignored Rust probeを拡張し、`build_codex_command`が生成するTask permission profileを使って、実Codex CLI `0.158.0-alpha.2.1`のWindows MxC sandboxから合成Workspace AのPowerShell childを起動した。Workspace Aの兄弟directoryにAgent B用の合成markerと未作成write targetを置き、childからのmarker読取とwriteをそれぞれnegative probeに加えた。
