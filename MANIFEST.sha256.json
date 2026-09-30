@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "65d9a1e362c007ef897dbb90250d8d113ce0ee1d3ef0d4d3e6586d86048eaf1b"
+      "sha256": "070fdf6aa31898c4314f6226c71a75c4fcb012e6da09453e280fa14665722414"
     },
     {
       "path": ".gitignore",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4d830f42a70def367698f65976baefdd39eb3e0854bb92bd1036b3f90650b654"
+      "sha256": "ee009ef92b6b923ce613a2c6b99c146dd93580d4650211864d075b47cf89e863"
     },
     {
       "path": "SECURITY.md",
@@ -3204,7 +3204,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "550a09fe9ba2812a85da16d41dd7770c6dcb516b18b41ce894dcc31292973bb2"
+      "sha256": "e1744ef6848ac6a7ec4de2c016faaa0c4501e17e1b7a72ce7ea04aadd90e86f1"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",

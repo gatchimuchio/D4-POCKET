@@ -1886,6 +1886,97 @@ pub fn run() -> Result<(), DesktopLaunchError> {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    fn automate_native_owner_confirmation(
+        summary: &DesktopOwnerOperationSummary,
+        confirm: bool,
+        forbidden_text: Option<&str>,
+    ) -> bool {
+        use std::io::{BufRead, BufReader};
+        use std::process::Stdio;
+
+        let expected_text = owner_confirmation_text(summary);
+        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tooling/windows_owner_confirmation_ui_test.ps1");
+        assert!(script.is_file(), "Windows UI Automation test helperがない");
+        let expected_text_hex = hex::encode(expected_text.as_bytes());
+        let owner_process_id = std::process::id().to_string();
+        let mut automation = Command::new("powershell.exe")
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+            .arg(script)
+            .args(["-OwnerProcessId", &owner_process_id])
+            .args(["-Decision", if confirm { "Yes" } else { "No" }])
+            .arg("-ExpectedTextHex")
+            .arg(expected_text_hex)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Windows UI Automation helperを起動する");
+        let stdout = automation.stdout.take().expect("UI自動操作の出力");
+        let (automation_tx, automation_rx) = mpsc::channel();
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            let mut ready = String::new();
+            if reader.read_line(&mut ready).is_ok() && ready.trim_end() == "READY" {
+                let mut result = String::new();
+                if reader.read_line(&mut result).is_ok() {
+                    let _ = automation_tx.send(Some(result));
+                    return;
+                }
+            }
+            let _ = automation_tx.send(None);
+        });
+        match automation_rx.recv_timeout(Duration::from_secs(15)) {
+            Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                let output = automation
+                    .wait_with_output()
+                    .expect("UI Automation終了待ち");
+                panic!(
+                    "UI Automationはdialog表示前の準備に失敗した: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let _ = automation.kill();
+                let output = automation
+                    .wait_with_output()
+                    .expect("UI Automation停止待ち");
+                panic!(
+                    "UI Automationの準備が時間内に完了しない: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            Ok(Some(_)) => {}
+        }
+        let confirmed = confirm_owner_operation(summary, None);
+        let result = automation_rx
+            .recv_timeout(Duration::from_secs(15))
+            .expect("UI AutomationがOwner確認へ応答しない")
+            .expect("UI Automationが結果を返さない");
+        let output = automation
+            .wait_with_output()
+            .expect("UI Automation終了待ち");
+        assert!(
+            output.status.success(),
+            "UI AutomationがOwner確認を完了しなかった: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let displayed_text: String =
+            serde_json::from_str(result.trim()).expect("UI AutomationのJSON応答");
+        assert_eq!(
+            displayed_text, expected_text,
+            "実表示がproduction確認文と異なる"
+        );
+        if let Some(forbidden_text) = forbidden_text {
+            assert!(
+                !displayed_text.contains(forbidden_text),
+                "秘密のTask本文がnative Owner確認へ露出した"
+            );
+        }
+        assert_eq!(confirmed, confirm);
+        confirmed
+    }
+
     fn test_root(label: &str) -> PathBuf {
         let mut random = [0u8; 16];
         getrandom::getrandom(&mut random).expect("乱数識別子");
@@ -1895,6 +1986,33 @@ mod tests {
         ));
         fs::create_dir_all(&path).expect("一時作業ディレクトリ");
         path
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "対話型Windows desktopで実Win32 Owner dialogを制御自動操作する"]
+    #[allow(non_snake_case)]
+    fn nativeOwner確認dialogのYesNoを制御UI自動化できTask本文を露出しない() {
+        let instruction = "owner-ui-test-private-instruction-marker";
+        let summary = DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+            runtime_id: "owner-ui-test-runtime".into(),
+            session_id: "owner-ui-test-session".into(),
+            workspace_id: "owner-ui-test-workspace".into(),
+            instruction_characters: instruction.chars().count(),
+            instruction_hash: sha256_tagged(instruction.as_bytes()),
+            payload_hash: sha256_tagged(b"owner-ui-test-payload"),
+        };
+
+        assert!(!automate_native_owner_confirmation(
+            &summary,
+            false,
+            Some(instruction)
+        ));
+        assert!(automate_native_owner_confirmation(
+            &summary,
+            true,
+            Some(instruction)
+        ));
     }
 
     #[test]
@@ -2931,7 +3049,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    #[ignore = "GUI_SHELL_CODEX_TASK_BROKER_TEST_EXEで指定したCodex CLIの登録確認だけを行い、Taskは実行しない"]
+    #[ignore = "GUI_SHELL_CODEX_TASK_BROKER_TEST_EXEで指定したCodex CLIを登録し、実Win32 Owner確認を自動操作する。Taskは実行しない"]
     #[allow(non_snake_case)]
     fn 登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する() {
         const RUNTIME_ID: &str = "installed-codex-fixture";
@@ -3018,6 +3136,51 @@ mod tests {
             .expect("Broker発行Session ID")
             .to_owned();
 
+        let declined_permission = desktop_owner_request(
+            "AgentTaskWorkspacePermissionGrant",
+            "desktop-codex-task-permission-ui-declined",
+            "desktop-codex-task-permission-ui-declined-nonce",
+            serde_json::json!({
+                "agent_runtime_id": RUNTIME_ID,
+                "session_id": agent_session_id,
+                "workspace_id": WORKSPACE_ID
+            }),
+        );
+        let declined_permission_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&declined_permission).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                let DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("Workspace Permissionは実Win32 Owner確認を使う")
+                };
+                assert_eq!(runtime_id, RUNTIME_ID);
+                assert_eq!(session_id, &agent_session_id);
+                assert_eq!(workspace_id, WORKSPACE_ID);
+                assert_eq!(
+                    payload_hash,
+                    declined_permission["payload_hash"].as_str().unwrap()
+                );
+                automate_native_owner_confirmation(summary, false, None)
+            },
+        )
+        .expect("拒否後のBroker応答");
+        let declined_permission_response: serde_json::Value =
+            serde_json::from_slice(&declined_permission_response).unwrap();
+        assert_eq!(declined_permission_response["status"], "rejected");
+        assert_eq!(
+            declined_permission_response["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
+
         let permission_payload = serde_json::json!({
             "agent_runtime_id": RUNTIME_ID,
             "session_id": agent_session_id,
@@ -3051,7 +3214,7 @@ mod tests {
                 assert_eq!(session_id, &agent_session_id);
                 assert_eq!(workspace_id, WORKSPACE_ID);
                 assert_eq!(payload_hash, permission["payload_hash"].as_str().unwrap());
-                true
+                automate_native_owner_confirmation(summary, true, None)
             },
         )
         .expect("native確認後のBroker応答");
@@ -3101,7 +3264,7 @@ mod tests {
                 assert_eq!(instruction_hash, &sha256_tagged(instruction.as_bytes()));
                 assert_eq!(payload_hash, approval["payload_hash"].as_str().unwrap());
                 assert!(!owner_confirmation_text(summary).contains(instruction));
-                true
+                automate_native_owner_confirmation(summary, true, Some(instruction))
             },
         )
         .expect("native確認後のBroker応答");

@@ -8,6 +8,8 @@ D4 Pocket Phase 21／C12 download consumer（2026-09-30）: native Desktop Owner
 
 D4 Pocket Windows Export hosted build補助: `.github/workflows/windows-manual-export-build.yml`は`workflow_dispatch`のみで起動し、Windows Server 2025上でclean `main`／`origin/main`一致を照合して、既存Export toolを合成Receipt／Manifest fixtureで実行する。目的はローカルApplication Controlで未完了のFlutter Windows Release／Rust Broker・起動器buildとunsigned portable bundle組立てを補助検証すること。Export toolが要求するremote HEAD再照合には当該stepだけcontents:read tokenを使い、Git環境設定はFlutter／Cargo子processへのallowlist外として継承しない。Artifactはuploadせず、commit・toolchain・inventory hash・scope限定済みevidenceだけをActions runへ記録する。Owner authority、Broker生成Receipt、installed product、署名、Installer、実起動、binary pruning、正式配布の証拠ではなく、Windows配布／Exportの`release_blocker`は維持する。
 
+Windows Rust manual validationの`workflow_dispatch`には、必要時だけ有効化する対話型Owner確認UI試験入力を設ける。試験はRust production formatterが生成する固定summaryと一致する実Win32 dialogに限ってUI AutomationでNo／Yesを操作し、AgentTask要求のBroker拒否gateを維持する。UI操作試験はWindows UI表示・選択経路の証拠であり、production Owner操作、Broker installed product、AgentTask成功や`task_execution=supported`の証拠へ昇格しない。通常Rust validationではこの入力は無効である。
+
 D4 Pocket Phase 21／C11追補（2026-09-30）: 更新一覧の各候補へ、現在trustで再検証済みの候補とBroker所有配布元だけから導出した取得先状態／URLを表示する。配布元未設定と未適格候補はURLなしとし、表示は`INTERNAL_STATE`のみで権限やdownload実行を生成しない。download／install／rollbackは`suspended`を維持する。詳細・検証結果は`docs/REV3_PROGRESS.md`。
 
 D4 Pocket Phase 21／C11追補（2026-09-30）: update trust版2のchannel別配布元一意性をJSON Schemaにも表現し、異なるURLを持つ同一channelの重複をnegative conformanceで拒否する。Brokerの既存起動時拒否と機械契約の差を閉じた。これは設定contractの検査であり、download実行、package照合、install／rollbackは未接続。詳細・検証結果は`docs/REV3_PROGRESS.md`。
