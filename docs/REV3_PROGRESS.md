@@ -2,6 +2,14 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## `Windows Server 2025`上での`Setup Doctor`画面証拠取得失敗（2026-10-01）
+
+- `workflow_dispatch`で一時branch `codex/verify-setup-doctor-uia-v16` のcommit `f51ba074be693ab58e0df965d413645b491ef29b`（[run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36764681765)）と `1139eef24ff945cce677ce115582487c593400f7`（[run #8](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36767327753)）をWindows Server 2025で手動検査した。workflowは`workflow_dispatch`のみで起動し、自動trigger、PR、artifact uploadは使用していない。
+- run #8では固定Rust 1.95.0／Flutter commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`、Desktop Release build、installed配置が成功。別jobのRust helper build、Desktop Flutter analyze／全test、Mobile analyze、終了時source cleanも成功した。
+- installed appのDiagnosticOnly起動では、初回windowが可視で、製品Setup Doctor reportとBroker Auditの照合も成立した。一方、UIA collectorは`verified_frontend_not_foreground`を記録し、Setup Doctorの要求可視要素を収集できなかった。診断値は`operator_readable=false`、`proof_passed=false`、`required_element_minimum=false`、`no_proof_errors=false`。よってこのhosted runのUI可読性proofは失敗であり、合格証拠として扱わない。この結果だけから製品regressionとも断定しない。
+- run #7はRelease build／stage後に同じ総合UIA条件で失敗し、run #8で判定別の安全なdiagnosticを追加して再実行した。失敗は同一runner sessionで対象Frontendをforegroundとして確認できず、global pointer操作・実画面要素確認を安全に成立させられなかったことによる。
+- 両runともrun専用temporary root／processのcleanupとsource clean確認が成功し、artifactは残していない。一時branchは削除済みで、失敗したworkflow差分はmainへ統合していない。Windows Setup Doctor／installed first-runの既存`release_blocker`と`release_ready=false`を維持する。
+
 ## Windows Setup Doctor UIAutomation収集器 v16 実装（2026-10-01）
 
 - v15で未収集だったSetup Doctor専用画面について、製品FrontendのMainWindowHandleとUIA runtime IDへ束縛した診断ナビゲーション、画面見出し、status、authority notice、各checkのtitle／status／message／non-pass recovery textを収集するv16 pathを追加した。観測対象は同一PID・同一MainWindowのControl Viewに限定し、scrollは最大17回、node数は既存上限内とする。
