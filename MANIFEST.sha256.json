@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b69bd7f931cb60cd48aa29adf08c075d54abb51f25ea0be4319489bbb34ebd5b"
+      "sha256": "aee80fa214fd1bcd3ec03f5206a2273bd25b9f79876b364e2e6fa4d6426526ab"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "6a4f5cdec0930c6dc5dc533ab164bf45dd6653a077fede776318862838b656ce"
+      "sha256": "9c6370630ab1216c037c3b061bd95e52fa3bf2631304006e9043ad9932711688"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1453,7 +1453,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "65c2adfd547a1ba7a5726906f2efa5a972aa8b83c7f31c95baf6f679d17f2c20"
+      "sha256": "d02dba797e41261b4be307148be9b9db0f83d159b0aec85b144a9be04eb4d004"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e1b85095880391b6b62d8fe7e243dfc1943dcf2e83f497c1dd125c6324c7afe1"
+      "sha256": "485ab0c32515dc29aaefb157b550d4cdf34270cd0d617ab85a2ef8bf69c81783"
     },
     {
       "path": "requirements-dev.txt",
@@ -4321,7 +4321,7 @@
     },
     {
       "path": "specs/update_trust.schema.json",
-      "sha256": "26b063eed1e7811d5757c7598dd3ea5431526543470ee7ca0dbee17b74602885"
+      "sha256": "a64021d9648c619ac47b1e225d334373e279e4dd7395c41158b913fac44eb461"
     },
     {
       "path": "specs/windows_tray_projection.schema.json",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ff140f2e83df31225d6657ba999350abaa0de99bcce2fb77de76f379a31d1588"
+      "sha256": "69627acff04d568d73e88121ae139ac289f748b6b50ac4318de1e1600a19c3ee"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

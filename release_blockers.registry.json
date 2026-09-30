@@ -478,6 +478,13 @@
           "execution_boundary": "UI／候補からURLやpathを受け取らず、download／install／rollbackは従来どおりsuspendedのまま。"
         },
         "scope_limit": "CONFIGとtest FIXTUREのみ。実HTTP要求、redirect／DNS／TLS、取得byte照合、展開、同一volume導入・rollback、Windows installed productのLIVE_RUNTIME証拠ではない。release blockerとrelease_ready=falseを維持する。"
+      },
+      "package_source_channel_uniqueness_schema_followup": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Schema 149件／正常example 149件／negative fixture 192件、Conformance 228 checks、Broker focused Rust test 1 passed／0 failed。tooling/validate_all.py --python-only --desktop-platform windowsはexit 0で、登録development check 10件すべて合格。strict日本語監査1114 file／0 findings。",
+        "observation": "JSON Schemaがstable／beta／nightlyごとにmaxContains=1を強制し、異なるURLを持つ同一channelのsourceをnegative conformanceで拒否した。Broker起動時検証の既存重複拒否もfocused testで確認した。",
+        "scope_limit": "CONFIGとFIXTUREの契約整合のみ。実HTTP、download byte照合、install／rollback、installed product、LIVE_RUNTIMEの証拠ではない。release blockerとrelease_ready=falseを維持する。"
       }
     },
     {

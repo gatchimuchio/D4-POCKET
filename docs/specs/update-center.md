@@ -6,7 +6,7 @@
 
 ## Broker所有の配布元設定
 
-`update_trust.json`版1は後方互換の署名検査専用形式として読み取る。版2は署名公開鍵・fingerprintに加えて、Broker所有の`package_sources`を持てる。各要素は`channel`と`base_url`だけであり、channelは`stable`、`beta`、`nightly`のいずれか、登録数は最大3、同じchannelを複数登録しない。新規初期設定は未構成の版2で、公開鍵未設定時は配布元も空でなければならない。版1に配布元fieldを追加することはできない。
+`update_trust.json`版1は後方互換の署名検査専用形式として読み取る。版2は署名公開鍵・fingerprintに加えて、Broker所有の`package_sources`を持てる。各要素は`channel`と`base_url`だけであり、channelは`stable`、`beta`、`nightly`のいずれか、登録数は最大3、同じchannelを複数登録しない。この一意性はJSON SchemaとBroker起動時検証の両方で強制する。新規初期設定は未構成の版2で、公開鍵未設定時は配布元も空でなければならない。版1に配布元fieldを追加することはできない。
 
 `base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。
 

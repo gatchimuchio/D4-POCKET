@@ -953,6 +953,15 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     }
     if validate_instance(source_configured_trust, trust_schema):
         errors.append("Broker所有の版2 update trustが有効な配布元設定を拒否した")
+    duplicate_channel_trust = {
+        **configured_trust,
+        "package_sources": [
+            {"channel": "stable", "base_url": "https://updates.example.invalid/d4/stable"},
+            {"channel": "stable", "base_url": "https://mirror.example.invalid/d4/stable"},
+        ],
+    }
+    if validate_instance(duplicate_channel_trust, trust_schema) == []:
+        errors.append("update trust schemaが同じchannelの複数配布元を受理した")
     legacy_trust = {key: value for key, value in trust.items() if key != "package_sources"}
     legacy_trust["版"] = 1
     if validate_instance(legacy_trust, trust_schema):

@@ -775,6 +775,36 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 - Windows Actionsは未使用。download要求は依然`suspended`であり、現在trust再検証のtest結果をLIVE_RUNTIMEやpackage真正性へ昇格しない。
 
+## Phase 21／C11追補 SchemaとBrokerの配布元channel一意性整合（2026-09-30）
+
+### 成立した変更
+
+- Broker起動時検証は同じchannelの複数sourceを拒否していたが、JSON SchemaはURLが異なる同一channel要素を受理していた。
+- Schemaの`package_sources`へ`stable`／`beta`／`nightly`ごとの`maxContains: 1`を加え、異なるURLの重複channelをnegative conformanceで拒否する。既存Broker検証も同じ重複sourceを拒否するfocused Rust testで確認した。
+- これは版2の設定contract適合補修であり、network、download、package byte照合、install／rollbackのproduction pathは追加しない。release blockerと`release_ready=false`は維持する。
+
+### 検証
+
+- Schema 149件、正常example 149件、negative fixture 192件で合格。
+```powershell
+python -X utf8 tooling/schema_check/check_schemas.py
+```
+- Conformance 228 checksで合格。異なるURLを持つ同一channelのsourceをJSON Schemaが拒否することを追加検査した。
+```powershell
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+```
+- Broker側の重複channel拒否focused testは1 passed／0 failed。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib package_source_requires_canonical_https_base_and_unique_known_channels -- --test-threads=1
+```
+- 変更後のstrict日本語基底監査は1114 file／0 findingsで合格。統合validatorはexit 0で、登録development check 10件すべて合格した。Schema、Conformance、Manifest、release gate整合、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査を含む。
+- Release gate検査の合格はrelease readinessを意味しない。実download／package byte照合／install／rollbackのblockerを保持し、`release_ready=false`のままとした。
+- Windows Actionsは未使用。対象はSchema／Conformance契約と既存Rust拒否testで、Windowsローカル検証が成立した。
+```powershell
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+- `git diff --check`も合格。
+
 ## Phase 21／C11追補 Broker所有配布元設定contract（2026-09-30）
 
 ### 成立した変更

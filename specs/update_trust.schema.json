@@ -50,6 +50,33 @@
     {
       "if": { "properties": { "public_key_der_hex": { "type": "string" } }, "required": ["public_key_der_hex"] },
       "then": { "properties": { "public_key_fingerprint": { "type": "string" } } }
+    },
+    {
+      "properties": {
+        "package_sources": {
+          "contains": { "properties": { "channel": { "const": "stable" } }, "required": ["channel"] },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "package_sources": {
+          "contains": { "properties": { "channel": { "const": "beta" } }, "required": ["channel"] },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "package_sources": {
+          "contains": { "properties": { "channel": { "const": "nightly" } }, "required": ["channel"] },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      }
     }
   ]
 }
