@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9fad8d0bed9df1a53a7fb317df82a69c7247725c3fe9157b1495d5bca65a0d53"
+      "sha256": "90a8455316be955fe1ae1e189abb9572ff9744a5cf9f1f69ffe2356c9d75594b"
     },
     {
       "path": "SECURITY.md",
@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "e1a15579989d5720684bb288b0f1332ee44191f60bd71df500b9bc42e8ee196a"
+      "sha256": "af3d45889401db1873bdaa1605c9909404bc0c5b06493336cc89990f7c696893"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "9d4dad5a77534fe98ba42d50d81067c79a94af0c719ca08dd22f4238c2ca1191"
+      "sha256": "b0c6de3603b23585ec49e881639b57a024eb1ba70d0129f01e19cdb7c76d5425"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",

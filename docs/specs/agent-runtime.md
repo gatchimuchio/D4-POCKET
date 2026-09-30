@@ -148,3 +148,9 @@ Windowsのignored Rust統合testは、実Codex CLI `0.158.0-alpha.2.1`と実MxC 
 この取消経路を最後まで通った観測は1回である。元の正常Task段階は過去にも成功実績がある一方、2026-09-30の再試行2回ではResponses stream切断と`chatgpt.com` CONNECT 1件（loopback proxyが拒否）が発生し、新しい取消段階へ到達しなかった。HTTP request parse、server応答書込、loopback外接続拒否にfixture側の異常は観測されず、原因は未確定である。既知slugへの試験model差替えもtool childを起動できず、採用せず戻した。失敗を成功へ読み替えない。
 
 この`LIVE_RUNTIME`観測の範囲は、当該Windowsで`Codex CLI`の子process群がRust試験内Broker consumerからの取消要求によって停止した一度の挙動に限る。権限発行、`Adapter`の対応metadata、監査保存callbackには`FIXTURE`を使い、実製品の`broker-server`／IPC、Desktop native Owner画面、耐久Auditを通していない。反復可能な隔離、期限・crash後のRecovery、MxC内部一時領域の物理cleanupも示さない。Rust管理scratchとMxC内部TEMPは別の一時領域である。Codex Adapterの`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### MxC AppContainer一時領域とBroker scratchの責任分離（2026-10-01）
+
+Broker-owned `WorkspaceTaskScratch`と、MxC tool childが実際に受け取る`TEMP`／`TMP`は別の領域として扱う。Windows AppContainerは`TEMP`／`TMP`をAppContainer profile配下の`AC\Temp`へリダイレクトするため、child値がBroker scratchと一致することを安全不変条件にしない。Broker scratchはBrokerが所有する作業・回収対象であり、AppContainer側の一時領域はMxC／Windows sandbox profileの寿命と権限境界に従う。
+
+Task対応を成立させるには、Broker scratchとAppContainer一時領域の双方を区別した上で、production Broker経路におけるtask間・同時task間の分離、実際のsandbox process群停止後の通常終了／取消／期限超過／crash時cleanup、およびcleanup失敗時のRecoveryを検証する。AppContainer環境handleのclose、child終了後にhostからpathが見えないこと、または`TEMP`／`TMP`がBroker scratchと違うこと単独では、物理削除・task間非共有を証明しない。条件が閉じるまでは`task_execution=unsupported`と既存`release_blocker`を維持する。

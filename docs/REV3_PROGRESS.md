@@ -1321,3 +1321,18 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
   required_action: 対象ごとの独立contract・負例試験・Owner操作を実装し、clean Windows installed productと必要platformで証拠を取得する。
   blocks_release: yes
 - `release_ready=false`を維持する。
+
+## R2追補 AppContainer TEMP／TMPとBroker scratchの責任分離（2026-10-01）
+
+### 成立した確認
+
+- 現在のclean `main` commit `f2a95443c702e7fd69d4218266a3a2c11ea73657`で、Rust生成Task設定を用いる実Windows MxC直接probeを再実行した。合成登録secretのliteral path・深度40 path・hardlink aliasに対する拒否、通常Workspace write許可、`TEMP`／`TMP`がBroker scratchと一致しないことを1回確認した。hardlink作成はWindows `UnauthorizedAccessException`／HRESULT `-2147024891`（Access Denied）で失敗した。
+- Microsoft Learnは、AppContainerの`TEMP`／`TMP`がprofile配下の`AC\Temp`へリダイレクトされる例を明記している。Codex CLI `0.158.0-alpha.2.1`のpinned MxC sourceでは、受信`TEMP`／`TMP`を`:tmpdir` policyへ射影した後、Windows `BaseContainerRunner`で実行する。従って実childの値がBroker指定pathと一致しない観測は、少なくとも「RustからCLIへの設定漏れ」を意味せず、AppContainerによるOS側redirectと整合する。
+- Microsoft MxCの同じpinned sourceではBaseContainerが対応hostでPSEC経路を優先し、子process終了後に`ProcessSecurityEnvironment` handleをcloseする。これはserver-side security-environment stateの終了を示すが、profile配下の実TEMP dataの物理削除や、task間・同時task間の一時領域分離を証明しない。hostから終了後にpathが見えない既存probeも同じく削除証拠へ昇格しない。
+- 設計上、Broker-owned `WorkspaceTaskScratch`とMxC／Windowsが提供するAppContainer一時領域を別責任にした。tool childの`TEMP`／`TMP`とBroker scratchの完全一致は要求せず、sandbox内実効分離、task間非共有、通常終了／取消／期限超過／crash時cleanupを実証対象とする。これは検証条件の正確化であり、実Agent Taskを起動可能にする変更ではない。
+
+### 正確な検証と証拠境界
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`: exit 0、1 passed／0 failed。インストール済みCodex CLI `0.158.0-alpha.2.1`と合成Workspace／secretを使う直接MxC sandbox probeであり、実Agent、Rust Broker、Owner Approval、production Task、cleanup lifecycleの試験ではない。
+- 外部資料の確認（`EXTERNAL_EVIDENCE`）: [Microsoft Learn AppContainer資料](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)、[Codex CLIの依存版固定箇所](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/Cargo.toml)、[Codex CLIのMxC権限変換処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/policy.rs)、[Codex CLIのWindows起動処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/windows.rs)、[Microsoft MxC BaseContainerの起動終了処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/appcontainer/common/src/base_container_runner.rs)、[PSEC環境handleの寿命処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/learning_mode/windows/src/secenv.rs)。source確認は実行環境の`LIVE_RUNTIME`証拠ではない。
+- production Broker／IPC経由の実Task、AppContainer tempの実体・task間分離・物理cleanup、取消／期限／crash後Recovery、installed product、Audit、result／diffのContent Exposureは未成立。TEMP pathの完全一致をblocker条件から外したが、AppContainer一時領域の寿命とRecovery検証は`release_blocker`として残し、`task_execution=unsupported`および`release_ready=false`を維持する。
