@@ -484,6 +484,12 @@ Rustが導入済みでRust helperを変更した場合は、次を実行する�
 cd native/rust_helper && cargo test
 ```
 
+WindowsでWindows DNS helper crateを変更した場合は、独立crateのnative API試験も実行する。
+
+```bash
+cd native/windows_dns && cargo test -- --test-threads=1
+```
+
 Flutterが導入済みでFlutter appを変更した場合は、次を実行する。
 
 ```bash

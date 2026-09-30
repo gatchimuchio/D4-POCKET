@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download実行経路をBroker/native Owner確認へ接続（install／process／rollbackはsuspended）
+状態: C12 download実行経路をBroker/native Owner確認とWindows期限付きDNS解決へ接続（install／process／rollbackはsuspended）
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -28,7 +28,7 @@
 
 downloadはBrokerのserial IPC loop外の単一worker上で非同期HTTP clientを使って実行し、Brokerは10 msのbounded loopでcompletionを受けてAuditを確定する。接続期限は20秒、HTTP要求全体は最大24時間、bodyの連続読取無通信期限は60秒とし、転送が続く場合に全体60秒で打ち切らない。Flutterは直接network／filesystemを扱わず、既存の`MethodChannel('gui_shell/broker')`を通じてjobを開始し、更新一覧の手動refreshで状態を読む。状態はBroker process内でboundedに保持し、常駐pollingは行わない。Broker再起動後はjob状態が消えるが、再度明示要求した場合に既存packageを固定directory内で全byte再hashして照合する。中断`.part`は次の明示download要求時に、Audit intent／結果を記録してBroker固定directory内だけを削除する。
 
-通信はHTTPSのみ、既定の証明書・hostname検証を有効にし、redirect・system proxy・自動retryを無効化する。OSのDNS結果に非global addressが一つでも含まれる場合は全体を拒否し、検査したaddressへ接続先を固定してDNS rebindingを防ぐ。DNS検索は専用worker内の同期OS resolverで行われ、Reqwestのconnect／request timeoutでは中断できないため、DNS処理期限とcancel可能なresolverの導入は`release_blocker`として残す。HTTP応答はstatus 200、単一の正確な`Content-Length`、`Transfer-Encoding`なし、`Content-Encoding`なしを要求する。固定64 KiB bufferで実byte数とSHA-256を計算し、署名済みbyte長・digestの両方が一致した場合だけ、capability directory内の`create_new`一時fileをfsyncし、create-only hard linkで`<digest>.pkg`として公開する。失敗・中断では一時fileを除去する。path、応答本文、秘密値はFlutter／Auditへ返さず、Auditには更新ID、候補hash、状態、byte長、static failure codeのみを記録する。
+通信はHTTPSのみ、既定の証明書・hostname検証を有効にし、redirect・system proxy・自動retryを無効化する。WindowsではRust helper内のWindows DNS Client `DnsQueryEx`を使い、A／AAAAを逐次照会する。各照会にはdownload全体期限と最大15秒のDNS期限の早い方を適用し、20 ms間隔でcancel要求を確認する。期限超過またはcancel時は`DnsCancelQuery`を呼び、callback完了まで結果・cancel handle・query contextを保持する。callbackを2秒以内に回収できない、またはcancelに失敗した場合はstatic failure codeで失敗し、未完了照会が残る間は後続照会を拒否する。DNS結果に非global addressが一つでも含まれる場合は全体を拒否し、検査したaddressへ接続先を固定してDNS rebindingを防ぐ。HTTP応答はstatus 200、単一の正確な`Content-Length`、`Transfer-Encoding`なし、`Content-Encoding`なしを要求する。固定64 KiB bufferで実byte数とSHA-256を計算し、署名済みbyte長・digestの両方が一致した場合だけ、capability directory内の`create_new`一時fileをfsyncし、create-only hard linkで`<digest>.pkg`として公開する。失敗・中断では一時fileを除去する。path、応答本文、秘密値はFlutter／Auditへ返さず、Auditには更新ID、候補hash、状態、byte長、static failure codeのみを記録する。
 
 保管は固定Broker directory、同時job一件、完成package一件（最大4 GiB）にboundedとする。別digestのpackageがすでにある場合は上書きせず拒否する。install／process起動／rollbackは未接続のため引き続き`suspended`。download済み状態は権限ではなく、後続installは現在trustを再検証し、保存package全体を再hashしてから別のApproval／Audit／Recovery契約へ進む必要がある。
 
@@ -41,7 +41,8 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 - 更新一覧の取得元projectionが現在trustで検証済みの候補とBroker所有sourceだけから導出され、未設定・未適格候補にURLを返さないこと
 - 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
 - 更新候補の永続化・再読込、延期のAudit、実行要求のsuspended
+- Windows DNS Clientの実callback、A／AAAA応答、明示cancel、有限deadlineとtimeout後のcancel、およびcancel／期限の事前判定
 - Broker所有update trust版1互換、版2の配布元構造・起動時検証、設定読込の上限・重複field拒否
 - Desktop設定画面の更新一覧と要求操作
 
-Windows installed productでの実配布元download、TLS／DNS失敗注入、破損package repair、保存後tamper検査からinstall／rollbackまでの経路、owner固定公開鍵の本番provisioningは未成立であり、正式releaseの`release_blocker`として保持する。metadata署名検査やlocal TLS fixtureの成功だけで実配布元の安全性、installed productでの更新成功、release readinessを主張しない。system proxy必須環境は未対応の`known_limitation`であり、直接HTTPS接続が許可されない環境ではdownloadは失敗する。
+Windows installed productでの実配布元download、製品BrokerからのDNS／TLS失敗注入、破損package repair、保存後tamper検査からinstall／rollbackまでの経路、owner固定公開鍵の本番provisioningは未成立であり、正式releaseの`release_blocker`として保持する。DNS API試験はWindows localの制御loopback fixtureを使用し、installed productや実配布元での挙動を証明しない。Linux／macOS pathは現状`ToSocketAddrs`を使う。この期限付き取消resolverとの機能差は非Windows技術工程R15で扱う`post_v1_scope`であり、Windows 1.0の完了主張へ含めない。metadata署名検査やlocal TLS fixtureの成功だけで実配布元の安全性、installed productでの更新成功、release readinessを主張しない。system proxy必須環境は未対応の`known_limitation`であり、直接HTTPS接続が許可されない環境ではdownloadは失敗する。

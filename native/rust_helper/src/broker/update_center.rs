@@ -235,6 +235,8 @@ fn download_error_code(error: &super::update_download::DownloadError) -> &'stati
         E::DigestMismatch => "update_download_digest_mismatch",
         E::Cancelled => "update_download_cancelled",
         E::TimedOut => "update_download_timeout",
+        E::ResolverBusy => "update_download_dns_unavailable",
+        E::DnsCancellationFailed => "update_download_dns_cancel_failed",
         E::Storage => "update_download_storage_failed",
     }
 }

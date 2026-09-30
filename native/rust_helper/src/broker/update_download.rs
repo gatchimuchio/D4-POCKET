@@ -7,14 +7,21 @@ use reqwest::{redirect, retry, Certificate, Client, Response, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::io::{Read, Write};
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+#[cfg(not(windows))]
+use std::net::ToSocketAddrs;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+#[cfg(windows)]
+#[path = "update_download/windows_dns.rs"]
+mod windows_dns;
 
 const MAX_PACKAGE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_DOWNLOAD_TIME: Duration = Duration::from_secs(24 * 60 * 60);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+const DNS_RESOLUTION_TIMEOUT: Duration = Duration::from_secs(15);
 const COPY_BUFFER_BYTES: usize = 64 * 1024;
 const PROGRESS_QUANTUM_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -37,6 +44,8 @@ pub(crate) enum DownloadError {
     DigestMismatch,
     Cancelled,
     TimedOut,
+    ResolverBusy,
+    DnsCancellationFailed,
     Storage,
 }
 
@@ -154,7 +163,7 @@ where
         });
     }
     let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
-    let addresses = resolve_public_addresses(host, 443)?;
+    let addresses = resolve_public_addresses(host, 443, cancel, deadline)?;
     let client = build_download_client(host, &addresses, &[])?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -489,10 +498,40 @@ fn map_reqwest_error(error: reqwest::Error) -> DownloadError {
     }
 }
 
-fn resolve_public_addresses(host: &str, port: u16) -> Result<Vec<SocketAddr>, DownloadError> {
-    let resolved = (host, port)
-        .to_socket_addrs()
-        .map_err(|_| DownloadError::NameResolution)?;
+fn resolve_public_addresses(
+    host: &str,
+    port: u16,
+    cancel: &AtomicBool,
+    deadline: std::time::Instant,
+) -> Result<Vec<SocketAddr>, DownloadError> {
+    if cancel.load(Ordering::Acquire) {
+        return Err(DownloadError::Cancelled);
+    }
+    if std::time::Instant::now() >= deadline {
+        return Err(DownloadError::TimedOut);
+    }
+    let resolved = if let Ok(address) = host.parse::<IpAddr>() {
+        vec![SocketAddr::new(address, port)]
+    } else {
+        #[cfg(windows)]
+        {
+            windows_dns::resolve(
+                host,
+                cancel,
+                deadline.min(std::time::Instant::now() + DNS_RESOLUTION_TIMEOUT),
+            )?
+            .into_iter()
+            .map(|address| SocketAddr::new(address, port))
+            .collect()
+        }
+        #[cfg(not(windows))]
+        {
+            (host, port)
+                .to_socket_addrs()
+                .map_err(|_| DownloadError::NameResolution)?
+                .collect()
+        }
+    };
     let mut addresses = BTreeSet::new();
     for address in resolved {
         if !is_public_address(address.ip()) {
@@ -604,6 +643,26 @@ mod tests {
                 "unexpectedly blocked: {address}"
             );
         }
+    }
+
+    #[test]
+    fn cancelled_or_expired_name_resolution_stops_before_resolver_call() {
+        let cancelled = AtomicBool::new(true);
+        assert_eq!(
+            resolve_public_addresses(
+                "updates.example",
+                443,
+                &cancelled,
+                std::time::Instant::now() + Duration::from_secs(5),
+            ),
+            Err(DownloadError::Cancelled)
+        );
+
+        let expired = std::time::Instant::now() - Duration::from_secs(1);
+        assert_eq!(
+            resolve_public_addresses("updates.example", 443, &AtomicBool::new(false), expired,),
+            Err(DownloadError::TimedOut)
+        );
     }
 
     #[test]

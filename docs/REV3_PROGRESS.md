@@ -749,6 +749,35 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
 ```
+
+## Phase 21 C12追補 Windows DNS期限・取消境界（2026-09-30）
+
+### 成立した変更
+
+- C12 package downloadが呼ぶ名前解決について、Windowsだけを対象にWindows DNS Client `DnsQueryEx`のcallback経路へ接続した。A／AAAAは逐次照会し、それぞれdownload全体deadlineと最大15秒のDNS deadlineの早い方を使用する。download cancel flagは20 ms間隔で確認する。
+- deadline／cancel時は`DnsCancelQuery`を呼び、callback完了まで結果・cancel handle・query contextを保持する。callback回収は最大2秒とし、cancel失敗・callback未回収をstatic failureへ閉じる。未完了queryが残る間はprocess内pending slotを維持し、次のDNS queryを拒否する。既存のpublic-address判定と、検査済みaddressへの接続pinningは保持した。
+- Rust helperの`#![forbid(unsafe_code)]`は変更していない。Windows DNS APIの`unsafe`とFFI共有状態は専用crate `native/windows_dns`へ隔離した。Windows外では既存`ToSocketAddrs`を維持し、期限付きcancel対応はWindows 1.0対象に限定する。
+- Windows localの試験processから実Windows DNS Client APIをloopback DNS fixtureへ呼び出した。A／AAAA応答のparse、非対称IPv4 octet `1.2.3.4`、明示cancel、deadline超過後cancel、事前cancelを観測した。これはhelper APIの`LIVE_RUNTIME`証拠だが、製品Broker／native Owner確認／installed productや実配布元の証拠ではない。
+- `release_blockers.registry.json`、C11のmachine-readable最終監査、`ROADMAP.md`、`docs/specs/update-center.md`へ成立範囲と残存blockerを反映した。破損package修復、installed download、install／rollback、実配布元は`release_blocker`を維持し、Linux／macOSの期限付きresolver差はR15の`post_v1_scope`として区別する。
+
+### 検証
+
+- Windows DNS helper独立試験: 4 passed／0 failed／0 ignored。loopback DNS serverは`127.0.0.1:53`を使用し、WindowsのDNS設定は変更していない。
+- Rust helper全target: 12 test target、429 passed／0 failed／3 ignored。DNS API専用testは独立crate testで別途4件実行した。
+- `cargo check --all-targets`、変更Rust fileの`rustfmt --check`、`git diff --check`、Blocker／最終監査JSON parse: 成功。
+- Schema: 150件、normal example 150件、negative fixture 193件で成功。Conformance: 229 checksで成功。
+- Conformanceの初回は旧resolver call表記の要求、二回目は書式改行と既存`#[cfg(test)]`分割による新resolver関数の見落しで失敗した。検査を削除・弱体化せず、空白正規化とresolver関数の独立抽出を加えてdeadline／Windows分岐／native cancel機構を必須検査にし、229 checksを再実行して合格した。
+- 厳格日本語監査は最初に新crate内英語panic message 2件を検出した。該当診断を日本語化した後、repository_files 1122／debt files 0／findings 0で合格した。
+- `python -X utf8 tooling/manifest.py --write`は1119件を書き込み、`python -X utf8 tooling/manifest.py --check`が合格した。新しいWindows DNS crateのmanifest coverageを`tooling/manifest.py`へ追加した。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。日本語基底、Schema、Conformance、Manifest、release gate、package portability、release smoke、evidence bundle、runtime assertion、C32最終開発監査の10検査がすべてpassed。Windows installed release evidenceの5項目は未成立としてfailedのままで、`release_ready=false`を維持する。
+- GitHub Actionsは未使用。local WindowsでWindows DNS API試験を含む対象検証を実行できた。
+
+### 残存範囲
+
+- `release_blocker`: 破損package repair、Windows installed product上の実download、実配布元／失敗注入、Installer／Uninstaller、install／rollback／crash Recovery、正式trust provisioning。
+- `post_v1_scope`: Linux／macOSの期限付きcancel可能なDNS resolver。非Windows技術工程R15で実装・検証する。
+- `known_limitation`: system proxyを必要とする環境ではdownloadを利用できない。
+- release blockerは未解消のものが残るため`release_ready=false`を維持する。GitHub Actionsは未使用。Windows localで必要なAPI／Rust試験が実行できた。
 - Rust update-focused試験は21 passed／0 failed。local TLS fixture、実byte長／digest照合、HTTP header拒否、URL／IP境界、partial recovery、Broker Owner確認、stale request、競合要求、Auditを含む。
 ```powershell
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_ -- --test-threads=1

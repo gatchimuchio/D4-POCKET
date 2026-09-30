@@ -507,6 +507,7 @@ dependencies = [
  "getrandom 0.2.17",
  "gui_shell_process_supervision",
  "gui_shell_windows_broker_channel",
+ "gui_shell_windows_dns",
  "gui_shell_windows_protection",
  "gui_shell_windows_runtime_observation",
  "hex",
@@ -533,6 +534,13 @@ name = "gui_shell_windows_broker_channel"
 version = "0.1.0"
 dependencies = [
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "gui_shell_windows_dns"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

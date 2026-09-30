@@ -457,8 +457,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器、Broker lifecycle、およびC12のnative Owner確認付きpackage downloadまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、破損package修復、失敗復旧の技術経路は未成立。同期OS DNS resolverには期限／cancel境界がなく、実配布元・installed product証拠も未取得。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "Owner待ちにせず、download時DNSを有限期限・cancel可能にし、破損packageのAudit付きRecoveryを実装する。続けてtest identityによるInstaller／Uninstaller、署名検証、same-volume install／replacement／rollback transaction、失敗／crash Recoveryを各Contract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／install／rollbackをinstalled productで検証する。production identityはTechnical Complete後の別blockerで扱う。",
+      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器、Broker lifecycle、およびC12のnative Owner確認付きpackage downloadまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、破損package修復、失敗復旧の技術経路は未成立。Windows DNS Clientの期限／cancel経路はhelper実試験で確認したが、実配布元・製品Broker・installed productの証拠は未取得。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "Owner待ちにせず、破損packageのAudit付きRecoveryを実装する。続けてtest identityによるInstaller／Uninstaller、署名検証、same-volume install／replacement／rollback transaction、失敗／crash Recoveryを各Contract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／install／rollbackをinstalled productで検証する。production identityはTechnical Complete後の別blockerで扱う。",
       "update_candidate_package_binding": {
         "date": "2026-09-30",
         "contract_version": 2,
@@ -529,6 +529,18 @@
           "crypto_provider": "Reqwestと既存Rustls Ring providerをrustls-no-providerで統一し、複数providerによる実行時曖昧性を除いた。"
         },
         "scope_limit": "local TLS serverとBroker test storeを使うFIXTURE。外部配布元、同期OS DNSの期限／cancel、破損package repair、Windows installed product、install／rollback、release readinessを証明しない。proxy必須環境はknown_limitation。release_blockerとrelease_ready=falseを維持する。"
+      },
+      "broker_bounded_windows_dns_resolution": {
+        "date": "2026-09-30",
+        "evidence_source": "LIVE_RUNTIME",
+        "validation": "Windows localでgui_shell_windows_dns test 4件合格。Rust helperは12 test targetで429 passed／0 failed／3 ignored、全target cargo check合格。Schema 150／normal example 150／negative fixture 193、Conformance 229 checks合格。",
+        "observations": {
+          "bounded_deadline": "DNS期限到達後にWindows DNS Clientへcancelを発行し、callback回収を待ってTimedOutへ閉じた。",
+          "cancellation": "download cancel flagを検知後にDnsCancelQueryを呼ぶ実試験に成功した。callback未回収・cancel失敗はstatic failureへ閉じる実装だが、そのfailure injection自体は未実施。",
+          "dual_stack": "loopback応答のA／AAAAをparseし、非対称IPv4 octet 1.2.3.4も正しいaddressへ変換した。",
+          "production_boundary": "更新downloadの既存DNS呼出しへ15秒上限と全体deadlineの早い方を渡し、public-address拒否と接続先固定を保持する。"
+        },
+        "scope_limit": "Windows localのtest processが実Windows DNS Client APIを制御loopback DNS fixtureに対して呼ぶLIVE_RUNTIME試験。外部DNS／配布元、Rust Broker IPC／native Owner確認からのinstalled product実行、cancel失敗の実機注入、install／rollback、release readinessを証明しない。non-WindowsはToSocketAddrsのままであり、Windows 1.0向け検証範囲外。release_blockerとrelease_ready=falseを維持する。"
       }
     },
     {

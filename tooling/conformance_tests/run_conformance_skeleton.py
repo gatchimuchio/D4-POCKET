@@ -6458,7 +6458,9 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
     ).split("#[cfg(test)]", 1)[0]
     required_download = (
         "parse_source_url(url_text)?",
-        "resolve_public_addresses(host, 443)?",
+        "resolve_public_addresses(host,443,cancel,deadline)?",
+        "const DNS_RESOLUTION_TIMEOUT: Duration = Duration::from_secs(15);",
+        "#[cfg(windows)]",
         ".https_only(true)",
         ".no_proxy()",
         ".redirect(redirect::Policy::none())",
@@ -6474,8 +6476,43 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
     errors = [
         f"Broker download transportの必須境界がない: {token}"
         for token in required_download
-        if token not in download
+        if re.sub(r"\s+", "", token) not in re.sub(r"\s+", "", download)
     ]
+    resolver_match = re.search(
+        r"(?ms)^fn resolve_public_addresses\(.*?^\}\s*$",
+        (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(
+            encoding="utf-8"
+        ),
+    )
+    if resolver_match is None:
+        errors.append("Broker DNS resolver関数がない")
+    else:
+        resolver = re.sub(r"\s+", "", resolver_match.group(0))
+        required_resolver = (
+            "deadline.min(std::time::Instant::now()+DNS_RESOLUTION_TIMEOUT)",
+            "windows_dns::resolve(",
+            "to_socket_addrs()",
+        )
+        errors.extend(
+            f"Broker DNS resolverの期限・platform境界がない: {token}"
+            for token in required_resolver
+            if token not in resolver
+        )
+    dns_helper = (ROOT / "native" / "windows_dns" / "src" / "lib.rs").read_text(
+        encoding="utf-8"
+    ).split("#[cfg(test)]", 1)[0]
+    required_dns = (
+        "DnsQueryEx(",
+        "DnsCancelQuery(",
+        "recv_timeout(CANCEL_CALLBACK_TIMEOUT)",
+        "PENDING_QUERY.compare_exchange(",
+        "Arc::into_raw(Arc::clone(&context))",
+    )
+    errors.extend(
+        f"Windows DNS resolverの期限・取消境界がない: {token}"
+        for token in required_dns
+        if re.sub(r"\s+", "", token) not in re.sub(r"\s+", "", dns_helper)
+    )
     if "OwnerConfirmationSource::DesktopNativeConfirmation" not in center:
         errors.append("更新downloadがDesktop native Owner確認へ結合されない")
     if "confirmation.payload_hash != hash" not in center:
