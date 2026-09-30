@@ -1415,3 +1415,24 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 相手TEMP markerが見えなかった限定結果は、TEMP rootの物理的一意性を示さない。異なる`CODEX_HOME`を使う2つの直接sandbox childに限られ、同じ`CODEX_HOME`のAgent、順次Task、再起動後のmarker残存、AppContainer TEMPの物理cleanupは未検証である。
 - production Broker／IPC、native Owner Approval、durable Audit、実Agent Task、cancel／deadline／crash時Recovery、installed product、result／diff Content Exposureは通していない。従ってcross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のままで、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 同一CODEX_HOMEでの同時・後続MxC TEMP目印照合（2026-10-01）
+
+### 成立した確認
+
+- 基準commit `b3fb1cb605f9c074dc9cfff34eb22a2d099026a0`からignored Windows Rust probeを拡張した。異なる合成Workspace／scratchを持つ2つの同時Codex CLI `0.158.0-alpha.2.1`／MxC sandbox childへ、同一の合成`CODEX_HOME`とRust生成Task permission profileを与えた。同時child間のTEMP目印相互読取は合計7回すべて`System.IO.FileNotFoundException`／HRESULT `-2147024894`だった。
+- 両child終了後、同じ`CODEX_HOME`で第三のsandbox childを順次起動し、自身のTEMPから先行childの目印名を照合した。後続childは両目印とも3回中3回`System.IO.FileNotFoundException`／HRESULT `-2147024894`と報告した。TEMP pathと目印本文はprobe結果へ保存・出力していない。
+- これらは指定した実Codex CLI／MxC child操作の`LIVE_RUNTIME`と、合成Workspace／scratch／markerの`FIXTURE`証拠である。実model・credential・API networkを使わず、永続Codex設定やWindows保護設定も変更していない。
+
+### 検証・失敗履歴
+
+- 最初の後続child probeはPowerShell script内のreport pathにquoteを二重付与しParserErrorとなった。`quote_path`が返すquoted literalをそのままplaceholder位置へ挿入するよう修正し、その後のfocused probeは3回中3回成功した。ParserErrorの試行は成功回数に含めない。
+- 既存の同一home・同時child focused probeは4回成功済み。後続child検査を含むfocused ignored testの正確なcommandは`$env:GUI_SHELL_CODEX_SANDBOX_TEST_EXE='C:\Users\ohira\AppData\Local\OpenAI\Codex\bin\faa963e871dd422c\codex.exe'; cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'Rust生成Task設定で実Windows隔離の登録secretを拒否する' -- --ignored --nocapture --test-threads=1`で、exit 0、1 passed／0 failed。後続childを含む実行と2回の再実行の計3回で両目印の非可視を確認した。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true native/rust_helper/src/adapters/codex_cli.rs`、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はexit 0、12 targets、438 passed／0 failed／5 ignored。Windows Actionsは未使用。Application Control、registry、ACLを変更していない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。日本語strict監査1126 files／0 findings、Schema 151件／正常example 151件／negative fixture 194件、Conformance 230 checks、登録済み10検査がすべてpassした。release blocker 5件、`task_execution=unsupported`、`release_ready=false`を維持する。
+
+### 証拠境界と未解決範囲
+
+- 同一`CODEX_HOME`条件の相互・後続child非可視性を示すが、実TEMP rootの一意性、child終了時の物理削除、同じ実Agent profileでの隔離、再起動後のmarker残存、MxC内部temporary dataのcleanupを示さない。後続child自身のTEMPから先行markerを読めなかったことは削除証拠ではない。
+- production Broker／IPC、native Owner Approval、durable Audit／Recovery、実Agent Task、cancel／deadline／crash時のcleanup、installed product、result／diff Content Exposureは通していない。cross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のまま、`task_execution=unsupported`および`release_ready=false`を維持する。

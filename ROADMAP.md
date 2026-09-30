@@ -953,3 +953,7 @@ v15は画面領域の要素取得を最大10,000件に制限し、欠落・上�
 Rustが生成するTask permission profileで、異なる合成Workspace／scratch／`CODEX_HOME`を持つ二つの実Codex CLI／MxC sandbox childを同時起動し、各childの`TEMP`へ書いた一意の合成markerを相手側TEMPから読めるか検査した。双方とも自身のmarkerは読み戻し、相手markerは`System.IO.FileNotFoundException`（HRESULT `-2147024894`）となった。実path・marker本文は保持していない。検査の詳細は`docs/REV3_PROGRESS.md`と`docs/specs/agent-coordination.md`を参照する。
 
 この直接sandboxの限定`LIVE_RUNTIME`観測はproduction Broker／IPC、Owner Approval、durable Audit／Recovery、同一`CODEX_HOME`でのTask隔離、順次実行後のcleanup、AppContainer TEMPの物理削除を証明しない。Agent Task／Compare／HandoffとMxC temporary cleanupの`release_blocker`、`task_execution=unsupported`、`release_ready=false`を維持する。
+
+### 同一CODEX_HOMEの追試（2026-10-01）
+
+同一の合成`CODEX_HOME`を共有する同時MxC sandbox child間でも、TEMP目印の相互読取は7回中7回拒否された。さらに両child終了後に同じhomeで起動した後続childから、両方の先行目印が3回中3回`FileNotFoundException`となった。これは後続childのTEMPから読めない観測であり、TEMP rootの物理的一意性、物理削除、production Broker／Agent Taskを証明しない。詳細と失敗履歴は`docs/REV3_PROGRESS.md`および`docs/specs/agent-coordination.md`に記録する。関連`release_blocker`、`task_execution=unsupported`、`release_ready=false`を維持する。

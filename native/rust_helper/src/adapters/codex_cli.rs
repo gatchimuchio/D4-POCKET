@@ -1285,14 +1285,12 @@ mod tests {
         let scratch = workspace.join(".d4p-tmp-live-probe");
         let peer_scratch = peer_workspace.join(".d4p-tmp-live-probe");
         let isolated_codex_home = root.path().join("codex-home");
-        let peer_codex_home = root.path().join("codex-home-agent-b");
         fs::create_dir(&workspace).expect("合成Workspace");
         fs::create_dir(&peer_workspace).expect("別Agent用の合成Workspace");
         fs::create_dir(&private).expect("合成secret領域");
         fs::create_dir(&scratch).expect("Task scratch相当directory");
         fs::create_dir(&peer_scratch).expect("別Agent用Task scratch相当directory");
         fs::create_dir(&isolated_codex_home).expect("検証専用Codex home");
-        fs::create_dir(&peer_codex_home).expect("別Agent用検証専用Codex home");
         let peer_marker = peer_workspace.join("agent-b-marker.txt");
         let peer_write_target = peer_workspace.join("agent-b-write-marker.txt");
         let workspace_marker = workspace.join("agent-a-marker.txt");
@@ -1634,7 +1632,7 @@ exit 0
             .stderr(Stdio::piped());
         let mut peer_sandbox = command(&executable, &peer_workspace);
         peer_sandbox
-            .env("CODEX_HOME", &peer_codex_home)
+            .env("CODEX_HOME", &isolated_codex_home)
             .envs(
                 peer_task_environment
                     .iter()
@@ -1795,6 +1793,97 @@ exit 0
             "Agent BのRust生成profile probeが失敗: code={:?}, stdout={peer_stdout}, stderr={peer_stderr}",
             peer_status.code(),
         );
+        let sequential_temp_report = workspace.join("sandbox-sequential-temp-report.txt");
+        let sequential_observer_script = r#"
+<# 先行Taskの一時目印を後続childから再読できるか照合する #>
+$ErrorActionPreference = 'Stop'
+function Get-PreviousMarkerState {
+    param([string]$MarkerPath, [string]$Expected)
+    try {
+        $actual = [IO.File]::ReadAllText($MarkerPath)
+        if ($actual -eq $Expected) { return 'readable' }
+        return 'changed'
+    } catch {
+        $probeError = $_.Exception.InnerException
+        if ($null -eq $probeError) { $probeError = $_.Exception }
+        return "$($probeError.GetType().FullName)/$($probeError.HResult)"
+    }
+}
+$tempRoot = [IO.Path]::GetFullPath($env:TEMP)
+$markerA = Join-Path $tempRoot '__GUI_SHELL_PREVIOUS_TEMP_A__'
+$markerB = Join-Path $tempRoot '__GUI_SHELL_PREVIOUS_TEMP_B__'
+$stateA = Get-PreviousMarkerState -MarkerPath $markerA -Expected 'synthetic-agent-a-temp'
+$stateB = Get-PreviousMarkerState -MarkerPath $markerB -Expected 'synthetic-agent-b-temp'
+[IO.File]::WriteAllText(__GUI_SHELL_SEQUENTIAL_REPORT__, "agent_a=$stateA`nagent_b=$stateB")
+exit 0
+"#
+        .replace("__GUI_SHELL_PREVIOUS_TEMP_A__", &agent_a_temp_marker)
+        .replace("__GUI_SHELL_PREVIOUS_TEMP_B__", &agent_b_temp_marker)
+        .replace(
+            "__GUI_SHELL_SEQUENTIAL_REPORT__",
+            &quote_path(&sequential_temp_report),
+        );
+        let mut sequential_observer = command(&executable, &workspace);
+        sequential_observer
+            .env("CODEX_HOME", &isolated_codex_home)
+            .envs(task_environment.iter().map(|(name, value)| (name, value)))
+            .args(["sandbox", "--permission-profile", &permission_profile])
+            .args(&profile_args)
+            .args(["--cd"])
+            .arg(&workspace)
+            .args([
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+            ])
+            .arg(sequential_observer_script)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut sequential_observer = process_tree::spawn(sequential_observer)
+            .expect("同一CODEX_HOMEの後続MxC observerを起動");
+        let sequential_deadline = Instant::now() + Duration::from_secs(100);
+        let sequential_status = loop {
+            if let Some(status) = sequential_observer
+                .try_wait()
+                .expect("後続MxC observerの終了状態")
+            {
+                break status;
+            }
+            if Instant::now() >= sequential_deadline {
+                let _ = sequential_observer.terminate_tree();
+                panic!("後続MxC observerが期限超過");
+            }
+            thread::sleep(Duration::from_millis(25));
+        };
+        sequential_observer
+            .stop_descendants()
+            .expect("後続MxC observerの残存process群を停止");
+        let (sequential_stdout, sequential_stderr) = process_output(&mut sequential_observer);
+        assert!(
+            sequential_status.success(),
+            "後続MxC observerが失敗: code={:?}, stdout={sequential_stdout}, stderr={sequential_stderr}",
+            sequential_status.code()
+        );
+        let sequential_temp_result =
+            fs::read_to_string(sequential_temp_report).expect("後続MxC observerのTEMP照合結果");
+        let sequential_states = ["agent_a=", "agent_b="].map(|prefix| {
+            sequential_temp_result
+                .lines()
+                .find_map(|line| line.strip_prefix(prefix))
+                .unwrap_or_else(|| {
+                    panic!("後続MxC observer結果が欠落: {prefix}={sequential_temp_result}")
+                })
+        });
+        assert!(
+            sequential_states.iter().all(|state| {
+                *state == "System.IO.FileNotFoundException/-2147024894"
+                    || *state == "System.UnauthorizedAccessException/-2147024891"
+            }),
+            "同一CODEX_HOMEの後続MxC childが先行Task TEMP目印を読めない: {sequential_temp_result}"
+        );
+        eprintln!("同一CODEX_HOMEの後続MxC TEMP照合: {sequential_temp_result}");
         assert_eq!(
             fs::read(workspace_output).expect("Workspace内write結果"),
             b"workspace-write-marker"
