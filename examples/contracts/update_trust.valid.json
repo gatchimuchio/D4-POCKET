@@ -1,6 +1,7 @@
 {
-  "版": 1,
+  "版": 2,
   "algorithm": "Ed25519",
   "public_key_der_hex": null,
-  "public_key_fingerprint": null
+  "public_key_fingerprint": null,
+  "package_sources": []
 }

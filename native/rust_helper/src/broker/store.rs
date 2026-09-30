@@ -17,6 +17,7 @@ const MAX_ADAPTER_STATE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_AGENT_TASK_SCRATCH_STATE_BYTES: usize = 512 * 1024;
 const MAX_SETUP_DOCTOR_REPORT_BYTES: usize = 64 * 1024;
 const MAX_FIRST_RUN_CONFIGURATION_BYTES: usize = 16 * 1024;
+const MAX_UPDATE_TRUST_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BrokerStoreError {
@@ -56,7 +57,9 @@ impl BrokerStoreError {
             BrokerStoreError::MalformedAgentTaskScratchState(message)
             | BrokerStoreError::TamperedAgentTaskScratchState(message) => message.clone(),
             BrokerStoreError::MalformedFirstRunConfiguration(message) => message.clone(),
-            BrokerStoreError::MissingFirstRunConfiguration => "初回設定fileが存在しない".to_string(),
+            BrokerStoreError::MissingFirstRunConfiguration => {
+                "初回設定fileが存在しない".to_string()
+            }
         }
     }
 }
@@ -191,9 +194,8 @@ impl BrokerPersistentStore {
                 "broker audit eventのserializeに失敗: {error}"
             ))
         })?;
-        append_jsonl_line(&self.audit_path, &serialized).map_err(|error| {
-            BrokerStoreError::Io(format!("audit eventの追記に失敗: {error}"))
-        })?;
+        append_jsonl_line(&self.audit_path, &serialized)
+            .map_err(|error| BrokerStoreError::Io(format!("audit eventの追記に失敗: {error}")))?;
         let anchored_log = self.load_audit_log()?;
         self.write_audit_anchor(&anchored_log)
     }
@@ -212,9 +214,8 @@ impl BrokerPersistentStore {
                 "replay nonceのserializeに失敗: {error}"
             ))
         })?;
-        append_jsonl_line(&self.replay_path, &serialized).map_err(|error| {
-            BrokerStoreError::Io(format!("replay nonceの追記に失敗: {error}"))
-        })?;
+        append_jsonl_line(&self.replay_path, &serialized)
+            .map_err(|error| BrokerStoreError::Io(format!("replay nonceの追記に失敗: {error}")))?;
         let nonces = self.load_replay_nonces(recorded_at_epoch_seconds)?;
         self.compact_replay_nonces(&nonces)?;
         Ok(nonces)
@@ -357,7 +358,9 @@ impl BrokerPersistentStore {
             ));
         }
         atomic_write(&self.a2a_path, serialized.as_bytes()).map_err(|error| {
-            BrokerStoreError::Io(format!("broker A2A connection stateの書込みに失敗: {error}"))
+            BrokerStoreError::Io(format!(
+                "broker A2A connection stateの書込みに失敗: {error}"
+            ))
         })
     }
 
@@ -465,10 +468,7 @@ impl BrokerPersistentStore {
                 )));
             }
         };
-        if !metadata.is_file()
-            || metadata.file_type().is_symlink()
-            || is_reparse_point(&metadata)
-        {
+        if !metadata.is_file() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
             return Err(BrokerStoreError::MalformedAgentTaskScratchState(
                 "Agent Task scratch回復記録は通常fileに限る".to_string(),
             ));
@@ -595,9 +595,7 @@ impl BrokerPersistentStore {
         Ok(())
     }
 
-    pub fn initialize_first_run_configuration(
-        &self,
-    ) -> Result<(Vec<u8>, bool), BrokerStoreError> {
+    pub fn initialize_first_run_configuration(&self) -> Result<(Vec<u8>, bool), BrokerStoreError> {
         let root_metadata = fs::symlink_metadata(&self.root).map_err(|_| {
             BrokerStoreError::MalformedFirstRunConfiguration(
                 "初回設定の固定storeを確認できない".to_string(),
@@ -634,9 +632,10 @@ impl BrokerPersistentStore {
         getrandom::getrandom(&mut random).map_err(|_| {
             BrokerStoreError::Io("初回設定の一時file識別子を生成できない".to_string())
         })?;
-        let temporary_path = self
-            .root
-            .join(format!(".first_run_configuration-{}.tmp", hex::encode(random)));
+        let temporary_path = self.root.join(format!(
+            ".first_run_configuration-{}.tmp",
+            hex::encode(random)
+        ));
         let write_result = (|| {
             let mut file = OpenOptions::new()
                 .create_new(true)
@@ -708,17 +707,44 @@ impl BrokerPersistentStore {
     }
 
     pub fn load_update_trust(&self) -> Result<Option<Value>, BrokerStoreError> {
-        let raw = fs::read_to_string(&self.update_trust_path).map_err(|error| {
+        let metadata = fs::symlink_metadata(&self.update_trust_path).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
-                "broker update trustの読取りに失敗: {error}"
+                "broker update trustのmetadata読取りに失敗: {error}"
             ))
+        })?;
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || is_reparse_point(&metadata)
+            || metadata.len() > MAX_UPDATE_TRUST_BYTES as u64
+        {
+            return Err(BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustの種類またはsizeが不正".to_string(),
+            ));
+        }
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        File::open(&self.update_trust_path)
+            .map_err(|_| {
+                BrokerStoreError::MalformedUpdateTrust("broker update trustを読めない".to_string())
+            })?
+            .take((MAX_UPDATE_TRUST_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|_| {
+                BrokerStoreError::MalformedUpdateTrust("broker update trustを読めない".to_string())
+            })?;
+        if bytes.len() > MAX_UPDATE_TRUST_BYTES {
+            return Err(BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustがbounded上限を超過".to_string(),
+            ));
+        }
+        let raw = String::from_utf8(bytes).map_err(|_| {
+            BrokerStoreError::MalformedUpdateTrust("broker update trustがUTF-8ではない".to_string())
         })?;
         if raw.trim().is_empty() {
             return Err(BrokerStoreError::MalformedUpdateTrust(
                 "broker update trustが空である".to_string(),
             ));
         }
-        let value: Value = serde_json::from_str(&raw).map_err(|error| {
+        let value: Value = crate::broker::json_input::read_unique(&raw).map_err(|error| {
             BrokerStoreError::MalformedUpdateTrust(format!(
                 "broker update trustがmalformed: {error}"
             ))
@@ -728,24 +754,51 @@ impl BrokerPersistentStore {
                 "broker update trustはobjectでなければならない".to_string(),
             )
         })?;
-        let expected_keys = [
+        let version = object.get("版").and_then(Value::as_u64);
+        let base_keys = [
             "版",
             "algorithm",
             "public_key_der_hex",
             "public_key_fingerprint",
         ];
-        if object.keys().any(|key| !expected_keys.contains(&key.as_str()))
+        let expected_keys: &[&str] = match version {
+            Some(1) => &base_keys,
+            Some(2) => &[
+                "版",
+                "algorithm",
+                "public_key_der_hex",
+                "public_key_fingerprint",
+                "package_sources",
+            ],
+            _ => &[],
+        };
+        if object
+            .keys()
+            .any(|key| !expected_keys.contains(&key.as_str()))
             || expected_keys.iter().any(|key| !object.contains_key(*key))
         {
             return Err(BrokerStoreError::MalformedUpdateTrust(
                 "broker update trustに未知または欠落fieldがある".to_string(),
             ));
         }
+        if object.get("algorithm") != Some(&Value::from("Ed25519")) {
+            return Err(BrokerStoreError::MalformedUpdateTrust(
+                "broker update trustのalgorithmが不正".to_string(),
+            ));
+        }
         if object.get("public_key_der_hex") == Some(&Value::Null)
             && object.get("public_key_fingerprint") == Some(&Value::Null)
-            && object.get("版") == Some(&Value::from(1))
-            && object.get("algorithm") == Some(&Value::from("Ed25519"))
         {
+            if version == Some(2)
+                && object
+                    .get("package_sources")
+                    .and_then(Value::as_array)
+                    .is_none_or(|sources| !sources.is_empty())
+            {
+                return Err(BrokerStoreError::MalformedUpdateTrust(
+                    "公開鍵未設定時にpackage sourceを構成できない".to_string(),
+                ));
+            }
             return Ok(None);
         }
         Ok(Some(value))
@@ -764,10 +817,11 @@ impl BrokerPersistentStore {
         }
         if !self.update_trust_path.exists() {
             let trust = serde_json::json!({
-                "版": 1,
+                "版": 2,
                 "algorithm": "Ed25519",
                 "public_key_der_hex": null,
-                "public_key_fingerprint": null
+                "public_key_fingerprint": null,
+                "package_sources": []
             });
             let serialized = serde_json::to_string_pretty(&trust).map_err(|error| {
                 BrokerStoreError::MalformedUpdateTrust(format!(
@@ -817,7 +871,7 @@ impl BrokerPersistentStore {
             .map(|_| ())
             .map_err(|error| {
                 BrokerStoreError::Io(format!(
-                "broker store file {}の初期化に失敗: {error}",
+                    "broker store file {}の初期化に失敗: {error}",
                     path.display()
                 ))
             })
@@ -972,7 +1026,7 @@ impl BrokerPersistentStore {
                 Ok(())
             } else {
                 Err(BrokerStoreError::TamperedAuditState(
-                "空でないaudit logにbroker audit anchorがない".to_string(),
+                    "空でないaudit logにbroker audit anchorがない".to_string(),
                 ))
             };
         }
@@ -982,7 +1036,9 @@ impl BrokerPersistentStore {
             ))
         })?;
         let record: AuditAnchorRecord = serde_json::from_str(&raw).map_err(|error| {
-            BrokerStoreError::MalformedAuditState(format!("broker audit anchorがmalformed: {error}"))
+            BrokerStoreError::MalformedAuditState(format!(
+                "broker audit anchorがmalformed: {error}"
+            ))
         })?;
         let expected = self.build_audit_anchor(audit_log);
         if record != expected {
@@ -1067,9 +1123,7 @@ fn validate_first_run_configuration(bytes: &[u8]) -> Result<(), BrokerStoreError
         ));
     }
     let document: FirstRunConfigurationDocument = serde_json::from_slice(bytes).map_err(|_| {
-        BrokerStoreError::MalformedFirstRunConfiguration(
-            "初回設定fileのJSON構造が不正".to_string(),
-        )
+        BrokerStoreError::MalformedFirstRunConfiguration("初回設定fileのJSON構造が不正".to_string())
     })?;
     if document.version != 1
         || document.product != "D4 Pocket"
@@ -1103,9 +1157,7 @@ fn load_or_create_anchor_key(path: &Path) -> Result<Vec<u8>, BrokerStoreError> {
     }
     let mut key = vec![0u8; 32];
     getrandom::getrandom(&mut key).map_err(|error| {
-        BrokerStoreError::Io(format!(
-                "broker audit anchor keyの生成に失敗: {error}"
-        ))
+        BrokerStoreError::Io(format!("broker audit anchor keyの生成に失敗: {error}"))
     })?;
     let encoded = hex::encode(&key);
     {
@@ -1267,6 +1319,92 @@ mod setup_doctor_report_tests {
         assert!(store
             .write_setup_doctor_report(&vec![0; MAX_SETUP_DOCTOR_REPORT_BYTES + 1])
             .is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod update_trust_store_tests {
+    use super::*;
+
+    fn temp_store(label: &str) -> (PathBuf, BrokerPersistentStore) {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-update-trust-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        let (store, _) = BrokerPersistentStore::open_or_create(&root, "update-trust-test")
+            .expect("永続storeを初期化する");
+        (root, store)
+    }
+
+    #[test]
+    fn legacy_v1_and_empty_v2_trust_remain_unconfigured() {
+        let (root, store) = temp_store("compatibility");
+        let path = root.join("update_trust.json");
+        for trust in [
+            serde_json::json!({
+                "版": 1,
+                "algorithm": "Ed25519",
+                "public_key_der_hex": null,
+                "public_key_fingerprint": null
+            }),
+            serde_json::json!({
+                "版": 2,
+                "algorithm": "Ed25519",
+                "public_key_der_hex": null,
+                "public_key_fingerprint": null,
+                "package_sources": []
+            }),
+        ] {
+            fs::write(&path, serde_json::to_vec(&trust).unwrap()).unwrap();
+            assert!(store.load_update_trust().unwrap().is_none());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v2_requires_source_field_and_unconfigured_trust_cannot_enable_a_source() {
+        let (root, store) = temp_store("source-requirements");
+        let path = root.join("update_trust.json");
+        fs::write(
+            &path,
+            r#"{"版":2,"algorithm":"Ed25519","public_key_der_hex":null,"public_key_fingerprint":null}"#.as_bytes(),
+        )
+        .unwrap();
+        assert!(store.load_update_trust().is_err());
+
+        let trust_with_source = serde_json::json!({
+            "版": 2,
+            "algorithm": "Ed25519",
+            "public_key_der_hex": null,
+            "public_key_fingerprint": null,
+            "package_sources": [{
+                "channel": "stable",
+                "base_url": "https://updates.example.invalid/d4/stable"
+            }]
+        });
+        fs::write(&path, serde_json::to_vec(&trust_with_source).unwrap()).unwrap();
+        assert!(store.load_update_trust().is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_fields_and_oversized_trust_are_rejected() {
+        let (root, store) = temp_store("bounded-unique");
+        let path = root.join("update_trust.json");
+        fs::write(
+            &path,
+            r#"{"版":2,"版":1,"algorithm":"Ed25519","public_key_der_hex":null,"public_key_fingerprint":null,"package_sources":[]}"#.as_bytes(),
+        )
+        .unwrap();
+        assert!(store.load_update_trust().is_err());
+
+        fs::write(&path, vec![b' '; MAX_UPDATE_TRUST_BYTES + 1]).unwrap();
+        assert!(store.load_update_trust().is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

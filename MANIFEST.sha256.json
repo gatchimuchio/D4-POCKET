@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "f6e65263a7c0bb88479cd9152ebbebc837f8e4e39039f36a48587af3f0eb47ca"
+      "sha256": "b69bd7f931cb60cd48aa29adf08c075d54abb51f25ea0be4319489bbb34ebd5b"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "ea4bc4c74d3cf0b13f0ce883fdc03038c289c06fdd97b8b34b6842549ad5add7"
+      "sha256": "6a4f5cdec0930c6dc5dc533ab164bf45dd6653a077fede776318862838b656ce"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1453,7 +1453,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "7f98b1e1d44670ee42d44d8a79fc8f612d06f80023b54a6ec4c0763b449c3749"
+      "sha256": "65c2adfd547a1ba7a5726906f2efa5a972aa8b83c7f31c95baf6f679d17f2c20"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -2857,7 +2857,7 @@
     },
     {
       "path": "examples/contracts/update_trust.valid.json",
-      "sha256": "d35795ed5ca163c61ed98970bf1efe896beab8688cb9c0b349384c6710e01273"
+      "sha256": "2a7568025102954bd7acab8339377d9f1f43dd4dd30d03a01b99a7574ae7bdc3"
     },
     {
       "path": "examples/contracts/windows_tray_projection.valid.json",
@@ -3013,7 +3013,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/adapter_center.rs",
-      "sha256": "77a813e193f0727a86c6c9a64ea383ef5e47940cf2446d8d74237a9d73b2b40f"
+      "sha256": "7ac106c225d82342e8f472234394fe077e6d54f2ab8a4d3074a6d0b11b9c4981"
     },
     {
       "path": "native/rust_helper/src/broker/agent_task_scratch.rs",
@@ -3157,11 +3157,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/store.rs",
-      "sha256": "78c971d5734e5115d248ad73494b932a7bcc2341caca32fb68a2a655ebc07fd0"
+      "sha256": "a83603ba0148bec1dd5ed9139c3d607c44d1106be90b98ca75d269dd98039609"
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "43a7385068f0a82b709c9797d7e95c7ddb3e0006f04c69ac6a4827237c0d4867"
+      "sha256": "83b0c7ee96e32d61db57b4e329923ff11232ffbed87969698105484ee22ae69b"
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1393387cce838cdf7cac71f76ffa4afeb04c6d0c95a0e420ce2d0f2f66a908db"
+      "sha256": "e1b85095880391b6b62d8fe7e243dfc1943dcf2e83f497c1dd125c6324c7afe1"
     },
     {
       "path": "requirements-dev.txt",
@@ -4321,7 +4321,7 @@
     },
     {
       "path": "specs/update_trust.schema.json",
-      "sha256": "b6ff8c7369689ed2b40a890e20eeda1b15f320202f2301b5c7266bbb9b6a6d2c"
+      "sha256": "26b063eed1e7811d5757c7598dd3ea5431526543470ee7ca0dbee17b74602885"
     },
     {
       "path": "specs/windows_tray_projection.schema.json",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "4b2081f1e25dab462197efbf9ae98785a681b595881dd91f9c874bebb1383e51"
+      "sha256": "ff140f2e83df31225d6657ba999350abaa0de99bcce2fb77de76f379a31d1588"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

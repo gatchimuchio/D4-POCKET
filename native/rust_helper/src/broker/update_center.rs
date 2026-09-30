@@ -15,9 +15,10 @@ use crate::audit_hash::sha256_tagged;
 use crate::update_verification::{verify_signed_update_signature, SignedUpdateCandidate};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const VERSION: u64 = 1;
+const TRUST_VERSION: u64 = 2;
 const CANDIDATE_VERSION: u64 = 2;
 const MAX_UPDATES: usize = 64;
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
@@ -82,12 +83,21 @@ pub(super) struct UpdateRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(super) struct UpdatePackageSource {
+    pub(super) channel: String,
+    pub(super) base_url: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct UpdateTrust {
     #[serde(rename = "版")]
     pub(super) version: u64,
     pub(super) algorithm: String,
     pub(super) public_key_der_hex: String,
     pub(super) public_key_fingerprint: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) package_sources: Vec<UpdatePackageSource>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -735,18 +745,83 @@ fn validate_record(record: &UpdateRecord) -> Result<(), String> {
 }
 
 fn validate_trust(trust: &UpdateTrust) -> Result<(), String> {
+    let mut channels = BTreeSet::new();
+    let sources_valid = match trust.version {
+        1 => trust.package_sources.is_empty(),
+        TRUST_VERSION => {
+            trust.package_sources.len() <= 3
+                && trust.package_sources.iter().all(|source| {
+                    ["stable", "beta", "nightly"].contains(&source.channel.as_str())
+                        && channels.insert(source.channel.as_str())
+                        && valid_update_base_url(&source.base_url)
+                })
+        }
+        _ => false,
+    };
     let key =
         hex::decode(&trust.public_key_der_hex).map_err(|_| "更新公開鍵hexが不正".to_string())?;
     let public_key =
         crate::checkpoint::public_key(&key).map_err(|_| "更新公開鍵DERが不正".to_string())?;
-    if trust.version != VERSION
+    if !sources_valid
         || trust.algorithm != "Ed25519"
         || trust.public_key_fingerprint != sha256_tagged(public_key)
         || !valid_hash(&trust.public_key_fingerprint)
     {
-        return Err("更新署名信頼設定が不正".to_string());
+        return Err("更新署名trustまたはpackage source設定が不正".to_string());
     }
     Ok(())
+}
+
+fn valid_update_base_url(value: &str) -> bool {
+    if value.len() > 2048
+        || !value.starts_with("https://")
+        || value
+            .bytes()
+            .any(|byte| matches!(byte, b'?' | b'#' | b'@' | b'\\' | b'%') || !byte.is_ascii())
+    {
+        return false;
+    }
+    let Some((host, path)) = value[8..].split_once('/') else {
+        return false;
+    };
+    if host.is_empty()
+        || host.bytes().any(|byte| byte.is_ascii_uppercase())
+        || host.contains(':')
+        || host.ends_with('.')
+        || host.parse::<std::net::IpAddr>().is_ok()
+        || host == "localhost"
+        || host.ends_with(".localhost")
+    {
+        return false;
+    }
+    let labels = host.split('.').collect::<Vec<_>>();
+    if labels.len() < 2
+        || host.len() > 253
+        || labels.iter().any(|label| {
+            label.is_empty()
+                || label.len() > 63
+                || (!label.as_bytes()[0].is_ascii_lowercase()
+                    && !label.as_bytes()[0].is_ascii_digit())
+                || (!label.as_bytes()[label.len() - 1].is_ascii_lowercase()
+                    && !label.as_bytes()[label.len() - 1].is_ascii_digit())
+                || !label
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        })
+    {
+        return false;
+    }
+    if path.is_empty() || path.ends_with('/') {
+        return false;
+    }
+    path.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment != "."
+            && segment != ".."
+            && segment.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
+            })
+    })
 }
 
 pub(super) fn verify_bytes_with_trust(
@@ -907,6 +982,7 @@ mod tests {
         rand::SystemRandom,
         signature::{Ed25519KeyPair, KeyPair},
     };
+    use std::io::Write;
 
     fn trust_and_candidate() -> (UpdateTrust, UpdateCandidateDocument) {
         let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
@@ -933,10 +1009,11 @@ mod tests {
         let signature = pair.sign(&signed);
         (
             UpdateTrust {
-                version: 1,
+                version: TRUST_VERSION,
                 algorithm: "Ed25519".into(),
                 public_key_der_hex: hex::encode(der),
                 public_key_fingerprint: fingerprint.clone(),
+                package_sources: Vec::new(),
             },
             UpdateCandidateDocument {
                 version: CANDIDATE_VERSION,
@@ -955,6 +1032,97 @@ mod tests {
                 rollback_available: true,
             },
         )
+    }
+
+    #[test]
+    fn package_source_requires_canonical_https_base_and_unique_known_channels() {
+        let (mut trust, _) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        assert!(validate_trust(&trust).is_ok());
+
+        let (mut legacy_trust, _) = trust_and_candidate();
+        legacy_trust.version = 1;
+        assert!(validate_trust(&legacy_trust).is_ok());
+
+        for base_url in [
+            "http://updates.example.invalid/d4/stable",
+            "https://user@updates.example.invalid/d4/stable",
+            "https://updates.example.invalid:443/d4/stable",
+            "https://updates.example.invalid/d4/stable?next=elsewhere",
+            "https://updates.example.invalid/d4/stable#fragment",
+            "https://updates.example.invalid/d4/../stable",
+            "https://updates.example.invalid/d4/%2e%2e/stable",
+            "https://127.0.0.1/d4/stable",
+            "https://[::1]/d4/stable",
+            "https://localhost/d4/stable",
+            "https://updates.localhost/d4/stable",
+            "https://updates.example.invalid/d4//stable",
+            "https://updates.example.invalid/d4/stable/",
+            "https://Updates.example.invalid/d4/stable",
+        ] {
+            trust.package_sources[0].base_url = base_url.into();
+            assert!(validate_trust(&trust).is_err(), "{base_url}");
+        }
+
+        trust.package_sources = vec![
+            UpdatePackageSource {
+                channel: "stable".into(),
+                base_url: "https://updates.example.invalid/d4/stable".into(),
+            },
+            UpdatePackageSource {
+                channel: "stable".into(),
+                base_url: "https://mirror.example.invalid/d4/stable".into(),
+            },
+        ];
+        assert!(validate_trust(&trust).is_err());
+        trust.version = 1;
+        assert!(validate_trust(&trust).is_err());
+    }
+
+    #[test]
+    fn broker_loads_v2_package_sources_from_its_bounded_persistent_trust() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "gui-shell-update-trust-v2-{}-{unique}",
+            std::process::id()
+        ));
+        let (store, _) = BrokerPersistentStore::open_or_create(&root, "update-trust-v2-test")
+            .expect("永続storeを初期化する");
+        let (mut trust, _) = trust_and_candidate();
+        trust.version = 1;
+        let trust_path = root.join("update_trust.json");
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&trust_path)
+            .unwrap();
+        file.write_all(&serde_json::to_vec(&trust).unwrap())
+            .unwrap();
+        drop(file);
+        assert_eq!(load_persistent_trust(&store).unwrap(), Some(trust.clone()));
+
+        trust.version = TRUST_VERSION;
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&trust_path)
+            .unwrap();
+        file.write_all(&serde_json::to_vec(&trust).unwrap())
+            .unwrap();
+        drop(file);
+
+        assert_eq!(load_persistent_trust(&store).unwrap(), Some(trust));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     fn call(broker: &mut Broker, operation: BrokerOperation, payload: Value) -> BrokerResponse {

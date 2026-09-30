@@ -1307,6 +1307,7 @@ mod tests {
             algorithm: "Ed25519".into(),
             public_key_der_hex: hex::encode(public_key_der),
             public_key_fingerprint: fingerprint,
+            package_sources: Vec::new(),
         });
         let installed = response(
             &mut broker,

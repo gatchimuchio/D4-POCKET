@@ -4,6 +4,14 @@
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
+## Broker所有の配布元設定
+
+`update_trust.json`版1は後方互換の署名検査専用形式として読み取る。版2は署名公開鍵・fingerprintに加えて、Broker所有の`package_sources`を持てる。各要素は`channel`と`base_url`だけであり、channelは`stable`、`beta`、`nightly`のいずれか、登録数は最大3、同じchannelを複数登録しない。新規初期設定は未構成の版2で、公開鍵未設定時は配布元も空でなければならない。版1に配布元fieldを追加することはできない。
+
+`base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。
+
+取得先の将来の決定式は、署名済み候補の`channel`と一致するBroker所有sourceを一つ選び、`base_url + "/" + update_id + ".pkg"`とする。候補／UIからURLやpathを受け取らず、署名済みchannelは配布元の選択値に限りAuthorityを与えない。現時点ではこの決定式を実downloadへ接続しておらず、redirect、DNS解決先、TLS接続、取得byte、展開、同一volume install／rollbackの検査は未実装である。download／install／rollbackは引き続き`suspended`であり、版2設定だけで実行可能にはならない。
+
 ## Broker経路
 
 通常認証済みBroker IPCから`更新一覧`、`更新署名検査`、`更新確認`、`更新延期`、`更新download要求`、`更新適用要求`、`更新rollback要求`をRust Update Centerへ送る。新規候補はContract版2とし、候補metadataに配布package全体の小文字hex SHA-256と正確なbyte長（1〜4 GiB）を必須化する。`更新確認`は候補metadataから決定的な署名対象byteを再構成し、package SHA-256・byte長を含む同じbyte列をBroker所有`update_trust.json`のEd25519公開鍵とfingerprintで検査する。署名対象byteと候補fieldが一致した候補だけを`updates.json`へatomic writeする。package位置や実行commandを候補から受け取らない。
@@ -26,6 +34,7 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 - Broker所有trustによるEd25519検証、署名対象の正本byte一致、package全体のSHA-256・正確なbyte長への署名結合
 - 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
 - 更新候補の永続化・再読込、延期のAudit、実行要求のsuspended
+- Broker所有update trust版1互換、版2の配布元構造・起動時検証、設定読込の上限・重複field拒否
 - Desktop設定画面の更新一覧と要求操作
 
 実ダウンロード後のfile照合、インストール、rollback適用、Windows installed productでの更新実証、owner固定公開鍵の本番provisioningは未成立であり、正式releaseの`release_blocker`として保持する。metadata署名検査の成功だけでpackage downloadや実行の真正性を主張しない。

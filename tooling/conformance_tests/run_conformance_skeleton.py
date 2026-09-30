@@ -938,6 +938,55 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     trust = load_contract_fixture("update_trust.valid.json")
     for name, value in (("update_candidate", candidate), ("update_receipt", receipt), ("update_list", listing), ("update_trust", trust)):
         errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    trust_schema = load_schema("update_trust.schema.json")
+    configured_trust = {
+        **trust,
+        "public_key_der_hex": "00" * 44,
+        "public_key_fingerprint": "sha256:" + "a" * 64,
+    }
+    source_configured_trust = {
+        **configured_trust,
+        "package_sources": [{
+            "channel": "stable",
+            "base_url": "https://updates.example.invalid/d4/stable",
+        }],
+    }
+    if validate_instance(source_configured_trust, trust_schema):
+        errors.append("Broker所有の版2 update trustが有効な配布元設定を拒否した")
+    legacy_trust = {key: value for key, value in trust.items() if key != "package_sources"}
+    legacy_trust["版"] = 1
+    if validate_instance(legacy_trust, trust_schema):
+        errors.append("旧版1 update trustの互換読取り契約が失われた")
+    if validate_instance({**legacy_trust, "package_sources": []}, trust_schema) == []:
+        errors.append("旧版1 update trustが版2専用配布元fieldを受理した")
+    for base_url in (
+        "http://updates.example.invalid/d4/stable",
+        "https://user@updates.example.invalid/d4/stable",
+        "https://updates.example.invalid:443/d4/stable",
+        "https://updates.example.invalid/d4/stable?channel=beta",
+        "https://updates.example.invalid/d4/stable#fragment",
+        "https://Updates.example.invalid/d4/stable",
+    ):
+        invalid_trust = {
+            **configured_trust,
+            "package_sources": [{"channel": "stable", "base_url": base_url}],
+        }
+        if validate_instance(invalid_trust, trust_schema) == []:
+            errors.append("update trust schemaが不正な配布元URLを受理した")
+    unsupported_channel_trust = {
+        **configured_trust,
+        "package_sources": [{
+            "channel": "preview",
+            "base_url": "https://updates.example.invalid/d4/preview",
+        }],
+    }
+    if validate_instance(unsupported_channel_trust, trust_schema) == []:
+        errors.append("update trust schemaが未対応channelを受理した")
+    if validate_instance({**trust, "package_sources": [{
+        "channel": "stable",
+        "base_url": "https://updates.example.invalid/d4/stable",
+    }]}, trust_schema) == []:
+        errors.append("未構成の署名鍵に配布元を結合したupdate trustを受理した")
     if validate_instance({**candidate, "public_key_der_hex": "00"}, load_schema("update_candidate.schema.json")) == []:
         errors.append("更新候補へBroker外部公開鍵を混入できた")
     if validate_instance({**candidate, "package_path": "C:/untrusted/package.zip"}, load_schema("update_candidate.schema.json")) == []:

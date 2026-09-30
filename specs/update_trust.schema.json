@@ -2,14 +2,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/update_trust.schema.json",
   "title": "更新署名信頼設定（UpdateTrust）",
-  "description": "Broker所有のEd25519公開鍵設定。秘密鍵と更新候補由来の鍵は含めない。",
+  "description": "Broker所有のEd25519公開鍵と任意のchannel別配布元設定。秘密鍵と更新候補由来のURLは含めない。",
   "type": "object",
   "required": ["版", "algorithm", "public_key_der_hex", "public_key_fingerprint"],
   "additionalProperties": false,
   "properties": {
-    "版": { "const": 1 },
+    "版": { "enum": [1, 2] },
     "algorithm": { "const": "Ed25519" },
     "public_key_der_hex": { "type": ["string", "null"], "pattern": "^[a-f0-9]{88}$" },
-    "public_key_fingerprint": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" }
-  }
+    "public_key_fingerprint": { "type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$" },
+    "package_sources": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["channel", "base_url"],
+        "additionalProperties": false,
+        "properties": {
+          "channel": { "enum": ["stable", "beta", "nightly"] },
+          "base_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "pattern": "^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:[.][a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(/[A-Za-z0-9._~-]+)+$"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "版": { "const": 1 } }, "required": ["版"] },
+      "then": { "not": { "required": ["package_sources"] } }
+    },
+    {
+      "if": { "properties": { "版": { "const": 2 } }, "required": ["版"] },
+      "then": { "required": ["package_sources"] }
+    },
+    {
+      "if": { "properties": { "public_key_der_hex": { "type": "null" } }, "required": ["public_key_der_hex"] },
+      "then": {
+        "properties": {
+          "public_key_fingerprint": { "type": "null" },
+          "package_sources": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "public_key_der_hex": { "type": "string" } }, "required": ["public_key_der_hex"] },
+      "then": { "properties": { "public_key_fingerprint": { "type": "string" } } }
+    }
+  ]
 }

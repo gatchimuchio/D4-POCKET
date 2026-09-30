@@ -4,6 +4,8 @@
 
 ## D4 Pocket統合 rev3 現行工程
 
+D4 Pocket Phase 21／C11追補（2026-09-30）: Broker所有`update_trust.json`を版2へ進め、署名公開鍵とは別にchannel別配布元を最大3件登録できる構造を追加した。版1は署名検査用途で互換維持し、未構成時は配布元なしのfail-closedを保つ。起動時にHTTPS固定形式・channel重複・JSON重複field・8 KiB上限を検証する。これは配布元設定contractの成立までであり、HTTP取得、redirect／DNS／TLS検証、取得byte照合、install／rollbackは未接続。詳細・検証結果は`docs/REV3_PROGRESS.md`と`docs/specs/update-center.md`。
+
 D4 Pocket Phase 21／rev1 C11追補（2026-09-30）: 更新候補Contractを版2へ進め、Broker所有Ed25519署名の正本byteへ配布package全体のSHA-256と正確なbyte長を含める。旧版候補は保存記録として保持しつつ`legacy_unbound`へ降格表示し、新規受理・適用を拒否する。署名検査はpackage実byte取得・照合やdownload／install／rollbackを実装したことを意味しない。Windows配布blockerと`release_ready=false`を維持し、次は取得byte照合とsame-volume導入／rollback／crash Recoveryへ進む。詳細・検証結果は`docs/REV3_PROGRESS.md`、契約は`docs/specs/update-center.md`。
 
 D4 Pocket Phase 21／C11追補（2026-09-30）: 永続候補の`verified`を現在権限として再利用せず、一覧・延期receiptとdownload／適用／rollback要求直前にBroker現在trustでEd25519署名および候補全体hashを再照合する。trust未設定／変更、署名不一致、永続content／hash改変は`verification_stale`へ降格し、要求を拒否する。更新download／install／rollback自体は引き続き未接続・suspended。詳細と試験結果は`docs/REV3_PROGRESS.md`。

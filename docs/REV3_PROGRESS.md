@@ -775,6 +775,45 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 
 - Windows Actionsは未使用。download要求は依然`suspended`であり、現在trust再検証のtest結果をLIVE_RUNTIMEやpackage真正性へ昇格しない。
 
+## Phase 21／C11追補 Broker所有配布元設定contract（2026-09-30）
+
+### 成立した変更
+
+- `update_trust.json`版2へ、Broker所有のchannel別`package_sources`を追加した。旧版1は配布元なしの署名trustとして引き続き読込可能。初期設定は公開鍵未設定・配布元空の版2で、鍵未設定のまま配布元だけを有効化できない。
+- channelは既存署名済み候補と同じ`stable`／`beta`／`nightly`に限定し、各channel一件・総数3件までとした。配布元はHTTPS、小文字ASCII DNS host、port／userinfo／query／fragmentなし、ASCII unreserved pathに限定し、IP literal、localhost、percent-encoding、dot segment、空segment、末尾slashを拒否する。
+- Brokerはtrust fileを8 KiBまでに制限し、通常file／非reparse point、重複JSON fieldなし、版に対応した厳密field構成を確認してから再検証する。Flutter・更新候補からURLやfile pathを受け取らない。
+- 次段download consumerが使う予定の決定式は、署名済み`channel`でBroker所有sourceを選び、`base_url`へ安全な`update_id`と固定`.pkg`を追加するものと定義した。現実装はsource設定の読込・検証までで、URL取得、redirect／DNS／TLS検証、package byte照合、archive展開、install／rollbackは未接続であり、実行要求は`suspended`のまま。
+- 証拠classは`CONFIG`と`FIXTURE`に限る。これはWindows installed product、実配布元、実HTTP、製品release readinessの`LIVE_RUNTIME`証拠ではない。`rev2_desktop_product_distribution`と`release_ready=false`を維持する。
+
+### 検証
+
+- Rust全12 targetで418 passed／0 failed／3 ignored。Broker trust版1互換、版2起動読込、URL境界negative、重複JSON、上限超過、未構成source拒否を含む。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```
+- Rust全targetの静的compile検査に成功。
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+```
+- 変更Rust 3 fileのrustfmt checkと差分空白検査に成功。
+```powershell
+rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/store.rs native/rust_helper/src/broker/update_center.rs native/rust_helper/src/broker/adapter_center.rs
+git diff --check
+```
+- Schemaは149件、正常example149件、negative fixture192件。Conformanceは228 checksで合格。
+```powershell
+python -X utf8 tooling/schema_check/check_schemas.py
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+```
+- 初回検査では、新Schema JSONの構文誤りとConformanceが禁止するfixture file書込patternを順に検出した。JSON構文を直し、fixture準備を固定test store上のfile操作へ変更してから上記最終検査を再実行し、全件合格を確認した。先行FAILは履歴として保持し、検査規則は弱めていない。
+- 初回統合validatorはRustの試験用JSONを1行の長い文字列で埋め込んだ箇所をstrict日本語監査が1件検出し、残る9検査は合格した。fixtureを構造化JSON生成へ変更し、再度のstrict監査は1114 file／0 findingsで合格した。例外台帳と監査規則は変更していない。
+- 最終`tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1114 file／0 findings、Schema 149／149／192、Conformance 228 checks、Manifest、release gate整合、packaging portability、release smoke、evidence bundle、runtime assertions、C32構造監査を含む登録development check 10件がすべて合格した。
+- 統合validator内のrelease gate整合検査とdevelopment smokeの合格はrelease readinessを意味しない。`release_ready=false`、Windows installed product／実package取得・照合・install・rollbackの既存`release_blocker`を維持する。
+- Windows Actionsは未使用。Windowsローカルの全target試験とcheckが完了したため、今回は追加runnerを要しないと判断した。
+```powershell
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+
 ## Phase 21／C11追補 配布packageの署名結合（2026-09-30）
 
 ### 成立した変更

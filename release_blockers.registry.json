@@ -465,6 +465,19 @@
           "execution_boundary": "一致する現在trustの実行要求も従来どおりAudit付きsuspendedで、download／install／rollbackを実行しない。"
         },
         "scope_limit": "Rust Broker libraryとtest用永続storeを使うFIXTURE。外部主体による製品store改変の実環境、Windows installed product、実download byte照合、Installer、update transaction、rollback、LIVE_RUNTIMEを証明しない。release_ready=falseとWindows配布release_blockerを維持する。"
+      },
+      "broker_owned_package_source_contract": {
+        "date": "2026-09-30",
+        "trust_contract_version": 2,
+        "evidence_source": "FIXTURE",
+        "validation": "Rust全12 targetで418 passed／0 failed／3 ignored、cargo check --all-targets成功、Schema 149／正常example 149／negative fixture 192、Conformance 228 checks成功。",
+        "observations": {
+          "legacy_trust": "update_trust版1はsourceなしの署名検証設定として読込互換を維持した。",
+          "source_validation": "Broker所有版2設定はchannel重複、未対応channel、非HTTPS、userinfo、explicit port、query、fragment、path traversal、IP literal、localhost、percent-encoding、空segment、末尾slash、大文字hostを拒否する。",
+          "bounded_unique_storage": "trust fileは8 KiB上限、通常file確認、重複JSON field拒否を通し、版2のsource設定をBroker起動時に再検証した。",
+          "execution_boundary": "UI／候補からURLやpathを受け取らず、download／install／rollbackは従来どおりsuspendedのまま。"
+        },
+        "scope_limit": "CONFIGとtest FIXTUREのみ。実HTTP要求、redirect／DNS／TLS、取得byte照合、展開、同一volume導入・rollback、Windows installed productのLIVE_RUNTIME証拠ではない。release blockerとrelease_ready=falseを維持する。"
       }
     },
     {
