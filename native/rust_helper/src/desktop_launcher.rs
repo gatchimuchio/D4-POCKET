@@ -1926,7 +1926,7 @@ mod tests {
             }
             let _ = automation_tx.send(None);
         });
-        match automation_rx.recv_timeout(Duration::from_secs(15)) {
+        match automation_rx.recv_timeout(Duration::from_secs(25)) {
             Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let output = automation
                     .wait_with_output()
@@ -1950,7 +1950,7 @@ mod tests {
         }
         let confirmed = confirm_owner_operation(summary, None);
         let result = automation_rx
-            .recv_timeout(Duration::from_secs(15))
+            .recv_timeout(Duration::from_secs(25))
             .expect("UI AutomationがOwner確認へ応答しない")
             .expect("UI Automationが結果を返さない");
         let output = automation

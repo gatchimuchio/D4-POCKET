@@ -3204,7 +3204,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "e1744ef6848ac6a7ec4de2c016faaa0c4501e17e1b7a72ce7ea04aadd90e86f1"
+      "sha256": "40144ad926f860ccf5f1fdf125ae34d6c174534268550eee825aa0f06da42d04"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4524,7 +4524,7 @@
     },
     {
       "path": "tooling/windows_owner_confirmation_ui_test.ps1",
-      "sha256": "d92f30def1bfa26de024900a65bd1f17a384d2589ee023f8e6d003d11bcf52f1"
+      "sha256": "8a41d9e06f117e6f9f9c6c555688f1e6a98b26d30f2fe41c8cdb7fe5452e5227"
     },
     {
       "path": "tooling/windows_release_evidence.py",

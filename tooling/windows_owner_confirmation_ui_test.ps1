@@ -82,8 +82,11 @@ function Stop-TestHarnessAfterUiTimeout {
 }
 
 try {
+  [Console]::Error.WriteLine('stage=before_UIAutomationClient')
   Add-Type -AssemblyName UIAutomationClient
+  [Console]::Error.WriteLine('stage=after_UIAutomationClient')
   Add-Type -AssemblyName UIAutomationTypes
+  [Console]::Error.WriteLine('stage=after_UIAutomationTypes')
 
   $hexBytes = [byte[]]::new($ExpectedTextHex.Length / 2)
   for ($index = 0; $index -lt $hexBytes.Length; $index++) {
