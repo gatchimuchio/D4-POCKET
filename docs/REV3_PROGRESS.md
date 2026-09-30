@@ -1265,3 +1265,32 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 個別に`python -X utf8 tooling/schema_check/check_schemas.py`（150／150／193）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（229 checks）、`python -X utf8 tooling/日本語基底監査.py --strict`（1123 files／0 findings）、`python -X utf8 tooling/manifest.py --check`、`git diff --cached --check`もすべてpass。
 - Windows Actions [#29](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36734597479): checkout SHA照合、Rust変更file format検査、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、Release Broker build、collector v6 smoke、cleanup、test後clean確認が全step成功。
 - collector JSONとtemporary helper／store／sessionはrun終了時に削除済み。Actions artifactはなし。
+
+## R2追補 OneDrive外短pathでのWindows Flutter検証（2026-10-01）
+
+### 成立した確認
+
+- sourceはcleanな`main`／`origin/main` commit `bb5caa48defa9994c6f16cca0e4e08f58b601cc2`からlocal temporary checkoutへ展開した。Flutter／Dartは3.44.0／3.12.0、Rustは1.95.0。元のOneDrive checkout、Windows Application Control、registry、ACLは変更していない。
+- `native/rust_helper`のdebug helperは一時checkout内で`cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml`によりbuildできた。2分42秒で終了し、Application Controlによる拒否は再現しなかった。
+- Desktop Flutterは`flutter analyze`成功、`flutter test --no-pub --reporter expanded`で130 test成功。最初のtest実行はRust debug helper未buildという明示前提により2件失敗したため、helperをbuildしてからsuite全体を再実行し、全件成功を確認した。
+- Mobile Flutterは`flutter analyze`成功、`flutter test --reporter expanded`で21 test成功。`packages/gui_shell_ui`は`flutter analyze`成功、`flutter test --reporter expanded`で56 test成功。
+
+### 証拠境界と環境範囲
+
+- Flutterのunit／widget testは開発環境の`FIXTURE` evidenceである。Desktopのうち2件はdebug Broker process／IPCへ接続するが、開発用lifecycle fixtureを含む`LIVE_RUNTIME`／`FIXTURE`の限定証拠である。installed product、Mobile実機、Agent Task隔離、Windows正式配布、release readinessを証明しない。
+- OneDrive外の短いlocal pathではRust helper buildとFlutter testが成立する。元のOneDrive checkoutは移動・修復しておらず、OneDriveが生成build artifactを同期できない既存制約を解消したとは主張しない。以後同環境でFlutter全数検証を行う場合は、OneDrive外の短いtemporary checkoutを使う。
+- `task_execution=unsupported`、既存release blocker、`release_ready=false`は変更しない。
+
+### 正確な検証
+
+```powershell
+cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml
+flutter analyze                         # apps/desktop_flutter
+flutter test --no-pub --reporter expanded # apps/desktop_flutter: 130 passed
+flutter analyze                         # apps/mobile_flutter
+flutter test --reporter expanded         # apps/mobile_flutter: 21 passed
+flutter analyze                         # packages/gui_shell_ui
+flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
+```
+
+- 進捗記録とmanifest更新後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。Schema 150件／正常example 150件／negative fixture 193件、Conformance 229件、日本語厳格監査1123 files／0 findingsを含む登録済み10 checkがすべてpassした。`python -X utf8 tooling/manifest.py --check`と`git diff --check`もpass。これは開発gateの成立であり、release blockerと`release_ready=false`を維持する。
