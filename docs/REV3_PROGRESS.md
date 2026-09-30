@@ -739,3 +739,37 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 前項のAnalyzer失敗をコード失敗と断定せず、Repositoryを移動せずに一時`Z:` drive aliasから`apps/desktop_flutter`を開いて`flutter analyze --no-pub`を再実行した。Analysis Serverは62秒で`No issues found!`を返し、Flutter Analyzerは成功した。一時drive aliasは実行後に解除し、Repository path・Windows保護設定は変更していない。
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes -- --test-threads=1`: 1件pass。Owner確認allowlistの既存Broker testを再実行しただけであり、登録済みCodex RuntimeへのOwner確認後、Agent Taskが非対応として拒否される統合経路は未試験。
 - この追試は前記LSP parse障害を短縮pathで回避できることを示す環境限定の静的解析結果で、OneDrive原pathでの再発防止やinstalled productを証明しない。以前の失敗記録と`dart analyze`の終了処理失敗は履歴として保持する。GitHub Actionsは使用していない。
+
+## R2追補 scratch作成後のsecret aliasをCLI起動直前に再検査（2026-09-30）
+
+### 成立した変更
+
+- 登録secretの初回検査はAdapter入口で実施済みだったが、その後Task scratchを作ってCLIをspawnするまでの間に、別のWorkspace writerがhardlink aliasを作成する競合窓があった。MxCの完全一致denyはalias名を検出しないため、起動直前にも同じ登録Workspace identityとsecret tree検査を行う。
+- WorkspaceWrite用command構成後、process_tree::spawnの直前に検査し、読み取り専用Dialogueの経路は変更しない。Windows fixtureはscratchを先に作り、その後secret hardlink aliasを追加して、実spawn_codex_task入口がCLI process生成前に「作業領域不在」で止まることを確認する。
+- この再検査はWorkspaceのcontentsを外部writerから原子的に固定せず、最終scanとprocess生成間の変更を排除しない。証拠classはFIXTUREであり、実MxC tool-child、production Broker IPC／Owner Approval、installed productの隔離証拠ではない。Adapterのtask_execution=unsupportedと関連release_blocker、release_ready=falseを維持する。
+
+### 検証
+
+- 対象Rust fileの整形確認は合格。
+```powershell
+rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs
+```
+- 追加した起動直前の否定試験は1件合格。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'scratch作成後に増えたsecret_hardlink_aliasはCLI起動直前に拒否する' -- --test-threads=1
+```
+- Rust全target試験は12 target、408件合格、0件失敗、3件明示ignore。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```
+- Rust全targetの静的compile検査は成功。
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+```
+- 統合validatorの初回実行は、実行commandを散文で記した1行を厳格日本語監査が検出して失敗した。commandをコードblockへ分離し、監査規則は変更していない。
+- 修正後の厳格日本語監査は1114 file／0 findingsで合格。Schema 149、正常example 149、negative fixture 192、Conformance 228 checks、および登録development check 10件を含む統合validatorはexit 0。
+- Release blocker 5件とrelease_ready=falseは維持される。統合開発検査は合格したが、installed product／MxC child isolation／release readinessを証明しない。
+- Windows Actionsは未使用。対象Windows上でRust全target検査を完了できたため、別runnerでの補助実行は不要と判断した。
+```powershell
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```

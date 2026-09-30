@@ -4,6 +4,8 @@
 
 ## D4 Pocket統合 rev3 現行工程
 
+R2追補（2026-09-30）: Windows AdapterのWorkspaceWrite spawn経路で、Task scratch作成後かつCLI process生成直前にも登録Workspace／secret hardlink aliasを再検査する。追加したWindows fixtureは実spawn関数でCLI起動前の拒否を確認するが、外部同時変更との原子性、実MxC tool-child隔離、production Task経路の証拠ではない。`task_execution=unsupported`、Agent隔離等の`release_blocker`、`release_ready=false`を維持する。詳細と検証結果は`docs/REV3_PROGRESS.md`。
+
 R2追補（2026-09-30）: Codex Adapter metadataの説明文にある通常語`permission`をAuthority field名として誤検出し、登録済みCodexとのAgent Session開始を`応答不正`で止めていたscannerを修正した。自由文では危険Authority値を引き続き拒否し、構造化objectのAuthority／Permission key拒否を維持する。Windows実Codex CLI登録を伴うBroker経路でSession開始後もWorkspace Permission／Owner Approvalの両grantを`AgentTask実行非対応`として拒否し、永続AuditとTask本文非露出を確認した。native Owner確認UI・実Agent Task・installed製品の証拠ではない。Rust全12 targetで407 passed／0 failed／3 ignored（主libは361 passed／0 failed／3 ignored）。初回はA2A loopback fixture 1件が間欠失敗し、単独再試験と全体再試験は成功した。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`。
 
 R2追補（2026-09-30）: Desktop BrokerClientでAgent Task Workspace Permission／Owner Approval発行をnative Owner確認待ちoperationへ加え、5秒の通常timeoutから305秒の専用待ちへ修正した。これはFlutter応答待ちだけの変更で、native Owner確認・Broker authorityを代替せず、timeoutもBroker要求取消を意味しない。Adapterの`task_execution=unsupported`、Agent Task実行隔離blocker、`release_ready=false`は維持する。回帰testと検証は`docs/REV3_PROGRESS.md`、timeout意味契約は`docs/specs/agent-runtime.md`。

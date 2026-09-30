@@ -131,6 +131,10 @@ Desktop Flutter BrokerClientは、このWorkspace Permission発行とTask Owner 
 
 TEMP／TMPがMxC child内でBroker `WorkspaceTaskScratch`と一致しない問題も残る。したがって、登録時／Task直前のhardlink検査と直接MxC childの作成拒否は限定された対策・証拠であり、Agent Adapter capabilityを`supported`へ変更しない。Broker経由の実Task、Owner承認、深度超過・別名secretを含む実tool child隔離、cancel／deadline／crash時停止、Audit／Recovery、scratch cleanupを検証するまで`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
 
+### Task spawn直前の登録secret再検査（2026-09-30）
+
+Task Adapterは、scratch作成前の登録secret検査に加え、WorkspaceWrite用commandを構成した後、process生成の直前にも登録Workspaceとsecret pathを再検査する。Windows fixtureはscratch作成後に登録secretのhardlink aliasを加え、実spawn関数がCLI起動へ進む前に`作業領域不在`で拒否することを確認する。これは`FIXTURE`証拠であり、Workspace contentsを外部processから原子的に固定するものではないため、最終検査とprocess生成の間に起きる同時変更を排除しない。MxC tool-child隔離／TEMP cleanupの実証でもない。Task capabilityは`unsupported`のまま維持する。
+
 ### 通常Broker IPCからのAgent Task権限発行拒否（2026-09-30）
 
 Windows向けBroker実測収集器の第6版は、通常のloopback接続資格を用いて本番Broker接続口へ`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`を別々に送り、両方が`desktop_native_owner_confirmation_required`で拒否されることを検査する。現行Rust実装からbuildした単体Release helperによる`LIVE_RUNTIME`実測で両拒否を確認し、収集器とrelease evidence validatorの必須条件にした。この否定経路が示すのは通常IPCによるOwner権限発行の拒否だけであり、Rust Desktop起動器上でのOwner確認成功、確認後の実Task、installed product、durable Audit統合を証明しない。`task_execution=unsupported`とrelease blockerは維持する。

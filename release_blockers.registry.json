@@ -181,6 +181,17 @@
     },
     {
       "name": "comprehensive_extension_rev1_completion",
+      "spawn_secret_revalidation_probe": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Windows Rust all-target test: 408 passed, 0 failed, 3 ignored; focused late-spawn fixture: 1 passed; strict Japanese audit: 1114 files, 0 findings; Schema: 149; examples: 149; negative fixtures: 192; Conformance: 228; all 10 registered development checks passed in validate_all.py.",
+        "observations": {
+          "check_position": "WorkspaceWrite command construction completed; registered Workspace and secret identities rechecked immediately before process_tree::spawn",
+          "post_scratch_alias": "A hardlink alias created after Task scratch creation was rejected by the actual spawn function with 作業領域不在.",
+          "dialogue_path": "Read-only Dialogue spawn path is unchanged."
+        },
+        "scope_limit": "FIXTURE only. Workspace contents are not atomically locked against external writers between the final scan and process creation. Does not prove real Codex/MxC child isolation, production Broker IPC, Owner Approval, installed product, or task_execution support."
+      },
       "latest_sandbox_probe": {
         "date": "2026-09-29",
         "cli_version": "0.158.0-alpha.2.1",

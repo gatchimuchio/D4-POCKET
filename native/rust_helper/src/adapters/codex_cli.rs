@@ -636,6 +636,10 @@ fn spawn_codex_task(
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
     )?;
+    if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
+        // Scratch作成後のWorkspace変化をもう一度確認し、CLI起動直前の秘密別名を拒否する。
+        validate_task_secret_paths(workspace, expected_workspace, secret_paths)?;
+    }
     let child_result = process_tree::spawn(task_command);
     // WindowsではCreateProcessがcurrent_dirを解決し終えるまでpath階層を固定する。
     drop(workspace_guard);
@@ -1536,6 +1540,48 @@ mod tests {
             Err(対話失敗::作業領域不在),
             "実Task入口でaliasを拒否し、未存在CLIの起動へ進まない"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn scratch作成後に増えたsecret_hardlink_aliasはCLI起動直前に拒否する() {
+        use std::io::Write;
+
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let workspace = root.path().join("workspace");
+        let private = workspace.join("private");
+        std::fs::create_dir_all(&private).unwrap();
+        let mut secret_file = std::fs::File::create(private.join("secret.txt")).unwrap();
+        secret_file.write_all(b"synthetic secret").unwrap();
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .unwrap()
+            .identity;
+        let secrets = ["private/secret.txt".to_owned()];
+        let mut context = scratch_context(identity);
+        context.secret_paths = secrets.to_vec();
+        let mut scratch = WorkspaceTaskScratch::create(&workspace, identity, &context).unwrap();
+
+        std::fs::hard_link(
+            private.join("secret.txt"),
+            workspace.join("public-alias.txt"),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            spawn_codex_task(
+                &root.path().join("missing-codex.exe"),
+                &workspace,
+                identity,
+                "synthetic fixture task",
+                CodexSandbox::WorkspaceWrite,
+                Some(&scratch),
+                &secrets,
+                None,
+            ),
+            Err(対話失敗::作業領域不在)
+        ));
+        scratch.cleanup().unwrap();
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
     #[test]
