@@ -22,6 +22,7 @@ class _UpdateTransport implements BrokerTransport {
           '件数': 0,
           '署名信頼設定': 'unconfigured',
           'download実行': 'suspended',
+          'download_job': null,
           '適用実行': 'suspended',
           'rollback実行': 'suspended',
           '証拠種別': 'INTERNAL_STATE',
@@ -52,17 +53,17 @@ void main() {
     expect(UpdateClient.signatureStatusLabel('unknown'), '不明');
   });
 
-  test('配布元表示はBrokerの導出状態だけを使い実行可能と表示しない', () {
+  test('配布元表示はBrokerの導出状態だけを使う', () {
     expect(
       UpdateClient.packageSourceLabel({
         '状態': 'configured',
         'URL': 'https://updates.example.invalid/d4/stable/update-1.pkg',
       }),
-      '配布元=updates.example.invalid（実downloadは保留）',
+      '配布元=updates.example.invalid',
     );
     expect(
       UpdateClient.packageSourceLabel({'状態': 'unconfigured', 'URL': null}),
-      '配布元未設定（実downloadは保留）',
+      '配布元未設定',
     );
     expect(
       UpdateClient.packageSourceLabel({
@@ -72,6 +73,36 @@ void main() {
       '配布元状態不明',
     );
     expect(UpdateClient.packageSourceLabel(null), '配布元状態不明');
+  });
+
+  test('download job表示は進捗・終了・失敗を境界付きで射影する', () {
+    expect(
+      UpdateClient.downloadJobLabel({
+        '状態': 'downloading',
+        '受信byte数': 25,
+        '全byte数': 100,
+      }),
+      'download中 25% (25 / 100 bytes)',
+    );
+    expect(
+      UpdateClient.downloadJobLabel({'状態': 'downloaded'}),
+      'download済み（installは別途保留）',
+    );
+    expect(
+      UpdateClient.downloadJobLabel({
+        '状態': 'failed',
+        '失敗code': 'update_download_digest_mismatch',
+      }),
+      'download失敗: SHA-256が不一致',
+    );
+    expect(
+      UpdateClient.downloadJobLabel({
+        '状態': 'failed',
+        '失敗code': 'secret path C:/private/update.pkg',
+      }),
+      'download失敗: 失敗code不明',
+    );
+    expect(UpdateClient.downloadJobLabel(null), 'download jobなし');
   });
 
   test('Update操作はBrokerの監査済みoperationへ限定される', () async {

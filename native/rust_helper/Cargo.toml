@@ -25,6 +25,10 @@ zeroize = "=1.9.0"
 
 ring = "0.17.14"
 
+# Broker-owned HTTPS update downloads; async transfer stays on one dedicated worker.
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls-no-provider", "stream"] }
+tokio = { version = "1", default-features = false, features = ["net", "rt", "time"] }
+
 cap-std = "=4.0.3"
 cap-fs-ext = "=4.0.3"
 

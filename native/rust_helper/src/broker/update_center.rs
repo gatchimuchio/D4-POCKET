@@ -1,13 +1,13 @@
-//! C11 更新センターのBroker経路。
+//! C11/C12 更新センターのBroker経路。
 //!
 //! 更新候補の表示・署名検査・延期・適用要求を扱う。候補に含まれる公開鍵、
 //! metadata、Profile、履歴は信頼源にならない。署名鍵はBroker所有の永続設定
-//! だけから読み、download / install / process / rollbackの実行は現段階では
-//! 常にsuspendedとする。
+//! だけから読み、downloadだけをnative Owner確認付きのbounded workerへ接続する。
+//! install / process / rollbackは未接続でsuspendedとする。
 #![allow(non_snake_case)]
 
 use super::protocol::{
-    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus,
+    Broker, BrokerError, BrokerOperation, BrokerResponse, BrokerStatus, OwnerConfirmationSource,
     EVIDENCE_SOURCE_INTERNAL_STATE,
 };
 use super::store::{BrokerPersistentStore, BrokerStoreError};
@@ -16,6 +16,9 @@ use crate::update_verification::{verify_signed_update_signature, SignedUpdateCan
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{mpsc, Arc};
+use std::thread::JoinHandle;
 
 const VERSION: u64 = 1;
 const TRUST_VERSION: u64 = 2;
@@ -30,6 +33,246 @@ const OP_DOWNLOAD: &str = "更新download要求";
 const OP_APPLY: &str = "更新適用要求";
 const OP_DEFER: &str = "更新延期";
 const OP_ROLLBACK: &str = "更新rollback要求";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UpdateDownloadConfirmation {
+    pub(crate) update_id: String,
+    pub(crate) candidate_hash: String,
+    pub(crate) source_url: String,
+    pub(crate) package_sha256: String,
+    pub(crate) package_size_bytes: u64,
+    pub(crate) offered_version: String,
+    pub(crate) channel: String,
+    pub(crate) summary: String,
+    pub(crate) display_host: String,
+    pub(crate) payload_hash: String,
+}
+
+#[derive(Debug, Clone)]
+struct UpdateDownloadJob {
+    job_id: String,
+    update_id: String,
+    candidate_hash: String,
+    package_sha256: String,
+    expected_bytes: u64,
+    state: String,
+    error_code: Option<String>,
+    progress: Arc<AtomicU64>,
+}
+
+#[derive(Debug)]
+struct UpdateDownloadCompletion {
+    result:
+        Result<super::update_download::DownloadedPackage, super::update_download::DownloadError>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UpdateDownloadRuntime {
+    job: Option<UpdateDownloadJob>,
+    completion_rx: Option<mpsc::Receiver<UpdateDownloadCompletion>>,
+    worker: Option<JoinHandle<()>>,
+    cancel: Option<Arc<AtomicBool>>,
+}
+
+impl UpdateDownloadRuntime {
+    fn is_running(&self) -> bool {
+        self.job
+            .as_ref()
+            .is_some_and(|job| job.state == "downloading")
+    }
+
+    fn projection(&self) -> Value {
+        let Some(job) = &self.job else {
+            return Value::Null;
+        };
+        json!({
+            "job_id": job.job_id,
+            "更新ID": job.update_id,
+            "候補hash": job.candidate_hash,
+            "package_sha256": job.package_sha256,
+            "状態": job.state,
+            "受信byte数": job.progress.load(Ordering::Acquire).min(job.expected_bytes),
+            "全byte数": job.expected_bytes,
+            "失敗code": job.error_code,
+        })
+    }
+
+    fn start(
+        &mut self,
+        directory: cap_std::fs::Dir,
+        request: &UpdateIDRequest,
+        record: &UpdateRecord,
+        source_url: String,
+    ) -> Result<Value, &'static str> {
+        if self.is_running() {
+            return Err("update_download_busy");
+        }
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+        let package_sha256 = record
+            .candidate
+            .package_sha256
+            .as_deref()
+            .ok_or("update_package_binding_required")?;
+        let expected_bytes = record
+            .candidate
+            .package_size_bytes
+            .ok_or("update_package_binding_required")?;
+        super::update_download::ensure_package_storage_room(
+            &directory,
+            package_sha256,
+            expected_bytes,
+        )
+        .map_err(|error| download_error_code(&error))?;
+
+        let mut random = [0u8; 16];
+        getrandom::getrandom(&mut random).map_err(|_| "update_download_job_id_failed")?;
+        let job_id = format!("update-download-{}", hex::encode(random));
+        let progress = Arc::new(AtomicU64::new(0));
+        let worker_progress = Arc::clone(&progress);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = Arc::clone(&cancel);
+        let (completion_tx, completion_rx) = mpsc::sync_channel(1);
+        let expected_sha256 = package_sha256.to_owned();
+        let worker = std::thread::Builder::new()
+            .name("d4p-update-download".to_string())
+            .spawn(move || {
+                let result = super::update_download::download_package(
+                    &directory,
+                    &source_url,
+                    &expected_sha256,
+                    expected_bytes,
+                    &worker_cancel,
+                    |bytes| worker_progress.store(bytes, Ordering::Release),
+                );
+                let _ = completion_tx.send(UpdateDownloadCompletion { result });
+            })
+            .map_err(|_| "update_download_worker_spawn_failed")?;
+        self.job = Some(UpdateDownloadJob {
+            job_id: job_id.clone(),
+            update_id: request.update_id.clone(),
+            candidate_hash: request.candidate_hash.clone(),
+            package_sha256: package_sha256.to_owned(),
+            expected_bytes,
+            state: "downloading".to_string(),
+            error_code: None,
+            progress,
+        });
+        self.completion_rx = Some(completion_rx);
+        self.worker = Some(worker);
+        self.cancel = Some(cancel);
+        Ok(self.projection())
+    }
+
+    fn take_completion(
+        &mut self,
+    ) -> Option<(
+        String,
+        String,
+        String,
+        Result<super::update_download::DownloadedPackage, super::update_download::DownloadError>,
+    )> {
+        let completion = match self.completion_rx.as_ref()?.try_recv() {
+            Ok(completion) => completion,
+            Err(mpsc::TryRecvError::Empty) => return None,
+            Err(mpsc::TryRecvError::Disconnected) => UpdateDownloadCompletion {
+                result: Err(super::update_download::DownloadError::Network),
+            },
+        };
+        self.completion_rx = None;
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+        self.cancel = None;
+        let job = self.job.as_mut()?;
+        let (decision, state, error_code) = match &completion.result {
+            Ok(package)
+                if package.sha256 == job.package_sha256 && package.bytes == job.expected_bytes =>
+            {
+                job.progress.store(package.bytes, Ordering::Release);
+                ("completed", "downloaded", None)
+            }
+            Ok(_) => ("failed", "failed", Some("update_download_result_mismatch")),
+            Err(error) => ("failed", "failed", Some(download_error_code(error))),
+        };
+        job.state = state.to_string();
+        job.error_code = error_code.map(str::to_string);
+        Some((
+            job.job_id.clone(),
+            decision.to_string(),
+            job.candidate_hash.clone(),
+            completion.result,
+        ))
+    }
+
+    fn audit_failed(&mut self) {
+        if let Some(job) = &mut self.job {
+            job.state = "audit_failed".to_string();
+            job.error_code = Some("update_download_audit_failed".to_string());
+        }
+    }
+}
+
+impl Drop for UpdateDownloadRuntime {
+    fn drop(&mut self) {
+        if let Some(cancel) = &self.cancel {
+            cancel.store(true, Ordering::Release);
+        }
+    }
+}
+
+fn download_error_code(error: &super::update_download::DownloadError) -> &'static str {
+    use super::update_download::DownloadError as E;
+    match error {
+        E::InvalidRequest => "update_download_request_invalid",
+        E::NameResolution => "update_download_dns_failed",
+        E::NonPublicAddress => "update_download_address_blocked",
+        E::Network => "update_download_network_failed",
+        E::RedirectOrUnexpectedStatus => "update_download_response_rejected",
+        E::InvalidHeaders => "update_download_headers_invalid",
+        E::SizeMismatch => "update_download_size_mismatch",
+        E::DigestMismatch => "update_download_digest_mismatch",
+        E::Cancelled => "update_download_cancelled",
+        E::TimedOut => "update_download_timeout",
+        E::Storage => "update_download_storage_failed",
+    }
+}
+
+pub(super) fn poll_download_completion(broker: &mut Broker) {
+    let Some((job_id, decision, candidate_hash, result)) = broker.update_download.take_completion()
+    else {
+        return;
+    };
+    let (decision, reason) = if decision == "completed" {
+        let Ok(package) = result else {
+            broker.update_download.audit_failed();
+            return;
+        };
+        (
+            "completed",
+            format!("Capability=署名済みupdate package取得 Permission=Broker固定package directoryへ{} byteを保存しhash一致を検証 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=download完了を記録 RecoveryAction=更新適用時にfileを再度hash検証。ここではinstall／process起動しない", package.bytes),
+        )
+    } else {
+        (
+            "failed",
+            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS接続と一時file書込みを試行 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=失敗を記録 RecoveryAction=生成中fileは除去済み。失敗codeを確認し明示操作で再試行".to_string(),
+        )
+    };
+    if broker
+        .append_audit(
+            &format!("{job_id}:result"),
+            OP_DOWNLOAD,
+            decision,
+            &reason,
+            "LIVE_RUNTIME",
+            &candidate_hash,
+        )
+        .is_err()
+    {
+        broker.update_download.audit_failed();
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -225,15 +468,42 @@ pub(super) fn dispatch(
     payload: &Value,
     request_id: &str,
     payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    download_confirmation: Option<&UpdateDownloadConfirmation>,
 ) -> BrokerResponse {
+    poll_download_completion(broker);
     match operation.as_str() {
         OP_LIST => list(broker, payload, request_id, payload_hash),
         OP_CHECK => check(broker, payload, request_id, payload_hash),
         OP_VERIFY => verify(broker, payload, request_id, payload_hash),
-        OP_DOWNLOAD => execution_request(broker, OP_DOWNLOAD, payload, request_id, payload_hash),
-        OP_APPLY => execution_request(broker, OP_APPLY, payload, request_id, payload_hash),
+        OP_DOWNLOAD => execution_request(
+            broker,
+            OP_DOWNLOAD,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            download_confirmation,
+        ),
+        OP_APPLY => execution_request(
+            broker,
+            OP_APPLY,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            None,
+        ),
         OP_DEFER => defer(broker, payload, request_id, payload_hash),
-        OP_ROLLBACK => execution_request(broker, OP_ROLLBACK, payload, request_id, payload_hash),
+        OP_ROLLBACK => execution_request(
+            broker,
+            OP_ROLLBACK,
+            payload,
+            request_id,
+            payload_hash,
+            owner_confirmation,
+            None,
+        ),
         _ => broker.reject_with_payload_hash(
             request_id,
             operation.as_str(),
@@ -271,7 +541,8 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             "更新一覧": updates,
             "件数": broker.updates.len(),
             "署名信頼設定": if broker.update_trust.is_some() { "configured" } else { "unconfigured" },
-            "download実行": "suspended",
+            "download実行": if broker.state_store.persistence_ready() { "available" } else { "suspended" },
+            "download_job": broker.update_download.projection(),
             "適用実行": "suspended",
             "rollback実行": "suspended",
             "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
@@ -534,6 +805,8 @@ fn execution_request(
     payload: &Value,
     request_id: &str,
     hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    download_confirmation: Option<&UpdateDownloadConfirmation>,
 ) -> BrokerResponse {
     let request: UpdateIDRequest = match serde_json::from_value::<UpdateIDRequest>(payload.clone())
     {
@@ -615,6 +888,236 @@ fn execution_request(
             "保存候補の署名・内容・候補hashが現在状態と一致しない",
             hash,
         );
+    }
+    if operation == OP_DOWNLOAD {
+        if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "desktop_native_owner_confirmation_required",
+                "更新packageの外部取得はRust Desktop起動器のnative Owner確認が必要",
+                hash,
+            );
+        }
+        let Some(confirmation) = download_confirmation else {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "update_download_confirmation_missing",
+                "更新取得先をBroker状態から表示したnative確認記録がない",
+                hash,
+            );
+        };
+        let current_source =
+            project_package_source(broker.update_trust.as_ref(), Some(&current_record), true);
+        let current_host = current_source["URL"]
+            .as_str()
+            .and_then(|url| reqwest::Url::parse(url).ok())
+            .and_then(|url| url.host_str().map(str::to_owned));
+        let package_sha256 = current_record.candidate.package_sha256.as_deref();
+        let package_size_bytes = current_record.candidate.package_size_bytes;
+        if confirmation.update_id != current_record.candidate.update_id
+            || confirmation.candidate_hash != current_record.candidate_hash
+            || confirmation.source_url != current_source["URL"].as_str().unwrap_or_default()
+            || Some(confirmation.display_host.as_str()) != current_host.as_deref()
+            || confirmation.package_sha256 != package_sha256.unwrap_or_default()
+            || Some(confirmation.package_size_bytes) != package_size_bytes
+            || confirmation.offered_version != current_record.candidate.offered_version
+            || confirmation.channel != current_record.candidate.channel
+            || confirmation.summary != current_record.candidate.summary
+            || confirmation.payload_hash != hash
+        {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "update_download_confirmation_stale",
+                "native Owner確認後にBroker trust、候補、配布先のいずれかが変化した",
+                hash,
+            );
+        }
+        if !broker.state_store.persistence_ready() {
+            return suspended(
+                broker,
+                operation,
+                request_id,
+                json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "復旧ID": "recover-update-download-store", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+                hash,
+                "永続Broker storeがないため更新packageを安全に保持できずsuspended",
+            );
+        }
+        if broker.update_download.is_running() {
+            return reject(
+                broker,
+                request_id,
+                operation,
+                "update_download_busy",
+                "別の更新downloadが実行中のため一時fileを変更しない",
+                hash,
+            );
+        }
+        let directory = match broker.state_store.open_update_package_directory() {
+            Ok(Some(directory)) => directory,
+            Ok(None) => {
+                return reject(
+                    broker,
+                    request_id,
+                    operation,
+                    "update_download_store_unavailable",
+                    "Broker所有の永続package directoryがない",
+                    hash,
+                )
+            }
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    operation,
+                    "update_download_store_invalid",
+                    "Broker所有のpackage directoryを安全に開けない",
+                    hash,
+                )
+            }
+        };
+        let cleanup_request_id = format!("{}:recovery", request_id);
+        if broker
+            .append_audit(
+                &cleanup_request_id,
+                "更新download中断file復旧",
+                "received",
+                "Capability=更新package一時file復旧 Permission=固定Broker update_packages内の生成済み *.partだけ Approval=現在のdownload要求に対するnative Owner確認 AuditEvent=除去前意図を確定 RecoveryAction=確認済みdownload package final fileを保持",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            )
+            .is_err()
+        {
+            return broker.audit_store_failed_response(
+                request_id,
+                operation,
+                "update_download_audit_failed",
+                "中断download復旧のAuditを確定できない",
+            );
+        }
+        let removed_partials = match super::update_download::remove_abandoned_partials(&directory) {
+            Ok(removed) => removed,
+            Err(_) => {
+                if broker
+                    .append_audit(
+                        &cleanup_request_id,
+                        "更新download中断file復旧",
+                        "recovery_failed",
+                        "Capability=更新package一時file復旧 Permission=固定Broker update_packages内の生成済み *.partを検査 Approval=現在のdownload要求に対するnative Owner確認 AuditEvent=復旧失敗を確定 RecoveryAction=一時fileを保持してdownloadを開始せず、Broker store状態を確認",
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        hash,
+                    )
+                    .is_err()
+                {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        operation,
+                        "update_download_audit_failed",
+                        "中断download復旧失敗のAuditを確定できない",
+                    );
+                }
+                return reject(
+                    broker,
+                    request_id,
+                    operation,
+                    "update_download_recovery_failed",
+                    "Broker所有download一時fileの復旧に失敗",
+                    hash,
+                );
+            }
+        };
+        if broker
+            .append_audit(
+                &cleanup_request_id,
+                "更新download中断file復旧",
+                "recovered",
+                &format!("Capability=更新package一時file復旧 Permission=固定Broker update_packages内の生成済み *.partだけを{}件除去 Approval=現在のdownload要求に対するnative Owner確認 AuditEvent=除去結果を確定 RecoveryAction=final packageは変更せず署名済みhashで再取得", removed_partials),
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            )
+            .is_err()
+        {
+            return broker.audit_store_failed_response(
+                request_id,
+                operation,
+                "update_download_audit_failed",
+                "中断download復旧結果のAuditを確定できない",
+            );
+        }
+        let queued = match broker.append_audit(
+            request_id,
+            operation,
+            "queued",
+            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS配布元から対象package一つを取得 Approval=Broker現在状態と配布先を示したRust Desktop native Owner確認 AuditEvent=queuedを永続記録 RecoveryAction=失敗時は一時fileを除去し現在状態を再確認。install／process起動はしない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            hash,
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "update_download_audit_failed",
+                    "download開始前Auditを確定できない",
+                )
+            }
+        };
+        let source_url = confirmation.source_url.clone();
+        let started =
+            broker
+                .update_download
+                .start(directory, &request, &current_record, source_url);
+        let body = match started {
+            Ok(body) => body,
+            Err(code) => {
+                let event = broker.append_audit(
+                    &format!("{}:failed", request_id),
+                    operation,
+                    "failed",
+                    "Capability=署名済みupdate package取得 Permission=download開始前の境界・容量検査だけ Approval=Rust Desktop native Owner確認済み AuditEvent=開始失敗 RecoveryAction=packageを実行せずBroker状態を再確認",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                );
+                if event.is_err() {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        operation,
+                        "update_download_audit_failed",
+                        "download開始失敗をAuditできない",
+                    );
+                }
+                return reject(
+                    broker,
+                    request_id,
+                    operation,
+                    code,
+                    "Brokerが更新download jobを開始できない",
+                    hash,
+                );
+            }
+        };
+        return BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: operation.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: queued.event_id,
+            error: None,
+            health: None,
+            body: Some(json!({
+                "版": VERSION,
+                "download_job": body,
+                "install実行": "suspended",
+                "復旧ID": "recover-update-download",
+                "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+            })),
+            shutdown_requested: broker.shutdown_requested,
+        };
     }
     suspended(
         broker,
@@ -1420,6 +1923,149 @@ mod tests {
         );
         assert_eq!(response.status, BrokerStatus::Suspended);
         assert_eq!(response.error.unwrap().code, "update_execution_suspended");
+    }
+
+    #[test]
+    fn update_download_requires_current_native_confirmation_and_runs_as_bounded_job() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-update-download-owner-{}-{unique}",
+            std::process::id()
+        ));
+        let (mut trust, candidate) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        let mut broker = Broker::new_persistent("session-1", &root).unwrap();
+        broker.update_trust = Some(trust);
+        assert_eq!(
+            call(
+                &mut broker,
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+        let record: UpdateRecord =
+            serde_json::from_value(broker.updates.get("update-1").unwrap().clone()).unwrap();
+        let payload = json!({
+            "版": 1,
+            "更新ID": "update-1",
+            "候補hash": record.candidate_hash,
+        });
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_DOWNLOAD,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
+        let denied = call(
+            &mut broker,
+            BrokerOperation::更新download要求,
+            payload.clone(),
+        );
+        assert_eq!(denied.status, BrokerStatus::Rejected);
+        assert_eq!(
+            denied.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let confirmation = UpdateDownloadConfirmation {
+            update_id: "update-1".into(),
+            candidate_hash: record.candidate_hash.clone(),
+            source_url: "https://updates.example.invalid/d4/stable/update-1.pkg".into(),
+            package_sha256: record.candidate.package_sha256.clone().unwrap(),
+            package_size_bytes: record.candidate.package_size_bytes.unwrap(),
+            offered_version: record.candidate.offered_version.clone(),
+            channel: record.candidate.channel.clone(),
+            summary: record.candidate.summary.clone(),
+            display_host: "updates.example.invalid".into(),
+            payload_hash: payload_hash.clone(),
+        };
+        let partial_name = format!("{}.part", "a".repeat(32));
+        let package_directory = broker
+            .state_store
+            .open_update_package_directory()
+            .unwrap()
+            .unwrap();
+        std::fs::write(root.join("update_packages").join(&partial_name), b"active").unwrap();
+        broker.update_download.job = Some(UpdateDownloadJob {
+            job_id: "update-download-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            update_id: "update-1".into(),
+            candidate_hash: record.candidate_hash.clone(),
+            package_sha256: record.candidate.package_sha256.clone().unwrap(),
+            expected_bytes: record.candidate.package_size_bytes.unwrap(),
+            state: "downloading".into(),
+            error_code: None,
+            progress: Arc::new(AtomicU64::new(0)),
+        });
+        let busy = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-busy"),
+            Some(confirmation.clone()),
+        );
+        assert_eq!(busy.status, BrokerStatus::Rejected);
+        assert_eq!(busy.error.unwrap().code, "update_download_busy");
+        assert!(root.join("update_packages").join(&partial_name).exists());
+        broker.update_download.job = None;
+
+        let mut stale_confirmation = confirmation.clone();
+        stale_confirmation.source_url =
+            "https://attacker.example.invalid/d4/stable/update-1.pkg".into();
+        let stale = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-stale"),
+            Some(stale_confirmation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.unwrap().code,
+            "update_download_confirmation_stale"
+        );
+        let queued = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-accepted"),
+            Some(confirmation),
+        );
+        assert_eq!(queued.status, BrokerStatus::Accepted);
+        assert_eq!(
+            queued.body.as_ref().unwrap()["download_job"]["状態"],
+            "downloading"
+        );
+        assert!(!root.join("update_packages").join(&partial_name).exists());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.operation == "更新download中断file復旧" && event.decision == "recovered"
+        }));
+
+        for _ in 0..400 {
+            broker.update_download_tick();
+            if broker.update_download.projection()["状態"] != "downloading" {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let job = broker.update_download.projection();
+        assert_eq!(job["状態"], "failed");
+        assert!(matches!(
+            job["失敗code"].as_str(),
+            Some("update_download_dns_failed" | "update_download_network_failed")
+        ));
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OP_DOWNLOAD && event.decision == "failed" }));
+        drop(broker);
+        drop(package_directory);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

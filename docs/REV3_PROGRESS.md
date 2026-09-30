@@ -734,6 +734,65 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
 
+## Phase 21／C12追補 Broker更新package download worker（2026-09-30）
+
+### 成立した変更
+
+- Rust Desktop起動器のnative Owner確認を経た内部経路だけで、現在の候補hash、Broker trustで再検証した署名、配布URL、version/channel/summary、package SHA-256・正確なbyte長、request payload hashをBrokerが副作用直前に再照合し、download要求を受理する。通常IPCやOwner credential単独では受理しない。Flutterは既存Broker bridge経由で要求・状態取得だけを行い、network／filesystemを直接扱わない。
+- Rust Brokerはserial IPC loop外の単一非同期workerでHTTPS取得する。proxy／redirect／retryを無効化し、DNS結果をpublic unicastに限定して取得addressへpinする。HTTP status、単一Content-Length、Transfer-Encoding／Content-Encodingの不在、実byte長、SHA-256を検査し、完全一致したfileだけをBroker固定directoryへcontent-addressed・create-onlyで公開する。処理は64 KiB単位、Job状態とfailure codeはbounded／Schema固定で、常駐pollingを行わない。partial cleanupと結果はBroker Auditへ接続する。
+- 適用、process起動、rollback、破損package修復は未接続。OS同期DNS resolverには期限／cancelがなく、同一digestの破損packageは修復不能である。これらはrelease_blockerとして保持する。system proxy必須環境への非対応はknown_limitation。local TLS serverとBroker test storeはFIXTUREであり、実配布元／Windows installed productのLIVE_RUNTIME証拠ではない。
+
+### 検証
+
+- Rust全12 target（lib、launcher、binaryおよび統合test）: 428 passed／0 failed／3 ignored。全target compile checkも成功。
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```
+- Rust update-focused試験は21 passed／0 failed。local TLS fixture、実byte長／digest照合、HTTP header拒否、URL／IP境界、partial recovery、Broker Owner確認、stale request、競合要求、Auditを含む。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_ -- --test-threads=1
+```
+- JSON Schemaは150件、正常example150件、negative fixture193件。Conformanceは229 checks。
+```powershell
+python -X utf8 tooling/schema_check/check_schemas.py
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+```
+- Desktop Flutter対象testは10件合格し、`flutter analyze --no-pub`は一時`Z:` drive aliasからの再実行で`No issues found!`。長いOneDrive原pathでの先行Analyzer parse失敗は環境制約として履歴に残す。一時aliasは解除し、保護設定は変更していない。
+```powershell
+flutter test --no-pub test/update_client_test.dart test/broker_client_payload_hash_test.dart
+flutter analyze --no-pub
+dart format --output=none --set-exit-if-changed lib/screens/settings.dart test/update_client_test.dart test/broker_client_payload_hash_test.dart
+```
+- Rust変更7 fileのrustfmt check、`git diff --check`、変更JSON 8 fileのparse、strict日本語基底監査1118 file／0 findings、packaging portability checkが成功した。portability試験はGit追跡sourceだけをZIP化するため、新規4 fileをindexへstageした状態で実行した。
+- 統合validatorの初回実行は新Rust comment 7件の日本語基底違反と、index未登録だった新Schema例のZIP欠落を検出した。commentを日本語化し、必要な4 fileをstageしてManifestを1115 fileで再生成後、strict監査とpackaging portability checkを個別再実行して成功した。最初の失敗は検査規則を弱めず修正した。
+- 最終`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。Manifest 1115 source files、strict日本語監査1118 file／0 findings、Schema 150／正常example150／negative fixture193、Conformance 229 checksを確認し、登録済みdevelopment check 10件が全件成功した。release gate整合、package portability、release smoke、evidence bundle、runtime assertions、C32構造監査を含む。
+- このvalidatorのrelease gate整合passはrelease readinessを意味しない。release evidenceはCONFIG／FIXTURE範囲に留まり、`release_ready=false`と既存release blockerを維持する。
+- Windows GitHub Actionsは未使用。対象Windows上で全Rust／Flutter検査とpackaging検査を実行でき、別runnerを追加する必要はなかった。
+
+### 残存項目
+
+- item: OS同期DNS解決の期限／cancel不能
+  classification: release_blocker
+  reason: HTTP client timeout開始前の同期resolverがworker停止を阻害し得る
+  required_action: 有限期限・cancel可能なDNS解決を実装し、timeout／cancel failure injectionで検証する
+  blocks_release: yes
+- item: 破損済み同一digest packageの修復
+  classification: release_blocker
+  reason: create-only保存と既存file検査により既存packageを置換しないが、安全なrepair／Recovery経路がない
+  required_action: Broker Audit／Recovery付きrepairを追加し、tamper・crash・再試行を試験する
+  blocks_release: yes
+- item: system proxy必須環境
+  classification: known_limitation
+  reason: download workerはsystem proxyを使用しない
+  required_action: 直接HTTPSが許可されない環境では使用できない旨を製品文書へ維持する
+  blocks_release: no
+- item: 外部配布元・Windows installed productでのdownloadおよびinstall／rollback
+  classification: release_blocker
+  reason: local TLS fixtureは実配布元、配布物、installed update transactionを証明しない
+  required_action: test identityと隔離Windows installed packageを用いて実配布元からの取得・tamper・install・rollback・crash Recoveryを実証する
+  blocks_release: yes
+
 ## Phase 21／C11 Broker導出取得元projectionとDesktop表示（2026-09-30）
 
 ### 成立した変更

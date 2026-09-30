@@ -51,7 +51,7 @@
 D4 PocketはGUI Shellを技術基盤とする製品表面であり、GUI Shellは通常の app templateでもBLUE-TANUKI専用 GUIでもない。
 
 - 🛂 **Control plane。** Flutter は operator surface を描画するが、権限を所有しない。
-- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。現行基準検査は149 schema、149正常example、192 negative fixture、225 Conformance checkである。
+- 📐 **Contract。** Runtime / Adapter / Permission / Approval / Audit / Recovery / Content Exposure の semantics は **JSON Schema-first** である。2026-09-30の現行検査は150 schema、150正常example、193 negative fixture、229 Conformance checkである。
 - 🤖 **LLM がその上に構築する基盤。** 新しい機能、Adapter、Tool、integration は、即興の shortcut ではなく宣言済み Contract を介して接続する。
 - 🔒 **安全性が第一、堅牢性が第二、操作明瞭性が第三、product UI はその後。**
 
@@ -336,7 +336,7 @@ Public review snapshot として tag を付けた GitHub Release は、完成製
 誇張せずに述べた現在の事実:
 
 - ✅ **Phase A/B は owner-use の範囲で完了している。** owner は desktop shell を日常の local operation に使え、status、problem、evidence、Recovery、Trust、Runtime、Authority の各 surface を確認できる。
-- ✅ development slice として **schema + conformance が通過**している（149 schema、149正常example、192 negative fixture、225 check）。Windows書出しはOwner確認後にManifest JSON fileを新規生成するが、実行可能App、独立Runtime、binary pruning、Installer、配布は成立していない。
+- ✅ development slice として **schema + conformance が通過**している（2026-09-30時点で150 schema、150正常example、193 negative fixture、229 check）。Windows書出しはOwner確認後にManifest JSON fileを新規生成するが、実行可能App、独立Runtime、binary pruning、Installer、配布は成立していない。
 - 🧪 C33ではWindows release buildと、clean isolated runにおけるRust Broker smoke（認証IPC、永続store、replay拒否、再起動後health、crash fail-closed）がPASSした。ただしinstalled productの総合evidence validatorは、UI Automation surface不足、Setup Doctorのinstalled path不一致、外部Audit anchorが未取得のため失敗しており、Windows正式証拠は成立していない。
 - ✅ **LLM が読む基盤は definition-locked** であり、範囲を限定した Reference Extension が一つ、cross-agent reproduction report が一つある。
 - ⛔ **v1.0 product release はまだ主張していない。** active <code>release_blocker</code> は <code>release_blockers.registry.json</code> に正規化されている。内容は Windows installed-path provenance、first-run、Setup Doctor、Broker evidence、Audit anchor の external tamper-evidence proof、明示的な owner GO である。Rust Broker の production authority cutover に関する表現は、独立した registry blocker ではなく、Windows installed-path の Broker / Runtime evidence blocker を通じて表現する。

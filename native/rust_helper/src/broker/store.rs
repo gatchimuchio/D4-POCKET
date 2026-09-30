@@ -3,6 +3,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
+use cap_fs_ext::OsMetadataExt as _;
+use cap_std::fs::Dir;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -229,6 +231,34 @@ impl BrokerPersistentStore {
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// 更新候補、Flutter、通信応答からpathを受け取らず、Broker固定のpackage保存先を開く。
+    pub fn open_update_package_directory(&self) -> Result<Dir, BrokerStoreError> {
+        let root =
+            Dir::open_ambient_dir(&self.root, cap_std::ambient_authority()).map_err(|error| {
+                BrokerStoreError::Io(format!("Broker store capabilityを開けない: {error}"))
+            })?;
+        match root.create_dir("update_packages") {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => {
+                return Err(BrokerStoreError::Io(format!(
+                    "更新package directoryを作成できない: {error}"
+                )))
+            }
+        }
+        let metadata = root.symlink_metadata("update_packages").map_err(|error| {
+            BrokerStoreError::Io(format!("更新package directoryを検査できない: {error}"))
+        })?;
+        if !metadata.is_dir() || metadata.file_attributes() & 0x400 != 0 {
+            return Err(BrokerStoreError::Io(
+                "更新package directoryが通常directoryではない".to_string(),
+            ));
+        }
+        root.open_dir("update_packages").map_err(|error| {
+            BrokerStoreError::Io(format!("更新package directoryを固定できない: {error}"))
+        })
     }
 
     pub fn load_profile_state(&self) -> Result<Value, BrokerStoreError> {

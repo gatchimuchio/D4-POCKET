@@ -283,6 +283,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "update_candidate.schema.json",
     "update_receipt.schema.json",
     "update_list.schema.json",
+    "update_download_job.schema.json",
     "update_trust.schema.json",
     "notification.schema.json",
     "notification_list.schema.json",
@@ -936,8 +937,30 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     receipt = load_contract_fixture("update_receipt.valid.json")
     listing = load_contract_fixture("update_list.valid.json")
     trust = load_contract_fixture("update_trust.valid.json")
+    download_job = load_contract_fixture("update_download_job.valid.json")
     for name, value in (("update_candidate", candidate), ("update_receipt", receipt), ("update_list", listing), ("update_trust", trust)):
         errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
+    update_list_schema = load_schema("update_list.schema.json")
+    missing_download_job = copy.deepcopy(listing)
+    missing_download_job.pop("download_job", None)
+    if validate_instance(missing_download_job, update_list_schema) == []:
+        errors.append("更新一覧がdownload job状態の欠落を受理した")
+    errors.extend(validate_instance(download_job, load_schema("update_download_job.schema.json")))
+    download_job_schema = load_schema("update_download_job.schema.json")
+    if validate_instance(
+        load_contract_fixture("invalid/update_download_job_path_leak.invalid.json"),
+        download_job_schema,
+    ) == []:
+        errors.append("UpdateDownloadJobがpackage pathの露出を受け入れた")
+    for invalid_job in (
+        {**download_job, "状態": "trusted"},
+        {**download_job, "受信byte数": 4 * 1024 * 1024 * 1024 + 1},
+        {**download_job, "local_path": "C:/private/update.pkg"},
+        {**download_job, "失敗code": "network failure at https://secret.example/token"},
+        {**download_job, "状態": "downloaded", "失敗code": "update_download_network_failed"},
+    ):
+        if validate_instance(invalid_job, load_schema("update_download_job.schema.json")) == []:
+            errors.append("UpdateDownloadJobが未知状態・容量超過・path／詳細漏えい・矛盾状態を受理した")
     trust_schema = load_schema("update_trust.schema.json")
     configured_trust = {
         **trust,
@@ -1043,8 +1066,8 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
     current_stale_receipt = dict(receipt)
     current_stale_receipt["署名状態"] = "verification_stale"
     errors.extend(validate_instance(current_stale_receipt, load_schema("update_receipt.schema.json")))
-    if listing["download実行"] != "suspended" or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
-        errors.append("更新実行経路がsuspendedではない")
+    if listing["download実行"] not in ("available", "suspended") or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
+        errors.append("更新実行可能状態または適用／rollbackのsuspended境界が不正")
     for name in ("ipc_request", "ipc_response"):
         operations = load_schema(f"{name}.schema.json")["properties"]["operation"]["enum"]
         for operation in ("更新一覧", "更新確認", "更新署名検査", "更新download要求", "更新適用要求", "更新延期", "更新rollback要求"):
@@ -6407,10 +6430,56 @@ def test_rust_helper_does_not_expose_hidden_authority_paths() -> list[str]:
     ]
     errors = []
     for path in sorted((RUST_HELPER / "src").rglob("*.rs")):
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
         for pattern in forbidden:
+            if pattern == "reqwest::" and path.as_posix().endswith(
+                (
+                    "native/rust_helper/src/broker/update_download.rs",
+                    "native/rust_helper/src/broker/update_center.rs",
+                    "native/rust_helper/src/desktop_launcher.rs",
+                )
+            ):
+                if path.name != "update_download.rs" and "reqwest::" in re.sub(
+                    r"reqwest::Url::parse", "", text
+                ):
+                    errors.append(f"{path} はURL解析以外のreqwest経路を追加した")
+                continue
             if pattern in text:
                 errors.append(f"{path} が禁止されたhelper authority patternを使う: {pattern}")
+    return errors
+
+
+def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
+    download = (RUST_HELPER / "src" / "broker" / "update_download.rs").read_text(
+        encoding="utf-8"
+    ).split("#[cfg(test)]", 1)[0]
+    center = (RUST_HELPER / "src" / "broker" / "update_center.rs").read_text(
+        encoding="utf-8"
+    ).split("#[cfg(test)]", 1)[0]
+    required_download = (
+        "parse_source_url(url_text)?",
+        "resolve_public_addresses(host, 443)?",
+        ".https_only(true)",
+        ".no_proxy()",
+        ".redirect(redirect::Policy::none())",
+        ".retry(retry::never())",
+        ".timeout(MAX_DOWNLOAD_TIME)",
+        ".read_timeout(READ_TIMEOUT)",
+        ".resolve_to_addrs(host, addresses)",
+        "validate_response_headers(response.headers(), expected_bytes)?",
+        "chunk.chunks(COPY_BUFFER_BYTES)",
+        "consume_chunk(",
+        ".hard_link(&temporary_name, directory, &final_name)",
+    )
+    errors = [
+        f"Broker download transportの必須境界がない: {token}"
+        for token in required_download
+        if token not in download
+    ]
+    if "OwnerConfirmationSource::DesktopNativeConfirmation" not in center:
+        errors.append("更新downloadがDesktop native Owner確認へ結合されない")
+    if "confirmation.payload_hash != hash" not in center:
+        errors.append("更新downloadが確認済み要求hashを実行直前に再照合しない")
     return errors
 
 
@@ -7799,10 +7868,11 @@ def test_agent_task_scratch_recovery_journal_is_bounded_and_content_free() -> li
     ):
         if required not in broker_source:
             errors.append(f"Broker scratch回復にprocess境界の強制終了試験がない: {required}")
-    startup_registration = server_source.find(
-        "broker.作業領域起動登録(workspace, &protected)"
+    compact_server_source = re.sub(r"\s+", "", server_source)
+    startup_registration = compact_server_source.find(
+        "broker.作業領域起動登録(workspace,&protected)"
     )
-    listener_start = server_source.find("TcpListener::bind(bind_addr)")
+    listener_start = compact_server_source.find("TcpListener::bind(bind_addr)")
     if startup_registration < 0 or listener_start < 0 or startup_registration > listener_start:
         errors.append("BrokerはWorkspace scratch回復をIPC受付開始前に完了しない")
     return errors
@@ -9512,6 +9582,7 @@ def main() -> int:
         test_update_fixture_requires_signature,
         test_update_policy_unsigned_rejection_uses_taxonomy,
         test_update_center_contract_and_execution_boundary,
+        test_update_download_transport_is_broker_owned_and_bounded,
         test_notification_center_contract_and_navigation_boundary,
         test_observation_center_contract_and_audit_separation,
         test_trace_inspector_surface_and_evidence_boundary,

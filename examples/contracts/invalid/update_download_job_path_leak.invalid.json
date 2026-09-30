@@ -1,0 +1,11 @@
+{
+  "job_id": "update-download-0123456789abcdef0123456789abcdef",
+  "更新ID": "update-1",
+  "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "package_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "状態": "failed",
+  "受信byte数": 0,
+  "全byte数": 1048576,
+  "失敗code": "update_download_network_failed",
+  "local_path": "C:/private/update.pkg"
+}

@@ -25,6 +25,7 @@
   ],
   "件数": 1,
   "署名信頼設定": "configured",
+  "download_job": null,
   "download実行": "suspended",
   "適用実行": "suspended",
   "rollback実行": "suspended",

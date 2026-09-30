@@ -437,8 +437,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器とBroker lifecycleまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、失敗復旧の技術経路は未成立。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "Owner待ちにせず、test identityによるInstaller／Uninstaller、download／install／launch、署名検証、update／rollback、失敗復旧を各Contract・negative test・隔離Windows実測へ接続する。次に信頼済み配布元から実byteを取得し、展開前に上限付きbyte長とSHA-256を照合するdownload consumer、same-volume導入・置換・rollback transaction、失敗／crash Recoveryを実装する。production identityはTechnical Complete後の別blockerで扱う。",
+      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器、Broker lifecycle、およびC12のnative Owner確認付きpackage downloadまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、破損package修復、失敗復旧の技術経路は未成立。同期OS DNS resolverには期限／cancel境界がなく、実配布元・installed product証拠も未取得。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "Owner待ちにせず、download時DNSを有限期限・cancel可能にし、破損packageのAudit付きRecoveryを実装する。続けてtest identityによるInstaller／Uninstaller、署名検証、same-volume install／replacement／rollback transaction、失敗／crash Recoveryを各Contract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／install／rollbackをinstalled productで検証する。production identityはTechnical Complete後の別blockerで扱う。",
       "update_candidate_package_binding": {
         "date": "2026-09-30",
         "contract_version": 2,
@@ -497,6 +497,18 @@
           "execution_boundary": "更新一覧とDesktopは配布先状態だけを表示し、download実行suspendedを維持した。候補URL fieldをUpdateCandidate Schema negativeで拒否した。"
         },
         "scope_limit": "Broker内状態のFIXTUREとUI射影のみ。実HTTP、redirect／DNS／TLS、取得byte照合、download保存、install／rollback、Windows installed product LIVE_RUNTIMEの証拠ではない。release blockerとrelease_ready=falseを維持する。"
+      },
+      "broker_update_download_worker": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Windows localでRust全12 target、428 passed／0 failed／3 ignored、cargo check --all-targets成功。Schema 150／正常example 150／negative fixture 193、Conformance 229 checks、Desktop Flutter対象test 10件、短縮一時pathでのFlutter analyze、package portability checkが成功。統合validatorのdevelopment check 10件も全件成功し、strict日本語監査1118 file／0 findings。release blockerを保持しrelease_ready=false。",
+        "observations": {
+          "native_confirmation": "通常IPC／Owner credential単独は拒否し、Rust Desktop起動器のnative確認から渡された同一候補・URL・表示値・request hashだけをBrokerが再検証して受理した。",
+          "https_transport": "local TLS serverから受信し、status／Content-Length／SHA-256を検査した正確なpackage byteだけをcontent-addressed固定storeへcreate-only公開した。",
+          "bounded_state": "単一download jobをBroker IPC loop外のworkerへ送り、進捗とstatic failure codeだけをSchema付きjob projectionへ返した。実行中に新要求が来た場合、active partialを削除せず拒否した。",
+          "crypto_provider": "Reqwestと既存Rustls Ring providerをrustls-no-providerで統一し、複数providerによる実行時曖昧性を除いた。"
+        },
+        "scope_limit": "local TLS serverとBroker test storeを使うFIXTURE。外部配布元、同期OS DNSの期限／cancel、破損package repair、Windows installed product、install／rollback、release readinessを証明しない。proxy必須環境はknown_limitation。release_blockerとrelease_ready=falseを維持する。"
       }
     },
     {

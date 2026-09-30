@@ -21,6 +21,10 @@ void main() {
       const Duration(seconds: 305),
     );
     expect(
+      brokerRequestTimeoutForOperation('更新download要求'),
+      const Duration(seconds: 305),
+    );
+    expect(
       brokerRequestTimeoutForOperation('AgentTask実行'),
       const Duration(seconds: 5),
     );

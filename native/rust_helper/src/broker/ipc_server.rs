@@ -93,6 +93,7 @@ impl BrokerServerError {
 /// Desktop起動器内だけで使う、Owner確認済みallowlist操作の一回限り要求。
 pub(crate) struct DesktopOwnerOperationRequest {
     pub request_json: String,
+    pub download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
     pub reply: SyncSender<BrokerResponse>,
 }
 
@@ -135,7 +136,9 @@ fn run_loopback_server_inner(
     owner_operations: Option<Receiver<DesktopOwnerOperationRequest>>,
     desktop_export_root: Option<(PathBuf, cap_std::fs::Dir)>,
 ) -> Result<(), BrokerServerError> {
-    if shutdown_requested(&shutdown) { return Ok(()); }
+    if shutdown_requested(&shutdown) {
+        return Ok(());
+    }
     let session_id = format!("broker-session-{}", random_hex(16)?);
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
@@ -143,25 +146,31 @@ fn run_loopback_server_inner(
     if let Some((path, root)) = desktop_export_root {
         broker.set_desktop_export_root(path, root);
     }
-    if shutdown_requested(&shutdown) { return Ok(()); }
+    if shutdown_requested(&shutdown) {
+        return Ok(());
+    }
 
     if shutdown.is_some() {
         let reason = "Capability=desktop.launch Permission=固定Desktop起動器のlifecycleのみ Approval=通常画面起動のためOwner承認不要・privileged actionは非承認 RecoveryAction=失敗時は起動器管理Brokerを停止し未変更endpointだけを整理してstoreを保持";
         let payload_hash = crate::audit_hash::sha256_tagged(b"gui-shell-desktop-launcher:start:v1");
-        broker.append_audit(
-            &format!("desktop-launcher:{}:start", session_id),
-            "D4 Pocket Desktop起動",
-            "recorded",
-            reason,
-            "LIVE_RUNTIME",
-            &payload_hash,
-        ).map_err(|error| BrokerServerError::new(error.message()))?;
+        broker
+            .append_audit(
+                &format!("desktop-launcher:{}:start", session_id),
+                "D4 Pocket Desktop起動",
+                "recorded",
+                reason,
+                "LIVE_RUNTIME",
+                &payload_hash,
+            )
+            .map_err(|error| BrokerServerError::new(error.message()))?;
     }
     if shutdown.is_some() && config.desktop_install_path_verified {
         broker.set_desktop_setup_doctor_runtime_evidence(true, false);
         broker
             .initialize_desktop_first_run_configuration()
-            .map_err(|_| BrokerServerError::new("初回UI設定を安全に生成・検証できないため起動を停止しました"))?;
+            .map_err(|_| {
+                BrokerServerError::new("初回UI設定を安全に生成・検証できないため起動を停止しました")
+            })?;
     }
 
     let workspace_startup = if let Some(path) = &config.workspace_config {
@@ -206,8 +215,11 @@ fn run_loopback_server_inner(
     };
 
     for (id, address) in &config.minidora_runtimes {
-        let adapter = crate::adapters::minidora::MinidoraAdapter::new(address).map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
-        broker.実行系登録(id, std::sync::Arc::new(adapter)).map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
+        let adapter = crate::adapters::minidora::MinidoraAdapter::new(address)
+            .map_err(|_| BrokerServerError::new("実行系接続先が不正"))?;
+        broker
+            .実行系登録(id, std::sync::Arc::new(adapter))
+            .map_err(|_| BrokerServerError::new("実行系登録が不正または重複"))?;
     }
     for (id, executable, workspace) in &config.codex_runtimes {
         let adapter = crate::adapters::codex_cli::CodexCliAdapter::new(executable, workspace)
@@ -231,7 +243,11 @@ fn run_loopback_server_inner(
             "release buildは開発用lifecycle fixtureを受け付けない",
         ));
     }
-    let owner_secret = if config.owner_session_file.is_some() { Some(random_hex(32)?) } else { None };
+    let owner_secret = if config.owner_session_file.is_some() {
+        Some(random_hex(32)?)
+    } else {
+        None
+    };
 
     if config.desktop_protected_store_dir.is_some()
         && (config.protected_store_dir.is_some()
@@ -247,7 +263,9 @@ fn run_loopback_server_inner(
         let mut protected = vec![config.store_dir.clone(), config.session_file.clone()];
         protected.extend(config.owner_session_file.iter().cloned());
         protected.extend(config.workspace_config.iter().cloned());
-        broker.保管先起動登録(path, config.owner_session_file.is_some(), &protected).map_err(BrokerServerError::new)?;
+        broker
+            .保管先起動登録(path, config.owner_session_file.is_some(), &protected)
+            .map_err(BrokerServerError::new)?;
     }
 
     if let Some(path) = &config.desktop_protected_store_dir {
@@ -270,19 +288,28 @@ fn run_loopback_server_inner(
 
     if let Some((settings, protected)) = workspace_startup {
         for workspace in &settings.workspaces {
-            broker.作業領域起動登録(workspace, &protected).map_err(BrokerServerError::new)?;
+            broker
+                .作業領域起動登録(workspace, &protected)
+                .map_err(BrokerServerError::new)?;
         }
     }
 
     let mobile = if let Some(address) = &config.mobile_bind {
-        if owner_secret.is_none() {return Err(BrokerServerError::new("端末連携はowner資格設定が必要"));}
-        Some(super::device_transport::DeviceListener::bind(address,&mut broker).map_err(BrokerServerError::new)?)
-    } else {None};
+        if owner_secret.is_none() {
+            return Err(BrokerServerError::new("端末連携はowner資格設定が必要"));
+        }
+        Some(
+            super::device_transport::DeviceListener::bind(address, &mut broker)
+                .map_err(BrokerServerError::new)?,
+        )
+    } else {
+        None
+    };
     let bind_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), config.port);
     let listener = TcpListener::bind(bind_addr)
         .map_err(|error| BrokerServerError::new(format!("broker IPCのbindに失敗: {error}")))?;
     let local_addr = listener.local_addr().map_err(|error| {
-            BrokerServerError::new(format!("broker IPC addrの読取りに失敗: {error}"))
+        BrokerServerError::new(format!("broker IPC addrの読取りに失敗: {error}"))
     })?;
     if local_addr.ip() != IpAddr::V4(Ipv4Addr::LOCALHOST) {
         return Err(BrokerServerError::new(
@@ -303,52 +330,97 @@ fn run_loopback_server_inner(
         transport: "authenticated_loopback_tcp".to_string(),
         max_request_bytes: config.max_request_bytes,
     };
-    if shutdown_requested(&shutdown) { return Ok(()); }
+    if shutdown_requested(&shutdown) {
+        return Ok(());
+    }
     if let Some(path) = &config.owner_session_file {
         let absolute = |p: &std::path::Path| -> Result<String, BrokerServerError> {
-            let parent = p.parent().filter(|v| !v.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
-            let parent = std::fs::canonicalize(parent).map_err(|_| BrokerServerError::new("資格fileの親directoryを確認できない"))?;
-            Ok(parent.join(p.file_name().ok_or_else(|| BrokerServerError::new("資格file名が不正"))?).to_string_lossy().to_lowercase())
+            let parent = p
+                .parent()
+                .filter(|v| !v.as_os_str().is_empty())
+                .unwrap_or(std::path::Path::new("."));
+            let parent = std::fs::canonicalize(parent)
+                .map_err(|_| BrokerServerError::new("資格fileの親directoryを確認できない"))?;
+            Ok(parent
+                .join(
+                    p.file_name()
+                        .ok_or_else(|| BrokerServerError::new("資格file名が不正"))?,
+                )
+                .to_string_lossy()
+                .to_lowercase())
         };
-        if absolute(path)? == absolute(&config.session_file)? || path.is_symlink() || config.session_file.is_symlink() {
-            return Err(BrokerServerError::new("owner資格と通常資格は異なる通常fileを指定する"));
+        if absolute(path)? == absolute(&config.session_file)?
+            || path.is_symlink()
+            || config.session_file.is_symlink()
+        {
+            return Err(BrokerServerError::new(
+                "owner資格と通常資格は異なる通常fileを指定する",
+            ));
         }
         let mut control = endpoint.clone();
-        control.session_secret = owner_secret.clone().ok_or_else(|| BrokerServerError::new("owner資格がない"))?;
+        control.session_secret = owner_secret
+            .clone()
+            .ok_or_else(|| BrokerServerError::new("owner資格がない"))?;
         control.credential_role = BrokerCredentialRole::Owner;
         write_endpoint_file(path, &control)?;
     }
     write_endpoint_file(&config.session_file, &endpoint)?;
 
-    listener.set_nonblocking(true).map_err(|_|BrokerServerError::new("listener設定失敗"))?;
-    if shutdown_requested(&shutdown) { return Ok(()); }
-    if let Some(ready) = ready { let _ = ready.send(()); }
+    listener
+        .set_nonblocking(true)
+        .map_err(|_| BrokerServerError::new("listener設定失敗"))?;
+    if shutdown_requested(&shutdown) {
+        return Ok(());
+    }
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
     loop {
-        if shutdown_requested(&shutdown) { break; }
+        if shutdown_requested(&shutdown) {
+            break;
+        }
         broker.端末期限処理();
         if let Some(owner_operations) = &owner_operations {
             if let Ok(request) = owner_operations.try_recv() {
-                let response = broker.desktop_owner_operation_json(&request.request_json);
+                let response = broker.desktop_owner_operation_json_with_update_confirmation(
+                    &request.request_json,
+                    request.download_confirmation,
+                );
                 let _ = request.reply.send(response);
             }
         }
-        if let Ok((stream,_)) = listener.accept() {
-            if handle_stream(stream, &endpoint.session_secret, owner_secret.as_deref(), &mut broker, &config).unwrap_or(false) {break;}
+        broker.update_download_tick();
+        if let Ok((stream, _)) = listener.accept() {
+            if handle_stream(
+                stream,
+                &endpoint.session_secret,
+                owner_secret.as_deref(),
+                &mut broker,
+                &config,
+            )
+            .unwrap_or(false)
+            {
+                break;
+            }
         }
-        if let Some(mobile) = &mobile {mobile.poll(&mut broker);}
+        if let Some(mobile) = &mobile {
+            mobile.poll(&mut broker);
+        }
         std::thread::sleep(Duration::from_millis(10));
     }
     if shutdown_requested(&shutdown) {
         let reason = "Capability=desktop.launch Permission=起動器が所有するDesktop process lifecycleのみ Approval=UI終了後の内部停止通知でありprivileged actionは非承認 AuditEvent=Broker終了 RecoveryAction=変更endpointは削除せずdurable storeを保持";
         let payload_hash = crate::audit_hash::sha256_tagged(b"gui-shell-desktop-launcher:stop:v1");
-        broker.append_audit(
-            &format!("desktop-launcher:{}:stop", endpoint.session_id),
-            "D4 Pocket Desktop終了",
-            "recorded",
-            reason,
-            "LIVE_RUNTIME",
-            &payload_hash,
-        ).map_err(|error| BrokerServerError::new(error.message()))?;
+        broker
+            .append_audit(
+                &format!("desktop-launcher:{}:stop", endpoint.session_id),
+                "D4 Pocket Desktop終了",
+                "recorded",
+                reason,
+                "LIVE_RUNTIME",
+                &payload_hash,
+            )
+            .map_err(|error| BrokerServerError::new(error.message()))?;
     }
     Ok(())
 }
@@ -375,7 +447,9 @@ fn verify_codex_workspace_roots(
 }
 
 fn shutdown_requested(shutdown: &Option<Arc<AtomicBool>>) -> bool {
-    shutdown.as_ref().is_some_and(|signal| signal.load(Ordering::Acquire))
+    shutdown
+        .as_ref()
+        .is_some_and(|signal| signal.load(Ordering::Acquire))
 }
 
 fn handle_stream(
@@ -385,7 +459,9 @@ fn handle_stream(
     broker: &mut Broker,
     config: &BrokerServerConfig,
 ) -> Result<bool, BrokerServerError> {
-    stream.set_nonblocking(false).map_err(|_|BrokerServerError::new("IPC blocking設定失敗"))?;
+    stream
+        .set_nonblocking(false)
+        .map_err(|_| BrokerServerError::new("IPC blocking設定失敗"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| {
@@ -456,7 +532,11 @@ fn handle_stream(
         Err(IpcLineError::Io(message)) => return Err(BrokerServerError::new(message)),
     };
 
-    let response = if owner { broker.owner要求処理(&request_json) } else { broker.handle_json(&request_json) };
+    let response = if owner {
+        broker.owner要求処理(&request_json)
+    } else {
+        broker.handle_json(&request_json)
+    };
     let shutdown = response.shutdown_requested;
     write_response(reader.get_mut(), &response)?;
     response_drain_result(shutdown, drain_after_response(&mut reader))
@@ -489,7 +569,10 @@ fn drain_after_response(reader: &mut BufReader<TcpStream>) -> Result<(), BrokerS
                 if matches!(
                     error.kind(),
                     std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
-                ) => return Ok(()),
+                ) =>
+            {
+                return Ok(())
+            }
             Err(error) => {
                 return Err(BrokerServerError::new(format!(
                     "IPC切断待機中の読取りに失敗: {error}"
@@ -505,9 +588,9 @@ fn read_limited_line(
 ) -> Result<Option<String>, IpcLineError> {
     let mut buffer = Vec::new();
     loop {
-        let available = reader.fill_buf().map_err(|error| {
-            IpcLineError::Io(format!("broker IPC lineの読取りに失敗: {error}"))
-        })?;
+        let available = reader
+            .fill_buf()
+            .map_err(|error| IpcLineError::Io(format!("broker IPC lineの読取りに失敗: {error}")))?;
         if available.is_empty() {
             if buffer.is_empty() {
                 return Ok(None);
@@ -547,14 +630,12 @@ fn write_response(
     })?;
     let mut frame = encoded.into_bytes();
     frame.push(b'\n');
-    stream
-        .write_all(&frame)
-        .map_err(|error| {
-            BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
-        })?;
-    stream
-        .flush()
-        .map_err(|error| BrokerServerError::new(format!("broker responseのflushに失敗: {error}")))?;
+    stream.write_all(&frame).map_err(|error| {
+        BrokerServerError::new(format!("broker responseの書込みに失敗: {error}"))
+    })?;
+    stream.flush().map_err(|error| {
+        BrokerServerError::new(format!("broker responseのflushに失敗: {error}"))
+    })?;
     Ok(())
 }
 
@@ -572,13 +653,13 @@ fn write_endpoint_file(path: &PathBuf, endpoint: &BrokerEndpoint) -> Result<(), 
             options.mode(0o600);
         }
         let mut file = options.open(&temporary_path).map_err(|error| {
-        BrokerServerError::new(format!("broker endpoint fileの作成に失敗: {error}"))
+            BrokerServerError::new(format!("broker endpoint fileの作成に失敗: {error}"))
         })?;
         file.write_all(encoded.as_bytes()).map_err(|error| {
-        BrokerServerError::new(format!("broker endpoint fileの書込みに失敗: {error}"))
+            BrokerServerError::new(format!("broker endpoint fileの書込みに失敗: {error}"))
         })?;
         file.sync_data().map_err(|error| {
-        BrokerServerError::new(format!("broker endpoint fileのsyncに失敗: {error}"))
+            BrokerServerError::new(format!("broker endpoint fileのsyncに失敗: {error}"))
         })?;
     }
     std::fs::rename(&temporary_path, path).map_err(|error| {
@@ -588,9 +669,8 @@ fn write_endpoint_file(path: &PathBuf, endpoint: &BrokerEndpoint) -> Result<(), 
 
 fn random_hex(byte_count: usize) -> Result<String, BrokerServerError> {
     let mut bytes = vec![0u8; byte_count];
-    getrandom::getrandom(&mut bytes).map_err(|error| {
-        BrokerServerError::new(format!("broker secretの生成に失敗: {error}"))
-    })?;
+    getrandom::getrandom(&mut bytes)
+        .map_err(|error| BrokerServerError::new(format!("broker secretの生成に失敗: {error}")))?;
     Ok(hex::encode(bytes))
 }
 
@@ -608,20 +688,16 @@ mod tests {
         let error = BrokerServerError::new("試験用の切断error");
         assert!(response_drain_result(true, Err(error)).unwrap());
         assert!(!response_drain_result(false, Ok(())).unwrap());
-        assert!(response_drain_result(
-            false,
-            Err(BrokerServerError::new("試験用の切断error"))
-        )
-        .is_err());
+        assert!(
+            response_drain_result(false, Err(BrokerServerError::new("試験用の切断error"))).is_err()
+        );
     }
 
     fn temporary_directory() -> PathBuf {
         let mut random = [0u8; 16];
         getrandom::getrandom(&mut random).expect("乱数識別子");
-        let path = std::env::temp_dir().join(format!(
-            "gui-shell-launcher-broker-{}",
-            hex::encode(random)
-        ));
+        let path =
+            std::env::temp_dir().join(format!("gui-shell-launcher-broker-{}", hex::encode(random)));
         std::fs::create_dir_all(&path).expect("一時作業ディレクトリ");
         path
     }
@@ -642,12 +718,14 @@ mod tests {
             workspaces: roots
                 .iter()
                 .enumerate()
-                .map(|(index, root)| super::super::workspace_root::WorkspaceStartup {
-                    runtime_id: runtime_id.to_string(),
-                    workspace_id: format!("workspace-{index}"),
-                    root_path: root.to_string_lossy().into_owned(),
-                    secret_paths: Vec::new(),
-                })
+                .map(
+                    |(index, root)| super::super::workspace_root::WorkspaceStartup {
+                        runtime_id: runtime_id.to_string(),
+                        workspace_id: format!("workspace-{index}"),
+                        root_path: root.to_string_lossy().into_owned(),
+                        secret_paths: Vec::new(),
+                    },
+                )
                 .collect(),
         }
     }
@@ -678,12 +756,14 @@ mod tests {
 
         let mut unbound = workspace_settings("another-runtime", &[&different_root]);
         assert!(verify_codex_workspace_roots(&codex_runtimes, &unbound, &[]).is_ok());
-        unbound.workspaces.push(super::super::workspace_root::WorkspaceStartup {
-            runtime_id: runtime,
-            workspace_id: "workspace-extra".into(),
-            root_path: codex_root.to_string_lossy().into_owned(),
-            secret_paths: Vec::new(),
-        });
+        unbound
+            .workspaces
+            .push(super::super::workspace_root::WorkspaceStartup {
+                runtime_id: runtime,
+                workspace_id: "workspace-extra".into(),
+                root_path: codex_root.to_string_lossy().into_owned(),
+                secret_paths: Vec::new(),
+            });
         assert!(verify_codex_workspace_roots(&codex_runtimes, &unbound, &[]).is_ok());
 
         std::fs::remove_dir_all(root).expect("試験専用directory");
@@ -730,9 +810,15 @@ mod tests {
         );
         assert!(!session_file.exists(), "拒否時にIPC endpointを作らない");
         let audit = read_audit(&store_dir.join("audit.jsonl"));
-        assert!(audit.contains("物理directoryが一致しない"), "拒否理由を監査へ記録する");
+        assert!(
+            audit.contains("物理directoryが一致しない"),
+            "拒否理由を監査へ記録する"
+        );
         assert!(audit.contains("rejected"), "設定拒否の判定を監査へ記録する");
-        assert!(!audit.contains("not-installed-codex.exe"), "executable pathを監査へ複写しない");
+        assert!(
+            !audit.contains("not-installed-codex.exe"),
+            "executable pathを監査へ複写しない"
+        );
 
         std::fs::remove_dir_all(root).expect("試験専用directory");
     }
@@ -781,7 +867,10 @@ mod tests {
             .expect("Broker終了");
 
         assert!(session_file.is_file(), "session fileの後処理は起動器が担う");
-        assert!(store_dir.is_dir(), "durable user state must survive app exit");
+        assert!(
+            store_dir.is_dir(),
+            "durable user state must survive app exit"
+        );
         let audit_text = read_audit(&store_dir.join("audit.jsonl"));
         let events: Vec<serde_json::Value> = audit_text
             .lines()
@@ -789,7 +878,10 @@ mod tests {
             .collect();
         assert_eq!(events.len(), 2);
         assert_eq!(events[1]["operation"], "D4 Pocket Desktop終了");
-        assert!(events[1]["reason"].as_str().unwrap().contains("RecoveryAction="));
+        assert!(events[1]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("RecoveryAction="));
         std::fs::remove_dir_all(root).expect("試験専用の一時ディレクトリだけを削除");
     }
 

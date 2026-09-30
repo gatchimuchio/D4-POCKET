@@ -18,7 +18,7 @@ class UpdateClient {
     final status = value['状態'];
     final urlValue = value['URL'];
     if (status == 'unconfigured' && urlValue == null) {
-      return '配布元未設定（実downloadは保留）';
+      return '配布元未設定';
     }
     if (status == 'ineligible' && urlValue == null) {
       return '取得元なし（候補を現在trustで再検証できません）';
@@ -35,8 +35,45 @@ class UpdateClient {
         uri.hasFragment) {
       return '配布元状態不明';
     }
-    return '配布元=${uri.host}（実downloadは保留）';
+    return '配布元=${uri.host}';
   }
+
+  static String downloadJobLabel(Object? value) {
+    if (value is! Map) return 'download jobなし';
+    final state = value['状態'];
+    final received = value['受信byte数'];
+    final total = value['全byte数'];
+    if (state == 'downloading' &&
+        received is num &&
+        total is num &&
+        total > 0) {
+      final percent = (received / total * 100).clamp(0, 100).round();
+      return 'download中 $percent% ($received / $total bytes)';
+    }
+    return switch (state) {
+      'downloaded' => 'download済み（installは別途保留）',
+      'failed' => 'download失敗: ${_downloadFailureLabel(value['失敗code'])}',
+      'audit_failed' => 'download結果のAudit失敗。復旧確認が必要',
+      _ => 'download状態不明',
+    };
+  }
+
+  static String _downloadFailureLabel(Object? code) => switch (code) {
+        'update_download_request_invalid' => '要求が不正',
+        'update_download_dns_failed' => '配布元の名前解決に失敗',
+        'update_download_address_blocked' => '許可されない接続先を検出',
+        'update_download_network_failed' => 'HTTPS通信に失敗',
+        'update_download_response_rejected' => '応答状態を拒否',
+        'update_download_headers_invalid' => '応答headerが契約外',
+        'update_download_size_mismatch' => '受信byte長が不一致',
+        'update_download_digest_mismatch' => 'SHA-256が不一致',
+        'update_download_cancelled' => 'downloadを中断',
+        'update_download_timeout' => '通信期限を超過',
+        'update_download_storage_failed' => 'Broker保管処理に失敗',
+        'update_download_result_mismatch' => '完了結果が不一致',
+        'update_download_audit_failed' => 'Audit確定に失敗',
+        _ => '失敗code不明',
+      };
 
   Future<Map<String, Object?>> list() async {
     final response = await _transport.request('更新一覧', payload: const {'版': 1});

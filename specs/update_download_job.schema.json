@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/update_download_job.schema.json",
+  "title": "更新download job状態（UpdateDownloadJob）",
+  "type": "object",
+  "required": ["job_id", "更新ID", "候補hash", "package_sha256", "状態", "受信byte数", "全byte数", "失敗code"],
+  "additionalProperties": false,
+  "properties": {
+    "job_id": { "type": "string", "pattern": "^update-download-[a-f0-9]{32}$" },
+    "更新ID": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "package_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "状態": { "enum": ["downloading", "downloaded", "failed", "audit_failed"] },
+    "受信byte数": { "type": "integer", "minimum": 0, "maximum": 4294967296 },
+    "全byte数": { "type": "integer", "minimum": 1, "maximum": 4294967296 },
+    "失敗code": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "update_download_request_invalid",
+        "update_download_dns_failed",
+        "update_download_address_blocked",
+        "update_download_network_failed",
+        "update_download_response_rejected",
+        "update_download_headers_invalid",
+        "update_download_size_mismatch",
+        "update_download_digest_mismatch",
+        "update_download_cancelled",
+        "update_download_timeout",
+        "update_download_storage_failed",
+        "update_download_result_mismatch",
+        "update_download_audit_failed"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "状態": { "const": "downloaded" } }, "required": ["状態"] },
+      "then": {
+        "properties": { "失敗code": { "const": null } },
+        "required": ["失敗code"]
+      }
+    },
+    {
+      "if": { "properties": { "状態": { "const": "failed" } }, "required": ["状態"] },
+      "then": {
+        "properties": { "失敗code": { "type": "string" } },
+        "required": ["失敗code"]
+      }
+    }
+  ]
+}

@@ -39,6 +39,19 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   required_action: iOS native招待UI・Keychain・TLS経路を実装する。秘密をDart/debug VM/log/artifactへ渡さないtest harnessでBroker到達・拒否・失効・background停止を検証する。Workspace識別子の開示範囲と選択をnative Device Link境界内で定義・検証し、Brokerが登録Runtime対応を再照合するまでMobile Agent startを有効化しない。
   blocks_release: yes
 
+- item: D4 Pocket 更新取得のDNS期限・破損package Recovery・installed updateが未成立
+  classification: release_blocker
+  registry_id: rev2_desktop_product_distribution
+  reason: native Owner確認後のlocal TLS download workerは実装したが、OS同期DNS resolverはtimeout／cancel不能であり、同digest名の破損packageは安全なrepair経路がない。実配布元を使うWindows installed update、install／rollback transaction、crash Recoveryも未検証。
+  required_action: DNS resolutionを有限期限・cancel可能にし、破損cacheのAudit付きrecoveryを実装してから、Windows installed productで外部source download、tamper、same-volume install／rollback、失敗注入を検証する。
+  blocks_release: yes
+
+- item: D4 Pocket更新取得はsystem proxyを使わない
+  classification: known_limitation
+  reason: 現行Broker downloaderはproxy経由の権限・接続先変化を避けるためsystem proxyを明示的に無効化し、直接HTTPS接続だけを許可する。proxy必須networkでは取得できない。
+  required_action: v1でproxy環境が必要な配布対象に含まれる場合、Broker所有のproxy trust／表示／AuditとSSRF・credential・failure境界を定義し、実proxy試験後に対応を有効にする。それまでは直接HTTPSが使えない環境を非対応として案内する。
+  blocks_release: no
+
 - item: language policy runtime convergence gate
   classification: release_blocker
   aggregate_of: windows_evidence_provenance_isolation, windows_installer_first_run_smoke, windows_broker_installed_smoke

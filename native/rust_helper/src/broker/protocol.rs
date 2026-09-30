@@ -13,20 +13,16 @@ use crate::broker::authority::{
     edit_approval, evaluate_authority, evaluate_broker_authority, normalize_inbound_payload,
     project_approval_content, verify_audit_chain, BrokerAuthorityRegistry,
 };
-use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
-use crate::broker::dialogue::{実行系ID妥当, 対話制御, 対話失敗, 実行系Adapter};
-use crate::broker::runtime_lifecycle::{
-    LifecycleAction, LifecycleError, RuntimeLifecycleRegistry,
-};
+use crate::broker::dialogue::{実行系Adapter, 実行系ID妥当, 対話制御, 対話失敗};
 #[cfg(test)]
 use crate::broker::runtime_lifecycle::LifecycleAdapter;
 #[cfg(debug_assertions)]
 use crate::broker::runtime_lifecycle::{
     development_fixture_adapter, DEVELOPMENT_LIFECYCLE_RUNTIME_ID,
 };
-use crate::broker::runtime_registry::{
-    ResourceObservationError, RuntimeResourceRegistry,
-};
+use crate::broker::runtime_lifecycle::{LifecycleAction, LifecycleError, RuntimeLifecycleRegistry};
+use crate::broker::runtime_registry::{ResourceObservationError, RuntimeResourceRegistry};
+use crate::broker::store::{BrokerPersistentStore, BrokerStoreError};
 use std::sync::Arc;
 
 #[path = "evaluation_control.rs"]
@@ -249,6 +245,15 @@ impl BrokerStateStore {
         Ok(())
     }
 
+    pub fn open_update_package_directory(
+        &self,
+    ) -> Result<Option<cap_std::fs::Dir>, BrokerStoreError> {
+        self.persistent_store
+            .as_ref()
+            .map(BrokerPersistentStore::open_update_package_directory)
+            .transpose()
+    }
+
     pub fn load_notification_state(&self) -> Result<Option<serde_json::Value>, BrokerStoreError> {
         if let Some(store) = &self.persistent_store {
             return store.load_notification_state().map(Some);
@@ -317,9 +322,7 @@ impl BrokerStateStore {
         store.write_setup_doctor_report(bytes)
     }
 
-    fn initialize_first_run_configuration(
-        &self,
-    ) -> Result<(Vec<u8>, bool), BrokerStoreError> {
+    fn initialize_first_run_configuration(&self) -> Result<(Vec<u8>, bool), BrokerStoreError> {
         let Some(store) = &self.persistent_store else {
             return Err(BrokerStoreError::Io(
                 "初回設定の生成には永続Broker storeが必要".to_string(),
@@ -565,8 +568,6 @@ pub enum BrokerOperation {
     対話内容閲覧状態,
     #[serde(rename = "対話内容閲覧")]
     対話内容閲覧,
-
-
 }
 
 impl BrokerOperation {
@@ -610,7 +611,9 @@ impl BrokerOperation {
             BrokerOperation::対話セッション一覧 => "対話セッション一覧",
             BrokerOperation::Agent一覧 => "Agent一覧",
             BrokerOperation::Agent作業要求検査 => "Agent作業要求検査",
-            BrokerOperation::AgentTaskWorkspacePermissionGrant => "AgentTaskWorkspacePermissionGrant",
+            BrokerOperation::AgentTaskWorkspacePermissionGrant => {
+                "AgentTaskWorkspacePermissionGrant"
+            }
             BrokerOperation::AgentTaskOwnerApprovalGrant => "AgentTaskOwnerApprovalGrant",
             BrokerOperation::AgentTask実行 => "AgentTask実行",
             BrokerOperation::AgentTask状態 => "AgentTask状態",
@@ -668,7 +671,9 @@ impl BrokerOperation {
             BrokerOperation::評価比較 => "評価比較",
             BrokerOperation::実行系資源観測 => "実行系資源観測",
             BrokerOperation::実行系ライフサイクル状態 => "実行系ライフサイクル状態",
-            BrokerOperation::実行系ライフサイクル承認要求 => "実行系ライフサイクル承認要求",
+            BrokerOperation::実行系ライフサイクル承認要求 => {
+                "実行系ライフサイクル承認要求"
+            }
             BrokerOperation::実行系ライフサイクル承認 => "実行系ライフサイクル承認",
             BrokerOperation::実行系ライフサイクル操作 => "実行系ライフサイクル操作",
             BrokerOperation::全Runtime停止要求 => "全Runtime停止要求",
@@ -689,8 +694,6 @@ impl BrokerOperation {
             BrokerOperation::対話内容失効 => "対話内容失効",
             BrokerOperation::対話内容閲覧状態 => "対話内容閲覧状態",
             BrokerOperation::対話内容閲覧 => "対話内容閲覧",
-
-
         }
     }
 }
@@ -910,8 +913,8 @@ pub struct Broker {
     pub(super) profiles: BTreeMap<String, Value>,
     pub(super) updates: BTreeMap<String, Value>,
     pub(super) update_trust: Option<super::update_center::UpdateTrust>,
-    pub(super) notification_states:
-        BTreeMap<String, super::notification_center::NotificationState>,
+    pub(super) update_download: super::update_center::UpdateDownloadRuntime,
+    pub(super) notification_states: BTreeMap<String, super::notification_center::NotificationState>,
     pub(super) observations: super::observation_center::ObservationCenter,
     #[cfg(windows)]
     pub(super) protected_store: Option<crate::protected_store::ProtectedStore>,
@@ -948,6 +951,7 @@ impl Broker {
             profiles: BTreeMap::new(),
             updates: BTreeMap::new(),
             update_trust: None,
+            update_download: super::update_center::UpdateDownloadRuntime::default(),
             notification_states: BTreeMap::new(),
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
@@ -990,14 +994,14 @@ impl Broker {
         let update_trust = super::update_center::load_persistent_trust(&persistent_store)?;
         let notification_states =
             super::notification_center::load_persistent_states(&persistent_store)?;
-        let a2a_connections =
-            super::a2a_center::load_persistent_connections(&persistent_store)?;
+        let a2a_connections = super::a2a_center::load_persistent_connections(&persistent_store)?;
         let hosts = super::host_center::load_persistent_hosts(&persistent_store)?;
         let adapters = super::adapter_center::load_persistent_adapters(&persistent_store)?;
-        let terminal_quarantines = RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
-            persistent_state.audit_log.events(),
-        )
-        .map_err(|error| BrokerStoreError::TamperedAuditState(error.message))?;
+        let terminal_quarantines =
+            RuntimeLifecycleRegistry::terminal_quarantines_from_verified_audit(
+                persistent_state.audit_log.events(),
+            )
+            .map_err(|error| BrokerStoreError::TamperedAuditState(error.message))?;
         Ok(Self {
             session_id: session_id.to_string(),
             seen_nonces: persistent_state.seen_nonces,
@@ -1019,6 +1023,7 @@ impl Broker {
             profiles,
             updates,
             update_trust,
+            update_download: super::update_center::UpdateDownloadRuntime::default(),
             notification_states,
             observations: super::observation_center::ObservationCenter::default(),
             #[cfg(windows)]
@@ -1088,9 +1093,7 @@ impl Broker {
             }
         };
         let configuration: Value = serde_json::from_slice(&bytes).map_err(|_| {
-            BrokerStoreError::MalformedFirstRunConfiguration(
-                "初回設定のJSON検証に失敗".to_string(),
-            )
+            BrokerStoreError::MalformedFirstRunConfiguration("初回設定のJSON検証に失敗".to_string())
         })?;
         let content_hash = sha256_tagged(&bytes);
         let accepted_reason = if created {
@@ -1114,7 +1117,11 @@ impl Broker {
         self.処理(envelope, false)
     }
 
-    pub fn 実行系登録(&mut self, 名前: &str, adapter: Arc<dyn 実行系Adapter>) -> Result<(), 対話失敗> {
+    pub fn 実行系登録(
+        &mut self,
+        名前: &str,
+        adapter: Arc<dyn 実行系Adapter>,
+    ) -> Result<(), 対話失敗> {
         if self.ライフサイクル.is_terminally_quarantined(名前)
             || super::adapter_center::runtime_is_quarantined(self, 名前)
         {
@@ -1190,13 +1197,21 @@ impl Broker {
     }
 
     #[cfg(test)]
-    fn ライフサイクル試験復旧削除(&mut self, runtime_id: &str, action: LifecycleAction) {
+    fn ライフサイクル試験復旧削除(
+        &mut self,
+        runtime_id: &str,
+        action: LifecycleAction,
+    ) {
         self.ライフサイクル
             .remove_recovery_for_test(runtime_id, action);
     }
 
     #[cfg(test)]
-    fn ライフサイクル試験能力削除(&mut self, runtime_id: &str, action: LifecycleAction) {
+    fn ライフサイクル試験能力削除(
+        &mut self,
+        runtime_id: &str,
+        action: LifecycleAction,
+    ) {
         self.ライフサイクル
             .remove_capability_for_test(runtime_id, action);
     }
@@ -1207,14 +1222,35 @@ impl Broker {
                 envelope,
                 true,
                 OwnerConfirmationSource::OwnerCredential,
+                None,
             ),
-            Err(_) => self.reject_with_payload_hash("malformed-owner-request", "unknown", "broker_request_malformed", "owner要求が不正", true, &sha256_tagged(input.as_bytes())),
+            Err(_) => self.reject_with_payload_hash(
+                "malformed-owner-request",
+                "unknown",
+                "broker_request_malformed",
+                "owner要求が不正",
+                true,
+                &sha256_tagged(input.as_bytes()),
+            ),
         }
+    }
+
+    pub(crate) fn update_download_tick(&mut self) {
+        super::update_center::poll_download_completion(self);
     }
 
     /// Rust起動器のnative確認を通過した固定allowlistのOwner操作だけを受け付ける。
     /// Owner権限は要求本文やmetadataから作らず、このprocess内呼出しだけが供給する。
+    #[cfg(test)]
     pub(crate) fn desktop_owner_operation_json(&mut self, input: &str) -> BrokerResponse {
+        self.desktop_owner_operation_json_with_update_confirmation(input, None)
+    }
+
+    pub(crate) fn desktop_owner_operation_json_with_update_confirmation(
+        &mut self,
+        input: &str,
+        download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+    ) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
             Err(_) => {
@@ -1228,7 +1264,10 @@ impl Broker {
                 )
             }
         };
-        let request_id = envelope.request_id.as_deref().unwrap_or("malformed-request");
+        let request_id = envelope
+            .request_id
+            .as_deref()
+            .unwrap_or("malformed-request");
         let operation = envelope
             .operation
             .as_ref()
@@ -1248,6 +1287,7 @@ impl Broker {
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
                     | BrokerOperation::回帰Case登録
+                    | BrokerOperation::更新download要求
             )
         );
         if !operation_is_allowlisted
@@ -1267,10 +1307,15 @@ impl Broker {
             envelope,
             true,
             OwnerConfirmationSource::DesktopNativeConfirmation,
+            download_confirmation,
         )
     }
 
-    pub(super) fn 処理(&mut self, envelope: BrokerRequestEnvelope, owner: bool) -> BrokerResponse {
+    pub(super) fn 処理(
+        &mut self,
+        envelope: BrokerRequestEnvelope,
+        owner: bool,
+    ) -> BrokerResponse {
         self.処理_with_export_confirmation(
             envelope,
             owner,
@@ -1279,6 +1324,7 @@ impl Broker {
             } else {
                 OwnerConfirmationSource::NotOwner
             },
+            None,
         )
     }
 
@@ -1287,6 +1333,7 @@ impl Broker {
         envelope: BrokerRequestEnvelope,
         owner: bool,
         export_confirmation: OwnerConfirmationSource,
+        download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -1438,78 +1485,369 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
-            operation @ (BrokerOperation::作業領域一覧 | BrokerOperation::作業領域承認 | BrokerOperation::作業領域失効 | BrokerOperation::作業領域ツリー | BrokerOperation::作業領域読取 | BrokerOperation::作業領域基準点保存 | BrokerOperation::作業領域差分 | BrokerOperation::作業領域比較範囲 | BrokerOperation::作業領域全体基準点保存 | BrokerOperation::作業領域変更一覧 | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::端末招待 | BrokerOperation::端末一覧 | BrokerOperation::端末招待取消 | BrokerOperation::端末失効) => self.端末制御処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::ホスト能力 => self.ホスト能力処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
-            BrokerOperation::実行系資源観測 => self.実行系資源観測要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
-            BrokerOperation::実行系ライフサイクル状態 => self.実行系ライフサイクル状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::実行系ライフサイクル承認要求 => self.実行系ライフサイクル承認要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::実行系ライフサイクル承認 => self.実行系ライフサイクル承認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::実行系ライフサイクル操作 => self.実行系ライフサイクル操作処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::全Runtime停止要求 => self.全Runtime停止要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
-            BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::回帰Case登録 => self.回帰Case登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::回帰Case一覧 => self.回帰Case一覧処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::回帰Case削除 => self.回帰Case削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::回帰Case削除中断確認 => self.回帰Case削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::作業領域一覧
+            | BrokerOperation::作業領域承認
+            | BrokerOperation::作業領域失効
+            | BrokerOperation::作業領域ツリー
+            | BrokerOperation::作業領域読取
+            | BrokerOperation::作業領域基準点保存
+            | BrokerOperation::作業領域差分
+            | BrokerOperation::作業領域比較範囲
+            | BrokerOperation::作業領域全体基準点保存
+            | BrokerOperation::作業領域変更一覧
+            | BrokerOperation::作業領域復旧プレビュー) => self.作業領域要求処理(
+                &request_id,
+                operation.as_str(),
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::端末招待
+            | BrokerOperation::端末一覧
+            | BrokerOperation::端末招待取消
+            | BrokerOperation::端末失効) => self.端末制御処理(
+                &request_id,
+                operation.as_str(),
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::ホスト能力 => self.ホスト能力処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::実行系資源観測 => self.実行系資源観測要求処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::実行系ライフサイクル状態 => self
+                .実行系ライフサイクル状態処理(
+                    &request_id,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    owner,
+                    &payload_hash,
+                ),
+            BrokerOperation::実行系ライフサイクル承認要求 => self
+                .実行系ライフサイクル承認要求処理(
+                    &request_id,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    owner,
+                    &payload_hash,
+                ),
+            BrokerOperation::実行系ライフサイクル承認 => self
+                .実行系ライフサイクル承認処理(
+                    &request_id,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    owner,
+                    &payload_hash,
+                ),
+            BrokerOperation::実行系ライフサイクル操作 => self
+                .実行系ライフサイクル操作処理(
+                    &request_id,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    owner,
+                    &payload_hash,
+                ),
+            BrokerOperation::全Runtime停止要求 => self.全Runtime停止要求処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &payload_hash,
+            ),
+            BrokerOperation::評価Dataset登録 => self.評価Dataset登録処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::回帰Case登録 => self.回帰Case登録処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::回帰Case一覧 => self.回帰Case一覧処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::回帰Case削除 => self.回帰Case削除処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::回帰Case削除中断確認 => self.回帰Case削除中断確認処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             #[cfg(windows)]
-            BrokerOperation::資格情報登録 => self.資格情報登録処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::資格情報登録 => self.資格情報登録処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             #[cfg(not(windows))]
-            BrokerOperation::資格情報登録 => self.reject_with_payload_hash(&request_id, "資格情報登録", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
+            BrokerOperation::資格情報登録 => self.reject_with_payload_hash(
+                &request_id,
+                "資格情報登録",
+                "credential_platform_unsupported",
+                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                true,
+                &payload_hash,
+            ),
             #[cfg(windows)]
-            BrokerOperation::資格情報一覧 => self.資格情報一覧処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            BrokerOperation::資格情報一覧 => self.資格情報一覧処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             #[cfg(not(windows))]
-            BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(&request_id, "資格情報一覧", "credential_platform_unsupported", "資格情報保管はWindows DPAPI環境だけに対応しています", true, &payload_hash),
-            BrokerOperation::MCP接続 => super::mcp_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::MCP切断 => super::mcp_center::disconnect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::MCP接続一覧 => super::mcp_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::MCPTool実行 => super::mcp_center::call_tool(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::A2A接続 => super::a2a_center::connect(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::A2A接続一覧 => super::a2a_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::Host登録 => super::host_center::register(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::Host一覧 => super::host_center::list(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::Host切替 => super::host_center::switch(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::アダプター一覧 | BrokerOperation::アダプター導入 | BrokerOperation::アダプター検証 | BrokerOperation::アダプター有効化 | BrokerOperation::アダプター無効化 | BrokerOperation::アダプター隔離 | BrokerOperation::アダプター更新 | BrokerOperation::アダプター削除) => super::adapter_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
-            operation @ (BrokerOperation::プロファイル作成 | BrokerOperation::プロファイル複製 | BrokerOperation::プロファイル適用要求 | BrokerOperation::プロファイル削除 | BrokerOperation::プロファイルexport | BrokerOperation::プロファイルimport | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &request_id, &payload_hash),
-            BrokerOperation::GuiShell構成 => super::compose_center::compose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::GuiShell構成Preview => super::compose_center::preview(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::GuiShell編集提案 => super::ai_edit_center::propose(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::GuiShell書出し => super::export_center::export(self, &request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, export_confirmation, &payload_hash),
-            operation @ (BrokerOperation::更新一覧 | BrokerOperation::更新確認 | BrokerOperation::更新署名検査 | BrokerOperation::更新download要求 | BrokerOperation::更新適用要求 | BrokerOperation::更新延期 | BrokerOperation::更新rollback要求) => super::update_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
-            operation @ (BrokerOperation::通知一覧 | BrokerOperation::通知既読 | BrokerOperation::通知破棄 | BrokerOperation::通知全既読) => super::notification_center::dispatch(self, operation, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
-            BrokerOperation::観測一覧 => super::observation_center::dispatch(self, BrokerOperation::観測一覧, envelope.payload.as_ref().unwrap_or(&Value::Null), &request_id, &payload_hash),
-            operation @ (BrokerOperation::評価Dataset一覧 | BrokerOperation::評価実験開始 | BrokerOperation::評価実験状態 | BrokerOperation::評価比較) => self.評価通常要求処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (
-                BrokerOperation::実行系列挙
-                | BrokerOperation::対話セッション一覧
-                | BrokerOperation::Agent一覧
-                | BrokerOperation::Agent作業要求検査
-                | BrokerOperation::AgentTaskWorkspacePermissionGrant
-                | BrokerOperation::AgentTaskOwnerApprovalGrant
-                | BrokerOperation::AgentTask実行
-                | BrokerOperation::AgentTask状態
-                | BrokerOperation::AgentTask取消
-                | BrokerOperation::対話開始
-                | BrokerOperation::対話送信
-                | BrokerOperation::対話取得
-                | BrokerOperation::対話中止
-                | BrokerOperation::対話終了
-                | BrokerOperation::対話承認
-                | BrokerOperation::対話承認待ち
-            ) => self.対話要求処理(
+            BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(
+                &request_id,
+                "資格情報一覧",
+                "credential_platform_unsupported",
+                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                true,
+                &payload_hash,
+            ),
+            BrokerOperation::MCP接続 => super::mcp_center::connect(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::MCP切断 => super::mcp_center::disconnect(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::MCP接続一覧 => super::mcp_center::list(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::MCPTool実行 => super::mcp_center::call_tool(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::A2A接続 => super::a2a_center::connect(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::A2A接続一覧 => super::a2a_center::list(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::Host登録 => super::host_center::register(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::Host一覧 => super::host_center::list(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::Host切替 => super::host_center::switch(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::アダプター一覧
+            | BrokerOperation::アダプター導入
+            | BrokerOperation::アダプター検証
+            | BrokerOperation::アダプター有効化
+            | BrokerOperation::アダプター無効化
+            | BrokerOperation::アダプター隔離
+            | BrokerOperation::アダプター更新
+            | BrokerOperation::アダプター削除) => super::adapter_center::dispatch(
+                self,
+                operation,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &request_id,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::プロファイル作成
+            | BrokerOperation::プロファイル複製
+            | BrokerOperation::プロファイル適用要求
+            | BrokerOperation::プロファイル削除
+            | BrokerOperation::プロファイルexport
+            | BrokerOperation::プロファイルimport
+            | BrokerOperation::プロファイル一覧) => super::profile_center::dispatch(
+                self,
+                operation,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &request_id,
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell構成 => super::compose_center::compose(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell構成Preview => super::compose_center::preview(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell編集提案 => super::ai_edit_center::propose(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::GuiShell書出し => super::export_center::export(
+                self,
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                export_confirmation,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::更新一覧
+            | BrokerOperation::更新確認
+            | BrokerOperation::更新署名検査
+            | BrokerOperation::更新download要求
+            | BrokerOperation::更新適用要求
+            | BrokerOperation::更新延期
+            | BrokerOperation::更新rollback要求) => super::update_center::dispatch(
+                self,
+                operation,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &request_id,
+                &payload_hash,
+                export_confirmation,
+                download_confirmation.as_ref(),
+            ),
+            operation @ (BrokerOperation::通知一覧
+            | BrokerOperation::通知既読
+            | BrokerOperation::通知破棄
+            | BrokerOperation::通知全既読) => super::notification_center::dispatch(
+                self,
+                operation,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &request_id,
+                &payload_hash,
+            ),
+            BrokerOperation::観測一覧 => super::observation_center::dispatch(
+                self,
+                BrokerOperation::観測一覧,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                &request_id,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::評価Dataset一覧
+            | BrokerOperation::評価実験開始
+            | BrokerOperation::評価実験状態
+            | BrokerOperation::評価比較) => self.評価通常要求処理(
+                &request_id,
+                operation.as_str(),
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::実行系列挙
+            | BrokerOperation::対話セッション一覧
+            | BrokerOperation::Agent一覧
+            | BrokerOperation::Agent作業要求検査
+            | BrokerOperation::AgentTaskWorkspacePermissionGrant
+            | BrokerOperation::AgentTaskOwnerApprovalGrant
+            | BrokerOperation::AgentTask実行
+            | BrokerOperation::AgentTask状態
+            | BrokerOperation::AgentTask取消
+            | BrokerOperation::対話開始
+            | BrokerOperation::対話送信
+            | BrokerOperation::対話取得
+            | BrokerOperation::対話中止
+            | BrokerOperation::対話終了
+            | BrokerOperation::対話承認
+            | BrokerOperation::対話承認待ち) => self.対話要求処理(
                 &request_id,
                 operation,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
                 owner,
                 &payload_hash,
             ),
-            operation @ (BrokerOperation::対話内容承認 | BrokerOperation::対話内容失効 | BrokerOperation::対話内容閲覧状態 | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話削除中断確認 => self.削除中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話部分破棄中断確認 => self.部分破棄中断確認処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話保管状態 => self.保管状態処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話内容削除 => self.内容削除処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            BrokerOperation::対話内容保存 => self.対話内容保存処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::対話内容承認
+            | BrokerOperation::対話内容失効
+            | BrokerOperation::対話内容閲覧状態
+            | BrokerOperation::対話内容閲覧) => self.内容閲覧処理(
+                &request_id,
+                operation.as_str(),
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話部分保存破棄 => self.部分保存破棄処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話削除中断確認 => self.削除中断確認処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話部分破棄中断確認 => self.部分破棄中断確認処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話保管状態 => self.保管状態処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話内容削除 => self.内容削除処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            BrokerOperation::対話内容保存 => self.対話内容保存処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             BrokerOperation::SetupDoctor報告取得 => self.setup_doctor_report(
                 &request_id,
                 envelope.payload.as_ref().unwrap_or(&Value::Null),
@@ -1562,9 +1900,29 @@ impl Broker {
                 project_approval_content(envelope.payload.as_ref().unwrap_or(&Value::Null)),
                 &payload_hash,
             ),
-            operation @ (BrokerOperation::対話履歴承認 | BrokerOperation::対話履歴失効 | BrokerOperation::対話履歴閲覧状態 | BrokerOperation::対話履歴閲覧) => self.履歴閲覧処理(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
-            operation @ (BrokerOperation::対話再実行 | BrokerOperation::対話分岐) => self.履歴再要求(&request_id, operation.as_str(), envelope.payload.as_ref().unwrap_or(&Value::Null), &payload_hash),
-            BrokerOperation::対話履歴一覧 => self.履歴要求処理(&request_id, envelope.payload.as_ref().unwrap_or(&Value::Null), owner, &payload_hash),
+            operation @ (BrokerOperation::対話履歴承認
+            | BrokerOperation::対話履歴失効
+            | BrokerOperation::対話履歴閲覧状態
+            | BrokerOperation::対話履歴閲覧) => self.履歴閲覧処理(
+                &request_id,
+                operation.as_str(),
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            operation @ (BrokerOperation::対話再実行 | BrokerOperation::対話分岐) => self
+                .履歴再要求(
+                    &request_id,
+                    operation.as_str(),
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    &payload_hash,
+                ),
+            BrokerOperation::対話履歴一覧 => self.履歴要求処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
             BrokerOperation::AuditVerify => self.accept_body(
                 &request_id,
                 BrokerOperation::AuditVerify,
@@ -1580,25 +1938,60 @@ impl Broker {
         }
     }
 
-    pub(crate) fn 保管先起動登録(&mut self, path: &Path, owner: bool, protected: &[std::path::PathBuf]) -> Result<(), &'static str> {
+    pub(crate) fn 保管先起動登録(
+        &mut self,
+        path: &Path,
+        owner: bool,
+        protected: &[std::path::PathBuf],
+    ) -> Result<(), &'static str> {
         let hash = sha256_tagged(path.to_string_lossy().as_bytes());
-        self.append_audit("保管先起動", "保管先登録", "received", "owner起動設定の保管先検査を受信", "CONFIG", &hash).map_err(|_| "保管先監査失敗")?;
+        self.append_audit(
+            "保管先起動",
+            "保管先登録",
+            "received",
+            "owner起動設定の保管先検査を受信",
+            "CONFIG",
+            &hash,
+        )
+        .map_err(|_| "保管先監査失敗")?;
         let result = (|| {
-            if !owner { return Err("保管先登録にはowner資格設定が必要"); }
-            #[cfg(not(windows))] {
+            if !owner {
+                return Err("保管先登録にはowner資格設定が必要");
+            }
+            #[cfg(not(windows))]
+            {
                 let _ = protected;
                 Err("Windows以外の保管先登録は未対応")
             }
-            #[cfg(windows)] {
-                if self.protected_store.is_some() { return Err("保管先登録の重複"); }
+            #[cfg(windows)]
+            {
+                if self.protected_store.is_some() {
+                    return Err("保管先登録の重複");
+                }
                 let (root, _) = super::workspace_root::open_isolated_root(path, protected)?;
-                self.append_audit("保管先起動", "保管先登録", "verified", "固定NTFS・link拒否・内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &hash).map_err(|_| "保管先監査失敗")?;
+                self.append_audit(
+                    "保管先起動",
+                    "保管先登録",
+                    "verified",
+                    "固定NTFS・link拒否・内部資格分離を確認",
+                    EVIDENCE_SOURCE_LIVE_RUNTIME,
+                    &hash,
+                )
+                .map_err(|_| "保管先監査失敗")?;
                 self.protected_store = Some(crate::protected_store::ProtectedStore::new(root));
                 Ok(())
             }
         })();
         if let Err(reason) = result {
-            self.append_audit("保管先起動", "保管先登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "保管先拒否監査失敗")?;
+            self.append_audit(
+                "保管先起動",
+                "保管先登録",
+                "rejected",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &hash,
+            )
+            .map_err(|_| "保管先拒否監査失敗")?;
         }
         result
     }
@@ -1659,27 +2052,86 @@ impl Broker {
         result
     }
 
-    pub(crate) fn 作業領域設定監査(&mut self, path: &Path, decision: &str, reason: &str) -> Result<(), &'static str> {
-        self.append_audit("作業領域設定", "作業領域設定読取", decision, reason, "CONFIG", &sha256_tagged(path.to_string_lossy().as_bytes()))
-            .map(|_|()).map_err(|_| "作業領域設定の監査失敗")
+    pub(crate) fn 作業領域設定監査(
+        &mut self,
+        path: &Path,
+        decision: &str,
+        reason: &str,
+    ) -> Result<(), &'static str> {
+        self.append_audit(
+            "作業領域設定",
+            "作業領域設定読取",
+            decision,
+            reason,
+            "CONFIG",
+            &sha256_tagged(path.to_string_lossy().as_bytes()),
+        )
+        .map(|_| ())
+        .map_err(|_| "作業領域設定の監査失敗")
     }
 
-    pub(crate) fn 作業領域起動登録(&mut self, config: &super::workspace_root::WorkspaceStartup, protected: &[std::path::PathBuf]) -> Result<(), &'static str> {
-        let payload=serde_json::to_value(config).map_err(|_| "作業領域設定を正本化できない")?;
-        let hash=sha256_tagged(payload.to_string().as_bytes());
-        self.append_audit("作業領域起動", "作業領域登録", "received", "owner起動設定のroot検査を受信", EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "作業領域設定の監査失敗")?;
-        let result=(|| {
-            if self.ライフサイクル.is_terminally_quarantined(&config.runtime_id) {return Err("実行系はterminal隔離中");}
-            if !self.authority_registry.runtime_registered(&config.runtime_id) && !self.対話.登録済み(&config.runtime_id) {return Err("実行系が未登録");}
-            let (root,filesystem,ancestry)=super::workspace_root::open_registered_root_with_ancestry(config,protected)?;
-            self.append_audit("作業領域起動", "作業領域登録", "verified", "rootの対応filesystemと内部資格分離を確認", EVIDENCE_SOURCE_LIVE_RUNTIME, &sha256_tagged(format!("{hash}:{filesystem}").as_bytes())).map_err(|_| "root検査の監査失敗")?;
-            self.作業領域登録範囲付き(&config.runtime_id,&config.workspace_id,root,&config.secret_paths,Some(ancestry))?;
+    pub(crate) fn 作業領域起動登録(
+        &mut self,
+        config: &super::workspace_root::WorkspaceStartup,
+        protected: &[std::path::PathBuf],
+    ) -> Result<(), &'static str> {
+        let payload = serde_json::to_value(config).map_err(|_| "作業領域設定を正本化できない")?;
+        let hash = sha256_tagged(payload.to_string().as_bytes());
+        self.append_audit(
+            "作業領域起動",
+            "作業領域登録",
+            "received",
+            "owner起動設定のroot検査を受信",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &hash,
+        )
+        .map_err(|_| "作業領域設定の監査失敗")?;
+        let result = (|| {
+            if self
+                .ライフサイクル
+                .is_terminally_quarantined(&config.runtime_id)
+            {
+                return Err("実行系はterminal隔離中");
+            }
+            if !self
+                .authority_registry
+                .runtime_registered(&config.runtime_id)
+                && !self.対話.登録済み(&config.runtime_id)
+            {
+                return Err("実行系が未登録");
+            }
+            let (root, filesystem, ancestry) =
+                super::workspace_root::open_registered_root_with_ancestry(config, protected)?;
+            self.append_audit(
+                "作業領域起動",
+                "作業領域登録",
+                "verified",
+                "rootの対応filesystemと内部資格分離を確認",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+                &sha256_tagged(format!("{hash}:{filesystem}").as_bytes()),
+            )
+            .map_err(|_| "root検査の監査失敗")?;
+            self.作業領域登録範囲付き(
+                &config.runtime_id,
+                &config.workspace_id,
+                root,
+                &config.secret_paths,
+                Some(ancestry),
+            )?;
             self.recover_agent_task_scratch(config, protected)?;
             Ok(())
         })();
-        if let Err(reason)=result {
-            self.作業領域=Default::default();
-            self.append_audit("作業領域起動", "作業領域登録", "rejected", reason, EVIDENCE_SOURCE_INTERNAL_STATE, &hash).map_err(|_| "登録拒否の監査失敗")?;
+        if let Err(reason) = result {
+            self.作業領域 = Default::default();
+            self.append_audit(
+                "作業領域起動",
+                "作業領域登録",
+                "rejected",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &hash,
+            )
+            .map_err(|_| "登録拒否の監査失敗")?;
         }
         result
     }
@@ -1699,7 +2151,8 @@ impl Broker {
             .作業領域
             .dialogue_binding(&config.runtime_id, &config.workspace_id)
             .ok_or("scratch回復対象のWorkspace登録が不在")?;
-        let (root, _, _) = super::workspace_root::open_registered_root_with_ancestry(config, protected)?;
+        let (root, _, _) =
+            super::workspace_root::open_registered_root_with_ancestry(config, protected)?;
         let metadata = root
             .dir_metadata()
             .map_err(|_| "scratch回復rootのidentityを確認できない")?;
@@ -1737,9 +2190,8 @@ impl Broker {
             actual_root,
         );
         for (index, outcome) in outcomes.iter().enumerate() {
-            let outcome_hash = sha256_tagged(
-                format!("{}|{}|{:?}", request_hash, index, outcome).as_bytes(),
-            );
+            let outcome_hash =
+                sha256_tagged(format!("{}|{}|{:?}", request_hash, index, outcome).as_bytes());
             self.append_audit(
                 &format!("agent-task-scratch-recovery:{index}"),
                 "Agent Task scratch回復",
@@ -1754,8 +2206,14 @@ impl Broker {
     }
 
     /// 起動制御面の登録。通常IPCとowner IPCはrootを提供できない。
-    pub fn 作業領域登録(&mut self, runtime: &str, id: &str, root: cap_std::fs::Dir, secrets: &[String]) -> Result<(), &'static str> {
-        self.作業領域登録範囲付き(runtime,id,root,secrets,None)
+    pub fn 作業領域登録(
+        &mut self,
+        runtime: &str,
+        id: &str,
+        root: cap_std::fs::Dir,
+        secrets: &[String],
+    ) -> Result<(), &'static str> {
+        self.作業領域登録範囲付き(runtime, id, root, secrets, None)
     }
 
     fn 作業領域登録範囲付き(
@@ -1766,63 +2224,211 @@ impl Broker {
         secrets: &[String],
         ancestry: Option<Vec<super::workspace_root::DirectoryIdentity>>,
     ) -> Result<(), &'static str> {
-        if !self.state_store.persistence_ready() {return Err("作業領域登録には永続監査が必要");}
-        if self.ライフサイクル.is_terminally_quarantined(runtime) {return Err("実行系はterminal隔離中");}
-        if !self.authority_registry.runtime_registered(runtime) && !self.対話.登録済み(runtime) {return Err("実行系が未登録");}
+        if !self.state_store.persistence_ready() {
+            return Err("作業領域登録には永続監査が必要");
+        }
+        if self.ライフサイクル.is_terminally_quarantined(runtime) {
+            return Err("実行系はterminal隔離中");
+        }
+        if !self.authority_registry.runtime_registered(runtime) && !self.対話.登録済み(runtime)
+        {
+            return Err("実行系が未登録");
+        }
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
-        let result = registry.register(runtime, id, root, secrets, ancestry, &mut |reason, hash| {
-            self.append_audit("作業領域登録", "作業領域登録", "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash)
-                .map(|_|()).map_err(|_| {audit_failed = true; "監査失敗"})
-        });
-        if !audit_failed {self.作業領域 = registry;}
+        let result =
+            registry.register(runtime, id, root, secrets, ancestry, &mut |reason, hash| {
+                self.append_audit(
+                    "作業領域登録",
+                    "作業領域登録",
+                    "recorded",
+                    reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                )
+                .map(|_| ())
+                .map_err(|_| {
+                    audit_failed = true;
+                    "監査失敗"
+                })
+            });
+        if !audit_failed {
+            self.作業領域 = registry;
+        }
         result
     }
 
-    fn 作業領域要求処理(&mut self, id: &str, operation: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+    fn 作業領域要求処理(
+        &mut self,
+        id: &str,
+        operation: &str,
+        payload: &Value,
+        owner: bool,
+        hash: &str,
+    ) -> BrokerResponse {
         if !self.state_store.persistence_ready() {
             self.作業領域 = Default::default();
-            return self.reject_with_payload_hash(id, operation, "broker_persistence_unavailable", "作業領域には永続監査が必要", true, hash);
+            return self.reject_with_payload_hash(
+                id,
+                operation,
+                "broker_persistence_unavailable",
+                "作業領域には永続監査が必要",
+                true,
+                hash,
+            );
         }
-        if matches!(operation, "作業領域承認" | "作業領域失効" | "作業領域基準点保存" | "作業領域全体基準点保存") && !owner {
-            return self.reject_with_payload_hash(id, operation, "権限拒否", "owner制御資格が必要", true, hash);
+        if matches!(
+            operation,
+            "作業領域承認" | "作業領域失効" | "作業領域基準点保存" | "作業領域全体基準点保存"
+        ) && !owner
+        {
+            return self.reject_with_payload_hash(
+                id,
+                operation,
+                "権限拒否",
+                "owner制御資格が必要",
+                true,
+                hash,
+            );
         }
-        if self.append_audit(id, operation, "received", "作業領域操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash).is_err() {
+        if self
+            .append_audit(
+                id,
+                operation,
+                "received",
+                "作業領域操作を受信",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            )
+            .is_err()
+        {
             self.作業領域 = Default::default();
-            return self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録");
+            return self.audit_store_failed_response(
+                id,
+                operation,
+                "監査失敗",
+                "監査修復後に作業領域を再登録",
+            );
         }
         let mut registry = std::mem::take(&mut self.作業領域);
         let mut audit_failed = false;
         let now = self.current_epoch_seconds();
         let result = registry.operate(operation, payload, owner, now, &mut |reason, digest| {
-            self.append_audit(id, operation, "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, digest)
-                .map(|_|()).map_err(|_| {audit_failed = true; "監査失敗"})
+            self.append_audit(
+                id,
+                operation,
+                "recorded",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                digest,
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                audit_failed = true;
+                "監査失敗"
+            })
         });
         if audit_failed {
-            return self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録");
+            return self.audit_store_failed_response(
+                id,
+                operation,
+                "監査失敗",
+                "監査修復後に作業領域を再登録",
+            );
         }
         self.作業領域 = registry;
         match result {
             Ok(body) => {
-                let evidence = if matches!(operation, "作業領域読取" | "作業領域ツリー" | "作業領域基準点保存" | "作業領域全体基準点保存" | "作業領域復旧プレビュー" | "作業領域差分" | "作業領域変更一覧") && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only")) {EVIDENCE_SOURCE_LIVE_RUNTIME} else {EVIDENCE_SOURCE_INTERNAL_STATE};
-                match self.append_audit(id, operation, "accepted", "作業領域操作の結果を確定", evidence, &sha256_tagged(body.to_string().as_bytes())) {
+                let evidence =
+                    if matches!(
+                        operation,
+                        "作業領域読取"
+                            | "作業領域ツリー"
+                            | "作業領域基準点保存"
+                            | "作業領域全体基準点保存"
+                            | "作業領域復旧プレビュー"
+                            | "作業領域差分"
+                            | "作業領域変更一覧"
+                    ) && matches!(body["表示範囲"].as_str(), Some("full" | "hash_only"))
+                    {
+                        EVIDENCE_SOURCE_LIVE_RUNTIME
+                    } else {
+                        EVIDENCE_SOURCE_INTERNAL_STATE
+                    };
+                match self.append_audit(
+                    id,
+                    operation,
+                    "accepted",
+                    "作業領域操作の結果を確定",
+                    evidence,
+                    &sha256_tagged(body.to_string().as_bytes()),
+                ) {
                     Ok(event) => {
-                        if matches!(operation, "作業領域読取" | "作業領域ツリー" | "作業領域基準点保存" | "作業領域全体基準点保存" | "作業領域復旧プレビュー" | "作業領域差分" | "作業領域変更一覧" | "作業領域比較範囲") && !self.作業領域.response_current(&body, self.current_epoch_seconds()) {
+                        if matches!(
+                            operation,
+                            "作業領域読取"
+                                | "作業領域ツリー"
+                                | "作業領域基準点保存"
+                                | "作業領域全体基準点保存"
+                                | "作業領域復旧プレビュー"
+                                | "作業領域差分"
+                                | "作業領域変更一覧"
+                                | "作業領域比較範囲"
+                        ) && !self
+                            .作業領域
+                            .response_current(&body, self.current_epoch_seconds())
+                        {
                             self.作業領域 = Default::default();
-                            return self.reject_with_payload_hash(id, operation, "作業領域期限超過", "取得後の承認期限を満たさないため再登録が必要", true, hash);
+                            return self.reject_with_payload_hash(
+                                id,
+                                operation,
+                                "作業領域期限超過",
+                                "取得後の承認期限を満たさないため再登録が必要",
+                                true,
+                                hash,
+                            );
                         }
-                        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:evidence.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false}
-                    },
-                    Err(_) => {self.作業領域 = Default::default();self.audit_store_failed_response(id, operation, "監査失敗", "監査修復後に作業領域を再登録")}
+                        BrokerResponse {
+                            request_id: id.into(),
+                            operation: operation.into(),
+                            status: BrokerStatus::Accepted,
+                            evidence_source: evidence.into(),
+                            audit_event_id: event.event_id,
+                            error: None,
+                            health: None,
+                            body: Some(body),
+                            shutdown_requested: false,
+                        }
+                    }
+                    Err(_) => {
+                        self.作業領域 = Default::default();
+                        self.audit_store_failed_response(
+                            id,
+                            operation,
+                            "監査失敗",
+                            "監査修復後に作業領域を再登録",
+                        )
+                    }
                 }
             }
-            Err(reason) => self.reject_with_payload_hash(id, operation, "作業領域拒否", reason, true, hash),
+            Err(reason) => {
+                self.reject_with_payload_hash(id, operation, "作業領域拒否", reason, true, hash)
+            }
         }
     }
 
-    pub(crate) fn 端末経路設定(&mut self, certificate_hash: String, port: u16) -> Result<(), &'static str> {
-        if !self.state_store.persistence_ready() || self.端末.is_some() {return Err("端末経路を設定できない");}
-        self.端末 = Some(super::device_link::端末制御::新規(certificate_hash, port)?);
+    pub(crate) fn 端末経路設定(
+        &mut self,
+        certificate_hash: String,
+        port: u16,
+    ) -> Result<(), &'static str> {
+        if !self.state_store.persistence_ready() || self.端末.is_some() {
+            return Err("端末経路を設定できない");
+        }
+        self.端末 = Some(super::device_link::端末制御::新規(
+            certificate_hash,
+            port,
+        )?);
         Ok(())
     }
 
@@ -1838,59 +2444,174 @@ impl Broker {
         if let Some(state) = &mut self.端末 {
             let (expired, sessions) = state.期限処理(now);
             self.対話.資格隔離(&sessions);
-            if !expired.is_empty() && self.append_audit("端末期限", "端末失効", "revoked", "期限超過で対話を隔離", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(expired.join(",").as_bytes())).is_err() {
+            if !expired.is_empty()
+                && self
+                    .append_audit(
+                        "端末期限",
+                        "端末失効",
+                        "revoked",
+                        "期限超過で対話を隔離",
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        &sha256_tagged(expired.join(",").as_bytes()),
+                    )
+                    .is_err()
+            {
                 self.端末全停止();
             }
         }
     }
 
-    fn 端末制御処理(&mut self, request_id: &str, operation: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
-        if !owner {return self.reject_with_payload_hash(request_id, operation, "権限拒否", "owner制御資格が必要", true, hash);}
-        let _event = match self.append_audit(request_id, operation, "received", "端末制御操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash) {
+    fn 端末制御処理(
+        &mut self,
+        request_id: &str,
+        operation: &str,
+        payload: &Value,
+        owner: bool,
+        hash: &str,
+    ) -> BrokerResponse {
+        if !owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "権限拒否",
+                "owner制御資格が必要",
+                true,
+                hash,
+            );
+        }
+        let _event = match self.append_audit(
+            request_id,
+            operation,
+            "received",
+            "端末制御操作を受信",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            hash,
+        ) {
             Ok(v) => v,
-            Err(_) => {self.端末全停止(); return self.audit_store_failed_response(request_id, operation, "監査失敗", "端末経路を停止");}
+            Err(_) => {
+                self.端末全停止();
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation,
+                    "監査失敗",
+                    "端末経路を停止",
+                );
+            }
         };
         let now = self.current_epoch_seconds();
-        let result = self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s| s.制御(operation, payload, now));
+        let result = self
+            .端末
+            .as_mut()
+            .ok_or("端末経路が未設定")
+            .and_then(|s| s.制御(operation, payload, now));
         match result {
             Ok((body, sessions)) => {
                 self.対話.資格隔離(&sessions);
-                match self.append_audit(request_id, operation, "accepted", "端末制御結果を確定", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(body.to_string().as_bytes())) {
-                    Ok(done) => self.端末成功応答(request_id, operation, body, done.event_id, EVIDENCE_SOURCE_INTERNAL_STATE),
-                    Err(_) => {self.端末全停止();self.audit_store_failed_response(request_id,operation,"監査失敗","端末経路を停止")}
+                match self.append_audit(
+                    request_id,
+                    operation,
+                    "accepted",
+                    "端末制御結果を確定",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(body.to_string().as_bytes()),
+                ) {
+                    Ok(done) => self.端末成功応答(
+                        request_id,
+                        operation,
+                        body,
+                        done.event_id,
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                    ),
+                    Err(_) => {
+                        self.端末全停止();
+                        self.audit_store_failed_response(
+                            request_id,
+                            operation,
+                            "監査失敗",
+                            "端末経路を停止",
+                        )
+                    }
                 }
             }
-            Err(reason) => self.reject_with_payload_hash(request_id, operation, "端末制御拒否", reason, true, hash),
+            Err(reason) => self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "端末制御拒否",
+                reason,
+                true,
+                hash,
+            ),
         }
     }
 
-    fn 端末成功応答(&self, id: &str, operation: &str, body: Value, audit_id: String, evidence_source: &str) -> BrokerResponse {
-        BrokerResponse {request_id:id.into(),operation:operation.into(),status:BrokerStatus::Accepted,evidence_source:evidence_source.into(),audit_event_id:audit_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+    fn 端末成功応答(
+        &self,
+        id: &str,
+        operation: &str,
+        body: Value,
+        audit_id: String,
+        evidence_source: &str,
+    ) -> BrokerResponse {
+        BrokerResponse {
+            request_id: id.into(),
+            operation: operation.into(),
+            status: BrokerStatus::Accepted,
+            evidence_source: evidence_source.into(),
+            audit_event_id: audit_id,
+            error: None,
+            health: None,
+            body: Some(body),
+            shutdown_requested: false,
+        }
     }
 
     fn 端末作業領域選択投影(body: &Value) -> Result<Value, &'static str> {
-        let object = body.as_object().filter(|value| {
-            value.len() == 1 && value.contains_key("作業領域")
-        }).ok_or("Workspace一覧の応答不正")?;
-        let entries = object.get("作業領域").and_then(Value::as_array)
-            .filter(|entries| entries.len() <= 16).ok_or("Workspace一覧の上限または形式不正")?;
-        let required = ["作業領域ID", "実行系ID", "登録hash", "承認状態", "有効期限", "表示範囲", "approval_id"];
+        let object = body
+            .as_object()
+            .filter(|value| value.len() == 1 && value.contains_key("作業領域"))
+            .ok_or("Workspace一覧の応答不正")?;
+        let entries = object
+            .get("作業領域")
+            .and_then(Value::as_array)
+            .filter(|entries| entries.len() <= 16)
+            .ok_or("Workspace一覧の上限または形式不正")?;
+        let required = [
+            "作業領域ID",
+            "実行系ID",
+            "登録hash",
+            "承認状態",
+            "有効期限",
+            "表示範囲",
+            "approval_id",
+        ];
         let valid_id = |value: &str| {
             let bytes = value.as_bytes();
             !bytes.is_empty()
                 && bytes.len() <= 128
                 && bytes[0].is_ascii_alphanumeric()
-                && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.' | b'-'))
+                && bytes
+                    .iter()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.' | b'-'))
         };
         let mut seen = Vec::with_capacity(entries.len());
         let mut projected = Vec::with_capacity(entries.len());
         for entry in entries {
-            let fields = entry.as_object().filter(|fields| {
-                fields.len() == required.len() && required.iter().all(|key| fields.contains_key(*key))
-            }).ok_or("Workspace一覧項目の形式不正")?;
-            let id = fields.get("作業領域ID").and_then(Value::as_str).filter(|id| valid_id(id))
+            let fields = entry
+                .as_object()
+                .filter(|fields| {
+                    fields.len() == required.len()
+                        && required.iter().all(|key| fields.contains_key(*key))
+                })
+                .ok_or("Workspace一覧項目の形式不正")?;
+            let id = fields
+                .get("作業領域ID")
+                .and_then(Value::as_str)
+                .filter(|id| valid_id(id))
                 .ok_or("Workspace ID不正")?;
-            let runtime = fields.get("実行系ID").and_then(Value::as_str).filter(|id| valid_id(id))
+            let runtime = fields
+                .get("実行系ID")
+                .and_then(Value::as_str)
+                .filter(|id| valid_id(id))
                 .ok_or("Runtime ID不正")?;
             if seen.iter().any(|known| known == id) {
                 return Err("Workspace ID重複");
@@ -1907,98 +2628,273 @@ impl Broker {
         let parsed = super::device_link::要求読取(raw);
         let r = match parsed {
             Ok(v) => v,
-            Err(_) => return self.reject_with_payload_hash("端末不正要求", "端末要求", "要求不正", "端末要求の構造を拒否", true, &hash),
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    "端末不正要求",
+                    "端末要求",
+                    "要求不正",
+                    "端末要求の構造を拒否",
+                    true,
+                    &hash,
+                )
+            }
         };
         let op = r.操作.as_str();
         if op != "端末結合" && !super::device_link::許可操作.contains(&op) {
-            return self.reject_with_payload_hash("端末不正要求", "端末要求", "権限拒否", "端末操作を拒否", true, &hash);
+            return self.reject_with_payload_hash(
+                "端末不正要求",
+                "端末要求",
+                "権限拒否",
+                "端末操作を拒否",
+                true,
+                &hash,
+            );
         }
-        let id = if super::device_link::hex形状(&r.nonce,32) {r.nonce.as_str()} else {"端末不正要求"};
-        let _event = match self.append_audit(id, op, "received", "暗号化端末要求を受信", EVIDENCE_SOURCE_LIVE_RUNTIME, &hash) {
+        let id = if super::device_link::hex形状(&r.nonce, 32) {
+            r.nonce.as_str()
+        } else {
+            "端末不正要求"
+        };
+        let _event = match self.append_audit(
+            id,
+            op,
+            "received",
+            "暗号化端末要求を受信",
+            EVIDENCE_SOURCE_LIVE_RUNTIME,
+            &hash,
+        ) {
             Ok(v) => v,
-            Err(_) => {self.端末全停止();return self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止");}
+            Err(_) => {
+                self.端末全停止();
+                return self.audit_store_failed_response(id, op, "監査失敗", "端末経路を停止");
+            }
         };
         let now = self.current_epoch_seconds();
         let result = if op == "端末結合" {
-            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.結合する(&r,now)).map(|body| (body, EVIDENCE_SOURCE_LIVE_RUNTIME.to_string()))
+            self.端末
+                .as_mut()
+                .ok_or("端末経路が未設定")
+                .and_then(|s| s.結合する(&r, now))
+                .map(|body| (body, EVIDENCE_SOURCE_LIVE_RUNTIME.to_string()))
         } else {
-            self.端末.as_mut().ok_or("端末経路が未設定").and_then(|s|s.認証する(&r,now)).and_then(|()|{
-                if op == "端末確認" {return Ok((serde_json::json!({"状態":"接続中"}), EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));}
-                if op == "端末離脱" {
-                    let sessions = self.端末.as_mut().ok_or("端末経路が未設定")?.失効(&r.資格ID)?;
-                    self.対話.資格隔離(&sessions);
-                    return Ok((serde_json::json!({"状態":"失効"}), EVIDENCE_SOURCE_INTERNAL_STATE.to_string()));
-                }
-                let response = match op {
-                    "実行系資源観測" => self.実行系資源観測要求処理(id, &r.内容, &hash),
-                    "実行系ライフサイクル状態" => self.実行系ライフサイクル状態処理(id, &r.内容, false, &hash),
-                    "全Runtime停止要求" => self.全Runtime停止要求処理(id, &r.内容, &hash),
-                    "通知一覧" => super::notification_center::dispatch(self, BrokerOperation::通知一覧, &r.内容, id, &hash),
-                    "対話履歴閲覧状態" | "対話履歴閲覧" => self.履歴閲覧処理(id, op, &r.内容, false, &hash),
-                    "作業領域一覧" => self.作業領域要求処理(id, op, &r.内容, false, &hash),
-                    _ => {
-                        let operation: BrokerOperation = serde_json::from_value(Value::String(op.into())).map_err(|_|"操作不正")?;
-                        self.対話要求処理(id, operation, &r.内容, false, &hash)
+            self.端末
+                .as_mut()
+                .ok_or("端末経路が未設定")
+                .and_then(|s| s.認証する(&r, now))
+                .and_then(|()| {
+                    if op == "端末確認" {
+                        return Ok((
+                            serde_json::json!({"状態":"接続中"}),
+                            EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+                        ));
                     }
-                };
-                if response.status != BrokerStatus::Accepted {return Err("対話操作拒否");}
-                let body = response.body.ok_or("対話応答不正")?;
-                let body = if op == "作業領域一覧" {
-                    Self::端末作業領域選択投影(&body)?
-                } else {
-                    body
-                };
-                let evidence_source = response.evidence_source;
-                self.端末.as_mut().ok_or("端末経路が未設定")?.所有記録(&r.資格ID,op,&body)?;
-                Ok((body, evidence_source))
-            })
+                    if op == "端末離脱" {
+                        let sessions = self
+                            .端末
+                            .as_mut()
+                            .ok_or("端末経路が未設定")?
+                            .失効(&r.資格ID)?;
+                        self.対話.資格隔離(&sessions);
+                        return Ok((
+                            serde_json::json!({"状態":"失効"}),
+                            EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+                        ));
+                    }
+                    let response = match op {
+                        "実行系資源観測" => {
+                            self.実行系資源観測要求処理(id, &r.内容, &hash)
+                        }
+                        "実行系ライフサイクル状態" => self
+                            .実行系ライフサイクル状態処理(id, &r.内容, false, &hash),
+                        "全Runtime停止要求" => {
+                            self.全Runtime停止要求処理(id, &r.内容, &hash)
+                        }
+                        "通知一覧" => super::notification_center::dispatch(
+                            self,
+                            BrokerOperation::通知一覧,
+                            &r.内容,
+                            id,
+                            &hash,
+                        ),
+                        "対話履歴閲覧状態" | "対話履歴閲覧" => {
+                            self.履歴閲覧処理(id, op, &r.内容, false, &hash)
+                        }
+                        "作業領域一覧" => {
+                            self.作業領域要求処理(id, op, &r.内容, false, &hash)
+                        }
+                        _ => {
+                            let operation: BrokerOperation =
+                                serde_json::from_value(Value::String(op.into()))
+                                    .map_err(|_| "操作不正")?;
+                            self.対話要求処理(id, operation, &r.内容, false, &hash)
+                        }
+                    };
+                    if response.status != BrokerStatus::Accepted {
+                        return Err("対話操作拒否");
+                    }
+                    let body = response.body.ok_or("対話応答不正")?;
+                    let body = if op == "作業領域一覧" {
+                        Self::端末作業領域選択投影(&body)?
+                    } else {
+                        body
+                    };
+                    let evidence_source = response.evidence_source;
+                    self.端末.as_mut().ok_or("端末経路が未設定")?.所有記録(
+                        &r.資格ID,
+                        op,
+                        &body,
+                    )?;
+                    Ok((body, evidence_source))
+                })
         };
         match result {
-            Ok((body, evidence_source)) => match self.append_audit(id,op,"accepted","端末要求結果を確定",&evidence_source,&sha256_tagged(body.to_string().as_bytes())) {
-                Ok(done) => self.端末成功応答(id,op,body,done.event_id,&evidence_source),
-                Err(_) => {self.端末全停止();self.audit_store_failed_response(id,op,"監査失敗","端末経路を停止")}
-            },
-            Err(reason) => self.reject_with_payload_hash(id,op,"端末要求拒否",reason,true,&hash),
-        }
-    }
-
-    fn 履歴閲覧処理(&mut self, id: &str, op: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
-        let log = match self.state_store.persistent_store.as_ref().ok_or("永続監査が必要")
-            .and_then(|s|s.verified_audit_log().map_err(|_|"監査検証失敗")) {
-            Ok(log) if log==self.audit_log => log,
-            _ => {self.履歴閲覧=Default::default(); return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");}
-        };
-        if self.append_audit(id,op,"received","Capability=dialogue.history.inspect Permission=現在承認照合 Approval=owner発行資格 Recovery=再承認",EVIDENCE_SOURCE_INTERNAL_STATE,hash).is_err() {
-            self.履歴閲覧=Default::default();return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");
-        }
-        let mut access=std::mem::take(&mut self.履歴閲覧);
-        let now=self.current_epoch_seconds();
-        let mut audit_failed=false;
-        let result=access.operate(op,payload,owner,now,&log,&mut |reason,digest|self.append_audit(id,op,"recorded",reason,EVIDENCE_SOURCE_INTERNAL_STATE,digest).map(|_|()).map_err(|_|{audit_failed=true;"監査失敗"}));
-        if audit_failed {return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");}
-        self.履歴閲覧=access;
-        match result {
-            Err(reason)=>self.reject_with_payload_hash(id,op,"権限拒否",reason,true,hash),
-            Ok(body)=>match self.append_audit(id,op,"accepted","履歴metadata閲覧の結果を確定。現在実行権限を生成しない",EVIDENCE_SOURCE_INTERNAL_STATE,&sha256_tagged(body.to_string().as_bytes())) {
-                Err(_)=>{self.履歴閲覧=Default::default();self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認")},
-                Ok(event)=>{
-                    let now=self.current_epoch_seconds();
-                    if !body["grant"].is_null() && !self.履歴閲覧.current(&body,now) {return self.reject_with_payload_hash(id,op,"期限超過","履歴閲覧の承認期限超過",true,hash);}
-                    BrokerResponse{request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false}
+            Ok((body, evidence_source)) => match self.append_audit(
+                id,
+                op,
+                "accepted",
+                "端末要求結果を確定",
+                &evidence_source,
+                &sha256_tagged(body.to_string().as_bytes()),
+            ) {
+                Ok(done) => self.端末成功応答(id, op, body, done.event_id, &evidence_source),
+                Err(_) => {
+                    self.端末全停止();
+                    self.audit_store_failed_response(id, op, "監査失敗", "端末経路を停止")
                 }
+            },
+            Err(reason) => {
+                self.reject_with_payload_hash(id, op, "端末要求拒否", reason, true, &hash)
             }
         }
     }
 
-    fn 履歴要求処理(&mut self, id: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
-        let op = "対話履歴一覧";
-        if !owner { return self.reject_with_payload_hash(id, op, "権限拒否", "owner制御資格が必要", true, hash); }
-        let query = match serde_json::from_value::<super::execution_history::Query>(payload.clone()) {
-            Ok(v) => v,
-            Err(_) => return self.reject_with_payload_hash(id, op, "要求不正", "履歴範囲が不正", true, hash),
+    fn 履歴閲覧処理(
+        &mut self,
+        id: &str,
+        op: &str,
+        payload: &Value,
+        owner: bool,
+        hash: &str,
+    ) -> BrokerResponse {
+        let log = match self
+            .state_store
+            .persistent_store
+            .as_ref()
+            .ok_or("永続監査が必要")
+            .and_then(|s| s.verified_audit_log().map_err(|_| "監査検証失敗"))
+        {
+            Ok(log) if log == self.audit_log => log,
+            _ => {
+                self.履歴閲覧 = Default::default();
+                return self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再承認");
+            }
         };
-        let log = match self.state_store.persistent_store.as_ref().ok_or("永続監査が必要")
-            .and_then(|s| s.verified_audit_log().map_err(|_| "監査検証に失敗")) {
+        if self.append_audit(id,op,"received","Capability=dialogue.history.inspect Permission=現在承認照合 Approval=owner発行資格 Recovery=再承認",EVIDENCE_SOURCE_INTERNAL_STATE,hash).is_err() {
+            self.履歴閲覧=Default::default();return self.audit_store_failed_response(id,op,"監査失敗","監査修復後に再承認");
+        }
+        let mut access = std::mem::take(&mut self.履歴閲覧);
+        let now = self.current_epoch_seconds();
+        let mut audit_failed = false;
+        let result = access.operate(op, payload, owner, now, &log, &mut |reason, digest| {
+            self.append_audit(
+                id,
+                op,
+                "recorded",
+                reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                digest,
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                audit_failed = true;
+                "監査失敗"
+            })
+        });
+        if audit_failed {
+            return self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再承認");
+        }
+        self.履歴閲覧 = access;
+        match result {
+            Err(reason) => self.reject_with_payload_hash(id, op, "権限拒否", reason, true, hash),
+            Ok(body) => match self.append_audit(
+                id,
+                op,
+                "accepted",
+                "履歴metadata閲覧の結果を確定。現在実行権限を生成しない",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &sha256_tagged(body.to_string().as_bytes()),
+            ) {
+                Err(_) => {
+                    self.履歴閲覧 = Default::default();
+                    self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再承認")
+                }
+                Ok(event) => {
+                    let now = self.current_epoch_seconds();
+                    if !body["grant"].is_null() && !self.履歴閲覧.current(&body, now) {
+                        return self.reject_with_payload_hash(
+                            id,
+                            op,
+                            "期限超過",
+                            "履歴閲覧の承認期限超過",
+                            true,
+                            hash,
+                        );
+                    }
+                    BrokerResponse {
+                        request_id: id.into(),
+                        operation: op.into(),
+                        status: BrokerStatus::Accepted,
+                        evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(),
+                        audit_event_id: event.event_id,
+                        error: None,
+                        health: None,
+                        body: Some(body),
+                        shutdown_requested: false,
+                    }
+                }
+            },
+        }
+    }
+
+    fn 履歴要求処理(
+        &mut self,
+        id: &str,
+        payload: &Value,
+        owner: bool,
+        hash: &str,
+    ) -> BrokerResponse {
+        let op = "対話履歴一覧";
+        if !owner {
+            return self.reject_with_payload_hash(
+                id,
+                op,
+                "権限拒否",
+                "owner制御資格が必要",
+                true,
+                hash,
+            );
+        }
+        let query = match serde_json::from_value::<super::execution_history::Query>(payload.clone())
+        {
+            Ok(v) => v,
+            Err(_) => {
+                return self.reject_with_payload_hash(
+                    id,
+                    op,
+                    "要求不正",
+                    "履歴範囲が不正",
+                    true,
+                    hash,
+                )
+            }
+        };
+        let log = match self
+            .state_store
+            .persistent_store
+            .as_ref()
+            .ok_or("永続監査が必要")
+            .and_then(|s| s.verified_audit_log().map_err(|_| "監査検証に失敗"))
+        {
             Ok(log) if log == self.audit_log => log,
             _ => return self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認"),
         };
@@ -2007,61 +2903,172 @@ impl Broker {
         }
         let body = match super::execution_history::page(&log, query) {
             Ok(body) => body,
-            Err(reason) => return self.reject_with_payload_hash(id, op, "履歴拒否", reason, true, hash),
+            Err(reason) => {
+                return self.reject_with_payload_hash(id, op, "履歴拒否", reason, true, hash)
+            }
         };
-        match self.append_audit(id, op, "accepted", "過去の観測記録を返却。現在権限を生成しない", EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(body.to_string().as_bytes())) {
-            Ok(event) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:event.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
+        match self.append_audit(
+            id,
+            op,
+            "accepted",
+            "過去の観測記録を返却。現在権限を生成しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(body.to_string().as_bytes()),
+        ) {
+            Ok(event) => BrokerResponse {
+                request_id: id.into(),
+                operation: op.into(),
+                status: BrokerStatus::Accepted,
+                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(),
+                audit_event_id: event.event_id,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: false,
+            },
             Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "監査修復後に再確認"),
         }
     }
 
-    fn 対話内容保存処理(&mut self, id: &str, payload: &Value, owner: bool, hash: &str) -> BrokerResponse {
+    fn 対話内容保存処理(
+        &mut self,
+        id: &str,
+        payload: &Value,
+        owner: bool,
+        hash: &str,
+    ) -> BrokerResponse {
         let op = "対話内容保存";
         if !owner || !self.state_store.persistence_ready() {
-            return self.reject_with_payload_hash(id, op, "権限拒否", "owner制御資格と永続監査が必要", true, hash);
+            return self.reject_with_payload_hash(
+                id,
+                op,
+                "権限拒否",
+                "owner制御資格と永続監査が必要",
+                true,
+                hash,
+            );
         }
-        match self.state_store.persistent_store.as_ref().and_then(|s| s.verified_audit_log().ok()) {
+        match self
+            .state_store
+            .persistent_store
+            .as_ref()
+            .and_then(|s| s.verified_audit_log().ok())
+        {
             Some(log) if log == self.audit_log => (),
             _ => return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認"),
         }
-        if self.append_audit(id, op, "received", "対話内容保存要求を受信", EVIDENCE_SOURCE_INTERNAL_STATE, hash).is_err() {
+        if self
+            .append_audit(
+                id,
+                op,
+                "received",
+                "対話内容保存要求を受信",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            )
+            .is_err()
+        {
             return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認");
         }
         #[cfg(not(windows))]
         {
             let _ = payload;
-            self.reject_with_payload_hash(id, op, "保管未対応", "このOSの安全保管は未対応", true, hash)
+            self.reject_with_payload_hash(
+                id,
+                op,
+                "保管未対応",
+                "このOSの安全保管は未対応",
+                true,
+                hash,
+            )
         }
         #[cfg(windows)]
         {
             if self.protected_store.is_none() {
-                return self.reject_with_payload_hash(id, op, "保管未登録", "起動制御で保管先を登録してください", true, hash);
+                return self.reject_with_payload_hash(
+                    id,
+                    op,
+                    "保管未登録",
+                    "起動制御で保管先を登録してください",
+                    true,
+                    hash,
+                );
             }
             let content = match self.対話.保存対象(payload) {
                 Ok(v) => v,
-                Err(e) => return self.reject_with_payload_hash(id, op, e.分類(), e.復旧(), true, hash),
+                Err(e) => {
+                    return self.reject_with_payload_hash(id, op, e.分類(), e.復旧(), true, hash)
+                }
             };
             let bytes = content.to_string().into_bytes();
             if bytes.len() > gui_shell_windows_protection::MAX_PLAINTEXT {
-                return self.reject_with_payload_hash(id, op, "保管上限超過", "保管監査再確認", true, hash);
+                return self.reject_with_payload_hash(
+                    id,
+                    op,
+                    "保管上限超過",
+                    "保管監査再確認",
+                    true,
+                    hash,
+                );
             }
             let target = content["要求"]["要求ID"].as_str().expect("検証済み要求ID");
-            if content_discard::blocked(&self.audit_log,target).unwrap_or(true) {
-                return self.reject_with_payload_hash(id,op,"破棄承認済み","同じ要求を再保存せず新要求で確認",true,hash);
+            if content_discard::blocked(&self.audit_log, target).unwrap_or(true) {
+                return self.reject_with_payload_hash(
+                    id,
+                    op,
+                    "破棄承認済み",
+                    "同じ要求を再保存せず新要求で確認",
+                    true,
+                    hash,
+                );
             }
-            if self.audit_log.events().iter().any(|e| e.operation == op && e.decision == "accepted"
-                && e.reason.strip_prefix("対話内容保存記録:").and_then(|s| serde_json::from_str::<Value>(s).ok())
-                    .is_some_and(|v| v["要求ID"] == target)) {
-                return self.reject_with_payload_hash(id, op, "保存済み", "暗号文の有無によらず再保存せず保管監査再確認", true, hash);
+            if self.audit_log.events().iter().any(|e| {
+                e.operation == op
+                    && e.decision == "accepted"
+                    && e.reason
+                        .strip_prefix("対話内容保存記録:")
+                        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                        .is_some_and(|v| v["要求ID"] == target)
+            }) {
+                return self.reject_with_payload_hash(
+                    id,
+                    op,
+                    "保存済み",
+                    "暗号文の有無によらず再保存せず保管監査再確認",
+                    true,
+                    hash,
+                );
             }
             let reason = format!("対話内容保存承認 Capability=対話内容保存 Permission=独立保管先:{target} Approval={hash} RecoveryAction=保管監査再確認");
-            let approval = match self.append_audit(id, op, "recorded", &reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash) {
+            let approval = match self.append_audit(
+                id,
+                op,
+                "recorded",
+                &reason,
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                hash,
+            ) {
                 Ok(v) => v.event_id,
-                Err(_) => return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認"),
+                Err(_) => {
+                    return self.audit_store_failed_response(id, op, "監査失敗", "保管監査再確認")
+                }
             };
-            let cipher_hash = match self.protected_store.as_ref().expect("登録検証済み").create(crate::protected_store::Purpose::History, target, &bytes) {
+            let cipher_hash = match self.protected_store.as_ref().expect("登録検証済み").create(
+                crate::protected_store::Purpose::History,
+                target,
+                &bytes,
+            ) {
                 Ok(v) => v,
-                Err(_) => return self.reject_with_payload_hash(id, op, "保管失敗", "既存/部分fileを変更せず保管監査再確認", true, hash),
+                Err(_) => {
+                    return self.reject_with_payload_hash(
+                        id,
+                        op,
+                        "保管失敗",
+                        "既存/部分fileを変更せず保管監査再確認",
+                        true,
+                        hash,
+                    )
+                }
             };
             let body = serde_json::json!({"版":1,"要求ID":target,
                 "対話セッションID":content["要求"]["対話セッションID"],"実行系ID":content["要求"]["実行系ID"],
@@ -2073,12 +3080,34 @@ impl Broker {
 
     #[cfg(windows)]
     fn 対話内容保存確定(&mut self, id: &str, body: Value) -> BrokerResponse {
-            let op = "対話内容保存";
-            let encoded = body.to_string();
-            match self.append_audit(id, op, "accepted", &format!("対話内容保存記録:{encoded}"), EVIDENCE_SOURCE_INTERNAL_STATE, &sha256_tagged(encoded.as_bytes())) {
-                Ok(v) => BrokerResponse {request_id:id.into(),operation:op.into(),status:BrokerStatus::Accepted,evidence_source:EVIDENCE_SOURCE_INTERNAL_STATE.into(),audit_event_id:v.event_id,error:None,health:None,body:Some(body),shutdown_requested:false},
-                Err(_) => self.audit_store_failed_response(id, op, "監査失敗", "暗号文を再使用せず保管監査再確認"),
-            }
+        let op = "対話内容保存";
+        let encoded = body.to_string();
+        match self.append_audit(
+            id,
+            op,
+            "accepted",
+            &format!("対話内容保存記録:{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &sha256_tagged(encoded.as_bytes()),
+        ) {
+            Ok(v) => BrokerResponse {
+                request_id: id.into(),
+                operation: op.into(),
+                status: BrokerStatus::Accepted,
+                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(),
+                audit_event_id: v.event_id,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: false,
+            },
+            Err(_) => self.audit_store_failed_response(
+                id,
+                op,
+                "監査失敗",
+                "暗号文を再使用せず保管監査再確認",
+            ),
+        }
     }
 
     fn 実行系ライフサイクル状態処理(
@@ -2099,7 +3128,10 @@ impl Broker {
                 payload_hash,
             );
         }
-        let query: 実行系ライフサイクル状態指定 = match serde_json::from_value::<実行系ライフサイクル状態指定>(payload.clone()) {
+        let query: 実行系ライフサイクル状態指定 = match serde_json::from_value::<
+            実行系ライフサイクル状態指定,
+        >(payload.clone())
+        {
             Ok(query) if query.version == 1 && 実行系ID妥当(&query.runtime_id) => query,
             _ => {
                 return self.reject_with_payload_hash(
@@ -2113,7 +3145,14 @@ impl Broker {
             }
         };
         if super::adapter_center::runtime_is_quarantined(self, &query.runtime_id) {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle状態照会を拒否しました", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "adapter_quarantined",
+                "隔離済みAdapterのlifecycle状態照会を拒否しました",
+                true,
+                payload_hash,
+            );
         }
         let body = match self
             .ライフサイクル
@@ -2165,8 +3204,13 @@ impl Broker {
                 payload_hash,
             );
         }
-        let request: 実行系ライフサイクル承認要求指定 = match serde_json::from_value::<実行系ライフサイクル承認要求指定>(payload.clone()) {
-            Ok(request) if request.version == 1 && 実行系ID妥当(&request.runtime_id) => request,
+        let request: 実行系ライフサイクル承認要求指定 = match serde_json::from_value::<
+            実行系ライフサイクル承認要求指定,
+        >(payload.clone())
+        {
+            Ok(request) if request.version == 1 && 実行系ID妥当(&request.runtime_id) => {
+                request
+            }
             _ => {
                 return self.reject_with_payload_hash(
                     request_id,
@@ -2179,7 +3223,14 @@ impl Broker {
             }
         };
         if super::adapter_center::runtime_is_quarantined(self, &request.runtime_id) {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle承認要求を拒否しました", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "adapter_quarantined",
+                "隔離済みAdapterのlifecycle承認要求を拒否しました",
+                true,
+                payload_hash,
+            );
         }
         let body = match self.ライフサイクル.request_approval(
             &request.runtime_id,
@@ -2255,11 +3306,17 @@ impl Broker {
                 payload_hash,
             );
         }
-        let request: 実行系ライフサイクル承認指定 = match serde_json::from_value::<実行系ライフサイクル承認指定>(payload.clone()) {
+        let request: 実行系ライフサイクル承認指定 = match serde_json::from_value::<
+            実行系ライフサイクル承認指定,
+        >(payload.clone())
+        {
             Ok(request)
                 if request.version == 1
                     && lifecycle_identifier_valid(&request.approval_id)
-                    && is_tagged_sha256(&request.approval_hash) => request,
+                    && is_tagged_sha256(&request.approval_hash) =>
+            {
+                request
+            }
             _ => {
                 return self.reject_with_payload_hash(
                     request_id,
@@ -2271,8 +3328,21 @@ impl Broker {
                 )
             }
         };
-        if self.ライフサイクル.approval_runtime_id(&request.approval_id).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle承認を拒否しました", true, payload_hash);
+        if self
+            .ライフサイクル
+            .approval_runtime_id(&request.approval_id)
+            .is_some_and(|runtime_id| {
+                super::adapter_center::runtime_is_quarantined(self, runtime_id)
+            })
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "adapter_quarantined",
+                "隔離済みAdapterのlifecycle承認を拒否しました",
+                true,
+                payload_hash,
+            );
         }
         let body = match self.ライフサイクル.approve(
             &request.approval_id,
@@ -2313,24 +3383,35 @@ impl Broker {
                 payload_hash,
             );
         }
-        let request: 実行系ライフサイクル操作指定 = match serde_json::from_value::<実行系ライフサイクル操作指定>(payload.clone()) {
-            Ok(request)
-                if request.version == 1
-                    && 実行系ID妥当(&request.runtime_id)
-                    && lifecycle_identifier_valid(&request.approval_id) => request,
-            _ => {
-                return self.reject_with_payload_hash(
+        let request: 実行系ライフサイクル操作指定 =
+            match serde_json::from_value::<実行系ライフサイクル操作指定>(
+                payload.clone(),
+            ) {
+                Ok(request)
+                    if request.version == 1
+                        && 実行系ID妥当(&request.runtime_id)
+                        && lifecycle_identifier_valid(&request.approval_id) =>
+                {
+                    request
+                }
+                _ => return self.reject_with_payload_hash(
                     request_id,
                     operation.as_str(),
                     "lifecycle_request_invalid",
                     "実行系ライフサイクル操作は版、実行系ID、閉じた操作、承認IDだけを受け付ける",
                     true,
                     payload_hash,
-                )
-            }
-        };
+                ),
+            };
         if super::adapter_center::runtime_is_quarantined(self, &request.runtime_id) {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterのlifecycle操作を拒否しました", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "adapter_quarantined",
+                "隔離済みAdapterのlifecycle操作を拒否しました",
+                true,
+                payload_hash,
+            );
         }
         if let Err(error) = self.ライフサイクル.preflight_execution(
             &request.runtime_id,
@@ -2437,7 +3518,7 @@ impl Broker {
                     operation.as_str(),
                     "broker_audit_append_failed",
                     &error.message(),
-                )
+                );
             }
         };
         BrokerResponse {
@@ -2477,21 +3558,29 @@ impl Broker {
         payload_hash: &str,
     ) -> BrokerResponse {
         let operation = BrokerOperation::実行系資源観測.as_str();
-        let query: 実行系資源観測指定 = match serde_json::from_value::<実行系資源観測指定>(payload.clone()) {
-            Ok(query) if query.version == 1 && 実行系ID妥当(&query.runtime_id) => query,
-            _ => {
-                return self.reject_with_payload_hash(
-                    request_id,
-                    operation,
-                    "要求不正",
-                    "実行系資源観測は版と実行系IDだけを受け付けます",
-                    true,
-                    payload_hash,
-                )
-            }
-        };
+        let query: 実行系資源観測指定 =
+            match serde_json::from_value::<実行系資源観測指定>(payload.clone()) {
+                Ok(query) if query.version == 1 && 実行系ID妥当(&query.runtime_id) => query,
+                _ => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation,
+                        "要求不正",
+                        "実行系資源観測は版と実行系IDだけを受け付けます",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
         if super::adapter_center::runtime_is_quarantined(self, &query.runtime_id) {
-            return self.reject_with_payload_hash(request_id, operation, "adapter_quarantined", "隔離済みAdapterの資源観測を拒否しました", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "adapter_quarantined",
+                "隔離済みAdapterの資源観測を拒否しました",
+                true,
+                payload_hash,
+            );
         }
         let _initial = match self.append_audit(
             request_id,
@@ -2512,23 +3601,23 @@ impl Broker {
             }
         };
         let stats = self.対話.資源統計(&query.runtime_id);
-        let mut observation = match self.資源観測.observe(
-            &query.runtime_id,
-            stats,
-            self.current_epoch_millis(),
-        ) {
-            Ok(observation) => observation,
-            Err(ResourceObservationError::UnknownRuntime) => {
-                return self.reject_with_payload_hash(
-                    request_id,
-                    operation,
-                    "実行系不在",
-                    "登録済み実行系だけを資源観測できます",
-                    true,
-                    payload_hash,
-                )
-            }
-        };
+        let mut observation =
+            match self
+                .資源観測
+                .observe(&query.runtime_id, stats, self.current_epoch_millis())
+            {
+                Ok(observation) => observation,
+                Err(ResourceObservationError::UnknownRuntime) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation,
+                        "実行系不在",
+                        "登録済み実行系だけを資源観測できます",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
         let observation_audit_id = self.audit_log.next_event_id();
         let Some(body) = observation.body.as_object_mut() else {
             self.資源観測.clear();
@@ -2584,30 +3673,94 @@ impl Broker {
         }
     }
 
-    fn 対話要求処理(&mut self, request_id: &str, operation: BrokerOperation, payload: &Value, owner: bool, payload_hash: &str) -> BrokerResponse {
+    fn 対話要求処理(
+        &mut self,
+        request_id: &str,
+        operation: BrokerOperation,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
         if !self.state_store.persistence_ready() {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "broker_persistence_unavailable", "対話には永続監査が必要", true, payload_hash);
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "broker_persistence_unavailable",
+                "対話には永続監査が必要",
+                true,
+                payload_hash,
+            );
         }
-        if matches!(operation, BrokerOperation::対話承認 | BrokerOperation::対話承認待ち) && !owner {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "権限拒否", "owner制御資格が必要", true, payload_hash);
+        if matches!(
+            operation,
+            BrokerOperation::対話承認 | BrokerOperation::対話承認待ち
+        ) && !owner
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "権限拒否",
+                "owner制御資格が必要",
+                true,
+                payload_hash,
+            );
         }
-        if payload.get("実行系ID").or_else(|| payload.get("agent_runtime_id")).and_then(Value::as_str).is_some_and(|runtime_id| super::adapter_center::runtime_is_quarantined(self, runtime_id)) {
-            return self.reject_with_payload_hash(request_id, operation.as_str(), "adapter_quarantined", "隔離済みAdapterの対話操作を拒否しました", true, payload_hash);
+        if payload
+            .get("実行系ID")
+            .or_else(|| payload.get("agent_runtime_id"))
+            .and_then(Value::as_str)
+            .is_some_and(|runtime_id| {
+                super::adapter_center::runtime_is_quarantined(self, runtime_id)
+            })
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                "adapter_quarantined",
+                "隔離済みAdapterの対話操作を拒否しました",
+                true,
+                payload_hash,
+            );
         }
-        let initial = self.append_audit(request_id, operation.as_str(), "received", "対話操作を受信", EVIDENCE_SOURCE_INTERNAL_STATE, payload_hash);
+        let initial = self.append_audit(
+            request_id,
+            operation.as_str(),
+            "received",
+            "対話操作を受信",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
         let mut last_event = match initial {
             Ok(event) => event.event_id,
-            Err(e) => return self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", &e.message()),
+            Err(e) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    operation.as_str(),
+                    "broker_audit_append_failed",
+                    &e.message(),
+                )
+            }
         };
-        let workspace_binding = if matches!(operation, BrokerOperation::対話開始 | BrokerOperation::Agent作業要求検査 | BrokerOperation::AgentTaskWorkspacePermissionGrant | BrokerOperation::AgentTaskOwnerApprovalGrant | BrokerOperation::AgentTask実行) {
+        let workspace_binding = if matches!(
+            operation,
+            BrokerOperation::対話開始
+                | BrokerOperation::Agent作業要求検査
+                | BrokerOperation::AgentTaskWorkspacePermissionGrant
+                | BrokerOperation::AgentTaskOwnerApprovalGrant
+                | BrokerOperation::AgentTask実行
+        ) {
             let (runtime, workspace) = if operation == BrokerOperation::対話開始 {
                 (payload.get("実行系ID"), payload.get("作業領域ID"))
             } else {
                 (payload.get("agent_runtime_id"), payload.get("workspace_id"))
             };
-            match (runtime.and_then(Value::as_str), workspace.and_then(Value::as_str)) {
+            match (
+                runtime.and_then(Value::as_str),
+                workspace.and_then(Value::as_str),
+            ) {
                 (Some(runtime_id), Some(workspace_id)) => {
-                    let Some(binding) = self.作業領域.dialogue_binding(runtime_id, workspace_id) else {
+                    let Some(binding) = self.作業領域.dialogue_binding(runtime_id, workspace_id)
+                    else {
                         return self.reject_with_payload_hash(
                             request_id,
                             operation.as_str(),
@@ -2626,15 +3779,55 @@ impl Broker {
         };
         let mut 対話 = std::mem::take(&mut self.対話);
         let now = self.current_epoch_seconds();
-        let result = 対話.操作_作業領域結合済み_scratch(operation.as_str(), payload, owner, now, workspace_binding.as_ref(), self.agent_task_scratch.clone(), &mut |reason, id, hash| {
-            let event = self.append_audit(id, operation.as_str(), "recorded", reason, EVIDENCE_SOURCE_INTERNAL_STATE, hash).map_err(|_| 対話失敗::監査失敗)?;
-            last_event = event.event_id.clone(); Ok(event.event_id)
-        });
+        let result = 対話.操作_作業領域結合済み_scratch(
+            operation.as_str(),
+            payload,
+            owner,
+            now,
+            workspace_binding.as_ref(),
+            self.agent_task_scratch.clone(),
+            &mut |reason, id, hash| {
+                let event = self
+                    .append_audit(
+                        id,
+                        operation.as_str(),
+                        "recorded",
+                        reason,
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        hash,
+                    )
+                    .map_err(|_| 対話失敗::監査失敗)?;
+                last_event = event.event_id.clone();
+                Ok(event.event_id)
+            },
+        );
         self.対話 = 対話;
         match result {
-            Ok(body) => BrokerResponse { request_id: request_id.into(), operation: operation.as_str().into(), status: BrokerStatus::Accepted, evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(), audit_event_id: last_event, error: None, health: None, body: Some(body), shutdown_requested: false },
-            Err(対話失敗::監査失敗) => self.audit_store_failed_response(request_id, operation.as_str(), "broker_audit_append_failed", "対話の監査を確定できない"),
-            Err(e) => self.reject_with_payload_hash(request_id, operation.as_str(), e.分類(), e.復旧(), true, payload_hash),
+            Ok(body) => BrokerResponse {
+                request_id: request_id.into(),
+                operation: operation.as_str().into(),
+                status: BrokerStatus::Accepted,
+                evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.into(),
+                audit_event_id: last_event,
+                error: None,
+                health: None,
+                body: Some(body),
+                shutdown_requested: false,
+            },
+            Err(対話失敗::監査失敗) => self.audit_store_failed_response(
+                request_id,
+                operation.as_str(),
+                "broker_audit_append_failed",
+                "対話の監査を確定できない",
+            ),
+            Err(e) => self.reject_with_payload_hash(
+                request_id,
+                operation.as_str(),
+                e.分類(),
+                e.復旧(),
+                true,
+                payload_hash,
+            ),
         }
     }
 
@@ -2873,9 +4066,10 @@ impl Broker {
         ];
         let status = if checks.iter().any(|check| check["status"] == "fail") {
             "fail"
-        } else if checks.iter().any(|check| {
-            matches!(check["status"].as_str(), Some("warning" | "unknown"))
-        }) {
+        } else if checks
+            .iter()
+            .any(|check| matches!(check["status"].as_str(), Some("warning" | "unknown")))
+        {
             "warning"
         } else {
             "pass"
@@ -2921,7 +4115,11 @@ impl Broker {
                 &error.message(),
             );
         }
-        if self.state_store.write_setup_doctor_report(&report_bytes).is_err() {
+        if self
+            .state_store
+            .write_setup_doctor_report(&report_bytes)
+            .is_err()
+        {
             return self.reject_with_payload_hash(
                 request_id,
                 operation,
@@ -3308,7 +4506,10 @@ impl Broker {
         self.observations.record_completed_span(
             &event,
             observation_started_at,
-            observation_started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+            observation_started
+                .elapsed()
+                .as_millis()
+                .min(u128::from(u64::MAX)) as u64,
         );
         Ok(event)
     }
@@ -3805,9 +5006,13 @@ mod tests {
                 Err(error) => panic!("loopback listener所有processの照合に失敗: {error:?}"),
             }
         }
-        assert!(visible, "登録前にloopback listener所有processを確認できなかった");
+        assert!(
+            visible,
+            "登録前にloopback listener所有processを確認できなかった"
+        );
         let mut broker = Broker::new("resource-session");
-        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        let adapter =
+            crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
         broker.実行系登録("local", Arc::new(adapter)).unwrap();
         (broker, listener)
     }
@@ -3848,9 +5053,7 @@ mod tests {
         broker
             .実行系登録(
                 "fixture-runtime",
-                Arc::new(
-                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
-                ),
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
             )
             .unwrap();
         broker
@@ -3872,14 +5075,10 @@ mod tests {
                 &scratch_name,
             )
             .expect("scratch作成前に回復記録を予約");
-        let workspace = cap_std::fs::Dir::open_ambient_dir(
-            &workspace_root,
-            cap_std::ambient_authority(),
-        )
-        .expect("Workspaceを開く");
-        workspace
-            .create_dir(&scratch_name)
-            .expect("scratchを作成");
+        let workspace =
+            cap_std::fs::Dir::open_ambient_dir(&workspace_root, cap_std::ambient_authority())
+                .expect("Workspaceを開く");
+        workspace.create_dir(&scratch_name).expect("scratchを作成");
         let scratch = workspace
             .open_dir_nofollow(&scratch_name)
             .expect("nofollowでscratchを開く");
@@ -3915,10 +5114,7 @@ mod tests {
         request
     }
 
-    fn first_run_configuration_request(
-        request_id: &str,
-        payload: Value,
-    ) -> BrokerRequestEnvelope {
+    fn first_run_configuration_request(request_id: &str, payload: Value) -> BrokerRequestEnvelope {
         let mut request = BrokerRequestEnvelope::health(request_id, &format!("nonce-{request_id}"));
         request.session_id = Some("first-run-session".to_string());
         request.operation = Some(BrokerOperation::初回設定取得);
@@ -3935,11 +5131,8 @@ mod tests {
         if let Some(root) = std::env::var_os(CHILD_ROOT_ENV).map(PathBuf::from) {
             let (broker, _) =
                 seed_agent_task_scratch_for_crash(&root, "scratch-session-crash-child");
-            fs::write(
-                root.join("child-ready.pid"),
-                std::process::id().to_string(),
-            )
-            .expect("journal保存後の準備完了札");
+            fs::write(root.join("child-ready.pid"), std::process::id().to_string())
+                .expect("journal保存後の準備完了札");
             loop {
                 std::hint::black_box(&broker);
                 std::thread::sleep(Duration::from_secs(1));
@@ -3988,16 +5181,17 @@ mod tests {
         }
         child.0.kill().expect("Broker子processを強制終了");
         let status = child.0.wait().expect("強制終了したBroker子processを回収");
-        assert!(!status.success(), "子Brokerが通常終了しておりcrash試験になっていない");
+        assert!(
+            !status.success(),
+            "子Brokerが通常終了しておりcrash試験になっていない"
+        );
 
         let mut restarted = Broker::new_persistent("scratch-session-restarted", &store_root)
             .expect("同じ永続storeからBrokerを再起動");
         restarted
             .実行系登録(
                 "fixture-runtime",
-                Arc::new(
-                    crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap(),
-                ),
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
             )
             .unwrap();
         restarted
@@ -4058,10 +5252,7 @@ mod tests {
         assert_eq!(read_event.operation, "初回設定取得");
         assert_eq!(read_event.payload_hash, read_hash);
 
-        let mut report_request = setup_doctor_request(
-            "setup-report-config",
-            json!({"version": 1}),
-        );
+        let mut report_request = setup_doctor_request("setup-report-config", json!({"version": 1}));
         report_request.session_id = Some("first-run-session".to_string());
         let report = broker.handle(report_request);
         assert_eq!(report.status, BrokerStatus::Accepted, "{:?}", report.error);
@@ -4140,7 +5331,10 @@ mod tests {
             .expect("製品報告を受理した監査記録");
         assert_eq!(exported.payload_hash, report_hash);
         assert_eq!(response.audit_event_id, exported.event_id);
-        assert_eq!(fs::read(root.join("setup_doctor_report.json")).unwrap(), bytes);
+        assert_eq!(
+            fs::read(root.join("setup_doctor_report.json")).unwrap(),
+            bytes
+        );
 
         let invalid = broker.handle(setup_doctor_request(
             "setup-report-2",
@@ -4151,7 +5345,10 @@ mod tests {
             invalid.error.as_ref().map(|error| error.code.as_str()),
             Some("setup_doctor_request_invalid")
         );
-        assert_eq!(fs::read(root.join("setup_doctor_report.json")).unwrap(), bytes);
+        assert_eq!(
+            fs::read(root.join("setup_doctor_report.json")).unwrap(),
+            bytes
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -4278,7 +5475,8 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn windows_resource_observation_binds_only_registered_loopback_owner_and_never_substitutes_unknown_metrics() {
+    fn windows_resource_observation_binds_only_registered_loopback_owner_and_never_substitutes_unknown_metrics(
+    ) {
         use std::thread;
         use std::time::Duration;
 
@@ -4293,7 +5491,10 @@ mod tests {
         assert_eq!(first.operation, "実行系資源観測");
         assert_eq!(first.evidence_source, EVIDENCE_SOURCE_LIVE_RUNTIME);
         let first_body = first.body.unwrap();
-        assert_eq!(first_body["観測監査ID"].as_str(), Some(first.audit_event_id.as_str()));
+        assert_eq!(
+            first_body["観測監査ID"].as_str(),
+            Some(first.audit_event_id.as_str())
+        );
         let first_audit = broker.audit_events().last().unwrap();
         assert_eq!(first_audit.event_id, first.audit_event_id);
         assert_eq!(
@@ -4302,7 +5503,10 @@ mod tests {
             "accepted監査eventは観測body全体を結合する"
         );
         assert_eq!(first_body["結合"]["状態"], "bound");
-        assert_eq!(first_body["結合"]["PID"].as_u64(), Some(u64::from(std::process::id())));
+        assert_eq!(
+            first_body["結合"]["PID"].as_u64(),
+            Some(u64::from(std::process::id()))
+        );
         assert_eq!(first_body["統治"]["能力ID"], "runtime.resource.observe");
         assert_eq!(first_body["計測"]["稼働時間Millis"]["状態"], "measured");
         assert_eq!(first_body["計測"]["RAMWorkingSetBytes"]["状態"], "measured");
@@ -4329,8 +5533,7 @@ mod tests {
         assert_eq!(second.status, BrokerStatus::Accepted);
         let second_body = second.body.unwrap();
         assert_eq!(
-            second_body["計測"]["CPU利用率Percent"]["状態"],
-            "measured",
+            second_body["計測"]["CPU利用率Percent"]["状態"], "measured",
             "second CPU observation: {:?}",
             second_body["計測"]["CPU利用率Percent"],
         );
@@ -4405,9 +5608,11 @@ mod tests {
         assert!(body["結合"]["PID"].is_null());
         assert!(body["結合"]["PID作成時刻UnixMillis"].is_null());
         assert_eq!(body["短期履歴"], json!([]));
-        assert!(body["計測"].as_object().unwrap().values().all(|metric| {
-            metric["状態"] == "unknown" && metric["値"].is_null()
-        }));
+        assert!(body["計測"]
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|metric| { metric["状態"] == "unknown" && metric["値"].is_null() }));
     }
 
     #[cfg(windows)]
@@ -4419,7 +5624,8 @@ mod tests {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
         let mut broker = Broker::new_persistent("resource-audit-session", &store).unwrap();
-        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        let adapter =
+            crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
         broker.実行系登録("local", Arc::new(adapter)).unwrap();
 
         let audit_path = store.join("audit.jsonl");
@@ -4465,7 +5671,8 @@ mod tests {
         fs::rename(&audit_path, &saved_audit_path).unwrap();
         fs::create_dir(&audit_path).unwrap();
 
-        let adapter = crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
+        let adapter =
+            crate::adapters::minidora::MinidoraAdapter::new(&address.to_string()).unwrap();
         assert_eq!(
             broker.実行系登録("local", Arc::new(adapter)),
             Err(対話失敗::監査失敗)
@@ -4500,12 +5707,17 @@ mod tests {
         fn transition(
             &self,
             action: LifecycleAction,
-        ) -> Result<crate::broker::runtime_lifecycle::LifecycleAdapterResult, crate::broker::runtime_lifecycle::LifecycleAdapterFailure> {
+        ) -> Result<
+            crate::broker::runtime_lifecycle::LifecycleAdapterResult,
+            crate::broker::runtime_lifecycle::LifecycleAdapterFailure,
+        > {
             self.calls.fetch_add(1, Ordering::SeqCst);
             if self.fail_action == Some(action) {
-                return Err(crate::broker::runtime_lifecycle::LifecycleAdapterFailure::new(
-                    "ライフサイクル試験Adapterの失敗",
-                ));
+                return Err(
+                    crate::broker::runtime_lifecycle::LifecycleAdapterFailure::new(
+                        "ライフサイクル試験Adapterの失敗",
+                    ),
+                );
             }
             if let Some(audit_path) = &self.sabotage_audit_path {
                 let saved = audit_path.with_extension("saved");
@@ -4513,10 +5725,14 @@ mod tests {
                 fs::create_dir(audit_path).expect("final監査経路をdirectoryへ置換できる");
             }
             let next_state = match action {
-                LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume => crate::broker::runtime_lifecycle::LifecycleState::Ready,
+                LifecycleAction::Start | LifecycleAction::Restart | LifecycleAction::Resume => {
+                    crate::broker::runtime_lifecycle::LifecycleState::Ready
+                }
                 LifecycleAction::Stop => crate::broker::runtime_lifecycle::LifecycleState::Stopped,
                 LifecycleAction::Pause => crate::broker::runtime_lifecycle::LifecycleState::Paused,
-                LifecycleAction::Quarantine => crate::broker::runtime_lifecycle::LifecycleState::Quarantined,
+                LifecycleAction::Quarantine => {
+                    crate::broker::runtime_lifecycle::LifecycleState::Quarantined
+                }
             };
             Ok(crate::broker::runtime_lifecycle::LifecycleAdapterResult {
                 next_state,
@@ -4536,12 +5752,8 @@ mod tests {
         issued_at: &str,
         payload: Value,
     ) -> BrokerRequestEnvelope {
-        let mut request = BrokerRequestEnvelope::command_envelope_at(
-            request_id,
-            "session-1",
-            nonce,
-            issued_at,
-        );
+        let mut request =
+            BrokerRequestEnvelope::command_envelope_at(request_id, "session-1", nonce, issued_at);
         request.operation = Some(operation);
         request.payload = Some(payload);
         request.refresh_payload_hash();
@@ -4604,7 +5816,12 @@ mod tests {
         body
     }
 
-    fn lifecycle_execute(broker: &mut Broker, action: &str, approval: &Value, nonce: &str) -> BrokerResponse {
+    fn lifecycle_execute(
+        broker: &mut Broker,
+        action: &str,
+        approval: &Value,
+        nonce: &str,
+    ) -> BrokerResponse {
         broker.handle(lifecycle_request(
             BrokerOperation::実行系ライフサイクル操作,
             &format!("execute-{nonce}"),
@@ -4667,7 +5884,10 @@ mod tests {
             json!({"版": 1, "承認ID": pending["承認ID"], "承認hash": pending["承認hash"]}),
         ));
         assert_eq!(normal_approval.status, BrokerStatus::Rejected);
-        assert_eq!(normal_approval.error.unwrap().code, "lifecycle_owner_approval_required");
+        assert_eq!(
+            normal_approval.error.unwrap().code,
+            "lifecycle_owner_approval_required"
+        );
 
         let stale = broker.handle(lifecycle_request(
             BrokerOperation::実行系ライフサイクル操作,
@@ -4696,9 +5916,19 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
 
         let quarantine_pending = lifecycle_pending(&mut broker, "quarantine", "quarantine-pending");
-        let quarantine_approved = lifecycle_owner_approve(&mut broker, &quarantine_pending, "quarantine-approval");
-        let quarantined = lifecycle_execute(&mut broker, "quarantine", &quarantine_approved, "quarantine-execute");
-        assert_eq!(quarantined.status, BrokerStatus::Accepted, "{quarantined:?}");
+        let quarantine_approved =
+            lifecycle_owner_approve(&mut broker, &quarantine_pending, "quarantine-approval");
+        let quarantined = lifecycle_execute(
+            &mut broker,
+            "quarantine",
+            &quarantine_approved,
+            "quarantine-execute",
+        );
+        assert_eq!(
+            quarantined.status,
+            BrokerStatus::Accepted,
+            "{quarantined:?}"
+        );
         let status = broker.handle(lifecycle_request(
             BrokerOperation::実行系ライフサイクル状態,
             "quarantine-status",
@@ -4765,7 +5995,10 @@ mod tests {
             json!({"版": 1, "実行系ID": "fixture", "操作": "pause"}),
         ));
         assert_eq!(invalid_transition.status, BrokerStatus::Rejected);
-        assert_eq!(invalid_transition.error.unwrap().code, "lifecycle_invalid_transition");
+        assert_eq!(
+            invalid_transition.error.unwrap().code,
+            "lifecycle_invalid_transition"
+        );
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         let (mut broker, calls, _) = lifecycle_test_broker(None);
@@ -4782,7 +6015,11 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         let (mut broker, calls, _) = lifecycle_test_broker(None);
-        broker.ライフサイクル試験permission設定("fixture", LifecycleAction::Start, false);
+        broker.ライフサイクル試験permission設定(
+            "fixture",
+            LifecycleAction::Start,
+            false,
+        );
         let response = broker.handle(lifecycle_request(
             BrokerOperation::実行系ライフサイクル承認要求,
             "permission-denied",
@@ -4825,12 +6062,14 @@ mod tests {
     }
 
     #[test]
-    fn lifecycle_quarantine_reservation_closes_dialogue_resource_and_workspace_before_adapter_result() {
+    fn lifecycle_quarantine_reservation_closes_dialogue_resource_and_workspace_before_adapter_result(
+    ) {
         let store = temp_store_dir("lifecycle-terminal-runtime-closure");
         let workspace_root = store.join("workspace");
         fs::create_dir_all(&workspace_root).unwrap();
         let mut broker = persistent_test_broker(&store);
-        let dialogue_adapter = crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap();
+        let dialogue_adapter =
+            crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap();
         broker
             .実行系登録("fixture", Arc::new(dialogue_adapter))
             .unwrap();
@@ -4852,11 +6091,8 @@ mod tests {
             .作業領域登録(
                 "fixture",
                 "fixture-workspace",
-                cap_std::fs::Dir::open_ambient_dir(
-                    &workspace_root,
-                    cap_std::ambient_authority(),
-                )
-                .unwrap(),
+                cap_std::fs::Dir::open_ambient_dir(&workspace_root, cap_std::ambient_authority())
+                    .unwrap(),
                 &[],
             )
             .unwrap();
@@ -4875,11 +6111,18 @@ mod tests {
             .to_string();
 
         let started_pending = lifecycle_pending(&mut broker, "start", "terminal-start-pending");
-        let started_approval = lifecycle_owner_approve(&mut broker, &started_pending, "terminal-start-approval");
-        let started = lifecycle_execute(&mut broker, "start", &started_approval, "terminal-start-execute");
+        let started_approval =
+            lifecycle_owner_approve(&mut broker, &started_pending, "terminal-start-approval");
+        let started = lifecycle_execute(
+            &mut broker,
+            "start",
+            &started_approval,
+            "terminal-start-execute",
+        );
         assert_eq!(started.status, BrokerStatus::Accepted);
 
-        let quarantine_pending = lifecycle_pending(&mut broker, "quarantine", "terminal-failing-pending");
+        let quarantine_pending =
+            lifecycle_pending(&mut broker, "quarantine", "terminal-failing-pending");
         let quarantine_approval = lifecycle_owner_approve(
             &mut broker,
             &quarantine_pending,
@@ -4960,11 +6203,8 @@ mod tests {
             broker.作業領域登録(
                 "fixture",
                 "fixture-workspace-replacement",
-                cap_std::fs::Dir::open_ambient_dir(
-                    &workspace_root,
-                    cap_std::ambient_authority(),
-                )
-                .unwrap(),
+                cap_std::fs::Dir::open_ambient_dir(&workspace_root, cap_std::ambient_authority(),)
+                    .unwrap(),
                 &[],
             ),
             Err("実行系はterminal隔離中")
@@ -5040,7 +6280,9 @@ mod tests {
         let store = temp_store_dir("lifecycle-request-audit-failure");
         let (mut broker, calls, _) = lifecycle_test_broker(None);
         broker.state_store = BrokerStateStore::durable_file_store(
-            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+            BrokerPersistentStore::open_or_create(&store, "session-1")
+                .unwrap()
+                .0,
         );
         broker.current_epoch_seconds_override = Some(fixed_now);
         let audit_path = store.join("audit.jsonl");
@@ -5055,7 +6297,10 @@ mod tests {
             json!({"版": 1, "実行系ID": "fixture", "操作": "start"}),
         ));
         assert_eq!(request_failure.status, BrokerStatus::Suspended);
-        let after_request_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        let after_request_failure = broker
+            .ライフサイクル
+            .status_body("fixture", fixed_now)
+            .unwrap();
         assert_eq!(after_request_failure["状態"], "unknown");
         assert_eq!(after_request_failure["承認一覧"], json!([]));
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -5067,7 +6312,9 @@ mod tests {
         let store = temp_store_dir("lifecycle-owner-approval-audit-failure");
         let (mut broker, calls, _) = lifecycle_test_broker(None);
         broker.state_store = BrokerStateStore::durable_file_store(
-            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+            BrokerPersistentStore::open_or_create(&store, "session-1")
+                .unwrap()
+                .0,
         );
         broker.current_epoch_seconds_override = Some(fixed_now);
         let pending = lifecycle_pending(&mut broker, "start", "owner-audit-pending");
@@ -5086,7 +6333,10 @@ mod tests {
             true,
         );
         assert_eq!(owner_failure.status, BrokerStatus::Suspended);
-        let after_owner_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        let after_owner_failure = broker
+            .ライフサイクル
+            .status_body("fixture", fixed_now)
+            .unwrap();
         assert_eq!(after_owner_failure["状態"], "unknown");
         assert_eq!(after_owner_failure["承認一覧"], json!([]));
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -5098,7 +6348,9 @@ mod tests {
         let store = temp_store_dir("lifecycle-pre-action-audit-failure");
         let (mut broker, calls, _) = lifecycle_test_broker(None);
         broker.state_store = BrokerStateStore::durable_file_store(
-            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+            BrokerPersistentStore::open_or_create(&store, "session-1")
+                .unwrap()
+                .0,
         );
         broker.current_epoch_seconds_override = Some(fixed_now);
         let pending = lifecycle_pending(&mut broker, "start", "pre-action-pending");
@@ -5107,9 +6359,13 @@ mod tests {
         let saved = audit_path.with_extension("saved");
         fs::rename(&audit_path, &saved).unwrap();
         fs::create_dir(&audit_path).unwrap();
-        let pre_action_failure = lifecycle_execute(&mut broker, "start", &approved, "pre-action-execute");
+        let pre_action_failure =
+            lifecycle_execute(&mut broker, "start", &approved, "pre-action-execute");
         assert_eq!(pre_action_failure.status, BrokerStatus::Suspended);
-        let after_pre_action_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        let after_pre_action_failure = broker
+            .ライフサイクル
+            .status_body("fixture", fixed_now)
+            .unwrap();
         assert_eq!(after_pre_action_failure["状態"], "unknown");
         assert_eq!(after_pre_action_failure["承認一覧"], json!([]));
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -5122,16 +6378,28 @@ mod tests {
         let audit_path = store.join("audit.jsonl");
         let (mut broker, calls, fail_closed) = lifecycle_test_broker(Some(audit_path.clone()));
         broker.state_store = BrokerStateStore::durable_file_store(
-            BrokerPersistentStore::open_or_create(&store, "session-1").unwrap().0,
+            BrokerPersistentStore::open_or_create(&store, "session-1")
+                .unwrap()
+                .0,
         );
         broker.current_epoch_seconds_override = Some(fixed_now);
         let pending = lifecycle_pending(&mut broker, "start", "final-pending");
         let approved = lifecycle_owner_approve(&mut broker, &pending, "final-approval");
         let final_failure = lifecycle_execute(&mut broker, "start", &approved, "final-execute");
         assert_eq!(final_failure.status, BrokerStatus::Suspended);
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "最終監査前に一回だけadapterが実行される");
-        assert!(fail_closed.load(Ordering::SeqCst) >= 1, "最終監査障害でadapterをfail-closedする");
-        let after_final_failure = broker.ライフサイクル.status_body("fixture", fixed_now).unwrap();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "最終監査前に一回だけadapterが実行される"
+        );
+        assert!(
+            fail_closed.load(Ordering::SeqCst) >= 1,
+            "最終監査障害でadapterをfail-closedする"
+        );
+        let after_final_failure = broker
+            .ライフサイクル
+            .status_body("fixture", fixed_now)
+            .unwrap();
         assert_eq!(after_final_failure["状態"], "unknown");
         assert_eq!(after_final_failure["承認一覧"], json!([]));
         let saved = audit_path.with_extension("saved");
@@ -5939,34 +7207,48 @@ mod tests {
 #[cfg(test)]
 mod 端末統治試験 {
     use super::*;
-    use serde_json::json;
     use crate::broker::dialogue::識別子生成;
-    struct 環境 {broker: Broker, path: std::path::PathBuf}
-    impl Drop for 環境 {fn drop(&mut self){assert_eq!(self.path.parent(),Some(std::env::temp_dir().as_path()));let _=std::fs::remove_dir_all(&self.path);}}
-    fn 環境生成()->環境 {
-        let path=std::env::temp_dir().join(format!("gui-shell-link-test-{}",識別子生成().unwrap()));
-        let mut broker=Broker::new_persistent("device-test",&path).unwrap();
-        broker.端末経路設定("b".repeat(64),7443).unwrap();
-        broker.実行系登録("local",Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap())).unwrap();
-        環境 {broker,path}
+    use serde_json::json;
+    struct 環境 {
+        broker: Broker,
+        path: std::path::PathBuf,
     }
-    fn 制御(b:&mut Broker,op:&str,p:Value)->BrokerResponse{
-        let id=識別子生成().unwrap();
+    impl Drop for 環境 {
+        fn drop(&mut self) {
+            assert_eq!(self.path.parent(), Some(std::env::temp_dir().as_path()));
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+    fn 環境生成() -> 環境 {
+        let path =
+            std::env::temp_dir().join(format!("gui-shell-link-test-{}", 識別子生成().unwrap()));
+        let mut broker = Broker::new_persistent("device-test", &path).unwrap();
+        broker.端末経路設定("b".repeat(64), 7443).unwrap();
+        broker
+            .実行系登録(
+                "local",
+                Arc::new(crate::adapters::minidora::MinidoraAdapter::new("127.0.0.1:9").unwrap()),
+            )
+            .unwrap();
+        環境 { broker, path }
+    }
+    fn 制御(b: &mut Broker, op: &str, p: Value) -> BrokerResponse {
+        let id = 識別子生成().unwrap();
         b.owner要求処理(&json!({"request_id":id,"nonce":id,"session_id":"device-test","operation":op,"payload":p,
             "payload_hash":sha256_tagged(p.to_string().as_bytes()),"issued_at":BrokerRequestEnvelope::current_issued_at(),"metadata":{}}).to_string())
     }
     fn 通常要求(b: &mut Broker, operation: BrokerOperation, payload: Value) -> BrokerResponse {
-        let id=識別子生成().unwrap();
-        let nonce=識別子生成().unwrap();
-        let mut request=BrokerRequestEnvelope::health(&id,&nonce);
-        request.session_id=Some("device-test".into());
-        request.operation=Some(operation);
-        request.payload=Some(payload);
-        request.issued_at=Some(BrokerRequestEnvelope::current_issued_at());
+        let id = 識別子生成().unwrap();
+        let nonce = 識別子生成().unwrap();
+        let mut request = BrokerRequestEnvelope::health(&id, &nonce);
+        request.session_id = Some("device-test".into());
+        request.operation = Some(operation);
+        request.payload = Some(payload);
+        request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
         request.refresh_payload_hash();
         b.handle(request)
     }
-    fn 通信(b:&mut Broker,c:&Value,op:&str,p:Value)->BrokerResponse{
+    fn 通信(b: &mut Broker, c: &Value, op: &str, p: Value) -> BrokerResponse {
         b.端末要求処理(&json!({"版":1,"HostID":c["HostID"],"端末ID":c["端末ID"],"資格ID":c.get("結合ID").unwrap_or(&c["招待ID"]),
             "資格秘密":c.get("端末秘密").unwrap_or(&c["招待秘密"]),"nonce":識別子生成().unwrap(),"発行時刻":b.current_epoch_seconds(),"操作":op,"内容":p}).to_string())
     }
@@ -6013,12 +7295,27 @@ mod 端末統治試験 {
             Err(対話失敗::応答不正)
         }
     }
-    fn 準備(b:&mut Broker)->(Value,Value){
-        let i=制御(b,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
-        let c=通信(b,&i,"端末結合",json!({})).body.unwrap();
-        let session=通信(b,&c,"対話開始",json!({"実行系ID":"local"})).body.unwrap();
-        let pending=通信(b,&c,"対話送信",json!({"対話セッションID":session["対話セッションID"],"入力":"こんにちは"})).body.unwrap();
-        (c,pending)
+    fn 準備(b: &mut Broker) -> (Value, Value) {
+        let i = 制御(
+            b,
+            "端末招待",
+            json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"}),
+        )
+        .body
+        .unwrap();
+        let c = 通信(b, &i, "端末結合", json!({})).body.unwrap();
+        let session = 通信(b, &c, "対話開始", json!({"実行系ID":"local"}))
+            .body
+            .unwrap();
+        let pending = 通信(
+            b,
+            &c,
+            "対話送信",
+            json!({"対話セッションID":session["対話セッションID"],"入力":"こんにちは"}),
+        )
+        .body
+        .unwrap();
+        (c, pending)
     }
     #[test]
     fn agent_list_rejects_untrusted_adapter_metadata_with_audit_and_no_leak() {
@@ -6031,8 +7328,7 @@ mod 端末統治試験 {
                     "../../../../examples/contracts/agent_adapter.valid.json"
                 ))
                 .unwrap();
-                metadata["tool_support"]["reason"] =
-                    json!(format!("sk-{secret_marker}"));
+                metadata["tool_support"]["reason"] = json!(format!("sk-{secret_marker}"));
                 metadata
             },
         ]
@@ -6059,7 +7355,10 @@ mod 端末統治試験 {
 
             let response = environment.broker.handle(request);
             assert_eq!(response.status, BrokerStatus::Rejected);
-            assert_eq!(response.error.as_ref().map(|error| error.code.as_str()), Some("応答不正"));
+            assert_eq!(
+                response.error.as_ref().map(|error| error.code.as_str()),
+                Some("応答不正")
+            );
 
             let response_json = serde_json::to_string(&response).unwrap();
             let audit_json = serde_json::to_string(environment.broker.audit_events()).unwrap();
@@ -6071,7 +7370,7 @@ mod 端末統治試験 {
     }
     #[test]
     fn 対話セッション一覧は通常要求経路で監査済み内部状態だけを返す() {
-        let mut e=環境生成();
+        let mut e = 環境生成();
         let metadata: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
@@ -6082,7 +7381,7 @@ mod 端末統治試験 {
                 Arc::new(AgentMetadataAdapter::new(metadata.clone())),
             )
             .unwrap();
-        let workspace_root=e.path.join("fixture-agent-workspace");
+        let workspace_root = e.path.join("fixture-agent-workspace");
         std::fs::create_dir(&workspace_root).unwrap();
         for workspace_id in ["fixture-workspace", "second-fixture-workspace"] {
             let (root, _, ancestry) =
@@ -6091,21 +7390,37 @@ mod 端末統治試験 {
                     &[],
                 )
                 .unwrap();
-            e.broker.作業領域登録範囲付き(
-                "fixture-agent",
-                workspace_id,
-                root,
-                &[],
-                Some(ancestry),
-            ).unwrap();
+            e.broker
+                .作業領域登録範囲付き(
+                    "fixture-agent",
+                    workspace_id,
+                    root,
+                    &[],
+                    Some(ancestry),
+                )
+                .unwrap();
         }
-        let unbound=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent"}));
-        assert_eq!(unbound.status,BrokerStatus::Rejected);
-        assert_eq!(unbound.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
-        let unregistered=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"not-registered"}));
-        assert_eq!(unregistered.status,BrokerStatus::Rejected);
-        assert_eq!(unregistered.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
-        let other_runtime_root=e.path.join("other-runtime-workspace");
+        let unbound = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"fixture-agent"}),
+        );
+        assert_eq!(unbound.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unbound.error.as_ref().map(|error| error.code.as_str()),
+            Some("作業領域不在")
+        );
+        let unregistered = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"fixture-agent","作業領域ID":"not-registered"}),
+        );
+        assert_eq!(unregistered.status, BrokerStatus::Rejected);
+        assert_eq!(
+            unregistered.error.as_ref().map(|error| error.code.as_str()),
+            Some("作業領域不在")
+        );
+        let other_runtime_root = e.path.join("other-runtime-workspace");
         std::fs::create_dir(&other_runtime_root).unwrap();
         e.broker
             .実行系登録(
@@ -6119,32 +7434,67 @@ mod 端末統治試験 {
                 &[],
             )
             .unwrap();
-        e.broker.作業領域登録範囲付き(
-            "other-fixture-agent",
-            "other-runtime-workspace",
-            other_root,
-            &[],
-            Some(other_ancestry),
-        ).unwrap();
-        let cross_runtime=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"other-runtime-workspace"}));
-        assert_eq!(cross_runtime.status,BrokerStatus::Rejected);
-        assert_eq!(cross_runtime.error.as_ref().map(|error|error.code.as_str()),Some("作業領域不在"));
-        let started=通常要求(&mut e.broker,BrokerOperation::対話開始,json!({"実行系ID":"fixture-agent","作業領域ID":"fixture-workspace"}));
-        assert_eq!(started.status,BrokerStatus::Accepted);
-        let listed=通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({}));
-        assert_eq!(listed.status,BrokerStatus::Accepted);
-        assert_eq!(listed.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
-        let body=listed.body.as_ref().expect("対話セッション一覧");
-        assert_eq!(body["版"],1);
-        assert_eq!(body["対話セッション"].as_array().unwrap().len(),1);
-        assert_eq!(body["対話セッション"][0]["作業領域ID"],"fixture-workspace");
-        assert_eq!(body["対話セッション"][0]["作業領域結合監査ID"],started.audit_event_id);
-        assert_ne!(body["対話セッション"][0]["作成監査ID"],started.audit_event_id);
-        assert_eq!(body["対話セッション"][0].as_object().unwrap().len(),6);
-        assert!(e.broker.audit_events().iter().any(|event|
-            event.event_id==started.audit_event_id && event.reason=="対話Sessionと登録済みWorkspaceの明示結合"));
+        e.broker
+            .作業領域登録範囲付き(
+                "other-fixture-agent",
+                "other-runtime-workspace",
+                other_root,
+                &[],
+                Some(other_ancestry),
+            )
+            .unwrap();
+        let cross_runtime = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"fixture-agent","作業領域ID":"other-runtime-workspace"}),
+        );
+        assert_eq!(cross_runtime.status, BrokerStatus::Rejected);
         assert_eq!(
-            通常要求(&mut e.broker,BrokerOperation::対話セッション一覧,json!({"authority":"owner"})).status,
+            cross_runtime
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("作業領域不在")
+        );
+        let started = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話開始,
+            json!({"実行系ID":"fixture-agent","作業領域ID":"fixture-workspace"}),
+        );
+        assert_eq!(started.status, BrokerStatus::Accepted);
+        let listed = 通常要求(
+            &mut e.broker,
+            BrokerOperation::対話セッション一覧,
+            json!({}),
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted);
+        assert_eq!(listed.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let body = listed.body.as_ref().expect("対話セッション一覧");
+        assert_eq!(body["版"], 1);
+        assert_eq!(body["対話セッション"].as_array().unwrap().len(), 1);
+        assert_eq!(body["対話セッション"][0]["作業領域ID"], "fixture-workspace");
+        assert_eq!(
+            body["対話セッション"][0]["作業領域結合監査ID"],
+            started.audit_event_id
+        );
+        assert_ne!(
+            body["対話セッション"][0]["作成監査ID"],
+            started.audit_event_id
+        );
+        assert_eq!(body["対話セッション"][0].as_object().unwrap().len(), 6);
+        assert!(e
+            .broker
+            .audit_events()
+            .iter()
+            .any(|event| event.event_id == started.audit_event_id
+                && event.reason == "対話Sessionと登録済みWorkspaceの明示結合"));
+        assert_eq!(
+            通常要求(
+                &mut e.broker,
+                BrokerOperation::対話セッション一覧,
+                json!({"authority":"owner"})
+            )
+            .status,
             BrokerStatus::Rejected
         );
     }
@@ -6236,7 +7586,10 @@ mod 端末統治試験 {
         );
         assert_eq!(ordinary_permission.status, BrokerStatus::Rejected);
         assert_eq!(
-            ordinary_permission.error.as_ref().map(|error| error.code.as_str()),
+            ordinary_permission
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
         let approval_without_permission = json!({
@@ -6254,7 +7607,10 @@ mod 端末統治試験 {
             .desktop_owner_operation_json(&approval_without_permission.to_string());
         assert_eq!(denied_without_permission.status, BrokerStatus::Rejected);
         assert_eq!(
-            denied_without_permission.error.as_ref().map(|error| error.code.as_str()),
+            denied_without_permission
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("権限拒否")
         );
 
@@ -6313,7 +7669,10 @@ mod 端末統治試験 {
         );
         assert_eq!(ordinary_approval.status, BrokerStatus::Rejected);
         assert_eq!(
-            ordinary_approval.error.as_ref().map(|error| error.code.as_str()),
+            ordinary_approval
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
         let native_approval_request = json!({
@@ -6332,7 +7691,10 @@ mod 端末統治試験 {
         assert_eq!(approval.status, BrokerStatus::Accepted);
         let approval_receipt = approval.body.as_ref().unwrap();
         assert_eq!(approval_receipt["実行状態"], "未実行");
-        assert_eq!(approval_receipt["指示hash"], crate::audit_hash::sha256_tagged(instruction.as_bytes()));
+        assert_eq!(
+            approval_receipt["指示hash"],
+            crate::audit_hash::sha256_tagged(instruction.as_bytes())
+        );
         assert_eq!(approval_receipt["use_limit"], 1);
         assert_eq!(approval_receipt["uses_remaining"], 1);
         assert_eq!(approval_receipt["status"], "issued_unconsumed");
@@ -6342,15 +7704,17 @@ mod 端末統治試験 {
         assert!(!approval_output.contains(instruction));
         assert!(!approval_audit.contains(instruction));
         assert!(e.broker.audit_events().iter().any(|event| {
-            event.operation == "AgentTaskOwnerApprovalGrant"
-                && event.reason.contains("Task未実行")
+            event.operation == "AgentTaskOwnerApprovalGrant" && event.reason.contains("Task未実行")
         }));
         let replayed_approval = e
             .broker
             .desktop_owner_operation_json(&native_approval_request.to_string());
         assert_eq!(replayed_approval.status, BrokerStatus::Rejected);
         assert_eq!(
-            replayed_approval.error.as_ref().map(|error| error.code.as_str()),
+            replayed_approval
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("broker_replay_detected")
         );
 
@@ -6380,8 +7744,7 @@ mod 端末統治試験 {
             mismatched_approval.body.as_ref().unwrap()["Approval状態"],
             "未取得"
         );
-        e.broker.current_epoch_seconds_override =
-            receipt["expires_at_epoch_seconds"].as_i64();
+        e.broker.current_epoch_seconds_override = receipt["expires_at_epoch_seconds"].as_i64();
         let expired_permission_preflight = 通常要求(
             &mut e.broker,
             BrokerOperation::Agent作業要求検査,
@@ -6467,14 +7830,14 @@ mod 端末統治試験 {
         );
         assert_eq!(ended_session.status, BrokerStatus::Accepted);
         assert_eq!(ended_session.body.as_ref().unwrap()["状態"], "終了");
-        let after_session_end = 通常要求(
-            &mut e.broker,
-            BrokerOperation::Agent作業要求検査,
-            payload,
-        );
+        let after_session_end =
+            通常要求(&mut e.broker, BrokerOperation::Agent作業要求検査, payload);
         assert_eq!(after_session_end.status, BrokerStatus::Rejected);
         assert_eq!(
-            after_session_end.error.as_ref().map(|error| error.code.as_str()),
+            after_session_end
+                .error
+                .as_ref()
+                .map(|error| error.code.as_str()),
             Some("セッション不一致")
         );
     }
@@ -6487,10 +7850,13 @@ mod 端末統治試験 {
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
         .expect("Agent Adapter試験構造を読み込む");
-        metadata["capabilities"].as_array_mut().unwrap().push(json!({
-            "capability_id":"task_execution",
-            "support":{"status":"unsupported","reason":"Broker統治済み書込Task経路なし"}
-        }));
+        metadata["capabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "capability_id":"task_execution",
+                "support":{"status":"unsupported","reason":"Broker統治済み書込Task経路なし"}
+            }));
         e.broker
             .実行系登録(
                 "unsupported-task-agent",
@@ -6562,7 +7928,9 @@ mod 端末統治試験 {
         );
         assert!(!e.broker.audit_events().iter().any(|event| {
             event.operation == "AgentTaskWorkspacePermissionGrant"
-                && event.reason.contains("発行（native Owner確認・Task未実行）")
+                && event
+                    .reason
+                    .contains("発行（native Owner確認・Task未実行）")
         }));
 
         let approval_request = json!({
@@ -6585,32 +7953,64 @@ mod 端末統治試験 {
         );
     }
     #[test]
-    fn 監査障害時も失効資格の保留送信を隔離する(){
-        let mut e=環境生成();let (c,p)=準備(&mut e.broker);
-        let audit=e.path.join("audit.jsonl");let saved=e.path.join("audit.saved");
-        std::fs::rename(&audit,&saved).unwrap();std::fs::create_dir(&audit).unwrap();
-        let r=制御(&mut e.broker,"端末失効",json!({"結合ID":c["結合ID"]}));assert_ne!(r.status,BrokerStatus::Accepted);
-        std::fs::remove_dir(&audit).unwrap();std::fs::rename(&saved,&audit).unwrap();
-        assert_ne!(通信(&mut e.broker,&c,"端末確認",json!({})).status,BrokerStatus::Accepted);
-        assert_ne!(制御(&mut e.broker,"対話承認",json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})).status,BrokerStatus::Accepted);
+    fn 監査障害時も失効資格の保留送信を隔離する() {
+        let mut e = 環境生成();
+        let (c, p) = 準備(&mut e.broker);
+        let audit = e.path.join("audit.jsonl");
+        let saved = e.path.join("audit.saved");
+        std::fs::rename(&audit, &saved).unwrap();
+        std::fs::create_dir(&audit).unwrap();
+        let r = 制御(&mut e.broker, "端末失効", json!({"結合ID":c["結合ID"]}));
+        assert_ne!(r.status, BrokerStatus::Accepted);
+        std::fs::remove_dir(&audit).unwrap();
+        std::fs::rename(&saved, &audit).unwrap();
+        assert_ne!(
+            通信(&mut e.broker, &c, "端末確認", json!({})).status,
+            BrokerStatus::Accepted
+        );
+        assert_ne!(
+            制御(
+                &mut e.broker,
+                "対話承認",
+                json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
     }
     #[test]
-    fn 期限処理は実制御の保留要求を隔離し監査する(){
-        let mut e=環境生成();let (c,p)=準備(&mut e.broker);
-        e.broker.current_epoch_seconds_override=Some(c["有効期限"].as_i64().unwrap());
+    fn 期限処理は実制御の保留要求を隔離し監査する() {
+        let mut e = 環境生成();
+        let (c, p) = 準備(&mut e.broker);
+        e.broker.current_epoch_seconds_override = Some(c["有効期限"].as_i64().unwrap());
         e.broker.端末期限処理();
-        assert_ne!(通信(&mut e.broker,&c,"端末確認",json!({})).status,BrokerStatus::Accepted);
+        assert_ne!(
+            通信(&mut e.broker, &c, "端末確認", json!({})).status,
+            BrokerStatus::Accepted
+        );
         // 時刻を戻しても、失効した要求のowner承認は復活しない。
-        e.broker.current_epoch_seconds_override=None;
-        assert_ne!(制御(&mut e.broker,"対話承認",json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})).status,BrokerStatus::Accepted);
+        e.broker.current_epoch_seconds_override = None;
+        assert_ne!(
+            制御(
+                &mut e.broker,
+                "対話承認",
+                json!({"要求ID":p["要求ID"],"要求hash":p["要求hash"],"表示範囲":"full"})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
         let (_, reopened) = BrokerPersistentStore::open_or_create(&e.path, "audit-check").unwrap();
-        assert!(reopened.audit_log.events().iter().any(|event| event.reason == "期限超過で対話を隔離"));
+        assert!(reopened
+            .audit_log
+            .events()
+            .iter()
+            .any(|event| event.reason == "期限超過で対話を隔離"));
     }
 
     #[test]
     #[allow(non_snake_case)]
-    fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する(){
-        let mut e=環境生成();
+    fn Mobileの読み取り投影は既存Broker統治経路だけを通りowner作用を拒否する() {
+        let mut e = 環境生成();
         let agent_fixture: Value = serde_json::from_str(include_str!(
             "../../../../examples/contracts/agent_adapter.valid.json"
         ))
@@ -6621,63 +8021,170 @@ mod 端末統治試験 {
                 Arc::new(AgentMetadataAdapter::new(agent_fixture.clone())),
             )
             .unwrap();
-        let agent_workspace=e.path.join("mobile-agent-workspace");
+        let agent_workspace = e.path.join("mobile-agent-workspace");
         std::fs::create_dir(&agent_workspace).unwrap();
-        e.broker.作業領域登録(
-            "fixture-agent",
-            "mobile-fixture-workspace",
-            cap_std::fs::Dir::open_ambient_dir(&agent_workspace,cap_std::ambient_authority()).unwrap(),
-            &[],
-        ).unwrap();
-        let invitation=制御(&mut e.broker,"端末招待",json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"})).body.unwrap();
-        let credential=通信(&mut e.broker,&invitation,"端末結合",json!({})).body.unwrap();
-        for (operation,payload) in [
-            ("Agent一覧",json!({})),
-            ("作業領域一覧",json!({})),
-            ("実行系ライフサイクル状態",json!({"版":1,"実行系ID":"local"})),
-            ("実行系資源観測",json!({"版":1,"実行系ID":"local"})),
-            ("通知一覧",json!({"版":1,"未読のみ":false,"上限":64})),
-            ("全Runtime停止要求",json!({"版":1})),
-            ("対話履歴閲覧状態",json!({})),
+        e.broker
+            .作業領域登録(
+                "fixture-agent",
+                "mobile-fixture-workspace",
+                cap_std::fs::Dir::open_ambient_dir(&agent_workspace, cap_std::ambient_authority())
+                    .unwrap(),
+                &[],
+            )
+            .unwrap();
+        let invitation = 制御(
+            &mut e.broker,
+            "端末招待",
+            json!({"端末ID":"c".repeat(32),"接続先Host":"127.0.0.1"}),
+        )
+        .body
+        .unwrap();
+        let credential = 通信(&mut e.broker, &invitation, "端末結合", json!({}))
+            .body
+            .unwrap();
+        for (operation, payload) in [
+            ("Agent一覧", json!({})),
+            ("作業領域一覧", json!({})),
+            (
+                "実行系ライフサイクル状態",
+                json!({"版":1,"実行系ID":"local"}),
+            ),
+            ("実行系資源観測", json!({"版":1,"実行系ID":"local"})),
+            ("通知一覧", json!({"版":1,"未読のみ":false,"上限":64})),
+            ("全Runtime停止要求", json!({"版":1})),
+            ("対話履歴閲覧状態", json!({})),
         ] {
-            let response=通信(&mut e.broker,&credential,operation,payload);
-            assert_eq!(response.status,BrokerStatus::Accepted,"{operation}");
-            assert_eq!(response.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE,"{operation} evidence source");
+            let response = 通信(&mut e.broker, &credential, operation, payload);
+            assert_eq!(response.status, BrokerStatus::Accepted, "{operation}");
+            assert_eq!(
+                response.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE,
+                "{operation} evidence source"
+            );
         }
-        let agent_list=通信(&mut e.broker,&credential,"Agent一覧",json!({}));
-        let agent_body=agent_list.body.as_ref().expect("Agent一覧projection");
-        assert_eq!(agent_body.as_object().map(serde_json::Map::len),Some(1));
+        let agent_list = 通信(&mut e.broker, &credential, "Agent一覧", json!({}));
+        let agent_body = agent_list.body.as_ref().expect("Agent一覧projection");
+        assert_eq!(agent_body.as_object().map(serde_json::Map::len), Some(1));
         assert!(agent_body.get("Agent").is_some_and(Value::is_array));
         assert_eq!(agent_body["Agent"], json!([agent_fixture]));
-        let workspace_list=通信(&mut e.broker,&credential,"作業領域一覧",json!({}));
-        assert_eq!(workspace_list.status,BrokerStatus::Accepted);
-        assert_eq!(workspace_list.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
-        let workspace_entries=workspace_list.body.as_ref().unwrap()["作業領域"].as_array().unwrap();
-        assert_eq!(workspace_entries.len(),1);
-        assert_eq!(workspace_entries[0],json!({"作業領域ID":"mobile-fixture-workspace","実行系ID":"fixture-agent"}));
-        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("登録hash"));
-        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("approval_id"));
-        assert!(!workspace_list.body.as_ref().unwrap().to_string().contains("mobile-agent-workspace"));
-        assert_eq!(通信(&mut e.broker,&credential,"対話セッション一覧",json!({})).status,BrokerStatus::Rejected);
-        assert_eq!(通信(&mut e.broker,&credential,"対話開始",json!({"実行系ID":"fixture-agent"})).status,BrokerStatus::Rejected);
-        let started=制御(&mut e.broker,"対話開始",json!({"実行系ID":"fixture-agent","作業領域ID":"mobile-fixture-workspace"}));
-        assert_eq!(started.status,BrokerStatus::Accepted);
-        let created_audit_id=started.audit_event_id.clone();
-        let listed=制御(&mut e.broker,"対話セッション一覧",json!({}));
-        assert_eq!(listed.status,BrokerStatus::Accepted);
-        assert_eq!(listed.evidence_source,EVIDENCE_SOURCE_INTERNAL_STATE);
-        let listed_body=listed.body.as_ref().expect("対話セッション一覧");
-        assert_eq!(listed_body["版"],1);
-        assert_eq!(listed_body["対話セッション"].as_array().unwrap().len(),1);
-        assert_eq!(listed_body["対話セッション"][0]["作業領域ID"],"mobile-fixture-workspace");
-        assert_eq!(listed_body["対話セッション"][0]["作業領域結合監査ID"],created_audit_id);
-        assert_ne!(listed_body["対話セッション"][0]["作成監査ID"],created_audit_id);
-        assert_eq!(listed_body["対話セッション"][0].as_object().unwrap().len(),6);
-        assert_eq!(通信(&mut e.broker,&credential,"対話履歴閲覧",json!({"approval_id":"a","query":{}})).status,BrokerStatus::Rejected);
-        assert_eq!(通信(&mut e.broker,&credential,"Agent一覧",json!({"authority":"owner"})).status,BrokerStatus::Rejected);
-        assert_eq!(通信(&mut e.broker,&credential,"作業領域一覧",json!({"実行系ID":"fixture-agent"})).status,BrokerStatus::Rejected);
-        assert_eq!(通信(&mut e.broker,&credential,"対話履歴承認",json!({"実行系ID":"local"})).status,BrokerStatus::Rejected);
-        assert_eq!(通信(&mut e.broker,&credential,"MCP接続一覧",json!({"版":1})).status,BrokerStatus::Rejected);
+        let workspace_list = 通信(&mut e.broker, &credential, "作業領域一覧", json!({}));
+        assert_eq!(workspace_list.status, BrokerStatus::Accepted);
+        assert_eq!(
+            workspace_list.evidence_source,
+            EVIDENCE_SOURCE_INTERNAL_STATE
+        );
+        let workspace_entries = workspace_list.body.as_ref().unwrap()["作業領域"]
+            .as_array()
+            .unwrap();
+        assert_eq!(workspace_entries.len(), 1);
+        assert_eq!(
+            workspace_entries[0],
+            json!({"作業領域ID":"mobile-fixture-workspace","実行系ID":"fixture-agent"})
+        );
+        assert!(!workspace_list
+            .body
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains("登録hash"));
+        assert!(!workspace_list
+            .body
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains("approval_id"));
+        assert!(!workspace_list
+            .body
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains("mobile-agent-workspace"));
+        assert_eq!(
+            通信(&mut e.broker, &credential, "対話セッション一覧", json!({})).status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            通信(
+                &mut e.broker,
+                &credential,
+                "対話開始",
+                json!({"実行系ID":"fixture-agent"})
+            )
+            .status,
+            BrokerStatus::Rejected
+        );
+        let started = 制御(
+            &mut e.broker,
+            "対話開始",
+            json!({"実行系ID":"fixture-agent","作業領域ID":"mobile-fixture-workspace"}),
+        );
+        assert_eq!(started.status, BrokerStatus::Accepted);
+        let created_audit_id = started.audit_event_id.clone();
+        let listed = 制御(&mut e.broker, "対話セッション一覧", json!({}));
+        assert_eq!(listed.status, BrokerStatus::Accepted);
+        assert_eq!(listed.evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+        let listed_body = listed.body.as_ref().expect("対話セッション一覧");
+        assert_eq!(listed_body["版"], 1);
+        assert_eq!(listed_body["対話セッション"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            listed_body["対話セッション"][0]["作業領域ID"],
+            "mobile-fixture-workspace"
+        );
+        assert_eq!(
+            listed_body["対話セッション"][0]["作業領域結合監査ID"],
+            created_audit_id
+        );
+        assert_ne!(
+            listed_body["対話セッション"][0]["作成監査ID"],
+            created_audit_id
+        );
+        assert_eq!(
+            listed_body["対話セッション"][0].as_object().unwrap().len(),
+            6
+        );
+        assert_eq!(
+            通信(
+                &mut e.broker,
+                &credential,
+                "対話履歴閲覧",
+                json!({"approval_id":"a","query":{}})
+            )
+            .status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            通信(
+                &mut e.broker,
+                &credential,
+                "Agent一覧",
+                json!({"authority":"owner"})
+            )
+            .status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            通信(
+                &mut e.broker,
+                &credential,
+                "作業領域一覧",
+                json!({"実行系ID":"fixture-agent"})
+            )
+            .status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            通信(
+                &mut e.broker,
+                &credential,
+                "対話履歴承認",
+                json!({"実行系ID":"local"})
+            )
+            .status,
+            BrokerStatus::Rejected
+        );
+        assert_eq!(
+            通信(&mut e.broker, &credential, "MCP接続一覧", json!({"版":1})).status,
+            BrokerStatus::Rejected
+        );
     }
 }
 

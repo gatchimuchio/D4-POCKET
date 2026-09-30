@@ -11,25 +11,25 @@ use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use zeroize::Zeroize;
-use serde::Deserialize;
-use serde_json::Value;
 use crate::audit_hash::sha256_tagged;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use zeroize::Zeroize;
 
 use crate::broker::export_center::{self, OwnerConfirmationSummary as ExportConfirmationSummary};
+#[cfg(test)]
+use crate::broker::ipc_server::run_loopback_server_cancellable;
 use crate::broker::ipc_server::{BrokerServerError, DesktopOwnerOperationRequest};
+use crate::broker::protocol::{
+    canonical_payload_hash, owner_delete_confirmation_summary, owner_recovery_confirmation_summary,
+    owner_registration_confirmation_summary, request_issued_at_is_current,
+    OwnerDeleteConfirmationSummary, OwnerRecoveryConfirmationSummary,
+    OwnerRegistrationConfirmationSummary,
+};
 use crate::broker::{
     BrokerCredentialRole, BrokerEndpoint, BrokerOperation, BrokerRequestEnvelope,
     BrokerServerConfig,
 };
-use crate::broker::protocol::{
-    canonical_payload_hash, owner_delete_confirmation_summary,
-    owner_recovery_confirmation_summary, owner_registration_confirmation_summary,
-    request_issued_at_is_current, OwnerDeleteConfirmationSummary,
-    OwnerRecoveryConfirmationSummary, OwnerRegistrationConfirmationSummary,
-};
-#[cfg(test)]
-use crate::broker::ipc_server::run_loopback_server_cancellable;
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
 const UI_POLL: Duration = Duration::from_millis(50);
@@ -103,6 +103,10 @@ enum DesktopOwnerOperationSummary {
         name: String,
         argument_count: usize,
         arguments_hash: String,
+        payload_hash: String,
+    },
+    UpdateDownload {
+        confirmation: crate::broker::update_center::UpdateDownloadConfirmation,
         payload_hash: String,
     },
 }
@@ -184,6 +188,113 @@ struct McpToolCallOwnerRequest {
     name: String,
     #[serde(rename = "arguments")]
     arguments: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdateDownloadOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "更新ID")]
+    update_id: String,
+    #[serde(rename = "候補hash")]
+    candidate_hash: String,
+}
+
+fn valid_update_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
+fn is_tagged_sha256(value: &str) -> bool {
+    value.strip_prefix("sha256:").is_some_and(|digest| {
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+fn current_update_download_confirmation(
+    request: &UpdateDownloadOwnerRequest,
+    payload_hash: &str,
+    endpoint: &BrokerEndpoint,
+) -> Option<crate::broker::update_center::UpdateDownloadConfirmation> {
+    let listing_payload = json!({"版": 1});
+    let mut nonce = [0u8; 16];
+    getrandom::getrandom(&mut nonce).ok()?;
+    let preflight = json!({
+        "request_id": format!("desktop-update-preflight-{}", hex::encode(nonce)),
+        "session_id": endpoint.session_id,
+        "operation": "更新一覧",
+        "payload_hash": canonical_payload_hash(Some(&listing_payload)),
+        "nonce": format!("desktop-update-preflight-nonce-{}", hex::encode(nonce)),
+        "issued_at": BrokerRequestEnvelope::current_issued_at(),
+        "metadata": {"client": "desktop_flutter"},
+        "payload": listing_payload,
+    });
+    let response = relay_normalized_channel_request(preflight.to_string().as_bytes(), endpoint)?;
+    let response: Value = serde_json::from_slice(&response).ok()?;
+    if response["operation"] != "更新一覧" || response["status"] != "accepted" {
+        return None;
+    }
+    let updates = response["body"]["更新一覧"].as_array()?;
+    let matching: Vec<&Value> = updates
+        .iter()
+        .filter(|value| {
+            value["更新ID"] == request.update_id
+                && value["候補hash"] == request.candidate_hash
+                && value["署名状態"] == "verified"
+                && value["版"] == 2
+        })
+        .collect();
+    let [record] = matching.as_slice() else {
+        return None;
+    };
+    let source = &record["取得元"];
+    if source["状態"] != "configured" {
+        return None;
+    }
+    let source_url = source["URL"].as_str()?;
+    let url = reqwest::Url::parse(source_url).ok()?;
+    let host = url.host_str()?;
+    if url.scheme() != "https"
+        || url.username() != ""
+        || url.password().is_some()
+        || url.port().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !source_url.ends_with(&format!("/{}.pkg", request.update_id))
+    {
+        return None;
+    }
+    let package_sha256 = record["package_sha256"].as_str()?;
+    if package_sha256.len() != 64
+        || !package_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return None;
+    }
+    let package_size_bytes = record["package_size_bytes"].as_u64()?;
+    if package_size_bytes == 0 || package_size_bytes > 4 * 1024 * 1024 * 1024 {
+        return None;
+    }
+    Some(crate::broker::update_center::UpdateDownloadConfirmation {
+        update_id: request.update_id.clone(),
+        candidate_hash: request.candidate_hash.clone(),
+        source_url: source_url.to_owned(),
+        package_sha256: package_sha256.to_owned(),
+        package_size_bytes,
+        offered_version: record["提供版"].as_str()?.to_owned(),
+        channel: record["channel"].as_str()?.to_owned(),
+        summary: record["内容概要"].as_str()?.to_owned(),
+        display_host: host.to_owned(),
+        payload_hash: payload_hash.to_owned(),
+    })
 }
 
 fn owner_confirmation_value(value: &str) -> String {
@@ -864,7 +975,10 @@ fn owner_operation_candidate(
     if envelope.session_id.is_some()
         || envelope.request_id.as_deref().is_none_or(str::is_empty)
         || envelope.nonce.as_deref().is_none_or(str::is_empty)
-        || !envelope.issued_at.as_deref().is_some_and(request_issued_at_is_current)
+        || !envelope
+            .issued_at
+            .as_deref()
+            .is_some_and(request_issued_at_is_current)
         || envelope.metadata.len() != 1
         || envelope.metadata[0].key != "client"
         || envelope.metadata[0].value != "desktop_flutter"
@@ -875,11 +989,13 @@ fn owner_operation_candidate(
     if envelope.payload_hash.as_deref() != Some(payload_hash.as_str()) {
         return None;
     }
-    let payload = envelope.payload.as_ref().unwrap_or(&serde_json::Value::Null);
+    let payload = envelope
+        .payload
+        .as_ref()
+        .unwrap_or(&serde_json::Value::Null);
     let summary = match envelope.operation? {
         BrokerOperation::MCP接続 => {
-            let request: McpConnectOwnerRequest =
-                serde_json::from_value(payload.clone()).ok()?;
+            let request: McpConnectOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
             let reference = &request.credential_ref;
             if request.version != 1
                 || request.operation != "接続"
@@ -928,6 +1044,22 @@ fn owner_operation_candidate(
         BrokerOperation::GuiShell書出し => DesktopOwnerOperationSummary::GuiShellExport(
             export_center::owner_confirmation_summary(payload, &payload_hash).ok()?,
         ),
+        BrokerOperation::更新download要求 => {
+            let request: UpdateDownloadOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || !valid_update_identifier(&request.update_id)
+                || !is_tagged_sha256(&request.candidate_hash)
+            {
+                return None;
+            }
+            let confirmation =
+                current_update_download_confirmation(&request, &payload_hash, endpoint)?;
+            DesktopOwnerOperationSummary::UpdateDownload {
+                confirmation,
+                payload_hash,
+            }
+        }
         BrokerOperation::AgentTaskWorkspacePermissionGrant => {
             let request: AgentTaskWorkspacePermissionRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -981,8 +1113,7 @@ fn owner_operation_candidate(
             }
         }
         BrokerOperation::MCPTool実行 => {
-            let request: McpToolCallOwnerRequest =
-                serde_json::from_value(payload.clone()).ok()?;
+            let request: McpToolCallOwnerRequest = serde_json::from_value(payload.clone()).ok()?;
             if request.version != 1
                 || request.operation != "実行"
                 || request.server_id.is_empty()
@@ -1104,7 +1235,9 @@ fn mcp_arguments_within_limits(value: &Value) -> bool {
             return false;
         }
         match current {
-            Value::Object(object) => pending.extend(object.values().map(|child| (child, depth + 1))),
+            Value::Object(object) => {
+                pending.extend(object.values().map(|child| (child, depth + 1)))
+            }
             Value::Array(values) => pending.extend(values.iter().map(|child| (child, depth + 1))),
             _ => {}
         }
@@ -1162,8 +1295,18 @@ where
                 if let Some((request_json, summary)) = owner_operation_candidate(&bytes, endpoint) {
                     if confirm_owner_operation(&summary) {
                         let (reply, response) = mpsc::sync_channel(1);
+                        let download_confirmation = match &summary {
+                            DesktopOwnerOperationSummary::UpdateDownload {
+                                confirmation, ..
+                            } => Some(confirmation.clone()),
+                            _ => None,
+                        };
                         owner_operations
-                            .send(DesktopOwnerOperationRequest { request_json, reply })
+                            .send(DesktopOwnerOperationRequest {
+                                request_json,
+                                download_confirmation,
+                                reply,
+                            })
                             .ok()?;
                         let response = response.recv().ok()?;
                         return response.to_json_string().ok().map(String::into_bytes);
@@ -1336,6 +1479,20 @@ fn owner_confirmation_text_for_identity(
             arguments_hash,
             payload_hash
         ),
+        DesktopOwnerOperationSummary::UpdateDownload {
+            confirmation,
+            payload_hash,
+        } => format!(
+            "署名済みD4 Pocket更新packageをdownloadしますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n配布host（Broker現在設定）: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\n内容概要: {}\n\nこの画面の前にRust起動器が通常認証Brokerから現在の候補を取得しました。確認後もBrokerがtrust・候補hash・取得URLを再検証し、表示時から変化していれば拒否します。公開HTTPSの直接接続のみ、redirect・system proxy・private／local IPを拒否します。取得byte長とSHA-256を検証し、固定Broker storeへ保存します。これはdownloadだけで、install／process起動／Permission付与は行いません。完了Audit後も適用操作は別途suspendedです。\n\npayload hash:\n{}",
+            owner_confirmation_value(&confirmation.update_id),
+            owner_confirmation_value(&confirmation.offered_version),
+            owner_confirmation_value(&confirmation.channel),
+            owner_confirmation_value(&confirmation.display_host),
+            confirmation.package_sha256,
+            confirmation.package_size_bytes,
+            owner_confirmation_value(&confirmation.summary),
+            payload_hash
+        ),
         DesktopOwnerOperationSummary::RegressionCaseDelete {
             summary,
             payload_hash,
@@ -1421,16 +1578,15 @@ impl RunningBroker {
         let store_dir = ensure_store_directory(runtime_dir)?;
         let protected_store_dir = ensure_protected_store_directory(runtime_dir)?;
         let export_dir = ensure_export_directory(runtime_dir)?;
-        let export_root = cap_std::fs::Dir::open_ambient_dir(
-            &export_dir,
-            cap_std::ambient_authority(),
-        )
-        .map_err(|_| {
-            DesktopLaunchError::new(
-                "EXPORT_DIRECTORY_UNAVAILABLE",
-                "Manifestの保存先を安全に開けません。",
-            )
-        })?;
+        let export_root =
+            cap_std::fs::Dir::open_ambient_dir(&export_dir, cap_std::ambient_authority()).map_err(
+                |_| {
+                    DesktopLaunchError::new(
+                        "EXPORT_DIRECTORY_UNAVAILABLE",
+                        "Manifestの保存先を安全に開けません。",
+                    )
+                },
+            )?;
         let session_file = runtime_dir.join(SESSION_FILE);
         prepare_session_paths(&session_file)?;
 
@@ -1709,8 +1865,7 @@ pub fn run() -> Result<(), DesktopLaunchError> {
             )
         })?;
     let product_identity = compiled_product_runtime_identity()?;
-    let runtime_dir =
-        runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
+    let runtime_dir = runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
     let mut broker = RunningBroker::start(&runtime_dir, true, product_identity)?;
 
@@ -2147,11 +2302,9 @@ mod tests {
         let server_store_dir = store_dir.clone();
         let server_protected_store_dir = protected_store_dir.clone();
         let server_export_dir = export_dir.clone();
-        let server_export_root = cap_std::fs::Dir::open_ambient_dir(
-            &server_export_dir,
-            cap_std::ambient_authority(),
-        )
-        .unwrap();
+        let server_export_root =
+            cap_std::fs::Dir::open_ambient_dir(&server_export_dir, cap_std::ambient_authority())
+                .unwrap();
         let server = thread::spawn(move || {
             let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
             config.desktop_protected_store_dir = Some(server_protected_store_dir);
@@ -2170,15 +2323,19 @@ mod tests {
         let normal = relay_channel_frame(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&normal).unwrap()),
             &broker_endpoint,
-        ).unwrap();
+        )
+        .unwrap();
         let normal: serde_json::Value = serde_json::from_slice(&normal).unwrap();
         assert_eq!(normal["status"], "rejected");
         assert_eq!(normal["error"]["code"], "owner_required");
 
-        let confirmed = desktop_export_request("desktop-export-confirmed", "desktop-export-confirmed-nonce");
+        let confirmed =
+            desktop_export_request("desktop-export-confirmed", "desktop-export-confirmed-nonce");
         let mut prompt_count = 0;
         let accepted = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&confirmed).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&confirmed).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |summary| {
@@ -2188,10 +2345,14 @@ mod tests {
                 };
                 assert_eq!(summary.export_id, "export-desktop-test");
                 assert_eq!(summary.optional_module_count, 1);
-                assert_eq!(summary.payload_hash, confirmed["payload_hash"].as_str().unwrap());
+                assert_eq!(
+                    summary.payload_hash,
+                    confirmed["payload_hash"].as_str().unwrap()
+                );
                 true
             },
-        ).unwrap();
+        )
+        .unwrap();
         let accepted: serde_json::Value = serde_json::from_slice(&accepted).unwrap();
         assert_eq!(prompt_count, 1);
         assert_eq!(accepted["status"], "accepted");
@@ -2207,7 +2368,10 @@ mod tests {
         );
         let manifest_file: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
         assert_eq!(manifest_file["product"], "D4 Pocket");
-        assert_eq!(manifest_file["manifest"]["inheritance_policy"]["credential"], "none");
+        assert_eq!(
+            manifest_file["manifest"]["inheritance_policy"]["credential"],
+            "none"
+        );
 
         let delete_payload = serde_json::json!({
             "版": 1,
@@ -2236,15 +2400,20 @@ mod tests {
                     panic!("削除はCase IDと両hashを示す専用確認を使う")
                 };
                 assert_eq!(summary.case_id, "cccccccccccccccccccccccccccccccc");
-                assert_eq!(summary.definition_hash, format!("sha256:{}", "d".repeat(64)));
-                assert_eq!(summary.ciphertext_hash, format!("sha256:{}", "e".repeat(64)));
+                assert_eq!(
+                    summary.definition_hash,
+                    format!("sha256:{}", "d".repeat(64))
+                );
+                assert_eq!(
+                    summary.ciphertext_hash,
+                    format!("sha256:{}", "e".repeat(64))
+                );
                 assert_eq!(payload_hash, delete["payload_hash"].as_str().unwrap());
-                let text = owner_confirmation_text(
-                    &DesktopOwnerOperationSummary::RegressionCaseDelete {
+                let text =
+                    owner_confirmation_text(&DesktopOwnerOperationSummary::RegressionCaseDelete {
                         summary: (*summary).clone(),
                         payload_hash: (*payload_hash).clone(),
-                    },
-                );
+                    });
                 assert!(text.contains("物理消去は保証しません"));
                 true
             },
@@ -2337,7 +2506,10 @@ mod tests {
                 };
                 assert_eq!(summary.request_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
                 assert_eq!(summary.display_name, "回帰Case登録試験");
-                assert_eq!(summary.input_characters, "owner-authored-redacted-input".chars().count());
+                assert_eq!(
+                    summary.input_characters,
+                    "owner-authored-redacted-input".chars().count()
+                );
                 assert_eq!(summary.required_condition_count, 1);
                 assert_eq!(payload_hash, registration["payload_hash"].as_str().unwrap());
                 let text = owner_confirmation_text(
@@ -2363,9 +2535,8 @@ mod tests {
         assert_eq!(registration_response["error"]["code"], "対話証跡不在");
 
         let mut secret_registration = registration.clone();
-        secret_registration["request_id"] = serde_json::Value::String(
-            "desktop-registration-secret-marker".into(),
-        );
+        secret_registration["request_id"] =
+            serde_json::Value::String("desktop-registration-secret-marker".into());
         secret_registration["nonce"] =
             serde_json::Value::String("desktop-registration-secret-marker-nonce".into());
         secret_registration["payload"]["入力"]["本文"] =
@@ -2415,13 +2586,17 @@ mod tests {
         assert_eq!(stale_approval_response["status"], "rejected");
         assert_eq!(stale_approval_response["error"]["code"], "権限拒否");
 
-        let declined = desktop_export_request("desktop-export-declined", "desktop-export-declined-nonce");
+        let declined =
+            desktop_export_request("desktop-export-declined", "desktop-export-declined-nonce");
         let declined = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&declined).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&declined).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |_| false,
-        ).unwrap();
+        )
+        .unwrap();
         let declined: serde_json::Value = serde_json::from_slice(&declined).unwrap();
         assert_eq!(declined["status"], "rejected");
         assert_eq!(declined["error"]["code"], "owner_required");
@@ -2644,49 +2819,75 @@ mod tests {
             .to_string()
             .contains(unregistered_instruction));
 
-        let mut changed_hash = desktop_export_request("desktop-export-changed-hash", "desktop-export-changed-hash-nonce");
+        let mut changed_hash = desktop_export_request(
+            "desktop-export-changed-hash",
+            "desktop-export-changed-hash-nonce",
+        );
         changed_hash["payload_hash"] = serde_json::Value::String("sha256:forged".into());
         let mut invalid_prompt_count = 0;
         let rejected = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&changed_hash).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&changed_hash).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
-            |_| { invalid_prompt_count += 1; true },
-        ).unwrap();
+            |_| {
+                invalid_prompt_count += 1;
+                true
+            },
+        )
+        .unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
         assert_eq!(invalid_prompt_count, 0);
         assert_eq!(rejected["error"]["code"], "broker_payload_hash_invalid");
 
-        let mut authority_metadata = desktop_export_request("desktop-export-authority-metadata", "desktop-export-authority-metadata-nonce");
+        let mut authority_metadata = desktop_export_request(
+            "desktop-export-authority-metadata",
+            "desktop-export-authority-metadata-nonce",
+        );
         authority_metadata["metadata"]["authority"] = serde_json::Value::Bool(true);
         let rejected = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&authority_metadata).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&authority_metadata).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |_| panic!("権限metadataで確認画面へ到達してはならない"),
-        ).unwrap();
+        )
+        .unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
-        assert_eq!(rejected["error"]["code"], "broker_authority_metadata_rejected");
+        assert_eq!(
+            rejected["error"]["code"],
+            "broker_authority_metadata_rejected"
+        );
 
-        let mut forged_session = desktop_export_request("desktop-export-forged-session", "desktop-export-forged-session-nonce");
+        let mut forged_session = desktop_export_request(
+            "desktop-export-forged-session",
+            "desktop-export-forged-session-nonce",
+        );
         forged_session["session_id"] = serde_json::Value::String("forged-session".into());
         let rejected = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&forged_session).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&forged_session).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |_| panic!("偽造sessionで確認画面へ到達してはならない"),
-        ).unwrap();
+        )
+        .unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
         assert_eq!(rejected["error"]["code"], "broker_request_malformed");
 
-        let mut stale = desktop_export_request("desktop-export-stale", "desktop-export-stale-nonce");
+        let mut stale =
+            desktop_export_request("desktop-export-stale", "desktop-export-stale-nonce");
         stale["issued_at"] = serde_json::Value::String("2000-01-01T00:00:00Z".into());
         let rejected = relay_channel_frame_with_owner_operations(
             gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&stale).unwrap()),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |_| panic!("期限切れ要求で確認画面へ到達してはならない"),
-        ).unwrap();
+        )
+        .unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
         assert_eq!(rejected["error"]["code"], "broker_issued_at_invalid");
 
@@ -2699,11 +2900,14 @@ mod tests {
             "metadata": {"client": "desktop_flutter"}
         });
         let rejected = relay_channel_frame_with_owner_operations(
-            gui_shell_windows_broker_channel::PipeFrame::Line(serde_json::to_vec(&non_export).unwrap()),
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&non_export).unwrap(),
+            ),
             &broker_endpoint,
             Some(&owner_operation_tx),
             |_| panic!("allowlist外のOwner操作で確認画面を表示してはならない"),
-        ).unwrap();
+        )
+        .unwrap();
         let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
         assert_eq!(rejected["status"], "rejected");
 
@@ -2916,9 +3120,9 @@ mod tests {
         assert!(audit.contains("AgentTaskWorkspacePermissionGrant"));
         assert!(audit.contains("AgentTaskOwnerApprovalGrant"));
         assert!(audit.matches("AgentTask実行非対応").count() >= 2);
-        assert!(!audit.contains(
-            "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）"
-        ));
+        assert!(
+            !audit.contains("Agent Task用Workspace Permission発行（native Owner確認・Task未実行）")
+        );
         assert!(!audit.contains(
             "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）"
         ));
@@ -3115,11 +3319,9 @@ mod tests {
             transport: "tcp".into(),
             max_request_bytes: MAX_REQUEST_BYTES,
         };
-        let (normalized, summary) = owner_operation_candidate(
-            input.to_string().as_bytes(),
-            &endpoint,
-        )
-        .expect("MCP切断はnative Owner確認候補");
+        let (normalized, summary) =
+            owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+                .expect("MCP切断はnative Owner確認候補");
         assert_eq!(
             BrokerRequestEnvelope::from_json_str(&normalized)
                 .unwrap()
@@ -3274,11 +3476,9 @@ mod tests {
             transport: "tcp".into(),
             max_request_bytes: MAX_REQUEST_BYTES,
         };
-        let (normalized, summary) = owner_operation_candidate(
-            input.to_string().as_bytes(),
-            &endpoint,
-        )
-        .expect("MCP接続はnative Owner確認候補");
+        let (normalized, summary) =
+            owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+                .expect("MCP接続はnative Owner確認候補");
         assert_eq!(
             BrokerRequestEnvelope::from_json_str(&normalized)
                 .unwrap()
@@ -3538,7 +3738,10 @@ mod tests {
             .arg(&outside)
             .output()
             .expect("Export保存先junction試験の作成");
-        assert!(result.status.success(), "Export保存先junction試験の作成失敗");
+        assert!(
+            result.status.success(),
+            "Export保存先junction試験の作成失敗"
+        );
 
         let error = ensure_export_directory(&runtime).unwrap_err();
         assert_eq!(error.code, "EXPORT_DIRECTORY_INVALID");

@@ -150,11 +150,11 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   evidence: 設定画面からProfile一覧、作成、適用要求、export、削除を通常Broker IPCへ接続し、Rust BrokerがSchema検証済みProfileを永続化する。import契約もBroker経路に接続している。
   authority_boundary: Profileは再利用可能な要求設定だけであり、Permission、Approval、Authority、Credentialを生成しない。適用要求はhash照合とAudit記録に限定し、Runtime操作へ到達しない。
 
-- item: D4 Pocket 更新センター（C11 current scope）
+- item: D4 Pocket 更新センター（C12 download consumer current scope）
   classification: required_for_v1
   status: implemented_for_current_scope
-  evidence: 通常Broker IPCから更新候補の一覧、Broker所有Ed25519 trustによる署名検査、署名済み候補の永続化、延期、download／適用／rollback要求をRust Update Centerへ接続し、Desktop設定画面へ表示した。
-  authority_boundary: 更新候補の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。未署名・未信頼候補は保存せず、download、install、process、rollbackの外部実行はsuspendedのままとする。信頼設定未構成とWindows installed product証拠は未成立として扱う。
+  evidence: 通常Broker IPCから更新候補の一覧、Broker所有Ed25519 trustによる署名検査、署名済み候補の永続化、延期、native Owner確認後のbounded download、適用／rollback要求をRust Update Centerへ接続し、Desktop設定画面へ表示した。download workerはlocal TLS integration testとBroker状態遷移fixtureで検査され、実配布元／installed productの証拠ではない。
+  authority_boundary: 更新候補の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。FlutterはURL/pathを作らず、native Owner確認後だけBroker workerがdownloadする。install／process／rollbackはsuspendedのまま。同期OS DNSの期限は未保証、system proxy未対応。
 
 - item: D4 Pocket 通知センター（C12 current scope）
   classification: required_for_v1

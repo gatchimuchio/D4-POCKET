@@ -127,6 +127,7 @@ REQUIRED = {
     "update_candidate.schema.json",
     "update_receipt.schema.json",
     "update_list.schema.json",
+    "update_download_job.schema.json",
     "update_trust.schema.json",
     "notification.schema.json",
     "notification_list.schema.json",

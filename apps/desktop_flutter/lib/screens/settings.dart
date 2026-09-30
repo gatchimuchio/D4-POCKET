@@ -629,14 +629,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   .map((value) => Map<String, Object?>.from(value))
                   .toList()
               : const <Map<String, Object?>>[];
+          final downloadJob = body['download_job'] is Map
+              ? Map<String, Object?>.from(body['download_job']! as Map)
+              : null;
+          final downloadAvailable = body['download実行'] == 'available';
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。署名検査前の候補は保存せず、download・適用・rollbackは現在suspendedです。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。install・process起動・rollbackはsuspendedです。',
               ),
+              if (downloadJob != null) ...[
+                const SizedBox(height: 4),
+                Text('取得状態: ${UpdateClient.downloadJobLabel(downloadJob)}'),
+              ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _refreshUpdates,
@@ -654,7 +662,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               else if (updates.isEmpty)
                 const Text('署名検査済みの更新候補はありません。')
               else
-                for (final update in updates) _updateRow(client, update),
+                for (final update in updates)
+                  _updateRow(
+                    client,
+                    update,
+                    downloadAvailable: downloadAvailable,
+                    downloadJob: downloadJob,
+                  ),
             ],
           );
         },
@@ -662,7 +676,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _updateRow(UpdateClient client, Map<String, Object?> update) {
+  Widget _updateRow(
+    UpdateClient client,
+    Map<String, Object?> update, {
+    required bool downloadAvailable,
+    required Map<String, Object?>? downloadJob,
+  }) {
     final updateId = update['更新ID']?.toString() ?? '';
     final candidateHash = update['候補hash']?.toString() ?? '';
     final signatureStatus = UpdateClient.signatureStatusLabel(update['署名状態']);
@@ -675,6 +694,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final packageSizeSummary = packageSize is num && packageSize > 0
         ? '$packageSize bytes'
         : 'byte長不明';
+    final jobState = downloadJob?['状態'];
+    final jobUpdateId = downloadJob?['更新ID'];
+    final alreadyDownloaded = jobState == 'downloaded';
+    final downloadBusy =
+        jobState == 'downloading' || jobState == 'audit_failed';
+    final sourceConfigured =
+        update['取得元'] is Map && (update['取得元']! as Map)['状態'] == 'configured';
+    final canDownload = downloadAvailable &&
+        update['署名状態'] == 'verified' &&
+        sourceConfigured &&
+        !downloadBusy &&
+        !alreadyDownloaded;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
@@ -688,14 +719,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         spacing: 4,
         children: [
           TextButton(
-            onPressed: () => _runUpdateRequest(
-              () => client.requestDownload(
-                updateId: updateId,
-                candidateHash: candidateHash,
-              ),
-              'download要求を記録しました（実行はsuspended）。',
-            ),
-            child: const Text('download要求'),
+            onPressed: canDownload
+                ? () => _runUpdateRequest(
+                      () => client.requestDownload(
+                        updateId: updateId,
+                        candidateHash: candidateHash,
+                      ),
+                      'download jobを開始しました。取得状態は一覧を更新して確認できます。',
+                    )
+                : null,
+            child: Text(alreadyDownloaded && jobUpdateId == updateId
+                ? '取得済み'
+                : 'download'),
           ),
           TextButton(
             onPressed: () => _runUpdateRequest(
