@@ -1306,6 +1306,16 @@ mod tests {
         let peer_checked = peer_workspace.join(".probe-agent-b-checked");
         let peer_continue = peer_workspace.join(".probe-agent-b-continue");
         let peer_write_result = peer_workspace.join("agent-b-write-result.txt");
+        let temp_probe_nonce = format!(
+            "{}-{}",
+            std::process::id(),
+            root.path()
+                .file_name()
+                .expect("検証専用rootの識別子")
+                .to_string_lossy()
+        );
+        let agent_a_temp_marker = format!("d4p-agent-a-{temp_probe_nonce}.txt");
+        let agent_b_temp_marker = format!("d4p-agent-b-{temp_probe_nonce}.txt");
         fs::write(&peer_marker, b"synthetic-agent-b-marker").expect("別Agent Workspace marker");
         fs::write(&workspace_marker, b"synthetic-agent-a-marker")
             .expect("Agent Aの作業領域確認file");
@@ -1501,6 +1511,24 @@ mod tests {
             quote_path(&workspace_output),
             quote_path(&environment_report)
         );
+        let workspace_checked_command = format!(
+            "<# 作業領域検査の同期点 #>[IO.File]::WriteAllText({},'checked');",
+            quote_path(&workspace_checked)
+        );
+        let agent_a_temp_checkpoint = format!(
+            "<# child自身の一時領域への書込と読戻し #>$tempMarkerA=Join-Path ([IO.Path]::GetFullPath($env:TEMP)) '{}'; [IO.File]::WriteAllText($tempMarkerA,'synthetic-agent-a-temp'); if([IO.File]::ReadAllText($tempMarkerA) -ne 'synthetic-agent-a-temp'){{exit 50}}; {}",
+            agent_a_temp_marker,
+            workspace_checked_command
+        );
+        let script = script.replacen(&workspace_checked_command, &agent_a_temp_checkpoint, 1);
+        let agent_a_temp_peer_probe = r#"; $tempPeerReadHResult=0; $tempPeerReadExceptionType=''; try { $tempPeerValue=[IO.File]::ReadAllText((Join-Path ([IO.Path]::GetFullPath($env:TEMP)) '__GUI_SHELL_PEER_TEMP_MARKER__')); if($tempPeerValue -ne 'synthetic-agent-b-temp'){exit 48} } catch { $tempError=$_.Exception.InnerException; if($null -eq $tempError){$tempError=$_.Exception}; $tempPeerReadHResult=$tempError.HResult; $tempPeerReadExceptionType=$tempError.GetType().FullName }; if(($tempPeerReadHResult -ne -2147024894) -and ($tempPeerReadHResult -ne -2147024891)){[Console]::Error.WriteLine("peer-temp-hresult=$tempPeerReadHResult; exception=$tempPeerReadExceptionType"); exit 49}; $deniedAliases=@("#
+            .replace("__GUI_SHELL_PEER_TEMP_MARKER__", &agent_b_temp_marker);
+        let script = script.replacen("; $deniedAliases=@(", &agent_a_temp_peer_probe, 1);
+        let agent_a_temp_report = format!(
+            "; <# 相手一時領域の拒否結果を合成Workspaceへ保存 #>[IO.File]::AppendAllText({},\"`npeerTempReadHResult=$tempPeerReadHResult`npeerTempReadException=$tempPeerReadExceptionType\"); exit 0",
+            quote_path(&environment_report)
+        );
+        let script = script.replacen("; exit 0", &agent_a_temp_report, 1);
 
         let peer_script = r#"
 $ErrorActionPreference = 'Stop'
@@ -1529,13 +1557,31 @@ if ($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -n
     exit 55
 }
 [IO.File]::WriteAllText(__GUI_SHELL_PEER_OWN_WRITE__, 'agent-b-own-write')
+$tempMarkerB = Join-Path ([IO.Path]::GetFullPath($env:TEMP)) '__GUI_SHELL_TEMP_OWN_MARKER__'
+[IO.File]::WriteAllText($tempMarkerB, 'synthetic-agent-b-temp')
+if ([IO.File]::ReadAllText($tempMarkerB) -ne 'synthetic-agent-b-temp') { exit 58 }
 [IO.File]::WriteAllText(__GUI_SHELL_PEER_CHECKED__, 'checked')
 $deadline = [DateTime]::UtcNow.AddSeconds(90)
 while (-not [IO.File]::Exists(__GUI_SHELL_PEER_CONTINUE__)) {
     if ([DateTime]::UtcNow -ge $deadline) { exit 57 }
     Start-Sleep -Milliseconds 25
 }
-[IO.File]::WriteAllText(__GUI_SHELL_PEER_REPORT__, "相手Workspace読取HRESULT=$peerReadError`n相手Workspace書込例外型=$peerWriteErrorType`n相手Workspace書込HRESULT=$peerWriteError")
+$tempPeerReadHResult = 0
+$tempPeerReadExceptionType = ''
+try {
+    $tempPeerValue = [IO.File]::ReadAllText((Join-Path ([IO.Path]::GetFullPath($env:TEMP)) '__GUI_SHELL_TEMP_PEER_MARKER__'))
+    if ($tempPeerValue -ne 'synthetic-agent-a-temp') { exit 59 }
+} catch {
+    $tempError = $_.Exception.InnerException
+    if ($null -eq $tempError) { $tempError = $_.Exception }
+    $tempPeerReadHResult = $tempError.HResult
+    $tempPeerReadExceptionType = $tempError.GetType().FullName
+}
+if (($tempPeerReadHResult -ne -2147024894) -and ($tempPeerReadHResult -ne -2147024891)) {
+    [Console]::Error.WriteLine("peer-temp-hresult=$tempPeerReadHResult; exception=$tempPeerReadExceptionType")
+    exit 60
+}
+[IO.File]::WriteAllText(__GUI_SHELL_PEER_REPORT__, "相手Workspace読取HRESULT=$peerReadError`n相手Workspace書込例外型=$peerWriteErrorType`n相手Workspace書込HRESULT=$peerWriteError`n相手TEMP読取HRESULT=$tempPeerReadHResult`n相手TEMP読取例外=$tempPeerReadExceptionType")
 exit 0
 "#
         .replace("__GUI_SHELL_PEER_READY__", &quote_path(&peer_ready))
@@ -1554,7 +1600,9 @@ exit 0
         )
         .replace("__GUI_SHELL_PEER_CHECKED__", &quote_path(&peer_checked))
         .replace("__GUI_SHELL_PEER_CONTINUE__", &quote_path(&peer_continue))
-        .replace("__GUI_SHELL_PEER_REPORT__", &quote_path(&peer_write_result));
+        .replace("__GUI_SHELL_PEER_REPORT__", &quote_path(&peer_write_result))
+        .replace("__GUI_SHELL_TEMP_OWN_MARKER__", &agent_b_temp_marker)
+        .replace("__GUI_SHELL_TEMP_PEER_MARKER__", &agent_a_temp_marker);
 
         let task_environment = generated
             .get_envs()
@@ -1616,14 +1664,20 @@ exit 0
             let _ = second.terminate_tree();
         }
 
+        fn read_pipe_lossy<R: std::io::Read>(mut pipe: R) -> std::io::Result<String> {
+            let mut bytes = Vec::new();
+            pipe.read_to_end(&mut bytes)?;
+            Ok(String::from_utf8_lossy(&bytes).into_owned())
+        }
+
         fn process_output(child: &mut super::process_tree::SupervisedChild) -> (String, String) {
             let mut stdout = String::new();
             let mut stderr = String::new();
-            if let Some(mut pipe) = child.child.stdout.take() {
-                let _ = pipe.read_to_string(&mut stdout);
+            if let Some(pipe) = child.child.stdout.take() {
+                stdout = read_pipe_lossy(pipe).unwrap_or_default();
             }
-            if let Some(mut pipe) = child.child.stderr.take() {
-                let _ = pipe.read_to_string(&mut stderr);
+            if let Some(pipe) = child.child.stderr.take() {
+                stderr = read_pipe_lossy(pipe).unwrap_or_default();
             }
             (stdout, stderr)
         }
@@ -1717,23 +1771,19 @@ exit 0
             .expect("Agent Bの残存process群を停止");
         let mut stdout = String::new();
         let mut stderr = String::new();
-        if let Some(mut pipe) = sandbox.child.stdout.take() {
-            pipe.read_to_string(&mut stdout)
-                .expect("Agent Aの標準出力を取得");
+        if let Some(pipe) = sandbox.child.stdout.take() {
+            stdout = read_pipe_lossy(pipe).expect("Agent Aの標準出力を取得");
         }
-        if let Some(mut pipe) = sandbox.child.stderr.take() {
-            pipe.read_to_string(&mut stderr)
-                .expect("Agent Aの標準errorを取得");
+        if let Some(pipe) = sandbox.child.stderr.take() {
+            stderr = read_pipe_lossy(pipe).expect("Agent Aの標準errorを取得");
         }
         let mut peer_stdout = String::new();
         let mut peer_stderr = String::new();
-        if let Some(mut pipe) = peer_sandbox.child.stdout.take() {
-            pipe.read_to_string(&mut peer_stdout)
-                .expect("Agent Bの標準出力を取得");
+        if let Some(pipe) = peer_sandbox.child.stdout.take() {
+            peer_stdout = read_pipe_lossy(pipe).expect("Agent Bの標準出力を取得");
         }
-        if let Some(mut pipe) = peer_sandbox.child.stderr.take() {
-            pipe.read_to_string(&mut peer_stderr)
-                .expect("Agent Bの標準errorを取得");
+        if let Some(pipe) = peer_sandbox.child.stderr.take() {
+            peer_stderr = read_pipe_lossy(pipe).expect("Agent Bの標準errorを取得");
         }
         assert!(
             status.success(),
@@ -1782,6 +1832,59 @@ exit 0
                 && peer_write_result.contains("相手Workspace書込HRESULT=-2147024891"),
             "Agent Bも同時実行中にAgent Aの読取・書込を拒否する: {peer_write_result}"
         );
+        let environment_report =
+            fs::read_to_string(environment_report).expect("sandbox内TEMP／TMP照合結果");
+        let agent_a_temp_read_hresult = environment_report
+            .lines()
+            .find_map(|line| line.strip_prefix("peerTempReadHResult="))
+            .expect("Agent Aの相手TEMP読取結果")
+            .parse::<i32>()
+            .expect("Agent Aの相手TEMP HRESULT");
+        let agent_b_temp_read_hresult = peer_write_result
+            .lines()
+            .find_map(|line| line.strip_prefix("相手TEMP読取HRESULT="))
+            .expect("Agent Bの相手TEMP読取結果")
+            .parse::<i32>()
+            .expect("Agent Bの相手TEMP HRESULT");
+        let agent_a_temp_read_exception = environment_report
+            .lines()
+            .find_map(|line| line.strip_prefix("peerTempReadException="))
+            .expect("Agent Aの相手TEMP例外型");
+        let agent_b_temp_read_exception = peer_write_result
+            .lines()
+            .find_map(|line| line.strip_prefix("相手TEMP読取例外="))
+            .expect("Agent Bの相手TEMP例外型");
+        assert_ne!(
+            agent_a_temp_read_hresult, 0,
+            "同時実行中のAgent AがAgent BのMxC TEMP目印を読めるため、task間temporary隔離が漏れている"
+        );
+        assert_ne!(
+            agent_b_temp_read_hresult, 0,
+            "同時実行中のAgent BがAgent AのMxC TEMP目印を読めるため、task間temporary隔離が漏れている"
+        );
+        assert!(
+            [agent_a_temp_read_hresult, agent_b_temp_read_hresult]
+                .iter()
+                .all(|code| *code == -2147024894 || *code == -2147024891),
+            "相手TEMPはfile不在またはAccess Deniedで拒否される: Agent A={agent_a_temp_read_hresult}, Agent B={agent_b_temp_read_hresult}"
+        );
+        assert!(
+            (agent_a_temp_read_hresult == -2147024894
+                && agent_a_temp_read_exception == "System.IO.FileNotFoundException")
+                || (agent_a_temp_read_hresult == -2147024891
+                    && agent_a_temp_read_exception == "System.UnauthorizedAccessException"),
+            "Agent Aの相手TEMP拒否はfile不在またはAccess Deniedである: HRESULT={agent_a_temp_read_hresult}, exception={agent_a_temp_read_exception}"
+        );
+        assert!(
+            (agent_b_temp_read_hresult == -2147024894
+                && agent_b_temp_read_exception == "System.IO.FileNotFoundException")
+                || (agent_b_temp_read_hresult == -2147024891
+                    && agent_b_temp_read_exception == "System.UnauthorizedAccessException"),
+            "Agent Bの相手TEMP拒否はfile不在またはAccess Deniedである: HRESULT={agent_b_temp_read_hresult}, exception={agent_b_temp_read_exception}"
+        );
+        eprintln!(
+            "同時MxC TEMP相互読取: Agent A={agent_a_temp_read_exception}/{agent_a_temp_read_hresult}, Agent B={agent_b_temp_read_exception}/{agent_b_temp_read_hresult}"
+        );
         assert!(
             !private.join("registered-write-target.txt").exists(),
             "登録secret fileへの書込みを拒否する"
@@ -1800,8 +1903,6 @@ exit 0
             b"synthetic-deep-secret-marker",
             "深い登録secretへのwriteを拒否する"
         );
-        let environment_report =
-            fs::read_to_string(environment_report).expect("sandbox内TEMP／TMP照合結果");
         eprintln!("MxC直接sandboxの合成観測: {environment_report}");
         assert!(
             environment_report.contains("hardlinkState=created-read-denied")

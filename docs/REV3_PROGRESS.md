@@ -1391,3 +1391,27 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0、11 test target、438 passed／0 failed／5 ignored。process supervision変更を含むRust helper全targetが成功した。
 - 初回の統合validatorは`.gitignore`変更後のmanifest hash不一致を検出したため、manifestを再生成して再実行した。最終の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1126 files／0 findings、Schema 151／151・negative 194、Conformance 229、登録済み10 checkがすべてpassした。development evidenceのrelease blocker 5件と`release_ready=false`は維持する。
 - この試験はJob Objectのprocess群停止だけを示す。production Broker IPC／Desktop native Owner確認、durable Audit、実Codex tool childの隔離、deadline／crash後のRecovery、AppContainer TEMPの分離・cleanupは未成立のままである。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 同時MxC child間TEMP目印の相互可視性（2026-10-01）
+
+### 成立した確認
+
+- 既存のWindows ignored probeを拡張し、Rustが生成したTask permission profile／launcher TEMP・TMPを使って、Codex CLI `0.158.0-alpha.2.1`の実MxC sandbox childを2つ同時起動した。各childは独立した合成Workspace、scratch、`CODEX_HOME`を使用し、host側barrierにより両方の検査が終わるまで双方を稼働させた。
+- 各childは自身のMxC `TEMP`へ一意な合成目印を書いて読み戻せた。相手childのTEMPに対する読み取りは、両方向とも`System.IO.FileNotFoundException`／HRESULT `-2147024894`となった。TEMPの実pathとmarker本文は保存・出力していない。隣接Workspaceを使う既存controlでは相互read／writeがAccess Denied（HRESULT `-2147024891`）、各自Workspace writeは成功した。
+- 子process診断出力に不正UTF-8が含まれた試行を一度観測したため、合成データだけを表示する当該ignored testのpipe診断をlossy UTF-8 decodeへ変更した。これはCLI本体やproduction経路の修正ではない。
+- 初回の相手TEMP読取はPowerShell `MethodInvocationException`の外側HRESULTを観測したため、inner exceptionの型とHRESULTを判定するようprobeを補正した。最終試行では双方で`System.IO.FileNotFoundException`を確認した。
+- Codex CLI childとWindows MxC sandboxの動作は当該runの`LIVE_RUNTIME`、Workspace／TEMP目印は`FIXTURE`証拠である。実model・credential・network接続、永続Codex設定、Windows保護設定の変更はない。
+
+### 検証・失敗履歴
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功（終了値0）。
+- `GUI_SHELL_CODEX_SANDBOX_TEST_EXE`にOwner指定Codex CLI実行fileを設定した後のfocused ignored test `Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`: exit 0、1 passed。相手TEMP両方向の例外型・HRESULTもassertした。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 初回はlocalhost TLS更新試験2件がWindows `ConnectionReset`／10054で失敗。個別再実行は双方passし、同じ全target commandの再実行は12 targets、438 passed／0 failed／5 ignoredでexit 0。初回失敗を成功履歴で置き換えず残す。
+- Windows Actionsはこのblockでは未使用。local Windowsでfocused LIVE_RUNTIME probeおよびRust全target検査を実行した。Application Control、registry、ACLを変更していない。
+- 初回の統合validatorは日本語厳格監査が新規診断文字列3件と進捗行1件を未局所化として指摘し、残る9検査はpassした。PowerShell block comment内の日本語記述と進捗文を補い、再度すべての開発検査を実行した。
+- 最終`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。厳格日本語監査1126 files／0 findings、Schema 151件・正常example 151件・negative fixture 194件、Conformance 230 checks、登録済み10検査すべてpass。release blockerと`release_ready=false`は維持する。
+
+### 証拠境界と未解決範囲
+
+- 相手TEMP markerが見えなかった限定結果は、TEMP rootの物理的一意性を示さない。異なる`CODEX_HOME`を使う2つの直接sandbox childに限られ、同じ`CODEX_HOME`のAgent、順次Task、再起動後のmarker残存、AppContainer TEMPの物理cleanupは未検証である。
+- production Broker／IPC、native Owner Approval、durable Audit、実Agent Task、cancel／deadline／crash時Recovery、installed product、result／diff Content Exposureは通していない。従ってcross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のままで、`task_execution=unsupported`および`release_ready=false`を維持する。

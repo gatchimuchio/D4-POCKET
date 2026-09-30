@@ -52,6 +52,12 @@ Workspace registryは、異なる実行系ID間の同一rootと通常pathで観�
 
 これは二つの直接sandbox childの指定された隣接Workspace間隔離だけを示し、production Broker／IPC、Owner確認、Approval／Audit、実Agent Task/model、製品Recovery、MxC内部temporary領域のtask間cleanup、path alias全般、installed productを示さない。cross-agent contamination全体とproduction Agent Taskは引き続き`release_blocker`であり、`task_execution=unsupported`を維持する。
 
+#### 同時MxC child間のTEMP目印相互可視性
+
+2026-10-01の追加Windows probeは、Rust生成Task permission profileを使う実Codex CLI `0.158.0-alpha.2.1`のsandbox childを2つ同時起動し、異なる合成Workspace、scratch、`CODEX_HOME`で双方が自身のMxC child `TEMP`へ一意な合成目印を書いてから、同時稼働中に相手目印を読めるか検査した。両childで自身の目印は読め、相手目印は`System.IO.FileNotFoundException`／HRESULT `-2147024894`となり読めなかった。pathやmarker本文はprobe結果へ保存しない。証拠classはchild動作の`LIVE_RUNTIME`と合成環境・目印の`FIXTURE`である。
+
+この限定結果は異なる合成`CODEX_HOME`を使う同時sandbox間で相手TEMP目印が読めないことを示すが、TEMP root自体の一意性、同一`CODEX_HOME`でのTask間隔離、順次Task／再起動後の残存、MxC内部データの物理削除を示さない。production Broker／IPC、Owner Approval、永続Audit／Recovery、実Task、installed productも通らない。従ってTEMP cleanup、production Agent Task、cross-agent contamination全体は引き続き`release_blocker`であり、`task_execution=unsupported`を維持する。
+
 owner起動設定でCodex runtimeと同じ`runtime_id`を持つWorkspaceについては、Broker起動前にAdapter固定作業pathとWorkspace rootをnofollowで開き、device ID／file IDが一致しない設定を拒否する。設定拒否は`CONFIG`として監査する。対話開始ではAgent AdapterにWorkspace IDを明示させ、Workspace registryが現在保持する登録とruntime IDの一致をRust Brokerで確認した後、Sessionへ結合し、別AuditEventへ登録hashを含む関係を記録する。Codex Adapterは登録時に固定rootの(device ID, file ID)を保持し、各taskのprocess spawn直前にnofollowで開き直して一致しないrootを拒否する。Windowsではvolume rootからworkspaceまでのdirectory handleをprocess spawn完了まで保持し、通常のNTFS path上でのdirectory rename／deleteによる差し替えを防ぐ。これはpath alias全般、管理者が作るmount等、Unixのcheck-to-spawn raceを網羅しない。実Agentの別Workspace書込隔離、Taskの成功、比較・Handoffの許可にも使わない。Mobile Device LinkのWorkspace選択は、認証済み一覧からWorkspace ID／Runtime IDのみを返す許可済み経路として実装する。Rust Brokerの通常Workspace一覧handlerでRuntime対応を検査し、Device Link応答ではpath・登録hash・Approval metadataを除去する。Mobile選択値はSession要求に過ぎずAuthorityを与えず、Task実行には作業Task専用の別Owner Approvalが必要である。実機TLS統合とinstalled productでの証拠は未成立。
 
 Desktop側の比較可否は2〜8件、比較用Session ID／Agent runtime IDの形式、識別不能なAgent runtime ID、空でないWorkspace参照、Session ID／Agent runtime ID／Workspace参照の重複を検査する。ここで使うsnapshotのAgent runtime IDやWorkspace文字列は宣言値に過ぎず、実Agent identity、実Workspace隔離、path alias／junction不在の証明ではない。UIは「Agent runtime IDとWorkspace参照の重複なし」とだけ表示し、実行時隔離を確認済みと表示しない。実Agent比較はBrokerの独立Workspace bindingと実行経路が成立するまで未接続である。
