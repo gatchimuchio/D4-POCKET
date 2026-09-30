@@ -1468,3 +1468,11 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - Rust全target試験の初回は、既存`failed_replacement_keeps_the_existing_corrupt_package_unchanged`がlocalhost HTTPS試験中に接続resetで失敗し、391 passed／1 failed／5 ignoredとなった。同testの単独再実行は1 passed／0 failed、その後の全再実行は12 target、438 passed／0 failed／5 ignoredで完了した。初回失敗を成功へ読み替えず、再現しなかったnetwork試験失敗として履歴に保持する。
 - `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（230 checks）、局所`rustfmt` check、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`がすべて合格した。strict日本語監査1126 files／0 findings、Schema 151／example 151／negative 194、release blocker 31、`post_v1_scope` 2、`release_ready=false`を維持した。
 - run #8はfixtureのReceipt／Manifestだけを使い、Broker生成・Owner authority・runtime Manifest消費・署名・installer・installed起動を検証していない。release blockerは解除せず、次工程はBroker生成Receipt／Manifestによるunsigned test bundleとOwner No／Yes、隔離profile、Audit／identity分離の実証である。
+
+## R2追補 Windows起動器正本のExport build接続記述を同期（2026-10-01）
+
+- 現行`docs/specs/gui-shell-export.md`、`docs/specs/gui-shell-module-pruning.md`および`tooling/export_windows_product.py`は、Schema検証済みManifestのApp ID／Audit store IDをRust compile-timeへ渡すDeveloper専用Windows bundle buildを定義・実装している。一方、`docs/specs/windows-desktop-launcher.md`にはbuild tool未接続・将来実装とする旧記述が残り、同じ正本索引内で矛盾していた。
+- 起動器正本を実装とExport意味正本へ同期し、現在のDeveloper build補助はcompile-time identityとidentity別Cargo targetを使う一方、runtime Manifest消費・Owner承認済みproduction Export・installed productを成立させない境界を明記した。
+- これは文書整合性の修正であり、Export Owner path、正式製品build、installed runtime、署名・Installerのrelease blocker状態を変更しない。
+- 記述変更直後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はConformanceとpackaging portabilityが失敗した。`run_conformance_skeleton.py`の起動器境界検査が未接続／将来実装という旧文言を要求していた。packaging portabilityのnested Conformance実行も同じ旧assertionを検出し、`fatal: not a git repository`診断を含め失敗した。
+- Conformanceの境界検査を弱めず、現在のDeveloper compile-time接続と、runtime Manifest消費／Owner承認済みproduction Exportが未成立であることを要求するassertionへ改めた。`python -X utf8 -m py_compile tooling/conformance_tests/run_conformance_skeleton.py`、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（230 checks）、最終の同`validate_all.py`はexit 0となり、packaging portabilityも合格した。release blocker 31件、`post_v1_scope` 2件、`release_ready=false`に変更はない。

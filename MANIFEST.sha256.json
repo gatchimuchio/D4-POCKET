@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "53a43da0703507cd1b5150ced7a12134281f8c72fc9969745540f9036ec5c84a"
+      "sha256": "372676187d513d66d6ce104796e4065642a1dc9f29600b1df404daae79967041"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1464,7 +1464,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "472f9ca37b3e4be316de74b631f543077eea0a943390bcf385bbc66ad55ee581"
+      "sha256": "2d16eaa9656b0ed7ae7e8308861d99acb5b39b4ebb17ede0fdb8d6bb29c1ddd8"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -4432,7 +4432,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "f532eb7503d5d7355dd67a0d859431c501dc700ad7e2d2b8face1bf694356943"
+      "sha256": "343f4d34f0ba35d4af8b99d1fbcecb7e835b5a76db35fc1de1cb0b79f4179939"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

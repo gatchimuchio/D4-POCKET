@@ -3063,8 +3063,9 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
         "GUI_SHELL_PRODUCT_AUDIT_STORE_ID",
         "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>",
         "旧runtimeからのcopy／migration／継承は行わない",
-        "現時点でManifestから製品buildへ値を渡すExport build toolは未接続である",
-        "将来Export build toolを実装する際は識別子ごとに分離したCargo target directoryを使い",
+        "Developer専用の`tooling/export_windows_product.py`はSchema検証済みManifestから両IDをRust Release buildのcompile-time入力へ渡し",
+        "このbuild補助はruntime Manifest消費やOwner承認済みproduction Export pathではない",
+        "現行Developer専用Export build toolは識別子ごとに分離したCargo target directoryを使い",
         "compile-time identityはFlutter childへ渡さない",
     ):
         if token not in launcher_doc:
