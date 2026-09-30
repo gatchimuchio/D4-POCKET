@@ -43,7 +43,7 @@
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "Flutter 3.44.0 Releaseのcollector v15診断専用実行でControl View 122要素、必須4画面領域、tray通常終了、Setup Doctor製品報告の成功を観測した。Setup Doctor画面そのものの操作者向け可読性、別profileでの正式証拠、strict validator合格は未成立です。",
-      "required_action": "v15 collectorをstage時と異なるuser profileからclean-source Windows Releaseへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集してtooling/windows_release_evidence.pyへ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。"
+      "required_action": "collector v16をstage時と異なるuser profileからclean-source Windows Releaseへ実行し、MainWindowへ結合したSetup Doctor UIAutomation text・topmost HWND sample、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを同一evidence bundleで収集してtooling/windows_release_evidence.pyへ通す。v16の実UIA実行は未確認のため、実行していない状態でoperator readabilityを合格へしない。pixel／contrastとscreen reader実操作は別の検証対象として範囲を明示し、Flutter engine更新時はUIA／screen reader互換性を再確認する。"
     },
     {
       "name": "windows_broker_installed_smoke",

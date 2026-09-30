@@ -1829,6 +1829,98 @@ def _valid_windows_installed_evidence() -> dict:
         "payload_hash": setup_report_sha256,
         "event_hash": "sha256:" + "d" * 64,
     }
+    ui_window_rect = {"x": 0, "y": 0, "width": 1920, "height": 1080}
+    ui_required_elements = []
+    ui_y = 160
+    def add_ui_observation(key: str, expected: str) -> None:
+        nonlocal ui_y
+        index = len(ui_required_elements)
+        ui_required_elements.append({
+            "key": key,
+            "expected": expected,
+            "matched": True,
+            "scroll_pass": 1,
+            "observation": {
+                "process_id": 1234,
+                "window_runtime_id": "window-1",
+                "runtime_id": f"ui-{index}",
+                "parent_runtime_id": "window-1",
+                "name": expected,
+                "control_type": "ControlType.Text",
+                "is_offscreen": False,
+                "bounding_rectangle": {"x": 260, "y": ui_y, "width": 800, "height": 22},
+                "visible_sample": {"x": 300, "y": ui_y + 10, "topmost_native_window_handle": 100},
+            },
+        })
+        ui_y += 28
+    add_ui_observation("page_title", "環境診断")
+    add_ui_observation("status_summary", "診断状態: 正常")
+    add_ui_observation("scope_notice", "この診断はPermissionやApprovalを作らず、製品リリースの完成判定にも使いません。")
+    add_ui_observation("authority_notice", "インストーラーは権限を付与しません。")
+    add_ui_observation("approval_notice", "インストーラーはPermissionを自動承認しません。")
+    status_labels = {"pass": "正常", "warning": "確認が必要", "fail": "問題あり"}
+    check_titles = {
+        "setup_doctor.ran_from_installed_app_path": "製品配置",
+        "setup_doctor.runtime_connection": "Broker接続",
+        "setup_doctor.authority_boundary": "権限境界",
+        "setup_doctor.network_public_bind": "通信範囲",
+        "setup_doctor.recovery_instruction": "復旧案内",
+        "setup_doctor.audit_storage": "監査保存",
+        "setup_doctor.config_created": "初回設定",
+    }
+    for check in setup_checks:
+        prefix = f"check:{check['check_id']}"
+        add_ui_observation(f"{prefix}:title", check_titles[check["check_id"]])
+        add_ui_observation(f"{prefix}:status", status_labels[check["status"]])
+        add_ui_observation(f"{prefix}:message", check["message"])
+        if check["status"] != "pass":
+            add_ui_observation(f"{prefix}:recovery", check["recovery_instruction"])
+    ui_proof = {
+        "evidence_version": 1,
+        "status": "passed",
+        "source": "uiautomation",
+        "evidence_class": "LIVE_RUNTIME",
+        "measurement_scope": "前景の可視UI Automation文字と最前面点の観測",
+        "visual_contrast_measured": False,
+        "screen_reader_executed": False,
+        "collector": "installer/windows/collect_installed_smoke.ps1",
+        "collector_version": "16",
+        "captured_at": "2026-06-05T00:00:00Z",
+        "run_id": "run-20260605T000000Z-a1b2c3d4-smoke-0123",
+        "process_id": 1234,
+        "main_window_handle": 100,
+        "report_sha256": setup_report_sha256,
+        "navigation": {
+            "label": "診断",
+            "action": "visible_uia_element_pointer_click",
+            "matched": True,
+            "observation": {
+                "process_id": 1234,
+                "window_runtime_id": "window-1",
+                "runtime_id": "nav-1",
+                "name": "診断\nタブ: 2/20",
+                "control_type": "ControlType.Text",
+                "is_offscreen": False,
+                "bounding_rectangle": {"x": 30, "y": 300, "width": 100, "height": 48},
+                "visible_sample": {"x": 50, "y": 320, "topmost_native_window_handle": 100},
+            },
+        },
+        "window": {
+            "runtime_id": "window-1",
+            "native_window_handle": 100,
+            "parent_runtime_id": "",
+            "process_id": 1234,
+            "name": "D4 Pocket",
+            "control_type": "ControlType.Window",
+            "is_offscreen": False,
+            "bounding_rectangle": ui_window_rect,
+        },
+        "scroll_passes": 1,
+        "required_elements": ui_required_elements,
+        "errors": [],
+    }
+    ui_evidence_path = r"C:\evidence\setup-doctor-ui.json"
+    ui_evidence_sha256 = "sha256:" + "5" * 64
     data = {
         "platform": "windows",
         "provenance": {
@@ -1858,6 +1950,7 @@ def _valid_windows_installed_evidence() -> dict:
             "evidence_bundle_sha256": "sha256:" + "4" * 64,
             "evidence_bundle_files": [
                 {"kind": "setup_doctor", "path": setup_report_path, "exists": True, "sha256": setup_report_sha256},
+                {"kind": "setup_doctor_operator_readability", "path": ui_evidence_path, "exists": True, "sha256": ui_evidence_sha256},
                 {"kind": "broker_smoke", "path": r"C:\evidence\broker.json", "sha256": "sha256:" + "6" * 64},
                 {"kind": "broker_lifecycle_audit", "path": r"C:\evidence\broker-audit.jsonl", "sha256": "sha256:" + "a" * 64},
                 {"kind": "first_run_configuration", "path": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store\first_run_configuration.json", "exists": True, "sha256": "sha256:" + "c" * 64},
@@ -1882,7 +1975,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "15",
+            "collector_version": "16",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -2096,6 +2189,17 @@ def _valid_windows_installed_evidence() -> dict:
             },
             "ran_from_installed_app_path": True,
             "operator_readable": True,
+            "operator_readability_evidence": {
+                "source": "uiautomation",
+                "evidence_class": "LIVE_RUNTIME",
+                "status": "passed",
+                "path": ui_evidence_path,
+                "sha256": ui_evidence_sha256,
+                "process_id": 1234,
+                "run_id": ui_proof["run_id"],
+                "report_sha256": setup_report_sha256,
+            },
+            "operator_readability_proof": ui_proof,
             "installer_grants_authority": False,
             "installer_silently_approves_permissions": False,
             "checks": setup_checks,
@@ -2362,6 +2466,37 @@ def test_windows_setup_doctor_does_not_promote_unknown_to_release_pass() -> list
     if result_by_name["windows_setup_doctor_smoke"].classification != "release_blocker":
         return ["strict Windows Setup Doctor validatorがunknown checkをrelease証拠として受け入れた"]
     return []
+
+
+def test_windows_setup_doctor_readability_requires_bound_visible_uia_evidence() -> list[str]:
+    mutations = (
+        ("UIA proof欠落", lambda data: data["setup_doctor"].pop("operator_readability_proof")),
+        ("別Frontend PID", lambda data: data["setup_doctor"]["operator_readability_proof"].update(process_id=9999)),
+        ("証拠範囲の改変", lambda data: data["setup_doctor"]["operator_readability_proof"].update(visual_contrast_measured=True)),
+        ("別主画面Handle", lambda data: data["setup_doctor"]["operator_readability_proof"].update(main_window_handle=12345)),
+        ("無関係なUIA主画面", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"].update(window_runtime_id="foreign-window")),
+        ("別窓に覆われた表示点", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"]["visible_sample"].update(topmost_native_window_handle=777)),
+        ("表示点が要素外", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"]["visible_sample"].update(x=1800)),
+        ("画面外要素", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"].update(is_offscreen=True)),
+        ("画面範囲外座標", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"]["bounding_rectangle"].update(x=3000)),
+        ("集約された偽表示", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"].update(name="環境診断 診断状態: 正常")),
+        ("重複ラベルの偽表示", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"].update(name="環境診断 環境診断")),
+        ("空のreport message", lambda data: data["setup_doctor"]["checks"][0].update(message="")),
+        ("同一runtime ID再利用", lambda data: data["setup_doctor"]["operator_readability_proof"]["required_elements"][1]["observation"].update(runtime_id=data["setup_doctor"]["operator_readability_proof"]["required_elements"][0]["observation"]["runtime_id"])),
+        ("sidecar未結合", lambda data: data["provenance"]["evidence_bundle_files"].__setitem__(slice(None), [record for record in data["provenance"]["evidence_bundle_files"] if record["kind"] != "setup_doctor_operator_readability"])),
+    )
+    errors = []
+    for label, mutate in mutations:
+        bad = _valid_windows_installed_evidence()
+        mutate(bad)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result = {item.name: item for item in results}["windows_setup_doctor_smoke"]
+        if result.classification != "release_blocker":
+            errors.append(f"Setup Doctor operator-readability validatorが{label}を受け入れた")
+    return errors
 
 
 def test_windows_release_evidence_requires_accepted_broker_health_audit() -> list[str]:
@@ -2993,8 +3128,21 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "15"' not in text:
-        errors.append("collect_installed_smoke.ps1の版識別子がControl Viewのbounded UIAutomation収集を表さない")
+    if 'collector_version = "16"' not in text:
+        errors.append("collect_installed_smoke.ps1の版識別子がSetup Doctorの実画面UIAutomation収集を表さない")
+    for token in (
+        "function Collect-SetupDoctorOperatorReadability",
+        "visible_uia_element_pointer_click",
+        "operator_readability_proof",
+        'New-EvidenceFileRecord -Kind "setup_doctor_operator_readability"',
+        "Get-SetupDoctorVisibleSample",
+        "WindowRootHandleAt",
+        "WindowProcessIdAt",
+        "NativeWindowHandle",
+        "window_runtime_id = $state.root_runtime_id",
+    ):
+        if token not in text:
+            errors.append(f"collect_installed_smoke.ps1に実画面可読性証拠の境界がない: {token}")
     return errors
 
 
@@ -9698,6 +9846,7 @@ def main() -> int:
         test_windows_release_evidence_rejects_unbound_first_run_config_audit,
         test_windows_release_evidence_validator_rejects_external_setup_probe_as_product_evidence,
         test_windows_setup_doctor_does_not_promote_unknown_to_release_pass,
+        test_windows_setup_doctor_readability_requires_bound_visible_uia_evidence,
         test_windows_release_evidence_requires_accepted_broker_health_audit,
         test_windows_release_evidence_requires_verified_launcher_child,
         test_windows_release_evidence_requires_normal_frontend_exit,

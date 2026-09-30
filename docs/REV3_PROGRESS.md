@@ -2,6 +2,16 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## Windows Setup Doctor UIAutomation収集器 v16 実装（2026-10-01）
+
+- v15で未収集だったSetup Doctor専用画面について、製品FrontendのMainWindowHandleとUIA runtime IDへ束縛した診断ナビゲーション、画面見出し、status、authority notice、各checkのtitle／status／message／non-pass recovery textを収集するv16 pathを追加した。観測対象は同一PID・同一MainWindowのControl Viewに限定し、scrollは最大17回、node数は既存上限内とする。
+- global pointer入力は、操作直前にforeground PID、WindowFromPoint PID、root HWNDを照合し、対象Frontend MainWindow以外へclick／wheelを送らない。各観測要素はUIA `IsOffscreen`、親子geometry交差に加え、要素内sample pointで最前面root HWNDを記録する。各要素はrun ID、Frontend PID／HWND、report hash、同じevidence bundleのsidecar hashへ結合する。
+- UIA観測は実画面text controlが露出している範囲の`LIVE_RUNTIME`証拠である。pixel／contrastの判定とscreen reader実操作は計測しない。Microsoftの[`IsOffscreen`仕様](https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.automationelement.automationelementinformation.isoffscreen?view=windowsdesktop-10.0)は別windowによる遮蔽をこの値で判定しないと明記するため、topmost HWND sampleを追加したが、文字全体のpixel描画品質を証明するものではない。
+- validator negative coverageにMainWindow／PID取り違え、foreign overlay sample、画面外、範囲外座標、aggregate／重複文字、空message、runtime ID再利用、sidecar不結合を追加した。synthetic fixtureはvalidator構造だけを試し、製品UIの実測証拠ではない。
+- 検証: `python -m py_compile tooling/windows_release_evidence.py tooling/conformance_tests/run_conformance_skeleton.py`、対象negative test（13 mutation、全てrelease blockerへfail-closed）、Win32 interop `Add-Type` compile、PowerShell AST parse、`git diff --check`が成功。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0。内訳は厳格日本語監査1126 file／0 finding、Schema 151／example 151／negative fixture 194、Conformance 230 checks、Manifest 1123 file、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32 development auditが成功。集約結果はrelease blocker 31件、`release_ready=false`。
+- 実際のv16製品UIA runと別profile formal collectorは未実行。pixel／contrast・screen reader実操作も未検証。手動Actionsは起動していない。synthetic fixture／静的検査はこれらのruntime proofを代替しない。
+- `windows_setup_doctor_smoke`、Windows installed first-run、および関連release blockerを維持する。release-ready／Technical Completeは未成立。
+
 ## R2追補 Windows native Owner確認dialogのローカル実操作試験（2026-09-30）
 
 ### 成立した範囲

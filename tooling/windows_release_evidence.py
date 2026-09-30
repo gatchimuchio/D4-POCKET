@@ -47,6 +47,7 @@ REQUIRED_BROKER_TRUE_FIELDS = {
 AGGREGATE_SURFACE_TEXT = "GUI Shell Dashboard NavigationRail Runtime Status Invariant Status"
 BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS = {
     "setup_doctor",
+    "setup_doctor_operator_readability",
     "broker_smoke",
     "broker_lifecycle_audit",
     "first_run_configuration",
@@ -807,6 +808,7 @@ def validate_setup_doctor(data: dict[str, Any]) -> EvidenceResult:
             errors.append("Setup Doctor が installed app path から実行されなかった")
         if not setup.get("operator_readable"):
             errors.append("Setup Doctor の operator readability を確認できなかった")
+        errors.extend(_validate_setup_doctor_operator_readability(data, setup))
         if setup.get("installer_grants_authority") is not False:
             errors.append("Setup Doctor の installer_grants_authority は false でなければならない")
         if setup.get("installer_silently_approves_permissions") is not False:
@@ -919,6 +921,235 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
         "Windows installed-path broker の launch/connect/restart/crash と一時資格file削除 evidence が機械検証に合格した。no-Python/no-FFI は個別に分類された static evidence または installed-launch evidence のままである。",
         "release candidate ごとに broker の installed-path smoke evidence を最新に保つ。",
     )
+
+
+def _setup_doctor_status_label(value: Any) -> str:
+    return {
+        "pass": "正常",
+        "warning": "確認が必要",
+        "fail": "問題あり",
+    }.get(str(value), "不明")
+
+
+def _setup_doctor_check_title(value: Any) -> str:
+    return {
+        "setup_doctor.ran_from_installed_app_path": "製品配置",
+        "setup_doctor.runtime_connection": "Broker接続",
+        "setup_doctor.authority_boundary": "権限境界",
+        "setup_doctor.network_public_bind": "通信範囲",
+        "setup_doctor.recovery_instruction": "復旧案内",
+        "setup_doctor.audit_storage": "監査保存",
+        "setup_doctor.config_created": "初回設定",
+    }.get(str(value), "その他の診断項目")
+
+
+def _rect_intersects_window(rect: Any, window: Any) -> bool:
+    required = ("x", "y", "width", "height")
+    if not isinstance(rect, dict) or not isinstance(window, dict):
+        return False
+    values = [rect.get(key) for key in required]
+    window_values = [window.get(key) for key in required]
+    if any(type(value) not in (int, float) or not math.isfinite(value) for value in values + window_values):
+        return False
+    x, y, width, height = values
+    wx, wy, wwidth, wheight = window_values
+    if width <= 0 or height <= 0 or wwidth <= 0 or wheight <= 0:
+        return False
+    return min(x + width, wx + wwidth) > max(x, wx) and min(y + height, wy + wheight) > max(y, wy)
+
+
+def _point_inside_rect(point: Any, rect: Any) -> bool:
+    if not isinstance(point, dict) or not isinstance(rect, dict):
+        return False
+    x, y = point.get("x"), point.get("y")
+    rx, ry, width, height = (rect.get(key) for key in ("x", "y", "width", "height"))
+    values = (x, y, rx, ry, width, height)
+    if any(type(value) not in (int, float) or not math.isfinite(value) for value in values):
+        return False
+    return width > 0 and height > 0 and rx <= x < rx + width and ry <= y < ry + height
+
+
+def _validate_setup_doctor_operator_readability(data: dict[str, Any], setup: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    proof = setup.get("operator_readability_proof")
+    reference = setup.get("operator_readability_evidence")
+    if setup.get("operator_readable") is not True:
+        errors.append("Setup Doctor の operator_readable は実画面証拠に基づき true でなければならない")
+    if not isinstance(proof, dict):
+        return errors + ["Setup Doctor の実UIAutomation operator-readability proof がない"]
+    if not isinstance(reference, dict):
+        errors.append("Setup Doctor の operator-readability evidence参照がない")
+    else:
+        for key, expected in (
+            ("source", "uiautomation"),
+            ("evidence_class", "LIVE_RUNTIME"),
+            ("status", "passed"),
+            ("process_id", _get(data, "first_run.process_id")),
+            ("run_id", _get(data, "provenance.isolation.run_id")),
+            ("report_sha256", setup.get("report_sha256")),
+        ):
+            if reference.get(key) != expected:
+                errors.append(f"Setup Doctor操作者向け可読性証拠の{key}が検証済みruntime／reportと一致しない")
+        if not _is_sha256_tag(reference.get("sha256")) or not reference.get("path"):
+            errors.append("Setup Doctor operator-readability sidecarのpathまたはSHA-256がない")
+        bundle_files = _get(data, "provenance.evidence_bundle_files")
+        records = [
+            item for item in bundle_files or []
+            if isinstance(item, dict) and item.get("kind") == "setup_doctor_operator_readability"
+        ] if isinstance(bundle_files, list) else []
+        if (
+            len(records) != 1
+            or records[0].get("exists") is not True
+            or records[0].get("path") != reference.get("path")
+            or records[0].get("sha256") != reference.get("sha256")
+        ):
+            errors.append("Setup Doctor operator-readability sidecarが同一evidence bundleへhash結合されていない")
+    if proof.get("evidence_version") != 1 or proof.get("status") != "passed":
+        errors.append("Setup Doctor operator-readability proofはversion 1のpassedでなければならない")
+    if (
+        proof.get("source") != "uiautomation"
+        or proof.get("evidence_class") != "LIVE_RUNTIME"
+        or proof.get("measurement_scope") != "前景の可視UI Automation文字と最前面点の観測"
+        or proof.get("visual_contrast_measured") is not False
+        or proof.get("screen_reader_executed") is not False
+        or proof.get("collector") != "installer/windows/collect_installed_smoke.ps1"
+        or proof.get("collector_version") != "16"
+        or proof.get("process_id") != _get(data, "first_run.process_id")
+        or proof.get("run_id") != _get(data, "provenance.isolation.run_id")
+        or proof.get("report_sha256") != setup.get("report_sha256")
+    ):
+        errors.append("Setup Doctor operator-readability proofのsource／process／run／report結合が不正")
+    if proof.get("errors") != []:
+        errors.append("Setup Doctor operator-readability proofに収集失敗がある")
+    if type(proof.get("scroll_passes")) is not int or not 1 <= proof["scroll_passes"] <= 17:
+        errors.append("Setup Doctor画面の移動回数が範囲外")
+
+    window = proof.get("window")
+    if (
+        not isinstance(window, dict)
+        or window.get("process_id") != proof.get("process_id")
+        or window.get("control_type") != "ControlType.Window"
+        or not isinstance(window.get("runtime_id"), str)
+        or not window.get("runtime_id")
+        or type(window.get("native_window_handle")) is not int
+        or window.get("native_window_handle", 0) <= 0
+        or type(proof.get("main_window_handle")) is not int
+        or proof.get("main_window_handle") != window.get("native_window_handle")
+        or proof.get("main_window_handle") != _get(data, "first_run.main_window_handle")
+        or not isinstance(window.get("bounding_rectangle"), dict)
+        or not _rect_intersects_window(window.get("bounding_rectangle"), window.get("bounding_rectangle"))
+    ):
+        errors.append("Setup Doctor operator-readability windowは同じFrontendの実UIA windowでない")
+        window_rect = None
+    else:
+        window_rect = window["bounding_rectangle"]
+
+    navigation = proof.get("navigation")
+    nav_observation = navigation.get("observation") if isinstance(navigation, dict) else None
+    if (
+        not isinstance(navigation, dict)
+        or navigation.get("label") != "診断"
+        or navigation.get("action") != "visible_uia_element_pointer_click"
+        or navigation.get("matched") is not True
+        or not isinstance(nav_observation, dict)
+        or nav_observation.get("process_id") != proof.get("process_id")
+        or nav_observation.get("window_runtime_id") != (window.get("runtime_id") if isinstance(window, dict) else None)
+        or nav_observation.get("control_type") != "ControlType.Text"
+        or str(nav_observation.get("name", "")).splitlines()[0].strip() != "診断"
+        or nav_observation.get("is_offscreen") is not False
+        or not isinstance(nav_observation.get("runtime_id"), str)
+        or not nav_observation.get("runtime_id")
+        or nav_observation.get("runtime_id") == (window.get("runtime_id") if isinstance(window, dict) else None)
+        or not _rect_intersects_window(nav_observation.get("bounding_rectangle"), window_rect)
+        or not _point_inside_rect(nav_observation.get("visible_sample"), nav_observation.get("bounding_rectangle"))
+        or not _point_inside_rect(nav_observation.get("visible_sample"), window_rect)
+        or not isinstance(nav_observation.get("visible_sample"), dict)
+        or nav_observation["visible_sample"].get("topmost_native_window_handle") != proof.get("main_window_handle")
+    ):
+        errors.append("Setup Doctorへの遷移が同じFrontendの可視『診断』UI操作として観測されていない")
+
+    expected: dict[str, str] = {
+        "page_title": "環境診断",
+        "status_summary": "診断状態: " + _setup_doctor_status_label(setup.get("status")),
+        "scope_notice": "この診断はPermissionやApprovalを作らず、製品リリースの完成判定にも使いません。",
+        "authority_notice": "インストーラーは権限を付与しません。",
+        "approval_notice": "インストーラーはPermissionを自動承認しません。",
+    }
+    checks = setup.get("checks")
+    if isinstance(checks, list):
+        seen_check_ids: set[str] = set()
+        for check in checks:
+            if not isinstance(check, dict) or not isinstance(check.get("check_id"), str):
+                errors.append("Setup Doctor UI表示と対応づけるcheck recordが不正")
+                continue
+            if check["check_id"] in seen_check_ids:
+                errors.append("Setup Doctor UI表示と対応づけるcheck_idが重複")
+            seen_check_ids.add(check["check_id"])
+            prefix = f"check:{check['check_id']}"
+            expected[f"{prefix}:title"] = _setup_doctor_check_title(check["check_id"])
+            expected[f"{prefix}:status"] = _setup_doctor_status_label(check.get("status"))
+            message = check.get("message")
+            if not isinstance(message, str) or not message.strip():
+                errors.append(f"Setup Doctor {check['check_id']} messageが空でUI表示を証明できない")
+            expected[f"{prefix}:message"] = message if isinstance(message, str) else ""
+            if check.get("status") != "pass":
+                recovery = check.get("recovery_instruction")
+                if not isinstance(recovery, str) or not recovery.strip():
+                    errors.append(f"Setup Doctor {check['check_id']} recovery_instructionが空である")
+                expected[f"{prefix}:recovery_heading"] = "次に行うこと"
+                expected[f"{prefix}:recovery"] = recovery if isinstance(recovery, str) else ""
+    else:
+        errors.append("Setup Doctor UIとの照合対象checksがlistでない")
+
+    actual = proof.get("required_elements")
+    if not isinstance(actual, list) or len(actual) != len(expected):
+        errors.append("Setup Doctor operator-readability proofのrequired element数が期待値と一致しない")
+        actual = actual if isinstance(actual, list) else []
+    by_key = {item.get("key"): item for item in actual if isinstance(item, dict) and isinstance(item.get("key"), str)}
+    if len(by_key) != len(actual):
+        errors.append("Setup Doctor operator-readability proofに不正または重複element keyがある")
+    if set(by_key) != set(expected):
+        errors.append("Setup Doctor operator-readability proofの要求表示項目がreportと一致しない")
+
+    used_runtime_ids: set[str] = set()
+    if isinstance(nav_observation, dict) and isinstance(nav_observation.get("runtime_id"), str):
+        used_runtime_ids.add(nav_observation["runtime_id"])
+    for key, text in expected.items():
+        item = by_key.get(key)
+        observation = item.get("observation") if isinstance(item, dict) else None
+        if (
+            not isinstance(item, dict)
+            or item.get("expected") != text
+            or item.get("matched") is not True
+            or type(item.get("scroll_pass")) is not int
+            or not 1 <= item["scroll_pass"] <= (proof.get("scroll_passes") if type(proof.get("scroll_passes")) is int else 0)
+            or not isinstance(observation, dict)
+        ):
+            errors.append(f"Setup Doctor画面要素{key}がreportの正確な表示証拠として不完全")
+            continue
+        runtime_id = observation.get("runtime_id")
+        observed_name = _normalised_text(observation.get("name"))
+        if (
+            observation.get("process_id") != proof.get("process_id")
+            or observation.get("window_runtime_id") != (window.get("runtime_id") if isinstance(window, dict) else None)
+            or observation.get("is_offscreen") is not False
+            or observation.get("control_type") not in {"ControlType.Text", "ControlType.Custom"}
+            or not isinstance(runtime_id, str)
+            or not runtime_id
+            or runtime_id in used_runtime_ids
+            or observed_name != _normalised_text(text)
+            or not _rect_intersects_window(observation.get("bounding_rectangle"), window_rect)
+            or not _point_inside_rect(observation.get("visible_sample"), observation.get("bounding_rectangle"))
+            or not _point_inside_rect(observation.get("visible_sample"), window_rect)
+            or not isinstance(observation.get("visible_sample"), dict)
+            or observation["visible_sample"].get("topmost_native_window_handle") != proof.get("main_window_handle")
+            or not isinstance(observation.get("parent_runtime_id"), str)
+            or not observation.get("parent_runtime_id")
+        ):
+            errors.append(f"Setup Doctor画面要素{key}は固有かつ可視の個別UI Automation要素ではない")
+        if isinstance(runtime_id, str):
+            used_runtime_ids.add(runtime_id)
+    return errors
 
 
 def validate_audit_anchor_external_tamper_evidence(data: dict[str, Any]) -> EvidenceResult:

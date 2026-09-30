@@ -16,8 +16,8 @@ Windows優先のリリース検証では、分離され、機械可読なイン�
 - item: native Windows Setup Doctor product evidence unresolved
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: 現行sourceのDiagnosticOnly installed runではreport・初回設定・Audit hash結合を実測したが、UIAutomationが必須surfaceを認識せず、operator readabilityは未成立。終了時cleanup errorがあり、別profileのformal evidenceも未取得。strict validatorはDiagnosticOnlyを受理しない。
-  required_action: Flutter/Dart semanticsによる個別surface観測と通常終了を成立させ、stage時と異なるuser profileでformal runを行う。固定store config/report、accepted Audit hash、画面を収集し、全checkがpassのときだけstrict validatorへ入力する。
+  reason: 直近の実行済みv15 DiagnosticOnly runは必須surface・通常終了・reportとAudit hashの一致を観測したが、stage ownerと同じprofileでstrict evidenceではない。現行sourceのv16 UIAutomation text／topmost-window proofはまだ実UIで実行しておらず、pixel／contrast・screen readerも測っていない。
+  required_action: collector v16をclean-source Windows Releaseとstage時と異なるprofileで実行し、Frontend MainWindowへ結合したSetup Doctor text／visible sample、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを同一bundleへ収集してstrict validatorへ通す。証拠が示さないpixel／contrast・screen reader範囲を合格と主張しない。
   blocks_release: yes
 ~~~
 

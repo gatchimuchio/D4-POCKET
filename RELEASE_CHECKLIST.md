@@ -211,7 +211,7 @@ Windows-first product path と LLM-readable substrate の demonstration path を
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
   reason: Flutter 3.44.0のRelease診断では明示的IAccessibleEx選択後にUIAutomation tree 121 nodeと必須4 surface、および通常tray終了を観測した。ただしDiagnosticOnlyの同一SID実行であり、Setup Doctor画面そのもののoperator readability、別profileのformal evidence、strict validator合格は未成立。
-  required_action: IAccessibleExを使うWindows Releaseをstage時と異なるuser profileからformal collectorへ通し、Setup Doctor画面の操作・可読性、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを収集して<code>python tooling\windows_release_evidence.py</code>へ合格させる。Flutter engine更新時もUIA surfaceとscreen readerの互換性を再確認する。
+  required_action: collector v16をclean-source Windows Releaseとstage時と異なるuser profileで実行し、MainWindowへ結合したSetup Doctor UIAutomation text／topmost sample、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを同一bundleで収集して<code>python tooling\windows_release_evidence.py</code>へ通す。v16実UIA、pixel／contrast、screen readerの未実施範囲は合格へ昇格せず、Flutter engine更新時も互換性を再確認する。
   blocks_release: yes
 
 - item: Flutter Windows UIAのexperimental IAccessibleEx依存

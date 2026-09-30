@@ -196,6 +196,69 @@ function New-EvidenceFileRecord {
   }
 }
 
+function Initialize-InstalledSmokeWin32 {
+  if ($null -ne ("GuiShellInstalledSmokeWin32V16" -as [type])) { return }
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class GuiShellInstalledSmokeWin32V16 {
+  [StructLayout(LayoutKind.Sequential)]
+  public struct NativePoint {
+    public int X;
+    public int Y;
+    public NativePoint(int x, int y) { X = x; Y = y; }
+  }
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")]
+  public static extern IntPtr WindowFromPoint(NativePoint point);
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetAncestor(IntPtr window, uint flags);
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+  [DllImport("user32.dll")]
+  public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extraInfo);
+  public static bool ClickAt(int x, int y, uint expectedProcessId, long expectedMainWindowHandle) {
+    if (!SetCursorPos(x, y)) return false;
+    if (ForegroundProcessId() != expectedProcessId || WindowProcessIdAt(x, y) != expectedProcessId ||
+        WindowRootHandleAt(x, y) != expectedMainWindowHandle) return false;
+    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    return true;
+  }
+  public static bool ScrollAt(int x, int y, int delta, uint expectedProcessId, long expectedMainWindowHandle) {
+    if (!SetCursorPos(x, y)) return false;
+    if (ForegroundProcessId() != expectedProcessId || WindowProcessIdAt(x, y) != expectedProcessId ||
+        WindowRootHandleAt(x, y) != expectedMainWindowHandle) return false;
+    mouse_event(0x0800, 0, 0, unchecked((uint)delta), UIntPtr.Zero);
+    return true;
+  }
+  public static uint ForegroundProcessId() {
+    uint processId;
+    GetWindowThreadProcessId(GetForegroundWindow(), out processId);
+    return processId;
+  }
+  public static uint WindowProcessIdAt(int x, int y) {
+    uint processId;
+    GetWindowThreadProcessId(WindowFromPoint(new NativePoint(x, y)), out processId);
+    return processId;
+  }
+  public static long WindowRootHandleAt(int x, int y) {
+    IntPtr window = WindowFromPoint(new NativePoint(x, y));
+    if (window == IntPtr.Zero) return 0;
+    IntPtr root = GetAncestor(window, 2);
+    return (root == IntPtr.Zero ? window : root).ToInt64();
+  }
+}
+"@
+}
+
 function Find-InstalledManifestPath {
   param([string]$ExePath)
 
@@ -347,21 +410,12 @@ function Request-InstalledFrontendExit {
   $windowHandle = $Frontend.MainWindowHandle
   if ($windowHandle -eq [IntPtr]::Zero) { return $false }
 
+  Initialize-InstalledSmokeWin32
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
-  if ($null -eq ("GuiShellInstalledSmokeWin32" -as [type])) {
-    Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public static class GuiShellInstalledSmokeWin32 {
-  [DllImport("user32.dll", SetLastError = true)]
-  public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-}
-"@
-  }
 
   # 通知領域controllerへ右button releaseを渡し、製品の終了menuを開く。
-  $posted = [GuiShellInstalledSmokeWin32]::PostMessage(
+  $posted = [GuiShellInstalledSmokeWin32V16]::PostMessage(
     $windowHandle,
     [uint32]0x8029,
     [IntPtr]::Zero,
@@ -993,6 +1047,404 @@ function Collect-VisibleSurfaces {
   return $capture
 }
 
+function Get-SetupDoctorElementString {
+  param($Element, [string]$PropertyName)
+  try {
+    $value = $Element.Current.$PropertyName
+    if ($null -eq $value) { return "" }
+    return $value.ToString().Trim()
+  } catch {
+    return ""
+  }
+}
+
+function Get-SetupDoctorControlType {
+  param($Element)
+  try {
+    $value = $Element.Current.ControlType.ProgrammaticName
+    if ($null -eq $value) { return "" }
+    return $value.ToString().Trim()
+  } catch {
+    return ""
+  }
+}
+
+function Get-SetupDoctorUiaState {
+  param([System.Diagnostics.Process]$Process)
+
+  $desktop = [System.Windows.Automation.AutomationElement]::RootElement
+  $desktopWalker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $windowCandidates = New-Object System.Collections.Generic.List[object]
+  $candidate = $desktopWalker.GetFirstChild($desktop)
+  $topLevelCount = 0
+  while ($null -ne $candidate) {
+    $topLevelCount += 1
+    if ($topLevelCount -gt 2048) { throw "画面上部のUI Automation window走査が上限を超えました。" }
+    try {
+      if ([int]$candidate.Current.ProcessId -eq $Process.Id -and
+          [long]$candidate.Current.NativeWindowHandle -eq [long]$Process.MainWindowHandle.ToInt64()) {
+        $windowCandidates.Add($candidate)
+      }
+    } catch { }
+    $candidate = $desktopWalker.GetNextSibling($candidate)
+  }
+  if ($windowCandidates.Count -ne 1) { throw "検証済みFrontendの主画面をUI Automationから一意に取得できません。" }
+  $window = $windowCandidates[0]
+
+  $rootRuntimeId = (($window.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join ".")
+  $rootRect = $window.Current.BoundingRectangle
+  $nodes = New-Object System.Collections.Generic.List[object]
+  $nodes.Add([ordered]@{
+    runtime_id = $rootRuntimeId
+    native_window_handle = [long]$window.Current.NativeWindowHandle
+    parent_runtime_id = ""
+    process_id = [int]$window.Current.ProcessId
+    name = Get-SetupDoctorElementString -Element $window -PropertyName "Name"
+    control_type = Get-SetupDoctorControlType -Element $window
+    is_offscreen = [bool]$window.Current.IsOffscreen
+    bounding_rectangle = [ordered]@{ x = $rootRect.X; y = $rootRect.Y; width = $rootRect.Width; height = $rootRect.Height }
+  })
+
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $pending = New-Object 'System.Collections.Generic.Stack[object]'
+  $child = $walker.GetFirstChild($window)
+  while ($null -ne $child -and $pending.Count -lt 10000) {
+    $pending.Push($child)
+    $child = $walker.GetNextSibling($child)
+  }
+  $truncated = ($null -ne $child)
+  $seen = @{ $rootRuntimeId = $true }
+  $duplicateRuntimeId = $false
+  while ($pending.Count -gt 0 -and $nodes.Count -lt 10001) {
+    $element = $pending.Pop()
+    try {
+      $runtimeId = (($element.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join ".")
+      $parent = $walker.GetParent($element)
+      $parentRuntimeId = $(if ($null -eq $parent) { "" } else { (($parent.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join ".") })
+      if ([string]::IsNullOrWhiteSpace($runtimeId) -or $seen.ContainsKey($runtimeId)) {
+        $duplicateRuntimeId = $true
+        continue
+      }
+      $seen[$runtimeId] = $true
+      $rect = $element.Current.BoundingRectangle
+      $nodes.Add([ordered]@{
+        runtime_id = $runtimeId
+        parent_runtime_id = $parentRuntimeId
+        process_id = [int]$element.Current.ProcessId
+        name = Get-SetupDoctorElementString -Element $element -PropertyName "Name"
+        control_type = Get-SetupDoctorControlType -Element $element
+        is_offscreen = [bool]$element.Current.IsOffscreen
+        bounding_rectangle = [ordered]@{ x = $rect.X; y = $rect.Y; width = $rect.Width; height = $rect.Height }
+      })
+      $next = $walker.GetFirstChild($element)
+      while ($null -ne $next -and ($nodes.Count + $pending.Count) -lt 10001) {
+        $pending.Push($next)
+        $next = $walker.GetNextSibling($next)
+      }
+      if ($null -ne $next) { $truncated = $true }
+    } catch {
+      throw "UI Automation treeが収集中に変化したか、読み取れなくなりました。"
+    }
+  }
+  if ($pending.Count -gt 0) { $truncated = $true }
+  return [pscustomobject]@{
+    window = $window
+    root_runtime_id = $rootRuntimeId
+    nodes = @($nodes.ToArray())
+    truncated = $truncated
+    duplicate_runtime_id = $duplicateRuntimeId
+  }
+}
+
+function Get-SetupDoctorVisibleSample {
+  param($Node, $Nodes, [int]$ProcessId, [long]$MainWindowHandle)
+
+  if ($null -eq $Node -or $Node.process_id -ne $ProcessId -or
+      $Node.control_type -in @("ControlType.Window", "ControlType.Pane", "ControlType.TitleBar") -or
+      $Node.is_offscreen -ne $false) { return $null }
+  $byId = @{}
+  foreach ($item in $Nodes) { $byId[$item.runtime_id] = $item }
+  $intersection = $null
+  $cursor = $Node
+  $seen = @{}
+  while ($null -ne $cursor) {
+    if ($seen.ContainsKey($cursor.runtime_id) -or $seen.Count -ge 64 -or
+        $cursor.process_id -ne $ProcessId -or $cursor.is_offscreen -ne $false) { return $null }
+    $seen[$cursor.runtime_id] = $true
+    $rect = $cursor.bounding_rectangle
+    if ($null -eq $rect) { return $null }
+    foreach ($value in @($rect.x, $rect.y, $rect.width, $rect.height)) {
+      if ($null -eq $value -or [double]::IsNaN([double]$value) -or [double]::IsInfinity([double]$value)) { return $null }
+    }
+    if ($rect.width -le 0 -or $rect.height -le 0) { return $null }
+    $bounds = @([double]$rect.x, [double]$rect.y, ([double]$rect.x + $rect.width), ([double]$rect.y + $rect.height))
+    if ($null -eq $intersection) { $intersection = $bounds }
+    else {
+      $intersection = @([Math]::Max($intersection[0], $bounds[0]), [Math]::Max($intersection[1], $bounds[1]),
+                        [Math]::Min($intersection[2], $bounds[2]), [Math]::Min($intersection[3], $bounds[3]))
+    }
+    if ($intersection[2] -le $intersection[0] -or $intersection[3] -le $intersection[1]) { return $null }
+    if ($cursor.parent_runtime_id -eq "") {
+      if ($cursor.control_type -ne "ControlType.Window") { return $null }
+      break
+    }
+    if (!$byId.ContainsKey($cursor.parent_runtime_id)) { return $null }
+    $cursor = $byId[$cursor.parent_runtime_id]
+  }
+  if ($null -eq $intersection) { return $null }
+  $sampleX = [int][Math]::Floor(($intersection[0] + $intersection[2]) / 2)
+  $sampleY = [int][Math]::Floor(($intersection[1] + $intersection[3]) / 2)
+  $topmostHandle = [GuiShellInstalledSmokeWin32V16]::WindowRootHandleAt($sampleX, $sampleY)
+  if ($topmostHandle -ne $MainWindowHandle) { return $null }
+  return [pscustomobject]@{
+    x = $sampleX
+    y = $sampleY
+    topmost_native_window_handle = $topmostHandle
+  }
+}
+
+function Get-SetupDoctorStatusLabel {
+  param([string]$Status)
+  switch ($Status) {
+    "pass" { return "正常" }
+    "warning" { return "確認が必要" }
+    "fail" { return "問題あり" }
+    default { return "不明" }
+  }
+}
+
+function Get-SetupDoctorCheckTitle {
+  param([string]$CheckId)
+  switch ($CheckId) {
+    "setup_doctor.ran_from_installed_app_path" { return "製品配置" }
+    "setup_doctor.runtime_connection" { return "Broker接続" }
+    "setup_doctor.authority_boundary" { return "権限境界" }
+    "setup_doctor.network_public_bind" { return "通信範囲" }
+    "setup_doctor.recovery_instruction" { return "復旧案内" }
+    "setup_doctor.audit_storage" { return "監査保存" }
+    "setup_doctor.config_created" { return "初回設定" }
+    default { return "その他の診断項目" }
+  }
+}
+
+function Collect-SetupDoctorOperatorReadability {
+  param(
+    [System.Diagnostics.Process]$Process,
+    [object[]]$Checks,
+    [string]$ReportStatus,
+    [string]$ReportSha256,
+    [string]$RunId,
+    [string]$OutputPath
+  )
+
+  Initialize-InstalledSmokeWin32
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $requirements = New-Object System.Collections.Generic.List[object]
+  $requirements.Add([pscustomobject]@{ key = "page_title"; expected = "環境診断" })
+  $requirements.Add([pscustomobject]@{ key = "status_summary"; expected = "診断状態: $(Get-SetupDoctorStatusLabel -Status $ReportStatus)" })
+  $requirements.Add([pscustomobject]@{ key = "scope_notice"; expected = "この診断はPermissionやApprovalを作らず、製品リリースの完成判定にも使いません。" })
+  $requirements.Add([pscustomobject]@{ key = "authority_notice"; expected = "インストーラーは権限を付与しません。" })
+  $requirements.Add([pscustomobject]@{ key = "approval_notice"; expected = "インストーラーはPermissionを自動承認しません。" })
+  foreach ($check in $Checks) {
+    $key = "check:$($check.check_id)"
+    $requirements.Add([pscustomobject]@{ key = "${key}:title"; expected = (Get-SetupDoctorCheckTitle -CheckId ([string]$check.check_id)) })
+    $requirements.Add([pscustomobject]@{ key = "${key}:status"; expected = (Get-SetupDoctorStatusLabel -Status ([string]$check.status)) })
+    $requirements.Add([pscustomobject]@{ key = "${key}:message"; expected = [string]$check.message })
+    if ([string]$check.status -ne "pass") {
+      $requirements.Add([pscustomobject]@{ key = "${key}:recovery_heading"; expected = "次に行うこと" })
+      $requirements.Add([pscustomobject]@{ key = "${key}:recovery"; expected = [string]$check.recovery_instruction })
+    }
+  }
+
+  $errors = New-Object System.Collections.Generic.List[string]
+  foreach ($requirement in $requirements) {
+    if ([string]::IsNullOrWhiteSpace([string]$requirement.expected)) {
+      $errors.Add("画面表示文字が空です: $($requirement.key)")
+    }
+  }
+  $matchesByKey = @{}
+  $scrollPasses = 0
+  $navigation = [ordered]@{ label = "診断"; action = "visible_uia_element_pointer_click"; matched = $false; observation = $null }
+  $windowEvidence = $null
+  $seenRuntimeIds = @{}
+  $mainWindowHandle = $Process.MainWindowHandle
+  $mainWindowNativeHandle = [long]$mainWindowHandle.ToInt64()
+  if ($mainWindowHandle -eq [IntPtr]::Zero) {
+    $errors.Add("verified_frontend_window_handle_missing")
+  } else {
+    $null = [GuiShellInstalledSmokeWin32V16]::SetForegroundWindow($mainWindowHandle)
+    Start-Sleep -Milliseconds 250
+    if ([GuiShellInstalledSmokeWin32V16]::ForegroundProcessId() -ne [uint32]$Process.Id) {
+      $errors.Add("verified_frontend_not_foreground")
+    }
+  }
+
+  $initialState = $null
+  if ($errors.Count -eq 0) {
+    try { $initialState = Get-SetupDoctorUiaState -Process $Process }
+    catch { $errors.Add("initial_uia_tree_unavailable") }
+  }
+  if ($null -ne $initialState) {
+    if ($initialState.truncated -or $initialState.duplicate_runtime_id) {
+      $errors.Add("navigation_uia_tree_incomplete")
+    } else {
+      $navCandidates = @($initialState.nodes | Where-Object {
+        $_.process_id -eq $Process.Id -and $_.control_type -eq "ControlType.Text" -and
+        ((($_.name -split "`r?`n")[0]).Trim() -eq "診断") -and
+        ($null -ne (Get-SetupDoctorVisibleSample -Node $_ -Nodes $initialState.nodes -ProcessId $Process.Id -MainWindowHandle $mainWindowNativeHandle))
+      })
+      if ($navCandidates.Count -ne 1) {
+        $errors.Add("visible_diagnostics_navigation_not_unique")
+      } else {
+        $nav = $navCandidates[0]
+        $navSample = Get-SetupDoctorVisibleSample -Node $nav -Nodes $initialState.nodes -ProcessId $Process.Id -MainWindowHandle $mainWindowNativeHandle
+        $rect = $nav.bounding_rectangle
+        $x = [int][Math]::Floor($rect.x + ($rect.width / 2))
+        $y = [int][Math]::Floor($rect.y + ($rect.height / 2))
+        if ([GuiShellInstalledSmokeWin32V16]::ForegroundProcessId() -ne [uint32]$Process.Id -or
+            [GuiShellInstalledSmokeWin32V16]::WindowProcessIdAt($x, $y) -ne [uint32]$Process.Id -or
+            [GuiShellInstalledSmokeWin32V16]::WindowRootHandleAt($x, $y) -ne $mainWindowNativeHandle -or
+            $null -eq $navSample -or
+            ![GuiShellInstalledSmokeWin32V16]::ClickAt($x, $y, [uint32]$Process.Id, $mainWindowNativeHandle)) {
+          $errors.Add("diagnostics_navigation_click_failed")
+        } else {
+          $navigation.matched = $true
+          $navigation.observation = [ordered]@{
+            process_id = $nav.process_id
+            window_runtime_id = $initialState.root_runtime_id
+            visible_sample = $navSample
+            runtime_id = $nav.runtime_id
+            name = $nav.name
+            control_type = $nav.control_type
+            is_offscreen = $nav.is_offscreen
+            bounding_rectangle = $nav.bounding_rectangle
+          }
+        }
+      }
+    }
+  }
+
+  $lastSignature = ""
+  $unchangedCount = 0
+  for ($pass = 0; $pass -lt 17 -and $errors.Count -eq 0; $pass += 1) {
+    if ([GuiShellInstalledSmokeWin32V16]::ForegroundProcessId() -ne [uint32]$Process.Id) {
+      $errors.Add("verified_frontend_lost_foreground_during_capture")
+      break
+    }
+    Start-Sleep -Milliseconds 180
+    $state = $null
+    try { $state = Get-SetupDoctorUiaState -Process $Process }
+    catch {
+      $errors.Add("setup_doctor_uia_tree_unavailable")
+      break
+    }
+    $scrollPasses += 1
+    if ($state.truncated -or $state.duplicate_runtime_id) {
+      $errors.Add("setup_doctor_uia_tree_incomplete")
+      break
+    }
+    if ($state.root_runtime_id -ne $initialState.root_runtime_id) {
+      $errors.Add("setup_doctor_main_window_changed_during_capture")
+      break
+    }
+    $windowNode = $state.nodes | Select-Object -First 1
+    if ($null -eq $windowEvidence) { $windowEvidence = $windowNode }
+    $headingVisible = @($state.nodes | Where-Object {
+      $_.name.Trim() -eq "環境診断" -and
+      ($null -ne (Get-SetupDoctorVisibleSample -Node $_ -Nodes $state.nodes -ProcessId $Process.Id -MainWindowHandle $mainWindowNativeHandle))
+    }).Count -gt 0
+    if (!$headingVisible) {
+      if ($pass -eq 16) { $errors.Add("setup_doctor_page_heading_not_observed") }
+    } else {
+      foreach ($requirement in $requirements) {
+        if ($matchesByKey.ContainsKey($requirement.key)) { continue }
+        $candidate = @($state.nodes | Where-Object {
+          $_.process_id -eq $Process.Id -and
+          (($_.name -replace '\s+', ' ').Trim() -ceq ($requirement.expected -replace '\s+', ' ').Trim()) -and
+          !( $seenRuntimeIds.ContainsKey($_.runtime_id) ) -and
+          ($null -ne (Get-SetupDoctorVisibleSample -Node $_ -Nodes $state.nodes -ProcessId $Process.Id -MainWindowHandle $mainWindowNativeHandle))
+        } | Select-Object -First 1)
+        if ($candidate.Count -eq 1) {
+          $node = $candidate[0]
+          $visibleSample = Get-SetupDoctorVisibleSample -Node $node -Nodes $state.nodes -ProcessId $Process.Id -MainWindowHandle $mainWindowNativeHandle
+          if ($null -eq $visibleSample) { continue }
+          $seenRuntimeIds[$node.runtime_id] = $true
+          $matchesByKey[$requirement.key] = [ordered]@{
+            key = $requirement.key
+            expected = $requirement.expected
+            matched = $true
+            scroll_pass = $scrollPasses
+            observation = [ordered]@{
+              process_id = $node.process_id
+              window_runtime_id = $state.root_runtime_id
+              visible_sample = $visibleSample
+              runtime_id = $node.runtime_id
+              parent_runtime_id = $node.parent_runtime_id
+              name = $node.name
+              control_type = $node.control_type
+              is_offscreen = $node.is_offscreen
+              bounding_rectangle = $node.bounding_rectangle
+            }
+          }
+        }
+      }
+    }
+    if ($matchesByKey.Count -eq $requirements.Count) { break }
+    $signature = [string]::Join("|", @($state.nodes | ForEach-Object {
+      "$($_.runtime_id):$([Math]::Round($_.bounding_rectangle.y, 1))"
+    }))
+    if ($signature -eq $lastSignature) { $unchangedCount += 1 } else { $unchangedCount = 0 }
+    $lastSignature = $signature
+    if ($unchangedCount -ge 2) { break }
+    $windowRect = $windowNode.bounding_rectangle
+    $scrollX = [int][Math]::Floor($windowRect.x + ($windowRect.width * 0.72))
+    $scrollY = [int][Math]::Floor($windowRect.y + ($windowRect.height * 0.78))
+    if ([GuiShellInstalledSmokeWin32V16]::WindowProcessIdAt($scrollX, $scrollY) -ne [uint32]$Process.Id -or
+        [GuiShellInstalledSmokeWin32V16]::WindowRootHandleAt($scrollX, $scrollY) -ne $mainWindowNativeHandle -or
+        ![GuiShellInstalledSmokeWin32V16]::ScrollAt($scrollX, $scrollY, -480, [uint32]$Process.Id, $mainWindowNativeHandle)) {
+      $errors.Add("setup_doctor_scroll_input_failed")
+      break
+    }
+  }
+
+  foreach ($requirement in $requirements) {
+    if (!$matchesByKey.ContainsKey($requirement.key)) {
+      $errors.Add("必要な可視画面要素を観測できません: $($requirement.key)")
+    }
+  }
+  $status = if ($errors.Count -eq 0 -and $matchesByKey.Count -eq $requirements.Count -and $navigation.matched) { "passed" } else { "failed" }
+  $evidence = [ordered]@{
+    evidence_version = 1
+    status = $status
+    source = "uiautomation"
+    evidence_class = "LIVE_RUNTIME"
+    measurement_scope = "前景の可視UI Automation文字と最前面点の観測"
+    visual_contrast_measured = $false
+    screen_reader_executed = $false
+    collector = "installer/windows/collect_installed_smoke.ps1"
+    collector_version = "16"
+    captured_at = (Get-Date).ToUniversalTime().ToString("o")
+    run_id = $RunId
+    process_id = $Process.Id
+    main_window_handle = [long]$Process.MainWindowHandle.ToInt64()
+    report_sha256 = $ReportSha256
+    navigation = $navigation
+    window = $windowEvidence
+    scroll_passes = $scrollPasses
+    required_elements = @($matchesByKey.Values)
+    errors = @($errors.ToArray())
+  }
+  $resolvedOutput = Resolve-InputOrOutputPath -Path $OutputPath
+  Write-JsonEvidence -Value $evidence -Path $resolvedOutput -Depth 10
+  return [pscustomobject]@{
+    passed = ($status -eq "passed")
+    evidence = $evidence
+    path = $resolvedOutput
+    sha256 = Get-TaggedSha256 -Path $resolvedOutput
+  }
+}
+
 trap {
   $failure = $_
   Stop-InstalledLauncher
@@ -1317,6 +1769,28 @@ $setupDoctor = [ordered]@{
     accepted_audit_event_payload_hash = $(if ($null -ne $setupDoctorAuditEvent) { $setupDoctorAuditEvent.payload_hash } else { $null })
   }
 }
+$readabilityOutputDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($OutputPath))
+if ([string]::IsNullOrWhiteSpace($readabilityOutputDirectory)) { $readabilityOutputDirectory = (Get-Location).Path }
+$readabilityEvidencePath = Join-Path $readabilityOutputDirectory ("setup_doctor_operator_readability_$([guid]::NewGuid().ToString('N')).json")
+$operatorReadability = Collect-SetupDoctorOperatorReadability `
+  -Process $process `
+  -Checks @($setupDoctorChecks) `
+  -ReportStatus $setupDoctorStatus `
+  -ReportSha256 $setupDoctorReportSha256 `
+  -RunId $runIsolationId `
+  -OutputPath $readabilityEvidencePath
+$setupDoctor["operator_readable"] = [bool]$operatorReadability.passed
+$setupDoctor["operator_readability_evidence"] = [ordered]@{
+  source = "uiautomation"
+  evidence_class = "LIVE_RUNTIME"
+  status = $operatorReadability.evidence.status
+  path = $operatorReadability.path
+  sha256 = $operatorReadability.sha256
+  process_id = $process.Id
+  run_id = $runIsolationId
+  report_sha256 = $setupDoctorReportSha256
+}
+$setupDoctor["operator_readability_proof"] = $operatorReadability.evidence
 $brokerEvidence = $null
 if ($BrokerEvidenceJson -ne "") {
   $brokerEvidencePath = Resolve-Path $BrokerEvidenceJson
@@ -1335,6 +1809,7 @@ if ($AuditAnchorEvidenceJson -ne "") {
 $evidenceBundleFiles = New-Object System.Collections.Generic.List[object]
 foreach ($record in @(
     (New-EvidenceFileRecord -Kind "setup_doctor" -Path $setupDoctorPath),
+    (New-EvidenceFileRecord -Kind "setup_doctor_operator_readability" -Path $readabilityEvidencePath),
     (New-EvidenceFileRecord -Kind "first_run_configuration" -Path $firstRunConfigurationPath),
     (New-EvidenceFileRecord -Kind "broker_smoke" -Path $BrokerEvidenceJson),
     (New-EvidenceFileRecord -Kind "broker_lifecycle_audit" -Path $brokerAuditPath),
@@ -1513,7 +1988,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "15"
+    collector_version = "16"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
