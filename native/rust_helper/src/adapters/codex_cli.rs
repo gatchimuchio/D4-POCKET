@@ -1280,13 +1280,18 @@ mod tests {
 
         let root = super::codex_cli_fixture::FixtureTempDirectory::create();
         let workspace = root.path().join("workspace");
+        let peer_workspace = root.path().join("workspace-agent-b");
         let private = workspace.join("private");
         let scratch = workspace.join(".d4p-tmp-live-probe");
         let isolated_codex_home = root.path().join("codex-home");
         fs::create_dir(&workspace).expect("合成Workspace");
+        fs::create_dir(&peer_workspace).expect("別Agent用の合成Workspace");
         fs::create_dir(&private).expect("合成secret領域");
         fs::create_dir(&scratch).expect("Task scratch相当directory");
         fs::create_dir(&isolated_codex_home).expect("検証専用Codex home");
+        let peer_marker = peer_workspace.join("agent-b-marker.txt");
+        let peer_write_target = peer_workspace.join("agent-b-write-marker.txt");
+        fs::write(&peer_marker, b"synthetic-agent-b-marker").expect("別Agent Workspace marker");
 
         let registered_paths = [
             "private/registered-marker.txt",
@@ -1376,11 +1381,11 @@ mod tests {
             .and_then(|value| serde_json::from_str::<String>(value).ok())
             .expect("Rust生成default_permissionsからsandbox profile名を得る");
         let quote_path = |path: &Path| format!("'{}'", path.to_string_lossy().replace('\'', "''"));
-        let denied_array = denied_paths
+        let denied_paths = denied_paths
             .iter()
             .map(|path| quote_path(&workspace.join(path)))
-            .collect::<Vec<_>>()
-            .join(",");
+            .collect::<Vec<_>>();
+        let denied_array = denied_paths.join(",");
         let denied_aliases = [
             workspace.join(r"PRIVATE\REGISTERED-MARKER.TXT"),
             deep_secret.clone(),
@@ -1402,17 +1407,20 @@ mod tests {
         ]
         .iter()
         .map(|path| quote_path(path))
-        .collect::<Vec<_>>()
-        .join(",");
+        .collect::<Vec<_>>();
+        let write_denied = write_denied.join(",");
         let workspace_output = workspace.join("workspace-write-marker.txt");
         let environment_report = workspace.join("sandbox-environment-report.txt");
         let hardlink_alias = workspace.join("synthetic-secret-hardlink-alias.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"hardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $peerReadError=0; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop}}catch{{$peerReadError=$_.Exception.HResult}}; if($peerReadError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_read_hresult=$peerReadError\"); exit 44}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $peerWriteError=0; $peerWriteErrorType=''; try{{[IO.File]::WriteAllText({},'synthetic-agent-a-write')}}catch{{$peerWriteError=$_.Exception.InnerException.HResult; $peerWriteErrorType=$_.Exception.InnerException.GetType().Name}}; if($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_write_type=$peerWriteErrorType; peer_write_hresult=$peerWriteError; target_exists=$([IO.File]::Exists({}))\"); exit 45}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"peerReadHResult=$peerReadError`npeerWriteException=$peerWriteErrorType`npeerWriteHResult=$peerWriteError`nhardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
             denied_array,
+            quote_path(&peer_marker),
             denied_aliases,
             decoys,
             write_denied,
+            quote_path(&peer_write_target),
+            quote_path(&peer_write_target),
             quote_path(&hardlink_alias),
             quote_path(&private.join("registered-marker.txt")),
             quote_path(&hardlink_alias),
@@ -1449,13 +1457,23 @@ mod tests {
         let output = sandbox.output().expect("実Codex sandboxを起動");
         assert!(
             output.status.success(),
-            "Rust生成profileによる合成probeが失敗: code={:?}, stderr={}",
+            "Rust生成profileによる合成probeが失敗: code={:?}, stdout={}, stderr={}",
             output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
         assert_eq!(
             fs::read(workspace_output).expect("Workspace内write結果"),
             b"workspace-write-marker"
+        );
+        assert_eq!(
+            fs::read(&peer_marker).expect("別Agent Workspaceのmarker"),
+            b"synthetic-agent-b-marker",
+            "Task sandboxは隣接する別Agent Workspaceを読み取れない"
+        );
+        assert!(
+            !peer_write_target.exists(),
+            "Task sandboxは隣接する別Agent Workspaceへ書き込めない"
         );
         assert!(
             !private.join("registered-write-target.txt").exists(),

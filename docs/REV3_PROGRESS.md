@@ -2,6 +2,17 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## R2追補 実Windows MxC sandboxから別Agent Workspaceへの到達拒否（2026-10-01）
+
+- 既存のignored Rust probeを拡張し、`build_codex_command`が生成するTask permission profileを使って、実Codex CLI `0.158.0-alpha.2.1`のWindows MxC sandboxから合成Workspace AのPowerShell childを起動した。Workspace Aの兄弟directoryにAgent B用の合成markerと未作成write targetを置き、childからのmarker読取とwriteをそれぞれnegative probeに加えた。
+- permissiveな初回試験は任意の例外を拒否として扱ったため証拠に採用しなかった。Windows Access Deniedの明示確認を加えた初回strict試験は、PowerShellの`MethodInvocationException` wrapper HRESULT `-2146233087`を直接比較してexit 45となった。追加診断後、内側の`.NET UnauthorizedAccessException`とHRESULT `-2147024891`の両方を確認する判定へ修正した。この中間失敗は試験harnessの例外unwrap不備であり、Product失敗とも拒否成功とも扱わない。
+- 最終実行結果は1 passed。兄弟Workspace markerのread HRESULTとwrite inner exception HRESULTはともに`-2147024891`、write exception型は`UnauthorizedAccessException`だった。A内の通常writeは成功し、Bのmarker内容は不変、B側write targetは生成されなかった。登録secretのexact／deep path拒否とhardlink作成拒否も同じ既存probeで再確認した。TEMP／TMPがBroker scratchと一致しない観測も維持され、今回の成功条件やcleanup証拠には使っていない。
+- 証拠区分は、実Codex CLI／MxC sandbox childによる指定path操作が`LIVE_RUNTIME`、二つのWorkspaceとmarkerが`FIXTURE`。これは単一Task sandboxから隣接する一つの別Workspaceへ到達できないことだけを示し、二Agentの同時実行、production Broker／IPC、Owner確認、durable Audit、実Agent／model、Task取消・deadline・crash Recovery、installed product、別path aliasの網羅を示さない。
+- 正確な検証: `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`。exit 0、対象test 1 passed／0 failed。binaryは既定のCodex CLI探索ではなく、明示したインストール済みCLI絶対pathを`GUI_SHELL_CODEX_SANDBOX_TEST_EXE`へ設定して起動した。
+- 回帰確認: `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は12 target、438 passed／0 failed／5 ignored。個別ignored probeは別途上記のとおり実行済み。`rustfmt --check --edition 2021 native/rust_helper/src/adapters/codex_cli.rs`と`git diff --check`はpass。`cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check`は変更していない複数Rust fileにも既存format差分を報告したため失敗として保持し、無関係fileの一括formatは行わなかった。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は開発validatorの全登録checkをpassした。strict日本語監査は1126 files／0 findings、Schema 151／151・example 151・negative 194、Conformance 230 checks、manifest／release gate／packaging portability／release smoke／evidence bundle／release runtime assertions（12 passed／0 failed）／C32監査がpass。Windows installed evidenceは5 gateが未成立であり、最終監査は31 `release_blocker`・2 `post_v1_scope`、`release_ready=false`を維持した。
+- cross-agent contamination全体とAgent Task production隔離は未成立の`release_blocker`。製品Adapter metadataの`task_execution=unsupported`、関連blocker、`release_ready=false`を維持する。
+
 ## `Windows Server 2025`上での`Setup Doctor`画面証拠取得失敗（2026-10-01）
 
 - `workflow_dispatch`で一時branch `codex/verify-setup-doctor-uia-v16` のcommit `f51ba074be693ab58e0df965d413645b491ef29b`（[run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36764681765)）と `1139eef24ff945cce677ce115582487c593400f7`（[run #8](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36767327753)）をWindows Server 2025で手動検査した。workflowは`workflow_dispatch`のみで起動し、自動trigger、PR、artifact uploadは使用していない。
