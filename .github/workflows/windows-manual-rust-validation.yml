@@ -41,7 +41,22 @@ jobs:
           rustc +1.95.0 --version
           cargo +1.95.0 --version
           "commit: ``$head``; runner: ``$env:ImageOS/$env:ImageVersion``; Rust: ``$(rustc +1.95.0 --version)``; TEMP: ``$env:TEMP``; TMP: ``$env:TMP``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP 'gui-shell-rust-target'
+          $runSuffix = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $targetName = "gui-shell-rust-target-$runSuffix"
+          $smokeName = "gui-shell-broker-smoke-$runSuffix"
+          $markerName = "gui-shell-broker-smoke-$runSuffix.owned"
+          $targetDir = Join-Path $env:RUNNER_TEMP $targetName
+          $smokeRoot = Join-Path $env:RUNNER_TEMP $smokeName
+          $marker = Join-Path $env:RUNNER_TEMP $markerName
+          if ((Test-Path -LiteralPath $targetDir) -or
+              (Test-Path -LiteralPath $smokeRoot) -or
+              (Test-Path -LiteralPath $marker)) {
+            throw '一時検証先が既に存在するため上書きしない'
+          }
+          New-Item -ItemType File -Path $marker | Out-Null
+          $env:CARGO_TARGET_DIR = $targetDir
+          "GUI_SHELL_BROKER_SMOKE_ROOT=$smokeRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "GUI_SHELL_BROKER_SMOKE_MARKER=$marker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: 変更Rust fileの整形を検査
         shell: pwsh
@@ -78,6 +93,140 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Release Broker helperをbuild
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir $env:CARGO_TARGET_DIR
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $helper = Join-Path $env:CARGO_TARGET_DIR 'release\gui_shell_rust_helper.exe'
+          if (!(Test-Path -LiteralPath $helper -PathType Leaf)) {
+            throw 'Release Broker helperがbuild先にない'
+          }
+          $helperHash = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
+          "Release helper SHA-256: ``$helperHash``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: 実Broker processと通常IPC smokeを照合
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $smokeRoot = $env:GUI_SHELL_BROKER_SMOKE_ROOT
+          $storeDir = Join-Path $smokeRoot 'store'
+          $sessionFile = Join-Path $smokeRoot 'broker-session.json'
+          $outputPath = Join-Path $smokeRoot 'broker-smoke.json'
+          $helper = Join-Path $env:CARGO_TARGET_DIR 'release\gui_shell_rust_helper.exe'
+          $collector = Join-Path $env:GITHUB_WORKSPACE 'installer\windows\collect_broker_smoke.ps1'
+          New-Item -ItemType Directory -Path $smokeRoot | Out-Null
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $collector -BrokerHelperExe $helper -OutputPath $outputPath -StoreDir $storeDir -SessionFile $sessionFile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path -LiteralPath $outputPath -PathType Leaf)) {
+            throw 'Broker smoke collectorの出力がない'
+          }
+          $evidence = Get-Content -Raw -LiteralPath $outputPath | ConvertFrom-Json
+          if ($evidence.status -ne 'passed' -or $evidence.errors.Count -ne 0) {
+            throw "Broker smoke collectorが失敗: $($evidence.errors -join '; ')"
+          }
+          if ($evidence.evidence_source.collector_version -ne '6' -or $evidence.evidence_source.synthetic -ne $false) {
+            throw '想定した非合成collector実行ではない'
+          }
+          $requiredTrue = @(
+            'helper_exe_exists'
+            'session_file_created'
+            'session_file_removed_after_collection'
+            'normal_endpoint_credential_role_verified'
+            'restricted_loopback_bind'
+            'authenticated_ipc_connection'
+            'durable_store_ready'
+            'normal_ipc_agent_task_workspace_permission_denied'
+            'normal_ipc_agent_task_owner_approval_denied'
+            'restart_replay_rejected'
+            'fresh_health_after_restart'
+            'crash_fail_closed'
+          )
+          foreach ($name in $requiredTrue) {
+            $property = $evidence.PSObject.Properties[$name]
+            if ($null -eq $property -or $property.Value -ne $true) {
+              throw "Broker smokeの必須観測が成立しない: $name"
+            }
+          }
+          if ($evidence.agent_task_workspace_permission_error_code -ne 'desktop_native_owner_confirmation_required' -or
+              $evidence.agent_task_owner_approval_error_code -ne 'desktop_native_owner_confirmation_required') {
+            throw '通常IPCのTask grant拒否codeが想定と異なる'
+          }
+          $helperHash = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            '### Windows Broker runtime smoke'
+            "- source commit: ``$env:GITHUB_SHA``"
+            "- runner: ``$env:ImageOS/$env:ImageVersion``"
+            "- Rust: ``$(rustc +1.95.0 --version)``"
+            "- Release helper SHA-256: ``$helperHash``"
+            '- collector: version 6, non-synthetic, passed'
+            '- observed: authenticated loopback IPC, durable-store readiness, both ordinary Task grant denials, restart replay rejection, fresh health, forced-stop fail-closed, session file cleanup'
+            '- scope: standalone Release Broker process only; not installed Desktop product, native Owner operation, Agent Task execution, formal release evidence, or release readiness'
+            '- artifact upload: none'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: 検査用processと一時出力をcleanup
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runSuffix = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $targetName = "gui-shell-rust-target-$runSuffix"
+          $smokeName = "gui-shell-broker-smoke-$runSuffix"
+          $markerName = "gui-shell-broker-smoke-$runSuffix.owned"
+          $targetDir = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP $targetName))
+          $smokeRoot = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP $smokeName))
+          $marker = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP $markerName))
+          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+          foreach ($entry in @(
+            @{ Name = $targetName; Path = $targetDir }
+            @{ Name = $smokeName; Path = $smokeRoot }
+            @{ Name = $markerName; Path = $marker }
+          )) {
+            if ((Split-Path -Leaf $entry.Path) -ne $entry.Name -or
+                !$entry.Path.StartsWith($runnerTemp, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "cleanup対象がRUNNER_TEMP直下の固定名ではない: $($entry.Path)"
+            }
+          }
+          if (Test-Path -LiteralPath $marker -PathType Leaf) {
+            $helper = Join-Path $targetDir 'release\gui_shell_rust_helper.exe'
+            if (Test-Path -LiteralPath $helper -PathType Leaf) {
+              $helperFullPath = [IO.Path]::GetFullPath($helper)
+              $ownedProcesses = @(Get-CimInstance Win32_Process | Where-Object {
+                $_.ExecutablePath -and
+                [string]::Equals([IO.Path]::GetFullPath([string]$_.ExecutablePath), $helperFullPath, [StringComparison]::OrdinalIgnoreCase) -and
+                [string]$_.CommandLine -and
+                ([string]$_.CommandLine).IndexOf($smokeRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
+              })
+              foreach ($process in $ownedProcesses) {
+                try {
+                  $processHandle = [Diagnostics.Process]::GetProcessById([int]$process.ProcessId)
+                  Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+                  if (!$processHandle.WaitForExit(5000)) {
+                    throw "検査用Broker processが終了しない: $($process.ProcessId)"
+                  }
+                  $processHandle.Dispose()
+                } catch [ArgumentException] {
+                  continue
+                }
+              }
+            }
+            foreach ($name in @($smokeName, $targetName)) {
+              $target = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP $name))
+              if ((Split-Path -Leaf $target) -ne $name -or
+                  !$target.StartsWith($runnerTemp, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "cleanup pathがRUNNER_TEMP直下の固定名ではない: $target"
+              }
+              if (Test-Path -LiteralPath $target) {
+                Remove-Item -LiteralPath $target -Recurse -Force
+              }
+            }
+            if (Test-Path -LiteralPath $marker -PathType Leaf) {
+              Remove-Item -LiteralPath $marker -Force
+            }
+          }
       - name: 試験後に作業treeがcleanなことを確認
         shell: pwsh
         run: |
