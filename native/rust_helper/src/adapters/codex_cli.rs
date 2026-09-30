@@ -682,14 +682,6 @@ fn build_codex_command(
         for setting in overrides {
             task_command.arg("-c").arg(setting);
         }
-        if let Some(scratch) = scratch {
-            let scratch_path = scratch.to_string_lossy().replace('\\', "/");
-            let encoded_path =
-                serde_json::to_string(&scratch_path).map_err(|_| 対話失敗::要求不正)?;
-            task_command.arg("-c").arg(format!(
-                "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
-            ));
-        }
         let proxy = format!("http://127.0.0.1:{}", test_api.port);
         task_command
             .env("CODEX_HOME", &test_api.codex_home)
@@ -704,6 +696,10 @@ fn build_codex_command(
             .env("RUST_LOG", "warn");
     }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
+        let scratch = scratch.ok_or(対話失敗::要求不正)?;
+        if !scratch.starts_with(workspace) || scratch == workspace {
+            return Err(対話失敗::要求不正);
+        }
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
         }
@@ -713,6 +709,9 @@ fn build_codex_command(
         for setting in TASK_PERMISSION_PROFILE_SUFFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
         }
+        task_command
+            .arg("-c")
+            .arg(task_scratch_environment_override(scratch)?);
     } else if !secret_paths.is_empty() {
         return Err(対話失敗::要求不正);
     }
@@ -742,6 +741,18 @@ fn build_codex_command(
             .env("TMP", scratch_path);
     }
     Ok(task_command)
+}
+
+fn task_scratch_environment_override(scratch: &Path) -> Result<String, 対話失敗> {
+    let scratch_path = scratch
+        .to_str()
+        .ok_or(対話失敗::要求不正)?
+        .replace('\\', "/");
+    let encoded_path =
+        serde_json::to_string(&scratch_path).map_err(|_| 対話失敗::要求不正)?;
+    Ok(format!(
+        "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
+    ))
 }
 
 fn task_filesystem_override(secret_paths: &[String]) -> Result<String, 対話失敗> {
@@ -1167,6 +1178,12 @@ mod tests {
                 {
                     assert!(args.windows(2).any(|pair| pair == ["-c", *setting]));
                 }
+                assert!(args.windows(2).any(|pair| {
+                    pair == [
+                        "-c",
+                        "shell_environment_policy.set={TEMP=\"C:/workspace/.d4p-tmp-test\",TMP=\"C:/workspace/.d4p-tmp-test\"}"
+                    ]
+                }));
                 let filesystem_override = args
                     .windows(2)
                     .find(|pair| {
@@ -1219,6 +1236,15 @@ mod tests {
             workspace,
             CodexSandbox::WorkspaceWrite,
             Some(Path::new(r"C:\outside-temp")),
+            &[],
+            None,
+        )
+        .is_err());
+        assert!(build_codex_command(
+            executable,
+            workspace,
+            CodexSandbox::WorkspaceWrite,
+            None,
             &[],
             None,
         )

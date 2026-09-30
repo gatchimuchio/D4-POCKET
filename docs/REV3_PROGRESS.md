@@ -1138,3 +1138,28 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 最終統合validatorはexit 0。Release gate整合checkの成功はrelease readinessを意味しない。release blocker 5件と`release_ready=false`は維持する。
 - `rustfmt` checkは`mod.rs`と`dialogue.rs`で成功。`regression_case.rs`全体のcheckは変更箇所と無関係な既存format差分を報告したため成功扱いしていない。Windows Actionsの所定format stepは成功し、`git diff --check`も成功した。
 - bundle scanはfixture由来の`INTERNAL_STATE`相当のbuild evidenceに限る。未知pattern、全credential形式、実installed app、Owner権限経路、実機起動を証明しない。
+
+## R2追補 Task scratch環境設定をproduction commandへ共通化（2026-09-30）
+
+### 成立した変更
+
+- Codex Task command builderはRustが起動するCLI processの`TEMP`／`TMP`をBroker-owned `WorkspaceTaskScratch`へ設定していたが、MxC shell childへ渡す`shell_environment_policy.set={TEMP=...,TMP=...}`はloopback偽Responses APIを使うtest設定の内側にあり、production Task commandには含まれていなかった。
+- Task専用command builderからscratchを同じ設定で常に明示するよう移し、Taskではscratchが必須かつ登録Workspaceの厳密な子directoryであることをcommand生成時にも検査する。read-only Dialogueには設定を追加しない。fake Codex CLI fixtureはTask固定設定と引数値が一致するときだけ受理し、この経路を検査する。
+- これはCLI起動設定がRustから生成されることを示す`FIXTURE`証拠に限る。以前のMxC child実測では同設定を明示しても`TEMP`／`TMP`がWorkspaceTaskScratchと一致せず、AppContainer内TEMPの後始末も未確認である。このため差分は実child isolation／cleanupの修正完了ではなく、`task_execution=unsupported`と`comprehensive_extension_rev1_completion` blockerを維持する。
+- 現行`release_blockers.registry.json`は17 record中15件がactive unresolved、2件がresolved inactiveであり、`release_ready=false`。Windows trackには12件が属し、`evidence_bundle.py`が表示する5件はWindows installed-evidence検査結果のblockerだけで、registry全体の件数ではない。本書の「5件」表記はこの証拠bundleの範囲として読み、現在数とrelease gate判断はregistryを正本とする。
+
+### 検証と失敗履歴
+
+- focused command設定test、fake CLIを使うAdapter lifecycle test、Broker fakeTask縦断testはいずれも1件ずつ合格した。
+- 全target testの初回実行はfixture 2件が失敗した。Rust側の新しい設定追加後もfixtureが旧来の`-c`設定5件と完全一致を要求しており、追加のTask TEMP／TMP設定を未知構成として拒否したのが原因だった。fixtureを現行command contractに同期した後の再実行は12 target、435 passed／0 failed／3 ignoredで合格した。初回の失敗は履歴として保持する。
+- `cargo check --all-targets`、変更Rust fileとfake CLI fixtureの`rustfmt --check`、`git diff --check`は合格した。ignored実Codex CLI／MxC probeは、既存の環境不一致を再測定しても解決根拠にならず、一時領域へ不要なmarkerを残すおそれもあるため再実行していない。
+- Windows Actionsは未使用。対象Windows上で全Rust targetのbuild／testを実行できたため、今回の設定生成検査にhosted補助は加えていない。実Codex CLIのMxC実測、production Broker IPC、Owner確認、installed product、release readinessは未検証である。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1123 file／0 findings、Schema 150／150／negative fixture 193、Conformance 229 checks、登録済みdevelopment checks 10件を含む全項目が合格した。development evidence bundleのWindows evidence blocker 5件と`release_ready=false`を保持する。これはregistry全体のactive unresolved 15件とは別scopeであり、release readinessの証拠ではない。
+
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib Dialogueはread_onlyのままTaskだけ専用permission_profileを使う -- --test-threads=1
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 偽CodexCLIはAdapterのTask成功 -- --test-threads=1
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib Broker制御からCodexAdapterを通るfakeTaskは成功 -- --test-threads=1
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```

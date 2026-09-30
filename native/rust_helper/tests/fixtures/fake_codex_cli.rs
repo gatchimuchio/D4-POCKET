@@ -119,7 +119,27 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         .filter(|pair| pair[0] == "-c")
         .map(|pair| pair[1].as_str())
         .collect::<Vec<_>>();
-    configs == TASK_PERMISSION_PROFILE.to_vec()
+    if configs.len() != TASK_PERMISSION_PROFILE.len() + 1
+        || configs[..TASK_PERMISSION_PROFILE.len()] != TASK_PERMISSION_PROFILE
+    {
+        return false;
+    }
+    let (Some(temp), Some(tmp)) = (env::var_os("TEMP"), env::var_os("TMP")) else {
+        return false;
+    };
+    if temp != tmp {
+        return false;
+    }
+    let Ok(temp) = temp.into_string() else {
+        return false;
+    };
+    let normalized_temp = temp.replace('\\', "/");
+    configs.last().is_some_and(|setting| {
+        *setting
+            == format!(
+                "shell_environment_policy.set={{TEMP=\"{normalized_temp}\",TMP=\"{normalized_temp}\"}}"
+            )
+    })
 }
 
 fn contains_pair(arguments: &[String], first: &str, second: &str) -> bool {
