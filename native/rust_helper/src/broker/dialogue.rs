@@ -310,35 +310,9 @@ fn agent_metadata_contains_credential_marker(value: &Value) -> bool {
             .values()
             .any(agent_metadata_contains_credential_marker),
         Value::Array(items) => items.iter().any(agent_metadata_contains_credential_marker),
-        Value::String(value) => {
-            let lower = value.to_ascii_lowercase();
-            contains_slack_token_prefix(&lower)
-                || [
-                    "api_key=",
-                    "api-key=",
-                    "token=",
-                    "password=",
-                    "bearer ",
-                    "openai_api_key",
-                    "codex_api_key",
-                    "github_pat_",
-                    "ghp_",
-                    "-----begin",
-                    "AIza",
-                    "sk-",
-                ]
-                .iter()
-                .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
-        }
+        Value::String(value) => crate::broker::contains_known_credential_marker(value),
         _ => false,
     }
-}
-
-fn contains_slack_token_prefix(value: &str) -> bool {
-    value.as_bytes().windows(5).any(|window| {
-        window[..3].eq_ignore_ascii_case(b"xox")
-            && (window[3..].eq_ignore_ascii_case(b"b-") || window[3..].eq_ignore_ascii_case(b"p-"))
-    })
 }
 
 fn agent_text_valid(value: &str) -> bool {

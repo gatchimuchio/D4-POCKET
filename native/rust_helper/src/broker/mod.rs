@@ -33,6 +33,67 @@ pub(crate) mod update_download;
 pub(crate) mod workspace;
 pub(crate) mod workspace_root;
 
+/// 既知形式の資格情報マーカーを拒否する。未知形式の秘密値不存在までは証明しない。
+pub(crate) fn contains_known_credential_marker(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    [
+        ("api_", "key="),
+        ("api-", "key="),
+        ("tok", "en="),
+        ("pass", "word="),
+        ("bear", "er "),
+        ("openai_", "api_key"),
+        ("codex_", "api_key"),
+        ("github_", "pat_"),
+        ("gh", "p_"),
+        ("--", "---begin"),
+        ("ai", "za"),
+        ("s", "k-"),
+        ("xox", "b-"),
+        ("xox", "p-"),
+    ]
+    .iter()
+    .any(|(prefix, suffix)| contains_split_marker(&lower, prefix, suffix))
+}
+
+fn contains_split_marker(value: &str, prefix: &str, suffix: &str) -> bool {
+    value.match_indices(prefix).any(|(index, _)| {
+        value
+            .get(index + prefix.len()..)
+            .is_some_and(|tail| tail.starts_with(suffix))
+    })
+}
+
+#[cfg(test)]
+mod credential_marker_tests {
+    use super::contains_known_credential_marker;
+
+    #[test]
+    fn 既知credential形式を大小文字を問わず拒否する() {
+        for value in [
+            "api_key=SYNTHETIC",
+            "api-key=SYNTHETIC",
+            "TOKEN=SYNTHETIC",
+            "PASSWORD=SYNTHETIC",
+            "Bearer SYNTHETIC",
+            "OPENAI_API_KEY",
+            "codex_api_key",
+            "github_pat_",
+            "ghp_",
+            "-----BEGIN",
+            "AIza",
+            "sk-",
+            "xoxb-SYNTHETIC",
+            "XoXp-SYNTHETIC",
+        ] {
+            assert!(contains_known_credential_marker(value), "{value}");
+        }
+        assert!(!contains_known_credential_marker(
+            "作業状態を要約してください"
+        ));
+    }
+}
+
 pub use audit::{BrokerAuditEvent, BrokerAuditLog};
 pub use ipc_server::{
     run_loopback_server, run_loopback_server_cancellable, BrokerCredentialRole, BrokerEndpoint,
