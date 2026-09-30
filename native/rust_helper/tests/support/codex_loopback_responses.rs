@@ -32,7 +32,7 @@ struct State {
     blocked_connect_other: AtomicUsize,
     blocked_non_local_requests: AtomicUsize,
     blocked_unhandled_local_requests: AtomicUsize,
-    command: String,
+    command: Mutex<String>,
     workspace: String,
 }
 
@@ -72,7 +72,7 @@ impl CodexLoopbackResponses {
             blocked_connect_other: AtomicUsize::new(0),
             blocked_non_local_requests: AtomicUsize::new(0),
             blocked_unhandled_local_requests: AtomicUsize::new(0),
-            command: synthetic_workspace_probe(),
+            command: Mutex::new(synthetic_workspace_probe()),
             workspace: workspace_text,
         });
         let worker_state = Arc::clone(&state);
@@ -115,6 +115,15 @@ impl CodexLoopbackResponses {
 
     pub(super) fn port(&self) -> u16 {
         self.port
+    }
+
+    pub(super) fn set_command(&self, command: String) {
+        *self
+            .state
+            .command
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = command;
+        self.state.tool_call_sent.store(false, Ordering::SeqCst);
     }
 
     pub(super) fn accepted_connections(&self) -> usize {
@@ -366,7 +375,11 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         .is_file();
     if !tool_result_exists && state.tool_offered.load(Ordering::SeqCst) {
         let arguments = json!({
-            "cmd": state.command,
+            "cmd": state
+                .command
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
             "workdir": state.workspace,
             "shell": "powershell.exe",
             "yield_time_ms": 30000

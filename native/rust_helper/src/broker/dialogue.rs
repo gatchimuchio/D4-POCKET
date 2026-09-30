@@ -3389,6 +3389,128 @@ mod tests {
                 "Broker管理WorkspaceTaskScratchをTask終端後に残さない"
             );
         }
+
+        let cancel_instruction =
+            "INTEGRATION_CANCEL_INSTRUCTION_SENTINEL: keep the bounded synthetic probe running";
+        let heartbeat = workspace_path.join("broker-real-codex-cancel-heartbeat.txt");
+        let heartbeat_literal = heartbeat.to_string_lossy().replace('\'', "''");
+        server.set_command(format!(
+            "$ErrorActionPreference='Stop'; <# 合成Workspace内で取消試験の稼働状態を記録する #> $heartbeat='{heartbeat_literal}'; [IO.File]::WriteAllText($heartbeat,'started'); while ($true) {{ [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 50 }}"
+        ));
+        let cancellation_marker = workspace_path.join("broker-real-codex-marker.txt");
+        std::fs::remove_file(&cancellation_marker)
+            .expect("次の合成Task用に成功Task markerを除去する");
+        let cancel_task_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+            "instruction":cancel_instruction,
+        });
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("実CLI取消Task用の合成Workspace Permission発行");
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskOwnerApprovalGrant",
+                &cancel_task_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("実CLI取消Task本文hashへ結合した合成Owner Approval発行");
+        let cancel_task = control
+            .操作_作業領域結合済み(
+                "AgentTask実行",
+                &cancel_task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("Broker承認経路から実Codex CLIの取消probeを開始");
+        assert_eq!(cancel_task["status"], "running");
+        let heartbeat_deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if std::fs::metadata(&heartbeat).is_ok_and(|metadata| metadata.len() >= 4) {
+                break;
+            }
+            assert!(
+                Instant::now() < heartbeat_deadline,
+                "実MxC tool childが取消前にheartbeatを更新する"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            server.tool_call_was_sent(),
+            "実CLIへ取消用tool callを送信した"
+        );
+        let cancel_task_id = cancel_task["task_id"].as_str().unwrap();
+        let cancelling = control
+            .操作_作業領域結合済み(
+                "AgentTask取消",
+                &json!({"task_id":cancel_task_id}),
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("実CLI取消をBroker Audit付きで要求");
+        assert_eq!(
+            cancelling["status"], "running",
+            "取消要求だけでは実CLI process群の停止前にterminal化しない"
+        );
+        let cancellation_deadline = Instant::now() + Duration::from_secs(20);
+        let cancelled = loop {
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":cancel_task_id}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .expect("実CLI取消Task状態取得");
+            if state["status"] != "running" {
+                break state;
+            }
+            assert!(
+                Instant::now() < cancellation_deadline,
+                "実CLI取消後のterminal状態への遷移待ち期限"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(cancelled["status"], "cancelled");
+        assert!(cancelled.get("result_hash").is_none());
+        let heartbeat_after_terminal = std::fs::metadata(&heartbeat)
+            .expect("停止済みtool child heartbeatをstatする")
+            .len();
+        std::thread::sleep(Duration::from_millis(250));
+        assert_eq!(
+            std::fs::metadata(&heartbeat)
+                .expect("terminal後heartbeatを再確認する")
+                .len(),
+            heartbeat_after_terminal,
+            "Broker terminal取消後に実MxC tool childが稼働を継続しない"
+        );
+        for entry in std::fs::read_dir(workspace_path).unwrap() {
+            assert!(
+                !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".d4p-tmp-"),
+                "実CLI取消後にBroker管理WorkspaceTaskScratchを残さない"
+            );
+        }
         drop(audit);
         assert!(audit_events.iter().any(|(operation, _, _)| {
             operation == "Agent Task実行開始（Permission／Owner Approval一回消費）"
@@ -3396,7 +3518,15 @@ mod tests {
         assert!(audit_events.iter().any(|(operation, _, _)| {
             operation == "Agent Task完了（結果本文非保存・hashのみ）"
         }));
+        assert!(audit_events.iter().any(|(operation, id, _)| {
+            operation.contains("取消要求") && id == cancel_task_id
+        }));
+        assert!(audit_events.iter().any(|(operation, id, _)| {
+            operation.contains("失敗・取消") && id == cancel_task_id
+        }));
         assert!(!format!("{audit_events:?}").contains(instruction));
+        assert!(!format!("{audit_events:?}").contains(cancel_instruction));
+        assert!(!cancelled.to_string().contains(cancel_instruction));
         eprintln!(
             "loopback_proxy_blocked_external_requests={}",
             server.blocked_external_requests()

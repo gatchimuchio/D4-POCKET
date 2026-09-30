@@ -1011,3 +1011,27 @@ cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all
 ```powershell
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
+
+## R2追補 実Codex CLI Broker Taskの取消・child停止観測（2026-09-30）
+
+### 成立した変更
+
+- Windows ignored Rust統合testを拡張し、実Codex CLI `0.158.0-alpha.2.1`を隔離`CODEX_HOME`とlocalhost限定の偽Responses APIだけで動かす。既存正常Taskの後、Brokerから2つ目のTaskを起動し、実MxC shell childが合成Workspaceのheartbeatを更新している間に`AgentTask取消`を要求する。
+- 完全に通過した1回では、停止要求中も状態が`running`のまま保たれ、terminal後に`cancelled`・結果hashなし、heartbeat停止、Broker管理`.d4p-tmp-` scratch不在、取消要求と失敗／取消Auditを確認した。指示本文はTask投影・Auditへ現れない。
+- 当該Windowsで`Codex CLI`と`MxC`子processを実起動し、停止する挙動だけを一度観測した。権限発行・照合、`Owner`確認、`Adapter`の対応状態、監査記録処理はRust試験用の代替であり、実製品を経由していない。したがって、実Broker server／IPC、Desktopのnative Owner画面、耐久Auditの証拠ではない。Broker管理scratchの削除も、MxC内部一時領域の物理削除を証明しない。`task_execution=unsupported`、R2 release blocker、`release_ready=false`を維持する。
+
+### 検証
+
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: Windows local 12 target、428 passed／0 failed／3 ignored。主lib 382件、binary 10件、各integration target合計46件。ignored LIVE_RUNTIMEは通常suiteに含まれない。
+- `Broker制御からCodexAdapterを通るfakeTaskは成功・取消・期限後停止を区別してscratchを片付ける_fixture`: 1件合格。
+- 対象2 Rust fileの`rustfmt --edition 2021 --check`と`git diff --check`: 合格。`cargo fmt --check`全crateは未変更の既存Rust file群にも多数のformat差分を報告したため、全体成功とは扱わない。
+- 明示したCodex CLI absolute pathを指定するignored LIVE_RUNTIME testの最初の全経路実行は1件成功し、取消・heartbeat停止まで完了した。その後の元CLI設定による再試行2回は、先行する正常Task段階でResponses streamが切れ、Broker Taskが`failed`となって取消段階へ到達しなかった。両回ともloopback proxyは`chatgpt.com` CONNECT 1件を拒否し、fixtureのHTTP parse／response write failureは0件。根本原因は未確定であり、先行失敗を保持する。
+- 同梱catalogにあるmodel slugを試験用API設定へ使う短い実験は、偽API tool call送信後もWorkspace markerが作成されず失敗したため、その差替えをrevertした。この試行をLIVE_RUNTIME成功や取消証拠へ数えない。
+- 以前失敗cleanupとして記録された2026-09-29作成の合成fixture Temp directory 2件は、今回もPowerShell実行policyが正確な削除commandを開始前に拒否したため残存する。現在の2026-09-30試験が作成したTemp directoryは見つからず、長時間processも確認されていない。代替削除経路は試していない。
+- WindowsローカルでRust検証が実行できたためGitHub Actionsは使っていない。
+
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```

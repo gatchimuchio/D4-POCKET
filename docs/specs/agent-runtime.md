@@ -138,3 +138,11 @@ Task Adapterは、scratch作成前の登録secret検査に加え、WorkspaceWrit
 ### 通常Broker IPCからのAgent Task権限発行拒否（2026-09-30）
 
 Windows向けBroker実測収集器の第6版は、通常のloopback接続資格を用いて本番Broker接続口へ`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`を別々に送り、両方が`desktop_native_owner_confirmation_required`で拒否されることを検査する。現行Rust実装からbuildした単体Release helperによる`LIVE_RUNTIME`実測で両拒否を確認し、収集器とrelease evidence validatorの必須条件にした。この否定経路が示すのは通常IPCによるOwner権限発行の拒否だけであり、Rust Desktop起動器上でのOwner確認成功、確認後の実Task、installed product、durable Audit統合を証明しない。`task_execution=unsupported`とrelease blockerは維持する。
+
+### 実Codex CLI Broker Taskの取消観測（2026-09-30）
+
+Windowsのignored Rust統合testは、実Codex CLI `0.158.0-alpha.2.1`と実MxC shell childを、localhost限定の偽Responses APIから固定合成命令だけ受ける構成で起動する。既存の正常Taskに続けて、合成Workspace内でheartbeat fileを更新し続けるtool childをBroker `AgentTask取消`から停止し、terminal状態が`cancelled`、結果hashなし、取消後のheartbeat不変、Broker所有`.d4p-tmp-` scratchなし、開始／取消要求／terminal Auditありを確認する試験を追加した。Audit callback、Owner確認、Task capability metadata上書きはRust test fixtureである。
+
+この取消経路を最後まで通った観測は1回である。元の正常Task段階は過去にも成功実績がある一方、2026-09-30の再試行2回ではResponses stream切断と`chatgpt.com` CONNECT 1件（loopback proxyが拒否）が発生し、新しい取消段階へ到達しなかった。HTTP request parse、server応答書込、loopback外接続拒否にfixture側の異常は観測されず、原因は未確定である。既知slugへの試験model差替えもtool childを起動できず、採用せず戻した。失敗を成功へ読み替えない。
+
+この`LIVE_RUNTIME`観測の範囲は、当該Windowsで`Codex CLI`の子process群がRust試験内Broker consumerからの取消要求によって停止した一度の挙動に限る。権限発行、`Adapter`の対応metadata、監査保存callbackには`FIXTURE`を使い、実製品の`broker-server`／IPC、Desktop native Owner画面、耐久Auditを通していない。反復可能な隔離、期限・crash後のRecovery、MxC内部一時領域の物理cleanupも示さない。Rust管理scratchとMxC内部TEMPは別の一時領域である。Codex Adapterの`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
