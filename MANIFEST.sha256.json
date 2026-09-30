@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "c615c14b798129632b4e3da2bd608ee695abee158dcd610b0ce034c7607028d9"
+      "sha256": "cda7f06534ee6e199765276ed95044d7d0481623adc7511e87e5f2cfd1f68574"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3772,7 +3772,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "1cd30845966e60b2512541c986a9f1ae61e0cf57a322a530b29d0ac0314bf206"
+      "sha256": "7ebf1ff1873047217354b46fe1d1bde5b5c0d70a56c7cf867a999563c6ad9d52"
     },
     {
       "path": "requirements-dev.txt",
@@ -4432,7 +4432,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "25288349846b71fbb01c1a160856e0833a4bfa6464df386371e62f4d7d7aa750"
+      "sha256": "f532eb7503d5d7355dd67a0d859431c501dc700ad7e2d2b8face1bf694356943"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4464,7 +4464,7 @@
     },
     {
       "path": "tooling/export_windows_product.py",
-      "sha256": "f9299f09ab186d64c806b0a066bc8ac3f77ac2d3b4107bf47ac5937cf71fc78c"
+      "sha256": "7d6cc86f2fc01985ba60680bdadb0b78de6b93197531ca47bef5aeeeb675398f"
     },
     {
       "path": "tooling/failure_injection_validation.py",

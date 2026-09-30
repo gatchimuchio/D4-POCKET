@@ -70,9 +70,9 @@ CREDENTIAL_PATTERNS = (
     (
         "credential_assignment",
         re.compile(
-            rb"(?i)\b(?:api[_-]?key|access[_-]?token|aws[_-]?secret[_-]?access[_-]?key|"
+            rb"(?i)\b(?P<field>api[_-]?key|access[_-]?token|aws[_-]?secret[_-]?access[_-]?key|"
             rb"client[_-]?secret|password|session[_-]?secret)\b"
-            rb"\s*[:=]\s*[\"']?[A-Za-z0-9/+=._-]{12,256}"
+            rb"\s*[:=]\s*[\"']?(?P<value>[A-Za-z0-9/+=._-]{12,256})"
         ),
     ),
     (
@@ -457,12 +457,23 @@ def _scan_credential_inventory(
                 chunk = source.read(CREDENTIAL_SCAN_CHUNK_BYTES)
                 if not chunk:
                     break
+                chunk_offset = bytes_scanned
                 bytes_scanned += len(chunk)
                 candidate = carry + chunk
                 for pattern_id, pattern in CREDENTIAL_PATTERNS:
-                    if pattern.search(candidate):
+                    match = pattern.search(candidate)
+                    if match is not None:
+                        diagnostic = ""
+                        if pattern_id == "credential_assignment":
+                            field = match.group("field").decode("ascii").lower()
+                            value_length = len(match.group("value"))
+                            byte_offset = chunk_offset - len(carry) + match.start()
+                            diagnostic = (
+                                f"; field={field}; byte_offset={byte_offset}; "
+                                f"value_length={value_length}"
+                            )
                         raise ValueError(
-                            f"既知Credential patternをbundleで検出した: {pattern_id} ({relative})"
+                            f"既知Credential patternをbundleで検出した: {pattern_id} ({relative}){diagnostic}"
                         )
                 carry = candidate[-CREDENTIAL_SCAN_OVERLAP_BYTES:]
         files_scanned += 1

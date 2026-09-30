@@ -1436,3 +1436,23 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 同一`CODEX_HOME`条件の相互・後続child非可視性を示すが、実TEMP rootの一意性、child終了時の物理削除、同じ実Agent profileでの隔離、再起動後のmarker残存、MxC内部temporary dataのcleanupを示さない。後続child自身のTEMPから先行markerを読めなかったことは削除証拠ではない。
 - production Broker／IPC、native Owner Approval、durable Audit／Recovery、実Agent Task、cancel／deadline／crash時のcleanup、installed product、result／diff Content Exposureは通していない。cross-agent contamination全体とMxC TEMP cleanupは`release_blocker`のまま、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 Windows Export credential scan診断と実Codex CLI再試験（2026-10-01）
+
+### Windows Export手動検証
+
+- [手動Windows Export run #6](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36784185786)は`workflow_dispatch`でclean `main`のcommit `1468bbaec77991bd6bf82e12bee9bf32279d8851`を検査した。checkout SHA／`origin/main`一致、clean source、固定Rust 1.95.0／Flutter 3.44.0 toolchain準備を確認し、Flutter Windows ReleaseとRust helper／launcher Release buildまで到達した。
+- その後Export bundleの既知Credential走査が`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出して停止した。検出一致が本物のcredentialかbinary内の別文字列との誤一致かは、このrunの診断では特定できない。fail-closed判定を維持し、bundle成功へ読み替えない。artifact uploadなし。前段失敗によりsource clean終了stepはskipされたが、hosted runnerは終了済みで一時workspace／build出力は保持されていない。
+- `tooling/export_windows_product.py`のCredential判定自体は変更せず、次回調査に限って一致field、artifact内byte offset、値長を診断し、候補値本文は出力しないようにした。conformance negative testはsynthetic候補値がdiagnosticへ漏れないことも検査する。原因が確定するまではscanを緩めない。
+- `python -X utf8 -m py_compile tooling/export_windows_product.py tooling/conformance_tests/run_conformance_skeleton.py`は成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は230 checks合格。`python -X utf8 tooling/manifest.py --write`でtracked manifest 1123件を更新後、履歴追記を含む最終`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`もexit 0。strict日本語監査1126 files／0 findings、Schema 151／example 151／negative 194、Conformance 230、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertions、C32監査の全登録checkがpassした。product Windows installed evidenceの5 gateは未成立、release blocker 31件、`post_v1_scope` 2件、`release_ready=false`を維持する。`git diff --check`もpass。
+
+### 実Codex CLI Broker Taskの再現性追試
+
+- Windows localの明示Codex CLI `0.158.0-alpha.2.1`、隔離CODEX_HOME、localhost偽Responses APIだけを使ったignored LIVE_RUNTIME testを、同じHEAD `1468bba`でこの継続中に3回実行した結果は2 passed／1 failed。失敗runではBroker Taskが`failed`となり取消段階へ届かず、CLI eventは`stream disconnected before completion`。server側のHTTP request parse／response write failureは0、Workspace内markerは作成済み、Workspace外writeなし、loopback proxyは`chatgpt.com` CONNECT 1件を遮断した。偽API server write成功記録はCLIがbodyを受領した証拠ではないため、原因は未確定とする。
+- 正確な実行は`$env:GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE = (Get-Command codex.exe -CommandType Application | Select-Object -First 1 -ExpandProperty Source); cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME -- --ignored --exact --nocapture --test-threads=1`。実Codex CLI `0.158.0-alpha.2.1`を明示した絶対pathで指定し、実model・資格情報は使っていない。
+- これはRust test-thread内Broker／synthetic Owner・Audit fixtureと実Codex CLI／MxC childに限る。3回中の失敗を通過runで相殺せず、production Adapterは`task_execution=unsupported`、Agent Task production隔離とCancellationの`release_blocker`、`release_ready=false`を維持する。
+
+### Windows Temp残存cleanup
+
+- 2026-09-29作成の専用fixture Temp directory 2件は、通常directory配下にfixture source／fake CLI executable／debug symbolだけがあり、reparse pointと実行中のfixture processはなかった。
+- 正確な2対象へ限定したrecursive `Remove-Item` commandはshell tool policyによりprocess起動前に拒否された。何も削除されていない。policyを迂回する別経路は試さず、cleanup未完了として残す。

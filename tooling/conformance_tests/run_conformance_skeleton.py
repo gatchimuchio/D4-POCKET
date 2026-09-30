@@ -9141,12 +9141,20 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
             errors.append("chunk境界をまたぐ既知AWS access-key markerをCredential scanが拒否しない")
         except ValueError:
             pass
-        probe.write_bytes(b"AWS_SECRET_ACCESS_KEY=synthetic-not-a-real-secret")
+        credential_field = "access_token"
+        credential_value = "synthetic-not-a-real-secret"
+        probe.write_bytes(f"{credential_field}={credential_value}".encode("ascii"))
         try:
             scan_credential_artifacts(bundle)
             errors.append("Credential名に結び付いたsynthetic値をscanが拒否しない")
-        except ValueError:
-            pass
+        except ValueError as error:
+            diagnostic = str(error)
+            if (
+                f"field={credential_field}" not in diagnostic
+                or f"value_length={len(credential_value)}" not in diagnostic
+                or credential_value in diagnostic
+            ):
+                errors.append("Credential scan診断がfield／長さだけを示し、候補値を秘匿しない")
         probe.write_bytes(b"synthetic private-key boundary: -----BEGIN PRIVATE KEY-----")
         try:
             scan_credential_artifacts(bundle)

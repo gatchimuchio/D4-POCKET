@@ -459,18 +459,18 @@
         "cli_version": "0.158.0-alpha.2.1",
         "test": "broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME",
         "evidence_source": "実Codex CLI／MxC childはLIVE_RUNTIME、Broker control／Owner確認／Adapter metadata／Audit callbackはFIXTURE",
-        "validation": "取消段階まで全assertを通過した実行は1回。その後、元の試験設定による2回は先行正常TaskのResponses stream切断でfailedとなり取消段階へ到達しなかった。既知model slugを使う別設定はtool childを起動できずrevertした。",
+        "validation": "取消段階まで全assertを通過した元sourceでの実行は1回。その後、元の試験設定による2回は先行正常TaskのResponses stream切断でfailedとなり取消段階へ到達しなかった。2026-10-01のHEAD 1468bbaで追加focused runは2 passed／1 failed。失敗runではworkspace marker作成後にCLIがstream disconnected before completionを返し、API応答write／request parse failureは0。既知model slugを使う別設定はtool childを起動できずrevertした。すべての失敗履歴を保持し、取消probe全経路の再現性は未成立。",
         "observations": {
           "task_state": "成功した1回ではBroker取消後にterminal status=cancelled、result_hashなし",
           "process_stop": "heartbeatを更新する実MxC shell childがterminal後に停止し、250ms後もfile長が不変",
           "broker_scratch": "terminal後にBroker管理.d4p-tmp- scratchなし。MxC内部TEMPの物理cleanupを証明しない",
           "audit": "in-memory fixture callbackに開始、取消要求、失敗／取消terminal eventあり。永続Auditではない",
-          "response_instability": "後続2回はResponses stream切断、response parse／write／incomplete request failure 0、loopback proxyがchatgpt.com CONNECTを各1件拒否。原因未確定。"
+          "response_instability": "先行2回とHEAD 1468bbaの1回でResponses stream切断を観測。HEAD上の新規失敗ではresponse write／incomplete request failure 0、loopback proxyがchatgpt.com CONNECTを1件拒否。追加のfocused run 2回はpassしたが、原因未確定。"
         },
         "real_model_or_credential_used": false,
         "configuration_persisted": false,
         "os_protection_changed": false,
-        "scope_limit": "in-process Broker consumerとsynthetic Owner／metadata fixtureによる当該Windowsの限定取消観測1回。production broker-server／IPC、Desktop native Owner UI、耐久Audit、繰返し可能な成功、deadline／crash Recovery、OneDrive／NTFS隔離matrix、MxC内部TEMP cleanup、release readinessは証明しない"
+        "scope_limit": "in-process Broker consumerとsynthetic Owner／metadata fixtureによる当該Windowsの限定取消観測1回。HEAD 1468bbaでは追加focused runが2／3 pass、1／3 failであり、繰返し可能な成功は未成立。production broker-server／IPC、Desktop native Owner UI、耐久Audit、deadline／crash Recovery、OneDrive／NTFS隔離matrix、MxC内部TEMP cleanup、release readinessは証明しない"
       },
       "desktop_broker_unsupported_gate_probe": {
         "date": "2026-09-30",
@@ -700,8 +700,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Rust起動器の製品別runtime rootとBrokerのcreate-only Manifest／Receipt／Audit結合は実装済み。Schema検査済みReceipt／ManifestからApp／Audit store IDをcompile-timeへ渡すWindows開発build toolも追加した。2026-09-27、OneDrive外の短いprocess-scoped TEMP／TMPからclean pushed commitを再構築し、PubとFlutter Windows Releaseは成功したが、Cargoのio-lifetimes／proc-macro2 build scriptがWindows Application ControlのOS error 4551で拒否されbundle未生成。path長対策後もhost execution policyが阻害要因であり、policy変更・拒否file移動による回避は行わない。toolはReceiptの出所・Owner操作を認証せず、build evidenceはINTERNAL_STATEでCredential artifact scan未実施、runtime Manifest未消費、未署名、未起動を固定する。実際のclean pushed source bundle buildと、clean source由来installed productでOwner No／Audit、Owner Yes／Manifest file／完了Audit、全package hash、分離Runtime／Audit storeを外部収集するformal LIVE_RUNTIME証拠は未成立。",
-      "required_action": "Windows Application Controlを弱めずにCargo build scriptを実行できる検証環境で、clean pushed sourceからBroker生成Receipt／Manifestによるunsigned test bundleを構成し、package hashを記録する。隔離test identityでOwner No／Yes双方を実行し、別Windows profileのinstalled-path testで製品間runtime／Audit store分離、Manifest file／完了Audit／継承禁止Receiptを確認する。production signing identityとFinal GOは要求せず、Technical Complete後のOwner Finalizationへ分離する。"
+      "reason": "Rust起動器の製品別runtime rootとBrokerのcreate-only Manifest／Receipt／Audit結合は実装済み。Schema検査済みReceipt／ManifestからApp／Audit store IDをcompile-timeへ渡すWindows開発build toolも追加した。2026-09-27、OneDrive外の短いprocess-scoped TEMP／TMPからclean pushed commitを再構築し、PubとFlutter Windows Releaseは成功したが、Cargoのio-lifetimes／proc-macro2 build scriptがWindows Application ControlのOS error 4551で拒否されbundle未生成だった。path長対策後もlocal host execution policyの阻害が残るため、policy変更・拒否file移動による回避はしていない。手動run #6（2026-10-01、clean main commit 1468bba）はWindows Server 2025で固定toolchainを準備し、Flutter／Rust Release build完了後、credential scanがrust_helper.exeにcredential_assignmentを検出してfail-closed停止した。pattern一致が実Credentialかbinary false positiveか未確定で、bundle／artifactは生成・uploadされず、source-clean stepは前段failureによりskip、hosted runnerは終了済み。現行scanはINTERNAL_STATEのfixture build入力であり、Owner authority、runtime Manifest消費、未署名bundle完成、installed product証拠ではない。formal LIVE_RUNTIME evidenceも未成立。",
+      "required_action": "Credential scanの拒否基準は弱めず、次の手動runで追加した秘密値非出力診断（field名／offset／値長のみ）から一致箇所を特定し、実Credentialでないことをsource・binary由来で検証してから、検出漏れを起こさない修正を行う。Windows Server 2025でclean pushed sourceのfixture bundle buildとsource-clean終了確認を再実行する。その後Broker生成Receipt／Manifestを使うunsigned test bundle、package hash、隔離test identityのOwner No／Yes、別Windows profileのinstalled-path runtime／Audit store分離、Manifest file／完了Audit／継承禁止Receiptを検証する。production signing identityとFinal GOは要求せず、Technical Complete後のOwner Finalizationへ分離する。"
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
