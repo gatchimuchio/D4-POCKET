@@ -701,3 +701,9 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart`: Analysis Server終了処理が`C:\Users\ohira\AppData\Local\Dart\perf\18552`を削除できずexit 1。静的Analyzer成功とは扱わない。GitHub CLIがこの環境にないため手動Actionsは起動していない。
 - `python -X utf8 tooling/manifest.py --write`: 1111 fileを記録。`python -X utf8 tooling/manifest.py --check`と`git diff --check`はともに合格。
 - Windows Actionsは未使用。ローカルDesktop全126 testsとPython統合validatorが合格し、残ったFlutter AnalyzerはOneDrive上のAnalysis Server障害である。`gh` CLIは未導入で、現行接続済みGitHub toolにも手動dispatch機能がないため、Actions runでの代替検証は実施していない。
+
+### Analyzer短縮path再試験（2026-09-30）
+
+- 前項のAnalyzer失敗をコード失敗と断定せず、Repositoryを移動せずに一時`Z:` drive aliasから`apps/desktop_flutter`を開いて`flutter analyze --no-pub`を再実行した。Analysis Serverは62秒で`No issues found!`を返し、Flutter Analyzerは成功した。一時drive aliasは実行後に解除し、Repository path・Windows保護設定は変更していない。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml desktop_owner_allowlist_requires_native_confirmation_and_broker_audits_both_outcomes -- --test-threads=1`: 1件pass。Owner確認allowlistの既存Broker testを再実行しただけであり、登録済みCodex RuntimeへのOwner確認後、Agent Taskが非対応として拒否される統合経路は未試験。
+- この追試は前記LSP parse障害を短縮pathで回避できることを示す環境限定の静的解析結果で、OneDrive原pathでの再発防止やinstalled productを証明しない。以前の失敗記録と`dart analyze`の終了処理失敗は履歴として保持する。GitHub Actionsは使用していない。
