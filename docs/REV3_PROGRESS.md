@@ -1196,9 +1196,11 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 変更はFlutter表示面とwidget testだけで、Rust Broker、診断契約、証拠class、権限判定、実測値は変更していない。390×844の狭い画面でwarning／unknownと復旧案内が分かれ、描画例外がないことを検査するtestを追加した。
 - このUI改善は導入済みWindows製品の実証ではない。`windows_setup_doctor_smoke`を含むrelease blockerと`release_ready=false`を維持する。
 
-### ローカル検証とWindows補助検証
+### 検証
 
-- 対象2 Dart fileの`dart format --output=none --set-exit-if-changed`と`git diff --check`は成功した。
-- local `flutter analyze --no-pub`はAnalysis Serverが受信LSP JSONを解析できず`FormatException: Unterminated string`、exit 255で終了し、analyzer findingsを得られなかった。`flutter test --no-pub --reporter expanded`はOneDrive Cloud Filesの`build/unit_test_assets`へのアクセス拒否を受けて開始できなかった。これは実装のPASSではなくhost環境の制約として扱う。
-- Windows Actions #4 (`36714964375`) は`f88cb7a22bca5ac67e3f9b8df07fd0d3f692387d`、一時branch `codex/verify-setup-doctor-ui-20260930`を対象に手動実行した。commit／runner照合、固定Flutter導入、Rust helper buildが成功し、Flutter analyzeも`No issues found!`だった。Widget testは129件成功したが、既存の環境診断test 1件が旧表示名`ネットワーク公開範囲:`／`監査鎖状態:`を期待して失敗した。変更後UIと追加したwarning／unknown・狭幅testは通過し、UI変更に合わせて既存test期待値を`通信範囲:`／`Broker監査鎖:`へ直した。Mobile analyzeは失敗停止によりskipされた。
-- この失敗履歴は残す。修正後の正確なcommitでも同じ手動workflowを再実行し、Desktop全test、Mobile analyze、終了時clean checkまで閉じた結果を追記してから一時branchを片付ける。PR、自動trigger、必須status checkは作らない。
+- 対象Dart fileの`dart format --output=none --set-exit-if-changed`、`git diff --check`、manifest検査は成功した。
+- OneDrive上のlocal `flutter analyze --no-pub`はAnalysis Serverが受信LSP JSONを解析できず`FormatException: Unterminated string`、exit 255で終了した。local `dart analyze lib/screens/setup_doctor.dart test/widget_test.dart`もAnalysis Serverの終了時に`AppData\Local\Dart\perf\7612`を削除できずexit 1となった。local `flutter test --no-pub --reporter expanded`は保護されたOneDrive Cloud Filesの`build/unit_test_assets`をFlutterが削除できず、test開始前に停止した。いずれもlocal analyzer／testの成功証拠には数えない。
+- 手動Windows Actions #4 (`36714964375`) は`f88cb7a22bca5ac67e3f9b8df07fd0d3f692387d`でFlutter analyzeが成功した一方、古い表示名を期待する既存widget assertion 1件が失敗した。残り129件と、新規のwarning／unknown・狭幅画面testは成功。失敗履歴は保持し、assertionを現在の「通信範囲」「Broker監査鎖」表示に修正した。
+- 修正後の統合validator `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows` はexit 0。厳格日本語監査1123 file／指摘0、Schema 150、正常例150、negative fixture 193、Conformance 229、登録済みdevelopment検査10件を含む検査が成功した。Windows installed-evidence blocker 5件とregistry全体のactive unresolved 15件を維持し、`release_ready=false`。
+- 手動Windows Actions [#5 (`36716608834`)](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36716608834) は`workflow_dispatch`で`codex/verify-setup-doctor-ui-20260930`上の正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を検証し、全step成功。Windows Server 2025 image `20260922.246.2`、Flutter 3.44.0（commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`）でRust helper build、Desktop analyze、全130 Desktop test、Mobile analyze、終了時clean確認が成功した。artifactはなく、runに関連するPRもない。
+- 成功した正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を`main`へfast-forwardし、`origin/main`との一致を確認した。一時検証branchはlocal／remote双方から削除済み。ActionsはRust／Flutter検査の証拠であり、Windows installed productの実起動、Setup DoctorのLIVE_RUNTIME製品証拠、release readinessを証明しない。既存release blockerと`release_ready=false`は維持する。
