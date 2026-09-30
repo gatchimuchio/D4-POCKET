@@ -10,6 +10,8 @@ D4 Pocket Windows Export hosted build補助: `.github/workflows/windows-manual-e
 
 実Win32 Owner確認dialogのNo／Yes表示・選択試験は、対話Desktopを持たないhosted Windows runnerではなく、Rust `winsafe`の安全APIを使うWindows local ignored testから実行する。testはPID・window title/class・本文・button IDとlabel・foreground・UI thread focusを照合してから固定試験入力だけを送る。これはRust production formatterとMessageBoxのlocal UI evidenceに限り、production Owner操作、installed product、Broker authority、AgentTask成功や`task_execution=supported`の証拠へ昇格しない。Windows manual ActionsはRust build／test補助に限る。
 
+R2追補（2026-09-30）: 実Codex CLI登録済みのBroker loopback統合testで、Permissionのnative Owner確認No／YesとOwner ApprovalのYesを実Win32 dialog経由で操作しても、Brokerが両grantを`AgentTask実行非対応`として拒否し、test用file-backed Auditへ記録することを確認した。証拠はWin32 dialog／CLI登録の`LIVE_RUNTIME`と、test thread Broker／一時store／自動入力の`FIXTURE`に分かれる。installed Desktop IPC、耐久製品Audit、Agent Task実行ではなく、`task_execution=unsupported`と関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`。
+
 D4 Pocket Phase 21／C11追補（2026-09-30）: 更新一覧の各候補へ、現在trustで再検証済みの候補とBroker所有配布元だけから導出した取得先状態／URLを表示する。配布元未設定と未適格候補はURLなしとし、表示は`INTERNAL_STATE`のみで権限やdownload実行を生成しない。download／install／rollbackは`suspended`を維持する。詳細・検証結果は`docs/REV3_PROGRESS.md`。
 
 D4 Pocket Phase 21／C11追補（2026-09-30）: update trust版2のchannel別配布元一意性をJSON Schemaにも表現し、異なるURLを持つ同一channelの重複をnegative conformanceで拒否する。Brokerの既存起動時拒否と機械契約の差を閉じた。これは設定contractの検査であり、download実行、package照合、install／rollbackは未接続。詳細・検証結果は`docs/REV3_PROGRESS.md`。

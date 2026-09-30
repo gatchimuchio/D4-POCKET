@@ -444,6 +444,21 @@
         },
         "scope_limit": "The production server function ran in a Rust test thread with test-owned Workspace/store, and the relay frame was invoked directly rather than through an installed Flutter process. Owner confirmation used a synthetic affirmative callback, not the Win32 dialog. This does not prove installed-product behavior, actual Owner UI, Agent Task execution, model/provider interoperability, or filesystem isolation."
       },
+      "native_owner_confirmation_gate_probe": {
+        "date": "2026-09-30",
+        "source_commit": "bce7d43e1525d3f23d29688f157c52ecc69a3062",
+        "source_worktree_clean": true,
+        "evidence_source": "LIVE_RUNTIME for actual Windows MessageBox display/input and installed Codex CLI registration probe; FIXTURE for the Rust test-thread Broker, direct loopback relay, temporary Workspace/store, and deterministic UI input",
+        "validation": "Windows local ignored Rust integration test passed 1/1 on source commit bce7d43e1525d3f23d29688f157c52ecc69a3062. No Agent Task or model request was launched.",
+        "observations": {
+          "workspace_permission_no": "The actual native dialog returned No for a Workspace Permission request.",
+          "workspace_permission_yes": "After actual native confirmation returned Yes, Broker still rejected the grant as AgentTask実行非対応 and returned no body.",
+          "owner_approval_yes": "After actual native confirmation returned Yes, Broker still rejected the Approval as AgentTask実行非対応 and returned no body.",
+          "audit_and_exposure": "Both unsupported rejections were written to the file-backed test Audit store; no grant-issuance Audit or Task instruction appeared in the dialog, response, or Audit.",
+          "agent_execution": "Not attempted; task_execution remains unsupported."
+        },
+        "scope_limit": "The test-hosted Broker runs in a Rust test thread with a temporary Workspace/store and direct test relay. UI input is deterministic automation, not an ordinary human operation. This does not prove installed Flutter/Desktop IPC, durable product Audit, Agent Task execution, provider interoperability, filesystem isolation, or release readiness."
+      },
       "task_scratch_launch_configuration": {
         "date": "2026-09-30",
         "source_base_commit": "3e36aa917710f5d2c0e2670cc688671d00c3252b",

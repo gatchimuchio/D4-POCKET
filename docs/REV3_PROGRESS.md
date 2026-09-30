@@ -29,6 +29,19 @@
 - 統合validatorのrelease gate検査成功は製品release成立を意味しない。evidence bundleはdevelopment evidenceのままで、現行release blockerと`release_ready=false`を維持する。
 - workflow: manual workflowの`workflow_dispatch`限定は統合validator内の検査が成功。Actionsは追加起動していない。Git閉包のbranch／commit／push／remote HEAD／backup／rollback refは本blockの最終報告に記録する。
 
+### 実Win32 Owner確認後もAgentTask非対応gateが拒否する統合追試（2026-09-30）
+
+- 先行記録の統合testはsynthetic Owner callbackを使っていたため、既存の実Win32 dialog試験を登録済みCodex CLIのBroker loopback統合testへ接続し直した。試験専用BrokerはRust test thread、Workspace／storeは一時fixture、要求relayはtestから直接呼び出す構成である。
+- Workspace Permission要求では実native dialogのNoを確認し、次の要求ではYesを選んでもBrokerが`AgentTask実行非対応`としてgrantを返さない。Owner Approvalも実native dialogでYesを選択した後、同じunsupported gateで拒否される。試験はPermissionとApprovalの拒否Auditがfile-backed test storeへ記録されること、grant発行Auditがないこと、Task本文がdialog／response／Auditへ露出しないことを確認する。実Codex CLIはRuntime登録probeだけに使い、Agent Task／model requestは開始しない。
+- 証拠classは混在する。実Windows MessageBox表示・入力とCLI登録probeは`LIVE_RUNTIME`、test thread Broker・一時Workspace/store・固定入力自動化は`FIXTURE`である。これはDesktop installed product、別process起動器／FlutterからのIPC、通常Owner操作、耐久製品Audit、Task実行成功または`task_execution=supported`の証拠ではない。
+- ignored統合testはWindows localで1件合格。実行時だけ`GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へ検出したCodex CLI実行fileを設定し、値は保存しない。
+
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'desktop_launcher::tests::登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する' -- --ignored --exact --test-threads=1 --nocapture
+```
+
+- Windows local ignored test: 1 passed／0 failed。全suiteやinstalled productの再検証ではない。既存Rust／Desktop／Agent隔離のrelease blockerと`task_execution=unsupported`、`release_ready=false`を維持する。
+
 ## R0 現行状態再固定（2026-09-29）
 
 ### Repository基準
