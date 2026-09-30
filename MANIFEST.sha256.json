@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "ffbab3758a5e671e307ec81ae1f3984baccac0d499cd03bcf6c84870e46a0282"
+      "sha256": "0700b818034b18505a02efd730e5c82862015aa9a55399193d292552379a4193"
     },
     {
       "path": "requirements-dev.txt",
