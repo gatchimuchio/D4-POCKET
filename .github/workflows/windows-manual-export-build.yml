@@ -30,11 +30,8 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) {
             throw "checkout HEAD ($head) does not match workflow commit ($env:GITHUB_SHA)"
           }
-          $remoteMainLines = @(git ls-remote origin refs/heads/main)
-          if ($LASTEXITCODE -ne 0 -or $remoteMainLines.Count -ne 1) {
-            throw 'origin/mainを一意に確認できない'
-          }
-          $remoteMain = ($remoteMainLines[0] -split '\s+')[0]
+          $remoteMain = (git rev-parse refs/remotes/origin/main).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'checkoutしたorigin/mainを解決できない' }
           if ($remoteMain -ne $head) {
             throw "origin/main ($remoteMain) does not match workflow commit ($head)"
           }
@@ -96,6 +93,8 @@ jobs:
           & "$flutterRoot\bin\flutter.bat" --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: fixtureから未署名Windows Release bundleを構築・検証
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -106,6 +105,12 @@ jobs:
           if (Test-Path -LiteralPath $bundle) {
             throw 'fixture bundle output already exists; refusing overwrite'
           }
+          $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
+          $env:GIT_CONFIG_COUNT = '1'
+          $env:GIT_CONFIG_KEY_0 = 'http.extraheader'
+          $env:GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic $basic"
+          Remove-Item Env:GH_TOKEN
+          $basic = $null
           python -X utf8 tooling/export_windows_product.py `
             --receipt examples/contracts/gui_shell_export_receipt.valid.json `
             --manifest-file examples/contracts/gui_shell_export_manifest.valid.json `
