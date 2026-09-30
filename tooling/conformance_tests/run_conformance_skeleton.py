@@ -1978,7 +1978,7 @@ def _valid_windows_installed_evidence() -> dict:
             "status": "passed",
             "evidence_source": {
                 "collector": "installer/windows/collect_broker_smoke.ps1",
-                "collector_version": "5",
+                "collector_version": "6",
                 "synthetic": False,
                 "command": r"powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1",
             },
@@ -1995,6 +1995,10 @@ def _valid_windows_installed_evidence() -> dict:
             "restricted_loopback_bind": True,
             "authenticated_ipc_connection": True,
             "durable_store_ready": True,
+            "normal_ipc_agent_task_workspace_permission_denied": True,
+            "agent_task_workspace_permission_error_code": "desktop_native_owner_confirmation_required",
+            "normal_ipc_agent_task_owner_approval_denied": True,
+            "agent_task_owner_approval_error_code": "desktop_native_owner_confirmation_required",
             "replay_nonce": "windows-installed-replay-nonce",
             "restart_replay_rejected": True,
             "replay_error_code": "broker_replay_detected",
@@ -2008,6 +2012,8 @@ def _valid_windows_installed_evidence() -> dict:
                 "restricted_loopback_bind": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "authenticated_ipc_connection": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "durable_store_ready": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "normal_ipc_agent_task_workspace_permission_denied": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
+                "normal_ipc_agent_task_owner_approval_denied": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "restart_replay_rejected": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "fresh_health_after_restart": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
                 "crash_fail_closed": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME"},
@@ -2451,6 +2457,44 @@ def test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_
     return []
 
 
+def test_windows_broker_evidence_requires_native_owner_denial_for_agent_task_grants() -> list[str]:
+    errors = []
+    for field, error_code in (
+        ("normal_ipc_agent_task_workspace_permission_denied", "agent_task_workspace_permission_error_code"),
+        ("normal_ipc_agent_task_owner_approval_denied", "agent_task_owner_approval_error_code"),
+    ):
+        bad = _valid_windows_installed_evidence()
+        bad["broker"][field] = False
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
+            errors.append(f"Windows broker validatorが{field}=falseを受け入れた")
+
+        bad = _valid_windows_installed_evidence()
+        bad["broker"][error_code] = "accepted"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "windows_installed_smoke.json"
+            path.write_text(json.dumps(bad), encoding="utf-8")
+            results = validate_windows_release_evidence(path)
+        result_by_name = {result.name: result for result in results}
+        if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
+            errors.append(f"Windows broker validatorが{error_code}の不一致を受け入れた")
+
+    bad = _valid_windows_installed_evidence()
+    bad["broker"]["evidence_source"]["collector_version"] = "5"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(bad), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_broker_installed_smoke"].classification != "release_blocker":
+        errors.append("Windows broker validatorが旧collector version 5を受け入れた")
+    return errors
+
+
 def test_windows_japanese_surface_labels() -> list[str]:
     from tooling.windows_release_evidence import _validate_surface_match_evidence, _contains_surface_label, SURFACE_NAMES
     errors = []
@@ -2786,14 +2830,33 @@ def test_windows_broker_smoke_keeps_full_duplex_response() -> list[str]:
         errors.append("collect_broker_smoke.ps1がWindows応答前に送信側socketをshutdownしている")
     if "$raw = $reader.ReadLine()" not in text:
         errors.append("collect_broker_smoke.ps1がBrokerの改行区切り応答を1フレームとして読んでいない")
-    if 'collector_version = "5"' not in text:
-        errors.append("collect_broker_smoke.ps1のcollector versionが一時資格file cleanupを反映していない")
+    if 'collector_version = "6"' not in text:
+        errors.append("collect_broker_smoke.ps1のcollector versionがAgent Task権限否定検査を反映していない")
     if "$sessionFileCreated = Test-Path -LiteralPath $SessionFile" not in text:
         errors.append("collect_broker_smoke.ps1がcleanup前にendpoint file生成を観測していない")
     if "$sessionFileRemovedAfterCollection = !(Test-Path -LiteralPath $SessionFile)" not in text:
         errors.append("collect_broker_smoke.ps1がendpoint資格file削除後の状態を測定していない")
     if "session_file_removed_after_collection = $sessionFileRemovedAfterCollection" not in text:
         errors.append("collect_broker_smoke.ps1が資格file cleanupをevidenceへ結合していない")
+    return errors
+
+
+def test_windows_broker_smoke_checks_agent_task_grants_through_normal_ipc() -> list[str]:
+    text = (INSTALLER / "windows" / "collect_broker_smoke.ps1").read_text(encoding="utf-8")
+    errors = []
+    for operation in ("AgentTaskWorkspacePermissionGrant", "AgentTaskOwnerApprovalGrant"):
+        if f'-Operation "{operation}"' not in text:
+            errors.append(f"collect_broker_smoke.ps1に{operation}の通常IPC probeがない")
+    for field in (
+        "normal_ipc_agent_task_workspace_permission_denied",
+        "agent_task_workspace_permission_error_code",
+        "normal_ipc_agent_task_owner_approval_denied",
+        "agent_task_owner_approval_error_code",
+    ):
+        if f"{field} =" not in text:
+            errors.append(f"collect_broker_smoke.ps1の結果に{field}がない")
+    if text.count("desktop_native_owner_confirmation_required") < 2:
+        errors.append("collect_broker_smoke.ps1が両grant操作のnative Owner確認拒否codeを照合しない")
     return errors
 
 
@@ -9382,6 +9445,7 @@ def main() -> int:
         test_windows_release_evidence_rejects_runtime_or_config_outside_isolated_profile,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,
+        test_windows_broker_evidence_requires_native_owner_denial_for_agent_task_grants,
         test_windows_japanese_surface_labels,
         test_windows_surface_geometry_and_identity,
         test_windows_release_evidence_validator_rejects_missing_surface_matches,
@@ -9394,6 +9458,7 @@ def main() -> int:
         test_windows_stage_uses_terminal_free_native_launcher,
         test_windows_installed_smoke_preserves_trap_failure,
         test_windows_broker_smoke_keeps_full_duplex_response,
+        test_windows_broker_smoke_checks_agent_task_grants_through_normal_ipc,
         test_windows_installed_smoke_reads_json_as_utf8,
         test_windows_installed_smoke_uses_launcher_owned_runtime,
         test_windows_installed_smoke_exit_matches_native_tray_contract,

@@ -83,6 +83,34 @@
           "errors": []
         },
         "scope_limit": "隔離temporary store／session／outputを使ったstandalone Rust Release helperの実行に限る。installed product launch、Flutter integration、別user profile smoke、正式release evidence provenance、release readinessは証明しない"
+      },
+      "latest_agent_task_normal_ipc_denial_probe": {
+        "date": "2026-09-30",
+        "evidence_source": "LIVE_RUNTIME",
+        "source_commit": "e8ea0587031402a19fc9dff260d7c925403cca2e",
+        "source_worktree_clean": false,
+        "rust_source_diff": false,
+        "build_command": "cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir <isolated temporary directory>",
+        "build_result": "成功。変更外のdead_code warningが2件",
+        "helper_sha256": "e9f6e1c536f4e8a166fe4ff5d775bd649c89b0bba635e82ab42d83c252b80344",
+        "collector": "installer/windows/collect_broker_smoke.ps1",
+        "collector_version": "6",
+        "collector_result": "passed",
+        "collector_output_sha256": "e2b40602ef691373635d0cbf137d6aa4c0c4aac46944e796f7290333cdd191c9",
+        "observations": {
+          "endpoint_host": "127.0.0.1",
+          "credential_role": "normal",
+          "workspace_permission_grant": "rejected",
+          "workspace_permission_error": "desktop_native_owner_confirmation_required",
+          "owner_approval_grant": "rejected",
+          "owner_approval_error": "desktop_native_owner_confirmation_required",
+          "restart_replay_rejected": true,
+          "fresh_health_after_restart": true,
+          "crash_fail_closed": true,
+          "session_credential_created_then_removed": true,
+          "errors": []
+        },
+        "scope_limit": "現行Rust sourceと隔離temporary store／session／outputを使ったstandalone Broker processの通常IPC拒否実測。build時はRust sourceに差分がなく、他の文書／tooling差分があった。installed product、Desktop起動器のnative Owner確認、Task実行、durable product Auditの統合、別profile、正式release evidence provenance、release readinessは証明しない"
       }
     },
     {

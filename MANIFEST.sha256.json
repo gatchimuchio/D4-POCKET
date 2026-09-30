@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b1fbf258ce6d0e2b31d569abc90637a8a169b1cd03cf55f4fe2af7272a38e198"
+      "sha256": "114235530839c542845db1a4ab3ee76ef59b3a66d8d67cbe03ef7e246e04f36d"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "905292f4c03f69958b05c7d1d58c1a28c0e7d30041f78b846a71f390ef3e1174"
+      "sha256": "aa2f51e98398a88cfb42b047d5717f35b26f129a00de17458489b5488d3ab1fe"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "336d5e4a49dffcff332da5fc9f8ffc34b806d9fa82a87fb152bee596eb408d1d"
+      "sha256": "f08aec81c692ba01338806cdc4b3493e550a9e3aa1ab6b15eb44e4cbf4b9d3d4"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2901,7 +2901,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "bbb2b7be9b4764081796069222b7c89d29008335aaa5786d3325891f9ca0a6d5"
+      "sha256": "96ff3e369dc2d72c150f3fc475bd270deb7f110e2224b22b7135ca9f55071cf2"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -2909,7 +2909,7 @@
     },
     {
       "path": "installer/windows/collect_broker_smoke.ps1",
-      "sha256": "f4f9059189f62600fffc963f308bca00fbc551443d97be0638c8dcf0e8f33f97"
+      "sha256": "2fff5adb0502404a77dac728c2761d16fc047652a502c5d8794c2afa222a23bc"
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "939bd24f78d2410918ccd73bba5e1d954b7a94b99882542685682272ea8006dd"
+      "sha256": "ffbab3758a5e671e307ec81ae1f3984baccac0d499cd03bcf6c84870e46a0282"
     },
     {
       "path": "requirements-dev.txt",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2c8f576e4a4017e35cc6971ff31a5f06e2df6fcc126925852e52d7fe523a8972"
+      "sha256": "6c005c28debe0b1ef37495925a62fa0351f4cc4ca76dff6294d9a6ad13572e36"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4485,7 +4485,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "6e2ce386ca7a133e246ff3adb7a0a140a6a7f546bcb294f312661517be06dc99"
+      "sha256": "596b8fe5af36c3a84008500d01865e1407550ef6e92efbd3f1300000ba448377"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",

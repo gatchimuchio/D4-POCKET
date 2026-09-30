@@ -654,3 +654,30 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - Schema 149／example 149／negative fixture 192、Conformance 225 checksは再合格。Manifest 1111件を再生成・照合した時点の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0、release gate validationはpassだった。その後、assert文面・検証履歴・registryを更新しながら開始したvalidator再試行ではManifest、release gate、packaging checkがfailedとなった。実行中に対象fileが変わったためManifestとの不一致による結果であり、そのFAIL履歴を保持する。差分・文書・Manifestを固定して再実行した最終validatorもexit 0、release gate validation passとなった。
 - Final validatorではWindows installed evidenceが5項目欠け、各項目は既存`release_blocker`としてfailedのまま残る。validator／release gateの構造検査がpassしたことをrelease readinessへ読み替えず、`release_ready=false`とする。
 - GitHub Actionsは未使用。現在のWindowsで実CLI／Rust全targetを検証できたため、OneDriveのPDB失敗はlocal Temp targetで補い、hosted runnerを不要なCIへ拡張しない。
+
+## R2追補 通常Broker IPCからAgent Task権限を発行できないことのWindows実測（2026-09-30）
+
+### 成立した確認
+
+- `installer/windows/collect_broker_smoke.ps1`をversion 6へ更新し、実Broker processのnormal loopback credentialから`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`を個別送信する。両要求が`desktop_native_owner_confirmation_required`で拒否されない場合はcollectorを失敗させる。応答本文や資格値はevidenceへ複写せず、拒否bool、固定error code、source provenanceだけを記録する。
+- release evidence validatorは両操作の実測bool、固定error code、`LIVE_RUNTIME` provenanceを必須化した。Conformanceへcollector構造検査と、片方の拒否欠落／error code差替をrelease blockerとして検出する否定試験を追加した。
+- 現行Rust source commit `e8ea0587031402a19fc9dff260d7c925403cca2e`からRelease helperをbuildし、isolated temporary store／sessionでcollectorを起動した。build時のworktreeは文書・tooling差分を含むdirty状態だったが、Rust sourceの差分はなかった。helper SHA-256は`e9f6e1c536f4e8a166fe4ff5d775bd649c89b0bba635e82ab42d83c252b80344`、collector output SHA-256は`e2b40602ef691373635d0cbf137d6aa4c0c4aac46944e796f7290333cdd191c9`。
+- collectorは両grant要求を通常IPCから拒否し、restart後replay拒否、新規health受理、Broker強制終了後のfail-closed、session資格fileの生成後削除も成功した。collector resultは`passed`、errorは0件。
+
+### 証拠境界
+
+この`LIVE_RUNTIME`観測はstandalone Rust Broker processの通常IPC経路に限る。通常credentialでWorkspace Permission／Owner Approvalを直接発行できないことを示すが、Desktop起動器のnative Owner確認、承認後のTask起動、耐久製品Audit統合、installed package、別user profileを検証していない。`task_execution=unsupported`、`windows_broker_installed_smoke`とAgent Taskの`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- Schema検査は成功し、149件のSchema、149件の正常例、192件の否定fixtureを確認した。実行コマンド: `python -X utf8 tooling/schema_check/check_schemas.py`。
+- 適合性検査は成功し、227件のcheckを確認した。実行コマンド: `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`。
+- Windows PowerShellの構文解析器で収集器scriptを解析し、構文errorなしを確認した。対象: `installer/windows/collect_broker_smoke.ps1`。
+- 変更差分に余分な空白や末尾空白がないことを確認した。実行コマンド: `git diff --check`。
+- `cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir <isolated temporary directory>`: exit 0。変更外のdead_code warning 2件。
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer\\windows\\collect_broker_smoke.ps1 -BrokerHelperExe <isolated Release helper> -OutputPath <isolated evidence path>`: exit 0。2つのAgent Task grant拒否と既存Broker smokeがすべて成功。
+- 厳格日本語監査: exit 0。1114 file／0 findings。
+- `python -X utf8 tooling/manifest.py --write`: exit 0。Manifestへ1111 fileを記録。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment検査10件は合格。Windows installed evidence 5項目はrelease blockerとして残り、`release_ready=false`。
+- GitHub Actionsは未使用。現WindowsでRelease helperのbuild・実Broker processを検証できたため不要。
+- このblockはcollector／validatorの拡張でありRust source変更を含まないため、Rust test suiteは再実行していない。Flutter、installed product、Desktop Owner操作も未検証。

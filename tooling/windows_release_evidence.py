@@ -38,6 +38,8 @@ REQUIRED_BROKER_TRUE_FIELDS = {
     "restricted_loopback_bind",
     "authenticated_ipc_connection",
     "durable_store_ready",
+    "normal_ipc_agent_task_workspace_permission_denied",
+    "normal_ipc_agent_task_owner_approval_denied",
     "restart_replay_rejected",
     "fresh_health_after_restart",
     "crash_fail_closed",
@@ -856,8 +858,8 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
         else:
             if source.get("collector") != "installer/windows/collect_broker_smoke.ps1":
                 errors.append("broker の evidence_source.collector は installer/windows/collect_broker_smoke.ps1 でなければならない")
-            if not source.get("collector_version"):
-                errors.append("broker の evidence_source.collector_version がない")
+            if source.get("collector_version") != "6":
+                errors.append("broker の evidence_source.collector_version は6でなければならない")
             if source.get("synthetic") is not False:
                 errors.append("合成した broker evidence は受理しない")
             if not source.get("command"):
@@ -884,6 +886,10 @@ def validate_broker_smoke(data: dict[str, Any]) -> EvidenceResult:
             errors.append("broker の endpoint_credential_role は normal でなければならない")
         if broker.get("replay_error_code") != "broker_replay_detected":
             errors.append("broker の replay_error_code は broker_replay_detected でなければならない")
+        if broker.get("agent_task_workspace_permission_error_code") != "desktop_native_owner_confirmation_required":
+            errors.append("通常Broker IPCのAgent Task Workspace Permissionはnative Owner確認必須として拒否されなければならない")
+        if broker.get("agent_task_owner_approval_error_code") != "desktop_native_owner_confirmation_required":
+            errors.append("通常Broker IPCのAgent Task Owner Approvalはnative Owner確認必須として拒否されなければならない")
         if "python_runtime_required_for_authority" in broker:
             errors.append("broker の top-level declaration python_runtime_required_for_authority は測定済み broker evidence として受理しない")
         if "flutter_rust_ffi_authority_bridge" in broker:

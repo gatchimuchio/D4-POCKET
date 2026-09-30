@@ -128,3 +128,7 @@ Agent Task用の書込Permissionは`agent_task_workspace_permission_request.sche
 同じ実MxC child検査へ起動前aliasを追加した。合成登録secret fileをhost側でhardlink化し、同一file identityとlink count 2を確認してからCodex CLIを起動したところ、未登録aliasからのreadは3/3回成功し、登録exact pathからのreadは3/3回拒否された。動的hardlink作成は別のexact-deny synthetic fileを対象にし、引き続き3/3回NativeErrorCode 5で拒否された。従って、MxC exact-path denyは起動前hardlink aliasを防がず、RustのWorkspace登録／Task preflightでmultiple linkを拒否してからspawnする境界が必要である。probeはそのRust preflightを意図的に迂回した直接`LIVE_RUNTIME`であり、Brokerやproduction Taskの挙動を示さない。`--runs 3`のbatch試行2回は最初のCLI呼出しでcommand exit 0後にResponses stream decode errorとなったためturn成功数へ加えず、個別`--runs 1`の完了turn 3件だけを反復数とする。
 
 TEMP／TMPがMxC child内でBroker `WorkspaceTaskScratch`と一致しない問題も残る。したがって、登録時／Task直前のhardlink検査と直接MxC childの作成拒否は限定された対策・証拠であり、Agent Adapter capabilityを`supported`へ変更しない。Broker経由の実Task、Owner承認、深度超過・別名secretを含む実tool child隔離、cancel／deadline／crash時停止、Audit／Recovery、scratch cleanupを検証するまで`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
+### 通常Broker IPCからのAgent Task権限発行拒否（2026-09-30）
+
+Windows向けBroker実測収集器の第6版は、通常のloopback接続資格を用いて本番Broker接続口へ`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`を別々に送り、両方が`desktop_native_owner_confirmation_required`で拒否されることを検査する。現行Rust実装からbuildした単体Release helperによる`LIVE_RUNTIME`実測で両拒否を確認し、収集器とrelease evidence validatorの必須条件にした。この否定経路が示すのは通常IPCによるOwner権限発行の拒否だけであり、Rust Desktop起動器上でのOwner確認成功、確認後の実Task、installed product、durable Audit統合を証明しない。`task_execution=unsupported`とrelease blockerは維持する。

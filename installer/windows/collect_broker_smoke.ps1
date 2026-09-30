@@ -179,6 +179,10 @@ $replay = $null
 $freshAfterRestart = $null
 $crashFailClosed = $false
 $normalEndpointCredentialRoleVerified = $false
+$agentTaskWorkspacePermissionErrorCode = $null
+$agentTaskOwnerApprovalErrorCode = $null
+$normalIpcAgentTaskWorkspacePermissionDenied = $false
+$normalIpcAgentTaskOwnerApprovalDenied = $false
 $sessionFileCreated = $false
 $sessionFileRemovedAfterCollection = $false
 $replayNonce = "windows-installed-replay-nonce-$([guid]::NewGuid().ToString('N'))"
@@ -198,6 +202,36 @@ try {
   }
   if ($health.health.persistence_ready -ne $true) {
     $errors.Add("broker の durable store が準備できていませんでした")
+  }
+
+  $taskPermissionRequest = New-BrokerRequest `
+    -RequestId "windows-installed-task-permission-$([guid]::NewGuid().ToString('N'))" `
+    -Operation "AgentTaskWorkspacePermissionGrant" `
+    -Nonce "windows-installed-task-permission-$([guid]::NewGuid().ToString('N'))" `
+    -SessionId $endpoint.session_id
+  $taskPermissionResponse = Invoke-BrokerRequest -Endpoint $endpoint -Request $taskPermissionRequest
+  $agentTaskWorkspacePermissionErrorCode = [string]$taskPermissionResponse.error.code
+  $normalIpcAgentTaskWorkspacePermissionDenied = (
+    $taskPermissionResponse.status -eq "rejected" -and
+    $agentTaskWorkspacePermissionErrorCode -eq "desktop_native_owner_confirmation_required"
+  )
+  if (!$normalIpcAgentTaskWorkspacePermissionDenied) {
+    $errors.Add("通常Broker IPCからのAgent Task Workspace Permission発行がnative Owner確認必須として拒否されませんでした")
+  }
+
+  $taskApprovalRequest = New-BrokerRequest `
+    -RequestId "windows-installed-task-approval-$([guid]::NewGuid().ToString('N'))" `
+    -Operation "AgentTaskOwnerApprovalGrant" `
+    -Nonce "windows-installed-task-approval-$([guid]::NewGuid().ToString('N'))" `
+    -SessionId $endpoint.session_id
+  $taskApprovalResponse = Invoke-BrokerRequest -Endpoint $endpoint -Request $taskApprovalRequest
+  $agentTaskOwnerApprovalErrorCode = [string]$taskApprovalResponse.error.code
+  $normalIpcAgentTaskOwnerApprovalDenied = (
+    $taskApprovalResponse.status -eq "rejected" -and
+    $agentTaskOwnerApprovalErrorCode -eq "desktop_native_owner_confirmation_required"
+  )
+  if (!$normalIpcAgentTaskOwnerApprovalDenied) {
+    $errors.Add("通常Broker IPCからのAgent Task Owner Approval発行がnative Owner確認必須として拒否されませんでした")
   }
 
   Stop-Broker -Process $broker -Endpoint $endpoint
@@ -262,7 +296,7 @@ $result = [ordered]@{
   collected_at = (Get-Date).ToUniversalTime().ToString("o")
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_broker_smoke.ps1"
-    collector_version = "5"
+    collector_version = "6"
     synthetic = $false
     command = "powershell -ExecutionPolicy Bypass -File installer\windows\collect_broker_smoke.ps1 -BrokerHelperExe `"$($helper.Path)`""
   }
@@ -279,6 +313,10 @@ $result = [ordered]@{
   restricted_loopback_bind = ($endpoint.host -eq "127.0.0.1" -and $restartEndpoint.host -eq "127.0.0.1")
   authenticated_ipc_connection = ($health.status -eq "accepted")
   durable_store_ready = ($health.health.persistence_ready -eq $true)
+  normal_ipc_agent_task_workspace_permission_denied = $normalIpcAgentTaskWorkspacePermissionDenied
+  agent_task_workspace_permission_error_code = $agentTaskWorkspacePermissionErrorCode
+  normal_ipc_agent_task_owner_approval_denied = $normalIpcAgentTaskOwnerApprovalDenied
+  agent_task_owner_approval_error_code = $agentTaskOwnerApprovalErrorCode
   replay_nonce = $replayNonce
   restart_replay_rejected = ($replay.status -eq "rejected" -and $replay.error.code -eq "broker_replay_detected")
   replay_error_code = $replay.error.code
@@ -292,6 +330,8 @@ $result = [ordered]@{
     restricted_loopback_bind = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     authenticated_ipc_connection = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     durable_store_ready = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    normal_ipc_agent_task_workspace_permission_denied = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
+    normal_ipc_agent_task_owner_approval_denied = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     restart_replay_rejected = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     fresh_health_after_restart = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }
     crash_fail_closed = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME" }

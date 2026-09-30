@@ -14,6 +14,8 @@ R2追補（2026-09-30）: Agent Task scratch journalの`activate`耐久保存失
 
 R2追補（2026-09-30）: Rust公開APIの旧更新署名入口は署名値が空でないだけで成功していたため、Broker所有の信頼鍵・署名対象byteを受け取らない限り拒否するよう変更し、否定試験を追加した。実Broker経路のEd25519検証は維持する。これは安全な署名検証入口の補強であり、Download／Install／Update／Rollback経路や`rev2_desktop_product_distribution`のblockerを閉じない。検証記録は`docs/REV3_PROGRESS.md`。
 
+R2追補（2026-09-30）: Windows Broker smoke collector v6は実Rust Broker processへ通常loopback credentialでAgent Task Workspace Permission／Owner Approvalの発行要求を送り、両方が`desktop_native_owner_confirmation_required`で拒否されることを実測・必須化した。現行Rust source commit `e8ea0587031402a19fc9dff260d7c925403cca2e`由来のstandalone Release helperでLIVE_RUNTIME成功したが、作業treeの文書／tooling差分を含む状態でのbuildであり、installed product、Desktop native Owner操作、Agent Task実行、release evidence provenanceではない。Task対応は`unsupported`、Windows installed-smoke blockerと`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`および`release_blockers.registry.json`。
+
 2026-09-29に受領したrev3統合仕様・工程表を現行開発基準とする。R0で再測定した基準commit、検証結果、環境差、formal evidence、既存blockerの一覧は[`docs/REV3_PROGRESS.md`](docs/REV3_PROGRESS.md)に追記する。旧rev1／rev2の進捗記録は履歴として保持し、rev3の完成証拠へ読み替えない。
 
 rev3工程はR0からR16までを履歴追加型で進める。Windows 1.0のTechnical CompleteはR0–R14の技術工程で判定し、R15の非Windows工程およびR16のOwner Finalizationと混同しない。Owner操作を routine 検証の前提にせず、production identity／署名、production Audit key、Final GOはTechnical Complete後のOwner Finalizationに限定する。
