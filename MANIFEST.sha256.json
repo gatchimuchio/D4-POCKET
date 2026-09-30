@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "070fdf6aa31898c4314f6226c71a75c4fcb012e6da09453e280fa14665722414"
+      "sha256": "23e977314c911a48048c21df0da979d4b63f2f73a5e523c63aab8353d1e42995"
     },
     {
       "path": ".gitignore",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "ee009ef92b6b923ce613a2c6b99c146dd93580d4650211864d075b47cf89e863"
+      "sha256": "4e9d169da0a099d0c96de338dd97439a01d35f9a788c869256e3ea4612aef713"
     },
     {
       "path": "SECURITY.md",
@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "402f69707a85ae090f92d7ffa82c0ad8f1434dc0300e234c04177204e202f56e"
+      "sha256": "f2c33072543b52e3d8f06c64d0d1c3c800bd955be38683835b37a9fd9d6ca0fd"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3204,7 +3204,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "40144ad926f860ccf5f1fdf125ae34d6c174534268550eee825aa0f06da42d04"
+      "sha256": "6965413df0a1aad34b165671e6f0e3639d2116654a6a628b680a21873f9ec76a"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4521,10 +4521,6 @@
     {
       "path": "tooling/windows_dpapi_check.ps1",
       "sha256": "eacae4061194bdc04507ed06a37cad70cd5c62f8150948dc036fa6a28e6a2f80"
-    },
-    {
-      "path": "tooling/windows_owner_confirmation_ui_test.ps1",
-      "sha256": "8a41d9e06f117e6f9f9c6c555688f1e6a98b26d30f2fe41c8cdb7fe5452e5227"
     },
     {
       "path": "tooling/windows_release_evidence.py",

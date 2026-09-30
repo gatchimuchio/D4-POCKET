@@ -1,13 +1,6 @@
 name: Windows Rust manual validation
 
-'on':
-  workflow_dispatch:
-    inputs:
-      run_native_owner_ui_test:
-        description: '対話型Windows desktopでOwner確認dialogのUI Automation試験を実行'
-        required: false
-        type: boolean
-        default: false
+'on': workflow_dispatch
 
 permissions:
   contents: read
@@ -84,14 +77,6 @@ jobs:
           cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: 実Win32 Owner確認dialogの制御UI自動操作
-        if: ${{ inputs.run_native_owner_ui_test }}
-        timeout-minutes: 2
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'nativeOwner確認dialogのYesNoを制御UI自動化できTask本文を露出しない' -- --ignored --test-threads=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 試験後に作業treeがcleanなことを確認
         shell: pwsh

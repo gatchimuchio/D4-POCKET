@@ -1892,89 +1892,273 @@ mod tests {
         confirm: bool,
         forbidden_text: Option<&str>,
     ) -> bool {
-        use std::io::{BufRead, BufReader};
         use std::process::Stdio;
+        use winsafe::{co, HwKbMouse, HWND, KEYBDINPUT};
+
+        const IDYES: u16 = 6;
+        const IDNO: u16 = 7;
+        const ID_STATIC_TEXT: u16 = 0xffff;
+
+        fn is_owner_dialog(window: &HWND, process_id: u32) -> bool {
+            if !window.IsWindow() || !window.IsWindowVisible() {
+                return false;
+            }
+            let (_, owner_process_id) = window.GetWindowThreadProcessId();
+            owner_process_id == process_id
+                && window.GetClassName().is_ok_and(|name| name == "#32770")
+                && window
+                    .GetWindowText()
+                    .is_ok_and(|title| title == "D4 Pocket Owner確認")
+        }
+
+        fn find_owner_dialog(process_id: u32) -> Option<HWND> {
+            let mut found = None;
+            winsafe::EnumWindows(|window| {
+                if is_owner_dialog(&window, process_id) {
+                    found = Some(window);
+                }
+                true
+            })
+            .expect("Windows top-level window列挙");
+            found
+        }
+
+        fn wait_for_focus(dialog: &HWND, control_id: u16, timeout: Duration) -> bool {
+            let (thread_id, process_id) = dialog.GetWindowThreadProcessId();
+            let deadline = Instant::now() + timeout;
+            while Instant::now() < deadline {
+                if let Ok(info) = winsafe::GetGUIThreadInfo(thread_id) {
+                    if is_owner_dialog(&info.hwndActive, process_id)
+                        && info.hwndFocus.GetDlgCtrlID().ok() == Some(control_id)
+                    {
+                        return true;
+                    }
+                }
+                thread::sleep(Duration::from_millis(25));
+            }
+            false
+        }
+
+        fn send_key(key: co::VK) {
+            let sent = winsafe::SendInput(&[
+                HwKbMouse::Kb(KEYBDINPUT {
+                    wVk: key,
+                    ..Default::default()
+                }),
+                HwKbMouse::Kb(KEYBDINPUT {
+                    wVk: key,
+                    dwFlags: co::KEYEVENTF::KEYUP,
+                    ..Default::default()
+                }),
+            ])
+            .expect("Owner確認dialogへの合成キー入力");
+            assert_eq!(sent, 2, "Owner確認dialogへのキー入力件数");
+        }
 
         let expected_text = owner_confirmation_text(summary);
-        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tooling/windows_owner_confirmation_ui_test.ps1");
-        assert!(script.is_file(), "Windows UI Automation test helperがない");
-        let expected_text_hex = hex::encode(expected_text.as_bytes());
-        let owner_process_id = std::process::id().to_string();
-        let mut automation = Command::new("powershell.exe")
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-            .arg(script)
-            .args(["-OwnerProcessId", &owner_process_id])
-            .args(["-Decision", if confirm { "Yes" } else { "No" }])
-            .arg("-ExpectedTextHex")
-            .arg(expected_text_hex)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("Windows UI Automation helperを起動する");
-        let stdout = automation.stdout.take().expect("UI自動操作の出力");
-        let (automation_tx, automation_rx) = mpsc::channel();
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stdout);
-            let mut ready = String::new();
-            if reader.read_line(&mut ready).is_ok() && ready.trim_end() == "READY" {
-                let mut result = String::new();
-                if reader.read_line(&mut result).is_ok() {
-                    let _ = automation_tx.send(Some(result));
-                    return;
-                }
-            }
-            let _ = automation_tx.send(None);
-        });
-        match automation_rx.recv_timeout(Duration::from_secs(25)) {
-            Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => {
-                let output = automation
-                    .wait_with_output()
-                    .expect("UI Automation終了待ち");
-                panic!(
-                    "UI Automationはdialog表示前の準備に失敗した: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                let _ = automation.kill();
-                let output = automation
-                    .wait_with_output()
-                    .expect("UI Automation停止待ち");
-                panic!(
-                    "UI Automationの準備が時間内に完了しない: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
-            Ok(Some(_)) => {}
+        if let Some(forbidden_text) = forbidden_text {
+            assert!(
+                !expected_text.contains(forbidden_text),
+                "秘密のTask本文がnative Owner確認へ露出した"
+            );
         }
-        let confirmed = confirm_owner_operation(summary, None);
-        let result = automation_rx
-            .recv_timeout(Duration::from_secs(25))
-            .expect("UI AutomationがOwner確認へ応答しない")
-            .expect("UI Automationが結果を返さない");
-        let output = automation
-            .wait_with_output()
-            .expect("UI Automation終了待ち");
-        assert!(
-            output.status.success(),
-            "UI AutomationがOwner確認を完了しなかった: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let displayed_text: String =
-            serde_json::from_str(result.trim()).expect("UI AutomationのJSON応答");
+        let request = match summary {
+            DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                runtime_id,
+                session_id,
+                workspace_id,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "agent_task_workspace_permission",
+                    "runtime_id": runtime_id,
+                    "session_id": session_id,
+                    "workspace_id": workspace_id,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
+            DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                runtime_id,
+                session_id,
+                workspace_id,
+                instruction_characters,
+                instruction_hash,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "agent_task_owner_approval",
+                    "runtime_id": runtime_id,
+                    "session_id": session_id,
+                    "workspace_id": workspace_id,
+                    "instruction_characters": instruction_characters,
+                    "instruction_hash": instruction_hash,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
+            _ => panic!("このUI試験ではAgent Taskの固定summaryだけを使用する"),
+        };
+
+        let executable = std::env::current_exe().expect("Rust試験実行fileの所在");
+        let mut command = Command::new(executable);
+        command
+            .env_clear()
+            .args([
+                "--exact",
+                "desktop_launcher::tests::owner_confirmation_dialog_child",
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("GUI_SHELL_OWNER_CONFIRMATION_UI_CHILD", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        for name in ["SystemRoot", "WINDIR", "TEMP", "TMP"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
+        let mut child = OwnerDialogTestChild(Some(
+            command
+                .spawn()
+                .expect("isolated Owner確認dialog child process"),
+        ));
+        let child_process_id = child.0.as_ref().unwrap().id();
+        let stdin = child
+            .0
+            .as_mut()
+            .unwrap()
+            .stdin
+            .take()
+            .expect("Owner確認dialog child stdin");
+        serde_json::to_writer(stdin, &request).expect("Owner確認dialog test request");
+
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let dialog = loop {
+            if let Some(dialog) = find_owner_dialog(child_process_id) {
+                break dialog;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "15秒以内にchild process所有のOwner確認dialogを発見できない"
+            );
+            thread::sleep(Duration::from_millis(25));
+        };
+
+        let displayed_text = dialog
+            .GetDlgItem(ID_STATIC_TEXT)
+            .and_then(|control| control.GetWindowText())
+            .expect("Owner確認dialogの本文control");
         assert_eq!(
             displayed_text, expected_text,
             "実表示がproduction確認文と異なる"
         );
-        if let Some(forbidden_text) = forbidden_text {
+        let yes_button = dialog
+            .GetDlgItem(IDYES)
+            .and_then(|button| button.GetWindowText())
+            .expect("Owner確認dialogのYes button");
+        let no_button = dialog
+            .GetDlgItem(IDNO)
+            .and_then(|button| button.GetWindowText())
+            .expect("Owner確認dialogのNo button");
+        let yes_label = yes_button
+            .split(['(', '（'])
+            .next()
+            .unwrap_or_default()
+            .trim();
+        let no_label = no_button
+            .split(['(', '（'])
+            .next()
+            .unwrap_or_default()
+            .trim();
+        assert!(
+            yes_label.eq_ignore_ascii_case("Yes") || yes_label == "はい",
+            "Win32 MessageBoxのYes button labelが想定外"
+        );
+        assert!(
+            no_label.eq_ignore_ascii_case("No") || no_label == "いいえ",
+            "Win32 MessageBoxのNo button labelが想定外"
+        );
+
+        assert!(
+            dialog.SetForegroundWindow(),
+            "Owner確認dialogをforegroundへ設定できない"
+        );
+        let foreground_deadline = Instant::now() + Duration::from_secs(5);
+        while !HWND::GetForegroundWindow()
+            .is_some_and(|foreground| is_owner_dialog(&foreground, child_process_id))
+        {
             assert!(
-                !displayed_text.contains(forbidden_text),
-                "秘密のTask本文がnative Owner確認へ露出した"
+                Instant::now() < foreground_deadline,
+                "Owner確認dialogがforegroundにならないためキーを送らない"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+
+        assert!(
+            wait_for_focus(&dialog, IDNO, Duration::from_secs(5)),
+            "Owner確認dialogの既定focusがNo buttonではないためキーを送らない"
+        );
+        if confirm {
+            send_key(co::VK::TAB);
+            assert!(
+                wait_for_focus(&dialog, IDYES, Duration::from_secs(2)),
+                "Tab後のfocusがYes buttonではないため確定キーを送らない"
             );
         }
-        assert_eq!(confirmed, confirm);
-        confirmed
+        assert!(
+            HWND::GetForegroundWindow()
+                .is_some_and(|foreground| is_owner_dialog(&foreground, child_process_id)),
+            "キー送信直前にforegroundが変わったため操作を中止する"
+        );
+        send_key(co::VK::RETURN);
+
+        let child_deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if child
+                .0
+                .as_mut()
+                .unwrap()
+                .try_wait()
+                .expect("Owner確認dialog child process status")
+                .is_some()
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < child_deadline,
+                "Owner確認dialog選択後、child processが10秒以内に終了しない"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+        let output = child
+            .0
+            .take()
+            .unwrap()
+            .wait_with_output()
+            .expect("Owner確認dialog child output");
+        assert!(
+            output.status.success(),
+            "実Win32 dialogの選択結果がchild processで期待値と一致しない"
+        );
+        confirm
+    }
+
+    #[cfg(windows)]
+    struct OwnerDialogTestChild(Option<Child>);
+
+    #[cfg(windows)]
+    impl Drop for OwnerDialogTestChild {
+        fn drop(&mut self) {
+            if let Some(child) = self.0.as_mut() {
+                if child.try_wait().ok().flatten().is_none() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+            }
+        }
     }
 
     fn test_root(label: &str) -> PathBuf {
@@ -2013,6 +2197,83 @@ mod tests {
             true,
             Some(instruction)
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "Owner確認dialog自動操作test専用の子process入口"]
+    fn owner_confirmation_dialog_child() {
+        use std::io::Read;
+
+        assert_eq!(
+            std::env::var_os("GUI_SHELL_OWNER_CONFIRMATION_UI_CHILD").as_deref(),
+            Some(OsStr::new("1")),
+            "child process markerが一致しない"
+        );
+        #[derive(Deserialize)]
+        #[serde(tag = "kind", rename_all = "snake_case")]
+        enum TestSummary {
+            AgentTaskWorkspacePermission {
+                runtime_id: String,
+                session_id: String,
+                workspace_id: String,
+                payload_hash: String,
+            },
+            AgentTaskOwnerApproval {
+                runtime_id: String,
+                session_id: String,
+                workspace_id: String,
+                instruction_characters: usize,
+                instruction_hash: String,
+                payload_hash: String,
+            },
+        }
+        #[derive(Deserialize)]
+        struct TestRequest {
+            summary: TestSummary,
+            confirm: bool,
+        }
+
+        let mut input = String::new();
+        std::io::stdin()
+            .take(8 * 1024)
+            .read_to_string(&mut input)
+            .expect("Owner確認dialog child request");
+        let request: TestRequest =
+            serde_json::from_str(&input).expect("Owner確認dialog child request JSON");
+        let summary = match request.summary {
+            TestSummary::AgentTaskWorkspacePermission {
+                runtime_id,
+                session_id,
+                workspace_id,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                runtime_id,
+                session_id,
+                workspace_id,
+                payload_hash,
+            },
+            TestSummary::AgentTaskOwnerApproval {
+                runtime_id,
+                session_id,
+                workspace_id,
+                instruction_characters,
+                instruction_hash,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                runtime_id,
+                session_id,
+                workspace_id,
+                instruction_characters,
+                instruction_hash,
+                payload_hash,
+            },
+        };
+        assert_eq!(
+            confirm_owner_operation(&summary, None),
+            request.confirm,
+            "実Win32 Owner確認dialogが選択を期待値へ反映しない"
+        );
     }
 
     #[test]

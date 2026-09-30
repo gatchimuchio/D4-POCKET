@@ -2,6 +2,33 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## R2追補 Windows native Owner確認dialogのローカル実操作試験（2026-09-30）
+
+### 成立した範囲
+
+- PowerShell UI Automation helperを除去し、Windows test専用child processと既存`winsafe`の安全APIで、production `confirm_owner_operation`が生成する実Win32 MessageBoxを検査する。試験はCredentialやTask本文をchild processへ渡さず、Agent Taskの表示用ID・hash・文字数・選択期待値だけをstdinで渡す。
+- 操作前にchild PID、可視top-level windowのclass/title、MessageBox本文、Yes／No control IDとlabel、foreground window、UI threadのactive／focus controlを照合する。Noは既定button、YesはTab後にfocus IDを確認してからEnterを送る。異常時に終了するのは試験が起動したchild processだけで、通常のBroker権限要求やTask実行は行わない。
+- ignored UI testは日本語Windows local対話Desktopで実行し、No／Yes各結果がchild processの`confirm_owner_operation`返値へ反映されること、Task本文markerが表示文に含まれないことを確認した。これは固定fixtureを使った実Windows MessageBox表示・入力の直接観測（`FIXTURE`）であり、Broker経由のOwner操作、installed productのlive runtime、Agent Task成功、`task_execution=supported`の証拠ではない。
+- Windows Rust manual workflowは`workflow_dispatch`のみのまま維持し、対話Desktopを必要とするUI入力を削除した。旧helperのUTF-8／hosted UI失敗経路を削除し、失敗履歴は下記の通り残す。
+- `task_execution=unsupported`、Agent Task実行・製品配布等の既存`release_blocker`と`release_ready=false`を維持する。
+
+### Windows Actionsの失敗履歴
+
+- 手動run [36721937797](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36721937797)、commit `f868e05259af1b4fa0c927f20c4e91fa545d62e4`: Rust全target検査は成功したが、Windows PowerShell 5.1がBOMなしUTF-8 helperの日本語を誤parseし、UI stepは失敗した。
+- 手動run [36723407003](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36723407003)、commit `dc3829166ab7547b722a90b1d081f52b51ca238f`: BOM追加後、Rust全target検査は成功したが、helperがdialog準備完了を通知せず、15秒でUI stepが失敗した。
+- 手動run [36725060867](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36725060867)、commit `3ab3611e4d547d05466800a52704aac331bbfda2`: Rust全target検査は成功したが、hosted runnerで12秒以内に対象dialogをUIAから発見できなかった。helperは親Rust test processを停止し、runは異常終了した。UIAがdialogを発見できない環境要因の詳細は確定していないため、Windows runnerのUI操作成功とは扱わない。
+- これらの失敗はhelper／実行環境の検証失敗であり、Owner確認製品機能の合否を証明しない。ローカル対話Desktopで検査できたため置換後のUI testにActionsは使わず、Actionsを追加起動していない。
+
+### ローカル検証
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'nativeOwner確認dialogのYesNoを制御UI自動化できTask本文を露出しない' -- --ignored --test-threads=1 --nocapture`: 成功、1 passed。実Win32 MessageBoxのNo／Yes選択を実行した。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功、12 targetで435 passed／0 failed／5 ignored。ignored試験には実Codex CLIを要するLIVE_RUNTIME経路等が含まれ、本結果でそれらを検証済みとはしない。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/desktop_launcher.rs`、`git diff --check`、`python -X utf8 tooling/manifest.py --check`: 成功。生成Manifestは1120 source fileを記録する。削除した旧PowerShell helperは、削除をGit indexへstage後にManifest対象から外れた。最初の`manifest.py --write`失敗は削除済みtracked fileの改行検査によるもので、検査規則は変更していない。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`初回は新Rust試験の英語診断文1件をstrict日本語監査が検出してexit 1。診断文を日本語化した後の最終実行はexit 0。厳格日本語監査1123 file／0 findings、Schema 150／example 150／negative fixture 193、Conformance 229 checks、manifest、release gate、packaging portability、release smoke、evidence bundle、runtime assertions、C32監査を含むdevelopment check 10件が成功した。
+- 統合validatorのrelease gate検査成功は製品release成立を意味しない。evidence bundleはdevelopment evidenceのままで、現行release blockerと`release_ready=false`を維持する。
+- workflow: manual workflowの`workflow_dispatch`限定は統合validator内の検査が成功。Actionsは追加起動していない。Git閉包のbranch／commit／push／remote HEAD／backup／rollback refは本blockの最終報告に記録する。
+
 ## R0 現行状態再固定（2026-09-29）
 
 ### Repository基準
