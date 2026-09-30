@@ -892,8 +892,8 @@ void main() {
     );
 
     expect(find.text('実行状態'), findsOneWidget);
-    expect(find.textContaining('ネットワーク公開範囲:'), findsOneWidget);
-    expect(find.textContaining('監査鎖状態:'), findsOneWidget);
+    expect(find.textContaining('通信範囲:'), findsOneWidget);
+    expect(find.textContaining('Broker監査鎖:'), findsOneWidget);
     expect(find.textContaining('取得元:'), findsOneWidget);
     expect(find.textContaining('鮮度:'), findsOneWidget);
     expect(find.textContaining('Flutterツールチェーン'), findsNothing);
