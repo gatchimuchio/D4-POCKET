@@ -160,7 +160,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "92987321d3be3acd3ea981428d3ed08097d19e82afdede78b262564081334054"
+      "sha256": "903234a5ed6f2341024bd5836739ef361a60bb6bd40243d4148a9bd9e3c2ddc0"
     },
     {
       "path": "SECURITY.md",
@@ -1192,7 +1192,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "a5f2c295d69914ddffb20a67656f68f916854cf2ad5e3d71c51ff360e07e9095"
+      "sha256": "c3862fcab50d064fc1e2cd8971f50c653a6b804dc7d57aca72c088b0847671c4"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1348,7 +1348,7 @@
     },
     {
       "path": "docs/specs/final-development-audit.json",
-      "sha256": "6c9f3d0dd54ad778f8022232dea1d76ad166ec51c28271ef46b736349d2c9d95"
+      "sha256": "705066b42ecc664e54df543771edc7783237f177753d8fe7b98e115691a8fb14"
     },
     {
       "path": "docs/specs/final-development-audit.md",
@@ -1456,7 +1456,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "74ab4c08e52897ea6d612ca67c2b2b31daa43a579b2fb1b0235b2604fb9ee713"
+      "sha256": "8b63aa9d49235fb7541bc260e792d9a86b4d200568bb6138d53d29ef072c0c80"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -3172,11 +3172,11 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "ada6448a545ef2e00b7b8eeac47a62d0d4b1315f9f197f99b101e9688afbf9e2"
+      "sha256": "757bf39600b03f27939d53c86c369836f8b1b1537edcadd0a4fc2a8e5a1da149"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "7b106ecd83904cbd36dde69599cbe61df9b01989809d3426b7f27163b3b2e0d7"
+      "sha256": "f6d40948acba79111f6d6c0539c9c922f4d1e6ba5b5f9402e48a56d0d41f26ba"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3760,7 +3760,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "949a0bbfb7067e3a5bc58bc65b60d9456caff0a41dc1b3a4ff4dac5e0020bdab"
+      "sha256": "d8f92c367567f295a468e69ea94a5ac17755eab5504bf5262ee6b385aee9e8bb"
     },
     {
       "path": "requirements-dev.txt",
@@ -4416,7 +4416,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ff2e83273640fb961ed7d0cba6c2ea83727dc53cfe6819b116697be251fb2b2e"
+      "sha256": "90a106477a7df23adc9ecf2b6aa768456e639487d6a5fea3a03ec38c1780924a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

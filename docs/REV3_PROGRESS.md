@@ -750,6 +750,51 @@ cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
 ```
 
+## Phase 21／C12追補 同一digest破損packageのAudit付きrepair（2026-09-30）
+
+### 成立した変更
+
+- 既存`<digest>.pkg`をBroker固定directoryからnofollowで開き、通常file・非reparseを確認した上で全byteを再hashする。期待byte長またはdigestと異なる通常fileだけを破損候補とし、symlink／reparse／directory／不正entryは従来どおりfail-closedにした。
+- native Owner確認済みdownloadが新しいresponseのstatus／header／byte長／SHA-256検査を通り、一時fileをfsyncした後にだけ、同一digest名の破損通常fileをatomic renameで置換する。保存先が欠損している場合はcreate-only hard linkを維持し、別digest／別packageは置換しない。
+- queued Auditへ条件付きrepairの対象・RecoveryActionを先に記録し、置換成功を`recovered`結果としてBroker Auditへ記録する。download後もinstall／process／rollbackはsuspendedのまま。再起動後は`.part`回復とfinal全byte再検証を明示download要求で行う。
+- 過去Phase 21／C12記録の「repair未成立」は当時の観測履歴として残し、本追補で現在状態を更新する。製品Broker／installed productでの修復証拠は未成立である。
+
+### 検証
+
+- 更新focused Rust試験は27 passed／0 failed。既存破損fileの分類・修復、non-file宛先拒否、通常新規時のcreate-only維持、Broker `recovered` Audit、local TLSで検証済みresponseだけを置換する経路を実行した。誤digest responseでは既存fileを変更せず、一時fileを除去する試験も合格した。
+- focused試験の最初の全群実行でlocal TLS fixtureが一度ConnectionResetになり、26 passed／1 failedだった。失敗case単独再実行と、その後のfocused全群再実行はいずれも成功した。初回失敗の原因は特定できておらず履歴として保持する。
+- Rust全targetは12 target、434 passed／0 failed／3 ignored。`cargo check --all-targets`も成功。Windows localで実行し、GitHub Actionsは使っていない。
+- Schemaは150件／正常例150件／negative fixture 193件、Conformanceは229 checks。Conformance初回は移動後のcreate-only hard-link実装に旧tokenを要求して失敗したため、現行実装のtokenを検査するよう更新し、全229 checksを再実行して合格した。
+- `python -X utf8 tooling/manifest.py --write`で1119 filesを記録し、統合validator内のmanifest checkも合格した。strict日本語監査はrepository 1122 files、debt 0、findings 0。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`のdevelopment checksはすべてpassedで、release gate／portability／smoke／evidence bundle／runtime assertion／C32監査を確認した。`release_ready=false`とrelease blocker 5件は維持する。
+
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_ -- --test-threads=1
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+python -X utf8 tooling/schema_check/check_schemas.py
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+python -X utf8 tooling/manifest.py --write
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+
+### 残存範囲
+
+- item: Windows installed product／実配布元でのdownload・repair・failure injection、Installer／Uninstaller、install／rollback／crash recovery、正式trust provisioning
+  classification: release_blocker
+  reason: local Rust／TLS fixtureは実配布元・製品Broker・installed productを通らず、release経路を実証しない
+  required_action: test identityの隔離Windows installed productへ同じ境界を接続し、実配布元tamperと失敗／crashを検証する
+  blocks_release: yes
+- item: Linux／macOSの期限付きcancel可能DNS resolver
+  classification: post_v1_scope
+  reason: 現行Windows 1.0以外のR15技術工程である
+  required_action: R15で対象OSごとの期限・cancel・negative／runtime試験を定義する
+  blocks_release: no
+- item: system proxy必須環境のdownload
+  classification: known_limitation
+  reason: 現workerはsystem proxyを使わず、直接HTTPSが許可されない環境では取得できない
+  required_action: 現行製品文書の制約記載を維持する
+  blocks_release: no
+
 ## Phase 21 C12追補 Windows DNS期限・取消境界（2026-09-30）
 
 ### 成立した変更

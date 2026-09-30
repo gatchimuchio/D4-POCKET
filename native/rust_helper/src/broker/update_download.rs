@@ -30,6 +30,21 @@ pub(crate) struct DownloadedPackage {
     pub(crate) file_name: String,
     pub(crate) bytes: u64,
     pub(crate) sha256: String,
+    pub(crate) disposition: PackageDisposition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PackageDisposition {
+    AlreadyVerified,
+    Downloaded,
+    RepairedCorrupt,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExistingPackageState {
+    Missing,
+    Verified,
+    Corrupt,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,18 +163,20 @@ where
     }
     let deadline = std::time::Instant::now() + MAX_DOWNLOAD_TIME;
     let url = parse_source_url(url_text)?;
-    if verify_existing_package(
+    let existing_state = verify_existing_package(
         directory,
         expected_sha256,
         expected_bytes,
         cancel,
         deadline,
         &mut progress,
-    )? {
+    )?;
+    if existing_state == ExistingPackageState::Verified {
         return Ok(DownloadedPackage {
             file_name: format!("{expected_sha256}.pkg"),
             bytes: expected_bytes,
             sha256: expected_sha256.to_owned(),
+            disposition: PackageDisposition::AlreadyVerified,
         });
     }
     let host = url.host_str().ok_or(DownloadError::InvalidRequest)?;
@@ -181,6 +198,7 @@ where
             response,
             expected_sha256,
             expected_bytes,
+            existing_state == ExistingPackageState::Corrupt,
             cancel,
             deadline,
             &mut progress,
@@ -236,6 +254,7 @@ async fn receive_package<F>(
     mut response: Response,
     expected_sha256: &str,
     expected_bytes: u64,
+    replace_corrupt: bool,
     cancel: &AtomicBool,
     deadline: std::time::Instant,
     progress: &mut F,
@@ -310,22 +329,67 @@ where
     }
     drop(output);
 
-    // 既存packageを置換せずlinkも追跡しない、新規作成だけの公開。
-    if directory
-        .hard_link(&temporary_name, directory, &final_name)
-        .is_err()
-    {
+    if cancel.load(Ordering::Acquire) {
         let _ = directory.remove_file(&temporary_name);
-        return Err(DownloadError::Storage);
+        return Err(DownloadError::Cancelled);
     }
-    directory
-        .remove_file(&temporary_name)
-        .map_err(|_| DownloadError::Storage)?;
+    if std::time::Instant::now() >= deadline {
+        let _ = directory.remove_file(&temporary_name);
+        return Err(DownloadError::TimedOut);
+    }
+
+    let disposition =
+        publish_verified_package(directory, &temporary_name, &final_name, replace_corrupt)?;
     Ok(DownloadedPackage {
         file_name: final_name,
         bytes: expected_bytes,
         sha256: expected_sha256.to_owned(),
+        disposition,
     })
+}
+
+fn publish_verified_package(
+    directory: &Dir,
+    temporary_name: &str,
+    final_name: &str,
+    replace_corrupt: bool,
+) -> Result<PackageDisposition, DownloadError> {
+    let result = (|| {
+        if replace_corrupt && package_entry_is_replaceable(directory, final_name)? {
+            // 同一digest名の通常fileだけを、完全検証・fsync済みの一時fileで原子的に置換する。
+            directory
+                .rename(temporary_name, directory, final_name)
+                .map_err(|_| DownloadError::Storage)?;
+            return Ok(PackageDisposition::RepairedCorrupt);
+        }
+        // 欠損時は既存fileを上書きせず、create-only hard linkで公開する。
+        directory
+            .hard_link(temporary_name, directory, final_name)
+            .map_err(|_| DownloadError::Storage)?;
+        directory
+            .remove_file(temporary_name)
+            .map_err(|_| DownloadError::Storage)?;
+        Ok(PackageDisposition::Downloaded)
+    })();
+    if result.is_err() {
+        let _ = directory.remove_file(temporary_name);
+    }
+    result
+}
+
+fn package_entry_is_replaceable(directory: &Dir, file_name: &str) -> Result<bool, DownloadError> {
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let file = match directory.open_with(file_name, &options) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(_) => return Err(DownloadError::Storage),
+    };
+    let metadata = file.metadata().map_err(|_| DownloadError::Storage)?;
+    if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+        return Err(DownloadError::Storage);
+    }
+    Ok(true)
 }
 
 fn verify_existing_package(
@@ -335,21 +399,23 @@ fn verify_existing_package(
     cancel: &AtomicBool,
     deadline: std::time::Instant,
     progress: &mut impl FnMut(u64),
-) -> Result<bool, DownloadError> {
+) -> Result<ExistingPackageState, DownloadError> {
     let name = format!("{expected_sha256}.pkg");
     let mut options = OpenOptions::new();
     options.read(true).follow(FollowSymlinks::No);
     let mut file = match directory.open_with(&name, &options) {
         Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(ExistingPackageState::Missing)
+        }
         Err(_) => return Err(DownloadError::Storage),
     };
     let metadata = file.metadata().map_err(|_| DownloadError::Storage)?;
-    if !metadata.is_file()
-        || metadata.file_attributes() & 0x400 != 0
-        || metadata.len() != expected_bytes
-    {
+    if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
         return Err(DownloadError::Storage);
+    }
+    if metadata.len() != expected_bytes {
+        return Ok(ExistingPackageState::Corrupt);
     }
     let mut digest = Sha256::new();
     let mut total = 0u64;
@@ -368,8 +434,10 @@ fn verify_existing_package(
         }
         total = total
             .checked_add(read as u64)
-            .filter(|total| *total <= expected_bytes)
-            .ok_or(DownloadError::SizeMismatch)?;
+            .ok_or(DownloadError::Storage)?;
+        if total > expected_bytes {
+            return Ok(ExistingPackageState::Corrupt);
+        }
         digest.update(&buffer[..read]);
         if total >= next_progress {
             progress(total);
@@ -377,10 +445,10 @@ fn verify_existing_package(
         }
     }
     if total != expected_bytes || hex::encode(digest.finalize()) != expected_sha256 {
-        return Err(DownloadError::DigestMismatch);
+        return Ok(ExistingPackageState::Corrupt);
     }
     progress(total);
-    Ok(true)
+    Ok(ExistingPackageState::Verified)
 }
 
 fn validate_response_headers(
@@ -812,6 +880,80 @@ mod tests {
     }
 
     #[test]
+    fn corrupt_same_digest_package_is_atomically_replaced_after_verification() {
+        let path = temporary_directory("update-package-repair");
+        let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let bytes = b"verified-package";
+        let digest = hex::encode(Sha256::digest(bytes));
+        let final_name = format!("{digest}.pkg");
+        let temporary_name = format!("{}.part", "a".repeat(32));
+        std::fs::write(path.join(&final_name), b"tampered-package").unwrap();
+        std::fs::write(path.join(&temporary_name), bytes).unwrap();
+
+        assert_eq!(
+            verify_existing_package(
+                &directory,
+                &digest,
+                bytes.len() as u64,
+                &AtomicBool::new(false),
+                std::time::Instant::now() + Duration::from_secs(5),
+                &mut |_| {},
+            )
+            .unwrap(),
+            ExistingPackageState::Corrupt
+        );
+        assert_eq!(
+            publish_verified_package(&directory, &temporary_name, &final_name, true),
+            Ok(PackageDisposition::RepairedCorrupt)
+        );
+        assert_eq!(std::fs::read(path.join(&final_name)).unwrap(), bytes);
+        assert!(!path.join(&temporary_name).exists());
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn package_repair_refuses_non_file_destination_and_cleans_temporary_bytes() {
+        let path = temporary_directory("update-package-repair-unsafe-entry");
+        let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let final_name = format!("{}.pkg", "b".repeat(64));
+        let temporary_name = format!("{}.part", "c".repeat(32));
+        std::fs::create_dir(path.join(&final_name)).unwrap();
+        std::fs::write(path.join(&temporary_name), b"verified").unwrap();
+
+        assert_eq!(
+            publish_verified_package(&directory, &temporary_name, &final_name, true),
+            Err(DownloadError::Storage)
+        );
+        assert!(path.join(&final_name).is_dir());
+        assert!(!path.join(&temporary_name).exists());
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn missing_package_uses_create_only_publication() {
+        let path = temporary_directory("update-package-create-only");
+        let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let final_name = format!("{}.pkg", "d".repeat(64));
+        let temporary_name = format!("{}.part", "e".repeat(32));
+        std::fs::write(path.join(&temporary_name), b"first").unwrap();
+        assert_eq!(
+            publish_verified_package(&directory, &temporary_name, &final_name, false),
+            Ok(PackageDisposition::Downloaded)
+        );
+        std::fs::write(path.join(&temporary_name), b"second").unwrap();
+        assert_eq!(
+            publish_verified_package(&directory, &temporary_name, &final_name, false),
+            Err(DownloadError::Storage)
+        );
+        assert_eq!(std::fs::read(path.join(&final_name)).unwrap(), b"first");
+        assert!(!path.join(&temporary_name).exists());
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
     fn only_generated_abandoned_partial_names_are_removed() {
         let path = temporary_directory("update-partial-recovery");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
@@ -825,10 +967,7 @@ mod tests {
         std::fs::remove_dir_all(path).unwrap();
     }
 
-    #[test]
-    fn local_tls_server_downloads_and_publishes_only_verified_package_bytes() {
-        let bytes = b"locally served signed package";
-        let digest = hex::encode(Sha256::digest(bytes));
+    fn local_tls_endpoint(bytes: &'static [u8]) -> (Client, Url, thread::JoinHandle<()>) {
         let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
         let server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
@@ -873,12 +1012,20 @@ mod tests {
             tls.write_all(bytes).unwrap();
             tls.flush().unwrap();
         });
-
         let root = Certificate::from_der(certified.cert.der().as_ref()).unwrap();
         let client = build_download_client("localhost", &[address], &[root]).unwrap();
         let url = Url::parse(&format!("https://localhost:{}/update.pkg", address.port())).unwrap();
+        (client, url, server)
+    }
+
+    #[test]
+    fn local_tls_server_repairs_only_after_verified_package_bytes() {
+        let bytes = b"locally served signed package";
+        let digest = hex::encode(Sha256::digest(bytes));
+        let (client, url, server) = local_tls_endpoint(bytes);
         let path = temporary_directory("update-local-tls");
         let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        std::fs::write(path.join(format!("{digest}.pkg")), vec![b'x'; bytes.len()]).unwrap();
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -896,6 +1043,7 @@ mod tests {
                     response,
                     &digest,
                     bytes.len() as u64,
+                    true,
                     &AtomicBool::new(false),
                     std::time::Instant::now() + Duration::from_secs(30),
                     &mut |_| {},
@@ -905,7 +1053,56 @@ mod tests {
             .unwrap();
         server.join().unwrap();
         assert_eq!(result.file_name, format!("{digest}.pkg"));
+        assert_eq!(result.disposition, PackageDisposition::RepairedCorrupt);
         assert_eq!(std::fs::read(path.join(&result.file_name)).unwrap(), bytes);
+        drop(directory);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn failed_replacement_keeps_the_existing_corrupt_package_unchanged() {
+        let response_bytes = b"wrong-content";
+        let trusted_bytes = b"right-content";
+        let trusted_digest = hex::encode(Sha256::digest(trusted_bytes));
+        let (client, url, server) = local_tls_endpoint(response_bytes);
+        let path = temporary_directory("update-package-repair-failed-transfer");
+        let directory = Dir::open_ambient_dir(&path, cap_std::ambient_authority()).unwrap();
+        let final_name = format!("{trusted_digest}.pkg");
+        let old_corrupt_bytes = b"tampered-data";
+        assert_eq!(old_corrupt_bytes.len(), trusted_bytes.len());
+        std::fs::write(path.join(&final_name), old_corrupt_bytes).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let response = runtime.block_on(async {
+            client
+                .get(url)
+                .header(ACCEPT_ENCODING, "identity")
+                .send()
+                .await
+        });
+        server.join().unwrap();
+        let response = response.unwrap();
+        let result = runtime.block_on(async {
+            receive_package(
+                &directory,
+                response,
+                &trusted_digest,
+                trusted_bytes.len() as u64,
+                true,
+                &AtomicBool::new(false),
+                std::time::Instant::now() + Duration::from_secs(30),
+                &mut |_| {},
+            )
+            .await
+        });
+        assert_eq!(result, Err(DownloadError::DigestMismatch));
+        assert_eq!(
+            std::fs::read(path.join(&final_name)).unwrap(),
+            old_corrupt_bytes
+        );
+        assert_eq!(std::fs::read_dir(&path).unwrap().count(), 1);
         drop(directory);
         std::fs::remove_dir_all(path).unwrap();
     }

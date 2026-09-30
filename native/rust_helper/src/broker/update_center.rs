@@ -251,14 +251,24 @@ pub(super) fn poll_download_completion(broker: &mut Broker) {
             broker.update_download.audit_failed();
             return;
         };
-        (
-            "completed",
-            format!("Capability=署名済みupdate package取得 Permission=Broker固定package directoryへ{} byteを保存しhash一致を検証 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=download完了を記録 RecoveryAction=更新適用時にfileを再度hash検証。ここではinstall／process起動しない", package.bytes),
-        )
+        match package.disposition {
+            super::update_download::PackageDisposition::AlreadyVerified => (
+                "completed",
+                format!("Capability=署名済みupdate package取得 Permission=Broker固定store内の既存packageを全byte再検証 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存packageの一致を記録 RecoveryAction=適用前にもfile全体を再hash検証。ここではinstall／process起動しない。{} byte", package.bytes),
+            ),
+            super::update_download::PackageDisposition::Downloaded => (
+                "completed",
+                format!("Capability=署名済みupdate package取得 Permission=Broker固定package directoryへ検証済み{} byteを新規保存 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=download完了を記録 RecoveryAction=適用時にfileを再度hash検証。ここではinstall／process起動しない", package.bytes),
+            ),
+            super::update_download::PackageDisposition::RepairedCorrupt => (
+                "recovered",
+                format!("Capability=署名済みupdate package取得 Permission=同一digest名の通常fileだけを原子的に置換 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=既存fileの長さ／hash不一致と検証済みpackageへの置換を記録 RecoveryAction=適用前にfile全体を再hash検証。ここではinstall／process起動しない。{} byte", package.bytes),
+            ),
+        }
     } else {
         (
             "failed",
-            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS接続と一時file書込みを試行 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=失敗を記録 RecoveryAction=生成中fileは除去済み。失敗codeを確認し明示操作で再試行".to_string(),
+            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS接続と一時file書込みを試行 Approval=対象候補とHTTPS hostのRust Desktop native Owner確認済み AuditEvent=失敗を記録 RecoveryAction=final packageは実行せず、次回明示要求時に固定storeを全byte再検証して状態を再判定".to_string(),
         )
     };
     if broker
@@ -1055,7 +1065,7 @@ fn execution_request(
             request_id,
             operation,
             "queued",
-            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS配布元から対象package一つを取得 Approval=Broker現在状態と配布先を示したRust Desktop native Owner確認 AuditEvent=queuedを永続記録 RecoveryAction=失敗時は一時fileを除去し現在状態を再確認。install／process起動はしない",
+            "Capability=署名済みupdate package取得 Permission=Broker固定HTTPS配布元から対象package一つを取得 Approval=Broker現在状態と配布先を示したRust Desktop native Owner確認 AuditEvent=queuedと修復範囲を永続記録 RecoveryAction=同一digest名が長さ／hash不一致の通常fileなら完全検証済み新fileで原子的に置換し、それ以外の不正entryは保持してfail-closed。失敗時はstoreを再検証しinstall／process起動はしない",
             EVIDENCE_SOURCE_INTERNAL_STATE,
             hash,
         ) {
@@ -1925,6 +1935,44 @@ mod tests {
         );
         assert_eq!(response.status, BrokerStatus::Suspended);
         assert_eq!(response.error.unwrap().code, "update_execution_suspended");
+    }
+
+    #[test]
+    fn repaired_package_completion_records_a_recovery_audit() {
+        let mut broker = Broker::new("session-1");
+        let package_sha256 = "a".repeat(64);
+        let mut runtime = UpdateDownloadRuntime::default();
+        runtime.job = Some(UpdateDownloadJob {
+            job_id: "update-download-repair-test".into(),
+            update_id: "update-1".into(),
+            candidate_hash: "candidate-hash".into(),
+            package_sha256: package_sha256.clone(),
+            expected_bytes: 123,
+            state: "downloading".into(),
+            error_code: None,
+            progress: Arc::new(AtomicU64::new(0)),
+        });
+        let (completion_tx, completion_rx) = mpsc::sync_channel(1);
+        completion_tx
+            .send(UpdateDownloadCompletion {
+                result: Ok(super::super::update_download::DownloadedPackage {
+                    file_name: format!("{package_sha256}.pkg"),
+                    bytes: 123,
+                    sha256: package_sha256,
+                    disposition: super::super::update_download::PackageDisposition::RepairedCorrupt,
+                }),
+            })
+            .unwrap();
+        runtime.completion_rx = Some(completion_rx);
+        broker.update_download = runtime;
+
+        poll_download_completion(&mut broker);
+
+        let event = broker.audit_events().last().unwrap();
+        assert_eq!(event.operation, OP_DOWNLOAD);
+        assert_eq!(event.decision, "recovered");
+        assert!(event.reason.contains("置換"));
+        assert_eq!(broker.update_download.projection()["状態"], "downloaded");
     }
 
     #[test]

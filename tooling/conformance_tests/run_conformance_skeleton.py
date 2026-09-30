@@ -6471,7 +6471,11 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         "validate_response_headers(response.headers(), expected_bytes)?",
         "chunk.chunks(COPY_BUFFER_BYTES)",
         "consume_chunk(",
-        ".hard_link(&temporary_name, directory, &final_name)",
+        ".hard_link(temporary_name, directory, final_name)",
+        "ExistingPackageState::Corrupt",
+        "PackageDisposition::RepairedCorrupt",
+        ".rename(temporary_name, directory, final_name)",
+        "fn package_entry_is_replaceable(",
     )
     errors = [
         f"Broker download transportの必須境界がない: {token}"
@@ -6517,6 +6521,12 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
         errors.append("更新downloadがDesktop native Owner確認へ結合されない")
     if "confirmation.payload_hash != hash" not in center:
         errors.append("更新downloadが確認済み要求hashを実行直前に再照合しない")
+    if '"recovered"' not in center or "検証済みpackageへの置換" not in center:
+        errors.append("破損package修復のAudit結果が回復として記録されない")
+    if "start(directory,&request,&current_record,source_url)" not in re.sub(
+        r"\s+", "", center
+    ):
+        errors.append("package修復の実行経路がnative Owner確認付きdownload jobから外れている")
     return errors
 
 

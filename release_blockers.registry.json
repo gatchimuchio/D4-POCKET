@@ -457,8 +457,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器、Broker lifecycle、およびC12のnative Owner確認付きpackage downloadまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、破損package修復、失敗復旧の技術経路は未成立。Windows DNS Clientの期限／cancel経路はhelper実試験で確認したが、実配布元・製品Broker・installed productの証拠は未取得。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "Owner待ちにせず、破損packageのAudit付きRecoveryを実装する。続けてtest identityによるInstaller／Uninstaller、署名検証、same-volume install／replacement／rollback transaction、失敗／crash Recoveryを各Contract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／install／rollbackをinstalled productで検証する。production identityはTechnical Complete後の別blockerで扱う。",
+      "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器、Broker lifecycle、およびC12のnative Owner確認付きpackage downloadまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、製品Broker／installed productの実証が未成立。同一digestの破損通常fileは検証済みtemporary packageによる原子的置換とBroker Auditを実装しFIXTUREで確認したが、製品経路の証拠にはならない。Windows DNS Clientの期限／cancel経路もhelper試験の範囲に限られ、実配布元・製品Broker・installed productの証拠は未取得。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "test identityによるInstaller／Uninstaller、署名検証、same-volume install／replacement／rollback transaction、失敗／crash Recoveryを各Contract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／repair／install／rollbackをinstalled productで検証する。production identityはTechnical Complete後の別blockerで扱う。",
       "update_candidate_package_binding": {
         "date": "2026-09-30",
         "contract_version": 2,
@@ -529,6 +529,18 @@
           "crypto_provider": "Reqwestと既存Rustls Ring providerをrustls-no-providerで統一し、複数providerによる実行時曖昧性を除いた。"
         },
         "scope_limit": "local TLS serverとBroker test storeを使うFIXTURE。外部配布元、同期OS DNSの期限／cancel、破損package repair、Windows installed product、install／rollback、release readinessを証明しない。proxy必須環境はknown_limitation。release_blockerとrelease_ready=falseを維持する。"
+      },
+      "broker_corrupt_package_repair": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Windows local focused Rust update testsは27 passed／0 failed。Rust全12 targetは434 passed／0 failed／3 ignored、cargo check --all-targets成功。Schema 150／normal example 150／negative fixture 193、Conformance 229 checks、Manifest 1119 files、strict日本語監査1122 files／debt 0／findings 0、統合validator development checks 10件すべてpassed。最初のfocused群でTLS fixtureが1回ConnectionResetとなったが、単独・全focused再実行とRust全targetは成功し、原因未確定の初回失敗を進捗履歴に保持した。release blocker 5件とrelease_ready=falseは維持。",
+        "observations": {
+          "classification": "既存同一digest fileの通常属性をnofollowで検査し、byte長またはSHA-256不一致を破損として分類する。symlink／reparse／directoryはfail-closed。",
+          "replacement": "Owner確認済みdownload後に新byte長／SHA-256を照合し、fsync後、同一digest名の通常fileだけを原子的renameで置換する。欠損時は従来どおりcreate-only hard link。",
+          "failure_isolation": "受信byteのdigest不一致時は既存破損packageを変更せず、一時fileを除去する試験に成功した。",
+          "audit": "置換範囲をqueued Auditへ先行記録し、成功をrecoveredとしてBroker Auditへ記録する経路を試験した。"
+        },
+        "scope_limit": "Rust unit／local TLS fixture。installed product、実配布元、電源断を伴うcrash試験、install／rollback transaction、release readinessを証明しない。製品レベルの修復・失敗注入証拠はrelease_blockerとして維持する。"
       },
       "broker_bounded_windows_dns_resolution": {
         "date": "2026-09-30",

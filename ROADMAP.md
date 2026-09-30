@@ -4,7 +4,7 @@
 
 ## D4 Pocket統合 rev3 現行工程
 
-D4 Pocket Phase 21／C12 download consumer（2026-09-30）: native Desktop Owner確認でBrokerの現候補・配布先・package identityを固定し、実行直前に再照合した後、Rust Brokerの単一workerでHTTPS packageを取得する。Windows DNS Clientの期限付き・取消可能な名前解決を接続し、redirect／proxy／retryを拒否、DNS public-address check、応答header、実byte長、SHA-256を検査してから固定storeへ保存する。Job状態はSchema付き・bounded・手動refreshで表示する。破損package repair、Windows installed実配布、install／rollbackは`release_blocker`として保持する。詳細・検証結果は`docs/REV3_PROGRESS.md`と`docs/specs/update-center.md`。
+D4 Pocket Phase 21／C12 download consumer（2026-09-30）: native Desktop Owner確認でBrokerの現候補・配布先・package identityを固定し、実行直前に再照合した後、Rust Brokerの単一workerでHTTPS packageを取得する。Windows DNS Clientの期限付き・取消可能な名前解決を接続し、redirect／proxy／retryを拒否、DNS public-address check、応答header、実byte長、SHA-256を検査してから固定storeへ保存する。Job状態はSchema付き・bounded・手動refreshで表示する。同一digest名の破損通常fileは、検証済みtemporary packageによる原子的置換とBroker Auditを実装・fixture検証した。製品Broker／installed productの実配布・失敗注入、install／rollbackは引き続き`release_blocker`。詳細・検証結果は`docs/REV3_PROGRESS.md`と`docs/specs/update-center.md`。
 
 D4 Pocket Phase 21／C11追補（2026-09-30）: 更新一覧の各候補へ、現在trustで再検証済みの候補とBroker所有配布元だけから導出した取得先状態／URLを表示する。配布元未設定と未適格候補はURLなしとし、表示は`INTERNAL_STATE`のみで権限やdownload実行を生成しない。download／install／rollbackは`suspended`を維持する。詳細・検証結果は`docs/REV3_PROGRESS.md`。
 
