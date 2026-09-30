@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "fb2e8ce8d91250f1886129239a8a756189ff60affc927161077e9a20c12fbea0"
+      "sha256": "45f188d50028b47eae7520bd414612be448dd1cd1b543a66ff8a749a563afe10"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3176,7 +3176,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "757bf39600b03f27939d53c86c369836f8b1b1537edcadd0a4fc2a8e5a1da149"
+      "sha256": "f8475bc16912c9c6691328885081f0fd8a92f440ad91408e859d649c5b12a470"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",

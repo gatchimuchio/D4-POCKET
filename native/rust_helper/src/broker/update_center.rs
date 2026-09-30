@@ -1928,13 +1928,25 @@ mod tests {
             .status,
             BrokerStatus::Accepted
         );
-        let response = call(
-            &mut broker,
-            BrokerOperation::更新適用要求,
-            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
-        );
-        assert_eq!(response.status, BrokerStatus::Suspended);
-        assert_eq!(response.error.unwrap().code, "update_execution_suspended");
+        for (operation, expected_operation) in [
+            (BrokerOperation::更新適用要求, OP_APPLY),
+            (BrokerOperation::更新rollback要求, OP_ROLLBACK),
+        ] {
+            let response = call(
+                &mut broker,
+                operation,
+                json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+            );
+            assert_eq!(response.status, BrokerStatus::Suspended);
+            assert_eq!(
+                response.error.as_ref().map(|error| error.code.as_str()),
+                Some("update_execution_suspended")
+            );
+            let event = broker.audit_events().last().unwrap();
+            assert_eq!(event.operation, expected_operation);
+            assert_eq!(event.decision, "suspended");
+            assert_eq!(response.audit_event_id, event.event_id);
+        }
     }
 
     #[test]

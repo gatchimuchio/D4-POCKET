@@ -1163,3 +1163,26 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 
 cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
 cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
 ```
+
+## R2追補 更新適用・rollback要求の停止Audit負例（2026-09-30）
+
+### 成立した変更
+
+- 更新候補が現在のBroker trustで正しく署名検証されていても、`更新適用要求`と`更新rollback要求`は未接続のため`Suspended`に留まり、個別要求に対応する`suspended` AuditEventを返すことを同一の回帰試験で検査するよう拡張した。
+- responseのerror codeとAuditEvent IDの一致も確認する。これはRust Broker内の`FIXTURE`であり、Installer、package展開、process切替、rollback transaction、導入済み製品の証拠ではない。適用・rollback経路は`suspended`のまま、`release_ready=false`を維持する。
+
+### 検証
+
+- focused Rust試験は1件合格。
+- Rust全試験対象の`cargo test`: 12対象、435成功／0失敗／3対象外。
+- `cargo check --all-targets`と変更fileの`rustfmt --edition 2021 --check`は成功。
+- `cargo fmt --all -- --check`は、今回変更していない多数のRust fileで既存format差分を検出して失敗した。無関係な全体整形は行わず、変更対象fileの局所checkは成功した。
+- 統合validatorは初回にsource hash manifest未更新、二回目に本節の英語検証文で失敗した。日本語化とmanifest再生成後の最終実行は終了値0。厳格日本語監査1123ファイル／指摘0、`Schema`150件／正常例150件／負例193件、適合確認229件、開発用検査10件が合格した。導入済み製品の証拠blocker 5件とregistry全体のactive unresolved 15件は残り、`release_ready=false`を維持する。
+- Windows上でRust全target検査を実行できたためGitHub Actionsは使用していない。Release blocker 15件と`release_ready=false`を保持する。
+
+```powershell
+cargo test --lib broker::update_center::tests::execution_requests_remain_suspended_and_audited -- --exact --test-threads=1
+cargo test --all-targets -- --test-threads=1
+cargo check --all-targets
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
