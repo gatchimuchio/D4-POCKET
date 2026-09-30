@@ -56,7 +56,7 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "現行main commit 75412301dfd7c17c99237fb795b894ffde119b5fからclean Rust Release helperをbuildし、Broker起動・認証IPC・再起動後のnonce replay拒否・新規health・強制終了後fail-closed・session資格file削除をLIVE_RUNTIMEで確認した。ただしこれは一時build領域からのstandalone helper実行であり、正式Windows installed evidence bundleへの取込み、final packageとのartifact同一性、installed product起動経路を示していないため、release gateは未成立。",
+      "reason": "現行main commit f740fff64248d1a16b900fafa790a65f245e9150を対象にしたWindows Actions #29で、clean source由来standalone Release helperのBroker起動・認証IPC・通常資格でのTask grant拒否・restart replay拒否・fresh health・強制停止後fail-closed・session資格file cleanupをLIVE_RUNTIMEで確認した。ただし正式Windows installed evidence bundleへの取込み、final packageとのartifact同一性、installed product起動経路を示していないため、release gateは未成立。",
       "required_action": "final Windows Release package内のRust helperをinstaller/windows/collect_broker_smoke.ps1で検査し、source commitとhelper artifact hashへ結合した実測値だけをrelease_evidence/windows_installed_smoke.jsonへ含め、tooling/windows_release_evidence.pyを通してください。既存の一時buildによるLIVE_RUNTIME probeはinstalled-path証拠へ昇格しない。",
       "latest_live_runtime_probe": {
         "date": "2026-09-29",
@@ -111,6 +111,49 @@
           "errors": []
         },
         "scope_limit": "現行Rust sourceと隔離temporary store／session／outputを使ったstandalone Broker processの通常IPC拒否実測。build時はRust sourceに差分がなく、他の文書／tooling差分があった。installed product、Desktop起動器のnative Owner確認、Task実行、durable product Auditの統合、別profile、正式release evidence provenance、release readinessは証明しない"
+      },
+      "latest_windows_manual_actions_runtime_probe": {
+        "date": "2026-10-01",
+        "evidence_source": "LIVE_RUNTIME",
+        "external_record": "EXTERNAL_EVIDENCE",
+        "workflow": ".github/workflows/windows-manual-rust-validation.yml",
+        "trigger": "workflow_dispatch",
+        "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36734597479",
+        "run_status": "success",
+        "run_duration": "15m 11s",
+        "job_duration": "14m 58s",
+        "source_commit": "f740fff64248d1a16b900fafa790a65f245e9150",
+        "source_worktree_clean_after_run": true,
+        "runner_image": "win25-vs2026/20260922.246.2",
+        "rust_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "rust_check_result": "全target成功",
+        "rust_test_result": {
+          "test_targets": 12,
+          "passed": 435,
+          "failed": 0,
+          "ignored": 5
+        },
+        "helper_sha256": "425ecedb7ebfa486c16aa3351b8aaa55e33304c3cf31e088afd08c8f108f8fe7",
+        "collector": "installer/windows/collect_broker_smoke.ps1",
+        "collector_version": "6",
+        "collector_result": "passed; non-synthetic",
+        "observations": {
+          "authenticated_loopback_ipc": true,
+          "durable_store_readiness": true,
+          "workspace_permission_grant_rejected": true,
+          "workspace_permission_error": "desktop_native_owner_confirmation_required",
+          "owner_approval_grant_rejected": true,
+          "owner_approval_error": "desktop_native_owner_confirmation_required",
+          "restart_replay_rejected": true,
+          "fresh_health_after_restart": true,
+          "forced_stop_fails_closed": true,
+          "session_credential_file_created_then_removed": true,
+          "cleanup_step_passed": true,
+          "post_test_worktree_clean_check_passed": true
+        },
+        "artifact_upload": "none",
+        "collector_output_retained": false,
+        "scope_limit": "Hosted Windows runner上でclean sourceからbuildしたstandalone Release Broker processのLIVE_RUNTIME smokeとRust検査に限る。collector outputはrun専用temporary領域のcleanupで削除され、artifact uploadなし。installed Desktop product、native Owner UI操作、Agent Task実行、正式release provenance、release readinessは証明しない"
       }
     },
     {

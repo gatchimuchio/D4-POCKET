@@ -1244,3 +1244,24 @@ python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 - 修正後の統合validator `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows` はexit 0。厳格日本語監査1123 file／指摘0、Schema 150、正常例150、negative fixture 193、Conformance 229、登録済みdevelopment検査10件を含む検査が成功した。Windows installed-evidence blocker 5件とregistry全体のactive unresolved 15件を維持し、`release_ready=false`。
 - 手動Windows Actions [#5 (`36716608834`)](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36716608834) は`workflow_dispatch`で`codex/verify-setup-doctor-ui-20260930`上の正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を検証し、全step成功。Windows Server 2025 image `20260922.246.2`、Flutter 3.44.0（commit `559ffa3f75e7402d65a8def9c28389a9b2e6fe42`）でRust helper build、Desktop analyze、全130 Desktop test、Mobile analyze、終了時clean確認が成功した。artifactはなく、runに関連するPRもない。
 - 成功した正確なcommit `c447376083d042f41f5af83be07459c9b932a93a`を`main`へfast-forwardし、`origin/main`との一致を確認した。一時検証branchはlocal／remote双方から削除済み。ActionsはRust／Flutter検査の証拠であり、Windows installed productの実起動、Setup DoctorのLIVE_RUNTIME製品証拠、release readinessを証明しない。既存release blockerと`release_ready=false`は維持する。
+
+## R2追補 Windows ActionsでRelease Broker runtime smokeを手動検証（2026-10-01）
+
+### 成立した確認
+
+- `.github/workflows/windows-manual-rust-validation.yml`を`workflow_dispatch`限定のまま拡張し、対象checkoutのRust全target検査・試験に続けてRelease helperをbuildし、既存`installer/windows/collect_broker_smoke.ps1` version 6で独立Broker processを検査する。build、store、session、collector outputはrun／attempt固有の`RUNNER_TEMP`に置き、所有marker・固定path・helper command lineを検査してprocessと一時領域をcleanupする。artifact upload、自動trigger、PRは追加しない。
+- 手動run [Windows Rust manual validation #29](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36734597479)は2026-10-01にcommit `f740fff64248d1a16b900fafa790a65f245e9150`を対象として成功した。Windows Server 2025 runner image `win25-vs2026/20260922.246.2`、`rustc 1.95.0 (59807616e 2026-04-14)`。全Rust targetの`cargo check`／`cargo test`が成功し、12 test targetで435 passed／0 failed／5 ignored。Release helper build、Broker smoke、cleanup、試験後clean確認も成功。job所要14分58秒、workflow全体15分11秒。
+- Release helper SHA-256は`425ecedb7ebfa486c16aa3351b8aaa55e33304c3cf31e088afd08c8f108f8fe7`。collector v6はnon-synthetic `passed`を返し、認証loopback IPC、durable-store readiness、通常credentialによるWorkspace Permission grant／Owner Approval grant双方の拒否（error codeはいずれも`desktop_native_owner_confirmation_required`）、restart後nonce replay拒否、再起動後health、強制停止後fail-closed、session credential fileの生成後削除を確認した。
+- collector outputはrunnerのrun専用temporary領域に作られ、cleanupで削除された。artifact uploadはないため、collector outputのhash／file自体は保存されていない。証拠はrun summaryとjob logに限定する。
+- 成功した正確なcommitだけを`main`へfast-forwardし、remote HEADとの一致を確認した。一時検証branch `codex/verify-broker-runtime-smoke-20260930`はlocal／remote双方から削除済み。
+
+### 証拠境界
+
+この結果はhosted Windows runnerでclean sourceからbuildしたstandalone Release Broker processの`LIVE_RUNTIME` smokeと、外部runnerの`EXTERNAL_EVIDENCE`記録である。通常資格によるgrant発行拒否を確認したもので、Desktop native Owner UI操作、installed Desktop／final packageとのbinary identity、Agent Task実行、耐久製品Audit統合、正式release provenanceを示さない。`task_execution=unsupported`、`windows_broker_installed_smoke`の`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- 記録更新後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1123 files／0 findings、Schema 150件／正常例150件／negative fixture 193件、Conformance 229 checks、Manifest／release gate／packaging／release smoke／evidence bundle／release runtime assertions／final development auditを含む全10検査がpassした。development evidenceのrelease blocker 5件と`release_ready=false`を維持する。
+- 個別に`python -X utf8 tooling/schema_check/check_schemas.py`（150／150／193）、`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`（229 checks）、`python -X utf8 tooling/日本語基底監査.py --strict`（1123 files／0 findings）、`python -X utf8 tooling/manifest.py --check`、`git diff --cached --check`もすべてpass。
+- Windows Actions [#29](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36734597479): checkout SHA照合、Rust変更file format検査、`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`、Release Broker build、collector v6 smoke、cleanup、test後clean確認が全step成功。
+- collector JSONとtemporary helper／store／sessionはrun終了時に削除済み。Actions artifactはなし。
