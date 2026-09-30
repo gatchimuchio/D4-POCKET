@@ -1,8 +1,30 @@
 {
   "版": 1,
-  "更新一覧": [],
-  "件数": 0,
-  "署名信頼設定": "unconfigured",
+  "更新一覧": [
+    {
+      "版": 2,
+      "更新ID": "update-1",
+      "現行版": "1.0.0",
+      "提供版": "1.1.0",
+      "channel": "stable",
+      "内容概要": "署名検査対象の安全更新",
+      "package_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "package_size_bytes": 1024,
+      "署名対象": "7b2276657273696f6e223a317d",
+      "署名": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "署名者fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rollback可能": true,
+      "署名状態": "verified",
+      "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "延期期限": null,
+      "取得元": {
+        "状態": "configured",
+        "URL": "https://updates.example.invalid/d4/stable/update-1.pkg"
+      }
+    }
+  ],
+  "件数": 1,
+  "署名信頼設定": "configured",
   "download実行": "suspended",
   "適用実行": "suspended",
   "rollback実行": "suspended",

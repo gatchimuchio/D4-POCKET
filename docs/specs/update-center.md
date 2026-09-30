@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C11 現行単位実装済み（実行系はsuspended）
+状態: C11 現行単位実装済み（配布先はBroker導出表示、実行系はsuspended）
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -10,7 +10,7 @@
 
 `base_url`は`https://`、小文字ASCIIの複数label DNS host、明示portなし、ASCII unreserved path segmentからなる固定形式だけを受け入れる。userinfo、query、fragment、backslash、percent-encoding、IP literal、`localhost`、空／末尾slash／`.`／`..` path segment、大文字hostは拒否する。設定は重複JSON fieldを拒否して8 KiB以内で読み、Broker起動時に再検証する。
 
-取得先の将来の決定式は、署名済み候補の`channel`と一致するBroker所有sourceを一つ選び、`base_url + "/" + update_id + ".pkg"`とする。候補／UIからURLやpathを受け取らず、署名済みchannelは配布元の選択値に限りAuthorityを与えない。現時点ではこの決定式を実downloadへ接続しておらず、redirect、DNS解決先、TLS接続、取得byte、展開、同一volume install／rollbackの検査は未実装である。download／install／rollbackは引き続き`suspended`であり、版2設定だけで実行可能にはならない。
+取得先は、現在のBroker trustで署名・候補hashを再検証できた版2候補に限り、署名済み`channel`と一致するBroker所有sourceを一つ選んで`base_url + "/" + update_id + ".pkg"`から決定する。Brokerは更新一覧の各候補へ`取得元`を射影し、配布元がある場合だけ`状態=configured`と導出URLを返す。該当配布元がない場合は`unconfigured`、候補が旧版・未検証・trust不整合の場合は`ineligible`とし、いずれもURLを返さない。Flutterまたは候補からURL／pathを受け取らず、署名済みchannelは配布元選択値に限りAuthorityを与えない。この一覧情報は`INTERNAL_STATE`の表示専用であり、Capability、Permission、Approval、ネットワーク作用、download可能状態を生成しない。redirect、DNS解決先、TLS接続、取得byte照合、展開、同一volume install／rollbackは未実装である。download／install／rollbackは引き続き`suspended`であり、版2設定や配布先表示だけで実行可能にはならない。
 
 ## Broker経路
 
@@ -32,6 +32,7 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 
 - UpdateCandidate版2、UpdateReceipt、UpdateListのSchemaとnegative fixture。版1の保存済みrecordは未結合表示へ降格し、版2でも現在trustとの再照合ができないrecordは`verification_stale`へ降格する。
 - Broker所有trustによるEd25519検証、署名対象の正本byte一致、package全体のSHA-256・正確なbyte長への署名結合
+- 更新一覧の取得元projectionが現在trustで検証済みの候補とBroker所有sourceだけから導出され、未設定・未適格候補にURLを返さないこと
 - 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
 - 更新候補の永続化・再読込、延期のAudit、実行要求のsuspended
 - Broker所有update trust版1互換、版2の配布元構造・起動時検証、設定読込の上限・重複field拒否

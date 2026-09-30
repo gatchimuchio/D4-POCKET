@@ -52,6 +52,28 @@ void main() {
     expect(UpdateClient.signatureStatusLabel('unknown'), '不明');
   });
 
+  test('配布元表示はBrokerの導出状態だけを使い実行可能と表示しない', () {
+    expect(
+      UpdateClient.packageSourceLabel({
+        '状態': 'configured',
+        'URL': 'https://updates.example.invalid/d4/stable/update-1.pkg',
+      }),
+      '配布元=updates.example.invalid（実downloadは保留）',
+    );
+    expect(
+      UpdateClient.packageSourceLabel({'状態': 'unconfigured', 'URL': null}),
+      '配布元未設定（実downloadは保留）',
+    );
+    expect(
+      UpdateClient.packageSourceLabel({
+        '状態': 'configured',
+        'URL': 'https://user@updates.example.invalid/update-1.pkg',
+      }),
+      '配布元状態不明',
+    );
+    expect(UpdateClient.packageSourceLabel(null), '配布元状態不明');
+  });
+
   test('Update操作はBrokerの監査済みoperationへ限定される', () async {
     final transport = _UpdateTransport();
     final client = UpdateClient(transport);

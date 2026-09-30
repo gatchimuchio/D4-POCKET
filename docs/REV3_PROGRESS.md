@@ -734,6 +734,33 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
 
+## Phase 21／C11 Broker導出取得元projectionとDesktop表示（2026-09-30）
+
+### 成立した変更
+
+- 更新一覧の各候補に`取得元`を追加した。Brokerは現在の信頼設定で候補署名と候補hashを再検証し、版2候補の署名済み`channel`とBroker所有配布元だけから`base_url/update_id.pkg`を導出する。
+- 配布元がない候補は`unconfigured`、旧候補・stale候補・trust不整合は`ineligible`としてURLを返さない。取得先URLのSchema上限とdot segment拒否を加え、候補由来の`package_url` fieldとdownload要求への呼出元URL持込をnegative testで拒否する。
+- Desktop更新一覧にBrokerが返した配布元host、署名済みpackage byte長、hash prefixを表示する。これは`INTERNAL_STATE`の表示projectionであり、ネットワーク接続・Permission・Approvalを生成せず、download／install／rollbackは`suspended`のまま。
+- 正本`docs/specs/update-center.md`、`規定/正本索引.json`、ROADMAP、release blocker履歴を更新した。既存release blockerと`release_ready=false`は維持する。
+
+### 検証
+
+- Rust全12 targetで419 passed／0 failed／3 ignored。新しいBroker取得元projectionと呼出元URL拒否focused testは1 passed。`cargo check --all-targets`成功。
+- Schema 149件／正常example 149件／negative fixture 192件、Conformance 228 checks成功。取得元欠落、状態とURLの矛盾、dot segment、候補由来URLを拒否した。
+- `flutter test --no-pub test/update_client_test.dart`は元OneDrive workspaceでは`build/unit_test_assets`削除失敗でtest前に停止した。同じcurrent sourceを短縮一時workspaceへ複製（`build`と`macos`生成物を除外）して3件passed。`flutter analyze --no-pub`も同workspaceで`No issues found`。この結果はFlutter sourceの検査でありWindows installed productの起動証拠ではない。
+- Flutter検証用の一時workspace cleanupは、検証済みTemp直下pathへのPowerShell再帰削除commandが実行policyで拒否されたため完了していない。Repository外のTempにsource copyと`.dart_tool`生成物が残る。production credentialは複製していない。正確なpathとcleanup未完了は作業報告に明記する。
+- Dart format checkで変更なし。Rustfmt check、`git diff --check`、変更JSON parseは成功。
+- 最終URL Schema締め付け前の統合validatorはexit 0、登録10検査すべてpassed、strict日本語監査1114 file／0 findings。release gate検査はpassしたがrelease blocker 5件と`release_ready=false`を維持した。後続のSchema pattern／negative test変更後にもSchema 149／149／192とConformance 228 checksを再実行し合格した。
+- Windows Actionsは未使用。必要なRust／Flutter／Schema検証がWindows localまたは短縮一時workspaceで成立したため、別runnerを要しなかった。
+
+### 残存blocker
+
+- item: 実HTTP download、redirect／DNS／TLS制御、実byte長・SHA-256照合、Broker保管、download失敗・crash Recovery、install／rollback
+  classification: release_blocker
+  reason: 本単位は配布元の表示projectionだけで、外部通信・実file・導入経路を実装していない。
+  required_action: native Owner確認と一回限りPermission／Approval／Audit／Recoveryを通したbounded download consumerを実装し、続けてpackage検証、same-volume導入・rollback、Windows実測を行う。
+  blocks_release: yes
+
 ## Phase 21／C11追補 永続候補の現在trust再検証（2026-09-30）
 
 ### 成立した変更

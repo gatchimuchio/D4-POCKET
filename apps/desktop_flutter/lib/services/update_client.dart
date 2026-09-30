@@ -13,6 +13,31 @@ class UpdateClient {
         _ => '不明',
       };
 
+  static String packageSourceLabel(Object? value) {
+    if (value is! Map) return '配布元状態不明';
+    final status = value['状態'];
+    final urlValue = value['URL'];
+    if (status == 'unconfigured' && urlValue == null) {
+      return '配布元未設定（実downloadは保留）';
+    }
+    if (status == 'ineligible' && urlValue == null) {
+      return '取得元なし（候補を現在trustで再検証できません）';
+    }
+    if (status != 'configured' || urlValue is! String) {
+      return '配布元状態不明';
+    }
+    final uri = Uri.tryParse(urlValue);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      return '配布元状態不明';
+    }
+    return '配布元=${uri.host}（実downloadは保留）';
+  }
+
   Future<Map<String, Object?>> list() async {
     final response = await _transport.request('更新一覧', payload: const {'版': 1});
     return _acceptedBody(response, '更新一覧');

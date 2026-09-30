@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "aee80fa214fd1bcd3ec03f5206a2273bd25b9f79876b364e2e6fa4d6426526ab"
+      "sha256": "e5e663ea4042370792f9b58f6a771b6528a1e3138cc8ee374627284e6ad0a668"
     },
     {
       "path": "SECURITY.md",
@@ -277,7 +277,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "cca58c4388796b634a14db958c75b960ec39827e49f9cffea1f5fadf16614d92"
+      "sha256": "77aef833b4d4e803890930bba2cb2851b4bc0b6d294afa5b7c9e89a50cb74222"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -369,7 +369,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
-      "sha256": "46d46ad9c5e3bc946259abc461dc4f4f7342782d5f6988f1cfa0a951cb006319"
+      "sha256": "6e5fe1404958b93d3d407edd454bb0447246699331939d0bf656de90b5c9a458"
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
@@ -617,7 +617,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "29af117ccc3d9e3fdd47c737a0ba2f5eb090357f2f17194be884b4f6bacc82f1"
+      "sha256": "d809bc29fc61322b7b8fd0590a1283501ed6b4ef35bb4c8378bc32f0d37d33e1"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "9c6370630ab1216c037c3b061bd95e52fa3bf2631304006e9043ad9932711688"
+      "sha256": "c11b7e827f7ba8365af9ad78920fa8ffb33639999300c0f1c1385bb45ec3b093"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1453,7 +1453,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "d02dba797e41261b4be307148be9b9db0f83d159b0aec85b144a9be04eb4d004"
+      "sha256": "8f43d468583cf73843f5f4d93d41fef69f50eafe9e62ea2b9f1ec7d912772799"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
@@ -2849,7 +2849,7 @@
     },
     {
       "path": "examples/contracts/update_list.valid.json",
-      "sha256": "a402fd7c4bfcd6df8812371d48ff117cefded34e5380b2b4fe782f625dafc944"
+      "sha256": "198bfd1048c37e1ae43f75c681e5ef60945dbd7ae04ac80a0093d54594f44534"
     },
     {
       "path": "examples/contracts/update_receipt.valid.json",
@@ -3161,7 +3161,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "83b0c7ee96e32d61db57b4e329923ff11232ffbed87969698105484ee22ae69b"
+      "sha256": "85c5960c9fe8d5f35fd7686a86308b465dbba998dfd8560bd6b569a7a618cf91"
     },
     {
       "path": "native/rust_helper/src/broker/workspace.rs",
@@ -3729,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "485ab0c32515dc29aaefb157b550d4cdf34270cd0d617ab85a2ef8bf69c81783"
+      "sha256": "986212c7f75268671dd893d7e6c539705d362fe2d1956d5ebd77893ec0c84609"
     },
     {
       "path": "requirements-dev.txt",
@@ -4313,11 +4313,11 @@
     },
     {
       "path": "specs/update_list.schema.json",
-      "sha256": "9029006b3127fef0e08dde82edc3bda880356b5817ba3b16c1aecdd290451d51"
+      "sha256": "346651d23b0f08130d49d35e86f8ada297b3c51cf0e7426862a08de0f12576a7"
     },
     {
       "path": "specs/update_receipt.schema.json",
-      "sha256": "60f22157cf7ccdd9dc7b25ab3f58a197d997a23526e2336e3aac7ac59da9d048"
+      "sha256": "f16f39fd0e258760b8100e3407f519f46c16823bc475e11c66bc36c452f10af1"
     },
     {
       "path": "specs/update_trust.schema.json",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "69627acff04d568d73e88121ae139ac289f748b6b50ac4318de1e1600a19c3ee"
+      "sha256": "adaeef07d17660b385f235d57f0d46f11654f21496d268ccfb84a4b2b4f544a1"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4501,7 +4501,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "5d16e600b4ed09e0a82b6b0a630fe50641896c9a53adf9767a832bcec8abd351"
+      "sha256": "2ee010e5c6dfdfc0177fa7f7cc7e12e6aae99e4012f086eba37c215fcd6815dd"
     }
   ]
 }

@@ -485,6 +485,18 @@
         "validation": "Schema 149件／正常example 149件／negative fixture 192件、Conformance 228 checks、Broker focused Rust test 1 passed／0 failed。tooling/validate_all.py --python-only --desktop-platform windowsはexit 0で、登録development check 10件すべて合格。strict日本語監査1114 file／0 findings。",
         "observation": "JSON Schemaがstable／beta／nightlyごとにmaxContains=1を強制し、異なるURLを持つ同一channelのsourceをnegative conformanceで拒否した。Broker起動時検証の既存重複拒否もfocused testで確認した。",
         "scope_limit": "CONFIGとFIXTUREの契約整合のみ。実HTTP、download byte照合、install／rollback、installed product、LIVE_RUNTIMEの証拠ではない。release blockerとrelease_ready=falseを維持する。"
+      },
+      "broker_derived_download_source_projection": {
+        "date": "2026-09-30",
+        "evidence_source": "FIXTURE",
+        "validation": "Rust全12 targetで419 passed／0 failed／3 ignored、focused Rust test 1 passed、cargo check --all-targets成功。Schema 149／正常example 149／negative fixture 192、Conformance 228 checks成功。Desktop Flutter対象test 3件と短縮一時workspace上のflutter analyze、Dart format check成功。統合validatorは10検査すべてpassed、strict日本語監査1114 file／0 findings、release blocker 5件・release_ready=false。URL Schema最終締め付け後にもSchemaとConformanceを再実行して合格。",
+        "observations": {
+          "configured_source": "現在のBroker trustで署名・候補hashを再検証できる版2候補だけに、署名済みchannelとBroker所有sourceからbase_url/update_id.pkgのURLを導出した。",
+          "unconfigured_source": "channel配布元がない場合は状態unconfigured、URL nullを返した。",
+          "stale_candidate": "trust未設定時は状態ineligible、URL nullへ閉じた。",
+          "execution_boundary": "更新一覧とDesktopは配布先状態だけを表示し、download実行suspendedを維持した。候補URL fieldをUpdateCandidate Schema negativeで拒否した。"
+        },
+        "scope_limit": "Broker内状態のFIXTUREとUI射影のみ。実HTTP、redirect／DNS／TLS、取得byte照合、download保存、install／rollback、Windows installed product LIVE_RUNTIMEの証拠ではない。release blockerとrelease_ready=falseを維持する。"
       }
     },
     {

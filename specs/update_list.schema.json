@@ -7,7 +7,16 @@
   "additionalProperties": false,
   "properties": {
     "版": { "const": 1 },
-    "更新一覧": { "type": "array", "maxItems": 64, "items": { "$ref": "update_receipt.schema.json" } },
+    "更新一覧": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "allOf": [
+          { "$ref": "update_receipt.schema.json" },
+          { "type": "object", "required": ["取得元"] }
+        ]
+      }
+    },
     "件数": { "type": "integer", "minimum": 0, "maximum": 64 },
     "署名信頼設定": { "enum": ["configured", "unconfigured"] },
     "download実行": { "const": "suspended" },

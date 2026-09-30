@@ -20,7 +20,30 @@
     "rollback可能": { "type": "boolean" },
     "署名状態": { "enum": ["verified", "legacy_unbound", "verification_stale"] },
     "候補hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "延期期限": { "type": ["string", "null"] }
+    "延期期限": { "type": ["string", "null"] },
+    "取得元": {
+      "type": "object",
+      "required": ["状態", "URL"],
+      "additionalProperties": false,
+      "properties": {
+        "状態": { "enum": ["configured", "unconfigured", "ineligible"] },
+        "URL": {
+          "type": ["string", "null"],
+          "maxLength": 2181,
+          "pattern": "^https://(?=[^/]{1,253}/)(?![0-9]{1,3}(?:\\.[0-9]{1,3}){3}/)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:[.][a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+)*/[A-Za-z0-9._~-]+\\.pkg$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "状態": { "const": "configured" } }, "required": ["状態"] },
+          "then": { "properties": { "URL": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "状態": { "enum": ["unconfigured", "ineligible"] } }, "required": ["状態"] },
+          "then": { "properties": { "URL": { "const": null } } }
+        }
+      ]
+    }
   },
   "allOf": [
     {

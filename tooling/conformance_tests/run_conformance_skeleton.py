@@ -1000,6 +1000,28 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         errors.append("更新候補へBroker外部公開鍵を混入できた")
     if validate_instance({**candidate, "package_path": "C:/untrusted/package.zip"}, load_schema("update_candidate.schema.json")) == []:
         errors.append("更新候補が外部package pathを受け入れた")
+    if validate_instance({**candidate, "package_url": "https://attacker.example/update-1.pkg"}, load_schema("update_candidate.schema.json")) == []:
+        errors.append("更新候補が外部package URLを受け入れた")
+    projected_item = listing["更新一覧"][0]
+    missing_source = copy.deepcopy(listing)
+    del missing_source["更新一覧"][0]["取得元"]
+    if validate_instance(missing_source, load_schema("update_list.schema.json")) == []:
+        errors.append("更新一覧がBroker導出の取得元状態を欠いたreceiptを受理した")
+    mismatched_source = copy.deepcopy(listing)
+    mismatched_source["更新一覧"][0]["取得元"] = {"状態": "configured", "URL": None}
+    if validate_instance(mismatched_source, load_schema("update_list.schema.json")) == []:
+        errors.append("配布元設定済み状態とURLの不一致を受理した")
+    for unsafe_url in (
+        "https://updates.example.invalid/d4/../update-1.pkg",
+        "https://127.0.0.1/d4/stable/update-1.pkg",
+        "https://Updates.example.invalid/d4/stable/update-1.pkg",
+    ):
+        unsafe_source = copy.deepcopy(listing)
+        unsafe_source["更新一覧"][0]["取得元"]["URL"] = unsafe_url
+        if validate_instance(unsafe_source, load_schema("update_list.schema.json")) == []:
+            errors.append("Broker導出取得先Schemaが非正規URLを受理した")
+    if projected_item["取得元"]["URL"] != "https://updates.example.invalid/d4/stable/update-1.pkg":
+        errors.append("更新一覧fixtureの取得先が更新ID付きBroker導出URLと一致しない")
     if candidate.get("版") != 2 or not candidate.get("package_sha256") or candidate.get("package_size_bytes", 0) <= 0:
         errors.append("更新候補が署名対象packageのhash・byte長を持たない")
     if validate_instance({**candidate, "package_sha256": "g" * 64}, load_schema("update_candidate.schema.json")) == []:

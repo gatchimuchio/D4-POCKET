@@ -283,20 +283,54 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
 
 fn project_update_record(value: &Value, trust: Option<&UpdateTrust>) -> Value {
     let mut projected = value.clone();
-    let status = match serde_json::from_value::<UpdateRecord>(value.clone()) {
-        Ok(record) if record.candidate.version == 1 => "legacy_unbound",
+    let (status, record) = match serde_json::from_value::<UpdateRecord>(value.clone()) {
+        Ok(record) if record.candidate.version == 1 => ("legacy_unbound", Some(record)),
         Ok(record)
             if record.signature_status == "verified"
                 && current_candidate_verification(trust, &record) =>
         {
-            "verified"
+            ("verified", Some(record))
         }
-        _ => "verification_stale",
+        Ok(record) => ("verification_stale", Some(record)),
+        Err(_) => ("verification_stale", None),
     };
     if let Some(object) = projected.as_object_mut() {
         object.insert("署名状態".into(), Value::String(status.into()));
+        object.insert(
+            "取得元".into(),
+            project_package_source(trust, record.as_ref(), status == "verified"),
+        );
     }
     projected
+}
+
+fn project_package_source(
+    trust: Option<&UpdateTrust>,
+    record: Option<&UpdateRecord>,
+    candidate_is_currently_verified: bool,
+) -> Value {
+    let Some(record) = record.filter(|record| {
+        candidate_is_currently_verified
+            && record.candidate.version == CANDIDATE_VERSION
+            && record.candidate.package_sha256.is_some()
+            && record.candidate.package_size_bytes.is_some()
+    }) else {
+        return json!({"状態": "ineligible", "URL": null});
+    };
+    let Some(trust) = trust.filter(|trust| validate_trust(trust).is_ok()) else {
+        return json!({"状態": "ineligible", "URL": null});
+    };
+    let Some(source) = trust
+        .package_sources
+        .iter()
+        .find(|source| source.channel == record.candidate.channel)
+    else {
+        return json!({"状態": "unconfigured", "URL": null});
+    };
+    json!({
+        "状態": "configured",
+        "URL": format!("{}/{}.pkg", source.base_url, record.candidate.update_id),
+    })
 }
 
 fn current_candidate_verification(trust: Option<&UpdateTrust>, record: &UpdateRecord) -> bool {
@@ -1149,6 +1183,79 @@ mod tests {
         );
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(response.error.unwrap().code, "update_trust_unconfigured");
+    }
+
+    #[test]
+    fn update_list_derives_package_url_only_from_current_candidate_and_broker_trust() {
+        let (mut trust, candidate) = trust_and_candidate();
+        trust.package_sources = vec![UpdatePackageSource {
+            channel: "stable".into(),
+            base_url: "https://updates.example.invalid/d4/stable".into(),
+        }];
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust.clone());
+        let checked = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [candidate]}),
+        );
+        assert_eq!(checked.status, BrokerStatus::Accepted);
+
+        let stored_hash = broker.updates["update-1"]["候補hash"].clone();
+        let forged_source = call(
+            &mut broker,
+            BrokerOperation::更新download要求,
+            json!({
+                "版": 1,
+                "更新ID": "update-1",
+                "候補hash": stored_hash,
+                "URL": "https://attacker.example.invalid/forged.pkg"
+            }),
+        );
+        assert_eq!(forged_source.status, BrokerStatus::Rejected);
+        assert_eq!(forged_source.error.unwrap().code, "update_request_invalid");
+
+        let listed = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        let body = listed.body.expect("更新一覧");
+        assert_eq!(body["download実行"], "suspended");
+        assert_eq!(
+            body["更新一覧"][0]["取得元"],
+            json!({
+                "状態": "configured",
+                "URL": "https://updates.example.invalid/d4/stable/update-1.pkg"
+            })
+        );
+
+        let (mut no_source_trust, second_candidate) = trust_and_candidate();
+        no_source_trust.package_sources.clear();
+        let mut no_source_broker = Broker::new("session-1");
+        no_source_broker.update_trust = Some(no_source_trust);
+        let checked = call(
+            &mut no_source_broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [second_candidate]}),
+        );
+        assert_eq!(checked.status, BrokerStatus::Accepted);
+        let listed = call(
+            &mut no_source_broker,
+            BrokerOperation::更新一覧,
+            json!({"版": 1}),
+        );
+        assert_eq!(
+            listed.body.unwrap()["更新一覧"][0]["取得元"],
+            json!({"状態": "unconfigured", "URL": null})
+        );
+
+        no_source_broker.update_trust = None;
+        let listed = call(
+            &mut no_source_broker,
+            BrokerOperation::更新一覧,
+            json!({"版": 1}),
+        );
+        assert_eq!(
+            listed.body.unwrap()["更新一覧"][0]["取得元"],
+            json!({"状態": "ineligible", "URL": null})
+        );
     }
 
     #[test]

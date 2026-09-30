@@ -357,7 +357,7 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "責任": "C11 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、延期、実行要求のsuspended境界"
+      "責任": "C11 更新候補の正本化、Broker所有Ed25519署名検査、永続一覧、Broker trust由来の配布先表示、延期、実行要求のsuspended境界"
     },
     {
       "path": "docs/specs/notification-center.md",

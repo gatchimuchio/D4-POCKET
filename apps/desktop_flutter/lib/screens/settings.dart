@@ -666,11 +666,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final updateId = update['更新ID']?.toString() ?? '';
     final candidateHash = update['候補hash']?.toString() ?? '';
     final signatureStatus = UpdateClient.signatureStatusLabel(update['署名状態']);
+    final packageSha256 = update['package_sha256']?.toString();
+    final packageHashSummary = packageSha256 != null &&
+            RegExp(r'^[a-f0-9]{64}$').hasMatch(packageSha256)
+        ? 'sha256:${packageSha256.substring(0, 12)}…'
+        : 'package未結合';
+    final packageSize = update['package_size_bytes'];
+    final packageSizeSummary = packageSize is num && packageSize > 0
+        ? '$packageSize bytes'
+        : 'byte長不明';
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text('${update['提供版'] ?? ''} ($updateId)'),
       subtitle: Text(
-        'channel=${update['channel']} / 署名=$signatureStatus / rollback=${update['rollback可能']}',
+        'channel=${update['channel']} / 署名=$signatureStatus / rollback=${update['rollback可能']}\n'
+        '$packageSizeSummary / $packageHashSummary / ${UpdateClient.packageSourceLabel(update['取得元'])}',
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ),
       trailing: Wrap(
         spacing: 4,
