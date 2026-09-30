@@ -105,6 +105,18 @@ jobs:
           if (Test-Path -LiteralPath $bundle) {
             throw 'fixture bundle output already exists; refusing overwrite'
           }
+          $receiptPath = Join-Path $env:GITHUB_WORKSPACE 'examples/contracts/gui_shell_export_receipt.valid.json'
+          $manifestFixturePath = Join-Path $env:GITHUB_WORKSPACE 'examples/contracts/gui_shell_export_manifest.valid.json'
+          $receiptFixture = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json
+          $manifestFileName = [string]$receiptFixture.manifest_file.file_name
+          if ($manifestFileName -notmatch '^d4-pocket-app-[0-9a-f]{32}\.json$') {
+            throw 'fixture Receipt contains an unexpected Manifest filename'
+          }
+          $manifestPath = Join-Path $env:RUNNER_TEMP $manifestFileName
+          if (Test-Path -LiteralPath $manifestPath) {
+            throw 'fixture Manifest staging path already exists; refusing overwrite'
+          }
+          Copy-Item -LiteralPath $manifestFixturePath -Destination $manifestPath
           $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
           $env:GIT_CONFIG_COUNT = '1'
           $env:GIT_CONFIG_KEY_0 = 'http.extraheader'
@@ -112,8 +124,8 @@ jobs:
           Remove-Item Env:GH_TOKEN
           $basic = $null
           python -X utf8 tooling/export_windows_product.py `
-            --receipt examples/contracts/gui_shell_export_receipt.valid.json `
-            --manifest-file examples/contracts/gui_shell_export_manifest.valid.json `
+            --receipt $receiptPath `
+            --manifest-file $manifestPath `
             --output-dir $bundle
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $evidencePath = Join-Path $bundle 'd4_pocket_build_receipt.json'
