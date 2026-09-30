@@ -3691,9 +3691,7 @@ fn authority_value_present(normalized: &str) -> bool {
 }
 
 fn authority_token_present(normalized: &str) -> bool {
-    normalized
-        .split('_')
-        .any(|token| canonical_authority_key(token).is_some() || authority_value_present(token))
+    normalized.split('_').any(authority_value_present)
 }
 
 fn json_metadata_value(value: &Value) -> String {
@@ -5444,6 +5442,24 @@ mod tests {
             response.error.unwrap().code,
             "broker_authority_metadata_rejected".to_string()
         );
+    }
+
+    #[test]
+    fn authority_scan_distinguishes_structural_claims_from_explanatory_prose() {
+        assert!(!metadata_attempts_authority_value(&serde_json::json!({
+            "capability": {
+                "reason": "専用permission profileの実Taskを未検証"
+            }
+        })));
+        assert!(metadata_attempts_authority_value(&serde_json::json!({
+            "permission": "workspace.write"
+        })));
+        assert!(metadata_attempts_authority_value(&serde_json::json!({
+            "reason": "permission=all"
+        })));
+        assert!(metadata_attempts_authority_value(&serde_json::json!({
+            "reason": "admin"
+        })));
     }
 
     #[test]

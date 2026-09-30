@@ -2725,6 +2725,209 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "GUI_SHELL_CODEX_TASK_BROKER_TEST_EXEで指定したCodex CLIの登録確認だけを行い、Taskは実行しない"]
+    #[allow(non_snake_case)]
+    fn 登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する() {
+        const RUNTIME_ID: &str = "installed-codex-fixture";
+        const WORKSPACE_ID: &str = "registered-workspace-fixture";
+
+        let executable = std::env::var_os("GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE")
+            .map(PathBuf::from)
+            .expect("検証対象Codex CLIを環境変数で明示する");
+        assert!(
+            executable.is_absolute(),
+            "Codex CLI pathは絶対pathで指定する"
+        );
+
+        let root = test_root("desktop-owner-registered-codex");
+        let workspace_root = root.join("workspace");
+        fs::create_dir(&workspace_root).unwrap();
+        let workspace_config = root.join("workspaces.json");
+        fs::write(
+            &workspace_config,
+            serde_json::to_vec(&serde_json::json!({
+                "version": 1,
+                "workspaces": [{
+                    "runtime_id": RUNTIME_ID,
+                    "workspace_id": WORKSPACE_ID,
+                    "root_path": workspace_root,
+                    "secret_paths": []
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let session_file = root.join(SESSION_FILE);
+        let owner_session_file = root.join("owner-session.json");
+        let store_dir = root.join("store");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server = thread::spawn(move || {
+            let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
+            config.owner_session_file = Some(owner_session_file);
+            config.workspace_config = Some(workspace_config);
+            config
+                .codex_runtimes
+                .push((RUNTIME_ID.to_owned(), executable, workspace_root));
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
+                config,
+                server_shutdown,
+                ready_tx,
+                owner_operation_rx,
+                None,
+            )
+        });
+        if let Err(error) = ready_rx.recv_timeout(Duration::from_secs(20)) {
+            shutdown.store(true, Ordering::Release);
+            let server_result = server.join();
+            panic!("Codex登録Brokerの起動失敗: {error:?}; server={server_result:?}");
+        }
+        let (mut session_bytes, mut broker_endpoint) = read_endpoint(&session_file).unwrap();
+
+        let session_start = desktop_owner_request(
+            "対話開始",
+            "desktop-codex-task-session-start",
+            "desktop-codex-task-session-start-nonce",
+            serde_json::json!({
+                "実行系ID": RUNTIME_ID,
+                "作業領域ID": WORKSPACE_ID
+            }),
+        );
+        let session_start = relay_channel_frame(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&session_start).unwrap(),
+            ),
+            &broker_endpoint,
+        )
+        .expect("通常資格IPCからAgent Sessionを作成する");
+        let session_start: serde_json::Value = serde_json::from_slice(&session_start).unwrap();
+        assert_eq!(session_start["status"], "accepted", "{session_start}");
+        let agent_session_id = session_start["body"]["対話セッションID"]
+            .as_str()
+            .expect("Broker発行Session ID")
+            .to_owned();
+
+        let permission_payload = serde_json::json!({
+            "agent_runtime_id": RUNTIME_ID,
+            "session_id": agent_session_id,
+            "workspace_id": WORKSPACE_ID
+        });
+        let permission = desktop_owner_request(
+            "AgentTaskWorkspacePermissionGrant",
+            "desktop-codex-task-permission-confirmed",
+            "desktop-codex-task-permission-confirmed-nonce",
+            permission_payload,
+        );
+        let mut permission_confirmation_count = 0;
+        let permission_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&permission).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                permission_confirmation_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    payload_hash,
+                } = summary
+                else {
+                    panic!("Workspace Permissionは固定scopeのnative確認を使う")
+                };
+                assert_eq!(runtime_id, RUNTIME_ID);
+                assert_eq!(session_id, &agent_session_id);
+                assert_eq!(workspace_id, WORKSPACE_ID);
+                assert_eq!(payload_hash, permission["payload_hash"].as_str().unwrap());
+                true
+            },
+        )
+        .expect("native確認後のBroker応答");
+        let permission_response: serde_json::Value =
+            serde_json::from_slice(&permission_response).unwrap();
+        assert_eq!(permission_confirmation_count, 1);
+        assert_eq!(permission_response["status"], "rejected");
+        assert_eq!(permission_response["error"]["code"], "AgentTask実行非対応");
+        assert!(permission_response["body"].is_null());
+
+        let instruction = "fixture-only task; no Agent execution";
+        let approval_payload = serde_json::json!({
+            "agent_runtime_id": RUNTIME_ID,
+            "session_id": agent_session_id,
+            "workspace_id": WORKSPACE_ID,
+            "instruction": instruction
+        });
+        let approval = desktop_owner_request(
+            "AgentTaskOwnerApprovalGrant",
+            "desktop-codex-task-approval-confirmed",
+            "desktop-codex-task-approval-confirmed-nonce",
+            approval_payload,
+        );
+        let mut approval_confirmation_count = 0;
+        let approval_response = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&approval).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                approval_confirmation_count += 1;
+                let DesktopOwnerOperationSummary::AgentTaskOwnerApproval {
+                    runtime_id,
+                    session_id,
+                    workspace_id,
+                    instruction_hash,
+                    payload_hash,
+                    ..
+                } = summary
+                else {
+                    panic!("Task本文はnative確認画面へ露出しない")
+                };
+                assert_eq!(runtime_id, RUNTIME_ID);
+                assert_eq!(session_id, &agent_session_id);
+                assert_eq!(workspace_id, WORKSPACE_ID);
+                assert_eq!(instruction_hash, &sha256_tagged(instruction.as_bytes()));
+                assert_eq!(payload_hash, approval["payload_hash"].as_str().unwrap());
+                assert!(!owner_confirmation_text(summary).contains(instruction));
+                true
+            },
+        )
+        .expect("native確認後のBroker応答");
+        let approval_response: serde_json::Value =
+            serde_json::from_slice(&approval_response).unwrap();
+        assert_eq!(approval_confirmation_count, 1);
+        assert_eq!(approval_response["status"], "rejected");
+        assert_eq!(approval_response["error"]["code"], "AgentTask実行非対応");
+        assert!(approval_response["body"].is_null());
+        assert!(!approval_response.to_string().contains(instruction));
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
+        assert!(audit.contains("対話Sessionと登録済みWorkspaceの明示結合"));
+        assert!(audit.contains("AgentTaskWorkspacePermissionGrant"));
+        assert!(audit.contains("AgentTaskOwnerApprovalGrant"));
+        assert!(audit.matches("AgentTask実行非対応").count() >= 2);
+        assert!(!audit.contains(
+            "Agent Task用Workspace Permission発行（native Owner確認・Task未実行）"
+        ));
+        assert!(!audit.contains(
+            "Agent Task本文hash・実行条件hashへのOwner Approval発行（native確認・Task未実行）"
+        ));
+        assert!(!audit.contains(instruction));
+        broker_endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn desktop_channel_normalization_never_accepts_ui_session_identity() {
         let valid = br#"{"request_id":"r1","operation":"health"}"#;

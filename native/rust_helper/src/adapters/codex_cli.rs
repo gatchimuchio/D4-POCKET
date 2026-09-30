@@ -1579,6 +1579,27 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
+    fn CodexAdapterのmetadataはAuthority入力検査に誤拒否されない() {
+        let adapter = CodexCliAdapter::for_test(
+            PathBuf::from(r"C:\codex.exe"),
+            PathBuf::from(r"C:\workspace"),
+        );
+        let metadata = adapter.agent_metadata().expect("登録Agent情報を取得");
+        assert!(
+            !crate::broker::protocol::metadata_attempts_authority_value(&metadata),
+            "Capabilityの説明文をAuthority field/valueと誤認しない: {metadata}"
+        );
+        let task_execution = metadata["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|capability| capability["capability_id"] == "task_execution")
+            .unwrap();
+        assert_eq!(task_execution["support"]["status"], "unsupported");
+    }
+
+    #[test]
     fn workspace_task_tempは登録Workspace内に作成され明示cleanupされる() {
         use std::time::{SystemTime, UNIX_EPOCH};
 

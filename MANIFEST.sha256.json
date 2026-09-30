@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "b1142d4ba9aad27808d698eb33fb28cd9ab5c38213c136a9dcd537996879e802"
+      "sha256": "882d7182e1129522ad4e4d8529a3ccd367beb26c7423f18f4b8c3fc560b840e7"
     },
     {
       "path": "SECURITY.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "65e6b5627d5b38770791f965cd1a8f30e799ee8213019cd864141b10042d7627"
+      "sha256": "b7538c85190a928859176f3aced3effbcf3e40d2e2cae3a96ef56d5e8e85403e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "9a1669676f14bc68cdbc05f6262206835ea05c2c79fade60865c643e00571251"
+      "sha256": "3ea6a36342508f8728904e36ab5384724570e3875d842953d7b77c57822f93f4"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3137,7 +3137,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "66cf809684ef6cc63a362e972e577599ec2b304bc4fbcb5386db8aa52c427336"
+      "sha256": "66e5e3b16824d9777cc6499d1123c8dc1282d2c1a93ea99748a0f6b8b576b389"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3181,7 +3181,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "dead0cfd2fcf72b762a8ac585cd52633f893950dd8ee6ed49eb541810947dfba"
+      "sha256": "b98c7a3a89575dd0bc58ffe224bbba2b3f9caf409c1ba753d3a9e08eda04b73d"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",

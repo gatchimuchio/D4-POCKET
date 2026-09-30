@@ -702,6 +702,38 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --write`: 1111 fileを記録。`python -X utf8 tooling/manifest.py --check`と`git diff --check`はともに合格。
 - Windows Actionsは未使用。ローカルDesktop全126 testsとPython統合validatorが合格し、残ったFlutter AnalyzerはOneDrive上のAnalysis Server障害である。`gh` CLIは未導入で、現行接続済みGitHub toolにも手動dispatch機能がないため、Actions runでの代替検証は実施していない。
 
+## R2追補 Codex Adapter metadataのAuthority誤検知を修正しBroker経路を再確認（2026-09-30）
+
+### 成立した変更
+
+- Codex Adapterは`task_execution=unsupported`とする理由に「専用permission profileの実Taskは未検証」と通常の説明文を含む。BrokerのAdapter metadata走査器は自由文を含む任意文字列から`permission`等をAuthority keyとして扱っていたため、権限昇格のない正規metadataを`応答不正`で拒否し、Task要求以前のAgent Session開始を阻害していた。
+- 自由文走査は`admin`、`all`、`approved`、`elevated`、`root`等の危険Authority値を拒否し、構造化object keyは従来どおりcanonical Authority／Permission keyを拒否するよう責務を分離した。説明文中の`permission profile`は受理しつつ、`{"permission":"workspace.write"}`、`permission=all`、`admin`は拒否する否定・境界testを追加した。Codex Adapter自身のmetadataを検査する回帰testも追加し、Task capabilityが`unsupported`のまま保持されることを確認する。
+- Windows専用ignored統合testは、明示指定したインストール済みCodex CLIの登録probeと実Broker loopback IPCを通し、登録Workspaceに結合したAgent Session開始が成功することを確認する。Owner操作callbackを肯定にしてもWorkspace Permission／Owner Approvalの両要求が`AgentTask実行非対応`で拒否され、grantを返さず、永続Auditへ拒否を記録し、Task本文をsummary／response／Auditへ露出しない。CLIは登録probeに限り、実Agent Task・model・network接続・実Win32 Owner dialogは実行していない。Owner確認callbackはtest fixtureであり、native確認画面の製品動作証拠ではない。
+- したがって本修正は通常metadataの誤拒否を解消するが、実Task実行を有効化しない。`task_execution=unsupported`、Agent隔離およびWindows installed証拠等の`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- Codex Adapter metadataの回帰testと自由文／構造field境界testは、それぞれ1件合格した。実行command:
+
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml 'CodexAdapterのmetadataはAuthority入力検査に誤拒否されない' -- --test-threads=1
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml authority_scan_distinguishes_structural_claims_from_explanatory_prose -- --test-threads=1
+```
+- 明示したWindows環境変数`GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`で起動したignored統合test `登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する`: 1 passed。実Codex CLIは登録probeのみ。Owner肯定操作はsynthetic callbackであり、Task・model・実native dialogは未実行。
+- Rust全targetの初回再実行は12 test target中、主lib 360 passed／1 failed／3 ignored、他targetはすべて成功した。未変更のA2A loopback fixtureで`A2A Agent Card応答を読めない`が発生した。該当testの単独再実行は1 passed、続く同一Rust全target再実行は主lib 361 passed／0 failed／3 ignored、他targetもすべて成功し、全12 target合計407 passed／0 failed／3 ignoredでexit 0となった。初回failureは履歴として保持し、原因は確定していない。
+- `git diff --check`: 合格。`desktop_launcher.rs`全体へのrustfmt `--check`は既存の無関係な整形差分も報告したため、ファイル全体の機械整形は行っていない。追加コードを手動確認し、差分全体へ無関係なformat変更を混入させていない。
+- 初回失敗した統合testが作ったTemp directory 2件の削除は実行環境のpolicyに拒否された。対象はWindowsのTemp配下に限定された試験用directoryであり、repositoryには含まれない。削除を回避する別経路は試していない。
+
+### 統合検査の追補
+
+- 統合validator初回は、新規testの英語diagnostic 1箇所と進捗記録のcommand表記2行を日本語基底監査が検出し、2 file／3 findingsで失敗した。test診断を日本語化し、正確なcommandを独立した実行記録へ分離した後の厳格監査は1114 file／0 findingsで合格した。監査規則や許可例外は変更していない。
+- 修正後の統合validatorは登録済みdevelopment検査10件すべて合格した。Schema 149件、正常例149件、negative fixture 192件、Conformance 228 checks、Manifest照合、release gate、packaging portability、release smoke、evidence bundle、runtime assertion、C32構造監査が合格した。Windows installed product evidence 5項目は既存`release_blocker`のままで、`release_ready=false`を維持する。
+- 統合validatorの実行command:
+
+```powershell
+python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+```
+
 ### Analyzer短縮path再試験（2026-09-30）
 
 - 前項のAnalyzer失敗をコード失敗と断定せず、Repositoryを移動せずに一時`Z:` drive aliasから`apps/desktop_flutter`を開いて`flutter analyze --no-pub`を再実行した。Analysis Serverは62秒で`No issues found!`を返し、Flutter Analyzerは成功した。一時drive aliasは実行後に解除し、Repository path・Windows保護設定は変更していない。

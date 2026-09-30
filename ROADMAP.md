@@ -4,6 +4,8 @@
 
 ## D4 Pocket統合 rev3 現行工程
 
+R2追補（2026-09-30）: Codex Adapter metadataの説明文にある通常語`permission`をAuthority field名として誤検出し、登録済みCodexとのAgent Session開始を`応答不正`で止めていたscannerを修正した。自由文では危険Authority値を引き続き拒否し、構造化objectのAuthority／Permission key拒否を維持する。Windows実Codex CLI登録を伴うBroker経路でSession開始後もWorkspace Permission／Owner Approvalの両grantを`AgentTask実行非対応`として拒否し、永続AuditとTask本文非露出を確認した。native Owner確認UI・実Agent Task・installed製品の証拠ではない。Rust全12 targetで407 passed／0 failed／3 ignored（主libは361 passed／0 failed／3 ignored）。初回はA2A loopback fixture 1件が間欠失敗し、単独再試験と全体再試験は成功した。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`。
+
 R2追補（2026-09-30）: Desktop BrokerClientでAgent Task Workspace Permission／Owner Approval発行をnative Owner確認待ちoperationへ加え、5秒の通常timeoutから305秒の専用待ちへ修正した。これはFlutter応答待ちだけの変更で、native Owner確認・Broker authorityを代替せず、timeoutもBroker要求取消を意味しない。Adapterの`task_execution=unsupported`、Agent Task実行隔離blocker、`release_ready=false`は維持する。回帰testと検証は`docs/REV3_PROGRESS.md`、timeout意味契約は`docs/specs/agent-runtime.md`。
 
 R2追補（2026-09-30）: OneDrive配下の長い日本語pathでAnalysis Serverが異常終了したため、一時`Z:` drive aliasから`flutter analyze --no-pub`を再実行し、`No issues found!`を確認した。aliasは解除済みで、元のRepository pathでの再発防止を意味しない。以前の失敗履歴と検証範囲は`docs/REV3_PROGRESS.md`。
