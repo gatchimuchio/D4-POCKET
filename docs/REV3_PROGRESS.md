@@ -1336,3 +1336,18 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml Rust生成Task設定で実Windows隔離の登録secretを拒否する -- --ignored --nocapture --test-threads=1`: exit 0、1 passed／0 failed。インストール済みCodex CLI `0.158.0-alpha.2.1`と合成Workspace／secretを使う直接MxC sandbox probeであり、実Agent、Rust Broker、Owner Approval、production Task、cleanup lifecycleの試験ではない。
 - 外部資料の確認（`EXTERNAL_EVIDENCE`）: [Microsoft Learn AppContainer資料](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)、[Codex CLIの依存版固定箇所](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/Cargo.toml)、[Codex CLIのMxC権限変換処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/policy.rs)、[Codex CLIのWindows起動処理](https://github.com/openai/codex/blob/rust-v0.158.0-alpha.2.1/codex-rs/mxc-sandbox/src/windows.rs)、[Microsoft MxC BaseContainerの起動終了処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/appcontainer/common/src/base_container_runner.rs)、[PSEC環境handleの寿命処理](https://github.com/microsoft/mxc/blob/6cd3d58f05d3447e67109cfb75e042803b843ca4/src/backends/learning_mode/windows/src/secenv.rs)。source確認は実行環境の`LIVE_RUNTIME`証拠ではない。
 - production Broker／IPC経由の実Task、AppContainer tempの実体・task間分離・物理cleanup、取消／期限／crash後Recovery、installed product、Audit、result／diffのContent Exposureは未成立。TEMP pathの完全一致をblocker条件から外したが、AppContainer一時領域の寿命とRecovery検証は`release_blocker`として残し、`task_execution=unsupported`および`release_ready=false`を維持する。
+
+## R2追補 Windows Job Objectによる子孫process停止試験（2026-10-01）
+
+### 成立した確認
+
+- `native/process_supervision/src/windows_job.rs`のWindows試験fixtureを、Job Objectへ割り当てた子processがさらに永続孫processを起動する構造へ拡張した。Broker相当ownerの強制終了試験は子・孫双方のprocess IDを記録し、Job handle close後に両方の終了をWindows process handleで待ち合わせる。
+- 通常取消経路に対応する新しい試験では、実Windows Job Objectの`terminate_and_wait`を実行し、Job内process数が0になることと、子・孫の終了をそれぞれ確認する。合成test executableだけを用い、外部network、資格情報、実Workspace内容には触れない。
+- 証拠はWindows上のprocess／Job Object操作に対する`LIVE_RUNTIME`と、合成child fixtureの`FIXTURE`を組み合わせたもの。Brokerのprocess supervision primitiveで子孫process停止を直接確認するが、実Codex／MxC Task経路へ接続した証拠ではない。
+
+### 正確な検証と残存範囲
+
+- `cargo +1.95.0 test --locked --manifest-path native/process_supervision/Cargo.toml -- --test-threads=1`: exit 0、4 passed／0 failed。通常停止、Broker相当owner終了後の子・孫process停止を確認した。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: exit 0、11 test target、438 passed／0 failed／5 ignored。process supervision変更を含むRust helper全targetが成功した。
+- 初回の統合validatorは`.gitignore`変更後のmanifest hash不一致を検出したため、manifestを再生成して再実行した。最終の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。strict日本語監査1126 files／0 findings、Schema 151／151・negative 194、Conformance 229、登録済み10 checkがすべてpassした。development evidenceのrelease blocker 5件と`release_ready=false`は維持する。
+- この試験はJob Objectのprocess群停止だけを示す。production Broker IPC／Desktop native Owner確認、durable Audit、実Codex tool childの隔離、deadline／crash後のRecovery、AppContainer TEMPの分離・cleanupは未成立のままである。`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。

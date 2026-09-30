@@ -88,7 +88,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "ad43c207a96a8bf28c2a82c9e7c7adfb1e649f03b2b078a14affcefc9c5890c0"
+      "sha256": "f70d066a94e3a6d879360270f9a7d401bd03faca4131e6057aff122683cb9237"
     },
     {
       "path": "AGENTS.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "90a8455316be955fe1ae1e189abb9572ff9744a5cf9f1f69ffe2356c9d75594b"
+      "sha256": "6e9c66c124e68311d39e45e032b06160c54a239a0ab027343a7e97c5ec4ce601"
     },
     {
       "path": "SECURITY.md",
@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "af3d45889401db1873bdaa1605c9909404bc0c5b06493336cc89990f7c696893"
+      "sha256": "ee2ab8f52e6d0b1497653bd26e5891e235f23fd035bab60807696f17483c5f31"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2960,7 +2960,7 @@
     },
     {
       "path": "native/process_supervision/src/windows_job.rs",
-      "sha256": "7a93fb244aec19364b5cc66d915dc9594ad42bf7ca62ee2f6d06954ece8926e5"
+      "sha256": "87a9ecedcf0fbd2473419bf0b5f3cc97c9dd0987de230a67dc6cc888ba3d3e22"
     },
     {
       "path": "native/rust_helper/Cargo.lock",

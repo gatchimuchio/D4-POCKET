@@ -186,29 +186,17 @@ mod tests {
 
     const OWNER_MARKER: &str = "GUI_SHELL_PROCESS_JOB_OWNER_MARKER";
     const CHILD_FIXTURE: &str = "GUI_SHELL_PROCESS_JOB_CHILD_FIXTURE";
+    const DESCENDANT_MARKER: &str = "GUI_SHELL_PROCESS_JOB_DESCENDANT_MARKER";
+    const DESCENDANT_FIXTURE: &str = "GUI_SHELL_PROCESS_JOB_DESCENDANT_FIXTURE";
 
     #[test]
     fn abrupt_broker_exit_closes_job_and_terminates_descendants() {
         if let Some(marker) = std::env::var_os(OWNER_MARKER) {
             let marker = std::path::PathBuf::from(marker);
+            let descendant_marker = marker.with_extension("descendant");
             let job = Job::create().expect("Job Object作成");
-            let executable = std::env::current_exe().expect("試験実行file");
-            let mut command = Command::new(executable);
-            command
-                .args([
-                    "--exact",
-                    "windows_job::tests::persistent_child_fixture",
-                    "--nocapture",
-                ])
-                .env(CHILD_FIXTURE, "1")
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .creation_flags(crate::CREATE_SUSPENDED);
-            let child = command.spawn().expect("停止中の子process起動");
-            job.assign_and_resume(child.id(), child.as_raw_handle())
-                .expect("Job割当て後に子processを再開");
-            fs::write(marker, child.id().to_string()).expect("子process ID記録");
+            start_persistent_tree(&job, &marker, &descendant_marker)
+                .expect("Job内の子・孫process起動");
             loop {
                 thread::sleep(Duration::from_secs(1));
             }
@@ -222,6 +210,7 @@ mod tests {
             "gui-shell-process-job-{}-{nonce}",
             std::process::id()
         ));
+        let descendant_marker = marker.with_extension("descendant");
         let executable = std::env::current_exe().expect("試験実行file");
         let mut owner = Command::new(executable)
             .args([
@@ -237,9 +226,14 @@ mod tests {
             .expect("Job owner process起動");
 
         let started = Instant::now();
-        let child_id = loop {
-            if let Ok(value) = fs::read_to_string(&marker) {
-                break value.parse::<u32>().expect("子process ID");
+        let (child_id, descendant_id) = loop {
+            let child = fs::read_to_string(&marker);
+            let descendant = fs::read_to_string(&descendant_marker);
+            if let (Ok(child), Ok(descendant)) = (child, descendant) {
+                break (
+                    child.parse::<u32>().expect("子process ID"),
+                    descendant.parse::<u32>().expect("孫process ID"),
+                );
             }
             if started.elapsed() > Duration::from_secs(10)
                 || owner.try_wait().expect("owner状態").is_some()
@@ -247,7 +241,8 @@ mod tests {
                 let _ = owner.kill();
                 let _ = owner.wait();
                 let _ = fs::remove_file(&marker);
-                panic!("Job ownerが子process登録を完了しない");
+                let _ = fs::remove_file(&descendant_marker);
+                panic!("Job ownerが子・孫process登録を完了しない");
             }
             thread::sleep(Duration::from_millis(10));
         };
@@ -256,16 +251,124 @@ mod tests {
         owner.wait().expect("Broker相当process回収");
         wait_for_process_exit(child_id, Duration::from_secs(10))
             .expect("Job handle close後の子process終了");
+        wait_for_process_exit(descendant_id, Duration::from_secs(10))
+            .expect("Job handle close後の孫process終了");
         fs::remove_file(marker).expect("marker削除");
+        fs::remove_file(descendant_marker).expect("孫process marker削除");
+    }
+
+    #[test]
+    fn explicit_termination_stops_descendants_and_waits_for_empty_job() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("時計")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "gui-shell-process-job-cancel-{}-{nonce}",
+            std::process::id()
+        ));
+        let child_marker = base.with_extension("child");
+        let descendant_marker = base.with_extension("descendant");
+        let job = Job::create().expect("Job Object作成");
+        let child_id = start_persistent_tree(&job, &child_marker, &descendant_marker)
+            .expect("Job内の子・孫process起動");
+
+        let started = Instant::now();
+        let descendant_id = loop {
+            if let Ok(value) = fs::read_to_string(&descendant_marker) {
+                break value.parse::<u32>().expect("孫process ID");
+            }
+            if started.elapsed() > Duration::from_secs(10) {
+                let _ = job.terminate_and_wait();
+                let _ = fs::remove_file(&child_marker);
+                let _ = fs::remove_file(&descendant_marker);
+                panic!("Job内の孫process起動を確認できない");
+            }
+            thread::sleep(Duration::from_millis(10));
+        };
+
+        job.terminate_and_wait()
+            .expect("取消相当のJob停止とprocess群回収");
+        assert_eq!(job.active_processes().expect("Job内process数"), 0);
+        wait_for_process_exit(child_id, Duration::from_secs(10)).expect("取消後の子process終了");
+        wait_for_process_exit(descendant_id, Duration::from_secs(10))
+            .expect("取消後の孫process終了");
+        fs::remove_file(child_marker).expect("子process marker削除");
+        fs::remove_file(descendant_marker).expect("孫process marker削除");
     }
 
     #[test]
     fn persistent_child_fixture() {
         if std::env::var_os(CHILD_FIXTURE).is_some() {
+            let marker = std::path::PathBuf::from(
+                std::env::var_os(DESCENDANT_MARKER).expect("孫process marker path"),
+            );
+            let executable = std::env::current_exe().expect("試験実行file");
+            let descendant = Command::new(executable)
+                .args([
+                    "--exact",
+                    "windows_job::tests::persistent_descendant_fixture",
+                    "--nocapture",
+                ])
+                .env(DESCENDANT_FIXTURE, "1")
+                .env_remove(CHILD_FIXTURE)
+                .env_remove(OWNER_MARKER)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("Jobを継承する孫process起動");
+            fs::write(marker, descendant.id().to_string()).expect("孫process ID記録");
+            drop(descendant);
             loop {
                 thread::sleep(Duration::from_secs(1));
             }
         }
+    }
+
+    #[test]
+    fn persistent_descendant_fixture() {
+        if std::env::var_os(DESCENDANT_FIXTURE).is_some() {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+    }
+
+    fn start_persistent_tree(
+        job: &Job,
+        child_marker: &std::path::Path,
+        descendant_marker: &std::path::Path,
+    ) -> io::Result<u32> {
+        let executable = std::env::current_exe()?;
+        let mut command = Command::new(executable);
+        command
+            .args([
+                "--exact",
+                "windows_job::tests::persistent_child_fixture",
+                "--nocapture",
+            ])
+            .env(CHILD_FIXTURE, "1")
+            .env(DESCENDANT_MARKER, descendant_marker)
+            .env_remove(OWNER_MARKER)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(crate::CREATE_SUSPENDED);
+        let child = command.spawn()?;
+        if let Err(error) = job.assign_and_resume(child.id(), child.as_raw_handle()) {
+            let mut child = child;
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+        let child_id = child.id();
+        drop(child);
+        if let Err(error) = fs::write(child_marker, child_id.to_string()) {
+            let _ = job.terminate_and_wait();
+            return Err(error);
+        }
+        Ok(child_id)
     }
 
     fn wait_for_process_exit(process_id: u32, timeout: Duration) -> io::Result<()> {
