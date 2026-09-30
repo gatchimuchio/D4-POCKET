@@ -5251,13 +5251,16 @@ def 資格情報保管庫の契約と境界を検査する() -> list[str]:
             不整合.append(f"C7資格情報保管庫仕様に必須境界がない: {token}")
 
     registration = load_contract_fixture("credential_registration.valid.json")
+    revocation = load_contract_fixture("credential_revocation_request.valid.json")
     receipt = load_contract_fixture("credential_receipt.valid.json")
     listing = load_contract_fixture("credential_list.valid.json")
     registration_schema = load_schema("credential_registration.schema.json")
+    revocation_schema = load_schema("credential_revocation_request.schema.json")
     receipt_schema = load_schema("credential_receipt.schema.json")
     list_schema = load_schema("credential_list.schema.json")
     for name, value, schema in (
         ("registration", registration, registration_schema),
+        ("revocation", revocation, revocation_schema),
         ("receipt", receipt, receipt_schema),
         ("list", listing, list_schema),
     ):
@@ -5272,11 +5275,23 @@ def 資格情報保管庫の契約と境界を検査する() -> list[str]:
         不整合.append("C7登録payloadの権限field混入を拒否しない")
     if not validate_instance({**receipt, "秘密値": "must-not-be-projected"}, receipt_schema):
         不整合.append("C7公開receiptの秘密値混入を拒否しない")
+    if any(key in revocation for key in ("秘密値", "credential", "authority", "permission_id", "approval_id")):
+        不整合.append("C7失効要求へ秘密値または権限fieldが混入している")
+    if not validate_instance({**revocation, "秘密値": "must-not-enter-request"}, revocation_schema):
+        不整合.append("C7失効要求の秘密値混入を拒否しない")
+    revoked_receipt = {**receipt, "状態": "失効", "失効時刻UnixMillis": 1780000000001}
+    if validate_instance(revoked_receipt, receipt_schema):
+        不整合.append("C7失効済みreceiptをmetadata schemaが受理しない")
+    if not validate_instance({**revoked_receipt, "失効時刻UnixMillis": None}, receipt_schema):
+        不整合.append("C7失効済みreceiptの失効時刻欠落を拒否しない")
     if listing.get("件数") != len(listing.get("資格情報一覧", [])):
         不整合.append("C7一覧valid fixtureの件数関係が不正")
 
     rust = (RUST_HELPER / "src" / "broker" / "credential_vault.rs").read_text(encoding="utf-8")
+    protocol = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(encoding="utf-8")
+    launcher = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
     owner_cli = (RUST_HELPER / "src" / "owner_cli.rs").read_text(encoding="utf-8")
+    broker_client = (DESKTOP_FLUTTER / "lib" / "services" / "broker_client.dart").read_text(encoding="utf-8")
     for token, source in (
         ("Purpose::Credential", rust),
         ("credential_owner_required", rust),
@@ -5286,6 +5301,12 @@ def 資格情報保管庫の契約と境界を検査する() -> list[str]:
         ("新規資格情報暗号文を破棄", rust),
         ("credential_storage_missing", rust),
         ("credential_storage_changed", rust),
+        ("credential_ledger", rust),
+        ("資格情報失効処理", rust + protocol),
+        ("desktop_native_owner_confirmation_required", protocol),
+        ("CredentialRevocation", launcher),
+        ("DEFBUTTON2", launcher),
+        ("資格情報失効", broker_client),
         ("資格情報公開receiptへ秘密値が混入している", owner_cli),
     ):
         if token not in source:

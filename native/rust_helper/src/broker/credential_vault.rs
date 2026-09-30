@@ -1,7 +1,7 @@
-//! C7 資格情報保管庫のowner登録、metadata一覧、統治済みMCP利用。
+//! C7 資格情報保管庫のowner登録・失効、metadata一覧、統治済みMCP利用。
 //!
 //! このmoduleは秘密値をRuntime、Flutter、Audit reason、応答へ返さない。秘密値の
-//! MCP以外への注入、更新、失効、削除、接続先変更は未接続に保つ。
+//! MCP以外への注入、更新、物理削除、接続先変更は未接続に保つ。
 #![cfg(windows)]
 #![allow(non_snake_case)]
 
@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 
 const VERSION: u64 = 1;
 const RECORD_PREFIX: &str = "資格情報記録:";
+const REVOCATION_PREFIX: &str = "資格情報失効記録:";
 const MCP_USE_PREFIX: &str = "MCP資格情報使用:";
 const MAX_TEXT_BYTES: usize = 256;
 const MAX_SECRET_BYTES: usize = 65_536;
@@ -40,6 +41,23 @@ struct Registration {
     route: String,
     #[serde(rename = "秘密値")]
     secret: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevocationRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "資格情報ID")]
+    credential_id: String,
+    #[serde(rename = "用途")]
+    purpose: String,
+    #[serde(rename = "接続対象")]
+    target: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "作成監査ID")]
+    created_audit_id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -95,6 +113,21 @@ struct McpCredentialUseRecord {
     used_at: i64,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CredentialRevocationRecord {
+    version: u64,
+    credential_id: String,
+    created_audit_id: String,
+    ciphertext_hash: String,
+    revoked_at: i64,
+}
+
+struct CredentialLedger {
+    entries: Vec<StoredCredential>,
+    last_use: BTreeMap<String, i64>,
+}
+
 impl Broker {
     pub(super) fn 資格情報MCP使用処理(
         &mut self,
@@ -124,8 +157,8 @@ impl Broker {
                 payload_hash,
             ));
         }
-        let entries = match stored_credentials(&self.audit_log) {
-            Ok(value) => value,
+        let entries = match credential_ledger(&self.audit_log) {
+            Ok(value) => value.entries,
             Err(_) => {
                 return Err(self.reject_with_payload_hash(
                     request_id,
@@ -214,7 +247,7 @@ impl Broker {
         environment_variable: &str,
         payload_hash: &str,
     ) -> Result<(), ()> {
-        let entries = stored_credentials(&self.audit_log)?;
+        let entries = credential_ledger(&self.audit_log)?.entries;
         if !entries.iter().any(|entry| {
             entry.public.credential_id == credential_id
                 && entry.public.purpose == "mcp_transport"
@@ -287,8 +320,8 @@ impl Broker {
                 )
             }
         };
-        let existing = match stored_credentials(&self.audit_log) {
-            Ok(value) => value,
+        let existing = match credential_ledger(&self.audit_log) {
+            Ok(value) => value.entries,
             Err(_) => {
                 return self.audit_store_failed_response(
                     request_id,
@@ -386,7 +419,10 @@ impl Broker {
         let reason = match serde_json::to_string(&stored) {
             Ok(value) => format!("{RECORD_PREFIX}{value}"),
             Err(_) => {
-                self.新規資格情報暗号文を破棄(&stored.storage_id, &stored.public.ciphertext_hash);
+                self.新規資格情報暗号文を破棄(
+                    &stored.storage_id,
+                    &stored.public.ciphertext_hash,
+                );
                 return self.audit_store_failed_response(
                     request_id,
                     OPERATION,
@@ -476,7 +512,7 @@ impl Broker {
                 payload_hash,
             );
         }
-        let mut entries = match stored_credentials(&self.audit_log) {
+        let ledger = match credential_ledger(&self.audit_log) {
             Ok(value) => value,
             Err(_) => {
                 return self.audit_store_failed_response(
@@ -487,19 +523,8 @@ impl Broker {
                 )
             }
         };
-        let last_use = match credential_last_use(&self.audit_log, &entries) {
-            Ok(value) => value,
-            Err(_) => {
-                return self.reject_with_payload_hash(
-                    request_id,
-                    OPERATION,
-                    "credential_audit_invalid",
-                    "資格情報使用Auditを検証できないため一覧を停止しました",
-                    true,
-                    payload_hash,
-                );
-            }
-        };
+        let mut entries = ledger.entries;
+        let last_use = ledger.last_use;
         for entry in &mut entries {
             entry.public.last_used_at = last_use.get(&entry.public.credential_id).copied();
         }
@@ -527,7 +552,10 @@ impl Broker {
                 .as_ref()
                 .expect("ProtectedStore登録確認済み");
             entries.iter().find_map(|entry| {
-                match store.inspect(crate::protected_store::Purpose::Credential, &entry.storage_id) {
+                match store.inspect(
+                    crate::protected_store::Purpose::Credential,
+                    &entry.storage_id,
+                ) {
                     Ok(Some((hash, _))) if hash == entry.public.ciphertext_hash => None,
                     Ok(Some(_)) => Some((
                         "credential_storage_changed",
@@ -552,7 +580,9 @@ impl Broker {
         }
         let public: Vec<Value> = entries
             .iter()
-            .map(|entry| serde_json::to_value(&entry.public).expect("公開資格情報metadataはJSON化可能"))
+            .map(|entry| {
+                serde_json::to_value(&entry.public).expect("公開資格情報metadataはJSON化可能")
+            })
             .collect();
         let body = json!({
             "版": VERSION,
@@ -592,12 +622,205 @@ impl Broker {
         }
     }
 
-    fn 新規資格情報暗号文を破棄(&self, storage_id: &str, ciphertext_hash: &str) -> bool {
+    pub(super) fn 資格情報失効処理(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        owner: bool,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        const OPERATION: &str = "資格情報失効";
+        if !owner {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_owner_required",
+                "資格情報失効にはnative Owner確認が必要です",
+                true,
+                payload_hash,
+            );
+        }
+        if !self.state_store.persistence_ready() {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "broker_persistence_unavailable",
+                "資格情報失効には永続Auditが必要です",
+                true,
+                payload_hash,
+            );
+        }
+        let request: RevocationRequest =
+            match serde_json::from_value::<RevocationRequest>(payload.clone()) {
+                Ok(value)
+                    if value.version == VERSION
+                        && hex_identifier(&value.credential_id)
+                        && safe_text(&value.purpose, MAX_TEXT_BYTES)
+                        && safe_text(&value.target, MAX_TEXT_BYTES)
+                        && super::protocol::is_tagged_sha256(&value.ciphertext_hash)
+                        && !value.created_audit_id.is_empty()
+                        && value.created_audit_id.len() <= 256 =>
+                {
+                    value
+                }
+                _ => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        OPERATION,
+                        "credential_revocation_invalid",
+                        "資格情報失効要求の版または識別子が不正です",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+        let log = match self.state_store.verified_audit_log() {
+            Ok(Some(log)) if log == self.audit_log => log,
+            _ => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "失効前に永続資格情報Auditを再確認してください",
+                )
+            }
+        };
+        let ledger = match credential_ledger(&log) {
+            Ok(value) => value,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_invalid",
+                    "資格情報Auditを検証できないため失効を停止しました",
+                )
+            }
+        };
+        let last_use = ledger.last_use;
+        let Some(mut entry) = ledger
+            .entries
+            .into_iter()
+            .find(|entry| entry.public.credential_id == request.credential_id)
+        else {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_not_found",
+                "登録Auditに一致する資格情報がありません",
+                true,
+                payload_hash,
+            );
+        };
+        if entry.public.status != "有効" || entry.public.revoked_at.is_some() {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_already_revoked",
+                "資格情報はすでに失効しており状態を再利用できません",
+                true,
+                payload_hash,
+            );
+        }
+        if entry.public.purpose != request.purpose
+            || entry.public.target != request.target
+            || entry.public.ciphertext_hash != request.ciphertext_hash
+            || entry.public.created_audit_id != request.created_audit_id
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                OPERATION,
+                "credential_metadata_stale",
+                "native確認時の資格情報metadataと現在の登録Auditが一致しません",
+                true,
+                payload_hash,
+            );
+        }
+        entry.public.last_used_at = last_use.get(&entry.public.credential_id).copied();
+        if self
+            .append_audit(
+                request_id,
+                OPERATION,
+                "received",
+                "Capability=credential.revoke Permission=credential.revoke.owner_control Approval=Rust Desktop native Owner確認で対象metadataを照合してOwnerがYesを選択 RecoveryAction=失効は取消不可。再利用が必要なら別IDで再登録し、暗号文物理削除は独立操作で行う。秘密値は記録しない",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                payload_hash,
+            )
+            .is_err()
+        {
+            return self.audit_store_failed_response(
+                request_id,
+                OPERATION,
+                "credential_audit_append_failed",
+                "資格情報失効の受信Auditを確定できません",
+            );
+        }
+        let record = CredentialRevocationRecord {
+            version: VERSION,
+            credential_id: entry.public.credential_id.clone(),
+            created_audit_id: entry.public.created_audit_id.clone(),
+            ciphertext_hash: entry.public.ciphertext_hash.clone(),
+            revoked_at: self.current_epoch_millis().max(entry.public.created_at),
+        };
+        let reason = match serde_json::to_string(&record) {
+            Ok(value) => format!("{REVOCATION_PREFIX}{value}"),
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_revocation_record_invalid",
+                    "資格情報失効記録を確定できません",
+                )
+            }
+        };
+        let mut public = entry.public;
+        public.status = "失効".to_string();
+        public.revoked_at = Some(record.revoked_at);
+        let body = serde_json::to_value(&public).expect("資格情報失効metadataはJSON化可能");
+        let event = match self.append_audit(
+            request_id,
+            OPERATION,
+            "accepted",
+            &reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            &canonical_payload_hash(Some(&body)),
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return self.audit_store_failed_response(
+                    request_id,
+                    OPERATION,
+                    "credential_audit_append_failed",
+                    "失効状態を確定するAuditを保存できません",
+                )
+            }
+        };
+        BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: OPERATION.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: event.event_id,
+            error: None,
+            health: None,
+            body: Some(body),
+            shutdown_requested: self.shutdown_requested,
+        }
+    }
+
+    fn 新規資格情報暗号文を破棄(
+        &self,
+        storage_id: &str,
+        ciphertext_hash: &str,
+    ) -> bool {
         self.protected_store
             .as_ref()
             .and_then(|store| {
                 store
-                    .prepare_delete(crate::protected_store::Purpose::Credential, storage_id, ciphertext_hash)
+                    .prepare_delete(
+                        crate::protected_store::Purpose::Credential,
+                        storage_id,
+                        ciphertext_hash,
+                    )
                     .ok()
             })
             .and_then(|prepared| prepared.commit().ok())
@@ -616,7 +839,10 @@ fn parse_registration(payload: &Value) -> Result<Registration, &'static str> {
         || !hex_identifier(&registration.credential_id)
         || !safe_text(&registration.purpose, MAX_TEXT_BYTES)
         || !safe_text(&registration.target, MAX_TEXT_BYTES)
-        || !matches!(registration.kind.as_str(), "api_key" | "oauth" | "basic" | "ssh" | "custom")
+        || !matches!(
+            registration.kind.as_str(),
+            "api_key" | "oauth" | "basic" | "ssh" | "custom"
+        )
         || registration.secret.is_empty()
         || registration.secret.as_bytes().len() > MAX_SECRET_BYTES
     {
@@ -625,61 +851,92 @@ fn parse_registration(payload: &Value) -> Result<Registration, &'static str> {
     Ok(registration)
 }
 
-fn stored_credentials(log: &BrokerAuditLog) -> Result<Vec<StoredCredential>, ()> {
-    let mut by_id = BTreeMap::new();
-    for event in log.events() {
-        if event.operation != "資格情報登録" || event.decision != "accepted" {
-            continue;
-        }
-        let encoded = event.reason.strip_prefix(RECORD_PREFIX).ok_or(())?;
-        let record: StoredCredential = serde_json::from_str(encoded).map_err(|_| ())?;
-        if record.public.created_audit_id != event.event_id
-            || record.public.version != VERSION
-            || record.public.exposure != "metadata_only"
-            || record.public.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
-            || !hex_identifier(&record.storage_id)
-            || record.storage_id != record.public.credential_id
-        {
-            return Err(());
-        }
-        if by_id.insert(record.public.credential_id.clone(), record).is_some() {
-            return Err(());
-        }
-    }
-    Ok(by_id.into_values().collect())
-}
-
-fn credential_last_use(
-    log: &BrokerAuditLog,
-    entries: &[StoredCredential],
-) -> Result<BTreeMap<String, i64>, ()> {
+fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
+    let mut by_id: BTreeMap<String, StoredCredential> = BTreeMap::new();
     let mut last_use = BTreeMap::new();
     for event in log.events() {
-        if event.operation != "MCP Credential使用" || event.decision != "accepted" {
-            continue;
+        match (event.operation.as_str(), event.decision.as_str()) {
+            ("資格情報登録", "accepted") => {
+                let encoded = event.reason.strip_prefix(RECORD_PREFIX).ok_or(())?;
+                let record: StoredCredential = serde_json::from_str(encoded).map_err(|_| ())?;
+                if record.public.created_audit_id != event.event_id
+                    || record.public.version != VERSION
+                    || record.public.exposure != "metadata_only"
+                    || record.public.evidence_source != EVIDENCE_SOURCE_INTERNAL_STATE
+                    || !hex_identifier(&record.storage_id)
+                    || record.storage_id != record.public.credential_id
+                    || record.public.status != "有効"
+                    || record.public.revoked_at.is_some()
+                    || record.public.created_at <= 0
+                    || record.public.last_used_at.is_some()
+                    || !safe_text(&record.public.purpose, MAX_TEXT_BYTES)
+                    || !safe_text(&record.public.target, MAX_TEXT_BYTES)
+                    || !matches!(
+                        record.public.kind.as_str(),
+                        "api_key" | "oauth" | "basic" | "ssh" | "custom"
+                    )
+                    || record.public.storage != "windows_dpapi"
+                    || !super::protocol::is_tagged_sha256(&record.public.ciphertext_hash)
+                {
+                    return Err(());
+                }
+                if by_id
+                    .insert(record.public.credential_id.clone(), record)
+                    .is_some()
+                {
+                    return Err(());
+                }
+            }
+            ("資格情報失効", "accepted") => {
+                let encoded = event.reason.strip_prefix(REVOCATION_PREFIX).ok_or(())?;
+                let record: CredentialRevocationRecord =
+                    serde_json::from_str(encoded).map_err(|_| ())?;
+                let entry = by_id.get_mut(&record.credential_id).ok_or(())?;
+                if record.version != VERSION
+                    || !hex_identifier(&record.credential_id)
+                    || record.created_audit_id != entry.public.created_audit_id
+                    || record.ciphertext_hash != entry.public.ciphertext_hash
+                    || record.revoked_at < entry.public.created_at
+                    || entry.public.status != "有効"
+                    || entry.public.revoked_at.is_some()
+                {
+                    return Err(());
+                }
+                entry.public.status = "失効".to_string();
+                entry.public.revoked_at = Some(record.revoked_at);
+            }
+            ("MCP Credential使用", "accepted") => {
+                let encoded = event.reason.strip_prefix(MCP_USE_PREFIX).ok_or(())?;
+                let record: McpCredentialUseRecord =
+                    serde_json::from_str(encoded).map_err(|_| ())?;
+                let entry = by_id.get(&record.credential_id).ok_or(())?;
+                if record.version != VERSION
+                    || !hex_identifier(&record.credential_id)
+                    || record.purpose != "mcp_transport"
+                    || !safe_text(&record.target, MAX_TEXT_BYTES)
+                    || !super::mcp_center::safe_credential_environment_name(
+                        &record.environment_variable,
+                    )
+                    || record.used_at <= 0
+                    || entry.public.purpose != record.purpose
+                    || entry.public.target != record.target
+                    || entry.public.status != "有効"
+                    || entry.public.revoked_at.is_some()
+                {
+                    return Err(());
+                }
+                last_use
+                    .entry(record.credential_id)
+                    .and_modify(|used_at: &mut i64| *used_at = (*used_at).max(record.used_at))
+                    .or_insert(record.used_at);
+            }
+            _ => {}
         }
-        let encoded = event.reason.strip_prefix(MCP_USE_PREFIX).ok_or(())?;
-        let record: McpCredentialUseRecord = serde_json::from_str(encoded).map_err(|_| ())?;
-        if record.version != VERSION
-            || !hex_identifier(&record.credential_id)
-            || record.purpose != "mcp_transport"
-            || !safe_text(&record.target, MAX_TEXT_BYTES)
-            || !super::mcp_center::safe_credential_environment_name(&record.environment_variable)
-            || record.used_at <= 0
-            || !entries.iter().any(|entry| {
-                entry.public.credential_id == record.credential_id
-                    && entry.public.purpose == record.purpose
-                    && entry.public.target == record.target
-            })
-        {
-            return Err(());
-        }
-        last_use
-            .entry(record.credential_id)
-            .and_modify(|used_at: &mut i64| *used_at = (*used_at).max(record.used_at))
-            .or_insert(record.used_at);
     }
-    Ok(last_use)
+    Ok(CredentialLedger {
+        entries: by_id.into_values().collect(),
+        last_use,
+    })
 }
 
 fn safe_text(value: &str, max_bytes: usize) -> bool {
@@ -693,7 +950,10 @@ fn version_only_payload(value: &Value) -> bool {
 }
 
 fn hex_identifier(value: &str) -> bool {
-    value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[cfg(test)]
@@ -732,7 +992,12 @@ mod tests {
         })
     }
 
-    fn call(broker: &mut Broker, operation: BrokerOperation, payload: Value, owner: bool) -> BrokerResponse {
+    fn call(
+        broker: &mut Broker,
+        operation: BrokerOperation,
+        payload: Value,
+        owner: bool,
+    ) -> BrokerResponse {
         let id = format!("credential-test-{}", broker.audit_events().len());
         let mut envelope = BrokerRequestEnvelope::command_envelope_at(
             &id,
@@ -744,6 +1009,21 @@ mod tests {
         envelope.payload = Some(payload);
         envelope.refresh_payload_hash();
         broker.処理(envelope, owner)
+    }
+
+    fn native_owner_call(broker: &mut Broker, payload: Value) -> BrokerResponse {
+        let id = format!("credential-native-test-{}", broker.audit_events().len());
+        let request = json!({
+            "request_id": id,
+            "session_id": "session-1",
+            "operation": "資格情報失効",
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": format!("native-nonce-{id}"),
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"},
+            "payload": payload,
+        });
+        broker.desktop_owner_operation_json(&request.to_string())
     }
 
     fn broker_with_vault(name: &str) -> (Broker, std::path::PathBuf) {
@@ -883,7 +1163,10 @@ mod tests {
             false,
         );
         assert_eq!(normal_add.status, BrokerStatus::Rejected);
-        assert_eq!(normal_add.error.expect("error").code, "credential_owner_required");
+        assert_eq!(
+            normal_add.error.expect("error").code,
+            "credential_owner_required"
+        );
         let owner_list = call(
             &mut broker,
             BrokerOperation::資格情報一覧,
@@ -891,9 +1174,26 @@ mod tests {
             true,
         );
         assert_eq!(owner_list.status, BrokerStatus::Rejected);
-        assert_eq!(owner_list.error.expect("error").code, "credential_normal_channel_required");
+        assert_eq!(
+            owner_list.error.expect("error").code,
+            "credential_normal_channel_required"
+        );
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn credential_revocation_requires_durable_audit_even_after_native_confirmation() {
+        let mut broker = Broker::new("session-1");
+        let response = native_owner_call(&mut broker, json!({"版": 1}));
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.expect("永続Audit必須").code,
+            "broker_persistence_unavailable"
+        );
+        let audit = broker.audit_events();
+        assert_eq!(audit.len(), 1);
+        assert_eq!(audit[0].decision, "rejected");
     }
 
     #[test]
@@ -901,7 +1201,13 @@ mod tests {
         let (mut broker, root) = broker_with_vault("missing");
         let id = "e".repeat(32);
         assert_eq!(
-            call(&mut broker, BrokerOperation::資格情報登録, fixture_payload(&id), true).status,
+            call(
+                &mut broker,
+                BrokerOperation::資格情報登録,
+                fixture_payload(&id),
+                true
+            )
+            .status,
             BrokerStatus::Accepted
         );
         let ciphertext = root.join("vault").join(format!("credential-{id}.dpapi"));
@@ -914,7 +1220,143 @@ mod tests {
         );
         assert_eq!(listed.status, BrokerStatus::Rejected);
         assert!(listed.body.is_none());
-        assert_eq!(listed.error.expect("error").code, "credential_storage_missing");
+        assert_eq!(
+            listed.error.expect("error").code,
+            "credential_storage_missing"
+        );
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn native_owner_revocation_is_audited_persistent_and_blocks_later_mcp_use() {
+        let (mut broker, root) = broker_with_vault("revocation");
+        let id = "1".repeat(32);
+        let target = "fixture-mcp-server";
+        let secret_marker = "synthetic-revocation-secret-never-project";
+        let added = call(
+            &mut broker,
+            BrokerOperation::資格情報登録,
+            mcp_fixture_payload(&id, target, secret_marker),
+            true,
+        );
+        assert_eq!(added.status, BrokerStatus::Accepted, "{added:?}");
+
+        let owner_credential_request = call(
+            &mut broker,
+            BrokerOperation::資格情報失効,
+            json!({"版": 1, "資格情報ID": id}),
+            true,
+        );
+        assert_eq!(owner_credential_request.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner_credential_request.error.expect("native確認拒否").code,
+            "desktop_native_owner_confirmation_required"
+        );
+
+        let stale = native_owner_call(
+            &mut broker,
+            json!({
+                "版": 1,
+                "資格情報ID": id,
+                "用途": "mcp_transport",
+                "接続対象": "another-server",
+                "暗号文hash": added.body.as_ref().unwrap()["暗号文hash"],
+                "作成監査ID": added.body.as_ref().unwrap()["作成監査ID"],
+            }),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale.error.expect("古いmetadata拒否").code,
+            "credential_metadata_stale"
+        );
+
+        let revoked = native_owner_call(
+            &mut broker,
+            json!({
+                "版": 1,
+                "資格情報ID": id,
+                "用途": "mcp_transport",
+                "接続対象": target,
+                "暗号文hash": added.body.as_ref().unwrap()["暗号文hash"],
+                "作成監査ID": added.body.as_ref().unwrap()["作成監査ID"],
+            }),
+        );
+        assert_eq!(revoked.status, BrokerStatus::Accepted, "{revoked:?}");
+        let receipt = revoked.body.expect("失効metadata");
+        assert_eq!(receipt["資格情報ID"], id);
+        assert_eq!(receipt["状態"], "失効");
+        assert!(receipt["失効時刻UnixMillis"].as_i64().is_some());
+        assert_eq!(receipt["公開範囲"], "metadata_only");
+        assert!(!receipt.to_string().contains(secret_marker));
+
+        drop(broker);
+        let audit_dir = root.join("audit");
+        let vault_dir = root.join("vault");
+        let mut broker =
+            Broker::new_persistent("session-1", &audit_dir).expect("失効AuditからBrokerを再起動");
+        broker.current_epoch_seconds_override = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_secs() as i64,
+        );
+        broker
+            .保管先起動登録(&vault_dir, true, std::slice::from_ref(&audit_dir))
+            .expect("再起動後も同じProtectedStoreを登録");
+
+        let unavailable = broker.資格情報MCP使用処理(
+            "mcp-use-after-revoke",
+            &id,
+            target,
+            &canonical_payload_hash(None),
+        );
+        let unavailable_code = match unavailable {
+            Err(response) => response.error.expect("失効後の利用拒否").code,
+            Ok(_) => panic!("失効済みCredentialの再利用を拒否する"),
+        };
+        assert_eq!(unavailable_code, "credential_not_available");
+        let listed = call(
+            &mut broker,
+            BrokerOperation::資格情報一覧,
+            json!({"版": 1}),
+            false,
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        let public = listed.body.expect("metadata一覧");
+        assert_eq!(public["資格情報一覧"][0]["状態"], "失効");
+        assert_eq!(
+            public["資格情報一覧"][0]["失効時刻UnixMillis"],
+            receipt["失効時刻UnixMillis"]
+        );
+        assert!(!public.to_string().contains(secret_marker));
+        assert!(root
+            .join("vault")
+            .join(format!("credential-{id}.dpapi"))
+            .exists());
+        let audit = serde_json::to_string(&broker.audit_events()).expect("失効監査");
+        assert!(audit.contains("Capability=credential.revoke"));
+        assert!(audit.contains("Permission=credential.revoke.owner_control"));
+        assert!(audit.contains("Approval=Rust Desktop native Owner確認"));
+        assert!(audit.contains("RecoveryAction=失効は取消不可"));
+        assert!(!audit.contains(secret_marker));
+
+        let duplicate = native_owner_call(
+            &mut broker,
+            json!({
+                "版": 1,
+                "資格情報ID": id,
+                "用途": "mcp_transport",
+                "接続対象": target,
+                "暗号文hash": added.body.as_ref().unwrap()["暗号文hash"],
+                "作成監査ID": added.body.as_ref().unwrap()["作成監査ID"],
+            }),
+        );
+        assert_eq!(duplicate.status, BrokerStatus::Rejected);
+        assert_eq!(
+            duplicate.error.expect("二重失効拒否").code,
+            "credential_already_revoked"
+        );
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
     }

@@ -27,6 +27,7 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
   List<McpCredentialSummary>? _credentials;
   String? _credentialTargetServerId;
   String? _selectedCredentialId;
+  String? _revokingCredentialId;
   bool _loading = false;
   bool _connecting = false;
   String? _disconnectingServerId;
@@ -154,7 +155,8 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                     value: null,
                     child: Text('使用しない'),
                   ),
-                  for (final credential in _credentials!)
+                  for (final credential
+                      in _credentials!.where((entry) => entry.status == '有効'))
                     DropdownMenuItem<String>(
                       value: credential.credentialId,
                       child: Text(
@@ -170,6 +172,42 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
                           }
                         }),
               ),
+            ],
+            if (_credentials != null &&
+                _credentialTargetServerId == _serverIdController.text) ...[
+              const SizedBox(height: 8),
+              const Text('このServer向けCredential metadata'),
+              for (final credential in _credentials!)
+                ListTile(
+                  key: ValueKey('mcp-credential-${credential.credentialId}'),
+                  title: Text('${credential.kind} ・ ${credential.status}'),
+                  subtitle: Text(
+                    'ID: ${credential.credentialId}'
+                    '${credential.revokedAt == null ? '' : '\n失効時刻: ${credential.revokedAt}'}',
+                  ),
+                  trailing: credential.status == '有効'
+                      ? IconButton(
+                          key: ValueKey(
+                              'mcp-credential-revoke-${credential.credentialId}'),
+                          tooltip: '資格情報を失効',
+                          onPressed: _loading ||
+                                  _connecting ||
+                                  _revokingCredentialId != null ||
+                                  _disconnectingServerId != null ||
+                                  _callingToolServerId != null
+                              ? null
+                              : () => _revokeCredential(client, credential),
+                          icon: _revokingCredentialId == credential.credentialId
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.key_off_outlined),
+                        )
+                      : const Text('失効済み'),
+                ),
             ],
             const SizedBox(height: 8),
             TextField(
@@ -428,14 +466,16 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
         argumentsText: _argumentsController.text,
         credentialId: _credentialTargetServerId == _serverIdController.text &&
                 _credentials?.any((entry) =>
-                        entry.credentialId == _selectedCredentialId) ==
+                        entry.credentialId == _selectedCredentialId &&
+                        entry.status == '有効') ==
                     true
             ? _selectedCredentialId
             : null,
         credentialEnvironmentVariable:
             _credentialTargetServerId == _serverIdController.text &&
                     _credentials?.any((entry) =>
-                            entry.credentialId == _selectedCredentialId) ==
+                            entry.credentialId == _selectedCredentialId &&
+                            entry.status == '有効') ==
                         true
                 ? _credentialEnvironmentController.text
                 : null,
@@ -456,6 +496,32 @@ class _McpConnectionCenterPanelState extends State<McpConnectionCenterPanel> {
       }
     } finally {
       if (mounted) setState(() => _connecting = false);
+    }
+  }
+
+  Future<void> _revokeCredential(
+    McpConnectionClient client,
+    McpCredentialSummary credential,
+  ) async {
+    setState(() {
+      _revokingCredentialId = credential.credentialId;
+      _message = null;
+    });
+    try {
+      await client.revokeCredential(credential: credential);
+      if (!mounted) return;
+      await _loadCredentials(client);
+      if (mounted) {
+        setState(() => _message =
+            'Credentialを論理失効しました。以後のMCP注入を拒否し、暗号文fileは別の物理削除操作まで保持します。');
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _message =
+            'Credential失効は確定していません。native Owner確認とBroker Audit状態を確認してください。');
+      }
+    } finally {
+      if (mounted) setState(() => _revokingCredentialId = null);
     }
   }
 

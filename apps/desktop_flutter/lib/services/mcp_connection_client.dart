@@ -45,12 +45,20 @@ class McpCredentialSummary {
     required this.purpose,
     required this.target,
     required this.kind,
+    required this.status,
+    required this.revokedAt,
+    required this.ciphertextHash,
+    required this.createdAuditId,
   });
 
   final String credentialId;
   final String purpose;
   final String target;
   final String kind;
+  final String status;
+  final int? revokedAt;
+  final String ciphertextHash;
+  final String createdAuditId;
 }
 
 class McpConnectionSummary {
@@ -215,6 +223,11 @@ class McpConnectionClient {
       final purpose = entry['用途'];
       final target = entry['接続対象'];
       final kind = entry['種類'];
+      final createdAt = entry['作成時刻UnixMillis'];
+      final lastUsedAt = entry['最終使用時刻UnixMillis'];
+      final revokedAt = entry['失効時刻UnixMillis'];
+      final ciphertextHash = entry['暗号文hash'];
+      final createdAuditId = entry['作成監査ID'];
       if (entry.length != fields.length ||
           !entry.keys.toSet().containsAll(fields) ||
           entry['版'] != 1 ||
@@ -232,16 +245,17 @@ class McpConnectionClient {
           !const {'api_key', 'oauth', 'basic', 'ssh', 'custom'}
               .contains(kind) ||
           entry['保管方式'] != 'windows_dpapi' ||
-          entry['状態'] != '有効' ||
-          entry['作成時刻UnixMillis'] is! int ||
-          (entry['最終使用時刻UnixMillis'] != null &&
-              entry['最終使用時刻UnixMillis'] is! int) ||
-          entry['失効時刻UnixMillis'] != null ||
-          entry['暗号文hash'] is! String ||
-          !RegExp(r'^sha256:[a-f0-9]{64}$')
-              .hasMatch(entry['暗号文hash'] as String) ||
-          entry['作成監査ID'] is! String ||
-          (entry['作成監査ID'] as String).isEmpty ||
+          !const {'有効', '失効'}.contains(entry['状態']) ||
+          createdAt is! int ||
+          createdAt < 1 ||
+          (lastUsedAt != null && (lastUsedAt is! int || lastUsedAt < 0)) ||
+          (entry['状態'] == '有効' && revokedAt != null) ||
+          (entry['状態'] == '失効' &&
+              (revokedAt is! int || revokedAt < createdAt)) ||
+          ciphertextHash is! String ||
+          !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(ciphertextHash) ||
+          createdAuditId is! String ||
+          createdAuditId.isEmpty ||
           entry['公開範囲'] != 'metadata_only' ||
           entry['証拠種別'] != 'INTERNAL_STATE') {
         throw const BrokerClientException('資格情報metadataのfieldまたは境界が不正です');
@@ -251,10 +265,114 @@ class McpConnectionClient {
         purpose: purpose,
         target: target,
         kind: kind,
+        status: entry['状態'] as String,
+        revokedAt: revokedAt as int?,
+        ciphertextHash: ciphertextHash,
+        createdAuditId: createdAuditId,
       );
     }).where((entry) =>
         entry.purpose == 'mcp_transport' && entry.target == targetServerId);
     return List.unmodifiable(entries);
+  }
+
+  Future<McpCredentialSummary> revokeCredential({
+    required McpCredentialSummary credential,
+  }) async {
+    if (!_validCredentialId(credential.credentialId) ||
+        credential.status != '有効' ||
+        credential.purpose.isEmpty ||
+        credential.purpose.length > 256 ||
+        _containsControl(credential.purpose) ||
+        credential.target.isEmpty ||
+        credential.target.length > 256 ||
+        _containsControl(credential.target) ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(credential.ciphertextHash) ||
+        credential.createdAuditId.isEmpty ||
+        credential.createdAuditId.length > 256 ||
+        _containsControl(credential.createdAuditId)) {
+      throw const BrokerClientException('Credential識別子の形式が不正です');
+    }
+    final response = await _transport.request(
+      '資格情報失効',
+      payload: {
+        '版': 1,
+        '資格情報ID': credential.credentialId,
+        '用途': credential.purpose,
+        '接続対象': credential.target,
+        '暗号文hash': credential.ciphertextHash,
+        '作成監査ID': credential.createdAuditId,
+      },
+    );
+    final body = _acceptedBody(response, '資格情報失効');
+    const fields = {
+      '版',
+      '資格情報ID',
+      '用途',
+      '接続対象',
+      '種類',
+      '保管方式',
+      '状態',
+      '作成時刻UnixMillis',
+      '最終使用時刻UnixMillis',
+      '失効時刻UnixMillis',
+      '暗号文hash',
+      '作成監査ID',
+      '公開範囲',
+      '証拠種別',
+    };
+    final id = body['資格情報ID'];
+    final purpose = body['用途'];
+    final target = body['接続対象'];
+    final kind = body['種類'];
+    final createdAt = body['作成時刻UnixMillis'];
+    final lastUsedAt = body['最終使用時刻UnixMillis'];
+    final revokedAt = body['失効時刻UnixMillis'];
+    final ciphertextHash = body['暗号文hash'];
+    final createdAuditId = body['作成監査ID'];
+    if (body.length != fields.length ||
+        !body.keys.toSet().containsAll(fields) ||
+        body['版'] != 1 ||
+        id != credential.credentialId ||
+        purpose is! String ||
+        purpose != credential.purpose ||
+        purpose.isEmpty ||
+        purpose.length > 256 ||
+        _containsControl(purpose) ||
+        target is! String ||
+        target != credential.target ||
+        target.isEmpty ||
+        target.length > 256 ||
+        _containsControl(target) ||
+        kind is! String ||
+        !const {'api_key', 'oauth', 'basic', 'ssh', 'custom'}.contains(kind) ||
+        createdAt is! int ||
+        createdAt < 1 ||
+        (lastUsedAt != null && (lastUsedAt is! int || lastUsedAt < 0)) ||
+        body['状態'] != '失効' ||
+        revokedAt is! int ||
+        revokedAt < createdAt ||
+        ciphertextHash is! String ||
+        ciphertextHash != credential.ciphertextHash ||
+        !RegExp(r'^sha256:[a-f0-9]{64}$').hasMatch(ciphertextHash) ||
+        createdAuditId is! String ||
+        createdAuditId != credential.createdAuditId ||
+        createdAuditId.isEmpty ||
+        body['保管方式'] != 'windows_dpapi' ||
+        body['公開範囲'] != 'metadata_only' ||
+        body['証拠種別'] != 'INTERNAL_STATE' ||
+        response['evidence_source'] != 'INTERNAL_STATE') {
+      throw const BrokerClientException('Credential失効receiptの公開境界が不正です');
+    }
+    return McpCredentialSummary(
+      credentialId: credential.credentialId,
+      purpose: purpose,
+      target: target,
+      kind: kind,
+      status: '失効',
+      revokedAt: revokedAt,
+      ciphertextHash: ciphertextHash,
+      createdAuditId: createdAuditId,
+    );
   }
 
   Future<List<McpConnectionSummary>> list() async {

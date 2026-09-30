@@ -136,7 +136,7 @@ GUI-ShellのGUI堅牢化では、権限をFlutterへ移さず、実証済みの�
   classification: required_for_v1
   status: implemented_for_current_scope
   evidence: owner controlの`資格情報登録`は新規資格情報をWindows ProtectedStoreのCredential purposeへDPAPI保管し、`資格情報一覧`は通常IPCへmetadata_onlyのreceiptだけを返す。同じIDの再登録、channel違反、保管欠落・改変はBrokerで拒否する。
-  authority_boundary: 資格情報ID、metadata、暗号文hashはAuthority、Permission、Approvalを生成しない。秘密値はFlutter、snapshot、Audit、error、log、trace、CLI出力へ投影しない。Windows MCP stdio childへの注入だけは対象Server一致のCredentialをnative Owner確認後にBrokerがprocess環境へ限定して渡す。接続先processは値を読み取り・外部送信でき、Job Objectはsandboxではない。MCP以外のRuntime／一般Tool／Agent／A2A注入、更新、失効、削除、接続先変更、Recovery、GUI管理面は未成立として扱う。
+  authority_boundary: 資格情報ID、metadata、暗号文hashはAuthority、Permission、Approvalを生成しない。秘密値はFlutter、snapshot、Audit、error、log、trace、CLI出力へ投影しない。Windows MCP stdio childへの注入だけは対象Server一致のCredentialをnative Owner確認後にBrokerがprocess環境へ限定して渡す。接続先processは値を読み取り・外部送信でき、Job Objectはsandboxではない。Desktop MCP接続センターの論理失効は単一Credential ID・用途・対象・登録receiptにnative Owner確認とBroker再照合を結び付けるが、暗号文fileは削除しない。MCP以外のRuntime／一般Tool／Agent／A2A注入、更新、物理削除・Recovery、接続先変更、GUI登録面は未成立として扱う。
 
 - item: D4 Pocket MCP Connection Center（C9 current scope）
   classification: required_for_v1

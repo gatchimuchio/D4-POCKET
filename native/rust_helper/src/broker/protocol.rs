@@ -161,6 +161,13 @@ impl BrokerStateStore {
         matches!(self.mode, BrokerPersistenceMode::DurableFileStore)
     }
 
+    pub(super) fn verified_audit_log(&self) -> Result<Option<BrokerAuditLog>, BrokerStoreError> {
+        self.persistent_store
+            .as_ref()
+            .map(BrokerPersistentStore::verified_audit_log)
+            .transpose()
+    }
+
     pub fn health_status(&self) -> &'static str {
         if self.persistence_required() && !self.persistence_ready() {
             "suspend"
@@ -434,6 +441,8 @@ pub enum BrokerOperation {
     資格情報登録,
     #[serde(rename = "資格情報一覧")]
     資格情報一覧,
+    #[serde(rename = "資格情報失効")]
+    資格情報失効,
     #[serde(rename = "MCP接続")]
     MCP接続,
     #[serde(rename = "MCP切断")]
@@ -625,6 +634,7 @@ impl BrokerOperation {
             BrokerOperation::回帰Case削除中断確認 => "回帰Case削除中断確認",
             BrokerOperation::資格情報登録 => "資格情報登録",
             BrokerOperation::資格情報一覧 => "資格情報一覧",
+            BrokerOperation::資格情報失効 => "資格情報失効",
             BrokerOperation::MCP接続 => "MCP接続",
             BrokerOperation::MCP切断 => "MCP切断",
             BrokerOperation::MCP接続一覧 => "MCP接続一覧",
@@ -1287,6 +1297,7 @@ impl Broker {
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
                     | BrokerOperation::回帰Case登録
+                    | BrokerOperation::資格情報失効
                     | BrokerOperation::更新download要求
             )
         );
@@ -1376,6 +1387,19 @@ impl Broker {
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
             }
+        }
+
+        if envelope.operation == Some(BrokerOperation::資格情報失効)
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "資格情報失効はRust Desktopのnative Owner確認経路だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
         }
 
         let payload_hash = envelope.payload_hash.clone().unwrap_or_default();
@@ -1612,6 +1636,22 @@ impl Broker {
             BrokerOperation::資格情報一覧 => self.reject_with_payload_hash(
                 &request_id,
                 "資格情報一覧",
+                "credential_platform_unsupported",
+                "資格情報保管はWindows DPAPI環境だけに対応しています",
+                true,
+                &payload_hash,
+            ),
+            #[cfg(windows)]
+            BrokerOperation::資格情報失効 => self.資格情報失効処理(
+                &request_id,
+                envelope.payload.as_ref().unwrap_or(&Value::Null),
+                owner,
+                &payload_hash,
+            ),
+            #[cfg(not(windows))]
+            BrokerOperation::資格情報失効 => self.reject_with_payload_hash(
+                &request_id,
+                "資格情報失効",
                 "credential_platform_unsupported",
                 "資格情報保管はWindows DPAPI環境だけに対応しています",
                 true,
@@ -4660,7 +4700,7 @@ fn collect_target_text(value: &Value, text: &mut String) {
     }
 }
 
-fn is_tagged_sha256(value: &str) -> bool {
+pub(super) fn is_tagged_sha256(value: &str) -> bool {
     value.len() == 71
         && value.starts_with("sha256:")
         && value

@@ -125,6 +125,28 @@ class _McpTransport implements BrokerTransport {
         },
       };
     }
+    if (operation == '資格情報失効') {
+      final id = payload!['資格情報ID']! as String;
+      final index =
+          credentialMetadata.indexWhere((entry) => entry['資格情報ID'] == id);
+      if (index < 0) {
+        return {
+          'status': 'rejected',
+          'error': {'code': 'credential_not_found'},
+        };
+      }
+      final revoked = {
+        ...credentialMetadata[index],
+        '状態': '失効',
+        '失効時刻UnixMillis': 2000,
+      };
+      credentialMetadata[index] = revoked;
+      return {
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'body': revoked,
+      };
+    }
     if (operation == 'MCP接続一覧') {
       final connections = connected
           ? [_receipt(evidence: listedEvidence)]
@@ -270,6 +292,28 @@ void main() {
       'required': true,
       'status': 'configured',
       'environment_variable': 'MCP_API_KEY',
+    });
+    expect(transport.payloads.toString(), isNot(contains('secret-marker')));
+  });
+
+  test('MCP clientはCredential IDと登録metadataをBrokerへ送りreceiptを検査する', () async {
+    final transport = _McpTransport();
+    final client = McpConnectionClient(transport);
+    final selected =
+        (await client.listCredentials(targetServerId: 'mcp-fixture')).single;
+    final revoked = await client.revokeCredential(
+      credential: selected,
+    );
+
+    expect(revoked.status, '失効');
+    expect(transport.operations, ['資格情報一覧', '資格情報失効']);
+    expect(transport.payloads.last, {
+      '版': 1,
+      '資格情報ID': '0123456789abcdef0123456789abcdef',
+      '用途': 'mcp_transport',
+      '接続対象': 'mcp-fixture',
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+      '作成監査ID': 'audit-credential-created',
     });
     expect(transport.payloads.toString(), isNot(contains('secret-marker')));
   });
@@ -537,6 +581,38 @@ void main() {
     });
     expect(transport.payloads.toString(), isNot(contains('secret-marker')));
     expect(find.textContaining('synthetic'), findsNothing);
+  });
+
+  testWidgets('Desktop panelのCredential失効は選択metadataをBrokerへ送り一覧を更新する',
+      (tester) async {
+    final transport = _McpTransport()..connected = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: McpConnectionCenterPanel(transport: transport),
+      ),
+    ));
+    await tester.enterText(find.byType(TextField).at(0), 'mcp-fixture');
+    await tester.tap(find.text('対象ServerのCredential metadata一覧を取得'));
+    await tester.pumpAndSettle();
+
+    final revoke = find.byKey(const ValueKey(
+        'mcp-credential-revoke-0123456789abcdef0123456789abcdef'));
+    await tester.ensureVisible(revoke);
+    await tester.tap(revoke);
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, ['資格情報一覧', '資格情報失効', '資格情報一覧']);
+    expect(transport.payloads[1], {
+      '版': 1,
+      '資格情報ID': '0123456789abcdef0123456789abcdef',
+      '用途': 'mcp_transport',
+      '接続対象': 'mcp-fixture',
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+      '作成監査ID': 'audit-credential-created',
+    });
+    expect(transport.credentialMetadata.first['状態'], '失効');
+    expect(find.text('api_key ・ 失効'), findsOneWidget);
+    expect(find.textContaining('secret-marker'), findsNothing);
   });
 
   testWidgets('Desktop panelはServer ID変更後に旧対象Credentialを再利用しない',

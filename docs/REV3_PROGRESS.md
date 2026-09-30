@@ -1294,3 +1294,30 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ```
 
 - 進捗記録とmanifest更新後の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。Schema 150件／正常example 150件／negative fixture 193件、Conformance 229件、日本語厳格監査1123 files／0 findingsを含む登録済み10 checkがすべてpassした。`python -X utf8 tooling/manifest.py --check`と`git diff --check`もpass。これは開発gateの成立であり、release blockerと`release_ready=false`を維持する。
+
+## C7追補 Windows DPAPI資格情報の論理失効（2026-10-01）
+
+### 成立した変更
+
+- CredentialをDesktop MCP接続センターのmetadata一覧へ表示し、有効な一件だけを選んで論理失効する操作を接続した。失効済みCredentialは新規MCP選択肢から除き、一覧には失効状態と時刻を表示する。
+- 要求はCredential ID、用途、接続対象、暗号文hash、登録監査IDへ結合する。Rust Desktopの既存native Owner確認は対象metadataとpayload hashを表示し、共通Win32 dialogの既定Noを維持する。Brokerはnative確認経路以外を拒否し、永続Audit chainと現行登録metadataを再検証する。
+- 失効eventをBroker Auditから復元する。再起動後も失効状態を維持し、失効後注入、二重失効、古い対象metadata、永続Auditなしの要求を拒否する。秘密値はUI／IPC／Auditへ返さず、暗号文fileは保持する。物理削除や失効取消は行わない。
+- revocation request schema、receipt状態条件、positive／negative fixture、IPC operation enum、Conformance確認を追加した。進捗はC7へ対応づけ、従来のrelease blockerと`release_ready=false`は解除していない。
+
+### 検証
+
+- `cargo check --locked --all-targets`: exit 0。Rust対象file 3件の`rustfmt --check --edition 2021 --config skip_children=true`: exit 0。
+- `cargo test --locked --all-targets -- --test-threads=1`: 12 test target、438 passed／0 failed／5 ignored。失効後のBroker再起動復元、再利用拒否、native確認metadata固定、永続Audit不在時の拒否を含む。初回並列実行は既存loopback／TLS試験3件が不安定失敗したが、直列の全target再実行ではすべてpassした。
+- `cargo test --locked revocation -- --test-threads=1`: 3件のRust単体試験と2件のWorkspace integration試験がpass。`dart format --output=none --set-exit-if-changed`は変更Dart 4 fileすべて整形済み。Schemaは151件／正常example 151件／negative fixture 194件、Conformanceは229 checksでpass。
+- `python -X utf8 tooling/日本語基底監査.py --strict`: 1126 files／0 findings。記録追記後とmanifest更新後の統合validatorは、この進捗追補を確定してから再実行する。
+- OneDrive checkoutのDesktop `flutter analyze --no-pub`はAnalysis ServerのLSP JSON `FormatException`でexit 255。Desktop `flutter test test/mcp_connection_center_test.dart`とMobile `flutter analyze`はFlutterがOneDrive配下の`macos/Flutter/ephemeral/Packages/.packages`／`ios/Flutter/ephemeral/Packages/.packages`を削除できず開始前に停止した。いずれも成功証拠に数えない。workflow_dispatch限定の`windows-manual-desktop-flutter-validation.yml`を一時検証branch上の正確なcommitで実行し、Desktop全testとDesktop／Mobile analyzeを補完確認する。
+
+### 証拠境界と残存分類
+
+- Rust／Flutter試験は`FIXTURE`であり、実installed Desktop、実際のWin32 Owner dialog操作、配布物とのbinary identity、製品release readinessを証明しない。Windows Actionsもそのworkflowが実行したbuild／analysis／testの範囲だけを示す。
+- item: Windows installed product上の資格情報登録・注入・失効の実操作、C7内のMCP以外の注入、更新、暗号文物理削除・Recovery、GUI登録・接続先変更、Mobile安全保管は未成立。
+  classification: release_blocker
+  reason: 現行範囲はWindows DPAPIとMCP stdioの限定Credentialに対する開発試験であり、上記機能や導入済み製品の実測を含まない。
+  required_action: 対象ごとの独立contract・負例試験・Owner操作を実装し、clean Windows installed productと必要platformで証拠を取得する。
+  blocks_release: yes
+- `release_ready=false`を維持する。

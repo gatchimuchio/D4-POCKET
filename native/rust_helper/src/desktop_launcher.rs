@@ -83,6 +83,14 @@ enum DesktopOwnerOperationSummary {
         summary: OwnerRegistrationConfirmationSummary,
         payload_hash: String,
     },
+    CredentialRevocation {
+        credential_id: String,
+        purpose: String,
+        target: String,
+        ciphertext_hash: String,
+        created_audit_id: String,
+        payload_hash: String,
+    },
     McpConnect {
         server_id: String,
         executable: String,
@@ -171,6 +179,23 @@ struct McpDisconnectOwnerRequest {
     operation: String,
     #[serde(rename = "ServerID")]
     server_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CredentialRevocationOwnerRequest {
+    #[serde(rename = "版")]
+    version: u64,
+    #[serde(rename = "資格情報ID")]
+    credential_id: String,
+    #[serde(rename = "用途")]
+    purpose: String,
+    #[serde(rename = "接続対象")]
+    target: String,
+    #[serde(rename = "暗号文hash")]
+    ciphertext_hash: String,
+    #[serde(rename = "作成監査ID")]
+    created_audit_id: String,
 }
 
 #[derive(Deserialize)]
@@ -1158,6 +1183,37 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::資格情報失効 => {
+            let request: CredentialRevocationOwnerRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if request.version != 1
+                || request.credential_id.len() != 32
+                || !request
+                    .credential_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                || request.purpose.is_empty()
+                || request.purpose.len() > 256
+                || request.purpose.chars().any(char::is_control)
+                || request.target.is_empty()
+                || request.target.len() > 256
+                || request.target.chars().any(char::is_control)
+                || !is_tagged_sha256(&request.ciphertext_hash)
+                || request.created_audit_id.is_empty()
+                || request.created_audit_id.len() > 256
+                || request.created_audit_id.chars().any(char::is_control)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::CredentialRevocation {
+                credential_id: request.credential_id,
+                purpose: request.purpose,
+                target: request.target,
+                ciphertext_hash: request.ciphertext_hash,
+                created_audit_id: request.created_audit_id,
+                payload_hash,
+            }
+        }
         _ => return None,
     };
     let normalized = normalize_channel_request(input.as_bytes(), &endpoint.session_id);
@@ -1524,6 +1580,22 @@ fn owner_confirmation_text_for_identity(
             summary.required_condition_count,
             summary.forbidden_condition_count,
             summary.required_reference_count,
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::CredentialRevocation {
+            credential_id,
+            purpose,
+            target,
+            ciphertext_hash,
+            created_audit_id,
+            payload_hash,
+        } => format!(
+            "指定Credentialを論理失効させますか？\n\nCredential ID: {}\n用途: {}\n接続対象: {}\n登録監査ID: {}\n暗号文hash: {}\n\nこの操作は永続Auditへ失効状態を記録し、以後のMCP注入を拒否します。Brokerは表示した登録監査ID・暗号文hash・用途・接続対象を処理時に再照合します。暗号文fileは削除せず保管を継続します。失効はこの操作では取消できません。再利用が必要なら別IDで登録してください。暗号文の物理削除とRecoveryは別操作で、ここでは実行しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
+            owner_confirmation_value(credential_id),
+            owner_confirmation_value(purpose),
+            owner_confirmation_value(target),
+            owner_confirmation_value(created_audit_id),
+            owner_confirmation_value(ciphertext_hash),
             payload_hash
         ),
     }
@@ -4031,6 +4103,93 @@ mod tests {
             "metadata": {"client": "desktop_flutter"}
         });
         assert!(owner_operation_candidate(request.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    fn credential_revocation_native_confirmation_binds_one_id_and_displays_current_metadata() {
+        let payload = serde_json::json!({
+            "版": 1,
+            "資格情報ID": "0123456789abcdef0123456789abcdef",
+            "用途": "mcp_transport",
+            "接続対象": "fixture-mcp-server",
+            "暗号文hash": format!("sha256:{}", "a".repeat(64)),
+            "作成監査ID": "credential-created-1"
+        });
+        let input = serde_json::json!({
+            "request_id": "desktop-credential-revoke",
+            "operation": "資格情報失効",
+            "payload": payload,
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "desktop-credential-revoke-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Normal,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (normalized, summary) =
+            owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+                .expect("論理失効をnative確認へ結び付ける");
+        let request = BrokerRequestEnvelope::from_json_str(&normalized).expect("正規化要求");
+        assert_eq!(request.session_id.as_deref(), Some("desktop-session"));
+        assert_eq!(request.operation, Some(BrokerOperation::資格情報失効));
+        let DesktopOwnerOperationSummary::CredentialRevocation {
+            credential_id,
+            purpose,
+            target,
+            ciphertext_hash,
+            created_audit_id,
+            payload_hash,
+        } = summary
+        else {
+            panic!("Credential失効専用のnative確認要約を使う")
+        };
+        assert_eq!(credential_id, "0123456789abcdef0123456789abcdef");
+        assert_eq!(purpose, "mcp_transport");
+        assert_eq!(target, "fixture-mcp-server");
+        assert_eq!(ciphertext_hash, input["payload"]["暗号文hash"]);
+        assert_eq!(created_audit_id, "credential-created-1");
+        assert_eq!(payload_hash, input["payload_hash"].as_str().unwrap());
+        let text = owner_confirmation_text(&DesktopOwnerOperationSummary::CredentialRevocation {
+            credential_id,
+            purpose,
+            target,
+            ciphertext_hash,
+            created_audit_id,
+            payload_hash,
+        });
+        assert!(text.contains("論理失効"));
+        assert!(text.contains("fixture-mcp-server"));
+        assert!(text.contains("mcp_transport"));
+        assert!(text.contains("登録監査ID: credential-created-1"));
+        assert!(text.contains(&format!(
+            "暗号文hash: {}",
+            input["payload"]["暗号文hash"].as_str().unwrap()
+        )));
+        assert!(text.contains("以後のMCP注入を拒否"));
+        assert!(text.contains("暗号文fileは削除せず"));
+        assert!(text.contains("取消できません"));
+        assert!(text.contains("payload hash"));
+        assert!(!text.contains("secret-marker"));
+
+        let mut escalated = payload.clone();
+        escalated["秘密値"] = serde_json::json!("secret-marker");
+        let invalid = serde_json::json!({
+            "request_id": "desktop-credential-revoke-escalated",
+            "operation": "資格情報失効",
+            "payload": escalated,
+            "payload_hash": canonical_payload_hash(Some(&escalated)),
+            "nonce": "desktop-credential-revoke-escalated-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]

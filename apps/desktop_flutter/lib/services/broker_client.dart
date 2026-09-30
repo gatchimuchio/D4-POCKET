@@ -14,6 +14,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   '回帰Case登録',
   '回帰Case削除',
   '回帰Case削除中断確認',
+  '資格情報失効',
   'MCP接続',
   'MCP切断',
   'MCP Tool実行',
