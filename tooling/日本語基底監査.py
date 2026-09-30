@@ -961,10 +961,22 @@ def scan_python(
 
 
 RUST_DIAGNOSTIC_RE = re.compile(
-    r"(?:println!|eprintln!|format!|panic!|bail!|ensure!|anyhow!|Err\s*\(|expect\s*\(|"
-    r"message\s*:|reason\s*:|description\s*:)",
+    r"(?:println!|eprintln!|format!|panic!|bail!|ensure!|anyhow!|Err|expect)\s*\(\s*$"
+    r"|(?:message|reason|description)\s*:\s*$",
     re.MULTILINE,
 )
+RUST_MACHINE_FORMATS = (
+    re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*=[^\s]+$"),
+    re.compile(r"^event: \{\}\\ndata: \{\}\\n\\n$"),
+    re.compile(
+        r"^HTTP/1\.0 \{status\} \{reason\}\\r\\ncontent-type: "
+        r"\{content_type\}\\r\\ncontent-length: \{\}\\r\\n\\r\\n$"
+    ),
+)
+
+
+def is_rust_machine_format(value: str) -> bool:
+    return any(pattern.fullmatch(value) for pattern in RUST_MACHINE_FORMATS)
 SHELL_DIAGNOSTIC_RE = re.compile(
     r"\b(?:echo|printf|throw|Write-(?:Host|Output|Error|Warning|Verbose)|System\.out\.print)\b",
     re.IGNORECASE,
@@ -992,6 +1004,8 @@ def scan_c_like_code(path: str, text: str, terms: tuple[str, ...]) -> list[Findi
     newlines = [index for index, char in enumerate(text) if char == "\n"]
     for token in tokens:
         if token.kind != "string":
+            continue
+        if is_rust_machine_format(token.body):
             continue
         before = text[max(0, token.start - 120) : token.start]
         if RUST_DIAGNOSTIC_RE.search(before) and is_non_japanese_prose(token.body, terms):
@@ -1336,12 +1350,17 @@ def run_self_tests() -> int:
     rust = (
         'format!("{{\\"request_id\\":\\"{}\\"}}");\n'
         'format!("broker-audit-{event_index}");\n'
+        'format!("model_providers.d4p_loopback_probe.base_url={base_url}");\n'
+        'format!("event: {}\\ndata: {}\\n\\n", event_type, payload);\n'
+        'format!("HTTP/1.0 {status} {reason}\\r\\ncontent-type: {content_type}\\r\\ncontent-length: {}\\r\\n\\r\\n", body.len());\n'
+        'format!("visible formatted broker failure message: {reason}");\n'
         'panic!("visible broker failure message");\n'
     )
     rust_findings = scan_c_like_code("native/example.rs", rust, ())
     check(
-        [finding.excerpt for finding in rust_findings] == ["visible broker failure message"],
-        "Rust の JSON・契約 ID と人間向け診断の分離失敗",
+        [finding.excerpt for finding in rust_findings]
+        == ["visible formatted broker failure message: {reason}", "visible broker failure message"],
+        "Rust の機械書式・JSON・契約 ID と直接診断文の分離失敗",
     )
 
     schema = json.dumps(

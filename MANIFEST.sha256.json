@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "fcc3911bcf29d040b9c24e86b9e8286f75d75a12d6cccab85c94037bfbc942d3"
+      "sha256": "0d2c169f6b27821cefb0c597cca13f05056984fd290e3477cc9cf3a8cb9c9929"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "0ba7699752decbb1bc8d6a5b7c0fa4defdf76fa3b6697447421c81189eed6f39"
+      "sha256": "336d5e4a49dffcff332da5fc9f8ffc34b806d9fa82a87fb152bee596eb408d1d"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "72d0c1905c7658494f2affd4fed9a97d8f31c3cf1ce1fb06efc7a26b5e0969cb"
+      "sha256": "9a1669676f14bc68cdbc05f6262206835ea05c2c79fade60865c643e00571251"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3077,7 +3077,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "6e7a01a64c28f6e22f1fa106fa233ed665befd00b78edf8ef96dc63237f025ba"
+      "sha256": "34d7468ccc316859592dbb76c15fea907355acf48ecbe018354cf5bdaab96726"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3270,6 +3270,10 @@
     {
       "path": "native/rust_helper/tests/support/broker_codex_fixture.rs",
       "sha256": "9c8e87ea165bc66145bd986926ecc8f82167664daa7910b6bd0e10fa761c0866"
+    },
+    {
+      "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
+      "sha256": "a8dc38a3b1de8c3997abd94b3b430e23a16a72a305e5dda432ac09b729d78435"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -3725,7 +3729,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0b7ef7020ceb3d55735abc787febcefcb12c10871a09a88b41a5b3f7880a282f"
+      "sha256": "939bd24f78d2410918ccd73bba5e1d954b7a94b99882542685682272ea8006dd"
     },
     {
       "path": "requirements-dev.txt",
@@ -4485,7 +4489,7 @@
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",
-      "sha256": "e1e7a850f4ad0029103a60d720402c0d34b5d6951ccc547b68c0a02744a31c1b"
+      "sha256": "1d4c1ee5517c1ca09c96286174eae92ce5c919a6f978514f4f9ed2d29150f8da"
     },
     {
       "path": "\u898f\u5b9a/00_\u65e5\u672c\u8a9e\u57fa\u5e95\u898f\u5b9a.md",

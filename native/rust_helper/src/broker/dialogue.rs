@@ -2323,6 +2323,10 @@ mod agent_task_fixture_fs;
 #[path = "../../tests/support/broker_codex_fixture.rs"]
 mod broker_codex_fixture_support;
 
+#[cfg(all(test, windows))]
+#[path = "../../tests/support/codex_loopback_responses.rs"]
+mod broker_codex_loopback_support;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3063,6 +3067,340 @@ mod tests {
                 .get(&session_id)
                 .is_some_and(|grant| grant.owner_approval.is_some()));
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "明示指定した実Codex CLIを資格情報なしloopback API経由でBroker Taskへ接続するときに実行する"]
+    fn Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME() {
+        use std::io::{Read, Write};
+
+        let executable = std::env::var_os("GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE")
+            .map(std::path::PathBuf::from)
+            .expect("GUI_SHELL_CODEX_TASK_BROKER_TEST_EXEにCodex CLI絶対pathを指定する");
+        assert!(executable.is_absolute(), "Codex CLIは絶対pathで指定する");
+        assert!(
+            executable.is_file(),
+            "指定したCodex CLIが通常fileとして存在する"
+        );
+
+        let fixture = super::broker_codex_fixture_support::BrokerCodexFixture::create();
+        let workspace_path = fixture.workspace_path();
+        let private = workspace_path.join("private");
+        std::fs::create_dir_all(&private).expect("合成登録secret directory");
+        let mut secret_file = std::fs::File::create(private.join("credential-backup.txt"))
+            .expect("合成登録secret file");
+        secret_file
+            .write_all(b"synthetic-secret-content-never-returned")
+            .expect("合成登録secret本文");
+        let workspace_parent = workspace_path.parent().expect("専用fixture root");
+        let mut outside_marker =
+            std::fs::File::create(workspace_parent.join("outside-read-marker.txt"))
+                .expect("合成Workspace外read marker");
+        outside_marker
+            .write_all(b"synthetic-outside-workspace-marker")
+            .expect("合成Workspace外marker本文");
+        let outside_write = workspace_parent.join("outside-write-marker.txt");
+        assert!(!outside_write.exists(), "Workspace外write targetは未作成");
+
+        let codex_home = workspace_parent.join("isolated-codex-home");
+        std::fs::create_dir(&codex_home).expect("資格情報を持たない専用CODEX_HOME");
+        let server =
+            super::broker_codex_loopback_support::CodexLoopbackResponses::start(workspace_path)
+                .expect("localhost限定Responses API試験用応答器");
+        let mut inner =
+            crate::adapters::codex_cli::CodexCliAdapter::new(&executable, workspace_path)
+                .expect("実Codex CLIのversion/help interfaceを確認する");
+        assert!(
+            inner.AgentTask実行対応(),
+            "Windows実CLIのworkspace-write interface"
+        );
+        let product_metadata = inner.agent_metadata().expect("製品Adapter metadata");
+        assert_eq!(
+            product_metadata["capabilities"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["capability_id"] == "task_execution")
+                .unwrap()["support"]["status"],
+            "unsupported",
+            "統合試験は製品AdapterのTask能力宣言を変更しない"
+        );
+        inner.use_test_loopback_responses_api(server.port(), codex_home);
+
+        let runtime_id = "codex-loopback-integration";
+        let workspace_id = "codex-loopback-integration-workspace";
+        let (workspace_handle, _, ancestry) =
+            super::super::workspace_root::open_isolated_root_with_ancestry(workspace_path, &[])
+                .unwrap();
+        let mut workspaces = super::super::workspace::WorkspaceRegistry::default();
+        let secret_paths = ["private/credential-backup.txt".to_owned()];
+        workspaces
+            .register(
+                runtime_id,
+                workspace_id,
+                workspace_handle,
+                &secret_paths,
+                Some(ancestry),
+                &mut |_, _| Ok(()),
+            )
+            .unwrap();
+        let binding = workspaces
+            .dialogue_binding(runtime_id, workspace_id)
+            .expect("Brokerが登録WorkspaceへAdapterを結合");
+
+        let mut control = 対話制御::default();
+        control
+            .登録(
+                runtime_id,
+                Arc::new(Broker統合CodexFixtureAdapter { inner }),
+            )
+            .unwrap();
+        let mut audit_events = Vec::new();
+        let mut audit = |operation: &str, session: &str, hash: &str| {
+            audit_events.push((operation.to_owned(), session.to_owned(), hash.to_owned()));
+            Ok(format!("loopback-integration-audit-{}", audit_events.len()))
+        };
+
+        let started = control
+            .操作_作業領域結合済み(
+                "対話開始",
+                &json!({"実行系ID":runtime_id,"作業領域ID":workspace_id}),
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .unwrap();
+        let session_id = started["対話セッションID"].as_str().unwrap().to_owned();
+        let instruction = "INTEGRATION_TASK_INSTRUCTION_SENTINEL: perform only the bounded synthetic workspace probe";
+        let task_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+            "instruction":instruction,
+        });
+        let permission_request = json!({
+            "agent_runtime_id":runtime_id,
+            "session_id":session_id,
+            "workspace_id":workspace_id,
+        });
+
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Owner No相当ではWorkspace Permissionを発行しない"
+        );
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Permissionと個別Owner Approvalがなければ実CLIを起動しない"
+        );
+        assert_eq!(
+            server.accepted_connections(),
+            0,
+            "Owner Permission前の拒否要求ではCodex CLIを起動しない"
+        );
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskWorkspacePermissionGrant",
+                &permission_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("試験用Owner確認でWorkspace Permissionを発行");
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Task本文hashへ結合したApprovalがなければ実CLIを起動しない"
+        );
+        assert_eq!(
+            server.accepted_connections(),
+            0,
+            "Task Approval前の拒否要求ではCodex CLIを起動しない"
+        );
+        control
+            .操作_作業領域結合済み(
+                "AgentTaskOwnerApprovalGrant",
+                &task_request,
+                true,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("試験用Owner確認で一回Approvalを発行");
+        assert_eq!(
+            server.post_requests(),
+            0,
+            "Approval発行はRuntime要求を送らない"
+        );
+        assert_eq!(
+            server.accepted_connections(),
+            0,
+            "Owner PermissionとTask Approvalが揃うまでCodex CLIを起動しない"
+        );
+
+        let task = control
+            .操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            )
+            .expect("Brokerが承認済み実Codex Taskを開始");
+        assert!(matches!(
+            task["status"].as_str(),
+            Some("running" | "completed")
+        ));
+        assert_eq!(
+            control.操作_作業領域結合済み(
+                "AgentTask実行",
+                &task_request,
+                false,
+                100,
+                Some(&binding),
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Permission／ApprovalはTask開始時に一回消費する"
+        );
+
+        let task_id = task["task_id"].as_str().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let result = loop {
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":task_id}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .unwrap();
+            if state["status"] != "running" {
+                break state;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "実Codex Broker Taskの終了待ち期限"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(
+            result["status"],
+            "completed",
+            "Task state: {result}; accepted_connections={}; incomplete_requests=({}); model_list_gets={}; responses_post_attempts={}; invalid_post_bodies={}; response_write=({}); responses_posts={}; tool_offered={}; tool_call_sent={}; workspace_marker={}; outside_write={}; blocked_proxy_requests={} ({})",
+            server.accepted_connections(),
+            server.incomplete_request_summary(),
+            server.model_list_requests(),
+            server.response_post_attempts(),
+            server.invalid_post_bodies(),
+            server.response_write_summary(),
+            server.post_requests(),
+            server.tool_was_offered(),
+            server.tool_call_was_sent(),
+            workspace_path.join("broker-real-codex-marker.txt").exists(),
+            outside_write.exists(),
+            server.blocked_external_requests(),
+            server.blocked_external_summary(),
+        );
+        assert!(result["result_hash"]
+            .as_str()
+            .unwrap()
+            .starts_with("sha256:"));
+        assert!(!result.to_string().contains(instruction));
+        assert!(!result
+            .to_string()
+            .contains("synthetic-secret-content-never-returned"));
+        assert!(!result.to_string().contains("合成試験Taskが完了しました"));
+        let mut workspace_marker =
+            std::fs::File::open(workspace_path.join("broker-real-codex-marker.txt"))
+                .expect("実MxC tool childのWorkspace marker");
+        let mut workspace_marker_bytes = Vec::new();
+        workspace_marker
+            .read_to_end(&mut workspace_marker_bytes)
+            .expect("Workspace marker読取");
+        assert_eq!(
+            workspace_marker_bytes, b"synthetic-task-write",
+            "実MxC tool childが登録Workspaceへだけ書き込む"
+        );
+        let mut secret_file = std::fs::File::open(private.join("credential-backup.txt")).unwrap();
+        let mut secret_bytes = Vec::new();
+        secret_file.read_to_end(&mut secret_bytes).unwrap();
+        assert_eq!(
+            secret_bytes, b"synthetic-secret-content-never-returned",
+            "登録secretは変更されず、試験結果へ本文を出さない"
+        );
+        assert!(!outside_write.exists(), "Workspace外への書込がない");
+        assert!(server.post_requests() >= 2, "Responses APIのtool／終端往復");
+        assert_eq!(
+            server.invalid_post_bodies(),
+            0,
+            "Responses API要求JSONが正しい"
+        );
+        assert_eq!(
+            server.response_write_failures(),
+            0,
+            "Responses API応答を全送信"
+        );
+        assert_eq!(
+            server.incomplete_request_count(),
+            0,
+            "途中切断したHTTP要求がない"
+        );
+        assert!(server.tool_was_offered(), "実CLIがBroker Task toolを公開");
+        assert!(
+            server.tool_call_was_sent(),
+            "実CLIが偽APIの固定tool callを処理"
+        );
+        for entry in std::fs::read_dir(workspace_path).unwrap() {
+            assert!(
+                !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".d4p-tmp-"),
+                "Broker管理WorkspaceTaskScratchをTask終端後に残さない"
+            );
+        }
+        drop(audit);
+        assert!(audit_events.iter().any(|(operation, _, _)| {
+            operation == "Agent Task実行開始（Permission／Owner Approval一回消費）"
+        }));
+        assert!(audit_events.iter().any(|(operation, _, _)| {
+            operation == "Agent Task完了（結果本文非保存・hashのみ）"
+        }));
+        assert!(!format!("{audit_events:?}").contains(instruction));
+        eprintln!(
+            "loopback_proxy_blocked_external_requests={}",
+            server.blocked_external_requests()
+        );
     }
 
     #[cfg(windows)]

@@ -630,3 +630,27 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/manifest.py --write`および`--check`、`git diff --check`: 合格。
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。10 development checksは全件合格。Windows installed evidenceの不足5件はrelease blockerとして残り、release gateの合格表示はdevelopment validation自体の判定であってrelease readinessではない。
 - Windows Actionsは未使用。現行Windows hostでRust全targetと統合validationを実行できたため、追加hosted検査は不要だった。
+
+## R2追補 Broker制御経路から実Codex CLIを実起動（2026-09-30）
+
+### 成立した確認
+
+- Windows ignored Rust試験を明示起動し、Owner指定のCodex CLI `0.158.0-alpha.2.1`を一時`CODEX_HOME`、資格情報なし、loopback偽Responses APIだけで実行した。CodexのApps／Plugins catalogはtest configで無効化し、loopback proxyが受けた非loopback要求は拒否した。実model、実credential、永続Codex設定、Windows保護設定は使わず／変更していない。
+- 試験は実Rust `CodexCliAdapter`とprocess群監督、Broker libraryのWorkspace登録、Task consumer、`WorkspaceTaskScratch`を通る。試験専用`Broker統合CodexFixtureAdapter`が能力metadataだけを`supported`へ上書きして`FIXTURE`出所を付し、元Adapterの`task_execution=unsupported`を実行前に確認する。したがって実CLI／MxC processの観測は`LIVE_RUNTIME`だが、実行Authority、Owner確認、metadataはfixtureであり、製品Task対応やproduction IPCの成立を意味しない。
+- Workspace Permissionまたは本文hash結合Owner Approvalがない要求、ならびに消費後再利用ではCodex CLIへの接続が起きないことを確認した。synthetic registered secret fileのreadとWorkspace外markerのread／writeは拒否され、許可Workspace内のmarker writeは成功した。Task結果にTask本文、secret本文、固定assistant本文が含まれないこと、Broker開始／完了Audit callback、正常終了後の`.d4p-tmp-*`scratch不在を確認した。callbackは試験内memoryでありdurable Auditの証拠ではない。scratch不在もMxC内部TEMPの物理cleanupを証明しない。
+- API transport安定化のため、test providerに限りApps／Plugins取得を無効化し、stream retryを2回へ制限した。偽APIは固定toolをWorkspace markerの有無で冪等に返す。これはtest設定であり、production CLI retry policyの変更ではない。
+- 初期試験serverはWindows listener由来のnonblocking socketを受け取り、`WSAEWOULDBLOCK`でHTTP request前に失敗した。socketをblockingへ戻した後もCodexのSSE body decodeで間欠失敗があり、Apps／Plugins外部取得を止めた上で限定retryを設定した。失敗runは成功回数へ含めず、観測履歴を保持する。最終構成のLIVE試験は3回連続で合格した。
+- 未解決の範囲は、production `broker-server`／IPCとDesktop native Owner確認、durable Audit、OneDrive Cloud Files／通常NTFS双方、深度超過とhardlink aliasを含む実tool-child隔離、cancel／deadline／crash後のprocess群停止・Recovery、MxC内部TEMPの実体と物理cleanup、結果／diffの操作者表示、実provider相互運用である。`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
+
+### 検証
+
+- PowerShell `$env:GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE='<Owner指定codex.exe絶対path>'; cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME' -- --ignored --exact --nocapture`：Windows local `LIVE_RUNTIME`を3回個別起動し3/3 success。各回で固定tool、Responses往復、許可／拒否path、通常scratch cleanupを確認。test内のAuthority／Approvalは`FIXTURE`。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：初回OneDrive内`target`出力はMSVC `LNK1201`（PDB書込失敗）でbuild停止。C:空きは約106 GBだった。同じ検証を`CARGO_TARGET_DIR=C:\Users\ohira\AppData\Local\Temp\D4PocketRustTarget-<一時識別子>`へ出力して再実行し、12 targetで405 passed／0 failed／2 ignored。
+- 同じ一時targetで`cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`を今回変更した3 Rust fileへ実行し成功。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 149、example 149、negative fixture 192で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 225 checksで成功。初回Conformanceは新規testの`std::fs::read/write`禁止patternを検出し、明示file handleへ直した後の再実行が合格した。
+- `python -X utf8 tooling/日本語基底監査.py --strict`：初回はRust test内のCLI設定／HTTP・SSE機械書式を直前120文字の診断macroで誤検出し、9 findingsとなった。監査器のRust診断判定を文字列直前の呼出しへ限定し、CLI assignment・HTTP・SSE書式の自己回帰testを加えた。監査自己試験46件と最終strict監査（1114 file／0 findings）は合格。実際の人間向け診断と合成assistant本文も日本語化し、例外台帳は広げていない。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`：今回変更したRust 3 fileで合格。`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`：専用Temp targetで12 target、405 passed／0 failed／2 ignored。既存OneDrive `target`への初回buildはMSVC `LNK1201`のまま履歴保持。
+- 最終sourceで明示LIVE試験を再実行したところ、最初の2回成功後に1回だけTask `failed`となった。観測はResponses API 3 POST、Workspace marker作成済み、`chatgpt.com` CONNECT拒否1件で、原因不明。試験専用の秘匿済み応答解析診断を追加し、その後は単発1回と連続5回が成功した。漏えい否定assertを最終fixture文面へ修正した後も追加5回連続で成功した。孤立失敗は消去せず未解明として記録し、成功反復へ加算しない。
+- Schema 149／example 149／negative fixture 192、Conformance 225 checksは再合格。Manifest 1111件を再生成・照合した時点の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0、release gate validationはpassだった。その後、assert文面・検証履歴・registryを更新しながら開始したvalidator再試行ではManifest、release gate、packaging checkがfailedとなった。実行中に対象fileが変わったためManifestとの不一致による結果であり、そのFAIL履歴を残した上で、現在の固定済み差分に対する最終再実行を行う。
+- Final validatorではWindows installed evidenceが5項目欠け、各項目は既存`release_blocker`としてfailedのまま残る。validator／release gateの構造検査がpassしたことをrelease readinessへ読み替えず、`release_ready=false`とする。
+- GitHub Actionsは未使用。現在のWindowsで実CLI／Rust全targetを検証できたため、OneDriveのPDB失敗はlocal Temp targetで補い、hosted runnerを不要なCIへ拡張しない。

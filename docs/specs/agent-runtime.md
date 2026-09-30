@@ -107,6 +107,16 @@ Agent Task用の書込Permissionは`agent_task_workspace_permission_request.sche
 
 このWorkspace PermissionはTask固有のOwner Approvalではない。Rust Desktopのnative Owner確認は、現行Workspace Permissionを前提に、本文hashとRuntime／Session／Workspace登録／Permission内部識別子／固定実行条件policyから計算した条件hashへ結合したApprovalを揮発状態で発行する。発行要求本文はnative確認文に表示せず、応答・Auditへ複写しない。Approvalは5分で失効し、Task preflightは現在の本文と条件が一致する場合だけ有効と表示する。独立したRust Broker Task Consumerは実装され、実行直前の再検証・Permission／Approval一回消費・bounded状態・開始／terminal Auditへ接続された。Codex AdapterはTask専用permission profileを`-c` overrideで指定し、`--ignore-user-config`でuser configを除いた後もTaskに限って`windows.sandbox="mxc"`と`:root=deny`を明示する。Workspace TEMP/TMP scratch cleanupも実装済みだが、metadataは`unsupported`でありBroker Consumerから起動されない。Rust／Conformance testはCLI config overrideの固定内容を検査し、前述の直接CLI smokeは合成markerに対する限定的な拒否挙動を観測するだけである。Task／実隔離・失敗時Recovery・結果/diff表示およびBroker経由LIVE_RUNTIME試験は`release_blocker`であり、CLI helper、process fixture、Consumer testを製品Task実行の証拠へ昇格しない。PermissionまたはApprovalの発行だけではTask保存、process起動、filesystem書込を行わない。
 
+2026-09-30、明示指定した実Codex CLI `0.158.0-alpha.2.1`を資格情報なしloopback偽Responses APIへ接続し、Windows ignored Rust試験からBrokerのWorkspaceRegistry、Task Consumer、`WorkspaceTaskScratch`、process群監督を通して固定Taskを実行した。合成登録secretのreadとWorkspace外read／writeは拒否され、許可Workspace write、Task終端後のBroker管理scratch不在、開始／完了Audit callbackを確認した。PermissionとTask Owner Approvalが揃わない拒否要求ではCLI接続自体が起きず、実行後のPermission／Approval再利用も拒否された。非loopback要求はloopback proxyが拒否した。
+
+この試験の`Broker統合CodexFixtureAdapter`は、製品Adapterの`task_execution=unsupported`をassertした後、試験内だけ能力metadataを`supported`へ上書きし、`FIXTURE`出所を付す。Owner確認はBroker libraryへのsynthetic confirmation値であり、Desktop native確認UIやproduction IPC／`broker-server`、耐久AuditStoreを通らない。実CLI／MxC childのprocessとfilesystem動作は当該Windows上の`LIVE_RUNTIME`だが、Authority、owner同意、metadataはfixture境界である。偽APIと固定command、stream retry、marker更新は試験専用であり、製品retry policyや実Agentの相互運用を示さない。
+
+先行試行ではWindows test serverの受入socketがnonblocking状態を引き継ぎ、`read_line`の`WSAEWOULDBLOCK`でHTTP要求前に切断した。受入socketをblockingへ戻すfixture修正後も、CodexのResponses stream body decodeが一時失敗したため、固定toolをmarker有無で冪等に応答する限定fixture retryを設けた。最終の明示LIVE試験は3回成功したが、失敗試行は履歴に残し、成功反復へ加算しない。
+
+その後の最終source再試行では2回成功後の1回がTask `failed`で終わった。観測上はResponses API 3 POST、合成Workspace marker作成済み、非loopback `chatgpt.com` CONNECT拒否1件であり、失敗原因は特定できていない。本文や資格値を出さない応答解析失敗要約を試験専用で追加したが、失敗は再現せず、その後の単発1回と連続5回は成功した。漏えい否定assertを最終fixture文面へ修正した後も、最終sourceでさらに5回連続成功した。孤立失敗は履歴・blockerへ残し、反復成功で安定性や原因解明を主張しない。
+
+この結果は正常終端時のin-process Broker統合経路を狭く検証するものである。OneDrive Cloud Filesと通常NTFSの双方、深度／hardlink aliasの実tool-child拒否、実Desktop Owner確認、production Broker IPCとdurable Audit、cancel／deadline／crash時のprocess停止とRecovery、MxC内部TEMPの物理cleanup、result/diff表示、実provider interoperabilityは未検証のまま残る。従って製品metadataは`unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+
 ### 登録secretのhardlink alias再検証（2026-09-29）
 
 完全一致pathのMxC denyは、同一fileを指す未登録hardlink aliasまで名前解決する保証ではない。合成secret fileへのhardlinkをsandbox起動前に作った初回probeでは、登録pathのdenyを迂回してalias側からreadでき、probeはexit code 45となった。この結果を受け、`WorkspaceReader::from_registered_dir`は登録secret fileと登録secret directory配下をhandle経由でbounded走査し、regular fileのlink countが1でない場合、reparse／volume境界等を含むunsafe状態としてfail-closedに拒否する。走査上限は深さ64、合計4096 entryであり、上限超過も拒否する。Task起動直前にはAdapterが登録root identityを再照合して同じ検査を実行し、登録後・起動前に追加されたaliasも起動させない。これらRust unit testは`FIXTURE`である。

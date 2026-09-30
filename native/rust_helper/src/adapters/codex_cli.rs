@@ -35,6 +35,12 @@ const MAX_REGISTERED_SECRET_PATHS: usize = 256;
 const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
     "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={";
 
+#[cfg(test)]
+struct CodexCliTestResponses {
+    port: u16,
+    codex_home: PathBuf,
+}
+
 const SAFE_ENVIRONMENT: &[&str] = &[
     "PATH",
     "SystemRoot",
@@ -56,6 +62,8 @@ pub struct CodexCliAdapter {
     workspace_identity: crate::broker::workspace_root::DirectoryIdentity,
     workspace_write_interface: bool,
     version: String,
+    #[cfg(test)]
+    test_responses_api: Option<CodexCliTestResponses>,
 }
 
 impl CodexCliAdapter {
@@ -91,7 +99,19 @@ impl CodexCliAdapter {
                 .nth(1)
                 .unwrap_or("unknown")
                 .to_string(),
+            #[cfg(test)]
+            test_responses_api: None,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn use_test_loopback_responses_api(&mut self, port: u16, codex_home: PathBuf) {
+        assert_ne!(port, 0, "loopback test server port must be assigned");
+        assert!(
+            codex_home.is_absolute(),
+            "isolated CODEX_HOME must be absolute"
+        );
+        self.test_responses_api = Some(CodexCliTestResponses { port, codex_home });
     }
 
     #[cfg(test)]
@@ -105,6 +125,8 @@ impl CodexCliAdapter {
             },
             workspace_write_interface: true,
             version: "test".into(),
+            #[cfg(test)]
+            test_responses_api: None,
         }
     }
 }
@@ -180,6 +202,19 @@ impl 実行系Adapter for CodexCliAdapter {
         )?;
         let mut scratch =
             WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
+        #[cfg(test)]
+        let result = run_agent_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &scratch,
+            &context.secret_paths,
+            instruction,
+            cancel,
+            deadline,
+            self.test_responses_api.as_ref(),
+        );
+        #[cfg(not(test))]
         let result = run_agent_task(
             &self.executable,
             &self.workspace,
@@ -203,6 +238,18 @@ impl 実行系Adapter for CodexCliAdapter {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗> {
+        #[cfg(test)]
+        let mut child = spawn_codex_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &要求.入力,
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            None,
+        )?;
+        #[cfg(not(test))]
         let mut child = spawn_codex_task(
             &self.executable,
             &self.workspace,
@@ -569,8 +616,19 @@ fn spawn_codex_task(
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
+    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
+    #[cfg(test)]
+    let task_command = build_codex_command(
+        executable,
+        workspace,
+        sandbox,
+        scratch.map(WorkspaceTaskScratch::path),
+        secret_paths,
+        test_responses_api,
+    )?;
+    #[cfg(not(test))]
     let task_command = build_codex_command(
         executable,
         workspace,
@@ -596,9 +654,51 @@ fn build_codex_command(
     sandbox: CodexSandbox,
     scratch: Option<&Path>,
     secret_paths: &[String],
+    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
+    #[cfg(test)]
+    if let Some(test_api) = test_responses_api {
+        let base_url = format!("http://127.0.0.1:{}/v1", test_api.port);
+        let overrides = [
+            "model=\"d4p-local-probe\"".to_owned(),
+            "model_provider=\"d4p_loopback_probe\"".to_owned(),
+            "model_providers.d4p_loopback_probe.name=\"D4 Pocket loopback probe\"".to_owned(),
+            format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),
+            "model_providers.d4p_loopback_probe.wire_api=\"responses\"".to_owned(),
+            "model_providers.d4p_loopback_probe.requires_openai_auth=false".to_owned(),
+            "model_providers.d4p_loopback_probe.request_max_retries=0".to_owned(),
+            "model_providers.d4p_loopback_probe.stream_max_retries=2".to_owned(),
+            // 任意の外部Apps／Plugins catalog取得を止め、偽API以外を試験対象から除く。
+            "features.apps=false".to_owned(),
+            "features.plugins=false".to_owned(),
+            "approval_policy=\"never\"".to_owned(),
+        ];
+        for setting in overrides {
+            task_command.arg("-c").arg(setting);
+        }
+        if let Some(scratch) = scratch {
+            let scratch_path = scratch.to_string_lossy().replace('\\', "/");
+            let encoded_path =
+                serde_json::to_string(&scratch_path).map_err(|_| 対話失敗::要求不正)?;
+            task_command.arg("-c").arg(format!(
+                "shell_environment_policy.set={{TEMP={encoded_path},TMP={encoded_path}}}"
+            ));
+        }
+        let proxy = format!("http://127.0.0.1:{}", test_api.port);
+        task_command
+            .env("CODEX_HOME", &test_api.codex_home)
+            .env("HTTP_PROXY", &proxy)
+            .env("HTTPS_PROXY", &proxy)
+            .env("ALL_PROXY", &proxy)
+            .env("NO_PROXY", "127.0.0.1,localhost")
+            .env("http_proxy", &proxy)
+            .env("https_proxy", &proxy)
+            .env("all_proxy", &proxy)
+            .env("no_proxy", "127.0.0.1,localhost")
+            .env("RUST_LOG", "warn");
+    }
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         for setting in TASK_PERMISSION_PROFILE_PREFIX_OVERRIDES {
             task_command.arg("-c").arg(setting);
@@ -697,6 +797,7 @@ fn run_agent_task(
     instruction: &str,
     cancel: &AtomicBool,
     deadline: Instant,
+    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<String, 対話失敗> {
     if Instant::now() >= deadline {
         return Err(対話失敗::期限超過);
@@ -704,6 +805,18 @@ fn run_agent_task(
     if cancel.load(Ordering::SeqCst) {
         return Err(対話失敗::取消);
     }
+    #[cfg(test)]
+    let mut child = spawn_codex_task(
+        executable,
+        workspace,
+        expected_workspace,
+        instruction,
+        CodexSandbox::WorkspaceWrite,
+        Some(scratch),
+        secret_paths,
+        test_responses_api,
+    )?;
+    #[cfg(not(test))]
     let mut child = spawn_codex_task(
         executable,
         workspace,
@@ -763,9 +876,89 @@ fn run_agent_task(
         .map_err(|_| 対話失敗::通信失敗)?
         .map_err(|_| 対話失敗::応答不正)?;
     if !status.success() {
+        #[cfg(test)]
+        if test_responses_api.is_some() {
+            eprintln!(
+                "Codex偽API試験の秘匿済み失敗概要: {}",
+                loopback_test_failure_summary(status.code(), &stdout, &_stderr)
+            );
+        }
         return Err(対話失敗::通信失敗);
     }
-    parse_jsonl(&stdout).map(|(message, _)| message)
+    let parsed = parse_jsonl(&stdout);
+    #[cfg(test)]
+    if test_responses_api.is_some() && parsed.is_err() {
+        eprintln!(
+            "Codex偽API試験の秘匿済み応答解析概要: {}",
+            loopback_test_failure_summary(status.code(), &stdout, &_stderr)
+        );
+    }
+    parsed.map(|(message, _)| message)
+}
+
+#[cfg(test)]
+fn loopback_test_failure_summary(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> String {
+    let stderr_summary = redact_loopback_test_message(&String::from_utf8_lossy(stderr));
+    let events = stdout
+        .split(|byte| *byte == b'\n')
+        .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
+        .take(16)
+        .collect::<Vec<_>>();
+    let event_types = events
+        .iter()
+        .filter_map(|event| event.get("type").and_then(Value::as_str).map(str::to_owned))
+        .collect::<Vec<_>>();
+    let error_message = events
+        .iter()
+        .find(|event| event.get("type").and_then(Value::as_str) == Some("error"))
+        .and_then(|event| event.get("message"))
+        .or_else(|| {
+            events
+                .iter()
+                .find_map(|event| event.get("item").and_then(|item| item.get("message")))
+        })
+        .and_then(Value::as_str)
+        .map(redact_loopback_test_message)
+        .unwrap_or_else(|| "<absent>".to_owned());
+    format!(
+        "exit_code={exit_code:?}; stdout_event_types={event_types:?}; error_message={error_message:?}; stderr_summary={stderr_summary:?}; stderr_bytes={}",
+        stderr.len(),
+    )
+}
+
+#[cfg(test)]
+fn redact_loopback_test_message(message: &str) -> String {
+    let mut sanitized = message.to_owned();
+    for marker in [
+        "INTEGRATION_TASK_INSTRUCTION_SENTINEL",
+        "synthetic-secret-content-never-returned",
+        "synthetic-outside-workspace-marker",
+    ] {
+        sanitized = sanitized.replace(marker, "<SYNTHETIC_MARKER>");
+    }
+    for name in ["USERPROFILE", "HOME", "TEMP", "TMP"] {
+        if let Some(path) = env::var_os(name).and_then(|value| value.into_string().ok()) {
+            if !path.is_empty() {
+                sanitized = sanitized.replace(&path, "<LOCAL_PATH>");
+            }
+        }
+    }
+    for pattern in [
+        r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+",
+        r"(?i)sk-[A-Za-z0-9_-]{8,}",
+        r"(?i)gh[pousr]_[A-Za-z0-9_]{8,}",
+        r"(?i)github_pat_[A-Za-z0-9_]{8,}",
+    ] {
+        let expression = regex::Regex::new(pattern).expect("試験診断文の秘匿化正規表現");
+        sanitized = expression
+            .replace_all(&sanitized, "<REDACTED>")
+            .into_owned();
+    }
+    sanitized
+        .chars()
+        .filter(|character| !character.is_control() || *character == '\t')
+        .take(700)
+        .collect()
 }
 
 fn pin_registered_workspace(
@@ -950,6 +1143,7 @@ mod tests {
                 sandbox,
                 is_task.then_some(scratch),
                 &secret_paths,
+                None,
             )
             .expect("固定Codex command");
             let args: Vec<_> = command
@@ -1022,6 +1216,7 @@ mod tests {
             CodexSandbox::WorkspaceWrite,
             Some(Path::new(r"C:\outside-temp")),
             &[],
+            None,
         )
         .is_err());
     }
@@ -1119,6 +1314,7 @@ mod tests {
             CodexSandbox::WorkspaceWrite,
             Some(&scratch),
             &secret_paths,
+            None,
         )
         .expect("本番Task command設定");
         let mut generated_args = generated.get_args();
@@ -1370,6 +1566,7 @@ mod tests {
             },
             workspace_write_interface: false,
             version: "test".into(),
+            test_responses_api: None,
         };
         assert!(!adapter.AgentTask実行対応());
         assert_eq!(
