@@ -583,24 +583,30 @@ fn hex_identifier(value: &str) -> bool {
 /// 既知のcredential表現だけを拒否する補助境界。任意の秘密値の不存在は証明しない。
 fn contains_secret_marker(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
-    [
-        "api_key=",
-        "api-key=",
-        "token=",
-        "password=",
-        "bearer ",
-        "openai_api_key",
-        "codex_api_key",
-        "github_pat_",
-        "ghp_",
-        "xoxb-",
-        "xoxp-",
-        "-----begin",
-        "AIza",
-        "sk-",
-    ]
-    .iter()
-    .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
+    contains_slack_token_prefix(&lower)
+        || [
+            "api_key=",
+            "api-key=",
+            "token=",
+            "password=",
+            "bearer ",
+            "openai_api_key",
+            "codex_api_key",
+            "github_pat_",
+            "ghp_",
+            "-----begin",
+            "AIza",
+            "sk-",
+        ]
+        .iter()
+        .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
+}
+
+fn contains_slack_token_prefix(value: &str) -> bool {
+    value.as_bytes().windows(5).any(|window| {
+        window[..3].eq_ignore_ascii_case(b"xox")
+            && (window[3..].eq_ignore_ascii_case(b"b-") || window[3..].eq_ignore_ascii_case(b"p-"))
+    })
 }
 
 fn contains_secret_marker_in_registration(value: &登録指定) -> bool {
@@ -2049,6 +2055,8 @@ mod tests {
         assert!(contains_secret_marker("OPENAI_API_KEY=redacted"));
         assert!(contains_secret_marker("Bearer abc"));
         assert!(contains_secret_marker("sk-test"));
+        assert!(contains_secret_marker("xoxb-SYNTHETIC"));
+        assert!(contains_secret_marker("XoXp-SYNTHETIC"));
         assert!(!contains_secret_marker("作業状態を要約してください"));
     }
 

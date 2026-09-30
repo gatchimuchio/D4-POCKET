@@ -312,27 +312,33 @@ fn agent_metadata_contains_credential_marker(value: &Value) -> bool {
         Value::Array(items) => items.iter().any(agent_metadata_contains_credential_marker),
         Value::String(value) => {
             let lower = value.to_ascii_lowercase();
-            [
-                "api_key=",
-                "api-key=",
-                "token=",
-                "password=",
-                "bearer ",
-                "openai_api_key",
-                "codex_api_key",
-                "github_pat_",
-                "ghp_",
-                "xoxb-",
-                "xoxp-",
-                "-----begin",
-                "AIza",
-                "sk-",
-            ]
-            .iter()
-            .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
+            contains_slack_token_prefix(&lower)
+                || [
+                    "api_key=",
+                    "api-key=",
+                    "token=",
+                    "password=",
+                    "bearer ",
+                    "openai_api_key",
+                    "codex_api_key",
+                    "github_pat_",
+                    "ghp_",
+                    "-----begin",
+                    "AIza",
+                    "sk-",
+                ]
+                .iter()
+                .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
         }
         _ => false,
     }
+}
+
+fn contains_slack_token_prefix(value: &str) -> bool {
+    value.as_bytes().windows(5).any(|window| {
+        window[..3].eq_ignore_ascii_case(b"xox")
+            && (window[3..].eq_ignore_ascii_case(b"b-") || window[3..].eq_ignore_ascii_case(b"p-"))
+    })
 }
 
 fn agent_text_valid(value: &str) -> bool {
@@ -2395,6 +2401,15 @@ mod tests {
             AgentAdapterMetadata::read(&embedded_credential).err(),
             Some(対話失敗::応答不正)
         );
+
+        for marker in ["xoxb-SYNTHETIC", "XoXp-SYNTHETIC"] {
+            let mut slack_credential = valid.clone();
+            slack_credential["tool_support"]["reason"] = json!(marker);
+            assert_eq!(
+                AgentAdapterMetadata::read(&slack_credential).err(),
+                Some(対話失敗::応答不正)
+            );
+        }
 
         let mut secret_flag = valid.clone();
         secret_flag["authentication"]["secret_value_present"] = json!(true);
