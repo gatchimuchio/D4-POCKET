@@ -1,0 +1,152 @@
+name: Windows GUI Shell Export bundle manual validation
+
+'on': workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-export-build-manual-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export-build:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - name: 対象commitを取得
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: mainの固定commitとclean状態を確認
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            throw "Export buildはmainからだけ起動できる: $env:GITHUB_REF"
+          }
+          $head = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) {
+            throw "checkout HEAD ($head) does not match workflow commit ($env:GITHUB_SHA)"
+          }
+          $remoteMainLines = @(git ls-remote origin refs/heads/main)
+          if ($LASTEXITCODE -ne 0 -or $remoteMainLines.Count -ne 1) {
+            throw 'origin/mainを一意に確認できない'
+          }
+          $remoteMain = ($remoteMainLines[0] -split '\s+')[0]
+          if ($remoteMain -ne $head) {
+            throw "origin/main ($remoteMain) does not match workflow commit ($head)"
+          }
+          $branch = (git branch --show-current).Trim()
+          if ($branch -eq '') {
+            git switch --create main $head
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } elseif ($branch -ne 'main') {
+            throw "Export build checkout must be main: $branch"
+          }
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'Export build source must be clean'
+          }
+          @(
+            "source_commit=$head"
+            "source_ref=$env:GITHUB_REF"
+            "remote_main=$remoteMain"
+            "runner_os=$env:RUNNER_OS"
+            "runner_image=$env:ImageOS/$env:ImageVersion"
+          ) | Tee-Object -FilePath "$env:RUNNER_TEMP\gui-shell-export-environment.txt"
+          @(
+            '# Windows Export bundle build (manual validation)'
+            "- Source commit: ``$head`` (verified against `GITHUB_SHA` and `origin/main`)."
+            "- Runner: ``$env:ImageOS/$env:ImageVersion``."
+            '- Input scope: checked-in synthetic Receipt and Manifest fixtures; no Broker or Owner authority was exercised.'
+            '- Result scope: Windows Release bundle construction only; no artifact is uploaded.'
+            '- This run does not establish Owner authorization, installed-product behavior, launch, signing, installer, update/rollback, binary pruning, or release readiness.'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: 固定RustとFlutter toolchainを用意
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default 1.95.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $rustcVersion = (rustc --version).Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $cargoVersion = (cargo --version).Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $rustcVersion.StartsWith('rustc 1.95.0 ') -or -not $cargoVersion.StartsWith('cargo 1.95.0 ')) {
+            throw "unexpected Rust toolchain: $rustcVersion / $cargoVersion"
+          }
+          $flutterRoot = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.44.0 https://github.com/flutter/flutter.git $flutterRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutterCommit = (git -C $flutterRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $flutterCommit -ne '559ffa3f75e7402d65a8def9c28389a9b2e6fe42') {
+            throw "Flutter checkout mismatch: $flutterCommit"
+          }
+          "$flutterRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          @(
+            "GUI_SHELL_EXPORT_RUSTC_VERSION=$rustcVersion"
+            "GUI_SHELL_EXPORT_CARGO_VERSION=$cargoVersion"
+            "GUI_SHELL_EXPORT_FLUTTER_COMMIT=$flutterCommit"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & "$flutterRoot\bin\flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: fixtureから未署名Windows Release bundleを構築・検証
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_TEMP.Contains('~')) {
+            throw "RUNNER_TEMP must not contain a DOS short-name marker: $env:RUNNER_TEMP"
+          }
+          $bundle = Join-Path $env:RUNNER_TEMP 'd4-pocket-export-fixture'
+          if (Test-Path -LiteralPath $bundle) {
+            throw 'fixture bundle output already exists; refusing overwrite'
+          }
+          python -X utf8 tooling/export_windows_product.py `
+            --receipt examples/contracts/gui_shell_export_receipt.valid.json `
+            --manifest-file examples/contracts/gui_shell_export_manifest.valid.json `
+            --output-dir $bundle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $evidencePath = Join-Path $bundle 'd4_pocket_build_receipt.json'
+          if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+            throw 'validated build evidence is missing'
+          }
+          $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding utf8 | ConvertFrom-Json
+          if ($evidence.evidence_type -ne 'd4_pocket_windows_export_build' -or
+              $evidence.source_commit -ne $env:GITHUB_SHA -or
+              $evidence.portable_bundle_assembled -ne $true -or
+              $evidence.formal_distribution_claimed -ne $false -or
+              $evidence.standalone_app_verified -ne $false -or
+              $evidence.signed -ne $false -or
+              $evidence.installer_status -ne 'not_started' -or
+              $evidence.launch_status -ne 'not_verified') {
+            throw 'build evidence scope or source identity is unexpected'
+          }
+          if ($evidence.credential_artifact_scan.status -ne 'passed_known_patterns' -or
+              $evidence.credential_artifact_scan.findings -ne 0 -or
+              $evidence.artifact_tree_sha256 -notmatch '^[0-9a-f]{64}$') {
+            throw 'bounded artifact scan or inventory evidence is invalid'
+          }
+          @(
+            "- Rust: ``$env:GUI_SHELL_EXPORT_RUSTC_VERSION`` / ``$env:GUI_SHELL_EXPORT_CARGO_VERSION``."
+            "- Flutter commit: ``$env:GUI_SHELL_EXPORT_FLUTTER_COMMIT``; framework: ``$($evidence.toolchain.flutter)``; Dart: ``$($evidence.toolchain.dart)``."
+            "- Export build: ``passed``; evidence source: ``INTERNAL_STATE``; fixture input only."
+            "- Artifact inventory: ``$($evidence.artifact_files.Count)`` files, ``$($evidence.artifact_total_bytes)`` bytes, tree SHA-256 ``$($evidence.artifact_tree_sha256)``."
+            '- Credential scan: zero findings for the implemented known-pattern set only; not proof of general credential absence.'
+            '- Signed: no; standalone app verified: no; installer: not started; launch: not verified; distribution claimed: no.'
+            '- Artifact upload: none. The hosted runner workspace is ephemeral.'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: source working treeがcleanなことを確認
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $changes = @(git status --porcelain --untracked-files=all)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes.Count -gt 0) {
+            $changes | Write-Output
+            throw 'Export build modified the checked-out source tree'
+          }
