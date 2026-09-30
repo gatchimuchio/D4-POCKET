@@ -4,6 +4,8 @@
 
 ## D4 Pocket統合 rev3 現行工程
 
+R2追補（2026-09-30）: Desktop BrokerClientでAgent Task Workspace Permission／Owner Approval発行をnative Owner確認待ちoperationへ加え、5秒の通常timeoutから305秒の専用待ちへ修正した。これはFlutter応答待ちだけの変更で、native Owner確認・Broker authorityを代替せず、timeoutもBroker要求取消を意味しない。Adapterの`task_execution=unsupported`、Agent Task実行隔離blocker、`release_ready=false`は維持する。回帰testと検証は`docs/REV3_PROGRESS.md`、timeout意味契約は`docs/specs/agent-runtime.md`。
+
 R2追補（2026-09-29）: 登録secret pathのliteral denyが事前作成hardlink aliasから迂回された直接probeを受け、WorkspaceReader registrationとTask直前にhardlink／unsafe entryをfail-closedで検査する。実CLIの直接MxC sandbox childでは合成secretへの新規hardlink作成がWindows access deniedとなったが、production `codex exec` tool child／Broker／Owner Approval経路の証拠ではない。登録secret深度40と大文字・区切りaliasの直接probeも拒否した。`task_execution=unsupported`、Agent隔離等の`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`と`docs/specs/agent-runtime.md`。
 
 R2追補（2026-09-30）: 実Codex CLI `exec`とMxC shell tool childをloopback偽Responses APIから3回起動し、合成登録secretへのhardlink作成が3/3回Win32 NativeErrorCode 5（access denied）で失敗、alias不在、通常Workspace read／write許可を観測した。これは手動構成したRust相当profileによる直接`LIVE_RUNTIME`であり、Rust生成profile・Broker・Owner Approval・production Agent Taskを通した証拠ではない。TEMP／TMPとWorkspaceTaskScratchの不一致等も残るため、`task_execution=unsupported`と関連`release_blocker`、`release_ready=false`を維持する。詳細は`docs/REV3_PROGRESS.md`、`docs/specs/agent-runtime.md`、`release_blockers.registry.json`。

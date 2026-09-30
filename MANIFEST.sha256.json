@@ -157,7 +157,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "114235530839c542845db1a4ab3ee76ef59b3a66d8d67cbe03ef7e246e04f36d"
+      "sha256": "6da9801ac91d40dd6d67b9b2ad56d460d6c30a9797f1e4920109f5c287e378b3"
     },
     {
       "path": "SECURITY.md",
@@ -313,7 +313,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/broker_client.dart",
-      "sha256": "dcdb67defe5573809a3fc21117207ff0338e9183a742f59913b3189b0e260e18"
+      "sha256": "b1c7f79a8f7b0a0f645268ddcea02e805df8ae1fd04e4243a3640e5cb9ea20e3"
     },
     {
       "path": "apps/desktop_flutter/lib/services/compose_client.dart",
@@ -549,7 +549,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "658bb958cb86537789cd304505d08f12fc595619d0e8746fbfe784a3ecca63bd"
+      "sha256": "32e3378e1ad02f0ef310f4b5e66ad8c8bd3464960137c889f8ac77f7c307a6bd"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "aa2f51e98398a88cfb42b047d5717f35b26f129a00de17458489b5488d3ab1fe"
+      "sha256": "62e51ddd4061cc0fa92a7217db09ec982a530ee684bd874d7f21c7b9be27127f"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "f08aec81c692ba01338806cdc4b3493e550a9e3aa1ab6b15eb44e4cbf4b9d3d4"
+      "sha256": "adf07ff0ae05a0f2cbe8668120a870ac4b4599ebef85b20526d58957a3a1d4d7"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -4381,7 +4381,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "6c005c28debe0b1ef37495925a62fa0351f4cc4ca76dff6294d9a6ad13572e36"
+      "sha256": "9bda809f923d273853478d828bde4bfe77d39bce5bb9245c981c4f8dacae9ce0"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

@@ -9,6 +9,23 @@ import 'package:gui_shell_ui/runtime_dialogue_client.dart'
 export 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerTransport, BrokerClientException;
 
+const _nativeOwnerConfirmationOperations = <String>{
+  'GUI Shell書出し',
+  '回帰Case登録',
+  '回帰Case削除',
+  '回帰Case削除中断確認',
+  'MCP接続',
+  'MCP切断',
+  'MCP Tool実行',
+  'AgentTaskWorkspacePermissionGrant',
+  'AgentTaskOwnerApprovalGrant',
+};
+
+Duration brokerRequestTimeoutForOperation(String operation) =>
+    _nativeOwnerConfirmationOperations.contains(operation)
+        ? const Duration(seconds: 305)
+        : const Duration(seconds: 5);
+
 class BrokerClient implements BrokerTransport {
   BrokerClient._(this._channel);
 
@@ -37,20 +54,9 @@ class BrokerClient implements BrokerTransport {
     };
     final String responseText;
     try {
-      final ownerConfirmationOperation = const {
-        'GUI Shell書出し',
-        '回帰Case登録',
-        '回帰Case削除',
-        '回帰Case削除中断確認',
-        'MCP接続',
-        'MCP切断',
-        'MCP Tool実行',
-      }.contains(operation);
       final response = await _channel
           .invokeMethod<String>('request', jsonEncode(request))
-          .timeout(ownerConfirmationOperation
-              ? const Duration(seconds: 305)
-              : const Duration(seconds: 5));
+          .timeout(brokerRequestTimeoutForOperation(operation));
       if (response == null || utf8.encode(response).length > 4 * 1024 * 1024) {
         throw const BrokerClientException('broker応答が空または上限超過です');
       }

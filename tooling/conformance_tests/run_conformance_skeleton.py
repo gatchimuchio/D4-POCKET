@@ -7466,6 +7466,24 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
     return errors
 
 
+def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> list[str]:
+    broker_client = (ROOT / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(
+        encoding="utf-8"
+    )
+    errors: list[str] = []
+    for operation in (
+        "AgentTaskWorkspacePermissionGrant",
+        "AgentTaskOwnerApprovalGrant",
+    ):
+        if operation not in broker_client:
+            errors.append(f"Agent Task native Owner確認operationをDesktop待機対象に含めない: {operation}")
+    if "brokerRequestTimeoutForOperation(operation)" not in broker_client:
+        errors.append("Desktop Broker要求がoperation別応答待ちpolicyを使わない")
+    if "Duration(seconds: 305)" not in broker_client or "Duration(seconds: 5)" not in broker_client:
+        errors.append("Desktop Broker要求のnative Owner確認待ちと通常待ちを区別しない")
+    return errors
+
+
 def test_agent_task_id_operations_are_content_free_and_declared() -> list[str]:
     schema = load_schema("agent_task_id_request.schema.json")
     valid = load_contract_fixture("agent_task_id_request.valid.json")
@@ -9552,6 +9570,7 @@ def main() -> int:
         test_agent_workspace_outside_access_default_deny,
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_broker_operations_are_declared_in_ipc_contracts,
+        test_agent_task_owner_confirmation_wait_uses_native_operation_timeout,
         test_agent_task_id_operations_are_content_free_and_declared,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,
         test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed,

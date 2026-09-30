@@ -681,3 +681,23 @@ Worker結果時刻のfixtureとAdapter試験は、実Agent executionのdeadline 
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment検査10件は合格。Windows installed evidence 5項目はrelease blockerとして残り、`release_ready=false`。
 - GitHub Actionsは未使用。現WindowsでRelease helperのbuild・実Broker processを検証できたため不要。
 - このblockはcollector／validatorの拡張でありRust source変更を含まないため、Rust test suiteは再実行していない。Flutter、installed product、Desktop Owner操作も未検証。
+
+## R2追補 Agent Task native Owner確認のFlutter応答待ち（2026-09-30）
+
+### 成立した変更
+
+- Desktopの`BrokerClient`で`AgentTaskWorkspacePermissionGrant`と`AgentTaskOwnerApprovalGrant`が、Rust Desktopのnative Owner確認を待つ既存operation分類から漏れ、5秒の通常応答timeoutを使っていた。Flutter callerが先にtimeoutしてもnative確認要求を取り消したことにはならず、呼出側の結果が曖昧になる。
+- 既存のOwner確認operation分類を共通timeout関数へ集約し、上記2 operationも305秒の応答待ちへ含めた。`AgentTask実行`など通常Broker operationは引き続き5秒。これはFlutterの待ち時間だけで、Owner同意・権限・Broker処理の取消を生成しない。timeoutは承認・拒否に読み替えず、再操作前にBroker状態を再照合する意味契約を`docs/specs/agent-runtime.md`へ追記した。
+- Rust authority経路、Broker TTL、Adapter metadata、`task_execution=unsupported`は変更していない。Agent Taskは依然未実行であり、release blockerと`release_ready=false`を維持する。
+
+### 検証
+
+- ConformanceへFlutter operation timeout分類の構造検査を先行追加した。修正前の実行はAgent Task grant 2件の分類欠落とtimeout policy未接続を検出して失敗し、修正後は228 checks合格。
+- `flutter test --no-pub --no-test-assets --reporter expanded test/broker_client_payload_hash_test.dart`: 6件合格。新しいpolicy testでWorkspace Permission／Owner Approvalが305秒、通常の`AgentTask実行`が5秒であることを確認した。
+- `flutter test --no-pub --no-test-assets --reporter expanded`: Desktop全126 tests合格。
+- `dart format lib/services/broker_client.dart test/broker_client_payload_hash_test.dart`: 成功、書式変更なし。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。strict日本語監査1114 file／0 findings、Schema 149／example 149／negative fixture 192、Conformance 228、登録development check 10件が合格。Windows installed evidence 5項目は従来の`release_blocker`のまま、`release_ready=false`。
+- `flutter analyze --no-pub`: Analysis Serverが日本語を含むOneDrive project path上の不正LSP JSONで異常終了。exit 1、Analyzer成功とは扱わない。初回focused testも既存`build/unit_test_assets`削除拒否で開始できなかったが、`--no-test-assets`指定のfocused／全testは合格。
+- `dart analyze lib/services/broker_client.dart test/broker_client_payload_hash_test.dart`: Analysis Server終了処理が`C:\Users\ohira\AppData\Local\Dart\perf\18552`を削除できずexit 1。静的Analyzer成功とは扱わない。GitHub CLIがこの環境にないため手動Actionsは起動していない。
+- `python -X utf8 tooling/manifest.py --write`: 1111 fileを記録。`python -X utf8 tooling/manifest.py --check`と`git diff --check`はともに合格。
+- Windows Actionsは未使用。ローカルDesktop全126 testsとPython統合validatorが合格し、残ったFlutter AnalyzerはOneDrive上のAnalysis Server障害である。`gh` CLIは未導入で、現行接続済みGitHub toolにも手動dispatch機能がないため、Actions runでの代替検証は実施していない。
