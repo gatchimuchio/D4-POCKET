@@ -1456,3 +1456,12 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 2026-09-29作成の専用fixture Temp directory 2件は、通常directory配下にfixture source／fake CLI executable／debug symbolだけがあり、reparse pointと実行中のfixture processはなかった。
 - 正確な2対象へ限定したrecursive `Remove-Item` commandはshell tool policyによりprocess起動前に拒否された。何も削除されていない。policyを迂回する別経路は試さず、cleanup未完了として残す。
+
+## R2追補 Windows Export credential scan再診断とマーカー保持形式変更（2026-10-01）
+
+- [手動Windows Export run #7](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36786755352)は`workflow_dispatch`でclean `main`のcommit `d2107c25fb8cbc2815534677d38723b373bf5ca6`をWindows Server 2025上で検査した。固定toolchain、Flutter Windows Release、Rust helper／launcher Release build、および開始時source cleanは成功した。
+- Exportのfail-closed既知Credential走査は`broker/gui_shell_rust_helper.exe`に`credential_assignment`を検出した。診断は`field=api_key`、artifact内byte offset `42737273`、一致値長`25`だけを記録し、候補値本文は出力していない。bundleは不成立、artifact uploadなし。scan後段のsource clean確認は前段失敗でskipされた。
+- この一致が実Credentialかbinary内byte列による誤検出かは未確定であり、run #7をfalse positiveと断定しない。commit `6f0681c`で追加された既知marker片の文字列配置が関連する可能性を調べ、検出field・offset・長さとmarker構成を照合したが、hosted executableの一致byte列そのものは取得していない。
+- `native/rust_helper/src/broker/mod.rs`では14個の既知marker片を連続ASCII文字列から数値`u32`配列へ移し、同じASCII byte列との一致判定を維持した。これは実行fileに検査対象markerそのものを連続埋め込みしないための変更であり、credential scanの拒否基準を緩和する変更ではない。Windows Release bundleでの効果は次の手動runで確認する。
+- Rust全target試験の初回は、既存`failed_replacement_keeps_the_existing_corrupt_package_unchanged`がlocalhost HTTPS試験中に接続resetで失敗し、391 passed／1 failed／5 ignoredとなった。同testの単独再実行は1 passed／0 failed、その後の全再実行は12 target、438 passed／0 failed／5 ignoredで完了した。初回失敗を成功へ読み替えず、再現しなかったnetwork試験失敗として履歴に保持する。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は230 checks合格。`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/mod.rs`と`git diff --check`も合格した。release blockerは解除せず、Windows Export runの再検証とsource clean証拠が成立するまで未解決を維持する。

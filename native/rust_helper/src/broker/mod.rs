@@ -36,31 +36,52 @@ pub(crate) mod workspace_root;
 /// 既知形式の資格情報マーカーを拒否する。未知形式の秘密値不存在までは証明しない。
 pub(crate) fn contains_known_credential_marker(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
-    [
-        ("api_", "key="),
-        ("api-", "key="),
-        ("tok", "en="),
-        ("pass", "word="),
-        ("bear", "er "),
-        ("openai_", "api_key"),
-        ("codex_", "api_key"),
-        ("github_", "pat_"),
-        ("gh", "p_"),
-        ("--", "---begin"),
-        ("ai", "za"),
-        ("s", "k-"),
-        ("xox", "b-"),
-        ("xox", "p-"),
-    ]
-    .iter()
-    .any(|(prefix, suffix)| contains_split_marker(&lower, prefix, suffix))
+    KNOWN_CREDENTIAL_MARKERS
+        .iter()
+        .any(|(prefix, suffix)| contains_split_marker(&lower, prefix, suffix))
 }
 
-fn contains_split_marker(value: &str, prefix: &str, suffix: &str) -> bool {
-    value.match_indices(prefix).any(|(index, _)| {
-        value
-            .get(index + prefix.len()..)
-            .is_some_and(|tail| tail.starts_with(suffix))
+// ASCII値をu32配列で保持し、検査対象文字列と同形の連続byte列を実行fileへ埋め込まない。
+const KNOWN_CREDENTIAL_MARKERS: &[(&[u32], &[u32])] = &[
+    (&[0x61, 0x70, 0x69, 0x5f], &[0x6b, 0x65, 0x79, 0x3d]),
+    (&[0x61, 0x70, 0x69, 0x2d], &[0x6b, 0x65, 0x79, 0x3d]),
+    (&[0x74, 0x6f, 0x6b], &[0x65, 0x6e, 0x3d]),
+    (&[0x70, 0x61, 0x73, 0x73], &[0x77, 0x6f, 0x72, 0x64, 0x3d]),
+    (&[0x62, 0x65, 0x61, 0x72], &[0x65, 0x72, 0x20]),
+    (
+        &[0x6f, 0x70, 0x65, 0x6e, 0x61, 0x69, 0x5f],
+        &[0x61, 0x70, 0x69, 0x5f, 0x6b, 0x65, 0x79],
+    ),
+    (
+        &[0x63, 0x6f, 0x64, 0x65, 0x78, 0x5f],
+        &[0x61, 0x70, 0x69, 0x5f, 0x6b, 0x65, 0x79],
+    ),
+    (
+        &[0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x5f],
+        &[0x70, 0x61, 0x74, 0x5f],
+    ),
+    (&[0x67, 0x68], &[0x70, 0x5f]),
+    (
+        &[0x2d, 0x2d],
+        &[0x2d, 0x2d, 0x2d, 0x62, 0x65, 0x67, 0x69, 0x6e],
+    ),
+    (&[0x61, 0x69], &[0x7a, 0x61]),
+    (&[0x73], &[0x6b, 0x2d]),
+    (&[0x78, 0x6f, 0x78], &[0x62, 0x2d]),
+    (&[0x78, 0x6f, 0x78], &[0x70, 0x2d]),
+];
+
+fn contains_split_marker(value: &str, prefix: &[u32], suffix: &[u32]) -> bool {
+    let marker_length = prefix.len() + suffix.len();
+    value.as_bytes().windows(marker_length).any(|window| {
+        prefix
+            .iter()
+            .zip(&window[..prefix.len()])
+            .all(|(marker, byte)| *marker == u32::from(*byte))
+            && suffix
+                .iter()
+                .zip(&window[prefix.len()..])
+                .all(|(marker, byte)| *marker == u32::from(*byte))
     })
 }
 
