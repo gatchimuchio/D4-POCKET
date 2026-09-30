@@ -734,6 +734,48 @@ cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml author
 python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
 ```
 
+## Phase 21／C11追補 配布packageの署名結合（2026-09-30）
+
+### 成立した変更
+
+- 現行UpdateCandidate版1のEd25519署名は版・説明等のmetadataだけを結合し、将来取得する配布packageのbyte identityを含んでいなかった。UpdateCandidate版2では`package_sha256`（小文字hex SHA-256）と`package_size_bytes`（1〜4 GiB）を必須化し、Brokerが再構成するcanonical signed byteへ双方を含める。署名対象byteとfieldの不一致は候補保存前に拒否する。candidateから公開鍵、package path、実行commandは引き続き受け取らない。
+- 版1の永続recordは削除せずBroker再起動後もdecode可能に保つ。一覧と延期receiptでは署名表示を`legacy_unbound`へ降格する。版1を新規候補として再受理せず、適用要求もpackage未結合として拒否する。
+- これはC11のdownload前の信頼metadata改善であり、実際に取得したbyteの長さ／hash照合、archive展開、Installer／Uninstaller、update置換、rollback／crash Recoveryは未実装。更新download／適用／rollbackは従来どおり`suspended`、Windows配布blockerと`release_ready=false`を維持する。証拠classは`FIXTURE`で、Windows installed productの`LIVE_RUNTIME`証拠ではない。
+
+### 検証
+
+- Schema 149件、正常example 149件、negative fixture 192件。Candidate版2の不足hash、不正hash、空／上限超過size、未知pathをnegative検査し、旧receiptは`legacy_unbound`時だけ適合する。
+```powershell
+python -X utf8 tooling/schema_check/check_schemas.py
+```
+- 全Conformance 228 checksで合格。
+```powershell
+python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+```
+- focused Rust更新センターtestは7件合格。署名後hash差替え、署名後byte長差替え、旧candidate拒否、旧永続record保持・降格表示・適用拒否を含む。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::update_center::tests -- --test-threads=1
+```
+- Rust全targetの静的検査は合格。
+```powershell
+cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets
+```
+- Rust全target試験はWindows localで12 target、411 passed／0 failed／3 ignored。Cargo出力先は短い一時検証領域を再利用し、OneDrive配下targetのPDB問題を避けた。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```
+- 実施履歴: 全target試験の先行実行では既存A2A loopback test 1件が応答読取失敗となった。対象test単独の11回実行はすべて合格し、同一変更状態で全targetを直列再実行した結果も12 target、411 passed／0 failed／3 ignoredとなった。先行失敗は履歴として保持する。この再実行は間欠失敗が再発しないことや、実運用A2A接続の健全性を証明しない。
+```powershell
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'broker::a2a_center::tests::owner接続をBrokerで受理し通常IPC一覧へbounded射影する' -- --test-threads=1
+cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1
+```
+- 対象Rust fileの整形検査と`git diff --check`は合格。
+```powershell
+rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/update_center.rs
+git diff --check
+```
+- GitHub Actionsは未使用。必要なRust／Python検査をWindows localで実行できた。署名候補の受理はpackage実byteの真正性を証明せず、正式release gateを閉じない。
+
 ### Analyzer短縮path再試験（2026-09-30）
 
 - 前項のAnalyzer失敗をコード失敗と断定せず、Repositoryを移動せずに一時`Z:` drive aliasから`apps/desktop_flutter`を開いて`flutter analyze --no-pub`を再実行した。Analysis Serverは62秒で`No issues found!`を返し、Flutter Analyzerは成功した。一時drive aliasは実行後に解除し、Repository path・Windows保護設定は変更していない。

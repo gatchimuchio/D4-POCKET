@@ -18,8 +18,10 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 const VERSION: u64 = 1;
+const CANDIDATE_VERSION: u64 = 2;
 const MAX_UPDATES: usize = 64;
 const MAX_MANIFEST_BYTES: usize = 64 * 1024;
+const MAX_PACKAGE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const OP_LIST: &str = "更新一覧";
 const OP_CHECK: &str = "更新確認";
 const OP_VERIFY: &str = "更新署名検査";
@@ -43,6 +45,18 @@ pub(super) struct UpdateCandidateDocument {
     pub(super) channel: String,
     #[serde(rename = "内容概要")]
     pub(super) summary: String,
+    #[serde(
+        rename = "package_sha256",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) package_sha256: Option<String>,
+    #[serde(
+        rename = "package_size_bytes",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) package_size_bytes: Option<u64>,
     #[serde(rename = "署名対象")]
     pub(super) signed_bytes_hex: String,
     #[serde(rename = "署名")]
@@ -133,6 +147,10 @@ struct SignedManifest<'a> {
     channel: &'a str,
     #[serde(rename = "内容概要")]
     summary: &'a str,
+    #[serde(rename = "package_sha256")]
+    package_sha256: &'a str,
+    #[serde(rename = "package_size_bytes")]
+    package_size_bytes: u64,
     #[serde(rename = "rollback可能")]
     rollback_available: bool,
 }
@@ -228,7 +246,7 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
             hash,
         );
     }
-    let updates: Vec<Value> = broker.updates.values().cloned().collect();
+    let updates: Vec<Value> = broker.updates.values().map(project_update_record).collect();
     accepted(
         broker,
         OP_LIST,
@@ -246,6 +264,16 @@ fn list(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> B
         hash,
         "更新候補一覧を返却。実行系操作はsuspended",
     )
+}
+
+fn project_update_record(value: &Value) -> Value {
+    let mut projected = value.clone();
+    if projected.get("版").and_then(Value::as_u64) == Some(1) {
+        if let Some(object) = projected.as_object_mut() {
+            object.insert("署名状態".into(), Value::String("legacy_unbound".into()));
+        }
+    }
+    projected
 }
 
 fn verify(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> BrokerResponse {
@@ -428,7 +456,7 @@ fn defer(broker: &mut Broker, payload: &Value, request_id: &str, hash: &str) -> 
         broker,
         OP_DEFER,
         request_id,
-        serde_json::to_value(record).unwrap_or(Value::Null),
+        project_update_record(&serde_json::to_value(record).unwrap_or(Value::Null)),
         hash,
         "更新延期を永続化。インストールは実行しない",
     )
@@ -498,6 +526,16 @@ fn execution_request(
             hash,
         );
     }
+    if record.candidate.version != CANDIDATE_VERSION {
+        return reject(
+            broker,
+            request_id,
+            operation,
+            "update_package_binding_required",
+            "配布packageのhashとbyte長へ署名が結合していない旧候補は実行できない",
+            hash,
+        );
+    }
     suspended(
         broker,
         operation,
@@ -512,6 +550,16 @@ fn verify_candidate(
     broker: &Broker,
     candidate: UpdateCandidateDocument,
 ) -> Result<UpdateRecord, (&'static str, &'static str)> {
+    match candidate.version {
+        1 => {
+            return Err((
+                "update_package_binding_required",
+                "新しい更新候補には配布packageのhashとbyte長を署名へ含める必要がある",
+            ));
+        }
+        CANDIDATE_VERSION => {}
+        _ => return Err(("update_candidate_invalid", "更新候補の版が未対応")),
+    }
     validate_candidate(&candidate)
         .map_err(|_| ("update_candidate_invalid", "更新候補の値が不正"))?;
     let Some(trust) = broker.update_trust.as_ref() else {
@@ -533,6 +581,13 @@ fn verify_candidate(
         offered_version: &candidate.offered_version,
         channel: &candidate.channel,
         summary: &candidate.summary,
+        package_sha256: candidate
+            .package_sha256
+            .as_deref()
+            .ok_or(("update_candidate_invalid", "package SHA-256が必要"))?,
+        package_size_bytes: candidate
+            .package_size_bytes
+            .ok_or(("update_candidate_invalid", "package byte長が必要"))?,
         rollback_available: candidate.rollback_available,
     };
     let canonical_bytes = serde_json::to_vec(&signed_manifest)
@@ -585,7 +640,20 @@ fn persist(broker: &Broker) -> Result<(), String> {
 }
 
 fn validate_candidate(candidate: &UpdateCandidateDocument) -> Result<(), ()> {
-    if candidate.version != VERSION
+    let package_binding_valid = match candidate.version {
+        1 => candidate.package_sha256.is_none() && candidate.package_size_bytes.is_none(),
+        CANDIDATE_VERSION => {
+            candidate
+                .package_sha256
+                .as_deref()
+                .is_some_and(valid_package_sha256)
+                && candidate
+                    .package_size_bytes
+                    .is_some_and(|size| (1..=MAX_PACKAGE_BYTES).contains(&size))
+        }
+        _ => false,
+    };
+    if !package_binding_valid
         || !valid_identifier(&candidate.update_id)
         || candidate.current_version.trim().is_empty()
         || candidate.offered_version.trim().is_empty()
@@ -603,6 +671,13 @@ fn validate_candidate(candidate: &UpdateCandidateDocument) -> Result<(), ()> {
         return Err(());
     }
     Ok(())
+}
+
+fn valid_package_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn validate_record(record: &UpdateRecord) -> Result<(), String> {
@@ -641,8 +716,8 @@ pub(super) fn verify_bytes_with_trust(
     let Some(trust) = trust else {
         return Err("broker所有の署名信頼設定が未構成");
     };
-    let public_key_der = hex::decode(&trust.public_key_der_hex)
-        .map_err(|_| "broker所有の署名公開鍵が不正")?;
+    let public_key_der =
+        hex::decode(&trust.public_key_der_hex).map_err(|_| "broker所有の署名公開鍵が不正")?;
     let signed_bytes = hex::decode(signed_bytes_hex).map_err(|_| "署名対象hexが不正")?;
     let signature = hex::decode(signature_hex).map_err(|_| "署名hexが不正")?;
     let result = verify_signed_update_signature(
@@ -800,12 +875,14 @@ mod tests {
         .chain(pair.public_key().as_ref().iter().copied())
         .collect::<Vec<_>>();
         let signed = serde_json::to_vec(&SignedManifest {
-            version: 1,
+            version: CANDIDATE_VERSION,
             update_id: "update-1",
             current_version: "1.0.0",
             offered_version: "1.1.0",
             channel: "stable",
             summary: "安全更新",
+            package_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            package_size_bytes: 1024,
             rollback_available: true,
         })
         .unwrap();
@@ -819,12 +896,16 @@ mod tests {
                 public_key_fingerprint: fingerprint.clone(),
             },
             UpdateCandidateDocument {
-                version: 1,
+                version: CANDIDATE_VERSION,
                 update_id: "update-1".into(),
                 current_version: "1.0.0".into(),
                 offered_version: "1.1.0".into(),
                 channel: "stable".into(),
                 summary: "安全更新".into(),
+                package_sha256: Some(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                ),
+                package_size_bytes: Some(1024),
                 signed_bytes_hex: hex::encode(signed),
                 signature_hex: hex::encode(signature.as_ref()),
                 signer_fingerprint: fingerprint,
@@ -873,6 +954,128 @@ mod tests {
         assert_eq!(broker.updates.len(), 1);
         let update = broker.updates.values().next().unwrap();
         assert_eq!(update["署名状態"], "verified");
+        assert_eq!(
+            update["package_sha256"],
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        assert_eq!(update["package_size_bytes"], 1024);
+    }
+
+    #[test]
+    fn update_signature_binds_package_digest_and_exact_size() {
+        let (trust, mut candidate) = trust_and_candidate();
+        candidate.package_sha256 =
+            Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into());
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [candidate]}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_signed_manifest_mismatch"
+        );
+        assert!(broker.updates.is_empty());
+
+        let (_, mut candidate) = trust_and_candidate();
+        candidate.package_size_bytes = Some(MAX_PACKAGE_BYTES + 1);
+        assert!(validate_candidate(&candidate).is_err());
+
+        let (_, mut candidate) = trust_and_candidate();
+        candidate.package_sha256 = Some("A".repeat(64));
+        assert!(validate_candidate(&candidate).is_err());
+
+        let (trust, mut candidate) = trust_and_candidate();
+        candidate.package_size_bytes = Some(1025);
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [candidate]}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_signed_manifest_mismatch"
+        );
+        assert!(broker.updates.is_empty());
+    }
+
+    #[test]
+    fn legacy_candidate_cannot_be_accepted_as_a_new_update() {
+        let (trust, mut candidate) = trust_and_candidate();
+        candidate.version = 1;
+        candidate.package_sha256 = None;
+        candidate.package_size_bytes = None;
+        let mut broker = Broker::new("session-1");
+        broker.update_trust = Some(trust);
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新確認,
+            json!({"版": 1, "候補": [candidate]}),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_package_binding_required"
+        );
+        assert!(broker.updates.is_empty());
+    }
+
+    #[test]
+    fn legacy_unbound_candidate_is_preserved_but_not_actionable() {
+        let (_, mut candidate) = trust_and_candidate();
+        candidate.version = 1;
+        candidate.package_sha256 = None;
+        candidate.package_size_bytes = None;
+        let record = UpdateRecord {
+            candidate,
+            signature_status: "verified".into(),
+            candidate_hash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            deferred_until: None,
+        };
+        let record_value = serde_json::to_value(record).unwrap();
+        let decoded = decode_state(&json!({"版": 1, "updates": [record_value.clone()]}));
+        assert!(decoded.is_ok(), "旧状態はBroker起動を妨げず保持できる");
+
+        let mut broker = Broker::new("session-1");
+        broker.updates.insert("update-1".into(), record_value);
+        let listing = call(&mut broker, BrokerOperation::更新一覧, json!({"版": 1}));
+        assert_eq!(
+            listing.body.unwrap()["更新一覧"][0]["署名状態"],
+            "legacy_unbound"
+        );
+        let deferred = call(
+            &mut broker,
+            BrokerOperation::更新延期,
+            json!({
+                "版": 1,
+                "更新ID": "update-1",
+                "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "延期期限": "2030-01-01T00:00:00Z"
+            }),
+        );
+        assert_eq!(deferred.status, BrokerStatus::Accepted);
+        assert_eq!(deferred.body.unwrap()["署名状態"], "legacy_unbound");
+        let response = call(
+            &mut broker,
+            BrokerOperation::更新適用要求,
+            json!({
+                "版": 1,
+                "更新ID": "update-1",
+                "候補hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }),
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "update_package_binding_required"
+        );
     }
 
     #[test]
@@ -904,10 +1107,8 @@ mod tests {
     #[test]
     fn verified_update_state_reloads_without_promoting_trust() {
         let (trust, candidate) = trust_and_candidate();
-        let root = std::env::temp_dir().join(format!(
-            "gui-shell-update-center-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("gui-shell-update-center-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         {
             let mut broker = Broker::new_persistent("session-1", &root).unwrap();

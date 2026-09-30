@@ -438,7 +438,20 @@
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
       "reason": "Phase 34の現単位はstaged配置から起動するWindows Rust Desktop起動器とBroker lifecycleまでであり、Installer／Uninstaller、Download→Install→Launch、署名済みupdateの適用・rollback、失敗復旧の技術経路は未成立。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "Owner待ちにせず、test identityによるInstaller／Uninstaller、download／install／launch、署名検証、update／rollback、失敗復旧を各Contract・negative test・隔離Windows実測へ接続する。production identityはTechnical Complete後の別blockerで扱う。"
+      "required_action": "Owner待ちにせず、test identityによるInstaller／Uninstaller、download／install／launch、署名検証、update／rollback、失敗復旧を各Contract・negative test・隔離Windows実測へ接続する。次に信頼済み配布元から実byteを取得し、展開前に上限付きbyte長とSHA-256を照合するdownload consumer、same-volume導入・置換・rollback transaction、失敗／crash Recoveryを実装する。production identityはTechnical Complete後の別blockerで扱う。",
+      "update_candidate_package_binding": {
+        "date": "2026-09-30",
+        "contract_version": 2,
+        "evidence_source": "FIXTURE",
+        "validation": "Rust全target 12 targetで411 passed／0 failed／3 ignored、cargo check --all-targets成功、Schema 149／正常example 149／negative fixture 192、Conformance 228 checks成功。",
+        "observations": {
+          "signed_fields": ["package_sha256", "package_size_bytes"],
+          "digest_change": "署名後にpackage SHA-256だけを差し替える候補を拒否した。",
+          "size_change": "署名後にpackage byte長だけを差し替える候補を拒否した。",
+          "legacy_record": "版1はlegacy_unboundとして保持・表示し、新規候補受理と適用要求を拒否した。"
+        },
+        "scope_limit": "FIXTUREだけ。署名対象に宣言digestとbyte長を結合するが、download済み実byteの照合、archive安全性、install／update／rollback transaction、Windows installed product LIVE_RUNTIMEを示さない。"
+      }
     },
     {
       "name": "windows_distribution_identity",

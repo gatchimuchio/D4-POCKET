@@ -940,6 +940,22 @@ def test_update_center_contract_and_execution_boundary() -> list[str]:
         errors.extend(validate_instance(value, load_schema(f"{name}.schema.json")))
     if validate_instance({**candidate, "public_key_der_hex": "00"}, load_schema("update_candidate.schema.json")) == []:
         errors.append("更新候補へBroker外部公開鍵を混入できた")
+    if validate_instance({**candidate, "package_path": "C:/untrusted/package.zip"}, load_schema("update_candidate.schema.json")) == []:
+        errors.append("更新候補が外部package pathを受け入れた")
+    if candidate.get("版") != 2 or not candidate.get("package_sha256") or candidate.get("package_size_bytes", 0) <= 0:
+        errors.append("更新候補が署名対象packageのhash・byte長を持たない")
+    if validate_instance({**candidate, "package_sha256": "g" * 64}, load_schema("update_candidate.schema.json")) == []:
+        errors.append("更新候補が不正なpackage hashを受理した")
+    if validate_instance({**candidate, "package_size_bytes": 0}, load_schema("update_candidate.schema.json")) == []:
+        errors.append("更新候補が空packageを受理した")
+    legacy_receipt = {key: value for key, value in receipt.items() if key not in {"package_sha256", "package_size_bytes"}}
+    legacy_receipt["版"] = 1
+    legacy_receipt["署名状態"] = "legacy_unbound"
+    errors.extend(validate_instance(legacy_receipt, load_schema("update_receipt.schema.json")))
+    legacy_verified_receipt = dict(legacy_receipt)
+    legacy_verified_receipt["署名状態"] = "verified"
+    if validate_instance(legacy_verified_receipt, load_schema("update_receipt.schema.json")) == []:
+        errors.append("package未結合の旧更新receiptをverifiedとして表示できた")
     if listing["download実行"] != "suspended" or listing["適用実行"] != "suspended" or listing["rollback実行"] != "suspended":
         errors.append("更新実行経路がsuspendedではない")
     for name in ("ipc_request", "ipc_response"):
