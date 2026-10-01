@@ -1373,6 +1373,20 @@ impl Broker {
             );
         }
 
+        if owner
+            && envelope.operation == Some(BrokerOperation::GuiShell書出し)
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "GUI Shell書出しはRust Desktop起動器のnative Owner確認だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
+        }
+
         if envelope.operation == Some(BrokerOperation::AgentTaskWorkspacePermissionGrant)
             || envelope.operation == Some(BrokerOperation::AgentTaskOwnerApprovalGrant)
             || envelope.operation == Some(BrokerOperation::MCPTool実行)

@@ -8769,6 +8769,26 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     ):
         if token not in source:
             errors.append(f"GUI Shell書出しBroker経路に境界tokenがない: {token}")
+    protocol_source = (RUST_HELPER / "src" / "broker" / "protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    compact_protocol = re.sub(r"\s+", "", protocol_source)
+    native_export_gate = (
+        "ifowner&&envelope.operation==Some(BrokerOperation::GuiShell書出し)"
+        "&&export_confirmation!=OwnerConfirmationSource::DesktopNativeConfirmation"
+    )
+    export_dispatch = "BrokerOperation::GuiShell書出し=>super::export_center::export"
+    native_export_gate_index = compact_protocol.find(native_export_gate)
+    export_dispatch_index = compact_protocol.find(export_dispatch)
+    if (
+        native_export_gate_index < 0
+        or export_dispatch_index < 0
+        or native_export_gate_index > export_dispatch_index
+        or "desktop_native_owner_confirmation_required" not in protocol_source
+    ):
+        errors.append("GUI Shell書出しが通常Owner資格を拒否しnative Owner確認だけをBroker dispatchへ通さない")
+    if "Owner資格だけのExport要求はManifestを作らずnative確認必須として拒否する" not in source:
+        errors.append("通常Owner資格だけのExport拒否とManifest非生成のRust回帰試験がない")
     launcher_source = (RUST_HELPER / "src" / "desktop_launcher.rs").read_text(
         encoding="utf-8"
     )

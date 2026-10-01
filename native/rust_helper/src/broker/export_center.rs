@@ -750,6 +750,12 @@ mod tests {
         json!({"request_id": "export-owner-test", "session_id": "session-1", "operation": OPERATION, "payload": payload, "payload_hash": payload_hash, "nonce": nonce, "issued_at": BrokerRequestEnvelope::current_issued_at(), "metadata": {}}).to_string()
     }
 
+    fn desktop_owner_request(broker: &mut Broker, payload: Value) -> String {
+        let mut request: Value = serde_json::from_str(&owner_request(broker, payload)).unwrap();
+        request["metadata"] = json!({"client": "desktop_flutter"});
+        request.to_string()
+    }
+
     #[test]
     fn Manifest_fileは新規作成だけを許可し既存fileを置換しない() {
         let root_path = std::env::temp_dir().join(format!(
@@ -820,8 +826,8 @@ mod tests {
     fn 書出しは新規identityと監査storeを生成するが権限を継承しない() {
         let mut broker = Broker::new("session-1");
         let export_root = configure_export_root(&mut broker, "fresh-identity");
-        let raw = owner_request(&mut broker, payload());
-        let response = broker.owner要求処理(&raw);
+        let raw = desktop_owner_request(&mut broker, payload());
+        let response = broker.desktop_owner_operation_json(&raw);
         assert_eq!(response.status, BrokerStatus::Accepted);
         let body = response.body.unwrap();
         let app_id = body["export_manifest"]["app_identity"]["app_id"]
@@ -950,8 +956,8 @@ mod tests {
         let export_root = configure_export_root(&mut broker, "module-closure");
         let mut request = payload();
         request["module_selection"] = json!({"optional_module_ids": ["shell.trace_inspector"]});
-        let raw = owner_request(&mut broker, request);
-        let response = broker.owner要求処理(&raw);
+        let raw = desktop_owner_request(&mut broker, request);
+        let response = broker.desktop_owner_operation_json(&raw);
         assert_eq!(response.status, BrokerStatus::Accepted);
         let plan = &response.body.unwrap()["export_manifest"]["module_plan"];
         assert_eq!(plan["selection_mode"], "explicit_optional");
@@ -989,8 +995,8 @@ mod tests {
         let export_root = configure_export_root(&mut broker, "empty-selection");
         let mut request = payload();
         request["module_selection"] = json!({"optional_module_ids": []});
-        let raw = owner_request(&mut broker, request);
-        let response = broker.owner要求処理(&raw);
+        let raw = desktop_owner_request(&mut broker, request);
+        let response = broker.desktop_owner_operation_json(&raw);
         assert_eq!(response.status, BrokerStatus::Accepted);
         let plan = &response.body.unwrap()["export_manifest"]["module_plan"];
         let included = plan["included_module_ids"].as_array().unwrap();
@@ -1022,8 +1028,11 @@ mod tests {
             let mut broker = Broker::new("session-1");
             let mut request = payload();
             request["module_selection"] = selection;
-            let raw = owner_request(&mut broker, request);
-            assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
+            let raw = desktop_owner_request(&mut broker, request);
+            assert_eq!(
+                broker.desktop_owner_operation_json(&raw).status,
+                BrokerStatus::Rejected
+            );
         }
     }
 
@@ -1044,15 +1053,38 @@ mod tests {
         let mut invalid = payload();
         invalid["compose_manifest"]["inheritance_policy"]["credential"] =
             Value::from("credential.value");
-        let raw = owner_request(&mut broker, invalid);
-        assert_eq!(broker.owner要求処理(&raw).status, BrokerStatus::Rejected);
+        let raw = desktop_owner_request(&mut broker, invalid);
+        assert_eq!(
+            broker.desktop_owner_operation_json(&raw).status,
+            BrokerStatus::Rejected
+        );
+    }
+
+    #[test]
+    fn Owner資格だけのExport要求はManifestを作らずnative確認必須として拒否する() {
+        let mut broker = Broker::new("session-1");
+        let export_root = configure_export_root(&mut broker, "owner-credential-denied");
+        let raw = owner_request(&mut broker, payload());
+        let response = broker.owner要求処理(&raw);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+        assert_eq!(fs::read_dir(&export_root).unwrap().count(), 0);
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OPERATION && event.decision == "rejected" }));
+        drop(broker);
+        fs::remove_dir_all(export_root).unwrap();
     }
 
     #[test]
     fn 固定Export保存先がない要求はfileを作らず拒否する() {
         let mut broker = Broker::new("session-1");
-        let raw = owner_request(&mut broker, payload());
-        let response = broker.owner要求処理(&raw);
+        let raw = desktop_owner_request(&mut broker, payload());
+        let response = broker.desktop_owner_operation_json(&raw);
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(response.error.unwrap().code, "gui_shell_export_target_unavailable");
         assert!(broker.audit_events().iter().any(|event| {
