@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "2322007363b7d4f807d24e7a7c12042bb5dd1b0fbc031f7639f2cb608c5dc86e"
+      "sha256": "30dbf535b8e9d26bab272f033b83257b4af18c76cbb610e098d6fcb3812e8e58"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3236,7 +3236,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "6035899190020d75319916326dfa28965b62ca5648c7a76f1351fb61bde7d5b8"
+      "sha256": "c21721278bcd4c4ce00fc482054417db2ff54fd028bfaad80bebe29131349996"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",

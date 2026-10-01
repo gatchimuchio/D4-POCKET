@@ -1740,3 +1740,11 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 維持する境界
 
 - `task_execution=unsupported`、R2 production positive E2E `release_blocker`、`release_ready=false`を維持する。Owner／Permission／Approval、production IPC、positive durable Audit、OneDrive Cloud Files／通常NTFSの統合実行、failure／deadline／crash Recovery、MxC TEMP cleanup、result／diff Content Exposure、通常ReleaseでのTask能力は未検証である。
+
+## R2追補 native Owner登録dialogと試験build capability表示の整合（2026-10-02）
+
+- source commit `f69ec7abfc5072dec2937f64eddeb03d0eaeab80`からFlutter Windows Release、通常Broker helper Release、`r2-e2e` feature付きRust Desktop launcher／loopback serverをbuildし、新規の隔離installed layoutへstageした。試験IdentityとLOCALAPPDATAはrun固有で、通常利用者の設定・Audit領域へ混ぜていない。
+- オーナー承認済みの合成OneDrive fixtureだけを使い、D4 Pocketの実Agent画面からCodex CLI／Workspace登録を開始した。native Win32 Owner dialogを実際に取得すると、feature付き試験buildが条件成立時にTask capabilityを`supported`として返す一方、「unsupportedのまま」と表示していた。この不整合を確認して登録要求をNoで拒否した。Runtime登録、Permission、Task Approval、Task実行、Task Auditは発生していない。
+- `desktop_launcher.rs`の登録確認文をCargo featureに合わせ、通常buildは従来どおりunsupportedを表示し、`r2-e2e` buildはloopback API・隔離CODEX_HOME・合成Workspace専用の検証buildであり、登録だけではPermission／Approvalを与えない旨を示すよう修正した。通常product capabilityやdefault featureは変更していない。双方の表示をRust testで固定した。
+- computer-useの`activate_window`は対象Owner dialogに対して2回timeoutしたが、返却済みwindow handleで直接状態取得することで、実dialog本文とNo選択後のアプリ状態を確認できた。No後にAgent登録が存在しない表示を確認した。
+- この修正後の再build・validationと、fresh installed appでのOwner登録／Workspace Permission／Task Approval／Task実行／positive durable Auditは未実行。前回stage artifactは修正前sourceに由来するため再使用しない。R2 `release_blocker`、通常buildの`task_execution=unsupported`、`release_ready=false`を維持する。

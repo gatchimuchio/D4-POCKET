@@ -54,6 +54,12 @@ const FRONTEND_ENVIRONMENT_ALLOWLIST: &[&str] = &[
     "WINDIR",
 ];
 
+#[cfg(feature = "r2-e2e")]
+const AGENT_CLI_REGISTRATION_NOTICE: &str = "このr2-e2e専用検証buildでは、loopback試験portと隔離CODEX_HOMEが有効な場合にTask実行Capabilityがsupportedになります。Task API接続先は環境指定の127.0.0.1偽Responses API用portです。登録自体はTaskを実行せず、Permission、Approval、Trust、Credentialを生成・保存しません。Task用Workspace PermissionとTaskごとのOwner Approvalは別のOwner確認が必要です。Credential実値を使用せず、合成Workspaceだけで試験してください。Broker終了時に登録は消えます。";
+
+#[cfg(not(feature = "r2-e2e"))]
+const AGENT_CLI_REGISTRATION_NOTICE: &str = "Taskは実行せず、Task実行能力はunsupportedのままです。Permission、Approval、Trust、Credentialを生成・保存しません。Broker終了時に登録は消えます。";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DesktopOwnerOperationSummary {
     GuiShellExport(ExportConfirmationSummary),
@@ -1543,7 +1549,7 @@ fn owner_confirmation_text_for_identity(
             secret_paths,
             payload_hash,
         } => format!(
-            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\nTaskは実行せず、Task実行能力はunsupportedのままです。Permission、Approval、Trust、Credentialを生成・保存しません。Broker終了時に登録は消えます。\n\npayload hash:\n{}",
+            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\n{}\n\npayload hash:\n{}",
             owner_confirmation_value(adapter_id),
             owner_confirmation_value(runtime_id),
             owner_confirmation_value(cli_path),
@@ -1559,6 +1565,7 @@ fn owner_confirmation_text_for_identity(
                     .collect::<Vec<_>>()
                     .join("\n")
             },
+            AGENT_CLI_REGISTRATION_NOTICE,
             payload_hash
         ),
         DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
@@ -3838,7 +3845,7 @@ mod tests {
                 assert_eq!(secret_paths[0], ".env");
                 assert_eq!(payload_hash, expected_payload_hash);
                 let confirmation_text = owner_confirmation_text(summary);
-                assert!(confirmation_text.contains("Task実行能力はunsupported"));
+                assert!(confirmation_text.contains(AGENT_CLI_REGISTRATION_NOTICE));
                 assert!(confirmation_text.contains(".env"));
                 assert!(!confirmation_text.contains("synthetic-secret-content-never-returned"));
             };
@@ -4333,7 +4340,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_cli_runtime_workspace_confirmation_displays_scope_and_preserves_unsupported_state() {
+    fn agent_cli_runtime_workspace_confirmation_matches_build_scope() {
         let summary = DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
             adapter_id: "codex-cli".into(),
             interface_scope: "--version と exec --help".into(),
@@ -4352,6 +4359,14 @@ mod tests {
         assert!(text.contains("secrets"));
         assert!(text.contains("Adapter ID: codex-cli"));
         assert!(text.contains("--version と exec --help"));
+        assert!(text.contains(AGENT_CLI_REGISTRATION_NOTICE));
+        #[cfg(feature = "r2-e2e")]
+        {
+            assert!(text.contains("r2-e2e専用検証build"));
+            assert!(text.contains("127.0.0.1偽Responses API"));
+            assert!(!text.contains("Task実行能力はunsupported"));
+        }
+        #[cfg(not(feature = "r2-e2e"))]
         assert!(text.contains("Task実行能力はunsupported"));
         assert!(text.contains("Permission、Approval、Trust、Credentialを生成・保存しません"));
     }
