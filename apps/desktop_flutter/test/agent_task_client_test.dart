@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart'
     show BrokerClientException, BrokerTransport;
 
-import '../lib/services/agent_task_client.dart';
+import 'package:gui_shell_desktop/services/agent_task_client.dart';
 
 const _session = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _task = 'cccccccccccccccccccccccccccccccc';
@@ -115,7 +115,7 @@ void main() {
 
   test('不正なTask要求はBrokerへ送信しない', () async {
     final transport = _FakeBrokerTransport([]);
-    final invalid = AgentTaskRequest(
+    const invalid = AgentTaskRequest(
       runtimeId: '../outside',
       sessionId: _session,
       workspaceId: 'workspace-local',
@@ -130,7 +130,7 @@ void main() {
   });
 }
 
-final _request = AgentTaskRequest(
+const _request = AgentTaskRequest(
   runtimeId: 'codex-local',
   sessionId: _session,
   workspaceId: 'workspace-local',
