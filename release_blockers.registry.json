@@ -839,6 +839,117 @@
         "os_protection_changed": false,
         "scope_limit": "staged製品の負経路だけを観測した。launcher manifestはper_user／isolated=falseと宣言するため、完全隔離されたfresh runtimeの証拠ではない。task_executionはunsupportedのままであり、Task Permission／Approval UI、正のTask、OneDrive Cloud Files／通常NTFSのtool-child隔離、失敗／deadline／crash Recovery、MxC TEMP後始末、result／diff Content Exposureは未検証。"
       },
+      "r2_installed_synthetic_task_e2e_run4": {
+        "date": "2026-10-02",
+        "status": "blocked_before_owner_registration",
+        "source_commit": "7dbeba1361d852180dd12c4165fffcab6e355da9",
+        "clean_source_archive_matches_commit": true,
+        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "run_id": "r2-synthetic-task-e2e-7dbeba1-run4",
+        "toolchain": {
+          "flutter": "3.44.0",
+          "rust": "1.95.0",
+          "codex_cli": "0.159.2"
+        },
+        "build_validation": {
+          "flutter_release": "flutter build windows --release --no-pub passed in 271.8s",
+          "rust_release": "cargo +1.95.0 build --locked --release --features r2-e2e --manifest-path native/rust_helper/Cargo.toml --bins passed in 7m35s; two existing MINIDORA dead-code warnings"
+        },
+        "installed_manifest": {
+          "stage_path": "C:\\d4p-r2-install-7dbeba1-run4",
+          "app_sha256": "sha256:61ab8546051491693484cc629003d050adea9c4e32fab48d91a5567535ba8737",
+          "broker_helper_sha256": "sha256:6a2f0aabcd6da0dba186207212b87b46c245e78ca58ad4087b27a7189c36030c",
+          "launcher_sha256": "sha256:a9c34ad9ea79806f3f1e2f729b628a34320f3449eba8e877f7395f19803114a9",
+          "fake_responses_api_sha256": "sha256:8cf193efc1cc185ee38713367cd7109de343aaaad008faf955f3820fa877c141"
+        },
+        "synthetic_environment": {
+          "local_data_root": "C:\\d4p-r2-local-7dbeba1-run4",
+          "temp_root": "C:\\d4p-r2-temp-7dbeba1-run4",
+          "workspace": "C:\\Users\\ohira\\OneDrive\\D4Pocket-R2-E2E-SYNTHETIC\\w-f69ec7a",
+          "codex_home_was_empty_before_launch": true,
+          "fake_api_listen": "127.0.0.1:49630"
+        },
+        "observations": {
+          "installed_ui": "Fresh staged D4 Pocket overview window appeared. Computer Use click/state refresh failed; after reselecting the exact returned window, state capture still returned Cannot read properties of null (reading 'window'). UI operation stopped before native Owner dialog, Runtime registration, Session, Permission, Approval, or Task.",
+          "fake_api": {
+            "requests": 0,
+            "models": 0,
+            "tool_offered": false,
+            "tool_call_sent": false,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": false
+          },
+          "cleanup": "Stopped only run-owned launcher PID 18044 and frontend PID 17844. Removed exact run-owned broker_session.json and desktop_launcher.lock; retained the Audit store and did not read audit_anchor.key. Fake API listener stopped."
+        },
+        "real_model_or_credential_used": false,
+        "task_created": false,
+        "owner_confirmation_completed": 0,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME proves the fresh staged overview startup only; FIXTURE records zero loopback API requests. Registration, native Owner approval, authenticated Task request, production positive Task, durable positive Audit, Workspace isolation, Recovery, TEMP cleanup after Task, and result/diff Content Exposure remain unproven. Startup outbound traffic was not independently measured. Keep task_execution=unsupported and the R2 release blocker unresolved."
+      },
+      "r2_installed_synthetic_task_e2e_run7": {
+        "date": "2026-10-02",
+        "status": "failed_after_task_started",
+        "source_commit": "7dbeba1361d852180dd12c4165fffcab6e355da9",
+        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "run_id": "r2-synthetic-task-e2e-7dbeba1-run7",
+        "toolchain": {
+          "flutter": "3.44.0",
+          "rust": "1.95.0",
+          "codex_cli": "0.159.2"
+        },
+        "installed_manifest": {
+          "stage_path": "C:\\d4p-r2-install-7dbeba1-run4",
+          "app_sha256": "sha256:61ab8546051491693484cc629003d050adea9c4e32fab48d91a5567535ba8737",
+          "broker_helper_sha256": "sha256:6a2f0aabcd6da0dba186207212b87b46c245e78ca58ad4087b27a7189c36030c",
+          "launcher_sha256": "sha256:a9c34ad9ea79806f3f1e2f729b628a34320f3449eba8e877f7395f19803114a9",
+          "fake_responses_api_sha256": "sha256:8cf193efc1cc185ee38713367cd7109de343aaaad008faf955f3820fa877c141"
+        },
+        "synthetic_environment": {
+          "local_data_root": "C:\\d4p-r2-local-7dbeba1-run7",
+          "temp_root": "C:\\d4p-r2-temp-7dbeba1-run7",
+          "workspace": "C:\\d4p-r2-e2e-7dbeba1-run7\\workspace",
+          "codex_home": "C:\\d4p-r2-temp-7dbeba1-run7\\D4Pocket-R2-E2E-SYNTHETIC\\codex-home",
+          "fake_api_listen": "127.0.0.1:54155"
+        },
+        "observations": {
+          "owner_registration": "実Flutter UIとnative Owner確認でRuntime codex-local／Workspace workspace-localを登録。Broker Session 179daa7b113a0ede282f79fe332e901eを開始。",
+          "owner_grants": "agent_task.execute Workspace PermissionとTask Approvalを別々にOwner確認。対象は同Session／Workspace、各1回、短期限。",
+          "task": {
+            "task_id": "76f0d99f6c34a1142d314d6f0f6af430",
+            "start_audit_ref": "broker-audit-58",
+            "terminal_status": "failed",
+            "terminal_audit_ref": "broker-audit-68",
+            "cancel_attempt_audit_ref": "broker-audit-69",
+            "cancel_attempt": "rejected; cancellation was not reported as successful"
+          },
+          "fake_api": {
+            "requests": 128,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_report_exists": false,
+            "workspace_marker_exists": false,
+            "continuation_marker_exists": false,
+            "temp_observer_marker_exists": false,
+            "outside_write_marker_exists": false,
+            "same_tool_call_repeated_without_marker": true
+          },
+          "scratch_recovery": "Post-failure journal contained zero entries with HMAC present; the HMAC was not independently recomputed.",
+          "cleanup": "Task child, loopback server, and only run-owned launcher/Broker processes were confirmed stopped. Test evidence was retained. Synthetic secret content was not read."
+        },
+        "real_model_or_credential_used": false,
+        "task_created": true,
+        "owner_confirmation_completed": 2,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME proves Owner registration/grants and UI-to-Broker-to-real-Codex/MxC tool-dispatch path only; the Task ended failed. FIXTURE recorded 128 repeated tool-call responses. The initial PowerShell failure cause, successful Workspace write, positive Task result, independently verified durable Audit chain, complete Workspace/secret isolation, failure Recovery semantics, and result/diff Content Exposure remain unproven. This is a feature-enabled synthetic test build, not normal Release capability. Keep task_execution=unsupported and the R2 release blocker unresolved."
+      },
       "latest_mxc_temp_directory_exit_observation": {
         "date": "2026-10-01",
         "source_base_commit": "7ab1c4db6de571d511d5dc27841b843bcf77cc26",

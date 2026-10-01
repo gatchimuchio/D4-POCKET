@@ -1768,3 +1768,27 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 維持する境界
 
 - 修正後のソースによる新規配置製品の実行経路でのTask成功、永続化された成功記録と再検証、隔離条件の組合せ試験、失敗・期限切れ・異常終了時の復旧、MxC一時領域の後始末、結果／差分の内容露出は次回runで未確認。通常Releaseの`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。`r2-e2e`偽Responses APIは合成試験専用であり、実providerとの相互運用や通常配布用機能の成立を証明しない。
+
+## R2追補 修正commitからのfresh installed run4とUI操作基盤停止（2026-10-02）
+
+- clean source commit `7dbeba1361d852180dd12c4165fffcab6e355da9`から作ったsource archiveを使用し、変更対象5 fileのSHA-256がcommit済み作業ツリーと一致することを確認した。Flutter 3.44.0の`flutter build windows --release --no-pub`は成功（271.8秒）。Rust 1.95.0の`cargo +1.95.0 build --locked --release --features r2-e2e --manifest-path native/rust_helper/Cargo.toml --bins`も成功（7分35秒、既存MINIDORA dead-code warning 2件）。
+- run `r2-synthetic-task-e2e-7dbeba1-run4`を`C:\d4p-r2-install-7dbeba1-run4`へfresh stageし、local dataとTEMP／TMPをrun専用rootへ分離した。Flutter UI、Rust launcher、feature付きBroker helper、loopback偽Responses APIのSHA-256はregistryの同名probeに記録した。
+- CLI `0.159.2`の`--version`だけをローカル確認した。Owner承認済み合成fixture内の空CODEX_HOMEを指定し、偽API serverはloopback `127.0.0.1:49630`で待機した。OneDrive Workspace内の`private/credential-backup.txt`は存在だけを確認し、内容は読んでいない。
+- installed `D4 Pocket` overview画面の表示までは`LIVE_RUNTIME`で観測した。Agent Centerへの画面操作後、Computer Useのclick／画面状態更新が失敗し、fresh windowを再選択した復旧後も`Cannot read properties of null (reading 'window')`で状態取得できなかった。UI helperの再試行条件に達したため操作を停止し、native Owner dialog、Runtime登録、Session、Permission／Approval、Taskには進まなかった。
+- 偽API停止時の証跡はrequests／models／tool提示／tool送信／不正body／途中request／応答失敗／外部要求がすべて0、Workspace markerなし。Task childは起動していない。実credentialと実modelは不使用。OS保護設定は変更していない。
+- このrunで起動したlauncher PID 18044とFlutter frontend PID 17844だけを停止した。run専用rootに残った`broker_session.json`（endpoint／secretを含むsession file）と`desktop_launcher.lock`を完全path照合後に削除し、Audit storeは保持した。`audit_anchor.key`は読んでいない。fake API listener終了を確認した。
+
+### 判定
+
+- 本runはclean installed artifactの起動表示と合成APIの無要求を示すだけで、R2 production positive E2Eの完了証拠ではない。UI automation failureによりOwner以降へ到達しておらず、source側receipt修正のproduction経路検証も未成立。R2 `release_blocker`、通常Releaseの`task_execution=unsupported`、`release_ready=false`を維持する。UI操作基盤が復旧した後、別のfresh installed runで登録からTask・durable Auditまで再実施する。
+
+## R2追補 fresh installed positive Task試行run7と偽API再送ループ（2026-10-02）
+
+- source commit `7dbeba1361d852180dd12c4165fffcab6e355da9`由来の`r2-e2e` staged app／launcher／Broker／localhost偽Responses APIを使用し、通常NTFS上のrun専用Workspace、LOCALAPPDATA、TEMP／TMP、空CODEX_HOMEで実施した。実Codex CLI `0.159.2`を起動し、API接続先はloopback `127.0.0.1:54155`だけだった。実provider、実credential、課金要求、外部通信は使用していない。
+- 実Flutter UIからRuntime `codex-local`とWorkspace `workspace-local`をnative Owner確認付きで登録し、Broker Session `179daa7b113a0ede282f79fe332e901e`を作成した。Workspace `agent_task.execute` Permission（同Session／Workspace、1回、短期限）と別個のTask Approval（同Session／Workspace、1回、最大15分）をそれぞれOwner確認で発行した。合成Task `76f0d99f6c34a1142d314d6f0f6af430`をUIからBroker経由で開始し、開始Audit参照は`broker-audit-58`、終端状態は`failed`（Audit参照`broker-audit-68`）となった。取消要求は`broker-audit-69`で拒否されており、取消成功とは扱わない。
+- CLI childはMxC経由でPowerShell tool childを起動した。偽Responses APIはtoolを提示・送信した後、同一tool callをmarker未作成のまま128 POSTにわたり再送した。期待したWorkspace report、TEMP observer marker、完了marker、継続marker、Workspace外書込markerはいずれも存在しなかった。したがってpositive Task、Workspace差分、TEMP書込成否は成立・観測できず、task成功とは扱わない。
+- 終了後、scratch recovery journalはHMAC付きで空entryだった。合成secret fileの存在のみを扱い内容は読んでいない。Task childと偽API listenerは終了し、このrunのlauncher／Broker processも個別確認後に停止した。Task結果とAudit参照は記録したが、run7についてAudit chainの独立再計算はしていない。run専用の失敗証跡は削除せず保持した。
+
+### 判定
+
+- run7はUI→Broker→実CLI／MxC→tool送信までの`LIVE_RUNTIME`経路を示すが、Taskは失敗しpositive結果ではない。128回の再送は偽Responses API fixtureの無制限再提示を示す一方、最初のPowerShell toolがreportを書けなかった根本原因は未確定である。次はfixtureを一回限り・fail-fastにし、Workspace reportをTEMP操作より先に記録して原因を特定する。R2 `release_blocker`、通常Releaseの`task_execution=unsupported`、`release_ready=false`を維持する。
