@@ -1748,3 +1748,23 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `desktop_launcher.rs`の登録確認文をCargo featureに合わせ、通常buildは従来どおりunsupportedを表示し、`r2-e2e` buildはloopback API・隔離CODEX_HOME・合成Workspace専用の検証buildであり、登録だけではPermission／Approvalを与えない旨を示すよう修正した。通常product capabilityやdefault featureは変更していない。双方の表示をRust testで固定した。
 - computer-useの`activate_window`は対象Owner dialogに対して2回timeoutしたが、返却済みwindow handleで直接状態取得することで、実dialog本文とNo選択後のアプリ状態を確認できた。No後にAgent登録が存在しない表示を確認した。
 - この修正後の再build・validationと、fresh installed appでのOwner登録／Workspace Permission／Task Approval／Task実行／positive durable Auditは未実行。前回stage artifactは修正前sourceに由来するため再使用しない。R2 `release_blocker`、通常buildの`task_execution=unsupported`、`release_ready=false`を維持する。
+
+## R2追補 installed positive E2E試行で発見したWorkspace Permission receipt不整合の修正（2026-10-02）
+
+- source base `1a1f27664e5763a15ba44b2900e6cacb636af381`から作ったfresh staged `r2-e2e` installed runで、実Flutter UI、native Owner登録、Broker Session／Workspace結合まで進んだ。Owner確認付きWorkspace Permission発行後、Flutterは「receipt不正」と表示したが、読み取り専用の再事前検査ではBroker内に一回・短期限のactive Permissionが存在した。Task start前に停止し、Task process／model request／Tool call／Workspace writeは行われなかった。fake API観測は要求0、tool提示／送信なし、markerなし。run専用frontendを停止するとBrokerのprocess-local Permissionも消失した。
+- 原因はFlutterが`{uses_remaining,status=issued_unconsumed}`だけを期待する一方、Brokerが`agent_task_workspace_permission.schema.json`準拠の13-field receipt（status=`active`）を返していたこと。`agent_task_client.dart`を実Broker contractに合わせ、未知field、形式不正、Runtime／Session／Workspace不一致、Registration hash不正、operation／scope／decision／source不一致、期限・回数・状態不一致をfail-closedで拒否する厳密照合へ修正した。Permission IDはUIへ露出しない。widget fixtureもSchema準拠に更新し、正常receiptと14種の異常receiptをclient testで固定した。
+- 失敗runのPermission発行を成功扱いせず、Task実行へ進めなかった。Owner承認のないままの実行、外部API要求、Credential利用、製品設定変更はない。以前の失敗はこの記録に保持し、修正後のfresh runと混同しない。
+
+### 検証
+
+- `dart format`、`git diff --check`: 成功。
+- `flutter pub get --enforce-lockfile`（Desktop／Mobile）: 成功。lockfile変更なし。
+- `flutter analyze --no-pub`（Desktop／Mobile）: 成功、No issues found。OneDrive日本語path上の旧LSP JSON parse失敗を避け、短い一時source copyで実行した。
+- 修正後のDesktop `flutter test --no-pub --reporter compact`: Rust helperを同一sourceからdebug buildした後、全144件成功。先行するtest asset無効runはShader asset欠落で失敗し、assets有効runの最初の試行は必要debug helper未buildのため既存Rust連携2件が失敗した。いずれも条件を正して全suiteを再実行し、全件PASSを確認した。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 152件／通常例152件／negative fixture 196件で成功。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 231 checks成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 成功。Windows product evidence欠落と31件のrelease blockerを検出し、`release_ready=false`を維持した。これはvalidator自体の検査成功であり、各release blockerの解消を意味しない。
+
+### 維持する境界
+
+- 修正後のソースによる新規配置製品の実行経路でのTask成功、永続化された成功記録と再検証、隔離条件の組合せ試験、失敗・期限切れ・異常終了時の復旧、MxC一時領域の後始末、結果／差分の内容露出は次回runで未確認。通常Releaseの`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。`r2-e2e`偽Responses APIは合成試験専用であり、実providerとの相互運用や通常配布用機能の成立を証明しない。

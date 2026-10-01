@@ -869,8 +869,20 @@ void main() {
         '指示hash': instructionHash,
       }),
       _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+        'permission_id': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        'agent_runtime_id': 'codex-r2-synthetic',
+        'session_id': sessionId,
+        'workspace_id': 'workspace-r2-synthetic',
+        'workspace_registration_hash':
+            'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        'operation': 'agent_task.execute',
+        'scope': 'session_workspace_once',
+        'decision': 'allow',
+        'source': 'owner',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
         'uses_remaining': 1,
-        'status': 'issued_unconsumed',
+        'status': 'active',
       }),
       _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
         '状態': 'Owner Approval発行済み',

@@ -316,7 +316,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/agent_task_client.dart",
-      "sha256": "458a6d91b37bc4316a3ce4769590dd6cf8b034a29d8c4b3e8ac9ca892215a7e0"
+      "sha256": "044b4b98541ab2007e15fbc8086bbef2cdf623e8afe18c6fd998866c828fbff6"
     },
     {
       "path": "apps/desktop_flutter/lib/services/ai_edit_client.dart",
@@ -556,7 +556,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/agent_task_client_test.dart",
-      "sha256": "6db4af1cbc36fbc87dc0453dbea079c98d04c4439931014bf936f52b97653ffe"
+      "sha256": "d13b44c0a4746ae589eaa7910650032c15c942a9443f06413d8f785cdda9d185"
     },
     {
       "path": "apps/desktop_flutter/test/ai_edit_client_test.dart",
@@ -636,7 +636,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "648d1d8bc703fc286ff7fd4b4124718252206787d5d0e875758cb5374580ce05"
+      "sha256": "22f394cadd40abbc7d75e341d99151cf28f3a50f5aed17edb39d3bbdb8fcf006"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "30dbf535b8e9d26bab272f033b83257b4af18c76cbb610e098d6fcb3812e8e58"
+      "sha256": "c84628bf92088b7d647d5b969bd03c300f4ab852ff01f9afd12041c04fd6f8e5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

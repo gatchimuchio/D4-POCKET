@@ -10,6 +10,8 @@ const _instructionHash =
     'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const _conditionsHash =
     'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+const _workspaceRegistrationHash =
+    'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 
 void main() {
   test('事前検査はBrokerの要求・hash・未実行状態を厳密に照合する', () async {
@@ -56,6 +58,50 @@ void main() {
       expect(error.toString(), isNot(contains('PRIVATE_TASK_SENTINEL')));
     }
     expect(transport.operations, ['Agent作業要求検査']);
+  });
+
+  test('Workspace Permission receiptはSchemaと現在要求への結合を照合する', () async {
+    final transport = _FakeBrokerTransport([
+      _accepted('AgentTaskWorkspacePermissionGrant', _permissionReceipt()),
+    ]);
+
+    await AgentTaskClient(transport).grantWorkspacePermission(_request);
+
+    expect(transport.operations, ['AgentTaskWorkspacePermissionGrant']);
+    expect(transport.requests.single['payload'], {
+      'agent_runtime_id': _request.runtimeId,
+      'session_id': _request.sessionId,
+      'workspace_id': _request.workspaceId,
+    });
+  });
+
+  test('Workspace Permission receiptの誤結合・昇格・再利用を拒否する', () async {
+    final invalidReceipts = [
+      _permissionReceipt()..['permission_id'] = 'invalid-id',
+      _permissionReceipt()..['agent_runtime_id'] = 'other-runtime',
+      _permissionReceipt()..['session_id'] = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      _permissionReceipt()..['workspace_id'] = 'other-workspace',
+      _permissionReceipt()..['workspace_registration_hash'] = 'sha256:bad',
+      _permissionReceipt()..['operation'] = 'filesystem_write',
+      _permissionReceipt()..['scope'] = 'all_sessions',
+      _permissionReceipt()..['decision'] = 'deny',
+      _permissionReceipt()..['source'] = 'adapter',
+      _permissionReceipt()..['expires_at_epoch_seconds'] = 0,
+      _permissionReceipt()..['use_limit'] = 2,
+      _permissionReceipt()..['uses_remaining'] = 0,
+      _permissionReceipt()..['status'] = 'consumed',
+      _permissionReceipt()..['unexpected'] = true,
+    ];
+
+    for (final receipt in invalidReceipts) {
+      final transport = _FakeBrokerTransport([
+        _accepted('AgentTaskWorkspacePermissionGrant', receipt),
+      ]);
+      await expectLater(
+        AgentTaskClient(transport).grantWorkspacePermission(_request),
+        throwsA(isA<BrokerClientException>()),
+      );
+    }
   });
 
   test('Owner Approval receiptの旧policy IDと未知fieldを拒否する', () async {
@@ -150,6 +196,22 @@ Map<String, Object?> _approvalReceipt() => {
       'use_limit': 1,
       'uses_remaining': 1,
       'status': 'issued_unconsumed',
+    };
+
+Map<String, Object?> _permissionReceipt() => {
+      'permission_id': 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+      'agent_runtime_id': _request.runtimeId,
+      'session_id': _request.sessionId,
+      'workspace_id': _request.workspaceId,
+      'workspace_registration_hash': _workspaceRegistrationHash,
+      'operation': 'agent_task.execute',
+      'scope': 'session_workspace_once',
+      'decision': 'allow',
+      'source': 'owner',
+      'expires_at_epoch_seconds': 1900000000,
+      'use_limit': 1,
+      'uses_remaining': 1,
+      'status': 'active',
     };
 
 Map<String, Object?> _taskRecord(String status) => {

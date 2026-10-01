@@ -127,9 +127,42 @@ class AgentTaskClient {
       'session_id': request.sessionId,
       'workspace_id': request.workspaceId,
     });
-    if (!_hasExactKeys(body, const {'uses_remaining', 'status'}) ||
+    const receiptKeys = {
+      'permission_id',
+      'agent_runtime_id',
+      'session_id',
+      'workspace_id',
+      'workspace_registration_hash',
+      'operation',
+      'scope',
+      'decision',
+      'source',
+      'expires_at_epoch_seconds',
+      'use_limit',
+      'uses_remaining',
+      'status',
+    };
+    final permissionId = body['permission_id'];
+    final runtimeId = body['agent_runtime_id'];
+    final sessionId = body['session_id'];
+    final workspaceId = body['workspace_id'];
+    final registrationHash = body['workspace_registration_hash'];
+    if (!_hasExactKeys(body, receiptKeys) ||
+        permissionId is! String ||
+        !_sessionId.hasMatch(permissionId) ||
+        runtimeId != request.runtimeId ||
+        sessionId != request.sessionId ||
+        workspaceId != request.workspaceId ||
+        registrationHash is! String ||
+        !_hash.hasMatch(registrationHash) ||
+        body['operation'] != 'agent_task.execute' ||
+        body['scope'] != 'session_workspace_once' ||
+        body['decision'] != 'allow' ||
+        body['source'] != 'owner' ||
+        !_positiveSafeInteger(body['expires_at_epoch_seconds']) ||
+        body['use_limit'] != 1 ||
         body['uses_remaining'] != 1 ||
-        body['status'] != 'issued_unconsumed') {
+        body['status'] != 'active') {
       throw const BrokerClientException('Workspace Permission receiptが不正です');
     }
   }
