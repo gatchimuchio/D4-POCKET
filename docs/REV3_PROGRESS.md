@@ -1602,3 +1602,19 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了値0、登録済みdevelopment check 10件すべて成功。厳格日本語監査1130 file／0 findings、Schema 152／正常例152／negative fixture 195、Conformance 231 checks、Manifest 1127 files、release gate、packaging、smoke、evidence bundle、runtime assertion、最終開発監査が成功した。`release_ready=false`と31件のrelease blockerは維持する。
 - `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`を変更3 Rust fileへ実行し成功した。`git diff --check`も成功した。
 - 観測したのは専用synthetic marker fileの正常Task終了後／取消後の消失だけである。MxC TEMP directory全体の全entry、deadline／process crash／電源断後cleanup、production Broker IPC、installed Desktop UIとnative Owner confirmation、耐久Audit／tamper検証、OneDrive Cloud Filesと通常NTFSの隔離matrix、result／diff Content Exposureは未確認。製品Adapter metadataは`task_execution=unsupported`、R2 release blockerと`release_ready=false`を維持する。
+
+## R2追補 Owner Approval固定ポリシーIDの契約整合（2026-10-01）
+
+### 成立した変更
+
+- 現行Brokerとnative Owner確認画面が示す固定ID `gui-shell-agent-task-sandbox-v1-max-runtime-900s` に対し、Owner Approval Schemaと正常例だけが旧ID `gui-shell-agent-task-sandbox-v1` を保持していた不整合を修正した。
+- Schema・正常例をBroker／native確認画面と同じ固定IDへ更新し、旧IDのreceiptを拒否するnegative fixtureを追加した。日本語の実行系仕様に900秒の最大実行条件と、ID一致だけでは隔離・Task対応を証明しない境界を記録した。ConformanceはSchema／正常例の値、Broker／native sourceの値、および旧ID rejectionを検査する。
+- 変更前の作業基点はcommit `4e8282f610c13d79b01cf7e32717c7a82a389b22`。試験対象はSchema、fixture、仕様、Conformanceの作業tree差分である。
+
+### 検証結果と境界
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: 成功、Schema 152件／正常例152件／negative fixture 196件。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 成功、231 checks。
+- 初回の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は、未追跡だった追加negative fixtureがGit追跡fileだけを束ねるpackaging portability検査のsource archiveから欠落し、その展開先Conformanceで`FileNotFoundError`となって失敗した。fixtureをintent-to-addで追跡対象へ含めてManifestを1128 fileで再生成し、`python -X utf8 tooling/packaging_portability_check.py`でsource bundle検査が成功した後、同じ統合validatorを再実行して終了値0を確認した。厳格日本語監査、Schema、Conformance、Manifest、release gate、配布形式、release smoke、証拠束、runtime assertion、最終開発監査の登録10検査がすべて成功し、`release_ready=false`と既存release blockerを維持した。初回失敗は履歴として保持する。
+- この修正はreceipt上の固定条件識別子と契約間整合だけを確認する。Task worker起動、Broker production IPC、installed Flutter／native Ownerからの正の実行、filesystem隔離、永続Audit、Recovery、結果／diff表示を検証していない。
+- `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。

@@ -653,6 +653,26 @@
         "os_protection_changed": false,
         "scope_limit": "Negative gate only. LIVE_RUNTIME covers the standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and rejection Audit reload; Workspace/store/secret are FIXTURE. Does not prove positive Agent Task execution, installed Desktop/native Owner operation, sandbox isolation, cancellation/deadline/crash Recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
       },
+      "latest_owner_approval_policy_contract_alignment": {
+        "date": "2026-10-01",
+        "source_base_commit": "4e8282f610c13d79b01cf7e32717c7a82a389b22",
+        "source_worktree_clean": false,
+        "evidence_sources": [
+          "CONFIG",
+          "FIXTURE"
+        ],
+        "validation": "python -X utf8 tooling/schema_check/check_schemas.py: Schema 152件、正常例152件、negative fixture 196件で成功。python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py: 231 checks成功。初回統合validatorは未追跡fixtureが一時source bundleから欠落してpackaging portabilityで失敗したため、fixtureをintent-to-addで追跡対象へ含めManifestを1128 fileで再生成。python -X utf8 tooling/packaging_portability_check.py成功後、python -X utf8 tooling/validate_all.py --python-only --desktop-platform windowsを再実行し終了値0、登録10検査すべて成功。release_ready=falseと既存blockerを維持。",
+        "observations": {
+          "policy_id": "gui-shell-agent-task-sandbox-v1-max-runtime-900s",
+          "contract_alignment": "Broker、native Owner確認画面、Owner Approval Schema、正常fixtureの固定識別子を一致させた。Conformanceは各sourceの一致を検査する。",
+          "stale_policy": "旧ID gui-shell-agent-task-sandbox-v1 のnegative fixtureはSchemaで拒否された。",
+          "scope": "固定receipt識別子と契約整合だけを確認。Task workerを起動していない。"
+        },
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "CONFIG／FIXTUREの契約検査のみ。production Broker／IPC、installed UIとnative Owner、正のTask実行、実filesystem隔離、永続Audit、Recovery、result／diffを証明しない。task_execution=unsupportedとR2 release blockerを維持する。"
+      },
       "concurrent_mxc_shared_home_temp_isolation_probe": {
         "date": "2026-10-01",
         "source_base_commit": "b3fb1cb605f9c074dc9cfff34eb22a2d099026a0",

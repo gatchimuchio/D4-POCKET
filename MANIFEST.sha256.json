@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "64a6f0a8da0a137dd9bc7c7fead128ae894d8c458929b4383dbcc98d69bb0a49"
+      "sha256": "83d7701f85254b9523d36ec1196334480f693e0db31599f58701e804b3ac1f3e"
     },
     {
       "path": "SECURITY.md",
@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "3fb9adc57d5fd33a2015287cde752a9508ef51e8ec5e0deaeedda6689152a4dc"
+      "sha256": "38b248d4117f8a645b2523e60ca7da267432306d6f050d94d7c6f3f1a4c6fefb"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1304,7 +1304,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "94d4cc541787d5421d68dbe7207170f7c736875013a01dbdd7df4ae3dcffbd2f"
+      "sha256": "f730b9318e0083ef67b4f648e451352f377b8d6156eeeef8eed3b4be0047b90d"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -1596,7 +1596,7 @@
     },
     {
       "path": "examples/contracts/agent_task_owner_approval.valid.json",
-      "sha256": "fc1f5ab07a7980dd8a2df5c12999d4cd9ce8fae07698d0c3b5b5584a6d5cb695"
+      "sha256": "86bab9016c5fc981fa026eba840614b4d9abf5fcd8c8fd17a751dc5b8e7d0f73"
     },
     {
       "path": "examples/contracts/agent_task_request.valid.json",
@@ -1921,6 +1921,10 @@
     {
       "path": "examples/contracts/invalid/agent_task_owner_approval_execution_claim.invalid.json",
       "sha256": "ff6ec98d4cdc48bc8886ce6d7acd5fa3546a28323d01122bc6e0c8316690b776"
+    },
+    {
+      "path": "examples/contracts/invalid/agent_task_owner_approval_stale_policy.invalid.json",
+      "sha256": "fc1f5ab07a7980dd8a2df5c12999d4cd9ce8fae07698d0c3b5b5584a6d5cb695"
     },
     {
       "path": "examples/contracts/invalid/agent_task_request_authority_escalation.invalid.json",
@@ -3784,7 +3788,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "98d9a1e91a921ea711effa167fdc06b0a75f3022a4d46f0ffa7cdce12283386b"
+      "sha256": "3c0b5091fb5d6c721695278fc69f8f6070d66d99b3763d8236fcd5b033379b56"
     },
     {
       "path": "requirements-dev.txt",
@@ -3880,7 +3884,7 @@
     },
     {
       "path": "specs/agent_task_owner_approval.schema.json",
-      "sha256": "63698c5c2ef923fbcd1906084bc08364a7992d987f59a33e700195162d293d11"
+      "sha256": "580b58351f1d261fcd991b16b85cb9a130d178d1f89de463baf9243773ed7f46"
     },
     {
       "path": "specs/agent_task_request.schema.json",
@@ -4448,7 +4452,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "1e251a69501b27bfac3c518d9451934b1f2df9b5307808cecd760c5060f9b564"
+      "sha256": "e205da2885af4084c352e5197041384dcb6b09cd60dae8855ed720b22a70ce4e"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

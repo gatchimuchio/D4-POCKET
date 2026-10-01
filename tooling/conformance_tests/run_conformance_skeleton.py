@@ -8016,6 +8016,11 @@ def test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed() -> lis
     schema = load_schema("agent_task_owner_approval.schema.json")
     receipt = load_contract_fixture("agent_task_owner_approval.valid.json")
     errors = validate_instance(receipt, schema)
+    stale_policy = load_contract_fixture(
+        "invalid/agent_task_owner_approval_stale_policy.invalid.json"
+    )
+    if validate_instance(stale_policy, schema) == []:
+        errors.append("Owner Approval receiptが期限上限のない旧実行ポリシー識別子を受け入れる")
     execution_claim = load_contract_fixture(
         "invalid/agent_task_owner_approval_execution_claim.invalid.json"
     )
@@ -8026,6 +8031,11 @@ def test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed() -> lis
             errors.append(f"Owner Approval receiptが秘密／権限／実行fieldを受け入れる: {field}")
     if receipt.get("use_limit") != 1 or receipt.get("uses_remaining") != 1:
         errors.append("Owner Approval receiptが未消費一回限りを示さない")
+    policy_id = "gui-shell-agent-task-sandbox-v1-max-runtime-900s"
+    if schema["properties"]["適用ポリシー"].get("const") != policy_id:
+        errors.append("Owner Approval Schemaが固定実行ポリシー識別子と一致しない")
+    if receipt.get("適用ポリシー") != policy_id:
+        errors.append("Owner Approval正常例が固定実行ポリシー識別子と一致しない")
     broker = (ROOT / "native/rust_helper/src/broker/dialogue.rs").read_text(
         encoding="utf-8"
     )
@@ -8048,6 +8058,9 @@ def test_agent_task_owner_approval_receipt_is_hash_bound_and_unconsumed() -> lis
             errors.append(f"Owner Approval native確認経路に必須表示／制限がない: {required}")
     if "AgentTaskOwnerApprovalGrant" not in protocol or "DesktopNativeConfirmation" not in protocol:
         errors.append("Owner Approval operationがRust Desktop native confirmationへ限定されない")
+    for source, text in (("Broker", broker), ("native確認画面", launcher)):
+        if policy_id not in text:
+            errors.append(f"Owner Approval {source}がSchemaと同じ固定実行ポリシーを使わない")
     return errors
 
 

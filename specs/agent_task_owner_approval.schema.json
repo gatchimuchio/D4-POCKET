@@ -26,7 +26,7 @@
     "作業領域ID": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
     "指示hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
     "実行条件hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-    "適用ポリシー": {"const": "gui-shell-agent-task-sandbox-v1"},
+    "適用ポリシー": {"const": "gui-shell-agent-task-sandbox-v1-max-runtime-900s"},
     "expires_at_epoch_seconds": {"type": "integer", "minimum": 1},
     "use_limit": {"const": 1},
     "uses_remaining": {"const": 1},
