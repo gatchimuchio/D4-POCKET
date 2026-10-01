@@ -771,6 +771,16 @@ impl 対話制御 {
         self.実行系.contains_key(id)
     }
 
+    /// 登録済みAdapterの検証済みmetadataから能力表示だけを取得する。
+    /// PermissionやApprovalは生成せず、不正・欠落metadataはunsupportedへ閉じる。
+    pub(crate) fn AgentTask能力対応(&self, id: &str) -> bool {
+        self.実行系
+            .get(id)
+            .and_then(|adapter| adapter.agent_metadata())
+            .and_then(|metadata| AgentAdapterMetadata::read(&metadata).ok())
+            .is_some_and(|metadata| metadata.task_execution_supported())
+    }
+
     pub(crate) fn 登録件数(&self) -> usize {
         self.実行系.len()
     }
@@ -2678,6 +2688,14 @@ mod tests {
         .unwrap();
         (c, n)
     }
+
+    #[test]
+    fn 登録AgentTask能力表示はmetadata由来で未登録時はunsupported() {
+        let (c, _) = 準備(false, false, false);
+        assert!(c.AgentTask能力対応("left"));
+        assert!(!c.AgentTask能力対応("unregistered-runtime"));
+    }
+
     fn 操作(
         c: &mut 対話制御, op: &str, v: Value, owner: bool
     ) -> Result<Value, 対話失敗> {

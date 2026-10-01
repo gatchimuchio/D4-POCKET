@@ -7900,7 +7900,8 @@ def test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free() -> 
         "desktop_native_owner_confirmation_required",
         "desktop_install_path_verified",
         "self.対話.登録件数() >= 8",
-        '"task_execution": "unsupported"',
+        'let task_execution = if self.対話.AgentTask能力対応(&request.runtime_id)',
+        '"task_execution": task_execution',
         "rollback_agent_cli_registration",
     ):
         if required not in protocol:

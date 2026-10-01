@@ -1190,7 +1190,7 @@ impl Broker {
                 request_id,
                 operation,
                 "received",
-                "Capability=Agent CLI実行系とWorkspaceの起動中登録 Permission=登録したCLI interface検査とWorkspace root保持だけ Approval=Rust Desktop native Owner確認済み・Task実行Permissionではない RecoveryAction=部分登録を同じBroker内で取消し、Task実行はunsupportedを維持",
+                "Capability=Agent CLI実行系とWorkspaceの起動中登録 Permission=登録したCLI interface検査とWorkspace root保持だけ Approval=Rust Desktop native Owner確認済み・Task用Permissionではない RecoveryAction=部分登録を同じBroker内で取消し、Task実行前に別PermissionとOwner Approvalを要求",
                 EVIDENCE_SOURCE_LIVE_RUNTIME,
                 payload_hash,
             )
@@ -1206,11 +1206,16 @@ impl Broker {
 
         match self.register_agent_cli_runtime_workspace(&request) {
             Ok(()) => {
+                let task_execution = if self.対話.AgentTask能力対応(&request.runtime_id) {
+                    "supported"
+                } else {
+                    "unsupported"
+                };
                 let body = serde_json::json!({
                     "runtime_id": request.runtime_id,
                     "workspace_id": request.workspace_id,
                     "registration_lifetime": "broker_process",
-                    "task_execution": "unsupported",
+                    "task_execution": task_execution,
                     "permission_generated": false,
                     "approval_generated": false,
                     "credential_value_accepted": false
@@ -1220,7 +1225,7 @@ impl Broker {
                     request_id,
                     operation,
                     "accepted",
-                    "Agent CLI実行系とWorkspaceをこのBroker process中だけ登録。Permission・Approval・Credentialは生成せずTask実行非対応を維持",
+                    "Agent CLI実行系とWorkspaceをこのBroker process中だけ登録。Permission・Approval・Credentialは生成せず、Taskは未実行。Capability表示は権限ではなく、Taskごとに別PermissionとOwner Approvalを要求",
                     EVIDENCE_SOURCE_LIVE_RUNTIME,
                     &accepted_hash,
                 ) {
