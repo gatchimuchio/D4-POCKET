@@ -25,7 +25,7 @@ mod windows {
         fn new(helper: &std::path::Path, codex: &std::path::Path) -> Self {
             let unique = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .expect("system clock after epoch")
+                .expect("システム時刻を取得")
                 .as_nanos();
             let root = std::env::temp_dir().join(format!(
                 "gui-shell-r2-task-e2e-{}-{unique}",
@@ -139,7 +139,7 @@ mod windows {
             assert!(self
                 .child
                 .take()
-                .expect("Broker process")
+                .expect("Broker子プロセスを取得")
                 .wait()
                 .expect("Broker process終了待ち")
                 .success());
