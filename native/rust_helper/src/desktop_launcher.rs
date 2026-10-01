@@ -2284,28 +2284,186 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    #[ignore = "対話型Windows desktopで実Win32 Export Owner dialogを制御自動操作する"]
+    #[ignore = "対話型Windowsで実Win32 Export Owner dialogとRust Brokerの生成結果を接続する"]
     #[allow(non_snake_case)]
-    fn nativeOwner確認dialogのExportNoYesを制御UI自動化できpayload本文を露出しない() {
-        let private_payload = "export-ui-private-manifest-payload-marker";
-        let summary = DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
-            display_name: "D4 Pocket UI試験".into(),
-            export_id: "export-owner-ui-test".into(),
-            distribution_channel: "local".into(),
-            optional_module_count: 2,
-            payload_hash: sha256_tagged(b"export-owner-ui-test-payload"),
-        });
+    fn nativeOwner確認dialogのExportNoYesをBrokerReceiptManifestまで接続する() {
+        const PRIVATE_COMPOSE_ID_MARKER: &str = "ui-private-compose-marker";
 
-        assert!(!automate_native_owner_confirmation(
-            &summary,
-            false,
-            Some(private_payload)
-        ));
-        assert!(automate_native_owner_confirmation(
-            &summary,
-            true,
-            Some(private_payload)
-        ));
+        let root = test_root("desktop-export-owner-dialog");
+        let session_file = root.join(SESSION_FILE);
+        let store_dir = root.join("store");
+        let protected_store_dir = root.join("protected");
+        let export_dir = root.join(EXPORT_DIRECTORY_NAME);
+        fs::create_dir(&protected_store_dir).unwrap();
+        fs::create_dir(&export_dir).unwrap();
+
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let (owner_operation_tx, owner_operation_rx) = mpsc::sync_channel(1);
+        let server_shutdown = Arc::clone(&shutdown);
+        let server_session_file = session_file.clone();
+        let server_store_dir = store_dir.clone();
+        let server_protected_store_dir = protected_store_dir.clone();
+        let server_export_dir = export_dir.clone();
+        let server_export_root =
+            cap_std::fs::Dir::open_ambient_dir(&server_export_dir, cap_std::ambient_authority())
+                .unwrap();
+        let server = thread::spawn(move || {
+            let mut config = BrokerServerConfig::new(server_store_dir, server_session_file);
+            config.desktop_protected_store_dir = Some(server_protected_store_dir);
+            crate::broker::ipc_server::run_loopback_server_cancellable_with_owner_operations(
+                config,
+                server_shutdown,
+                ready_tx,
+                owner_operation_rx,
+                Some((server_export_dir, server_export_root)),
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (mut session_bytes, mut broker_endpoint) = read_endpoint(&session_file).unwrap();
+
+        let mut rejected_request = desktop_export_request(
+            "desktop-export-owner-dialog-no",
+            "desktop-export-owner-dialog-no-nonce",
+        );
+        rejected_request["payload"]["compose_manifest"]["compose_id"] =
+            serde_json::Value::String(PRIVATE_COMPOSE_ID_MARKER.to_string());
+        rejected_request["payload_hash"] =
+            serde_json::Value::String(canonical_payload_hash(rejected_request.get("payload")));
+        let mut rejected_prompt_count = 0;
+        let rejected = relay_channel_frame_with_owner_operations(
+            gui_shell_windows_broker_channel::PipeFrame::Line(
+                serde_json::to_vec(&rejected_request).unwrap(),
+            ),
+            &broker_endpoint,
+            Some(&owner_operation_tx),
+            |summary| {
+                rejected_prompt_count += 1;
+                assert!(matches!(
+                    summary,
+                    DesktopOwnerOperationSummary::GuiShellExport(_)
+                ));
+                assert!(!owner_confirmation_text(summary).contains(PRIVATE_COMPOSE_ID_MARKER));
+                automate_native_owner_confirmation(summary, false, Some(PRIVATE_COMPOSE_ID_MARKER))
+            },
+        )
+        .unwrap();
+        let rejected: serde_json::Value = serde_json::from_slice(&rejected).unwrap();
+        assert_eq!(rejected_prompt_count, 1);
+        assert_eq!(rejected["status"], "rejected");
+        assert_eq!(rejected["error"]["code"], "owner_required");
+        assert!(fs::read_dir(&export_dir).unwrap().next().is_none());
+
+        let mut accepted_request = desktop_export_request(
+            "desktop-export-owner-dialog-yes",
+            "desktop-export-owner-dialog-yes-nonce",
+        );
+        accepted_request["payload"]["compose_manifest"]["compose_id"] =
+            serde_json::Value::String(PRIVATE_COMPOSE_ID_MARKER.to_string());
+        accepted_request["payload_hash"] =
+            serde_json::Value::String(canonical_payload_hash(accepted_request.get("payload")));
+        let mut accepted_prompt_count = 0;
+        let accepted =
+            relay_channel_frame_with_owner_operations(
+                gui_shell_windows_broker_channel::PipeFrame::Line(
+                    serde_json::to_vec(&accepted_request).unwrap(),
+                ),
+                &broker_endpoint,
+                Some(&owner_operation_tx),
+                |summary| {
+                    accepted_prompt_count += 1;
+                    let DesktopOwnerOperationSummary::GuiShellExport(summary) = summary else {
+                        panic!("Export要求はExport固有の確認summaryを使う")
+                    };
+                    assert_eq!(summary.export_id, "export-desktop-test");
+                    assert_eq!(summary.optional_module_count, 1);
+                    assert_eq!(
+                        summary.payload_hash,
+                        accepted_request["payload_hash"].as_str().unwrap()
+                    );
+                    assert!(!owner_confirmation_text(
+                        &DesktopOwnerOperationSummary::GuiShellExport(summary.clone())
+                    )
+                    .contains(PRIVATE_COMPOSE_ID_MARKER));
+                    automate_native_owner_confirmation(
+                        &DesktopOwnerOperationSummary::GuiShellExport(summary.clone()),
+                        true,
+                        Some(PRIVATE_COMPOSE_ID_MARKER),
+                    )
+                },
+            )
+            .unwrap();
+        let accepted: serde_json::Value = serde_json::from_slice(&accepted).unwrap();
+        assert_eq!(accepted_prompt_count, 1);
+        assert_eq!(accepted["status"], "accepted");
+        assert_eq!(accepted["request_id"], "desktop-export-owner-dialog-yes");
+        assert_eq!(accepted["body"]["authority_strip"], true);
+        assert_eq!(accepted["body"]["credential_inherited"], false);
+        assert_eq!(accepted["body"]["manifest_file_status"], "written");
+        assert_eq!(accepted["body"]["build_status"], "not_started");
+        assert_eq!(accepted["body"]["artifact_status"], "not_built");
+
+        let manifest_path = accepted["body"]["manifest_file"]["path"].as_str().unwrap();
+        let manifest_bytes = fs::read(manifest_path).unwrap();
+        assert_eq!(
+            crate::audit_hash::sha256_tagged(&manifest_bytes),
+            accepted["body"]["manifest_file"]["sha256"]
+        );
+        let manifest_file: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        assert_eq!(manifest_file["product"], "D4 Pocket");
+        assert_eq!(
+            manifest_file["manifest"]["inheritance_policy"]["credential"],
+            "none"
+        );
+        assert_eq!(
+            manifest_file["manifest"]["inheritance_policy"]["authority"],
+            "none"
+        );
+        assert_eq!(
+            manifest_file["manifest"]["app_identity"]["app_id"],
+            accepted["body"]["export_manifest"]["app_identity"]["app_id"]
+        );
+        assert_eq!(
+            manifest_file["manifest"]["audit_store"]["store_id"],
+            accepted["body"]["export_manifest"]["audit_store"]["store_id"]
+        );
+
+        if let Some(capture_dir) = std::env::var_os("GUI_SHELL_EXPORT_E2E_CAPTURE_DIR") {
+            let capture_dir = PathBuf::from(capture_dir);
+            let metadata = fs::symlink_metadata(&capture_dir).unwrap();
+            assert!(metadata.is_dir() && !metadata.file_type().is_symlink());
+            assert!(!is_reparse_point(&metadata));
+            let resolved_capture = fs::canonicalize(&capture_dir).unwrap();
+            let resolved_temp = fs::canonicalize(std::env::temp_dir()).unwrap();
+            assert!(resolved_capture.starts_with(&resolved_temp));
+            assert_ne!(resolved_capture, resolved_temp);
+            assert!(fs::read_dir(&resolved_capture).unwrap().next().is_none());
+
+            let receipt_bytes = serde_json::to_vec_pretty(&accepted["body"]).unwrap();
+            fs::write(
+                resolved_capture.join("d4_pocket_build_receipt.json"),
+                receipt_bytes,
+            )
+            .unwrap();
+            fs::write(
+                resolved_capture.join("broker-generated-manifest.json"),
+                &manifest_bytes,
+            )
+            .unwrap();
+        }
+
+        shutdown.store(true, Ordering::Release);
+        server.join().unwrap().unwrap();
+        let audit = fs::read_to_string(store_dir.join("audit.jsonl")).unwrap();
+        assert!(audit.contains("desktop-export-owner-dialog-no"));
+        assert!(audit.contains("desktop-export-owner-dialog-yes"));
+        assert!(audit.contains("owner_required"));
+        assert!(audit.contains("Rust Desktop起動器のネイティブ確認"));
+        assert!(!audit.contains(PRIVATE_COMPOSE_ID_MARKER));
+
+        broker_endpoint.session_secret.zeroize();
+        session_bytes.zeroize();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(windows)]

@@ -1011,6 +1011,8 @@ mod tests {
             .unwrap();
             tls.write_all(bytes).unwrap();
             tls.flush().unwrap();
+            tls.conn.send_close_notify();
+            let _ = tls.flush();
         });
         let root = Certificate::from_der(certified.cert.der().as_ref()).unwrap();
         let client = build_download_client("localhost", &[address], &[root]).unwrap();

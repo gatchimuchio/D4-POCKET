@@ -84,7 +84,7 @@
     },
     {
       "path": ".github/workflows/windows-manual-rust-validation.yml",
-      "sha256": "1e419f47d6c9ed03592b572102e4dcf5f52a7104cdbd15f31db3a4778dcd48da"
+      "sha256": "f506f39ae80dda28e47a01bd560db378ddd4c84759e3af3df558a9926b9cbe07"
     },
     {
       "path": ".gitignore",
@@ -3188,7 +3188,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
-      "sha256": "f6d40948acba79111f6d6c0539c9c922f4d1e6ba5b5f9402e48a56d0d41f26ba"
+      "sha256": "52155397b8f838e86285a0756397c9ed7e9e51c6f781891e3aed1d0eb21973ee"
     },
     {
       "path": "native/rust_helper/src/broker/update_download/windows_dns.rs",
@@ -3212,7 +3212,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "f57f47454a2956a52fee2386a091dd500d4ac24299f751adf06310f38d97cb87"
+      "sha256": "2566a06d41f34ba43e2bef18fe537b2d40ff9296c1ff0a2c65d011585f5f6c22"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4432,7 +4432,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "ea41d30ff0902224aa599d26cdb4a9401f916ffdcbefd63adf2917f158a8ba4a"
+      "sha256": "4d53d3b1557cb68debd882a3e82b0e02bee4a479f028675007b436c587708fdf"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

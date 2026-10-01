@@ -70,6 +70,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/desktop_launcher.rs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/update_download.rs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/unit/agent_task_fixture_fs.rs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/unit/codex_cli_fixture.rs
