@@ -12,6 +12,8 @@ use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
 use serde_json::{json, Value};
 use std::env;
+#[cfg(all(feature = "r2-e2e", not(test)))]
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -35,10 +37,56 @@ const MAX_REGISTERED_SECRET_PATHS: usize = 256;
 const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
     "permissions.d4p-agent-task.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={";
 
-#[cfg(test)]
+#[cfg(any(test, feature = "r2-e2e"))]
 struct CodexCliTestResponses {
     port: u16,
     codex_home: PathBuf,
+}
+
+#[cfg(all(feature = "r2-e2e", not(test)))]
+fn loopback_responses_from_environment() -> Result<Option<CodexCliTestResponses>, String> {
+    const PORT_ENV: &str = "GUI_SHELL_R2_E2E_RESPONSES_PORT";
+    const HOME_ENV: &str = "GUI_SHELL_R2_E2E_CODEX_HOME";
+    let port = env::var(PORT_ENV).ok();
+    let codex_home = env::var_os(HOME_ENV).map(PathBuf::from);
+    match (port, codex_home) {
+        (None, None) => Ok(None),
+        (Some(port), Some(codex_home)) => {
+            let port = port
+                .parse::<u16>()
+                .ok()
+                .filter(|port| *port != 0)
+                .ok_or_else(|| "R2 loopback偽API portが不正".to_string())?;
+            if !codex_home.is_absolute()
+                || codex_home.file_name().and_then(|name| name.to_str()) != Some("codex-home")
+            {
+                return Err("R2 loopback試験CODEX_HOMEが不正".into());
+            }
+            let metadata = fs::symlink_metadata(&codex_home)
+                .map_err(|_| "R2 loopback試験CODEX_HOMEを確認できない")?;
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err("R2 loopback試験CODEX_HOMEが通常directoryではない".into());
+            }
+            if !codex_home.parent().is_some_and(|parent| {
+                parent.file_name().and_then(|name| name.to_str())
+                    == Some("D4Pocket-R2-E2E-SYNTHETIC")
+                    && parent.join("OWNER-APPROVED-SYNTHETIC.txt").is_file()
+            }) {
+                return Err("R2 loopback試験fixture rootを確認できない".into());
+            }
+            if fs::read_dir(&codex_home)
+                .map_err(|_| "R2 loopback試験CODEX_HOMEを検査できない")?
+                .next()
+                .transpose()
+                .map_err(|_| "R2 loopback試験CODEX_HOMEを検査できない")?
+                .is_some()
+            {
+                return Err("R2 loopback試験CODEX_HOMEに既存fileがある".into());
+            }
+            Ok(Some(CodexCliTestResponses { port, codex_home }))
+        }
+        _ => Err("R2 loopback試験設定が揃っていない".into()),
+    }
 }
 
 const SAFE_ENVIRONMENT: &[&str] = &[
@@ -62,7 +110,7 @@ pub struct CodexCliAdapter {
     workspace_identity: crate::broker::workspace_root::DirectoryIdentity,
     workspace_write_interface: bool,
     version: String,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r2-e2e"))]
     test_responses_api: Option<CodexCliTestResponses>,
 }
 
@@ -89,6 +137,11 @@ impl CodexCliAdapter {
         }
         let workspace_write_interface = workspace_write_interface_present(&help.stdout);
 
+        #[cfg(all(feature = "r2-e2e", not(test)))]
+        let test_responses_api = loopback_responses_from_environment()?;
+        #[cfg(test)]
+        let test_responses_api: Option<CodexCliTestResponses> = None;
+
         Ok(Self {
             executable,
             workspace,
@@ -99,8 +152,8 @@ impl CodexCliAdapter {
                 .nth(1)
                 .unwrap_or("unknown")
                 .to_string(),
-            #[cfg(test)]
-            test_responses_api: None,
+            #[cfg(any(test, feature = "r2-e2e"))]
+            test_responses_api,
         })
     }
 
@@ -147,6 +200,32 @@ impl 実行系Adapter for CodexCliAdapter {
     }
 
     fn agent_metadata(&self) -> Option<Value> {
+        #[cfg(all(feature = "r2-e2e", not(test)))]
+        let task_execution_capability = if self.test_responses_api.is_some() {
+            json!({
+                "capability_id": "task_execution",
+                "support": {
+                    "status": "supported",
+                    "reason": "決定論的なlocalhost偽APIを使うR2統合検証build内だけのTask実行"
+                }
+            })
+        } else {
+            json!({
+                "capability_id": "task_execution",
+                "support": {
+                    "status": "unsupported",
+                    "reason": "R2統合検証buildのloopback試験条件が設定されていない"
+                }
+            })
+        };
+        #[cfg(not(all(feature = "r2-e2e", not(test))))]
+        let task_execution_capability = json!({
+            "capability_id": "task_execution",
+            "support": {
+                "status": "unsupported",
+                "reason": "専用permission profileの実Task、隔離、後始末を実Agentで検証していない"
+            }
+        });
         Some(json!({
             "adapter_id": "codex-cli",
             "agent_id": "codex",
@@ -155,7 +234,7 @@ impl 実行系Adapter for CodexCliAdapter {
             "model": "unknown",
             "status": "degraded",
             "capabilities": [
-                {"capability_id": "task_execution", "support": {"status": "unsupported", "reason": "専用permission profileの実Task、隔離、後始末を実Agentで検証していない"}},
+                task_execution_capability,
                 {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
             ],
             "workspace_requirements": {
@@ -202,7 +281,7 @@ impl 実行系Adapter for CodexCliAdapter {
         )?;
         let mut scratch =
             WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
-        #[cfg(test)]
+        #[cfg(any(test, feature = "r2-e2e"))]
         let result = run_agent_task(
             &self.executable,
             &self.workspace,
@@ -214,7 +293,7 @@ impl 実行系Adapter for CodexCliAdapter {
             deadline,
             self.test_responses_api.as_ref(),
         );
-        #[cfg(not(test))]
+        #[cfg(not(any(test, feature = "r2-e2e")))]
         let result = run_agent_task(
             &self.executable,
             &self.workspace,
@@ -238,7 +317,7 @@ impl 実行系Adapter for CodexCliAdapter {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗> {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "r2-e2e"))]
         let mut child = spawn_codex_task(
             &self.executable,
             &self.workspace,
@@ -249,7 +328,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &[],
             None,
         )?;
-        #[cfg(not(test))]
+        #[cfg(not(any(test, feature = "r2-e2e")))]
         let mut child = spawn_codex_task(
             &self.executable,
             &self.workspace,
@@ -616,10 +695,10 @@ fn spawn_codex_task(
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
-    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r2-e2e"))]
     let task_command = build_codex_command(
         executable,
         workspace,
@@ -628,7 +707,7 @@ fn spawn_codex_task(
         secret_paths,
         test_responses_api,
     )?;
-    #[cfg(not(test))]
+    #[cfg(not(any(test, feature = "r2-e2e")))]
     let task_command = build_codex_command(
         executable,
         workspace,
@@ -658,11 +737,11 @@ fn build_codex_command(
     sandbox: CodexSandbox,
     scratch: Option<&Path>,
     secret_paths: &[String],
-    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r2-e2e"))]
     if let Some(test_api) = test_responses_api {
         let base_url = format!("http://127.0.0.1:{}/v1", test_api.port);
         let overrides = [
@@ -816,7 +895,7 @@ fn run_agent_task(
     instruction: &str,
     cancel: &AtomicBool,
     deadline: Instant,
-    #[cfg(test)] test_responses_api: Option<&CodexCliTestResponses>,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<String, 対話失敗> {
     if Instant::now() >= deadline {
         return Err(対話失敗::期限超過);
@@ -824,7 +903,7 @@ fn run_agent_task(
     if cancel.load(Ordering::SeqCst) {
         return Err(対話失敗::取消);
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r2-e2e"))]
     let mut child = spawn_codex_task(
         executable,
         workspace,
@@ -835,7 +914,7 @@ fn run_agent_task(
         secret_paths,
         test_responses_api,
     )?;
-    #[cfg(not(test))]
+    #[cfg(not(any(test, feature = "r2-e2e")))]
     let mut child = spawn_codex_task(
         executable,
         workspace,

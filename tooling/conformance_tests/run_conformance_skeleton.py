@@ -6704,6 +6704,7 @@ def test_update_download_transport_is_broker_owned_and_bounded() -> list[str]:
 
 def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     adapter_path = RUST_HELPER / "src" / "adapters" / "codex_cli.rs"
+    cargo_manifest_path = RUST_HELPER / "Cargo.toml"
     broker_path = RUST_HELPER / "src" / "broker" / "ipc_server.rs"
     workspace_path = RUST_HELPER / "src" / "broker" / "workspace.rs"
     dialogue_path = RUST_HELPER / "src" / "broker" / "dialogue.rs"
@@ -6712,6 +6713,7 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
     if not adapter_path.is_file():
         return ["Codex CLI Adapter sourceが存在しない"]
     adapter = adapter_path.read_text(encoding="utf-8")
+    cargo_manifest = cargo_manifest_path.read_text(encoding="utf-8")
     broker = broker_path.read_text(encoding="utf-8")
     workspace = workspace_path.read_text(encoding="utf-8")
     dialogue = dialogue_path.read_text(encoding="utf-8")
@@ -6759,11 +6761,20 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         "exec_interface_present",
         "workspace_write_interface_present",
         "remove_open_dir_all",
-        'task_execution", "support": {"status": "unsupported"',
     )
     for token in task_required:
         if token not in adapter:
             errors.append(f"Codex Agent Task境界または未検証gateがない: {token}")
+    explicit_unsupported_gate = 'task_execution", "support": {"status": "unsupported"' in adapter
+    isolated_e2e_unsupported_gate = (
+        '[features]\ndefault = []\n# Local-only integrated R2 test build. Never use for product distribution.\nr2-e2e = []'
+        in cargo_manifest
+        and '#[cfg(not(all(feature = "r2-e2e", not(test))))]' in adapter
+        and 'let task_execution_capability = json!({' in adapter
+        and '"status": "unsupported"' in adapter
+    )
+    if not explicit_unsupported_gate and not isolated_e2e_unsupported_gate:
+        errors.append("Codex Agent Taskの通常Release unsupported gateが既定のまま保たれない")
     if adapter.count("task_filesystem_override(secret_paths)?") != 1:
         errors.append("Codex Taskが登録secretから単一のfilesystem overrideを生成しない")
     if "permissions.d4p-agent-task.filesystem.glob_scan_max_depth=" in adapter:

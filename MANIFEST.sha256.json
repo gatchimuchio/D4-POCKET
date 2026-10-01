@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "6b8bcd2906305c43744488f2ddbadc0884c4ae552e704c3a3ddce494579be5fc"
+      "sha256": "2322007363b7d4f807d24e7a7c12042bb5dd1b0fbc031f7639f2cb608c5dc86e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -2988,7 +2988,7 @@
     },
     {
       "path": "native/rust_helper/Cargo.toml",
-      "sha256": "ec810be44a4eebd2c8a3ddfc80adf5ca5c21b058978ed53c293a0d4d63edb28e"
+      "sha256": "f73896579f4727dfd1daf6536433ea29bece3cf4ec91f28737467c700b366d39"
     },
     {
       "path": "native/rust_helper/README.md",
@@ -3024,7 +3024,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "2a0f9cf84e572ad7490fe6e9dea075723e9c9e1c2d0c4af3e59ec6707e354d0d"
+      "sha256": "8d4a4dfe7602a0e2ef575214a13830be02e1666d5be3f3c772842628ade3eaf7"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3049,6 +3049,10 @@
     {
       "path": "native/rust_helper/src/bin/gui_shell_desktop_launcher.rs",
       "sha256": "8ad87561ef721f438acd614bebd89de0de6b818b4df0c642d3c9c98b93533a85"
+    },
+    {
+      "path": "native/rust_helper/src/bin/r2_e2e_responses.rs",
+      "sha256": "8c82d3e99782209de2f131f4c28e7604fa354e961881c6f51b40692f1c06b2b8"
     },
     {
       "path": "native/rust_helper/src/broker/a2a_center.rs",
@@ -4460,7 +4464,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e2eb1bc1f4e0f1a09d5b06b97020dba62107c9c002582b6a1b6bb921c20d699e"
+      "sha256": "b58caaa278cea80685c2d366588bd1afd44b7fe6743d06a24347f61deba7c356"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

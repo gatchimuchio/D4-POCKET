@@ -4,9 +4,19 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 
+[features]
+default = []
+# Local-only integrated R2 test build. Never use for product distribution.
+r2-e2e = []
+
 [lib]
 name = "gui_shell_rust_helper"
 path = "src/lib.rs"
+
+[[bin]]
+name = "gui_shell_r2_e2e_responses"
+path = "src/bin/r2_e2e_responses.rs"
+required-features = ["r2-e2e"]
 
 [dependencies]
 getrandom = "0.2"

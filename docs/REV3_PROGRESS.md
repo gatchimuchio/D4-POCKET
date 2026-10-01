@@ -1717,3 +1717,26 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo test --locked --lib -- --ignored Rust生成Task設定で実Windows隔離の登録secretを拒否する --nocapture`はOneDrive Cloud Files、通常NTFSそれぞれ1 passed。`cargo test --locked --all-targets -- --test-threads=1`は12 target、444 passed／0 failed／7 ignored。Rust変更fileの`rustfmt 1.95.0 --edition 2021 --config skip_children=true --check`と`git diff --check`も成功した。
 - 実Codex CLIとloopback fake Responses APIを使う別のignored試験は1 passedで、in-process Broker fixture経由の通常完了・取消、MxC TEMP marker／rootの終了後不在、外部接続遮断0件を確認した。Broker、Owner判断、Audit callback、Workspace、APIはfixtureであり、production Broker server／authenticated IPCではない。
 - 本probeは製品Adapterを実行可能へ昇格せず、`task_execution=unsupported`を変更しない。登録前に作られたhardlink aliasをMxC childが読めないこと、installed Flutter UIからnative Owner確認、production IPC／Broker経由の正Task、永続positive Audit、deadline／crash Recovery、結果／diffのContent Exposureは未確認であり、R2 `release_blocker`と`release_ready=false`を維持する。
+
+## R2追補 統合E2E用localhost偽Responses API経路の準備（2026-10-02）
+
+### 実装範囲
+
+- 通常のCargo既定featureは空のまま、明示指定時だけ有効な`r2-e2e`検証featureと、合成Workspace専用の`gui_shell_r2_e2e_responses`を追加した。検証featureはtask用既存Adapter／Broker／Owner操作経路を通すための局所的なbuild設定で、通常ReleaseのTask対応を有効化しない。
+- 検証launcherのTask capabilityは、loopback偽API用portと、オーナー承認済み合成OneDrive root直下にある空の通常`codex-home`が両方検証できた場合だけ`supported`を返す。片方欠落、不正port、非通常directory、root／承認marker不一致、既存内容ありの場合は開始前に停止する。偽APIの接続先は`127.0.0.1`に固定し、通常`CODEX_HOME`やCredentialは引き継がない。
+- 専用fixture serverの証跡は要求数、固定tool callの提示・送信、破損要求、途中要求、応答書込失敗、非loopback要求、合成Workspace内markerの有無だけであり、task本文やfile内容は出力しない。
+- この準備blockではinstalled Flutter／native launcher／Brokerを通したTaskをまだ実行していない。fake API buildは通常Releaseやprovider接続の製品証拠ではなく、R2 production positive E2Eを閉じない。
+
+### 検証
+
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功。11 target、444 passed／0 failed／6 ignored。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`: 成功。
+- `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --release --bins`: 成功。既存`minidora.rs`のdead-code warning 2件のみ。
+- `python tooling/schema_check/check_schemas.py`: 成功。Schema 152件／通常例152件／negative fixture 196件。
+- `python tooling/conformance_tests/run_conformance_skeleton.py`: 成功。231 checks。Codex Taskの通常Release gateはdefault-off検証featureと区別して検査する。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/adapters/codex_cli.rs native/rust_helper/src/bin/r2_e2e_responses.rs`および`git diff --check`: 成功。
+- 途中の全target再実行ではWindows loopback／TLS接続resetが2回、別の単独再実行ではConformance並走下でA2A loopback読取失敗が1回あった。該当A2A試験のfocused retry 3回と最終全target再実行は成功し、最終全target結果を採用する。失敗原因は確定していないため失敗履歴を保持する。
+
+### 維持する境界
+
+- `task_execution=unsupported`、R2 production positive E2E `release_blocker`、`release_ready=false`を維持する。Owner／Permission／Approval、production IPC、positive durable Audit、OneDrive Cloud Files／通常NTFSの統合実行、failure／deadline／crash Recovery、MxC TEMP cleanup、result／diff Content Exposure、通常ReleaseでのTask能力は未検証である。
