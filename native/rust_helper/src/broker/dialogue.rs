@@ -3325,6 +3325,14 @@ mod tests {
             Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => "access_denied",
             Err(_) => "other_error",
         };
+        let temp_directory_observation = |path: &std::path::Path| match std::fs::read_dir(path) {
+            Ok(entries) => format!("存在_内容数_{}", entries.count()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "不在".to_owned(),
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                "参照拒否".to_owned()
+            }
+            Err(_) => "その他失敗".to_owned(),
+        };
         let marker_while_mxc_child_running =
             marker_observation(&temp_marker_path, b"d4p synthetic temp observer");
         assert_eq!(
@@ -3405,9 +3413,14 @@ mod tests {
         } else {
             false
         };
+        let temp_directory_after_mxc_exit =
+            temp_directory_observation(std::path::Path::new(child_temp));
         eprintln!(
-            "MxC TEMP markerのBroker親観測: 実行中={}; CLI終了後={}; probe固有marker除去={}",
-            marker_while_mxc_child_running, marker_after_mxc_exit, marker_removed_by_probe
+            "MxC TEMP markerのBroker親観測: 実行中={}; CLI終了後={}; TEMP実体状態={}; 試験固有marker除去={}",
+            marker_while_mxc_child_running,
+            marker_after_mxc_exit,
+            temp_directory_after_mxc_exit,
+            marker_removed_by_probe
         );
         assert_eq!(
             marker_after_mxc_exit, "not_found",
@@ -3601,13 +3614,15 @@ mod tests {
         assert!(cancelled.get("result_hash").is_none());
         let cancel_marker_after_exit =
             marker_observation(&cancel_temp_marker_path, b"d4p synthetic temp observer");
+        let cancel_temp_directory_after_exit =
+            temp_directory_observation(std::path::Path::new(cancel_temp));
         assert_eq!(
             cancel_marker_after_exit, "not_found",
             "Broker取消でMxC child終了後にTEMPのtask markerを残さない"
         );
         eprintln!(
-            "取消MxC TEMP markerのBroker親観測: 実行中={}; child終了後={}",
-            cancel_marker_while_running, cancel_marker_after_exit
+            "取消MxC TEMP markerのBroker親観測: 実行中={}; child終了後={}; TEMP実体状態={}",
+            cancel_marker_while_running, cancel_marker_after_exit, cancel_temp_directory_after_exit
         );
         let heartbeat_after_terminal = std::fs::metadata(&heartbeat)
             .expect("停止済みtool child heartbeatをstatする")

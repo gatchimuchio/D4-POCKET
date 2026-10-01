@@ -161,7 +161,7 @@ Windowsのignored Rust統合testは、実Codex CLI `0.158.0-alpha.2.1`と実MxC 
 
 ### MxC AppContainer一時領域とBroker scratchの責任分離（2026-10-01）
 
-Broker-owned `WorkspaceTaskScratch`と、MxC tool childが実際に受け取る`TEMP`／`TMP`は別の領域として扱う。Windows AppContainerは`TEMP`／`TMP`をAppContainer profile配下の`AC\Temp`へリダイレクトするため、child値がBroker scratchと一致することを安全不変条件にしない。Broker scratchはBrokerが所有する作業・回収対象であり、AppContainer側の一時領域はMxC／Windows sandbox profileの寿命と権限境界に従う。
+Broker-owned `WorkspaceTaskScratch`と、MxC tool childが実際に受け取る`TEMP`／`TMP`は別の領域として扱う。Windows AppContainerは`TEMP`／`TMP`をAppContainer profile配下の`AC\Temp`へリダイレクトする（[Microsoft Learn: Launch an AppContainer](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)）ため、child値がBroker scratchと一致することを安全不変条件にしない。Broker scratchはBrokerが所有する作業・回収対象であり、AppContainer側の一時領域はMxC／Windows sandbox profileの寿命と権限境界に従う。
 
 Task対応を成立させるには、Broker scratchとAppContainer一時領域の双方を区別した上で、production Broker経路におけるtask間・同時task間の分離、実際のsandbox process群停止後の通常終了／取消／期限超過／crash時cleanup、およびcleanup失敗時のRecoveryを検証する。AppContainer環境handleのclose、child終了後にhostからpathが見えないこと、または`TEMP`／`TMP`がBroker scratchと違うこと単独では、物理削除・task間非共有を証明しない。条件が閉じるまでは`task_execution=unsupported`と既存`release_blocker`を維持する。
 
@@ -170,3 +170,9 @@ Task対応を成立させるには、Broker scratchとAppContainer一時領域�
 Rust source／testがcommit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`と一致するWindows Release Broker processを起動し、実Codex CLI `0.159.2`の登録だけを行う統合testを追加した。通常認証loopback IPCでAgent Sessionを作成した後、Task要求検査・Task起動はmetadataの`unsupported`により拒否され、通常資格によるWorkspace Permission／Owner Approval発行要求もnative Owner確認必須として拒否される。拒否AuditはBroker終了後に永続storeから再読込でき、指示本文と合成secretは応答・Auditに含まれない。
 
 この`LIVE_RUNTIME`証拠はRelease helper process、通常認証IPC、実CLIの登録・能力投影、Brokerの拒否とfile-backed Audit再読込に限る。Workspace／store／secretは合成`FIXTURE`で、native Owner UIは操作せず、Task processは起動していない。scratchが作成されないことはTask後始末の証拠ではない。正の実Task、installed Desktop経路、sandbox隔離、取消／期限／crash Recovery、MxC一時領域の後始末、結果／diffのContent Exposureは未成立であり、Codex Adapterを`task_execution=unsupported`に保つ。
+
+### MxC TEMP実体の正常終了・取消後照合（2026-10-01）
+
+実Codex CLI `0.159.2`と実MxC shell childを使うignored Rust統合testへ、固定loopback偽Responses APIがchild内で報告したTEMP pathを、Task terminal後に単一directoryとして照合する観測を加えた。親test processから実行中markerを読め、正常完了後とBroker取消後はいずれもmarker readが`NotFound`、同じTEMP rootの`read_dir`も`NotFound`となった。観測結果は状態とentry件数だけを出し、絶対path・entry名・本文を記録しない。focused runは1回で、正常完了と取消を各1回観測した。
+
+この`LIVE_RUNTIME`範囲は当該CLI版とMxC childの正常完了／Broker取消後に、報告されたTEMP directory pathが存在しなかったことだけである。Broker consumer、Owner判断、Audit callback、Workspace、CODEX_HOME、loopback APIは`FIXTURE`であり、installed Desktop UI、native Owner confirmation、Release Broker／authenticated IPC上の正Task、file-backed positive Audit、deadline／process crash／電源断、全一時entryのcleanupを証明しない。TEMP rootが終了後に不在だった一度の観測をtask間隔離や異常終了cleanupへ一般化せず、`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。

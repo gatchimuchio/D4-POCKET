@@ -1638,6 +1638,22 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - この修正はreceipt上の固定条件識別子と契約間整合だけを確認する。Task worker起動、Broker production IPC、installed Flutter／native Ownerからの正の実行、filesystem隔離、永続Audit、Recovery、結果／diff表示を検証していない。
 - `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
 
+## R2追補 MxC TEMP実体の正常終了・取消後照合（2026-10-01）
+
+### 成立した観測
+
+- ignored Rust統合test `Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME`を拡張し、実Codex CLI `0.159.2`のMxC childから報告されたTEMP pathをterminal後に単一directoryとして照合する。正常完了とBroker取消を各1回実行し、実行中は合成markerをhost test processから読め、各terminal後はmarkerとTEMP directory rootの双方が`NotFound`となった。
+- 試験出力はmarker状態、TEMP root状態、directory内entry件数だけとし、TEMP path、entry名、内容は出力・保存しない。TEMP／TMPの一致とBroker `.d4p-tmp-*` scratchとの不一致、loopback外接続拒否0件も同runで確認した。
+- Codex CLI／MxC child終端後のdirectory不在は当該実機・版における`LIVE_RUNTIME`。Broker consumer、Owner判断、Audit callback、Workspace、CODEX_HOME、fake Responses APIは`FIXTURE`。実model、credential、課金要求、Windows保護設定変更はない。
+
+### 検証と未成立境界
+
+- focused ignored testはexit 0、1 passed。環境変数`GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`には`C:\Users\ohira\AppData\Local\OpenAI\Codex\bin\c6fe824d725f02d7\codex.exe`（`codex-cli 0.159.2`）を指定した。
+- `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 13対象を実行し、成功444件／失敗0件／無視7件。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/src/broker/dialogue.rs`と`git diff --check`は成功。
+- source更新直後の最初の統合validatorはManifest hash不一致で失敗した。文書追補後の再検証では進捗記録1652行目の英語比率が日本語基底監査に検出されたため、試験件数の説明を日本語化した。`python -X utf8 tooling/manifest.py --write`で1130 filesへ再生成後、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はexit 0。厳格日本語監査1133 files／検出0件、Schema 152／正常例152／negative fixture 196、Conformance 231 checks、登録10検査が成功し、`release_ready=false`、31件のrelease blockerを維持した。
+- 一度ずつの正常完了／取消後にTEMP rootが不在だった結果は、反復性、同時・後続Task間分離、deadline／process crash／電源断後のcleanupを示さない。production Release Broker／authenticated IPCと正Task、installed Flutter／native Owner confirmation、durable positive Audit／改変検証、OneDrive Cloud Files／通常NTFS隔離matrix、result／diff Content Exposureも未成立。Codex Adapterの`task_execution=unsupported`とR2 `release_blocker`を維持する。
+
 ## R2追補 Agent CenterのBroker Task操作contract配線（2026-10-01）
 
 ### 成立した範囲
