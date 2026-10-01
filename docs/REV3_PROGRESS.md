@@ -1518,4 +1518,4 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 境界と残存範囲
 
 - 今回成立したのはWin32確認画面、synthetic fixtureを用いたBroker Receipt／Manifest生成、未署名の開発用bundle組立、既知の資格情報pattern検査、単体Broker実行確認まで。`rev2_export_owner_ui_authority_path`は未解決の`release_blocker`として維持する。
-- 別Windows user profileからのinstalled app起動、正式Owner authority、runtimeでのManifest消費、実installed Audit storeの分離と完了Audit、非継承Receipt、実製品launch、署名／Installer、release readinessは未成立。`release_ready=false`を維持する。
+- 別Windows user profileからのinstalled app起動、正式Owner authority、実installed Audit storeの分離と完了Audit、非継承Receipt、実製品launch、署名／Installer、release readinessは未成立。現行`docs/specs/windows-desktop-launcher.md`はruntimeでManifestを再読込してpath／authority選択へ使うことを認めず、compile-time identityを使う設計である。従ってruntime Manifest消費は未完了項目や次工程条件にしない。必要な次の証拠はManifest由来compile-time IDを含むBundleの別profile installed-path実行とAudit境界である。`release_ready=false`を維持する。

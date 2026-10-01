@@ -700,8 +700,8 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Rust起動器の製品別runtime root、Broker create-only Manifest／Receipt／Audit結合、Schema検証済みManifestからのWindows開発bundle生成は実装済み。過去の手動run #6／#7はknown-pattern credential scanでfail-closed停止し、run #8はsynthetic fixture bundleのscan 0件で成功したが一般的な秘密不存在は証明しない。今回、実Win32 No／Yes確認dialogをfixture-backed Broker Receipt／Manifest生成へ接続し、run #30はcommit 3d312b27d2a4b53575de5561790ecc7fc8f2439cでRust全target試験・Release Broker build・standalone Broker smokeを含む9 stepすべてpassした。さらに同じclean commitでBroker test経路が生成したReceipt／Manifestから14-file unsigned development bundleをWindows上で生成し、Receipt／Manifest／bundle hash一致とknown-pattern scan 0 findingsを確認した。証拠源はWin32 dialogのLIVE_RUNTIME、synthetic Broker／WorkspaceのFIXTURE、bundle buildのINTERNAL_STATE、Actions runner結果のEXTERNAL_EVIDENCEに限定される。installed product、runtime Manifest消費、正式Owner authority、別profileのAudit分離・完了Audit・非継承Receipt、製品起動・署名・Installerの証拠は未成立。",
-      "required_action": "Broker生成Manifestを消費するruntime経路と新規App／Audit identity境界を実装・検証し、Broker ExportからWindows製品bundleを経た別Windows user profile上のinstalled-path起動まで接続する。実Owner No／Yes判断、Manifest消費、独立Audit storeと完了Audit、authority／credential非継承Receipt、clean-source・artifact hash provenanceをLIVE_RUNTIME evidenceとして収集し、Windows release evidence validatorへ通す。known-pattern scan結果を一般的な秘密不存在へ昇格しない。production signing identityとFinal GOはTechnical Complete後のOwner Finalizationに分離する。",
+      "reason": "Rust起動器の製品別runtime root、Broker create-only Manifest／Receipt／Audit結合、Schema検証済みManifest由来App／Audit IDをcompile-timeへ渡すWindows開発bundle生成は実装済み。過去の手動run #6／#7はknown-pattern credential scanで停止し、run #8はfixture bundleのscan 0件で成功したが一般的な秘密不存在は証明しない。今回、実Win32 No／Yes確認dialogをfixture-backed Broker Receipt／Manifest生成へ接続し、run #30はcommit 3d312b27d2a4b53575de5561790ecc7fc8f2439cでRust全target検査・Release Broker build・standalone Broker smokeを含む9 stepすべてpassした。同じclean commitからBroker test経路が生成したReceipt／Manifestを使い、14-file unsigned development bundleをWindows上で生成し、hash一致とknown-pattern scan 0 findingsを確認した。現行docs/specs/windows-desktop-launcher.mdはpath／authority選択のためのruntime Manifest再読込を認めず、compile-time IDを使う。この契約は維持する。今回の証拠はWin32 dialogのLIVE_RUNTIME、synthetic Broker／WorkspaceのFIXTURE、bundle buildのINTERNAL_STATE、Actions結果のEXTERNAL_EVIDENCEに限られ、別profile installed product、production Owner authority、実Audit store分離・完了Audit、非継承Receipt、実製品起動・署名・Installerは未成立。",
+      "required_action": "Broker生成Manifest由来のApp ID／Audit store IDをcompile-time build入力へ渡す既存契約を維持し、hash固定したunsigned test bundleを別Windows user profileへ配置してinstalled-path起動を実測する。実Owner No／Yes判断がBroker Export結果へ結び付き、製品別保存rootとAudit store、起動・終了／完了Audit、authority／credential非継承Receiptが当該bundleのsource commit・artifact hashへ結び付くLIVE_RUNTIME evidenceを収集し、Windows release evidence validatorへ通す。Manifestのruntime再読込をpath／authority選択に追加しない。production signing identityとFinal GOはTechnical Complete後のOwner Finalizationに分離する。",
       "latest_broker_generated_export_bundle_probe": {
         "date": "2026-10-01",
         "evidence_sources": [
@@ -740,6 +740,7 @@
           "credential_known_pattern_scan": "passed_known_patterns",
           "credential_known_pattern_findings": 0,
           "runtime_manifest_consumed": false,
+          "runtime_manifest_policy": "path／authority選択のためにruntimeで再読込しない。Manifest由来IDをcompile-timeへ渡す現行契約を保持",
           "installed_launch_verified": false,
           "signed": false,
           "installer": "not_started",
@@ -756,7 +757,7 @@
             ]
           }
         },
-        "scope_limit": "synthetic Broker／Workspaceを用いたtest生成物からのWindows bundle組立と既知pattern scanに限る。Owner authorization、production source authority、runtime Manifest消費、別profile installed runtime、Audit／permission継承の製品実証、release readinessは証明しない"
+        "scope_limit": "synthetic Broker／Workspaceを用いたtest生成物からのWindows bundle組立と既知pattern scanに限る。Owner authorization、production source authority、別profile installed runtime、Audit／permission継承の製品実証、release readinessは証明しない。runtime Manifest再読込は現行起動契約の要件ではない"
       }
     },
     {
