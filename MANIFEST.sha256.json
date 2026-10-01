@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "b7eaab64f8f5504208c1b800b8d1d7bddc0a28b988cfb2f693ce0ecc06a7cf74"
+      "sha256": "7137dbde14c73a3a518b107a2ec06104a66db42cd91763747dcb1a50988b89b7"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3012,7 +3012,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "94cfa95e6272b8cab335fa525b6f9b8eafe8660269c9bede55797335129d2a1c"
+      "sha256": "8bff9bb81c299fcd92f7712359898a865c002adaf3c3492e0a18cc1ca231f985"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "native/rust_helper/tests/support/codex_loopback_responses.rs",
-      "sha256": "0612729fcff5573b4e208d2afcf782805d1c13b3482f21270f571eb7287a0f35"
+      "sha256": "8d4c1ffbe49bc3212f9b092bdd5982ebf4f24a2f2befead698fcaf94df7a795f"
     },
     {
       "path": "native/rust_helper/tests/unit/agent_task_fixture_fs.rs",
@@ -3784,7 +3784,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "0a67f19f0d7f5bdeccb347fa766e3457951138244988e8af03f0655f7cb8f5e2"
+      "sha256": "8bdbd70d5bfdbf9c72b894e97c9ca0056d6ff7d79afee0e92bf7d810e1dadd06"
     },
     {
       "path": "requirements-dev.txt",

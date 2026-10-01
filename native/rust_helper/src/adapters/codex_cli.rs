@@ -666,7 +666,8 @@ fn build_codex_command(
     if let Some(test_api) = test_responses_api {
         let base_url = format!("http://127.0.0.1:{}/v1", test_api.port);
         let overrides = [
-            "model=\"d4p-local-probe\"".to_owned(),
+            // 偽API fixtureではCLI標準helpにあるmodel例を使い、独自識別子への依存を避ける。
+            "model=\"o3\"".to_owned(),
             "model_provider=\"d4p_loopback_probe\"".to_owned(),
             "model_providers.d4p_loopback_probe.name=\"D4 Pocket loopback probe\"".to_owned(),
             format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),

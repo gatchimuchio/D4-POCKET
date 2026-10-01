@@ -1567,3 +1567,21 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 検証成功後、対象commitだけを`main`へfast-forwardし、local／remote HEAD一致を確認して一時branchをlocal／remote双方から削除した。Actions実行とbranch cleanupの詳細を`release_blockers.registry.json`にも記録した。
 - 手動検証の結果追記後の初回統合検査では、報告文1行の英語混在を日本語厳格監査が検出し、終了値1となった。該当散文を日本語化した後、厳格監査単体は1130ファイル／検出0件で成功した。初回失敗は履歴に保持する。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`の再実行は終了値0となり、登録済み10検査が全て成功した。内訳は厳格監査1130ファイル／検出0件、Schema 152件／正常例152件／negative fixture 195件、Conformance 231件、Manifest 1127ファイル、release gate、packaging、release smoke、evidence bundle、runtime assertion、最終開発監査の成功である。`release_ready=false`と未解決release blockerは維持する。
 - 本E2EでAgent Taskを起動しない。clean installed Flutter／Desktop UIと実native pipe／Brokerを通した一体動作、Task成功、OneDrive Cloud Files／通常NTFSの実隔離matrix、Task間分離、Audit改変試験、failure／deadline／crash Recovery、Broker scratchとMxC TEMP実体のcleanup、result／diff Content Exposureは未成立の`release_blocker`である。`task_execution=unsupported`と`release_ready=false`を保持する。
+
+## R2追補 現行Codex CLIによるBroker Task試験の再現性補強（2026-10-01）
+
+### 追加で成立した範囲
+
+- 実Codex CLI `0.159.2`を資格情報のない隔離`CODEX_HOME`とloopback偽Responses APIへ接続し、Rust生成のTask command／MxC profileを通してBroker dialogue consumerから合成Taskを実行した。synthetic registered secretの読取とWorkspace外の読書込を拒否し、登録Workspace内のmarker書込を確認した。成功Taskの結果投影に指示本文・secret本文・偽API応答本文が含まれないこと、Broker scratchが残らないこともassertした。
+- 同じ試験でheartbeatを書き続ける二つ目のTaskを取消し、terminal後にheartbeatが増えないこと、result hashがないこと、scratchが残らないことを確認した。
+- 現行CLIで偽API応答の不安定が続いたため、試験専用model識別子とSSE応答をCodex CLIの標準例に沿う最小形へ変更した。変更後は同じfocused testが3回連続で成功した。先行する3回の失敗は履歴に保持し、根本原因が完全に証明されたとは扱わない。
+- 証拠classは実CLI／MxC tool childの指定操作に対する`LIVE_RUNTIME`、Broker Owner判断・Adapter能力上書き・Audit callback・Workspace／secretの`FIXTURE`である。実model、資格情報、課金要求、保護設定変更はない。
+
+### 未成立範囲と検証
+
+- 本試験はin-process Broker consumerを通るfixtureであり、production Release Broker／authenticated IPC、installed Flutter／Desktop native Owner確認、durable Audit、OneDrive Cloud Filesと通常NTFS双方、深度・hardlink alias隔離matrix、deadline／crash Recovery、MxC内部TEMPの実体・物理cleanup、result／diff UIを証明しない。製品Adapter metadataは`task_execution=unsupported`のままである。
+- 別の直接MxC probe `python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <codex.exe絶対path> --runs 1`は現行CLIでexit 1。loopback API応答とtool callは観測したが、shell childが`-2147450747`（`0x80008085`）で失敗してprobe reportが生成されなかった。model識別子を変えた追試でも解消せず、原因未確定として保持する。
+- focused ignored test `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME' -- --ignored --exact --nocapture --test-threads=1`は、fixture変更後3回連続で1 passed。
+- `cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功。全target serial Rust試験の最終runは13 targets、444 passed／0 failed／7 ignored。先行runではlocal TLS更新fixtureがConnectionResetし、focused再実行も一度`Network`対`DigestMismatch`で失敗した後に1 passedとなった。失敗履歴は保持する。
+- Schemaは152件／正常例152件／negative fixture 195件、Conformanceは231 checksで成功。変更2 Rust fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check ...`と`git diff --check`は成功した。workspace全体の`cargo fmt --all -- --check`は既存多数fileのformat差分を検出してexit 1となったため、全体一括formatは行わず変更fileだけ検査した。
+- R2のproduction E2E、`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。

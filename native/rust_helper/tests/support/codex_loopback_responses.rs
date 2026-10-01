@@ -322,7 +322,7 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         state.model_list_requests.fetch_add(1, Ordering::SeqCst);
         let response = json!({
             "object": "list",
-            "data": [{"id": "d4p-local-probe", "object": "model", "created": 0, "owned_by": "local-test"}]
+            "data": [{"id": "o3", "object": "model", "created": 0, "owned_by": "local-test"}]
         });
         let payload = response.to_string();
         let _ = respond(&mut stream, 200, "application/json", payload.as_bytes());
@@ -366,22 +366,15 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         state.tool_offered.store(offered, Ordering::SeqCst);
     }
     let response_id = format!("d4p-broker-task-{request_number}");
-    let mut events = vec![
-        event(
-            "response.created",
-            json!({"type":"response.created","response":{"id":response_id}}),
-        ),
-        event(
-            "response.in_progress",
-            json!({"type":"response.in_progress","response":{"id":response_id,"status":"in_progress"}}),
-        ),
-    ];
+    let mut events = vec![event(
+        "response.created",
+        json!({"type":"response.created","response":{"id":response_id}}),
+    )];
     let tool_result_exists = Path::new(&state.workspace)
         .join("broker-real-codex-marker.txt")
         .is_file();
     if !tool_result_exists && state.tool_offered.load(Ordering::SeqCst) {
         let call_id = format!("d4p-broker-task-call-{request_number}");
-        let item_id = format!("d4p-broker-task-item-{request_number}");
         let arguments = json!({
             "cmd": state
                 .command
@@ -393,42 +386,14 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
             "yield_time_ms": 30000
         });
         let item = json!({
-            "id": item_id,
-            "status":"completed",
             "type":"function_call",
             "call_id":call_id,
             "name":"exec_command",
             "arguments":arguments.to_string()
         });
         events.push(event(
-            "response.output_item.added",
-            json!({
-                "type":"response.output_item.added",
-                "output_index":0,
-                "item":{
-                    "id":item_id,
-                    "status":"in_progress",
-                    "type":"function_call",
-                    "call_id":call_id,
-                    "name":"exec_command",
-                    "arguments":""
-                }
-            }),
-        ));
-        events.push(event(
-            "response.function_call_arguments.done",
-            json!({
-                "type":"response.function_call_arguments.done",
-                "item_id":item_id,
-                "output_index":0,
-                "call_id":call_id,
-                "name":"exec_command",
-                "arguments":arguments.to_string()
-            }),
-        ));
-        events.push(event(
             "response.output_item.done",
-            json!({"type":"response.output_item.done","output_index":0,"item":item.clone()}),
+            json!({"type":"response.output_item.done","item":item.clone()}),
         ));
         state.tool_call_sent.store(true, Ordering::SeqCst);
         events.push(event(
@@ -437,8 +402,6 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                 "type":"response.completed",
                 "response":{
                     "id":response_id,
-                    "status":"completed",
-                    "output":[item],
                     "usage":{"input_tokens":1,"input_tokens_details":null,"output_tokens":1,"output_tokens_details":null,"total_tokens":2}
                 }
             }),
@@ -447,49 +410,14 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         let message_id = format!("d4p-broker-task-message-{request_number}");
         let text = "合成試験Taskが完了しました";
         let item = json!({
-            "id":message_id,
-            "status":"completed",
             "type":"message",
             "role":"assistant",
+            "id":message_id,
             "content":[{"type":"output_text","text":text,"annotations":[]}]
         });
         events.push(event(
-            "response.output_item.added",
-            json!({
-                "type":"response.output_item.added",
-                "output_index":0,
-                "item":{
-                    "id":message_id,
-                    "status":"in_progress",
-                    "type":"message",
-                    "role":"assistant",
-                    "content":[]
-                }
-            }),
-        ));
-        events.push(event(
-            "response.output_text.delta",
-            json!({
-                "type":"response.output_text.delta",
-                "item_id":message_id,
-                "output_index":0,
-                "content_index":0,
-                "delta":text
-            }),
-        ));
-        events.push(event(
-            "response.output_text.done",
-            json!({
-                "type":"response.output_text.done",
-                "item_id":message_id,
-                "output_index":0,
-                "content_index":0,
-                "text":text
-            }),
-        ));
-        events.push(event(
             "response.output_item.done",
-            json!({"type":"response.output_item.done","output_index":0,"item":item.clone()}),
+            json!({"type":"response.output_item.done","item":item.clone()}),
         ));
         events.push(event(
             "response.completed",
@@ -497,8 +425,6 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                 "type":"response.completed",
                 "response":{
                     "id":response_id,
-                    "status":"completed",
-                    "output":[item],
                     "usage":{"input_tokens":1,"input_tokens_details":null,"output_tokens":1,"output_tokens_details":null,"total_tokens":2}
                 }
             }),
