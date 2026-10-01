@@ -220,6 +220,30 @@ class ShellCoreClient {
 
   ShellSnapshot getSnapshot() => snapshot;
 
+  Future<List<AgentSessionRecord>> refreshAgentSessions() async {
+    final broker = brokerTransport;
+    if (mode != 'broker' || broker == null) {
+      throw const BrokerClientException('BrokerのAgent Session一覧を更新できません');
+    }
+    final response = await broker.request(
+      '対話セッション一覧',
+      payload: const <String, Object?>{},
+    );
+    final auditId = response['audit_event_id'];
+    if (response['operation'] != '対話セッション一覧' ||
+        response['status'] != 'accepted' ||
+        response['error'] != null ||
+        response['evidence_source'] != 'INTERNAL_STATE' ||
+        auditId is! String ||
+        !_isSafeAuditIdentifier(auditId)) {
+      throw const BrokerClientException('BrokerのAgent Session一覧応答が不正です');
+    }
+    final body = _acceptedResponseBodyMap(response, '対話セッション一覧');
+    return List<AgentSessionRecord>.unmodifiable(
+      _agentSessionSnapshotJson(body).map(AgentSessionRecord.fromJson),
+    );
+  }
+
   Future<HostSelectionRecord> selectHost(String hostId) async {
     HostRegistryRecord? host;
     for (final item in snapshot.hosts) {

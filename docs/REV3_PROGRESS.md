@@ -1618,3 +1618,22 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 初回の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は、未追跡だった追加negative fixtureがGit追跡fileだけを束ねるpackaging portability検査のsource archiveから欠落し、その展開先Conformanceで`FileNotFoundError`となって失敗した。fixtureをintent-to-addで追跡対象へ含めてManifestを1128 fileで再生成し、`python -X utf8 tooling/packaging_portability_check.py`でsource bundle検査が成功した後、同じ統合validatorを再実行して終了値0を確認した。厳格日本語監査、Schema、Conformance、Manifest、release gate、配布形式、release smoke、証拠束、runtime assertion、最終開発監査の登録10検査がすべて成功し、`release_ready=false`と既存release blockerを維持した。初回失敗は履歴として保持する。
 - この修正はreceipt上の固定条件識別子と契約間整合だけを確認する。Task worker起動、Broker production IPC、installed Flutter／native Ownerからの正の実行、filesystem隔離、永続Audit、Recovery、結果／diff表示を検証していない。
 - `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 Agent CenterのBroker Task操作contract配線（2026-10-01）
+
+### 成立した範囲
+
+- Agent Centerから既存Broker transportを使ってAgent Session開始・再読込を要求し、Broker投影結果が登録済みRuntime／Workspaceへ一致することを照合する。
+- Task instructionを実行せず事前検査へ送り、応答の識別子、hash、未実行状態を照合する。Brokerがunsupportedを返した場合はWorkspace Permission／Owner Approval／Task開始へ進まず、本文をエラー表示しない。
+- Workspace Permissionと一回Task Owner Approvalを別操作として要求し、Brokerの厳密なreceipt受理後だけTask開始を表示する。Task start／state／cancel応答のrecord version、ID、status、hash、監査参照を検証し、結果本文は表示しない。Workspace差分は既存の独立経路のままとする。
+- 成功経路のwidget testはcapabilityを`supported`と返すfake Brokerを使う。これは画面とserviceの接続確認用`FIXTURE`であり、製品AdapterのCapabilityを変更せず、production実行を証明しない。
+- Task requestはBroker受理後にUI stateから破棄し、画面dispose時にも残存Task UI stateをclearする。
+
+### 検証と未成立境界
+
+- `flutter test --no-pub --no-test-assets --reporter expanded`（`apps/desktop_flutter`）: 成功、142 passed／0 failed。
+- `flutter test --no-pub --no-test-assets --reporter expanded test/widget_test.dart --plain-name 'Agent CenterはBroker事前検査後に分離Owner確認とTask状態照会を使う'`（`apps/desktop_flutter`）: 成功、1 passed。
+- `git diff --check`: 成功。`flutter analyze --no-pub`のローカル実行はOneDrive日本語pathを含むLSP応答のdecode中にAnalysis Serverがcrashし、Dart診断結果を返さなかった。これはanalyze成功ではない。Hosted Windows手動Actionsで同一commitのanalyzeとFlutter suiteを補完する。
+- 初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は日本語基底監査が画面英語ラベル3件とfake Broker error文字列1件を検出して失敗した。表示ラベルとfixture errorを日本語化して失敗履歴を保持し、`python -X utf8 tooling/manifest.py --write`で1128 fileのManifestを再生成した後、同じ統合validatorを再実行して成功した。厳格日本語監査1133 files／0 findings、Schema 152／正常例152／negative fixture 196、Conformance 231 checks、release gate、source packaging、smoke、証拠束、runtime assertion、最終開発監査の登録10検査がすべて成功し、`release_ready=false`と31件のrelease blockerを維持した。
+- このUI／service testは`FIXTURE`のみ。installed Desktop UI、実native Owner confirmation、authenticated production IPC、Agent Task process、durable Audit／Recovery、OneDrive Cloud Files／NTFS隔離、result／diff Content Exposureは未実証。
+- `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。

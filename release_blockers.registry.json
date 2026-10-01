@@ -653,6 +653,21 @@
         "os_protection_changed": false,
         "scope_limit": "Negative gate only. LIVE_RUNTIME covers the standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and rejection Audit reload; Workspace/store/secret are FIXTURE. Does not prove positive Agent Task execution, installed Desktop/native Owner operation, sandbox isolation, cancellation/deadline/crash Recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
       },
+      "latest_agent_task_ui_broker_contract_wiring": {
+        "date": "2026-10-01",
+        "evidence_source": "FIXTURE",
+        "source_commit": "13e1b402c533be9f1095a9cd5c6e615080a5c304",
+        "source_worktree_clean": false,
+        "validation": "Flutter full suite: flutter test --no-pub --no-test-assets --reporter expanded, 142 passed, 0 failed. Focused Broker Task UI widget test passed. dart format --output=none --set-exit-if-changed and git diff --check passed. python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows passed after one retained initial Japanese-base audit failure; final strict audit had 0 findings, Schema 152/152 examples and 196 negative fixtures passed, Conformance 231 checks passed, and all 10 registered development checks passed. Hosted Windows Flutter analyze is still pending.",
+        "observations": {
+          "session_start_and_refresh": "Agent Center requests Session start and reloads Broker-projected Sessions through the existing Broker transport, then matches the new Session to the registered Runtime and Workspace.",
+          "preflight": "Task instruction is sent only to Broker preflight; accepted response is checked against Runtime, Session, Workspace, instruction hash, and not-started status. Unsupported rejection does not expose the instruction or proceed to grants.",
+          "authority_ui": "Workspace Permission and one-time Task Owner Approval are separate UI actions; Task start requires both receipts to be accepted by Broker. Task state and cancellation are explicit Broker requests.",
+          "content_boundary": "UI stores instruction transiently until accepted start, then clears it; task records expose hashes, status, and audit reference, not result content. Workspace diff remains a separate path.",
+          "positive_widget_path": "A supported-capability fake Broker exercises inspect, Workspace Permission, Owner Approval, start, and explicit state refresh. This is a widget fixture, not production capability evidence."
+        },
+        "scope_limit": "Flutter unit/widget FIXTURE only. Does not prove installed product behavior, native Owner dialog, authenticated production IPC, supported production Adapter, Agent Task process execution, Workspace isolation, durable Audit/Recovery, result/diff Content Exposure, or R2 production E2E. task_execution=unsupported and release_ready=false remain required."
+      },
       "latest_owner_approval_policy_contract_alignment": {
         "date": "2026-10-01",
         "source_base_commit": "4e8282f610c13d79b01cf7e32717c7a82a389b22",

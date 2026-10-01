@@ -611,10 +611,10 @@ void main() {
     expect(find.text('audit-workspace-bound'), findsOneWidget);
     expect(find.textContaining('書込み隔離は未検証'), findsOneWidget);
     expect(
-      find.textContaining('Task状態・結果・diff表示の製品UI経路は未接続'),
+      find.textContaining('この画面のTask操作は事前検査のみ'),
       findsOneWidget,
     );
-    expect(find.text('タスク: Brokerから未取得'), findsOneWidget);
+    expect(find.text('タスク: 事前検査のみ。実行状態は未接続'), findsOneWidget);
     expect(
       find.textContaining('保留中の承認: Brokerから未取得（承認がないことを意味しません）'),
       findsOneWidget,
@@ -663,7 +663,6 @@ void main() {
       _brokerAcceptedBody('approval_edit', {'ok': false}),
       _brokerCommandSuspendedResponse(),
       _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
-        'adapter_id': 'codex-cli',
         'runtime_id': 'codex-r2-synthetic',
         'workspace_id': 'workspace-r2-synthetic',
         'registration_lifetime': 'broker_process',
@@ -701,6 +700,273 @@ void main() {
     expect(registration.containsKey('permission'), isFalse);
     expect(registration.containsKey('approval_id'), isFalse);
     expect(find.text('Task実行: unsupported'), findsOneWidget);
+    expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
+  });
+
+  testWidgets('Agent CenterはSession結合後のTask unsupportedを事前検査しgrantへ進まない',
+      (WidgetTester tester) async {
+    const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': 'codex-r2-synthetic',
+        'workspace_id': 'workspace-r2-synthetic',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'unsupported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+      _brokerAcceptedBody('対話開始', {
+        '対話セッションID': sessionId,
+        '実行系ID': 'codex-r2-synthetic',
+        '状態': '利用中',
+      }),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionId,
+          '実行系ID': 'codex-r2-synthetic',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created-r2',
+          '作業領域ID': 'workspace-r2-synthetic',
+          '作業領域結合監査ID': 'audit-workspace-bound-r2',
+        },
+      ]),
+      {
+        'request_id': 'test-agent-task-preflight',
+        'operation': 'Agent作業要求検査',
+        'status': 'rejected',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-agent-task-preflight',
+        'error': {
+          'code': 'AgentTask実行非対応',
+          'message': 'PRIVATE_TASK_SENTINEL',
+        },
+        'body': null,
+        'shutdown_requested': false,
+      },
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final registrationFields = find.byType(TextFormField);
+    await tester.enterText(registrationFields.at(0), 'codex-r2-synthetic');
+    await tester.enterText(
+        registrationFields.at(1), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(registrationFields.at(2), 'workspace-r2-synthetic');
+    await tester.enterText(
+        registrationFields.at(3), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(registrationFields.at(4), '.env');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    await tester.pumpAndSettle();
+    expect(find.text(sessionId), findsOneWidget);
+
+    final preflightButton = find.text('Task実行能力を事前検査（実行なし）');
+    await tester.ensureVisible(preflightButton);
+    await tester.pumpAndSettle();
+    await tester.tap(preflightButton);
+    await tester.pumpAndSettle();
+    final instructionField = find.byType(TextFormField);
+    await tester.enterText(instructionField, '合成のTask事前検査指示');
+    await tester.tap(find.text('Broker事前検査'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations, contains('Agent作業要求検査'));
+    expect(transport.operations,
+        isNot(contains('AgentTaskWorkspacePermissionGrant')));
+    expect(
+        transport.operations, isNot(contains('AgentTaskOwnerApprovalGrant')));
+    expect(transport.operations, isNot(contains('AgentTask実行')));
+    expect(find.textContaining('AgentTask実行非対応'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
+    expect(find.text('Task実行: unsupported'), findsOneWidget);
+  });
+
+  testWidgets('Agent CenterはBroker事前検査後に分離Owner確認とTask状態照会を使う',
+      (WidgetTester tester) async {
+    const sessionId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const taskId = 'cccccccccccccccccccccccccccccccc';
+    const instructionHash =
+        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const resultHash =
+        'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    Map<String, Object?> taskRecord({
+      required String status,
+      String? resultHash,
+    }) =>
+        {
+          'task_id': taskId,
+          'record_version': 2,
+          'agent_runtime_id': 'codex-r2-synthetic',
+          'session_id': sessionId,
+          'workspace_id': 'workspace-r2-synthetic',
+          'description': 'Agent作業Task（内容は別のWorkspace差分経路で確認）',
+          'instruction_hash': instructionHash,
+          'status': status,
+          'audit_event_id': 'audit-task-$status',
+          if (resultHash != null) 'result_hash': resultHash,
+        };
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': 'codex-r2-synthetic',
+        'workspace_id': 'workspace-r2-synthetic',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'supported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+      _brokerAcceptedBody('対話開始', {
+        '対話セッションID': sessionId,
+        '実行系ID': 'codex-r2-synthetic',
+        '状態': '利用中',
+      }),
+      _brokerDialogueSessionListResponse(sessions: [
+        {
+          '対話セッションID': sessionId,
+          '実行系ID': 'codex-r2-synthetic',
+          '状態': '利用中',
+          '作成監査ID': 'audit-session-created-r2',
+          '作業領域ID': 'workspace-r2-synthetic',
+          '作業領域結合監査ID': 'audit-workspace-bound-r2',
+        },
+      ]),
+      _brokerAcceptedBody('Agent作業要求検査', {
+        '版': 1,
+        '状態': '要求検査済み',
+        '実行状態': '未実行',
+        'Permission状態': '未付与',
+        'Approval状態': '未取得',
+        '実行系ID': 'codex-r2-synthetic',
+        '対話セッションID': sessionId,
+        '作業領域ID': 'workspace-r2-synthetic',
+        '指示hash': instructionHash,
+      }),
+      _brokerAcceptedBody('AgentTaskWorkspacePermissionGrant', {
+        'uses_remaining': 1,
+        'status': 'issued_unconsumed',
+      }),
+      _brokerAcceptedBody('AgentTaskOwnerApprovalGrant', {
+        '状態': 'Owner Approval発行済み',
+        '実行状態': '未実行',
+        '実行系ID': 'codex-r2-synthetic',
+        '対話セッションID': sessionId,
+        '作業領域ID': 'workspace-r2-synthetic',
+        '指示hash': instructionHash,
+        '実行条件hash': resultHash,
+        '適用ポリシー': 'gui-shell-agent-task-sandbox-v1-max-runtime-900s',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+        'status': 'issued_unconsumed',
+      }),
+      _brokerAcceptedBody('AgentTask実行', taskRecord(status: 'running')),
+      _brokerAcceptedBody(
+        'AgentTask状態',
+        taskRecord(status: 'completed', resultHash: resultHash),
+      ),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final registrationFields = find.byType(TextFormField);
+    await tester.enterText(registrationFields.at(0), 'codex-r2-synthetic');
+    await tester.enterText(
+        registrationFields.at(1), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(registrationFields.at(2), 'workspace-r2-synthetic');
+    await tester.enterText(
+        registrationFields.at(3), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(registrationFields.at(4), '.env');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));
+    await tester.pumpAndSettle();
+
+    final preflightButton = find.text('Task実行能力を事前検査（実行なし）');
+    await tester.ensureVisible(preflightButton);
+    await tester.pumpAndSettle();
+    await tester.tap(preflightButton);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField),
+      '合成のTask指示（秘密情報なし）',
+    );
+    await tester.tap(find.text('Broker事前検査'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workspace PermissionのOwner確認'), findsOneWidget);
+    expect(find.text('Task一回ApprovalのOwner確認'), findsNothing);
+    await tester.ensureVisible(find.text('Workspace PermissionのOwner確認'));
+    await tester.tap(find.text('Workspace PermissionのOwner確認'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Task一回ApprovalのOwner確認'), findsOneWidget);
+    expect(find.text('Taskを一回実行'), findsNothing);
+    await tester.ensureVisible(find.text('Task一回ApprovalのOwner確認'));
+    await tester.tap(find.text('Task一回ApprovalのOwner確認'));
+    await tester.pumpAndSettle();
+
+    final startTaskButton = find.text('Taskを一回実行');
+    await tester.ensureVisible(startTaskButton);
+    await tester.tap(startTaskButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Task状態: running'), findsOneWidget);
+    expect(find.textContaining('合成のTask指示'), findsNothing);
+
+    final refreshTaskButton = find.text('Task状態を更新');
+    await tester.ensureVisible(refreshTaskButton);
+    await tester.tap(refreshTaskButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Task状態: completed'), findsOneWidget);
+    expect(find.textContaining(resultHash), findsOneWidget);
+    expect(
+        transport.operations,
+        containsAllInOrder([
+          'Agent作業要求検査',
+          'AgentTaskWorkspacePermissionGrant',
+          'AgentTaskOwnerApprovalGrant',
+          'AgentTask実行',
+          'AgentTask状態',
+        ]));
+    final approvalRequest = transport.requests.firstWhere(
+      (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant',
+    );
+    expect(
+      (approvalRequest['payload']! as Map)['instruction'],
+      '合成のTask指示（秘密情報なし）',
+    );
+    expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
   });
 
   test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {
