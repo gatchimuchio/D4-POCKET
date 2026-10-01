@@ -688,8 +688,11 @@ void main() {
     await tester.enterText(fields.at(4), '.env\nsecrets');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(transport.operations.last, 'AgentCLI実行系作業領域登録');
+    expect(transport.returnedResponses.last['operation'], 'AgentCLI実行系作業領域登録');
+    expect(transport.returnedResponses.last['status'], 'accepted');
     final registration = transport.requests.last['payload']! as Map;
     expect(registration['runtime_id'], 'codex-r2-synthetic');
     expect(registration['adapter_id'], 'codex-cli');
@@ -697,7 +700,7 @@ void main() {
     expect(registration['secret_paths'], ['.env', 'secrets']);
     expect(registration.containsKey('permission'), isFalse);
     expect(registration.containsKey('approval_id'), isFalse);
-    expect(find.textContaining('Task実行はunsupportedのまま'), findsWidgets);
+    expect(find.text('Task実行: unsupported'), findsOneWidget);
   });
 
   test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {
@@ -1140,6 +1143,7 @@ class _FakeBrokerTransport implements BrokerTransport {
   final List<Map<String, Object?>> _responses;
   final List<String> operations = [];
   final List<Map<String, Object?>> requests = [];
+  final List<Map<String, Object?>> returnedResponses = [];
 
   @override
   Future<Map<String, Object?>> request(
@@ -1160,10 +1164,16 @@ class _FakeBrokerTransport implements BrokerTransport {
         (_responses.isEmpty || _responses.first['operation'] != operation)) {
       return Future.value(_brokerDialogueSessionListResponse());
     }
+    if (operation == '作業領域一覧' &&
+        (_responses.isEmpty || _responses.first['operation'] != operation)) {
+      return Future.value(_brokerWorkspaceListResponse());
+    }
     if (_responses.isEmpty) {
       throw BrokerClientException('$operation 用の fake broker 応答がありません');
     }
-    return _responses.removeAt(0);
+    final response = _responses.removeAt(0);
+    returnedResponses.add(response);
+    return response;
   }
 }
 
@@ -1340,6 +1350,18 @@ Map<String, Object?> _brokerDialogueSessionListResponse({
     'shutdown_requested': false,
   };
 }
+
+Map<String, Object?> _brokerWorkspaceListResponse() => {
+      'request_id': 'test-作業領域一覧',
+      'operation': '作業領域一覧',
+      'status': 'accepted',
+      'evidence_source': 'INTERNAL_STATE',
+      'audit_event_id': 'audit-workspace-list-read',
+      'error': null,
+      'health': null,
+      'body': {'作業領域': <Map<String, Object?>>[]},
+      'shutdown_requested': false,
+    };
 
 Map<String, Object?> _brokerHostCapabilityResponse() {
   return _brokerAcceptedBody('ホスト能力', {

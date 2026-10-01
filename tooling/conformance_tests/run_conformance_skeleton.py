@@ -7905,6 +7905,26 @@ def test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free() -> 
             errors.append(f"native Owner確認が登録範囲を示さない: {required}")
     if "AgentCLI実行系作業領域登録" not in broker_client:
         errors.append("登録要求のnative Owner確認待ちがDesktop clientにない")
+    native_owner_e2e_name = (
+        "fn 登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する()"
+    )
+    native_owner_e2e_start = launcher.find(native_owner_e2e_name)
+    native_owner_e2e_end = launcher.find("\n    #[test]", native_owner_e2e_start)
+    native_owner_e2e = (
+        launcher[native_owner_e2e_start:native_owner_e2e_end]
+        if native_owner_e2e_start >= 0 and native_owner_e2e_end >= 0
+        else ""
+    )
+    for required in (
+        '"AgentCLI実行系作業領域登録"',
+        "automate_native_owner_confirmation(",
+        '"Agent作業要求検査"',
+        '"AgentTask実行"',
+        '"unsupported"',
+        "synthetic-secret-content-never-returned",
+    ):
+        if required not in native_owner_e2e:
+            errors.append(f"native Owner付きAgent CLI負のE2Eが境界を検査しない: {required}")
     if "supports_cli_adapter" not in adapter_registry or '"codex-cli"' not in adapter_registry:
         errors.append("CLI Adapter選択をBroker CoreではなくAdapter層で解決しない")
     if "crate::adapters::codex_cli::CodexCliAdapter" in protocol:

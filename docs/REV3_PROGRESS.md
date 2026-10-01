@@ -1544,3 +1544,22 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 本testは未対応gateの本番Release Broker拒否経路を検証する負のE2Eであり、Agent Taskを起動しない。Owner資格endpointおよびWin32確認画面は使わず、実Task process、Workspace変更、Task scratch作成・削除、sandbox拒否、取消／期限／crash、result／diff UIを検証していない。
 - `release_blocker`: clean installed Desktop UIからnative Owner判断をBrokerへ結合した正のTask実行、実tool-child隔離、OneDrive Cloud Files／通常NTFSのsecret・深度・alias検査、Task間分離、Audit tamper検証、停止とRecovery、Broker scratch／AppContainer一時領域の後始末、result／diffのContent Exposure。
 - `task_execution=unsupported`と`release_ready=false`を維持する。新しい拒否probeを正のproduction Task完了またはrelease gate解除へ昇格しない。
+
+## R2追補 実Codex CLI登録からnative Owner確認・Task拒否までのE2E補強（2026-10-01）
+
+### 成立した範囲
+
+- Agent CenterのCodex CLI登録UIからBroker要求へ渡すfieldをWidget testで固定した。runtime／adapter／Workspace／secret pathだけを送信し、Permission、Approval ID、Credential実値は送らない。表示されるTask能力は`unsupported`のままである。
+- 実Windows上のignored Rust testでは、実Codex CLIをBroker登録要求へ接続し、実Win32 Owner確認dialogのNo／Yesをそれぞれ操作した。Noの後はAgent未登録、Yesの後はBroker Agent一覧に登録されたことを確認した。確認summaryと監査へsecret本文が出ず、登録応答はPermission／Approval／Credentialを生成しない。
+- 同じtest内で、通常Desktop relayからのWorkspace Permission／Owner Approval要求、Task preflight、Task startを送信した。Taskはworker起動前に`AgentTask実行非対応`で拒否され、応答本文・監査にTask指示markerまたはsecret markerがない。終了後にfile-backed Auditを照合し、成功した登録と拒否結果だけが残ることを確認した。
+- 別のignored integration testでは、現在sourceからbuildしたWindows Release Broker helperを別process起動し、実Codex CLIの起動時登録を含む認証loopback IPCでTask能力の`unsupported`、通常資格によるPermission／Approval発行拒否、Task preflight／start拒否、Broker終了後のAudit再openを確認した。これはOwner dialog経路とは別probeであり、二つの試験を単一installed-product E2Eとは扱わない。
+- 証拠class: 実CLI probeと実Win32 dialogの`LIVE_RUNTIME`、test thread Broker・Release Broker用合成Workspace／store・自動入力の`FIXTURE`。実model、実Credential、課金要求、Windows保護設定変更は使っていない。
+
+### 検証結果と境界
+
+- focused native Owner／登録test `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib 'desktop_launcher::tests::登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する' -- --ignored --exact --nocapture --test-threads=1`はexit 0、1 passed。Widget testのfixtureは画面初期化時のWorkspace一覧応答を補い、登録要求への応答とstatusもassertする。短い一時pathでの`flutter analyze --no-pub`と`flutter test --no-pub --plain-name 'Codex登録UIは指定値だけをnative Owner確認Broker要求へ渡す'`はpassした。
+- Rust `cargo check --all-targets`、serial `cargo test --all-targets`（13 targets、444 passed／0 failed／7 ignored）、Schema（152／正常example 152／negative fixture 195）、Conformance（231 checks）はpassした。
+- 初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は、新規進捗行1件が厳格日本語監査へ検出されexit 1。該当表現を日本語化し、`python -X utf8 tooling/日本語基底監査.py --strict`を再実行して1130 files／0 findingsでpassした。初回失敗を成功へ読み替えない。
+- `cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper --target-dir C:\\d4-r2-target`による現行Release helperのbuildは成功した。既存MINIDORAの未使用項目に関するwarningは2件。Release helper SHA-256 `56bc5d14b4bd94361802f01d9a908b311d7d06f3119f289f587ddffd5f92710d`。実Codex CLIは`codex-cli 0.159.3`。`GUI_SHELL_AGENT_TASK_E2E_HELPER_EXE`と`GUI_SHELL_CODEX_TASK_E2E_CLI`へそれぞれ当該Release helper／CLIの絶対pathを設定した`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --test agent_task_production_e2e 'windows::production_agent_task_gate_fails_closed_over_authenticated_ipc' -- --ignored --exact --nocapture --test-threads=1`はexit 0、1 passed。
+- Windows manual ActionsとDesktop Flutter全testの結果は、対象commit固定後にこの記録へ追記する。OneDrive checkout上のFlutter SDKがephemeral directoryを削除できなかったため、local Desktop analyzeとfocused Widget testだけ短い一時pathで行い、ACLは変更していない。
+- 本E2EでAgent Taskを起動しない。clean installed Flutter／Desktop UIと実native pipe／Brokerを通した一体動作、Task成功、OneDrive Cloud Files／通常NTFSの実隔離matrix、Task間分離、Audit改変試験、failure／deadline／crash Recovery、Broker scratchとMxC TEMP実体のcleanup、result／diff Content Exposureは未成立の`release_blocker`である。`task_execution=unsupported`と`release_ready=false`を保持する。

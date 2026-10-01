@@ -535,6 +535,27 @@
         "os_protection_changed": false,
         "scope_limit": "Direct Codex sandbox children only, with distinct synthetic CODEX_HOME and Workspaces. Peer marker non-visibility does not prove distinct TEMP roots, same-CODEX_HOME isolation, sequential-task isolation, physical deletion, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
+      "native_owner_cli_registration_gate_probe": {
+        "date": "2026-10-01",
+        "source_base_commit": "0f807201ec011acab1c8f73cd78d7345db10b1b5",
+        "source_tree_clean": false,
+        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "validation": "Local Windows focused native Owner registration test: 1 passed; current-source Release Broker production negative-gate E2E: 1 passed; Rust all-target check passed; serial all-target tests: 13 targets, 444 passed, 0 failed, 7 ignored; Schema 152, examples 152, negative fixtures 195; Conformance 231 checks; Desktop Flutter analyze and focused registration Widget test passed in a short-path source copy.",
+        "release_helper_sha256": "56bc5d14b4bd94361802f01d9a908b311d7d06f3119f289f587ddffd5f92710d",
+        "codex_cli_version": "0.159.3",
+        "observations": {
+          "owner_decline": "Actual Win32 Owner dialog No response rejected the registration; the subsequent Agent list remained empty.",
+          "owner_confirm": "Actual Win32 Owner dialog Yes response registered the real Codex CLI and synthetic Workspace through the production Broker owner-operation handler.",
+          "authority": "Registration generated no Permission, Approval, or Credential value; Agent task_execution remained unsupported.",
+          "normal_relay": "Workspace Permission and Owner Approval requests were rejected; Agent Task preflight and start were rejected before worker launch.",
+          "audit_and_exposure": "File-backed test Audit contained registration and rejection outcomes after Broker shutdown; synthetic secret and instruction markers were absent.",
+          "release_process_probe": "A separately run current-source Release Broker helper process passed authenticated loopback IPC fail-closed checks and durable Audit reopen. This probe did not include the native Owner dialog."
+        },
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "The native Owner and registration path used a Rust test-thread Broker, temporary Workspace/store, and automated Win32 input; the Widget test used a fake Broker transport. The separate Release Broker process probe is a distinct negative-only E2E. Neither proves one installed Flutter UI-to-native named-pipe-to-Broker E2E, positive Agent Task execution, OneDrive Cloud Files and ordinary NTFS isolation matrix, task lifecycle Recovery, MxC internal TEMP cleanup, result/diff Content Exposure, or task_execution support. Keep the comprehensive release blocker unresolved."
+      },
       "latest_production_agent_task_negative_gate_probe": {
         "date": "2026-10-01",
         "source_commit": "8ec3434b3a713a00654b97c14d19e21cb31e69a7",
