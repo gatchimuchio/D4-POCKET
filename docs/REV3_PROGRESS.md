@@ -1675,3 +1675,28 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 同じbranch上の後続Windows手動workflow run #12（`workflow_dispatch`、[run 36864800422](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36864800422)、対象commit `459369a637ff60b92f7ce1550d78ad3cb41548c2`、runner `windows-2025`／`win25-vs2026/20260925.250.1`）は全体成功、7m36s、artifactなし。Rust helper build成功、Desktop analyzeは`No issues found`、Desktop全testは142 passed／0 failed、Mobile analyzeは`No issues found`、検査後の作業tree clean確認も成功した。これはhosted Windowsでのbuild／Flutter検査だけで、installed product・native Owner実操作・Agent Task production E2Eを証明しない。
 - このUI／service testは`FIXTURE`のみ。installed Desktop UI、実native Owner confirmation、authenticated production IPC、Agent Task process、durable Audit／Recovery、OneDrive Cloud Files／NTFS隔離、result／diff Content Exposureは未実証。
 - `task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 staged Desktop UIのOwner登録・Session・Task拒否までのWindows実測（2026-10-02）
+
+### 成立した範囲
+
+- clean source commit `c0b15ae82a46a298e42bc2aaf54615d4c32682dd`からbuildしたstaged Windows Releaseを、Rust Desktop launcher経由で起動した。manifest上のapp／Broker helper／launcher SHA-256は順に`5d02c1f144dc5eddd7c3d6abcee1aa85a251bec880c8e64b93e5e7270878510b`、`d98a430d3714c1f29d1c98fa5fce536e70cf0679d8503278d9e574424b6fb1b8`、`c9da06cd11c960617b045fb29bf12d0c8637c267c29f3b2105109c7623b8fc0a`。
+- Agent Centerの登録UIから実Codex CLIの登録要求を行い、native Owner確認を承認した。登録は合成NTFS Workspace、CLIの`--version`／`exec --help`確認、secret pathなしに限定し、Task・Permission・Approval・Trust・Credentialは生成されなかった。UIはRuntime `codex-local`、Workspace `workspace-local`、Task `unsupported`を表示した。
+- Broker Session開始とWorkspace結合をUIから実行し、Session `240fda7256cf022e06cb92e47d5dc44a`、Audit `broker-audit-39/40`を確認した。Task事前検査には外部接続・file変更を指示しない合成本文だけを入力した。production UI／Broker経路は`AgentTask実行非対応`で拒否し、Audit `broker-audit-48/49`に受信／拒否を記録した。Worker、Task、Workspace変更、Task Permission／Approvalは発生しなかった。
+- Product Audit UIは`durable_file_store`／`hash_chain`を表示した。保存JSONLのRust Broker固定field連結hashを79件について再計算し、連続hash、anchor件数、head一致を確認した。Task本文の完全一致はAuditに存在しない。Rust BrokerはAudit storeを開いて稼働し、UIからの追加要求を処理した。HMAC鍵そのものは読み出していない。
+- staged manifestは`broker_mediated=true`だが、launcher runtimeのscopeは`per_user`、`isolated=false`と宣言する。このため、専用staging artifactからの起動は確認したが、完全隔離runtime／fresh user profile上のinstalled-product証拠へ一般化しない。終了時に当該staging frontend processは停止した。ほかのGUI-Shell processは停止していない。
+
+### 検証境界
+
+- 証拠classは製品UI／native confirmation／Broker動作の`LIVE_RUNTIME`、Broker Session／Audit stateの`INTERNAL_STATE`、CLI／Workspace／Task本文の`FIXTURE`。実model、実Credential、課金API、Task実行、OS保護設定変更はない。外部通信は独立計測していない。
+- このE2Eは登録とSession作成後、現在の`task_execution=unsupported` gateが実Taskより前にfail-closedとなる負経路である。Workspace Permission／Owner ApprovalのTask用確認dialog、正のTask、実tool-child、secret／depth／hardlink隔離、OneDrive Cloud Files、通常NTFSのTask書込、失敗／deadline／crash Recovery、MxC TEMP後始末、結果／diff Content Exposureは未実証。
+- Python `verify_audit_chain`はcanonical JSON hashを使いRust Broker形式と互換でないため、このstoreの検査器としては不適用。Rust実装の固定field連結方式でhashを照合した。HMAC anchorの鍵を使った独立再計算は行っていない。
+- `task_execution=unsupported`、R2 production positive E2E `release_blocker`、`release_ready=false`を維持する。OneDrive Cloud Files検査のため同期rootへ合成fixtureを作成する操作は、所有者が別途許可するまで保留する。
+
+### Repository検証
+
+- `python -X utf8 tooling/schema_check/check_schemas.py`: 成功、Schema 152件／normal example 152件／negative fixture 196件。
+- `python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 成功、231 checks。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment check 10件すべて成功、日本語strict監査1133 files／0 findings、Manifest 1130 files。`release_ready=false`と既存release blockerは維持。
+- `python -X utf8 tooling/manifest.py --write`、統合validator内のmanifest check、および`git diff --check`: 成功。
+- このblockは文書・Manifest更新のみでRust／Flutter source変更なし。Rust／Flutter全testは今回再実行していない。

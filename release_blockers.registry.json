@@ -813,6 +813,32 @@
         "formal_product_evidence": false,
         "scope_limit": "LIVE_RUNTIME proves only launch/display of the staged product and appearance of a native Owner window request. It does not prove Owner approval, production IPC registration/session, positive Agent Task, isolation, durable positive Task Audit, Recovery, TEMP cleanup, or result/diff Content Exposure. Keep task_execution=unsupported and the R2 release blocker unresolved."
       },
+      "staged_desktop_owner_registration_session_and_unsupported_task_probe": {
+        "date": "2026-10-02",
+        "source_commit": "c0b15ae82a46a298e42bc2aaf54615d4c32682dd",
+        "source_worktree_clean": true,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "installed_manifest": {
+          "run_id": "r2-owner-e2e-c0b15ae-20261002a",
+          "broker_mediated": true,
+          "launcher_runtime_scope": "per_user",
+          "launcher_runtime_isolated": false,
+          "app_sha256": "sha256:5d02c1f144dc5eddd7c3d6abcee1aa85a251bec880c8e64b93e5e7270878510b",
+          "broker_sha256": "sha256:d98a430d3714c1f29d1c98fa5fce536e70cf0679d8503278d9e574424b6fb1b8",
+          "launcher_sha256": "sha256:c9da06cd11c960617b045fb29bf12d0c8637c267c29f3b2105109c7623b8fc0a"
+        },
+        "observations": {
+          "owner_registration": "Agent Center登録UIからWindows native Owner確認へ到達し、Runtime codex-local、Workspace workspace-localを登録した。secret pathなしであり、Task Permission、Approval、Trust、Credentialは生成しなかった。",
+          "session_workspace_binding": "製品UIはBrokerが作成したSessionとWorkspace結合、およびAudit参照broker-audit-39/40を表示した。",
+          "task_preflight": "実行しない合成指示を製品UIからBroker事前検査へ送り、Worker／Task起動前にAgentTask実行非対応で拒否した。Audit broker-audit-48/49は受信／拒否を記録し、指示本文は耐久Audit JSONLに存在しなかった。",
+          "audit_store": "製品Audit UIはdurable_file_store／hash_chainを表示した。検査時のRust Broker形式の事象79件は固定field連結hashの再計算に合格し、連続hash、anchor件数、anchor headが一致した。HMAC鍵は読み出さず、独立再計算していない。",
+          "execution": "Task process、Workspace書込み、Permission／Approval grant、model／API呼出し、Credential使用、課金要求はなかった。外部通信は独立計測していない。",
+          "cleanup": "検証用staged frontend processを停止し、無関係なGUI-Shell processは停止しなかった。"
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "staged製品の負経路だけを観測した。launcher manifestはper_user／isolated=falseと宣言するため、完全隔離されたfresh runtimeの証拠ではない。task_executionはunsupportedのままであり、Task Permission／Approval UI、正のTask、OneDrive Cloud Files／通常NTFSのtool-child隔離、失敗／deadline／crash Recovery、MxC TEMP後始末、result／diff Content Exposureは未検証。"
+      },
       "latest_mxc_temp_directory_exit_observation": {
         "date": "2026-10-01",
         "source_base_commit": "7ab1c4db6de571d511d5dc27841b843bcf77cc26",
