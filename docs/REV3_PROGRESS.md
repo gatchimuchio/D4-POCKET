@@ -1519,3 +1519,28 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 今回成立したのはWin32確認画面、synthetic fixtureを用いたBroker Receipt／Manifest生成、未署名の開発用bundle組立、既知の資格情報pattern検査、単体Broker実行確認まで。`rev2_export_owner_ui_authority_path`は未解決の`release_blocker`として維持する。
 - 別Windows user profileからのinstalled app起動、正式Owner authority、実installed Audit storeの分離と完了Audit、非継承Receipt、実製品launch、署名／Installer、release readinessは未成立。現行`docs/specs/windows-desktop-launcher.md`はruntimeでManifestを再読込してpath／authority選択へ使うことを認めず、compile-time identityを使う設計である。従ってruntime Manifest消費は未完了項目や次工程条件にしない。必要な次の証拠はManifest由来compile-time IDを含むBundleの別profile installed-path実行とAudit境界である。`release_ready=false`を維持する。
+
+## R2追補 Release Broker processでのAgent Task未対応gate E2E（2026-10-01）
+
+### 成立した確認
+
+- Rust source／testがcommit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`と一致する状態で、Windows Release helperを別process起動し、実Codex CLI `0.159.2`をruntimeとして登録するignored integration testを実行した。実行時点では進捗・仕様・Blocker registry・Manifestだけに未commit差分があり、Rust source差分はなかった。通常loopback資格とOwner資格fileは別々に生成され、通常認証IPCでAgent一覧とBroker登録Workspaceへ結合したAgent Sessionを取得できる。
+- Agent metadataの`task_execution=unsupported`を実Broker projectionで確認し、`Agent作業要求検査`と`AgentTask実行`を同じSession／Workspace／合成指示本文で送ったところ、両方が`AgentTask実行非対応`として拒否された。指示本文は応答へ返らない。
+- Workspace PermissionとOwner Approvalの発行要求は通常資格で通常endpointへ送り、両方が`desktop_native_owner_confirmation_required`として拒否された。BrokerはTask本文を返さず、既存のnative Owner確認endpointを迂回する動作はなかった。
+- Brokerを正常終了した後、永続Audit storeを再openし、Session・両grant拒否・Task検査／実行拒否のAudit記録を照合した。指示本文と合成secret markerはAuditに含まれない。test専用一時rootは終了後に削除される。
+- 証拠classはRelease Broker process／認証loopback IPC／実CLI登録と拒否Auditの`LIVE_RUNTIME`、合成Workspace・secret・storeの`FIXTURE`。実model、API資格情報、Windows保護設定変更は使用していない。実helper SHA-256は`C816AFA894A45613AA5683A87472DA3E5815D29F640FFCF507C9D7E5B49DC73B`。
+
+### 正確な検証と履歴
+
+- Release helper build: `cargo +1.95.0 build --locked --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper` — 成功。既存`native/rust_helper/src/adapters/minidora.rs`の未使用項目warningが2件。
+- E2E: `GUI_SHELL_AGENT_TASK_E2E_HELPER_EXE`へ上記Release helperの絶対path、`GUI_SHELL_CODEX_TASK_E2E_CLI`へ`Get-Command codex`の絶対pathを設定し、`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --test agent_task_production_e2e 'windows::production_agent_task_gate_fails_closed_over_authenticated_ipc' -- --ignored --exact --nocapture` — HEAD `8ec3434`、Rust source差分なし（文書／Manifest差分あり）の作業treeで1 passed／0 failed。
+- Rust検証: `cargo +1.95.0 check --locked --manifest-path native/rust_helper/Cargo.toml --all-targets`成功。`cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`の再実行は13 target、439 passed／0 failed／7 ignored。初回全target実行では既存localhost TLS試験`local_tls_server_repairs_only_after_verified_package_bytes`がConnectionResetで1回失敗したが、単独再実行1件成功後の全serial再実行は成功した。初回失敗は消去せず履歴へ残す。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: Schema 151件、正常例151件、negative fixture 194件で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 230 checks成功。追加Rust testの`rustfmt +1.95.0 --edition 2021 --check native/rust_helper/tests/agent_task_production_e2e.rs`と`git diff --check`も成功。
+- 初回の統合`validate_all.py`は追加testの英語failure message 2箇所を厳格日本語監査が検出して失敗したため、該当messageを日本語化した。修正後の厳格監査は1127 files／0 findings、`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了値0となり、登録済みdevelopment check 10件すべて成功した。Manifestは1124 files。release blocker 31件と`release_ready=false`を維持する。
+- commit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`は`main`へpushされ、remote HEAD一致を確認した。commit時点のworking treeにはこの進捗・仕様・registry／Manifest更新が未commitで残っていたためcleanではない。Rust source差分はなかった。backup: `codex/backup-main`=`8ec3434b3a713a00654b97c14d19e21cb31e69a7`、`codex/backup-main-prev`=`7117aaf58678b44ebc34fd01a751252299c396ea`。
+
+### 証拠境界と未解決範囲
+
+- 本testは未対応gateの本番Release Broker拒否経路を検証する負のE2Eであり、Agent Taskを起動しない。Owner資格endpointおよびWin32確認画面は使わず、実Task process、Workspace変更、Task scratch作成・削除、sandbox拒否、取消／期限／crash、result／diff UIを検証していない。
+- `release_blocker`: clean installed Desktop UIからnative Owner判断をBrokerへ結合した正のTask実行、実tool-child隔離、OneDrive Cloud Files／通常NTFSのsecret・深度・alias検査、Task間分離、Audit tamper検証、停止とRecovery、Broker scratch／AppContainer一時領域の後始末、result／diffのContent Exposure。
+- `task_execution=unsupported`と`release_ready=false`を維持する。新しい拒否probeを正のproduction Task完了またはrelease gate解除へ昇格しない。

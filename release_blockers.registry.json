@@ -535,6 +535,33 @@
         "os_protection_changed": false,
         "scope_limit": "Direct Codex sandbox children only, with distinct synthetic CODEX_HOME and Workspaces. Peer marker non-visibility does not prove distinct TEMP roots, same-CODEX_HOME isolation, sequential-task isolation, physical deletion, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
+      "latest_production_agent_task_negative_gate_probe": {
+        "date": "2026-10-01",
+        "source_commit": "8ec3434b3a713a00654b97c14d19e21cb31e69a7",
+        "source_worktree_clean": false,
+        "rust_source_diff": false,
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
+        "validation": "Windows main-commit ignored integration test passed 1/1 using a Release Broker process and installed Codex CLI 0.159.2 registration. Rust-only source/test tree matched the recorded commit; documentation and manifest changes were present. Rust all-target check passed; serial suite rerun passed with 13 targets, 439 passed, 0 failed, 7 ignored; Schema 151/151 examples and 194 negative fixtures passed; Conformance 230 checks passed.",
+        "helper_sha256": "C816AFA894A45613AA5683A87472DA3E5815D29F640FFCF507C9D7E5B49DC73B",
+        "observations": {
+          "agent_session": "Accepted over authenticated normal loopback IPC and bound to the registered synthetic Workspace.",
+          "task_execution_capability": "Broker projection remained unsupported.",
+          "task_request_inspection": "Rejected as AgentTask実行非対応; no response body or instruction echo.",
+          "task_start": "Rejected as AgentTask実行非対応 before a task worker was started.",
+          "normal_ipc_permission_grant": "Rejected as desktop_native_owner_confirmation_required.",
+          "normal_ipc_owner_approval": "Rejected as desktop_native_owner_confirmation_required; instruction body not echoed.",
+          "audit": "Rejection events were present after Broker shutdown and persistent-store reopen; instruction and synthetic secret marker were absent.",
+          "native_owner_ui": "Not exercised.",
+          "task_scratch_cleanup": "Not exercised because no Task started."
+        },
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "Negative gate only. LIVE_RUNTIME covers the standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and rejection Audit reload; Workspace/store/secret are FIXTURE. Does not prove positive Agent Task execution, installed Desktop/native Owner operation, sandbox isolation, cancellation/deadline/crash Recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
+      },
       "concurrent_mxc_shared_home_temp_isolation_probe": {
         "date": "2026-10-01",
         "source_base_commit": "b3fb1cb605f9c074dc9cfff34eb22a2d099026a0",

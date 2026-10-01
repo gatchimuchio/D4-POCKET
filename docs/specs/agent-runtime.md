@@ -154,3 +154,9 @@ Windowsのignored Rust統合testは、実Codex CLI `0.158.0-alpha.2.1`と実MxC 
 Broker-owned `WorkspaceTaskScratch`と、MxC tool childが実際に受け取る`TEMP`／`TMP`は別の領域として扱う。Windows AppContainerは`TEMP`／`TMP`をAppContainer profile配下の`AC\Temp`へリダイレクトするため、child値がBroker scratchと一致することを安全不変条件にしない。Broker scratchはBrokerが所有する作業・回収対象であり、AppContainer側の一時領域はMxC／Windows sandbox profileの寿命と権限境界に従う。
 
 Task対応を成立させるには、Broker scratchとAppContainer一時領域の双方を区別した上で、production Broker経路におけるtask間・同時task間の分離、実際のsandbox process群停止後の通常終了／取消／期限超過／crash時cleanup、およびcleanup失敗時のRecoveryを検証する。AppContainer環境handleのclose、child終了後にhostからpathが見えないこと、または`TEMP`／`TMP`がBroker scratchと違うこと単独では、物理削除・task間非共有を証明しない。条件が閉じるまでは`task_execution=unsupported`と既存`release_blocker`を維持する。
+
+### Release Broker processの未対応Task拒否経路（2026-10-01）
+
+Rust source／testがcommit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`と一致するWindows Release Broker processを起動し、実Codex CLI `0.159.2`の登録だけを行う統合testを追加した。通常認証loopback IPCでAgent Sessionを作成した後、Task要求検査・Task起動はmetadataの`unsupported`により拒否され、通常資格によるWorkspace Permission／Owner Approval発行要求もnative Owner確認必須として拒否される。拒否AuditはBroker終了後に永続storeから再読込でき、指示本文と合成secretは応答・Auditに含まれない。
+
+この`LIVE_RUNTIME`証拠はRelease helper process、通常認証IPC、実CLIの登録・能力投影、Brokerの拒否とfile-backed Audit再読込に限る。Workspace／store／secretは合成`FIXTURE`で、native Owner UIは操作せず、Task processは起動していない。scratchが作成されないことはTask後始末の証拠ではない。正の実Task、installed Desktop経路、sandbox隔離、取消／期限／crash Recovery、MxC一時領域の後始末、結果／diffのContent Exposureは未成立であり、Codex Adapterを`task_execution=unsupported`に保つ。
