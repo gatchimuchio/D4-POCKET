@@ -655,10 +655,31 @@
       },
       "latest_agent_task_ui_broker_contract_wiring": {
         "date": "2026-10-01",
-        "evidence_source": "FIXTURE",
-        "source_commit": "13e1b402c533be9f1095a9cd5c6e615080a5c304",
-        "source_worktree_clean": false,
-        "validation": "Local Flutter full suite: flutter test --no-pub --no-test-assets --reporter expanded, 142 passed, 0 failed. Focused Broker Task UI widget test passed. dart format --output=none --set-exit-if-changed and git diff --check passed. python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows passed after one retained initial Japanese-base audit failure; final strict audit had 0 findings, Schema 152/152 examples and 196 negative fixtures passed, Conformance 231 checks passed, and all 10 registered development checks passed. Manual Windows Flutter workflow_dispatch run #11 (run 36863295820, commit be12e4e6140ff6e612ff9ef1897aca072b709e92) built Rust helper but failed Desktop flutter analyze on one relative-lib import and two prefer_const_constructors infos; Mobile analyze and post-run cleanliness were skipped, with no artifact. Those three findings are fixed in the follow-up commit; hosted revalidation is pending.",
+        "evidence_sources": [
+          "FIXTURE",
+          "EXTERNAL_EVIDENCE"
+        ],
+        "source_commit": "459369a637ff60b92f7ce1550d78ad3cb41548c2",
+        "source_worktree_clean": true,
+        "validation": "Local final Flutter full suite: flutter test --no-pub --no-test-assets --reporter expanded, 142 passed, 0 failed. Focused Broker Task UI widget test passed. dart format --output=none --set-exit-if-changed and git diff --check passed. python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows passed on the source state represented by this commit after retaining and fixing one initial Japanese-base audit failure; strict audit 1133 files/0 findings, Schema 152/152 examples and 196 negative fixtures, Conformance 231 checks, and all 10 registered development checks passed. Windows manual workflow_dispatch run #11 (https://github.com/gatchimuchio/GUI-Shell/actions/runs/36863295820, commit be12e4e6140ff6e612ff9ef1897aca072b709e92) built Rust helper but failed Desktop analyze on one relative-lib import and two prefer_const_constructors infos; this failure remains in history. Follow-up run #12 (https://github.com/gatchimuchio/GUI-Shell/actions/runs/36864800422, exact source commit 459369a637ff60b92f7ce1550d78ad3cb41548c2) succeeded on windows-2025 image win25-vs2026/20260925.250.1 in 7m36s: Rust helper build passed, Desktop analyze reported no issues, 142 Desktop tests passed, Mobile analyze reported no issues, post-run worktree was clean; no artifact was uploaded.",
+        "latest_windows_manual_actions": {
+          "workflow": ".github/workflows/windows-manual-desktop-flutter-validation.yml",
+          "trigger": "workflow_dispatch",
+          "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36864800422",
+          "run_status": "success",
+          "source_commit": "459369a637ff60b92f7ce1550d78ad3cb41548c2",
+          "runner_image": "win25-vs2026/20260925.250.1",
+          "rust_helper_build": "passed",
+          "desktop_analyze": "passed; no issues found",
+          "desktop_test_result": {
+            "passed": 142,
+            "failed": 0
+          },
+          "mobile_analyze": "passed; no issues found",
+          "post_test_worktree_clean": true,
+          "artifact_upload": "none",
+          "scope_limit": "EXTERNAL_EVIDENCE for hosted build and checks only; Flutter tests are FIXTURE. Does not prove installed product, native Owner interaction, production Agent Task execution, isolation, durable Audit/Recovery, or R2 production E2E."
+        },
         "observations": {
           "session_start_and_refresh": "Agent Center requests Session start and reloads Broker-projected Sessions through the existing Broker transport, then matches the new Session to the registered Runtime and Workspace.",
           "preflight": "Task instruction is sent only to Broker preflight; accepted response is checked against Runtime, Session, Workspace, instruction hash, and not-started status. Unsupported rejection does not expose the instruction or proceed to grants.",
