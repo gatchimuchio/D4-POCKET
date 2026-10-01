@@ -1092,6 +1092,8 @@ mod codex_cli_fixture;
 mod tests {
     use super::*;
     use std::fs;
+    #[cfg(windows)]
+    use std::os::windows::fs::MetadataExt;
 
     const BRACKET_SECRET_GLOB: &str = "private/vault[[]ab[]].json";
     const BRACKET_SECRET_SUBTREE_GLOB: &str = "private/vault[[]ab[]].json/**";
@@ -1330,10 +1332,7 @@ mod tests {
             "private/vault{x}.txt",
             "private/deep-secret-root",
         ];
-        let deep_relative = (0..40)
-            .map(|index| format!("d{index:02}"))
-            .collect::<Vec<_>>()
-            .join("/");
+        let deep_relative = vec!["d"; 40].join("/");
         let deep_secret_relative = format!("private/deep-secret-root/{deep_relative}/secret.txt");
         let denied_paths = [
             "private/registered-marker.txt",
@@ -1462,10 +1461,51 @@ mod tests {
             "別Agent用TEMP／TMP設定がある"
         );
         let quote_path = |path: &Path| format!("'{}'", path.to_string_lossy().replace('\'', "''"));
-        let denied_paths = denied_paths
+        let cloud_file =
+            std::env::var_os("GUI_SHELL_ONEDRIVE_CLOUD_FILE_TEST_PATH").map(PathBuf::from);
+        let cloud_read_probe = if let Some(path) = cloud_file.as_ref() {
+            assert!(path.is_absolute(), "OneDrive合成Cloud File pathは絶対path");
+            assert_eq!(
+                path.file_name().and_then(|name| name.to_str()),
+                Some("OWNER-APPROVED-SYNTHETIC.txt"),
+                "Cloud File probeは所有者承認済み合成fileだけを対象にする"
+            );
+            assert!(
+                path.ancestors().any(|ancestor| {
+                    ancestor.file_name().and_then(|name| name.to_str())
+                        == Some("D4Pocket-R2-E2E-SYNTHETIC")
+                }),
+                "Cloud File probeは専用合成fixture root内に限る"
+            );
+            let attributes = std::fs::symlink_metadata(path)
+                .expect("OneDrive合成Cloud File metadata")
+                .file_attributes();
+            const FILE_ATTRIBUTE_UNPINNED: u32 = 0x0010_0000;
+            const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+            assert_ne!(
+                attributes & FILE_ATTRIBUTE_UNPINNED,
+                0,
+                "OneDrive合成fileがonline-onlyである (attributes=0x{attributes:08X})"
+            );
+            assert_ne!(
+                attributes & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+                0,
+                "OneDrive合成fileがremote data accessを要求するplaceholderである (attributes=0x{attributes:08X})"
+            );
+            String::from(
+                r#"$cloudErrorType=''; $cloudErrorHResult=0; try{$null=Get-Content -Raw -LiteralPath __D4P_CLOUD_FILE_PATH__ -ErrorAction Stop}catch{$cloudErrorType=$_.Exception.GetType().Name; $cloudErrorHResult=$_.Exception.HResult}; if($cloudErrorType -ne 'UnauthorizedAccessException' -or $cloudErrorHResult -ne -2147024891){[Console]::Error.WriteLine('OneDrive Cloud Filesの読取拒否が想定外です'); exit 61};"#,
+            )
+            .replace("__D4P_CLOUD_FILE_PATH__", &quote_path(path))
+        } else {
+            String::new()
+        };
+        let mut denied_paths = denied_paths
             .iter()
             .map(|path| quote_path(&workspace.join(path)))
             .collect::<Vec<_>>();
+        if let Some(path) = cloud_file.as_ref() {
+            denied_paths.push(quote_path(path));
+        }
         let denied_array = denied_paths.join(",");
         let denied_aliases = [
             workspace.join(r"PRIVATE\REGISTERED-MARKER.TXT"),
@@ -1494,10 +1534,11 @@ mod tests {
         let environment_report = workspace.join("sandbox-environment-report.txt");
         let hardlink_alias = workspace.join("synthetic-secret-hardlink-alias.txt");
         let script = format!(
-            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; [IO.File]::WriteAllText({},'ready'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 46}}; Start-Sleep -Milliseconds 25}}; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; $peerReadError=0; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop}}catch{{$peerReadError=$_.Exception.HResult}}; if($peerReadError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_read_hresult=$peerReadError\"); exit 44}}; $peerWriteError=0; $peerWriteErrorType=''; try{{[IO.File]::WriteAllText({},'synthetic-agent-a-write')}}catch{{$peerWriteError=$_.Exception.InnerException.HResult; $peerWriteErrorType=$_.Exception.InnerException.GetType().Name}}; if($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_write_type=$peerWriteErrorType; peer_write_hresult=$peerWriteError; target_exists=$([IO.File]::Exists({}))\"); exit 45}}; [IO.File]::WriteAllText({},'checked'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 47}}; Start-Sleep -Milliseconds 25}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"peerReadHResult=$peerReadError`npeerWriteException=$peerWriteErrorType`npeerWriteHResult=$peerWriteError`nhardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
+            "$probeLabel='合成path検査'; $ErrorActionPreference='Stop'; [IO.File]::WriteAllText({},'ready'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 46}}; Start-Sleep -Milliseconds 25}}; $denied=@({}); foreach($p in $denied){{try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit 41}}catch{{}}}}; {}; $peerReadError=0; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop}}catch{{$peerReadError=$_.Exception.HResult}}; if($peerReadError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_read_hresult=$peerReadError\"); exit 44}}; $peerWriteError=0; $peerWriteErrorType=''; try{{[IO.File]::WriteAllText({},'synthetic-agent-a-write')}}catch{{$peerWriteError=$_.Exception.InnerException.HResult; $peerWriteErrorType=$_.Exception.InnerException.GetType().Name}}; if($peerWriteErrorType -ne 'UnauthorizedAccessException' -or $peerWriteError -ne -2147024891){{[Console]::Error.WriteLine(\"peer_write_type=$peerWriteErrorType; peer_write_hresult=$peerWriteError; target_exists=$([IO.File]::Exists({}))\"); exit 45}}; [IO.File]::WriteAllText({},'checked'); $deadline=[DateTime]::UtcNow.AddSeconds(90); while(-not [IO.File]::Exists({})){{if([DateTime]::UtcNow -ge $deadline){{exit 47}}; Start-Sleep -Milliseconds 25}}; $deniedAliases=@({}); $aliasIndex=0; foreach($p in $deniedAliases){{$aliasIndex++; try{{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop; exit (43+$aliasIndex)}}catch{{}}}}; $decoys=@({}); foreach($p in $decoys){{$null=Get-Content -Raw -LiteralPath $p -ErrorAction Stop}}; $writeDenied=@({}); foreach($p in $writeDenied){{try{{[IO.File]::WriteAllText($p,'synthetic-write'); exit 42}}catch{{}}}}; $hardlinkState='creation-denied'; $hardlinkErrorType=''; $hardlinkErrorHResult=0; try{{New-Item -ItemType HardLink -Path {} -Target {} -ErrorAction Stop | Out-Null; try{{$null=Get-Content -Raw -LiteralPath {} -ErrorAction Stop; $hardlinkState='created-readable'}}catch{{$hardlinkState='created-read-denied'}}}}catch{{$hardlinkErrorType=$_.Exception.GetType().Name; $hardlinkErrorHResult=$_.Exception.HResult}}; $expectedScratch=[IO.Path]::GetFullPath({}); $tempMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TEMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); $tmpMatchesScratch=[string]::Equals([IO.Path]::GetFullPath($env:TMP),$expectedScratch,[StringComparison]::OrdinalIgnoreCase); [IO.File]::WriteAllText({},'workspace-write-marker'); [IO.File]::WriteAllText({},\"peerReadHResult=$peerReadError`npeerWriteException=$peerWriteErrorType`npeerWriteHResult=$peerWriteError`nhardlinkState=$hardlinkState`nhardlinkErrorType=$hardlinkErrorType`nhardlinkErrorHResult=$hardlinkErrorHResult`nTEMP作業領域一致=$tempMatchesScratch`nTMP作業領域一致=$tmpMatchesScratch\"); exit 0",
             quote_path(&workspace_ready),
             quote_path(&workspace_start),
             denied_array,
+            cloud_read_probe,
             quote_path(&peer_marker),
             quote_path(&peer_write_target),
             quote_path(&peer_write_target),
@@ -1797,6 +1838,23 @@ exit 0
             "Agent BのRust生成profile probeが失敗: code={:?}, stdout={peer_stdout}, stderr={peer_stderr}",
             peer_status.code(),
         );
+        if let Some(path) = cloud_file.as_ref() {
+            const FILE_ATTRIBUTE_UNPINNED: u32 = 0x0010_0000;
+            const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+            let attributes = std::fs::symlink_metadata(path)
+                .expect("Task後もOneDrive合成Cloud File metadata")
+                .file_attributes();
+            assert_ne!(
+                attributes & FILE_ATTRIBUTE_UNPINNED,
+                0,
+                "Task後も合成Cloud Fileがonline-onlyのままである"
+            );
+            assert_ne!(
+                attributes & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+                0,
+                "Agentの拒否probeでCloud Fileがhydrateされない"
+            );
+        }
         let sequential_temp_report = workspace.join("sandbox-sequential-temp-report.txt");
         let sequential_observer_script = r#"
 <# 先行Taskの一時目印を後続childから再読できるか照合する #>

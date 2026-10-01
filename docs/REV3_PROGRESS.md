@@ -1700,3 +1700,20 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: exit 0。登録済みdevelopment check 10件すべて成功、日本語strict監査1133 files／0 findings、Manifest 1130 files。`release_ready=false`と既存release blockerは維持。
 - `python -X utf8 tooling/manifest.py --write`、統合validator内のmanifest check、および`git diff --check`: 成功。
 - このblockは文書・Manifest更新のみでRust／Flutter source変更なし。Rust／Flutter全testは今回再実行していない。
+
+## R2追補 実Codex CLIのOneDrive Cloud Files／通常NTFS隔離probe（2026-10-02）
+
+### 成立した範囲
+
+- オーナーが合成fixtureのみの作成・使用を承認したため、専用OneDrive fixture内の合成markerだけを対象にした。実Credential、実Workspace data、実Model、課金APIは使用していない。
+- Rust Adapterが生成するTask用sandbox profileと実Codex CLI `0.159.2`を使い、実MxC tool childから合成filesystem probeを実行した。OneDrive markerは実行前後ともWindows attribute `0x00501620`で、`UNPINNED`／`RECALL_ON_DATA_ACCESS`／`OFFLINE` bitsが立ち、`fsutil`のCloud Files reparse tagは`0x9000401A`だった。MxC childからの読取は`UnauthorizedAccessException`／HRESULT `-2147024891`（Access Denied）となった。
+- 同じRust生成Task用profileの通常NTFS fixtureでは、登録合成secret file／directoryと深さ40のsecret pathの読取・書込拒否、Workspace内通常fileの読書込、別Agent Workspaceへの読書込拒否、動的hardlink作成拒否、相手MxC TEMP markerの不可視を確認した。TEMP／TMPはBroker scratchと一致しなかった。
+- これは実Codex／MxC childの`LIVE_RUNTIME`と合成Workspace／markerの`FIXTURE`に分かれる。OneDrive Cloud Filesと通常NTFSの両環境で同じignored Rust probeを各1回成功させた。
+
+### 検証境界と失敗履歴
+
+- 初回OneDrive probeは、長いOneDrive絶対pathと深いfixture pathの合計でMxCがTask開始前にfail-closedとなった。fixtureの深いdirectory componentを1文字へ短縮し、試験の隔離要件を変えずに再実行して成功した。この初回失敗を成功へ読み替えない。
+- 初回統合validatorはstrict日本語監査がRust test内の英語異常時diagnostic 1件を検出して失敗した。さらにPowerShell script全体をRust `format!` literalに置いた場合も監査器が診断文字列として扱ったため、異常時文面を日本語化した上でCloud File pathだけを安全なplaceholder置換で結合する形に分離した。二度のvalidator失敗履歴を保持する。
+- `cargo test --locked --lib -- --ignored Rust生成Task設定で実Windows隔離の登録secretを拒否する --nocapture`はOneDrive Cloud Files、通常NTFSそれぞれ1 passed。`cargo test --locked --all-targets -- --test-threads=1`は12 target、444 passed／0 failed／7 ignored。Rust変更fileの`rustfmt 1.95.0 --edition 2021 --config skip_children=true --check`と`git diff --check`も成功した。
+- 実Codex CLIとloopback fake Responses APIを使う別のignored試験は1 passedで、in-process Broker fixture経由の通常完了・取消、MxC TEMP marker／rootの終了後不在、外部接続遮断0件を確認した。Broker、Owner判断、Audit callback、Workspace、APIはfixtureであり、production Broker server／authenticated IPCではない。
+- 本probeは製品Adapterを実行可能へ昇格せず、`task_execution=unsupported`を変更しない。登録前に作られたhardlink aliasをMxC childが読めないこと、installed Flutter UIからnative Owner確認、production IPC／Broker経由の正Task、永続positive Audit、deadline／crash Recovery、結果／diffのContent Exposureは未確認であり、R2 `release_blocker`と`release_ready=false`を維持する。

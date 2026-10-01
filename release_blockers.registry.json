@@ -858,6 +858,37 @@
         "os_protection_changed": false,
         "scope_limit": "One observation each for normal completion and Broker cancellation of a real CLI/MxC child, inside an in-process Broker fixture. Does not establish production Release Broker IPC, installed Desktop/native Owner confirmation, deadline/crash/power-loss cleanup, repeated reliability, task-to-task isolation, durable positive Audit, OneDrive/NTFS isolation, result/diff Content Exposure, or task_execution support."
       },
+      "mxc_direct_cloud_file_ntfs_isolation_probe": {
+        "date": "2026-10-02",
+        "source_base_commit": "72342c4a6e58b0fe0671e97285a237ed034848c6",
+        "source_worktree_clean": false,
+        "cli_version": "0.159.2",
+        "evidence_source": "LIVE_RUNTIME for the actual Codex CLI/MxC child and Windows Cloud Files attributes; FIXTURE for synthetic Workspace, registered-secret markers, and OneDrive marker",
+        "owner_approved_synthetic_fixture": true,
+        "validation": "The focused ignored Rust sandbox test passed 1/1 on the OneDrive Cloud Files fixture and 1/1 on ordinary NTFS. The complete Windows Rust suite passed on 12 targets: 444 passed, 0 failed, 7 ignored. The separate real CLI/loopback fake-Responses in-process Broker fixture passed 1/1.",
+        "onedrive_cloud_file": {
+          "attributes": "0x00501620",
+          "unpinned": true,
+          "recall_on_data_access": true,
+          "offline": true,
+          "reparse_tag": "0x9000401A",
+          "MxC_child_read": "UnauthorizedAccessException, HRESULT -2147024891 (Access Denied)",
+          "placeholder_state_after_probe": "UNPINNED and RECALL_ON_DATA_ACCESS remained set"
+        },
+        "ordinary_ntfs_synthetic_results": {
+          "registered_secret_file_and_directory_read_write": "denied",
+          "depth_40_registered_secret_read_write": "denied",
+          "workspace_read_write": "allowed",
+          "peer_workspace_read_write": "denied",
+          "dynamic_hardlink_creation": "denied by the MxC child",
+          "peer_mxc_temp_marker": "not visible",
+          "task_TEMP_TMP_equal_broker_scratch": false
+        },
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "scope_limit": "Direct Rust-generated Adapter command and actual Codex CLI/MxC children only; not a clean installed Flutter-to-native-Owner-to-production-Broker authenticated IPC Task. The pre-existing hardlink-alias read case, durable positive Task Audit, deadline/crash Recovery, result/diff Content Exposure, provider interoperability, and task_execution support remain unproven."
+      },
       "concurrent_mxc_shared_home_temp_isolation_probe": {
         "date": "2026-10-01",
         "source_base_commit": "b3fb1cb605f9c074dc9cfff34eb22a2d099026a0",
