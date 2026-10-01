@@ -32,6 +32,7 @@ FlutterがMethodChannel `gui_shell/broker` の`request` methodへ渡す値は、
 - PID不一致、未設定、pipe名不正、JSON不正、上限超過、期限超過、Broker停止はfail-closedとする。失敗時にTCP、snapshot、別endpoint、Owner資格へfallbackしない。
 - Runnerはpipeの接続・frame送受信だけを担い、要求を解釈して権限を付与せず、認証secretを保持しない。
 - relayがpipeで受けた要求を処理するときは、必ず既存のauthenticated loopback TCP Brokerへnormal secretで再接続する。Brokerが停止・拒否・Audit失敗を返した場合、その応答を変更せずUIへ返す。
+- `AgentCLI実行系作業領域登録`はoperation固有Schemaに適合する要求だけをnative Owner確認へ進める。起動器はCLI実行file、Workspace root、Runtime／Workspace ID、秘密path除外を確認文に表示し、No／未確認を通常資格のOwner操作へfallbackしない。Yes後の登録は既存Broker内だけに保持し、Broker終了時に消去する。Task実行、Permission、Approval、Credentialは登録操作から生成しない。
 
 ## 4. 上限・応答・復旧
 

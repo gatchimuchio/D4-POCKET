@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use unicode_normalization::UnicodeNormalization;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::audit_hash::sha256_tagged;
 use crate::broker::audit::{BrokerAuditEvent, BrokerAuditLog};
@@ -52,6 +52,18 @@ struct SetupDoctorReportRequest {
 #[serde(deny_unknown_fields)]
 struct FirstRunConfigurationRequest {
     version: u8,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentCliRuntimeWorkspaceRegistration {
+    version: u8,
+    adapter_id: String,
+    runtime_id: String,
+    cli_path: String,
+    workspace_id: String,
+    workspace_root: String,
+    secret_paths: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -427,6 +439,8 @@ pub enum BrokerOperation {
     AgentTask状態,
     #[serde(rename = "AgentTask取消")]
     AgentTask取消,
+    #[serde(rename = "AgentCLI実行系作業領域登録")]
+    AgentCLI実行系作業領域登録,
     #[serde(rename = "評価Dataset登録")]
     評価Dataset登録,
     #[serde(rename = "回帰Case登録")]
@@ -627,6 +641,7 @@ impl BrokerOperation {
             BrokerOperation::AgentTask実行 => "AgentTask実行",
             BrokerOperation::AgentTask状態 => "AgentTask状態",
             BrokerOperation::AgentTask取消 => "AgentTask取消",
+            BrokerOperation::AgentCLI実行系作業領域登録 => "AgentCLI実行系作業領域登録",
             BrokerOperation::評価Dataset登録 => "評価Dataset登録",
             BrokerOperation::回帰Case登録 => "回帰Case登録",
             BrokerOperation::回帰Case一覧 => "回帰Case一覧",
@@ -936,6 +951,7 @@ pub struct Broker {
     agent_task_scratch: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_install_path_verified: bool,
+    desktop_agent_workspace_protected_paths: Vec<PathBuf>,
     desktop_loopback_bind_verified: bool,
     desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
 }
@@ -974,6 +990,7 @@ impl Broker {
             agent_task_scratch: None,
             desktop_export_root: None,
             desktop_install_path_verified: false,
+            desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
         }
@@ -1046,6 +1063,7 @@ impl Broker {
             agent_task_scratch: Some(agent_task_scratch),
             desktop_export_root: None,
             desktop_install_path_verified: false,
+            desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
         })
@@ -1065,7 +1083,266 @@ impl Broker {
         path: std::path::PathBuf,
         root: cap_std::fs::Dir,
     ) {
+        self.desktop_agent_workspace_protected_paths
+            .push(path.clone());
         self.desktop_export_root = Some((path, root));
+    }
+
+    pub(crate) fn set_desktop_agent_workspace_protected_paths(&mut self, paths: Vec<PathBuf>) {
+        self.desktop_agent_workspace_protected_paths = paths;
+    }
+
+    fn agent_cli_runtime_workspace_registration(
+        &mut self,
+        request_id: &str,
+        payload: &Value,
+        payload_hash: &str,
+    ) -> BrokerResponse {
+        let operation = BrokerOperation::AgentCLI実行系作業領域登録.as_str();
+        let request =
+            match serde_json::from_value::<AgentCliRuntimeWorkspaceRegistration>(payload.clone()) {
+                Ok(request) => request,
+                Err(_) => {
+                    return self.reject_with_payload_hash(
+                        request_id,
+                        operation,
+                        "agent_cli_registration_request_invalid",
+                        "Agent CLI実行系登録の要求形式が不正です",
+                        true,
+                        payload_hash,
+                    )
+                }
+            };
+        let workspace_id_valid = !request.workspace_id.is_empty()
+            && request.workspace_id.len() <= 128
+            && request
+                .workspace_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte));
+        let secret_paths_valid = request.secret_paths.len() <= 16
+            && request.secret_paths.iter().all(|path| {
+                !path.is_empty()
+                    && path.len() <= 256
+                    && !path.chars().any(char::is_control)
+                    && !Path::new(path).is_absolute()
+                    && !path
+                        .split(['/', '\\'])
+                        .any(|part| part == ".." || part == ".")
+            })
+            && request
+                .secret_paths
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                == request.secret_paths.len();
+        if request.version != 1
+            || request.adapter_id.is_empty()
+            || request.adapter_id.len() > 128
+            || !request.adapter_id.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_.".contains(&byte)
+            })
+            || !crate::adapters::supports_cli_adapter(&request.adapter_id)
+            || !実行系ID妥当(&request.runtime_id)
+            || !workspace_id_valid
+            || request.cli_path.is_empty()
+            || request.workspace_root.is_empty()
+            || request.cli_path.len() > 1024
+            || request.workspace_root.len() > 1024
+            || request.cli_path.chars().any(char::is_control)
+            || request.workspace_root.chars().any(char::is_control)
+            || !secret_paths_valid
+            || !Path::new(&request.cli_path).is_absolute()
+            || !Path::new(&request.workspace_root).is_absolute()
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "agent_cli_registration_request_invalid",
+                "Agent CLI実行系・Workspaceの識別子またはpath範囲が不正です",
+                true,
+                payload_hash,
+            );
+        }
+        if !self.desktop_install_path_verified
+            || self.desktop_agent_workspace_protected_paths.is_empty()
+        {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "desktop_runtime_registration_unavailable",
+                "検証済みWindows Desktop起動器のBrokerだけが登録できます",
+                true,
+                payload_hash,
+            );
+        }
+        if self.対話.登録件数() >= 8 || self.対話.登録済み(&request.runtime_id) {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "agent_cli_registration_limit_or_duplicate",
+                "Agent CLI登録の上限に達したかRuntime IDが重複しています",
+                true,
+                payload_hash,
+            );
+        }
+        if self
+            .append_audit(
+                request_id,
+                operation,
+                "received",
+                "Capability=Agent CLI実行系とWorkspaceの起動中登録 Permission=登録したCLI interface検査とWorkspace root保持だけ Approval=Rust Desktop native Owner確認済み・Task実行Permissionではない RecoveryAction=部分登録を同じBroker内で取消し、Task実行はunsupportedを維持",
+                EVIDENCE_SOURCE_LIVE_RUNTIME,
+                payload_hash,
+            )
+            .is_err()
+        {
+            return self.audit_store_failed_response(
+                request_id,
+                operation,
+                "broker_audit_append_failed",
+                "Agent CLI登録開始Auditを確定できません",
+            );
+        }
+
+        match self.register_agent_cli_runtime_workspace(&request) {
+            Ok(()) => {
+                let body = serde_json::json!({
+                    "runtime_id": request.runtime_id,
+                    "workspace_id": request.workspace_id,
+                    "registration_lifetime": "broker_process",
+                    "task_execution": "unsupported",
+                    "permission_generated": false,
+                    "approval_generated": false,
+                    "credential_value_accepted": false
+                });
+                let accepted_hash = canonical_payload_hash(Some(&body));
+                let audit = match self.append_audit(
+                    request_id,
+                    operation,
+                    "accepted",
+                    "Agent CLI実行系とWorkspaceをこのBroker process中だけ登録。Permission・Approval・Credentialは生成せずTask実行非対応を維持",
+                    EVIDENCE_SOURCE_LIVE_RUNTIME,
+                    &accepted_hash,
+                ) {
+                    Ok(event) => event,
+                    Err(error) => {
+                        self.rollback_agent_cli_registration(&request.runtime_id);
+                        return self.audit_store_failed_response(
+                            request_id,
+                            operation,
+                            "broker_audit_append_failed",
+                            &error.message(),
+                        );
+                    }
+                };
+                BrokerResponse {
+                    request_id: request_id.to_owned(),
+                    operation: operation.to_owned(),
+                    status: BrokerStatus::Accepted,
+                    evidence_source: EVIDENCE_SOURCE_LIVE_RUNTIME.to_owned(),
+                    audit_event_id: audit.event_id,
+                    error: None,
+                    health: None,
+                    body: Some(body),
+                    shutdown_requested: self.shutdown_requested,
+                }
+            }
+            Err(reason) => {
+                if self.対話.登録済み(&request.runtime_id) {
+                    self.rollback_agent_cli_registration(&request.runtime_id);
+                }
+                if self
+                    .append_audit(
+                        request_id,
+                        operation,
+                        "rejected",
+                        reason,
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        payload_hash,
+                    )
+                    .is_err()
+                {
+                    return self.audit_store_failed_response(
+                        request_id,
+                        operation,
+                        "broker_audit_append_failed",
+                        "Agent CLI登録拒否Auditを確定できません",
+                    );
+                }
+                self.reject_with_payload_hash(
+                    request_id,
+                    operation,
+                    "agent_cli_registration_rejected",
+                    reason,
+                    true,
+                    payload_hash,
+                )
+            }
+        }
+    }
+
+    fn register_agent_cli_runtime_workspace(
+        &mut self,
+        request: &AgentCliRuntimeWorkspaceRegistration,
+    ) -> Result<(), &'static str> {
+        let startup = super::workspace_root::WorkspaceStartup {
+            runtime_id: request.runtime_id.clone(),
+            workspace_id: request.workspace_id.clone(),
+            root_path: request.workspace_root.clone(),
+            secret_paths: request.secret_paths.clone(),
+        };
+        let (root, _, ancestry) = super::workspace_root::open_registered_root_with_ancestry(
+            &startup,
+            &self.desktop_agent_workspace_protected_paths,
+        )?;
+        let adapter = crate::adapters::create_cli_adapter(
+            &request.adapter_id,
+            Path::new(&request.cli_path),
+            Path::new(&request.workspace_root),
+        )
+        .map_err(|_| "Owner確認後のAgent CLI interface検査に失敗")?;
+        let metadata = root
+            .dir_metadata()
+            .map_err(|_| "Workspace root識別子を確認できない")?;
+        let identity = super::workspace_root::DirectoryIdentity {
+            device: cap_fs_ext::MetadataExt::dev(&metadata),
+            file_id: cap_fs_ext::MetadataExt::ino(&metadata),
+        };
+        if adapter.作業領域実体識別子()
+            != Some(crate::broker::dialogue::AgentTaskWorkspaceIdentity::new(
+                identity.device,
+                identity.file_id,
+            ))
+        {
+            return Err("Agent CLIの作業rootとOwner確認済みWorkspaceが一致しない");
+        }
+        self.実行系登録(&request.runtime_id, adapter)
+            .map_err(|_| "Agent CLI実行系登録と監査に失敗")?;
+        if let Err(error) = self.作業領域登録範囲付き(
+            &request.runtime_id,
+            &request.workspace_id,
+            root,
+            &request.secret_paths,
+            Some(ancestry),
+        ) {
+            self.rollback_agent_cli_registration(&request.runtime_id);
+            return Err(error);
+        }
+        let protected_paths = self.desktop_agent_workspace_protected_paths.clone();
+        if self
+            .recover_agent_task_scratch(&startup, &protected_paths)
+            .is_err()
+        {
+            self.rollback_agent_cli_registration(&request.runtime_id);
+            return Err("Broker scratch回復を確認できずWorkspace登録を取消した");
+        }
+        Ok(())
+    }
+
+    fn rollback_agent_cli_registration(&mut self, runtime_id: &str) {
+        self.作業領域.remove_runtime(runtime_id);
+        self.資源観測.unregister(runtime_id);
+        self.対話.直後登録取消(runtime_id);
     }
 
     pub(crate) fn initialize_desktop_first_run_configuration(
@@ -1291,6 +1568,7 @@ impl Broker {
             envelope.operation,
             Some(
                 BrokerOperation::GuiShell書出し
+                    | BrokerOperation::AgentCLI実行系作業領域登録
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
                     | BrokerOperation::MCPTool実行
@@ -1401,6 +1679,19 @@ impl Broker {
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
             }
+        }
+
+        if envelope.operation == Some(BrokerOperation::AgentCLI実行系作業領域登録)
+            && export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation
+        {
+            return self.reject_with_payload_hash(
+                &request_id,
+                &operation,
+                "desktop_native_owner_confirmation_required",
+                "Codex実行系とWorkspaceの登録はRust Desktopのnative Owner確認だけで許可します",
+                true,
+                envelope.payload_hash.as_deref().unwrap_or("unknown"),
+            );
         }
 
         if envelope.operation == Some(BrokerOperation::資格情報失効)
@@ -1523,6 +1814,12 @@ impl Broker {
         }
 
         match envelope.operation.unwrap() {
+            BrokerOperation::AgentCLI実行系作業領域登録 => self
+                .agent_cli_runtime_workspace_registration(
+                    &request_id,
+                    envelope.payload.as_ref().unwrap_or(&Value::Null),
+                    &payload_hash,
+                ),
             operation @ (BrokerOperation::作業領域一覧
             | BrokerOperation::作業領域承認
             | BrokerOperation::作業領域失効
@@ -5018,6 +5315,103 @@ mod tests {
             "session-1",
             parse_issued_at_epoch_seconds("2026-06-01T00:00:30Z").unwrap(),
         )
+    }
+
+    fn codex_registration_request(request_id: &str, nonce: &str) -> BrokerRequestEnvelope {
+        let root = std::env::temp_dir().join("gui-shell-codex-registration-test");
+        let mut request = BrokerRequestEnvelope::health(request_id, nonce);
+        request.operation = Some(BrokerOperation::AgentCLI実行系作業領域登録);
+        request.payload = Some(json!({
+            "version": 1,
+            "adapter_id": "codex-cli",
+            "runtime_id": "codex-test",
+            "cli_path": root.join("codex.exe"),
+            "workspace_id": "workspace-test",
+            "workspace_root": root.join("workspace"),
+            "secret_paths": [".env"]
+        }));
+        request.refresh_payload_hash();
+        request
+    }
+
+    #[test]
+    fn agent_cli_runtime_workspace_registration_requires_desktop_native_owner_confirmation() {
+        let mut broker = test_broker();
+        broker.desktop_install_path_verified = true;
+        broker.desktop_agent_workspace_protected_paths =
+            vec![std::env::temp_dir().join("gui-shell-protected")];
+
+        let request = codex_registration_request("codex-register-normal", "codex-register-normal");
+        let normal = broker.handle(request.clone());
+        assert_eq!(normal.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+
+        let owner_request = json!({
+            "request_id": request.request_id,
+            "operation": request.operation.as_ref().map(BrokerOperation::as_str),
+            "payload_hash": request.payload_hash,
+            "nonce": request.nonce,
+            "issued_at": request.issued_at,
+            "metadata": {"client": "desktop_flutter"},
+            "payload": request.payload
+        });
+        let owner = broker.owner要求処理(&owner_request.to_string());
+        assert_eq!(owner.status, BrokerStatus::Rejected);
+        assert_eq!(
+            owner.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        assert!(!broker.対話.登録済み("codex-test"));
+        assert_eq!(broker.audit_events().len(), 2);
+    }
+
+    #[test]
+    fn agent_cli_runtime_workspace_registration_requires_verified_desktop_installation() {
+        let mut broker = test_broker();
+        let mut request =
+            codex_registration_request("codex-register-unverified", "codex-register-unverified");
+        request.session_id = Some("session-1".to_string());
+        let response = broker.処理_with_export_confirmation(
+            request,
+            true,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            None,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "desktop_runtime_registration_unavailable"
+        );
+        assert!(!broker.対話.登録済み("codex-test"));
+        assert_eq!(broker.audit_events().len(), 1);
+    }
+
+    #[test]
+    fn agent_cli_runtime_workspace_registration_rejects_unknown_adapter_id() {
+        let mut broker = test_broker();
+        broker.desktop_install_path_verified = true;
+        broker.desktop_agent_workspace_protected_paths =
+            vec![std::env::temp_dir().join("gui-shell-protected")];
+        let mut request = codex_registration_request("unknown-adapter", "unknown-adapter");
+        request.session_id = Some("session-1".to_string());
+        request.payload.as_mut().unwrap()["adapter_id"] = json!("unknown-cli");
+        request.refresh_payload_hash();
+        let response = broker.処理_with_export_confirmation(
+            request,
+            true,
+            OwnerConfirmationSource::DesktopNativeConfirmation,
+            None,
+        );
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.unwrap().code,
+            "agent_cli_registration_request_invalid"
+        );
+        assert!(!broker.対話.登録済み("codex-test"));
+        assert_eq!(broker.audit_events().len(), 1);
     }
 
     fn resource_request(

@@ -672,6 +672,7 @@ fn build_codex_command(
             format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),
             "model_providers.d4p_loopback_probe.wire_api=\"responses\"".to_owned(),
             "model_providers.d4p_loopback_probe.requires_openai_auth=false".to_owned(),
+            "model_providers.d4p_loopback_probe.supports_websockets=false".to_owned(),
             "model_providers.d4p_loopback_probe.request_max_retries=0".to_owned(),
             "model_providers.d4p_loopback_probe.stream_max_retries=2".to_owned(),
             // 任意の外部Apps／Plugins catalog取得を止め、偽API以外を試験対象から除く。

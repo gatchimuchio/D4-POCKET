@@ -771,6 +771,10 @@ impl 対話制御 {
         self.実行系.contains_key(id)
     }
 
+    pub(crate) fn 登録件数(&self) -> usize {
+        self.実行系.len()
+    }
+
     /// C5が一括の承認待ち対話を作る前に、既存対話を追い出さずに確認する上限。
     /// この値は権限・Approval・送信許可を生成しない。
     pub(crate) fn 評価要求可能数(&self) -> usize {

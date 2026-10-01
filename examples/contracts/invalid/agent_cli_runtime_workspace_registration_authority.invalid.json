@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "adapter_id": "codex-cli",
+  "runtime_id": "codex-local-test",
+  "cli_path": "C:\\Tools\\Codex\\codex.exe",
+  "workspace_id": "r2-synthetic-workspace",
+  "workspace_root": "C:\\d4-r2-synthetic-workspace",
+  "secret_paths": [],
+  "permission": "workspace.write"
+}

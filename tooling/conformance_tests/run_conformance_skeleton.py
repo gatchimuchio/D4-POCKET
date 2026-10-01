@@ -182,6 +182,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_task",
     "agent_task_scratch_recovery",
     "agent_task_request",
+    "agent_cli_runtime_workspace_registration",
     "agent_task_workspace_permission_request",
     "agent_task_workspace_permission",
     "agent_tool_call",
@@ -268,6 +269,7 @@ BROKER_REQUIRED_SOURCES = {
 BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
     "ipc_response.schema.json",
+    "agent_cli_runtime_workspace_registration.schema.json",
     "broker_error.schema.json",
     "broker_endpoint.schema.json",
     "broker_session.schema.json",
@@ -7837,6 +7839,7 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
     )
     required_operations = (
         "Agent一覧",
+        "AgentCLI実行系作業領域登録",
         "Agent作業要求検査",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
@@ -7855,6 +7858,60 @@ def test_agent_broker_operations_are_declared_in_ipc_contracts() -> list[str]:
     return errors
 
 
+def test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free() -> list[str]:
+    schema = load_schema("agent_cli_runtime_workspace_registration.schema.json")
+    valid = load_contract_fixture("agent_cli_runtime_workspace_registration.valid.json")
+    invalid = load_contract_fixture(
+        "invalid/agent_cli_runtime_workspace_registration_authority.invalid.json"
+    )
+    errors: list[str] = []
+    if validate_instance(valid, schema):
+        errors.append("Agent CLI Runtime／Workspace登録の正常例が契約に適合しない")
+    if validate_instance(invalid, schema) == []:
+        errors.append("Agent CLI Runtime／Workspace登録要求がAuthority fieldを受け入れた")
+    for field in ("permission", "approval_id", "credential_value", "owner"):
+        if validate_instance({**valid, field: "untrusted"}, schema) == []:
+            errors.append(f"Agent CLI Runtime／Workspace登録が禁止fieldを受け入れた: {field}")
+
+    protocol = (ROOT / "native/rust_helper/src/broker/protocol.rs").read_text(
+        encoding="utf-8"
+    )
+    launcher = (ROOT / "native/rust_helper/src/desktop_launcher.rs").read_text(
+        encoding="utf-8"
+    )
+    broker_client = (ROOT / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(
+        encoding="utf-8"
+    )
+    adapter_registry = (ROOT / "native/rust_helper/src/adapters/mod.rs").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        "desktop_native_owner_confirmation_required",
+        "desktop_install_path_verified",
+        "self.対話.登録件数() >= 8",
+        '"task_execution": "unsupported"',
+        "rollback_agent_cli_registration",
+    ):
+        if required not in protocol:
+            errors.append(f"Agent CLI登録Broker境界が不足: {required}")
+    for required in (
+        "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録",
+        "Adapter ID: {}",
+        "cli_path",
+        "workspace_root",
+        "secret_paths",
+    ):
+        if required not in launcher:
+            errors.append(f"native Owner確認が登録範囲を示さない: {required}")
+    if "AgentCLI実行系作業領域登録" not in broker_client:
+        errors.append("登録要求のnative Owner確認待ちがDesktop clientにない")
+    if "supports_cli_adapter" not in adapter_registry or '"codex-cli"' not in adapter_registry:
+        errors.append("CLI Adapter選択をBroker CoreではなくAdapter層で解決しない")
+    if "crate::adapters::codex_cli::CodexCliAdapter" in protocol:
+        errors.append("Broker CoreがCodex固有Adapterを直接生成する")
+    return errors
+
+
 def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> list[str]:
     broker_client = (ROOT / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(
         encoding="utf-8"
@@ -7863,6 +7920,7 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
     for operation in (
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
+        "AgentCLI実行系作業領域登録",
     ):
         if operation not in broker_client:
             errors.append(f"Agent Task native Owner確認operationをDesktop待機対象に含めない: {operation}")
@@ -9997,6 +10055,7 @@ def main() -> int:
         test_agent_workspace_outside_access_default_deny,
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_broker_operations_are_declared_in_ipc_contracts,
+        test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free,
         test_agent_task_owner_confirmation_wait_uses_native_operation_timeout,
         test_agent_task_id_operations_are_content_free_and_declared,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,

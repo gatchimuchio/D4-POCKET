@@ -152,6 +152,10 @@
       "責任": "Agent Task要求のRuntime／Session／Workspace参照と指示本文。Authority・Permission・Approval・Audit・実行pathを内包しない"
     },
     {
+      "path": "specs/agent_cli_runtime_workspace_registration.schema.json",
+      "責任": "Windows Desktop native Owner確認後のCLI Adapter・Workspace起動中登録要求。Credential値やTask権限を含まない"
+    },
+    {
       "path": "specs/agent_task.schema.json",
       "責任": "Agent Taskの状態投影。版2はRuntime／Session／WorkspaceとBroker計算指示hashへ結合し、本文・実行path・Permission／Approval識別子・出力本文を含めない"
     },

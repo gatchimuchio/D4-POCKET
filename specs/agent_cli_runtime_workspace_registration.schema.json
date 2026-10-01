@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_cli_runtime_workspace_registration.schema.json",
+  "title": "Agent CLI実行系・作業領域の登録要求",
+  "type": "object",
+  "required": ["version", "adapter_id", "runtime_id", "cli_path", "workspace_id", "workspace_root", "secret_paths"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "adapter_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
+      "description": "Adapter層が対応表で解決するCLI実装識別子。Authorityを含まない。"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "このDesktop起動中だけ有効なRuntime識別子。"
+    },
+    "cli_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Rust BrokerがOwner確認後にAdapter層を通じて実物interfaceを検査する絶対実行file path。"
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "description": "このDesktop起動中だけ有効なBroker作業領域識別子。"
+    },
+    "workspace_root": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Rust Brokerが通常directory・実体識別子・Broker内部領域との非重複を検査する絶対root path。"
+    },
+    "secret_paths": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "description": "Workspace rootからの相対秘密path。秘密本文やCredential値ではない。"
+      }
+    }
+  }
+}

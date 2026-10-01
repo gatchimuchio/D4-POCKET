@@ -143,6 +143,22 @@ fn run_loopback_server_inner(
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
+    let mut desktop_agent_workspace_protected_paths =
+        vec![config.store_dir.clone(), config.session_file.clone()];
+    desktop_agent_workspace_protected_paths
+        .extend(config.store_dir.parent().map(std::path::Path::to_path_buf));
+    desktop_agent_workspace_protected_paths.extend(
+        config
+            .session_file
+            .parent()
+            .map(std::path::Path::to_path_buf),
+    );
+    desktop_agent_workspace_protected_paths.extend(config.owner_session_file.iter().cloned());
+    desktop_agent_workspace_protected_paths.extend(config.workspace_config.iter().cloned());
+    desktop_agent_workspace_protected_paths.extend(config.protected_store_dir.iter().cloned());
+    desktop_agent_workspace_protected_paths
+        .extend(config.desktop_protected_store_dir.iter().cloned());
+    broker.set_desktop_agent_workspace_protected_paths(desktop_agent_workspace_protected_paths);
     if let Some((path, root)) = desktop_export_root {
         broker.set_desktop_export_root(path, root);
     }

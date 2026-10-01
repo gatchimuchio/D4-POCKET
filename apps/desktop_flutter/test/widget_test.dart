@@ -611,7 +611,7 @@ void main() {
     expect(find.text('audit-workspace-bound'), findsOneWidget);
     expect(find.textContaining('書込み隔離は未検証'), findsOneWidget);
     expect(
-      find.textContaining('Task・diff・Tool・command内容は現在のBroker contractにない'),
+      find.textContaining('Task状態・結果・diff表示の製品UI経路は未接続'),
       findsOneWidget,
     );
     expect(find.text('タスク: Brokerから未取得'), findsOneWidget);
@@ -637,6 +637,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Agent引き継ぎ'), findsOneWidget);
+    expect(find.text('登録を開始'), findsNothing);
     expect(find.textContaining('未接続です。Task成果'), findsOneWidget);
     expect(find.text('文書を更新する'), findsNothing);
     expect(find.text('README.md'), findsNothing);
@@ -646,6 +647,57 @@ void main() {
           'python3 tooling/conformance_tests/run_conformance_skeleton.py'),
       findsNothing,
     );
+  });
+
+  testWidgets('Codex登録UIは指定値だけをnative Owner確認Broker要求へ渡す',
+      (WidgetTester tester) async {
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'adapter_id': 'codex-cli',
+        'runtime_id': 'codex-r2-synthetic',
+        'workspace_id': 'workspace-r2-synthetic',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'unsupported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'codex-r2-synthetic');
+    await tester.enterText(fields.at(1), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(fields.at(2), 'workspace-r2-synthetic');
+    await tester.enterText(fields.at(3), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(fields.at(4), '.env\nsecrets');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+
+    expect(transport.operations.last, 'AgentCLI実行系作業領域登録');
+    final registration = transport.requests.last['payload']! as Map;
+    expect(registration['runtime_id'], 'codex-r2-synthetic');
+    expect(registration['adapter_id'], 'codex-cli');
+    expect(registration['workspace_root'], r'C:\d4-r2-synthetic-workspace');
+    expect(registration['secret_paths'], ['.env', 'secrets']);
+    expect(registration.containsKey('permission'), isFalse);
+    expect(registration.containsKey('approval_id'), isFalse);
+    expect(find.textContaining('Task実行はunsupportedのまま'), findsWidgets);
   });
 
   test('Broker対話sessionの重複IDまたは未知内容fieldは製品snapshotを閉鎖する', () async {

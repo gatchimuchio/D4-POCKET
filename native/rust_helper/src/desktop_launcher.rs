@@ -71,6 +71,16 @@ enum DesktopOwnerOperationSummary {
         instruction_hash: String,
         payload_hash: String,
     },
+    AgentCliRuntimeWorkspaceRegistration {
+        adapter_id: String,
+        interface_scope: String,
+        runtime_id: String,
+        cli_path: String,
+        workspace_id: String,
+        workspace_root: String,
+        secret_paths: Vec<String>,
+        payload_hash: String,
+    },
     RegressionCaseDelete {
         summary: OwnerDeleteConfirmationSummary,
         payload_hash: String,
@@ -134,6 +144,18 @@ struct AgentTaskOwnerApprovalRequest {
     session_id: String,
     workspace_id: String,
     instruction: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentCliRuntimeWorkspaceRegistrationRequest {
+    version: u8,
+    adapter_id: String,
+    runtime_id: String,
+    cli_path: String,
+    workspace_id: String,
+    workspace_root: String,
+    secret_paths: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -1069,6 +1091,55 @@ fn owner_operation_candidate(
         BrokerOperation::GuiShell書出し => DesktopOwnerOperationSummary::GuiShellExport(
             export_center::owner_confirmation_summary(payload, &payload_hash).ok()?,
         ),
+        BrokerOperation::AgentCLI実行系作業領域登録 => {
+            let request: AgentCliRuntimeWorkspaceRegistrationRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            let Some(interface_scope) =
+                crate::adapters::cli_adapter_confirmation_scope(&request.adapter_id)
+            else {
+                return None;
+            };
+            if request.version != 1
+                || !agent_task_permission_identifier_is_valid(&request.runtime_id)
+                || !agent_task_permission_identifier_is_valid(&request.workspace_id)
+                || request.cli_path.is_empty()
+                || request.cli_path.len() > 1024
+                || request.cli_path.chars().any(char::is_control)
+                || !Path::new(&request.cli_path).is_absolute()
+                || request.workspace_root.is_empty()
+                || request.workspace_root.len() > 1024
+                || request.workspace_root.chars().any(char::is_control)
+                || !Path::new(&request.workspace_root).is_absolute()
+                || request.secret_paths.len() > 16
+                || request.secret_paths.iter().any(|path| {
+                    path.is_empty()
+                        || path.len() > 256
+                        || path.chars().any(char::is_control)
+                        || Path::new(path).is_absolute()
+                        || path
+                            .split(['/', '\\'])
+                            .any(|part| part == "." || part == "..")
+                })
+                || request
+                    .secret_paths
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    != request.secret_paths.len()
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
+                adapter_id: request.adapter_id,
+                interface_scope: interface_scope.to_owned(),
+                runtime_id: request.runtime_id,
+                cli_path: request.cli_path,
+                workspace_id: request.workspace_id,
+                workspace_root: request.workspace_root,
+                secret_paths: request.secret_paths,
+                payload_hash,
+            }
+        }
         BrokerOperation::更新download要求 => {
             let request: UpdateDownloadOwnerRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -1462,6 +1533,34 @@ fn owner_confirmation_text_for_identity(
                 summary.payload_hash
             )
         }
+        DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
+            adapter_id,
+            interface_scope,
+            runtime_id,
+            cli_path,
+            workspace_id,
+            workspace_root,
+            secret_paths,
+            payload_hash,
+        } => format!(
+            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\nTaskは実行せず、Task実行能力はunsupportedのままです。Permission、Approval、Trust、Credentialを生成・保存しません。Broker終了時に登録は消えます。\n\npayload hash:\n{}",
+            owner_confirmation_value(adapter_id),
+            owner_confirmation_value(runtime_id),
+            owner_confirmation_value(cli_path),
+            owner_confirmation_value(interface_scope),
+            owner_confirmation_value(workspace_id),
+            owner_confirmation_value(workspace_root),
+            if secret_paths.is_empty() {
+                "（除外pathなし）".to_owned()
+            } else {
+                secret_paths
+                    .iter()
+                    .map(|path| format!("• {}", owner_confirmation_value(path)))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            },
+            payload_hash
+        ),
         DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
             runtime_id,
             session_id,
@@ -2080,6 +2179,29 @@ mod tests {
                 },
                 "confirm": confirm
             }),
+            DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
+                adapter_id,
+                interface_scope,
+                runtime_id,
+                cli_path,
+                workspace_id,
+                workspace_root,
+                secret_paths,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "agent_cli_runtime_workspace_registration",
+                    "adapter_id": adapter_id,
+                    "interface_scope": interface_scope,
+                    "runtime_id": runtime_id,
+                    "cli_path": cli_path,
+                    "workspace_id": workspace_id,
+                    "workspace_root": workspace_root,
+                    "secret_paths": secret_paths,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
             _ => panic!("このUI試験ではAgent Taskの固定summaryだけを使用する"),
         };
 
@@ -2501,6 +2623,16 @@ mod tests {
                 instruction_hash: String,
                 payload_hash: String,
             },
+            AgentCliRuntimeWorkspaceRegistration {
+                adapter_id: String,
+                interface_scope: String,
+                runtime_id: String,
+                cli_path: String,
+                workspace_id: String,
+                workspace_root: String,
+                secret_paths: Vec<String>,
+                payload_hash: String,
+            },
         }
         #[derive(Deserialize)]
         struct TestRequest {
@@ -2553,6 +2685,25 @@ mod tests {
                 workspace_id,
                 instruction_characters,
                 instruction_hash,
+                payload_hash,
+            },
+            TestSummary::AgentCliRuntimeWorkspaceRegistration {
+                adapter_id,
+                interface_scope,
+                runtime_id,
+                cli_path,
+                workspace_id,
+                workspace_root,
+                secret_paths,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
+                adapter_id,
+                interface_scope,
+                runtime_id,
+                cli_path,
+                workspace_id,
+                workspace_root,
+                secret_paths,
                 payload_hash,
             },
         };
@@ -3976,6 +4127,30 @@ mod tests {
             assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
         }
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn agent_cli_runtime_workspace_confirmation_displays_scope_and_preserves_unsupported_state() {
+        let summary = DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
+            adapter_id: "codex-cli".into(),
+            interface_scope: "--version と exec --help".into(),
+            runtime_id: "codex-r2-synthetic".into(),
+            cli_path: r"C:\Tools\Codex\codex.exe".into(),
+            workspace_id: "workspace-r2-synthetic".into(),
+            workspace_root: r"C:\d4-r2-synthetic-workspace".into(),
+            secret_paths: vec![".env".into(), "secrets".into()],
+            payload_hash: format!("sha256:{}", "a".repeat(64)),
+        };
+        let text = owner_confirmation_text(&summary);
+        assert!(text.contains("codex-r2-synthetic"));
+        assert!(text.contains(r"C:\Tools\Codex\codex.exe"));
+        assert!(text.contains(r"C:\d4-r2-synthetic-workspace"));
+        assert!(text.contains(".env"));
+        assert!(text.contains("secrets"));
+        assert!(text.contains("Adapter ID: codex-cli"));
+        assert!(text.contains("--version と exec --help"));
+        assert!(text.contains("Task実行能力はunsupported"));
+        assert!(text.contains("Permission、Approval、Trust、Credentialを生成・保存しません"));
     }
 
     #[test]

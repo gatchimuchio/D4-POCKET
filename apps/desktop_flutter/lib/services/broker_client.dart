@@ -21,6 +21,7 @@ const _nativeOwnerConfirmationOperations = <String>{
   '更新download要求',
   'AgentTaskWorkspacePermissionGrant',
   'AgentTaskOwnerApprovalGrant',
+  'AgentCLI実行系作業領域登録',
 };
 
 Duration brokerRequestTimeoutForOperation(String operation) =>
