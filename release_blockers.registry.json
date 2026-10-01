@@ -700,8 +700,64 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "Rust起動器の製品別runtime rootとBrokerのcreate-only Manifest／Receipt／Audit結合は実装済み。Schema検査済みReceipt／ManifestからApp／Audit store IDをcompile-timeへ渡すWindows開発build toolも追加した。2026-09-27、OneDrive外の短いprocess-scoped TEMP／TMPからclean pushed commitを再構築し、PubとFlutter Windows Releaseは成功したが、Cargoのio-lifetimes／proc-macro2 build scriptがWindows Application ControlのOS error 4551で拒否されbundle未生成だった。path長対策後もlocal host execution policyの阻害が残るため、policy変更・拒否file移動による回避はしていない。手動run #6（clean main commit 1468bba）とrun #7（clean main commit d2107c2）はWindows Server 2025でFlutter／Rust Release build後、credential scanがrust_helper.exeにcredential_assignmentを検出してfail-closed停止した。run #7はfield=api_key、offset=42737273、値長25だけを出力し、候補値本文は秘匿した。既知marker保持形式を数値u32配列へ変更後の手動run #8（commit f5bbd67、Windows Server 2025 image 20260922.246.2）はFlutter／Rust Release、fixture bundle build、known-pattern scan 0 findings、source cleanまで成功した。bundleは61,974,738 bytes、tree SHA-256 dfa1233410ad75b3dd65ddb66b7d7bd3788e93c1a14aba03af41b03b7d4c7e69でartifact uploadなし。よってfixture Release bundle上の既知pattern scan失敗は現行commitで解消したが、run #7の一致byte列を得ていないため因果を断定しない。この証拠はsynthetic Receipt／Manifest fixtureのINTERNAL_STATEに限り、Broker生成Receipt／Manifest、Owner authority、runtime Manifest消費、installed product、Audit store分離の証拠ではない。formal LIVE_RUNTIME evidenceも未成立。",
-      "required_action": "次にBroker生成Receipt／Manifestから新規identity・Audit storeを持つunsigned test bundleを生成し、bundle hashを固定してOwner No／Yesの拒否・受理を検証する。別Windows profileでinstalled-path runtime／Audit store分離、Manifest file／完了Audit／継承禁止Receiptを確認し、Broker生成からinstalled runtimeまでのLIVE_RUNTIME evidenceを結合する。今回のknown-pattern scan passを一般的な秘密不存在へ昇格しない。production signing identityとFinal GOは要求せず、Technical Complete後のOwner Finalizationへ分離する。"
+      "reason": "Rust起動器の製品別runtime root、Broker create-only Manifest／Receipt／Audit結合、Schema検証済みManifestからのWindows開発bundle生成は実装済み。過去の手動run #6／#7はknown-pattern credential scanでfail-closed停止し、run #8はsynthetic fixture bundleのscan 0件で成功したが一般的な秘密不存在は証明しない。今回、実Win32 No／Yes確認dialogをfixture-backed Broker Receipt／Manifest生成へ接続し、run #30はcommit 3d312b27d2a4b53575de5561790ecc7fc8f2439cでRust全target試験・Release Broker build・standalone Broker smokeを含む9 stepすべてpassした。さらに同じclean commitでBroker test経路が生成したReceipt／Manifestから14-file unsigned development bundleをWindows上で生成し、Receipt／Manifest／bundle hash一致とknown-pattern scan 0 findingsを確認した。証拠源はWin32 dialogのLIVE_RUNTIME、synthetic Broker／WorkspaceのFIXTURE、bundle buildのINTERNAL_STATE、Actions runner結果のEXTERNAL_EVIDENCEに限定される。installed product、runtime Manifest消費、正式Owner authority、別profileのAudit分離・完了Audit・非継承Receipt、製品起動・署名・Installerの証拠は未成立。",
+      "required_action": "Broker生成Manifestを消費するruntime経路と新規App／Audit identity境界を実装・検証し、Broker ExportからWindows製品bundleを経た別Windows user profile上のinstalled-path起動まで接続する。実Owner No／Yes判断、Manifest消費、独立Audit storeと完了Audit、authority／credential非継承Receipt、clean-source・artifact hash provenanceをLIVE_RUNTIME evidenceとして収集し、Windows release evidence validatorへ通す。known-pattern scan結果を一般的な秘密不存在へ昇格しない。production signing identityとFinal GOはTechnical Complete後のOwner Finalizationに分離する。",
+      "latest_broker_generated_export_bundle_probe": {
+        "date": "2026-10-01",
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE",
+          "INTERNAL_STATE",
+          "EXTERNAL_EVIDENCE"
+        ],
+        "source_commit": "3d312b27d2a4b53575de5561790ecc7fc8f2439c",
+        "manual_actions": {
+          "workflow": ".github/workflows/windows-manual-rust-validation.yml",
+          "trigger": "workflow_dispatch",
+          "temporary_branch": "codex/export-owner-broker-validation",
+          "run_number": 30,
+          "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36798761327",
+          "status": "success",
+          "steps_passed": 9,
+          "artifact_uploaded": false,
+          "scope": "Rust全target検査、Release Broker build、standalone Broker IPC smoke。Export Owner authorityやinstalled productの証明ではない"
+        },
+        "owner_dialog_probe": {
+          "no_result": "owner_required; Manifest未生成",
+          "yes_result": "Broker test経路がReceiptをaccepted、Manifest fileを生成",
+          "synthetic_summary_marker_leaked": false
+        },
+        "receipt_sha256": "32fb15004c2531fd44631af8edca23b17105dade097cb0107d10d0fc3b846ad5",
+        "manifest_sha256": "ba49850e15aea12a27f28007d418230c92b6ee897e78117f9743f6c08fdcd5b6",
+        "bundle": {
+          "kind": "unsigned development bundle; standalone_app_verified=false; formal_distribution_claimed=false",
+          "file_count": 14,
+          "total_bytes": 62023973,
+          "tree_sha256": "d154308a123315a82ed59ebb6d57fb128ff24c2b8052ce65da86f37d2713af36",
+          "app_id": "d4-pocket-app-aded8a8e3c38d9dcc233bb44786d87b7",
+          "audit_store_id": "audit-store-cf50852e45f1fcfe5e04d485d112ab2b",
+          "export_id": "export-desktop-test",
+          "credential_known_pattern_scan": "passed_known_patterns",
+          "credential_known_pattern_findings": 0,
+          "runtime_manifest_consumed": false,
+          "installed_launch_verified": false,
+          "signed": false,
+          "installer": "not_started",
+          "artifact_uploaded": false,
+          "local_temp_cleanup": {
+            "status": "blocked_before_execution_by_policy",
+            "deleted": false,
+            "preflight": "four exact targets under TEMP; no reparse points; no non-shell process references",
+            "targets": [
+              "D4PocketBrokerExportCapture-9874e540",
+              "D4PocketBrokerExportCapture-9874e540-retry1",
+              "D4PocketBrokerExportBuild-3d312b2",
+              "d4-pocket-app-aded8a8e3c38d9dcc233bb44786d87b7.json"
+            ]
+          }
+        },
+        "scope_limit": "synthetic Broker／Workspaceを用いたtest生成物からのWindows bundle組立と既知pattern scanに限る。Owner authorization、production source authority、runtime Manifest消費、別profile installed runtime、Audit／permission継承の製品実証、release readinessは証明しない"
+      }
     },
     {
       "name": "rev2_module_pruning_binary_and_measurement",
