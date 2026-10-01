@@ -2,6 +2,25 @@
 
 本書は、受領した統合仕様書rev3・開発工程表rev3の工程状態を履歴追加型で記録する。rev1／rev2の記録は書き換えず、旧工程のPASSをrev3の機能完成証拠として再利用しない。現行のrelease gateは既存`release_blockers.registry.json`が管理し、本書の検証記録だけで解除しない。
 
+## R2追補 現行Codex CLIでのBroker／Owner否定経路再検証（2026-10-01）
+
+- 対象source commitは`7f7feb3e5723ee30a45acc3383007addd99f2440`で、Rust test実行前のsource worktreeはcleanだった。実機PATHのCodex CLIは`0.159.2`。`codex exec --help`で`--ignore-user-config`、`--ephemeral`等の実interfaceも再確認した。実model／資格情報、Windows保護設定は使用・変更していない。
+- `cargo +1.95.0 build --release --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher`は成功。Release helperのSHA-256は`2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153`。未使用のMINIDORA診断関数に既存warningが2件出た。
+- `production_agent_task_gate_fails_closed_over_authenticated_ipc`の最初の`--exact`指定はWindows module prefixを欠き、0件実行だったため証拠に採用しない。正しい`windows::production_agent_task_gate_fails_closed_over_authenticated_ipc`指定で再実行し、1 passed／0 failed（2.08秒）。実Release Broker process、認証済みloopback IPC、現行Codex登録／metadata、unsupported Task要求の拒否、Broker終了後のfile-backed Audit再読込を確認した。
+- `登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する`は1 passed／0 failed（2.70秒）。現行CLI登録に対する実Win32 Owner No／Yes dialog、Broker owner-operation handler、通常Desktop IPC projectionを通し、Permission／Approval／preflight／startが`AgentTask実行非対応`で拒否され、Task workerが開始されず、Auditに合成secret・Task本文がないことを確認した。Owner dialog自体の単独Yes／No testも1 passed／0 failed（0.70秒）。ただしBrokerはtest harness内threadであり、installed Flutter UIや製品起動器からのnamed-pipe全経路ではない。
+- `Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME`は1 passed／0 failed（17.61秒）。実Codex CLI `0.159.2`とMxC tool childが合成Workspace上で完了TaskとBroker cancellationを実行した。MxC TEMP／TMPは互いに一致したがBrokerのWorkspaceTaskScratchとは不一致。合成TEMP markerはchild生存中に読め、正常終了／取消後はhost側probeで`not_found`となった。これはmarkerのhost可視性だけであり、TEMP directoryの物理削除やdeadline／crash後cleanupを証明しない。試験専用Adapter wrapper、Owner callback、in-memory Audit、loopback偽Responses APIを使用しており、production Broker process／durable Auditの正のTask実行ではない。
+- `cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`は13 targets、444 passed／0 failed／7 ignored。現行CLIを用いた上記ignored testは別途明示実行した。
+- これらによりproductionのunsupported fail-closed、Owner dialog部品、実CLI/MxCの限定したTask／取消が個別に再確認できたが、1本のinstalled-product production E2Eには統合されていない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。未成立範囲はinstalled Flutter→native Owner→authenticated production IPC→durable Auditの正のTask経路、OneDrive Cloud Files／通常NTFSの実tool-child secret・depth・hardlink隔離、failure／deadline／crash Recovery、MxC TEMP異常終了cleanup、result／diff Content Exposureである。
+
+## R2追補 Windows Release installed UI／Owner窓の実測（2026-10-01）
+
+- source commit `7f7feb3e5723ee30a45acc3383007addd99f2440`からASCII-only detached worktreeでFlutter Windows Releaseをbuildし、Rust Release起動器／Broker helperとともにisolated temporary installへstageした。日本語pathのmanaged worktreeではFlutter buildが`app.dill` pathの文字化けで失敗し、ASCII-only worktreeでのbuild成功をその代替にした。Flutter artifact SHA-256 `2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03`、launcher `341217def14a59fc6160f725d52743027fed0e666a4303bd50287810e5f17df6`、Broker helper `2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153`。
+- 収集器第16版の`-NoPythonRuntime -DiagnosticOnly`導入検査は終了コード`0`で成果物・Rust起動器経由の起動・Broker接続先・`Setup Doctor`製品報告の合格を観測したが、正式証拠ではない。配置作業者と同じWindows利用者で実行し、UI Automationが前景画面を確認できず必須画面要素を取得できなかった。画面は通常終了せずFrontendを強制停止し、後始末失敗とBroker起動検査の欠落もあったため、`diagnostic_only`のまま保持する。`installed_manifest.json`内のFlutter成果物SHA-256は`2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03`、証拠一式のSHA-256は`812a3a0a50402a6dbb391b0c05f01f003c8d8beea603ddac1bf975fd509d925e`。
+- 同じstaged ReleaseをRust Desktop起動器から別の一時LOCALAPPDATAで再起動した。実Frontend PID／image hashの一致を確認し、Computer Use screenshotとUI Automation treeで概要およびAgent Centerを観測した。画面には段階D/E pending、release未主張、実Adapter未登録、比較なし、Task結果未接続が表示された。synthetic WorkspaceとCodex CLI pathを登録フォームへ入れ、native Owner確認窓の表示まで進んだ。
+- Owner窓はComputer Useの`activate_window`が2回連続timeoutし、No／Yesいずれの入力も行っていない。registration受理、Session開始、Task preflight／start、Task worker、production Task Auditは未実行。LLMがOwner確認を代行しない境界を維持した。確認待ちで残った試験専用Frontend／Launcher processだけをPIDと実行path照合後に停止した。
+- isolated test LOCALAPPDATA／TEMP／APPDATA／empty Workspaceは実行器がrecursive removalをpolicy拒否したため削除していない。対象はTemp配下の今回専用dirで、reparse pointなし・該当Product process終了を確認済み。これは残存test artifactとして引き継ぎ、他の既存GUI-Shell process／workspaceには触れていない。
+- このLIVE_RUNTIME UI observationはinstalled artifactの起動・表示とnative Owner窓の要求発生までを示すだけで、Owner承認、Flutter→native→production BrokerのTask経路やTask成功を示さない。positive production E2Eは未成立であり、`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+
 ## R2追補 同時実MxC sandbox間の相互Workspace到達拒否（2026-10-01）
 
 - 直前の単一child試験を拡張し、Agent A／B相当の独立Workspace、scratch、Codex homeを使う実Codex CLI `0.158.0-alpha.2.1`のMxC sandboxを2つ同時に起動した。開始前と相互検査後にhost側barrierを設け、双方が検査を完了するまでどちらも解放しない。各childは相手Workspace markerの読取と相手側新規file作成を試し、その間もう一方のchild process群がJob Object内で生存していることを同期状態で確認する。

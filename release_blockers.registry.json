@@ -653,6 +653,84 @@
         "os_protection_changed": false,
         "scope_limit": "Negative gate only. LIVE_RUNTIME covers the standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and rejection Audit reload; Workspace/store/secret are FIXTURE. Does not prove positive Agent Task execution, installed Desktop/native Owner operation, sandbox isolation, cancellation/deadline/crash Recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
       },
+      "current_main_native_owner_agent_task_negative_gate_probe": {
+        "date": "2026-10-01",
+        "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
+        "source_worktree_clean": true,
+        "cli_version": "codex-cli 0.159.2",
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
+        "validation": "cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib desktop_launcher::tests::登録CodexへのnativeOwner確認後もAgentTask非対応gateを維持する -- --ignored --exact --nocapture --test-threads=1: 1 passed, 0 failed, 2.70s. Standalone nativeOwner確認dialog Yes/No test: 1 passed, 0 failed, 0.70s. Rust all-target regression separately passed: 13 targets, 444 passed, 0 failed, 7 ignored.",
+        "observations": {
+          "actual_win32_owner_dialog": "Real native Win32 Owner No/Yes dialogs were automated by the Rust test harness; registration No was rejected, registration Yes was accepted without granting Permission, Approval, or Credential value.",
+          "broker_and_ipc": "The Broker server function ran on a test thread with the production owner-operation handler and Desktop channel relay. Normal Desktop IPC projected the registered current Codex CLI and Agent Session.",
+          "unsupported_gate": "Owner-confirmed Workspace Permission and Task Approval requests were rejected as AgentTask実行非対応; preflight and start were rejected before a Task worker started.",
+          "durable_audit": "The test read the Broker file-backed Audit after server shutdown and confirmed synthetic secret and Task instruction markers were absent.",
+          "wrong_filter_attempt": "An initial --exact invocation omitted the windows:: prefix and ran 0 tests; it is not counted as evidence. The corrected exact invocation above ran 1 test."
+        },
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME covers actual Win32 dialogs and current Codex CLI registration metadata. Broker, temporary Workspace/store, and Desktop channel relay are exercised inside the Rust test harness, not one installed Flutter -> native named pipe -> product Broker path. No Task worker was started; this is a negative-only authority gate proof and does not prove positive Task execution, filesystem isolation, Recovery, TEMP cleanup, result/diff Content Exposure, or task_execution support."
+      },
+      "current_main_release_broker_negative_agent_task_gate_probe": {
+        "date": "2026-10-01",
+        "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
+        "source_worktree_clean": true,
+        "cli_version": "codex-cli 0.159.2",
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
+        "validation": "Release helper build succeeded with cargo +1.95.0 build --release --locked --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_rust_helper --bin gui_shell_desktop_launcher. Corrected exact ignored integration test windows::production_agent_task_gate_fails_closed_over_authenticated_ipc passed 1/1 in 2.08s. Release helper SHA-256: 2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153.",
+        "observations": {
+          "release_broker_process": "A standalone Release Broker process accepted the current installed Codex CLI registration and Agent Session over authenticated loopback IPC.",
+          "task_gate": "Capability remained unsupported; preflight and Task start were rejected, and normal IPC Workspace Permission/Owner Approval grants were rejected as desktop_native_owner_confirmation_required.",
+          "audit": "After Broker shutdown, the persistent Audit chain was reopened and rejection events verified; synthetic instruction and secret marker were absent.",
+          "wrong_filter_attempt": "An initial --exact invocation omitted the windows:: prefix and ran 0 tests; it is not counted as evidence. The corrected exact invocation above ran 1 test."
+        },
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "Negative-only LIVE_RUNTIME proof for a standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and durable rejection Audit. Workspace/store/secret are FIXTURE. It does not prove installed Desktop/native Owner operation, positive Agent Task execution, sandbox isolation, Task recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
+      },
+      "current_main_real_cli_loopback_fake_responses_task_probe": {
+        "date": "2026-10-01",
+        "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
+        "source_worktree_clean": true,
+        "cli_version": "codex-cli 0.159.2",
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "FIXTURE"
+        ],
+        "test": "broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME",
+        "validation": "cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --lib Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME -- --ignored --nocapture --test-threads=1: 1 passed, 0 failed, 17.61s. Rust all-target regression passed separately: 13 targets, 444 passed, 0 failed, 7 ignored.",
+        "observations": {
+          "real_cli_task": "The actual current Codex CLI and MxC tool child executed the fixed synthetic loopback Responses API task through an in-process Broker control fixture; completion and explicit Broker cancellation both passed.",
+          "owner_and_audit": "Adapter support override, Owner decisions, and Audit were test-only wrapper/callback/in-memory state, not production metadata or durable Audit.",
+          "temporary_path": "MxC child TEMP and TMP matched one another but did not match Broker WorkspaceTaskScratch. A synthetic marker was host-readable while the child lived and host-probe not_found after normal exit and cancellation.",
+          "cleanup_limit": "Host-side marker not_found does not prove physical deletion of the MxC TEMP directory. Deadline/crash/power-loss cleanup was not tested. External model/provider and credentials were not used."
+        },
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME for actual Codex CLI/MxC behavior; FIXTURE for Broker control, Owner callbacks, Audit, and synthetic Workspace. Not production Broker IPC, installed Flutter/native Owner, durable Audit, OneDrive Cloud Files/ordinary NTFS matrix, deadline/crash Recovery, physical TEMP cleanup, result/diff UI, or task_execution support."
+      },
+      "current_main_rust_all_targets_regression": {
+        "date": "2026-10-01",
+        "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
+        "source_worktree_clean": true,
+        "command": "cargo +1.95.0 test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1",
+        "result": {
+          "targets": 13,
+          "passed": 444,
+          "failed": 0,
+          "ignored": 7
+        },
+        "scope_limit": "Default all-target execution does not run ignored live tests; the production-negative Broker test, native Owner gate test, and actual CLI loopback test above were explicitly run separately."
+      },
       "latest_agent_task_ui_broker_contract_wiring": {
         "date": "2026-10-01",
         "evidence_sources": [
@@ -708,6 +786,32 @@
         "installed_product_ui_used": false,
         "os_protection_changed": false,
         "scope_limit": "CONFIG／FIXTUREの契約検査のみ。production Broker／IPC、installed UIとnative Owner、正のTask実行、実filesystem隔離、永続Audit、Recovery、result／diffを証明しない。task_execution=unsupportedとR2 release blockerを維持する。"
+      },
+      "current_main_installed_agent_center_ui_probe": {
+        "date": "2026-10-01",
+        "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
+        "source_worktree_clean": true,
+        "evidence_sources": [
+          "LIVE_RUNTIME",
+          "EXTERNAL_EVIDENCE"
+        ],
+        "artifacts": {
+          "flutter_release_sha256": "2fda3beb48f15420e1e7683129abfdfdafc94f10f32452c9c3c53e42ccdd9d03",
+          "desktop_launcher_sha256": "341217def14a59fc6160f725d52743027fed0e666a4303bd50287810e5f17df6",
+          "broker_helper_sha256": "2087943b9b519621471b16eebb33e4ea69bb376ce1a9bd7aec4925a70c59153",
+          "diagnostic_evidence_bundle_sha256": "812a3a0a50402a6dbb391b0c05f01f003c8d8beea603ddac1bf975fd509d925e"
+        },
+        "observations": {
+          "collector_v16": "-NoPythonRuntime -DiagnosticOnly exited 0; installed artifact provenance and launcher-mediated startup were measured, Setup Doctor product report passed, but visible surface UIA failed, foreground could not be verified, frontend cleanup required force stop, Broker smoke was missing, and staging used the same Windows profile. Formal evidence status remains diagnostic_only.",
+          "manual_installed_ui": "The exact staged Release artifact was relaunched via the Rust Desktop launcher with isolated temporary application data. Screenshot and UI Automation observed the Overview and Agent Center; release remained unclaimed, stages D/E pending, and no Agent Adapter or Session registered.",
+          "owner_confirmation": "A test-only CLI/workspace registration reached the native Owner confirmation window. Computer Use activate_window timed out twice; no Yes/No input was sent. Registration, Agent Session, Task preflight/start, worker, and positive production Task Audit were not reached.",
+          "cleanup": "Only the test-owned launcher/frontend PIDs were stopped after path identity checks. Exact isolated Temp profile/workspace directories remain because recursive removal was rejected by the execution policy; no existing unrelated GUI-Shell process was stopped."
+        },
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "formal_product_evidence": false,
+        "scope_limit": "LIVE_RUNTIME proves only launch/display of the staged product and appearance of a native Owner window request. It does not prove Owner approval, production IPC registration/session, positive Agent Task, isolation, durable positive Task Audit, Recovery, TEMP cleanup, or result/diff Content Exposure. Keep task_execution=unsupported and the R2 release blocker unresolved."
       },
       "concurrent_mxc_shared_home_temp_isolation_probe": {
         "date": "2026-10-01",
