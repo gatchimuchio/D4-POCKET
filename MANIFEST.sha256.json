@@ -1196,7 +1196,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "4d9f1eb27da1c2da956097ace39e57b3fb2271f4dc98a25c1a1e47094b3c5ec8"
+      "sha256": "2efbd35c4d86086d9ed327d33d5a7af32523203f31d175326cc23282c9544e06"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3212,7 +3212,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "4c3ab537dff6c79afe4c6c8ff17f748a8bb831bf799f69423246a139700d4ebf"
+      "sha256": "f57f47454a2956a52fee2386a091dd500d4ac24299f751adf06310f38d97cb87"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -4432,7 +4432,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "07c9258fcda2d93458172580df7d35330b461a4ae01ba2b328538393a76908c6"
+      "sha256": "ea41d30ff0902224aa599d26cdb4a9401f916ffdcbefd63adf2917f158a8ba4a"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

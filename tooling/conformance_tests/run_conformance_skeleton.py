@@ -8794,6 +8794,12 @@ def test_gui_shell_export_is_new_identity_and_non_inheriting() -> list[str]:
     )
     if "Dir::open_ambient_dir" not in launcher_source or "Some((export_dir, export_root))" not in launcher_source:
         errors.append("GUI Shell書出しが検査済み固定保存先のDirectory handleをBrokerへ渡さない")
+    if (
+        "nativeOwner確認dialogのExportNoYesを制御UI自動化できpayload本文を露出しない"
+        not in launcher_source
+        or '"kind": "gui_shell_export"' not in launcher_source
+    ):
+        errors.append("GUI Shell書出しのWin32 Owner dialog No/Yes・payload非露出実試験がない")
     return errors
 
 

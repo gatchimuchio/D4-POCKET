@@ -2035,6 +2035,17 @@ mod tests {
             );
         }
         let request = match summary {
+            DesktopOwnerOperationSummary::GuiShellExport(summary) => json!({
+                "summary": {
+                    "kind": "gui_shell_export",
+                    "display_name": summary.display_name,
+                    "export_id": summary.export_id,
+                    "distribution_channel": summary.distribution_channel,
+                    "optional_module_count": summary.optional_module_count,
+                    "payload_hash": summary.payload_hash
+                },
+                "confirm": confirm
+            }),
             DesktopOwnerOperationSummary::AgentTaskWorkspacePermission {
                 runtime_id,
                 session_id,
@@ -2273,6 +2284,32 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    #[ignore = "対話型Windows desktopで実Win32 Export Owner dialogを制御自動操作する"]
+    #[allow(non_snake_case)]
+    fn nativeOwner確認dialogのExportNoYesを制御UI自動化できpayload本文を露出しない() {
+        let private_payload = "export-ui-private-manifest-payload-marker";
+        let summary = DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
+            display_name: "D4 Pocket UI試験".into(),
+            export_id: "export-owner-ui-test".into(),
+            distribution_channel: "local".into(),
+            optional_module_count: 2,
+            payload_hash: sha256_tagged(b"export-owner-ui-test-payload"),
+        });
+
+        assert!(!automate_native_owner_confirmation(
+            &summary,
+            false,
+            Some(private_payload)
+        ));
+        assert!(automate_native_owner_confirmation(
+            &summary,
+            true,
+            Some(private_payload)
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "Owner確認dialog自動操作test専用の子process入口"]
     fn owner_confirmation_dialog_child() {
         use std::io::Read;
@@ -2285,6 +2322,13 @@ mod tests {
         #[derive(Deserialize)]
         #[serde(tag = "kind", rename_all = "snake_case")]
         enum TestSummary {
+            GuiShellExport {
+                display_name: String,
+                export_id: String,
+                distribution_channel: String,
+                optional_module_count: usize,
+                payload_hash: String,
+            },
             AgentTaskWorkspacePermission {
                 runtime_id: String,
                 session_id: String,
@@ -2314,6 +2358,19 @@ mod tests {
         let request: TestRequest =
             serde_json::from_str(&input).expect("Owner確認dialog child request JSON");
         let summary = match request.summary {
+            TestSummary::GuiShellExport {
+                display_name,
+                export_id,
+                distribution_channel,
+                optional_module_count,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::GuiShellExport(ExportConfirmationSummary {
+                display_name,
+                export_id,
+                distribution_channel,
+                optional_module_count,
+                payload_hash,
+            }),
             TestSummary::AgentTaskWorkspacePermission {
                 runtime_id,
                 session_id,
