@@ -3284,6 +3284,81 @@ mod tests {
         );
 
         let task_id = task["task_id"].as_str().unwrap();
+        let temp_report_path = workspace_path.join("broker-real-codex-temp-report.json");
+        let temp_report_deadline = Instant::now() + Duration::from_secs(30);
+        while !temp_report_path.is_file() {
+            assert!(
+                Instant::now() < temp_report_deadline,
+                "実MxC tool childがTEMP／TMP報告を書き出す期限"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let temp_report: Value = serde_json::from_slice(
+            &std::fs::read(&temp_report_path).expect("合成TEMP／TMP報告を読む"),
+        )
+        .expect("合成TEMP／TMP報告JSON");
+        let child_temp = temp_report["temp"]
+            .as_str()
+            .filter(|path| !path.is_empty() && std::path::Path::new(path).is_absolute())
+            .expect("実tool child TEMP絶対path");
+        let child_tmp = temp_report["tmp"]
+            .as_str()
+            .filter(|path| !path.is_empty() && std::path::Path::new(path).is_absolute())
+            .expect("実tool child TMP絶対path");
+        let temp_marker_name = temp_report["marker_name"]
+            .as_str()
+            .filter(|name| {
+                name.starts_with("d4p-broker-temp-observer-")
+                    && name.ends_with(".marker")
+                    && std::path::Path::new(name)
+                        .file_name()
+                        .and_then(|part| part.to_str())
+                        == Some(*name)
+            })
+            .expect("実tool childがTEMPへ作った合成marker名");
+        let temp_marker_path = std::path::Path::new(child_temp).join(temp_marker_name);
+        let marker_observation = |path: &std::path::Path, expected: &[u8]| match std::fs::read(path)
+        {
+            Ok(bytes) if bytes == expected => "readable_match",
+            Ok(_) => "readable_mismatch",
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "not_found",
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => "access_denied",
+            Err(_) => "other_error",
+        };
+        let marker_while_mxc_child_running =
+            marker_observation(&temp_marker_path, b"d4p synthetic temp observer");
+        assert_eq!(
+            marker_while_mxc_child_running, "readable_match",
+            "Broker親が実行中MxC TEMPの合成markerを観測"
+        );
+        let normalize_windows_path = |path: &str| {
+            path.replace('/', "\\")
+                .trim_end_matches('\\')
+                .to_ascii_lowercase()
+        };
+        assert_eq!(
+            normalize_windows_path(child_temp),
+            normalize_windows_path(child_tmp),
+            "実MxC tool child TEMPとTMPが同じ合成pathを指す"
+        );
+        let broker_scratch = std::fs::read_dir(workspace_path)
+            .expect("稼働中のWorkspaceTaskScratchを列挙")
+            .filter_map(Result::ok)
+            .find(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"))
+            .map(|entry| entry.path())
+            .expect("実CLI tool childの稼働中Broker scratch");
+        let temp_matches_broker_scratch = normalize_windows_path(child_temp)
+            == normalize_windows_path(&broker_scratch.to_string_lossy());
+        eprintln!(
+            "実MxC tool childのTEMP_TMP一致={}; Broker scratch一致={}",
+            normalize_windows_path(child_temp) == normalize_windows_path(child_tmp),
+            temp_matches_broker_scratch
+        );
+        std::fs::write(
+            workspace_path.join("broker-real-codex-task-continue"),
+            b"continue synthetic task",
+        )
+        .expect("合成tool childの同期を解除");
         let deadline = Instant::now() + Duration::from_secs(60);
         let result = loop {
             let state = control
@@ -3322,6 +3397,21 @@ mod tests {
             outside_write.exists(),
             server.blocked_external_requests(),
             server.blocked_external_summary(),
+        );
+        let marker_after_mxc_exit =
+            marker_observation(&temp_marker_path, b"d4p synthetic temp observer");
+        let marker_removed_by_probe = if marker_after_mxc_exit == "readable_match" {
+            std::fs::remove_file(&temp_marker_path).is_ok()
+        } else {
+            false
+        };
+        eprintln!(
+            "MxC TEMP markerのBroker親観測: 実行中={}; CLI終了後={}; probe固有marker除去={}",
+            marker_while_mxc_child_running, marker_after_mxc_exit, marker_removed_by_probe
+        );
+        assert_eq!(
+            marker_after_mxc_exit, "not_found",
+            "正常終了後にMxC TEMPのTask markerが残らない"
         );
         assert!(result["result_hash"]
             .as_str()
@@ -3387,8 +3477,19 @@ mod tests {
             "INTEGRATION_CANCEL_INSTRUCTION_SENTINEL: keep the bounded synthetic probe running";
         let heartbeat = workspace_path.join("broker-real-codex-cancel-heartbeat.txt");
         let heartbeat_literal = heartbeat.to_string_lossy().replace('\'', "''");
+        let cancel_temp_report_path =
+            workspace_path.join("broker-real-codex-cancel-temp-report.txt");
+        let cancel_temp_report_literal = cancel_temp_report_path
+            .to_string_lossy()
+            .replace('\'', "''");
+        let workspace_label = workspace_path
+            .file_name()
+            .expect("一時Workspaceの一意な末尾名")
+            .to_string_lossy();
+        let cancel_temp_marker_name =
+            format!("d4p-broker-cancel-temp-observer-{workspace_label}.marker");
         server.set_command(format!(
-            "$ErrorActionPreference='Stop'; <# 合成Workspace内で取消試験の稼働状態を記録する #> $heartbeat='{heartbeat_literal}'; [IO.File]::WriteAllText($heartbeat,'started'); while ($true) {{ [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 50 }}"
+            "$ErrorActionPreference='Stop'; <# MxC TEMP markerと合成Workspace内取消状態を記録する #> $tempMarkerName='{cancel_temp_marker_name}'; $tempMarker=Join-Path $env:TEMP $tempMarkerName; [IO.File]::WriteAllText($tempMarker,'d4p synthetic temp observer'); [IO.File]::WriteAllText('{cancel_temp_report_literal}',($env:TEMP+'|'+$tempMarkerName)); $heartbeat='{heartbeat_literal}'; [IO.File]::WriteAllText($heartbeat,'started'); while ($true) {{ [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 50 }}"
         ));
         let cancellation_marker = workspace_path.join("broker-real-codex-marker.txt");
         std::fs::remove_file(&cancellation_marker)
@@ -3441,6 +3542,21 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(20));
         }
+        let cancel_temp_state =
+            std::fs::read_to_string(&cancel_temp_report_path).expect("取消中MxC TEMP観測報告");
+        let (cancel_temp, reported_cancel_marker_name) = cancel_temp_state
+            .split_once('|')
+            .expect("取消中MxC TEMPとmarker名");
+        assert!(std::path::Path::new(cancel_temp).is_absolute());
+        assert_eq!(reported_cancel_marker_name, cancel_temp_marker_name);
+        let cancel_temp_marker_path =
+            std::path::Path::new(cancel_temp).join(reported_cancel_marker_name);
+        let cancel_marker_while_running =
+            marker_observation(&cancel_temp_marker_path, b"d4p synthetic temp observer");
+        assert_eq!(
+            cancel_marker_while_running, "readable_match",
+            "Broker親が取消中MxC TEMPの合成markerを観測"
+        );
         assert!(
             server.tool_call_was_sent(),
             "実CLIへ取消用tool callを送信した"
@@ -3483,6 +3599,16 @@ mod tests {
         };
         assert_eq!(cancelled["status"], "cancelled");
         assert!(cancelled.get("result_hash").is_none());
+        let cancel_marker_after_exit =
+            marker_observation(&cancel_temp_marker_path, b"d4p synthetic temp observer");
+        assert_eq!(
+            cancel_marker_after_exit, "not_found",
+            "Broker取消でMxC child終了後にTEMPのtask markerを残さない"
+        );
+        eprintln!(
+            "取消MxC TEMP markerのBroker親観測: 実行中={}; child終了後={}",
+            cancel_marker_while_running, cancel_marker_after_exit
+        );
         let heartbeat_after_terminal = std::fs::metadata(&heartbeat)
             .expect("停止済みtool child heartbeatをstatする")
             .len();

@@ -679,6 +679,8 @@ fn build_codex_command(
             // 任意の外部Apps／Plugins catalog取得を止め、偽API以外を試験対象から除く。
             "features.apps=false".to_owned(),
             "features.plugins=false".to_owned(),
+            // 認証なしloopback試験ではmachine analyticsの送信も無効化する。
+            "analytics.enabled=false".to_owned(),
             "approval_policy=\"never\"".to_owned(),
         ];
         for setting in overrides {

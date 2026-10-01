@@ -1585,3 +1585,20 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功。全target serial Rust試験の最終runは13 targets、444 passed／0 failed／7 ignored。先行runではlocal TLS更新fixtureがConnectionResetし、focused再実行も一度`Network`対`DigestMismatch`で失敗した後に1 passedとなった。失敗履歴は保持する。
 - Schemaは152件／正常例152件／negative fixture 195件、Conformanceは231 checksで成功。変更2 Rust fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check ...`と`git diff --check`は成功した。workspace全体の`cargo fmt --all -- --check`は既存多数fileのformat差分を検出してexit 1となったため、全体一括formatは行わず変更fileだけ検査した。
 - R2のproduction E2E、`task_execution=unsupported`、該当`release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 実Codex Broker fixtureにおけるMxC TEMP正常終了・取消後観測（2026-10-01）
+
+### 成立した観測
+
+- 実Codex CLI `0.159.2`のMxC tool childから、`TEMP`／`TMP`と合成marker名を報告させた。実行中はBroker test親processから当該marker本文を読み取れたが、通常Task完了後は同じmarkerが`not_found`となった。Cancellation TaskでもBroker親から実行中markerを読み取れ、Job Object経由の取消でchild停止を確認した後は同markerが`not_found`となった。絶対pathは保存・表示しない。
+- analytics無効化後の7回連続成功runすべてで、`TEMP=TMP`、`TEMP`とBroker `.d4p-tmp-*` scratchは不一致、通常完了／取消の両方でMxC TEMP markerは実行中`readable_match`・child終了後`not_found`、Broker scratchはterminal後に不在だった。
+- stream切断と非loopback `chatgpt.com` CONNECTが発生した失敗履歴は保持する。loopback test profileだけへ`analytics.enabled=false`を設定した後は7回連続成功し、各runの遮断対象外接続数は0だった。この設定は`#[cfg(test)]`内だけで、製品設定・ユーザー設定・本番Adapter commandを変更しない。
+- 実CLI／MxC tool childのmarker可視性とTask process終端は`LIVE_RUNTIME`。Broker Owner判断、Adapter能力fixture、Audit callback、Workspace、markerは`FIXTURE`。実model、credential、課金要求、Windows保護設定変更はない。
+
+### 検証結果と境界
+
+- `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へ実CLI絶対pathを設定したfocused ignored test `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib 'broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME' -- --ignored --exact --nocapture --test-threads=1`は、loopback test profileのanalytics無効化後に7回連続で1 passed。修正前には同じ変更途中のfocused runで2件がstream切断により失敗しており、応答送信・HTTP request parseの失敗は0、`chatgpt.com` CONNECT遮断を各失敗で1件観測した。初回失敗を成功へ読み替えない。
+- `cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets`は成功した。全target試験の初回は既知のlocalhost TLS更新fixture `local_tls_server_repairs_only_after_verified_package_bytes` がWindows error 10054 `ConnectionReset`で1件失敗し、直後の単独再試験1件は成功、serial全target再実行は13 targetsで444 passed／0 failed／7 ignoredだった。初回失敗は保持する。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は終了値0、登録済みdevelopment check 10件すべて成功。厳格日本語監査1130 file／0 findings、Schema 152／正常例152／negative fixture 195、Conformance 231 checks、Manifest 1127 files、release gate、packaging、smoke、evidence bundle、runtime assertion、最終開発監査が成功した。`release_ready=false`と31件のrelease blockerは維持する。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`を変更3 Rust fileへ実行し成功した。`git diff --check`も成功した。
+- 観測したのは専用synthetic marker fileの正常Task終了後／取消後の消失だけである。MxC TEMP directory全体の全entry、deadline／process crash／電源断後cleanup、production Broker IPC、installed Desktop UIとnative Owner confirmation、耐久Audit／tamper検証、OneDrive Cloud Filesと通常NTFSの隔離matrix、result／diff Content Exposureは未確認。製品Adapter metadataは`task_execution=unsupported`、R2 release blockerと`release_ready=false`を維持する。
