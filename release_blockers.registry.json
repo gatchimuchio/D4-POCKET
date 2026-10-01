@@ -540,7 +540,35 @@
         "source_base_commit": "0f807201ec011acab1c8f73cd78d7345db10b1b5",
         "source_tree_clean": false,
         "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
-        "validation": "Local Windows focused native Owner registration test: 1 passed; current-source Release Broker production negative-gate E2E: 1 passed; Rust all-target check passed; serial all-target tests: 13 targets, 444 passed, 0 failed, 7 ignored; Schema 152, examples 152, negative fixtures 195; Conformance 231 checks; Desktop Flutter analyze and focused registration Widget test passed in a short-path source copy.",
+        "validation": "Local Windows focused native Owner registration test: 1 passed; current-source Release Broker production negative-gate E2E: 1 passed; Rust all-target check passed; serial all-target tests: 13 targets, 444 passed, 0 failed, 7 ignored; Schema 152, examples 152, negative fixtures 195; Conformance 231 checks; Desktop Flutter analyze and focused registration Widget test passed in a short-path source copy. Windows manual Actions #32 and Desktop Flutter manual Actions #10 both passed on the exact committed source; evidence and scope are recorded below.",
+        "hosted_actions": {
+          "source_commit": "fc8144c743c980b004637952f31734e4ca9910da",
+          "trigger": "workflow_dispatch",
+          "temporary_branch": "codex/r2-agent-registration-e2e",
+          "branch_fast_forwarded_to_main_then_deleted_local_and_remote": true,
+          "source_tree_clean_at_hosted_checkout": true,
+          "existing_source_tree_clean_false_scope": "Initial local probes ran while documentation and evidence files were pending; this historical local observation is distinct from the clean hosted checkout.",
+          "rust": {
+            "run_id": 36835238543,
+            "url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835238543",
+            "conclusion": "success",
+            "duration_seconds": 964,
+            "runner": "windows-2025",
+            "toolchain": "Rust/Cargo 1.95.0",
+            "checks": ["rustfmt", "cargo check --all-targets", "serial cargo test --all-targets", "Release Broker helper build", "authenticated loopback IPC negative-gate smoke", "runner cleanup", "post-test clean tree"]
+          },
+          "desktop_flutter": {
+            "run_id": 36835318511,
+            "url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/36835318511",
+            "conclusion": "success",
+            "duration_seconds": 483,
+            "runner": "windows-2025",
+            "flutter_version": "3.44.0",
+            "checks": ["Rust helper build", "Desktop flutter analyze", "all Desktop Flutter tests", "Mobile flutter analyze", "post-test clean tree"]
+          },
+          "artifacts_uploaded": false,
+          "pull_request_created": false
+        },
         "release_helper_sha256": "56bc5d14b4bd94361802f01d9a908b311d7d06f3119f289f587ddffd5f92710d",
         "codex_cli_version": "0.159.3",
         "observations": {
