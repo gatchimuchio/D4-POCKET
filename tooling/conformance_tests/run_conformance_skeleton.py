@@ -7936,18 +7936,53 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
     broker_client = (ROOT / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(
         encoding="utf-8"
     )
+    runner = (ROOT / "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp").read_text(
+        encoding="utf-8"
+    )
     errors: list[str] = []
-    for operation in (
+    owner_operations = (
+        "GUI Shell書出し",
+        "回帰Case登録",
+        "回帰Case削除",
+        "回帰Case削除中断確認",
+        "資格情報失効",
+        "MCP接続",
+        "MCP切断",
+        "MCP Tool実行",
+        "更新download要求",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
         "AgentCLI実行系作業領域登録",
-    ):
+    )
+    owner_set_match = re.search(
+        r"const _nativeOwnerConfirmationOperations = <String>\{(.*?)\};",
+        broker_client,
+        re.DOTALL,
+    )
+    if owner_set_match is None:
+        errors.append("Flutter native Owner確認operation集合を特定できない")
+    else:
+        client_operations = re.findall(r"'([^']+)'", owner_set_match.group(1))
+        if set(client_operations) != set(owner_operations):
+            errors.append("FlutterとWindows Runnerのnative Owner確認operation集合が一致しない")
+    for operation in owner_operations:
         if operation not in broker_client:
             errors.append(f"Agent Task native Owner確認operationをDesktop待機対象に含めない: {operation}")
+        encoded_operation = "".join(f"\\x{byte:02X}" for byte in operation.encode("utf-8"))
+        if encoded_operation not in runner:
+            errors.append(f"Windows Runner pipe timeoutがOwner確認operationを待機対象に含めない: {operation}")
     if "brokerRequestTimeoutForOperation(operation)" not in broker_client:
         errors.append("Desktop Broker要求がoperation別応答待ちpolicyを使わない")
     if "Duration(seconds: 305)" not in broker_client or "Duration(seconds: 5)" not in broker_client:
         errors.append("Desktop Broker要求のnative Owner確認待ちと通常待ちを区別しない")
+    if (
+        "RequiresOwnerConfirmationPipeTimeout(request)" not in runner
+        or 'request.find("\\\"operation\\\":")' not in runner
+        or "request.compare(operation_value" not in runner
+    ):
+        errors.append("Windows Runner pipeがOwner確認要求別の応答待ちpolicyを使わない")
+    if "kOwnerConfirmationPipeTimeoutMs = 310000" not in runner or "kDefaultPipeTimeoutMs = 5000" not in runner:
+        errors.append("Windows Runner pipeのOwner確認／通常要求timeout境界が不正")
     return errors
 
 

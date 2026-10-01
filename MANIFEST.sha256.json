@@ -564,7 +564,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/broker_client_payload_hash_test.dart",
-      "sha256": "4eee3083142fed63e7b23081844f5a58d8653629d0273eb6f67197c66331b165"
+      "sha256": "4d40706eaa6104ebe1c9c7358142653c29a4b647a372b267f3ad6a3dc27e77d1"
     },
     {
       "path": "apps/desktop_flutter/test/c27_performance_validation_test.dart",
@@ -692,7 +692,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.cpp",
-      "sha256": "579acb1eaed9e680ddaa7aa698be4266362ea9e47eb0b96f6b8b418d55d0eb80"
+      "sha256": "d8db3994825e58c07a94f657b182d7d1a26090d79e31528a902f9c64aab2e864"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/broker_pipe_controller.h",
@@ -1312,7 +1312,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "9446907a632b4fc22a3ad0dd83026763ab9b423bcab82d8a13b8be973eb0eb71"
+      "sha256": "3093728b9ffc55e1fe0e8e920cf3e9985eb19ac6b975c41caee2bc037906647c"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -4460,7 +4460,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "e205da2885af4084c352e5197041384dcb6b09cd60dae8855ed720b22a70ce4e"
+      "sha256": "e2eb1bc1f4e0f1a09d5b06b97020dba62107c9c002582b6a1b6bb921c20d699e"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",

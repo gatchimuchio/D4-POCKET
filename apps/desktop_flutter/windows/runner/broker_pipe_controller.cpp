@@ -20,6 +20,34 @@ constexpr size_t kMaxConcurrentRequests = 4;
 constexpr DWORD kDefaultPipeTimeoutMs = 5000;
 constexpr DWORD kOwnerConfirmationPipeTimeoutMs = 310000;
 constexpr wchar_t kPipePrefix[] = L"\\\\.\\pipe\\D4PocketBroker-";
+// UTF-8 operation values mirrored from broker_client.dart.
+constexpr const char* kOwnerConfirmationOperationValues[] = {
+    "\x47\x55\x49\x20\x53\x68\x65\x6C\x6C\xE6\x9B\xB8\xE5\x87\xBA\xE3\x81\x97",
+    "\xE5\x9B\x9E\xE5\xB8\xB0\x43\x61\x73\x65\xE7\x99\xBB\xE9\x8C\xB2",
+    "\xE5\x9B\x9E\xE5\xB8\xB0\x43\x61\x73\x65\xE5\x89\x8A\xE9\x99\xA4",
+    "\xE5\x9B\x9E\xE5\xB8\xB0\x43\x61\x73\x65\xE5\x89\x8A\xE9\x99\xA4\xE4\xB8\xAD\xE6\x96\xAD\xE7\xA2\xBA\xE8\xAA\x8D",
+    "\xE8\xB3\x87\xE6\xA0\xBC\xE6\x83\x85\xE5\xA0\xB1\xE5\xA4\xB1\xE5\x8A\xB9",
+    "\x4D\x43\x50\xE6\x8E\xA5\xE7\xB6\x9A",
+    "\x4D\x43\x50\xE5\x88\x87\xE6\x96\xAD",
+    "\x4D\x43\x50\x20\x54\x6F\x6F\x6C\xE5\xAE\x9F\xE8\xA1\x8C",
+    "\xE6\x9B\xB4\xE6\x96\xB0\x64\x6F\x77\x6E\x6C\x6F\x61\x64\xE8\xA6\x81\xE6\xB1\x82",
+    "\x41\x67\x65\x6E\x74\x54\x61\x73\x6B\x57\x6F\x72\x6B\x73\x70\x61\x63\x65\x50\x65\x72\x6D\x69\x73\x73\x69\x6F\x6E\x47\x72\x61\x6E\x74",
+    "\x41\x67\x65\x6E\x74\x54\x61\x73\x6B\x4F\x77\x6E\x65\x72\x41\x70\x70\x72\x6F\x76\x61\x6C\x47\x72\x61\x6E\x74",
+    "\x41\x67\x65\x6E\x74\x43\x4C\x49\xE5\xAE\x9F\xE8\xA1\x8C\xE7\xB3\xBB\xE4\xBD\x9C\xE6\xA5\xAD\xE9\xA0\x98\xE5\x9F\x9F\xE7\x99\xBB\xE9\x8C\xB2",
+};
+
+bool RequiresOwnerConfirmationPipeTimeout(const std::string& request) {
+  const auto operation_key = request.find("\"operation\":");
+  if (operation_key == std::string::npos) return false;
+  const size_t operation_value = operation_key + sizeof("\"operation\":") - 1;
+  for (const char* operation : kOwnerConfirmationOperationValues) {
+    const std::string encoded_value = std::string("\"") + operation + "\"";
+    if (request.compare(operation_value, encoded_value.size(), encoded_value) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 struct PipeResult {
   bool ok = false;
@@ -140,10 +168,9 @@ bool ReadLine(HANDLE pipe, std::string* response,
 
 PipeResult Exchange(const std::wstring& pipe_name, const std::string& request) {
   // This only classifies the transport timeout; Rust retains all authority decisions.
-  const DWORD timeout_ms =
-      request.find("\"operation\":\"GUI Shell\xE6\x9B\xB8\xE5\x87\xBA\xE3\x81\x97\"") != std::string::npos
-          ? kOwnerConfirmationPipeTimeoutMs
-          : kDefaultPipeTimeoutMs;
+  const DWORD timeout_ms = RequiresOwnerConfirmationPipeTimeout(request)
+                               ? kOwnerConfirmationPipeTimeoutMs
+                               : kDefaultPipeTimeoutMs;
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::milliseconds(timeout_ms);
   if (!IsValidPipeName(pipe_name) || request.empty() || request.size() > kMaxRequestBytes) {

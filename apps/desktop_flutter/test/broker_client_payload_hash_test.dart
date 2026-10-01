@@ -7,27 +7,32 @@ import 'package:gui_shell_desktop/services/broker_client.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Agent Task grantはnative Owner確認の応答待ち時間を使う', () {
-    expect(
-      brokerRequestTimeoutForOperation('AgentTaskWorkspacePermissionGrant'),
-      const Duration(seconds: 305),
-    );
-    expect(
-      brokerRequestTimeoutForOperation('AgentTaskOwnerApprovalGrant'),
-      const Duration(seconds: 305),
-    );
-    expect(
-      brokerRequestTimeoutForOperation('MCP Tool実行'),
-      const Duration(seconds: 305),
-    );
-    expect(
-      brokerRequestTimeoutForOperation('更新download要求'),
-      const Duration(seconds: 305),
-    );
-    expect(
-      brokerRequestTimeoutForOperation('AgentTask実行'),
-      const Duration(seconds: 5),
-    );
+  test('native Owner確認のBroker操作はFlutter待機時間を共有する', () {
+    for (final operation in [
+      'GUI Shell書出し',
+      '回帰Case登録',
+      '回帰Case削除',
+      '回帰Case削除中断確認',
+      '資格情報失効',
+      'MCP接続',
+      'MCP切断',
+      'MCP Tool実行',
+      '更新download要求',
+      'AgentTaskWorkspacePermissionGrant',
+      'AgentTaskOwnerApprovalGrant',
+      'AgentCLI実行系作業領域登録',
+    ]) {
+      expect(
+        brokerRequestTimeoutForOperation(operation),
+        const Duration(seconds: 305),
+      );
+    }
+    for (final operation in ['AgentTask実行', 'health']) {
+      expect(
+        brokerRequestTimeoutForOperation(operation),
+        const Duration(seconds: 5),
+      );
+    }
   });
 
   test('payload_hash matches the Rust broker null payload vector', () {
