@@ -1879,3 +1879,18 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - `native/rust_helper/tests/support/codex_loopback_responses.rs`の試験専用probeを修正した。TEMP診断に固定`temp_step`を加え、許可されたTEMP scopeを確認した上で、TEMP書込み結果とは独立にsecret／Workspace外境界とWorkspace書込みを試せるようにする。許可されないscopeではhost continuationを出さず、拒否試験へ進まない。TEMP失敗はそのまま記録し、成功へ読み替えない。この変更は通常Release、production Task capability、Permission／Approvalを変更しない。
 - 検証: `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses temp_probe_keeps_boundary_checks_independent_from_temp_diagnostic -- --test-threads=1`は1 passed。対象Rust fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`と`git diff --check`は成功。全target／統合validatorはこの追補のcommit前に実行する。
 - 維持する境界: run20は実installed UI／native Owner／production Broker Taskを開始したがTask成功ではない。durable positive Audit、restart検証、result／diff Content Exposure、MxC TEMP cleanup、OneDrive Cloud Files／通常NTFS隔離matrix、failure／deadline／crash Recoveryは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。次はこのfixture修正commitからfresh installed runを行う。
+
+## R2追補 fresh staged run23のpositive Taskとfile-backed Audit検証（2026-10-02）
+
+- remote `main`と一致したclean source commit `19bab4e05b152b99ac1a01308f6be17f7d7721b0`からstageしたrun23で、実Flutter UI、Rust Desktop起動器／PID照合付きnamed-pipe relay、production Broker、実Codex CLI `0.159.2`／MxC childを通した。製品artifactには試験専用`r2-e2e`機能を有効化しており、通常ReleaseのTask能力は変更していない。app／launcher／Broker helper／localhost偽Responses APIのSHA-256は`release_blockers.registry.json`へ固定した。
+- 合成NTFS Workspaceと空の隔離CODEX_HOMEを使用し、APIは`127.0.0.1:58556`の偽Responses APIだけに向けた。実provider、実model、実資格情報、外部API要求は不使用。偽APIは2 requestを受け、tool提示・送信・tool結果受領を確認し、不正body、途中request、応答書込み失敗、非loopback／外部要求はいずれも0件。
+- installed UIからRuntime／Workspace登録とSession `566fb8538a6ac3afa6fe026fa831d83e`を行い、native Owner確認で登録、`agent_task.execute`の一回Workspace Permission（Audit `broker-audit-83`）、別個の一回Task Approval（Audit `broker-audit-85`）を発行した。Task `4e0b5663267328232d6156ebea9e9134`はBroker経由で開始され、UIは`completed`、結果hash `sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab`を表示した。Audit `broker-audit-94`の理由は`Agent Task完了（結果本文非保存・hashのみ）`であり、本文ではなくhashだけが記録された。
+- file-backed Audit JSONLの2026-10-02 13:54 UTC時点の検査snapshot 139件について、Rust `BrokerAuditEvent`の実際のfield連結hash方式で全event hash、previous link、event ID一意性を独立再計算し、不一致0件を確認した。headは`sha256:0aeedfdb46285c1014689d09cfc9ae9773b31ee1b8c5d9fdf9a2f6fc10f4aaaf`。anchorのevent count／head一致とHMACも確認し、Task指示本文はAuditに存在しなかった。これは稼働中store snapshotの独立検証であり、Broker停止後の再起動・再読込検証ではない。
+- Workspaceには合成完了marker（20 byte）とTEMP診断report（769 byte）が作成された。空のsynthetic secret canaryは0 byteのままで、Workspace外write markerは存在しない。reportはTEMP書込み`failed`、scope=`mxc_appcontainer`、step=`temp_directory_check`、例外`System.Management.Automation.RuntimeException`、HRESULT `-2146233087`を示す。TEMP物理cleanup成功やsecret／外部read拒否は、このpositive Taskから推論しない。
+- Agent CenterにはTask状態・結果hash・Audit参照が表示されたが、画面自身が実行directory、変更file、tool／command、test、result本文、diffのBroker projection未接続を明示している。Workspace diff／Content Exposure経路の証拠にはならない。
+
+### 判定と残存範囲
+
+- run23は試験専用feature付きstaged appでのpositive Taskおよびfile-backed positive completion Auditを成立させた。通常ReleaseのTask実行能力、Auditの再起動後検証、result／diff表示、MxC TEMP cleanup、OneDrive Cloud Files／通常NTFSの隔離matrix、失敗／期限／crash Recoveryは未成立。偽APIによるLIVE_RUNTIME試験は実provider相互運用の証拠ではない。
+- 偽API listenerとTask childは停止済み。合成runのAudit／Workspace証跡は保持した。D4 Pocket launcher／frontendはまだ実行中であり、通常終了はtrayの`終了`操作が必要だが、この実行環境から通知領域を操作できなかった。未確認の強制終了は行っていない。
+- したがって本runで「positive Task completion」検証点は閉じるが、R2 production E2E全体は閉じない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。

@@ -950,6 +950,95 @@
         "os_protection_changed": false,
         "scope_limit": "LIVE_RUNTIME proves Owner registration/grants and UI-to-Broker-to-real-Codex/MxC tool-dispatch path only; the Task ended failed. FIXTURE recorded 128 repeated tool-call responses. The initial PowerShell failure cause, successful Workspace write, positive Task result, independently verified durable Audit chain, complete Workspace/secret isolation, failure Recovery semantics, and result/diff Content Exposure remain unproven. This is a feature-enabled synthetic test build, not normal Release capability. Keep task_execution=unsupported and the R2 release blocker unresolved."
       },
+      "r2_installed_synthetic_task_e2e_run23": {
+        "date": "2026-10-02",
+        "status": "positive_task_completed_with_release_blockers",
+        "source_commit": "19bab4e05b152b99ac1a01308f6be17f7d7721b0",
+        "source_worktree_clean": true,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-19bab4e-run23",
+        "toolchain": {
+          "codex_cli": "0.159.2",
+          "rust": "1.95.0",
+          "task_build_feature": "r2-e2e"
+        },
+        "artifacts": {
+          "installed_app_sha256": "sha256:c604d04af9c4304fe8fbf38c85447191942f3dab8b2c8cbcb58f4666b10f80e2",
+          "launcher_sha256": "sha256:bf222906324adbe6e22130805d1ce80b56589b1e5989cf9ef58e2788712eb672",
+          "fake_responses_api_sha256": "sha256:280cbf9f4211ecb7e1d454b0aa755152a70af4f4722b750de738bb77930c3dc9"
+        },
+        "synthetic_environment": {
+          "api_endpoint": "127.0.0.1:58556",
+          "workspace_kind": "run-local synthetic NTFS Workspace",
+          "codex_home": "run-local isolated empty CODEX_HOME",
+          "real_model_or_credential_used": false,
+          "external_requests": 0
+        },
+        "observations": {
+          "production_path": "Staged Flutter UI -> Windows Runner PID-bound named-pipe relay -> production Rust Broker -> real Codex CLI/MxC -> loopback fake Responses API.",
+          "owner_decisions": ["Runtime/Workspace registration", "one-use agent_task.execute Workspace Permission", "separate one-use Task Approval"],
+          "session_id": "566fb8538a6ac3afa6fe026fa831d83e",
+          "permission_audit_ref": "broker-audit-83",
+          "approval_audit_ref": "broker-audit-85",
+          "task": {
+            "task_id": "4e0b5663267328232d6156ebea9e9134",
+            "status": "completed",
+            "start_audit_ref": "broker-audit-87",
+            "completion_audit_ref": "broker-audit-94",
+            "completion_reason": "Agent Task完了（結果本文非保存・hashのみ）",
+            "instruction_hash": "sha256:3f9af2133b63394186aefdce67d0ca6264dbec6354d5b848cdd1b0c3bd908707",
+            "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab"
+          },
+          "fake_api": {
+            "requests": 2,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": true,
+            "invalid_bodies": 0,
+            "incomplete_requests": 0,
+            "response_write_failures": 0,
+            "blocked_external_requests": 0
+          },
+          "workspace": {
+            "completion_marker_exists": true,
+            "completion_marker_bytes": 20,
+            "temp_report_exists": true,
+            "temp_report_bytes": 769,
+            "synthetic_secret_canary_bytes": 0,
+            "outside_write_marker_exists": false
+          },
+          "temp_diagnostic": {
+            "scope": "mxc_appcontainer",
+            "write": "failed",
+            "step": "temp_directory_check",
+            "error_type": "System.Management.Automation.RuntimeException",
+            "error_hresult": -2146233087
+          },
+          "audit_snapshot": {
+            "verified_at_utc": "2026-10-02T13:54:06Z",
+            "verified_event_count": 139,
+            "verified_head_hash": "sha256:0aeedfdb46285c1014689d09cfc9ae9773b31ee1b8c5d9fdf9a2f6fc10f4aaaf",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "task_instruction_body_present": false,
+            "broker_restart_verified": false
+          },
+          "cleanup": {
+            "fake_api_listener_stopped": true,
+            "task_child_stopped": true,
+            "evidence_retained": true,
+            "launcher_and_frontend_still_running": true,
+            "reason_not_force_stopped": "Normal exit is controlled by the native tray-menu Exit action; the UI automation surface could not target the notification area."
+          }
+        },
+        "task_created": true,
+        "owner_confirmation_completed": 3,
+        "os_protection_changed": false,
+        "scope_limit": "This closes positive Task completion only in the staged r2-e2e feature build using a loopback fake API. It does not enable or prove normal Release task_execution, provider interoperability, restart durability, result/diff Content Exposure, successful MxC TEMP cleanup, the OneDrive Cloud Files/ordinary NTFS isolation matrix, or failure/deadline/crash Recovery. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
+      },
       "latest_mxc_temp_directory_exit_observation": {
         "date": "2026-10-01",
         "source_base_commit": "7ab1c4db6de571d511d5dc27841b843bcf77cc26",
