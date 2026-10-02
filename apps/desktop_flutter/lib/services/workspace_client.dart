@@ -126,6 +126,95 @@ class WorkspaceClient {
     return List.unmodifiable(result);
   }
 
+  Future<void> approveRead(
+      WorkspaceRegistration registration, String visibility) async {
+    if (!_id.hasMatch(registration.id) ||
+        !_hash.hasMatch(registration.hash) ||
+        !_visibilities.contains(visibility)) {
+      _invalid();
+    }
+    final payload = <String, Object?>{
+      '作業領域ID': registration.id,
+      '登録hash': registration.hash,
+      '表示範囲': visibility,
+    };
+    final response = await _request('作業領域承認', payload);
+    final body = _map(response['body']);
+    _keys(body, [
+      '作業領域ID',
+      'approval_id',
+      'permission_id',
+      'capability_id',
+      'recovery_id',
+      '有効期限',
+      '表示範囲',
+    ]);
+    final approval = body['approval_id'];
+    final expires = body['有効期限'];
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    if (body['作業領域ID'] != registration.id ||
+        approval is! String ||
+        approval.isEmpty ||
+        approval.length > 128 ||
+        approval.contains(RegExp(r'[\x00-\x1f\x7f]')) ||
+        body['permission_id'] != 'workspace.inspect.$approval' ||
+        body['capability_id'] != 'workspace.inspect' ||
+        body['recovery_id'] != 'workspace.reapprove' ||
+        expires is! int ||
+        expires <= now ||
+        expires > now + 305 ||
+        body['表示範囲'] != visibility) {
+      _invalid();
+    }
+  }
+
+  Future<String> saveWholeBaseline(WorkspaceRegistration registration) async {
+    if (!registration.current(DateTime.now()) ||
+        registration.visibility != 'full' ||
+        !_id.hasMatch(registration.id) ||
+        !_hash.hasMatch(registration.hash)) {
+      _invalid();
+    }
+    final payload = <String, Object?>{
+      '作業領域ID': registration.id,
+      '登録hash': registration.hash,
+    };
+    final response = await _request('作業領域全体基準点保存', payload);
+    final body = _map(response['body']);
+    _keys(body, [
+      'version',
+      'operation',
+      '要求hash',
+      '作業領域ID',
+      '実行系ID',
+      '登録hash',
+      'approval_id',
+      '有効期限',
+      '表示範囲',
+      'projection',
+    ]);
+    final projection = _map(body['projection']);
+    _keys(projection, ['基準点hash', '対象数']);
+    final baselineHash = _string(projection['基準点hash']);
+    final count = projection['対象数'];
+    if (body['version'] != 1 ||
+        body['operation'] != '作業領域全体基準点保存' ||
+        body['要求hash'] != brokerPayloadHash(payload) ||
+        body['作業領域ID'] != registration.id ||
+        body['実行系ID'] != registration.runtime ||
+        body['登録hash'] != registration.hash ||
+        body['approval_id'] != registration.approval ||
+        body['有効期限'] != registration.expires ||
+        body['表示範囲'] != 'full' ||
+        !_hash.hasMatch(baselineHash) ||
+        count is! int ||
+        count < 0 ||
+        count > 4096) {
+      _invalid();
+    }
+    return baselineHash;
+  }
+
   Future<WorkspaceView> read(WorkspaceRegistration selected, String path,
       {required bool tree,
       bool scope = false,

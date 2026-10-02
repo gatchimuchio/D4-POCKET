@@ -13,6 +13,7 @@ class TestBroker implements BrokerTransport {
   String visibility = 'full';
   bool folders = false;
   String baselineHash = "sha256:${'c' * 64}";
+  bool hasBaseline = true;
   String diffKind = "text";
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
@@ -39,6 +40,34 @@ class TestBroker implements BrokerTransport {
       body = {
         '作業領域': [registration]
       };
+    } else if (operation == '作業領域承認') {
+      approval = 'approval-owner-granted';
+      visibility = payload!['表示範囲'] as String;
+      body = {
+        '作業領域ID': payload['作業領域ID'],
+        'approval_id': approval,
+        'permission_id': 'workspace.inspect.$approval',
+        'capability_id': 'workspace.inspect',
+        'recovery_id': 'workspace.reapprove',
+        '有効期限': expires,
+        '表示範囲': visibility,
+      };
+      mutate?.call(body);
+    } else if (operation == '作業領域全体基準点保存') {
+      hasBaseline = true;
+      body = {
+        'version': 1,
+        'operation': operation,
+        '要求hash': brokerPayloadHash(payload),
+        '作業領域ID': payload!['作業領域ID'],
+        '実行系ID': 'runtime-a',
+        '登録hash': 'sha256:${'a' * 64}',
+        'approval_id': approval,
+        '有効期限': expires,
+        '表示範囲': visibility,
+        'projection': {'基準点hash': baselineHash, '対象数': 1},
+      };
+      mutate?.call(body);
     } else {
       await pendingRead?.future;
       final tree = operation == '作業領域ツリー';
@@ -91,8 +120,8 @@ class TestBroker implements BrokerTransport {
       }
       if (visibility == 'full' && operation == '作業領域比較範囲') {
         body['projection'] = {
-          '基準点hash': baselineHash,
-          '相対paths': ['file.txt']
+          '基準点hash': hasBaseline ? baselineHash : null,
+          '相対paths': hasBaseline ? ['file.txt'] : []
         };
       }
       if (visibility == 'full' && operation == '作業領域変更一覧') {
@@ -380,6 +409,47 @@ void main() {
       expect(broker.operations, ['作業領域一覧', '作業領域読取', '作業領域一覧']);
     }
   });
+  test('Workspace承認と全体基準点保存のreceiptを要求・範囲照合する', () async {
+    final broker = TestBroker()
+      ..approval = null
+      ..hasBaseline = false;
+    final client = WorkspaceClient(broker);
+    final denied = (await client.list()).single;
+    await client.approveRead(denied, 'full');
+    expect(broker.operations.last, '作業領域承認');
+    final granted = (await client.list()).single;
+    expect(granted.visibility, 'full');
+    final baseline = await client.saveWholeBaseline(granted);
+    expect(baseline, broker.baselineHash);
+    expect(broker.operations.last, '作業領域全体基準点保存');
+
+    for (final mutation in <void Function(Map<String, Object?>)>[
+      (body) => body['表示範囲'] = 'summary',
+      (body) => body['capability_id'] = 'agent_task.execute',
+      (body) => body['extra_authority'] = true,
+    ]) {
+      final invalid = TestBroker()
+        ..approval = null
+        ..mutate = mutation;
+      final invalidClient = WorkspaceClient(invalid);
+      await expectLater(
+          invalidClient.approveRead(
+              (await invalidClient.list()).single, 'full'),
+          throwsA(isA<BrokerClientException>()));
+    }
+
+    for (final mutation in <void Function(Map<String, Object?>)>[
+      (body) => body['登録hash'] = 'sha256:${'d' * 64}',
+      (body) => (body['projection'] as Map)['対象数'] = 4097,
+      (body) => (body['projection'] as Map)['extra'] = true,
+    ]) {
+      final invalid = TestBroker()..mutate = mutation;
+      final invalidClient = WorkspaceClient(invalid);
+      await expectLater(
+          invalidClient.saveWholeBaseline((await invalidClient.list()).single),
+          throwsA(isA<BrokerClientException>()));
+    }
+  });
   test('登録・承認・期限・要求・表示範囲の不一致とbinary本文を拒否', () async {
     for (final mutation in <void Function(Map<String, Object?>)>[
       (v) => v['登録hash'] = 'sha256:${'c' * 64}',
@@ -442,6 +512,34 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
     expect(find.text('本文'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('未承認WorkspaceからOwner承認・全体基準点・変更一覧へ進む', (tester) async {
+    final broker = TestBroker()
+      ..approval = null
+      ..hasBaseline = false;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButton<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('本文・差分 (full)').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('読取範囲を承認'));
+    await tester.tap(find.text('読取範囲を承認'));
+    await tester.pumpAndSettle();
+    expect(find.text('基準点がありません。保存には現在のfull読取承認とnative Owner確認が必要です。'),
+        findsOneWidget);
+
+    await tester.ensureVisible(find.text('全体基準点を保存'));
+    await tester.tap(find.text('全体基準点を保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('全体基準点の変更一覧'), findsOneWidget);
+    expect(broker.operations, contains('作業領域承認'));
+    expect(broker.operations, contains('作業領域全体基準点保存'));
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets('フォルダーから配下本文へ移動しnullサイズを表示しない', (tester) async {

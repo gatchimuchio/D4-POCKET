@@ -1582,6 +1582,8 @@ impl Broker {
                     | BrokerOperation::回帰Case登録
                     | BrokerOperation::資格情報失効
                     | BrokerOperation::更新download要求
+                    | BrokerOperation::作業領域承認
+                    | BrokerOperation::作業領域全体基準点保存
             )
         );
         if !operation_is_allowlisted
@@ -7615,6 +7617,61 @@ mod tests {
             response.error.as_ref().map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
+    }
+
+    #[test]
+    fn workspace_inspection_owner_operations_require_and_reach_native_confirmation() {
+        for (index, operation) in [
+            BrokerOperation::作業領域承認,
+            BrokerOperation::作業領域全体基準点保存,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let payload = if operation == BrokerOperation::作業領域承認 {
+                json!({
+                    "作業領域ID": "workspace-fixture",
+                    "登録hash": format!("sha256:{}", "a".repeat(64)),
+                    "表示範囲": "full"
+                })
+            } else {
+                json!({
+                    "作業領域ID": "workspace-fixture",
+                    "登録hash": format!("sha256:{}", "a".repeat(64))
+                })
+            };
+
+            let mut normal = BrokerRequestEnvelope::health(
+                &format!("workspace-owner-normal-{index}"),
+                &format!("workspace-owner-normal-nonce-{index}"),
+            );
+            normal.session_id = Some("session-1".to_string());
+            normal.operation = Some(operation.clone());
+            normal.payload = Some(payload.clone());
+            normal.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+            normal.refresh_payload_hash();
+            let mut normal_broker = test_broker();
+            assert_eq!(normal_broker.handle(normal).status, BrokerStatus::Rejected);
+
+            let request = json!({
+                "request_id": format!("workspace-owner-native-{index}"),
+                "session_id": "session-1",
+                "operation": operation.as_str(),
+                "payload": payload,
+                "payload_hash": canonical_payload_hash(Some(&payload)),
+                "nonce": format!("workspace-owner-native-nonce-{index}"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"}
+            });
+            let mut desktop_broker = test_broker();
+            let response = desktop_broker.desktop_owner_operation_json(&request.to_string());
+            assert_eq!(response.status, BrokerStatus::Rejected);
+            assert_ne!(
+                response.error.as_ref().map(|error| error.code.as_str()),
+                Some("desktop_owner_operation_invalid"),
+                "{operation:?} must reach the Workspace Broker handler after native confirmation"
+            );
+        }
     }
 
     #[test]

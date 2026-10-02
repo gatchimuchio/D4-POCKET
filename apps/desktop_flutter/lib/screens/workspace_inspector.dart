@@ -18,6 +18,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   List<WorkspaceRegistration> _registrations = [];
   WorkspaceView? _view;
   String? _selected;
+  final Map<String, String> _requestedVisibility = {};
   String _message = '登録済み作業領域を確認中';
   bool _busy = false;
   bool _active = true;
@@ -185,6 +186,81 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     }
   }
 
+  String _requestedVisibilityFor(WorkspaceRegistration registration) =>
+      _requestedVisibility['${registration.id}:${registration.hash}'] ??
+      (registration.current(DateTime.now())
+          ? registration.visibility
+          : 'summary');
+
+  Future<void> _approveRead(WorkspaceRegistration registration) async {
+    final generation = ++_generation;
+    final visibility = _requestedVisibilityFor(registration);
+    setState(() {
+      _view = null;
+      _busy = true;
+      _selected = registration.id;
+      _message = 'native Owner確認で読取範囲を要求中';
+    });
+    try {
+      await widget.client.approveRead(registration, visibility);
+      final registrations = await widget.client.list();
+      if (!mounted || !_active || generation != _generation) return;
+      WorkspaceRegistration? granted;
+      for (final item in registrations) {
+        if (item.id == registration.id &&
+            item.hash == registration.hash &&
+            item.visibility == visibility &&
+            item.current(DateTime.now())) {
+          granted = item;
+          break;
+        }
+      }
+      setState(() {
+        _registrations = registrations;
+        _busy = false;
+        _message = granted == null
+            ? 'Brokerが現在の読取承認を返さないため表示を停止しました。'
+            : 'Brokerの現在登録・承認を再確認しました。';
+      });
+      if (granted != null) {
+        await _read(granted, '', visibility != 'full',
+            scope: visibility == 'full');
+      }
+    } catch (_) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _busy = false;
+        _view = null;
+        _message = 'Owner確認またはBroker承認が成立しないため表示を停止しました。';
+      });
+    }
+  }
+
+  Future<void> _saveWholeBaseline(WorkspaceRegistration registration) async {
+    final generation = ++_generation;
+    setState(() {
+      _view = null;
+      _busy = true;
+      _message = 'native Owner確認後、Brokerが全体基準点を取得します';
+    });
+    try {
+      await widget.client.saveWholeBaseline(registration);
+      if (!mounted || !_active || generation != _generation) return;
+      setState(() {
+        _busy = false;
+        _message = 'Brokerが全体基準点を保存しました。範囲を再取得中です。';
+      });
+      await _read(registration, '', false, scope: true);
+    } catch (_) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _busy = false;
+        _view = null;
+        _message = '基準点保存または現在の承認を確認できません。表示を停止しました。';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final view = _view;
@@ -197,15 +273,58 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       Text(_message),
       if (_busy) const LinearProgressIndicator(),
       for (final registration in _registrations)
-        ListTile(
-          title: Text(registration.id),
-          subtitle: Text(
-              '${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}'),
-          selected: _selected == registration.id,
-          onTap: !_active || _busy || !registration.current(DateTime.now())
-              ? null
-              : () => _read(registration, '', true),
-        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ListTile(
+            title: Text(registration.id),
+            subtitle: Text(
+                '${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}'),
+            selected: _selected == registration.id,
+            onTap: !_active || _busy || !registration.current(DateTime.now())
+                ? null
+                : () => _read(registration, '', true),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('Owner承認範囲'),
+                DropdownButton<String>(
+                  value: _requestedVisibilityFor(registration),
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('非表示 (none)')),
+                    DropdownMenuItem(
+                        value: 'hash_only', child: Text('hashのみ (hash_only)')),
+                    DropdownMenuItem(
+                        value: 'summary', child: Text('概要 (summary)')),
+                    DropdownMenuItem(
+                        value: 'redacted', child: Text('redacted')),
+                    DropdownMenuItem(
+                        value: 'full', child: Text('本文・差分 (full)')),
+                  ],
+                  onChanged: !_active || _busy
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() => _requestedVisibility[
+                                  '${registration.id}:${registration.hash}'] =
+                              value);
+                        },
+                ),
+                TextButton.icon(
+                  onPressed: !_active || _busy
+                      ? null
+                      : () => _approveRead(registration),
+                  icon: const Icon(Icons.admin_panel_settings),
+                  label: Text(registration.current(DateTime.now())
+                      ? '読取範囲を変更・再承認'
+                      : '読取範囲を承認'),
+                ),
+              ],
+            ),
+          ),
+        ]),
       if (view != null) ...[
         Text('監査: ${view.auditId}'),
         TextButton(
@@ -225,7 +344,15 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         if (view.registration.visibility == 'full' &&
             view.operation == '作業領域比較範囲') ...[
           if (projection!['基準点hash'] == null)
-            const Text('基準点がありません。所有者の制御操作で保存してください。')
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('基準点がありません。保存には現在のfull読取承認とnative Owner確認が必要です。'),
+              TextButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _saveWholeBaseline(view.registration),
+                  icon: const Icon(Icons.save_alt),
+                  label: const Text('全体基準点を保存')),
+            ])
           else ...[
             const Text('基準点に保存されたfileです。全体基準点では変更一覧も取得できます。'),
             TextButton(
