@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "dc4ffaea5e086ebc0feb44ec14b303edfc2e3604e6e01f53c4e9b977e03aefa5"
+      "sha256": "37ca1f6cc6e742a4ee272006120c7f09ba1b980b5ecd45ca076a8d901417f6df"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3036,7 +3036,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
-      "sha256": "ee30906c56b0cfab5f96ddcb6b3b020282145534c8056a3ad9b2c059382acff5"
+      "sha256": "41e339a70852f4cce5fad37c20bbe87e764e337a55c0de35c45aa48746948b3c"
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
@@ -3184,7 +3184,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "349468db96fda2bdfdd22cbe82605566a0997a13eadbacde19e97aff653a623e"
+      "sha256": "39f25f5334974a184e2944fbe571fbc9b460cd940d32596157c9432362e58c5c"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",

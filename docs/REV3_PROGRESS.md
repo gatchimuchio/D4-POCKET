@@ -1857,3 +1857,15 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 維持する境界
 
 - 上記修正commitからのfresh installed再試行、登録後のPermission／Approval／positive Task、Workspace marker／result／diff、durable Auditと再起動後のchain／HMAC検証は未実行であり、本節時点では成立していない。OneDrive Cloud Files／通常NTFSの隔離matrix、failure／deadline／crash Recovery、MxC TEMP cleanup、result／diff Content Exposure、通常ReleaseのTask能力も未完了。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 fresh installed run19の登録再失敗と失敗理由の安全な細分化（2026-10-02）
+
+- source commit `ae95ddf1a53f547e655ddff0464f42966d8b7ddc`由来としてbuild／stageしたrun19のFlutter、launcher、Rust Broker helperは、直前のbuild artifact hashとそれぞれ一致した。実Flutter Agent Centerで合成Workspace／Codex CLI `0.159.2`の登録を開始し、除外pathの入力形式を正規化した後、実Win32 native Owner確認dialogでOwner Yesを選択した。
+- run19 Auditは`broker-audit-36`で要求を受領し、`broker-audit-37`で拒否、`broker-audit-38`で集約拒否を記録した。UIは「Owner確認後のAgent CLI interface検査に失敗」。Runtime／Workspace登録、Permission、Task Approval、Task、model／tool request、Workspace writeは発生していない。loopback偽APIへのrequestと完了markerもなかった。
+- 実行後の隔離CODEX_HOMEに`tmp`が存在した。一方、別の新規合成環境で実Codex CLIを同じ許可環境変数集合から直接起動したprobeは`--version`／`exec --help`ともexit 0で、要求interface tokenと`workspace-write`を確認した。この直接probeは`LIVE_RUNTIME`だが、Broker Adapterが同じ応答を読んだことの証拠ではない。
+- run18で推定した「空CODEX_HOME確認とCLI probeの順序衝突」の修正だけでは、run19登録を閉じたと確認できなかった。既存protocolは複数のAdapter初期化失敗を同一表示へ丸めるため、どの固定検査段階で拒否したかは未確定のまま保持する。
+- `native/rust_helper/src/adapters/mod.rs`に固定文言だけを返す失敗理由射影を追加し、version probe、exec help probe、probe起動／期限／出力上限の失敗を識別する。CLI stdout／stderr、path、OS errorなどの可変値はAudit／UIへ反映しない。protocolは既知理由だけをこの射影へ通し、未知理由は従来の一般拒否へ閉じる。
+- 診断理由testを加えた最初のRust全target実行では`broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes`がWindows WSA 10054で失敗した。対象test単独再実行は1 passed。manifest更新後の全target再実行は450 passed／0 failed／7 ignored（library 402 passed／6 ignoredを含む）。`python -X utf8 tooling/schema_check/check_schemas.py`は152 schema／152 example／196 negative fixture、conformanceは231 checksで成功。strict日本語監査は1134 files／0 findingsで成功。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`のmanifest再生成前実行は、変更後の`native/rust_helper/src/broker/protocol.rs` hash不一致だけでmanifest／release gate／packaging portabilityが失敗した。`python -X utf8 tooling/manifest.py --write`後の同validator再実行はexit 0で全development checkが成功した。validator内のrelease blocker 31件、`release_ready=false`はそのまま。
+- 実装中に最初のRust compileで`map_err`の`String`／`&str`型不一致が見つかり、借用closureへ修正してから上記全target再実行を行った。
+- この修正は登録失敗の識別性だけを改善し、Permission、Approval、Trust、Task capabilityを変更しない。fresh installed再試行、Permission／Approval／positive Task、durable Auditのrestart後検証はこの記録時点で未成立。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。

@@ -1305,7 +1305,7 @@ impl Broker {
             Path::new(&request.cli_path),
             Path::new(&request.workspace_root),
         )
-        .map_err(|_| "Owner確認後のAgent CLI interface検査に失敗")?;
+        .map_err(|error| crate::adapters::cli_registration_error_reason(&error))?;
         let metadata = root
             .dir_metadata()
             .map_err(|_| "Workspace root識別子を確認できない")?;
