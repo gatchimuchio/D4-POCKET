@@ -315,6 +315,7 @@ impl Drop for CodexLoopbackResponses {
     }
 }
 
+// TEMP書込み結果は個別に記録する。許可scopeを確認した後の独立したWorkspace／secret境界試験は、TEMP失敗だけでは省略しない。
 fn synthetic_workspace_probe() -> String {
     concat!(
         "$ErrorActionPreference='Stop'; ",
@@ -322,16 +323,17 @@ fn synthetic_workspace_probe() -> String {
         "$workspace=(Get-Location).Path; ",
         "$tempReport=Join-Path $workspace 'broker-real-codex-temp-report.json'; ",
         "$tempMarkerName='d4p-broker-temp-observer-'+[IO.Path]::GetFileName($workspace)+'.marker'; ",
-        "$tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
+        "$tempStep='initial'; $tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_step=$tempStep;temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
         "[IO.File]::WriteAllText($tempReport,$tempState); ",
-        "try { $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object { $_.Name -like '.d4p-tmp-*' }); if($scratch.Count -ne 1){throw [InvalidOperationException]::new('registered scratch count mismatch')}; ",
+        "$tempStep='scratch_discovery'; try { $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object { $_.Name -like '.d4p-tmp-*' }); if($scratch.Count -ne 1){throw [InvalidOperationException]::new('registered scratch count mismatch')}; ",
+        "$tempStep='scope_validation'; ",
         "$expected=[IO.Path]::GetFullPath($scratch[0].FullName).TrimEnd([char]92); $tempActual=[IO.Path]::GetFullPath($env:TEMP).TrimEnd([char]92); $tmpActual=[IO.Path]::GetFullPath($env:TMP).TrimEnd([char]92); ",
         "$tempMatches=[string]::Equals($expected,$tempActual,[StringComparison]::OrdinalIgnoreCase); $tmpMatches=[string]::Equals($expected,$tmpActual,[StringComparison]::OrdinalIgnoreCase); ",
         "$tempParts=$tempActual.Split([char]92); $sandboxGuid=[Guid]::Empty; $mxcTemp=$false; if($tempParts.Count -ge 9){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3].StartsWith('sandbox.',[StringComparison]::OrdinalIgnoreCase) -and [Guid]::TryParse($tempParts[-3].Substring(8),[ref]$sandboxGuid))}; ",
         "if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif([string]::Equals($tempActual,$tmpActual,[StringComparison]::OrdinalIgnoreCase) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual} else {throw [InvalidOperationException]::new('TEMP/TMP is outside the Broker scratch or MxC AppContainer temp')}; ",
-        "if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){throw [DirectoryNotFoundException]::new('scoped TEMP directory is absent')}; [IO.File]::WriteAllText((Join-Path $tempTarget $tempMarkerName),'d4p synthetic temp observer'); $tempWrite='passed'; $tempErrorType=$null; $tempErrorHResult=$null } catch { $tempError=$_.Exception.InnerException; if($null -eq $tempError){$tempError=$_.Exception}; $tempWrite='failed'; if($null -eq $tempMatches){$tempMatches=$false}; if($null -eq $tmpMatches){$tmpMatches=$false}; if($null -eq $tempScope){$tempScope='unrecognized'}; $tempErrorType=$tempError.GetType().FullName; $tempErrorHResult=$tempError.HResult }; ",
-        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; ",
-        "[IO.File]::WriteAllText($tempReport,$tempState); if($tempWrite -ne 'passed'){exit 45}; ",
+        "$tempStep='temp_directory_check'; if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){throw [DirectoryNotFoundException]::new('scoped TEMP directory is absent')}; $tempStep='temp_write'; [IO.File]::WriteAllText((Join-Path $tempTarget $tempMarkerName),'d4p synthetic temp observer'); $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorType=$null; $tempErrorHResult=$null } catch { $tempError=$_.Exception.InnerException; if($null -eq $tempError){$tempError=$_.Exception}; $tempWrite='failed'; if($null -eq $tempMatches){$tempMatches=$false}; if($null -eq $tmpMatches){$tmpMatches=$false}; if($null -eq $tempScope){$tempScope='unrecognized'}; $tempErrorType=$tempError.GetType().FullName; $tempErrorHResult=$tempError.HResult }; ",
+        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; ",
+        "[IO.File]::WriteAllText($tempReport,$tempState); ",
         "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; ",
         "$deadline=[DateTime]::UtcNow.AddSeconds(30); ",
         "while(-not [IO.File]::Exists($continue)){if([DateTime]::UtcNow -ge $deadline){exit 44}; Start-Sleep -Milliseconds 25}; ",
@@ -1038,6 +1040,18 @@ mod tests {
         assert!(!launch_failure
             .to_string()
             .contains("PowerShell host failed"));
+    }
+
+    #[test]
+    fn temp_probe_keeps_boundary_checks_independent_from_temp_diagnostic() {
+        let probe = synthetic_workspace_probe();
+        assert!(probe.contains("temp_step=$tempStep"));
+        assert!(probe.contains("$tempStep='temp_write'"));
+        assert!(!probe.contains("exit 45"));
+        assert!(probe.contains("if (-not $secretDenied) { exit 41 }"));
+        assert!(probe.contains("if (-not $outsideReadDenied) { exit 42 }"));
+        assert!(probe.contains("if (-not $outsideWriteDenied) { exit 43 }"));
+        assert!(probe.contains("broker-real-codex-marker.txt"));
     }
 }
 
