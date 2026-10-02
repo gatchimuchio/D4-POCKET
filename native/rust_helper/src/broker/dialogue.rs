@@ -3304,17 +3304,55 @@ mod tests {
         let task_id = task["task_id"].as_str().unwrap();
         let temp_report_path = workspace_path.join("broker-real-codex-temp-report.json");
         let temp_report_deadline = Instant::now() + Duration::from_secs(30);
-        while !temp_report_path.is_file() {
+        let temp_report = loop {
+            if temp_report_path.is_file() {
+                if let Ok(bytes) = std::fs::read(&temp_report_path) {
+                    if let Ok(report) = serde_json::from_slice::<Value>(&bytes) {
+                        if report["stage"] == "temp_checked" {
+                            break report;
+                        }
+                    }
+                }
+            }
             assert!(
                 Instant::now() < temp_report_deadline,
-                "実MxC tool childがTEMP／TMP報告を書き出す期限"
+                "実MxC tool childがTEMP／TMP報告を確定する期限: accepted={}; incomplete=({}); responses_posts={}; invalid_bodies={}; response_write=({}); tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_rejections={}; tool_outputs=({}); request_shapes={}; outside_requests={} ({})",
+                server.accepted_connections(),
+                server.incomplete_request_summary(),
+                server.post_requests(),
+                server.invalid_post_bodies(),
+                server.response_write_summary(),
+                server.tool_was_offered(),
+                server.tool_call_was_sent(),
+                server.tool_result_was_received(),
+                server.repeated_tool_call_rejections(),
+                server.tool_output_summary(),
+                server.request_shape_summary(),
+                server.blocked_external_requests(),
+                server.blocked_external_summary()
             );
             std::thread::sleep(Duration::from_millis(20));
-        }
-        let temp_report: Value = serde_json::from_slice(
-            &std::fs::read(&temp_report_path).expect("合成TEMP／TMP報告を読む"),
-        )
-        .expect("合成TEMP／TMP報告JSON");
+        };
+        assert_eq!(
+            temp_report["temp_write"], "passed",
+            "TEMP書込probe: {temp_report}"
+        );
+        let temp_scope = temp_report["temp_scope"]
+            .as_str()
+            .expect("実MxC子プロセスの一時保存範囲を確認");
+        assert!(
+            matches!(temp_scope, "broker_workspace_scratch" | "mxc_appcontainer"),
+            "TEMPはBroker scratchまたはMxC専用AppContainer temp内に限る: {temp_report}"
+        );
+        let temp_is_workspace_scratch = temp_scope == "broker_workspace_scratch";
+        assert_eq!(
+            temp_report["temp_matches_workspace_scratch"], temp_is_workspace_scratch,
+            "TEMP scopeとBroker scratch照合が一致: {temp_report}"
+        );
+        assert_eq!(
+            temp_report["tmp_matches_workspace_scratch"], temp_is_workspace_scratch,
+            "TMP scopeとBroker scratch照合が一致: {temp_report}"
+        );
         let child_temp = temp_report["temp"]
             .as_str()
             .filter(|path| !path.is_empty() && std::path::Path::new(path).is_absolute())
@@ -3409,7 +3447,7 @@ mod tests {
         assert_eq!(
             result["status"],
             "completed",
-            "Task state: {result}; accepted_connections={}; incomplete_requests=({}); model_list_gets={}; responses_post_attempts={}; invalid_post_bodies={}; response_write=({}); responses_posts={}; tool_offered={}; tool_call_sent={}; workspace_marker={}; outside_write={}; blocked_proxy_requests={} ({})",
+            "Task state: {result}; accepted_connections={}; incomplete_requests=({}); model_list_gets={}; responses_post_attempts={}; invalid_post_bodies={}; response_write=({}); responses_posts={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_tool_rejections={}; tool_outputs=({}); request_shapes={}; workspace_marker={}; outside_write={}; blocked_proxy_requests={} ({})",
             server.accepted_connections(),
             server.incomplete_request_summary(),
             server.model_list_requests(),
@@ -3419,6 +3457,10 @@ mod tests {
             server.post_requests(),
             server.tool_was_offered(),
             server.tool_call_was_sent(),
+            server.tool_result_was_received(),
+            server.repeated_tool_call_rejections(),
+            server.tool_output_summary(),
+            server.request_shape_summary(),
             workspace_path.join("broker-real-codex-marker.txt").exists(),
             outside_write.exists(),
             server.blocked_external_requests(),
@@ -3443,6 +3485,10 @@ mod tests {
         assert_eq!(
             marker_after_mxc_exit, "not_found",
             "正常終了後にMxC TEMPのTask markerが残らない"
+        );
+        assert_eq!(
+            temp_directory_after_mxc_exit, "不在",
+            "正常終了後にMxC専用TEMP directoryが残らない"
         );
         assert!(result["result_hash"]
             .as_str()
@@ -3493,6 +3539,15 @@ mod tests {
             server.tool_call_was_sent(),
             "実CLIが偽APIの固定tool callを処理"
         );
+        assert!(
+            server.tool_result_was_received(),
+            "実CLIがtool実行結果をResponses APIへ返した"
+        );
+        assert_eq!(
+            server.repeated_tool_call_rejections(),
+            0,
+            "偽APIが同じtool callを再送しない"
+        );
         for entry in std::fs::read_dir(workspace_path).unwrap() {
             assert!(
                 !entry
@@ -3520,7 +3575,7 @@ mod tests {
         let cancel_temp_marker_name =
             format!("d4p-broker-cancel-temp-observer-{workspace_label}.marker");
         server.set_command(format!(
-            "$ErrorActionPreference='Stop'; <# MxC TEMP markerと合成Workspace内取消状態を記録する #> $tempMarkerName='{cancel_temp_marker_name}'; $tempMarker=Join-Path $env:TEMP $tempMarkerName; [IO.File]::WriteAllText($tempMarker,'d4p synthetic temp observer'); [IO.File]::WriteAllText('{cancel_temp_report_literal}',($env:TEMP+'|'+$tempMarkerName)); $heartbeat='{heartbeat_literal}'; [IO.File]::WriteAllText($heartbeat,'started'); while ($true) {{ [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 50 }}"
+            "$ErrorActionPreference='Stop'; <# MxC TEMP markerと合成Workspace内取消状態を記録する #> $workspace=(Get-Location).Path; $tempRoot=[IO.Path]::GetFullPath($env:TEMP).TrimEnd([char]92); $tmpRoot=[IO.Path]::GetFullPath($env:TMP).TrimEnd([char]92); $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object {{ $_.Name -like '.d4p-tmp-*' }}); if($scratch.Count -ne 1){{exit 61}}; $expected=[IO.Path]::GetFullPath($scratch[0].FullName).TrimEnd([char]92); $tempParts=$tempRoot.Split([char]92); $sandboxGuid=[Guid]::Empty; $mxcTemp=$false; if($tempParts.Count -ge 9){{$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3].StartsWith('sandbox.',[StringComparison]::OrdinalIgnoreCase) -and [Guid]::TryParse($tempParts[-3].Substring(8),[ref]$sandboxGuid))}}; $workspaceTemp=[string]::Equals($expected,$tempRoot,[StringComparison]::OrdinalIgnoreCase); if(-not [string]::Equals($tempRoot,$tmpRoot,[StringComparison]::OrdinalIgnoreCase) -or (-not $workspaceTemp -and -not $mxcTemp)){{exit 62}}; $tempMarkerName='{cancel_temp_marker_name}'; $tempMarker=Join-Path $tempRoot $tempMarkerName; [IO.File]::WriteAllText($tempMarker,'d4p synthetic temp observer'); [IO.File]::WriteAllText('{cancel_temp_report_literal}',($tempRoot+'|'+$tempMarkerName)); $heartbeat='{heartbeat_literal}'; [IO.File]::WriteAllText($heartbeat,'started'); while ($true) {{ [IO.File]::AppendAllText($heartbeat,'x'); Start-Sleep -Milliseconds 50 }}"
         ));
         let cancellation_marker = workspace_path.join("broker-real-codex-marker.txt");
         std::fs::remove_file(&cancellation_marker)
@@ -3567,9 +3622,40 @@ mod tests {
             if std::fs::metadata(&heartbeat).is_ok_and(|metadata| metadata.len() >= 4) {
                 break;
             }
+            let state = control
+                .操作_作業領域結合済み(
+                    "AgentTask状態",
+                    &json!({"task_id":cancel_task["task_id"]}),
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .expect("取消probeのTask状態を確認");
+            assert_eq!(
+                state["status"],
+                "running",
+                "heartbeat前に取消probeが終端化: state={state}; responses_posts={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_rejections={}; tool_outputs=({}); request_shapes={}; outside_requests={}",
+                server.post_requests(),
+                server.tool_was_offered(),
+                server.tool_call_was_sent(),
+                server.tool_result_was_received(),
+                server.repeated_tool_call_rejections(),
+                server.tool_output_summary(),
+                server.request_shape_summary(),
+                server.blocked_external_requests()
+            );
             assert!(
                 Instant::now() < heartbeat_deadline,
-                "実MxC tool childが取消前にheartbeatを更新する"
+                "実MxC tool childが取消前にheartbeatを更新; state={state}; responses_posts={}; tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_rejections={}; tool_outputs=({}); request_shapes={}; outside_requests={}",
+                server.post_requests(),
+                server.tool_was_offered(),
+                server.tool_call_was_sent(),
+                server.tool_result_was_received(),
+                server.repeated_tool_call_rejections(),
+                server.tool_output_summary(),
+                server.request_shape_summary(),
+                server.blocked_external_requests()
             );
             std::thread::sleep(Duration::from_millis(20));
         }

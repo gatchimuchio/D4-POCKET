@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -26,6 +26,14 @@ struct State {
     model_list_requests: AtomicUsize,
     tool_offered: AtomicBool,
     tool_call_sent: AtomicBool,
+    tool_result_received: AtomicBool,
+    tool_output_items_seen: AtomicUsize,
+    tool_output_missing_call_id: AtomicUsize,
+    tool_output_id_mismatches: AtomicUsize,
+    request_shapes: Mutex<Vec<String>>,
+    repeated_tool_call_rejections: AtomicUsize,
+    tool_call_count: AtomicUsize,
+    active_tool_call_id: Mutex<Option<String>>,
     blocked_connect_requests: AtomicUsize,
     blocked_connect_openai: AtomicUsize,
     blocked_connect_chatgpt: AtomicUsize,
@@ -66,6 +74,14 @@ impl CodexLoopbackResponses {
             model_list_requests: AtomicUsize::new(0),
             tool_offered: AtomicBool::new(false),
             tool_call_sent: AtomicBool::new(false),
+            tool_result_received: AtomicBool::new(false),
+            tool_output_items_seen: AtomicUsize::new(0),
+            tool_output_missing_call_id: AtomicUsize::new(0),
+            tool_output_id_mismatches: AtomicUsize::new(0),
+            request_shapes: Mutex::new(Vec::new()),
+            repeated_tool_call_rejections: AtomicUsize::new(0),
+            tool_call_count: AtomicUsize::new(0),
+            active_tool_call_id: Mutex::new(None),
             blocked_connect_requests: AtomicUsize::new(0),
             blocked_connect_openai: AtomicUsize::new(0),
             blocked_connect_chatgpt: AtomicUsize::new(0),
@@ -124,6 +140,30 @@ impl CodexLoopbackResponses {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = command;
         self.state.tool_call_sent.store(false, Ordering::SeqCst);
+        self.state.tool_offered.store(false, Ordering::SeqCst);
+        self.state
+            .repeated_tool_call_rejections
+            .store(0, Ordering::SeqCst);
+        self.state
+            .tool_result_received
+            .store(false, Ordering::SeqCst);
+        self.state.tool_output_items_seen.store(0, Ordering::SeqCst);
+        self.state
+            .tool_output_missing_call_id
+            .store(0, Ordering::SeqCst);
+        self.state
+            .tool_output_id_mismatches
+            .store(0, Ordering::SeqCst);
+        self.state
+            .request_shapes
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+        *self
+            .state
+            .active_tool_call_id
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     }
 
     pub(super) fn accepted_connections(&self) -> usize {
@@ -186,6 +226,38 @@ impl CodexLoopbackResponses {
         self.state.tool_call_sent.load(Ordering::SeqCst)
     }
 
+    pub(super) fn tool_result_was_received(&self) -> bool {
+        self.state.tool_result_received.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn repeated_tool_call_rejections(&self) -> usize {
+        self.state
+            .repeated_tool_call_rejections
+            .load(Ordering::SeqCst)
+    }
+
+    pub(super) fn tool_output_summary(&self) -> String {
+        format!(
+            "items={}, missing_call_id={}, id_mismatch={}",
+            self.state.tool_output_items_seen.load(Ordering::SeqCst),
+            self.state
+                .tool_output_missing_call_id
+                .load(Ordering::SeqCst),
+            self.state.tool_output_id_mismatches.load(Ordering::SeqCst),
+        )
+    }
+
+    pub(super) fn request_shape_summary(&self) -> String {
+        format!(
+            "{:?}",
+            *self
+                .state
+                .request_shapes
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+        )
+    }
+
     pub(super) fn blocked_external_requests(&self) -> usize {
         self.state.blocked_connect_requests.load(Ordering::SeqCst)
             + self.state.blocked_non_local_requests.load(Ordering::SeqCst)
@@ -234,10 +306,16 @@ fn synthetic_workspace_probe() -> String {
         "$workspace=(Get-Location).Path; ",
         "$tempReport=Join-Path $workspace 'broker-real-codex-temp-report.json'; ",
         "$tempMarkerName='d4p-broker-temp-observer-'+[IO.Path]::GetFileName($workspace)+'.marker'; ",
-        "$tempMarker=Join-Path $env:TEMP $tempMarkerName; ",
-        "[IO.File]::WriteAllText($tempMarker,'d4p synthetic temp observer'); ",
-        "$tempState=@{temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName}|ConvertTo-Json -Compress; ",
+        "$tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
         "[IO.File]::WriteAllText($tempReport,$tempState); ",
+        "try { $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object { $_.Name -like '.d4p-tmp-*' }); if($scratch.Count -ne 1){throw [InvalidOperationException]::new('registered scratch count mismatch')}; ",
+        "$expected=[IO.Path]::GetFullPath($scratch[0].FullName).TrimEnd([char]92); $tempActual=[IO.Path]::GetFullPath($env:TEMP).TrimEnd([char]92); $tmpActual=[IO.Path]::GetFullPath($env:TMP).TrimEnd([char]92); ",
+        "$tempMatches=[string]::Equals($expected,$tempActual,[StringComparison]::OrdinalIgnoreCase); $tmpMatches=[string]::Equals($expected,$tmpActual,[StringComparison]::OrdinalIgnoreCase); ",
+        "$tempParts=$tempActual.Split([char]92); $sandboxGuid=[Guid]::Empty; $mxcTemp=$false; if($tempParts.Count -ge 9){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3].StartsWith('sandbox.',[StringComparison]::OrdinalIgnoreCase) -and [Guid]::TryParse($tempParts[-3].Substring(8),[ref]$sandboxGuid))}; ",
+        "if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif([string]::Equals($tempActual,$tmpActual,[StringComparison]::OrdinalIgnoreCase) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual} else {throw [InvalidOperationException]::new('TEMP/TMP is outside the Broker scratch or MxC AppContainer temp')}; ",
+        "if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){throw [DirectoryNotFoundException]::new('scoped TEMP directory is absent')}; [IO.File]::WriteAllText((Join-Path $tempTarget $tempMarkerName),'d4p synthetic temp observer'); $tempWrite='passed'; $tempErrorType=$null; $tempErrorHResult=$null } catch { $tempError=$_.Exception.InnerException; if($null -eq $tempError){$tempError=$_.Exception}; $tempWrite='failed'; if($null -eq $tempMatches){$tempMatches=$false}; if($null -eq $tmpMatches){$tmpMatches=$false}; if($null -eq $tempScope){$tempScope='unrecognized'}; $tempErrorType=$tempError.GetType().FullName; $tempErrorHResult=$tempError.HResult }; ",
+        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; ",
+        "[IO.File]::WriteAllText($tempReport,$tempState); if($tempWrite -ne 'passed'){exit 45}; ",
         "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; ",
         "$deadline=[DateTime]::UtcNow.AddSeconds(30); ",
         "while(-not [IO.File]::Exists($continue)){if([DateTime]::UtcNow -ge $deadline){exit 44}; Start-Sleep -Milliseconds 25}; ",
@@ -363,6 +441,42 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         }
     };
     let request_number = state.post_requests.fetch_add(1, Ordering::SeqCst) + 1;
+    let input_items = request
+        .get("input")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let mut output_items = 0;
+    let mut message_items = 0;
+    let mut reasoning_items = 0;
+    let mut other_items = 0;
+    for item in input_items {
+        match item.get("type").and_then(Value::as_str) {
+            Some("function_call_output") => output_items += 1,
+            Some("message") => message_items += 1,
+            Some("reasoning") => reasoning_items += 1,
+            _ => other_items += 1,
+        }
+    }
+    let previous_response_id = request
+        .get("previous_response_id")
+        .is_some_and(Value::is_string);
+    let has_exec_command = request
+        .get("tools")
+        .and_then(Value::as_array)
+        .is_some_and(|tools| {
+            tools
+                .iter()
+                .any(|tool| tool.get("name").and_then(Value::as_str) == Some("exec_command"))
+        });
+    state
+        .request_shapes
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push(format!(
+            "要求{request_number}の構成: 入力項目数={}, 結果項目数={output_items}, 文章項目数={message_items}, 推論項目数={reasoning_items}, その他項目数={other_items}, 前回応答ID有無={previous_response_id}, コマンド実行有無={has_exec_command}",
+            input_items.len()
+        ));
     if request_number == 1 {
         let offered = request
             .get("tools")
@@ -374,16 +488,161 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
             });
         state.tool_offered.store(offered, Ordering::SeqCst);
     }
-    let response_id = format!("d4p-broker-task-{request_number}");
-    let mut events = vec![event(
-        "response.created",
-        json!({"type":"response.created","response":{"id":response_id}}),
-    )];
+    let active_tool_call_id = state
+        .active_tool_call_id
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
+    let output_items: Vec<&Value> = request
+        .get("input")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|item| item.get("type").and_then(Value::as_str) == Some("function_call_output"))
+        .collect();
+    state
+        .tool_output_items_seen
+        .fetch_add(output_items.len(), Ordering::SeqCst);
+    let tool_result_received = active_tool_call_id
+        .as_deref()
+        .is_some_and(|expected_call_id| {
+            let mut matched = false;
+            for item in &output_items {
+                match item.get("call_id").and_then(Value::as_str) {
+                    Some(call_id) if call_id == expected_call_id => matched = true,
+                    Some(_) => {
+                        state
+                            .tool_output_id_mismatches
+                            .fetch_add(1, Ordering::SeqCst);
+                    }
+                    None => {
+                        state
+                            .tool_output_missing_call_id
+                            .fetch_add(1, Ordering::SeqCst);
+                    }
+                }
+            }
+            matched
+        });
+    if tool_result_received {
+        state.tool_result_received.store(true, Ordering::SeqCst);
+    }
+    let response_id = format!("resp_d4p_broker_task_{request_number}");
+    let mut events = vec![
+        response_lifecycle_event("response.created", &response_id, "in_progress", json!([])),
+        response_lifecycle_event(
+            "response.in_progress",
+            &response_id,
+            "in_progress",
+            json!([]),
+        ),
+    ];
     let tool_result_exists = Path::new(&state.workspace)
         .join("broker-real-codex-marker.txt")
         .is_file();
-    if !tool_result_exists && state.tool_offered.load(Ordering::SeqCst) {
-        let call_id = format!("d4p-broker-task-call-{request_number}");
+    let tool_was_offered = request
+        .get("tools")
+        .and_then(Value::as_array)
+        .is_some_and(|tools| {
+            tools
+                .iter()
+                .any(|tool| tool.get("name").and_then(Value::as_str) == Some("exec_command"))
+        });
+    if tool_result_exists && state.tool_result_received.load(Ordering::SeqCst) {
+        *state
+            .active_tool_call_id
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+        let message_id = format!("msg_d4p_broker_task_{request_number}");
+        let text = "合成試験Taskが完了しました";
+        let started_item = json!({
+            "type":"message",
+            "role":"assistant",
+            "id":message_id,
+            "status":"in_progress",
+            "content":[]
+        });
+        let item = json!({
+            "type":"message",
+            "role":"assistant",
+            "id":message_id,
+            "status":"completed",
+            "content":[{"type":"output_text","text":text,"annotations":[],"logprobs":[]}]
+        });
+        events.push(event(
+            "response.output_item.added",
+            json!({
+                "type":"response.output_item.added",
+                "response_id":response_id,
+                "output_index":0,
+                "item":started_item
+            }),
+        ));
+        events.push(event(
+            "response.content_part.added",
+            json!({
+                "type":"response.content_part.added",
+                "response_id":response_id,
+                "item_id":message_id,
+                "output_index":0,
+                "content_index":0,
+                "part":{"type":"output_text","text":"","annotations":[],"logprobs":[]}
+            }),
+        ));
+        events.push(event(
+            "response.output_text.delta",
+            json!({
+                "type":"response.output_text.delta",
+                "response_id":response_id,
+                "item_id":message_id,
+                "output_index":0,
+                "content_index":0,
+                "delta":text,
+                "logprobs":[]
+            }),
+        ));
+        events.push(event(
+            "response.output_text.done",
+            json!({
+                "type":"response.output_text.done",
+                "response_id":response_id,
+                "item_id":message_id,
+                "output_index":0,
+                "content_index":0,
+                "text":text,
+                "logprobs":[]
+            }),
+        ));
+        events.push(event(
+            "response.content_part.done",
+            json!({
+                "type":"response.content_part.done",
+                "response_id":response_id,
+                "item_id":message_id,
+                "output_index":0,
+                "content_index":0,
+                "part":{"type":"output_text","text":text,"annotations":[],"logprobs":[]}
+            }),
+        ));
+        events.push(event(
+            "response.output_item.done",
+            json!({
+                "type":"response.output_item.done",
+                "response_id":response_id,
+                "output_index":0,
+                "item":item.clone()
+            }),
+        ));
+        events.push(completed_response_event(&response_id, item));
+    } else if active_tool_call_id.is_none() && tool_was_offered {
+        state.tool_offered.store(true, Ordering::SeqCst);
+        let call_number = state.tool_call_count.fetch_add(1, Ordering::SeqCst) + 1;
+        let call_id = format!("call_d4p_broker_task_{call_number}");
+        let item_id = format!("fc_d4p_broker_task_{call_number}");
+        *state
+            .active_tool_call_id
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(call_id.clone());
         let arguments = json!({
             "cmd": state
                 .command
@@ -394,50 +653,83 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
             "shell": "powershell.exe",
             "yield_time_ms": 30000
         });
-        let item = json!({
+        let started_item = json!({
             "type":"function_call",
+            "id":item_id,
             "call_id":call_id,
             "name":"exec_command",
+            "status":"in_progress",
+            "arguments":""
+        });
+        let item = json!({
+            "type":"function_call",
+            "id":item_id,
+            "call_id":call_id,
+            "name":"exec_command",
+            "status":"completed",
             "arguments":arguments.to_string()
         });
         events.push(event(
+            "response.output_item.added",
+            json!({
+                "type":"response.output_item.added",
+                "response_id":response_id,
+                "output_index":0,
+                "item":started_item
+            }),
+        ));
+        events.push(event(
+            "response.function_call_arguments.delta",
+            json!({
+                "type":"response.function_call_arguments.delta",
+                "response_id":response_id,
+                "item_id":item_id,
+                "output_index":0,
+                "delta":arguments.to_string()
+            }),
+        ));
+        events.push(event(
+            "response.function_call_arguments.done",
+            json!({
+                "type":"response.function_call_arguments.done",
+                "response_id":response_id,
+                "item_id":item_id,
+                "output_index":0,
+                "arguments":arguments.to_string()
+            }),
+        ));
+        events.push(event(
             "response.output_item.done",
-            json!({"type":"response.output_item.done","item":item.clone()}),
+            json!({
+                "type":"response.output_item.done",
+                "response_id":response_id,
+                "output_index":0,
+                "item":item.clone()
+            }),
         ));
         state.tool_call_sent.store(true, Ordering::SeqCst);
-        events.push(event(
-            "response.completed",
-            json!({
-                "type":"response.completed",
-                "response":{
-                    "id":response_id,
-                    "usage":{"input_tokens":1,"input_tokens_details":null,"output_tokens":1,"output_tokens_details":null,"total_tokens":2}
-                }
-            }),
-        ));
+        events.push(completed_response_event(&response_id, item));
     } else {
-        let message_id = format!("d4p-broker-task-message-{request_number}");
-        let text = "合成試験Taskが完了しました";
-        let item = json!({
-            "type":"message",
-            "role":"assistant",
-            "id":message_id,
-            "content":[{"type":"output_text","text":text,"annotations":[]}]
-        });
-        events.push(event(
-            "response.output_item.done",
-            json!({"type":"response.output_item.done","item":item.clone()}),
-        ));
-        events.push(event(
-            "response.completed",
-            json!({
-                "type":"response.completed",
-                "response":{
-                    "id":response_id,
-                    "usage":{"input_tokens":1,"input_tokens_details":null,"output_tokens":1,"output_tokens_details":null,"total_tokens":2}
-                }
-            }),
-        ));
+        state
+            .repeated_tool_call_rejections
+            .fetch_add(1, Ordering::SeqCst);
+        if respond(
+            &mut stream,
+            409,
+            "text/plain",
+            b"synthetic tool result missing expected Workspace marker",
+        )
+        .is_err()
+        {
+            state.response_write_failures.fetch_add(1, Ordering::SeqCst);
+        }
+        return;
+    }
+    for (sequence_number, event) in events.iter_mut().enumerate() {
+        event
+            .as_object_mut()
+            .expect("Responses eventはobject")
+            .insert("sequence_number".to_owned(), json!(sequence_number));
     }
     let payload = events
         .into_iter()
@@ -458,6 +750,141 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         Err(_) => {
             state.response_write_failures.fetch_add(1, Ordering::SeqCst);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn post(server: &CodexLoopbackResponses, request: &Value) -> Vec<u8> {
+        let port = server.port();
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("loopback偽APIへ接続");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("応答期限を設定");
+        let body = request.to_string();
+        write!(
+            stream,
+            "POST /v1/responses HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .expect("合成Responses要求を送信");
+        let mut response = Vec::new();
+        let mut chunk = [0; 4096];
+        loop {
+            let size = match stream.read(&mut chunk) {
+                Ok(size) => size,
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {
+                    let header_end = response
+                        .windows(4)
+                        .position(|part| part == b"\r\n\r\n")
+                        .expect("ConnectionReset前にHTTP応答headerが届く");
+                    let header = String::from_utf8_lossy(&response[..header_end]);
+                    let content_length = header
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().ok())
+                                .flatten()
+                        })
+                        .expect("HTTP応答にContent-Lengthがある");
+                    assert!(
+                        response.len() >= header_end + 4 + content_length,
+                        "ConnectionResetでHTTP応答が途中切断: status={:?}; received={}; expected={}",
+                        header.lines().next(),
+                        response.len().saturating_sub(header_end + 4),
+                        content_length
+                    );
+                    return response;
+                }
+                Err(error) => panic!(
+                    "合成Responses応答を読む: {error}; accepted={}; incomplete=({}); posts={}; response_writes=({})",
+                    server.accepted_connections(),
+                    server.incomplete_request_summary(),
+                    server.post_requests(),
+                    server.response_write_summary(),
+                ),
+            };
+            if size == 0 {
+                return response;
+            }
+            response.extend_from_slice(&chunk[..size]);
+            let Some(header_end) = response.windows(4).position(|part| part == b"\r\n\r\n") else {
+                continue;
+            };
+            let header = String::from_utf8_lossy(&response[..header_end]);
+            let content_length = header.lines().find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().ok())
+                    .flatten()
+            });
+            if let Some(content_length) = content_length {
+                if response.len() >= header_end + 4 + content_length {
+                    return response;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn failed_tool_result_is_not_replayed_as_another_exec_command() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("時刻を取得")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "gui-shell-r2-fake-api-repeat-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&workspace).expect("専用Workspaceを作成");
+        let server = CodexLoopbackResponses::start(&workspace).expect("fake APIを開始");
+
+        let first = post(
+            &server,
+            &json!({
+                "tools":[{"type":"function","name":"exec_command"}],
+                "input":[]
+            }),
+        );
+        let first = String::from_utf8(first).expect("HTTP応答はUTF-8");
+        assert!(
+            first.starts_with("HTTP/1.0 200 OK"),
+            "{first}; accepted={}; incomplete=({}); posts={}; invalid={}",
+            server.accepted_connections(),
+            server.incomplete_request_summary(),
+            server.post_requests(),
+            server.invalid_post_bodies()
+        );
+        assert!(first.contains("function_call"), "{first}");
+
+        let second = post(
+            &server,
+            &json!({
+                "input":[{
+                    "type":"function_call_output",
+                    "call_id":"call_d4p_broker_task_1",
+                    "output":"synthetic command failed"
+                }]
+            }),
+        );
+        let second = String::from_utf8(second).expect("HTTP応答はUTF-8");
+        assert!(second.starts_with("HTTP/1.0 409 Conflict"), "{second}");
+        assert!(
+            !second.contains("function_call"),
+            "同じtoolを再送しない: {second}"
+        );
+        assert!(server.tool_call_was_sent());
+        assert!(server.tool_result_was_received());
+        assert_eq!(server.repeated_tool_call_rejections(), 1);
+        assert_eq!(server.post_requests(), 2);
+
+        drop(server);
+        std::fs::remove_dir_all(workspace).expect("test専用Workspaceを削除");
     }
 }
 
@@ -505,6 +932,69 @@ fn event(_event_type: &str, payload: Value) -> Value {
     payload
 }
 
+fn completed_response_event(response_id: &str, output_item: Value) -> Value {
+    response_lifecycle_event(
+        "response.completed",
+        response_id,
+        "completed",
+        json!([output_item]),
+    )
+}
+
+fn response_lifecycle_event(
+    event_type: &str,
+    response_id: &str,
+    status: &str,
+    output: Value,
+) -> Value {
+    let completed = status == "completed";
+    let completed_at = if completed { json!(1) } else { Value::Null };
+    let usage = if completed {
+        json!({
+            "input_tokens":1,
+            "input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},
+            "output_tokens":1,
+            "output_tokens_details":{"reasoning_tokens":0},
+            "total_tokens":2
+        })
+    } else {
+        Value::Null
+    };
+    json!({
+        "type":event_type,
+        "response":{
+            "id":response_id,
+            "object":"response",
+            "access_programs":null,
+            "created_at":0,
+            "status":status,
+            "completed_at":completed_at,
+            "background":false,
+            "error":null,
+            "incomplete_details":null,
+            "instructions":null,
+            "max_output_tokens":null,
+            "max_tool_calls":null,
+            "model":"o3",
+            "output":output,
+            "parallel_tool_calls":true,
+            "previous_response_id":null,
+            "reasoning":{"effort":null,"summary":null},
+            "service_tier":"default",
+            "store":true,
+            "temperature":1.0,
+            "text":{"format":{"type":"text"}},
+            "tool_choice":"auto",
+            "tools":[],
+            "top_p":1.0,
+            "truncation":"disabled",
+            "usage":usage,
+            "user":null,
+            "metadata":{}
+        }
+    })
+}
+
 enum BlockedRequest {
     NonLocal,
     UnhandledLocal,
@@ -549,6 +1039,7 @@ fn respond(
         200 => "OK",
         400 => "Bad Request",
         403 => "Forbidden",
+        409 => "Conflict",
         413 => "Payload Too Large",
         _ => "Error",
     };
@@ -558,5 +1049,25 @@ fn respond(
     );
     stream.write_all(headers.as_bytes())?;
     stream.write_all(body)?;
-    stream.flush()
+    stream.flush()?;
+    let _ = stream.shutdown(Shutdown::Write);
+    let mut trailing = [0; 1024];
+    loop {
+        match stream.read(&mut trailing) {
+            Ok(0) => break,
+            Ok(_) => continue,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::WouldBlock
+                ) =>
+            {
+                break;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
 }

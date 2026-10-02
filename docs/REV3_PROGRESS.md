@@ -1792,3 +1792,23 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 判定
 
 - run7はUI→Broker→実CLI／MxC→tool送信までの`LIVE_RUNTIME`経路を示すが、Taskは失敗しpositive結果ではない。128回の再送は偽Responses API fixtureの無制限再提示を示す一方、最初のPowerShell toolがreportを書けなかった根本原因は未確定である。次はfixtureを一回限り・fail-fastにし、Workspace reportをTEMP操作より先に記録して原因を特定する。R2 `release_blocker`、通常Releaseの`task_execution=unsupported`、`release_ready=false`を維持する。
+
+## R2追補 偽Responses API再送停止とMxC TEMP probe安定化（2026-10-02）
+
+- run7後のfixture修正では、Responses APIのSSEを`response.created`／`response.in_progress`／sequence number付きの正式なresponse lifecycleへ合わせ、function call item／call IDと`function_call_output.call_id`を厳密に結合した。結果を受け取れない同一tool callは再提示せずHTTP 409でfail-fastし、要求形状はitem種別数だけを記録して本文・commandを残さない。正常応答はHTTP/1.1の明示的close／half-closeで送信し、Windows loopbackの応答直後RSTを避ける。
+- ignored Rust統合試験は実Codex CLI `0.159.2`を起動し、loopback偽Responses API、in-process Broker／Owner／Audit fixture、合成NTFS Workspaceを通した。正常完了とBroker取消の両TaskでMxC TEMP書込・限定scopeを確認し、child終了後に合成markerとTEMP directoryが不在、外部要求が0となることを確認した。これはproduction Broker IPCやdurable product Auditではない。
+- TEMP probeは最初にstage=`temp_checked`の確定reportを待ち、TEMP／TMPがBroker Workspace scratchまたはMxC AppContainerの`...\\sandbox.{GUID}\\AC\\Temp`に一致しなければ書込み前に停止する。取消probeも同じ二つの許可scope以外へ書かない。
+
+### 検証と失敗履歴
+
+- `cargo +1.95.0 test --locked failed_tool_result_is_not_replayed_as_another_exec_command -- --nocapture --test-threads=1`: 成功、1 passed。初回2回はWindows loopback WSA 10054で失敗し、半閉鎖を追加する前のserver shutdownではHTTP body受信前のRSTも観測した。成功応答後のwrite-half shutdownとpeer drainを追加してfocused retryを通した。
+- `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`にCodex CLI `0.159.2`を指定した`r2-e2e` ignored統合試験: 成功、1 passed。修正前のfixtureでは同tool call再提示、function output重複、Responses stream切断が複数回発生した。正規SSE lifecycle／sequence number／full completed response導入後に3回連続成功し、half-close後の最終再実行も正常完了と取消を通した。
+- `cargo +1.95.0 test --locked --all-targets -- --test-threads=1`: 成功、446 passed／0 failed／7 ignored。直前の全target試行では既存MINIDORA loopback試験が一度失敗してfocused retryは成功した一方、test server shutdown時のRSTでfixture unit試験が失敗した。これらの失敗は保持し、最終全target再実行を採用した。
+- `rustfmt +1.95.0 --check`（変更Rust 3 file）および`git diff --check`: 成功。
+- 初回`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`はstrict日本語監査が一時領域診断、要求形状診断、HTTP wire responseの3箇所を検出して失敗した。診断ラベルを日本語化し、既存の機械形式例外に合うHTTP/1.0 wire形式へ限定変更した後、`python -X utf8 tooling/日本語基底監査.py --strict`は0 findingsで成功した。統合validatorは修正後に再実行する。
+- HTTP wire形式を1.0へ合わせた後の最初のfocused unit再試行は、試験fixtureのstatus-line期待値だけが1.1のままで失敗した。成功／409確認をHTTP/1.0へ揃えたため、test codeと実装の不一致を解消した状態で再実行する。
+- HTTP/1.0 wire変更後のfocused unitは1 passed。続く直列全target実行ではfixture loopback unitと既存update package TLS loopback testがWSA 10054で各1回失敗し、原因は確定していない。fixture unit focused retryは成功し、再度の直列全target実行は446 passed／0 failed／7 ignored。最初のHTTP/1.1 response期待値不一致と先行loopback resetも失敗履歴として残す。
+
+### 維持する境界
+
+- このblockはRust test fixture／ignored integration testだけの修正で、production implementation、Flutter、通常Release capabilityを変更していない。実installed productのOwner／Permission／ApprovalからTask成功、file-backed positive Audit chainの独立検証、Cloud Filesと通常NTFSの隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持し、次はこのcommitからfresh installed runを行う。

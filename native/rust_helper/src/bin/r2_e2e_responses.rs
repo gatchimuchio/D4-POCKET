@@ -38,6 +38,8 @@ fn main() -> ExitCode {
         "models": server.model_list_requests(),
         "tool_offered": server.tool_was_offered(),
         "tool_call_sent": server.tool_call_was_sent(),
+        "tool_result_received": server.tool_result_was_received(),
+        "repeated_tool_call_rejections": server.repeated_tool_call_rejections(),
         "invalid_bodies": server.invalid_post_bodies(),
         "response_write_failures": server.response_write_failures(),
         "incomplete_requests": server.incomplete_request_count(),
@@ -46,9 +48,11 @@ fn main() -> ExitCode {
     });
     drop(server);
     println!("EVIDENCE {evidence}");
-    if evidence["requests"].as_u64().unwrap_or_default() < 2
+    if evidence["requests"].as_u64().unwrap_or_default() != 2
         || evidence["tool_offered"] != true
         || evidence["tool_call_sent"] != true
+        || evidence["tool_result_received"] != true
+        || evidence["repeated_tool_call_rejections"] != 0
         || evidence["invalid_bodies"] != 0
         || evidence["response_write_failures"] != 0
         || evidence["incomplete_requests"] != 0
