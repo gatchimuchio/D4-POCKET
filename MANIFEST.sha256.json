@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "5adc2d6a2237655a24256e0873868ae8c8b9ab9c7171f926c45af0b7631df8ae"
+      "sha256": "dc4ffaea5e086ebc0feb44ec14b303edfc2e3604e6e01f53c4e9b977e03aefa5"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3024,7 +3024,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "8d4a4dfe7602a0e2ef575214a13830be02e1666d5be3f3c772842628ade3eaf7"
+      "sha256": "3d7fe1fe2265f1864329d477ad1c9b91213ad0e71294e07796ab18dfffdb2910"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",

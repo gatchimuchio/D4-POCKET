@@ -1836,3 +1836,24 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 
 - 安全な出力分類は診断専用であり、run17の失敗根本原因は未確定。次に指定基準`c306548`のsourceからfresh installed buildを作り、diagnostic summaryを使ってtool実行の失敗段階を切り分ける。
 - このfixture追加はtest-onlyで、通常ReleaseのCodex Task能力を有効化しない。正のproduction Broker E2E、restart後のAudit anchor HMAC検証、OneDrive Cloud Files／通常NTFS隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 fresh installed run18の登録拒否原因と試験home検査順修正（2026-10-02）
+
+### run18の観測と失敗履歴
+
+- source commit `f71b7b9a9ba848f33c78a8381e9af2d4fbd7bd25`からFlutter Windows Releaseと`r2-e2e` Rust launcher／Broker／loopback偽APIをbuildし、run固有の新規installed layoutへstageした。実Flutter Agent CenterとWin32 native Owner確認dialogで、合成WorkspaceとCodex CLI `0.159.2`の登録を開始し、Owner確認はYesで確定した。
+- installed run18 Auditでは登録要求`broker-audit-46`がreceived、interface検査後の登録`broker-audit-47`と集約拒否`broker-audit-48`がrejectedだった。UIには「Owner確認後のAgent CLI interface検査に失敗」と表示された。Runtime／Workspace登録は成立せず、Workspace Permission、Task Approval、Task、model／tool要求、Workspace writeは発生していない。native確認は登録要求だけで、Task権限を与えたものではない。
+- 隔離run18のloopback偽Responses APIは停止時に要求0、tool提示／送信なし、tool結果なし、Workspace markerなしを返した。安全な同一環境probeでは`--version`成功、`exec --help`成功、必要な8 interface tokenをすべて確認した。実Codex CLI probe後に試験用`CODEX_HOME`へ`tmp` directoryが生成されていた。
+- 根本原因は、CLI version/help probeがCODEX_HOMEを初期化した後に、登録経路が「試験用CODEX_HOMEは空」と検査して自ら拒否する順序だった。TaskやAuthorityの拒否ではなく、試験初期状態検査と実CLI probeの副作用が衝突していた。
+
+### 修正と検証
+
+- `native/rust_helper/src/adapters/codex_cli.rs`で、`r2-e2e`に限りloopback／空CODEX_HOME検査をCLI probeより前へ移動した。通常buildとdefault feature、production Task capabilityは変更していない。probeは引き続き隔離run専用CODEX_HOMEだけを継承し、利用者の通常Credential／homeを使わない。
+- `cargo +1.95.0 test --locked --offline --all-targets --features r2-e2e -- --test-threads=1`: 初回は既存`broker::update_download::tests::failed_replacement_keeps_the_existing_corrupt_package_unchanged`がWindows localhost接続reset WSA 10054で失敗。該当testの単独再実行は1 passed。全target再実行は449 passed、0 failed、7 ignored。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: schema 152、example 152、negative fixture 196で成功。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 231 checks成功。
+- 変更前の`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`は作業中sourceのmanifest hash不一致でmanifest／release gate／packaging checkが失敗した。`python -X utf8 tooling/manifest.py --write`後の同validator再実行はexit 0で全検査項目が成功した。厳格日本語監査も0 findingsで成功。開発validator成功は製品完成を意味せず、既存release blocker 31件、`release_ready=false`は維持する。
+- run18の失敗Auditと隔離状態は失敗履歴として保持し、アプリと偽APIは停止した。`audit_anchor.key`は読んでいない。Audit chain／anchor HMAC／再起動後耐久性はこのrunでは独立検証していない。
+
+### 維持する境界
+
+- 上記修正commitからのfresh installed再試行、登録後のPermission／Approval／positive Task、Workspace marker／result／diff、durable Auditと再起動後のchain／HMAC検証は未実行であり、本節時点では成立していない。OneDrive Cloud Files／通常NTFSの隔離matrix、failure／deadline／crash Recovery、MxC TEMP cleanup、result／diff Content Exposure、通常ReleaseのTask能力も未完了。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。

@@ -126,6 +126,11 @@ impl CodexCliAdapter {
             return Err("Codexのworkspaceがsecret pathに該当する".into());
         }
 
+        // CLIのversion/help probe自身がCODEX_HOMEへ一時directoryを作る版がある。
+        // 試験用homeの空状態はprobeより先に検証し、実利用者homeには触れない。
+        #[cfg(all(feature = "r2-e2e", not(test)))]
+        let test_responses_api = loopback_responses_from_environment()?;
+
         let version = run_probe(&executable, &workspace, &["--version"])?;
         let version_output = String::from_utf8_lossy(&version.stdout);
         if !version.success || !version_output.contains("codex-cli") {
@@ -137,8 +142,6 @@ impl CodexCliAdapter {
         }
         let workspace_write_interface = workspace_write_interface_present(&help.stdout);
 
-        #[cfg(all(feature = "r2-e2e", not(test)))]
-        let test_responses_api = loopback_responses_from_environment()?;
         #[cfg(test)]
         let test_responses_api: Option<CodexCliTestResponses> = None;
 
