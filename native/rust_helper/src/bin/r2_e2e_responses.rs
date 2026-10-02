@@ -39,6 +39,7 @@ fn main() -> ExitCode {
         "tool_offered": server.tool_was_offered(),
         "tool_call_sent": server.tool_call_was_sent(),
         "tool_result_received": server.tool_result_was_received(),
+        "tool_output_diagnostics": server.tool_output_diagnostics(),
         "repeated_tool_call_rejections": server.repeated_tool_call_rejections(),
         "invalid_bodies": server.invalid_post_bodies(),
         "response_write_failures": server.response_write_failures(),

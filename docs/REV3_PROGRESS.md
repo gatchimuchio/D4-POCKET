@@ -1812,3 +1812,27 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 ### 維持する境界
 
 - このblockはRust test fixture／ignored integration testだけの修正で、production implementation、Flutter、通常Release capabilityを変更していない。実installed productのOwner／Permission／ApprovalからTask成功、file-backed positive Audit chainの独立検証、Cloud Filesと通常NTFSの隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持し、次はこのcommitからfresh installed runを行う。
+
+## R2追補 fresh installed run16／run17のTask失敗と安全なtool出力診断（2026-10-02）
+
+### 失敗履歴・観測
+
+- run16／run17は、当時の作業branch `codex/r2-inspector-owner-confirmation-20261002`のsource commit `fca1d0c9d83f03108ebaaf64ea742ca38079b4fc`からstageした試験buildであり、指定基準HEAD `c306548e559d069fafd7dfb20088882521b04bb1`そのものではない。後続の診断buildは基準HEADへ戻した`main`で作成する。
+- fresh install run16では、合成fixture、native Owner確認、Session／Workspace結合、Task preflightまで進んだ。UIに残った古いsnapshotからの遅延操作によりPermission確認のissued-at期限が切れ、Brokerは`broker_issued_at_invalid`として拒否した。Task、偽API要求、tool実行、Workspace変更は発生せず、当該失敗Auditを保持した。
+- fresh install run17では、native Owner登録、Session／Workspace結合、preflight、Workspace Permission、別個のTask Owner Approval、Task開始までをinstalled UI→Rust Brokerで実行した。Task開始Audit参照は`broker-audit-43/44`、終了状態は`failed`・Audit参照`broker-audit-53`である。Task結果／diffはBrokerから未取得であり、成功とは扱わない。
+- run17のloopback偽Responses APIは4 POSTを受け、tool offer／call／function output受領が各成立した。Workspace完了markerがないためAPIが409を返し、同一結果を含む後続requestが3回観測された。これはtoolを3回再実行した証拠ではなく、API応答後のrequest再試行である。外部要求、不正body、途中request、応答書込み失敗は0件。TEMP reportとWorkspace完了markerはいずれも存在しない。
+- run17 Broker Audit JSONLは終了後101件。Rust `BrokerAuditEvent`の連結hash規則を独立再計算し、event ID一意性、全previous hash、全event hash、anchorの件数とhead一致を確認した。anchor HMACは鍵を読まず未検証であり、Broker再起動後の復元検証を示すものではない。Audit本文へTask instruction／credential値は追加保存していない。
+- run17のscratch recovery journalは0件、Workspace内には登録済みの空synthetic secret fixtureだけが残り、Workspace外書込みmarkerとTEMP内容はない。偽API、run17のlauncher／frontend processは停止した。強制停止で残った隔離run専用`broker_session.json`と空launcher lockは保持Auditとは分離された一時状態であり、直接削除はホスト実行ポリシーに拒否されたため、後続の管理されたlauncher cleanup経路で処理する。一般ユーザーのLOCALAPPDATAや資格情報には触れていない。
+
+### 診断fixture変更・検証
+
+- 偽APIが受け取った`function_call_output`本文を保存しないまま、出力形式・byte数・固定済み失敗分類・合成開始marker有無だけを返す診断を追加した。固定分類はHostFxr起動失敗、shell解決失敗、sandboxアクセス拒否、期限超過、その他error、出力なし／error兆候なしに限る。要求本文、stdout／stderr、path、secretは診断値へ含めない。PowerShell probeの先頭へ固定合成開始markerを追加した。
+- `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses tool_output_diagnostic_records_only_bounded_safe_classification -- --nocapture --test-threads=1`: 1 passed。synthetic secretとlocal pathを含む入力が診断出力へ漏れないnegative testを含む。
+- `GUI_SHELL_CODEX_TASK_BROKER_TEST_EXE`へCodex CLI `0.159.2`を指定したignored Rust integration test: 1 passed。実CLI／MxC childのTEMP marker消失、Broker scratchとの分離、取消後cleanup、外部要求0を再確認した。これはin-process Broker／test fixtureであり、installed production Broker E2Eではない。
+- `cargo +1.95.0 check --locked --offline --manifest-path native/rust_helper/Cargo.toml --features r2-e2e --bin gui_shell_r2_e2e_responses`: 成功。変更Rust fileの`rustfmt +1.95.0 --edition 2021 --config skip_children=true --check`と`git diff --check`も成功。
+- 初回focused試験呼出しはbinary target名、feature指定、exact test名の不一致で実行前に拒否または0件となった。正しい`gui_shell_r2_e2e_responses` targetと`r2-e2e` featureを指定した後に1件実行し成功した。Rust source／production path failureへ読み替えない。
+
+### 次の検証と維持する境界
+
+- 安全な出力分類は診断専用であり、run17の失敗根本原因は未確定。次に指定基準`c306548`のsourceからfresh installed buildを作り、diagnostic summaryを使ってtool実行の失敗段階を切り分ける。
+- このfixture追加はtest-onlyで、通常ReleaseのCodex Task能力を有効化しない。正のproduction Broker E2E、restart後のAudit anchor HMAC検証、OneDrive Cloud Files／通常NTFS隔離matrix、failure／deadline／crash Recovery、result／diff Content Exposureは未成立。`task_execution=unsupported`、R2 production E2E `release_blocker`、`release_ready=false`を維持する。

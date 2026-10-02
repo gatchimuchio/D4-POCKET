@@ -30,6 +30,7 @@ struct State {
     tool_output_items_seen: AtomicUsize,
     tool_output_missing_call_id: AtomicUsize,
     tool_output_id_mismatches: AtomicUsize,
+    tool_output_diagnostics: Mutex<Vec<Value>>,
     request_shapes: Mutex<Vec<String>>,
     repeated_tool_call_rejections: AtomicUsize,
     tool_call_count: AtomicUsize,
@@ -78,6 +79,7 @@ impl CodexLoopbackResponses {
             tool_output_items_seen: AtomicUsize::new(0),
             tool_output_missing_call_id: AtomicUsize::new(0),
             tool_output_id_mismatches: AtomicUsize::new(0),
+            tool_output_diagnostics: Mutex::new(Vec::new()),
             request_shapes: Mutex::new(Vec::new()),
             repeated_tool_call_rejections: AtomicUsize::new(0),
             tool_call_count: AtomicUsize::new(0),
@@ -154,6 +156,11 @@ impl CodexLoopbackResponses {
         self.state
             .tool_output_id_mismatches
             .store(0, Ordering::SeqCst);
+        self.state
+            .tool_output_diagnostics
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
         self.state
             .request_shapes
             .lock()
@@ -247,6 +254,14 @@ impl CodexLoopbackResponses {
         )
     }
 
+    pub(super) fn tool_output_diagnostics(&self) -> Vec<Value> {
+        self.state
+            .tool_output_diagnostics
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
     pub(super) fn request_shape_summary(&self) -> String {
         format!(
             "{:?}",
@@ -303,6 +318,7 @@ impl Drop for CodexLoopbackResponses {
 fn synthetic_workspace_probe() -> String {
     concat!(
         "$ErrorActionPreference='Stop'; ",
+        "Write-Output 'D4P_R2_SYNTHETIC_PROBE_STARTED'; ",
         "$workspace=(Get-Location).Path; ",
         "$tempReport=Join-Path $workspace 'broker-real-codex-temp-report.json'; ",
         "$tempMarkerName='d4p-broker-temp-observer-'+[IO.Path]::GetFileName($workspace)+'.marker'; ",
@@ -329,6 +345,106 @@ fn synthetic_workspace_probe() -> String {
         "[IO.File]::WriteAllText((Join-Path $workspace 'broker-real-codex-marker.txt'),'synthetic-task-write'); exit 0"
     )
     .to_owned()
+}
+
+fn collect_output_text(value: &Value, depth: usize, output: &mut String) {
+    if depth > 8 || output.len() >= MAX_REQUEST_BYTES {
+        return;
+    }
+    match value {
+        Value::String(text) => {
+            let remaining = MAX_REQUEST_BYTES.saturating_sub(output.len());
+            let end = text
+                .char_indices()
+                .map(|(index, character)| index + character.len_utf8())
+                .take_while(|end| *end <= remaining)
+                .last()
+                .unwrap_or_default();
+            output.push_str(&text[..end]);
+            output.push('\n');
+        }
+        Value::Object(object) => {
+            for key in [
+                "error",
+                "message",
+                "stdout",
+                "stderr",
+                "output",
+                "status",
+                "exit_code",
+                "exitCode",
+            ] {
+                if let Some(value) = object.get(key) {
+                    collect_output_text(value, depth + 1, output);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items.iter().take(32) {
+                collect_output_text(item, depth + 1, output);
+            }
+        }
+        Value::Number(number) => {
+            output.push_str(&number.to_string());
+            output.push('\n');
+        }
+        Value::Null | Value::Bool(_) => {}
+    }
+}
+
+fn safe_tool_output_diagnostic(output: &Value) -> Value {
+    let output_type = match output {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    };
+    let output_bytes = output
+        .as_str()
+        .map(str::len)
+        .unwrap_or_else(|| output.to_string().len());
+    let parsed_string = output
+        .as_str()
+        .and_then(|text| serde_json::from_str::<Value>(text).ok());
+    let mut diagnostic_text = String::new();
+    if let Some(parsed) = parsed_string.as_ref() {
+        collect_output_text(parsed, 0, &mut diagnostic_text);
+    } else {
+        collect_output_text(output, 0, &mut diagnostic_text);
+    }
+    let normalized = diagnostic_text.to_ascii_lowercase();
+    let error_category = if normalized.contains("0x80008085") || normalized.contains("-2147450747")
+    {
+        "hostfxr起動失敗"
+    } else if normalized.contains("commandnotfoundexception")
+        || (normalized.contains("powershell")
+            && (normalized.contains("not recognized")
+                || normalized.contains("not found")
+                || normalized.contains("could not find")))
+    {
+        "shell解決失敗"
+    } else if normalized.contains("unauthorizedaccessexception")
+        || normalized.contains("access is denied")
+        || normalized.contains("permission denied")
+    {
+        "sandboxアクセス拒否"
+    } else if normalized.contains("timed out") || normalized.contains("timeout") {
+        "実行期限超過"
+    } else if normalized.contains("error") || normalized.contains("exception") {
+        "その他エラー"
+    } else if output.is_null() || output.as_str().is_some_and(str::is_empty) {
+        "出力なし"
+    } else {
+        "error兆候なし"
+    };
+    json!({
+        "output_type": output_type,
+        "output_bytes": output_bytes,
+        "error_category": error_category,
+        "probe_started": diagnostic_text.contains("D4P_R2_SYNTHETIC_PROBE_STARTED"),
+    })
 }
 
 fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
@@ -526,6 +642,22 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
         });
     if tool_result_received {
         state.tool_result_received.store(true, Ordering::SeqCst);
+        if let Some(expected_call_id) = active_tool_call_id.as_deref() {
+            if let Some(item) = output_items
+                .iter()
+                .find(|item| item.get("call_id").and_then(Value::as_str) == Some(expected_call_id))
+            {
+                let mut diagnostics = state
+                    .tool_output_diagnostics
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if diagnostics.is_empty() {
+                    diagnostics.push(safe_tool_output_diagnostic(
+                        item.get("output").unwrap_or(&Value::Null),
+                    ));
+                }
+            }
+        }
     }
     let response_id = format!("resp_d4p_broker_task_{request_number}");
     let mut events = vec![
@@ -885,6 +1017,27 @@ mod tests {
 
         drop(server);
         std::fs::remove_dir_all(workspace).expect("test専用Workspaceを削除");
+    }
+
+    #[test]
+    fn tool_output_diagnostic_records_only_bounded_safe_classification() {
+        let private_output = "D4P_R2_SYNTHETIC_PROBE_STARTED UnauthorizedAccessException synthetic-secret-content C:\\Users\\example\\private.txt";
+        let diagnostic = safe_tool_output_diagnostic(&json!(private_output));
+        assert_eq!(diagnostic["error_category"], "sandboxアクセス拒否");
+        assert_eq!(diagnostic["probe_started"], true);
+        assert_eq!(diagnostic["output_type"], "string");
+        assert!(!diagnostic.to_string().contains("synthetic-secret-content"));
+        assert!(!diagnostic.to_string().contains("C:\\\\Users"));
+        assert!(!diagnostic.to_string().contains("private.txt"));
+
+        let launch_failure = safe_tool_output_diagnostic(&json!({
+            "stderr": "PowerShell host failed: 0x80008085",
+            "exit_code": -2147450747,
+        }));
+        assert_eq!(launch_failure["error_category"], "hostfxr起動失敗");
+        assert!(!launch_failure
+            .to_string()
+            .contains("PowerShell host failed"));
     }
 }
 
