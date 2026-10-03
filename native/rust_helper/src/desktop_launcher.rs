@@ -857,6 +857,7 @@ fn prepare_session_paths(session_file: &Path) -> Result<(), DesktopLaunchError> 
 fn acquire_instance_lock(runtime_dir: &Path) -> Result<File, DesktopLaunchError> {
     let lock_path = runtime_dir.join("desktop_launcher.lock");
     reject_reparse_file(&lock_path)?;
+    // 安定したlock fileを残す。handle終了でOS lockは解放され、file再作成による別inodeの競合を避ける。
     let file = OpenOptions::new()
         .create(true)
         .read(true)
@@ -2953,6 +2954,48 @@ mod tests {
     }
 
     #[test]
+    fn launcher_recovery_removes_stale_endpoint_and_partial_file_but_keeps_audit() {
+        let root = test_root("startup-session-recovery");
+        let session_file = root.join(SESSION_FILE);
+        let temporary_file = session_file.with_extension("json.tmp");
+        let audit_file = root.join("store").join("audit.jsonl");
+        fs::create_dir_all(audit_file.parent().unwrap()).unwrap();
+        fs::write(&session_file, b"stale-synthetic-endpoint").unwrap();
+        fs::write(&temporary_file, b"partial-synthetic-endpoint").unwrap();
+        fs::write(&audit_file, b"durable-audit-marker").unwrap();
+
+        prepare_session_paths(&session_file).expect("起動時の古い接続file回収");
+
+        assert!(!session_file.exists(), "前回Brokerのendpointを回収する");
+        assert!(
+            !temporary_file.exists(),
+            "不完全なendpoint一時fileを回収する"
+        );
+        assert_eq!(
+            fs::read(&audit_file).unwrap(),
+            b"durable-audit-marker",
+            "永続Audit storeは起動時回収の対象外"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn launcher_recovery_rejects_invalid_stale_endpoint_without_deleting_it() {
+        let root = test_root("startup-session-invalid");
+        let session_file = root.join(SESSION_FILE);
+        let temporary_file = session_file.with_extension("json.tmp");
+        fs::create_dir(&session_file).unwrap();
+        fs::write(&temporary_file, b"partial-synthetic-endpoint").unwrap();
+
+        let error = prepare_session_paths(&session_file).unwrap_err();
+
+        assert_eq!(error.code, "SESSION_FILE_INVALID");
+        assert!(session_file.is_dir(), "不正なpathを削除しない");
+        assert!(temporary_file.is_file(), "拒否後に別fileを掃除しない");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn desktop_channel_relay_reuses_normal_broker_auth_and_audited_rejections() {
         let root = test_root("desktop-channel-relay");
         let session_file = root.join(SESSION_FILE);
@@ -4227,18 +4270,26 @@ mod tests {
     }
 
     #[test]
-    fn runtime_state_is_separate_from_installation_and_lock_prevents_duplicate_launch() {
+    fn launcher_recovery_keeps_runtime_state_separate_and_reuses_lock_anchor() {
         let root = fs::canonicalize(test_root("runtime")).unwrap();
         let runtime = runtime_directory_with_identity(&root, None).unwrap();
         assert!(runtime.starts_with(&root));
         assert!(runtime.ends_with(Path::new("GUI-Shell").join("broker").join("desktop")));
         let export_dir = ensure_export_directory(&runtime).unwrap();
         assert_eq!(export_dir, runtime.join(EXPORT_DIRECTORY_NAME));
+        let lock_path = runtime.join("desktop_launcher.lock");
         let first = acquire_instance_lock(&runtime).unwrap();
+        assert_eq!(fs::metadata(&lock_path).unwrap().len(), 0);
         let second = acquire_instance_lock(&runtime).unwrap_err();
         assert_eq!(second.code, "INSTANCE_ALREADY_RUNNING");
         drop(first);
-        assert!(acquire_instance_lock(&runtime).is_ok());
+        assert!(
+            lock_path.is_file(),
+            "lock anchor fileは安定したinodeとして残す"
+        );
+        assert_eq!(fs::metadata(&lock_path).unwrap().len(), 0);
+        let restarted = acquire_instance_lock(&runtime).unwrap();
+        drop(restarted);
         fs::remove_dir_all(root).unwrap();
     }
 

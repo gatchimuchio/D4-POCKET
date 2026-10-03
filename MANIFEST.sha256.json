@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "5584fdf41d05dc1728f981ec6a967b02507926d1fda98881c4f8cadf5ebe59bb"
+      "sha256": "7eacf3bd38b4467198f3a454691d41b478d25997a8390db4d2b4fd9aff9f919a"
     },
     {
       "path": "SECURITY.md",
@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "74d488b8a1220f9adc23df25090b946f86fb6a8cbbcbeb2b7f04e83b502c4206"
+      "sha256": "417cee1b97f44f3be1a214eca56b55d49c7f6a919504974cd6461eebe4b22f69"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3236,7 +3236,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "c21721278bcd4c4ce00fc482054417db2ff54fd028bfaad80bebe29131349996"
+      "sha256": "880d1fc3e2732c66cc54da9c1c6c6a18d258886f7901d2fc8e2dac1d35c57d2e"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3800,7 +3800,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "e5276f3b02015ef31140c78f4331df11ddfd32a1194e287f4988f4a02272f5a0"
+      "sha256": "41a079381e9997efc8f5a675d7dd103fa28d3dd0eee55c73d86ca3ae1cfded4c"
     },
     {
       "path": "requirements-dev.txt",

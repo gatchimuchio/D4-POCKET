@@ -1951,6 +1951,34 @@
         "os_protection_changed": false,
         "scope_limit": "This proves one synthetic production-path Task only in a staged r2-e2e feature build. It does not enable normal Release task_execution or prove external-provider interoperability, TEMP cleanup, active-Task deadline/crash Recovery, task-to-task isolation, result/diff Content Exposure, the OneDrive Cloud Files/ordinary NTFS integrated matrix, or graceful tray shutdown. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
+      "launcher_session_recovery_fixture": {
+        "date": "2026-10-04",
+        "source_base_commit": "9bbc74413e3b2fd06e3c19422aee245fa42eb4fd",
+        "source_worktree_clean": false,
+        "evidence_source": "FIXTURE",
+        "code_path": "run -> acquire_instance_lock -> RunningBroker::start -> prepare_session_paths",
+        "validation": {
+          "command": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib desktop_launcher::tests:: -- --test-threads=1",
+          "result": "28 passed, 0 failed, 4 ignored",
+          "endpoint_cleanup_regression": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib endpoint_cleanup_removes_only_the_original_bytes -- --test-threads=1: 1 passed",
+          "changed_file_rustfmt": "rustfmt +1.95.0 --check --edition 2021 --config skip_children=true native/rust_helper/src/desktop_launcher.rs: passed",
+          "whole_crate_rustfmt": "cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check: exit 1, 494 format-diff sections in other Rust sources; desktop_launcher.rs diff sections=0"
+        },
+        "observations": {
+          "stale_broker_session_endpoint_removed_before_new_broker": true,
+          "partial_endpoint_file_removed": true,
+          "durable_audit_store_preserved": true,
+          "invalid_session_path_rejected_without_deletion": true,
+          "adjacent_temporary_file_preserved_after_invalid_path_rejection": true,
+          "launcher_lock_anchor": {
+            "file_length_bytes": 0,
+            "persists_after_handle_drop": true,
+            "os_lock_can_be_reacquired": true,
+            "disposition": "Stable lock anchor; deleting/recreating it can permit separate processes to lock different file identities."
+          }
+        },
+        "scope_limit": "Rust unit fixtures only. They do not prove installed launcher crash/restart, runtime-profile provenance, actual run38 residual-file cleanup, graceful exit, or durable production Audit after recovery. Existing run38 artifacts were not touched. Keep the R2 release blocker active, task_execution=unsupported, and release_ready=false."
+      },
       "latest_installed_e2e_observation": {
         "date": "2026-10-04",
         "positive_task_run": "r2_installed_synthetic_task_e2e_run38",
