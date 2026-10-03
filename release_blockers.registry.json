@@ -1160,6 +1160,123 @@
         "os_protection_changed": false,
         "scope_limit": "LIVE_RUNTIME proves the staged UI/native Owner/production Broker path reached a real Codex/MxC Task that ended failed. It does not prove successful Workspace write, positive Task completion, successful TEMP write or cleanup, outside/secret read denial, failure Recovery semantics, Broker-restart verification of this Audit, result/diff exposure, normal Release task_execution, or provider interoperability. Keep task_execution=unsupported and the R2 release blocker unresolved."
       },
+      "r2_installed_synthetic_task_e2e_run31": {
+        "date": "2026-10-03",
+        "status": "cancelled_after_task_started",
+        "source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
+        "source_worktree_clean": true,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run31-9159b88",
+        "installed_manifest": {
+          "stage_run_id": "d4p-r2-run30-9159b88",
+          "app_sha256": "sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671",
+          "fake_responses_api_sha256": "sha256:b2924713cf72cecc8ab5eb2d555c534a53af8650026492320f19f08b55b2cdc2"
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempts": [
+          {
+            "task_id": "1e908929679bf19963495eebf5feb172",
+            "status": "failed",
+            "permission_audit_ref": "broker-audit-56",
+            "approval_audit_ref": "broker-audit-59",
+            "start_audit_ref": "broker-audit-62",
+            "terminal_audit_ref": "broker-audit-72",
+            "fake_api": {
+              "requests": 4,
+              "tool_offered": true,
+              "tool_call_sent": true,
+              "tool_result_received": true,
+              "repeated_tool_call_rejections": 3,
+              "invalid_bodies": 0,
+              "incomplete_requests": 0,
+              "response_write_failures": 0,
+              "blocked_external_requests": 0,
+              "workspace_marker_exists": false
+            }
+          },
+          {
+            "task_id": "0296907e42edae32637e87f1fa027926",
+            "status": "cancelled",
+            "permission_audit_ref": "broker-audit-86",
+            "approval_audit_ref": "broker-audit-89",
+            "start_audit_ref": "broker-audit-92",
+            "cancel_request_audit_ref": "broker-audit-100",
+            "terminal_audit_ref": "broker-audit-101",
+            "duplicate_cancel_audit_ref": "broker-audit-102",
+            "duplicate_cancel_decision": "rejected",
+            "assistant_ui_action": "A state-refresh click was likely mis-targeted as the Task stop control; this was an assistant operation error, not evidence of successful completion.",
+            "fake_api": {
+              "requests": 4,
+              "models": 0,
+              "tool_offered": true,
+              "tool_call_sent": true,
+              "tool_result_received": true,
+              "repeated_tool_call_rejections": 3,
+              "invalid_bodies": 0,
+              "incomplete_requests": 0,
+              "response_write_failures": 0,
+              "blocked_external_requests": 0,
+              "workspace_marker_exists": false
+            }
+          }
+        ],
+        "observations": {
+          "temp_diagnostic": {
+            "report_stage": "temp_checked",
+            "scope": "unrecognized",
+            "write": "failed",
+            "report_step": "temp_directory_check",
+            "bounded_api_output_step": "workspace_detected",
+            "interpretation": "The diagnostic does not prove an actual TEMP write denial. The host continuation marker was not armed by a watcher before Task start; the test command has a 30-second wait. Late marker timing is a likely failure contributor, not a proven sole cause."
+          },
+          "workspace": {
+            "completion_marker_exists": false,
+            "outside_write_marker_exists": false,
+            "outside_read_result": "unknown",
+            "synthetic_secret_read_result": "unknown",
+            "task_instruction_body_present_in_audit": false
+          },
+          "audit_snapshot_while_broker_running": {
+            "verified_event_count": 140,
+            "verified_head_hash": "sha256:bfd9e6aa059accfd477015ebd78f27475ff535a6ef646f281c6842ff486ba116",
+            "audit_jsonl_sha256": "sha256:0f3fa4613e333b11d40a420084928d85939c7d33ddb035d8c509909e7b7e2402",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "broker_restart_verified": false,
+            "snapshot_is_final": false
+          },
+          "cleanup": {
+            "fake_api_listener_absent": true,
+            "frontend_pids_remaining": [3932, 20140],
+            "launcher_pids_remaining": [16816, 15584],
+            "windows_hidden_in_notification_area": true,
+            "desktop_exit_audit_ref": null,
+            "cleanup_complete": false
+          }
+        },
+        "post_owner_reported_exit_check": {
+          "observed_at_utc": "2026-10-03T09:01:50Z",
+          "owner_reported_exit": true,
+          "frontend_pids_still_alive": [3932, 20140],
+          "launcher_pids_still_alive": [16816, 15584],
+          "main_window_handles": 0,
+          "audit_event_count": 158,
+          "audit_last_event_id": "broker-audit-158",
+          "audit_last_operation": "通知一覧",
+          "audit_jsonl_sha256": "sha256:290c57dfe323294000679aee565d9182fa262231d4f30dfbac08019c0fe3f8ba",
+          "audit_chain_reverified_after_owner_report": false,
+          "interpretation": "Owner reported using exit, but both frontend/launcher pairs remained alive and notification-list Audit events continued. This observation proves neither process termination nor an application exit Audit. Computer Use exposed no targetable D4 Pocket/tray window, so the assistant did not force-kill processes or use non-UI window-message automation."
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "This is a failed/cancelled staged r2-e2e attempt, not positive Task completion. It does not prove successful Workspace write, outside/secret read denial, TEMP success or cleanup, Recovery, Broker-restart durability, result/diff exposure, normal Release task_execution, or provider interoperability. Hidden app processes remain and the Audit snapshot may grow; the R2 release blocker and task_execution=unsupported stay active."
+      },
       "current_cli_0160_mxc_shell_path_probe": {
         "date": "2026-10-03",
         "source_commit": "3ff426483014cc39f790f6c46254e94e7d85d782",
