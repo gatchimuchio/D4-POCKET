@@ -1681,10 +1681,127 @@
         "task_created": true,
         "scope_limit": "This is a failed staged r2-e2e installed-path Task attempt. It does not prove positive Task completion or result hash, registered-secret/outside-read denial, successful MxC TEMP write or cleanup, Broker-restart durability, result/diff Content Exposure, normal Release task_execution, or provider interoperability. The specific Task failure cause is unconfirmed; the child-side outside-read Test-Path precheck could confuse parent visibility with read denial but is not proven as the run's root cause. A later source-only fake-API fixture change moves initial/postcondition checks to the host and has not yet been exercised by a fresh installed run. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
+      "r2_installed_synthetic_task_e2e_run37": {
+        "date": "2026-10-03",
+        "status": "positive_task_completed_broker_restart_verified_temp_write_failed_normal_exit_audit_missing",
+        "source_commit": "3688fa0fc0a50d3f06df40d003b8115c194846e1",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "3688fa0fc0a50d3f06df40d003b8115c194846e1",
+        "test_harness_worktree_clean": true,
+        "fake_api_artifact_hash_captured": true,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run37-3688fa0",
+        "installed_manifest": {
+          "build_feature": "r2-e2e",
+          "rust_launcher_and_broker_source_commit": "3688fa0fc0a50d3f06df40d003b8115c194846e1",
+          "flutter_app_source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
+          "flutter_app_relevant_source_unchanged_through": "3688fa0fc0a50d3f06df40d003b8115c194846e1",
+          "app_sha256": "sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
+        },
+        "fake_api": {
+          "sha256": "sha256:83a1e3cbcd92b76cd34c929f731385984c65aa7a4bbeea25154b7fd0353999dc",
+          "requests": 2,
+          "models": 0,
+          "tool_offered": true,
+          "tool_call_sent": true,
+          "tool_result_received": true,
+          "repeated_tool_call_rejections": 0,
+          "invalid_bodies": 0,
+          "incomplete_requests": 0,
+          "response_write_failures": 0,
+          "blocked_external_requests": 0,
+          "workspace_marker_exists": true,
+          "workspace_boundary_fixtures_valid_after_task": true
+        },
+        "codex_cli": {
+          "version": "0.160.0",
+          "sha256": "sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2",
+          "real_credential_used": false,
+          "real_model_used": false,
+          "mxc_tool_child_observed": true
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempt": {
+          "task_id": "7d3b5a7c71758370f35192231f7211e8",
+          "session_id": "7eaa7c009934aed6cff2e0452b2fb597",
+          "status": "completed",
+          "permission_audit_refs": ["broker-audit-50", "broker-audit-51"],
+          "approval_audit_refs": ["broker-audit-53", "broker-audit-54"],
+          "start_audit_refs": ["broker-audit-58", "broker-audit-59"],
+          "state_query_and_completion_audit_ref": "broker-audit-65",
+          "completion_reason_classification": "Agent Task完了（結果本文非保存・hashのみ）",
+          "result_hash": "sha256:55c569826e219f9d375b6ec4b1e4a15d2d569e81a4ff75403e579e18c53787ab",
+          "instruction_hash": "sha256:5f0a5289a48dfa18d1320e754decfa2adb9257da19c6f198f0f813d60f1a1ef9",
+          "task_instruction_body_present_in_audit": false,
+          "completion_event_binding_note": "Broker source computes a completion event hash over task_id, terminal status, instruction_hash, result_hash and completed_at, and passes that commitment to the Audit callback. The durable recorded reason classifies this Task as completed; the raw instruction body is absent."
+        },
+        "observations": {
+          "workspace": {
+            "completion_marker_exists": true,
+            "completion_marker_bytes": 20,
+            "completion_marker_sha256": "sha256:712aff9ceb6418d369c1f968d51294af292dbfe4bda6739d4e86ba333227a29c",
+            "registered_secret_file_exists": true,
+            "registered_secret_read_denied": true,
+            "outside_read_denied": true,
+            "outside_read_canary_unchanged": true,
+            "outside_read_canary_sha256": "sha256:dce4420c5955e4ba4cf856610818e2ad6a319f2a22a73407477dcacba474670e",
+            "outside_write_denied": true,
+            "outside_write_marker_exists": false,
+            "denial_scope": "The fixed synthetic MxC tool probe writes the completion marker only after registered-secret and outside-read attempts are denied. Host pre/postconditions confirmed the fixed outside-read canary bytes were unchanged and the outside-write marker remained absent. This applies only to the named synthetic paths and this child run."
+          },
+          "temp_probe": {
+            "scope": "mxc_appcontainer",
+            "write": "failed",
+            "step": "temp_write",
+            "actual_temp_write_attempted": true,
+            "error_fingerprint": "directory_missing",
+            "temp_report_sha256": "sha256:728e5e9dc5d1f43815f2364bdb8b037a5853e7b9bdd022edf8621f4f6037b8a6",
+            "physical_temp_cleanup_proven": false
+          },
+          "audit_restart": {
+            "same_isolated_profile_reopened": true,
+            "desktop_start_audit_ref": "broker-audit-76",
+            "broker_backed_dashboard_snapshot_observed": true,
+            "event_count_after_restart_observation": 97,
+            "head_hash_after_restart_observation": "sha256:17aa7032b56435b978428d9b5f13f6f3e830b4ce631883660d0e9da931b9f429",
+            "event_hash_errors_after_restart": 0,
+            "previous_link_errors_after_restart": 0,
+            "duplicate_event_ids_after_restart": 0,
+            "anchor_count_and_head_match_after_restart": true,
+            "anchor_hmac_valid_after_restart": true,
+            "final_event_count_after_process_stop": 108,
+            "final_head_hash": "sha256:18f504a99e7faecd324262fcbbbc983e6c75735f990777035e68a8efad3ab135",
+            "final_audit_jsonl_sha256": "sha256:9a17ce3bad10de805bdd39ede247ae094043440ae0ed0b8695cdb41af7358b39",
+            "final_event_hash_errors": 0,
+            "final_previous_link_errors": 0,
+            "final_duplicate_event_ids": 0,
+            "final_anchor_count_and_head_match": true,
+            "final_anchor_hmac_valid": true,
+            "task_completion_reason_preserved": true
+          },
+          "cleanup": {
+            "fake_api_listener_absent": true,
+            "host_watcher_absent": true,
+            "run37_desktop_processes_absent": true,
+            "session_state": "active",
+            "desktop_exit_audit_ref": null,
+            "last_audit_event_id": "broker-audit-108",
+            "last_audit_operation": "通知一覧",
+            "last_audit_decision": "accepted",
+            "shutdown_mode": "After Task completion, exact run37 launcher/frontend paths were verified and stopped to exercise same-profile Broker restart. The restarted instance reloaded and verified the Audit store; its exact launcher/frontend paths were then stopped after evidence capture. Session remains active and no normal Desktop exit Audit is claimed."
+          }
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "This is a positive installed-path Task run only in the r2-e2e test-feature build, using a loopback fake Responses API and synthetic NTFS Workspace/profile. It does not enable normal Release task_execution or establish real provider interoperability. The MxC TEMP write was attempted but failed with directory_missing; physical TEMP cleanup is unproven. Same-profile Broker restart accepted the durable Audit chain after a post-completion process stop, but this is not crash-during-Task recovery and no normal tray Exit Audit was produced. Result/diff Content Exposure UI, deadline/crash Recovery during active work, task-to-task cleanup/isolation, OneDrive Cloud Files plus ordinary NTFS integrated matrix, and normal Release capability eligibility remain open. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
+      },
       "latest_installed_e2e_observation": {
         "date": "2026-10-03",
-        "positive_task_run": "r2_installed_synthetic_task_e2e_run35",
-        "previous_positive_task_run": "r2_installed_synthetic_task_e2e_run32",
+        "positive_task_run": "r2_installed_synthetic_task_e2e_run37",
+        "previous_positive_task_run": "r2_installed_synthetic_task_e2e_run35",
         "prior_failed_runs": [
           "r2_installed_synthetic_task_e2e_run33",
           "r2_installed_synthetic_task_e2e_run34",
@@ -1693,7 +1810,7 @@
         "run34_test_harness_cause": "Windows path separator regex was under-escaped in the Rust-built PowerShell probe; actual TEMP write was not attempted.",
         "fixture_fix": "PowerShell regex now receives the escaped Windows backslash and slash class; generated-probe regression test covers both separators.",
         "run35_result": "Installed r2-e2e test build completed one real Codex/MxC Workspace Task through UI, native Owner decisions, authenticated Broker IPC, and file-backed Audit; same-profile restart accepted the existing Audit chain and HMAC. The synthetic secret/outside path denials passed. TEMP was classified as mxc_appcontainer but the directory check failed before an actual TEMP write.",
-        "latest_attempt": "r2_installed_synthetic_task_e2e_run36",
+        "latest_attempt": "r2_installed_synthetic_task_e2e_run37",
         "run36_result": "Task failed after real UI/Owner/Broker/Codex/MxC path. TEMP write was attempted and classified directory_missing. Outside-read denial and the exact Task failure cause remain unconfirmed; no completion marker was created. Owner-reported exit was followed by no run36 process, but the Broker session remained active and no normal exit Audit exists.",
         "fixture_fix_after_run36": "Development-only fake API now checks the outside-read canary and outside-write absence on the host both before and after the child probe; the child attempts outside read directly without a Test-Path visibility precondition. Focused fixture tests pass; fresh installed run is pending.",
         "local_validation_after_run36": {
@@ -1706,7 +1823,8 @@
           "integrated_validator": "python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows exited 0 after MANIFEST.sha256.json regeneration",
           "scope_limit": "The three exact network/loopback test cases were individually successful but intermittently failed under unfiltered all-target load on this Windows host. The filtered suite does not claim an unfiltered-suite pass or prove the cause of those transport failures."
         },
-        "next_action": "Commit and push the bounded fake-API fixture change, then perform fresh installed run37 using synthetic identity/profile and verify completed Task, host-side outside/secret marker postconditions, TEMP result, file-backed Audit and restart, and cleanup. Keep task_execution unsupported until all required release gates pass; continue deadline/crash Recovery, task-to-task isolation, result/diff Content Exposure, OneDrive Cloud Files/ordinary NTFS integration, normal Release capability gating, and normal Desktop Exit Audit.",
+        "run37_result": "Fresh installed r2-e2e run37 completed one production Broker Task through native Owner-confirmed Workspace Permission, separate Task Approval, real Codex CLI 0.160.0/MxC child and loopback fake Responses API. Secret/outside read denials and host-side outside marker postconditions passed for the named synthetic paths. Same-profile Broker restart reloaded and verified the durable Audit chain. The actual MxC TEMP write failed with directory_missing, and normal Desktop Exit Audit is absent.",
+        "next_action": "Determine why the actual MxC AppContainer TEMP directory is missing during the child write without weakening isolation or replacing the runtime behavior with a fixture-only workaround; then perform a fresh installed run. Separately test active-Task deadline/crash Recovery, task-to-task isolation/cleanup, result/diff Content Exposure, OneDrive Cloud Files and ordinary NTFS integration, normal Release capability gating, and normal tray Exit Audit.",
         "release_state": {
           "task_execution": "unsupported",
           "r2_release_blocker_active": true,
