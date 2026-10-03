@@ -17,7 +17,21 @@ fn main() -> ExitCode {
         eprintln!("合成Workspaceを確認できない");
         return ExitCode::from(2);
     }
-    let server = match fixture::CodexLoopbackResponses::start(workspace) {
+    let port = match std::env::args_os().nth(2) {
+        None => 0,
+        Some(value) => match value
+            .to_str()
+            .and_then(|value| value.parse::<u16>().ok())
+            .filter(|port| *port != 0)
+        {
+            Some(port) => port,
+            None => {
+                eprintln!("任意指定portは1から65535で指定する");
+                return ExitCode::from(2);
+            }
+        },
+    };
+    let server = match fixture::CodexLoopbackResponses::start_on(workspace, port) {
         Ok(server) => server,
         Err(_) => {
             eprintln!("localhost偽Responses APIを起動できない");

@@ -1065,6 +1065,101 @@
         "os_protection_changed": false,
         "scope_limit": "This closes positive Task completion only in the staged r2-e2e feature build using a loopback fake API. It does not enable or prove normal Release task_execution, provider interoperability, restart durability, result/diff Content Exposure, successful MxC TEMP cleanup, the OneDrive Cloud Files/ordinary NTFS isolation matrix, or failure/deadline/crash Recovery. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
+      "r2_installed_synthetic_task_e2e_run27": {
+        "date": "2026-10-03",
+        "status": "failed_after_task_started",
+        "source_commit": "9c1f8a777728efc2ab02c8ae4e4e8addd10a0282",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "9c1f8a777728efc2ab02c8ae4e4e8addd10a0282",
+        "test_harness_worktree_clean": false,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run27-9c1f8a",
+        "toolchain": {
+          "rust": "1.95.0",
+          "task_build_feature": "r2-e2e"
+        },
+        "installed_manifest": {
+          "run_id": "d4p-r2-run24-corrected-9c1f8a",
+          "app_sha256": "sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:af8705e4d0cec22b343d1aade4637172a03e55f3aaeec67cbd1322dc67aebe7b",
+          "launcher_sha256": "sha256:d37482daf9aac363fd58f5bede8b28eba1c89a772b39b8ce16a21065c3ce29fe",
+          "fake_responses_api_sha256": "sha256:a7d96813fd9b934063c428e909be322461572c000daea12eaa43ee266258af8a"
+        },
+        "synthetic_environment": {
+          "api_endpoint": "127.0.0.1:56106",
+          "workspace_kind": "run-local synthetic NTFS Workspace",
+          "codex_home": "run-local isolated CODEX_HOME",
+          "real_model_or_credential_used": false,
+          "external_requests": 0
+        },
+        "observations": {
+          "production_path": "Staged Flutter UI -> PID-bound named-pipe relay -> production Rust Broker -> real Codex CLI/MxC -> loopback fake Responses API.",
+          "owner_decisions": ["Runtime/Workspace registration", "one-use agent_task.execute Workspace Permission", "separate one-use Task Approval"],
+          "session_id": "15e47a5f7d02173b29210ece3c914c99",
+          "permission_audit_ref": "broker-audit-56",
+          "approval_audit_ref": "broker-audit-58",
+          "task": {
+            "task_id": "363174fe325b01a4c9bb73f6c68eaf38",
+            "status": "failed",
+            "start_audit_ref": "broker-audit-61",
+            "terminal_audit_ref": "broker-audit-81",
+            "duplicate_cancel_audit_ref": "broker-audit-82",
+            "duplicate_cancel_decision": "rejected",
+            "instruction_hash": "sha256:048a79594b1e21251d4eff07ccf6311e3845e4845c2816d2c560dad3403d7bd4",
+            "completion_marker_exists": false
+          },
+          "fake_api": {
+            "requests": 4,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": true,
+            "repeated_tool_call_rejections": 3,
+            "invalid_bodies": 0,
+            "incomplete_requests": 0,
+            "response_write_failures": 0,
+            "blocked_external_requests": 0
+          },
+          "workspace": {
+            "completion_marker_exists": false,
+            "synthetic_secret_canary_bytes": 0,
+            "outside_read_result": "unknown",
+            "outside_write_marker_exists": false
+          },
+          "temp_diagnostic": {
+            "stage": "temp_checked",
+            "scope": "unrecognized",
+            "write": "failed",
+            "step": "temp_directory_check",
+            "temp_equals_tmp": true,
+            "path_component_shape": "sandbox.{GUID}",
+            "test_fixture_matcher_before": "sandbox.GUID only",
+            "interpretation": "Fixture misclassified the braced AppContainer GUID; no actual TEMP write denial is proven and overall Task failure root cause remains unknown."
+          },
+          "audit_after_process_exit": {
+            "verified_event_count": 101,
+            "verified_head_hash": "sha256:80e5e4a6af2a9c425d8c18fe67c8959270044de6c59f6317349f413fca35a7b0",
+            "audit_jsonl_sha256": "sha256:9aa40a95a593237bc68bd9a3ee8c38fef82d13ec650c4995a25f11925eb5d94b",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "task_instruction_body_present": false,
+            "broker_restart_verified": false
+          },
+          "cleanup": {
+            "launcher_pid_absent": true,
+            "frontend_pid_absent": true,
+            "api_listener_absent": true,
+            "desktop_exit_audit_ref": "broker-audit-101",
+            "evidence_recorded_before_run_root_cleanup": true
+          }
+        },
+        "task_created": true,
+        "owner_confirmation_completed": 3,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME proves the staged UI/native Owner/production Broker path reached a real Codex/MxC Task that ended failed. It does not prove successful Workspace write, positive Task completion, successful TEMP write or cleanup, outside/secret read denial, failure Recovery semantics, Broker-restart verification of this Audit, result/diff exposure, normal Release task_execution, or provider interoperability. Keep task_execution=unsupported and the R2 release blocker unresolved."
+      },
       "current_cli_0160_mxc_shell_path_probe": {
         "date": "2026-10-03",
         "source_commit": "3ff426483014cc39f790f6c46254e94e7d85d782",

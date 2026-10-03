@@ -54,7 +54,11 @@ pub(super) struct CodexLoopbackResponses {
 
 impl CodexLoopbackResponses {
     pub(super) fn start(workspace: &Path) -> std::io::Result<Self> {
-        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        Self::start_on(workspace, 0)
+    }
+
+    pub(super) fn start_on(workspace: &Path, port: u16) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", port))?;
         listener.set_nonblocking(true)?;
         let port = listener.local_addr()?.port();
         let workspace_text = workspace.to_string_lossy().into_owned();
@@ -320,31 +324,36 @@ fn synthetic_workspace_probe() -> String {
     concat!(
         "$ErrorActionPreference='Stop'; ",
         "Write-Output 'D4P_R2_SYNTHETIC_PROBE_STARTED'; ",
-        "$workspace=(Get-Location).Path; ",
+        "$workspace=(Get-Location).Path; Write-Output 'D4P_R2_TEMP_STEP_workspace_detected'; ",
         "$tempReport=Join-Path $workspace 'broker-real-codex-temp-report.json'; ",
-        "$tempMarkerName='d4p-broker-temp-observer-'+[IO.Path]::GetFileName($workspace)+'.marker'; ",
-        "$tempStep='initial'; $tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_step=$tempStep;temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
-        "[IO.File]::WriteAllText($tempReport,$tempState); ",
-        "$tempStep='scratch_discovery'; try { $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object { $_.Name -like '.d4p-tmp-*' }); if($scratch.Count -ne 1){throw [InvalidOperationException]::new('registered scratch count mismatch')}; ",
+        "$tempMarkerName='d4p-broker-temp-observer-'+(Split-Path -Leaf $workspace)+'.marker'; Write-Output 'D4P_R2_TEMP_STEP_initial_state_prepared'; ",
+        "$tempStep='initial'; $tempConfigured=($env:TEMP -ne $null -and $env:TEMP -ne ''); $tmpConfigured=($env:TMP -ne $null -and $env:TMP -ne ''); $tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_step=$tempStep;temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
+        "Write-Output 'D4P_R2_TEMP_STEP_initial_json_ready'; ",
+        "Write-Output 'D4P_R2_TEMP_STEP_initial_write_attempt'; try { Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop } catch { $initialErrorKind='other'; if($_.CategoryInfo.Category -eq 'PermissionDenied'){$initialErrorKind='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound'){$initialErrorKind='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$initialErrorKind='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$initialErrorKind='invalid_operation'}; Write-Output ('D4P_R2_TEMP_INITIAL_WRITE_ERROR_'+$initialErrorKind); exit 46 }; ",
+        "Write-Output 'D4P_R2_TEMP_STEP_initial_report_written'; ",
+        "$tempStep='scratch_discovery'; $scratch=@(Get-ChildItem -LiteralPath $workspace -Directory -Force | Where-Object { $_.Name -like '.d4p-tmp-*' }); ",
+        "Write-Output 'D4P_R2_TEMP_STEP_scratch_discovery'; ",
         "$tempStep='scope_validation'; ",
-        "$expected=[IO.Path]::GetFullPath($scratch[0].FullName).TrimEnd([char]92); $tempActual=[IO.Path]::GetFullPath($env:TEMP).TrimEnd([char]92); $tmpActual=[IO.Path]::GetFullPath($env:TMP).TrimEnd([char]92); ",
-        "$tempMatches=[string]::Equals($expected,$tempActual,[StringComparison]::OrdinalIgnoreCase); $tmpMatches=[string]::Equals($expected,$tmpActual,[StringComparison]::OrdinalIgnoreCase); ",
-        "$tempParts=$tempActual.Split([char]92); $sandboxGuid=[Guid]::Empty; $mxcTemp=$false; if($tempParts.Count -ge 9){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3].StartsWith('sandbox.',[StringComparison]::OrdinalIgnoreCase) -and [Guid]::TryParse($tempParts[-3].Substring(8),[ref]$sandboxGuid))}; ",
-        "if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif([string]::Equals($tempActual,$tmpActual,[StringComparison]::OrdinalIgnoreCase) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual} else {throw [InvalidOperationException]::new('TEMP/TMP is outside the Broker scratch or MxC AppContainer temp')}; ",
-        "$tempStep='temp_directory_check'; if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){throw [DirectoryNotFoundException]::new('scoped TEMP directory is absent')}; $tempStep='temp_write'; [IO.File]::WriteAllText((Join-Path $tempTarget $tempMarkerName),'d4p synthetic temp observer'); $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorType=$null; $tempErrorHResult=$null } catch { $tempError=$_.Exception.InnerException; if($null -eq $tempError){$tempError=$_.Exception}; $tempWrite='failed'; if($null -eq $tempMatches){$tempMatches=$false}; if($null -eq $tmpMatches){$tmpMatches=$false}; if($null -eq $tempScope){$tempScope='unrecognized'}; $tempErrorType=$tempError.GetType().FullName; $tempErrorHResult=$tempError.HResult }; ",
-        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=([string]::IsNullOrWhiteSpace($env:TEMP) -eq $false);tmp_configured=([string]::IsNullOrWhiteSpace($env:TMP) -eq $false);temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; ",
-        "[IO.File]::WriteAllText($tempReport,$tempState); ",
+        "$tempScope='unrecognized'; $tempTarget=$null; $tempMatches=$false; $tmpMatches=$false; $tempActual=$env:TEMP; $tmpActual=$env:TMP; $mxcTemp=$false; ",
+        "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
+        "Write-Output ('D4P_R2_TEMP_SCOPE_'+$tempScope); Write-Output 'D4P_R2_TEMP_STEP_scope_validation'; ",
+        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempErrorType=$null; $tempErrorHResult=$null; if($tempScope -ne 'unrecognized'){if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){$tempErrorFingerprint='directory_missing'} else {$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName) -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}}}; ",
+        "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
+        "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
+        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
+        "Write-Output 'D4P_R2_TEMP_STEP_temp_report_written'; ",
         "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; ",
-        "$deadline=[DateTime]::UtcNow.AddSeconds(30); ",
-        "while(-not [IO.File]::Exists($continue)){if([DateTime]::UtcNow -ge $deadline){exit 44}; Start-Sleep -Milliseconds 25}; ",
-        "$secretDenied=$false; try { $null=[IO.File]::ReadAllText((Join-Path $workspace 'private\\credential-backup.txt')) } catch { $secretDenied=$true }; ",
+        "$continued=$false; ",
+        "Write-Output 'D4P_R2_TEMP_STEP_waiting_for_continue'; ",
+        "for($attempt=0;$attempt -lt 1200;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
+        "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; ",
         "$outside=Split-Path -Parent $workspace; ",
-        "$outsideReadDenied=$false; try { $null=[IO.File]::ReadAllText((Join-Path $outside 'outside-read-marker.txt')) } catch { $outsideReadDenied=$true }; ",
+        "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; if(-not (Test-Path -LiteralPath $outsideReadPath -PathType Leaf)){exit 45}; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true }; ",
         "if (-not $outsideReadDenied) { exit 42 }; ",
-        "$outsideWriteDenied=$false; try { [IO.File]::WriteAllText((Join-Path $outside 'outside-write-marker.txt'),'unexpected'); } catch { $outsideWriteDenied=$true }; ",
+        "$outsideWritePath=Join-Path $outside 'outside-write-marker.txt'; if(Test-Path -LiteralPath $outsideWritePath){exit 48}; $outsideWriteDenied=$false; try { Set-Content -LiteralPath $outsideWritePath -Value 'unexpected' -NoNewline -ErrorAction Stop } catch { $outsideWriteDenied=$true }; if(Test-Path -LiteralPath $outsideWritePath){$outsideWriteDenied=$false}; ",
         "if (-not $outsideWriteDenied) { exit 43 }; ",
-        "[IO.File]::WriteAllText((Join-Path $workspace 'broker-real-codex-marker.txt'),'synthetic-task-write'); exit 0"
+        "Set-Content -LiteralPath (Join-Path $workspace 'broker-real-codex-marker.txt') -Value 'synthetic-task-write' -NoNewline -ErrorAction Stop; exit 0"
     )
     .to_owned()
 }
@@ -394,6 +403,58 @@ fn collect_output_text(value: &Value, depth: usize, output: &mut String) {
     }
 }
 
+fn allowlisted_output_field(
+    value: &Value,
+    field: &str,
+    values: &[&'static str],
+) -> Option<&'static str> {
+    fn find(
+        value: &Value,
+        field: &str,
+        values: &[&'static str],
+        depth: usize,
+    ) -> Option<&'static str> {
+        if depth > 8 {
+            return None;
+        }
+        if let Some(object) = value.as_object() {
+            if let Some(actual) = object.get(field).and_then(Value::as_str) {
+                if let Some(allowed) = values
+                    .iter()
+                    .copied()
+                    .find(|allowed| actual.eq_ignore_ascii_case(allowed))
+                {
+                    return Some(allowed);
+                }
+            }
+            return object
+                .values()
+                .find_map(|nested| find(nested, field, values, depth + 1));
+        }
+        if let Some(array) = value.as_array() {
+            return array
+                .iter()
+                .find_map(|nested| find(nested, field, values, depth + 1));
+        }
+        if let Some(text) = value.as_str() {
+            if let Ok(nested) = serde_json::from_str::<Value>(text) {
+                return find(&nested, field, values, depth + 1);
+            }
+        }
+        None
+    }
+
+    find(value, field, values, 0)
+}
+
+fn allowlisted_marker(text: &str, prefix: &str, values: &[&'static str]) -> Option<&'static str> {
+    values.iter().copied().find(|value| {
+        let marker = format!("{prefix}{value}");
+        text.split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+            .any(|token| token.eq_ignore_ascii_case(&marker))
+    })
+}
+
 fn safe_tool_output_diagnostic(output: &Value) -> Value {
     let output_type = match output {
         Value::Null => "null",
@@ -441,11 +502,136 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
     } else {
         "error兆候なし"
     };
+    let temp_step = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_STEP_",
+        &[
+            "workspace_detected",
+            "initial_state_prepared",
+            "initial_json_ready",
+            "initial_write_attempt",
+            "initial_report_written",
+            "scratch_discovery",
+            "scope_validation",
+            "temp_directory_check",
+            "temp_write",
+            "temp_write_completed",
+            "temp_report_written",
+            "waiting_for_continue",
+        ],
+    )
+    .or_else(|| {
+        allowlisted_output_field(
+            output,
+            "temp_step",
+            &[
+                "initial",
+                "scratch_discovery",
+                "scope_validation",
+                "temp_directory_check",
+                "temp_write",
+                "temp_write_completed",
+            ],
+        )
+    });
+    let temp_scope = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_SCOPE_",
+        &[
+            "broker_workspace_scratch",
+            "mxc_appcontainer",
+            "unrecognized",
+        ],
+    )
+    .or_else(|| {
+        allowlisted_output_field(
+            output,
+            "temp_scope",
+            &[
+                "broker_workspace_scratch",
+                "mxc_appcontainer",
+                "unrecognized",
+            ],
+        )
+    });
+    let temp_write = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_WRITE_",
+        &["pending", "passed", "failed"],
+    )
+    .or_else(|| allowlisted_output_field(output, "temp_write", &["pending", "passed", "failed"]));
+    let temp_error_fingerprint = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_ERROR_KIND_",
+        &[
+            "access_denied",
+            "directory_missing",
+            "file_missing",
+            "invalid_operation",
+            "other",
+        ],
+    );
+    let temp_initial_write_error = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_INITIAL_WRITE_ERROR_",
+        &[
+            "access_denied",
+            "directory_missing",
+            "file_missing",
+            "invalid_operation",
+            "io_failure",
+            "other",
+        ],
+    );
+    let temp_error_kind = allowlisted_output_field(
+        output,
+        "temp_error_type",
+        &[
+            "system.unauthorizedaccessexception",
+            "system.io.directorynotfoundexception",
+            "system.io.filenotfoundexception",
+            "system.invalidoperationexception",
+            "system.management.automation.parseexception",
+            "system.management.automation.runtimeexception",
+            "system.management.automation.methodinvocationexception",
+        ],
+    );
+    let mut error_fingerprints = Vec::new();
+    for (needle, fingerprint) in [
+        ("0x80008085", "hostfxr_startup_failure"),
+        ("-2147450747", "hostfxr_startup_failure"),
+        (
+            "commandnotfoundexception",
+            "powershell_command_resolution_failure",
+        ),
+        ("parseexception", "powershell_parse_failure"),
+        ("unauthorizedaccessexception", "access_denied"),
+        ("directorynotfoundexception", "directory_missing"),
+        ("filenotfoundexception", "file_missing"),
+        ("ioexception", "io_failure"),
+        ("argumentnullexception", "invalid_null_argument"),
+        ("invalidoperationexception", "invalid_operation"),
+        ("methodinvocationexception", "method_invocation_failure"),
+        ("runtimeexception", "powershell_runtime_failure"),
+        ("timed out", "execution_timeout"),
+        ("exit code 44", "synthetic_probe_deadline"),
+    ] {
+        if normalized.contains(needle) && !error_fingerprints.contains(&fingerprint) {
+            error_fingerprints.push(fingerprint);
+        }
+    }
     json!({
         "output_type": output_type,
         "output_bytes": output_bytes,
         "error_category": error_category,
         "probe_started": diagnostic_text.contains("D4P_R2_SYNTHETIC_PROBE_STARTED"),
+        "temp_step": temp_step,
+        "temp_scope": temp_scope,
+        "temp_write": temp_write,
+        "temp_error_kind": temp_error_kind,
+        "temp_error_fingerprint": temp_error_fingerprint,
+        "temp_initial_write_error": temp_initial_write_error,
+        "error_fingerprints": error_fingerprints,
     })
 }
 
@@ -1028,9 +1214,22 @@ mod tests {
         assert_eq!(diagnostic["error_category"], "sandboxアクセス拒否");
         assert_eq!(diagnostic["probe_started"], true);
         assert_eq!(diagnostic["output_type"], "string");
+        assert_eq!(diagnostic["error_fingerprints"][0], "access_denied");
         assert!(!diagnostic.to_string().contains("synthetic-secret-content"));
         assert!(!diagnostic.to_string().contains("C:\\\\Users"));
         assert!(!diagnostic.to_string().contains("private.txt"));
+
+        let temp_output = json!("D4P_R2_TEMP_STEP_temp_write D4P_R2_TEMP_SCOPE_mxc_appcontainer D4P_R2_TEMP_WRITE_failed D4P_R2_TEMP_ERROR_KIND_access_denied D4P_R2_TEMP_INITIAL_WRITE_ERROR_io_failure C:\\Users\\example\\private synthetic-secret-content");
+        let temp_diagnostic = safe_tool_output_diagnostic(&temp_output);
+        assert_eq!(temp_diagnostic["temp_step"], "temp_write");
+        assert_eq!(temp_diagnostic["temp_scope"], "mxc_appcontainer");
+        assert_eq!(temp_diagnostic["temp_write"], "failed");
+        assert_eq!(temp_diagnostic["temp_error_fingerprint"], "access_denied");
+        assert_eq!(temp_diagnostic["temp_initial_write_error"], "io_failure");
+        assert!(!temp_diagnostic
+            .to_string()
+            .contains("synthetic-secret-content"));
+        assert!(!temp_diagnostic.to_string().contains("C:\\\\Users"));
 
         let launch_failure = safe_tool_output_diagnostic(&json!({
             "stderr": "PowerShell host failed: 0x80008085",
@@ -1043,15 +1242,84 @@ mod tests {
     }
 
     #[test]
+    fn loopback_server_binds_an_explicit_available_port() {
+        let workspace =
+            std::env::temp_dir().join(format!("d4p-r2-loopback-port-{}", std::process::id()));
+        std::fs::create_dir_all(&workspace).expect("test専用Workspaceを作成");
+        let reservation = TcpListener::bind(("127.0.0.1", 0)).expect("空きloopback portを取得");
+        let port = reservation
+            .local_addr()
+            .expect("loopback portを取得")
+            .port();
+        drop(reservation);
+        let server = CodexLoopbackResponses::start_on(&workspace, port)
+            .expect("指定loopback portへserverをbind");
+        assert_eq!(server.port(), port);
+        drop(server);
+        std::fs::remove_dir_all(workspace).expect("test専用Workspaceを削除");
+    }
+
+    #[test]
     fn temp_probe_keeps_boundary_checks_independent_from_temp_diagnostic() {
         let probe = synthetic_workspace_probe();
         assert!(probe.contains("temp_step=$tempStep"));
         assert!(probe.contains("$tempStep='temp_write'"));
-        assert!(!probe.contains("exit 45"));
+        assert!(probe.contains("outside-read-marker.txt"));
+        assert!(probe.contains(
+            "if(-not (Test-Path -LiteralPath $outsideReadPath -PathType Leaf)){exit 45}"
+        ));
         assert!(probe.contains("if (-not $secretDenied) { exit 41 }"));
         assert!(probe.contains("if (-not $outsideReadDenied) { exit 42 }"));
         assert!(probe.contains("if (-not $outsideWriteDenied) { exit 43 }"));
         assert!(probe.contains("broker-real-codex-marker.txt"));
+    }
+
+    #[test]
+    fn temp_probe_recognizes_braced_and_unbraced_appcontainer_guids() {
+        let probe = synthetic_workspace_probe();
+        let marker = "-match '^sandbox";
+        let pattern_start = probe
+            .find(marker)
+            .expect("MxC一時領域sandbox要素matcherを確認")
+            + "-match '".len();
+        let pattern_end = pattern_start
+            + probe[pattern_start..]
+                .find('\'')
+                .expect("sandbox要素matcherの終端を確認");
+        let component_pattern = regex::Regex::new(&probe[pattern_start..pattern_end])
+            .expect("PowerShell互換のsandbox要素正規表現を構築");
+        let guid = "a2244533-d491-4ca4-bfc2-27a7edd7c351";
+        let unbraced_component = String::from("sandbox.") + guid;
+        let braced_component = String::from("sandbox.{") + guid + "}";
+        let opening_brace_only_component = String::from("sandbox.{") + guid;
+        let closing_brace_only_component = String::from("sandbox.") + guid + "}";
+
+        assert!(
+            component_pattern.is_match(&unbraced_component),
+            "波括弧なしのAppContainer識別子を受理する"
+        );
+        assert!(
+            component_pattern.is_match(&braced_component),
+            "波括弧付きのAppContainer識別子を受理する"
+        );
+        assert!(
+            !component_pattern.is_match(&opening_brace_only_component),
+            "開き波括弧だけのAppContainer識別子を拒否する"
+        );
+        assert!(
+            !component_pattern.is_match(&closing_brace_only_component),
+            "閉じ波括弧だけのAppContainer識別子を拒否する"
+        );
+    }
+
+    #[test]
+    fn temp_probe_uses_shell_operations_compatible_with_mxc_restricted_language() {
+        let probe = synthetic_workspace_probe();
+        assert!(probe.contains("Set-Content -LiteralPath"));
+        assert!(probe.contains("Get-Content -LiteralPath"));
+        assert!(!probe.contains("[IO."));
+        assert!(!probe.contains("::"));
+        assert!(!probe.contains(".GetType("));
     }
 }
 
