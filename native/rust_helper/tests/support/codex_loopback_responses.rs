@@ -337,7 +337,7 @@ fn synthetic_workspace_probe() -> String {
         "$tempScope='unrecognized'; $tempTarget=$null; $tempMatches=$false; $tmpMatches=$false; $tempActual=$env:TEMP; $tmpActual=$env:TMP; $mxcTemp=$false; ",
         "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
         "Write-Output ('D4P_R2_TEMP_SCOPE_'+$tempScope); Write-Output 'D4P_R2_TEMP_STEP_scope_validation'; ",
-        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempErrorType=$null; $tempErrorHResult=$null; if($tempScope -ne 'unrecognized'){if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){$tempErrorFingerprint='directory_missing'} else {$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName) -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}}}; ",
+        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempErrorType=$null; $tempErrorHResult=$null; if($tempScope -ne 'unrecognized'){$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName) -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}}; ",
         "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
         "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
@@ -1272,6 +1272,16 @@ mod tests {
         assert!(probe.contains("if (-not $outsideReadDenied) { exit 42 }"));
         assert!(probe.contains("if (-not $outsideWriteDenied) { exit 43 }"));
         assert!(probe.contains("broker-real-codex-marker.txt"));
+    }
+
+    #[test]
+    fn temp_probe_attempts_write_without_visibility_precheck() {
+        let probe = synthetic_workspace_probe();
+        assert!(probe.contains(
+            "$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName)"
+        ));
+        assert!(probe.contains("-match 'DirectoryNotFound|PathNotFound'"));
+        assert!(!probe.contains("Test-Path -LiteralPath $tempTarget -PathType Container"));
     }
 
     #[test]
