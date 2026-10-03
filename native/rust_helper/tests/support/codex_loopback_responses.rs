@@ -337,10 +337,14 @@ fn synthetic_workspace_probe() -> String {
         "$tempScope='unrecognized'; $tempTarget=$null; $tempMatches=$false; $tmpMatches=$false; $tempActual=$env:TEMP; $tmpActual=$env:TMP; $mxcTemp=$false; ",
         "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
         "Write-Output ('D4P_R2_TEMP_SCOPE_'+$tempScope); Write-Output 'D4P_R2_TEMP_STEP_scope_validation'; ",
-        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempErrorType=$null; $tempErrorHResult=$null; if($tempScope -ne 'unrecognized'){$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName) -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}}; ",
+        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempDirectoryExists=$null; $tempDirectoryCreate='not_attempted'; $tempRetryWrite='not_attempted'; $tempCleanup='not_attempted'; $tempCreatedDirectory=$false; $tempErrorType=$null; $tempErrorHResult=$null; $tempMarker=if($tempTarget){Join-Path $tempTarget $tempMarkerName}else{$null}; ",
+        "if($tempScope -ne 'unrecognized'){$tempStep='temp_write'; try { Set-Content -LiteralPath $tempMarker -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}; $tempDirectoryExists=Test-Path -LiteralPath $tempTarget -PathType Container}; ",
+        "Write-Output ('D4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_'+$(if($tempDirectoryExists -eq $true){'true'}elseif($tempDirectoryExists -eq $false){'false'}else{'unknown'})); ",
+        "if($tempScope -eq 'mxc_appcontainer' -and $tempDirectoryExists -eq $false -and $tempWrite -eq 'failed' -and $tempErrorFingerprint -eq 'directory_missing'){$tempStep='temp_directory_create'; try { if(Test-Path -LiteralPath $tempTarget -PathType Container){$tempDirectoryCreate='appeared_before_create'}else{New-Item -ItemType Directory -Path $tempTarget -ErrorAction Stop | Out-Null; $tempCreatedDirectory=$true; $tempDirectoryCreate='created'} } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempDirectoryCreate='failed_access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempDirectoryCreate='failed_directory_missing'} else {$tempDirectoryCreate='failed_other'}}; Write-Output ('D4P_R2_TEMP_DIRECTORY_CREATE_'+$tempDirectoryCreate); if($tempDirectoryCreate -in @('created','appeared_before_create')){$tempStep='temp_retry_write'; try { Set-Content -LiteralPath $tempMarker -Value 'd4p synthetic temp observer retry' -NoNewline -ErrorAction Stop; $tempRetryWrite='passed' } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempRetryWrite='failed_access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempRetryWrite='failed_directory_missing'} else {$tempRetryWrite='failed_other'}}; Write-Output ('D4P_R2_TEMP_RETRY_WRITE_'+$tempRetryWrite)}}; ",
+        "if($tempWrite -eq 'passed' -or $tempRetryWrite -eq 'passed' -or $tempCreatedDirectory){$tempStep='temp_cleanup'; try { Remove-Item -LiteralPath $tempMarker -Force -ErrorAction Stop; if(Test-Path -LiteralPath $tempMarker){$tempCleanup='marker_still_present'}else{$tempCleanup='marker_removed'} } catch {$tempCleanup='marker_remove_failed'}; if($tempCreatedDirectory -and $tempCleanup -eq 'marker_removed'){try { Remove-Item -LiteralPath $tempTarget -Force -ErrorAction Stop; if(Test-Path -LiteralPath $tempTarget){$tempCleanup='marker_removed_directory_not_empty'}else{$tempCleanup='marker_and_created_directory_removed'} } catch { if($_.FullyQualifiedErrorId -match 'DirectoryNotEmpty'){$tempCleanup='marker_removed_directory_not_empty'} else {$tempCleanup='marker_removed_directory_delete_failed'}}}; Write-Output ('D4P_R2_TEMP_CLEANUP_'+$tempCleanup)}; ",
         "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
-        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
+        "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_directory_exists_after_initial_write=$tempDirectoryExists;temp_directory_create=$tempDirectoryCreate;temp_retry_write=$tempRetryWrite;temp_cleanup=$tempCleanup;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
         "Write-Output 'D4P_R2_TEMP_STEP_temp_report_written'; ",
         "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; ",
         "$continued=$false; ",
@@ -517,6 +521,9 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
             "temp_directory_check",
             "temp_write",
             "temp_write_completed",
+            "temp_directory_create",
+            "temp_retry_write",
+            "temp_cleanup",
             "temp_report_written",
             "waiting_for_continue",
         ],
@@ -532,6 +539,9 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
                 "temp_directory_check",
                 "temp_write",
                 "temp_write_completed",
+                "temp_directory_create",
+                "temp_retry_write",
+                "temp_cleanup",
             ],
         )
     });
@@ -561,6 +571,47 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
         &["pending", "passed", "failed"],
     )
     .or_else(|| allowlisted_output_field(output, "temp_write", &["pending", "passed", "failed"]));
+    let temp_directory_exists = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_",
+        &["true", "false", "unknown"],
+    );
+    let temp_directory_create = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_DIRECTORY_CREATE_",
+        &[
+            "not_attempted",
+            "created",
+            "appeared_before_create",
+            "failed_access_denied",
+            "failed_directory_missing",
+            "failed_other",
+        ],
+    );
+    let temp_retry_write = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_RETRY_WRITE_",
+        &[
+            "not_attempted",
+            "passed",
+            "failed_access_denied",
+            "failed_directory_missing",
+            "failed_other",
+        ],
+    );
+    let temp_cleanup = allowlisted_marker(
+        &diagnostic_text,
+        "D4P_R2_TEMP_CLEANUP_",
+        &[
+            "not_attempted",
+            "marker_removed",
+            "marker_and_created_directory_removed",
+            "marker_removed_directory_not_empty",
+            "marker_removed_directory_delete_failed",
+            "marker_still_present",
+            "marker_remove_failed",
+        ],
+    );
     let temp_error_fingerprint = allowlisted_marker(
         &diagnostic_text,
         "D4P_R2_TEMP_ERROR_KIND_",
@@ -629,6 +680,10 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
         "temp_step": temp_step,
         "temp_scope": temp_scope,
         "temp_write": temp_write,
+        "temp_directory_exists_after_initial_write": temp_directory_exists,
+        "temp_directory_create": temp_directory_create,
+        "temp_retry_write": temp_retry_write,
+        "temp_cleanup": temp_cleanup,
         "temp_error_kind": temp_error_kind,
         "temp_error_fingerprint": temp_error_fingerprint,
         "temp_initial_write_error": temp_initial_write_error,
@@ -1220,11 +1275,21 @@ mod tests {
         assert!(!diagnostic.to_string().contains("C:\\\\Users"));
         assert!(!diagnostic.to_string().contains("private.txt"));
 
-        let temp_output = json!("D4P_R2_TEMP_STEP_temp_write D4P_R2_TEMP_SCOPE_mxc_appcontainer D4P_R2_TEMP_WRITE_failed D4P_R2_TEMP_ERROR_KIND_access_denied D4P_R2_TEMP_INITIAL_WRITE_ERROR_io_failure C:\\Users\\example\\private synthetic-secret-content");
+        let temp_output = json!("D4P_R2_TEMP_STEP_temp_cleanup D4P_R2_TEMP_SCOPE_mxc_appcontainer D4P_R2_TEMP_WRITE_failed D4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_false D4P_R2_TEMP_DIRECTORY_CREATE_created D4P_R2_TEMP_RETRY_WRITE_passed D4P_R2_TEMP_CLEANUP_marker_and_created_directory_removed D4P_R2_TEMP_ERROR_KIND_access_denied D4P_R2_TEMP_INITIAL_WRITE_ERROR_io_failure C:\\Users\\example\\private synthetic-secret-content");
         let temp_diagnostic = safe_tool_output_diagnostic(&temp_output);
-        assert_eq!(temp_diagnostic["temp_step"], "temp_write");
+        assert_eq!(temp_diagnostic["temp_step"], "temp_cleanup");
         assert_eq!(temp_diagnostic["temp_scope"], "mxc_appcontainer");
         assert_eq!(temp_diagnostic["temp_write"], "failed");
+        assert_eq!(
+            temp_diagnostic["temp_directory_exists_after_initial_write"],
+            "false"
+        );
+        assert_eq!(temp_diagnostic["temp_directory_create"], "created");
+        assert_eq!(temp_diagnostic["temp_retry_write"], "passed");
+        assert_eq!(
+            temp_diagnostic["temp_cleanup"],
+            "marker_and_created_directory_removed"
+        );
         assert_eq!(temp_diagnostic["temp_error_fingerprint"], "access_denied");
         assert_eq!(temp_diagnostic["temp_initial_write_error"], "io_failure");
         assert!(!temp_diagnostic
@@ -1279,11 +1344,21 @@ mod tests {
     #[test]
     fn temp_probe_attempts_write_without_visibility_precheck() {
         let probe = synthetic_workspace_probe();
-        assert!(probe.contains(
-            "$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName)"
-        ));
+        assert!(
+            probe.contains("$tempStep='temp_write'; try { Set-Content -LiteralPath $tempMarker")
+        );
         assert!(probe.contains("-match 'DirectoryNotFound|PathNotFound'"));
-        assert!(!probe.contains("Test-Path -LiteralPath $tempTarget -PathType Container"));
+        assert!(probe.contains("D4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_"));
+        assert!(
+            probe.find("Set-Content -LiteralPath $tempMarker").unwrap()
+                < probe
+                    .find("Test-Path -LiteralPath $tempTarget -PathType Container")
+                    .unwrap()
+        );
+        assert!(probe
+            .contains("$tempScope -eq 'mxc_appcontainer' -and $tempDirectoryExists -eq $false"));
+        assert!(probe.contains("New-Item -ItemType Directory -Path $tempTarget"));
+        assert!(probe.contains("Remove-Item -LiteralPath $tempTarget -Force"));
     }
 
     #[test]

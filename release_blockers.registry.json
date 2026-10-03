@@ -1799,7 +1799,7 @@
         "scope_limit": "This is a positive installed-path Task run only in the r2-e2e test-feature build, using a loopback fake Responses API and synthetic NTFS Workspace/profile. It does not enable normal Release task_execution or establish real provider interoperability. The MxC TEMP write was attempted but failed with directory_missing; physical TEMP cleanup is unproven. Same-profile Broker restart accepted the durable Audit chain after a post-completion process stop, but this is not crash-during-Task recovery and no normal tray Exit Audit was produced. Result/diff Content Exposure UI, deadline/crash Recovery during active work, task-to-task cleanup/isolation, OneDrive Cloud Files plus ordinary NTFS integrated matrix, and normal Release capability eligibility remain open. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
       "latest_installed_e2e_observation": {
-        "date": "2026-10-03",
+        "date": "2026-10-04",
         "positive_task_run": "r2_installed_synthetic_task_e2e_run37",
         "previous_positive_task_run": "r2_installed_synthetic_task_e2e_run35",
         "prior_failed_runs": [
@@ -1824,7 +1824,35 @@
           "scope_limit": "The three exact network/loopback test cases were individually successful but intermittently failed under unfiltered all-target load on this Windows host. The filtered suite does not claim an unfiltered-suite pass or prove the cause of those transport failures."
         },
         "run37_result": "Fresh installed r2-e2e run37 completed one production Broker Task through native Owner-confirmed Workspace Permission, separate Task Approval, real Codex CLI 0.160.0/MxC child and loopback fake Responses API. Secret/outside read denials and host-side outside marker postconditions passed for the named synthetic paths. Same-profile Broker restart reloaded and verified the durable Audit chain. The actual MxC TEMP write failed with directory_missing, and normal Desktop Exit Audit is absent.",
-        "next_action": "Determine why the actual MxC AppContainer TEMP directory is missing during the child write without weakening isolation or replacing the runtime behavior with a fixture-only workaround; then perform a fresh installed run. Separately test active-Task deadline/crash Recovery, task-to-task isolation/cleanup, result/diff Content Exposure, OneDrive Cloud Files and ordinary NTFS integration, normal Release capability gating, and normal tray Exit Audit.",
+        "run37_post_owner_close_recheck": {
+          "owner_reported_desktop_closed": true,
+          "run_root_process_count": 0,
+          "audit_event_count": 108,
+          "audit_jsonl_sha256_unchanged": "sha256:9a17ce3bad10de805bdd39ede247ae094043440ae0ed0b8695cdb41af7358b39",
+          "anchor_event_count": 108,
+          "session_state": "active",
+          "desktop_exit_audit_ref": null,
+          "disposition": "Owner-reported closure and process absence are confirmed; the durable state did not gain a normal exit Audit or terminal Session state. Do not claim graceful exit evidence."
+        },
+        "temp_diagnostic_fixture_update_2026_10_04": {
+          "status": "implemented_fixture_only_installed_observation_pending",
+          "evidence_source": "FIXTURE",
+          "initial_write_order": "The child attempts the exact synthetic TEMP marker write before querying whether the TEMP directory exists; no visibility precheck gates the first write.",
+          "bounded_followup": "Only for recognized mxc_appcontainer scope plus initial directory_missing plus absent directory, the probe attempts to create that exact TEMP directory and one marker retry.",
+          "cleanup": "Removes the exact synthetic marker and only non-recursively removes the empty directory created by this probe; a nonempty or unremovable directory is reported, never recursively deleted.",
+          "audit_projection": "Only allowlisted classifications are emitted; raw path, exception text, and marker content are excluded.",
+          "validation": {
+            "r2_fixture_binary": "9 passed, 0 failed",
+            "cargo_check_all_targets_r2_e2e": "exit 0",
+            "touched_file_rustfmt_and_diff_check": "passed",
+            "all_targets_filtered_command": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e -- --test-threads=1 --skip failed_replacement_keeps_the_existing_corrupt_package_unchanged --skip 'ContentLength付きJSONだけを期限内に取得する' --skip local_tls_server_repairs_only_after_verified_package_bytes",
+            "all_targets_filtered_result": "exit 0; all remaining targets passed",
+            "filtered_cases_individually": "The three exact filtered loopback/TLS tests each passed on isolated rerun.",
+            "unfiltered_suite": "Three attempts encountered distinct Windows localhost/TLS transport failures (WSA 10054 or invalid Content-Type); the affected tests individually passed. Root cause is undetermined and no unfiltered-suite pass is claimed."
+          },
+          "scope_limit": "No production runtime or task_execution capability change. No fresh installed MxC TEMP result, physical cleanup proof, or R2 completion claim."
+        },
+        "next_action": "Commit and push the bounded fixture/documentation update, then perform a fresh installed run38 from that exact clean source to observe TEMP directory existence, create/retry result, and exact cleanup. Keep task_execution=unsupported and the R2 release blocker active. Separately test active-Task deadline/crash Recovery, task-to-task isolation/cleanup, result/diff Content Exposure, OneDrive Cloud Files and ordinary NTFS integration, normal Release capability gating, and normal tray Exit Audit.",
         "release_state": {
           "task_execution": "unsupported",
           "r2_release_blocker_active": true,
@@ -1953,7 +1981,7 @@
         "scope_limit": "Direct Codex sandbox children only. Later-child non-visibility does not prove distinct TEMP roots, physical deletion, same real Agent profile isolation, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
       "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、`--ignore-user-config`後もTaskだけに固定する`windows.sandbox`のmxc overrideと`:root=deny`、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、別OS process強制終了後のBroker library回復fixture 1件、`cargo check --all-targets`、前回実行した`cargo test --all-targets -- --test-threads=1`では366件が成功した。先行したローカル再実行はlib 321件ほか計355件が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、全体成功ではない。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持する。先行したローカルsource/build gateでは`cargo check --all-targets`が成功した一方、ローカル全target testはOS error 4551で起動できなかった。2026-09-28の手動Windows Actions [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)はcommit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`を検査し、2026-09-29の現行mainに対する[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)もWindows Server 2025／Rust 1.95.0で全target check／testに成功した（12 target、389 passed／0 failed／0 ignored、rustfmtと試験後cleanも成功）。これらのActions証拠はRust検査範囲に限られ、ローカルApplication Control、installed productのLIVE_RUNTIME、release readinessを証明しない。先行run #9のcompile失敗はtest-onlyの`expect_err`が`Secret: Debug`を要求した問題で、秘密値型へDebugを追加せず修正した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構で失敗し、profileを安全境界として扱わない。2026-09-29の現行mxc直接CLI probeではOneDrive .env ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込を拒否し、Workspace通常file／Task scratch相当の読書込を許可した一方、:minimal=readの範囲としてC:/Windows/win.iniは読めた。同じsource commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)はWindows Server 2025／Rust 1.95.0でcheckout SHA照合、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認に成功した。このhosted証拠はRust test／buildに限る。直接CLIのLIVE_RUNTIME証拠は合成path probeに限り、codex exec、Rust Broker、Owner Approval、実Agent Taskを通していない。別process強制終了試験はRust test harness内のBroker libraryと永続storeを使う`FIXTURE`であり、production `broker-server`／IPCや電源断後cleanupの`LIVE_RUNTIME`証拠ではない。windows.sandbox overrideは方式選択を固定するだけで、実Codex Task、秘密file拒否、外部path拒否を証明しない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・製品経路のcrash recovery・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
-      "required_action": "run35では試験feature付き段階配置品を使った正のTask完了と同一profile Audit restart読戻しが一度成立したが、run36 fresh installed再試行はfailed。outside-read前提`Test-Path`を除き、host側でcanary内容不変とoutside-write不在をTask後にも確認するfake-API fixture変更を作成済み。次はこの変更をcommit／pushし、fresh installed run37でTask completion、secret／outside boundary、TEMP書込みと終了後観測、Audit restart、cleanupを検証する。終了操作後もrun36 sessionはactiveで正常終了Auditがなかったため、tray exitの正常Auditも引き続き確認する。TEMP successだけでR2を閉じず、期限／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、`Compare`／`Handoff` failure pathを進める。通常Releaseの`task_execution`は正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
+      "required_action": "run37ではr2-e2e installed pathのpositive Task completion、指定合成secret/outside境界、同一profile Broker restart後のdurable Audit読戻しが成立した一方、実MxC TEMP writeはdirectory_missing、物理cleanupと通常Desktop Exit Auditは未成立。Owner報告後にrun37由来process不在、Audit 108 events／既知JSONL hash不変を確認したが、Sessionはactiveのまま。TEMP fixtureは初回write順を保ったbounded directory create/retry／非再帰cleanup診断へ更新済み。変更をcommit／pushし、正確なclean sourceからfresh installed run38を実行する。TEMP結果だけでR2を閉じず、期限／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、Compare／Handoff failure path、tray通常終了Auditを別途検証する。通常Releaseのtask_executionは正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
     },
     {
       "name": "rev2_desktop_product_distribution",
