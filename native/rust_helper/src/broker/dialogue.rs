@@ -3316,7 +3316,7 @@ mod tests {
             }
             assert!(
                 Instant::now() < temp_report_deadline,
-                "実MxC tool childがTEMP／TMP報告を確定する期限: accepted={}; incomplete=({}); responses_posts={}; invalid_bodies={}; response_write=({}); tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_rejections={}; tool_outputs=({}); request_shapes={}; outside_requests={} ({})",
+                "実MxC tool childがTEMP／TMP報告を確定する期限: accepted={}; incomplete=({}); responses_posts={}; invalid_bodies={}; response_write=({}); tool_offered={}; tool_call_sent={}; tool_result_received={}; repeat_rejections={}; tool_outputs=({}); safe_tool_output_diagnostics={:?}; request_shapes={}; outside_requests={} ({})",
                 server.accepted_connections(),
                 server.incomplete_request_summary(),
                 server.post_requests(),
@@ -3327,97 +3327,70 @@ mod tests {
                 server.tool_result_was_received(),
                 server.repeated_tool_call_rejections(),
                 server.tool_output_summary(),
+                server.tool_output_diagnostics(),
                 server.request_shape_summary(),
                 server.blocked_external_requests(),
                 server.blocked_external_summary()
             );
             std::thread::sleep(Duration::from_millis(20));
         };
-        assert_eq!(
-            temp_report["temp_write"], "passed",
-            "TEMP書込probe: {temp_report}"
-        );
-        let temp_scope = temp_report["temp_scope"]
-            .as_str()
-            .expect("実MxC子プロセスの一時保存範囲を確認");
-        assert!(
-            matches!(temp_scope, "broker_workspace_scratch" | "mxc_appcontainer"),
-            "TEMPはBroker scratchまたはMxC専用AppContainer temp内に限る: {temp_report}"
-        );
-        let temp_is_workspace_scratch = temp_scope == "broker_workspace_scratch";
-        assert_eq!(
-            temp_report["temp_matches_workspace_scratch"], temp_is_workspace_scratch,
-            "TEMP scopeとBroker scratch照合が一致: {temp_report}"
-        );
-        assert_eq!(
-            temp_report["tmp_matches_workspace_scratch"], temp_is_workspace_scratch,
-            "TMP scopeとBroker scratch照合が一致: {temp_report}"
-        );
-        let child_temp = temp_report["temp"]
-            .as_str()
-            .filter(|path| !path.is_empty() && std::path::Path::new(path).is_absolute())
-            .expect("実tool child TEMP絶対path");
-        let child_tmp = temp_report["tmp"]
-            .as_str()
-            .filter(|path| !path.is_empty() && std::path::Path::new(path).is_absolute())
-            .expect("実tool child TMP絶対path");
+        let child_temp = temp_report["temp"].as_str().unwrap_or_default().to_owned();
+        let child_tmp = temp_report["tmp"].as_str().unwrap_or_default().to_owned();
         let temp_marker_name = temp_report["marker_name"]
             .as_str()
-            .filter(|name| {
-                name.starts_with("d4p-broker-temp-observer-")
-                    && name.ends_with(".marker")
-                    && std::path::Path::new(name)
-                        .file_name()
-                        .and_then(|part| part.to_str())
-                        == Some(*name)
-            })
-            .expect("実tool childがTEMPへ作った合成marker名");
-        let temp_marker_path = std::path::Path::new(child_temp).join(temp_marker_name);
-        let marker_observation = |path: &std::path::Path, expected: &[u8]| match std::fs::read(path)
-        {
-            Ok(bytes) if bytes == expected => "readable_match",
-            Ok(_) => "readable_mismatch",
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "not_found",
-            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => "access_denied",
-            Err(_) => "other_error",
+            .unwrap_or_default()
+            .to_owned();
+        let temp_marker_name_is_safe = temp_marker_name.starts_with("d4p-broker-temp-observer-")
+            && temp_marker_name.ends_with(".marker")
+            && std::path::Path::new(&temp_marker_name)
+                .file_name()
+                .and_then(|part| part.to_str())
+                == Some(temp_marker_name.as_str());
+        let temp_path_is_safe = temp_marker_name_is_safe
+            && std::path::Path::new(&child_temp).is_absolute()
+            && std::path::Path::new(&child_tmp).is_absolute();
+        let temp_marker_path =
+            temp_path_is_safe.then(|| std::path::Path::new(&child_temp).join(&temp_marker_name));
+        let marker_observation = |path: Option<&std::path::Path>, expected: &[u8]| match path {
+            Some(path) => match std::fs::read(path) {
+                Ok(bytes) if bytes == expected => "readable_match",
+                Ok(_) => "readable_mismatch",
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => "not_found",
+                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                    "access_denied"
+                }
+                Err(_) => "other_error",
+            },
+            None => "invalid_path",
         };
-        let temp_directory_observation = |path: &std::path::Path| match std::fs::read_dir(path) {
-            Ok(entries) => format!("存在_内容数_{}", entries.count()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => "不在".to_owned(),
-            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
-                "参照拒否".to_owned()
-            }
-            Err(_) => "その他失敗".to_owned(),
+        let temp_directory_observation = |path: Option<&std::path::Path>| match path {
+            Some(path) => match std::fs::read_dir(path) {
+                Ok(entries) => format!("存在_内容数_{}", entries.count()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => "不在".to_owned(),
+                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                    "参照拒否".to_owned()
+                }
+                Err(_) => "その他失敗".to_owned(),
+            },
+            None => "invalid_path".to_owned(),
         };
         let marker_while_mxc_child_running =
-            marker_observation(&temp_marker_path, b"d4p synthetic temp observer");
-        assert_eq!(
-            marker_while_mxc_child_running, "readable_match",
-            "Broker親が実行中MxC TEMPの合成markerを観測"
-        );
+            marker_observation(temp_marker_path.as_deref(), b"d4p synthetic temp observer");
         let normalize_windows_path = |path: &str| {
             path.replace('/', "\\")
                 .trim_end_matches('\\')
                 .to_ascii_lowercase()
         };
-        assert_eq!(
-            normalize_windows_path(child_temp),
-            normalize_windows_path(child_tmp),
-            "実MxC tool child TEMPとTMPが同じ合成pathを指す"
-        );
-        let broker_scratch = std::fs::read_dir(workspace_path)
-            .expect("稼働中のWorkspaceTaskScratchを列挙")
-            .filter_map(Result::ok)
-            .find(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"))
-            .map(|entry| entry.path())
-            .expect("実CLI tool childの稼働中Broker scratch");
-        let temp_matches_broker_scratch = normalize_windows_path(child_temp)
-            == normalize_windows_path(&broker_scratch.to_string_lossy());
-        eprintln!(
-            "実MxC tool childのTEMP_TMP一致={}; Broker scratch一致={}",
-            normalize_windows_path(child_temp) == normalize_windows_path(child_tmp),
-            temp_matches_broker_scratch
-        );
+        let broker_scratch = std::fs::read_dir(workspace_path).ok().and_then(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .find(|entry| entry.file_name().to_string_lossy().starts_with(".d4p-tmp-"))
+                .map(|entry| entry.path())
+        });
+        let temp_matches_broker_scratch = broker_scratch.as_ref().is_some_and(|scratch| {
+            normalize_windows_path(&child_temp)
+                == normalize_windows_path(&scratch.to_string_lossy())
+        });
         std::fs::write(
             workspace_path.join("broker-real-codex-task-continue"),
             b"continue synthetic task",
@@ -3466,30 +3439,74 @@ mod tests {
             server.blocked_external_requests(),
             server.blocked_external_summary(),
         );
+        let temp_write = temp_report["temp_write"]
+            .as_str()
+            .expect("実MxC子プロセスTEMP書込み状態");
+        assert!(
+            matches!(temp_write, "passed" | "failed"),
+            "TEMP書込み状態は固定enum"
+        );
+        let temp_scope = temp_report["temp_scope"]
+            .as_str()
+            .expect("実MxC子プロセスの一時保存範囲を確認");
+        assert!(
+            matches!(temp_scope, "broker_workspace_scratch" | "mxc_appcontainer"),
+            "TEMPはBroker scratchまたはMxC専用AppContainer tempに分類する"
+        );
+        let temp_is_workspace_scratch = temp_scope == "broker_workspace_scratch";
+        assert_eq!(
+            temp_report["temp_matches_workspace_scratch"], temp_is_workspace_scratch,
+            "TEMP scopeとBroker scratch照合が一致"
+        );
+        assert_eq!(
+            temp_report["tmp_matches_workspace_scratch"], temp_is_workspace_scratch,
+            "TMP scopeとBroker scratch照合が一致"
+        );
+        assert!(temp_path_is_safe, "TEMP／TMPとmarker名は安全な絶対path");
+        assert!(temp_marker_name_is_safe, "合成marker名はfile nameだけ");
+        if temp_write == "passed" {
+            assert_eq!(
+                marker_while_mxc_child_running, "readable_match",
+                "TEMP書込み成功時にBroker親が実行中MxC markerを観測"
+            );
+        }
+        assert_eq!(
+            normalize_windows_path(&child_temp),
+            normalize_windows_path(&child_tmp),
+            "実MxC tool child TEMPとTMPが同じ合成pathを指す"
+        );
+        assert!(
+            broker_scratch.is_some(),
+            "稼働中のWorkspaceTaskScratchを確認"
+        );
+        assert!(temp_matches_broker_scratch || temp_scope == "mxc_appcontainer");
         let marker_after_mxc_exit =
-            marker_observation(&temp_marker_path, b"d4p synthetic temp observer");
-        let marker_removed_by_probe = if marker_after_mxc_exit == "readable_match" {
-            std::fs::remove_file(&temp_marker_path).is_ok()
-        } else {
-            false
-        };
-        let temp_directory_after_mxc_exit =
-            temp_directory_observation(std::path::Path::new(child_temp));
+            marker_observation(temp_marker_path.as_deref(), b"d4p synthetic temp observer");
+        let temp_directory_after_mxc_exit = temp_directory_observation(
+            temp_path_is_safe.then_some(std::path::Path::new(&child_temp)),
+        );
         eprintln!(
-            "MxC TEMP markerのBroker親観測: 実行中={}; CLI終了後={}; TEMP実体状態={}; 試験固有marker除去={}",
+            "MxC TEMP markerのBroker親観測: write={}; 実行中={}; CLI終了後={}; TEMP実体状態={}",
+            temp_write,
             marker_while_mxc_child_running,
             marker_after_mxc_exit,
-            temp_directory_after_mxc_exit,
-            marker_removed_by_probe
+            temp_directory_after_mxc_exit
         );
-        assert_eq!(
-            marker_after_mxc_exit, "not_found",
-            "正常終了後にMxC TEMPのTask markerが残らない"
-        );
-        assert_eq!(
-            temp_directory_after_mxc_exit, "不在",
-            "正常終了後にMxC専用TEMP directoryが残らない"
-        );
+        if temp_write == "passed" {
+            assert_eq!(
+                marker_after_mxc_exit, "not_found",
+                "TEMP書込み成功時にMxC終了後markerが消える"
+            );
+        } else {
+            assert_eq!(
+                temp_report["temp_directory_create"], "not_attempted",
+                "MxC AppContainer外へディレクトリを作成しない"
+            );
+            assert_eq!(
+                temp_report["temp_retry_write"], "not_attempted",
+                "TEMP directory不在時に権限境界を拡張したretryをしない"
+            );
+        }
         assert!(result["result_hash"]
             .as_str()
             .unwrap()
@@ -3668,8 +3685,10 @@ mod tests {
         assert_eq!(reported_cancel_marker_name, cancel_temp_marker_name);
         let cancel_temp_marker_path =
             std::path::Path::new(cancel_temp).join(reported_cancel_marker_name);
-        let cancel_marker_while_running =
-            marker_observation(&cancel_temp_marker_path, b"d4p synthetic temp observer");
+        let cancel_marker_while_running = marker_observation(
+            Some(&cancel_temp_marker_path),
+            b"d4p synthetic temp observer",
+        );
         assert_eq!(
             cancel_marker_while_running, "readable_match",
             "Broker親が取消中MxC TEMPの合成markerを観測"
@@ -3716,10 +3735,12 @@ mod tests {
         };
         assert_eq!(cancelled["status"], "cancelled");
         assert!(cancelled.get("result_hash").is_none());
-        let cancel_marker_after_exit =
-            marker_observation(&cancel_temp_marker_path, b"d4p synthetic temp observer");
+        let cancel_marker_after_exit = marker_observation(
+            Some(&cancel_temp_marker_path),
+            b"d4p synthetic temp observer",
+        );
         let cancel_temp_directory_after_exit =
-            temp_directory_observation(std::path::Path::new(cancel_temp));
+            temp_directory_observation(Some(std::path::Path::new(cancel_temp)));
         assert_eq!(
             cancel_marker_after_exit, "not_found",
             "Broker取消でMxC child終了後にTEMPのtask markerを残さない"

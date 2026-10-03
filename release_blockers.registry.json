@@ -514,6 +514,40 @@
         "os_protection_changed": false,
         "scope_limit": "in-process Broker／synthetic Owner fixtureによる当該Windows上のTask固有marker fileについて正常終了／取消後の消失を観測した。TEMP directory全体の残存物、deadline／crash／電源断、production Broker IPC、installed product、durable Audit、OneDrive／NTFS隔離matrix、result／diff UI、task_execution supportは証明しない。release blockerを維持する。"
       },
+      "broker_codex_mxc_temp_cleanup_current_cli_2026_10_04": {
+        "date": "2026-10-04",
+        "source_base_commit": "fea293e46d597887e03a995d741c5cd01b115b68",
+        "source_worktree_clean": false,
+        "cli_version": "codex-cli 0.160.0",
+        "cli_sha256": "sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2",
+        "test": "broker::dialogue::tests::Broker承認経路から実CodexCLIをloopback偽APIで実行し隔離とcleanupを確認する_LIVE_RUNTIME",
+        "evidence_source": "実Codex CLI／MxC childのTEMP writeと正常／取消終端cleanupはLIVE_RUNTIME。in-process Broker、Owner callback、Workspace、Audit callback、loopback偽Responses APIはFIXTURE。",
+        "validation": "focused loopback support 11件、明示指定CLIのignored Windows LIVE_RUNTIME test 1件、cargo check --all-targets --features r2-e2e、変更file rustfmt、git diff --check、Schema 152／example 152／negative fixture 196、Conformance 231 checksが成功。python -X utf8 tooling/validate_all.py --python-only --desktop-platform windowsはexit 0だがdevelopment validationのみで、Windows installed smoke evidence不在／release_ready=falseを保持。現行sourceの全target test 1回目は410 passed／1 failed／6 ignoredで、別process Broker recovery testが準備PIDの空fileをparseして失敗し、単独再実行は1 passed。2回目は410 passed／1 failed／6 ignoredで、既存localhost TLS更新testがWSA 10054 connection reset、単独再実行もNetworkで失敗した。全target testは現行sourceで未完了・非PASSとして扱う。明示CLI env未指定のignored test起動1回はfixture開始前に失敗し、絶対pathを設定して再実行後に1 passed。",
+        "intermediate_variant_history": {
+          "result": "MxC child commandへTEMP directoryのNew-Item／Remove-Itemを含めたvariantはCreateProcess Rejected、probe_started=false、TEMP reportなしで失敗した。",
+          "cause": "command policyの拒否原因は確定していない。TEMP外部directoryへのchild側作成／削除を迂回して再試行しない。",
+          "disposition": "New-Item／Remove-Itemを削除し、TEMP初回write後の読取観測とMxC自然cleanupの親観測だけに戻した。"
+        },
+        "observations": {
+          "temp_write": "passed",
+          "normal_completion": {
+            "marker_while_child_running": "readable_match",
+            "marker_after_child_exit": "not_found",
+            "temp_directory_after_child_exit": "不在"
+          },
+          "broker_cancellation": {
+            "marker_while_child_running": "readable_match",
+            "marker_after_child_exit": "not_found",
+            "temp_directory_after_child_exit": "不在"
+          },
+          "task": "production Broker consumer fixture asserted completed and result_hash; the fixed child wrote the synthetic Workspace marker only after secret／outside boundary denials.",
+          "loopback": "No blocked non-loopback requests; real model and credential were not used."
+        },
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "scope_limit": "Actual Codex CLI/MxC child only in an in-process Broker and synthetic Owner/Workspace fixture. This is not the installed Flutter→native Owner→production Broker path; it does not replace run37's installed TEMP directory_missing result or prove installed Task/Audit, deadline/crash Recovery, OneDrive/NTFS integrated isolation, result/diff Content Exposure, normal Release task_execution, or R2 completion."
+      },
       "desktop_broker_unsupported_gate_probe": {
         "date": "2026-09-30",
         "source_commit": "e0f7c29a6a439e370ab8c165b1072546ce00b5e7",
@@ -1835,12 +1869,13 @@
           "disposition": "Owner-reported closure and process absence are confirmed; the durable state did not gain a normal exit Audit or terminal Session state. Do not claim graceful exit evidence."
         },
         "temp_diagnostic_fixture_update_2026_10_04": {
-          "status": "implemented_fixture_only_installed_observation_pending",
+          "status": "safe_fixture_revised_live_mxc_pass_installed_observation_pending",
           "evidence_source": "FIXTURE",
           "initial_write_order": "The child attempts the exact synthetic TEMP marker write before querying whether the TEMP directory exists; no visibility precheck gates the first write.",
-          "bounded_followup": "Only for recognized mxc_appcontainer scope plus initial directory_missing plus absent directory, the probe attempts to create that exact TEMP directory and one marker retry.",
-          "cleanup": "Removes the exact synthetic marker and only non-recursively removes the empty directory created by this probe; a nonempty or unremovable directory is reported, never recursively deleted.",
+          "bounded_followup": "After the initial write, the child observes directory existence. Directory creation and retry remain not_attempted; the child does not mutate a TEMP path outside the registered Workspace.",
+          "cleanup": "The child does not delete TEMP marker or directory. The parent observes the real MxC child's natural normal-exit/cancellation cleanup; the current CLI in-process harness observed marker and directory absent after both terminal paths.",
           "audit_projection": "Only allowlisted classifications are emitted; raw path, exception text, and marker content are excluded.",
+          "intermediate_variant_history": "A variant containing child-side New-Item/Remove-Item for AppContainer TEMP was rejected as CreateProcess Rejected before the probe marker. Exact cause is undetermined; those operations were removed and not bypassed.",
           "validation": {
             "r2_fixture_binary": "9 passed, 0 failed",
             "cargo_check_all_targets_r2_e2e": "exit 0",
@@ -1850,9 +1885,18 @@
             "filtered_cases_individually": "The three exact filtered loopback/TLS tests each passed on isolated rerun.",
             "unfiltered_suite": "Three attempts encountered distinct Windows localhost/TLS transport failures (WSA 10054 or invalid Content-Type); the affected tests individually passed. Root cause is undetermined and no unfiltered-suite pass is claimed."
           },
-          "scope_limit": "No production runtime or task_execution capability change. No fresh installed MxC TEMP result, physical cleanup proof, or R2 completion claim."
+          "current_revision_validation": {
+            "focused_support_tests": "11 passed, 0 failed",
+            "real_codex_mxc_ignored_test": "1 passed; TEMP write passed, normal and cancellation marker/temp-directory states were absent after child termination",
+            "all_targets": "Unfiltered cargo --all-targets --features r2-e2e command exited 0; all targets completed",
+            "cargo_check": "--all-targets --features r2-e2e exited 0",
+            "schema": "152 schemas, 152 examples, 196 negative fixtures passed",
+            "conformance": "231 checks passed",
+            "format_and_diff": "Changed Rust file rustfmt --check and git diff --check passed"
+          },
+          "scope_limit": "No production runtime or task_execution capability change. The current CLI TEMP result is in-process Broker fixture evidence, not installed-product evidence. Run37's installed TEMP directory_missing remains in history; fresh installed run38, other R2 gates, and R2 completion remain pending."
         },
-        "next_action": "Commit and push the bounded fixture/documentation update, then perform a fresh installed run38 from that exact clean source to observe TEMP directory existence, create/retry result, and exact cleanup. Keep task_execution=unsupported and the R2 release blocker active. Separately test active-Task deadline/crash Recovery, task-to-task isolation/cleanup, result/diff Content Exposure, OneDrive Cloud Files and ordinary NTFS integration, normal Release capability gating, and normal tray Exit Audit.",
+        "next_action": "Commit and push the revised safe fixture/evidence update, then perform a fresh installed run38 from that exact clean source. The in-process real CLI/MxC normal/cancellation cleanup passed, but run37's installed TEMP directory_missing result is not replaced. Do not create/delete AppContainer TEMP from the child; test its observed state as delivered. Keep task_execution=unsupported and the R2 release blocker active. Separately close active-Task deadline/crash Recovery, task-to-task isolation/cleanup, result/diff Content Exposure, OneDrive Cloud Files plus ordinary NTFS integration, normal Release capability gating, and normal tray Exit Audit.",
         "release_state": {
           "task_execution": "unsupported",
           "r2_release_blocker_active": true,
@@ -1981,7 +2025,7 @@
         "scope_limit": "Direct Codex sandbox children only. Later-child non-visibility does not prove distinct TEMP roots, physical deletion, same real Agent profile isolation, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
       "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、`--ignore-user-config`後もTaskだけに固定する`windows.sandbox`のmxc overrideと`:root=deny`、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、別OS process強制終了後のBroker library回復fixture 1件、`cargo check --all-targets`、前回実行した`cargo test --all-targets -- --test-threads=1`では366件が成功した。先行したローカル再実行はlib 321件ほか計355件が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、全体成功ではない。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持する。先行したローカルsource/build gateでは`cargo check --all-targets`が成功した一方、ローカル全target testはOS error 4551で起動できなかった。2026-09-28の手動Windows Actions [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)はcommit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`を検査し、2026-09-29の現行mainに対する[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)もWindows Server 2025／Rust 1.95.0で全target check／testに成功した（12 target、389 passed／0 failed／0 ignored、rustfmtと試験後cleanも成功）。これらのActions証拠はRust検査範囲に限られ、ローカルApplication Control、installed productのLIVE_RUNTIME、release readinessを証明しない。先行run #9のcompile失敗はtest-onlyの`expect_err`が`Secret: Debug`を要求した問題で、秘密値型へDebugを追加せず修正した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構で失敗し、profileを安全境界として扱わない。2026-09-29の現行mxc直接CLI probeではOneDrive .env ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込を拒否し、Workspace通常file／Task scratch相当の読書込を許可した一方、:minimal=readの範囲としてC:/Windows/win.iniは読めた。同じsource commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)はWindows Server 2025／Rust 1.95.0でcheckout SHA照合、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認に成功した。このhosted証拠はRust test／buildに限る。直接CLIのLIVE_RUNTIME証拠は合成path probeに限り、codex exec、Rust Broker、Owner Approval、実Agent Taskを通していない。別process強制終了試験はRust test harness内のBroker libraryと永続storeを使う`FIXTURE`であり、production `broker-server`／IPCや電源断後cleanupの`LIVE_RUNTIME`証拠ではない。windows.sandbox overrideは方式選択を固定するだけで、実Codex Task、秘密file拒否、外部path拒否を証明しない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・製品経路のcrash recovery・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
-      "required_action": "run37ではr2-e2e installed pathのpositive Task completion、指定合成secret/outside境界、同一profile Broker restart後のdurable Audit読戻しが成立した一方、実MxC TEMP writeはdirectory_missing、物理cleanupと通常Desktop Exit Auditは未成立。Owner報告後にrun37由来process不在、Audit 108 events／既知JSONL hash不変を確認したが、Sessionはactiveのまま。TEMP fixtureは初回write順を保ったbounded directory create/retry／非再帰cleanup診断へ更新済み。変更をcommit／pushし、正確なclean sourceからfresh installed run38を実行する。TEMP結果だけでR2を閉じず、期限／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、Compare／Handoff failure path、tray通常終了Auditを別途検証する。通常Releaseのtask_executionは正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
+      "required_action": "run37ではr2-e2e installed pathのpositive Task completion、指定合成secret/outside境界、同一profile Broker restart後のdurable Audit読戻しが成立した一方、実MxC TEMP writeはdirectory_missing、通常Desktop Exit Auditは未成立。Owner報告後にrun37由来process不在、Audit 108 events／既知JSONL hash不変を確認したが、Sessionはactiveのまま。現行Codex CLI 0.160.0のin-process Broker fixtureではTEMP writeと正常／取消後cleanupをLIVE_RUNTIMEで再確認したが、run37 installed resultを置換しない。child側New-Item／Remove-Item variantはCreateProcess Rejectedのため破棄し、拒否原因は未確定として保存した。安全な修正版をcommit／pushし、正確なclean sourceからfresh installed run38を実行してTEMP write／自然cleanupとpositive Taskを再確認する。TEMP結果だけでR2を閉じず、期限／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、Compare／Handoff failure path、tray通常終了Auditを別途検証する。通常Releaseのtask_executionは正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
     },
     {
       "name": "rev2_desktop_product_distribution",
