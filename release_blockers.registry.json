@@ -2038,7 +2038,42 @@
             "chain_and_hmac_recalculated": false,
             "normal_desktop_exit_audit_ref": null
           },
-          "disposition": "The reported exit did not stop these exact run40 processes. Do not claim process shutdown or graceful tray exit; the newly built visibility-linked poll fix has not yet been tested in an installed run."
+          "disposition": "At the 06:41 and 06:55 snapshots, the reported exit had not stopped these exact run40 processes. A later native tray Exit produced broker-audit-188 and the exact run40 processes and fake API listener became absent; see run40_final_exit_audit_verification. This still does not make run40 a positive Task E2E or verify the separately rebuilt visibility-linked poll fix."
+        },
+        "run40_final_exit_audit_verification": {
+          "date": "2026-10-04",
+          "observed_at_local": "2026-10-04T07:43:22+09:00",
+          "source_commit": "8babcd3b4eba08e959e8d447d6a680d7cdbba994",
+          "source_worktree_clean": true,
+          "run_root": "C:\\d4p-r2-run40-8babcd3",
+          "run_root_process_count": 0,
+          "fake_api_listener": {
+            "address": "127.0.0.1",
+            "port": 56601,
+            "absent": true
+          },
+          "audit_event_count": 188,
+          "last_event": {
+            "event_id": "broker-audit-188",
+            "operation": "D4 Pocket Desktop終了",
+            "decision": "recorded",
+            "evidence_source": "LIVE_RUNTIME",
+            "event_hash": "sha256:3915510aaa5448ad1f813a11a715bd2f5cb99dc9c6ec42d9841b0033ad57e283"
+          },
+          "event_id_sequence_errors": 0,
+          "duplicate_event_ids": 0,
+          "event_hash_errors": 0,
+          "previous_link_errors": 0,
+          "anchor_event_count": 188,
+          "anchor_head_hash": "sha256:3915510aaa5448ad1f813a11a715bd2f5cb99dc9c6ec42d9841b0033ad57e283",
+          "anchor_count_and_head_match": true,
+          "anchor_hmac_valid": true,
+          "audit_jsonl_sha256": "sha256:1463ee37fef4ef0ae91d14c1e751864334a5f00a9458d27289d61ae8445ce29c",
+          "task_started": false,
+          "task_permission_or_owner_approval_granted": false,
+          "runtime_isolated": false,
+          "formal_runtime_proof": false,
+          "disposition": "The later tray Exit, process/listener termination, and file-backed Audit integrity are verified for run40 only. Run40 is not a positive Task E2E, does not test the source 5eaeef3 visibility-linked repair, and does not resolve the R2 release blocker."
         },
         "run40_hidden_window_poll_repair": {
           "files": [
