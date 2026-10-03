@@ -18,6 +18,9 @@ C20は、D4 PocketのWindows日常操作をsystem tray（常駐トレイ）へ�
 ## 境界
 
 - Windows native trayはfilesystem、process、network、credential、Broker secretへアクセスしない。
+- trayの状態投影はWin32が観測したトップレベルwindowの可視状態を使う。Flutterから可視状態を設定・偽装するchannelは設けない。
+- Broker由来のtray状態はwindowが可視の間だけ30秒周期で更新する。Win32が観測したwindow可視状態の変化をFlutterへ通知し、windowを隠した時点でpoll timerとnative projectionを停止・`不明`化する。未完了の一回の取得があっても、隠れたwindowへ古い状態を再投影しない。トレイから再表示した後は現在のBroker状態を再取得してから投影する。
+- tray plugin／native visibility照会が利用できない場合、tray表示用のBroker pollを開始・継続しない。
 - trayのMethodChannelは表示射影と固定actionだけを受け付け、受信値は上限付き型検査を行う。
 - 全Runtime停止はBrokerが保持するlifecycle対象を列挙してowner再承認待ちreceiptを返すだけであり、成功した停止とは扱わない。
 - `停止実行済み=false`、`承認状態=owner_reapproval_required`、`権限生成=なし`を変更しない。

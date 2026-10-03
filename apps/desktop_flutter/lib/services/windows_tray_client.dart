@@ -7,6 +7,7 @@ import 'broker_client.dart';
 import 'notification_client.dart';
 
 typedef WindowsTrayActionHandler = FutureOr<void> Function(String action);
+typedef WindowsTrayVisibilityHandler = void Function(bool visible);
 
 class WindowsTrayProjection {
   const WindowsTrayProjection({
@@ -34,8 +35,12 @@ class WindowsTrayProjection {
 
   static Future<WindowsTrayProjection> fromSnapshot(
     ShellSnapshot snapshot,
-    BrokerTransport? transport,
-  ) async {
+    BrokerTransport? transport, {
+    bool windowVisible = true,
+  }) async {
+    if (!windowVisible) {
+      return unavailable(stopRequestSupported: transport != null);
+    }
     final brokerSnapshot = snapshot.snapshotSource == 'broker';
     Object criticalCount = '不明';
     if (transport != null) {
@@ -53,9 +58,8 @@ class WindowsTrayProjection {
       }
     }
     return WindowsTrayProjection(
-      runtimeStatus: brokerSnapshot
-          ? snapshot.operationStatus.runtimeStatus
-          : '不明',
+      runtimeStatus:
+          brokerSnapshot ? snapshot.operationStatus.runtimeStatus : '不明',
       pendingApprovalCount: brokerSnapshot
           ? snapshot.operationStatus.pendingApprovalsCount
           : '不明',
@@ -64,6 +68,17 @@ class WindowsTrayProjection {
       stopRequestSupported: transport != null,
     );
   }
+
+  static WindowsTrayProjection unavailable({
+    required bool stopRequestSupported,
+  }) =>
+      WindowsTrayProjection(
+        runtimeStatus: '不明',
+        pendingApprovalCount: '不明',
+        criticalNotificationCount: '不明',
+        evidenceSource: '不明',
+        stopRequestSupported: stopRequestSupported,
+      );
 }
 
 class WindowsTrayClient {
@@ -72,20 +87,48 @@ class WindowsTrayClient {
 
   final MethodChannel _channel;
   WindowsTrayActionHandler? _actionHandler;
+  WindowsTrayVisibilityHandler? _visibilityHandler;
   bool _available = false;
 
   bool get available => _available;
 
-  Future<void> start({required WindowsTrayActionHandler onAction}) async {
+  Future<bool> start({
+    required WindowsTrayActionHandler onAction,
+    WindowsTrayVisibilityHandler? onVisibilityChanged,
+  }) async {
     _actionHandler = onAction;
+    _visibilityHandler = onVisibilityChanged;
     _channel.setMethodCallHandler(_handleMethodCall);
     try {
-      await _channel.invokeMethod<void>('initialize');
+      final windowVisible = await _channel.invokeMethod<bool>('initialize');
+      if (windowVisible == null) {
+        _available = false;
+        return false;
+      }
       _available = true;
+      return windowVisible;
     } on MissingPluginException {
       _available = false;
+      return false;
     } on PlatformException {
       _available = false;
+      return false;
+    }
+  }
+
+  Future<bool?> isWindowVisible() async {
+    if (!_available) return null;
+    try {
+      final windowVisible =
+          await _channel.invokeMethod<bool>('isWindowVisible');
+      if (windowVisible == null) _available = false;
+      return windowVisible;
+    } on MissingPluginException {
+      _available = false;
+      return null;
+    } on PlatformException {
+      _available = false;
+      return null;
     }
   }
 
@@ -102,6 +145,7 @@ class WindowsTrayClient {
 
   Future<void> dispose() async {
     _actionHandler = null;
+    _visibilityHandler = null;
     _channel.setMethodCallHandler(null);
     _available = false;
   }
@@ -109,6 +153,9 @@ class WindowsTrayClient {
   Future<Object?> _handleMethodCall(MethodCall call) async {
     if (call.method == 'onTrayAction' && call.arguments is String) {
       await _actionHandler?.call(call.arguments as String);
+    } else if (call.method == 'onWindowVisibilityChanged' &&
+        call.arguments is bool) {
+      _visibilityHandler?.call(call.arguments as bool);
     }
     return null;
   }

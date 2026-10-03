@@ -18,6 +18,7 @@ constexpr UINT kTrayStopCommand = 41002;
 constexpr UINT kTrayExitCommand = 41003;
 constexpr UINT kTrayIconId = 41004;
 constexpr wchar_t kTooltip[] = L"D4 Pocket";
+constexpr char kUnknown[] = "\xE4\xB8\x8D\xE6\x98\x8E";
 
 std::wstring Utf8ToWide(const std::string& value) {
   if (value.empty()) return L"";
@@ -55,17 +56,17 @@ bool BoolValue(const flutter::EncodableMap& map, const char* key) {
 
 std::string CountValue(const flutter::EncodableMap& map, const char* key) {
   const auto found = map.find(flutter::EncodableValue(key));
-  if (found == map.end()) return "unknown";
+  if (found == map.end()) return kUnknown;
   if (const auto* value = std::get_if<std::string>(&found->second)) {
-    return value->empty() || value->size() > 64 ? "unknown" : *value;
+    return value->empty() || value->size() > 64 ? kUnknown : *value;
   }
   if (const auto* value = std::get_if<int32_t>(&found->second)) {
-    return *value >= 0 && *value <= 256 ? std::to_string(*value) : "unknown";
+    return *value >= 0 && *value <= 256 ? std::to_string(*value) : kUnknown;
   }
   if (const auto* value = std::get_if<int64_t>(&found->second)) {
-    return *value >= 0 && *value <= 256 ? std::to_string(*value) : "unknown";
+    return *value >= 0 && *value <= 256 ? std::to_string(*value) : kUnknown;
   }
-  return "unknown";
+  return kUnknown;
 }
 
 }  // namespace
@@ -88,6 +89,23 @@ TrayController::~TrayController() {
 
 bool TrayController::Initialize() {
   return AddIcon();
+}
+
+void TrayController::HandleWindowVisibility(bool visible) {
+  const auto unknown = std::string(kUnknown);
+  if (!visible) {
+    runtime_status_ = unknown;
+    pending_approval_count_ = unknown;
+    critical_notification_count_ = unknown;
+  }
+  if (window_visibility_known_ && last_window_visible_ == visible) return;
+  window_visibility_known_ = true;
+  last_window_visible_ = visible;
+  if (channel_) {
+    channel_->InvokeMethod(
+        "onWindowVisibilityChanged",
+        std::make_unique<flutter::EncodableValue>(visible));
+  }
 }
 
 bool TrayController::AddIcon() {
@@ -122,7 +140,13 @@ void TrayController::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
   if (call.method_name() == "initialize") {
-    result->Success();
+    result->Success(
+        flutter::EncodableValue(window_ != nullptr && IsWindowVisible(window_)));
+    return;
+  }
+  if (call.method_name() == "isWindowVisible") {
+    result->Success(
+        flutter::EncodableValue(window_ != nullptr && IsWindowVisible(window_)));
     return;
   }
   if (call.method_name() == "publish") {
@@ -139,11 +163,15 @@ void TrayController::UpdateMenuProjection(
     const flutter::EncodableValue& arguments) {
   const auto* map = std::get_if<flutter::EncodableMap>(&arguments);
   if (map == nullptr) return;
-  runtime_status_ = StringValue(*map, "runtime_status", "unknown");
+  stop_request_supported_ = BoolValue(*map, "stop_request_supported");
+  if (window_ == nullptr || !IsWindowVisible(window_)) {
+    HandleWindowVisibility(false);
+    return;
+  }
+  runtime_status_ = StringValue(*map, "runtime_status", kUnknown);
   pending_approval_count_ = CountValue(*map, "pending_approval_count");
   critical_notification_count_ =
       CountValue(*map, "critical_notification_count");
-  stop_request_supported_ = BoolValue(*map, "stop_request_supported");
 }
 
 void TrayController::NotifyAction(const std::string& action) {

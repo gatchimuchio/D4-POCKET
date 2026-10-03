@@ -200,7 +200,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/main.dart",
-      "sha256": "90c5bab5215f34143cb15b97417ab59cdc160bb9b80a80bfdbb644be490d0d67"
+      "sha256": "8b45995220659c203ed781924b6e782fc4c97cf643713a861b7f7dac8da57eef"
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
@@ -384,7 +384,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/windows_tray_client.dart",
-      "sha256": "bd5efc66552ed2d760861adac0ffc8e71bfcc09edc0d8370979eec0317b4abcc"
+      "sha256": "ea7b51d27f86999f0467fac654bfb65ad084837855cb31b44df51b558b01ab39"
     },
     {
       "path": "apps/desktop_flutter/lib/services/workspace_client.dart",
@@ -640,7 +640,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "0a73122e03973a27d630dd092c8a271fb9ca3918021df5df5794e9a1e923a15e"
+      "sha256": "7ff00c3a4d0057aa8927410fb320c85b455cf45cff2fd6add0b74e59b62c4798"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -700,7 +700,7 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/flutter_window.cpp",
-      "sha256": "8f022030517e280f67925c002a3ea1307dfa42318d1624a0a008a9e820510cea"
+      "sha256": "d976f887b38ec7a0440d568c6010c77c053510a725b9df23f3677c8834510cf1"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/flutter_window.h",
@@ -724,11 +724,11 @@
     },
     {
       "path": "apps/desktop_flutter/windows/runner/tray_controller.cpp",
-      "sha256": "0c6cb03c97dbed44bd359b55f3d83ae7b744839f23887d544adb94cd3ef6a35f"
+      "sha256": "f0571200890b867f2a99a835c0c7f2d3791e2ca15b969a62756efddbf9afb4aa"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/tray_controller.h",
-      "sha256": "b0d1a9f7e62c47087b13ecb2b18ed0301c9db083b893afa00fa0aa66bcf60efd"
+      "sha256": "2c0b2c22b193ec366e4911ec85878b4a85b59c3715d82ce7c4df5244ed0f83d8"
     },
     {
       "path": "apps/desktop_flutter/windows/runner/utils.cpp",
@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "d595ca84191b566686224081fd6b09b4b3f5be750d1e493cd493faf598b46ff4"
+      "sha256": "5bc5853188a46a297a104f22e594f3e9668d64f621c04291248f35c5c248c97e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1480,7 +1480,7 @@
     },
     {
       "path": "docs/specs/windows-tray-surface.md",
-      "sha256": "2f63943128f967fa355e755aa1312e652ed31fd0bd7d06aa1813fa143af7a3aa"
+      "sha256": "cf7b7bd1ede82a29caa45f65212fdd380cbb6dc7bedc8e9f497c5f734531c5b3"
     },
     {
       "path": "docs/specs/workspace-inspection.md",
@@ -3800,7 +3800,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "45c1867b384b74402ef80dfdc75433f227628dd8078076d570adbe43e02e6076"
+      "sha256": "3c5fcb10dbf6810df8cac30980579ff2da557a522cb05948b8aad66f26ddf0a6"
     },
     {
       "path": "requirements-dev.txt",

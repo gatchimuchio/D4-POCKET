@@ -1993,6 +1993,75 @@
           "final_session_state": "active"
         },
         "run38_exit_observation": "Owner first reported app exit, but the exact run-root frontend and launcher remained live and notification-list Audit events continued increasing. Exact run-owned processes were force-stopped only after Task completion and fake API exit to exercise same-profile restart; they were stopped again after evidence capture. Owner later reported closing the app again; the subsequent live process check found no run-root process, but the 111-event Audit head/hash remained unchanged and no normal tray Exit or Desktop exit Audit appeared. Process absence is confirmed; graceful shutdown remains unproven. The run-specific broker_session.json and desktop_launcher.lock remained after force-stop; exact-path Remove-Item was rejected again by execution policy, with no alternate deletion mechanism used.",
+        "run40_hidden_window_poll_observation": {
+          "date": "2026-10-04",
+          "source_commit": "8babcd3b4eba08e959e8d447d6a680d7cdbba994",
+          "run_root": "C:\\d4p-r2-run40-8babcd3",
+          "task_started": false,
+          "owner_reported_exit": true,
+          "observed_at_local": "2026-10-04T06:41:35+09:00",
+          "processes_still_running": {
+            "launcher_pid": 14376,
+            "frontend_pid": 2388,
+            "frontend_window_visible": false
+          },
+          "fake_api_listener": {
+            "address": "127.0.0.1",
+            "port": 56601,
+            "pid": 4624
+          },
+          "audit_growth_since_2026_10_04T06_22_44_plus_09_00": {
+            "prior_event_count": 94,
+            "observed_event_count": 132,
+            "additional_events": 38,
+            "additional_events_operation": "通知一覧",
+            "additional_events_decision": "accepted"
+          },
+          "final_audit_jsonl_sha256": "sha256:2e2e756f928704aa6faf547465ccc2f72727fe76a4f3afa8389793aa10f3e9ee",
+          "final_anchor_event_count": 132,
+          "final_anchor_head": "sha256:bd7b51a2ce29e2c1e2bc22cbe3459564f615e18c8fda49a3437b5eb7473dbaa1",
+          "final_snapshot_chain_and_hmac_recalculated": false,
+          "normal_desktop_exit_audit_ref": null,
+          "post_owner_close_recheck": {
+            "observed_at_local": "2026-10-04T06:55:02+09:00",
+            "launcher_pid_still_running": 14376,
+            "frontend_pid_still_running": 2388,
+            "fake_api_listener_still_running": true,
+            "audit_event_count": 159,
+            "events_added_since_previous_snapshot": 27,
+            "last_event_id": "broker-audit-159",
+            "last_operation": "通知一覧",
+            "last_decision": "accepted",
+            "audit_jsonl_sha256": "sha256:68532a0528d1a959c13e5a57eed07e2682fa085b597d2170d6a5e959dc9934fc",
+            "anchor_event_count": 159,
+            "anchor_head": "sha256:b412a686390a94ae3a7d36c063bcea3352a25358d139226679e094b85f7dec25",
+            "chain_and_hmac_recalculated": false,
+            "normal_desktop_exit_audit_ref": null
+          },
+          "disposition": "The reported exit did not stop these exact run40 processes. Do not claim process shutdown or graceful tray exit; the newly built visibility-linked poll fix has not yet been tested in an installed run."
+        },
+        "run40_hidden_window_poll_repair": {
+          "files": [
+            "apps/desktop_flutter/lib/main.dart",
+            "apps/desktop_flutter/lib/services/windows_tray_client.dart",
+            "apps/desktop_flutter/test/windows_tray_client_test.dart",
+            "apps/desktop_flutter/windows/runner/flutter_window.cpp",
+            "apps/desktop_flutter/windows/runner/tray_controller.cpp",
+            "apps/desktop_flutter/windows/runner/tray_controller.h",
+            "docs/specs/windows-tray-surface.md"
+          ],
+          "behavior": "Win32-observed visibility changes notify Flutter; the 30-second Broker projection timer runs only while visible, hidden native projection becomes unknown, and stale hidden-window results are discarded.",
+          "focused_flutter_test": "flutter test --no-pub --no-test-assets test/windows_tray_client_test.dart: 6 passed",
+          "desktop_analyze": "flutter analyze --no-pub via existing Z: workspace mapping: passed",
+          "mobile_analyze": "flutter analyze --no-pub via existing Z: workspace mapping: passed",
+          "windows_release_build": "flutter build windows --release --no-pub via existing Z: workspace mapping: passed",
+          "schema": "152 schemas, 152 examples, 196 negative fixtures passed",
+          "conformance": "231 checks passed",
+          "installed_runtime_verification": "not run; the rebuilt source has not been staged into a fresh installed hide/reopen smoke test. The old run40 process was reconfirmed active at the 06:55 timestamped snapshot above.",
+          "integrated_validator": "python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows: exited 0; all 10 registered development checks passed, release_ready=false retained",
+          "path_sensitive_validation_note": "Conformance from the existing Z: mapping failed its synthetic agent_runtime Workspace path check; rerunning from the physical Japanese workspace root passed all 231 checks.",
+          "authority_or_task_capability_changed": false
+        },
         "run37_post_owner_close_recheck": {
           "owner_reported_desktop_closed": true,
           "run_root_process_count": 0,

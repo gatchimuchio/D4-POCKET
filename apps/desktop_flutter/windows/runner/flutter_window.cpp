@@ -59,6 +59,9 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_SHOWWINDOW && tray_controller_) {
+    tray_controller_->HandleWindowVisibility(wparam != FALSE);
+  }
   if (broker_pipe_controller_ &&
       broker_pipe_controller_->HandleMessage(message, lparam)) {
     return 0;
