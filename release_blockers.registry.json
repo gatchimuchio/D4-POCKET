@@ -1065,6 +1065,59 @@
         "os_protection_changed": false,
         "scope_limit": "This closes positive Task completion only in the staged r2-e2e feature build using a loopback fake API. It does not enable or prove normal Release task_execution, provider interoperability, restart durability, result/diff Content Exposure, successful MxC TEMP cleanup, the OneDrive Cloud Files/ordinary NTFS isolation matrix, or failure/deadline/crash Recovery. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
+      "current_cli_0160_mxc_shell_path_probe": {
+        "date": "2026-10-03",
+        "source_commit": "3ff426483014cc39f790f6c46254e94e7d85d782",
+        "source_worktree_clean": true,
+        "cli_version": "0.160.0",
+        "validation": "python -X utf8 tooling/codex_mxc_exec_temp_probe.py --exe <explicit Codex CLI absolute path> --runs 1 (one inherited-PATH failure and one process-scoped Windows system-shell PATH pass); cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib 'Rust生成Task設定で実Windows隔離の登録secretを拒否する' -- --ignored --nocapture --test-threads=1 (1 passed).",
+        "evidence_source": "LIVE_RUNTIME for direct Codex CLI/MxC child and explicit Windows sandbox; FIXTURE for the synthetic Workspace, secret markers, isolated CODEX_HOME, and loopback fake Responses API",
+        "real_model_or_credential_used": false,
+        "configuration_persisted": false,
+        "os_protection_changed": false,
+        "observations": {
+          "inherited_path_run": {
+            "result": "failed",
+            "responses_api_requests": 2,
+            "exec_command_offered": true,
+            "tool_child_exit_code": -2147450747,
+            "probe_report_created": false,
+            "blocked_non_loopback_connects": 4
+          },
+          "windows_system_shell_path_run": {
+            "result": "observed",
+            "process_only_path_change": true,
+            "path_restored_after_run": true,
+            "responses_api_requests": 2,
+            "exec_command_offered": true,
+            "tool_child_exit_code": 0,
+            "turn_terminal_event": "turn.completed",
+            "blocked_non_loopback_connects": 4,
+            "temp_equals_tmp": true,
+            "temp_equals_broker_scratch": false,
+            "temp_marker_written_inside_child": true,
+            "temp_marker_after_cli_exit": "not_host_visible_after_cli_exit",
+            "temp_directory_visible_after_cli_exit": false,
+            "physical_deletion_proven": false,
+            "registered_secret_exact_read_write_denied": true,
+            "default_secret_glob_reads_denied": true,
+            "default_secret_glob_writes_allowed": true,
+            "preexisting_registered_secret_hardlink_alias_read_allowed": true,
+            "dynamic_registered_secret_hardlink_creation_denied": true,
+            "outside_workspace_read_write_denied": true
+          },
+          "explicit_rust_generated_mxc_sandbox_test": {
+            "result": "passed",
+            "passed": 1,
+            "failed": 0,
+            "explicit_shell": "powershell.exe",
+            "registered_secret_read_write_denied": true,
+            "dynamic_hardlink_creation_denied": true,
+            "cross_agent_workspace_and_temp_reads_denied": true
+          }
+        },
+        "scope_limit": "One inherited-PATH and one process-scoped Windows-system-shell-PATH direct codex exec probe, plus one explicit powershell.exe Rust-generated sandbox test. The selected shell executable and equivalence to the clean installed product launch environment remain unconfirmed. No production Broker Task, Owner UI, Audit, deadline/crash Recovery, task-to-task cleanup, or OneDrive/NTFS integrated matrix was exercised. Host non-visibility is not physical deletion. Keep task_execution=unsupported and the R2 release blocker unresolved."
+      },
       "latest_mxc_temp_directory_exit_observation": {
         "date": "2026-10-01",
         "source_base_commit": "7ab1c4db6de571d511d5dc27841b843bcf77cc26",
