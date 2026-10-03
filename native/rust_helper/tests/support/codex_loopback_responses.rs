@@ -325,8 +325,8 @@ fn synthetic_workspace_probe() -> String {
         "$ErrorActionPreference='Stop'; ",
         "Write-Output 'D4P_R2_SYNTHETIC_PROBE_STARTED'; ",
         "$workspace=(Get-Location).Path; Write-Output 'D4P_R2_TEMP_STEP_workspace_detected'; ",
-        "$tempReport=Join-Path $workspace 'broker-real-codex-temp-report.json'; ",
-        "$tempMarkerName='d4p-broker-temp-observer-'+(Split-Path -Leaf $workspace)+'.marker'; Write-Output 'D4P_R2_TEMP_STEP_initial_state_prepared'; ",
+        "$tempReport=$workspace+'\\broker-real-codex-temp-report.json'; Write-Output 'D4P_R2_TEMP_STEP_report_path_ready'; ",
+        "$workspaceLeaf=$workspace.Substring($workspace.LastIndexOf([char]92)+1); $tempMarkerName='d4p-broker-temp-observer-'+$workspaceLeaf+'.marker'; Write-Output 'D4P_R2_TEMP_STEP_initial_state_prepared'; ",
         "$tempStep='initial'; $tempConfigured=($env:TEMP -ne $null -and $env:TEMP -ne ''); $tmpConfigured=($env:TMP -ne $null -and $env:TMP -ne ''); $tempState=@{version=1;stage='started';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$false;tmp_matches_workspace_scratch=$false;temp_scope='unrecognized';temp_write='pending';temp_step=$tempStep;temp_error_type=$null;temp_error_hresult=$null}|ConvertTo-Json -Compress; ",
         "Write-Output 'D4P_R2_TEMP_STEP_initial_json_ready'; ",
         "Write-Output 'D4P_R2_TEMP_STEP_initial_write_attempt'; try { Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop } catch { $initialErrorKind='other'; if($_.CategoryInfo.Category -eq 'PermissionDenied'){$initialErrorKind='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound'){$initialErrorKind='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$initialErrorKind='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$initialErrorKind='invalid_operation'}; Write-Output ('D4P_R2_TEMP_INITIAL_WRITE_ERROR_'+$initialErrorKind); exit 46 }; ",
@@ -337,7 +337,7 @@ fn synthetic_workspace_probe() -> String {
         "$tempScope='unrecognized'; $tempTarget=$null; $tempMatches=$false; $tmpMatches=$false; $tempActual=$env:TEMP; $tmpActual=$env:TMP; $mxcTemp=$false; ",
         "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
         "Write-Output ('D4P_R2_TEMP_SCOPE_'+$tempScope); Write-Output 'D4P_R2_TEMP_STEP_scope_validation'; ",
-        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempDirectoryExists=$null; $tempDirectoryCreate='not_attempted'; $tempRetryWrite='not_attempted'; $tempCleanup='not_attempted'; $tempCreatedDirectory=$false; $tempErrorType=$null; $tempErrorHResult=$null; $tempMarker=if($tempTarget){Join-Path $tempTarget $tempMarkerName}else{$null}; ",
+        "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempDirectoryExists=$null; $tempDirectoryCreate='not_attempted'; $tempRetryWrite='not_attempted'; $tempCleanup='not_attempted'; $tempCreatedDirectory=$false; $tempErrorType=$null; $tempErrorHResult=$null; $tempMarker=if($tempTarget){$tempTarget.TrimEnd([char]92)+'\\'+$tempMarkerName}else{$null}; ",
         "if($tempScope -ne 'unrecognized'){$tempStep='temp_write'; try { Set-Content -LiteralPath $tempMarker -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}; $tempDirectoryExists=Test-Path -LiteralPath $tempTarget -PathType Container}; ",
         "Write-Output ('D4P_R2_TEMP_DIRECTORY_EXISTS_AFTER_WRITE_'+$(if($tempDirectoryExists -eq $true){'true'}elseif($tempDirectoryExists -eq $false){'false'}else{'unknown'})); ",
         "if($tempScope -eq 'mxc_appcontainer' -and $tempDirectoryExists -eq $false -and $tempWrite -eq 'failed' -and $tempErrorFingerprint -eq 'directory_missing'){$tempStep='temp_directory_create'; try { if(Test-Path -LiteralPath $tempTarget -PathType Container){$tempDirectoryCreate='appeared_before_create'}else{New-Item -ItemType Directory -Path $tempTarget -ErrorAction Stop | Out-Null; $tempCreatedDirectory=$true; $tempDirectoryCreate='created'} } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempDirectoryCreate='failed_access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempDirectoryCreate='failed_directory_missing'} else {$tempDirectoryCreate='failed_other'}}; Write-Output ('D4P_R2_TEMP_DIRECTORY_CREATE_'+$tempDirectoryCreate); if($tempDirectoryCreate -in @('created','appeared_before_create')){$tempStep='temp_retry_write'; try { Set-Content -LiteralPath $tempMarker -Value 'd4p synthetic temp observer retry' -NoNewline -ErrorAction Stop; $tempRetryWrite='passed' } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempRetryWrite='failed_access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound|PathNotFound'){$tempRetryWrite='failed_directory_missing'} else {$tempRetryWrite='failed_other'}}; Write-Output ('D4P_R2_TEMP_RETRY_WRITE_'+$tempRetryWrite)}}; ",
@@ -346,19 +346,19 @@ fn synthetic_workspace_probe() -> String {
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
         "$tempState=@{version=1;stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_configured=$tempConfigured;tmp_configured=$tmpConfigured;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_directory_exists_after_initial_write=$tempDirectoryExists;temp_directory_create=$tempDirectoryCreate;temp_retry_write=$tempRetryWrite;temp_cleanup=$tempCleanup;temp_error_type=$tempErrorType;temp_error_hresult=$tempErrorHResult}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
         "Write-Output 'D4P_R2_TEMP_STEP_temp_report_written'; ",
-        "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; ",
+        "$continue=$workspace+'\\broker-real-codex-task-continue'; ",
         "$continued=$false; ",
         "Write-Output 'D4P_R2_TEMP_STEP_waiting_for_continue'; ",
         "for($attempt=0;$attempt -lt 1200;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
-        "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
+        "$secretDenied=$false; try { Get-Content -LiteralPath ($workspace+'\\private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; ",
-        "$outside=Split-Path -Parent $workspace; ",
+        "$outside=$workspace.Substring(0,$workspace.LastIndexOf([char]92)); ",
         // AppContainerでは親directoryの可視性自体が拒否され得る。fixtureの存在はhost側で確認し、childはreadを直接試す。
-        "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true }; ",
+        "$outsideReadPath=$outside+'\\outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true }; ",
         "if (-not $outsideReadDenied) { exit 42 }; ",
-        "$outsideWritePath=Join-Path $outside 'outside-write-marker.txt'; if(Test-Path -LiteralPath $outsideWritePath){exit 48}; $outsideWriteDenied=$false; try { Set-Content -LiteralPath $outsideWritePath -Value 'unexpected' -NoNewline -ErrorAction Stop } catch { $outsideWriteDenied=$true }; if(Test-Path -LiteralPath $outsideWritePath){$outsideWriteDenied=$false}; ",
+        "$outsideWritePath=$outside+'\\outside-write-marker.txt'; if(Test-Path -LiteralPath $outsideWritePath){exit 48}; $outsideWriteDenied=$false; try { Set-Content -LiteralPath $outsideWritePath -Value 'unexpected' -NoNewline -ErrorAction Stop } catch { $outsideWriteDenied=$true }; if(Test-Path -LiteralPath $outsideWritePath){$outsideWriteDenied=$false}; ",
         "if (-not $outsideWriteDenied) { exit 43 }; ",
-        "Set-Content -LiteralPath (Join-Path $workspace 'broker-real-codex-marker.txt') -Value 'synthetic-task-write' -NoNewline -ErrorAction Stop; exit 0"
+        "Set-Content -LiteralPath ($workspace+'\\broker-real-codex-marker.txt') -Value 'synthetic-task-write' -NoNewline -ErrorAction Stop; exit 0"
     )
     .to_owned()
 }
@@ -512,6 +512,7 @@ fn safe_tool_output_diagnostic(output: &Value) -> Value {
         "D4P_R2_TEMP_STEP_",
         &[
             "workspace_detected",
+            "report_path_ready",
             "initial_state_prepared",
             "initial_json_ready",
             "initial_write_attempt",
@@ -1135,6 +1136,16 @@ mod tests {
     use std::io::Read;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[test]
+    fn synthetic_probe_path_construction_does_not_depend_on_powershell_providers() {
+        let probe = synthetic_workspace_probe();
+        assert!(probe.contains("$tempReport=$workspace+'\\broker-real-codex-temp-report.json'"));
+        assert!(probe.contains("$workspace.LastIndexOf([char]92)"));
+        assert!(!probe.contains("Join-Path"));
+        assert!(!probe.contains("Split-Path"));
+        assert!(probe.contains("D4P_R2_TEMP_STEP_report_path_ready"));
+    }
+
     fn post(server: &CodexLoopbackResponses, request: &Value) -> Vec<u8> {
         let port = server.port();
         let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("loopback偽APIへ接続");
@@ -1265,6 +1276,12 @@ mod tests {
 
     #[test]
     fn tool_output_diagnostic_records_only_bounded_safe_classification() {
+        let report_ready = safe_tool_output_diagnostic(&json!(
+            "D4P_R2_TEMP_STEP_report_path_ready C:\\Users\\example\\private\\synthetic.txt"
+        ));
+        assert_eq!(report_ready["temp_step"], "report_path_ready");
+        assert!(!report_ready.to_string().contains("C:\\\\Users"));
+
         let private_output = "D4P_R2_SYNTHETIC_PROBE_STARTED UnauthorizedAccessException synthetic-secret-content C:\\Users\\example\\private.txt";
         let diagnostic = safe_tool_output_diagnostic(&json!(private_output));
         assert_eq!(diagnostic["error_category"], "sandboxアクセス拒否");
@@ -1332,7 +1349,7 @@ mod tests {
         assert!(probe.contains("$tempStep='temp_write'"));
         assert!(probe.contains("outside-read-marker.txt"));
         assert!(probe.contains(
-            "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true };"
+            "$outsideReadPath=$outside+'\\outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true };"
         ));
         assert!(!probe.contains("Test-Path -LiteralPath $outsideReadPath"));
         assert!(probe.contains("if (-not $secretDenied) { exit 41 }"));
