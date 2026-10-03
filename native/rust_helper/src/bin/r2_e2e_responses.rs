@@ -3,9 +3,28 @@
 mod fixture;
 
 use serde_json::json;
+use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::process::ExitCode;
+
+fn workspace_boundary_fixtures_valid(workspace: &Path) -> bool {
+    let Some(parent) = workspace.parent() else {
+        return false;
+    };
+    let outside_read = parent.join("outside-read-marker.txt");
+    let outside_write = parent.join("outside-write-marker.txt");
+    matches!(
+        fs::symlink_metadata(&outside_read),
+        Ok(metadata)
+            if metadata.file_type().is_file()
+                && fs::read(&outside_read)
+                    .is_ok_and(|contents| contents.as_slice() == b"synthetic outside marker")
+    ) && matches!(
+        fs::symlink_metadata(outside_write),
+        Err(error) if error.kind() == io::ErrorKind::NotFound
+    )
+}
 
 fn main() -> ExitCode {
     let Some(workspace) = std::env::args_os().nth(1) else {
@@ -15,6 +34,10 @@ fn main() -> ExitCode {
     let workspace = Path::new(&workspace);
     if !workspace.is_absolute() || !workspace.is_dir() {
         eprintln!("合成Workspaceを確認できない");
+        return ExitCode::from(2);
+    }
+    if !workspace_boundary_fixtures_valid(workspace) {
+        eprintln!("合成Workspace外境界fixtureを確認できない");
         return ExitCode::from(2);
     }
     let port = match std::env::args_os().nth(2) {
@@ -47,7 +70,7 @@ fn main() -> ExitCode {
         eprintln!("R2 loopback偽APIの停止指示を確認できない");
         return ExitCode::FAILURE;
     }
-    let evidence = json!({
+    let mut evidence = json!({
         "requests": server.post_requests(),
         "models": server.model_list_requests(),
         "tool_offered": server.tool_was_offered(),
@@ -62,6 +85,8 @@ fn main() -> ExitCode {
         "workspace_marker_exists": workspace.join("broker-real-codex-marker.txt").is_file(),
     });
     drop(server);
+    evidence["workspace_boundary_fixtures_valid_after_task"] =
+        json!(workspace_boundary_fixtures_valid(workspace));
     println!("EVIDENCE {evidence}");
     if evidence["requests"].as_u64().unwrap_or_default() != 2
         || evidence["tool_offered"] != true
@@ -73,9 +98,48 @@ fn main() -> ExitCode {
         || evidence["incomplete_requests"] != 0
         || evidence["blocked_external_requests"] != 0
         || evidence["workspace_marker_exists"] != true
+        || evidence["workspace_boundary_fixtures_valid_after_task"] != true
     {
         eprintln!("R2 loopbackResponses APIの検証条件が成立しない");
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::workspace_boundary_fixtures_valid;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn loopback_harness_checks_outside_markers_before_the_sandboxed_probe() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test用時刻")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "d4p-r2-outside-marker-fixture-{}-{suffix}",
+            std::process::id()
+        ));
+        let workspace = root.join("workspace");
+        fs::create_dir_all(&workspace).expect("test専用Workspace作成");
+        let missing_read_marker_is_rejected = !workspace_boundary_fixtures_valid(&workspace);
+        let outside_read = root.join("outside-read-marker.txt");
+        fs::write(&outside_read, b"synthetic outside marker")
+            .expect("合成Workspace外read marker作成");
+        let valid_fixture_is_accepted = workspace_boundary_fixtures_valid(&workspace);
+        fs::write(&outside_read, b"unexpected modification").expect("改変read markerの拒否試験");
+        let modified_read_marker_is_rejected = !workspace_boundary_fixtures_valid(&workspace);
+        fs::write(&outside_read, b"synthetic outside marker").expect("read marker復元");
+        fs::write(root.join("outside-write-marker.txt"), b"unexpected")
+            .expect("既存write markerの拒否試験");
+        let existing_write_marker_is_rejected = !workspace_boundary_fixtures_valid(&workspace);
+        fs::remove_dir_all(&root).expect("test専用fixture削除");
+
+        assert!(missing_read_marker_is_rejected);
+        assert!(valid_fixture_is_accepted);
+        assert!(modified_read_marker_is_rejected);
+        assert!(existing_write_marker_is_rejected);
+    }
 }

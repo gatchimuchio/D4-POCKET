@@ -349,7 +349,8 @@ fn synthetic_workspace_probe() -> String {
         "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; ",
         "$outside=Split-Path -Parent $workspace; ",
-        "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; if(-not (Test-Path -LiteralPath $outsideReadPath -PathType Leaf)){exit 45}; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true }; ",
+        // AppContainerでは親directoryの可視性自体が拒否され得る。fixtureの存在はhost側で確認し、childはreadを直接試す。
+        "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true }; ",
         "if (-not $outsideReadDenied) { exit 42 }; ",
         "$outsideWritePath=Join-Path $outside 'outside-write-marker.txt'; if(Test-Path -LiteralPath $outsideWritePath){exit 48}; $outsideWriteDenied=$false; try { Set-Content -LiteralPath $outsideWritePath -Value 'unexpected' -NoNewline -ErrorAction Stop } catch { $outsideWriteDenied=$true }; if(Test-Path -LiteralPath $outsideWritePath){$outsideWriteDenied=$false}; ",
         "if (-not $outsideWriteDenied) { exit 43 }; ",
@@ -1266,8 +1267,9 @@ mod tests {
         assert!(probe.contains("$tempStep='temp_write'"));
         assert!(probe.contains("outside-read-marker.txt"));
         assert!(probe.contains(
-            "if(-not (Test-Path -LiteralPath $outsideReadPath -PathType Leaf)){exit 45}"
+            "$outsideReadPath=Join-Path $outside 'outside-read-marker.txt'; $outsideReadDenied=$false; try { Get-Content -LiteralPath $outsideReadPath -Raw -ErrorAction Stop | Out-Null } catch { $outsideReadDenied=$true };"
         ));
+        assert!(!probe.contains("Test-Path -LiteralPath $outsideReadPath"));
         assert!(probe.contains("if (-not $secretDenied) { exit 41 }"));
         assert!(probe.contains("if (-not $outsideReadDenied) { exit 42 }"));
         assert!(probe.contains("if (-not $outsideWriteDenied) { exit 43 }"));

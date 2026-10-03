@@ -1585,18 +1585,128 @@
         "task_created": true,
         "scope_limit": "This is a positive installed-path Task run only in the r2-e2e test-feature build, using a loopback fake Responses API and synthetic NTFS Workspace. It does not enable normal Release task_execution or establish real provider interoperability. The MxC TEMP write was not attempted and physical cleanup is unproven; result/diff Content Exposure UI, deadline/crash Recovery, task-to-task cleanup/isolation matrix, OneDrive Cloud Files plus ordinary NTFS integrated matrix, normal Release capability eligibility, and normal tray Exit Audit remain open. Broker-local restart acceptance and its HMAC do not prove resistance to same-user rewriting of key, anchor, and log together. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
       },
+      "r2_installed_synthetic_task_e2e_run36": {
+        "date": "2026-10-03",
+        "status": "task_failed_temp_write_failed_boundary_result_unconfirmed",
+        "source_commit": "6e31a1c0b6b8d22481bab6bd61d93a77edbfc660",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "6e31a1c0b6b8d22481bab6bd61d93a77edbfc660",
+        "test_harness_worktree_clean": true,
+        "fake_api_artifact_hash_captured": true,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run36-6e31a1c",
+        "installed_manifest": {
+          "build_feature": "r2-e2e",
+          "app_sha256": "sha256:e617996bdd69365aac1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671",
+          "fake_api_sha256": "sha256:9c0525d68cf105df01fdd9d27f3edee8e9aa0d355cb7b8f6b2035e64311f8eea"
+        },
+        "codex_cli": {
+          "version": "0.160.0",
+          "sha256": "sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2",
+          "real_credential_used": false,
+          "real_model_used": false,
+          "mxc_tool_child_observed": true
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempt": {
+          "task_id": "0e548cb404c14d12c057a4a80e9ced98",
+          "session_id": "c8b0cd0031dc7d08db72f426d5074542",
+          "status": "failed",
+          "permission_audit_refs": ["broker-audit-73", "broker-audit-74"],
+          "approval_audit_refs": ["broker-audit-75", "broker-audit-76"],
+          "start_audit_refs": ["broker-audit-79", "broker-audit-80"],
+          "terminal_state_audit_ref": "broker-audit-94",
+          "terminal_reason": "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）"
+        },
+        "fake_api": {
+          "requests": 4,
+          "models": 0,
+          "tool_offered": true,
+          "tool_call_sent": true,
+          "tool_result_received": true,
+          "repeated_tool_call_rejections": 3,
+          "invalid_bodies": 0,
+          "incomplete_requests": 0,
+          "response_write_failures": 0,
+          "blocked_external_requests": 0,
+          "workspace_marker_exists": false,
+          "host_boundary_postcondition_field_present": false
+        },
+        "observations": {
+          "workspace": {
+            "completion_marker_exists": false,
+            "registered_secret_file_exists": true,
+            "registered_secret_read_denied": "unconfirmed",
+            "outside_read_denied": "unconfirmed",
+            "outside_write_marker_exists": false,
+            "broker_scratch_directories_after_task": 0,
+            "task_instruction_body_present_in_audit": false
+          },
+          "temp_probe": {
+            "scope": "mxc_appcontainer",
+            "write": "failed",
+            "step": "temp_write",
+            "actual_temp_write_attempted": true,
+            "error_fingerprint": "directory_missing",
+            "physical_temp_cleanup_proven": false
+          },
+          "audit": {
+            "event_count_after_reported_exit": 108,
+            "head_hash": "sha256:93e28aa711734bbcdb8356607164b40aa4179c6b210f35fc12f12587bcee8afc",
+            "audit_jsonl_sha256": "sha256:cbc258935322e4f17fa08d29252ebacddbe22192a6859fed2f128f12c7779e8f",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "broker_restart_verified": false
+          },
+          "cleanup": {
+            "fake_api_listener_absent": true,
+            "host_watcher_absent": true,
+            "run36_installed_processes_absent": true,
+            "owner_reported_exit_action": true,
+            "broker_session_state": "active",
+            "desktop_exit_audit_ref": null,
+            "last_audit_event_id": "broker-audit-108",
+            "last_audit_operation": "通知一覧",
+            "last_audit_decision": "accepted",
+            "shutdown_mode": "Owner reported exit; follow-up found no process from the run36 installed root. Broker session remained active and no normal Desktop exit Audit was recorded."
+          }
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "This is a failed staged r2-e2e installed-path Task attempt. It does not prove positive Task completion or result hash, registered-secret/outside-read denial, successful MxC TEMP write or cleanup, Broker-restart durability, result/diff Content Exposure, normal Release task_execution, or provider interoperability. The specific Task failure cause is unconfirmed; the child-side outside-read Test-Path precheck could confuse parent visibility with read denial but is not proven as the run's root cause. A later source-only fake-API fixture change moves initial/postcondition checks to the host and has not yet been exercised by a fresh installed run. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
+      },
       "latest_installed_e2e_observation": {
         "date": "2026-10-03",
         "positive_task_run": "r2_installed_synthetic_task_e2e_run35",
         "previous_positive_task_run": "r2_installed_synthetic_task_e2e_run32",
         "prior_failed_runs": [
           "r2_installed_synthetic_task_e2e_run33",
-          "r2_installed_synthetic_task_e2e_run34"
+          "r2_installed_synthetic_task_e2e_run34",
+          "r2_installed_synthetic_task_e2e_run36"
         ],
         "run34_test_harness_cause": "Windows path separator regex was under-escaped in the Rust-built PowerShell probe; actual TEMP write was not attempted.",
         "fixture_fix": "PowerShell regex now receives the escaped Windows backslash and slash class; generated-probe regression test covers both separators.",
         "run35_result": "Installed r2-e2e test build completed one real Codex/MxC Workspace Task through UI, native Owner decisions, authenticated Broker IPC, and file-backed Audit; same-profile restart accepted the existing Audit chain and HMAC. The synthetic secret/outside path denials passed. TEMP was classified as mxc_appcontainer but the directory check failed before an actual TEMP write.",
-        "next_action": "Repair the synthetic MxC TEMP observer to attempt and classify an in-container marker without treating host path non-visibility as deletion; then verify normal completion, cancellation, deadline/crash Recovery, task-to-task isolation, result/diff Content Exposure UI, integrated OneDrive Cloud Files/ordinary NTFS behavior, normal Release capability gating, and normal Desktop Exit Audit. Do not promote task_execution from unsupported until all required gates pass.",
+        "latest_attempt": "r2_installed_synthetic_task_e2e_run36",
+        "run36_result": "Task failed after real UI/Owner/Broker/Codex/MxC path. TEMP write was attempted and classified directory_missing. Outside-read denial and the exact Task failure cause remain unconfirmed; no completion marker was created. Owner-reported exit was followed by no run36 process, but the Broker session remained active and no normal exit Audit exists.",
+        "fixture_fix_after_run36": "Development-only fake API now checks the outside-read canary and outside-write absence on the host both before and after the child probe; the child attempts outside read directly without a Test-Path visibility precondition. Focused fixture tests pass; fresh installed run is pending.",
+        "local_validation_after_run36": {
+          "cargo_check_all_targets_r2_e2e": "passed",
+          "all_targets_command": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e -- --test-threads=1 --skip failed_replacement_keeps_the_existing_corrupt_package_unchanged --skip local_tls_server_repairs_only_after_verified_package_bytes --skip loopback_HTTPからAgent_Cardを取得してmetadata_onlyへ射影する",
+          "all_targets_result": "exit 0; every test target completed; zero failures; the three exact filtered loopback cases passed individually",
+          "unfiltered_attempts": "Two all-target invocations stopped in the library target on different loopback transport failures; later targets were not reached. A subsequent two-case-filtered attempt stopped on a third local TLS fixture; that exact case passed individually.",
+          "schema": "152 schemas, 152 examples, 196 negative fixtures passed",
+          "conformance": "231 checks passed",
+          "integrated_validator": "python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows exited 0 after MANIFEST.sha256.json regeneration",
+          "scope_limit": "The three exact network/loopback test cases were individually successful but intermittently failed under unfiltered all-target load on this Windows host. The filtered suite does not claim an unfiltered-suite pass or prove the cause of those transport failures."
+        },
+        "next_action": "Commit and push the bounded fake-API fixture change, then perform fresh installed run37 using synthetic identity/profile and verify completed Task, host-side outside/secret marker postconditions, TEMP result, file-backed Audit and restart, and cleanup. Keep task_execution unsupported until all required release gates pass; continue deadline/crash Recovery, task-to-task isolation, result/diff Content Exposure, OneDrive Cloud Files/ordinary NTFS integration, normal Release capability gating, and normal Desktop Exit Audit.",
         "release_state": {
           "task_execution": "unsupported",
           "r2_release_blocker_active": true,
@@ -1725,7 +1835,7 @@
         "scope_limit": "Direct Codex sandbox children only. Later-child non-visibility does not prove distinct TEMP roots, physical deletion, same real Agent profile isolation, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
       "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、`--ignore-user-config`後もTaskだけに固定する`windows.sandbox`のmxc overrideと`:root=deny`、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、別OS process強制終了後のBroker library回復fixture 1件、`cargo check --all-targets`、前回実行した`cargo test --all-targets -- --test-threads=1`では366件が成功した。先行したローカル再実行はlib 321件ほか計355件が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、全体成功ではない。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持する。先行したローカルsource/build gateでは`cargo check --all-targets`が成功した一方、ローカル全target testはOS error 4551で起動できなかった。2026-09-28の手動Windows Actions [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)はcommit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`を検査し、2026-09-29の現行mainに対する[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)もWindows Server 2025／Rust 1.95.0で全target check／testに成功した（12 target、389 passed／0 failed／0 ignored、rustfmtと試験後cleanも成功）。これらのActions証拠はRust検査範囲に限られ、ローカルApplication Control、installed productのLIVE_RUNTIME、release readinessを証明しない。先行run #9のcompile失敗はtest-onlyの`expect_err`が`Secret: Debug`を要求した問題で、秘密値型へDebugを追加せず修正した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構で失敗し、profileを安全境界として扱わない。2026-09-29の現行mxc直接CLI probeではOneDrive .env ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込を拒否し、Workspace通常file／Task scratch相当の読書込を許可した一方、:minimal=readの範囲としてC:/Windows/win.iniは読めた。同じsource commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)はWindows Server 2025／Rust 1.95.0でcheckout SHA照合、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認に成功した。このhosted証拠はRust test／buildに限る。直接CLIのLIVE_RUNTIME証拠は合成path probeに限り、codex exec、Rust Broker、Owner Approval、実Agent Taskを通していない。別process強制終了試験はRust test harness内のBroker libraryと永続storeを使う`FIXTURE`であり、production `broker-server`／IPCや電源断後cleanupの`LIVE_RUNTIME`証拠ではない。windows.sandbox overrideは方式選択を固定するだけで、実Codex Task、秘密file拒否、外部path拒否を証明しない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・製品経路のcrash recovery・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
-      "required_action": "run35では、試験機能付き段階配置品を使った正のAgent Task完了と、同一の隔離利用者領域でBroker監査storeを再起動後に読み戻す確認が一度成立した。この成功経路だけを再試行する作業は不要。次はMxC process内のTEMP領域へ一時目印fileを書き込み、`access_denied`／`directory_missing`／hostから見えない状態を別々に分類できる検査へ直す。正常完了・取消・期限超過・異常終了後の目印とTEMP状態も実測する。結果／差分の`Content Exposure`表示、Task間の一時file回収とAgent分離、OneDrive Cloud Filesと通常NTFSの統合試験、復旧、トレイからの正常終了Auditを検証する。通常Releaseの`task_execution`能力は正規のAuthority／Recovery／visibility関門が全て成立するまでunsupportedを維持する。`Compare`／`Handoff`の失敗系は非課金の試験identityまたは決定論的fixtureで進め、実providerの相互運用や正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
+      "required_action": "run35では試験feature付き段階配置品を使った正のTask完了と同一profile Audit restart読戻しが一度成立したが、run36 fresh installed再試行はfailed。outside-read前提`Test-Path`を除き、host側でcanary内容不変とoutside-write不在をTask後にも確認するfake-API fixture変更を作成済み。次はこの変更をcommit／pushし、fresh installed run37でTask completion、secret／outside boundary、TEMP書込みと終了後観測、Audit restart、cleanupを検証する。終了操作後もrun36 sessionはactiveで正常終了Auditがなかったため、tray exitの正常Auditも引き続き確認する。TEMP successだけでR2を閉じず、期限／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、`Compare`／`Handoff` failure pathを進める。通常Releaseの`task_execution`は正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
     },
     {
       "name": "rev2_desktop_product_distribution",
