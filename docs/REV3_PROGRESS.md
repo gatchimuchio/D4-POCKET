@@ -1941,3 +1941,44 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - Broker稼働中のAudit snapshot 140件は独立再計算でevent hash／previous link不一致0、重複event ID 0、anchor count／head一致、HMAC有効、Task本文なしを確認した。これはBroker再起動後の耐久性証明ではない。偽API listenerは停止済みだが、Launcher／Flutter processは2組が通知領域に隠れたまま残り、Auditの通知eventが増加している。Desktop exit Auditもなく、run cleanupは未完了。Task completion／outside-write markerはなく、outside／secret read結果は`unknown`である。
 - Ownerから終了操作済みとの報告後、2026-10-03 09:01:50 UTCに再確認したが、Frontend PID `3932`／`20140`とLauncher PID `16816`／`15584`は依然生存し、MainWindowHandleは全て0だった。Audit anchor／JSONLは158 eventへ進み、最新`broker-audit-158`は通知一覧の受理記録、JSONL SHA-256は`290c57dfe323294000679aee565d9182fa262231d4f30dfbac08019c0fe3f8ba`。140 event時点の再計算結果を158 event全体へ流用せず、owner終了報告後の全chain／HMACは未再検証とする。Computer Useには対象可能なD4 Pocket／通知領域windowがなく、強制終了や未検証のwindow-message操作は行っていない。したがって終了Audit・process終了・cleanup完了は成立していない。
 - R2 positive production E2Eは未完了のまま。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。次は両test instanceのnative tray `終了`後にPIDとAuditの最終状態を照合し、fresh installed runで期限内markerを含むTask E2Eを再試行する。
+
+## R2追補 fresh installed run32のpositive TaskとTEMP未判定（2026-10-03）
+
+- run31と同じstaged product artifact（product source commit 9159b88f73e1036381493a957545535afd48c5cc）で、freshなprofile／合成Workspaceを用いたrun32を実行した。現行main 209751720b973ce52ebf1dbb60137485bc9f56f8との比較では、apps/desktop_flutterとnative/rust_helper/srcに差分はない。artifact hash、synthetic run ID、Task／Audit参照はrelease_blockers.registry.jsonのr2_installed_synthetic_task_e2e_run32に記録した。
+- 実Flutter UI、native Owner確認、production Broker、別個の一回限りWorkspace Permission／Task Approval、実Codex CLI／MxC、loopback偽Responses APIを通り、Task bc442f051d8ac54a7568bd45b7b04e59はUI上completedとなり、Workspaceのbroker-real-codex-marker.txtが存在した。Permission broker-audit-44、Approval broker-audit-46、Task開始broker-audit-52、状態照会broker-audit-56。合成secretは0 byte、outside-read canaryは存在、outside-write markerとBroker scratch directoryは不在だった。
+- TEMP reportはscope=unrecognized／write=failed／step=temp_directory_checkであり、scope不明のため実TEMP書込みは試みられていない。watcherはreport後に継続markerを作ったのでTaskは完了したが、TEMPの書込み可否・marker cleanupは未確認である。Broker終了後のAudit JSONL 100 eventを独立再計算し、event hash／previous link不一致0、重複0、anchor count／head一致、HMAC有効を確認した。head=sha256:e9e9d8d9a626c46e62563bf854919438af558053576ac0ab397cbd41fdb6b589。Broker restart後の再読込ではない。
+- このrunはstaged r2-e2e buildでのpositive Task completionを補強するが、通常ReleaseのTask capability、TEMP cleanup、Audit restart durability、result／diff Content Exposure、OneDrive Cloud Files／通常NTFSの統合隔離、failure／deadline／crash Recoveryを証明しない。task_execution=unsupported、R2 release_blocker、release_ready=falseを維持する。
+
+## R2追補 fresh installed run33のTask失敗とwatcher期限超過（2026-10-03）
+
+- run32と同じproduct artifact／loopback fixtureを使ったrun33で、Task 367b5900ae9281c701f8999b634fb2a2はUI上failedとなった。Workspace Permission broker-audit-91、別個のApproval broker-audit-93、Task開始broker-audit-97、状態照会broker-audit-103。fake API／実CLIを通したproduction Task経路の失敗記録であり、positive completionではない。
+- Host watcherは240003msでtimeoutとなり、Workspace Task markerは不在、outside-write markerも不在、synthetic secretは0 byte、Workspace内Broker scratch directoryが1件残存した。TEMP reportはunrecognized／failed／temp_directory_checkであり、実TEMP書込みは試みられていない。outside-read canaryは用意されているが、read拒否結果を独立に確定できる証拠はないためunknownとする。
+- Broker終了後のAudit JSONL 110 eventは独立再計算でevent hash／previous link不一致0、重複0、anchor count／head一致、HMAC有効。head=sha256:8af76f9899db5f412827dc2ee237c5e111715f404c9f27ff0df540ac1a55435e。Broker restart後の再読込、Scratch recovery、Task成功は未確認。
+
+## R2追補 fresh installed run34失敗とWindows TEMP path separator誤判定（2026-10-03）
+
+- run34はstaged r2-e2e product、実Flutter UI／native Owner確認／production Broker、実Codex CLI 0.160.0／MxC、loopback偽Responses APIを通ったが、Task 1ebd3e158075f9e8f70b670185ae8718はfailed。Workspace Permission broker-audit-49、別個のApproval broker-audit-51、Task開始broker-audit-54、終端状態照会broker-audit-60。偽APIは4 requests、tool提示・送信・結果受領あり、再送拒否3、invalid／incomplete／response write failure／外部要求0、Workspace marker不在だった。
+- TEMP reportのunrecognized／failed／temp_directory_checkは実TEMP書込み拒否を示さない。別途raw pathを出力せずcomponentだけ確認した結果、TEMP=TMPで末尾がsandbox.{GUID}/AC/Tempの形だった。根本原因はtest probeのRust string literalでseparator regex用のbackslashが不足し、PowerShell実行時のregexがWindows backslashではなくslashだけを分割していたこと。run34 watcherはscope不明を尊重して継続markerを出さず、その後Taskが失敗した。secret／outside read結果はunknown、outside-write／Task markerは不在。
+- Broker終了後のAudit JSONL 72 eventを独立再計算し、event hash／previous link不一致0、重複0、anchor count／head一致、HMAC有効を確認した。head=sha256:f670f08f19d17a71f7f26c3a97d1f291ec90179ddacadc7c20bb2c4ff8ef26f5。Broker restart後の再読込ではない。
+- ウィンドウのclose操作後も当該runのlauncher／Flutter processが通知領域に残っていたため、偽API停止とTask終端を確認してから、実行pathと親子PIDを照合した当該2 processだけを停止した。停止後は当該Desktop／偽API processが不在。trayの通常終了操作によるDesktop exit Auditはなく、強制停止を正常終了証拠へ置き換えない。
+- Ownerからrun34の終了操作を行ったとの追加申告を受領した。最終照合では当該installed app／launcher／偽API processとloopback listenerはいずれも不在だが、保存Auditは72 eventのままで末尾は`broker-audit-72`「通知一覧」受理であり、Desktop正常終了eventは観測していない。申告された操作と正常終了Auditを区別する。
+
+## R2追補 TEMP separator fixture修正と回帰検証（2026-10-03）
+
+- run32～34で使ったloopback偽Responses API executableは実行開始時のhashを保存していない。現在のbuild出力の更新時刻は3 runのAudit最終記録より後であり、その現存hashを過去runのartifact証拠として遡及適用しない。各recordはfake_api_artifact_hash_captured=falseとし、次のfresh runでは起動直前に実行file hashを固定する。
+- native/rust_helper/tests/support/codex_loopback_responses.rsのPowerShell regexを、Rust文字列経由でもWindows backslashとslashの両方を分割するescapeへ修正した。生成probe本文から実際のmatcherを抽出し、Windows形式とslash形式のpathを分割するtemp_probe_splits_windows_path_separators testを追加。別の安全なsynthetic PowerShell sampleでも修正前は1 component、修正後は4 componentとなり、sandbox.{GUID}/AC/Tempのtail matcherを満たすことを確認した。これはdevelopment-only fixture修正であり、production隔離やTEMP cleanupを変更・証明しない。
+- cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e の初回並列実行ではbroker::update_downloadのlocal TLS test 2件が接続resetで失敗した。-- --test-threads=1 の全target再実行では460 passed／0 failed／7 ignored。R2 fake API fixture 7 testも全通過。
+- focused testは1件成功し、変更file単独の整形確認も成功した。Schema 152件、example 152件、negative fixture 196件、およびconformance 231件の確認も成功した。実行したcommandは次のとおり。
+  ```text
+  cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --lib temp_probe_splits_windows_path_separators -- --nocapture
+  rustfmt +1.95.0 --check --edition 2021 native/rust_helper/tests/support/codex_loopback_responses.rs
+  python -X utf8 tooling/schema_check/check_schemas.py
+  python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py
+  ```
+- cargo +1.95.0 fmt --manifest-path native/rust_helper/Cargo.toml -- --check はcrate全体の既存format差分を多数報告したため失敗。変更file単独のrustfmt --checkはpassし、無関係fileのformat変更は行っていない。
+- 最新文書・manifestを対象にした`validate_all.py --python-only --desktop-platform windows`はexit 0。日本語基底監査、Schema、conformance、manifest、release gate、packaging portability、release smoke、evidence bundle、release runtime assertions、C32開発監査の全checkがpassした。これはPython側の統合validationであり、installed Windows実行、通常Release Task capability、R2完了の証拠ではない。
+- 次は修正fixtureをcommit／push後にbuildし、fresh installed runでscope classification、Task marker、Audit、実TEMP markerの観測を再実施する。修正後runの成功が確認されるまではtask_execution=unsupported、R2 release_blocker、release_ready=falseを維持する。
+
+  ```text
+  python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows
+  ```

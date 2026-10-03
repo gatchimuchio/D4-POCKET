@@ -335,7 +335,7 @@ fn synthetic_workspace_probe() -> String {
         "Write-Output 'D4P_R2_TEMP_STEP_scratch_discovery'; ",
         "$tempStep='scope_validation'; ",
         "$tempScope='unrecognized'; $tempTarget=$null; $tempMatches=$false; $tmpMatches=$false; $tempActual=$env:TEMP; $tmpActual=$env:TMP; $mxcTemp=$false; ",
-        "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
+        "if($scratch.Count -eq 1 -and $tempActual -ne $null -and $tmpActual -ne $null){$expected=$scratch[0].FullName; $tempMatches=($expected -ieq $tempActual); $tmpMatches=($expected -ieq $tmpActual); $tempParts=@($tempActual -split '[\\\\/]+' | Where-Object { $_ -ne '' }); if($tempParts.Count -ge 3){$mxcTemp=($tempParts[-1] -ieq 'Temp' -and $tempParts[-2] -ieq 'AC' -and $tempParts[-3] -match '^sandbox\\.(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\})$')}; if($tempMatches -and $tmpMatches){$tempScope='broker_workspace_scratch'; $tempTarget=$expected} elseif(($tempActual -ieq $tmpActual) -and $mxcTemp){$tempScope='mxc_appcontainer'; $tempTarget=$tempActual}}; ",
         "Write-Output ('D4P_R2_TEMP_SCOPE_'+$tempScope); Write-Output 'D4P_R2_TEMP_STEP_scope_validation'; ",
         "$tempStep='temp_directory_check'; $tempWrite='failed'; $tempErrorFingerprint='invalid_operation'; $tempErrorType=$null; $tempErrorHResult=$null; if($tempScope -ne 'unrecognized'){if(-not (Test-Path -LiteralPath $tempTarget -PathType Container)){$tempErrorFingerprint='directory_missing'} else {$tempStep='temp_write'; try { Set-Content -LiteralPath (Join-Path $tempTarget $tempMarkerName) -Value 'd4p synthetic temp observer' -NoNewline -ErrorAction Stop; $tempStep='temp_write_completed'; $tempWrite='passed'; $tempErrorFingerprint=$null } catch { if($_.CategoryInfo.Category -eq 'PermissionDenied'){$tempErrorFingerprint='access_denied'} elseif($_.FullyQualifiedErrorId -match 'DirectoryNotFound'){$tempErrorFingerprint='directory_missing'} elseif($_.FullyQualifiedErrorId -match 'FileNotFound'){$tempErrorFingerprint='file_missing'} elseif($_.CategoryInfo.Category -eq 'InvalidOperation'){$tempErrorFingerprint='invalid_operation'} else {$tempErrorFingerprint='other'}}}}; ",
         "if($tempWrite -eq 'failed'){Write-Output ('D4P_R2_TEMP_ERROR_KIND_'+$tempErrorFingerprint)}; ",
@@ -1272,6 +1272,42 @@ mod tests {
         assert!(probe.contains("if (-not $outsideReadDenied) { exit 42 }"));
         assert!(probe.contains("if (-not $outsideWriteDenied) { exit 43 }"));
         assert!(probe.contains("broker-real-codex-marker.txt"));
+    }
+
+    #[test]
+    fn temp_probe_splits_windows_path_separators() {
+        let probe = synthetic_workspace_probe();
+        let marker = "-split '";
+        let pattern_start = probe
+            .find(marker)
+            .expect("TEMP path separator matcherを確認")
+            + marker.len();
+        let pattern_end = pattern_start
+            + probe[pattern_start..]
+                .find('\'')
+                .expect("TEMP path separator matcherの終端を確認");
+        let path_pattern = regex::Regex::new(&probe[pattern_start..pattern_end])
+            .expect("Windows path separator matcherを構築");
+
+        for path in [
+            r"C:\sandbox.01234567-89ab-cdef-0123-456789abcdef\AC\Temp",
+            "C:/sandbox.01234567-89ab-cdef-0123-456789abcdef/AC/Temp",
+        ] {
+            let parts = path_pattern
+                .split(path)
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                parts,
+                [
+                    "C:",
+                    "sandbox.01234567-89ab-cdef-0123-456789abcdef",
+                    "AC",
+                    "Temp"
+                ],
+                "両形式のWindows path separatorを分割する"
+            );
+        }
     }
 
     #[test]

@@ -1277,6 +1277,223 @@
         "task_created": true,
         "scope_limit": "This is a failed/cancelled staged r2-e2e attempt, not positive Task completion. It does not prove successful Workspace write, outside/secret read denial, TEMP success or cleanup, Recovery, Broker-restart durability, result/diff exposure, normal Release task_execution, or provider interoperability. Hidden app processes remain and the Audit snapshot may grow; the R2 release blocker and task_execution=unsupported stay active."
       },
+      "r2_installed_synthetic_task_e2e_run32": {
+        "date": "2026-10-03",
+        "status": "positive_task_completed_with_release_blockers",
+        "source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
+        "test_harness_worktree_clean": true,
+        "fake_api_artifact_hash_captured": false,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run32-2097517",
+        "installed_manifest": {
+          "stage_run_id": "d4p-r2-run30-9159b88",
+          "app_sha256": "sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempts": [
+          {
+            "task_id": "bc442f051d8ac54a7568bd45b7b04e59",
+            "status": "completed",
+            "permission_audit_ref": "broker-audit-44",
+            "approval_audit_ref": "broker-audit-46",
+            "start_audit_ref": "broker-audit-52",
+            "state_query_audit_ref": "broker-audit-56"
+          }
+        ],
+        "observations": {
+          "workspace": {
+            "task_marker_exists": true,
+            "outside_read_canary_exists": true,
+            "outside_write_marker_exists": false,
+            "synthetic_secret_bytes": 0,
+            "broker_scratch_directories_remaining": 0,
+            "task_instruction_body_present_in_audit": false
+          },
+          "temp_probe": {
+            "scope": "unrecognized",
+            "write": "failed",
+            "step": "temp_directory_check",
+            "actual_temp_write_attempted": false,
+            "host_watcher_status": "created",
+            "host_watcher_elapsed_ms": 235499
+          },
+          "audit": {
+            "event_count": 100,
+            "head_hash": "sha256:e9e9d8d9a626c46e62563bf854919438af558053576ac0ab397cbd41fdb6b589",
+            "audit_jsonl_sha256": "sha256:1880ee5f279870c2e718d097ef1c828327d494d9145a90e692688b2e20a50a37",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "broker_restart_verified": false
+          }
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "The installed staged r2-e2e path completed one synthetic Task and wrote its Workspace marker. The TEMP classifier returned unrecognized and therefore did not attempt a TEMP write; this run proves neither TEMP cleanup nor Broker-restart durability, result/diff exposure, the OneDrive Cloud Files/ordinary NTFS matrix, failure/deadline/crash Recovery, normal Release task_execution, or provider interoperability. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
+      },
+      "r2_installed_synthetic_task_e2e_run33": {
+        "date": "2026-10-03",
+        "status": "failed_after_task_started",
+        "source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
+        "test_harness_worktree_clean": true,
+        "fake_api_artifact_hash_captured": false,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run33-2097517",
+        "installed_manifest": {
+          "stage_run_id": "d4p-r2-run30-9159b88",
+          "app_sha256": "sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempt": {
+          "task_id": "367b5900ae9281c701f8999b634fb2a2",
+          "status": "failed",
+          "permission_audit_ref": "broker-audit-91",
+          "approval_audit_ref": "broker-audit-93",
+          "start_audit_ref": "broker-audit-97",
+          "state_query_audit_ref": "broker-audit-103"
+        },
+        "observations": {
+          "workspace": {
+            "task_marker_exists": false,
+            "outside_read_canary_exists": true,
+            "outside_write_marker_exists": false,
+            "synthetic_secret_bytes": 0,
+            "broker_scratch_directories_remaining": 1,
+            "task_instruction_body_present_in_audit": false
+          },
+          "temp_probe": {
+            "scope": "unrecognized",
+            "write": "failed",
+            "step": "temp_directory_check",
+            "actual_temp_write_attempted": false,
+            "host_watcher_status": "timeout",
+            "host_watcher_elapsed_ms": 240003
+          },
+          "audit": {
+            "event_count": 110,
+            "head_hash": "sha256:8af76f9899db5f412827dc2ee237c5e111715f404c9f27ff0df540ac1a55435e",
+            "audit_jsonl_sha256": "sha256:3eced4ad79b89384bf1de95d3199c7892955f678141f524cba1614bacb600e68",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "broker_restart_verified": false
+          }
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "The staged r2-e2e Task ended failed after the host watcher timed out; no Workspace Task marker exists and one Broker scratch directory remains in the preserved synthetic run. The TEMP path classifier did not attempt a TEMP write. No outside/secret read denial or successful cleanup is claimed. Keep task_execution=unsupported, the R2 release blocker active, and release_ready=false."
+      },
+      "r2_installed_synthetic_task_e2e_run34": {
+        "date": "2026-10-03",
+        "status": "failed_after_task_started",
+        "source_commit": "9159b88f73e1036381493a957545535afd48c5cc",
+        "source_worktree_clean": true,
+        "test_harness_source_commit": "209751720b973ce52ebf1dbb60137485bc9f56f8",
+        "test_harness_worktree_clean": true,
+        "fake_api_artifact_hash_captured": false,
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "run_id": "d4p-r2-run34-2097517",
+        "installed_manifest": {
+          "stage_run_id": "d4p-r2-run30-9159b88",
+          "app_sha256": "sha256:e617996bdd69365aacf1095cee9f2b3d2a3d6ba9dd1ac39ac48e22ad7c3ce44f",
+          "broker_sha256": "sha256:c9169cc0880b39dfad7fa458407824f6d7299e064145dbf8ab0d203816c5622d",
+          "launcher_sha256": "sha256:c3165076021ffcd0814d32244be2667e67634c5495267cff186094d83a0c4671"
+        },
+        "owner_decisions": ["one-use Workspace Permission", "separate one-use Task Approval"],
+        "task_attempt": {
+          "task_id": "1ebd3e158075f9e8f70b670185ae8718",
+          "status": "failed",
+          "permission_audit_ref": "broker-audit-49",
+          "approval_audit_ref": "broker-audit-51",
+          "start_audit_ref": "broker-audit-54",
+          "terminal_state_query_audit_ref": "broker-audit-60"
+        },
+        "fake_api": {
+          "requests": 4,
+          "models": 0,
+          "tool_offered": true,
+          "tool_call_sent": true,
+          "tool_result_received": true,
+          "repeated_tool_call_rejections": 3,
+          "invalid_bodies": 0,
+          "incomplete_requests": 0,
+          "response_write_failures": 0,
+          "blocked_external_requests": 0,
+          "workspace_marker_exists": false
+        },
+        "observations": {
+          "temp_probe": {
+            "reported_scope": "unrecognized",
+            "reported_write": "failed",
+            "reported_step": "temp_directory_check",
+            "actual_temp_write_attempted": false,
+            "independent_shape_match": "sandbox.{GUID}/AC/Temp with TEMP=TMP",
+            "cause": "Rust string escaping reduced the intended Windows path separator regex from two runtime backslashes to one; the PowerShell regex matched slash but not Windows backslash."
+          },
+          "workspace": {
+            "task_marker_exists": false,
+            "outside_write_marker_exists": false,
+            "outside_read_result": "unknown",
+            "synthetic_secret_bytes": 0,
+            "task_instruction_body_present_in_audit": false
+          },
+          "audit": {
+            "event_count": 72,
+            "head_hash": "sha256:f670f08f19d17a71f7f26c3a97d1f291ec90179ddacadc7c20bb2c4ff8ef26f5",
+            "audit_jsonl_sha256": "sha256:dc6a77953aed106910873f990764c3445cdb3db1e181547ee2a9b465b10ff27e",
+            "event_hash_errors": 0,
+            "previous_link_errors": 0,
+            "duplicate_event_ids": 0,
+            "anchor_count_and_head_match": true,
+            "anchor_hmac_valid": true,
+            "broker_restart_verified": false
+          },
+          "cleanup": {
+            "fake_api_listener_absent": true,
+            "desktop_processes_absent": true,
+            "owner_reported_exit_action": true,
+            "desktop_exit_audit_ref": null,
+            "last_audit_event_id": "broker-audit-72",
+            "last_audit_operation": "通知一覧",
+            "last_audit_decision": "accepted",
+            "shutdown_mode": "verified exact launcher/frontend processes were stopped after window close left them tray-resident"
+          }
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "task_created": true,
+        "scope_limit": "This run is a failed staged r2-e2e attempt whose host watcher withheld continuation after the fixture falsely classified a Windows TEMP path as unrecognized. It does not prove actual TEMP write denial, boundary probes, Task completion, MxC cleanup, Broker-restart durability, result/diff exposure, normal Release task_execution, or provider interoperability. The Task failure is not evidence of a product failure at TEMP; retain the R2 release blocker and task_execution=unsupported."
+      },
+      "latest_installed_e2e_observation": {
+        "date": "2026-10-03",
+        "positive_task_run": "r2_installed_synthetic_task_e2e_run32",
+        "later_failed_runs": [
+          "r2_installed_synthetic_task_e2e_run33",
+          "r2_installed_synthetic_task_e2e_run34"
+        ],
+        "run34_test_harness_cause": "Windows path separator regex was under-escaped in the Rust-built PowerShell probe; actual TEMP write was not attempted.",
+        "fixture_fix": "PowerShell regex now receives the escaped Windows backslash and slash class; generated-probe regression test covers both separators.",
+        "next_action": "Commit and push the fixture correction, hash the rebuilt loopback executable immediately before launch, then run a fresh installed synthetic Task.",
+        "release_state": {
+          "task_execution": "unsupported",
+          "r2_release_blocker_active": true,
+          "release_ready": false
+        }
+      },
       "current_cli_0160_mxc_shell_path_probe": {
         "date": "2026-10-03",
         "source_commit": "3ff426483014cc39f790f6c46254e94e7d85d782",
