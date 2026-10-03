@@ -19,6 +19,9 @@ mod windows {
         workspace: PathBuf,
         child: Option<Child>,
         endpoint: Option<BrokerEndpoint>,
+        helper_path: PathBuf,
+        codex_path: PathBuf,
+        process_generation: u32,
     }
 
     impl Fixture {
@@ -63,20 +66,48 @@ mod windows {
                     && !workspace.to_string_lossy().contains('='),
                 "Codex runtime引数のpathが区切り文字と衝突しない"
             );
-            let runtime = format!("r2-codex={}={}", codex.display(), workspace.display());
-            let child = Command::new(helper)
+            let mut fixture = Self {
+                root,
+                store,
+                session_file,
+                owner_file,
+                workspace,
+                child: None,
+                endpoint: None,
+                helper_path: helper.to_path_buf(),
+                codex_path: codex.to_path_buf(),
+                process_generation: 0,
+            };
+            fixture.start_process();
+            fixture
+        }
+
+        fn start_process(&mut self) {
+            self.process_generation += 1;
+            self.session_file = self
+                .root
+                .join(format!("normal-{}.json", self.process_generation));
+            self.owner_file = self
+                .root
+                .join(format!("owner-{}.json", self.process_generation));
+            let runtime = format!(
+                "r2-codex={}={}",
+                self.codex_path.display(),
+                self.workspace.display()
+            );
+            let child = Command::new(&self.helper_path)
                 .args(["broker-server", "--store-dir"])
-                .arg(&store)
+                .arg(&self.store)
                 .arg("--session-file")
-                .arg(&session_file)
+                .arg(&self.session_file)
                 .arg("--owner-session-file")
-                .arg(&owner_file)
+                .arg(&self.owner_file)
                 .arg("--workspace-config")
-                .arg(root.join("workspace.json"))
+                .arg(self.root.join("workspace.json"))
                 .arg("--codex-runtime")
                 .arg(runtime)
-                .current_dir(&root)
-                .env("CODEX_HOME", root.join("codex-home"))
+                .current_dir(&self.root)
+                .env("CODEX_HOME", self.root.join("codex-home"))
                 .env_remove("OPENAI_API_KEY")
                 .env_remove("CODEX_API_KEY")
                 .env_remove("ANTHROPIC_API_KEY")
@@ -85,23 +116,15 @@ mod windows {
                 .stderr(Stdio::null())
                 .spawn()
                 .expect("Release Broker processを起動");
-            let mut fixture = Self {
-                root,
-                store,
-                session_file,
-                owner_file,
-                workspace,
-                child: Some(child),
-                endpoint: None,
-            };
-            let endpoint = fixture.wait_for_endpoint(false);
-            let owner = fixture.wait_for_endpoint(true);
+            self.child = Some(child);
+            self.endpoint = None;
+            let endpoint = self.wait_for_endpoint(false);
+            let owner = self.wait_for_endpoint(true);
             assert_ne!(
                 endpoint.session_secret, owner.session_secret,
                 "通常IPC資格とOwner資格が分離する"
             );
-            fixture.endpoint = Some(endpoint);
-            fixture
+            self.endpoint = Some(endpoint);
         }
 
         fn wait_for_endpoint(&mut self, owner: bool) -> BrokerEndpoint {
@@ -143,6 +166,7 @@ mod windows {
                 .wait()
                 .expect("Broker process終了待ち")
                 .success());
+            self.endpoint = None;
         }
     }
 
@@ -189,12 +213,13 @@ mod windows {
     }
 
     fn shutdown_request(session_id: &str) -> String {
+        let request_id = format!("r2-production-e2e-shutdown-{session_id}");
         json!({
-            "request_id": "r2-production-e2e-shutdown",
+            "request_id": request_id,
             "session_id": session_id,
             "operation": "shutdown",
             "payload_hash": sha256_tagged(b"null"),
-            "nonce": "r2-production-e2e-shutdown-nonce",
+            "nonce": format!("{request_id}-nonce"),
             "issued_at": BrokerRequestEnvelope::current_issued_at(),
             "metadata": {"client": "r2_production_agent_task_e2e"},
         })
@@ -215,7 +240,8 @@ mod windows {
 
         let mut fixture = Fixture::new(&helper, &codex);
         let endpoint = fixture.endpoint().clone();
-        let agent_list = send_request(&endpoint, &request(&endpoint, "Agent一覧", json!({})));
+        let agent_list_request = request(&endpoint, "Agent一覧", json!({}));
+        let agent_list = send_request(&endpoint, &agent_list_request);
         assert_eq!(agent_list["status"], "accepted", "{agent_list}");
         let agents = agent_list["body"]["Agent"].as_array().expect("Agent一覧");
         let codex_agent = agents
@@ -284,6 +310,32 @@ mod windows {
         }
 
         fixture.stop();
+        fixture.start_process();
+        let restarted_endpoint = fixture.endpoint().clone();
+        assert_ne!(
+            endpoint.session_id, restarted_endpoint.session_id,
+            "Broker再起動で通常IPC sessionを新規発行する"
+        );
+        assert_ne!(
+            endpoint.session_secret, restarted_endpoint.session_secret,
+            "Broker再起動で通常IPC資格を新規発行する"
+        );
+        let stale_session = send_request(&restarted_endpoint, &agent_list_request);
+        assert_eq!(stale_session["status"], "rejected", "{stale_session}");
+        assert!(stale_session["body"].is_null());
+        let stale_session_audit_id = stale_session["audit_event_id"]
+            .as_str()
+            .expect("再起動前session要求の拒否Audit")
+            .to_string();
+        let restarted_agent_list = send_request(
+            &restarted_endpoint,
+            &request(&restarted_endpoint, "Agent一覧", json!({})),
+        );
+        assert_eq!(
+            restarted_agent_list["status"], "accepted",
+            "{restarted_agent_list}"
+        );
+        fixture.stop();
         let audit_path = fixture.store.join("audit.jsonl");
         let audit_text = fs::read_to_string(&audit_path).expect("永続Audit file");
         assert!(!audit_text.contains(instruction));
@@ -293,7 +345,14 @@ mod windows {
             "r2-production-e2e-verify",
         )
         .expect("終了後に永続Audit chainを再検証");
-        for response in [&started, &workspace_permission, &owner_approval] {
+        for response in [
+            &agent_list,
+            &started,
+            &workspace_permission,
+            &owner_approval,
+            &stale_session,
+            &restarted_agent_list,
+        ] {
             let event_id = response["audit_event_id"].as_str().unwrap();
             assert!(persisted
                 .audit_log
@@ -308,6 +367,11 @@ mod windows {
                     && event.reason.contains("AgentTask実行非対応")
             }));
         }
+        assert!(persisted
+            .audit_log
+            .events()
+            .iter()
+            .any(|event| event.event_id == stale_session_audit_id && event.decision == "rejected"));
         assert!(fs::read_dir(&fixture.workspace).unwrap().all(|entry| {
             !entry
                 .unwrap()

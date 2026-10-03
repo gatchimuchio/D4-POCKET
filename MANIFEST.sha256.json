@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "fc938d17da4a45f7c03eebfbd0e09f26ca2c2d91f7783d03a91621ba85a94121"
+      "sha256": "a3c3f2cf29afe778eae80e3176449122fa91a216981a79bb2ce8e3ec26e1897e"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3296,7 +3296,7 @@
     },
     {
       "path": "native/rust_helper/tests/agent_task_production_e2e.rs",
-      "sha256": "73ebc22bc40cbd6d4b81e1945297e025a727390584a69a46ce61b03c1a677563"
+      "sha256": "06a4bacce646f8f767dc801d22e3d1d2760d7c70bf7f8079808240e9d5f9685d"
     },
     {
       "path": "native/rust_helper/tests/broker_ipc.rs",
@@ -3800,7 +3800,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "9a5974eb559444abc0cf00a5d60c58c48bcbf8bd82701e19817eeb199eb119ad"
+      "sha256": "143f9f6d79867bfdc33a55ee12bf60208e837e36da2def6451a2a014364a693a"
     },
     {
       "path": "requirements-dev.txt",

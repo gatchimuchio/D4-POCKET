@@ -696,6 +696,25 @@
         "os_protection_changed": false,
         "scope_limit": "Negative-only LIVE_RUNTIME proof for a standalone Release Broker process, authenticated IPC, actual CLI registration/projection, and durable rejection Audit. Workspace/store/secret are FIXTURE. It does not prove installed Desktop/native Owner operation, positive Agent Task execution, sandbox isolation, Task recovery, AppContainer TEMP cleanup, result/diff exposure, or task_execution support."
       },
+      "current_main_release_broker_process_restart_audit_probe": {
+        "date": "2026-10-03",
+        "source_commit": "59b32108dc0003a6834d4be9059970c9f95b898c",
+        "production_source_unchanged": true,
+        "cli_version": "codex-cli 0.160.0",
+        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "validation": "cargo +1.95.0 build --locked --offline --manifest-path native/rust_helper/Cargo.toml --release --bin gui_shell_rust_helper succeeded with existing MINIDORA dead-code warnings. Focused ignored production Broker E2E windows::production_agent_task_gate_fails_closed_over_authenticated_ipc passed 1/1 after two sequential Release Broker processes used the same synthetic store. cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1 passed 449, failed 0, ignored 7. Schema check passed: 152 schemas, 152 examples, 196 negative fixtures. Conformance passed: 231 checks. rustfmt --check and git diff --check passed. python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows passed all 10 development checks; strict Japanese audit 1134 files/0 findings; Manifest 1131 files; release_ready remained false. Release helper SHA-256: D616F45F1B288983B1756F666FE61F5406382B29A87A24424451BF58CFA801E.",
+        "observations": {
+          "broker_restart": "The standalone Release Broker was shut down normally and restarted against the same isolated synthetic store. Restart created a different authenticated session ID and secret. A pre-restart request was rejected with no body; a fresh request was accepted.",
+          "audit": "After the second shutdown, BrokerPersistentStore reopened and verified the persistent Audit chain. Audit references from before and after restart, including the stale-session rejection, remained present. The synthetic Task instruction and secret marker were absent.",
+          "task_gate": "Codex task_execution remained unsupported. No Task worker, Workspace Permission, or Task Approval was created; the existing negative gate continued to reject Task execution and normal-IPC Owner grants."
+        },
+        "release_helper_sha256": "sha256:d616f45f1b288983b1756f666fe61f5406382b29a87a24424451bf58cfa801e",
+        "codex_cli_sha256": "sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2",
+        "real_model_or_credential_used": false,
+        "installed_product_ui_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "LIVE_RUNTIME is limited to a standalone Release Broker process and actual Codex CLI 0.160.0 interface probes; the Workspace, store, and markers are synthetic FIXTURE. This does not verify restart durability of run23's positive Task-completion Audit, installed Flutter/native Owner flow, positive Task execution, Task-state persistence, sandbox isolation, Recovery, TEMP cleanup, result/diff exposure, provider interoperability, or task_execution support."
+      },
       "current_main_real_cli_loopback_fake_responses_task_probe": {
         "date": "2026-10-01",
         "source_commit": "7f7feb3e5723ee30a45acc3383007addd99f2440",
@@ -1032,6 +1051,13 @@
             "evidence_retained": true,
             "launcher_and_frontend_still_running": true,
             "reason_not_force_stopped": "Normal exit is controlled by the native tray-menu Exit action; the UI automation surface could not target the notification area."
+          },
+          "post_run_normal_exit": {
+            "owner_reported_normal_exit": true,
+            "launcher_pid_absent": true,
+            "frontend_pid_absent": true,
+            "fake_api_listener_absent": true,
+            "verification": "After the owner used the native tray Exit action, the run23 Launcher PID 16268 and Flutter PID 8268 were absent, and TCP port 58556 had no listener."
           }
         },
         "task_created": true,

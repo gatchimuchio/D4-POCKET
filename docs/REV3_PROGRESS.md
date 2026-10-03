@@ -1894,3 +1894,20 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - run23は試験専用feature付きstaged appでのpositive Taskおよびfile-backed positive completion Auditを成立させた。通常ReleaseのTask実行能力、Auditの再起動後検証、result／diff表示、MxC TEMP cleanup、OneDrive Cloud Files／通常NTFSの隔離matrix、失敗／期限／crash Recoveryは未成立。偽APIによるLIVE_RUNTIME試験は実provider相互運用の証拠ではない。
 - 偽API listenerとTask childは停止済み。合成runのAudit／Workspace証跡は保持した。D4 Pocket launcher／frontendはまだ実行中であり、通常終了はtrayの`終了`操作が必要だが、この実行環境から通知領域を操作できなかった。未確認の強制終了は行っていない。
 - したがって本runで「positive Task completion」検証点は閉じるが、R2 production E2E全体は閉じない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 現行Release Broker process再起動後のAudit保持と旧Session拒否（2026-10-03）
+
+### 実装と観測
+
+- `native/rust_helper/tests/agent_task_production_e2e.rs`のignored Windows E2Eを拡張し、同じ合成Workspace／file-backed storeを使うRelease Brokerを順次2 process起動する。1つ目の通常終了後に同じstoreから2つ目を起動し、通常Session IDと資格が新しくなること、再起動前の要求は拒否され本文を返さないこと、新Sessionからのfresh要求は受理されることを検査する。
+- 2つ目のBroker終了後に永続storeを開き直す。再起動前後双方の応答Audit参照と、旧Session要求の拒否Auditがhash chain上に残ること、合成Task指示・secret markerがAudit本文にないことを確認する。
+- 現行Release Broker helperはproduction Rust source commit `59b32108dc0003a6834d4be9059970c9f95b898c`からbuildし、実Codex CLI `0.160.0`のinterface検査を行った。Windows `LIVE_RUNTIME`はstandalone Release Broker／loopback IPC／実CLI probeの範囲、Workspace・store・markerは`FIXTURE`。実Task、model／Credential、installed Flutter UI、Owner画面、外部通信は使っていない。
+- 同日、Ownerのtray `終了`操作後にrun23の既知Launcher PID `16268`とFlutter PID `8268`が不在、偽API port `58556`のlistener不在を確認した。run23の元cleanup recordは試験終了時点の記録として保持し、後追い終了確認をregistryへ追記した。
+
+### 検証と境界
+
+- `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --test agent_task_production_e2e -- --ignored --exact windows::production_agent_task_gate_fails_closed_over_authenticated_ipc --nocapture --test-threads=1`: 成功、1 passed／0 failed。
+- `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: 成功、449 passed／0 failed／7 ignored。
+- `python -X utf8 tooling/schema_check/check_schemas.py`: 成功、Schema 152件／normal example 152件／negative fixture 196件。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`: 成功、231 checks。
+- `rustfmt +1.95.0 --edition 2021 --config skip_children=true --check native/rust_helper/tests/agent_task_production_e2e.rs`と`git diff --check`: 成功。`python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`: 成功、development check 10件すべてpass。厳格日本語監査1134 files／0 findings、Schema 152件／example 152件／negative fixture 196件、Conformance 231 checks、Manifest 1131 files。Evidence bundleはrelease blocker 5件と`release_ready=false`を保持し、最終開発監査はpassだが正式releaseを証明しない。
+- この試験が閉じるのはstandalone production Brokerの再起動後Audit読込と旧Session拒否の補助証拠だけである。run23のpositive Task完了Auditを再起動後に再読込した証拠ではない。Task状態は契約どおり揮発し、Codex `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。result／diff Content Exposure、MxC TEMP cleanup、OneDrive Cloud Files／通常NTFSのTask統合隔離、failure／deadline／crash Recovery、通常Release Task capabilityは未成立。
