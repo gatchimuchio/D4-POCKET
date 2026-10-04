@@ -35,7 +35,7 @@ R14へ送る作業には、追加long-run、網羅的fault matrix、全数regres
 | R2-C3 | native trayからの正常終了 | `CLOSED` | `docs/REV3_PROGRESS.md`のrun40正常終了記録 | 直接的な回帰証拠のみ |
 | R2-C4 | 局所cross-Workspace隔離LIVE_RUNTIME | `CLOSED` | 既存の局所隔離LIVE_RUNTIME記録 | 直接的な回帰証拠のみ |
 | R2-A | active Task cancel／deadline、子孫停止、Recovery、stale authority不再利用 | `CLOSED` | 本書「R2-A受入れ結果」、`docs/REV3_PROGRESS.md`の2026-10-05追補、`release_blockers.registry.json`の`r2_bounded_exit_gate.closed_conditions.R2-A`。従来の失敗履歴は保持 | 直接的な回帰証拠のみ |
-| R2-B | Codex／Broker／Launcher crash、子孫停止、Recovery、stale authority不再利用 | `OPEN` | registry `installed_task_crash_recovery_run50`／`installed_task_crash_recovery_run51`は部分・失敗範囲を保持し、受入れPASSへ昇格しない | 直接的な回帰証拠のみ |
+| R2-B | Codex／Broker／Launcher crash、子孫停止、Recovery、stale authority不再利用 | `IMPLEMENTING` | registry `installed_task_crash_recovery_run50`／`installed_task_crash_recovery_run51`は部分・失敗範囲を保持し、受入れPASSへ昇格しない | 直接的な回帰証拠のみ |
 | R2-C | Task間scratch／Agent状態の非汚染 | `OPEN` | 未着手 | 直接的な回帰証拠のみ |
 | R2-D | Agent Centerのresult／diff／changed files／test result表示とContent Exposure境界 | `OPEN` | 実装・local test記録は`docs/REV3_PROGRESS.md`に保持。配置済み製品の受入れは未成立 | 直接的な回帰証拠のみ |
 | R2-E | 配置済み経路で通常NTFS／OneDrive Cloud Files双方のsecret・Workspace境界 | `OPEN` | 未着手 | 直接的な回帰証拠のみ |
@@ -69,6 +69,18 @@ R2-Aは次の一回ずつの限定受入れでPASSとする。短縮期限は試
 - 両TaskのOwner確認・Permission・Approvalは各run内で新規発行され、開始時に一回消費された。終端後の自動Grant復元・再発行はAuditにない。Grant再利用拒否は既存CLOSED R2-C1の証拠に委ね、再試験していない。
 - 実モデル、production credential、課金、外部要求、OS保護設定変更なし。MxC AppContainer TEMPの書込み失敗はD4-owned WorkspaceTaskScratchの保証範囲外であり、R2-Aの判定には含めない。
 - 判定: R2-Aの有限受入れ条件はPASS。過去の失敗・不成立試行は履歴として維持し、再分類しない。追加race、長時間、fault matrix、別platform検査はR14へ送る。
+
+### R2-B 開発通過Acceptance Contract
+
+R2-Bは、active Taskを各故障位置で一回ずつ中断する有限受入れとする。
+
+1. installed D4 Pocketのproduction Broker経路でTaskをactiveにし、Codex CLI processだけを異常終了する。起動中のMxC／tool process群停止、Taskのfailed終端とAudit、完了書込みがないことを確認する。
+2. 同じ経路でTaskをactiveにし、Brokerのrequest server threadを`r2-e2e`専用有界crash triggerで異常終了する。LauncherがBroker停止を検知してOwner操作待ちなしに終了し、Task process群を停止することを確認する。同一隔離storeで次回起動し、未終端Taskのdurable Recovery記録を確認する。
+3. 同じ経路でTaskとMxC/tool process群がactiveな状態から正確なLauncher processを異常終了する。BrokerはLauncherと同一process内のthreadであり、独立したBroker processは存在しない。この共有fault domainを明示し、Task process群とFlutter childの停止、同一隔離store再起動後のdurable Recoveryを確認する。
+4. Task開始AuditにPermission／Approvalの一回消費を確認し、再起動後に旧grantが復元・再発行されないことを確認する。Permission／Approval再利用拒否のIPC試験は既存CLOSED R2-C1証拠を再利用し、重複しない。
+5. 各runは隔離Workspace／profileとloopback偽Responses APIだけを使い、実model、production credential、課金、外部要求を発生させない。MxC AppContainer TEMPの物理削除は対象外。
+
+受入れは以上の3故障位置に限定する。別process fault matrix、反復race、長時間、performance、platform variantおよび最終統合後の全数regressionはR14へ送る。D4-owned WorkspaceTaskScratchの各cleanup細目はR2-Fでこの結果を参照し、同一故障試験を繰り返さない。
 
 ## 4. R2後の必須遷移
 

@@ -232,7 +232,7 @@
           "ledger_path": "docs/REV4_ACCEPTANCE_LEDGER.md",
           "condition_order": ["R2-A", "R2-B", "R2-C", "R2-D", "R2-E", "R2-F", "R2-G", "R2-H"],
           "active_condition": "R2-B",
-          "active_condition_status": "OPEN",
+          "active_condition_status": "IMPLEMENTING",
           "closed_condition_retest": "forbidden_without_specific_regression_evidence",
           "deferred_final_assurance": {
             "formal_evidence_phase": "R13",

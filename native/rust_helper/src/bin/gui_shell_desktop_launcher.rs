@@ -4,6 +4,10 @@
 #[cfg(windows)]
 fn main() {
     if let Err(error) = gui_shell_rust_helper::desktop_launcher::run() {
+        if error.requires_immediate_exit() {
+            // Broker異常終了時はowner操作待ちのdialogでAgent Task childを生存させない。
+            std::process::exit(1);
+        }
         use winsafe::{co, prelude::*, HWND};
         let _ = HWND::NULL.MessageBox(
             &error.dialog_text(),

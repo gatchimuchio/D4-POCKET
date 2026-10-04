@@ -496,6 +496,17 @@ const AGENT_TASK_EXECUTION_LIMIT: Duration = Duration::from_secs(900);
 #[cfg(feature = "r2-e2e")]
 const R2_E2E_TASK_EXECUTION_LIMIT_ENV: &str = "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS";
 
+#[cfg(feature = "r2-e2e")]
+const R2_E2E_BROKER_THREAD_CRASH_AFTER_MS_ENV: &str =
+    "GUI_SHELL_R2_E2E_BROKER_THREAD_CRASH_AFTER_MS";
+
+#[cfg(feature = "r2-e2e")]
+fn r2_e2e_broker_thread_crash_after_ms(value: Option<&str>) -> Option<u64> {
+    value
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|milliseconds| (1_000..=120_000).contains(milliseconds))
+}
+
 #[cfg(any(feature = "r2-e2e", test))]
 fn r2_e2e_task_execution_limit_ms(value: Option<&str>) -> Option<u64> {
     value
@@ -1663,6 +1674,18 @@ impl 対話制御 {
                     .agent_tasks
                     .get(&request.task_id)
                     .ok_or(対話失敗::要求不正)?;
+                #[cfg(feature = "r2-e2e")]
+                if task.status == "running"
+                    && std::env::var(R2_E2E_BROKER_THREAD_CRASH_AFTER_MS_ENV)
+                        .ok()
+                        .as_deref()
+                        .and_then(|value| r2_e2e_broker_thread_crash_after_ms(Some(value)))
+                        .is_some_and(|milliseconds| {
+                            task.created_at.elapsed() >= Duration::from_millis(milliseconds)
+                        })
+                {
+                    panic!("R2-E2E: active Agent Task中のBroker server thread crashを注入");
+                }
                 Ok(AgentTask状態射影(task))
             }
             "AgentTask結果表示承認" => {
@@ -2596,6 +2619,23 @@ mod tests {
         assert_eq!(r2_e2e_task_execution_limit_ms(Some("900001")), None);
         assert_eq!(r2_e2e_task_execution_limit_ms(Some("invalid")), None);
         assert_eq!(r2_e2e_task_execution_limit_ms(None), None);
+    }
+
+    #[cfg(feature = "r2-e2e")]
+    #[test]
+    fn Broker異常終了注入は有界な試験値だけを受理する() {
+        assert_eq!(
+            r2_e2e_broker_thread_crash_after_ms(Some("1000")),
+            Some(1000)
+        );
+        assert_eq!(
+            r2_e2e_broker_thread_crash_after_ms(Some("120000")),
+            Some(120000)
+        );
+        assert_eq!(r2_e2e_broker_thread_crash_after_ms(Some("999")), None);
+        assert_eq!(r2_e2e_broker_thread_crash_after_ms(Some("120001")), None);
+        assert_eq!(r2_e2e_broker_thread_crash_after_ms(Some("invalid")), None);
+        assert_eq!(r2_e2e_broker_thread_crash_after_ms(None), None);
     }
 
     #[cfg(windows)]

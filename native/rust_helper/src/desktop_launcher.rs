@@ -450,6 +450,13 @@ impl DesktopLaunchError {
         Self { code, message }
     }
 
+    pub fn requires_immediate_exit(&self) -> bool {
+        matches!(
+            self.code,
+            "BROKER_STOPPED" | "BROKER_SHUTDOWN_FAILED" | "BROKER_CHANNEL_SHUTDOWN_FAILED"
+        )
+    }
+
     pub fn dialog_text(&self) -> String {
         format!(
             "{}\n\nエラーコード: {}\n\nD4 Pocketを終了して再起動してください。繰り返す場合は管理者へこのコードを伝えてください。",
@@ -2155,12 +2162,46 @@ fn launch_frontend(
         OsStr::new(&broker.channel_pipe_name),
     );
     command.current_dir(&layout.app_dir);
+
+    #[cfg(windows)]
+    let frontend_job = {
+        use std::os::windows::process::CommandExt;
+
+        let job = gui_shell_process_supervision::Job::create().map_err(|_| {
+            DesktopLaunchError::new(
+                "FRONTEND_SUPERVISION_UNAVAILABLE",
+                "D4 Pocket画面の終了監督を準備できません。",
+            )
+        })?;
+        command.creation_flags(gui_shell_process_supervision::CREATE_SUSPENDED);
+        job
+    };
+
     let mut frontend = command.spawn().map_err(|_| {
         DesktopLaunchError::new(
             "FRONTEND_START_FAILED",
             "D4 Pocket画面を起動できません。製品ファイルを確認してください。",
         )
     })?;
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+
+        if frontend_job
+            .assign_and_resume(frontend.id(), frontend.as_raw_handle())
+            .is_err()
+        {
+            let _ = frontend_job.terminate_and_wait();
+            let _ = frontend.kill();
+            let _ = frontend.wait();
+            return Err(DesktopLaunchError::new(
+                "FRONTEND_SUPERVISION_FAILED",
+                "D4 Pocket画面の終了監督を開始できません。",
+            ));
+        }
+    }
+
     broker.frontend_pid.store(frontend.id(), Ordering::Release);
     wait_for_frontend(&mut frontend, broker)
 }
@@ -2231,6 +2272,20 @@ pub fn run() -> Result<(), DesktopLaunchError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn broker_failure_codes_exit_without_dialog() {
+        for code in [
+            "BROKER_STOPPED",
+            "BROKER_SHUTDOWN_FAILED",
+            "BROKER_CHANNEL_SHUTDOWN_FAILED",
+        ] {
+            assert!(DesktopLaunchError::new(code, "test").requires_immediate_exit());
+        }
+        for code in ["FRONTEND_START_FAILED", "FRONTEND_EXIT_FAILED"] {
+            assert!(!DesktopLaunchError::new(code, "test").requires_immediate_exit());
+        }
+    }
 
     #[cfg(windows)]
     fn automate_native_owner_confirmation(
