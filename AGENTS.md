@@ -730,3 +730,13 @@ phase固有実装は、次を保持する。
 - 境界付きRust helper authority
 - Windows-first release evidenceとLinux development evidenceの分離
 - macOS host validationが成立するまでのmacOS known limitation処理
+
+### 28. 工程内Acceptanceと最終品質保証の分離
+
+現行工程のAcceptanceは、当該機能の成立、基本安全境界、致命的failureの不在、および次工程へ安全に進める条件だけを判定する。これは製品全体のrelease acceptanceではない。
+
+品質基準やAuthority境界を弱めず、工程の証明深度だけを段階化する。現行工程の明示Acceptance Contractは満たすが、最終出荷級の全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceの追加強化を要求しない。それらは正本の定める後続工程へ送る。
+
+D4 Pocket rev4では、作業開始時に`docs/REV4_ACCEPTANCE_LEDGER.md`を読み、`OPEN`または`FAIL`だけを順番に処理する。`PASS`は同じblockで`CLOSED`へ移す。CLOSED条件の再訪は、具体的regression evidenceが成立条件を破壊した場合に限る。強い証拠を追加取得できること、未知riskの可能性、文書表現の修正だけでは再試験しない。
+
+R2はR3へ進むための有限な開発通過gateであり、R2-A〜H以外の条件を追加しない。R2のCLOSEDはrelease ready、formal acceptance、最終製品保証を意味しない。Formal EvidenceはR13、統合後の最終品質保証（全数回帰・長時間・fault・performance）はR14で実施し、R2で成立した証拠の再生成ではなく、最終統合状態を対象にする。MxC、OS、Provider等の外部所有内部実装の完全性をD4 Pocketの保証へ取り込まない。

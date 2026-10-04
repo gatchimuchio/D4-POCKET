@@ -207,3 +207,9 @@ R2を閉じるために残る条件は、(1) installed active Taskの取消／�
 MxC childの`TEMP`／`TMP`がWindows AppContainer profileへリダイレクトされる場合、その内部directoryの物理削除はD4 Pocketの保証として主張しない。D4 Pocketが保証すべき対象はBroker-owned `WorkspaceTaskScratch`の範囲・Task間分離・通常終了／取消／期限／crash後の停止と回収、および回収不能時のfail-closed Recoveryである。MxC／Windows側のTEMP寿命を観測しただけでD4のscratch cleanupを代替せず、逆にD4の保証外であるTEMP削除をR2 blockerへ追加しない。
 
 通常Releaseの`task_execution`は、上記8条件と既存の閉鎖条件がすべて適切な証拠classでPASSした場合に限り`supported`へ変更する。PASS後は追加の仮説的riskを理由に`unsupported`を維持しない。未解決項目がある間はfail-closedで`unsupported`を保つ。R2完了後は新たな局所最適化を挟まずR3 Multi-Agent Compareへ進み、R3完了後にR4 Handoffへ進む。
+
+### D4 Pocket rev4 工程内Acceptanceと最終QAの分離
+
+このrev3記録は当時の作業履歴として保持する。現在のR2-A〜Hの状態と有限Acceptanceは`docs/REV4_ACCEPTANCE_LEDGER.md`が正本であり、既存のCLOSED条件を再試験しない。
+
+R2のPASSは後続開発へ進むための機能成立gateであり、release acceptanceや製品全体の保証ではない。各R2条件が要求する安全境界・Recoveryは必要最小限の受入れで確認し、長時間、全数regression、広範なfault injection、性能、Formal Evidenceの最終強化はR13/R14へ移送する。工程の短縮を理由にAuthority、Permission、Approval、Audit、Recovery、Content Exposureの意味を弱めてはならない。

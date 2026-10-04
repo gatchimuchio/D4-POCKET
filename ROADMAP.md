@@ -1,10 +1,10 @@
 # GUI Shell ロードマップ
 
-状態: D4 Pocket / GUI-Shell統合rev3に基づく開発中。R0現行状態再固定とR1正本・Blocker体系再編を完了し、R2 Agent Task本番経路を進行中。Technical Completeおよび正式releaseは未成立。
+状態: D4 Pocket / GUI-Shell統合rev4の工程収束規則を適用して開発中。R2は探索・最終出荷検査ではなく、R3へ安全に進むための有限な開発通過gateとする。現行Acceptance状態、順序、証拠、R14への最終QA移送先は`docs/REV4_ACCEPTANCE_LEDGER.md`を正本とする。Technical Completeおよび正式releaseは未成立。
 
-R2の範囲は現行ユーザー指示で有限固定する。既に実証済みのpositive Task、Permission／Approval一回消費、耐久Audit、tray正常終了、局所cross-Workspace隔離は既存証拠を再利用し、別名fixtureによる反復をしない。残る8条件は`release_blockers.registry.json`の`r2_bounded_exit_gate.remaining_conditions`を正本とする。仮説的な追加riskをR2へ積み増さず、8条件と既存の閉鎖条件が成立した時点で通常Releaseの`task_execution=supported`へ昇格し、直ちにR3 Multi-Agent Compare、その後R4 Handoffへ進む。
+R2-A〜HをAcceptance Ledgerの順で処理する。既にCLOSEDと定められたpositive Task、Permission／Approval一回消費、durable Audit、tray終了、局所cross-Workspace隔離は再試験しない。R2では各条件の機能成立と必要最小限の安全境界だけを確認し、全数回帰、長時間稼働、網羅的fault injection、性能、Formal Evidenceの強化は後工程へ送る。安全・Authority・Audit・Recovery要件そのものは変更しない。全有限条件のPASS後はnormal Releaseの`task_execution=supported`へ昇格し、release readinessとは分離したままR2をCLOSED、R3をOPENにしてCompareを開始する。rev3の進捗記録は履歴として保持し、現行状態の正本へ逆流させない。
 
-## D4 Pocket統合 rev3 現行工程
+## rev3作業履歴（現行工程の正本ではない）
 
 R2追補（2026-10-04、run50 Audit projection不一致）: 修正前source 1dc2014c6a71b5dd1cf094a2f313608ab06b9160由来のinstalled r2-e2e run50でnative Owner Permission／Task Approval後にTaskを開始し、同じfile-backed Auditを持つBroker restart後もTask開始Audit broker-audit-59に対応するRecovery Auditが0件だった。productionは意味markerをreasonへ記録し、Recoveryはoperationのみ検索していた。active process descendantsがLauncher停止前に消失していたためprocess cleanupも未検証。根因修正とproduction形式・旧形式・冪等性testを追加し、focused testはPASS。run50はidentity_kind=gui_shell／isolated=false／formal_runtime_proof=false、MxC TEMP write失敗であり、R2 Recovery／provenance合格ではない。修正後fresh installed crash LIVE_RUNTIME再試験までtask_execution=unsupportedを維持する。詳細はdocs/REV3_PROGRESS.md。
 

@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "b1a71cab714a7c7830f49acbac13d0c5b1e56a9c76891dd1507e5e70ac84a78d"
+      "sha256": "c34271edc3da212196a55f7b95188c5d3fff6b17273e0742114730f0c1b5af83"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9ab5ac62749ca82a8b0fe63945a235d66b97ae9c5c4a636f997396bb8ded6f62"
+      "sha256": "7cdcdb6c26af3d418898199bd54d0af81e04e9ba30d99f2c118669d280f74459"
     },
     {
       "path": "SECURITY.md",
@@ -1207,6 +1207,10 @@
       "sha256": "f2e97ac03752b6504a84d54a443e94fd7ca23d6f63d1d60d2fa9c94c2234baeb"
     },
     {
+      "path": "docs/REV4_ACCEPTANCE_LEDGER.md",
+      "sha256": "fe6c04236c9f5af5b58f2e272ebf8a39e4fb7bef623e9107c0ef64a07835c940"
+    },
+    {
       "path": "docs/SETUP_DOCTOR.md",
       "sha256": "fae33223287f7190bfa87036fa63102dd9a4ee15b48fceb20a4ff6ff197cb5eb"
     },
@@ -1312,7 +1316,7 @@
     },
     {
       "path": "docs/specs/agent-runtime.md",
-      "sha256": "d7711fb22a03b4d27bd563745ce0d10925047df737f686c9e8ee0c493302ce45"
+      "sha256": "5c73c6ae4b8aacb8bc6da7cb40725e900480bfd280c5d0aefacf4822fcd4cd6e"
     },
     {
       "path": "docs/specs/approval-visibility-boundary.md",
@@ -3808,7 +3812,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "5391fe482793b70d6d1529aa5c001f0727fd4c265f61de8cb555e9c3e937fef3"
+      "sha256": "b223b405c404c07a77ed8727d07165b23e339df263b1fc5287c3cdb1e49d4ba5"
     },
     {
       "path": "requirements-dev.txt",

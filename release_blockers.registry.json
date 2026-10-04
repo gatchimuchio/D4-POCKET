@@ -225,7 +225,22 @@
     {
       "name": "comprehensive_extension_rev1_completion",
       "r2_bounded_exit_gate": {
-        "version": 1,
+        "version": 2,
+        "phase_acceptance_policy": {
+          "purpose": "development_progression_not_final_product_acceptance",
+          "active_phase": "R2",
+          "ledger_path": "docs/REV4_ACCEPTANCE_LEDGER.md",
+          "condition_order": ["R2-A", "R2-B", "R2-C", "R2-D", "R2-E", "R2-F", "R2-G", "R2-H"],
+          "active_condition": "R2-A",
+          "active_condition_status": "IMPLEMENTING",
+          "closed_condition_retest": "forbidden_without_specific_regression_evidence",
+          "deferred_final_assurance": {
+            "formal_evidence_phase": "R13",
+            "integrated_final_qa_phase": "R14",
+            "scope": ["全数回帰", "長時間稼働", "fault injection", "performance", "最終統合状態のFormal Evidence"]
+          },
+          "safety_contracts_unchanged": true
+        },
         "closed_conditions_reuse_existing_evidence": [
           "installed positive Task completion",
           "Permission／Approval一回消費",
