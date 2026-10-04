@@ -2163,3 +2163,12 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - focused validation: `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e deadline_supervision_probe_waits_past_broker_limit_only_with_explicit_marker -- --nocapture` — unit test 1 passed、および同名の`r2_e2e_responses` fixture test 1 passed。`rustfmt +1.95.0 --check --edition 2021 native/rust_helper/tests/support/codex_loopback_responses.rs`もpassed。
 - 証拠分類は`FIXTURE`。この変更はinstalled Taskの期限到達、Brokerの期限処理、Job Objectによるprocess群停止、Recovery／Auditを証明しない。次の専用installed runで実Taskが900秒期限を越えて生存を継続するよう同期し、期限到達後の終端・子孫停止・Recoveryを一体観測するための試験制御だけを提供する。
 - `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。R2期限条件はinstalled `LIVE_RUNTIME`の期限到達／停止／Recovery証拠でのみ閉じる。
+
+## R2有限完了条件の固定（2026-10-04）
+
+- 基準Repositoryはremoteと一致した`main` HEAD `5276ea6f0a89c7ec644640f351aa12eefcbb2070`。この記録はscopeと完了条件を同期するだけで、新たなinstalled実行証拠を追加しない。
+- ユーザーが実証済みと指定したpositive Task completion、Permission／Approval一回消費、production Broker／実Codex CLI／MxC経路、Workspace書込みとresult hash、durable Auditとchain／HMAC、Broker再起動読戻し、tray正常終了、局所cross-Workspace隔離は既存の追補を再利用する。同じ条件を別run名・別fixtureで反復しない。
+- 残件はregistryの`r2_bounded_exit_gate.remaining_conditions`に列挙した8条件に限定する。内容は、実Taskの取消・期限監督と子孫停止・復旧、Codex／Broker／Launcher異常終了時の復旧、Task／Agent間の隔離、Agent Centerにおける結果・差分・変更file・試験結果の内容露出制御、OneDrive Cloud Filesと通常NTFSの実製品経路における秘密・作業領域境界、Broker所有の一時作業領域の保証範囲、通常Release能力の有限昇格条件、実行由来と配置成果物識別子の結合である。R2外の仮説的riskはblockerへ積み増さない。
+- D4 Pocketが負うTEMP保証はBroker-owned `WorkspaceTaskScratch`に限る。MxC／Windows AppContainer内部`TEMP`の物理削除をD4の保証と主張せず、それを理由に無期限でR2を延長しない。
+- 全有限条件がPASSしたら通常Release `task_execution=supported`へ昇格し、直ちにR3 Multi-Agent Compareへ進む。R3の完了後はR4 Handoffを続ける。
+- このscope同期時点では`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。以後の各条件はLIVE_RUNTIME等の適切な実証と作業単位のcommit／pushで履歴追記する。

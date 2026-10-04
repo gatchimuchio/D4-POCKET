@@ -2,6 +2,8 @@
 
 状態: D4 Pocket / GUI-Shell統合rev3に基づく開発中。R0現行状態再固定とR1正本・Blocker体系再編を完了し、R2 Agent Task本番経路を進行中。Technical Completeおよび正式releaseは未成立。
 
+R2の範囲は現行ユーザー指示で有限固定する。既に実証済みのpositive Task、Permission／Approval一回消費、耐久Audit、tray正常終了、局所cross-Workspace隔離は既存証拠を再利用し、別名fixtureによる反復をしない。残る8条件は`release_blockers.registry.json`の`r2_bounded_exit_gate.remaining_conditions`を正本とする。仮説的な追加riskをR2へ積み増さず、8条件と既存の閉鎖条件が成立した時点で通常Releaseの`task_execution=supported`へ昇格し、直ちにR3 Multi-Agent Compare、その後R4 Handoffへ進む。
+
 ## D4 Pocket統合 rev3 現行工程
 
 R2追補（2026-10-04、run50 Audit projection不一致）: 修正前source 1dc2014c6a71b5dd1cf094a2f313608ab06b9160由来のinstalled r2-e2e run50でnative Owner Permission／Task Approval後にTaskを開始し、同じfile-backed Auditを持つBroker restart後もTask開始Audit broker-audit-59に対応するRecovery Auditが0件だった。productionは意味markerをreasonへ記録し、Recoveryはoperationのみ検索していた。active process descendantsがLauncher停止前に消失していたためprocess cleanupも未検証。根因修正とproduction形式・旧形式・冪等性testを追加し、focused testはPASS。run50はidentity_kind=gui_shell／isolated=false／formal_runtime_proof=false、MxC TEMP write失敗であり、R2 Recovery／provenance合格ではない。修正後fresh installed crash LIVE_RUNTIME再試験までtask_execution=unsupportedを維持する。詳細はdocs/REV3_PROGRESS.md。

@@ -189,3 +189,13 @@ Rust source／testがcommit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`と一致�
 修正前sourceのinstalled run50ではoperation=AgentTask実行、reason=Agent Task実行開始（Permission／Owner Approval一回消費）の実記録を再起動Recoveryが見落とし、同Task IDのRecovery Auditを追加しなかった。この失敗で旧単体fixtureがproduction Audit形状を再現していないことが分かった。コードを両field照合へ修正し、production形状、旧形状、完了Task除外、再起動冪等性のfocused testは1 passed。crash fixtureの準備PID札はatomic rename公開へ変更し、空file読みraceもfocused testで再検証した。
 
 修正後sourceを使ったinstalled D4 Pocket実Codex Task中のLauncher／Broker crash、process群停止、永続Recoveryの統合LIVE_RUNTIME検証はまだ未実施。run50はRecovery成功の証拠ではなく、R2 blockerと通常Release task_execution=unsupportedを維持する。
+
+### D4 Pocket rev3 R2有限完了条件
+
+R2の未完了範囲を、現行ユーザー指示で次の有限条件に固定する。すでに成立したpositive Task completion、Permission／Approval一回消費、durable Auditの再起動読戻し、native tray正常終了、局所cross-Workspace隔離は、対応する既存証拠を再利用し、fixture名を変えただけの再試験を要求しない。Task／Agent間のscratch・状態隔離は別の未成立条件であり、既存cross-Workspace試験と同一視しない。
+
+R2を閉じるために残る条件は、(1) installed active Taskの取消／期限到達・process子孫停止・Recovery、(2) active Task中のCodex／Broker／Launcher crash・process子孫停止・Recovery、(3) installed product経路におけるTask間scratch／Agent状態の相互非汚染、(4) result／diff／changed files／test resultのContent ExposureをAgent Centerへ接続、(5) OneDrive Cloud Filesと通常NTFSの双方でinstalled経路のsecret／Workspace境界を検証、(6) D4 Pocketが所有するWorkspaceTaskScratchの保証範囲だけを確定・検証、(7) 通常Releaseでの有限な`task_execution`昇格gate、(8) runtime provenanceとinstalled artifact identityを現行Release evidenceへ結合、である。各条件の実行・判定は`release_blockers.registry.json`の`r2_bounded_exit_gate`に同期する。
+
+MxC childの`TEMP`／`TMP`がWindows AppContainer profileへリダイレクトされる場合、その内部directoryの物理削除はD4 Pocketの保証として主張しない。D4 Pocketが保証すべき対象はBroker-owned `WorkspaceTaskScratch`の範囲・Task間分離・通常終了／取消／期限／crash後の停止と回収、および回収不能時のfail-closed Recoveryである。MxC／Windows側のTEMP寿命を観測しただけでD4のscratch cleanupを代替せず、逆にD4の保証外であるTEMP削除をR2 blockerへ追加しない。
+
+通常Releaseの`task_execution`は、上記8条件と既存の閉鎖条件がすべて適切な証拠classでPASSした場合に限り`supported`へ変更する。PASS後は追加の仮説的riskを理由に`unsupported`を維持しない。未解決項目がある間はfail-closedで`unsupported`を保つ。R2完了後は新たな局所最適化を挟まずR3 Multi-Agent Compareへ進み、R3完了後にR4 Handoffへ進む。
