@@ -34,7 +34,7 @@ R14へ送る作業には、追加long-run、網羅的fault matrix、全数regres
 | R2-C2 | 永続AuditとBroker再起動後の読戻し | `CLOSED` | `docs/REV3_PROGRESS.md`の既存Audit再起動読戻し記録 | 直接的な回帰証拠のみ |
 | R2-C3 | native trayからの正常終了 | `CLOSED` | `docs/REV3_PROGRESS.md`のrun40正常終了記録 | 直接的な回帰証拠のみ |
 | R2-C4 | 局所cross-Workspace隔離LIVE_RUNTIME | `CLOSED` | 既存の局所隔離LIVE_RUNTIME記録 | 直接的な回帰証拠のみ |
-| R2-A | active Task cancel／deadline、子孫停止、Recovery、stale authority不再利用 | `IMPLEMENTING` | 既存失敗履歴: registry `installed_task_deadline_attempt_run52`、`installed_task_cancellation_probe_2026_10_05`、`installed_task_cancellation_probe_120s_registration_hang_2026_10_05`。いずれもPASS証拠にはしない | 直接的な回帰証拠のみ |
+| R2-A | active Task cancel／deadline、子孫停止、Recovery、stale authority不再利用 | `CLOSED` | 本書「R2-A受入れ結果」、`docs/REV3_PROGRESS.md`の2026-10-05追補、`release_blockers.registry.json`の`r2_bounded_exit_gate.closed_conditions.R2-A`。従来の失敗履歴は保持 | 直接的な回帰証拠のみ |
 | R2-B | Codex／Broker／Launcher crash、子孫停止、Recovery、stale authority不再利用 | `OPEN` | registry `installed_task_crash_recovery_run50`／`installed_task_crash_recovery_run51`は部分・失敗範囲を保持し、受入れPASSへ昇格しない | 直接的な回帰証拠のみ |
 | R2-C | Task間scratch／Agent状態の非汚染 | `OPEN` | 未着手 | 直接的な回帰証拠のみ |
 | R2-D | Agent Centerのresult／diff／changed files／test result表示とContent Exposure境界 | `OPEN` | 実装・local test記録は`docs/REV3_PROGRESS.md`に保持。配置済み製品の受入れは未成立 | 直接的な回帰証拠のみ |
@@ -45,9 +45,9 @@ R14へ送る作業には、追加long-run、網羅的fault matrix、全数regres
 
 現在の工程状態: `IMPLEMENTING`
 
-現在のactive condition: `R2-A`
+現在のactive condition: `R2-B`
 
-次条件: `R2-A`がPASS/CLOSEDになった後に限り`R2-B`を開始
+次条件: `R2-B`を開始
 
 ### R2-A 開発通過Acceptance Contract
 
@@ -56,10 +56,19 @@ R2-Aは次の一回ずつの限定受入れでPASSとする。短縮期限は試
 1. staged installed D4 Pocket UIから、native Owner確認、production Broker、実Codex CLI／MxC childを通して合成Taskをactiveにする。
 2. Owner cancelを一回行い、cancelled終端、Codex／child process停止、D4-owned WorkspaceTaskScratch回収、Recovery／Auditを確認する。
 3. 短縮deadlineを一回発生させ、deadline由来のfailed終端、Codex／child process停止、Scratch回収、Recovery／Auditを確認する。cancelとdeadlineの終端理由を混同しない。
-4. 各終端後、消費済みPermission／Approvalを再利用できず、次Taskは現行条件で新規Permission／Approvalを要求することを同一受入れ内で確認する。
+4. Task開始Auditで当該Permission／Approvalの一回消費を確認する。消費済みGrantの再利用拒否は既存CLOSEDのR2-C1証拠を再利用し、R2-Aで同じ試験を再実行しない。終端後に旧Grantが復元・再発行されないことを監査記録で確認する。
 5. loopback偽APIのみを使用し、real model、production credential、課金、外部要求を発生させない。
 
 受入れはこの範囲で終了する。複数回race、全種process fault matrix、通常900秒deadline待ち、長時間反復、performance、別OS／追加platform variantはR14等の後工程へ送る。MxC AppContainer TEMPの物理削除はD4 PocketのR2保証対象外。
+
+### R2-A 受入れ結果（2026-10-05）
+
+- `Owner cancel`: installed run `d4p-r2-A-cd4f2ab-run2`、実Codex CLI 0.160.0／MxC child。Task `e3a093e56923d91b8f2053336df094cd`は新規Permission（`broker-audit-139/140`）と独立Owner Approval（`broker-audit-142/143`）を使い、開始Audit `broker-audit-146`に一回消費を記録した。取消要求`broker-audit-148/149`後、installed Agent Centerは`cancelled`と終端Audit `broker-audit-151`を表示した。終端Audit reasonには`RecoveryAction=Workspace差分を確認`が記録された。loopback偽APIは1 request／tool call送信／tool resultなし／外部要求0。終端後にCodex／MxC子process、Task scratch journal entry、`.d4p-tmp-*`、完了markerは存在しなかった。
+- `短縮deadline`: 同じstaged installed経路の新Session `253b9133001ba0189eac12c210debc4b`、実Codex CLI 0.160.0／MxC childでTask `38285d80bf8d4aa0d088fb93b81211c5`を開始。新規Permission `broker-audit-167/168`、Owner Approval `broker-audit-169/170`、一回消費を記録した開始Audit `broker-audit-173`、installed UIの`failed`終端とAudit `broker-audit-182`を確認した。終端Audit reasonには`RecoveryAction=Workspace差分を確認`が記録された。試験専用`r2-e2e`短縮期限（25,000ms）で、長時間待機markerを持つ合成toolとloopback偽Responses APIを使用。偽APIは1 request／tool call送信／result未受信／外部要求0を報告。Owner cancel要求はなく、期限到達後にCodex／MxC子processとscratch journal entryはなく、Workspace完了markerもなかった。
+- deadlineのAudit reasonは汎用のTask失敗／取消表現であり、終端理由単独では期限を識別できない。期限への帰属は、試験専用短縮設定、期限を越えて待機する制御probe、cancel要求の不在、Taskの`failed`終端、子孫停止を組み合わせた`CONFIG`＋`FIXTURE`＋`LIVE_RUNTIME`証拠による。コード上、期限超過はprocess群停止後に`期限超過`として返り、Task状態を`failed`へ写像する。
+- 両TaskのOwner確認・Permission・Approvalは各run内で新規発行され、開始時に一回消費された。終端後の自動Grant復元・再発行はAuditにない。Grant再利用拒否は既存CLOSED R2-C1の証拠に委ね、再試験していない。
+- 実モデル、production credential、課金、外部要求、OS保護設定変更なし。MxC AppContainer TEMPの書込み失敗はD4-owned WorkspaceTaskScratchの保証範囲外であり、R2-Aの判定には含めない。
+- 判定: R2-Aの有限受入れ条件はPASS。過去の失敗・不成立試行は履歴として維持し、再分類しない。追加race、長時間、fault matrix、別platform検査はR14へ送る。
 
 ## 4. R2後の必須遷移
 

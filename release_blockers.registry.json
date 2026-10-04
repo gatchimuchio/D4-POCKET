@@ -231,8 +231,8 @@
           "active_phase": "R2",
           "ledger_path": "docs/REV4_ACCEPTANCE_LEDGER.md",
           "condition_order": ["R2-A", "R2-B", "R2-C", "R2-D", "R2-E", "R2-F", "R2-G", "R2-H"],
-          "active_condition": "R2-A",
-          "active_condition_status": "IMPLEMENTING",
+          "active_condition": "R2-B",
+          "active_condition_status": "OPEN",
           "closed_condition_retest": "forbidden_without_specific_regression_evidence",
           "deferred_final_assurance": {
             "formal_evidence_phase": "R13",
@@ -248,8 +248,49 @@
           "native tray正常終了",
           "局所cross-Workspace隔離LIVE_RUNTIME"
         ],
+        "closed_conditions": {
+          "R2-A": {
+            "date": "2026-10-05",
+            "status": "CLOSED",
+            "evidence_sources": ["LIVE_RUNTIME", "CONFIG", "FIXTURE", "INTERNAL_STATE"],
+            "installed_run_id": "d4p-r2-A-cd4f2ab-run2",
+            "cancel": {
+              "task_id": "e3a093e56923d91b8f2053336df094cd",
+              "permission_audit_ids": ["broker-audit-139", "broker-audit-140"],
+              "owner_approval_audit_ids": ["broker-audit-142", "broker-audit-143"],
+              "task_start_audit_id": "broker-audit-146",
+              "cancel_audit_ids": ["broker-audit-148", "broker-audit-149"],
+              "terminal_audit_id": "broker-audit-151",
+              "terminal_status": "cancelled",
+              "recovery_action": "Workspace差分を確認",
+              "fake_api": "loopback only; 1 request; tool call sent; no result; no external request or completion marker",
+              "cleanup": "Codex/MxC descendants absent; D4 scratch journal empty; no .d4p-tmp directory"
+            },
+            "deadline": {
+              "session_id": "253b9133001ba0189eac12c210debc4b",
+              "task_id": "38285d80bf8d4aa0d088fb93b81211c5",
+              "permission_audit_ids": ["broker-audit-167", "broker-audit-168"],
+              "owner_approval_audit_ids": ["broker-audit-169", "broker-audit-170"],
+              "task_start_audit_id": "broker-audit-173",
+              "terminal_audit_id": "broker-audit-182",
+              "terminal_status": "failed",
+              "recovery_action": "Workspace差分を確認",
+              "codex_cli_version": "0.160.0",
+              "test_deadline_ms": 25000,
+              "long_wait_probe_ms": 1000000,
+              "owner_cancel_requested": false,
+              "fake_api": "loopback only; 1 request; tool call sent; no result; no external request or completion marker",
+              "cleanup": "Codex/MxC descendants absent; D4 scratch journal empty; no .d4p-tmp directory",
+              "attribution_limit": "Terminal Audit reason is generic. Deadline is established by test-only short deadline plus controlled long-wait probe, no cancel request, failed Task state, and descendant stop; Audit reason alone is not deadline-specific."
+            },
+            "authority": "Fresh Permission and one-use Owner Approval were consumed at each Task start. R2-C1 CLOSED evidence for reuse denial was reused; no replay test was repeated. No post-terminal grant restoration/re-issue event was recorded.",
+            "real_model_or_credential_used": false,
+            "external_request_observed": false,
+            "os_protection_changed": false,
+            "scope_limit": "R2-A development acceptance only; not final product assurance, formal Release provenance, or release readiness."
+          }
+        },
         "remaining_conditions": [
-          "installed active Taskの取消／期限到達・process子孫停止・Recovery",
           "active Task中のCodex／Broker／Launcher crash・process子孫停止・Recovery",
           "installed product経路でのTask間scratch／Agent状態の相互非汚染",
           "result／diff／changed files／test resultのContent ExposureをAgent Centerへ接続",
