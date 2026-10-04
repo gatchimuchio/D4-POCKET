@@ -457,6 +457,80 @@
         },
         "scope_limit": "Failed synthetic failure/cancel-race observation only. It does not prove that cancellation caused process stop, or pass cancellation Recovery, deadline detection, crash Recovery, or deadline-triggered process-group stop. The expected-deadline helper exit cannot distinguish termination causes."
       },
+      "installed_task_cancellation_probe_120s_registration_hang_2026_10_05": {
+        "date": "2026-10-05",
+        "evidence_sources": ["LIVE_RUNTIME", "FIXTURE"],
+        "current_repository_head": "7126ae0d9a3df3d0b0dd5d0b5efc1e4132169e33",
+        "installed_artifact_source_commit": "f888c7e0d4abb499c9524849c2605570748a0146",
+        "source_worktree_clean": false,
+        "installed_run_id": "d4p-r2-cancel-120s",
+        "installed_artifact": {
+          "manifest_version": 3,
+          "manifest_sha256": "ca628b3a232e04c4a7f8edf83b4565990d45c2c439aa525a549f12b1e7bfba8b",
+          "app_sha256": "55b2d58c93719472452b81ece3d7a7c10094d379537446344a853e188af25d0e",
+          "broker_sha256": "871794537b171b90f51ab82e55b364087f06c0a59b97bf915c142895e4568a4a",
+          "launcher_sha256": "af693b22a0c522f7de3eacaede09072d08992cccdb3e1ff4024f8713fed0fe34",
+          "product_manifest": null,
+          "runtime_formal_proof": false,
+          "runtime_source_diff_since_artifact_commit": false
+        },
+        "test_environment": {
+          "task_limit_ms": 120000,
+          "localappdata": "C:\\Users\\ohira\\AppData\\Local\\Temp\\d4p-r2-cancel-120s\\localappdata",
+          "codex_home_was_empty_at_launch": true,
+          "workspace": "C:\\Users\\ohira\\AppData\\Local\\Temp\\d4p-r2-cancel-120s\\workspace",
+          "real_model_or_credential_used": false,
+          "os_protection_changed": false
+        },
+        "runtime_registration": {
+          "result": "accepted",
+          "runtime_id": "codex-local",
+          "workspace_id": "workspace-local",
+          "codex_cli": "codex-cli 0.160.0; --version and exec --help interface probes succeeded",
+          "audit_refs": ["broker-audit-32", "broker-audit-33", "broker-audit-34", "broker-audit-35"],
+          "permission_or_task_approval_created": false,
+          "task_started": false
+        },
+        "observations": {
+          "ui": "After accepted registration, the fresh Flutter process reported non-responding. Computer Use could not re-capture the D4 window after reselecting it and returned a Codex app screen instead; no further UI input or Task start was attempted.",
+          "cleanup": "The exact newly launched Launcher and its Flutter child were identity-checked, then stopped. The synthetic Audit and Workspace were preserved.",
+          "additional_host_process_cleanup": "A later host process audit found three residual Launcher/Flutter pairs under the same f888c7 stage path: PIDs 16732/16016 (created 2026-10-04 23:38 local time), 16380/10848 (2026-10-05 00:53), and 14192/16276 (2026-10-05 04:45). Executable paths and each parent-child relationship were checked before all six processes were stopped. Their originating Tasks/runs are unknown; this is not counted as this run's Task cleanup, cancellation, deadline, or crash Recovery evidence. Stage Audit and Workspace were preserved.",
+          "fake_api": {
+            "expected_request_shape": "tool_call_without_result",
+            "requests": 0,
+            "tool_offered": false,
+            "tool_call_sent": false,
+            "tool_result_received": false,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": false,
+            "workspace_boundary_fixtures_valid_after_task": true,
+            "helper_exit": 1,
+            "exit_reason": "expected request shape was not observed; not cancellation or deadline evidence"
+          },
+          "workspace": {
+            "completion_marker_exists": false,
+            "outside_write_marker_exists": false
+          }
+        },
+        "validation": {
+          "focused_helper": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_r2_e2e_responses --features r2-e2e: 16 passed",
+          "focused_helper_final_rerun": "same command: 15 passed, 1 failed; fixture::tests::failed_tool_result_is_not_replayed_as_another_exec_command hit ConnectionReset before HTTP response headers",
+          "focused_helper_failure_retry": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --bin gui_shell_r2_e2e_responses --features r2-e2e -- fixture::tests::failed_tool_result_is_not_replayed_as_another_exec_command --exact --nocapture: 1 passed",
+          "default_parallel_first_run": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml: 419 passed, 3 failed, 6 ignored; the three localhost/TLS ConnectionReset failures are retained below.",
+          "test_retry_result": {
+            "broker::dialogue::broker_codex_loopback_support::tests::failed_tool_result_is_not_replayed_as_another_exec_command": "rerun alone: 1 passed",
+            "broker::update_download::tests::failed_replacement_keeps_the_existing_corrupt_package_unchanged": "rerun alone: 1 passed",
+            "broker::update_download::tests::local_tls_server_repairs_only_after_verified_package_bytes": "rerun alone: 1 passed"
+          },
+          "default_serial_rerun": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml -- --test-threads=1: 468 passed, 0 failed, 7 ignored",
+          "schema": "153 schemas, 153 examples, 197 negative fixtures passed",
+          "conformance": "232 checks passed",
+          "japanese_strict_audit": "1137 repository files, 0 findings",
+          "manifest": "1134 files checked",
+          "integrated_development_validator": "python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows: exit 0, 10 development checks passed; release_ready=false and 31 release blockers retained; not installed R2 Task evidence"
+        },
+        "scope_limit": "Registration-only incomplete LIVE_RUNTIME attempt. No Agent Task was created, so this is not a cancellation/deadline/process-cleanup/Recovery result and does not pass any R2 remaining condition. The UI hang cause is unclassified; task_execution remains unsupported and the R2 release blocker remains active."
+      },
       "r2_deadline_fixture_continuation_correction": {
         "date": "2026-10-04",
         "source_base_commit": "5e64044ad385c65c56b4aba8a18c18e2e8f71244",

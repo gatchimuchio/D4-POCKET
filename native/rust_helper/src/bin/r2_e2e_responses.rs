@@ -26,7 +26,18 @@ fn workspace_boundary_fixtures_valid(workspace: &Path) -> bool {
     )
 }
 
-fn evidence_matches_expected_outcome(evidence: &serde_json::Value, expect_deadline: bool) -> bool {
+// このfixtureが示すのはloopback APIの要求形状だけである。
+// Taskの終端原因はBroker Auditを別途確認して判定する。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExpectedRequestShape {
+    CompletedToolWrite,
+    ToolCallWithoutResult,
+}
+
+fn evidence_matches_expected_request_shape(
+    evidence: &serde_json::Value,
+    expected: ExpectedRequestShape,
+) -> bool {
     let common = evidence["requests"].as_u64().unwrap_or_default() >= 1
         && evidence["tool_offered"] == true
         && evidence["tool_call_sent"] == true
@@ -36,17 +47,21 @@ fn evidence_matches_expected_outcome(evidence: &serde_json::Value, expect_deadli
         && evidence["incomplete_requests"] == 0
         && evidence["blocked_external_requests"] == 0
         && evidence["workspace_boundary_fixtures_valid_after_task"] == true;
-    if expect_deadline {
-        common
-            && evidence["tool_result_received"] == false
-            && evidence["workspace_marker_exists"] == false
-            && evidence["expected_outcome"] == "deadline"
-    } else {
-        common
-            && evidence["requests"].as_u64() == Some(2)
-            && evidence["tool_result_received"] == true
-            && evidence["workspace_marker_exists"] == true
-            && evidence["expected_outcome"] == "completion"
+    match expected {
+        ExpectedRequestShape::ToolCallWithoutResult => {
+            common
+                && evidence["requests"].as_u64() == Some(1)
+                && evidence["tool_result_received"] == false
+                && evidence["workspace_marker_exists"] == false
+                && evidence["expected_request_shape"] == "tool_call_without_result"
+        }
+        ExpectedRequestShape::CompletedToolWrite => {
+            common
+                && evidence["requests"].as_u64() == Some(2)
+                && evidence["tool_result_received"] == true
+                && evidence["workspace_marker_exists"] == true
+                && evidence["expected_request_shape"] == "completed_tool_write"
+        }
     }
 }
 
@@ -78,11 +93,13 @@ fn main() -> ExitCode {
             }
         },
     };
-    let expected_deadline = match std::env::args_os().nth(3) {
-        None => false,
-        Some(value) if value == "--expect-deadline" => true,
+    let expected_request_shape = match std::env::args_os().nth(3) {
+        None => ExpectedRequestShape::CompletedToolWrite,
+        Some(value) if value == "--expect-deadline" || value == "--expect-cancellation" => {
+            ExpectedRequestShape::ToolCallWithoutResult
+        }
         Some(_) => {
-            eprintln!("任意指定モードは--expect-deadlineだけを受理する");
+            eprintln!("任意指定モードは--expect-deadlineまたは--expect-cancellationだけを受理する");
             return ExitCode::from(2);
         }
     };
@@ -107,7 +124,10 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     let mut evidence = json!({
-        "expected_outcome": if expected_deadline { "deadline" } else { "completion" },
+        "expected_request_shape": match expected_request_shape {
+            ExpectedRequestShape::CompletedToolWrite => "completed_tool_write",
+            ExpectedRequestShape::ToolCallWithoutResult => "tool_call_without_result",
+        },
         "requests": server.post_requests(),
         "models": server.model_list_requests(),
         "tool_offered": server.tool_was_offered(),
@@ -125,7 +145,7 @@ fn main() -> ExitCode {
     evidence["workspace_boundary_fixtures_valid_after_task"] =
         json!(workspace_boundary_fixtures_valid(workspace));
     println!("EVIDENCE {evidence}");
-    if !evidence_matches_expected_outcome(&evidence, expected_deadline) {
+    if !evidence_matches_expected_request_shape(&evidence, expected_request_shape) {
         eprintln!("R2 loopbackResponses APIの検証条件が成立しない");
         return ExitCode::FAILURE;
     }
@@ -134,14 +154,17 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{evidence_matches_expected_outcome, workspace_boundary_fixtures_valid};
+    use super::{
+        evidence_matches_expected_request_shape, workspace_boundary_fixtures_valid,
+        ExpectedRequestShape,
+    };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn deadline_mode_accepts_only_tool_start_without_result_or_workspace_write() {
+    fn deadline_request_shape_requires_tool_start_without_result_or_workspace_write() {
         let valid = serde_json::json!({
-            "expected_outcome": "deadline",
+            "expected_request_shape": "tool_call_without_result",
             "requests": 1,
             "tool_offered": true,
             "tool_call_sent": true,
@@ -154,24 +177,73 @@ mod tests {
             "workspace_marker_exists": false,
             "workspace_boundary_fixtures_valid_after_task": true
         });
-        assert!(evidence_matches_expected_outcome(&valid, true));
+        assert!(evidence_matches_expected_request_shape(
+            &valid,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
 
         let mut unexpected_completion = valid.clone();
         unexpected_completion["workspace_marker_exists"] = serde_json::json!(true);
-        assert!(!evidence_matches_expected_outcome(
+        assert!(!evidence_matches_expected_request_shape(
             &unexpected_completion,
-            true
+            ExpectedRequestShape::ToolCallWithoutResult
         ));
 
         let mut rejected_repeat = valid.clone();
         rejected_repeat["repeated_tool_call_rejections"] = serde_json::json!(1);
-        assert!(!evidence_matches_expected_outcome(&rejected_repeat, true));
+        assert!(!evidence_matches_expected_request_shape(
+            &rejected_repeat,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
+    }
+
+    #[test]
+    fn cancellation_request_shape_is_identical_to_deadline_request_shape() {
+        let valid = serde_json::json!({
+            "expected_request_shape": "tool_call_without_result",
+            "requests": 1,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": false,
+            "repeated_tool_call_rejections": 0,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": false,
+            "workspace_boundary_fixtures_valid_after_task": true
+        });
+        assert!(evidence_matches_expected_request_shape(
+            &valid,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
+
+        let mut unexpected_result = valid.clone();
+        unexpected_result["tool_result_received"] = serde_json::json!(true);
+        assert!(!evidence_matches_expected_request_shape(
+            &unexpected_result,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
+
+        let mut unexpected_write = valid.clone();
+        unexpected_write["workspace_marker_exists"] = serde_json::json!(true);
+        assert!(!evidence_matches_expected_request_shape(
+            &unexpected_write,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
+
+        let mut wrong_shape = valid;
+        wrong_shape["expected_request_shape"] = serde_json::json!("completed_tool_write");
+        assert!(!evidence_matches_expected_request_shape(
+            &wrong_shape,
+            ExpectedRequestShape::ToolCallWithoutResult
+        ));
     }
 
     #[test]
     fn normal_mode_still_requires_completed_tool_and_workspace_write() {
         let completed = serde_json::json!({
-            "expected_outcome": "completion",
+            "expected_request_shape": "completed_tool_write",
             "requests": 2,
             "tool_offered": true,
             "tool_call_sent": true,
@@ -184,11 +256,17 @@ mod tests {
             "workspace_marker_exists": true,
             "workspace_boundary_fixtures_valid_after_task": true
         });
-        assert!(evidence_matches_expected_outcome(&completed, false));
+        assert!(evidence_matches_expected_request_shape(
+            &completed,
+            ExpectedRequestShape::CompletedToolWrite
+        ));
 
         let mut no_result = completed.clone();
         no_result["tool_result_received"] = serde_json::json!(false);
-        assert!(!evidence_matches_expected_outcome(&no_result, false));
+        assert!(!evidence_matches_expected_request_shape(
+            &no_result,
+            ExpectedRequestShape::CompletedToolWrite
+        ));
     }
 
     #[test]
