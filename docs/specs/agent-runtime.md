@@ -182,3 +182,10 @@ Rust source／testがcommit `8ec3434b3a713a00654b97c14d19e21cb31e69a7`と一致�
 実Codex CLI `0.159.2`と実MxC shell childを使うignored Rust統合testへ、固定loopback偽Responses APIがchild内で報告したTEMP pathを、Task terminal後に単一directoryとして照合する観測を加えた。親test processから実行中markerを読め、正常完了後とBroker取消後はいずれもmarker readが`NotFound`、同じTEMP rootの`read_dir`も`NotFound`となった。観測結果は状態とentry件数だけを出し、絶対path・entry名・本文を記録しない。focused runは1回で、正常完了と取消を各1回観測した。
 
 この`LIVE_RUNTIME`範囲は当該CLI版とMxC childの正常完了／Broker取消後に、報告されたTEMP directory pathが存在しなかったことだけである。Broker consumer、Owner判断、Audit callback、Workspace、CODEX_HOME、loopback APIは`FIXTURE`であり、installed Desktop UI、native Owner confirmation、Release Broker／authenticated IPC上の正Task、file-backed positive Audit、deadline／process crash／電源断、全一時entryのcleanupを証明しない。TEMP rootが終了後に不在だった一度の観測をtask間隔離や異常終了cleanupへ一般化せず、`task_execution=unsupported`、関連`release_blocker`、`release_ready=false`を維持する。
+### 2026-10-04 run50 Audit projection補正
+
+起動時の中断Task判定は永続AuditのTask IDを相関し、開始／終端の固定意味markerをAuditEvent.operationまたはAuditEvent.reasonの完全一致で検出する。Broker operation名と意味markerを別fieldへ射影するproduction Auditと、旧形式で意味markerをoperationへ直接置く記録の双方を読む。Task本文からmarkerを導出せず、Permission／Approvalも復元しない。
+
+修正前sourceのinstalled run50ではoperation=AgentTask実行、reason=Agent Task実行開始（Permission／Owner Approval一回消費）の実記録を再起動Recoveryが見落とし、同Task IDのRecovery Auditを追加しなかった。この失敗で旧単体fixtureがproduction Audit形状を再現していないことが分かった。コードを両field照合へ修正し、production形状、旧形状、完了Task除外、再起動冪等性のfocused testは1 passed。crash fixtureの準備PID札はatomic rename公開へ変更し、空file読みraceもfocused testで再検証した。
+
+修正後sourceを使ったinstalled D4 Pocket実Codex Task中のLauncher／Broker crash、process群停止、永続Recoveryの統合LIVE_RUNTIME検証はまだ未実施。run50はRecovery成功の証拠ではなく、R2 blockerと通常Release task_execution=unsupportedを維持する。

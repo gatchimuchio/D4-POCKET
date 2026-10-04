@@ -240,6 +240,36 @@
         "os_protection_changed": false,
         "scope_limit": "Windowsのlocal unit／process fixtureとhosted Windows Export buildに限定。installed D4 Pocket UI／Broker経路で実Codex Task稼働中のcrash、Task終端・Workspace結果・永続Recoveryの一体観測、OneDrive Cloud Filesと通常NTFSの比較、通常Release task_execution support、release readinessは未確認。"
       },
+      "installed_task_crash_recovery_run50": {
+        "date": "2026-10-04",
+        "source_commit": "1dc2014c6a71b5dd1cf094a2f313608ab06b9160",
+        "source_worktree_clean": true,
+        "installed_run_id": "d4p-r2-crash-1dc2014-run50",
+        "task_id": "fdf5688cc878b9574978f3c08d837953",
+        "task_start_audit_id": "broker-audit-59",
+        "evidence_source": "LIVE_RUNTIME",
+        "result": "failed",
+        "observations": {
+          "audit_projection": "実file-backed AuditEventはoperation=AgentTask実行、reason=Agent Task実行開始（Permission／Owner Approval一回消費）。Broker restart後も同Task IDのeventは開始一件のみで、Agent Task中断回復は0件。",
+          "process_stop": "Codex／PowerShell descendantsはLauncherを停止する直前にすでに不在。Launcher停止後にFlutter childが残ったため、確認済みrun50 processだけを試験cleanupした。process-group crash cleanup passとは数えない。",
+          "fake_api": "requests=4、repeated_tool_call_rejections=3、completion markerなし。",
+          "temp": "scope=mxc_appcontainer、write failed、directory_missing。TEMP cleanupの証拠ではない。",
+          "artifact_identity": {
+            "app_sha256": "sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46",
+            "broker_sha256": "sha256:d208cf43d29c6bd2dc6eb3c411056bb37030faaf9fdfb45f4163aace431ba64a",
+            "launcher_sha256": "sha256:f63380d7b38ecc4dda7727a07cd2d10874fd8139f9d06078254e0dd6c4db1f9f",
+            "identity_kind": "gui_shell",
+            "isolated": false,
+            "formal_runtime_proof": false
+          }
+        },
+        "root_cause": "Recovery実装は意味markerをoperationからだけ検索したが、production Audit projectionはBroker operation名をoperationへ、Task開始／終端markerをreasonへ保存する。",
+        "source_fix": "Recoveryは意味markerをoperationまたはreasonで照合し、production形式・旧直接形式・完了Task除外・冪等性の回帰fixtureを追加。crash fixtureの準備PIDは一時fileからatomic renameで公開する。",
+        "focused_validation": "task_crash_recovery_is_idempotent_and_fails_closed: 1 passed。broker強制終了後の別process起動登録で永続scratchを監査付き回収する: 修正後1 passed。Rust all-target全体はlocalhost試験／準備raceの失敗を含みPASS未成立。",
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "run50はcrash Recovery、process-group stop、MxC TEMP cleanupを証明しない。修正後のfresh installed LIVE_RUNTIME再検証が必要。通常Release capability、installed artifact provenance、release readinessも証明しない。"
+      },
       "spawn_secret_revalidation_probe": {
         "date": "2026-09-30",
         "evidence_source": "FIXTURE",

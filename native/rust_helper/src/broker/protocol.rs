@@ -1085,12 +1085,20 @@ impl Broker {
         let mut started = BTreeMap::<String, String>::new();
         let mut terminal = BTreeSet::<String>::new();
         for event in self.audit_log.events() {
-            if event.operation == TASK_START {
+            // 実製品のAuditEvent.operationにはBroker操作名（例：AgentTask実行）が入り、
+            // Taskの意味識別子はreasonに保存される。旧形式のように意味識別子を
+            // operationへ直接記録したeventも、互換性維持のため受理する。
+            if event.operation == TASK_START || event.reason == TASK_START {
                 started.insert(event.request_id.clone(), event.event_hash.clone());
-            } else if matches!(
-                event.operation.as_str(),
-                TASK_COMPLETE | TASK_FAILED | TASK_WORKER_START_FAILED | TASK_RECOVERY
-            ) {
+            } else if [
+                TASK_COMPLETE,
+                TASK_FAILED,
+                TASK_WORKER_START_FAILED,
+                TASK_RECOVERY,
+            ]
+            .iter()
+            .any(|marker| event.operation == *marker || event.reason == *marker)
+            {
                 terminal.insert(event.request_id.clone());
             }
         }
@@ -5599,52 +5607,75 @@ mod tests {
     fn task_crash_recovery_is_idempotent_and_fails_closed() {
         let root = temp_store_dir("agent-task-interruption-recovery");
         let interrupted_task_id = "fixture-interrupted-task";
+        let legacy_task_id = "fixture-legacy-interrupted-task";
         let completed_task_id = "fixture-completed-task";
+        const TASK_START: &str = "Agent Task実行開始（Permission／Owner Approval一回消費）";
+        const TASK_COMPLETE: &str = "Agent Task完了（結果本文非保存・hashのみ）";
         {
             let mut broker =
                 Broker::new_persistent("task-recovery-seed", &root).expect("永続Brokerを作成");
-            for task_id in [interrupted_task_id, completed_task_id] {
-                broker
-                    .append_audit(
-                        task_id,
-                        "Agent Task実行開始（Permission／Owner Approval一回消費）",
-                        "accepted",
-                        "合成Task開始記録",
-                        EVIDENCE_SOURCE_INTERNAL_STATE,
-                        &sha256_tagged(task_id.as_bytes()),
-                    )
-                    .expect("Task開始Auditを確定");
-            }
+            broker
+                .append_audit(
+                    interrupted_task_id,
+                    "AgentTask実行",
+                    "accepted",
+                    TASK_START,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(interrupted_task_id.as_bytes()),
+                )
+                .expect("production形式のTask開始Auditを確定");
+            broker
+                .append_audit(
+                    legacy_task_id,
+                    TASK_START,
+                    "accepted",
+                    "旧形式のTask開始Audit",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(legacy_task_id.as_bytes()),
+                )
+                .expect("旧形式のTask開始Auditを確定");
             broker
                 .append_audit(
                     completed_task_id,
-                    "Agent Task完了（結果本文非保存・hashのみ）",
+                    "AgentTask実行",
+                    "accepted",
+                    TASK_START,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(completed_task_id.as_bytes()),
+                )
+                .expect("完了Taskのproduction形式開始Auditを確定");
+            broker
+                .append_audit(
+                    completed_task_id,
+                    "AgentTask取消",
                     "recorded",
-                    "合成Task終端記録",
+                    TASK_COMPLETE,
                     EVIDENCE_SOURCE_INTERNAL_STATE,
                     &sha256_tagged(b"completed-task"),
                 )
-                .expect("完了Taskの終端Auditを確定");
+                .expect("production形式の完了Task終端Auditを確定");
         }
 
         {
             let broker = Broker::new_persistent("task-recovery-first-restart", &root)
                 .expect("再起動時に中断Taskを回復");
-            let recovered = broker
-                .audit_events()
-                .iter()
-                .filter(|event| {
-                    event.request_id == interrupted_task_id
-                        && event.operation.starts_with("Agent Task中断回復")
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(recovered.len(), 1, "中断Taskの回復記録は一件");
-            assert_eq!(recovered[0].decision, "suspended");
-            assert_eq!(recovered[0].evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
-            assert!(recovered[0].reason.contains("Taskを再開せず隔離"));
-            assert!(recovered[0]
-                .reason
-                .contains("Permission／Approvalは復元せず"));
+            for task_id in [interrupted_task_id, legacy_task_id] {
+                let recovered = broker
+                    .audit_events()
+                    .iter()
+                    .filter(|event| {
+                        event.request_id == task_id
+                            && event.operation.starts_with("Agent Task中断回復")
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(recovered.len(), 1, "中断Taskの回復記録は一件");
+                assert_eq!(recovered[0].decision, "suspended");
+                assert_eq!(recovered[0].evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+                assert!(recovered[0].reason.contains("Taskを再開せず隔離"));
+                assert!(recovered[0]
+                    .reason
+                    .contains("Permission／Approvalは復元せず"));
+            }
             assert!(!broker.audit_events().iter().any(|event| {
                 event.request_id == completed_task_id
                     && event.operation.starts_with("Agent Task中断回復")
@@ -5653,18 +5684,20 @@ mod tests {
 
         let broker = Broker::new_persistent("task-recovery-second-restart", &root)
             .expect("回復記録後の再起動");
-        assert_eq!(
-            broker
-                .audit_events()
-                .iter()
-                .filter(|event| {
-                    event.request_id == interrupted_task_id
-                        && event.operation.starts_with("Agent Task中断回復")
-                })
-                .count(),
-            1,
-            "Brokerを再起動しても回復Auditを重複追加しない"
-        );
+        for task_id in [interrupted_task_id, legacy_task_id] {
+            assert_eq!(
+                broker
+                    .audit_events()
+                    .iter()
+                    .filter(|event| {
+                        event.request_id == task_id
+                            && event.operation.starts_with("Agent Task中断回復")
+                    })
+                    .count(),
+                1,
+                "Brokerを再起動しても回復Auditを重複追加しない"
+            );
+        }
         drop(broker);
         fs::remove_dir_all(root).expect("回復fixture storeを削除");
     }
@@ -5713,8 +5746,11 @@ mod tests {
                     &sha256_tagged(b"fixture-task-start"),
                 )
                 .expect("稼働Task開始Auditを永続化");
-            fs::write(root.join("child-ready.pid"), std::process::id().to_string())
-                .expect("journal保存後の準備完了札");
+            let ready_path = root.join("child-ready.pid");
+            let ready_temp = root.join("child-ready.pid.tmp");
+            fs::write(&ready_temp, std::process::id().to_string())
+                .expect("journal保存後に準備完了札を一時fileへ保存");
+            fs::rename(ready_temp, ready_path).expect("完全な準備完了札をatomic公開");
             loop {
                 std::hint::black_box(&broker);
                 std::thread::sleep(Duration::from_secs(1));
