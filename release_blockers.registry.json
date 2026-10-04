@@ -270,6 +270,40 @@
         "os_protection_changed": false,
         "scope_limit": "run50はcrash Recovery、process-group stop、MxC TEMP cleanupを証明しない。修正後のfresh installed LIVE_RUNTIME再検証が必要。通常Release capability、installed artifact provenance、release readinessも証明しない。"
       },
+      "installed_task_crash_recovery_run51": {
+        "date": "2026-10-04",
+        "source_commit": "b19a4f05b9d38e0057f15ae61d02a67f386898c7",
+        "source_worktree_clean": true,
+        "installed_run_id": "d4p-r2-crash-b19a4f0-run51",
+        "task_id": "7ec80a7ebc87995f3f2d4c68ee44c4ec",
+        "task_start_audit_id": "broker-audit-70",
+        "task_recovery_audit_id": "broker-audit-78",
+        "evidence_sources": ["LIVE_RUNTIME", "INTERNAL_STATE", "FIXTURE"],
+        "result": "broker_restart_recovery_audit_passed_process_group_cleanup_unverified",
+        "artifact_identity": {
+          "manifest_sha256": "sha256:de67d49d7d3e90b6044f57fba5433c93ef3df2091bbf2dda80228d967f253de9",
+          "app_sha256": "sha256:4cdf0b3cf55d8c034d87b06b0ba297860581be6ff8f2231a347ec2d22197ac46",
+          "broker_sha256": "sha256:b35cdedc3479e6a651a7d6b0f121a734b2ce24ed2091455fab5d8fee2a30a339",
+          "launcher_sha256": "sha256:28b3ebaa51d4577bd5df3918e39130ec8e81eac7870377a0b4bee95ede63b405",
+          "identity_kind": "gui_shell",
+          "scope": "per_user",
+          "isolated": false,
+          "formal_runtime_proof": false,
+          "product_manifest": null
+        },
+        "observations": {
+          "owner_grants": "Workspace Permission broker-audit-57 and separate one-use Task Approval broker-audit-62 were issued through native Owner confirmations; Task start broker-audit-70 records one-time consumption.",
+          "recovery": "After exact Launcher termination and same-profile Broker restart, one recovery event broker-audit-78 was appended with decision=suspended, evidence=INTERNAL_STATE, and the same request ID as task-start event broker-audit-70. The Broker accepted the existing file-backed store and appended the event.",
+          "process_stop": "At Launcher crash time, Codex and PowerShell task descendants were already absent; Flutter child remained. Only the exact verified run51 Launcher and Flutter processes were terminated during test cleanup. Active-task process-group cleanup is not proven.",
+          "fake_api": "4 requests; models=0; tool offered/called/result received; repeated tool-call rejections=3; external requests=0; workspace boundary fixture postcondition=true; completion marker absent.",
+          "temp": "scope=mxc_appcontainer; write=failed; diagnostic=directory_missing; physical cleanup not proven.",
+          "audit": "113 events at final capture; anchor count=113 and anchor head matched final event. Independent HMAC recomputation was not performed in this run.",
+          "ui": "Audit viewer search for the Recovery marker returned no match. After navigating back to Agent Center and activating registration, the window showed Windows 'Not Responding'; no secondary-dialog enumeration was done before exact-process cleanup. Cause unresolved; no normal tray exit evidence."
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "PASS is limited to installed Broker restart and durable Audit-based Task quarantine. It does not prove active process-group kill, deadline Recovery, Agent Center Recovery/result projection, TEMP cleanup, normal Release task_execution support, artifact provenance, or release readiness. Keep task_execution=unsupported and release_ready=false."
+      },
       "spawn_secret_revalidation_probe": {
         "date": "2026-09-30",
         "evidence_source": "FIXTURE",
