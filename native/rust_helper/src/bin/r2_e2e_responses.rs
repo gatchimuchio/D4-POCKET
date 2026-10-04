@@ -26,6 +26,30 @@ fn workspace_boundary_fixtures_valid(workspace: &Path) -> bool {
     )
 }
 
+fn evidence_matches_expected_outcome(evidence: &serde_json::Value, expect_deadline: bool) -> bool {
+    let common = evidence["requests"].as_u64().unwrap_or_default() >= 1
+        && evidence["tool_offered"] == true
+        && evidence["tool_call_sent"] == true
+        && evidence["repeated_tool_call_rejections"] == 0
+        && evidence["invalid_bodies"] == 0
+        && evidence["response_write_failures"] == 0
+        && evidence["incomplete_requests"] == 0
+        && evidence["blocked_external_requests"] == 0
+        && evidence["workspace_boundary_fixtures_valid_after_task"] == true;
+    if expect_deadline {
+        common
+            && evidence["tool_result_received"] == false
+            && evidence["workspace_marker_exists"] == false
+            && evidence["expected_outcome"] == "deadline"
+    } else {
+        common
+            && evidence["requests"].as_u64() == Some(2)
+            && evidence["tool_result_received"] == true
+            && evidence["workspace_marker_exists"] == true
+            && evidence["expected_outcome"] == "completion"
+    }
+}
+
 fn main() -> ExitCode {
     let Some(workspace) = std::env::args_os().nth(1) else {
         eprintln!("合成Workspaceの絶対pathが必要");
@@ -54,6 +78,18 @@ fn main() -> ExitCode {
             }
         },
     };
+    let expected_deadline = match std::env::args_os().nth(3) {
+        None => false,
+        Some(value) if value == "--expect-deadline" => true,
+        Some(_) => {
+            eprintln!("任意指定モードは--expect-deadlineだけを受理する");
+            return ExitCode::from(2);
+        }
+    };
+    if std::env::args_os().nth(4).is_some() {
+        eprintln!("余分な引数を受理しない");
+        return ExitCode::from(2);
+    }
     let server = match fixture::CodexLoopbackResponses::start_on(workspace, port) {
         Ok(server) => server,
         Err(_) => {
@@ -71,6 +107,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     let mut evidence = json!({
+        "expected_outcome": if expected_deadline { "deadline" } else { "completion" },
         "requests": server.post_requests(),
         "models": server.model_list_requests(),
         "tool_offered": server.tool_was_offered(),
@@ -88,18 +125,7 @@ fn main() -> ExitCode {
     evidence["workspace_boundary_fixtures_valid_after_task"] =
         json!(workspace_boundary_fixtures_valid(workspace));
     println!("EVIDENCE {evidence}");
-    if evidence["requests"].as_u64().unwrap_or_default() != 2
-        || evidence["tool_offered"] != true
-        || evidence["tool_call_sent"] != true
-        || evidence["tool_result_received"] != true
-        || evidence["repeated_tool_call_rejections"] != 0
-        || evidence["invalid_bodies"] != 0
-        || evidence["response_write_failures"] != 0
-        || evidence["incomplete_requests"] != 0
-        || evidence["blocked_external_requests"] != 0
-        || evidence["workspace_marker_exists"] != true
-        || evidence["workspace_boundary_fixtures_valid_after_task"] != true
-    {
+    if !evidence_matches_expected_outcome(&evidence, expected_deadline) {
         eprintln!("R2 loopbackResponses APIの検証条件が成立しない");
         return ExitCode::FAILURE;
     }
@@ -108,9 +134,62 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::workspace_boundary_fixtures_valid;
+    use super::{evidence_matches_expected_outcome, workspace_boundary_fixtures_valid};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn deadline_mode_accepts_only_tool_start_without_result_or_workspace_write() {
+        let valid = serde_json::json!({
+            "expected_outcome": "deadline",
+            "requests": 1,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": false,
+            "repeated_tool_call_rejections": 0,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": false,
+            "workspace_boundary_fixtures_valid_after_task": true
+        });
+        assert!(evidence_matches_expected_outcome(&valid, true));
+
+        let mut unexpected_completion = valid.clone();
+        unexpected_completion["workspace_marker_exists"] = serde_json::json!(true);
+        assert!(!evidence_matches_expected_outcome(
+            &unexpected_completion,
+            true
+        ));
+
+        let mut rejected_repeat = valid.clone();
+        rejected_repeat["repeated_tool_call_rejections"] = serde_json::json!(1);
+        assert!(!evidence_matches_expected_outcome(&rejected_repeat, true));
+    }
+
+    #[test]
+    fn normal_mode_still_requires_completed_tool_and_workspace_write() {
+        let completed = serde_json::json!({
+            "expected_outcome": "completion",
+            "requests": 2,
+            "tool_offered": true,
+            "tool_call_sent": true,
+            "tool_result_received": true,
+            "repeated_tool_call_rejections": 0,
+            "invalid_bodies": 0,
+            "response_write_failures": 0,
+            "incomplete_requests": 0,
+            "blocked_external_requests": 0,
+            "workspace_marker_exists": true,
+            "workspace_boundary_fixtures_valid_after_task": true
+        });
+        assert!(evidence_matches_expected_outcome(&completed, false));
+
+        let mut no_result = completed.clone();
+        no_result["tool_result_received"] = serde_json::json!(false);
+        assert!(!evidence_matches_expected_outcome(&no_result, false));
+    }
 
     #[test]
     fn loopback_harness_checks_outside_markers_before_the_sandboxed_probe() {

@@ -459,6 +459,31 @@ struct AgentTask作業 {
 const AGENT_TASK_RECORD_LIMIT: usize = 128;
 const AGENT_TASK_EXECUTION_LIMIT: Duration = Duration::from_secs(900);
 
+#[cfg(feature = "r2-e2e")]
+const R2_E2E_TASK_EXECUTION_LIMIT_ENV: &str = "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS";
+
+#[cfg(any(feature = "r2-e2e", test))]
+fn r2_e2e_task_execution_limit_ms(value: Option<&str>) -> Option<u64> {
+    value
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|milliseconds| {
+            (1..AGENT_TASK_EXECUTION_LIMIT.as_millis() as u64).contains(milliseconds)
+        })
+}
+
+fn agent_task_execution_limit() -> Duration {
+    #[cfg(feature = "r2-e2e")]
+    if let Some(milliseconds) = r2_e2e_task_execution_limit_ms(
+        std::env::var(R2_E2E_TASK_EXECUTION_LIMIT_ENV)
+            .ok()
+            .as_deref(),
+    ) {
+        return Duration::from_millis(milliseconds);
+    }
+
+    AGENT_TASK_EXECUTION_LIMIT
+}
+
 const AGENT_TASK_EXECUTION_POLICY: &str = "gui-shell-agent-task-sandbox-v1-max-runtime-900s";
 
 fn AgentTask結果hash化(
@@ -1429,7 +1454,7 @@ impl 対話制御 {
                     .get(&request.session_id)
                     .ok_or(対話失敗::権限拒否)?;
                 // Grant期限は開始許可の期限。消費後の実行時間は別の固定上限でboundedにする。
-                let deadline = Instant::now() + AGENT_TASK_EXECUTION_LIMIT;
+                let deadline = Instant::now() + agent_task_execution_limit();
                 let permission_id = grant.permission_id.clone();
                 if Instant::now() >= deadline
                     || self
@@ -2325,6 +2350,21 @@ mod broker_codex_loopback_support;
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn 試験用Task期限は900秒の上限を短縮する値だけ受理する() {
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("1")), Some(1));
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("15000")), Some(15_000));
+        assert_eq!(
+            r2_e2e_task_execution_limit_ms(Some("899999")),
+            Some(899_999)
+        );
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("0")), None);
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("900000")), None);
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("900001")), None);
+        assert_eq!(r2_e2e_task_execution_limit_ms(Some("invalid")), None);
+        assert_eq!(r2_e2e_task_execution_limit_ms(None), None);
+    }
 
     #[cfg(windows)]
     const CANCEL_FIXTURE_OWNER_APPROVAL_OPERATION: &str = "AgentTaskOwnerApprovalGrant";

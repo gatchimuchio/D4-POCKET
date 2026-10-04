@@ -340,6 +340,42 @@
         },
         "scope_limit": "FIXTURE限定。installed Task deadline到達、process群停止、Recovery／Audit、通常Release task_execution support、release readinessを証明しない。"
       },
+      "installed_task_deadline_attempt_run52": {
+        "date": "2026-10-04",
+        "source_commit": "b19a4f05b9d38e0057f15ae61d02a67f386898c7",
+        "source_worktree_clean": true,
+        "installed_run_id": "d4p-r2-installed-run51",
+        "task_id": "c9c89e299d261afdf1c92ebbde61c943",
+        "task_start_audit_id": "broker-audit-229",
+        "task_terminal_audit_id": "broker-audit-238",
+        "evidence_source": "LIVE_RUNTIME for the failed installed synthetic Task attempt; not deadline evidence",
+        "result": "inconclusive_test_fixture_rejected_tool_continuations",
+        "observations": {
+          "task_state": "The installed Agent Center showed Task state failed after a state refresh; the terminal Audit reason classified failure/cancellation and did not identify the product deadline as the cause.",
+          "process_and_scratch": "At refresh, Codex/PowerShell descendants and WorkspaceTaskScratch were absent; the task journal had no active entry. Their absence alone does not establish that deadline supervision caused cleanup.",
+          "fake_api": "4 Requests API requests; one tool call was offered and sent, a tool result was received, three repeated tool-call continuations were rejected, no Workspace completion marker was written, and no external request was observed.",
+          "fixture_mismatch": "The synthetic tool call uses yield_time_ms=30000 while its explicit supervision probe waits up to 1000 seconds. The loopback fixture rejects a subsequent request before the Workspace completion marker exists, so the run terminates through a fixture error before the 900-second Broker deadline can be credited.",
+          "temp": "MxC TEMP scope was mxc_appcontainer; write failed with directory_missing. No D4-owned WorkspaceTaskScratch guarantee is inferred from MxC TEMP."
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "Failed attempt only. Does not pass deadline detection, process-group stop, Recovery, or Audit for deadline. Preserve as failure history; do not treat Task failed or descendants absent as deadline success."
+      },
+      "r2_deadline_fixture_continuation_correction": {
+        "date": "2026-10-04",
+        "source_base_commit": "5e64044ad385c65c56b4aba8a18c18e2e8f71244",
+        "source_worktree_clean": false,
+        "evidence_source": "FIXTURE",
+        "validation": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e -- --test-threads=1 --skip 'owner接続をBrokerで受理し通常IPC一覧へbounded射影する': lib 415 passed／0 failed／6 ignored／1 filtered; r2_e2e_responses 15 passed; main 10 passed; broker_ipc 10 passed; canonical_decimal_hash 1 passed; checkpoint 8 passed; protected_data 2 passed; protected_startup 1 passed; protected_store 3 passed; workspace_diff 2 passed; workspace_reader 2 passed; workspace_startup 7 passed. Skipped A2A loopback test was rerun alone and passed. Default and r2-e2e cargo check --all-targets passed.",
+        "observations": {
+          "test_limit": "GUI_SHELL_R2_E2E_TASK_EXECUTION_LIMIT_MS is read only when feature r2-e2e is compiled. Only integer values from 1 through 899999 are accepted; absent or invalid values retain the fixed 900-second limit. The Owner policy remains max-runtime-900s.",
+          "deadline_mode": "The loopback Responses API helper has a separate expected-deadline mode requiring a tool call but no tool result, no repeated rejection, no Workspace completion marker, and intact outside-boundary fixtures. The existing positive mode still requires its completed tool result and Workspace marker.",
+          "product_scope": "No normal Release capability, Permission, Owner Approval, production deadline, or process supervision behavior was weakened or changed."
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "FIXTURE and code validation only. The corrected helper has not yet been run through a fresh installed Task; deadline Recovery and process cleanup remain unresolved."
+      },
       "spawn_secret_revalidation_probe": {
         "date": "2026-09-30",
         "evidence_source": "FIXTURE",
