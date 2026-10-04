@@ -12,7 +12,7 @@
 
 private定義はWindowsの`ProtectedStore::Purpose::Regression`へ暗号化し、C5の`Purpose::Evaluation`と分離する。plaintext fallback、normal IPC（通常IPC）へのraw本文返却、Audit reasonへのprivate本文複写を行わない。公開receiptはCase ID、要求ID/hash、結果hash、終了監査ID、保管hash、件数および証拠種別だけを`hash_only`で返す。
 
-Windows Desktop production pathではRust起動器が固定する`%LOCALAPPDATA%\GUI-Shell\broker\desktop\protected`をBroker起動時に検査・接続する。Windows NTFSとreparse point拒否を含む既存root境界検査を通し、Brokerの通常store・session fileから分離する。owner任意設定のProtectedStoreとは別経路であり、起動登録だけでOwner資格、Permission、Approvalを生成しない。検査不能時はBrokerをfail-closedで起動しない。既存の別path保管物は自動移行・削除・上書きしない。
+Windows Desktop production pathではRust起動器が選ぶruntime root直下の`protected`をBroker起動時に検査・接続する。generic GUI Shellでは`%LOCALAPPDATA%\GUI-Shell\broker\desktop\protected`、D4 Pocket Exportでは`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\protected`となる。Windows NTFSとreparse point拒否を含む既存root境界検査を通し、Brokerの通常store・session fileから分離する。owner任意設定のProtectedStoreとは別経路であり、起動登録だけでOwner資格、Permission、Approvalを生成しない。検査不能時はBrokerをfail-closedで起動しない。既存の別path保管物は自動移行・削除・上書きしない。
 
 登録のaccepted Auditはreceiptのhash-only projectionを含み、入力本文・条件・参照・期待経路を含まない。保管後のAudit確定に失敗した場合、Brokerは成功を返さず、残存暗号文を再利用しないRecoveryとして保管監査の再確認を要求する。
 

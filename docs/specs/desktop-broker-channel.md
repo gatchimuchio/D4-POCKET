@@ -84,7 +84,7 @@ reportは機密・path・資格を含まない最大64 KiBのJSONとし、Broker
 
 ### 8.2 Broker統治の初回UI設定
 
-Windows Rust Desktop起動器がinstalled package配置を検証した場合に限り、Brokerは固定durable store内のfirst_run_configuration.jsonを初回起動時に生成する。pathは%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\first_run_configuration.jsonであり、要求本文・環境変数・UIがpathを指定できない。開発Broker、installed配置未検証、永続store未接続では生成済みと扱わない。
+Windows Rust Desktop起動器がinstalled package配置を検証した場合に限り、Brokerはruntime identityに対応する固定durable store内のfirst_run_configuration.jsonを初回起動時に生成する。generic GUI Shellではpathは%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\first_run_configuration.json、D4 Pocket Exportでは%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\store\first_run_configuration.jsonである。要求本文・環境変数・UIがpathを指定できない。開発Broker、installed配置未検証、永続store未接続では生成済みと扱わない。
 
 設定内容はspecs/first_run_configuration.schema.jsonの日本語UI既定値だけとする。追加field、Profile、Permission、Capability、Approval、Authority、Runtime、Agent、Credential、監査内容、filesystem pathを含めない。設定は要求設定であり権限源ではない。現在の初回契約では既定値だけを受理し、利用者設定の更新・migrationは別contractが成立するまで行わない。
 

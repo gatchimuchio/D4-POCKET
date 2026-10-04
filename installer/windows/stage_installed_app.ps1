@@ -18,6 +18,8 @@
 
   [string]$BuildTimestamp = "",
 
+  [string]$ProductManifestJson = "",
+
   [switch]$AllowExistingInstallRoot
 )
 
@@ -83,6 +85,49 @@ $release = Resolve-Path $FlutterReleaseDir
 $helper = Resolve-Path $BrokerHelperExe
 $desktopLauncher = Resolve-Path $DesktopLauncherExe
 
+$launcherBytes = [System.IO.File]::ReadAllBytes($desktopLauncher.Path)
+$launcherText = [System.Text.Encoding]::ASCII.GetString($launcherBytes)
+$embeddedAppIds = @([regex]::Matches($launcherText, 'd4-pocket-app-[0-9a-f]{32}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+$embeddedAuditStoreIds = @([regex]::Matches($launcherText, 'audit-store-[0-9a-f]{32}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+$productAppId = $null
+$productAuditStoreId = $null
+$productManifestPath = $null
+$productManifestSha256 = $null
+$launcherRuntimeIdentityKind = "gui_shell"
+
+if ($ProductManifestJson -ne "") {
+  $productManifestPath = (Resolve-Path -LiteralPath $ProductManifestJson).Path
+  $productManifestItem = Get-Item -LiteralPath $productManifestPath -Force
+  if ($productManifestItem.PSIsContainer -or
+      ($productManifestItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or
+      $productManifestItem.Length -lt 1 -or $productManifestItem.Length -gt 65536) {
+    throw "D4 Pocket Product Manifestは通常fileかつ64 KiB以下でなければなりません。"
+  }
+  try {
+    $productManifestText = [System.Text.UTF8Encoding]::new($false, $true).GetString([System.IO.File]::ReadAllBytes($productManifestPath))
+    $productManifest = ConvertFrom-Json -InputObject $productManifestText -ErrorAction Stop
+  } catch {
+    throw "D4 Pocket Product ManifestをUTF-8 JSONとして読み取れません。"
+  }
+  $productAppId = [string]$productManifest.manifest.app_identity.app_id
+  $productAuditStoreId = [string]$productManifest.manifest.audit_store.store_id
+  if ($productManifest.version -ne 1 -or
+      $productManifest.product -ne "D4 Pocket" -or
+      [string]$productManifest.export_id -notmatch '^[A-Za-z0-9._-]{1,64}$' -or
+      $productAppId -notmatch '^d4-pocket-app-[0-9a-f]{32}$' -or
+      $productAuditStoreId -notmatch '^audit-store-[0-9a-f]{32}$') {
+    throw "D4 Pocket Product Manifestの製品identityが不正です。"
+  }
+  if ($embeddedAppIds.Count -ne 1 -or $embeddedAppIds[0] -cne $productAppId -or
+      $embeddedAuditStoreIds.Count -ne 1 -or $embeddedAuditStoreIds[0] -cne $productAuditStoreId) {
+    throw "Rust Desktop起動器のcompile-time identityがProduct Manifestと一致しません。"
+  }
+  $launcherRuntimeIdentityKind = "d4_pocket_product"
+  $productManifestSha256 = Get-TaggedSha256 -Path $productManifestPath
+} elseif ($embeddedAppIds.Count -ne 0 -or $embeddedAuditStoreIds.Count -ne 0) {
+  throw "製品identityをcompile-time埋込した起動器には、対応するProduct Manifestが必要です。"
+}
+
 if ($RunId -eq "") {
   $RunId = "run-$((Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 }
@@ -98,7 +143,11 @@ if ($GitRoot -eq "") {
 if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
   throw "LOCALAPPDATA を確認できないため、Desktop起動器の保存先宣言を作成できません。"
 }
-$launcherRuntimeDir = Join-Path $env:LOCALAPPDATA "GUI-Shell\broker\desktop"
+if ($launcherRuntimeIdentityKind -eq "d4_pocket_product") {
+  $launcherRuntimeDir = Join-Path $env:LOCALAPPDATA (Join-Path "D4Pocket\apps" (Join-Path $productAppId (Join-Path "stores" $productAuditStoreId)))
+} else {
+  $launcherRuntimeDir = Join-Path $env:LOCALAPPDATA "GUI-Shell\broker\desktop"
+}
 
 if ((Test-Path $InstallRoot) -and !$AllowExistingInstallRoot.IsPresent) {
   throw "InstallRoot はすでに存在します。正式証拠には新規の分離実行 root が必要です: $InstallRoot"
@@ -126,18 +175,22 @@ $evidenceDir = New-Item -ItemType Directory -Force -Path (Join-Path $runtimeDir.
 Copy-Item -Recurse -Force -Path (Join-Path $release.Path "*") -Destination $appDir.FullName
 Copy-Item -Force -Path $helper.Path -Destination (Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe")
 Copy-Item -Force -Path $desktopLauncher.Path -Destination (Join-Path $installRootPath.FullName "gui_shell_desktop_launcher.exe")
+if ($null -ne $productManifestPath) {
+  Copy-Item -LiteralPath $productManifestPath -Destination (Join-Path $installRootPath.FullName "product_manifest.json")
+}
 
 $appExe = Join-Path $appDir.FullName "gui_shell_desktop.exe"
 $brokerExe = Join-Path $brokerDir.FullName "gui_shell_rust_helper.exe"
 $launcherExe = Join-Path $installRootPath.FullName "gui_shell_desktop_launcher.exe"
 $configPath = Join-Path $configDir.FullName "gui_shell.json"
+# Broker単体smoke専用scratch endpoint。実製品runtime endpointはlauncher_runtime.session_fileで別に宣言する。
 $sessionFile = Join-Path $runtimeDir.FullName "broker_session.json"
 $appArtifactSha256 = Get-TaggedSha256 -Path $appExe
 $brokerArtifactSha256 = Get-TaggedSha256 -Path $brokerExe
 $launcherArtifactSha256 = Get-TaggedSha256 -Path $launcherExe
 
 $manifest = [ordered]@{
-  manifest_version = 2
+  manifest_version = 3
   run_id = $RunId
   staged_at = (Get-Date).ToUniversalTime().ToString("o")
   source_commit = $sourceCommit
@@ -158,11 +211,21 @@ $manifest = [ordered]@{
     root = $launcherRuntimeDir
     store_dir = (Join-Path $launcherRuntimeDir "store")
     session_file = (Join-Path $launcherRuntimeDir "broker_session.json")
+    identity_kind = $launcherRuntimeIdentityKind
+    app_id = $productAppId
+    audit_store_id = $productAuditStoreId
     scope = "per_user"
     isolated = $false
     evidence_class = "CONFIG"
     formal_runtime_proof = $false
   }
+  product_manifest = $(if ($null -ne $productManifestPath) {
+      [ordered]@{
+        path = (Join-Path $installRootPath.FullName "product_manifest.json")
+        sha256 = $productManifestSha256
+        runtime_manifest_consumed_by_launcher = $false
+      }
+    } else { $null })
   runtime_dir = $runtimeDir.FullName
   store_dir = $storeDir.FullName
   config_dir = $configDir.FullName

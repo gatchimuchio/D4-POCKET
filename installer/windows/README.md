@@ -8,7 +8,7 @@ gui_shell_desktop_launcher.exe
   -> 通常認証Broker endpointを使うgui_shell_desktop.exe
 ```
 
-起動器はBroker authorityをRust側に保ち、認証済みloopback IPCだけを使う。durable Broker stateは`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store`へ保存し、通常終了時は起動時とbyteが一致する一時endpointだけを削除する。Owner資格を作成しない。これはstaged起動／Broker lifecycleの限定機能であり、正式installer、uninstaller、signed update、rollback、formal package identity、Download→Installを実装したことを意味しない。
+起動器はBroker authorityをRust側に保ち、認証済みloopback IPCだけを使う。generic GUI Shellのdurable Broker stateは`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store`へ、D4 Pocket Exportではcompile-time埋込identity別の`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\store`へ保存する。通常終了時は起動時とbyteが一致する一時endpointだけを削除する。Owner資格を作成しない。これはstaged起動／Broker lifecycleの限定機能であり、正式installer、uninstaller、signed update、rollback、formal package identity、Download→Installを実装したことを意味しない。
 
 ## Buildとstaging
 
@@ -23,13 +23,15 @@ cargo build --release --locked --manifest-path native\rust_helper\Cargo.toml --b
   -DesktopLauncherExe .\native\rust_helper\target\release\gui_shell_desktop_launcher.exe
 ```
 
-staged manifestの`launcher_runtime`は起動器が使う`%LOCALAPPDATA%\GUI-Shell\broker\desktop`を示す`CONFIG`宣言で、per-user scope、`isolated=false`、`formal_runtime_proof=false`を明記する。manifestの`runtime_dir`／`store_dir`／`config_dir`／`audit_dir`は証拠collector用の分離scratch pathであり、標準起動器の保存先ではない。この差をWindows installed evidenceで解消せず、二つのpathを同じruntimeとして報告してはならない。
+D4 Pocket Exportから作った起動器をstageするときは、同じExport artifactの`product_manifest.json`を`-ProductManifestJson`で渡す。stagerはManifestのApp ID／Audit store IDと起動器のcompile-time埋込値を照合し、製品固有の`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`をruntime rootとして記録し、Manifestをbyte-preservingでstage rootへ複製する。compile-time identityがあるのにManifestがない場合、またはidentityが一致しない場合はstagingを拒否する。この照合はExport時の正本Schema検証を置き換えない。runtime Manifestを起動器が読み込むという意味ではなく、保存pathの証拠を一致させるためのstaging metadataである。Manifestを渡さないのは製品identity未埋込のgeneric GUI-Shell起動器に限る。
+
+staged manifestの`launcher_runtime`は起動器identityに対応した保存先を示す`CONFIG`宣言で、per-user scope、`isolated=false`、`formal_runtime_proof=false`を明記する。`launcher_runtime.session_file`は製品の実接続先宣言である。一方、manifestの`runtime_dir`／`store_dir`／`config_dir`／`audit_dir`および`broker_session_file`は、証拠collectorと独立Broker smoke用の分離scratch pathであり、標準起動器の保存先ではない。`collect_broker_smoke.ps1`は引数のsession fileを事前削除し得るため、製品runtimeのsession pathを同scriptへ渡してはならない。この差をWindows installed evidenceで解消せず、二つのpathを同じruntimeとして報告してはならない。
 
 `collect_broker_smoke.ps1`と`collect_installed_smoke.ps1`は別個のevidence collectorである。後者はRust Desktop起動器を起動し、起動器の直接child、同じWindows session、起動後の生成時刻、Flutter executableのSHA-256でprocess identityを確認する。Windows package virtualizationがWMI `ExecutablePath`を書き換える場合があるため、path文字列一致を要求しない。`LOCALAPPDATA`はrun固有の新規pathへ限定し、実際のBroker runtime、endpoint、Store、AuditEventをそこで観測する。stage時の`runtime/` scratch pathや独立Broker smokeを製品起動の代替にしない。
 
 正式collectorはstageを実行したWindows user SIDと異なるWindows user profileから起動し、`-UseCurrentWindowsProfile`を指定する。staged manifestにはuser SIDそのものではなく、run固有salt付きSHA-256 digestを保存し、collector内だけで現在userと比較する。対象installed rootとmanifestには読み取り権限、evidence出力先には当該test userの書き込み権限が必要だが、collectorはACLを変更しない。同一profileでの開発確認は`-DiagnosticOnly`に限定し、Temp下に別runtimeを作成する。
 
-Rust BrokerはSetup Doctor reportとfirst-run UI configurationを固定storeへ生成・読取するcontractを実装済みである。通常起動UIは認証済みBroker IPCから両方のprojectionを読み取り、Flutterはfileへ書かない。collector version 16はfirst-run configの起動前不在・既定値・file hashとaccepted AuditEvent、Setup Doctor reportの固定store byte hashとaccepted AuditEventをevidence bundleへ含める。Setup Doctor専用画面のtext収集はFrontendのPID／MainWindowHandle／UIA runtime IDに結合し、pointer click／scroll前にforeground PIDとtopmost root HWNDを再照合する。各text nodeは親子geometryとUIA IsOffscreenに加え、node内sample pointのtopmost HWNDを記録する。観測treeは10,000 node、画面scrollは最大17回にboundedとする。これは実UIA textとsample pointの限定証拠であり、pixel／contrastやscreen reader実操作は計測しない。2026-09-29に実測した122 node、必須4 surface、tray通常終了、Setup Doctor report `pass`はv15 DiagnosticOnly runの履歴であり、v16の実UIA run・別profile strict evidenceは未成立である。
+Rust BrokerはSetup Doctor reportとfirst-run UI configurationをidentity別の固定storeへ生成・読取するcontractを実装済みである。通常起動UIは認証済みBroker IPCから両方のprojectionを読み取り、Flutterはfileへ書かない。collector version 17はgeneric／D4 Pocket runtime identityを区別し、D4 Pocket ExportのManifest／compile-time ID／runtime pathを照合してからfirst-run configの起動前不在・既定値・file hashとaccepted AuditEvent、Setup Doctor reportの固定store byte hashとaccepted AuditEventをevidence bundleへ含める。Setup Doctor専用画面のtext収集はFrontendのPID／MainWindowHandle／UIA runtime IDに結合し、pointer click／scroll前にforeground PIDとtopmost root HWNDを再照合する。各text nodeは親子geometryとUIA IsOffscreenに加え、node内sample pointのtopmost HWNDを記録する。観測treeは10,000 node、画面scrollは最大17回にboundedとする。これは実UIA textとsample pointの限定証拠であり、pixel／contrastやscreen reader実操作は計測しない。2026-09-29に実測した122 node、必須4 surface、tray通常終了、Setup Doctor report `pass`はv15 DiagnosticOnly runの履歴であり、v17の実UIA run・別profile strict evidenceは未成立である。
 
 `collect_broker_smoke.ps1`は認証IPC、`127.0.0.1`限定bind、`credential_role=normal`、永続store準備、通常IPCからのAgent Task Workspace Permission／Owner Approval発行拒否、Broker restart後のreplay拒否、crash時のfail-closedを検証する。Task権限2操作は`desktop_native_owner_confirmation_required`で拒否されることを個別に測定し、collector version 6以降のBroker evidence validatorが両方の実測値とerror codeを必須化する。これはBroker単体のLIVE_RUNTIME証拠であり、Desktop起動器、native Owner確認、installed product、Agent Task実行、正式releaseを証明しない。No-Python／no-FFI値は非正式なstatic declarationに限る。
 

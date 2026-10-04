@@ -413,8 +413,59 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
             local_appdata = isolation.get("isolated_localappdata")
             runtime_dir = isolation.get("isolated_runtime_dir")
             config_dir = isolation.get("isolated_config_dir")
+            runtime_identity = isolation.get("runtime_identity")
             if not _windows_path_is_within(runtime_dir, local_appdata):
                 errors.append("起動器runtimeが実行user profileのisolated LOCALAPPDATA外にある")
+            if not isinstance(runtime_identity, dict):
+                errors.append("provenance.isolation.runtime_identity object がない")
+            else:
+                identity_kind = runtime_identity.get("kind")
+                runtime_normalized = str(runtime_dir or "").replace("/", "\\").rstrip("\\").casefold()
+                if runtime_identity.get("evidence_class") != "CONFIG":
+                    errors.append("起動器runtime identityはCONFIG証拠として分類しなければならない")
+                if identity_kind == "gui_shell":
+                    if (
+                        runtime_identity.get("app_id") is not None
+                        or runtime_identity.get("audit_store_id") is not None
+                        or runtime_identity.get("product_manifest_path") is not None
+                        or runtime_identity.get("product_manifest_sha256") is not None
+                        or not runtime_normalized.endswith("\\gui-shell\\broker\\desktop")
+                    ):
+                        errors.append("generic GUI Shell runtime identityと実runtime pathが一致しない")
+                elif identity_kind == "d4_pocket_product":
+                    app_id = runtime_identity.get("app_id")
+                    audit_store_id = runtime_identity.get("audit_store_id")
+                    product_manifest_path = str(runtime_identity.get("product_manifest_path") or "")
+                    staged_install_root = ntpath.dirname(str(provenance.get("staged_manifest_path") or ""))
+                    expected_product_manifest_path = ntpath.join(staged_install_root, "product_manifest.json")
+                    if (
+                        not isinstance(app_id, str)
+                        or re.fullmatch(r"d4-pocket-app-[0-9a-f]{32}", app_id) is None
+                        or not isinstance(audit_store_id, str)
+                        or re.fullmatch(r"audit-store-[0-9a-f]{32}", audit_store_id) is None
+                        or not runtime_normalized.endswith(
+                            f"\\d4pocket\\apps\\{app_id.casefold()}\\stores\\{audit_store_id.casefold()}"
+                        )
+                        or not _is_sha256_tag(runtime_identity.get("product_manifest_sha256"))
+                        or ntpath.normcase(ntpath.normpath(product_manifest_path))
+                        != ntpath.normcase(ntpath.normpath(expected_product_manifest_path))
+                    ):
+                        errors.append("D4 Pocket runtime identity、installed Product Manifestまたは実runtime pathが一致しない")
+                else:
+                    errors.append("起動器runtime identity kindが未知です")
+                first_run_identity = _get(data, "first_run.launcher_runtime_identity")
+                if not isinstance(first_run_identity, dict) or any(
+                    first_run_identity.get(key) != runtime_identity.get(key)
+                    for key in (
+                        "kind",
+                        "app_id",
+                        "audit_store_id",
+                        "product_manifest_path",
+                        "product_manifest_sha256",
+                        "evidence_class",
+                    )
+                ):
+                    errors.append("first_run.runtime identityがprovenanceと一致しない")
             if config_dir and not _windows_path_is_within(config_dir, local_appdata):
                 errors.append("製品config directoryが実行user profileのisolated LOCALAPPDATA外にある")
             config_path = _get(data, "first_run.config_path")
@@ -446,6 +497,20 @@ def validate_provenance_and_isolation(data: dict[str, Any], path: Path = DEFAULT
             missing = BASE_REQUIRED_EVIDENCE_BUNDLE_KINDS - kinds
             if missing:
                 errors.append(f"provenance.evidence_bundle_files に次の kind がない: {', '.join(sorted(missing))}")
+            runtime_identity = isolation.get("runtime_identity")
+            product_manifest_records = [
+                item for item in bundle_files
+                if isinstance(item, dict) and item.get("kind") == "product_manifest"
+            ]
+            if isinstance(runtime_identity, dict) and runtime_identity.get("kind") == "d4_pocket_product":
+                if (
+                    len(product_manifest_records) != 1
+                    or product_manifest_records[0].get("path") != runtime_identity.get("product_manifest_path")
+                    or product_manifest_records[0].get("sha256") != runtime_identity.get("product_manifest_sha256")
+                ):
+                    errors.append("D4 Pocket Product Manifestが実行器runtime identityへhash結合されていない")
+            elif product_manifest_records:
+                errors.append("generic GUI Shell evidenceに未宣言のProduct Manifestが含まれる")
 
         errors.extend(_validate_field_provenance(data))
 
@@ -1013,7 +1078,7 @@ def _validate_setup_doctor_operator_readability(data: dict[str, Any], setup: dic
         or proof.get("visual_contrast_measured") is not False
         or proof.get("screen_reader_executed") is not False
         or proof.get("collector") != "installer/windows/collect_installed_smoke.ps1"
-        or proof.get("collector_version") != "16"
+        or proof.get("collector_version") != "17"
         or proof.get("process_id") != _get(data, "first_run.process_id")
         or proof.get("run_id") != _get(data, "provenance.isolation.run_id")
         or proof.get("report_sha256") != setup.get("report_sha256")

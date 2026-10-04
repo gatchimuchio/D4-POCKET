@@ -306,6 +306,91 @@ function Assert-NormalBrokerEndpoint {
   }
 }
 
+function Resolve-InstalledRuntimeIdentity {
+  param(
+    $InstalledManifest,
+    [string]$LauncherPath,
+    [string]$LocalAppDataRoot
+  )
+
+  $manifestVersion = [int]$InstalledManifest.manifest_version
+  if ($manifestVersion -notin @(2, 3)) {
+    throw "installed manifest versionを確認できません。"
+  }
+  $runtime = $InstalledManifest.launcher_runtime
+  $kind = [string](Get-EvidenceValue -Object $runtime -Name "identity_kind")
+  $appId = [string](Get-EvidenceValue -Object $runtime -Name "app_id")
+  $auditStoreId = [string](Get-EvidenceValue -Object $runtime -Name "audit_store_id")
+  $launcherText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($LauncherPath))
+  $embeddedAppIds = @([regex]::Matches($launcherText, 'd4-pocket-app-[0-9a-f]{32}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+  $embeddedAuditStoreIds = @([regex]::Matches($launcherText, 'audit-store-[0-9a-f]{32}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+
+  if ($manifestVersion -eq 2) {
+    if ($embeddedAppIds.Count -ne 0 -or $embeddedAuditStoreIds.Count -ne 0) {
+      throw "製品identityをcompile-time埋込した起動器ですが、staged manifestが旧形式です。Product Manifest付きで再stageしてください。"
+    }
+    $kind = "gui_shell"
+    $appId = $null
+    $auditStoreId = $null
+  }
+
+  $declaredRoot = [string](Get-EvidenceValue -Object $runtime -Name "root")
+  $manifestSha256 = $null
+  if ($kind -eq "gui_shell") {
+    if ($null -ne $runtime.app_id -or $null -ne $runtime.audit_store_id -or
+        $embeddedAppIds.Count -ne 0 -or $embeddedAuditStoreIds.Count -ne 0 -or
+        !$declaredRoot.TrimEnd('\').EndsWith('GUI-Shell\broker\desktop', [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "generic GUI Shell起動器のruntime identity宣言が一致しません。"
+    }
+    $runtimeRoot = Join-Path $LocalAppDataRoot "GUI-Shell\broker\desktop"
+    $manifestPath = $null
+  } elseif ($kind -eq "d4_pocket_product") {
+    if ($appId -notmatch '^d4-pocket-app-[0-9a-f]{32}$' -or
+        $auditStoreId -notmatch '^audit-store-[0-9a-f]{32}$' -or
+        $embeddedAppIds.Count -ne 1 -or $embeddedAppIds[0] -cne $appId -or
+        $embeddedAuditStoreIds.Count -ne 1 -or $embeddedAuditStoreIds[0] -cne $auditStoreId) {
+      throw "D4 Pocket runtime identityと起動器のcompile-time identityが一致しません。"
+    }
+    $expectedSuffix = "D4Pocket\apps\$appId\stores\$auditStoreId"
+    if (!$declaredRoot.TrimEnd('\').EndsWith($expectedSuffix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "D4 Pocket staged manifestのruntime rootがidentityと一致しません。"
+    }
+    $manifestPath = Join-Path (Split-Path -Parent $LauncherPath) "product_manifest.json"
+    $productManifestInfo = $InstalledManifest.product_manifest
+    if ($null -eq $productManifestInfo -or
+        [string]$productManifestInfo.path -ne $manifestPath -or
+        !(Test-Path -LiteralPath $manifestPath -PathType Leaf) -or
+        [string](Get-TaggedSha256 -Path $manifestPath) -ne [string]$productManifestInfo.sha256) {
+      throw "D4 Pocket Product Manifestの配置またはSHA-256がstaged manifestと一致しません。"
+    }
+    $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+    if (($manifestItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        $manifestItem.Length -lt 1 -or $manifestItem.Length -gt 65536) {
+      throw "D4 Pocket Product Manifestのfilesystem境界またはsizeが不正です。"
+    }
+    $productManifest = Read-Utf8Json -Path $manifestPath
+    if ($productManifest.version -ne 1 -or
+        $productManifest.product -ne "D4 Pocket" -or
+        [string]$productManifest.manifest.app_identity.app_id -cne $appId -or
+        [string]$productManifest.manifest.audit_store.store_id -cne $auditStoreId) {
+      throw "D4 Pocket Product Manifestのidentityがruntime宣言と一致しません。"
+    }
+    $manifestSha256 = [string]$productManifestInfo.sha256
+    $runtimeRoot = Join-Path $LocalAppDataRoot (Join-Path "D4Pocket\apps" (Join-Path $appId (Join-Path "stores" $auditStoreId)))
+  } else {
+    throw "launcher runtime identity kindが未知です。"
+  }
+
+  return [pscustomobject]@{
+    kind = $kind
+    app_id = $appId
+    audit_store_id = $auditStoreId
+    runtime_root = $runtimeRoot
+    product_manifest_path = $manifestPath
+    product_manifest_sha256 = $manifestSha256
+  }
+}
+
 function Restore-SmokeEnvironment {
   foreach ($name in $smokeEnvironmentVariables) {
     $value = $previousSmokeEnvironment[$name]
@@ -1423,7 +1508,7 @@ function Collect-SetupDoctorOperatorReadability {
     visual_contrast_measured = $false
     screen_reader_executed = $false
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "16"
+    collector_version = "17"
     captured_at = (Get-Date).ToUniversalTime().ToString("o")
     run_id = $RunId
     process_id = $Process.Id
@@ -1496,7 +1581,11 @@ if ($UseCurrentWindowsProfile.IsPresent) {
   New-Item -ItemType Directory -Path $newLocalAppDataRoot -ErrorAction Stop | Out-Null
   $localAppDataRoot = $newLocalAppDataRoot
 }
-$brokerRuntimeRoot = Join-Path $localAppDataRoot "GUI-Shell\broker\desktop"
+$launcherRuntimeIdentity = Resolve-InstalledRuntimeIdentity `
+  -InstalledManifest $installedManifest `
+  -LauncherPath $launcher.Path `
+  -LocalAppDataRoot $localAppDataRoot
+$brokerRuntimeRoot = $launcherRuntimeIdentity.runtime_root
 $brokerStoreDir = Join-Path $brokerRuntimeRoot "store"
 $brokerEndpointFile = Join-Path $brokerRuntimeRoot "broker_session.json"
 $firstRunConfigurationPath = Join-Path $brokerStoreDir "first_run_configuration.json"
@@ -1823,6 +1912,9 @@ foreach ($record in @(
     $evidenceBundleFiles.Add($record)
   }
 }
+if ($launcherRuntimeIdentity.kind -eq "d4_pocket_product") {
+  $evidenceBundleFiles.Add((New-EvidenceFileRecord -Kind "product_manifest" -Path $launcherRuntimeIdentity.product_manifest_path))
+}
 $evidenceBundleFileValues = @($evidenceBundleFiles.ToArray())
 $bundleText = (@{ files = @($evidenceBundleFileValues) } | ConvertTo-Json -Compress -Depth 10)
 $evidenceBundleSha256 = Get-TaggedStringSha256 -Text $bundleText
@@ -1955,6 +2047,14 @@ $evidence = [ordered]@{
       isolated_store_dir = $brokerStoreDir
       isolated_config_dir = $null
       isolated_audit_dir = $brokerStoreDir
+      runtime_identity = [ordered]@{
+        kind = $launcherRuntimeIdentity.kind
+        app_id = $launcherRuntimeIdentity.app_id
+        audit_store_id = $launcherRuntimeIdentity.audit_store_id
+        product_manifest_path = $launcherRuntimeIdentity.product_manifest_path
+        product_manifest_sha256 = $launcherRuntimeIdentity.product_manifest_sha256
+        evidence_class = "CONFIG"
+      }
       run_id = $runIsolationId
       separate_windows_user_profile = $separateWindowsProfileVerified
     }
@@ -1970,6 +2070,7 @@ $evidence = [ordered]@{
       formal_release_input = !$surfaceBuildRegistry
     }
     "first_run.broker_lifecycle_audit" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
+    "first_run.launcher_runtime_identity" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }
     "first_run.broker_health_request" = [ordered]@{ source_type = "directly_measured"; evidence_class = "LIVE_RUNTIME"; formal_release_input = $true }
     "first_run.config_audit" = [ordered]@{
       source_type = $(if ($configAuditMatched) { "directly_measured" } else { "unsupported_claim" })
@@ -1988,7 +2089,7 @@ $evidence = [ordered]@{
   }
   evidence_source = [ordered]@{
     collector = "installer/windows/collect_installed_smoke.ps1"
-    collector_version = "16"
+    collector_version = "17"
     manual_confirmation = $false
     screenshot_path = $(if ($ScreenshotPath -ne "") { $ScreenshotPath } else { $null })
   }
@@ -2010,6 +2111,14 @@ $evidence = [ordered]@{
     launcher_exited_after_frontend = $launcherExitedAfterFrontend
     launcher_exit_code = $launcherExitCode
     launcher_runtime_dir = $brokerRuntimeRoot
+    launcher_runtime_identity = [ordered]@{
+      kind = $launcherRuntimeIdentity.kind
+      app_id = $launcherRuntimeIdentity.app_id
+      audit_store_id = $launcherRuntimeIdentity.audit_store_id
+      product_manifest_path = $launcherRuntimeIdentity.product_manifest_path
+      product_manifest_sha256 = $launcherRuntimeIdentity.product_manifest_sha256
+      evidence_class = "CONFIG"
+    }
     profile_identity_isolated_from_staging_user = $separateWindowsProfileVerified
     profile_identity_sid_exposed = $false
     process_id = $process.Id

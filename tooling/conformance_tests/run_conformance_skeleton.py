@@ -1886,7 +1886,7 @@ def _valid_windows_installed_evidence() -> dict:
         "visual_contrast_measured": False,
         "screen_reader_executed": False,
         "collector": "installer/windows/collect_installed_smoke.ps1",
-        "collector_version": "16",
+        "collector_version": "17",
         "captured_at": "2026-06-05T00:00:00Z",
         "run_id": "run-20260605T000000Z-a1b2c3d4-smoke-0123",
         "process_id": 1234,
@@ -1946,6 +1946,14 @@ def _valid_windows_installed_evidence() -> dict:
                 "isolated_store_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store",
                 "isolated_config_dir": None,
                 "isolated_audit_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop\store",
+                "runtime_identity": {
+                    "kind": "gui_shell",
+                    "app_id": None,
+                    "audit_store_id": None,
+                    "product_manifest_path": None,
+                    "product_manifest_sha256": None,
+                    "evidence_class": "CONFIG",
+                },
                 "run_id": "run-20260605T000000Z-a1b2c3d4-smoke-0123",
                 "separate_windows_user_profile": True,
             },
@@ -1968,6 +1976,7 @@ def _valid_windows_installed_evidence() -> dict:
             "first_run.config_audit": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "first_run.broker_lifecycle_audit": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "first_run.broker_health_request": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
+            "first_run.launcher_runtime_identity": {"source_type": "static_assertion", "evidence_class": "CONFIG", "formal_release_input": True},
             "first_run.installer_authority_boundary": {"source_type": "static_assertion", "evidence_class": "CONFIG", "formal_release_input": True},
             "setup_doctor": {"source_type": "product_export", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
             "broker.ipc_restart_crash": {"source_type": "directly_measured", "evidence_class": "LIVE_RUNTIME", "formal_release_input": True},
@@ -1977,7 +1986,7 @@ def _valid_windows_installed_evidence() -> dict:
         },
         "evidence_source": {
             "collector": "installer/windows/collect_installed_smoke.ps1",
-            "collector_version": "16",
+            "collector_version": "17",
             "manual_confirmation": False,
             "screenshot_path": r"C:\ProgramData\GUI-Shell\evidence\first-window.png",
         },
@@ -1999,6 +2008,14 @@ def _valid_windows_installed_evidence() -> dict:
             "launcher_exited_after_frontend": True,
             "launcher_exit_code": 0,
             "launcher_runtime_dir": r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123\GUI-Shell\broker\desktop",
+            "launcher_runtime_identity": {
+                "kind": "gui_shell",
+                "app_id": None,
+                "audit_store_id": None,
+                "product_manifest_path": None,
+                "product_manifest_sha256": None,
+                "evidence_class": "CONFIG",
+            },
             "profile_identity_isolated_from_staging_user": True,
             "profile_identity_sid_exposed": False,
             "config_existed_before_launch": False,
@@ -2636,6 +2653,85 @@ def test_windows_release_evidence_rejects_staged_runtime_scratch_path() -> list[
     return []
 
 
+def test_windows_release_evidence_rejects_malformed_product_runtime_identity() -> list[str]:
+    evidence = _valid_windows_installed_evidence()
+    app_id = "d4-pocket-app-" + "1" * 32
+    audit_store_id = "audit-store-" + "2" * 32
+    runtime_root = (
+        r"C:\Users\test\AppData\Local\D4Pocket-installed-smoke-run-20260605T000000Z-a1b2c3d4-smoke-0123"
+        + rf"\D4Pocket\apps\{app_id}\stores\{audit_store_id}"
+    )
+    product_manifest_path = r"C:\Users\owner\AppData\Local\GUI-Shell\installed-runs\run-20260605T000000Z-a1b2c3d4\product_manifest.json"
+    identity = {
+        "kind": "d4_pocket_product",
+        "app_id": app_id,
+        "audit_store_id": audit_store_id,
+        "product_manifest_path": product_manifest_path,
+        "product_manifest_sha256": "sha256:" + "b" * 64,
+        "evidence_class": "CONFIG",
+    }
+    isolation = evidence["provenance"]["isolation"]
+    isolation["isolated_runtime_dir"] = runtime_root
+    isolation["isolated_store_dir"] = runtime_root + r"\store"
+    isolation["isolated_audit_dir"] = runtime_root + r"\store"
+    isolation["runtime_identity"] = identity
+    evidence["first_run"]["launcher_runtime_dir"] = runtime_root
+    evidence["first_run"]["broker_endpoint_file"] = runtime_root + r"\broker_session.json"
+    evidence["first_run"]["broker_lifecycle_audit"]["path"] = runtime_root + r"\store\audit.jsonl"
+    evidence["first_run"]["launcher_runtime_identity"] = dict(identity)
+    evidence["provenance"]["evidence_bundle_files"].append(
+        {
+            "kind": "product_manifest",
+            "path": product_manifest_path,
+            "exists": True,
+            "sha256": identity["product_manifest_sha256"],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(evidence), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    if result_by_name["windows_evidence_provenance_isolation"].status != "passed":
+        return ["一致するD4 Pocket runtime identityとstage済みProduct Manifestを受け入れなかった: "
+                + result_by_name["windows_evidence_provenance_isolation"].reason]
+
+    outside_manifest_path = r"C:\evidence\product_manifest.json"
+    identity_with_unbound_manifest = dict(identity)
+    identity_with_unbound_manifest["product_manifest_path"] = outside_manifest_path
+    isolation["runtime_identity"] = identity_with_unbound_manifest
+    evidence["first_run"]["launcher_runtime_identity"] = dict(identity_with_unbound_manifest)
+    product_manifest_record = next(
+        item for item in evidence["provenance"]["evidence_bundle_files"]
+        if item["kind"] == "product_manifest"
+    )
+    product_manifest_record["path"] = outside_manifest_path
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(evidence), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    result = result_by_name["windows_evidence_provenance_isolation"]
+    if result.classification != "release_blocker" or "installed Product Manifest" not in result.reason:
+        return ["stage済みinstalled manifest外のProduct ManifestをWindows evidenceとして拒否しなかった"]
+
+    malformed_identity = dict(identity)
+    malformed_identity["app_id"] = "d4-pocket-app-invalid"
+    isolation["runtime_identity"] = malformed_identity
+    evidence["first_run"]["launcher_runtime_identity"] = dict(malformed_identity)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "windows_installed_smoke.json"
+        path.write_text(json.dumps(evidence), encoding="utf-8")
+        results = validate_windows_release_evidence(path)
+    result_by_name = {result.name: result for result in results}
+    result = result_by_name["windows_evidence_provenance_isolation"]
+    if result.classification != "release_blocker":
+        return ["不正なD4 Pocket runtime identityをWindows installed evidenceとして受け入れた"]
+    if "D4 Pocket runtime identity" not in result.reason:
+        return ["不正なD4 Pocket runtime identityを具体的に拒否しなかった"]
+    return []
+
+
 def test_windows_release_evidence_rejects_runtime_or_config_outside_isolated_profile() -> list[str]:
     errors: list[str] = []
     for field, value, label in (
@@ -3012,15 +3108,37 @@ def test_windows_stage_installer_powershell_boolean_grouping() -> list[str]:
 
 def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     stage = (INSTALLER / "windows" / "stage_installed_app.ps1").read_text(encoding="utf-8")
+    broker_smoke = (INSTALLER / "windows" / "collect_broker_smoke.ps1").read_text(encoding="utf-8")
     launcher = (ROOT / "native" / "rust_helper" / "src" / "desktop_launcher.rs").read_text(encoding="utf-8")
     broker_server = (ROOT / "native" / "rust_helper" / "src" / "broker" / "ipc_server.rs").read_text(encoding="utf-8")
     launcher_doc = (ROOT / "docs" / "specs" / "windows-desktop-launcher.md").read_text(encoding="utf-8")
+    broker_channel_doc = (ROOT / "docs" / "specs" / "desktop-broker-channel.md").read_text(encoding="utf-8")
+    regression_case_doc = (ROOT / "docs" / "specs" / "regression-case.md").read_text(encoding="utf-8")
     errors = []
     for token in ["[string]$DesktopLauncherExe", "gui_shell_desktop_launcher.exe", "launcher_exe =", "launcher_artifact_sha256", "launcher_runtime = [ordered]@{", "formal_runtime_proof = $false", "staging_user_identity = [ordered]@{", "salted_hash = $stagingUserIdentityHash"]:
         if token not in stage:
             errors.append(f"staged installがnative起動器を配置・hash結合しない: {token}")
+    for token in (
+        "[string]$ProductManifestJson",
+        "manifest_version = 3",
+        "identity_kind = $launcherRuntimeIdentityKind",
+        "app_id = $productAppId",
+        "audit_store_id = $productAuditStoreId",
+        "Copy-Item -LiteralPath $productManifestPath",
+        "embeddedAppIds[0] -cne $productAppId",
+        'Join-Path $env:LOCALAPPDATA (Join-Path "D4Pocket\\apps"',
+        'session_file = (Join-Path $launcherRuntimeDir "broker_session.json")',
+        '$sessionFile = Join-Path $runtimeDir.FullName "broker_session.json"',
+        "broker_session_file = $sessionFile",
+    ):
+        if token not in stage:
+            errors.append(f"staged installがD4 Pocket runtime identityをManifest／起動器へ結合しない: {token}")
     if 'Join-Path $env:LOCALAPPDATA "GUI-Shell\\broker\\desktop"' not in stage:
         errors.append("staged manifestが起動器のper-user runtime rootを示さない")
+    if 'Remove-Item -Force -Path $SessionFile' not in broker_smoke:
+        errors.append("独立Broker smokeのscratch session file cleanup境界を確認できない")
+    if 'broker_session_file = $sessionFile' not in stage or '$sessionFile = Join-Path $runtimeDir.FullName "broker_session.json"' not in stage:
+        errors.append("Broker単体smokeが製品runtime session fileを触れないようscratch pathを分離していない")
     for token in [
         "run_loopback_server_cancellable",
         "BrokerCredentialRole::Normal",
@@ -3072,6 +3190,18 @@ def test_windows_stage_uses_terminal_free_native_launcher() -> list[str]:
     ):
         if token not in launcher_doc:
             errors.append(f"Windows起動仕様にExport runtime identity境界がない: {token}")
+    for token in (
+        "%LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\store",
+        "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>\\store",
+    ):
+        if token not in broker_channel_doc:
+            errors.append(f"Broker channel仕様にidentity別の初回設定保存pathがない: {token}")
+    for token in (
+        "%LOCALAPPDATA%\\GUI-Shell\\broker\\desktop\\protected",
+        "%LOCALAPPDATA%\\D4Pocket\\apps\\<App ID>\\stores\\<Audit store ID>\\protected",
+    ):
+        if token not in regression_case_doc:
+            errors.append(f"Regression Case仕様にidentity別ProtectedStore pathがない: {token}")
     return errors
 
 
@@ -3131,8 +3261,8 @@ def test_windows_installed_smoke_reads_json_as_utf8() -> list[str]:
         errors.append("collect_installed_smoke.ps1にUTF-8 JSON readerがない")
     if "[System.IO.File]::ReadAllText($resolved.Path, [System.Text.Encoding]::UTF8)" not in text:
         errors.append("collect_installed_smoke.ps1のJSON readerがUTF-8明示読取りではない")
-    if 'collector_version = "16"' not in text:
-        errors.append("collect_installed_smoke.ps1の版識別子がSetup Doctorの実画面UIAutomation収集を表さない")
+    if 'collector_version = "17"' not in text:
+        errors.append("collect_installed_smoke.ps1の版識別子がruntime identity-aware installed evidenceを表さない")
     for token in (
         "function Collect-SetupDoctorOperatorReadability",
         "visible_uia_element_pointer_click",
@@ -3171,7 +3301,13 @@ def test_windows_installed_smoke_uses_launcher_owned_runtime() -> list[str]:
         "same_windows_session = $true",
         "started_after_launcher = $true",
         'SetEnvironmentVariable("LOCALAPPDATA", $localAppDataRoot, "Process")',
-        'Join-Path $localAppDataRoot "GUI-Shell\\broker\\desktop"',
+        'Join-Path $LocalAppDataRoot "GUI-Shell\\broker\\desktop"',
+        "function Resolve-InstalledRuntimeIdentity",
+        '"D4Pocket\\apps\\$appId\\stores\\$auditStoreId"',
+        'Get-TaggedSha256 -Path $manifestPath',
+        'New-EvidenceFileRecord -Kind "product_manifest"',
+        'runtime_identity = [ordered]@{',
+        '"first_run.launcher_runtime_identity" = [ordered]@{ source_type = "static_assertion"; evidence_class = "CONFIG"; formal_release_input = $true }',
         "isolated_runtime_dir = $brokerRuntimeRoot",
         "D4 Pocket Desktop起動",
         "D4 Pocket Desktop終了",
@@ -10025,6 +10161,7 @@ def main() -> int:
         test_windows_release_evidence_requires_verified_launcher_child,
         test_windows_release_evidence_requires_normal_frontend_exit,
         test_windows_release_evidence_rejects_staged_runtime_scratch_path,
+        test_windows_release_evidence_rejects_malformed_product_runtime_identity,
         test_windows_release_evidence_rejects_runtime_or_config_outside_isolated_profile,
         test_windows_release_evidence_validator_rejects_unmeasured_or_synthetic_evidence,
         test_windows_release_evidence_validator_rejects_broker_top_level_unmeasured_declarations,

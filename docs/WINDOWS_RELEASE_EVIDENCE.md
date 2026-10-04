@@ -16,8 +16,8 @@ Windows優先のリリース検証では、分離され、機械可読なイン�
 - item: native Windows Setup Doctor product evidence unresolved
   classification: release_blocker
   registry_id: windows_setup_doctor_smoke
-  reason: 直近の実行済みv15 DiagnosticOnly runは必須surface・通常終了・reportとAudit hashの一致を観測したが、stage ownerと同じprofileでstrict evidenceではない。現行sourceのv16 UIAutomation text／topmost-window proofはまだ実UIで実行しておらず、pixel／contrast・screen readerも測っていない。
-  required_action: collector v16をclean-source Windows Releaseとstage時と異なるprofileで実行し、Frontend MainWindowへ結合したSetup Doctor text／visible sample、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを同一bundleへ収集してstrict validatorへ通す。証拠が示さないpixel／contrast・screen reader範囲を合格と主張しない。
+  reason: 直近の実行済みv15 DiagnosticOnly runは必須surface・通常終了・reportとAudit hashの一致を観測したが、stage ownerと同じprofileでstrict evidenceではない。現行sourceのv17 UIAutomation text／topmost-window proofはまだ実UIで実行しておらず、pixel／contrast・screen readerも測っていない。D4 Pocket compile-time runtime identityをProduct Manifestと照合して実pathへ結合するv17 collectorもfresh staged runでは未検証である。
+  required_action: collector v17をclean-source Windows Releaseとstage時と異なるprofileで実行し、D4 Pocket Exportの場合は同じExportのProduct Manifestをstage時に渡す。Frontend MainWindowへ結合したSetup Doctor text／visible sample、config／report hash、accepted AuditEvent、通常終了、cleanup errorなしを同一bundleへ収集してstrict validatorへ通す。証拠が示さないpixel／contrast・screen reader範囲を合格と主張しない。
   blocks_release: yes
 ~~~
 
@@ -46,7 +46,7 @@ release_evidence/windows_installed_smoke.json
 - ファイルごとのevidence bundle hash
 - formal evidence groupごとの`field_provenance`
 
-`%LOCALAPPDATA%\GUI-Shell\installed`は従来の共有pathであり、正式R2証拠には無効である。`-InstallRoot`を指定せずに`stage_installed_app.ps1`を使用し、固有の`%LOCALAPPDATA%\GUI-Shell\installed-runs\<run_id>` rootを作成する。
+`%LOCALAPPDATA%\GUI-Shell\installed`は従来の共有pathであり、正式R2証拠には無効である。`-InstallRoot`を指定せずに`stage_installed_app.ps1`を使用し、固有の`%LOCALAPPDATA%\GUI-Shell\installed-runs\<run_id>` rootを作成する。generic GUI Shell起動器は`%LOCALAPPDATA%\GUI-Shell\broker\desktop`を使う。D4 Pocket Export起動器はcompile-time埋込App ID／Audit store IDに従い、`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>`を使う。後者のstageでは同一Export由来の`product_manifest.json`を`-ProductManifestJson`へ渡す。stagerはManifest内IDとlauncher埋込IDを照合し、stage rootにcopyとSHA-256を記録する。collector v17は実起動器のcompile-time identity、Manifest copy／hash、実runtime rootの一致を検査してからAudit／endpointを読む。Manifestはlauncherがruntime inputとして消費するものではなく、この証拠境界はCONFIGである。いずれの宣言も、それだけではformal isolationまたはrelease proofを証明しない。
 
 ## 証拠分類
 
@@ -64,11 +64,11 @@ formal evidence groupでは、そのevidence sourceを次のように分類し�
 
 未対応の主張、および未分類のcollector declarationはリリースブロッカーである。
 
-## Broker生成Setup Doctor reportと初回設定（実装状態 2026-09-26）
+## Broker生成Setup Doctor reportと初回設定（現行契約確認 2026-10-04）
 
-通常製品UIは認証済みRust Broker IPCで`Setup Doctor報告取得`（payloadは`version: 1`のみ）を要求し、受け取ったreportを表示する。Brokerは実起動時に検証したinstalled package配置、実際のIPv4 loopback bind、永続Audit状態から固定7 checkを生成し、`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\setup_doctor_report.json`へ最大64 KiB・最新一件だけをatomic replaceする。要求から出力pathを選べず、reportはCapability／Permission／Approvalを生成しない。保存byte列のSHA-256は同operationの`accepted` AuditEvent payload hashへ結合する。保存・Audit失敗時は成功reportを返さない。
+通常製品UIは認証済みRust Broker IPCで`Setup Doctor報告取得`（payloadは`version: 1`のみ）を要求し、受け取ったreportを表示する。Brokerは実起動時に検証したinstalled package配置、実際のIPv4 loopback bind、永続Audit状態から固定7 checkを生成し、generic GUI Shellでは`%LOCALAPPDATA%\GUI-Shell\broker\desktop\store\setup_doctor_report.json`、D4 Pocket Exportでは`%LOCALAPPDATA%\D4Pocket\apps\<App ID>\stores\<Audit store ID>\store\setup_doctor_report.json`へ最大64 KiB・最新一件だけをatomic replaceする。要求から出力pathを選べず、reportはCapability／Permission／Approvalを生成しない。保存byte列のSHA-256は同operationの`accepted` AuditEvent payload hashへ結合する。保存・Audit失敗時は成功reportを返さない。
 
-Windows collector version 15は通常起動した製品が生成した固定store reportを読み、正確なbyte列、SHA-256、`Setup Doctor報告取得 / accepted / setup_doctor_report_exported / LIVE_RUNTIME` AuditEventを照合する。report bytesとAuditEventをrelease evidenceへ同梱する。初回UI設定についても起動前不在、固定既定値、固定Store fileのSHA-256、`初回設定取得 / accepted / LIVE_RUNTIME` AuditEventのpayload hashを照合し、config fileをbundleへ含める。可視surfaceとtray終了menuはprocessを限定したWindows UI Automation Control Viewから収集し、10,000 node上限・重複runtime ID・個別surfaceの親子／geometryを厳格検証する。上限や重複があるtreeは可視surface evidenceとして受理しない。外部probe、collector推定check、任意JSONを製品reportとしては受け入れない。strict validatorは正本Schema、hash、Audit payload hash、evidence bundle file、固定Store path、check一覧を再検証し、全check `pass`とoperator readabilityを要求する。
+Windows collector version 17は通常起動した製品が生成したruntime identity別の固定store reportを読み、正確なbyte列、SHA-256、`Setup Doctor報告取得 / accepted / setup_doctor_report_exported / LIVE_RUNTIME` AuditEventを照合する。report bytesとAuditEventをrelease evidenceへ同梱する。初回UI設定についても起動前不在、固定既定値、固定Store fileのSHA-256、`初回設定取得 / accepted / LIVE_RUNTIME` AuditEventのpayload hashを照合し、config fileをbundleへ含める。可視surfaceとtray終了menuはprocessを限定したWindows UI Automation Control Viewから収集し、10,000 node上限・重複runtime ID・個別surfaceの親子／geometryを厳格検証する。上限や重複があるtreeは可視surface evidenceとして受理しない。外部probe、collector推定check、任意JSONを製品reportとしては受け入れない。strict validatorは正本Schema、hash、Audit payload hash、evidence bundle file、runtime identity別Store path、check一覧を再検証し、全check `pass`とoperator readabilityを要求する。
 
 2026-09-29、staged Release buildを`-DiagnosticOnly -NoPythonRuntime`で再実行した。v15 collectorは122 nodeのControl Viewを上限未到達で収集し、4つの必須surfaceを実測してsurface validatorが合格した。製品trayの「終了」操作でFlutter画面とRust起動器が通常終了し、起動器exit code 0、endpoint cleanup、cleanup errorなしを確認した。Setup Doctor reportは`pass`、初回設定fileとaccepted AuditEvent hashも一致した。ただし出力は`diagnostic_only`であり、stage userと同じprofileだったため、formal first-run gateはprofile分離とstrict statusの理由で未合格である。Setup Doctor専用画面のoperator readabilityも未検証で、release blockerは保持する。Computer Useの画面／accessibility観測は、上記collectorの正式evidenceに使用していない。
 
@@ -76,7 +76,7 @@ Windows collector version 15は通常起動した製品が生成した固定stor
 
 ## 収集フロー
 
-> `collect_installed_smoke.ps1`はRust Desktop起動器経由へ変更済みである。正式実行はstageに使ったWindows userとは別のprofileから行い、`-UseCurrentWindowsProfile`を指定する。collectorはそのprofile内にrun固有のLOCALAPPDATAを作って起動器の実Broker runtimeを分離する。manifestはrun固有salt付きuser identity digestだけを保存し、raw SIDを含めない。stage manifestの`runtime/` pathは外部probe scratchであり、製品runtime／config／Auditの証拠として使用しない。Flutter本番起動が最初に要求するhealthについて、通常資格認証後のBroker `accepted / LIVE_RUNTIME` AuditEventをcollectorが数え、event IDを記録する。この記録はBrokerが認証済み要求を受理・記録した証拠であり、Flutterが応答を受け取ったことや呼出し元PIDは証明しない。Setup Doctor reportは同じ実runtime固定storeから読み、accepted Audit payload hashと照合する。別profileでの実収集、初回config生成、operator readabilityは未成立なのでrelease blockerを維持する。
+> `collect_installed_smoke.ps1`はRust Desktop起動器経由へ変更済みである。collector v17はmanifest v2のgeneric GUI Shellとmanifest v3のgeneric／D4 Pocket identity-aware rootを区別する。D4 Pocketではstage済みProduct Manifest hash／IDとlauncher compile-time IDを照合してから、実際のproduct runtime rootを導出する。正式実行はstageに使ったWindows userとは別のprofileから行い、`-UseCurrentWindowsProfile`を指定する。collectorはそのprofile内にrun固有のLOCALAPPDATAを作って起動器の実Broker runtimeを分離する。manifestはrun固有salt付きuser identity digestだけを保存し、raw SIDを含めない。stage manifestの`runtime/` pathは外部probe scratchであり、製品runtime／config／Auditの証拠として使用しない。Flutter本番起動が最初に要求するhealthについて、通常資格認証後のBroker `accepted / LIVE_RUNTIME` AuditEventをcollectorが数え、event IDを記録する。この記録はBrokerが認証済み要求を受理・記録した証拠であり、Flutterが応答を受け取ったことや呼出し元PIDは証明しない。Setup Doctor reportは同じ実runtime固定storeから読み、accepted Audit payload hashと照合する。別profileでの実収集、初回config生成、operator readabilityは未成立なのでrelease blockerを維持する。
 
 Flutter child processの同定は、起動器PIDを親PIDとして持つ`Win32_Process`観測、起動器と同じWindows session、起動後のprocess作成時刻、実行imageのSHA-256一致を組み合わせる。Windows package virtualizationがWMIの`ExecutablePath`を別のLocalCache表記へ写す場合があるため、path文字列一致だけをimage identityの根拠にしない。終了時cleanupも同じ親PID・時刻・session・hash条件で対象を再確認する。Desktopの`WM_CLOSE`は通常trayへ隠す動作であり終了ではないため、collectorは実tray callbackからnative『終了』menuを開き、UIAutomationで該当processのmenu itemを実行する。強制終了またはcleanup errorがあれば正式smokeを拒否する。evidenceの`first_run.process_identity`はprocess identityのLIVE_RUNTIME観測を保持し、BrokerがFlutter caller PIDを識別したという意味ではない。
 
@@ -87,6 +87,9 @@ powershell -ExecutionPolicy Bypass -File installer\windows\stage_installed_app.p
   -FlutterReleaseDir .\apps\desktop_flutter\build\windows\x64\runner\Release `
   -BrokerHelperExe .\native\rust_helper\target\release\gui_shell_rust_helper.exe `
   -DesktopLauncherExe .\native\rust_helper\target\release\gui_shell_desktop_launcher.exe
+
+# D4 Pocket Exportの起動器をstageする場合は、同一ExportのProduct Manifestも追加する。
+# -ProductManifestJson .\<same-export>\product_manifest.json
 
 $Manifest = Get-Content -Raw "<stage-installed-root>\installed_manifest.json" | ConvertFrom-Json
 $EvidenceRoot = "<ownerがtest userに必要最小限のACLを設定した共有evidence directory>"

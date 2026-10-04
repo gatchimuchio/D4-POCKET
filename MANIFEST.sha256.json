@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "0594a8d87131610eeb7d6417dd34aadb95dbbf463eec7a9557de56f38426de99"
+      "sha256": "bc54f64527e108b6b3a67883b3883d2e550af8f29ce98837cd1d839f879eed08"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1216,7 +1216,7 @@
     },
     {
       "path": "docs/WINDOWS_RELEASE_EVIDENCE.md",
-      "sha256": "c139c95203cb64abf1316c254676781e5c8fbf498b2fc1f253a52ea2dae8909b"
+      "sha256": "0853c1eb51db84d30fd8a9e8beb5b2bb54ea10e74811f923a660dc1b9a82af38"
     },
     {
       "path": "docs/WINDOWS_RELEASE_PLAN.md",
@@ -1340,7 +1340,7 @@
     },
     {
       "path": "docs/specs/desktop-broker-channel.md",
-      "sha256": "cc6e8d41df39934ba0974729a5c356abd1c0713b897fbb044edf5669c56c659b"
+      "sha256": "5c18f80d871a4f4f888f713115cfed22b59abd93289fbf9614ba2d307be02ebb"
     },
     {
       "path": "docs/specs/desktop-ux-integration.md",
@@ -1444,7 +1444,7 @@
     },
     {
       "path": "docs/specs/regression-case.md",
-      "sha256": "42f07c05d10a4c738b530fb315eb83b8d83b39dd9ece03a37713f6f6c8f6c857"
+      "sha256": "6ae079a40cfc1103d85e7d464c7c65fff6c3c6d0e9acf410564b410faa84a589"
     },
     {
       "path": "docs/specs/runtime-catalog.md",
@@ -1472,7 +1472,7 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "6333408af75bc500186c9ce4ba867a7510df8a7d0bbe69e1907b84f42be52b0a"
+      "sha256": "13c12f4e365c173ef815e4769e76d0c021ab9fe73ecf5133a6cd545fdd023a6d"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -2944,7 +2944,7 @@
     },
     {
       "path": "installer/windows/README.md",
-      "sha256": "70db398173d6287b9c400599c624020f21195c205977ed3309b4d9e53956988d"
+      "sha256": "bb0cadc9509a4615d4488245de66aa9f60f88948cfd8b7e97a31c16554d90267"
     },
     {
       "path": "installer/windows/collect_audit_anchor_proof.ps1",
@@ -2956,7 +2956,7 @@
     },
     {
       "path": "installer/windows/collect_installed_smoke.ps1",
-      "sha256": "bdeb799b33a62f841c64cac461d0e4f66202fa091be6dde3be0d425037684b2c"
+      "sha256": "1001bb6f98f2af9154e58f48be3d274c41bd3a951cb508472d8684e8fb9ebd6d"
     },
     {
       "path": "installer/windows/collect_setup_doctor.ps1",
@@ -2964,7 +2964,7 @@
     },
     {
       "path": "installer/windows/stage_installed_app.ps1",
-      "sha256": "d7f136b656cea53b4b69babd9beb3e29f6722eb29960d60e4e08965c1234eb41"
+      "sha256": "ec978bf34124838309ac0c9402bef11f183386502e96c739a8302d9a6bb530e6"
     },
     {
       "path": "native/process_supervision/Cargo.lock",
@@ -3800,7 +3800,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "642456f8d5287e50ecc68ba9df617058c9ce3a8c3d19fa970e4891ba79cb5512"
+      "sha256": "05b70cda54b23f9c1634427a3812adfaf76b25883e969cf2d2c2f3c34da8a0bf"
     },
     {
       "path": "requirements-dev.txt",
@@ -4464,7 +4464,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "3dcd46c28ae30a2b9c0b757038fee927e842d8879245bbad14721faf8e75062e"
+      "sha256": "9422f359d3e953706f04c27dc96e0dbb35ae0883c59157e5aed414f8e28383a0"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4568,7 +4568,7 @@
     },
     {
       "path": "tooling/windows_release_evidence.py",
-      "sha256": "58a396cfb3867f2cdfd7ea5153736f04b55e990ab1f58a8a0a112f0f4c5e5c3d"
+      "sha256": "a620f2c247b4444c59d54f8a80c509b7953b691862ca3eab58553f9af42fbfec"
     },
     {
       "path": "tooling/\u65e5\u672c\u8a9e\u57fa\u5e95\u76e3\u67fb.py",
