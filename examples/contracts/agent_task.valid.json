@@ -7,5 +7,6 @@
   "description": "Agent作業",
   "instruction_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "status": "running",
-  "audit_event_id": "audit-1"
+  "audit_event_id": "audit-1",
+  "result_content_available": false
 }

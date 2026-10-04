@@ -57,6 +57,14 @@ Task状態はBroker内の独立したbounded projectionであり、通常対話�
 
 開始・終了・取消要求Auditは固定label、task ID、instruction／result hashと状態だけを保持し、本文・出力・Credentialを含めない。worker出力本文はBrokerのTask状態recordやAuditへ保存せず、Broker側でhash化後に破棄する。`result_hash`と`completed`はAgent processの応答完了を示すに限り、Workspace変更の正しさ、test成功、隔離、release readinessを証明しない。Workspace差分の列挙・内容表示は別のWorkspace inspection／Content Exposure Boundaryへ従う。worker終了Auditを確定できない場合はTaskを`quarantined`へ移し取消を要求し、成功結果を返さない。
 
+### Agent Task結果の期限付きContent Exposure
+
+完了Taskの出力本文はAgentTask状態recordとAuditへ保存しない。Brokerはサイズ上限1 MiB、同時に保持する本文8件、完了から15分の上限で、Broker process内の揮発メモリに限って本文を一時保持する。上限超過・期限切れ・Broker終了時は本文を破棄する。recordは`result_content_available`の真偽だけを返し、raw本文を含めない。この値は表示許可や内容の安全性を意味しない。
+
+本文を返すには`AgentTask結果表示承認`による独立したnative Owner確認が必要である。要求はtask ID、確定済みresult hash、Content Exposure範囲に結合し、5分・一回限りとする。これはTask実行Permission／Approvalではなく、再実行やWorkspace読取を許可しない。`none`はprojectionなし、`hash_only`はhashのみ、`summary`／`redacted`は承認済みの変換器がないため固定説明だけ、`full`だけがAgent出力本文を返す。本文取得前にApprovalを消費し、監査に本文を含めず、監査確定できない場合は本文を返さない。Agent Centerの本文表示も5分で消去し、別画面への移動・app非activeで即時破棄する。
+
+Agent出力に含まれるtest報告はAgentの自己申告であり、Brokerがtestを起動・確認した事実へ昇格しない。変更file／diffはAgent Task結果表示Approvalを流用せず、同じ登録Runtime／Workspaceへ結合したWorkspace Inspectorの独立読取Approval、基準点、表示範囲だけで表示する。Workspace読取Approval、失効、全体baseline保存はRust Desktopのnative Owner確認を要し、5分の読取grantはTask実行Permission／書込権を与えない。`full`は登録されたsecret除外以外の内容を読み得る。baselineは現行Broker契約上Workspaceあたり一つでTask IDには結合されないため、Task固有成果と誤認しない。試験結果の独立した実行・検証recordがない場合は`unknown`とする。
+
 Task状態recordはBroker processの揮発状態で、再起動後に照会できない。PermissionとApprovalも揮発し再利用できない。Broker終了またはSession隔離時のCancellation flagだけではOS child process群の終了証明にならない。Windows Job Objectの異常終了試験、fake Codex CLIでの期限超過・子孫停止、および永続Brokerの中断Task再起動監査を実装・fixture検証したが、実製品経路の一体Recoveryは未実証である。scratch回復journalと起動時reaperは、現在のWorkspace再登録時にroot identityを再照合してから回収し、不一致は保持してTaskを拒否する。現行Codex Adapterはread-only Dialogueに`--sandbox read-only`を使い、Task専用経路には`default_permissions=d4p-agent-task`のprofileを指定する。Windows Task commandは`windows.sandbox="mxc"`を明示し、filesystem policyは`:root=deny`、`:minimal=read`、`:workspace`継承、およびglob走査深度32までのWorkspace root内`**/*.env`、`**/.env.*`、`**/.ssh/**`、`**/secrets/**` denyを組み合わせる。networkも無効にする。Task起動時は登録Workspace直下へ乱数名scratch directoryを作成し、Rustが起動するCodex CLI process自身の`TEMP`／`TMP`へ設定して、process群停止後にhandle経由で削除する。ただし、実`codex exec`のMxC shell childでは`TEMP`／`TMP`が当該scratchと一致しなかった。CLIの`shell_environment_policy.set`にも同じscratchを明示した追試でも一致せず、その理由とMxC child一時領域の物理cleanupは未確認である。したがってこのscratchをAgent tool childの一時領域境界やcleanup保証として扱わない。Task profileの実効範囲は当該CLI／Windowsと個別probeの範囲に限られ、深度32超や列挙されていない別名secret pathを包括的に拒否する保証ではない。通常ReleaseのBroker capability metadataは`unsupported`のままであり、実Task pathはまだ通常Releaseへ開いていない。実Agentの書込隔離・外部path拒否、Task deadline／crashからのinstalled product一体Recovery、通常終端cleanup、差分内容UIおよびLIVE_RUNTIME conformanceは未成立の`release_blocker`である。Job Objectはprocess群の終了管理であってfilesystem cleanupやsandboxではない。
 
 ### 中断Taskの再起動時隔離（2026-10-04）

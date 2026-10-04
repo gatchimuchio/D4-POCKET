@@ -6,8 +6,17 @@ import '../services/workspace_client.dart';
 import 'workspace_diff_panel.dart';
 
 class WorkspaceInspector extends StatefulWidget {
-  const WorkspaceInspector({super.key, required this.client});
+  const WorkspaceInspector({
+    super.key,
+    required this.client,
+    this.runtimeId,
+    this.workspaceId,
+    this.active = true,
+  });
   final WorkspaceClient client;
+  final String? runtimeId;
+  final String? workspaceId;
+  final bool active;
 
   @override
   State<WorkspaceInspector> createState() => _WorkspaceInspectorState();
@@ -22,6 +31,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   bool _busy = false;
   bool _active = true;
   bool _diffPaired = false;
+  String _requestedVisibility = 'hash_only';
   int _generation = 0;
   Timer? _timer;
   final _elapsed = Stopwatch()..start();
@@ -33,7 +43,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!_active || !mounted) return;
+      if (!_isActive || !mounted) return;
       if (_view != null &&
           (!_view!.registration.current(DateTime.now()) ||
               _elapsed.elapsedMilliseconds >= _viewLimit)) {
@@ -50,7 +60,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         _refresh(preserve: true);
       }
     });
-    _refresh();
+    if (_isActive) _refresh();
   }
 
   @override
@@ -68,14 +78,26 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   @override
   void didUpdateWidget(covariant WorkspaceInspector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client != widget.client) {
+    if (oldWidget.client != widget.client ||
+        oldWidget.runtimeId != widget.runtimeId ||
+        oldWidget.workspaceId != widget.workspaceId) {
       _generation++;
       _view = null;
       _registrations = [];
       _selected = null;
       _refresh();
+    } else if (oldWidget.active != widget.active) {
+      _generation++;
+      _view = null;
+      _busy = false;
+      _registrations = [];
+      _selected = null;
+      _message = '画面を離れたためWorkspace表示を消去しました。';
+      if (_isActive) _refresh();
     }
   }
+
+  bool get _isActive => _active && widget.active;
 
   @override
   void dispose() {
@@ -86,6 +108,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
   }
 
   Future<void> _refresh({bool preserve = false}) async {
+    if (!_isActive) return;
     final previous = preserve ? _view : null;
     final generation = ++_generation;
     setState(() {
@@ -94,8 +117,14 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       _message = '現在の登録・承認状態を確認中';
     });
     try {
-      final registrations = await widget.client.list();
-      if (!mounted || !_active || generation != _generation) return;
+      final registrations = (await widget.client.list())
+          .where((registration) =>
+              (widget.runtimeId == null ||
+                  registration.runtime == widget.runtimeId) &&
+              (widget.workspaceId == null ||
+                  registration.id == widget.workspaceId))
+          .toList(growable: false);
+      if (!mounted || !_isActive || generation != _generation) return;
       WorkspaceView? refreshedComparison;
       if (previous != null &&
           (previous.operation == '作業領域復旧プレビュー' ||
@@ -112,7 +141,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
             baselineHash: previous.baselineHash);
       }
 
-      if (!mounted || !_active || generation != _generation) return;
+      if (!mounted || !_isActive || generation != _generation) return;
       setState(() {
         _registrations = registrations;
         if (!registrations.any((v) => v.id == _selected)) _selected = null;
@@ -148,6 +177,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
       bool changes = false,
       bool preview = false,
       String? baselineHash}) async {
+    if (!_isActive) return;
     final generation = ++_generation;
     setState(() {
       _diffPaired = false;
@@ -163,7 +193,7 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           changes: changes,
           preview: preview,
           baselineHash: baselineHash);
-      if (!mounted || !_active || generation != _generation) return;
+      if (!mounted || !_isActive || generation != _generation) return;
       setState(() {
         _view = view;
         _viewLimit = _elapsed.elapsedMilliseconds + 300000;
@@ -185,14 +215,121 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
     }
   }
 
+  Future<void> _approveContent(WorkspaceRegistration registration) async {
+    if (!_isActive || _busy) return;
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _view = null;
+      _selected = registration.id;
+      _message = 'native Owner確認待ちです。Workspace本文はまだ表示しません。';
+    });
+    try {
+      final current = await widget.client
+          .approveContent(registration, _requestedVisibility);
+      if (!mounted || !_isActive || generation != _generation) return;
+      setState(() {
+        _registrations = _registrations
+            .map((entry) => entry.id == current.id ? current : entry)
+            .toList(growable: false);
+        _message = '現在のWorkspace読取Approvalを確認しました。Task実行権は付与していません。';
+      });
+    } on Object {
+      if (!mounted || generation != _generation) return;
+      setState(() => _message = 'Workspace読取Approvalを確認できません。本文表示を停止しました。');
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _revokeContent(WorkspaceRegistration registration) async {
+    if (!_isActive || _busy) return;
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _view = null;
+      _message = 'native Owner確認待ちです。失効前の表示を消去しました。';
+    });
+    try {
+      await widget.client.revokeContent(registration);
+      if (!mounted || !_isActive || generation != _generation) return;
+      setState(() {
+        _registrations = _registrations
+            .map((entry) => entry.id == registration.id
+                ? WorkspaceRegistration.parse({
+                    '作業領域ID': registration.id,
+                    '実行系ID': registration.runtime,
+                    '登録hash': registration.hash,
+                    '承認状態': 'denied',
+                    '有効期限': null,
+                    '表示範囲': 'none',
+                    'approval_id': null,
+                  })
+                : entry)
+            .toList(growable: false);
+        _message = 'Workspace読取ApprovalとBroker baselineを失効しました。';
+      });
+    } on Object {
+      if (!mounted || generation != _generation) return;
+      setState(() => _message = 'Workspace失効状態を確認できません。表示を停止しました。');
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _captureWholeBaseline(WorkspaceRegistration registration) async {
+    if (!_isActive || _busy) return;
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _view = null;
+      _selected = registration.id;
+      _message = 'native Owner確認待ちです。Workspaceをまだ読み取りません。';
+    });
+    try {
+      final view = await widget.client.captureWholeBaseline(registration);
+      if (!mounted || !_isActive || generation != _generation) return;
+      setState(() {
+        _view = view;
+        _viewLimit = _elapsed.elapsedMilliseconds + 300000;
+        _message = 'Broker内の比較baselineを作成しました。Task実行・Workspace変更は行っていません。';
+      });
+    } on Object {
+      if (!mounted || generation != _generation) return;
+      setState(() => _message = 'Workspace baselineを作成できません。');
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _busy = false;
+          _nextCheck = _elapsed.elapsedMilliseconds + 2000;
+        });
+      }
+    }
+  }
+
+  Future<void> _readBaselineChanges(WorkspaceView baseline) async {
+    final hash = baseline.baselineHash;
+    if (hash == null) return;
+    await _read(baseline.registration, '', false,
+        changes: true, baselineHash: hash);
+  }
+
   @override
   Widget build(BuildContext context) {
     final view = _view;
     final projection = view?.projection;
+    final selectedMatches =
+        _registrations.where((registration) => registration.id == _selected);
+    final selectedRegistration =
+        selectedMatches.isEmpty ? null : selectedMatches.first;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('作業領域インスペクタ', style: Theme.of(context).textTheme.titleLarge),
       TextButton(
-          onPressed: _busy || !_active ? null : () => _refresh(),
+          onPressed: _busy || !_isActive ? null : () => _refresh(),
           child: const Text('登録状態を更新')),
       Text(_message),
       if (_busy) const LinearProgressIndicator(),
@@ -202,10 +339,69 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
           subtitle: Text(
               '${registration.runtime}・${registration.visibility}・${registration.current(DateTime.now()) ? '承認あり' : '未承認または期限切れ'}'),
           selected: _selected == registration.id,
-          onTap: !_active || _busy || !registration.current(DateTime.now())
+          onTap: !_isActive || _busy
               ? null
-              : () => _read(registration, '', true),
+              : () {
+                  setState(() {
+                    _selected = registration.id;
+                    _view = null;
+                  });
+                  if (registration.current(DateTime.now())) {
+                    _read(registration, '', true);
+                  }
+                },
         ),
+      if (selectedRegistration != null) ...[
+        Text(
+            '選択Workspace: ${selectedRegistration.id}・登録hash ${selectedRegistration.hash}'),
+        DropdownButton<String>(
+          value: _requestedVisibility,
+          items: const [
+            DropdownMenuItem(value: 'none', child: Text('none')),
+            DropdownMenuItem(value: 'hash_only', child: Text('hash_only')),
+            DropdownMenuItem(value: 'summary', child: Text('summary')),
+            DropdownMenuItem(value: 'redacted', child: Text('redacted')),
+            DropdownMenuItem(value: 'full', child: Text('full')),
+          ],
+          onChanged: !_isActive || _busy
+              ? null
+              : (value) {
+                  if (value != null) {
+                    setState(() => _requestedVisibility = value);
+                  }
+                },
+        ),
+        OutlinedButton(
+          onPressed: _busy || !_isActive
+              ? null
+              : () => _approveContent(selectedRegistration),
+          child: const Text('native Owner確認でWorkspace読取を許可'),
+        ),
+        if (selectedRegistration.current(DateTime.now())) ...[
+          Text(
+              '現在のWorkspace読取範囲: ${selectedRegistration.visibility}・Task実行／書込権は別です。'),
+          OutlinedButton(
+            onPressed: _busy || !_isActive
+                ? null
+                : () => _revokeContent(selectedRegistration),
+            child: const Text('native Owner確認でWorkspace読取を失効'),
+          ),
+          if (selectedRegistration.visibility == 'full') ...[
+            OutlinedButton(
+              onPressed: _busy || !_isActive
+                  ? null
+                  : () => _read(selectedRegistration, '', false, scope: true),
+              child: const Text('既存baselineの比較範囲を確認'),
+            ),
+            OutlinedButton(
+              onPressed: _busy || !_isActive
+                  ? null
+                  : () => _captureWholeBaseline(selectedRegistration),
+              child: const Text('native Owner確認で比較baselineを保存'),
+            ),
+          ],
+        ],
+      ],
       if (view != null) ...[
         Text('監査: ${view.auditId}'),
         TextButton(
@@ -222,6 +418,15 @@ class _WorkspaceInspectorState extends State<WorkspaceInspector>
         if (view.registration.visibility == 'summary' ||
             view.registration.visibility == 'redacted')
           Text(projection!['説明'] as String),
+        if (view.operation == '作業領域全体基準点保存') ...[
+          Text('比較baseline hash: ${projection!['基準点hash']}'),
+          Text('取得file数: ${projection['対象数']}'),
+          const Text('Workspace単位のbaselineです。特定Taskの成果とはBroker上で結合されていません。'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _readBaselineChanges(view),
+            child: const Text('baseline以降の変更file／差分を表示'),
+          ),
+        ],
         if (view.registration.visibility == 'full' &&
             view.operation == '作業領域比較範囲') ...[
           if (projection!['基準点hash'] == null)

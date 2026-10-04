@@ -148,6 +148,12 @@ owner専用の作業領域全体基準点保存は作業領域ID・登録hashと
 
 Dart consumerは応答操作・要求hash・登録・Approval・基準点を照合し、重複path、未知状態、不正件数、相対pathの逸脱を拒否する。空の全体基準点と4096までの対象に対応する。表示中の定期照合でも変更一覧を再取得し、失効・基準点置換・画面非表示で古い結果を復元しない。通常UIはowner資格を持たない。Windows native windowの操作証拠はwidget/実IPC試験とは別のrelease_blockerとして継続する。
 
+## rev3 Agent Centerへの接続
+
+Agent Center内のWorkspace Inspectorは、選択中Agent SessionのRuntime IDとWorkspace IDで登録一覧を絞り込む。未承認Workspaceを選ぶだけでは本文を読み込まず、Content Exposure範囲を指定した`作業領域承認`、明示失効の`作業領域失効`、全体baselineの`作業領域全体基準点保存`はそれぞれnative Owner確認を経てBrokerへ送る。直接IPCは同じnative確認なしに拒否する。workspace.inspectの5分読取ApprovalはAgentTask実行／書込Permissionと独立し、失効時はBroker baselineと画面本文を破棄する。
+
+全体baselineを作る前に現在のfull Workspace読取Approvalを要する。Approval後に現在の登録hash・approval・期限・LIVE_RUNTIME応答を再照合し、後続の変更一覧とfile差分も同じ基準点hash・Workspace登録に結合して表示する。`作業領域全体基準点保存`は現行Broker契約上Workspaceあたり一つでTask IDには結合されない。したがってAgent Centerはそれを特定Taskの変更証拠と表示せず、他Taskがbaselineを置換した場合は古いhashでの比較を拒否する。Agentが報告したtest結果は引き続き`unknown`であり、Broker実行済み試験へ昇格しない。
+
 ## 再照合と差分表示方式の分離
 
 定期再照合では従来どおり本文・pathを画面から除去する。統合差分/左右比較の選択だけをインスペクタのUI状態として保持し、同じ表示の再照合成功後に引き継ぐ。新しい対象取得操作では統合差分へ戻す。表示方式は承認・基準点・本文を所有せず、拒否された内容を復元できない。遅延応答の間に実際に非表示フレームを描画する試験を通し、即時応答だけで継続表示を保証しない。

@@ -157,7 +157,11 @@
     },
     {
       "path": "specs/agent_task.schema.json",
-      "責任": "Agent Taskの状態投影。版2はRuntime／Session／WorkspaceとBroker計算指示hashへ結合し、本文・実行path・Permission／Approval識別子・出力本文を含めない"
+      "責任": "Agent Taskの状態投影。版2はRuntime／Session／WorkspaceとBroker計算指示hashへ結合し、本文・実行path・Permission／Approval識別子・出力本文を含めない。bounded揮発結果本文の有無は表示権限を意味しない"
+    },
+    {
+      "path": "specs/agent_task_content_exposure.schema.json",
+      "責任": "Task結果本文に対するTask実行Approvalから独立したnative Ownerの一回・期限付きContent Exposure要求。表示範囲の適用とBroker内揮発本文の取得契約"
     },
     {
       "path": "specs/agent_task_id_request.schema.json",

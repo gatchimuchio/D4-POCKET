@@ -8100,6 +8100,10 @@ def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> l
         "更新download要求",
         "AgentTaskWorkspacePermissionGrant",
         "AgentTaskOwnerApprovalGrant",
+        "AgentTask結果表示承認",
+        "作業領域承認",
+        "作業領域失効",
+        "作業領域全体基準点保存",
         "AgentCLI実行系作業領域登録",
     )
     owner_set_match = re.search(
@@ -8156,7 +8160,7 @@ def test_agent_task_id_operations_are_content_free_and_declared() -> list[str]:
     ):
         if required not in broker:
             errors.append(f"Agent Task consumerが必須のbounded経路を欠く: {required}")
-    if '"description": "Agent作業Task（内容は別のWorkspace差分経路で確認）"' not in broker:
+    if '"description": "Agent作業Task（結果本文とWorkspace差分は別の権限経路）"' not in broker:
         errors.append("Agent Task状態projectionのdescriptionが固定labelではない")
     return errors
 
@@ -8261,6 +8265,7 @@ def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[
         "instruction_hash",
         "status",
         "audit_event_id",
+        "result_content_available",
     }
     if set(current) != expected:
         errors.append("AgentTask版2のfield集合が実行範囲へ過不足なく固定されていない")
@@ -8275,7 +8280,7 @@ def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[
     if validate_instance(legacy, schema):
         errors.append("版なしAgentTaskの履歴互換形を読み取れない")
 
-    for field in ("agent_runtime_id", "workspace_id", "instruction_hash"):
+    for field in ("agent_runtime_id", "workspace_id", "instruction_hash", "result_content_available"):
         candidate = {**current}
         candidate.pop(field)
         if validate_instance(candidate, schema) == []:
@@ -8298,6 +8303,8 @@ def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[
             errors.append(f"AgentTask状態recordが許可外statusを受理した: {status}")
     if validate_instance({**current, "result_hash": "raw-output"}, schema) == []:
         errors.append("AgentTask状態recordが不正なresult hashを受理した")
+    if validate_instance({**current, "result_content_available": "yes"}, schema) == []:
+        errors.append("AgentTask状態recordが不正な結果本文保持状態を受理した")
     if validate_instance({**current, "description": "x" * 161}, schema) == []:
         errors.append("AgentTask状態recordが表示labelの上限超過を受理した")
 
@@ -8305,6 +8312,125 @@ def test_agent_task_state_record_is_versioned_scoped_and_content_free() -> list[
     for required in ("履歴互換", "実行状態の証拠", "Content Exposure Boundary"):
         if required not in contract_text:
             errors.append(f"Agent Runtime正本が版2／履歴投影の境界を定義しない: {required}")
+    return errors
+
+
+def test_agent_task_result_content_exposure_is_separate_and_bounded() -> list[str]:
+    schema = load_schema("agent_task_content_exposure.schema.json")
+    task_id = "a" * 32
+    result_hash = "sha256:" + "b" * 64
+    valid_grant = {
+        "operation": "AgentTask結果表示承認",
+        "payload": {
+            "task_id": task_id,
+            "result_hash": result_hash,
+            "content_visibility": "full",
+        },
+    }
+    valid_read = {
+        "operation": "AgentTask結果取得",
+        "payload": {"task_id": task_id, "approval_id": "c" * 32},
+    }
+    errors = []
+    for request in (valid_grant, valid_read):
+        if validate_instance(request, schema):
+            errors.append("Agent Task結果Content Exposureの正規要求を受理できない")
+    for visibility in ("none", "hash_only", "summary", "redacted", "full"):
+        candidate = {
+            "operation": "AgentTask結果表示承認",
+            "payload": {
+                "task_id": task_id,
+                "result_hash": result_hash,
+                "content_visibility": visibility,
+            },
+        }
+        if validate_instance(candidate, schema):
+            errors.append(f"Agent Task結果Content Exposureの範囲を受理できない: {visibility}")
+    result_receipt_schema = {
+        "$schema": schema["$schema"],
+        "$defs": schema["$defs"],
+        "$ref": "#/$defs/result_receipt",
+    }
+    valid_projections = {
+        "none": None,
+        "hash_only": {"result_hash": result_hash},
+        "summary": {"説明": "この表示範囲に提供できる承認済み内容はありません"},
+        "redacted": {"説明": "この表示範囲に提供できる承認済み内容はありません"},
+        "full": {"result_hash": result_hash, "text": "合成結果"},
+    }
+    for visibility, projection in valid_projections.items():
+        receipt = {
+            "task_id": task_id,
+            "result_hash": result_hash,
+            "content_visibility": visibility,
+            "projection": projection,
+        }
+        if validate_instance(receipt, result_receipt_schema):
+            errors.append(f"Agent Task結果receiptの正規projectionを受理できない: {visibility}")
+    mismatched_receipts = [
+        {
+            "task_id": task_id,
+            "result_hash": result_hash,
+            "content_visibility": "hash_only",
+            "projection": {"result_hash": result_hash, "text": "unexpected"},
+        },
+        {
+            "task_id": task_id,
+            "result_hash": result_hash,
+            "content_visibility": "full",
+            "projection": None,
+        },
+    ]
+    if any(
+        validate_instance(receipt, result_receipt_schema) == []
+        for receipt in mismatched_receipts
+    ):
+        errors.append("Agent Task結果receiptが要求visibilityと不一致のprojectionを拒否しない")
+    invalid_grants = [
+        {"operation": "AgentTask結果表示承認", "payload": {"task_id": task_id, "result_hash": result_hash}},
+        {"operation": "AgentTask結果表示承認", "payload": {"task_id": task_id, "result_hash": result_hash, "content_visibility": "full", "approval_id": "d" * 32}},
+        {"operation": "AgentTask結果表示承認", "payload": {"task_id": task_id, "result_hash": "raw", "content_visibility": "full"}},
+        {"operation": "AgentTask結果取得", "payload": {"task_id": task_id, "approval_id": "d" * 32, "content_visibility": "full"}},
+    ]
+    if any(validate_instance(candidate, schema) == [] for candidate in invalid_grants):
+        errors.append("Agent Task結果Content Exposure要求が欠落・未知・不正fieldを拒否しない")
+
+    root = Path(__file__).resolve().parents[2]
+    dialogue = (root / "native/rust_helper/src/broker/dialogue.rs").read_text(encoding="utf-8")
+    protocol = (root / "native/rust_helper/src/broker/protocol.rs").read_text(encoding="utf-8")
+    launcher = (root / "native/rust_helper/src/desktop_launcher.rs").read_text(encoding="utf-8")
+    flutter = (root / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(encoding="utf-8")
+    workspace_client = (root / "apps/desktop_flutter/lib/services/workspace_client.dart").read_text(encoding="utf-8")
+    workspace_screen = (root / "apps/desktop_flutter/lib/screens/workspace_inspector.dart").read_text(encoding="utf-8")
+    for operation in ("AgentTask結果表示承認", "AgentTask結果取得"):
+        if operation not in dialogue or operation not in protocol:
+            errors.append(f"Agent Task結果Content Exposureが統治済みBroker経路へ未接続: {operation}")
+    if "DesktopNativeConfirmation" not in protocol or "AgentTask結果表示承認" not in launcher or "AgentTask結果表示承認" not in flutter:
+        errors.append("Agent Task結果表示承認がnative Owner確認経路へ限定されない")
+    for operation in ("作業領域承認", "作業領域失効", "作業領域全体基準点保存"):
+        if (
+            f"BrokerOperation::{operation}" not in protocol
+            or operation not in launcher
+            or operation not in workspace_client
+        ):
+            errors.append(f"Workspace内容露出操作がnative Owner／Agent Center経路へ未接続: {operation}")
+    if (
+        "native Owner確認でWorkspace読取を許可" not in workspace_screen
+        or "native Owner確認で比較baselineを保存" not in workspace_screen
+        or "baseline以降の変更file／差分を表示" not in workspace_screen
+    ):
+        errors.append("Agent Center内Workspace Inspectorに内容Approval／差分導線がない")
+    if "作業領域基準点保存" not in protocol or "DesktopNativeConfirmation" not in protocol:
+        errors.append("Workspace比較基準点の部分保存をnative Owner確認で拘束しない")
+    if "Task IDには結合されない" not in launcher:
+        errors.append("Workspace単一baselineがTask固有証拠ではないことをnative確認で示さない")
+    for required in ("1_048_576", "AGENT_TASK_RESULT_BODY_LIMIT", "Duration::from_secs(900)", "content_visibility"):
+        if required not in dialogue:
+            errors.append(f"Agent Task結果のbounded保持・可視性境界が欠落: {required}")
+    contract = (root / "docs/specs/agent-runtime.md").read_text(encoding="utf-8")
+    for required in ("15分", "native Owner確認", "Task実行Permission", "Agentの自己申告", "unknown"):
+        if required not in contract:
+            errors.append(f"Agent Task結果露出の意味境界が日本語正本にない: {required}")
     return errors
 
 

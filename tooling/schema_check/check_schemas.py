@@ -146,6 +146,7 @@ REQUIRED = {
     "agent_session.schema.json",
     "agent_workspace.schema.json",
     "agent_task.schema.json",
+    "agent_task_content_exposure.schema.json",
     "agent_task_id_request.schema.json",
     "agent_task_request.schema.json",
     "agent_cli_runtime_workspace_registration.schema.json",

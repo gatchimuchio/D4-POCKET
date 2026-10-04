@@ -20,6 +20,10 @@ void main() {
       '更新download要求',
       'AgentTaskWorkspacePermissionGrant',
       'AgentTaskOwnerApprovalGrant',
+      'AgentTask結果表示承認',
+      '作業領域承認',
+      '作業領域失効',
+      '作業領域全体基準点保存',
       'AgentCLI実行系作業領域登録',
     ]) {
       expect(

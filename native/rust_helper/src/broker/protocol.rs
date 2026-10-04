@@ -433,6 +433,10 @@ pub enum BrokerOperation {
     AgentTaskWorkspacePermissionGrant,
     #[serde(rename = "AgentTaskOwnerApprovalGrant")]
     AgentTaskOwnerApprovalGrant,
+    #[serde(rename = "AgentTask結果表示承認")]
+    AgentTask結果表示承認,
+    #[serde(rename = "AgentTask結果取得")]
+    AgentTask結果取得,
     #[serde(rename = "AgentTask実行")]
     AgentTask実行,
     #[serde(rename = "AgentTask状態")]
@@ -638,6 +642,8 @@ impl BrokerOperation {
                 "AgentTaskWorkspacePermissionGrant"
             }
             BrokerOperation::AgentTaskOwnerApprovalGrant => "AgentTaskOwnerApprovalGrant",
+            BrokerOperation::AgentTask結果表示承認 => "AgentTask結果表示承認",
+            BrokerOperation::AgentTask結果取得 => "AgentTask結果取得",
             BrokerOperation::AgentTask実行 => "AgentTask実行",
             BrokerOperation::AgentTask状態 => "AgentTask状態",
             BrokerOperation::AgentTask取消 => "AgentTask取消",
@@ -1629,6 +1635,7 @@ impl Broker {
                     | BrokerOperation::AgentCLI実行系作業領域登録
                     | BrokerOperation::AgentTaskWorkspacePermissionGrant
                     | BrokerOperation::AgentTaskOwnerApprovalGrant
+                    | BrokerOperation::AgentTask結果表示承認
                     | BrokerOperation::MCPTool実行
                     | BrokerOperation::回帰Case削除
                     | BrokerOperation::回帰Case削除中断確認
@@ -1725,6 +1732,11 @@ impl Broker {
 
         if envelope.operation == Some(BrokerOperation::AgentTaskWorkspacePermissionGrant)
             || envelope.operation == Some(BrokerOperation::AgentTaskOwnerApprovalGrant)
+            || envelope.operation == Some(BrokerOperation::AgentTask結果表示承認)
+            || envelope.operation == Some(BrokerOperation::作業領域承認)
+            || envelope.operation == Some(BrokerOperation::作業領域失効)
+            || envelope.operation == Some(BrokerOperation::作業領域基準点保存)
+            || envelope.operation == Some(BrokerOperation::作業領域全体基準点保存)
             || envelope.operation == Some(BrokerOperation::MCPTool実行)
         {
             if export_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
@@ -1732,7 +1744,7 @@ impl Broker {
                     &request_id,
                     &operation,
                     "desktop_native_owner_confirmation_required",
-                    "Agent Task権限・ApprovalとMCP Tool実行はRust Desktopのnative Owner確認経路だけで許可します",
+                    "Agent Task権限・Approval・結果表示、Workspace読取・比較制御、MCP Tool実行はRust Desktopのnative Owner確認経路だけで許可します",
                     true,
                     envelope.payload_hash.as_deref().unwrap_or("unknown"),
                 );
@@ -2195,6 +2207,8 @@ impl Broker {
             | BrokerOperation::Agent作業要求検査
             | BrokerOperation::AgentTaskWorkspacePermissionGrant
             | BrokerOperation::AgentTaskOwnerApprovalGrant
+            | BrokerOperation::AgentTask結果表示承認
+            | BrokerOperation::AgentTask結果取得
             | BrokerOperation::AgentTask実行
             | BrokerOperation::AgentTask状態
             | BrokerOperation::AgentTask取消
@@ -7785,6 +7799,124 @@ mod tests {
             response.error.as_ref().map(|error| error.code.as_str()),
             Some("desktop_native_owner_confirmation_required")
         );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTask結果表示ApprovalはDesktop_native確認を必須とする() {
+        let payload = json!({
+            "task_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "result_hash": format!("sha256:{}", "b".repeat(64)),
+            "content_visibility": "full"
+        });
+        let mut broker = test_broker();
+        let mut request = BrokerRequestEnvelope::health(
+            "agent-task-result-normal",
+            "agent-task-result-normal-nonce",
+        );
+        request.session_id = Some("session-1".to_string());
+        request.operation = Some(BrokerOperation::AgentTask結果表示承認);
+        request.payload = Some(payload.clone());
+        request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+        request.refresh_payload_hash();
+        let response = broker.handle(request);
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let owner_envelope = json!({
+            "request_id": "agent-task-result-owner-credential",
+            "session_id": "session-1",
+            "operation": "AgentTask結果表示承認",
+            "payload": payload.clone(),
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "agent-task-result-owner-credential-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {}
+        });
+        let mut owner_broker = test_broker();
+        let response = owner_broker.owner要求処理(&owner_envelope.to_string());
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_eq!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+
+        let desktop_envelope = json!({
+            "request_id": "agent-task-result-native-confirmed",
+            "session_id": "session-1",
+            "operation": "AgentTask結果表示承認",
+            "payload": payload.clone(),
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "agent-task-result-native-confirmed-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let mut desktop_broker = test_broker();
+        let response = desktop_broker.desktop_owner_operation_json(&desktop_envelope.to_string());
+        assert_eq!(response.status, BrokerStatus::Rejected);
+        assert_ne!(
+            response.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn Workspace読取と比較制御はDesktop_native確認を必須とする() {
+        let registration_hash = format!("sha256:{}", "b".repeat(64));
+        let requests = [
+            (
+                BrokerOperation::作業領域承認,
+                json!({
+                    "作業領域ID": "workspace-a",
+                    "登録hash": registration_hash,
+                    "表示範囲": "full"
+                }),
+            ),
+            (
+                BrokerOperation::作業領域失効,
+                json!({
+                    "作業領域ID": "workspace-a",
+                    "登録hash": registration_hash
+                }),
+            ),
+            (
+                BrokerOperation::作業領域基準点保存,
+                json!({
+                    "作業領域ID": "workspace-a",
+                    "登録hash": registration_hash,
+                    "相対paths": ["file.txt"]
+                }),
+            ),
+            (
+                BrokerOperation::作業領域全体基準点保存,
+                json!({
+                    "作業領域ID": "workspace-a",
+                    "登録hash": registration_hash
+                }),
+            ),
+        ];
+        for (index, (operation, payload)) in requests.into_iter().enumerate() {
+            let mut request = BrokerRequestEnvelope::health(
+                &format!("workspace-owner-gate-{index}"),
+                &format!("workspace-owner-gate-nonce-{index}"),
+            );
+            request.session_id = Some("session-1".to_string());
+            request.operation = Some(operation);
+            request.payload = Some(payload);
+            request.issued_at = Some(BrokerRequestEnvelope::current_issued_at());
+            request.refresh_payload_hash();
+            let mut broker = test_broker();
+            let response = broker.handle(request);
+            assert_eq!(response.status, BrokerStatus::Rejected);
+            assert_eq!(
+                response.error.as_ref().map(|error| error.code.as_str()),
+                Some("desktop_native_owner_confirmation_required")
+            );
+        }
     }
 
     #[test]

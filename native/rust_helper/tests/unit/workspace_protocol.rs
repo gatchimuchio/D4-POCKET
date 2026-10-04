@@ -25,6 +25,26 @@ fn request(b: &mut Broker, op: &str, payload: Value, owner: bool) -> BrokerRespo
         "issued_at":epoch_seconds_to_rfc3339(b.current_epoch_seconds()),"metadata":{},"payload_hash":canonical_payload_hash(Some(&payload)),"payload":payload});
     if owner {b.owner要求処理(&value.to_string())} else {b.handle_json(&value.to_string())}
 }
+fn native_request(b: &mut Broker, op: &str, payload: Value) -> BrokerResponse {
+    let id = crate::broker::dialogue::識別子生成().unwrap();
+    let value = json!({
+        "request_id": id,
+        "nonce": id,
+        "session_id": "workspace-test",
+        "operation": op,
+        "issued_at": epoch_seconds_to_rfc3339(b.current_epoch_seconds()),
+        "metadata": {},
+        "payload_hash": canonical_payload_hash(Some(&payload)),
+        "payload": payload
+    });
+    let envelope = BrokerRequestEnvelope::from_json_str(&value.to_string()).unwrap();
+    b.処理_with_export_confirmation(
+        envelope,
+        true,
+        OwnerConfirmationSource::DesktopNativeConfirmation,
+        None,
+    )
+}
 fn registration(b: &mut Broker) -> Value {
     let r = request(b,"作業領域一覧",json!({}),false);
     assert_eq!(r.status,BrokerStatus::Accepted);
@@ -32,7 +52,7 @@ fn registration(b: &mut Broker) -> Value {
 }
 fn approve(b: &mut Broker, visibility: &str) -> Value {
     let hash = registration(b);
-    let result = request(b,"作業領域承認",json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":visibility}),true);
+    let result = native_request(b,"作業領域承認",json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":visibility}));
     assert_eq!(result.status,BrokerStatus::Accepted);
     result.body.unwrap()
 }
@@ -46,11 +66,11 @@ fn workspace_requires_current_owner_grant_and_binds_real_read_to_durable_audit()
     assert_ne!(read(b,"private-document.txt").status,BrokerStatus::Accepted);
     let hash=registration(b);
     let p=json!({"作業領域ID":"workspace-a","登録hash":hash,"表示範囲":"full"});
-    assert_eq!(request(b,"作業領域承認",p.clone(),false).error.unwrap().code,"権限拒否");
+    assert_eq!(request(b,"作業領域承認",p.clone(),false).error.unwrap().code,"desktop_native_owner_confirmation_required");
     let mut wrong=p.clone();wrong["登録hash"]=json!("sha256:".to_string()+&"0".repeat(64));
-    assert_ne!(request(b,"作業領域承認",wrong,true).status,BrokerStatus::Accepted);
+    assert_ne!(native_request(b,"作業領域承認",wrong).status,BrokerStatus::Accepted);
     let mut injected=p;injected["root"]=json!(f.root);
-    assert_ne!(request(b,"作業領域承認",injected,true).status,BrokerStatus::Accepted);
+    assert_ne!(native_request(b,"作業領域承認",injected).status,BrokerStatus::Accepted);
     let grant=approve(b,"full");
     let r=read(b,"private-document.txt");
     assert_eq!(r.status,BrokerStatus::Accepted);assert_eq!(r.evidence_source,"LIVE_RUNTIME");
@@ -64,7 +84,7 @@ fn workspace_requires_current_owner_grant_and_binds_real_read_to_durable_audit()
     }
     let revoke=json!({"作業領域ID":"workspace-a","登録hash":registration(b)});
     assert_ne!(request(b,"作業領域失効",revoke.clone(),false).status,BrokerStatus::Accepted);
-    assert_eq!(request(b,"作業領域失効",revoke,true).status,BrokerStatus::Accepted);
+    assert_eq!(native_request(b,"作業領域失効",revoke).status,BrokerStatus::Accepted);
     assert_ne!(read(b,"private-document.txt").status,BrokerStatus::Accepted);
     let (_,state)=BrokerPersistentStore::open_or_create(f.root.join("store"),"audit-reopen").unwrap();
     let event=state.audit_log.events().iter().find(|e|e.event_id==audit_id).unwrap();

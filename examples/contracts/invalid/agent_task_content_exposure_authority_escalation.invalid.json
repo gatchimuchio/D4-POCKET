@@ -1,0 +1,10 @@
+{
+  "operation": "AgentTask結果表示承認",
+  "payload": {
+    "task_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "result_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content_visibility": "full",
+    "approval_id": "cccccccccccccccccccccccccccccccc",
+    "permission": "workspace.write"
+  }
+}

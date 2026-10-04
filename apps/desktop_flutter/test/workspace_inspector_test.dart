@@ -13,10 +13,12 @@ class TestBroker implements BrokerTransport {
   String visibility = 'full';
   bool folders = false;
   String baselineHash = "sha256:${'c' * 64}";
+  String baselineEvidence = 'LIVE_RUNTIME';
   String diffKind = "text";
   String? approval = 'approval-a';
   int expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
   bool revokeAfterRead = false;
+  List<Map<String, Object?>> additionalRegistrations = [];
   void Function(Map<String, Object?>)? mutate;
   Completer<void>? pendingRead;
   final operations = <String>[];
@@ -37,7 +39,38 @@ class TestBroker implements BrokerTransport {
     String evidence = 'INTERNAL_STATE';
     if (operation == '作業領域一覧') {
       body = {
-        '作業領域': [registration]
+        '作業領域': [registration, ...additionalRegistrations]
+      };
+    } else if (operation == '作業領域承認') {
+      approval = 'approval-created';
+      expires = DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240;
+      visibility = payload!['表示範囲'] as String;
+      body = {
+        '作業領域ID': payload['作業領域ID'],
+        'approval_id': approval,
+        'permission_id': 'workspace.inspect.$approval',
+        'capability_id': 'workspace.inspect',
+        'recovery_id': 'workspace.reapprove',
+        '有効期限': expires,
+        '表示範囲': visibility,
+      };
+    } else if (operation == '作業領域失効') {
+      approval = null;
+      visibility = 'none';
+      body = {'作業領域ID': payload!['作業領域ID'], '承認状態': 'revoked'};
+    } else if (operation == '作業領域全体基準点保存') {
+      evidence = baselineEvidence;
+      body = {
+        'version': 1,
+        'operation': operation,
+        '要求hash': brokerPayloadHash(payload),
+        '作業領域ID': 'workspace-a',
+        '実行系ID': 'runtime-a',
+        '登録hash': 'sha256:${'a' * 64}',
+        'approval_id': approval,
+        '有効期限': expires,
+        '表示範囲': visibility,
+        'projection': {'基準点hash': baselineHash, '対象数': 1},
       };
     } else {
       await pendingRead?.future;
@@ -154,7 +187,62 @@ class TestBroker implements BrokerTransport {
   }
 }
 
+Future<void> _scrollRootTo(WidgetTester tester, Finder target) async {
+  final root = find.byType(SingleChildScrollView).first;
+  final scrollable =
+      find.descendant(of: root, matching: find.byType(Scrollable)).first;
+  await tester.dragUntilVisible(target, scrollable, const Offset(0, -300));
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  test('Workspace読取Approval・baseline・失効をそれぞれBrokerで照合する', () async {
+    final broker = TestBroker()
+      ..approval = null
+      ..visibility = 'none';
+    final client = WorkspaceClient(broker);
+    final unapproved = (await client.list()).single;
+    final approved = await client.approveContent(unapproved, 'full');
+    expect(approved.current(DateTime.now()), isTrue);
+    expect(approved.visibility, 'full');
+    final baseline = await client.captureWholeBaseline(approved);
+    expect(baseline.operation, '作業領域全体基準点保存');
+    expect(baseline.baselineHash, broker.baselineHash);
+    expect(baseline.projection?['対象数'], 1);
+    final changes = await client.read(baseline.registration, '',
+        tree: false, changes: true, baselineHash: baseline.baselineHash);
+    expect(changes.projection?['changes'], [
+      {'path': 'file.txt', 'status': 'modified'}
+    ]);
+    await client.revokeContent(approved);
+    expect(broker.operations, [
+      '作業領域一覧',
+      '作業領域承認',
+      '作業領域一覧',
+      '作業領域全体基準点保存',
+      '作業領域一覧',
+      '作業領域変更一覧',
+      '作業領域一覧',
+      '作業領域比較範囲',
+      '作業領域一覧',
+      '作業領域失効',
+      '作業領域一覧',
+    ]);
+  });
+
+  test('Workspace baselineはfull承認とLIVE_RUNTIME証拠を必須にする', () async {
+    final broker = TestBroker()..visibility = 'hash_only';
+    final client = WorkspaceClient(broker);
+    await expectLater(client.captureWholeBaseline((await client.list()).single),
+        throwsA(isA<BrokerClientException>()));
+
+    broker
+      ..visibility = 'full'
+      ..baselineEvidence = 'INTERNAL_STATE';
+    await expectLater(client.captureWholeBaseline((await client.list()).single),
+        throwsA(isA<BrokerClientException>()));
+  });
+
   test('通常TCP応答の別要求IDと別操作を拒否する', () async {
     final root = await Directory.systemTemp.createTemp('gui-shell-reply-bind-');
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
@@ -205,7 +293,7 @@ void main() {
     }
   });
 
-  test('独立Brokerとowner CLIから製品Dart読取まで実接続する', () async {
+  test('Owner資格だけの直接IPCからWorkspace内容を取得できない', () async {
     final executable = File(
             '../../native/rust_helper/target/debug/gui_shell_rust_helper${Platform.isWindows ? '.exe' : ''}')
         .absolute
@@ -257,7 +345,7 @@ void main() {
       final denied = (await client.list()).single;
       await expectLater(client.read(denied, 'file.txt', tree: false),
           throwsA(isA<BrokerClientException>()));
-      final granted = await Process.run(executable, [
+      final ownerCliBypass = await Process.run(executable, [
         '作業領域制御',
         '--session-file',
         owner,
@@ -266,94 +354,8 @@ void main() {
         denied.hash,
         'full'
       ]);
-      expect(granted.exitCode, 0);
-      final selected = (await client.list()).single;
-      final view = await client.read(selected, 'file.txt', tree: false);
-      expect(view.projection!['text'], '実接続本文');
-      await File('${project.path}/large')
-          .writeAsBytes(List<int>.filled(70000, 120));
-      final saved = await Process.run(executable, [
-        '作業領域制御',
-        '--session-file',
-        owner,
-        '作業領域基準点保存',
-        selected.id,
-        selected.hash,
-        'file.txt',
-        'large'
-      ]);
-      expect(saved.exitCode, 0);
-      final scope = await client.read(selected, '', tree: false, scope: true);
-      expect(scope.projection!['相対paths'], ['file.txt', 'large']);
-      final baselineHash = scope.projection!['基準点hash'] as String;
-      await File('${project.path}/file.txt').writeAsString('比較後の本文\n');
-      final diff = await client.read(selected, 'file.txt',
-          tree: false, baselineHash: baselineHash);
-      expect((diff.projection!['diff'] as Map)['kind'], 'text');
-      expect((diff.projection!['diff'] as Map)['unified'], contains('比較後の本文'));
-
-      await File('${project.path}/large')
-          .writeAsBytes(List<int>.filled(70001, 121));
-      final large = await client.read(selected, 'large',
-          tree: false, baselineHash: baselineHash);
-      final largeDiff = large.projection!['diff'] as Map;
-      expect(largeDiff['kind'], 'oversized');
-      expect(largeDiff['unified'], isNull);
-      expect(largeDiff['rows'], isEmpty);
-      expect((largeDiff['before'] as Map)['bytes'], 70000);
-      expect((largeDiff['after'] as Map)['bytes'], 70001);
-      final tree = await client.read(selected, '', tree: true);
-      expect((tree.projection!['entries'] as List).length, 3);
-      final nested = await client.read(selected, 'folder', tree: true);
-      expect((nested.projection!['entries'] as List).single['path'],
-          'folder/nested.txt');
-      final nestedFile =
-          await client.read(selected, 'folder/nested.txt', tree: false);
-      expect(nestedFile.projection!['text'], '配下の本文');
-      await expectLater(client.read(selected, '.env', tree: false),
-          throwsA(isA<BrokerClientException>()));
-      final whole = await Process.run(executable, [
-        '作業領域制御',
-        '--session-file',
-        owner,
-        '作業領域全体基準点保存',
-        selected.id,
-        selected.hash
-      ]);
-      expect(whole.exitCode, 0);
-      final wholeScope =
-          await client.read(selected, '', tree: false, scope: true);
-      final wholeHash = wholeScope.projection!['基準点hash'] as String;
-      await File('${project.path}/new.txt').writeAsString('新規');
-      await File('${project.path}/file.txt').writeAsString('変更');
-      await File('${project.path}/folder/nested.txt').delete();
-      final changes = await client.read(selected, '',
-          tree: false, changes: true, baselineHash: wholeHash);
-      expect(changes.projection!['changes'], [
-        {'path': 'file.txt', 'status': 'modified'},
-        {'path': 'folder/nested.txt', 'status': 'deleted'},
-        {'path': 'new.txt', 'status': 'added'}
-      ]);
-      final newDiff = await client.read(selected, 'new.txt',
-          tree: false, baselineHash: wholeHash);
-      expect((newDiff.projection!['diff'] as Map)['before'], isNull);
-      final rollback = await client.read(selected, 'new.txt',
-          tree: false, preview: true, baselineHash: wholeHash);
-      expect(rollback.projection!['action'], 'remove');
-      expect(rollback.projection!['execution_permitted'], false);
-      expect((rollback.projection!['diff'] as Map)['after'], isNull);
-      expect(await File('${project.path}/new.txt').readAsString(), '新規');
-
-      final revoked = await Process.run(executable, [
-        '作業領域制御',
-        '--session-file',
-        owner,
-        '作業領域失効',
-        selected.id,
-        selected.hash
-      ]);
-      expect(revoked.exitCode, 0);
-      await expectLater(client.read(selected, 'file.txt', tree: false),
+      expect(ownerCliBypass.exitCode, isNot(0));
+      await expectLater(client.read(denied, 'file.txt', tree: false),
           throwsA(isA<BrokerClientException>()));
       await transport.request('shutdown');
       expect(await process.exitCode.timeout(const Duration(seconds: 10)), 0);
@@ -431,8 +433,10 @@ void main() {
             body: SingleChildScrollView(
                 child: WorkspaceInspector(client: WorkspaceClient(broker))))));
     await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('workspace-a'));
     await tester.tap(find.text('workspace-a'));
     await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
     await tester.tap(find.text('file.txt'));
     await tester.pumpAndSettle();
     expect(find.text('本文'), findsOneWidget);
@@ -441,6 +445,91 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 2200)));
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
+    expect(find.text('本文'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Agent Center内InspectorでOwner確認後にbaseline差分へ進める', (tester) async {
+    final broker = TestBroker();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    final capture = find.text('native Owner確認で比較baselineを保存');
+    await tester.ensureVisible(capture);
+    await tester.tap(capture);
+    await tester.pumpAndSettle();
+    expect(find.text('取得file数: 1'), findsOneWidget);
+    final compare = find.text('baseline以降の変更file／差分を表示');
+    await tester.ensureVisible(compare);
+    await tester.tap(compare);
+    await tester.pumpAndSettle();
+    expect(find.text('変更 1件・変更なし 2件・secret除外 1件'), findsOneWidget);
+    expect(find.text('file.txt'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('未承認Workspaceを選択しても本文は出さずOwner確認操作を示す', (tester) async {
+    final broker = TestBroker()
+      ..approval = null
+      ..visibility = 'none';
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: WorkspaceInspector(client: WorkspaceClient(broker))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    expect(find.text('native Owner確認でWorkspace読取を許可'), findsOneWidget);
+    expect(find.text('本文'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+      'Agent Center用InspectorはTaskのRuntime／Workspaceだけ表示し非active時に本文を消す',
+      (tester) async {
+    final broker = TestBroker()
+      ..additionalRegistrations = [
+        {
+          '作業領域ID': 'workspace-other',
+          '実行系ID': 'runtime-other',
+          '登録hash': 'sha256:${'f' * 64}',
+          '承認状態': 'approved',
+          '有効期限': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 240,
+          '表示範囲': 'full',
+          'approval_id': 'approval-other',
+        },
+      ];
+    Widget buildInspector({required bool active}) => MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: WorkspaceInspector(
+                client: WorkspaceClient(broker),
+                runtimeId: 'runtime-a',
+                workspaceId: 'workspace-a',
+                active: active,
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(buildInspector(active: true));
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsOneWidget);
+    expect(find.text('workspace-other'), findsNothing);
+    await tester.tap(find.text('workspace-a'));
+    await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
+    await tester.tap(find.text('file.txt'));
+    await tester.pumpAndSettle();
+    expect(find.text('本文'), findsOneWidget);
+
+    await tester.pumpWidget(buildInspector(active: false));
+    await tester.pumpAndSettle();
+    expect(find.text('workspace-a'), findsNothing);
     expect(find.text('本文'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
@@ -455,8 +544,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('フォルダー'), findsOneWidget);
     expect(find.text('null バイト'), findsNothing);
+    await _scrollRootTo(tester, find.text('folder'));
     await tester.tap(find.text('folder'));
     await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('folder/nested.txt'));
+    await tester.ensureVisible(find.text('folder/nested.txt'));
     await tester.tap(find.text('folder/nested.txt'));
     await tester.pumpAndSettle();
     expect(find.text('本文'), findsOneWidget);
@@ -534,6 +626,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('基準点の対象file'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('file.txt'));
     await tester.tap(find.text('file.txt'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('復旧プレビュー'));
@@ -645,6 +738,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('基準点の対象file'));
     await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('全体基準点の変更一覧'));
     await tester.tap(find.text('全体基準点の変更一覧'));
     await tester.pumpAndSettle();
     expect(find.text('変更 1件・変更なし 2件・secret除外 1件'), findsOneWidget);
@@ -672,6 +766,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('基準点の対象file'));
     await tester.pumpAndSettle();
+    await _scrollRootTo(tester, find.text('file.txt'));
     await tester.tap(find.text('file.txt'));
     await tester.pumpAndSettle();
     expect(find.textContaining('--- a/file'), findsOneWidget);

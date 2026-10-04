@@ -13,7 +13,7 @@
         "properties": {"record_version": {"const": 2}}
       },
       "then": {
-        "required": ["agent_runtime_id", "workspace_id", "instruction_hash"]
+        "required": ["agent_runtime_id", "workspace_id", "instruction_hash", "result_content_available"]
       }
     }
   ],
@@ -58,6 +58,10 @@
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
       "description": "任意の本文hash参照。結果本文や実行成功の証拠ではない。"
+    },
+    "result_content_available": {
+      "type": "boolean",
+      "description": "Brokerのbounded揮発保管に、期限内の結果本文があることだけを示す。Permission、Approval、表示権限やtest成功を意味しない。"
     }
   }
 }

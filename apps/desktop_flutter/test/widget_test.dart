@@ -694,10 +694,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump();
 
-    expect(transport.operations.last, 'AgentCLI実行系作業領域登録');
-    expect(transport.returnedResponses.last['operation'], 'AgentCLI実行系作業領域登録');
-    expect(transport.returnedResponses.last['status'], 'accepted');
-    final registration = transport.requests.last['payload']! as Map;
+    expect(transport.operations, contains('AgentCLI実行系作業領域登録'));
+    final registrationResponse = transport.returnedResponses.singleWhere(
+        (response) => response['operation'] == 'AgentCLI実行系作業領域登録');
+    expect(registrationResponse['status'], 'accepted');
+    final registrationRequest = transport.requests
+        .singleWhere((request) => request['operation'] == 'AgentCLI実行系作業領域登録');
+    final registration = registrationRequest['payload']! as Map;
     expect(registration['runtime_id'], 'codex-r2-synthetic');
     expect(registration['adapter_id'], 'codex-cli');
     expect(registration['workspace_root'], r'C:\d4-r2-synthetic-workspace');
@@ -826,11 +829,12 @@ void main() {
           'agent_runtime_id': 'codex-r2-synthetic',
           'session_id': sessionId,
           'workspace_id': 'workspace-r2-synthetic',
-          'description': 'Agent作業Task（内容は別のWorkspace差分経路で確認）',
+          'description': 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）',
           'instruction_hash': instructionHash,
           'status': status,
           'audit_event_id': 'audit-task-$status',
           if (resultHash != null) 'result_hash': resultHash,
+          'result_content_available': resultHash != null,
         };
     final transport = _FakeBrokerTransport([
       _brokerHealthResponse(),
@@ -913,6 +917,24 @@ void main() {
         'AgentTask状態',
         taskRecord(status: 'completed', resultHash: resultHash),
       ),
+      _brokerAcceptedBody('AgentTask結果表示承認', {
+        'task_id': taskId,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'approval_id': 'ffffffffffffffffffffffffffffffff',
+        'expires_at_epoch_seconds': 1900000000,
+        'use_limit': 1,
+        'uses_remaining': 1,
+      }),
+      _brokerAcceptedBody('AgentTask結果取得', {
+        'task_id': taskId,
+        'result_hash': resultHash,
+        'content_visibility': 'full',
+        'projection': {
+          'result_hash': resultHash,
+          'text': 'AGENT_REPORT_PRIVATE_SENTINEL test結果はAgentの未検証主張',
+        },
+      }),
     ]);
     final client = await ShellCoreClient.product(transport: transport);
 
@@ -977,13 +999,40 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('Task結果本文: AgentTask APIから未提供'),
+      find.textContaining('Task結果本文: native Owner確認後'),
       findsOneWidget,
     );
     expect(
-      find.textContaining('変更ファイル／差分概要: Task APIから未取得'),
+      find.textContaining('Workspace Inspectorで'),
       findsOneWidget,
     );
+    expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
+    final visibilityDropdown = find.byType(DropdownButton<String>).last;
+    await tester.tap(visibilityDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('full').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('native Owner確認後に結果を表示'));
+    await tester.tap(find.text('native Owner確認後に結果を表示'));
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsOneWidget);
+    expect(find.textContaining('test主張は未検証'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client, active: false)),
+    ));
+    expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client, active: true)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('AGENT_REPORT_PRIVATE_SENTINEL'), findsNothing);
     expect(find.textContaining('Task実行・状態は未接続'), findsNothing);
     expect(
         transport.operations,
@@ -993,6 +1042,8 @@ void main() {
           'AgentTaskOwnerApprovalGrant',
           'AgentTask実行',
           'AgentTask状態',
+          'AgentTask結果表示承認',
+          'AgentTask結果取得',
         ]));
     final approvalRequest = transport.requests.firstWhere(
       (request) => request['operation'] == 'AgentTaskOwnerApprovalGrant',

@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/agent_task_content_exposure.schema.json",
+  "title": "Agent Task結果の個別内容露出",
+  "description": "Task実行Approvalとは独立した、native Ownerによる一回限りの期限付き結果表示許可。",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["operation", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"const": "AgentTask結果表示承認"},
+        "payload": {"$ref": "#/$defs/grant_request"}
+      }
+    },
+    {
+      "type": "object",
+      "required": ["operation", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"const": "AgentTask結果取得"},
+        "payload": {"$ref": "#/$defs/read_request"}
+      }
+    }
+  ],
+  "$defs": {
+    "task_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "result_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "visibility": {"enum": ["none", "hash_only", "summary", "redacted", "full"]},
+    "grant_request": {
+      "type": "object",
+      "required": ["task_id", "result_hash", "content_visibility"],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {"$ref": "#/$defs/task_id"},
+        "result_hash": {"$ref": "#/$defs/result_hash"},
+        "content_visibility": {"$ref": "#/$defs/visibility"}
+      }
+    },
+    "read_request": {
+      "type": "object",
+      "required": ["task_id", "approval_id"],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {"$ref": "#/$defs/task_id"},
+        "approval_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"}
+      }
+    },
+    "grant_receipt": {
+      "type": "object",
+      "required": ["task_id", "result_hash", "content_visibility", "approval_id", "expires_at_epoch_seconds", "use_limit", "uses_remaining"],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {"$ref": "#/$defs/task_id"},
+        "result_hash": {"$ref": "#/$defs/result_hash"},
+        "content_visibility": {"$ref": "#/$defs/visibility"},
+        "approval_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "expires_at_epoch_seconds": {"type": "integer", "minimum": 1},
+        "use_limit": {"const": 1},
+        "uses_remaining": {"const": 1}
+      }
+    },
+    "result_receipt": {
+      "type": "object",
+      "required": ["task_id", "result_hash", "content_visibility", "projection"],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {"$ref": "#/$defs/task_id"},
+        "result_hash": {"$ref": "#/$defs/result_hash"},
+        "content_visibility": {"$ref": "#/$defs/visibility"},
+        "projection": {
+          "description": "content_visibilityと一致する条件分岐だけを受理する。",
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"content_visibility": {"const": "none"}}, "required": ["content_visibility"]},
+          "then": {"properties": {"projection": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"content_visibility": {"const": "hash_only"}}, "required": ["content_visibility"]},
+          "then": {
+            "properties": {
+              "projection": {
+                "type": "object",
+                "required": ["result_hash"],
+                "additionalProperties": false,
+                "properties": {"result_hash": {"$ref": "#/$defs/result_hash"}}
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"content_visibility": {"enum": ["summary", "redacted"]}}, "required": ["content_visibility"]},
+          "then": {
+            "properties": {
+              "projection": {
+                "type": "object",
+                "required": ["説明"],
+                "additionalProperties": false,
+                "properties": {"説明": {"const": "この表示範囲に提供できる承認済み内容はありません"}}
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"content_visibility": {"const": "full"}}, "required": ["content_visibility"]},
+          "then": {
+            "properties": {
+              "projection": {
+                "type": "object",
+                "required": ["result_hash", "text"],
+                "additionalProperties": false,
+                "properties": {
+                  "result_hash": {"$ref": "#/$defs/result_hash"},
+                  "text": {"type": "string", "maxLength": 1048576}
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

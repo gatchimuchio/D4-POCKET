@@ -434,8 +434,37 @@ struct AgentTask識別子要求 {
     task_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTask結果表示要求 {
+    task_id: String,
+    result_hash: String,
+    content_visibility: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTask結果取得要求 {
+    task_id: String,
+    approval_id: String,
+}
+
+#[derive(PartialEq, Eq)]
+struct AgentTask本文 {
+    result_hash: String,
+    text: String,
+}
+
+struct AgentTask結果表示承認 {
+    approval_id: String,
+    result_hash: String,
+    visibility: String,
+    expires_at_epoch_seconds: i64,
+    monotonic_expiry: Instant,
+}
+
 struct AgentTask受信結果 {
-    result: Result<String, 対話失敗>,
+    result: Result<AgentTask本文, 対話失敗>,
     completed_at: Instant,
 }
 
@@ -449,6 +478,9 @@ struct AgentTask作業 {
     status: &'static str,
     audit_event_id: String,
     result_hash: Option<String>,
+    result_body: Option<String>,
+    result_expires_at: Option<Instant>,
+    result_exposure_approval: Option<AgentTask結果表示承認>,
     cancel: Arc<AtomicBool>,
     owner_cancel_requested_at: Option<Instant>,
     receiver: Option<mpsc::Receiver<AgentTask受信結果>>,
@@ -457,6 +489,8 @@ struct AgentTask作業 {
 }
 
 const AGENT_TASK_RECORD_LIMIT: usize = 128;
+const AGENT_TASK_RESULT_BODY_LIMIT: usize = 8;
+const AGENT_TASK_RESULT_BODY_TTL: Duration = Duration::from_secs(900);
 const AGENT_TASK_EXECUTION_LIMIT: Duration = Duration::from_secs(900);
 
 #[cfg(feature = "r2-e2e")]
@@ -490,7 +524,7 @@ fn AgentTask結果hash化(
     result: Result<String, 対話失敗>,
     cancel: &AtomicBool,
     deadline: Instant,
-) -> Result<String, 対話失敗> {
+) -> Result<AgentTask本文, 対話失敗> {
     if Instant::now() >= deadline {
         return Err(対話失敗::期限超過);
     }
@@ -501,17 +535,20 @@ fn AgentTask結果hash化(
         if output.len() > 1_048_576 {
             Err(対話失敗::応答不正)
         } else {
-            Ok(sha256_tagged(output.as_bytes()))
+            Ok(AgentTask本文 {
+                result_hash: sha256_tagged(output.as_bytes()),
+                text: output,
+            })
         }
     })
 }
 
 fn AgentTask結果完了時刻検査(
-    result: Result<String, 対話失敗>,
+    result: Result<AgentTask本文, 対話失敗>,
     completed_at: Instant,
     owner_cancel_requested_at: Option<Instant>,
     deadline: Instant,
-) -> Result<String, 対話失敗> {
+) -> Result<AgentTask本文, 対話失敗> {
     if completed_at >= deadline {
         return match result {
             Ok(_) | Err(対話失敗::取消) => Err(対話失敗::期限超過),
@@ -547,6 +584,13 @@ fn Agent作業要求識別子妥当(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+}
+
+fn 固定長hex識別子妥当(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn Agent実行系ID取得(
@@ -1571,6 +1615,9 @@ impl 対話制御 {
                                         status: "quarantined",
                                         audit_event_id: start_audit_id,
                                         result_hash: None,
+                                        result_body: None,
+                                        result_expires_at: None,
+                                        result_exposure_approval: None,
                                         cancel,
                                         owner_cancel_requested_at: None,
                                         receiver: None,
@@ -1594,6 +1641,9 @@ impl 対話制御 {
                     status,
                     audit_event_id,
                     result_hash: None,
+                    result_body: None,
+                    result_expires_at: None,
+                    result_exposure_approval: None,
                     cancel,
                     owner_cancel_requested_at: None,
                     receiver,
@@ -1614,6 +1664,134 @@ impl 対話制御 {
                     .get(&request.task_id)
                     .ok_or(対話失敗::要求不正)?;
                 Ok(AgentTask状態射影(task))
+            }
+            "AgentTask結果表示承認" => {
+                if !owner {
+                    return Err(対話失敗::権限拒否);
+                }
+                let request: AgentTask結果表示要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.task_id)
+                    || request.result_hash.len() != 71
+                    || !request.result_hash.starts_with("sha256:")
+                    || !request.result_hash[7..]
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    || !["none", "hash_only", "summary", "redacted", "full"]
+                        .contains(&request.content_visibility.as_str())
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let task = self
+                    .agent_tasks
+                    .get(&request.task_id)
+                    .filter(|task| {
+                        task.status == "completed"
+                            && task.result_hash.as_deref() == Some(request.result_hash.as_str())
+                            && task.result_body.is_some()
+                            && task
+                                .result_expires_at
+                                .is_some_and(|expires| Instant::now() < expires)
+                    })
+                    .ok_or(対話失敗::権限拒否)?;
+                let approval_id = 識別子生成()?;
+                let expires_at_epoch_seconds = 現在.saturating_add(300);
+                監査(
+                    "Agent Task結果表示Approval発行（native Owner確認・Task実行権なし）",
+                    &request.task_id,
+                    &sha256_tagged(
+                        json!({
+                            "task_id": task.task_id,
+                            "result_hash": request.result_hash,
+                            "content_visibility": request.content_visibility,
+                            "approval_id": approval_id,
+                            "expires_at_epoch_seconds": expires_at_epoch_seconds,
+                        })
+                        .to_string()
+                        .as_bytes(),
+                    ),
+                )?;
+                let task = self
+                    .agent_tasks
+                    .get_mut(&request.task_id)
+                    .ok_or(対話失敗::要求不正)?;
+                task.result_exposure_approval = Some(AgentTask結果表示承認 {
+                    approval_id: approval_id.clone(),
+                    result_hash: request.result_hash.clone(),
+                    visibility: request.content_visibility.clone(),
+                    expires_at_epoch_seconds,
+                    monotonic_expiry: Instant::now() + Duration::from_secs(300),
+                });
+                Ok(json!({
+                    "task_id": request.task_id,
+                    "result_hash": request.result_hash,
+                    "content_visibility": request.content_visibility,
+                    "approval_id": approval_id,
+                    "expires_at_epoch_seconds": expires_at_epoch_seconds,
+                    "use_limit": 1,
+                    "uses_remaining": 1
+                }))
+            }
+            "AgentTask結果取得" => {
+                let request: AgentTask結果取得要求 = 読取(値)?;
+                if !Agent作業要求識別子妥当(&request.task_id)
+                    || !固定長hex識別子妥当(&request.approval_id)
+                {
+                    return Err(対話失敗::要求不正);
+                }
+                let task = self
+                    .agent_tasks
+                    .get_mut(&request.task_id)
+                    .ok_or(対話失敗::要求不正)?;
+                let approval = task
+                    .result_exposure_approval
+                    .take()
+                    .filter(|approval| {
+                        approval.approval_id == request.approval_id
+                            && approval.result_hash
+                                == task.result_hash.as_deref().unwrap_or_default()
+                            && 現在 < approval.expires_at_epoch_seconds
+                            && Instant::now() < approval.monotonic_expiry
+                    })
+                    .ok_or(対話失敗::権限拒否)?;
+                let result_hash = task.result_hash.clone().ok_or(対話失敗::要求不正)?;
+                let text = task
+                    .result_body
+                    .as_ref()
+                    .filter(|_| {
+                        task.result_expires_at
+                            .is_some_and(|expires| Instant::now() < expires)
+                    })
+                    .ok_or(対話失敗::要求不正)?;
+                let projection = match approval.visibility.as_str() {
+                    "none" => Value::Null,
+                    "hash_only" => json!({"result_hash": result_hash}),
+                    "summary" | "redacted" => {
+                        json!({"説明": "この表示範囲に提供できる承認済み内容はありません"})
+                    }
+                    "full" => json!({"result_hash": result_hash, "text": text}),
+                    _ => return Err(対話失敗::要求不正),
+                };
+                let result_body_hash = sha256_tagged(
+                    json!({
+                        "task_id": task.task_id,
+                        "result_hash": result_hash,
+                        "content_visibility": approval.visibility,
+                        "projection_hash": sha256_tagged(projection.to_string().as_bytes()),
+                    })
+                    .to_string()
+                    .as_bytes(),
+                );
+                監査(
+                    "Agent Task結果表示（本文非記録・Content Exposure適用済み）",
+                    &request.task_id,
+                    &result_body_hash,
+                )?;
+                Ok(json!({
+                    "task_id": request.task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": approval.visibility,
+                    "projection": projection
+                }))
             }
             "AgentTask取消" => {
                 let request: AgentTask識別子要求 = 読取(値)?;
@@ -2171,13 +2349,26 @@ impl 対話制御 {
             let Some(result) = completed else {
                 continue;
             };
-            let (status, result_hash, failure) = match result {
-                Ok(hash) if hash.starts_with("sha256:") && hash.len() == 71 => {
-                    ("completed", Some(hash), None)
+            let (status, result_hash, result_body, failure) = match result {
+                Ok(output)
+                    if output.result_hash.starts_with("sha256:")
+                        && output.result_hash.len() == 71
+                        && output.result_hash[7..]
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) =>
+                {
+                    (
+                        "completed",
+                        Some(output.result_hash),
+                        Some(output.text),
+                        None,
+                    )
                 }
-                Ok(_) => ("failed", None, Some(対話失敗::応答不正)),
-                Err(error) if error == 対話失敗::取消 => ("cancelled", None, Some(error)),
-                Err(error) => ("failed", None, Some(error)),
+                Ok(_) => ("failed", None, None, Some(対話失敗::応答不正)),
+                Err(error) if error == 対話失敗::取消 => {
+                    ("cancelled", None, None, Some(error))
+                }
+                Err(error) => ("failed", None, None, Some(error)),
             };
             let event_hash = sha256_tagged(
                 json!({
@@ -2193,7 +2384,7 @@ impl 対話制御 {
             );
             let event_id = match 監査(
                 if status == "completed" {
-                    "Agent Task完了（結果本文非保存・hashのみ）"
+                    "Agent Task完了（本文は期限付き揮発保管・Auditはhashのみ）"
                 } else {
                     "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）"
                 },
@@ -2217,9 +2408,48 @@ impl 対話制御 {
             task.receiver = None;
             task.status = status;
             task.result_hash = result_hash;
+            task.result_body = result_body;
+            task.result_expires_at = task
+                .result_body
+                .as_ref()
+                .map(|_| Instant::now() + AGENT_TASK_RESULT_BODY_TTL);
+            task.result_exposure_approval = None;
             task.audit_event_id = event_id;
         }
+        self.AgentTask結果本文回収();
         Ok(())
+    }
+
+    fn AgentTask結果本文回収(&mut self) {
+        let now = Instant::now();
+        for task in self.agent_tasks.values_mut() {
+            if task.result_expires_at.is_some_and(|expires| now >= expires) {
+                task.result_body = None;
+                task.result_expires_at = None;
+                task.result_exposure_approval = None;
+            }
+        }
+        let mut retained = self
+            .agent_tasks
+            .iter()
+            .filter_map(|(task_id, task)| {
+                task.result_body
+                    .as_ref()
+                    .zip(task.result_expires_at)
+                    .map(|(_, expires)| (task_id.clone(), expires))
+            })
+            .collect::<Vec<_>>();
+        if retained.len() > AGENT_TASK_RESULT_BODY_LIMIT {
+            retained.sort_by_key(|(_, expires)| *expires);
+            let excess = retained.len() - AGENT_TASK_RESULT_BODY_LIMIT;
+            for (task_id, _) in retained.into_iter().take(excess) {
+                if let Some(task) = self.agent_tasks.get_mut(&task_id) {
+                    task.result_body = None;
+                    task.result_expires_at = None;
+                    task.result_exposure_approval = None;
+                }
+            }
+        }
     }
 }
 
@@ -2230,10 +2460,12 @@ fn AgentTask状態射影(task: &AgentTask作業) -> Value {
         "agent_runtime_id": task.runtime_id,
         "session_id": task.session_id,
         "workspace_id": task.workspace_id,
-        "description": "Agent作業Task（内容は別のWorkspace差分経路で確認）",
+        "description": "Agent作業Task（結果本文とWorkspace差分は別の権限経路）",
         "instruction_hash": task.instruction_hash,
         "status": task.status,
         "audit_event_id": task.audit_event_id,
+        "result_content_available": task.result_body.is_some()
+            && task.result_expires_at.is_some_and(|expires| Instant::now() < expires),
     });
     if let Some(result_hash) = &task.result_hash {
         projection["result_hash"] = json!(result_hash);
@@ -2838,93 +3070,104 @@ mod tests {
     #[test]
     fn AgentTask取消後または期限後に届いた成功応答を採用しない() {
         let cancelled = AtomicBool::new(true);
-        assert_eq!(
+        assert!(
             AgentTask結果hash化(
                 Ok("遅延応答試験用秘密本文".into()),
                 &cancelled,
                 Instant::now() + Duration::from_secs(60),
-            ),
-            Err(対話失敗::取消)
+            ) == Err(対話失敗::取消)
         );
 
         let not_cancelled = AtomicBool::new(false);
-        assert_eq!(
+        assert!(
             AgentTask結果hash化(
                 Ok("遅延応答試験用秘密本文".into()),
                 &not_cancelled,
                 Instant::now() - Duration::from_secs(1),
-            ),
-            Err(対話失敗::期限超過)
+            ) == Err(対話失敗::期限超過)
         );
 
-        assert_eq!(
+        assert!(
             AgentTask結果hash化(
                 Ok("同時期限・取消試験用本文".into()),
                 &cancelled,
                 Instant::now() - Duration::from_secs(1),
-            ),
-            Err(対話失敗::期限超過),
+            ) == Err(対話失敗::期限超過),
             "期限到達時にBrokerが取消flagを立てても期限超過を保持する"
+        );
+        assert!(
+            AgentTask結果hash化(
+                Ok("x".repeat(1_048_577)),
+                &not_cancelled,
+                Instant::now() + Duration::from_secs(60),
+            ) == Err(対話失敗::応答不正),
+            "本文上限を超える結果は保持しない"
         );
     }
 
     #[test]
     fn AgentTask完了結果は期限前の取消と期限後の停止を区別する() {
         let deadline = Instant::now();
-        assert_eq!(
+        assert!(
             AgentTask結果完了時刻検査(
                 Err(対話失敗::取消),
                 deadline - Duration::from_millis(1),
                 None,
                 deadline,
-            ),
-            Err(対話失敗::取消),
+            ) == Err(対話失敗::取消),
             "期限前に完了したOwner取消は取消のまま保持する"
         );
-        assert_eq!(
-            AgentTask結果完了時刻検査(Err(対話失敗::取消), deadline, None, deadline,),
-            Err(対話失敗::期限超過),
+        assert!(
+            AgentTask結果完了時刻検査(Err(対話失敗::取消), deadline, None, deadline,)
+                == Err(対話失敗::期限超過),
             "deadlineで停止要求したworkerの遅延取消応答は期限超過へ分類する"
         );
-        assert_eq!(
+        assert!(
             AgentTask結果完了時刻検査(
-                Ok("sha256:fixture".into()),
+                Ok(AgentTask本文 {
+                    result_hash: "sha256:fixture".into(),
+                    text: String::new()
+                }),
                 deadline + Duration::from_millis(1),
                 None,
                 deadline,
-            ),
-            Err(対話失敗::期限超過),
+            ) == Err(対話失敗::期限超過),
             "期限後の成功hashを採用しない"
         );
-        assert_eq!(
+        assert!(
             AgentTask結果完了時刻検査(
                 Err(対話失敗::通信失敗),
                 deadline + Duration::from_millis(1),
                 None,
                 deadline,
-            ),
-            Err(対話失敗::通信失敗),
+            ) == Err(対話失敗::通信失敗),
             "process終了を確認できない通信失敗を期限超過で隠さない"
         );
 
         let cancellation_requested_at = deadline - Duration::from_millis(20);
-        assert_eq!(
+        assert!(
             AgentTask結果完了時刻検査(
-                Ok("sha256:fixture".into()),
+                Ok(AgentTask本文 {
+                    result_hash: "sha256:fixture".into(),
+                    text: String::new()
+                }),
                 cancellation_requested_at + Duration::from_millis(1),
                 Some(cancellation_requested_at),
                 deadline,
-            ),
-            Err(対話失敗::取消),
+            ) == Err(対話失敗::取消),
             "Owner取消の受理後に競合して届いた成功hashを採用しない"
         );
+        let completed_before_cancel = AgentTask結果完了時刻検査(
+            Ok(AgentTask本文 {
+                result_hash: "sha256:fixture".into(),
+                text: String::new(),
+            }),
+            cancellation_requested_at - Duration::from_millis(1),
+            Some(cancellation_requested_at),
+            deadline,
+        );
         assert_eq!(
-            AgentTask結果完了時刻検査(
-                Ok("sha256:fixture".into()),
-                cancellation_requested_at - Duration::from_millis(1),
-                Some(cancellation_requested_at),
-                deadline,
-            ),
+            completed_before_cancel.map(|output| output.result_hash),
             Ok("sha256:fixture".into()),
             "Owner取消受理前に完了したworker結果は後続poll遅延で取消へ書き換えない"
         );
@@ -2982,6 +3225,200 @@ mod tests {
         assert!(!state.to_string().contains("TASK_PRIVATE_OUTPUT_SENTINEL"));
         assert!(!state.as_object().unwrap().contains_key("instruction"));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn AgentTask結果はOwnerの範囲別Approval後だけ一回取得できAuditへ本文を出さない() {
+        let (mut c, _) = 準備(false, false, false);
+        let session_id = 開始(&mut c, "left");
+        let instruction = "出力露出境界の合成試験";
+        AgentTask権限とApprovalを発行(&mut c, &session_id, instruction);
+        let started = AgentTask操作(
+            &mut c,
+            "AgentTask実行",
+            AgentTask要求(&session_id, instruction),
+            false,
+        )
+        .unwrap();
+        let task_id = started["task_id"].as_str().unwrap().to_owned();
+        let mut state = Value::Null;
+        for _ in 0..50 {
+            state =
+                AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false).unwrap();
+            if state["status"] != "running" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert_eq!(state["status"], "completed");
+        assert_eq!(state["result_content_available"], true);
+        assert!(!state.to_string().contains("TASK_PRIVATE_OUTPUT_SENTINEL"));
+        let result_hash = state["result_hash"].as_str().unwrap().to_owned();
+
+        assert_eq!(
+            AgentTask操作(
+                &mut c,
+                "AgentTask結果表示承認",
+                json!({
+                    "task_id": task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": "full"
+                }),
+                false,
+            ),
+            Err(対話失敗::権限拒否),
+            "Owner確認なしでは本文表示Approvalを発行しない"
+        );
+        assert_eq!(
+            AgentTask操作(
+                &mut c,
+                "AgentTask結果表示承認",
+                json!({
+                    "task_id": task_id,
+                    "result_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                    "content_visibility": "full"
+                }),
+                true,
+            ),
+            Err(対話失敗::権限拒否),
+            "別result hashへApprovalを結合できない"
+        );
+        assert_eq!(
+            AgentTask操作(
+                &mut c,
+                "AgentTask結果表示承認",
+                json!({
+                    "task_id": task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": "all"
+                }),
+                true,
+            ),
+            Err(対話失敗::要求不正),
+            "未知visibilityは拒否する"
+        );
+
+        for visibility in ["none", "hash_only", "summary", "redacted", "full"] {
+            let receipt = AgentTask操作(
+                &mut c,
+                "AgentTask結果表示承認",
+                json!({
+                    "task_id": task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": visibility
+                }),
+                true,
+            )
+            .unwrap();
+            assert_eq!(receipt["use_limit"], 1);
+            assert_eq!(receipt["uses_remaining"], 1);
+            let approval_id = receipt["approval_id"].as_str().unwrap();
+            assert!(固定長hex識別子妥当(approval_id));
+
+            let payload = json!({"task_id": task_id, "approval_id": approval_id});
+            let mut audit_material = String::new();
+            let mut audit = |reason: &str, object_id: &str, hash: &str| {
+                audit_material.push_str(reason);
+                audit_material.push_str(object_id);
+                audit_material.push_str(hash);
+                Ok("fixture-result-read-audit".to_owned())
+            };
+            let projection = c
+                .操作_作業領域結合済み(
+                    "AgentTask結果取得",
+                    &payload,
+                    false,
+                    100,
+                    None,
+                    &mut audit,
+                )
+                .unwrap();
+            assert!(!audit_material.contains("TASK_PRIVATE_OUTPUT_SENTINEL"));
+            match visibility {
+                "none" => assert!(projection["projection"].is_null()),
+                "hash_only" => assert_eq!(projection["projection"]["result_hash"], result_hash),
+                "summary" | "redacted" => assert_eq!(
+                    projection["projection"]["説明"],
+                    "この表示範囲に提供できる承認済み内容はありません"
+                ),
+                "full" => assert_eq!(
+                    projection["projection"]["text"],
+                    "TASK_PRIVATE_OUTPUT_SENTINEL"
+                ),
+                _ => unreachable!(),
+            }
+            assert_eq!(projection["content_visibility"], visibility);
+            assert_eq!(
+                AgentTask操作(&mut c, "AgentTask結果取得", payload, false,),
+                Err(対話失敗::権限拒否),
+                "結果表示Approvalは一回で消費する"
+            );
+        }
+        c.agent_tasks.get_mut(&task_id).unwrap().result_expires_at =
+            Some(Instant::now() - Duration::from_secs(1));
+        let expired =
+            AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false).unwrap();
+        assert_eq!(expired["result_content_available"], false);
+        assert_eq!(
+            AgentTask操作(
+                &mut c,
+                "AgentTask結果表示承認",
+                json!({
+                    "task_id": task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": "full"
+                }),
+                true,
+            ),
+            Err(対話失敗::権限拒否),
+            "期限後の本文を再びApprovalできない"
+        );
+    }
+
+    #[test]
+    fn AgentTask結果本文はBroker内で最大8件だけ保持する() {
+        let (mut c, _) = 準備(false, false, false);
+        let session_id = 開始(&mut c, "left");
+        let mut task_ids = Vec::new();
+        for index in 0..9 {
+            let instruction = format!("本文保持上限の連続試験{index}");
+            AgentTask権限とApprovalを発行(&mut c, &session_id, &instruction);
+            let started = AgentTask操作(
+                &mut c,
+                "AgentTask実行",
+                AgentTask要求(&session_id, &instruction),
+                false,
+            )
+            .unwrap();
+            let task_id = started["task_id"].as_str().unwrap().to_owned();
+            task_ids.push(task_id.clone());
+            let mut state = Value::Null;
+            for _ in 0..50 {
+                state =
+                    AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false)
+                        .unwrap();
+                if state["status"] != "running" {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            assert_eq!(state["status"], "completed");
+        }
+        let availability = task_ids
+            .iter()
+            .map(|task_id| {
+                AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false).unwrap()
+                    ["result_content_available"]
+                    .as_bool()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            availability.iter().filter(|available| **available).count(),
+            8
+        );
+        assert!(!availability[0], "最古の本文を先にevictする");
+        assert!(availability[1..].iter().all(|available| *available));
     }
 
     #[test]

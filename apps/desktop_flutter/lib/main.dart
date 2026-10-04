@@ -397,7 +397,7 @@ class _ShellHomePageState extends State<ShellHomePage> {
             widget.runtimeLifecycleConnect ?? connectRuntimeLifecycleClient,
       ),
       AuthorityMap(client: widget.client),
-      AgentCenter(client: widget.client),
+      AgentCenter(client: widget.client, active: selectedIndex == 5),
       ApprovalCenter(client: widget.client),
       AuditViewer(client: widget.client),
       RecoveryCenter(client: widget.client),

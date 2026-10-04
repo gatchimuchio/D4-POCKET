@@ -1,4 +1,10 @@
+import 'dart:convert';
+
 import 'broker_client.dart' show BrokerClientException, BrokerTransport;
+
+final _runtimeId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
+final _sessionId = RegExp(r'^[a-f0-9]{32}$');
+final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
 
 const _agentTaskExecutionPolicy =
     'gui-shell-agent-task-sandbox-v1-max-runtime-900s';
@@ -66,6 +72,7 @@ class AgentTaskRecord {
     required this.status,
     required this.auditEventId,
     this.resultHash,
+    this.resultContentAvailable = false,
   });
 
   final String taskId;
@@ -76,6 +83,39 @@ class AgentTaskRecord {
   final String status;
   final String auditEventId;
   final String? resultHash;
+  final bool resultContentAvailable;
+}
+
+class AgentTaskResultApproval {
+  const AgentTaskResultApproval({
+    required this.taskId,
+    required this.resultHash,
+    required this.visibility,
+    required this.approvalId,
+  });
+
+  final String taskId;
+  final String resultHash;
+  final String visibility;
+  final String approvalId;
+}
+
+class AgentTaskResultProjection {
+  const AgentTaskResultProjection({
+    required this.taskId,
+    required this.resultHash,
+    required this.visibility,
+    required this.projection,
+  });
+
+  final String taskId;
+  final String resultHash;
+  final String visibility;
+  final Object? projection;
+
+  String? get text => projection is Map<String, Object?>
+      ? (projection as Map<String, Object?>)['text'] as String?
+      : null;
 }
 
 class AgentTaskClient {
@@ -223,6 +263,115 @@ class AgentTaskClient {
     return _taskRecord(body, expectedTaskId: taskId);
   }
 
+  Future<AgentTaskResultApproval> grantResultExposure(
+    AgentTaskRecord task,
+    String visibility,
+  ) async {
+    _validateTaskId(task.taskId);
+    final resultHash = task.resultHash;
+    if (task.status != 'completed' ||
+        !task.resultContentAvailable ||
+        resultHash == null ||
+        !_hash.hasMatch(resultHash) ||
+        !const {'none', 'hash_only', 'summary', 'redacted', 'full'}
+            .contains(visibility)) {
+      throw const BrokerClientException('Task結果表示の前提を確認できません');
+    }
+    final body = await _acceptedBody('AgentTask結果表示承認', {
+      'task_id': task.taskId,
+      'result_hash': resultHash,
+      'content_visibility': visibility,
+    });
+    final approvalId = body['approval_id'];
+    if (!_hasExactKeys(body, const {
+          'task_id',
+          'result_hash',
+          'content_visibility',
+          'approval_id',
+          'expires_at_epoch_seconds',
+          'use_limit',
+          'uses_remaining',
+        }) ||
+        body['task_id'] != task.taskId ||
+        body['result_hash'] != resultHash ||
+        body['content_visibility'] != visibility ||
+        approvalId is! String ||
+        !_sessionId.hasMatch(approvalId) ||
+        !_positiveSafeInteger(body['expires_at_epoch_seconds']) ||
+        body['use_limit'] != 1 ||
+        body['uses_remaining'] != 1) {
+      throw const BrokerClientException('Task結果表示Approvalが不正です');
+    }
+    return AgentTaskResultApproval(
+      taskId: task.taskId,
+      resultHash: resultHash,
+      visibility: visibility,
+      approvalId: approvalId,
+    );
+  }
+
+  Future<AgentTaskResultProjection> readResult(
+    AgentTaskResultApproval approval,
+  ) async {
+    _validateTaskId(approval.taskId);
+    if (!_hash.hasMatch(approval.resultHash) ||
+        !_sessionId.hasMatch(approval.approvalId) ||
+        !const {'none', 'hash_only', 'summary', 'redacted', 'full'}
+            .contains(approval.visibility)) {
+      throw const BrokerClientException('Task結果取得のApprovalが不正です');
+    }
+    final body = await _acceptedBody('AgentTask結果取得', {
+      'task_id': approval.taskId,
+      'approval_id': approval.approvalId,
+    });
+    if (!_hasExactKeys(body, const {
+          'task_id',
+          'result_hash',
+          'content_visibility',
+          'projection',
+        }) ||
+        body['task_id'] != approval.taskId ||
+        body['result_hash'] != approval.resultHash ||
+        body['content_visibility'] != approval.visibility) {
+      throw const BrokerClientException('Task結果projectionが要求と一致しません');
+    }
+    final projection = body['projection'];
+    switch (approval.visibility) {
+      case 'none':
+        if (projection != null) {
+          throw const BrokerClientException('none範囲のprojectionが不正です');
+        }
+      case 'hash_only':
+        final value = _stringMap(projection);
+        if (!_hasExactKeys(value, const {'result_hash'}) ||
+            value['result_hash'] != approval.resultHash) {
+          throw const BrokerClientException('hash_only projectionが不正です');
+        }
+      case 'summary':
+      case 'redacted':
+        final value = _stringMap(projection);
+        if (!_hasExactKeys(value, const {'説明'}) ||
+            value['説明'] != 'この表示範囲に提供できる承認済み内容はありません') {
+          throw const BrokerClientException('summary/redacted projectionが不正です');
+        }
+      case 'full':
+        final value = _stringMap(projection);
+        final text = value['text'];
+        if (!_hasExactKeys(value, const {'result_hash', 'text'}) ||
+            value['result_hash'] != approval.resultHash ||
+            text is! String ||
+            utf8.encode(text).length > 1048576) {
+          throw const BrokerClientException('full projectionが不正または上限超過です');
+        }
+    }
+    return AgentTaskResultProjection(
+      taskId: approval.taskId,
+      resultHash: approval.resultHash,
+      visibility: approval.visibility,
+      projection: projection,
+    );
+  }
+
   Future<Map<String, Object?>> _acceptedBody(
     String operation,
     Map<String, Object?> payload,
@@ -279,10 +428,13 @@ class AgentTaskClient {
       'instruction_hash',
       'status',
       'audit_event_id',
+      'result_content_available',
     };
     if (!requiredKeys.every(body.containsKey) ||
-        body.keys.any(
-            (key) => !requiredKeys.contains(key) && key != 'result_hash')) {
+        body.keys.any((key) =>
+            !requiredKeys.contains(key) &&
+            key != 'result_hash' &&
+            key != 'result_content_available')) {
       throw const BrokerClientException('Agent Task状態recordのfieldが不正です');
     }
     final taskId = body['task_id'];
@@ -293,8 +445,9 @@ class AgentTaskClient {
     final status = body['status'];
     final auditId = body['audit_event_id'];
     final resultHash = body['result_hash'];
+    final resultContentAvailable = body['result_content_available'];
     if (body['record_version'] != 2 ||
-        body['description'] != 'Agent作業Task（内容は別のWorkspace差分経路で確認）' ||
+        body['description'] != 'Agent作業Task（結果本文とWorkspace差分は別の権限経路）' ||
         taskId is! String ||
         !_sessionId.hasMatch(taskId) ||
         (expectedTaskId != null && taskId != expectedTaskId) ||
@@ -311,6 +464,7 @@ class AgentTaskClient {
         auditId is! String ||
         auditId.isEmpty ||
         auditId.length > 256 ||
+        resultContentAvailable is! bool ||
         (resultHash != null &&
             (resultHash is! String || !_hash.hasMatch(resultHash)))) {
       throw const BrokerClientException('Agent Task状態recordの識別・値が不正です');
@@ -330,6 +484,7 @@ class AgentTaskClient {
       status: status,
       auditEventId: auditId,
       resultHash: resultHash as String?,
+      resultContentAvailable: resultContentAvailable,
     );
   }
 
@@ -346,6 +501,9 @@ bool _hasExactKeys(Map<String, Object?> value, Set<String> keys) =>
 bool _positiveSafeInteger(Object? value) =>
     value is int && value > 0 && value <= 9007199254740991;
 
-final _runtimeId = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$');
-final _sessionId = RegExp(r'^[a-f0-9]{32}$');
-final _hash = RegExp(r'^sha256:[a-f0-9]{64}$');
+Map<String, Object?> _stringMap(Object? value) {
+  if (value is! Map || value.keys.any((key) => key is! String)) {
+    throw const BrokerClientException('Task結果projectionの形が不正です');
+  }
+  return Map<String, Object?>.from(value);
+}

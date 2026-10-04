@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/generated_contracts.dart';
@@ -10,9 +12,14 @@ import 'shared.dart';
 import 'workspace_inspector.dart';
 
 class AgentCenter extends StatefulWidget {
-  const AgentCenter({super.key, required this.client});
+  const AgentCenter({
+    super.key,
+    required this.client,
+    this.active = true,
+  });
 
   final ShellCoreClient client;
+  final bool active;
 
   @override
   State<AgentCenter> createState() => _AgentCenterState();
@@ -28,12 +35,17 @@ class _AgentTaskUiState {
   AgentTaskRequest? request;
   String permissionStatus;
   String approvalStatus;
+  String resultVisibility = 'hash_only';
+  AgentTaskResultProjection? resultProjection;
   AgentTaskRecord? record;
 }
 
-class _AgentCenterState extends State<AgentCenter> {
+class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   bool _registrationPending = false;
   bool _sessionPending = false;
+  bool _appActive = true;
+  int _resultGeneration = 0;
+  Timer? _resultClearTimer;
   String? _taskPreflightSession;
   String? _registrationStatus;
   final Map<String, String> _taskPreflightStatus = {};
@@ -44,6 +56,7 @@ class _AgentCenterState extends State<AgentCenter> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final snapshot = widget.client.getSnapshot();
     _sessions = widget.client.mode == 'broker'
         ? List<AgentSessionRecord>.of(snapshot.agentSessions)
@@ -52,9 +65,37 @@ class _AgentCenterState extends State<AgentCenter> {
 
   @override
   void dispose() {
+    _clearAllResultProjections();
     _agentTasks.clear();
     _taskPreflightStatus.clear();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    _clearAllResultProjections();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant AgentCenter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active && !widget.active) {
+      _clearAllResultProjections();
+    }
+  }
+
+  bool get _active => widget.active && _appActive;
+
+  void _clearAllResultProjections() {
+    _resultGeneration++;
+    _resultClearTimer?.cancel();
+    _resultClearTimer = null;
+    for (final task in _agentTasks.values) {
+      task.resultProjection = null;
+    }
   }
 
   Future<void> _registerCodexRuntime() async {
@@ -109,6 +150,7 @@ class _AgentCenterState extends State<AgentCenter> {
           return;
         }
         setState(() {
+          _agentTasks.clear();
           _registered = input.withTaskExecutionStatus(
             body['task_execution']! as String,
           );
@@ -183,6 +225,7 @@ class _AgentCenterState extends State<AgentCenter> {
       builder: (context) => const _AgentTaskInstructionDialog(),
     );
     if (!mounted || instruction == null) return;
+    _clearAllResultProjections();
     final request = AgentTaskRequest(
       runtimeId: session.agentRuntimeId,
       sessionId: session.sessionId,
@@ -250,6 +293,7 @@ class _AgentCenterState extends State<AgentCenter> {
       _taskPreflightStatus[session.sessionId] = 'Broker応答を確認中です。';
     });
     try {
+      state.resultProjection = null;
       await action(AgentTaskClient(transport), state);
       if (!mounted) return;
       setState(() {
@@ -314,6 +358,7 @@ class _AgentCenterState extends State<AgentCenter> {
       return;
     }
     setState(() {
+      state.resultProjection = null;
       _taskPreflightSession = session.sessionId;
       _taskPreflightStatus[session.sessionId] = 'Broker Task状態を更新中です。';
     });
@@ -330,6 +375,68 @@ class _AgentCenterState extends State<AgentCenter> {
           ? error.message
           : 'Broker Task状態を確認できません。';
       setState(() => _taskPreflightStatus[session.sessionId] = message);
+    } finally {
+      if (mounted) setState(() => _taskPreflightSession = null);
+    }
+  }
+
+  Future<void> _showAgentTaskResult(AgentSessionRecord session) async {
+    final transport = widget.client.brokerTransport;
+    final state = _agentTasks[session.sessionId];
+    final task = state?.record;
+    if (transport == null ||
+        state == null ||
+        task == null ||
+        task.status != 'completed' ||
+        !task.resultContentAvailable ||
+        _taskPreflightSession != null ||
+        !_sessionStillMatchesRegistration(session)) {
+      return;
+    }
+    final taskId = task.taskId;
+    final visibility = state.resultVisibility;
+    _clearAllResultProjections();
+    final resultGeneration = _resultGeneration;
+    setState(() {
+      _taskPreflightSession = session.sessionId;
+      _taskPreflightStatus[session.sessionId] =
+          'native Owner確認待ちです。本文はまだ表示しません。';
+    });
+    try {
+      final client = AgentTaskClient(transport);
+      final approval = await client.grantResultExposure(task, visibility);
+      final projection = await client.readResult(approval);
+      if (!mounted ||
+          !identical(_agentTasks[session.sessionId], state) ||
+          !_active ||
+          resultGeneration != _resultGeneration ||
+          state.record?.taskId != taskId ||
+          state.resultVisibility != visibility) {
+        return;
+      }
+      setState(() {
+        state.resultProjection = projection;
+        _resultClearTimer?.cancel();
+        _resultClearTimer = Timer(const Duration(minutes: 5), () {
+          if (!mounted) return;
+          _clearAllResultProjections();
+          setState(() {
+            _taskPreflightStatus[session.sessionId] = '結果本文の表示期限を過ぎたため消去しました。';
+          });
+        });
+        _taskPreflightStatus[session.sessionId] = visibility == 'full'
+            ? 'native Ownerが許可したAgent報告を表示中です。内容・test主張は未検証です。'
+            : '承認されたContent Exposure範囲で結果を表示しました。';
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      final message = error is BrokerClientException
+          ? error.message
+          : 'native Owner確認またはTask結果取得に失敗しました。';
+      setState(() {
+        state.resultProjection = null;
+        _taskPreflightStatus[session.sessionId] = message;
+      });
     } finally {
       if (mounted) setState(() => _taskPreflightSession = null);
     }
@@ -383,6 +490,8 @@ class _AgentCenterState extends State<AgentCenter> {
           if (task != null) 'Task状態: ${task.status}',
           if (task != null) '指示hash: ${task.instructionHash}',
           if (task?.resultHash != null) '結果hash: ${task!.resultHash}',
+          if (task != null)
+            '結果本文: ${task.resultContentAvailable ? 'Broker内に期限付きで利用可能' : '利用不可・期限切れ・未保持'}',
           if (task != null) '終了監査参照: ${task.auditEventId}',
         ],
       ),
@@ -415,6 +524,46 @@ class _AgentCenterState extends State<AgentCenter> {
           onPressed: busy ? null : () => _cancelAgentTask(session),
           child: const Text('Task停止を要求'),
         ),
+      if (task?.status == 'completed') ...[
+        const SizedBox(height: 8),
+        const Text('Agent Task結果（Agent報告。test結果・正しさをBrokerは検証しません）'),
+        DropdownButton<String>(
+          value: taskState.resultVisibility,
+          items: const [
+            DropdownMenuItem(value: 'none', child: Text('none')),
+            DropdownMenuItem(value: 'hash_only', child: Text('hash_only')),
+            DropdownMenuItem(value: 'summary', child: Text('summary')),
+            DropdownMenuItem(value: 'redacted', child: Text('redacted')),
+            DropdownMenuItem(value: 'full', child: Text('full')),
+          ],
+          onChanged: busy
+              ? null
+              : (value) {
+                  if (value == null) return;
+                  _clearAllResultProjections();
+                  setState(() {
+                    taskState.resultVisibility = value;
+                  });
+                },
+        ),
+        OutlinedButton(
+          onPressed: busy || !(task?.resultContentAvailable ?? false)
+              ? null
+              : () => _showAgentTaskResult(session),
+          child: const Text('native Owner確認後に結果を表示'),
+        ),
+        if (taskState.resultProjection case final projection?) ...[
+          Text('表示範囲: ${projection.visibility}・Task ${projection.taskId}'),
+          if (projection.projection == null) const Text('結果本文は表示しません。'),
+          if (projection.projection is Map<String, Object?> &&
+              projection.text == null)
+            Text((projection.projection as Map<String, Object?>)['説明']
+                    as String? ??
+                'hash: ${projection.resultHash}'),
+          if (projection.text case final text?)
+            SelectableText(text, key: const ValueKey('agent-task-result-text')),
+        ],
+      ],
     ];
   }
 
@@ -428,10 +577,12 @@ class _AgentCenterState extends State<AgentCenter> {
       task == null
           ? 'タスク: Broker記録は未取得（Taskが存在しない証拠ではありません）'
           : 'タスク: ${task.status}（Task ID ${task.taskId}）',
-      'Task結果本文: AgentTask APIから未提供',
-      '変更ファイル／差分概要: Task APIから未取得。Workspace Inspectorは現在承認と基準点を使う独立経路で、Task差分と同一視しません。',
+      task?.resultContentAvailable == true
+          ? 'Task結果本文: native Owner確認後にContent Exposure範囲でAgent報告を取得可能'
+          : 'Task結果本文: Broker内に現在取得可能な本文なし',
+      '変更ファイル／差分概要: 選択Runtime／Workspaceに絞ったWorkspace Inspectorで、別のWorkspace承認と基準点を使って確認します。Task結果と同一視しません。',
       '道具呼出し: AgentTask APIから未提供',
-      'シェルコマンド／試験状態: AgentTask APIから未提供',
+      'シェルコマンド／試験状態: Agent報告の主張は未検証。Broker実行済みtest証跡はunknown',
       '保留中の承認: 未取得（承認がないことを意味しません）',
       '巻戻し候補: Task結果から未取得。Workspace復旧プレビューは別の読取経路です。',
       '監査リンク: Session作成 ${session.auditEventId}',
@@ -499,9 +650,19 @@ class _AgentCenterState extends State<AgentCenter> {
               ],
             ),
           ),
-        if (client.workspaceClient != null)
+        if (client.workspaceClient != null && _registered != null)
           BorderedPanel(
-              child: WorkspaceInspector(client: client.workspaceClient!)),
+              child: WorkspaceInspector(
+            client: client.workspaceClient!,
+            runtimeId: _registered!.runtimeId,
+            workspaceId: _registered!.workspaceId,
+            active: widget.active && _appActive,
+          )),
+        if (client.workspaceClient != null && _registered == null)
+          const BorderedPanel(
+            child: Text(
+                'Runtime／Workspace登録後に、その登録範囲だけのWorkspace Inspectorを表示します。'),
+          ),
         BorderedPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

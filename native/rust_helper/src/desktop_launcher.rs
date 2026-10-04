@@ -77,6 +77,28 @@ enum DesktopOwnerOperationSummary {
         instruction_hash: String,
         payload_hash: String,
     },
+    AgentTaskResultExposure {
+        task_id: String,
+        result_hash: String,
+        content_visibility: String,
+        payload_hash: String,
+    },
+    WorkspaceContentApproval {
+        workspace_id: String,
+        registration_hash: String,
+        content_visibility: String,
+        payload_hash: String,
+    },
+    WorkspaceContentRevocation {
+        workspace_id: String,
+        registration_hash: String,
+        payload_hash: String,
+    },
+    WorkspaceBaselineCapture {
+        workspace_id: String,
+        registration_hash: String,
+        payload_hash: String,
+    },
     AgentCliRuntimeWorkspaceRegistration {
         adapter_id: String,
         interface_scope: String,
@@ -150,6 +172,34 @@ struct AgentTaskOwnerApprovalRequest {
     session_id: String,
     workspace_id: String,
     instruction: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTaskResultExposureRequest {
+    task_id: String,
+    result_hash: String,
+    content_visibility: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkspaceContentApprovalRequest {
+    #[serde(rename = "作業領域ID")]
+    workspace_id: String,
+    #[serde(rename = "登録hash")]
+    registration_hash: String,
+    #[serde(rename = "表示範囲")]
+    content_visibility: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkspaceBindingRequest {
+    #[serde(rename = "作業領域ID")]
+    workspace_id: String,
+    #[serde(rename = "登録hash")]
+    registration_hash: String,
 }
 
 #[derive(Deserialize)]
@@ -372,6 +422,21 @@ fn agent_task_permission_identifier_is_valid(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+}
+
+fn agent_task_result_identifier_is_valid(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn tagged_sha256_is_valid(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1199,6 +1264,66 @@ fn owner_operation_candidate(
                 payload_hash,
             }
         }
+        BrokerOperation::AgentTask結果表示承認 => {
+            let request: AgentTaskResultExposureRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_result_identifier_is_valid(&request.task_id)
+                || !tagged_sha256_is_valid(&request.result_hash)
+                || !["none", "hash_only", "summary", "redacted", "full"]
+                    .contains(&request.content_visibility.as_str())
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::AgentTaskResultExposure {
+                task_id: request.task_id,
+                result_hash: request.result_hash,
+                content_visibility: request.content_visibility,
+                payload_hash,
+            }
+        }
+        BrokerOperation::作業領域承認 => {
+            let request: WorkspaceContentApprovalRequest =
+                serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_permission_identifier_is_valid(&request.workspace_id)
+                || !tagged_sha256_is_valid(&request.registration_hash)
+                || !["none", "hash_only", "summary", "redacted", "full"]
+                    .contains(&request.content_visibility.as_str())
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::WorkspaceContentApproval {
+                workspace_id: request.workspace_id,
+                registration_hash: request.registration_hash,
+                content_visibility: request.content_visibility,
+                payload_hash,
+            }
+        }
+        BrokerOperation::作業領域失効 => {
+            let request: WorkspaceBindingRequest = serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_permission_identifier_is_valid(&request.workspace_id)
+                || !tagged_sha256_is_valid(&request.registration_hash)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::WorkspaceContentRevocation {
+                workspace_id: request.workspace_id,
+                registration_hash: request.registration_hash,
+                payload_hash,
+            }
+        }
+        BrokerOperation::作業領域全体基準点保存 => {
+            let request: WorkspaceBindingRequest = serde_json::from_value(payload.clone()).ok()?;
+            if !agent_task_permission_identifier_is_valid(&request.workspace_id)
+                || !tagged_sha256_is_valid(&request.registration_hash)
+            {
+                return None;
+            }
+            DesktopOwnerOperationSummary::WorkspaceBaselineCapture {
+                workspace_id: request.workspace_id,
+                registration_hash: request.registration_hash,
+                payload_hash,
+            }
+        }
         BrokerOperation::MCP切断 => {
             let request: McpDisconnectOwnerRequest =
                 serde_json::from_value(payload.clone()).ok()?;
@@ -1588,6 +1713,48 @@ fn owner_confirmation_text_for_identity(
         } => format!(
             "このAgent Taskの一回限りOwner Approvalを発行しますか？\n\nRuntime ID: {}\nSession ID: {}\nWorkspace ID: {}\n指示文字数: {}\n指示hash: {}\n要求ポリシー: gui-shell-agent-task-sandbox-v1-max-runtime-900s\n範囲: このSession・Workspace・指示hash・実行条件に限定、Approval発行後5分以内に開始、開始後の最大実行時間15分\n\nCompose画面でTask本文を確認してから判断してください。この確認画面は本文を表示しません。このApprovalはTask開始と最大15分の実行を一回だけ許可し、Workspace差分の確認と判断は別操作です。Credential等の秘密をTask本文へ含めないでください。発行はTaskを保存・変更・実行せず、実行可能なsandboxの存在も証明しません。Windows accountの再認証ではありません。\n\npayload hash:\n{}",
             runtime_id, session_id, workspace_id, instruction_characters, instruction_hash, payload_hash
+        ),
+        DesktopOwnerOperationSummary::AgentTaskResultExposure {
+            task_id,
+            result_hash,
+            content_visibility,
+            payload_hash,
+        } => format!(
+            "完了したAgent Taskの結果を一回だけ表示するApprovalを発行しますか？\n\nTask ID: {}\n確定結果hash: {}\nContent Exposure: {}\n範囲: このTaskと結果hashに限定、5分以内に一回だけ取得\n\n`full`はAgentが返した本文全体を表示し、秘密情報や危険な指示を含む可能性があります。Agentのtest結果・主張はBroker検証済みではありません。画面の表示範囲を確認してください。これはTask実行ApprovalでもWorkspace読取許可でもなく、Permission・Credential・Authorityを与えません。Auditには本文を保存しません。\n\npayload hash:\n{}",
+            owner_confirmation_value(task_id), owner_confirmation_value(result_hash),
+            owner_confirmation_value(content_visibility), payload_hash
+        ),
+        DesktopOwnerOperationSummary::WorkspaceContentApproval {
+            workspace_id,
+            registration_hash,
+            content_visibility,
+            payload_hash,
+        } => format!(
+            "この登録済みWorkspaceの読取内容を一時承認しますか？\n\nWorkspace ID: {}\n登録hash: {}\nContent Exposure: {}\n範囲: このWorkspace登録に限定、5分間\n\n`full`では登録済みsecret除外以外のファイル内容をBrokerへ読み込み、画面に表示できます。secret除外は登録されたpath境界であり、一般的な秘密検出ではありません。これはTask実行Permission／ApprovalでもWorkspace書込許可でもありません。\n\npayload hash:\n{}",
+            owner_confirmation_value(workspace_id),
+            owner_confirmation_value(registration_hash),
+            owner_confirmation_value(content_visibility),
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::WorkspaceContentRevocation {
+            workspace_id,
+            registration_hash,
+            payload_hash,
+        } => format!(
+            "このWorkspaceの一時読取許可と比較基準点を失効しますか？\n\nWorkspace ID: {}\n登録hash: {}\n結果: 現在の読取許可とBroker内baselineを破棄します。Workspace上のfileは変更・削除しません。\n\npayload hash:\n{}",
+            owner_confirmation_value(workspace_id),
+            owner_confirmation_value(registration_hash),
+            payload_hash
+        ),
+        DesktopOwnerOperationSummary::WorkspaceBaselineCapture {
+            workspace_id,
+            registration_hash,
+            payload_hash,
+        } => format!(
+            "このWorkspaceの現在状態を比較baselineとしてBroker内へ取得しますか？\n\nWorkspace ID: {}\n登録hash: {}\n範囲: 現在のfull読取承認で列挙できる全file。Brokerが保持するbaselineはWorkspaceあたり一つで、既存baselineがあれば置換します。\n\n内容を読む操作です。宣言済みsecret pathを除外し、保持量はBroker上限に従います。Workspace fileの変更・Task実行はしません。Task IDには結合されないため、別Taskの比較結果と混同しないでください。\n\npayload hash:\n{}",
+            owner_confirmation_value(workspace_id),
+            owner_confirmation_value(registration_hash),
+            payload_hash
         ),
         DesktopOwnerOperationSummary::McpDisconnect {
             server_id,
@@ -2187,6 +2354,62 @@ mod tests {
                 },
                 "confirm": confirm
             }),
+            DesktopOwnerOperationSummary::AgentTaskResultExposure {
+                task_id,
+                result_hash,
+                content_visibility,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "agent_task_result_exposure",
+                    "task_id": task_id,
+                    "result_hash": result_hash,
+                    "content_visibility": content_visibility,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
+            DesktopOwnerOperationSummary::WorkspaceContentApproval {
+                workspace_id,
+                registration_hash,
+                content_visibility,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "workspace_content_approval",
+                    "workspace_id": workspace_id,
+                    "registration_hash": registration_hash,
+                    "content_visibility": content_visibility,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
+            DesktopOwnerOperationSummary::WorkspaceContentRevocation {
+                workspace_id,
+                registration_hash,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "workspace_content_revocation",
+                    "workspace_id": workspace_id,
+                    "registration_hash": registration_hash,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
+            DesktopOwnerOperationSummary::WorkspaceBaselineCapture {
+                workspace_id,
+                registration_hash,
+                payload_hash,
+            } => json!({
+                "summary": {
+                    "kind": "workspace_baseline_capture",
+                    "workspace_id": workspace_id,
+                    "registration_hash": registration_hash,
+                    "payload_hash": payload_hash
+                },
+                "confirm": confirm
+            }),
             DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
                 adapter_id,
                 interface_scope,
@@ -2631,6 +2854,28 @@ mod tests {
                 instruction_hash: String,
                 payload_hash: String,
             },
+            AgentTaskResultExposure {
+                task_id: String,
+                result_hash: String,
+                content_visibility: String,
+                payload_hash: String,
+            },
+            WorkspaceContentApproval {
+                workspace_id: String,
+                registration_hash: String,
+                content_visibility: String,
+                payload_hash: String,
+            },
+            WorkspaceContentRevocation {
+                workspace_id: String,
+                registration_hash: String,
+                payload_hash: String,
+            },
+            WorkspaceBaselineCapture {
+                workspace_id: String,
+                registration_hash: String,
+                payload_hash: String,
+            },
             AgentCliRuntimeWorkspaceRegistration {
                 adapter_id: String,
                 interface_scope: String,
@@ -2693,6 +2938,46 @@ mod tests {
                 workspace_id,
                 instruction_characters,
                 instruction_hash,
+                payload_hash,
+            },
+            TestSummary::AgentTaskResultExposure {
+                task_id,
+                result_hash,
+                content_visibility,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::AgentTaskResultExposure {
+                task_id,
+                result_hash,
+                content_visibility,
+                payload_hash,
+            },
+            TestSummary::WorkspaceContentApproval {
+                workspace_id,
+                registration_hash,
+                content_visibility,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::WorkspaceContentApproval {
+                workspace_id,
+                registration_hash,
+                content_visibility,
+                payload_hash,
+            },
+            TestSummary::WorkspaceContentRevocation {
+                workspace_id,
+                registration_hash,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::WorkspaceContentRevocation {
+                workspace_id,
+                registration_hash,
+                payload_hash,
+            },
+            TestSummary::WorkspaceBaselineCapture {
+                workspace_id,
+                registration_hash,
+                payload_hash,
+            } => DesktopOwnerOperationSummary::WorkspaceBaselineCapture {
+                workspace_id,
+                registration_hash,
                 payload_hash,
             },
             TestSummary::AgentCliRuntimeWorkspaceRegistration {
@@ -3064,7 +3349,10 @@ mod tests {
         .unwrap();
         let owner_rejected: serde_json::Value = serde_json::from_slice(&owner_rejected).unwrap();
         assert_eq!(owner_rejected["status"], "rejected");
-        assert_eq!(owner_rejected["error"]["code"], "権限拒否");
+        assert_eq!(
+            owner_rejected["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
 
         let stale = serde_json::json!({
             "request_id": "desktop-channel-stale-1",
@@ -4966,6 +5254,151 @@ mod tests {
             "metadata": {"client": "desktop_flutter"}
         });
         assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn AgentTask結果表示native確認はTask_hash_visibilityを固定し危険を明示する() {
+        let task_id = "a".repeat(32);
+        let result_hash = format!("sha256:{}", "b".repeat(64));
+        let payload = serde_json::json!({
+            "task_id": task_id,
+            "result_hash": result_hash,
+            "content_visibility": "full"
+        });
+        let input = serde_json::json!({
+            "request_id": "desktop-agent-result-exposure",
+            "operation": "AgentTask結果表示承認",
+            "payload": payload,
+            "payload_hash": canonical_payload_hash(Some(&payload)),
+            "nonce": "desktop-agent-result-exposure-nonce",
+            "issued_at": BrokerRequestEnvelope::current_issued_at(),
+            "metadata": {"client": "desktop_flutter"}
+        });
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let (_, summary) = owner_operation_candidate(input.to_string().as_bytes(), &endpoint)
+            .expect("Task結果表示はnative確認候補");
+        let text = owner_confirmation_text(&summary);
+        assert!(text.contains(&task_id));
+        assert!(text.contains(&result_hash));
+        assert!(text.contains("full"));
+        assert!(text.contains("秘密情報や危険な指示を含む可能性"));
+        assert!(text.contains("test結果・主張はBroker検証済みではありません"));
+        assert!(text.contains("Task実行ApprovalでもWorkspace読取許可でもなく"));
+
+        for invalid_payload in [
+            serde_json::json!({"task_id":"short", "result_hash":result_hash, "content_visibility":"full"}),
+            serde_json::json!({"task_id":task_id, "result_hash":"raw", "content_visibility":"full"}),
+            serde_json::json!({"task_id":task_id, "result_hash":result_hash, "content_visibility":"all"}),
+            serde_json::json!({"task_id":task_id, "result_hash":result_hash, "content_visibility":"full", "approval_id":"caller-chosen"}),
+        ] {
+            let invalid = serde_json::json!({
+                "request_id": "desktop-agent-result-invalid",
+                "operation": "AgentTask結果表示承認",
+                "payload": invalid_payload,
+                "payload_hash": canonical_payload_hash(Some(&invalid_payload)),
+                "nonce": "desktop-agent-result-invalid-nonce",
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"}
+            });
+            assert!(owner_operation_candidate(invalid.to_string().as_bytes(), &endpoint).is_none());
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn Workspace読取とbaselineのnative確認は対象と範囲を固定する() {
+        let endpoint = BrokerEndpoint {
+            host: "127.0.0.1".into(),
+            port: 43123,
+            session_id: "desktop-session".into(),
+            session_secret: "not-used-by-candidate".into(),
+            credential_role: BrokerCredentialRole::Owner,
+            transport: "tcp".into(),
+            max_request_bytes: MAX_REQUEST_BYTES,
+        };
+        let registration_hash = format!("sha256:{}", "b".repeat(64));
+        let request = |request_id: &str, operation: &str, payload: Value| {
+            serde_json::json!({
+                "request_id": request_id,
+                "operation": operation,
+                "payload": payload,
+                "payload_hash": canonical_payload_hash(Some(&payload)),
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"}
+            })
+        };
+        let approval_payload = serde_json::json!({
+            "作業領域ID": "workspace-a",
+            "登録hash": registration_hash,
+            "表示範囲": "full"
+        });
+        let approval = request(
+            "desktop-workspace-content-approval",
+            "作業領域承認",
+            approval_payload.clone(),
+        );
+        let (_, summary) = owner_operation_candidate(approval.to_string().as_bytes(), &endpoint)
+            .expect("Workspace読取Approvalはnative確認候補");
+        assert!(matches!(
+            &summary,
+            DesktopOwnerOperationSummary::WorkspaceContentApproval { .. }
+        ));
+        let prompt = owner_confirmation_text(&summary);
+        assert!(prompt.contains("workspace-a"));
+        assert!(prompt.contains(&registration_hash));
+        assert!(prompt.contains("full"));
+        assert!(prompt.contains("一般的な秘密検出ではありません"));
+        assert!(prompt.contains("Task実行Permission／ApprovalでもWorkspace書込許可でもありません"));
+
+        let baseline = request(
+            "desktop-workspace-baseline",
+            "作業領域全体基準点保存",
+            serde_json::json!({
+                "作業領域ID": "workspace-a",
+                "登録hash": registration_hash
+            }),
+        );
+        let (_, summary) = owner_operation_candidate(baseline.to_string().as_bytes(), &endpoint)
+            .expect("Workspace全体baselineはnative確認候補");
+        let prompt = owner_confirmation_text(&summary);
+        assert!(prompt.contains("既存baselineがあれば置換します"));
+        assert!(prompt.contains("Task IDには結合されない"));
+        assert!(prompt.contains("Workspace fileの変更・Task実行はしません"));
+
+        let revoked = request(
+            "desktop-workspace-revoke",
+            "作業領域失効",
+            serde_json::json!({
+                "作業領域ID": "workspace-a",
+                "登録hash": registration_hash
+            }),
+        );
+        let (_, summary) = owner_operation_candidate(revoked.to_string().as_bytes(), &endpoint)
+            .expect("Workspace失効はnative確認候補");
+        assert!(owner_confirmation_text(&summary)
+            .contains("現在の読取許可とBroker内baselineを破棄します"));
+
+        let escalated = request(
+            "desktop-workspace-escalated",
+            "作業領域承認",
+            serde_json::json!({
+                "作業領域ID": "workspace-a",
+                "登録hash": registration_hash,
+                "表示範囲": "full",
+                "permission": "workspace.write"
+            }),
+        );
+        assert!(owner_operation_candidate(escalated.to_string().as_bytes(), &endpoint).is_none());
     }
 
     #[test]
