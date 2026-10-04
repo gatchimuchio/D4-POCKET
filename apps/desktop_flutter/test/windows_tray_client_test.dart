@@ -1,11 +1,28 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gui_shell_desktop/main.dart';
 import 'package:gui_shell_desktop/services/shell_core_client.dart';
 import 'package:gui_shell_desktop/services/windows_tray_client.dart';
 import 'package:gui_shell_ui/runtime_dialogue_client.dart' show BrokerTransport;
 
 class _TrayTransport implements BrokerTransport {
   final operations = <String>[];
+  bool _holdNextNotification = false;
+  Completer<void>? _notificationStarted;
+  Completer<void>? _notificationRelease;
+
+  void holdNextNotification() {
+    _holdNextNotification = true;
+    _notificationStarted = Completer<void>();
+    _notificationRelease = Completer<void>();
+  }
+
+  Future<void> get notificationStarted => _notificationStarted!.future;
+
+  void releaseNotification() => _notificationRelease!.complete();
 
   @override
   Future<Map<String, Object?>> request(
@@ -13,6 +30,11 @@ class _TrayTransport implements BrokerTransport {
     Map<String, Object?>? payload,
   }) async {
     operations.add(operation);
+    if (operation == '通知一覧' && _holdNextNotification) {
+      _holdNextNotification = false;
+      _notificationStarted!.complete();
+      await _notificationRelease!.future;
+    }
     return {
       'status': 'accepted',
       'body': {
@@ -143,5 +165,136 @@ void main() {
     expect(client.available, isFalse);
     expect(await client.isWindowVisible(), isNull);
     await client.dispose();
+  });
+
+  testWidgets('ウィンドウを隠すとトレイ更新を止め、再表示後に再開する', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var windowVisible = true;
+    var visibilityQueries = 0;
+    final transport = _TrayTransport();
+    final published = <Map<Object?, Object?>>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => windowVisible,
+        'isWindowVisible' => () {
+            visibilityQueries += 1;
+            return windowVisible;
+          }(),
+        'publish' => () {
+            published.add(call.arguments! as Map<Object?, Object?>);
+            return null;
+          }(),
+        _ => null,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+    expect(visibilityQueries, 2);
+    int notificationPollCount() =>
+        transport.operations.where((operation) => operation == '通知一覧').length;
+
+    final initialNotificationPolls = notificationPollCount();
+    expect(initialNotificationPolls, greaterThan(0));
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(visibilityQueries, 4);
+    expect(notificationPollCount(), initialNotificationPolls + 1);
+
+    Future<void> reportNativeVisibility(bool visible) async {
+      const codec = StandardMethodCodec();
+      await messenger.handlePlatformMessage(
+        channel.name,
+        codec.encodeMethodCall(
+          MethodCall('onWindowVisibilityChanged', visible),
+        ),
+        (_) {},
+      );
+      await tester.pumpAndSettle();
+    }
+
+    windowVisible = false;
+    await reportNativeVisibility(false);
+    expect(published.last['runtime_status'], '不明');
+    final queriesWhenHidden = visibilityQueries;
+    await tester.pump(const Duration(seconds: 60));
+    await tester.pumpAndSettle();
+    expect(visibilityQueries, queriesWhenHidden);
+    expect(notificationPollCount(), initialNotificationPolls + 1);
+
+    windowVisible = true;
+    await reportNativeVisibility(true);
+    expect(visibilityQueries, queriesWhenHidden + 2);
+    expect(notificationPollCount(), initialNotificationPolls + 2);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(visibilityQueries, queriesWhenHidden + 4);
+    expect(notificationPollCount(), initialNotificationPolls + 3);
+  });
+
+  testWidgets('通知取得中に隠した場合は完了後の古い射影を破棄する', (tester) async {
+    const channel = MethodChannel('gui_shell/tray');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var windowVisible = true;
+    final transport = _TrayTransport();
+    final published = <Map<Object?, Object?>>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      return switch (call.method) {
+        'initialize' => windowVisible,
+        'isWindowVisible' => windowVisible,
+        'publish' => () {
+            published.add(call.arguments! as Map<Object?, Object?>);
+            return null;
+          }(),
+        _ => null,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    await tester.pumpWidget(
+      GuiShellDesktopApp(client: ShellCoreClient.mock(transport: transport)),
+    );
+    await tester.pumpAndSettle();
+    final priorNotificationPolls =
+        transport.operations.where((operation) => operation == '通知一覧').length;
+
+    transport.holdNextNotification();
+    await tester.pump(const Duration(seconds: 30));
+    await transport.notificationStarted;
+    expect(
+      transport.operations.where((operation) => operation == '通知一覧').length,
+      priorNotificationPolls + 1,
+    );
+
+    windowVisible = false;
+    const codec = StandardMethodCodec();
+    await messenger.handlePlatformMessage(
+      channel.name,
+      codec.encodeMethodCall(
+        const MethodCall('onWindowVisibilityChanged', false),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+    expect(published.last['runtime_status'], '不明');
+    final hiddenProjectionCount = published.length;
+
+    transport.releaseNotification();
+    await tester.pumpAndSettle();
+    expect(published, hasLength(hiddenProjectionCount));
+    expect(published.last['runtime_status'], '不明');
   });
 }

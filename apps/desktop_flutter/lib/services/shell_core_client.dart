@@ -214,8 +214,8 @@ class ShellCoreClient {
     );
   }
 
-  factory ShellCoreClient.mock() {
-    return const ShellCoreClient._(_mockSnapshot, 'mock');
+  factory ShellCoreClient.mock({BrokerTransport? transport}) {
+    return ShellCoreClient._(_mockSnapshot, 'mock', null, transport);
   }
 
   ShellSnapshot getSnapshot() => snapshot;

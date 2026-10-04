@@ -376,7 +376,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/services/shell_core_client.dart",
-      "sha256": "9d25a05a911ba2f0e68fc52066f81d89cb394c1fef3fe19c136bcc501919dbf9"
+      "sha256": "e8d58ed06949b477fb5329470e4b8cf1b1b70f7056427b91a59b1bf27dee16aa"
     },
     {
       "path": "apps/desktop_flutter/lib/services/update_client.dart",
@@ -640,7 +640,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
-      "sha256": "7ff00c3a4d0057aa8927410fb320c85b455cf45cff2fd6add0b74e59b62c4798"
+      "sha256": "4ce574eaea871e47b595abe8530a8c41381c4ba5403beadfafb138426bf40316"
     },
     {
       "path": "apps/desktop_flutter/test/workspace_inspector_test.dart",
@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "c67532b97c0e52612d67d2a19ae8edda221436fd9c7e6e30823837409b542c2c"
+      "sha256": "0594a8d87131610eeb7d6417dd34aadb95dbbf463eec7a9557de56f38426de99"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",

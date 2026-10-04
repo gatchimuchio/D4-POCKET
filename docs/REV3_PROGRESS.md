@@ -2110,3 +2110,11 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - source `64c608465982407a759f6059ef00d900fb30139e`はAgent CenterのTask状態表示とrun45操作記録を訂正した。これはfresh installed artifactやTask結果本文／diff経路、終了Auditの追加証拠ではない。
 
 通常Releaseの`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+
+## R2追補 タイトルバー×による非表示中のトレイpoll回帰fixture（2026-10-04）
+
+- Owner訂正どおり、Windows native `WM_CLOSE`はトレイの終了要求がない場合に`ShowWindow(SW_HIDE)`を行い、`WM_SHOWWINDOW`で可視性変化をFlutterへ通知する。Flutterの常駐トレイ更新は可視中だけ30秒周期で`通知一覧`を読み、非表示通知でtimerを停止して表示値を`不明`へ戻す。再表示通知後は現在状態を再取得してから投影する。
+- `ShellHomePage`を通るFlutter testを追加した。試験用native channelで可視／非表示を遷移させ、試験用Broker transportが受ける`通知一覧`要求数を照合する。可視中の周期更新、非表示60秒間に追加pollがないこと、再表示直後と次周期の更新再開を確認した。さらに通知要求の応答を保留して非表示化し、応答解放後に古い射影が再publishされず`不明`表示が保持されることを確認した。
+- OneDrive内checkoutではFlutterが生成物`macos/Flutter/ephemeral/Packages/.packages`と`build/unit_test_assets`を削除できず、Flutter commandが起動前に停止した。ACL、OS保護設定、製品pathは変更せず、tracked sourceをASCII名の一時copyへ複写して同じFlutter SDKで検査した。tray testは8 passed／0 failed、Desktop全体とMobileの`flutter analyze`は問題なし、`dart format`差分なし。
+- この回帰検査の証拠区分は`FIXTURE`。native channelとBroker transportは試験用であり、installed Windowsの実際の×操作、実Rust Broker、実Audit増分停止を証明しない。起動中の一件は完了してよいが、非表示windowへ古い値を再投影しない境界のfixture検査である。
+- `release_blocker`: Windows installed productでのtray icon、×によるhide／再表示、通常終了、Broker-mediated stop requestの一体実証は未成立。今回のtest追加はC20のrelease gate、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を変更しない。
