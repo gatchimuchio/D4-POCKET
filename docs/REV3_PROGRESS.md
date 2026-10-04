@@ -2101,3 +2101,12 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 偽Responses APIはloopback限定の合成fixture。実model／実credential／課金／外部API要求は不使用、Windows保護設定も変更していない。Codex CLIは実物`0.160.0`、SHA-256 `sha256:7d4588265a55adb1403f85d2e058b11dc971459842de84876c86ff02fb7771f2`。製品manifestはruntime scope `per_user`、`isolated=false`、`formal_runtime_proof=false`を宣言し、今回のrun profileを製品隔離保証へ昇格しない。
 - Ownerはrun45の終了を報告したが、その後のLIVE_RUNTIME再確認でもLauncher PID `6152`とFlutter frontend PID `17656`が稼働し、D4 Pocket windowが列挙された。Brokerの`session.json`は`active`、最新確認時点のAudit末尾は`broker-audit-207`（`通知一覧`／`accepted`）で、終了報告後も通知照会Auditが進んでいた。したがってnative tray通常終了は観測されず、Desktop終了Auditもない。Computer Useでは通知領域を選択できず、force-stopは行わない。通常終了が成立するまで最終Audit chain／HMAC検証、session fileとsynthetic profileのcleanupを保留する。Owner報告と実測の不一致を隠さず記録し、残る物理操作はtray menuの「終了」を成立させること。
 - run45は`r2-e2e`試験feature付き段階配置品でのpositive Taskと実TEMP writeを示すが、通常Release capabilityではない。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。通常Release昇格、正式runtime provenance、Audit restart durability、failure／deadline／crash Recovery、result／diff Content Exposure、task間隔離、OneDrive Cloud Files／通常NTFS統合、Compare／Handoff等は未成立のまま保持する。
+
+## R2追補 run45のタイトルバー×操作に関するOwner訂正（2026-10-04）
+
+- Ownerから、run45時の操作はタイトルバーの×を押して画面を消したものであり、トレイメニューから製品を終了したのではないと確認した。前節の「Ownerの終了報告」と「残る物理操作はtray menuの『終了』」という当時の解釈は訂正する。クリック直後にLauncher／frontend processと通知照会が継続していたのは、×でトレイへ隠れる仕様と整合する。
+- その後の確認ではrun45のprocessは不在だったが、介在操作と停止原因を観測していないため、×がprocessを終了させたとも正常終了したとも推定しない。最終Auditは231件で末尾は`broker-audit-231`／`通知一覧`、anchor count／head一致は確認済み。全event chainとanchor HMACは再計算しておらず、`broker_session.json`も残存しているため、run45のgraceful tray exit、最終Audit耐久性、endpoint cleanup、profile cleanupは未確認のまま。
+- 追加のOwner物理操作は開発試験の前提ではない。通常tray exitの検証は既存controlled UI automation／product test pathで行う。run45のpositive Task・合成secret／Workspace外path probe・TEMP writeの限定証拠は維持するが、reused staged artifact、`r2-e2e` feature、`isolated=false`／`formal_runtime_proof=false`を明示し、通常Release capabilityへ昇格しない。
+- source `64c608465982407a759f6059ef00d900fb30139e`はAgent CenterのTask状態表示とrun45操作記録を訂正した。これはfresh installed artifactやTask結果本文／diff経路、終了Auditの追加証拠ではない。
+
+通常Releaseの`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
