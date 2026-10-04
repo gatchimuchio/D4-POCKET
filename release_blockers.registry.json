@@ -417,6 +417,40 @@
         "os_protection_changed": false,
         "scope_limit": "Failed attempt only. Does not pass deadline detection, process-group stop, Recovery, or Audit for deadline. Preserve as failure history; do not treat Task failed or descendants absent as deadline success."
       },
+      "installed_task_cancellation_probe_2026_10_05": {
+        "date": "2026-10-05",
+        "source_commit": "f888c7e0d4abb499c9524849c2605570748a0146",
+        "source_worktree_clean": true,
+        "installed_run_id": "d4p-r2-live-deadline-f888c7",
+        "task_id": "ce0673b83169287daf32eee0442e029f",
+        "session_id": "a1b4b3238e555d3e11db0367eeb2724e",
+        "task_body_sha256": "dad7e4dec545e58200ffa7f8e5b2b09a0fc48821f6e96537842261e588f519d3",
+        "task_start_audit_id": "broker-audit-121",
+        "task_terminal_audit_id": "broker-audit-128",
+        "task_state_query_audit_id": "broker-audit-135",
+        "evidence_source": "LIVE_RUNTIME for the installed synthetic Task cancellation and post-cancel observations; not deadline or crash evidence",
+        "result": "inconclusive_task_cancelled_by_ui_automation_error",
+        "installed_artifact": {
+          "manifest_version": 3,
+          "manifest_sha256": "ca628b3a232e04c4a7f8edf83b4565990d45c2c439aa525a549f12b1e7bfba8b",
+          "app_sha256": "55b2d58c93719472452b81ece3d7a7c10094d379537446344a853e188af25d0e",
+          "broker_sha256": "871794537b171b90f51ab82e55b364087f06c0a59b97bf915c142895e4568a4a",
+          "launcher_sha256": "af693b22a0c522f7de3eacaede09072d08992cccdb3e1ff4024f8713fed0fe34",
+          "product_manifest": null,
+          "runtime_formal_proof": false
+        },
+        "observations": {
+          "cause": "During an intended Task status refresh, the UI automation clicked the adjacent Task stop control. This was an automation error; the Task was cancelled, not crashed, and no deadline cause was established.",
+          "audit": "Task start was broker-audit-121. The terminal event broker-audit-128 records AgentTask取消. A subsequent state query was rejected as 要求不正 at broker-audit-135 while the Agent Center continued to display running.",
+          "process_cleanup": "After cancellation, the Codex CLI process and its Task-specific temporary directory were absent, no Codex/MxC descendants remained, and the Launcher and Flutter UI remained alive. The completion marker was absent. This observation does not establish deadline-triggered process-group termination.",
+          "fake_api": "One loopback Requests API request; a tool call was sent, no tool result was received, no Workspace completion marker was written, and no external request was observed. The helper was configured for an expected-deadline predicate that cannot distinguish Task cancellation from deadline termination, so its exit status is not deadline evidence.",
+          "artifact_identity": "Installed binary hashes matched the staged manifest. The manifest declares product_manifest=null and runtime formal proof false; this is a test-stage artifact, not formal Release provenance.",
+          "audit_integrity_snapshot": "A stable 151-event file-backed snapshot had zero event-hash, previous-link, duplicate-ID, and sequence errors; anchor head/count and HMAC matched. JSONL SHA-256 072f1088202a4f27115b7a1a43f85c77ca036321cac1899c6700c24dceea88a8; head 5ebcd8193298e0f14f9e33a99de848cc6e3c0320397ceb789ee4b339b9bf309d. This snapshot validates the recorded chain, not deadline or crash semantics."
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "Failed synthetic cancellation probe only. Does not pass cancellation Recovery/UI state reconciliation, deadline detection, crash Recovery, or process-group stop. Preserve the state-query rejection and automation error; do not reinterpret the helper's expected-deadline result as a deadline pass."
+      },
       "r2_deadline_fixture_continuation_correction": {
         "date": "2026-10-04",
         "source_base_commit": "5e64044ad385c65c56b4aba8a18c18e2e8f71244",

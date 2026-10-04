@@ -2204,3 +2204,12 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - Release Broker helperのbuildと非synthetic Broker smokeが成功した。認証済みloopback IPC、永続storeの準備、通常IPCからのWorkspace Permission／Task Approval拒否、再起動後のreplay拒否、新規health、強制停止時のfail-closed、session file cleanupを確認した。検査process／一時出力をcleanupし、試験後に作業treeへ差分がないことも確認した。成果物のuploadはない。
 - Actionsの証拠範囲はRust全targetと単独Release Broker processのWindows検証であり、配置済みFlutter UI／native Owner経路、正のAgent Task、Content Exposure UI、deadline／crash Recovery、正式Release capability、artifact provenanceを証明しない。R2条件4は未閉鎖であり、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
 - 成功した正確なcommitだけを`main`へfast-forwardしてpushし、remote `main` HEAD一致を確認した。検証用branchはlocal／remote双方から削除した。手動検査branchはPRを作成せず、Actions結果を自動gateに用いていない。
+
+## R2追補 installed Task取消試行と状態照会不整合（2026-10-05）
+
+- clean source commit `f888c7e0d4abb499c9524849c2605570748a0146`から作成したmanifest v3の試験用段階配置品を使用した。source worktreeはclean。App／Broker／LauncherのSHA-256と配置Manifestのhashは`release_blockers.registry.json`へ記録した。Manifestは`product_manifest=null`、runtime formal proof=falseであり、正式Release provenanceではない。
+- installed Flutter UIで合成Taskを開始した。Session `a1b4b3238e555d3e11db0367eeb2724e`、Task `ce0673b83169287daf32eee0442e029f`、Task本文hash `sha256:dad7e4dec545e58200ffa7f8e5b2b09a0fc48821f6e96537842261e588f519d3`、開始Audit `broker-audit-121`。Workspace Permissionと独立した一回限りTask Approvalを現行native UIで発行した。
+- Task状態更新を試みたUI自動操作で、隣接する「Task stop」を誤クリックした。これは試験自動化側の誤操作であり、実際の終端Audit `broker-audit-128`は`AgentTask取消`。期限到達でもprocess crashでもない。Codex processとTask専用一時directoryは取消後に不在、Launcher／Flutterは残存、Task完了markerなしを観測した。偽APIは1 request、tool call送信、tool resultなし、外部要求なし。
+- 取消後もAgent CenterはTaskを`running`と表示し、状態照会要求は`broker-audit-135`で`要求不正`として拒否された。従って取消の画面状態反映・Recoveryは未成立として保持する。試験helperの`expected-deadline`判定は取消と期限停止を識別できないため、そのexit statusを期限証拠に採用しない。
+- 同時点のfile-backed Audit snapshotは151 event、event hash／previous link／重複ID／sequence errorなし、anchor head/countとHMAC一致。JSONL hashとheadはregistryに記録した。これはAudit連鎖の整合を示すが、取消・期限・crashの意味的成功を示さない。
+- 判定: 今回は失敗した取消観測であり、deadline／crash／Recoveryのいずれも閉じない。誤操作と状態照会拒否を履歴に保持し、同じ試験を名称だけ変えてPASS扱いしない。通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`は維持する。
