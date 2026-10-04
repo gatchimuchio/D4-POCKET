@@ -67,7 +67,10 @@ fn workspace_control_is_rejected_over_normal_authenticated_ipc() {
             "payload_hash":gui_shell_rust_helper::audit_hash::sha256_tagged(payload.to_string().as_bytes()),"payload":payload});
         let result = send_request(&process.endpoint,&request.to_string());
         assert_eq!(result["status"],"rejected");
-        assert_eq!(result["error"]["code"],"権限拒否");
+        assert_eq!(
+            result["error"]["code"],
+            "desktop_native_owner_confirmation_required"
+        );
         assert!(result["body"].is_null());
     }
 }
