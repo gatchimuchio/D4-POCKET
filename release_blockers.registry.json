@@ -304,6 +304,19 @@
         "os_protection_changed": false,
         "scope_limit": "PASS is limited to installed Broker restart and durable Audit-based Task quarantine. It does not prove active process-group kill, deadline Recovery, Agent Center Recovery/result projection, TEMP cleanup, normal Release task_execution support, artifact provenance, or release readiness. Keep task_execution=unsupported and release_ready=false."
       },
+      "deadline_supervision_test_fixture": {
+        "date": "2026-10-04",
+        "evidence_source": "FIXTURE",
+        "source_base_commit": "ed6f9809e6990b62c4d768deccb41c19d76cf111",
+        "source_worktree_clean": false,
+        "validation": "cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e deadline_supervision_probe_waits_past_broker_limit_only_with_explicit_marker -- --nocapture: unit test 1 passed、r2_e2e_responses fixture test 1 passed。rustfmt +1.95.0 --check --edition 2021 native/rust_helper/tests/support/codex_loopback_responses.rs passed。",
+        "observations": {
+          "default_wait": "通常のprobe待機は1,200回×25msで最大30秒。",
+          "explicit_test_wait": "専用合成Workspaceにbroker-real-codex-task-extended-supervision markerがある場合だけ40,000回×25msで最大1,000秒となり、Brokerの900秒Task期限を越える。",
+          "production_change": "production deadline、process監督、権限、通常Release capabilityは変更していない。"
+        },
+        "scope_limit": "FIXTURE限定。installed Task deadline到達、process群停止、Recovery／Audit、通常Release task_execution support、release readinessを証明しない。"
+      },
       "spawn_secret_revalidation_probe": {
         "date": "2026-09-30",
         "evidence_source": "FIXTURE",

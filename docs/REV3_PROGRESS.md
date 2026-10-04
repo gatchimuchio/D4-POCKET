@@ -2156,3 +2156,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 最終file-backed Auditは113 event、head `sha256:61337208a56408648038b2fd62f7b816fa78dd4141912cda8d0599651bb55fc8`、JSONL SHA-256 `sha256:76f37776657aee195ba06e16e1124c097e1a5bcb088a4f15bb75aea0fb9fe22c`。anchor count=113かつhead一致。Broker再起動が保存済みstoreを読み込んで新eventを追記したことは確認したが、このrunの独立HMAC再計算はしていない。
 - 再起動後のAudit UIでRecovery marker検索は「一致する監査事象なし」、Recovery画面にもTask固有項目は表示されなかった。Agent Centerへ戻った後、登録開始操作の直後にFlutter windowがWindows上で「応答なし」と表示された。secondary native dialogの有無を確認する前に、hash／pathを照合したrun51 Launcher／Flutterだけを停止したため、ハング原因は未確定。このrunで通常tray exit／終了Auditは成立していない。Audit storeとsynthetic profileは保持した。
 - 判定: installed Broker再起動後のAuditによるTask RecoveryはPASS。active Task deadline、crash瞬間の子孫停止、MxC TEMP cleanup、Agent CenterからのRecovery／結果投影、通常Release capability、installed artifact provenanceは未成立。`task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持し、このUI無応答の原因を確認するまでは同じrunの再試験で隠さない。
+
+## R2追補 active Task deadline観測用fixtureの有界化（2026-10-04）
+
+- 通常の合成Workspace probeはこれまでどおり最大30秒で継続markerを待つ。専用の合成Workspaceに`broker-real-codex-task-extended-supervision` markerが明示された場合に限り、最大40,000回×25ms（1,000秒）まで待機する試験専用分岐を追加した。production Brokerの900秒Task期限、process監督、権限、通常Release capabilityは変更していない。
+- focused validation: `cargo +1.95.0 test --locked --offline --manifest-path native/rust_helper/Cargo.toml --all-targets --features r2-e2e deadline_supervision_probe_waits_past_broker_limit_only_with_explicit_marker -- --nocapture` — unit test 1 passed、および同名の`r2_e2e_responses` fixture test 1 passed。`rustfmt +1.95.0 --check --edition 2021 native/rust_helper/tests/support/codex_loopback_responses.rs`もpassed。
+- 証拠分類は`FIXTURE`。この変更はinstalled Taskの期限到達、Brokerの期限処理、Job Objectによるprocess群停止、Recovery／Auditを証明しない。次の専用installed runで実Taskが900秒期限を越えて生存を継続するよう同期し、期限到達後の終端・子孫停止・Recoveryを一体観測するための試験制御だけを提供する。
+- `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。R2期限条件はinstalled `LIVE_RUNTIME`の期限到達／停止／Recovery証拠でのみ閉じる。

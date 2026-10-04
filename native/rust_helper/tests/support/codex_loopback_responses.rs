@@ -341,7 +341,9 @@ fn synthetic_workspace_probe_script() -> String {
         "Write-Output ('D4P_R2_TEMP_WRITE_'+$tempWrite); Write-Output ('D4P_R2_TEMP_STEP_'+$tempStep); ",
         "$tempState=@{stage='temp_checked';temp=$env:TEMP;tmp=$env:TMP;marker_name=$tempMarkerName;temp_matches_workspace_scratch=$tempMatches;tmp_matches_workspace_scratch=$tmpMatches;temp_scope=$tempScope;temp_write=$tempWrite;temp_step=$tempStep;temp_directory_create=$tempDirectoryCreate;temp_retry_write=$tempRetryWrite}|ConvertTo-Json -Compress; Set-Content -LiteralPath $tempReport -Value $tempState -NoNewline -ErrorAction Stop; ",
         "$continue=Join-Path $workspace 'broker-real-codex-task-continue'; $continued=$false; ",
-        "for($attempt=0;$attempt -lt 1200;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
+        // 通常fixtureは短時間に保ち、明示した試験markerがある場合だけBrokerの900秒期限を越えて待機する。
+        "$waitLimit=1200; $extendedWaitMarker=Join-Path $workspace 'broker-real-codex-task-extended-supervision'; if(Test-Path -LiteralPath $extendedWaitMarker -PathType Leaf){$waitLimit=40000}; ",
+        "for($attempt=0;$attempt -lt $waitLimit;$attempt++){if(Test-Path -LiteralPath $continue -PathType Leaf){$continued=$true;break}; Start-Sleep -Milliseconds 25}; if(-not $continued){exit 44}; ",
         "$secretDenied=$false; try { Get-Content -LiteralPath (Join-Path $workspace 'private\\credential-backup.txt') -Raw -ErrorAction Stop | Out-Null } catch { $secretDenied=$true }; ",
         "if (-not $secretDenied) { exit 41 }; $outside=Split-Path -Parent $workspace; ",
         // AppContainerでは親directoryの可視性自体が拒否され得る。fixtureの存在はhost側で確認し、childはreadを直接試す。
@@ -1461,6 +1463,20 @@ mod tests {
         assert!(!probe.contains("New-Item -ItemType Directory -Path $tempTarget"));
         assert!(!probe.contains("Remove-Item -LiteralPath $tempMarker"));
         assert!(probe.contains("'d4p synthetic temp observer'"));
+    }
+
+    #[test]
+    fn deadline_supervision_probe_waits_past_broker_limit_only_with_explicit_marker() {
+        let probe = synthetic_workspace_probe_script();
+        assert!(probe.contains("$waitLimit=1200"));
+        assert!(probe.contains("$waitLimit=40000"));
+        assert!(probe.contains("broker-real-codex-task-extended-supervision"));
+        assert!(probe.contains("Start-Sleep -Milliseconds 25"));
+        assert!(1_200_u64 * 25 < 900_000, "通常fixtureの待機は30秒に限定");
+        assert!(
+            40_000_u64 * 25 > 900_000,
+            "試験用待機はBrokerの900秒上限を超える"
+        );
     }
 
     #[test]
