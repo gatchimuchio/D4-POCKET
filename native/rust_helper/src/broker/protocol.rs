@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -1029,7 +1029,7 @@ impl Broker {
                 persistent_state.audit_log.events(),
             )
             .map_err(|error| BrokerStoreError::TamperedAuditState(error.message))?;
-        Ok(Self {
+        let mut broker = Self {
             session_id: session_id.to_string(),
             seen_nonces: persistent_state.seen_nonces,
             audit_log: persistent_state.audit_log,
@@ -1066,7 +1066,52 @@ impl Broker {
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
-        })
+        };
+        broker.recover_interrupted_agent_tasks()?;
+        Ok(broker)
+    }
+
+    /// Broker再起動時、永続開始記録に終端結果がないTaskを再開せず隔離する。
+    /// 回復判断は既存Auditへ一度だけ追記し、Permission／Approvalは履歴から復元しない。
+    fn recover_interrupted_agent_tasks(&mut self) -> Result<(), BrokerStoreError> {
+        const TASK_START: &str = "Agent Task実行開始（Permission／Owner Approval一回消費）";
+        const TASK_COMPLETE: &str = "Agent Task完了（結果本文非保存・hashのみ）";
+        const TASK_FAILED: &str = "Agent Task失敗・取消（RecoveryAction=Workspace差分を確認）";
+        const TASK_WORKER_START_FAILED: &str =
+            "Agent Task worker起動失敗 RecoveryAction=再試行前にRuntime状態確認";
+        const TASK_RECOVERY: &str =
+            "Agent Task中断回復（状態隔離・RecoveryAction=Workspace差分を確認）";
+
+        let mut started = BTreeMap::<String, String>::new();
+        let mut terminal = BTreeSet::<String>::new();
+        for event in self.audit_log.events() {
+            if event.operation == TASK_START {
+                started.insert(event.request_id.clone(), event.event_hash.clone());
+            } else if matches!(
+                event.operation.as_str(),
+                TASK_COMPLETE | TASK_FAILED | TASK_WORKER_START_FAILED | TASK_RECOVERY
+            ) {
+                terminal.insert(event.request_id.clone());
+            }
+        }
+
+        for (task_id, start_event_hash) in started {
+            if terminal.contains(&task_id) {
+                continue;
+            }
+            let recovery_hash = sha256_tagged(
+                format!("agent-task-interruption|{task_id}|{start_event_hash}").as_bytes(),
+            );
+            self.append_audit(
+                &task_id,
+                TASK_RECOVERY,
+                "suspended",
+                "永続開始記録に終端結果がないためTaskを再開せず隔離。過去のPermission／Approvalは復元せず、新しいWorkspace差分確認を要求",
+                EVIDENCE_SOURCE_INTERNAL_STATE,
+                &recovery_hash,
+            )?;
+        }
+        Ok(())
     }
 
     pub(crate) fn set_desktop_setup_doctor_runtime_evidence(
@@ -5550,6 +5595,80 @@ mod tests {
         (broker, scratch_name)
     }
 
+    #[test]
+    fn task_crash_recovery_is_idempotent_and_fails_closed() {
+        let root = temp_store_dir("agent-task-interruption-recovery");
+        let interrupted_task_id = "fixture-interrupted-task";
+        let completed_task_id = "fixture-completed-task";
+        {
+            let mut broker =
+                Broker::new_persistent("task-recovery-seed", &root).expect("永続Brokerを作成");
+            for task_id in [interrupted_task_id, completed_task_id] {
+                broker
+                    .append_audit(
+                        task_id,
+                        "Agent Task実行開始（Permission／Owner Approval一回消費）",
+                        "accepted",
+                        "合成Task開始記録",
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        &sha256_tagged(task_id.as_bytes()),
+                    )
+                    .expect("Task開始Auditを確定");
+            }
+            broker
+                .append_audit(
+                    completed_task_id,
+                    "Agent Task完了（結果本文非保存・hashのみ）",
+                    "recorded",
+                    "合成Task終端記録",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(b"completed-task"),
+                )
+                .expect("完了Taskの終端Auditを確定");
+        }
+
+        {
+            let broker = Broker::new_persistent("task-recovery-first-restart", &root)
+                .expect("再起動時に中断Taskを回復");
+            let recovered = broker
+                .audit_events()
+                .iter()
+                .filter(|event| {
+                    event.request_id == interrupted_task_id
+                        && event.operation.starts_with("Agent Task中断回復")
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(recovered.len(), 1, "中断Taskの回復記録は一件");
+            assert_eq!(recovered[0].decision, "suspended");
+            assert_eq!(recovered[0].evidence_source, EVIDENCE_SOURCE_INTERNAL_STATE);
+            assert!(recovered[0].reason.contains("Taskを再開せず隔離"));
+            assert!(recovered[0]
+                .reason
+                .contains("Permission／Approvalは復元せず"));
+            assert!(!broker.audit_events().iter().any(|event| {
+                event.request_id == completed_task_id
+                    && event.operation.starts_with("Agent Task中断回復")
+            }));
+        }
+
+        let broker = Broker::new_persistent("task-recovery-second-restart", &root)
+            .expect("回復記録後の再起動");
+        assert_eq!(
+            broker
+                .audit_events()
+                .iter()
+                .filter(|event| {
+                    event.request_id == interrupted_task_id
+                        && event.operation.starts_with("Agent Task中断回復")
+                })
+                .count(),
+            1,
+            "Brokerを再起動しても回復Auditを重複追加しない"
+        );
+        drop(broker);
+        fs::remove_dir_all(root).expect("回復fixture storeを削除");
+    }
+
     pub(super) fn persistent_test_broker(store_dir: &Path) -> Broker {
         let mut broker = Broker::new_persistent("session-1", store_dir).unwrap();
         broker.current_epoch_seconds_override =
@@ -5582,8 +5701,18 @@ mod tests {
     fn broker強制終了後の別process起動登録で永続scratchを監査付き回収する() {
         const CHILD_ROOT_ENV: &str = "GUI_SHELL_AGENT_TASK_SCRATCH_CRASH_TEST_ROOT";
         if let Some(root) = std::env::var_os(CHILD_ROOT_ENV).map(PathBuf::from) {
-            let (broker, _) =
+            let (mut broker, _) =
                 seed_agent_task_scratch_for_crash(&root, "scratch-session-crash-child");
+            broker
+                .append_audit(
+                    "fixture-task",
+                    "Agent Task実行開始（Permission／Owner Approval一回消費）",
+                    "accepted",
+                    "合成稼働Task開始記録",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    &sha256_tagged(b"fixture-task-start"),
+                )
+                .expect("稼働Task開始Auditを永続化");
             fs::write(root.join("child-ready.pid"), std::process::id().to_string())
                 .expect("journal保存後の準備完了札");
             loop {
@@ -5641,6 +5770,11 @@ mod tests {
 
         let mut restarted = Broker::new_persistent("scratch-session-restarted", &store_root)
             .expect("同じ永続storeからBrokerを再起動");
+        assert!(restarted.audit_events().iter().any(|event| {
+            event.request_id == "fixture-task"
+                && event.operation.starts_with("Agent Task中断回復")
+                && event.decision == "suspended"
+        }));
         restarted
             .実行系登録(
                 "fixture-runtime",

@@ -224,6 +224,22 @@
     },
     {
       "name": "comprehensive_extension_rev1_completion",
+      "agent_task_crash_recovery_restart_audit": {
+        "date": "2026-10-04",
+        "source_base_commit": "52f7817fc10e9f7870338801d1e4272146d76b0b",
+        "source_worktree_clean": false,
+        "evidence_source": "Broker再起動とTask Audit照合はFIXTURE。Windows Job Objectの子孫停止と偽Codex期限超過は機構単位のLIVE_RUNTIMEに限定。",
+        "validation": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml task_crash_recovery_is_idempotent_and_fails_closed: 1 passed。broker強制終了後の別process起動登録で永続scratchを監査付き回収する: 1 passed。偽CodexCLIはAdapterのTask成功・期限超過cleanup・子孫停止を通る: 1 passed。cargo test --locked --manifest-path native/process_supervision/Cargo.toml abrupt_broker_exit_closes_job_and_terminates_descendants: 1 passed。",
+        "observations": {
+          "unmatched_start": "永続Task開始に終端Auditがない場合、再実行せずsuspended／INTERNAL_STATEの回復Auditを一件記録する。",
+          "idempotency_and_authority": "完了済みTaskを再分類せず、Broker再起動を繰り返しても回復Auditを重複させない。以前のPermission／Approvalを復元しない。",
+          "process_cleanup": "Job所有processの異常終了で子・孫processが停止する。偽Codex CLIの期限超過後は子孫heartbeatが止まりBroker管理Workspace scratchが消去される。",
+          "actions": "commit 52f7817上のWindows手動Export build run #9が成功。合成fixtureから未署名portable bundleをbuild・検査し、artifact uploadなし。"
+        },
+        "real_model_or_credential_used": false,
+        "os_protection_changed": false,
+        "scope_limit": "Windowsのlocal unit／process fixtureとhosted Windows Export buildに限定。installed D4 Pocket UI／Broker経路で実Codex Task稼働中のcrash、Task終端・Workspace結果・永続Recoveryの一体観測、OneDrive Cloud Filesと通常NTFSの比較、通常Release task_execution support、release readinessは未確認。"
+      },
       "spawn_secret_revalidation_probe": {
         "date": "2026-09-30",
         "evidence_source": "FIXTURE",
