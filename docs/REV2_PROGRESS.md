@@ -2723,3 +2723,31 @@ Codex AdapterのTask経路はproduction metadataで`unsupported`のままであ�
 - 同じRust source commitを`main`へfast-forward pushし、`git ls-remote origin refs/heads/main`が`6441ae8b2827d2afa01f9963ff2472fd2b889ce2`と一致することを確認した。目的を終えた一時branchはlocal／remote双方から削除した。
 
 このActions結果は対象commit上のhosted Windows Rust build／testだけを証明し、ローカルWindowsでの生成executable起動可否、installed product、production Agent Task、release readinessを証明しない。`windows_rust_integration_test_execution_policy`のhosted検査gateは解消状態を維持する一方、実Agent隔離のrelease blockerは解消しない。
+
+## Agent CenterのTask実状態表示とrun45終了追跡（2026-10-04）
+
+Agent CenterはBroker Taskの`completed`と結果hashを表示する一方、同じ画面の固定文言で「Task実行・状態は未接続」と表示していた。Task状態を現SessionでBrokerから取得した値に基づいて表示し、未取得状態は「Taskが存在しない証拠ではない」と明記した。結果hashとTask本文を区別し、AgentTask APIから結果本文、Task専用diff、道具・shell・試験記録、保留中Approval、巻戻し候補を取得していないことを個別表示する。作業領域の結合IDはroot pathとして扱わない。Workspace Inspectorは現在の読取Approvalと基準点に基づく独立経路であり、Task実行結果のdiffと同一視しない。Capabilityは権限にならず、実行前にBrokerが現行Workspace PermissionとTask単位Approvalを検証する境界を維持する。
+
+- `flutter test --no-pub test/widget_test.dart`（Desktop app＋`gui_shell_ui`だけを複製したASCII一時copy）：46件合格。未対応Taskとcompleted Taskの表示、結果本文／Task差分の未取得表示、権限境界、既存Agent surfaceを確認した。
+- `flutter analyze --no-pub`（Desktop、ASCII一時copy）：`No issues found`。同（Mobile、ASCII一時copy）：`No issues found`。OneDrive日本語path上のDesktop testは`build\unit_test_assets`削除拒否で起動前に失敗し、同path上のMobile analyzeはanalysis serverがLSP JSONの`Unterminated string`で停止した。Mobile側の生成`flutter_10.log`は`.gitignore`対象と確認後に削除した。製品ACL、Application Control、OS設定は変更していない。
+- 全Desktop `flutter test --no-pub`（ASCII一時copy）：146件合格、2件失敗。`runtime_lifecycle_test.dart`と`workspace_inspector_test.dart`の実Broker統合testは、Rust helperが一時copyにbuildされていないため「先にRust helperをbuildしてください」でassertion前に停止した。全suite合格とは扱わない。
+- `dart format apps/desktop_flutter/lib/screens/agent_center.dart apps/desktop_flutter/test/widget_test.dart`：変更なし。`git diff --check`：合格。
+- `python -X utf8 tooling/schema_check/check_schemas.py`：Schema 152件／example 152件／negative fixture 196件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`：231 checksで合格。途中で表示文言変更が5つの必須Agent surface labelを外したため失敗し、正本surface名を保つラベルへ修正してから合格した。厳格日本語監査は1134ファイル／finding 0件。`MANIFEST.sha256.json`は1131 fileで再生成し、check合格。
+- `python -X utf8 tooling/validate_all.py --python-only --desktop-platform windows`の初回は上記Conformance surface欠落で失敗した。ラベル修正後の再実行はexit 0で、登録済み開発検査10件が合格した。release gate検査は正常終了したが、release blocker 5件と`release_ready=false`を維持しており、release成立を意味しない。
+
+run45について、Ownerが行ったのはタイトルバーの×を押して画面をトレイへ隠す操作であり、製品の終了操作ではない。×直後にlauncher／Flutter processが動作を継続し、`通知一覧` Auditが増えた観測は、隠れて常駐する挙動と整合する。後刻の再確認では両processが不在だったが、その間の終了操作や停止原因は観測しておらず、×操作による終了とは結び付けない。Auditは231件で、anchor件数・headは最終行と一致した一方、末尾は`broker-audit-231`／`通知一覧`のまま、`D4 Pocket Desktop終了` Auditはなく、`broker_session.json`も残存していた。今回の確認では全event chainとanchor HMACを再計算していない。したがって明示的なトレイ終了、終了Audit、endpoint cleanup、最終Audit耐久性は未確認のままとする。run45のTask完了・合成境界・MxC TEMP書込成功の既存証拠は維持するが、`r2-e2e` staged artifactの再利用、`isolated=false`、自然cleanup未確認などの範囲制限も維持する。
+
+未完了項目の分類:
+
+- item: BrokerのTask結果本文／Task専用diff投影
+  classification: release_blocker
+  reason: AgentTask状態APIは結果hashのみで、Task本文とTaskに対応するdiffを製品UIへ返さない。
+  required_action: Content Exposure、現在のPermission／Approval、基準点、Auditへ結合したBroker経路とinstalled product試験を実装する。
+  blocks_release: yes
+- item: run45の明示的トレイ終了・終了Audit・endpoint cleanup
+  classification: release_blocker
+  reason: タイトルバー×はトレイへ隠す操作であり、後刻のprocess不在は停止原因未観測のため、明示的終了を証明しない。末尾Auditは通知一覧でendpoint fileも残る。
+  required_action: 製品のトレイ終了操作を実行し、Broker終了Auditとendpoint cleanupを観測したうえでfile-backed Audit chain／anchorを再計算して確認する。
+  blocks_release: yes
+
+`task_execution=unsupported`、R2のrelease blocker、`release_ready=false`を維持する。このUI表示修正はTask結果／diffのBroker実装、通常Release昇格、隔離・Recovery、正式releaseの証拠ではない。

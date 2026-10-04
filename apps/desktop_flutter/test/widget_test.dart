@@ -611,12 +611,17 @@ void main() {
     expect(find.text('audit-workspace-bound'), findsOneWidget);
     expect(find.textContaining('書込み隔離は未検証'), findsOneWidget);
     expect(
-      find.textContaining('この画面のTask操作は事前検査のみ'),
+      find.textContaining('Capability表示だけでは権限になりません'),
       findsOneWidget,
     );
-    expect(find.text('タスク: 事前検査のみ。実行状態は未接続'), findsOneWidget);
     expect(
-      find.textContaining('保留中の承認: Brokerから未取得（承認がないことを意味しません）'),
+      find.text(
+        'タスク: Broker記録は未取得（Taskが存在しない証拠ではありません）',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('保留中の承認: 未取得（承認がないことを意味しません）'),
       findsOneWidget,
     );
     expect(find.textContaining('文書を更新する'), findsNothing);
@@ -796,6 +801,11 @@ void main() {
     expect(find.textContaining('AgentTask実行非対応'), findsOneWidget);
     expect(find.textContaining('PRIVATE_TASK_SENTINEL'), findsNothing);
     expect(find.text('Task実行: unsupported'), findsOneWidget);
+    expect(
+      find.text('タスク: Broker記録は未取得（Taskが存在しない証拠ではありません）'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Task実行・状態は未接続'), findsNothing);
   });
 
   testWidgets('Agent CenterはBroker事前検査後に分離Owner確認とTask状態照会を使う',
@@ -962,6 +972,19 @@ void main() {
 
     expect(find.text('Task状態: completed'), findsOneWidget);
     expect(find.textContaining(resultHash), findsOneWidget);
+    expect(
+      find.text('タスク: completed（Task ID $taskId）'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Task結果本文: AgentTask APIから未提供'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('変更ファイル／差分概要: Task APIから未取得'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Task実行・状態は未接続'), findsNothing);
     expect(
         transport.operations,
         containsAllInOrder([

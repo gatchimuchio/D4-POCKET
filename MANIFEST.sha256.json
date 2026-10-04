@@ -208,7 +208,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "d0ff5c46d731a7bd778dd5dc464ddcf7493e146ae8844a1a5cf74624fcb32ee8"
+      "sha256": "8b1dd3895ee1d95f91ed6920645ce1ed8dfa24ccf7dcba7ac82e0c384cccacea"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -636,7 +636,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "22f394cadd40abbc7d75e341d99151cf28f3a50f5aed17edb39d3bbdb8fcf006"
+      "sha256": "c3c1a11b3ba3967708feda1952f2b3ab5f1a74ec21f0fca834146a10d8d67114"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1200,7 +1200,7 @@
     },
     {
       "path": "docs/REV2_PROGRESS.md",
-      "sha256": "e18c2c50f91a205058be0faa10a7fe14206bd0833a2ac885f33ee9caf08ba8ae"
+      "sha256": "1b1191049aafea97d3c719db90bf240afe6efc0f6d69265ee0315c7afef7e702"
     },
     {
       "path": "docs/REV3_PROGRESS.md",
@@ -3800,7 +3800,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "58699169abb44a54d2f7a110f4afc1fc331271feaf362d90da466dfb1f91d04d"
+      "sha256": "642456f8d5287e50ecc68ba9df617058c9ce3a8c3d19fa970e4891ba79cb5512"
     },
     {
       "path": "requirements-dev.txt",

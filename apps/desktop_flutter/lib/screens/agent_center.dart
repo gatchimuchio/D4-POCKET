@@ -418,6 +418,27 @@ class _AgentCenterState extends State<AgentCenter> {
     ];
   }
 
+  List<String> _taskEvidenceRows(AgentSessionRecord session) {
+    final task = _agentTasks[session.sessionId]?.record;
+    final workspace = session.workspace.trim();
+    return [
+      workspace.isEmpty
+          ? '作業領域: Broker結合を確認できません'
+          : '作業領域: Broker結合ID $workspace（root pathではありません）',
+      task == null
+          ? 'タスク: Broker記録は未取得（Taskが存在しない証拠ではありません）'
+          : 'タスク: ${task.status}（Task ID ${task.taskId}）',
+      'Task結果本文: AgentTask APIから未提供',
+      '変更ファイル／差分概要: Task APIから未取得。Workspace Inspectorは現在承認と基準点を使う独立経路で、Task差分と同一視しません。',
+      '道具呼出し: AgentTask APIから未提供',
+      'シェルコマンド／試験状態: AgentTask APIから未提供',
+      '保留中の承認: 未取得（承認がないことを意味しません）',
+      '巻戻し候補: Task結果から未取得。Workspace復旧プレビューは別の読取経路です。',
+      '監査リンク: Session作成 ${session.auditEventId}',
+      if (task != null) '監査リンク: Task終端 ${task.auditEventId}',
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final client = widget.client;
@@ -589,7 +610,7 @@ class _AgentCenterState extends State<AgentCenter> {
                   ),
                 ],
                 const Text(
-                  'この画面のTask操作は事前検査のみです。Brokerがunsupportedを返した場合はPermission／Approval要求へ進みません。Task実行・状態・結果は未接続で、Capability表示だけでは権限を与えません。',
+                  'Capability表示だけでは権限になりません。Task実行には現在のWorkspace PermissionとTaskごとの別Owner ApprovalをBrokerが再検証します。',
                 ),
                 if (_registered != null &&
                     session.agentRuntimeId == _registered!.runtimeId &&
@@ -606,20 +627,9 @@ class _AgentCenterState extends State<AgentCenter> {
                     Text(_taskPreflightStatus[session.sessionId]!),
                   ..._agentTaskControls(session),
                 ],
-                const SectionList(
-                  title: '未接続の実行情報',
-                  rows: [
-                    '作業領域: 実行directoryは未確認',
-                    'タスク: 事前検査のみ。実行状態は未接続',
-                    '変更ファイル: Brokerから未取得',
-                    '道具呼出し: Brokerから未取得',
-                    'シェルコマンド: Brokerから未取得',
-                    '試験状態: Brokerから未取得',
-                    '差分概要: Brokerから未取得',
-                    '保留中の承認: Brokerから未取得（承認がないことを意味しません）',
-                    '巻戻し候補: Brokerから未取得',
-                    '監査リンク: 上記の監査ID参照のみ',
-                  ],
+                SectionList(
+                  title: 'Task結果と未取得情報',
+                  rows: _taskEvidenceRows(session),
                 ),
               ],
             ),

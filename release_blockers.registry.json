@@ -2276,18 +2276,42 @@
         "run43_result": "Fresh installed r2-e2e run43 from clean source commit 38624dda3fe80d2ec955728ee3cb98d13db7b0c8 completed Task 4e5d884a4d0798e9d67fc1a0b80a6c26 through Flutter UI, native Owner decisions, production Broker IPC, real Codex CLI 0.160.0/MxC, and a loopback fake Responses API. Result hash was shown; result body and diff were not projected. Named synthetic boundary assertions passed. Direct MxC TEMP write failed with directory_missing. The 70-event file-backed Audit chain and anchor HMAC verified after process stop, but run43 was not restarted. The manifest still declares per-user isolated=false despite the run-specific profile. Owner-reported exit left the exact launcher/frontend alive; they were force-stopped after task termination and Audit verification. Exact session-file removal was rejected by execution policy; no normal tray exit Audit was observed. Keep normal Release task_execution unsupported and the R2 release blocker active.",
         "run44_result": "Task 70dcb419a6c62140189bb79a7b6545fe failed because the installed-run test coordinator omitted broker-real-codex-task-continue after the validated TEMP report. TEMP write passed, but the remaining child boundary assertions and Workspace completion marker did not run. Preserve this as a harness handoff failure, not a product Task success or a boundary pass.",
         "run45_result": "Fresh synthetic Workspace/profile on the reused staged r2-e2e artifact completed Task 57c484a483c285f94ff3eec084b8394b through Flutter UI, native Owner Permission and separate Task Approval, authenticated production Broker IPC, real Codex CLI 0.160.0/MxC, and a loopback fake Responses API. Result hash was shown; the named secret/outside boundary assertions and Workspace marker passed. Direct MxC TEMP write passed; marker and TEMP directory were not visible after child exit, while the probe's own cleanup action remained not_attempted. Manifest isolated=false/formal_runtime_proof=false.",
-        "run45_after_owner_exit_report_observation": {
+        "run45_after_titlebar_x_observation": {
           "launcher_pid": 6152,
           "frontend_pid": 17656,
-          "owner_reported_exit": true,
+          "owner_action_reported": "titlebar_x_clicked_to_hide_to_tray",
+          "titlebar_x_is_exit": false,
           "processes_alive_after_report": true,
           "product_window_observed": true,
           "broker_session_state": "active",
           "latest_audit_ref": "broker-audit-207",
           "latest_audit_operation": "通知一覧",
+          "notification_audit_continued_while_hidden": true,
           "native_tray_exit_observed": false,
           "final_file_backed_audit_validation": false,
           "synthetic_profile_cleanup": "pending"
+        },
+        "run45_after_titlebar_x_hide_followup": {
+          "observed_local_date": "2026-10-04",
+          "owner_action_was_hide_not_exit": true,
+          "later_process_absence_cause_observed": false,
+          "launcher_process_running": false,
+          "frontend_process_running": false,
+          "codex_force_stop_performed": false,
+          "audit_event_count": 231,
+          "latest_audit_ref": "broker-audit-231",
+          "latest_audit_operation": "通知一覧",
+          "audit_file_sha256": "sha256:532012311a511b75f7fad3501c9eed52274ced3b72fac76c2f28b810c91aaf4e",
+          "anchor_event_count": 231,
+          "anchor_head_equals_latest_event_hash": true,
+          "full_chain_recalculated": false,
+          "anchor_hmac_recalculated": false,
+          "desktop_exit_audit_observed": false,
+          "broker_endpoint_file_present": true,
+          "store_session_record_state": "active",
+          "normal_shutdown_verified": false,
+          "synthetic_profile_cleanup": "pending",
+          "scope_limit": "The owner clicked titlebar X to hide the window to tray, not to exit. Both processes were observed alive and notification polling continued immediately afterward, consistent with tray-resident behavior. They were absent in a later check, but the intervening action and stop cause were not observed; do not attribute that absence to titlebar X or treat it as a normal shutdown. Audit tail, retained endpoint, and active startup session record do not prove a graceful exit; full chain and anchor HMAC were not recalculated after this observation."
         },
         "run43_exit_observation": {
           "owner_reported_exit": true,
@@ -2595,7 +2619,7 @@
         "scope_limit": "Direct Codex sandbox children only. Later-child non-visibility does not prove distinct TEMP roots, physical deletion, same real Agent profile isolation, Broker IPC, Owner Approval, durable Audit, Recovery, production Agent Task, installed product, or task_execution support."
       },
       "reason": "総合機能拡張`rev1`の`C1`以降で規定された機能・性能・長時間運用・障害注入・全数監査は未完了。`Rust Broker`のAgentTask consumerは実行直前の再検証、Permission／Owner Approvalの一回消費、有界状態、開始／終了Auditを備える。Codex Adapterは実物CLI `0.158.0-alpha.2.1`のinterfaceを確認し、Task専用`d4p-agent-task` permission profile、`--ignore-user-config`後もTaskだけに固定する`windows.sandbox`のmxc overrideと`:root=deny`、登録Workspace内TEMP／TMP scratch、Windows Job Object process群監督、通常終端cleanupを実装した。Broker scratch回復用HMAC認証bounded journalと起動時reaperに対し、Schema 145／正常例145／negative fixture179、Conformance 225 checks、厳格日本語監査と開発validator登録済み10検査、scratch focused Rust 7件、別OS process強制終了後のBroker library回復fixture 1件、`cargo check --all-targets`、前回実行した`cargo test --all-targets -- --test-threads=1`では366件が成功した。先行したローカル再実行はlib 321件ほか計355件が成功した後、`workspace_diff` test executableがWindows Application Control（OS error 4551）で起動前にblockされ、全体成功ではない。過去のWindows Application Control（OS error 4551）による起動拒否は履歴として保持する。先行したローカルsource/build gateでは`cargo check --all-targets`が成功した一方、ローカル全target testはOS error 4551で起動できなかった。2026-09-28の手動Windows Actions [run #10](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36419291719)はcommit `9c841a527f0c1ef4e0086e71c40c3279e0264c3f`を検査し、2026-09-29の現行mainに対する[run #13](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36445136387)もWindows Server 2025／Rust 1.95.0で全target check／testに成功した（12 target、389 passed／0 failed／0 ignored、rustfmtと試験後cleanも成功）。これらのActions証拠はRust検査範囲に限られ、ローカルApplication Control、installed productのLIVE_RUNTIME、release readinessを証明しない。先行run #9のcompile失敗はtest-onlyの`expect_err`が`Secret: Debug`を要求した問題で、秘密値型へDebugを追加せず修正した。permission profile付き補助実行は合成`.env`目印をOneDrive配下とOneDrive外の管理対象作業領域双方で読み取った。OneDrive外のACLには継承された読み書き許可の後ろに読み取り拒否が観測され、拒否は実効しなかった。完全一致読取拒否も補助実行機構で失敗し、profileを安全境界として扱わない。2026-09-29の現行mxc直接CLI probeではOneDrive .env ReparsePointと合成Workspace外pathの読取、任意外部pathへの書込を拒否し、Workspace通常file／Task scratch相当の読書込を許可した一方、:minimal=readの範囲としてC:/Windows/win.iniは読めた。同じsource commit `8fba0e1ce5b0abc862b53cfbcbaf8885a4f07bb9`に対する手動Windows Actions [run #14](https://github.com/gatchimuchio/GUI-Shell/actions/runs/36453922841)はWindows Server 2025／Rust 1.95.0でcheckout SHA照合、rustfmt、全target check／test（12 target、389 passed／0 failed／0 ignored）、試験後clean確認に成功した。このhosted証拠はRust test／buildに限る。直接CLIのLIVE_RUNTIME証拠は合成path probeに限り、codex exec、Rust Broker、Owner Approval、実Agent Taskを通していない。別process強制終了試験はRust test harness内のBroker libraryと永続storeを使う`FIXTURE`であり、production `broker-server`／IPCや電源断後cleanupの`LIVE_RUNTIME`証拠ではない。windows.sandbox overrideは方式選択を固定するだけで、実Codex Task、秘密file拒否、外部path拒否を証明しない。Adapter metadataは`unsupported`のままでBrokerからTaskを起動できない。秘密file拒否・実Workspace隔離・製品経路のcrash recovery・結果とdiffの`Content Exposure`表示・cross-agent contamination／比較／`Handoff`／長期状態は未成立。release_ready=falseと他のrelease blockerを維持する。",
-      "required_action": "run38ではr2-e2e staged productのpositive Task、指定合成Workspace境界、同一profile Broker restart後のTask完了Audit再読込が成立した。一方、実MxC TEMP writeはdirectory_missingで失敗し、Ownerの終了報告後もfrontend／launcher processが継続し通知Auditが増えたため、restart試験用に正確なrun processをforce-stopした。normal tray Exit／Desktop Exit Auditは未成立。run-specific installed manifestはlauncher_runtime.isolated=falseかつdefault per-user rootを宣言する一方、観測したAudit storeはrun profile B配下にあり、証拠由来の対応が不完全。force-stop後にbroker_session.jsonとdesktop_launcher.lockが残り、正確なfile cleanup commandはexecution policyに拒否された。R2を閉じる前にprofile provenanceとsession cleanupを整え、installed TEMP write／自然cleanup、active-Task deadline／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、Compare／Handoff failure path、graceful tray exitを個別に検証する。通常Release task_executionは正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
+      "required_action": "run45ではr2-e2e staged productのpositive Task、指定合成Workspace境界、秘密／外部path負例、および実MxC TEMP writeが成立した。Ownerが実施したのはタイトルバー×で画面をトレイへ隠す操作であり、終了ではない。直後にlauncher／frontend processの継続と通知Auditの増加を観測しており、これは常駐挙動と整合する。後刻のprocess不在は停止原因・介在操作を観測しておらず、明示的な製品終了の証拠にしない。file-backed Auditは231件でbroker-audit-231／通知一覧が末尾、D4 Pocket Desktop終了Auditはなく、broker_session.jsonが残る。anchor count/headの一致だけを確認し、全event chain／anchor HMACは再計算していないため、正常終了・最終Audit耐久性・endpoint cleanupは未確認。reused staged artifactとinstalled manifestのisolated=false／formal_runtime_proof=falseも維持する。R2を閉じるには、profile provenanceを確定し、明示的tray exit・終了Audit・endpoint cleanupのLIVE_RUNTIME証拠とfile-backed chain／HMAC再計算、installed TEMP自然cleanup、active Task deadline／crash Recovery、Task間scratch／Agent隔離、result／diff Content Exposure、OneDrive Cloud Files／通常NTFS統合、通常Release capability gate、Compare／Handoff failure pathを個別に検証する。通常Release task_executionは正規Authority／Recovery／visibility gate成立までunsupportedを維持し、実provider／正式releaseを推論しない。有料資格やOwner GOを通常開発の前提にしない。"
     },
     {
       "name": "rev2_desktop_product_distribution",
