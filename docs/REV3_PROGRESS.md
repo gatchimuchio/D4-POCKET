@@ -2213,3 +2213,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 取消後もAgent CenterはTaskを`running`と表示し、状態照会要求は`broker-audit-135`で`要求不正`として拒否された。従って取消の画面状態反映・Recoveryは未成立として保持する。試験helperの`expected-deadline`判定は取消と期限停止を識別できないため、そのexit statusを期限証拠に採用しない。
 - 同時点のfile-backed Audit snapshotは151 event、event hash／previous link／重複ID／sequence errorなし、anchor head/countとHMAC一致。JSONL hashとheadはregistryに記録した。これはAudit連鎖の整合を示すが、取消・期限・crashの意味的成功を示さない。
 - 判定: 今回は失敗した取消観測であり、deadline／crash／Recoveryのいずれも閉じない。誤操作と状態照会拒否を履歴に保持し、同じ試験を名称だけ変えてPASS扱いしない。通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`は維持する。
+
+## R2追補 runの監査再照合による取消解釈訂正（2026-10-05）
+
+- 前節の初回記録はAudit eventの意味を取り違えていたため訂正する。`broker-audit-127`は取消要求の受信、`broker-audit-128`は汎用のTask failure/cancel終端marker、`broker-audit-129`がその`AgentTask取消`要求への`要求不正`拒否である。終端markerを「UI操作による取消完了」とは扱わない。
+- `broker-audit-135`と`broker-audit-174`は`AgentTask状態`要求の受信記録であり、同operationの拒否eventは存在しない。通常の成功状態照会は受信eventを応答の監査参照として返すため、先行報告の「状態照会拒否」は誤り。installed UIは後続観測でTask状態`failed`を表示した。
+- sourceでは各対話要求のdispatch前にTask進捗を反映し、その後に取消対象が`pending`／`running`か検査する。したがって、Taskが先にterminalへ進んで取消要求が拒否された可能性はある。ただし、Taskのterminal原因はAudit、loopback helper、残存processの観測だけではdeadline、cancel、その他failureに分類できない。
+- processとTask一時directoryが終端後に不在という観測は維持するが、その停止を誤クリックやdeadlineの効果と帰属しない。これは期限・crash Recovery、または取消成功の証拠ではない。前節とregistryには当初解釈とこの訂正の両方を履歴として残す。

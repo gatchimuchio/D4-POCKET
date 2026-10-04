@@ -429,7 +429,7 @@
         "task_terminal_audit_id": "broker-audit-128",
         "task_state_query_audit_id": "broker-audit-135",
         "evidence_source": "LIVE_RUNTIME for the installed synthetic Task cancellation and post-cancel observations; not deadline or crash evidence",
-        "result": "inconclusive_task_cancelled_by_ui_automation_error",
+        "result": "inconclusive_task_failure_raced_with_cancel_request",
         "installed_artifact": {
           "manifest_version": 3,
           "manifest_sha256": "ca628b3a232e04c4a7f8edf83b4565990d45c2c439aa525a549f12b1e7bfba8b",
@@ -440,8 +440,8 @@
           "runtime_formal_proof": false
         },
         "observations": {
-          "cause": "During an intended Task status refresh, the UI automation clicked the adjacent Task stop control. This was an automation error; the Task was cancelled, not crashed, and no deadline cause was established.",
-          "audit": "Task start was broker-audit-121. The terminal event broker-audit-128 records AgentTask取消. A subsequent state query was rejected as 要求不正 at broker-audit-135 while the Agent Center continued to display running.",
+          "cause": "During an intended Task status refresh, the UI automation clicked the adjacent Task stop control. This was an automation error. The cancel request was received, but the Task was already terminal when the cancel operation reached its active-state check; no evidence shows that this click caused the termination.",
+          "audit": "Task start was broker-audit-121. broker-audit-127 is AgentTask取消 received; broker-audit-128 records the generic Agent Task failure/cancellation terminal marker; broker-audit-129 rejects the AgentTask取消 operation with 要求不正. broker-audit-135 is AgentTask状態 received and has no matching rejection event. A later UI observation displays failed; a later state refresh is broker-audit-174, also received without a matching rejection event.",
           "process_cleanup": "After cancellation, the Codex CLI process and its Task-specific temporary directory were absent, no Codex/MxC descendants remained, and the Launcher and Flutter UI remained alive. The completion marker was absent. This observation does not establish deadline-triggered process-group termination.",
           "fake_api": "One loopback Requests API request; a tool call was sent, no tool result was received, no Workspace completion marker was written, and no external request was observed. The helper was configured for an expected-deadline predicate that cannot distinguish Task cancellation from deadline termination, so its exit status is not deadline evidence.",
           "artifact_identity": "Installed binary hashes matched the staged manifest. The manifest declares product_manifest=null and runtime formal proof false; this is a test-stage artifact, not formal Release provenance.",
@@ -449,7 +449,13 @@
         },
         "real_model_or_credential_used": false,
         "os_protection_changed": false,
-        "scope_limit": "Failed synthetic cancellation probe only. Does not pass cancellation Recovery/UI state reconciliation, deadline detection, crash Recovery, or process-group stop. Preserve the state-query rejection and automation error; do not reinterpret the helper's expected-deadline result as a deadline pass."
+        "interpretation_correction": {
+          "date": "2026-10-05",
+          "supersedes": "The first report incorrectly treated broker-audit-128 as proof that the click completed cancellation and broker-audit-135 as a rejected state query.",
+          "verified_interpretation": "Audit review shows the cancellation request itself was rejected at broker-audit-129 after progress reflection had recorded a terminal failure/cancellation marker. AgentTask状態 requests at broker-audit-135 and broker-audit-174 have received events but no matching rejection events; the installed UI displays failed. The terminal cause remains unclassified.",
+          "source_review": "AgentTaskProgress reflection runs before dispatching AgentTask取消. It may move a Task to terminal before cancellation checks pending/running status; this is a plausible race explanation, not proof of the exact live termination cause."
+        },
+        "scope_limit": "Failed synthetic failure/cancel-race observation only. It does not prove that cancellation caused process stop, or pass cancellation Recovery, deadline detection, crash Recovery, or deadline-triggered process-group stop. The expected-deadline helper exit cannot distinguish termination causes."
       },
       "r2_deadline_fixture_continuation_correction": {
         "date": "2026-10-04",
