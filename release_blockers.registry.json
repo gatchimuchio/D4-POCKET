@@ -273,9 +273,35 @@
           "schema": "153 schemas／153 examples／197 negative fixtures passed",
           "conformance": "232 checks passed",
           "japanese_strict_audit": "1137 files／0 findings passed",
-          "windows_actions_retry": "pending on corrected commit"
+          "windows_actions_retry": "修正commit f888c7e0d4abb499c9524849c2605570748a0146上のrun #38は成功。配置済み製品のContent Exposure LIVE_RUNTIME確認は別途未成立"
         },
         "scope_limit": "Run #37自体はWindows Rust全target検査の失敗であり、test修正後のActions検証ではない。test修正はAuthority経路を許可せず、installed Agent Centerのpositive Content Exposure、R2 condition 4、Release capability、製品完成を証明しない。"
+      },
+      "r2_windows_rust_manual_validation_run38": {
+        "date": "2026-10-04",
+        "evidence_source": "EXTERNAL_EVIDENCE",
+        "manual_actions": {
+          "workflow": ".github/workflows/windows-manual-rust-validation.yml",
+          "trigger": "workflow_dispatch",
+          "temporary_branch": "codex/r2-agent-center-content-exposure-20261004",
+          "branch_cleanup": "local_and_remote_deleted_after_successful_fast_forward",
+          "run_number": 38,
+          "run_id": 37207891109,
+          "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37207891109",
+          "target_commit": "f888c7e0d4abb499c9524849c2605570748a0146",
+          "runner": "Windows Server 2025 windows-2025-vs2026 image 20260925.250.1",
+          "rust": "1.95.0",
+          "result": "success",
+          "artifact_uploaded": false
+        },
+        "tests": {
+          "rust_all_targets": "468 passed／0 failed／7 ignored",
+          "release_broker_build": "passed",
+          "release_broker_smoke": "成功: 認証済みloopback IPC、永続store準備、通常Task権限の拒否、再起動後replay拒否、新規health、強制停止時fail-closed、session file cleanup",
+          "test_process_cleanup": "passed",
+          "source_tree_after_test": "試験後の差分なし"
+        },
+        "scope_limit": "Windows hosted runner上のRust全targetと単独Release Broker検証に限る。配置済みFlutter／native OwnerのContent Exposure、正のAgent Task、deadline／crash Recovery、通常Release task_execution、runtime provenance、release readinessを証明しない。"
       },
       "agent_task_crash_recovery_restart_audit": {
         "date": "2026-10-04",

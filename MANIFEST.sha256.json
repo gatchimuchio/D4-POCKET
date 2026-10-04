@@ -1204,7 +1204,7 @@
     },
     {
       "path": "docs/REV3_PROGRESS.md",
-      "sha256": "5b295bf0ffb501ebc5baa746bb499aa8bb97b51752b53bb3fa9d9798cd1e9e7c"
+      "sha256": "76942b97a0dfd5def178becddfe7921366c858c27dcb43c00f01a12d865df0f6"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -3808,7 +3808,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "3822224382bd2b11eddcb7c8c161bc61a0f8680a502e3eb888171562981623c0"
+      "sha256": "157f84a255b5ecb003709c2d84c8eaea72acb68b8e4fdb044f14772fd69fa16e"
     },
     {
       "path": "requirements-dev.txt",

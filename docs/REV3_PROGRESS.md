@@ -2197,3 +2197,10 @@ flutter test --reporter expanded         # packages/gui_shell_ui: 56 passed
 - 該当するプロセス結合試験を、native確認のない通常IPC／Owner CLIではApproval、読取、基準点、変更一覧、diffを許可しない拒否契約へ修正した。製品の権限判定は変更していない。Workspace読取・差分の成功試験は既存targetに残し、Agent Centerからの成功結果投影はR2 Content Exposure条件で`LIVE_RUNTIME`確認する。
 - 修正後の`workspace_startup`対象試験は7 passed／0 failed。Schema 153件／正例153件／負例197件、Conformance 232件、日本語厳格監査1137 file／findings 0、Manifest 1134件の再生成と照合、`git diff --check`は成功した。ローカル全target実行の一部localhost/TLS試験は別の実行でWindowsのsocket resetが発生しており、全target無失敗とは報告しない。Windows Actions再実行は修正commit作成後に手動dispatchし、その正確な結果を追記する。
 - この記録は試験契約の是正に限られ、配置済みAgent Centerでの内容提示およびR2条件4の許可経路を実稼働で証明しない。`task_execution=unsupported`、R2 gate未完了、`release_ready=false`を維持する。
+
+## R2追補 修正commitのWindows Rust手動Actions再検証（2026-10-04）
+
+- Windows Server 2025のhosted runnerでworkflow `.github/workflows/windows-manual-rust-validation.yml`を`workflow_dispatch`により手動起動した。run #38／ID `37207891109`は一時検証branch `codex/r2-agent-center-content-exposure-20261004`の正確なcommit `f888c7e0d4abb499c9524849c2605570748a0146`を取得し、runner image `20260925.250.1`とRust 1.95.0を記録した。全target結果は468 passed／0 failed／7 ignored。
+- Release Broker helperのbuildと非synthetic Broker smokeが成功した。認証済みloopback IPC、永続storeの準備、通常IPCからのWorkspace Permission／Task Approval拒否、再起動後のreplay拒否、新規health、強制停止時のfail-closed、session file cleanupを確認した。検査process／一時出力をcleanupし、試験後に作業treeへ差分がないことも確認した。成果物のuploadはない。
+- Actionsの証拠範囲はRust全targetと単独Release Broker processのWindows検証であり、配置済みFlutter UI／native Owner経路、正のAgent Task、Content Exposure UI、deadline／crash Recovery、正式Release capability、artifact provenanceを証明しない。R2条件4は未閉鎖であり、通常Release `task_execution=unsupported`、R2 `release_blocker`、`release_ready=false`を維持する。
+- 成功した正確なcommitだけを`main`へfast-forwardしてpushし、remote `main` HEAD一致を確認した。検証用branchはlocal／remote双方から削除した。手動検査branchはPRを作成せず、Actions結果を自動gateに用いていない。
