@@ -247,6 +247,36 @@
         "after_r2": ["R3 Multi-Agent Compare", "R4 Handoff"],
         "promotion_rule": "closed_conditions_reuse_existing_evidenceとremaining_conditionsをすべて適切な証拠でPASSしたらsupportedへ昇格する。PASS後に仮説的riskでunsupportedを維持しない。"
       },
+      "r2_windows_rust_manual_validation_run37": {
+        "date": "2026-10-04",
+        "evidence_source": "EXTERNAL_EVIDENCE",
+        "manual_actions": {
+          "workflow": ".github/workflows/windows-manual-rust-validation.yml",
+          "trigger": "workflow_dispatch",
+          "temporary_branch": "codex/r2-agent-center-content-exposure-20261004",
+          "run_number": 37,
+          "run_id": 37205380364,
+          "run_url": "https://github.com/gatchimuchio/GUI-Shell/actions/runs/37205380364",
+          "target_commit": "0977bb1f34914a4b469cb622cece55081a1e368c",
+          "result": "failure",
+          "artifact_uploaded": false
+        },
+        "failed_tests": [
+          "startup_owner_approval_real_ipc_read_and_revocation_are_connected",
+          "owner_checkpoint_and_current_ipc_diff_bind_real_changes_and_revocation",
+          "large_file_baseline_and_diff_return_only_full_file_metadata",
+          "whole_workspace_changes_bind_actual_files_current_grant_and_audit"
+        ],
+        "cause": "これらprocess-level testは通常Owner credential CLIのみでWorkspace Inspectorのpositive操作を許す旧期待だった。現行Rust Desktop起動器のnative Owner confirmationがないためBrokerはdesktop_native_owner_confirmation_requiredでfail-closed拒否する。Production挙動を弱めず、testをnegative contractへ是正した。",
+        "post_correction_local_validation": {
+          "workspace_startup_target": "7 passed／0 failed",
+          "schema": "153 schemas／153 examples／197 negative fixtures passed",
+          "conformance": "232 checks passed",
+          "japanese_strict_audit": "1137 files／0 findings passed",
+          "windows_actions_retry": "pending on corrected commit"
+        },
+        "scope_limit": "Run #37自体はWindows Rust全target検査の失敗であり、test修正後のActions検証ではない。test修正はAuthority経路を許可せず、installed Agent Centerのpositive Content Exposure、R2 condition 4、Release capability、製品完成を証明しない。"
+      },
       "agent_task_crash_recovery_restart_audit": {
         "date": "2026-10-04",
         "source_base_commit": "52f7817fc10e9f7870338801d1e4272146d76b0b",
