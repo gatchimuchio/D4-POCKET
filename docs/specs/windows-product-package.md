@@ -36,3 +36,15 @@ manifestのfile一覧はASCII Windows-safe relative pathのcase-insensitive昇�
 ## 5. 適合確認
 
 packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。product version表示のWidget／build argument testはversion source結合だけを検査する。これらはinstalled別user profile、署名検証、package配布元trust、Installer、Update／Rollback、正式Releaseの証拠ではない。
+
+## 6. 製品導入先の固定規則
+
+P11の導入先は、管理者権限を要求しない現在利用者単位とする。Rust BrokerはWindows Known Folder APIで取得した現在利用者の`LocalAppData`を起点に、次の固定rootを導出する。
+
+```text
+%LOCALAPPDATA%/Programs/D4 Pocket/<App ID>/versions/<製品版>-<package SHA-256>/
+```
+
+`App ID`、製品版、package SHA-256は検証済みpackage／現在のBroker trustから得る。Flutter、Setup UI、update候補は導入先pathを指定しない。異なるApp ID、製品版、package digestは別のversion directoryになる。導入先が同一volumeであることを要求し、既存version directoryを上書きしない。
+
+実package展開後のversion directory切替、Start Menu登録、Permission、native Owner Approval、Audit、RecoveryはBroker consumerの責任であり、固定path計画だけでは実作用を意味しない。D4 Pocket runtime／Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。

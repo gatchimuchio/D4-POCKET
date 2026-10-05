@@ -51,6 +51,6 @@ rustix = { version = "=1.1.4", features = ["fs"] }
 gui_shell_windows_broker_channel = { path = "../windows_broker_channel" }
 gui_shell_windows_protection = { path = "../windows_protection" }
 gui_shell_windows_runtime_observation = { path = "../windows_runtime_observation" }
-winsafe = { version = "=0.0.29", default-features = false, features = ["kernel", "psapi", "user"] }
+winsafe = { version = "=0.0.29", default-features = false, features = ["advapi", "kernel", "psapi", "shell", "user"] }
 gui_shell_windows_dns = { path = "../windows_dns" }
 gui_shell_process_supervision = { path = "../process_supervision" }
