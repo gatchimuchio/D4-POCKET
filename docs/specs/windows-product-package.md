@@ -1,6 +1,6 @@
 # Windows製品Package
 
-状態: P11 Windows Productizationのpackage format／reader contract。Installer、installed product、Update／Rollback、正式配布の成立を意味しない。
+状態: P11のpackage format／readerおよびBroker統治の未起動version staging consumer。Installer、active version切替、Start Menu、Rollback、installed product、正式配布の成立を意味しない。
 
 ## 1. 責任境界
 
@@ -10,13 +10,15 @@ Developer専用の`tooling/package_windows_product.py`は、commit／build recei
 
 Rust `product_package` readerは、期待するApp ID／Audit Store ID／製品版を呼出し元から固定で受け、packageの構造、path、file数、size、各file hash、同梱`product_manifest.json`の新規identityとAuthority非継承を検査する。展開先は未存在の新規stage directoryに限定する。検査失敗時はreaderが作成したstageだけを除去する。
 
-Broker consumer向けAPIは、capability directoryから開いた入力file handle、正確なbyte長、署名済み候補のpackage SHA-256に加え、出力先parent directory capabilityと単一componentのstage名を受け取る。同一入力handleから読んだ全byteを検査し、stageとpayload内directoryをcapability相対・no-followで作成／展開する。stage作成後は開いたdirectory handleとfile identityを照合し、既存stageを上書きしない。検査失敗時はidentity照合済みの当該stage handleだけを除去し、identityを確立できない場合は別directory誤削除を避けて残置する。Ambient pathを出力先として再openするBroker consumer APIではない。このAPIはreader unit testで検証済みだが、現行Install／Updateのproduction consumerには未接続である。reader自身は署名検証・Owner確認・install root公開を行わない。
+Broker consumer向けAPIは、capability directoryから開いた入力file handle、正確なbyte長、署名済み候補のpackage SHA-256に加え、出力先parent directory capabilityと単一componentのstage名を受け取る。同一入力handleから読んだ全byteを検査し、stageとpayload内directoryをcapability相対・no-followで作成／展開する。stage作成後は開いたdirectory handleとfile identityを照合し、既存stageを上書きしない。検査失敗時はidentity照合済みの当該stage handleだけを除去し、identityを確立できない場合は別directory誤削除を避けて残置する。Ambient pathを出力先として再openするAPIではない。Windows Brokerの`更新適用要求`consumerはこのAPIへ接続済みで、実行時にBroker固定download storeから同一file handleをno-followで開き、署名済み全体hash／長さとProduct Manifestを再検証してから、固定`versions` directory capability内へ展開する。既存stageは上書きしない。
 
-package reader自体はBrokerの署名検証、Owner確認、Permission、Approval、Audit、製品配置を実施しない。package内SHA-256は自己整合性検査であり、配布元の真正性を証明しない。今後の導入・更新consumerはBrokerのtrust、native Owner確認、Permission／Approval、durable Audit、Recovery経路へ接続しなければならない。これらが未接続のpackageを正式配布用として扱ってはならない。
+package reader自体はBrokerの署名検証、Owner確認、Permission、Approval、Audit、製品配置を実施しない。package内SHA-256は自己整合性検査であり、配布元の真正性を証明しない。現行consumerはBroker現在trustで候補を再検証し、Rust Desktop起動器のnative Owner確認を要求する。Brokerへ埋め込まれた製品App／Audit Store identityとWindows Known Folderから固定導入先を再導出し、展開前のdurable Audit、展開結果Auditを記録する。成功値は`version_staged`であり、有効化は`suspended`のまま。これはBroker test fixture上のconsumer経路と実Win32 Owner dialog表示・選択の検証であり、installed productからの配布・起動を証明しない。
 
 ## 2. 導入・更新consumerの必須境界
 
-現行package readerは製品root、Start Menu、registry、processへ作用しない。standalone Setupからこれらを直接変更する経路は設けない。導入・削除・更新を実装するときは、既存Brokerを唯一の権限依存作用主体とし、操作ごとにCapability、現在条件に束縛したPermissionとnative Owner Approval、durable AuditEvent、失敗時RecoveryActionを接続する。Flutter／manifest／Setup UI／package metadataは権限を生成しない。
+導入・更新のversion stagingは既存Brokerだけが実行する。通常IPC、Owner資格のみの要求、Flutter／manifest／package metadataは導入権限を生成できず、native Owner確認がない要求は拒否する。native確認対象は現在trustで検証された候補の版、channel、package hash／byte長、App ID、Audit Store ID、Known Folder由来の固定導入先であり、Brokerが実行直前に候補・identity・destinationを再照合する。Brokerはdurable Audit storeが利用可能な場合だけintentを先に確定し、その後でLocalAppData配下にcapability directoryを作成し、packageを展開する。
+
+本consumerが行うのはcontent-addressedな未起動version directoryの作成だけである。Start Menu変更、active version選択、process起動、旧version削除、rollback、Uninstaller、Repair UIは行わない。通常失敗は自身のstageだけをreaderがidentity照合してcleanupする。process crash／電源断で展開途中のstageが残った場合も起動・有効化せずfail-closedとなるが、現状は残存stageの自動Recovery／再試行を実装していないため、同じdestinationへの再適用は拒否される。このRecoveryとinstalled product経路はP11の未完了条件として残す。standalone Setupからfilesystem／registryへ直接作用する経路は設けない。
 
 ## 3. 製品版表示
 
@@ -37,7 +39,7 @@ manifestのfile一覧はASCII Windows-safe relative pathのcase-insensitive昇�
 
 ## 5. 適合確認
 
-packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。product version表示のWidget／build argument testはversion source結合だけを検査する。これらはinstalled別user profile、署名検証、package配布元trust、Installer、Update／Rollback、正式Releaseの証拠ではない。
+packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。Broker apply fixtureはnative Owner由来の一回限り確認context、現在candidate／製品identity／destination再照合、package tamper拒否、durable intent／completion Audit、version staging、再適用時の非上書きを検査する。Win32 Owner UI試験はRust起動器が作る確認文と実MessageBoxの表示・No／Yes結果を検査する。これらは別user profileからのinstalled product、実配布元経由のdownload、Installer、active version／Start Menu切替、crash後stage Recovery、Rollback、正式Releaseの証拠ではない。
 
 ## 6. 製品導入先の固定規則
 
@@ -49,4 +51,4 @@ P11の導入先は、管理者権限を要求しない現在利用者単位と�
 
 `App ID`、製品版、package SHA-256は検証済みpackage／現在のBroker trustから得る。Flutter、Setup UI、update候補は導入先pathを指定しない。異なるApp ID、製品版、package digestは別のversion directoryになる。導入先が同一volumeであることを要求し、既存version directoryを上書きしない。
 
-実package展開後のversion directory切替、Start Menu登録、Permission、native Owner Approval、Audit、RecoveryはBroker consumerの責任であり、固定path計画だけでは実作用を意味しない。D4 Pocket runtime／Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。
+Windows Broker consumerはKnown Folder APIの現在利用者`LocalAppData`から固定`versions` directoryをcapabilityで開き、同一volumeと非reparse directory identityを検証して、署名済みpackageのversion directoryを新規作成する。展開前intent Auditが失敗した場合はinstall directoryを作成しない。package全体と内包fileの検証が成功した場合だけ`version_staged`を返し、永続Auditへ完了記録する。Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。なお、固定path／fixture上のconsumer接続はinstalled productの起動、別user profile隔離、process cleanup、起動失敗Recovery、Rollbackを意味しない。

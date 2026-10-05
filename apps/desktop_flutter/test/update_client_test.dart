@@ -29,8 +29,22 @@ class _UpdateTransport implements BrokerTransport {
         },
       };
     }
+    if (operation == '更新適用要求') {
+      return {
+        'status': 'accepted',
+        'body': {
+          '版': 1,
+          '導入状態': 'version_staged',
+          '有効化': 'suspended',
+          'file数': 14,
+          'total_bytes': 4096,
+          '復旧ID': 'recover-update-install-activation',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+      };
+    }
     return {
-      'status': operation == '更新適用要求' ? 'suspended' : 'accepted',
+      'status': 'accepted',
       'body': {'版': 1, '実行状態': 'suspended'},
     };
   }
@@ -115,10 +129,12 @@ void main() {
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',
     );
-    await client.requestApply(
+    final apply = await client.requestApply(
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',
     );
+    expect(apply['導入状態'], 'version_staged');
+    expect(apply['有効化'], 'suspended');
     await client.defer(
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',

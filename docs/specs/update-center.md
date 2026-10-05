@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download／同一digest破損packageのBroker Audit付きrepairをfixture接続（install／process／rollbackはsuspended）
+状態: C12 downloadに加え、署名済みpackageの未起動version stagingをBroker／native Owner経路へ接続。active version／process／Start Menu／rollbackはsuspended。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -30,7 +30,15 @@ downloadはBrokerのserial IPC loop外の単一worker上で非同期HTTP client�
 
 通信はHTTPSのみ、既定の証明書・hostname検証を有効にし、redirect・system proxy・自動retryを無効化する。WindowsではRust helper内のWindows DNS Client `DnsQueryEx`を使い、A／AAAAを逐次照会する。各照会にはdownload全体期限と最大15秒のDNS期限の早い方を適用し、20 ms間隔でcancel要求を確認する。期限超過またはcancel時は`DnsCancelQuery`を呼び、callback完了まで結果・cancel handle・query contextを保持する。callbackを2秒以内に回収できない、またはcancelに失敗した場合はstatic failure codeで失敗し、未完了照会が残る間は後続照会を拒否する。DNS結果に非global addressが一つでも含まれる場合は全体を拒否し、検査したaddressへ接続先を固定してDNS rebindingを防ぐ。HTTP応答はstatus 200、単一の正確な`Content-Length`、`Transfer-Encoding`なし、`Content-Encoding`なしを要求する。固定64 KiB bufferで実byte数とSHA-256を計算し、署名済みbyte長・digestの両方が一致した場合だけ、capability directory内の`create_new`一時fileをfsyncして公開する。保存先が欠損している場合はcreate-only hard linkで`<digest>.pkg`を作る。同一digest名に既存fileがあり、再検証でbyte長またはSHA-256が不一致の場合は、既存fileを保持したまま一時fileを受信し、正確なbyte長・SHA-256の一致とfsyncの後に限り、同名の通常fileを原子的renameで置換する。symlink／reparse／directory／不正entryは置換せずfail-closedとする。受信・検証失敗時はfinalを変更せず、一時fileだけを除去する。download前のqueued Auditに条件付き修復範囲を記録し、置換成功は`recovered`結果としてAuditする。process crash後は次の明示download要求で`.part`を回復し、final package全byteを再検証する。finalが欠損または不一致なら再取得し、既存finalは新しい完全packageの検証前に置換しない。path、応答本文、秘密値はFlutter／Auditへ返さず、Auditには更新ID、候補hash、状態、byte長、static failure codeのみを記録する。
 
-保管は固定Broker directory、同時job一件、完成package一件（最大4 GiB）にboundedとする。別digestのpackageがすでにある場合は上書きせず拒否する。install／process起動／rollbackは未接続のため引き続き`suspended`。download済み状態は権限ではなく、後続installは現在trustを再検証し、保存package全体を再hashしてから別のApproval／Audit／Recovery契約へ進む必要がある。
+保管は固定Broker directory、同時job一件、完成package一件（最大4 GiB）にboundedとする。別digestのpackageがすでにある場合は上書きせず拒否する。download済み状態は権限ではなく、適用時にも現在trustを再検証し、保存package全体を再hashする。
+
+## 未起動の版別導入
+
+`更新適用要求`は、Rust Desktop起動器がOwner確認を表示するBroker内部の許可操作一覧へ追加した。起動器は認証済みBrokerの現在の`更新一覧`から、版、配布系統、署名済み配布物のSHA-256／byte長、内容概要、build時に固定された製品App ID／Audit Store ID、およびWindows既知フォルダーAPIから導出した版別導入先を確認画面へ示す。配布元URLや導入先pathをFlutter要求から受け取らない。Owner確認情報は一回限りで、Brokerは実行直前に現在の信頼設定・署名・候補内容・配布物の長さとdigest・製品識別子・要求hash・既知フォルダー由来の導入先を再照合する。Owner確認欠落、識別子不一致、古い候補、通常ファイルでない配布物、byte長不一致、digest不一致、同梱`Product Manifest`の識別子／`Authority`継承不一致は拒否する。
+
+Brokerは永続Auditを利用できる場合に限り、展開前の`queued`を確定する。その後、Windows既知フォルダーの`LocalAppData/Programs/D4 Pocket/<App ID>/versions`をCapabilityとして作成／開く。配布物はBroker固定保存領域からリンクを追跡せずに開いた同一ファイルハンドルを使い、全体のdigest／byte長と各収録ファイルのhashを照合しながら、digest名で決まる新しい版別directoryへ展開する。既存directoryは上書きしない。reader失敗時は識別子照合済みの当該展開先だけを削除し、結果Auditを確定する。成功時は`version_staged`／`有効化=suspended`とし、開始／完了Audit ID、ファイル数、byte数だけを返す。秘密値、ファイル本文、導入pathはFlutterへの応答へ返さない。Flutterは成功時に未起動版の展開完了と、Start Menu切替／process起動／rollbackが保留であることを表示する。
+
+この処理は有効版を選ばず、Start Menu、registry、process、旧版、rollbackへ作用しない。process crash／電源断で展開途中のdirectoryが残った場合、自動起動しないfail-closedを維持する一方、現時点では残存物の自動Recovery／再試行を実装していないため、同じ導入先への再適用は拒否される。Installer／Uninstaller、途中状態のRecovery、有効版切替、Start Menu、installed productの起動・初回設定、Rollback、実配布元downloadと連結した製品経路はP11未完了である。通常Broker libraryのtest fixtureと、別Win32 Owner dialogのtestは通過したが、正式installed productのLIVE_RUNTIME証拠ではない。
 
 Flutterは一覧表示と要求送信だけを担当し、filesystem、process、network、credential、privileged IPCを直接扱わない。
 
@@ -40,10 +48,10 @@ Flutterは一覧表示と要求送信だけを担当し、filesystem、process�
 - Broker所有trustによるEd25519検証、署名対象の正本byte一致、package全体のSHA-256・正確なbyte長への署名結合
 - 更新一覧の取得元projectionが現在trustで検証済みの候補とBroker所有sourceだけから導出され、未設定・未適格候補にURLを返さないこと
 - 信頼設定未構成、署名不正、現在trust変更、永続候補content／hash改変、未知field、malformed stateのfail-closed
-- 更新候補の永続化・再読込、延期のAudit、実行要求のsuspended
+- 更新候補の永続化・再読込、延期のAudit、download／applyのnative Owner境界、署名packageのversion staging、rollbackのsuspended応答
 - Windows DNS Clientの実callback、A／AAAA応答、明示cancel、有限deadlineとtimeout後のcancel、およびcancel／期限の事前判定
 - 同一digest破損regular fileの分類、検証済みpackage後の原子的repair、非regular entry拒否、digest failure時の旧file保持、Broker `recovered` Audit
 - Broker所有update trust版1互換、版2の配布元構造・起動時検証、設定読込の上限・重複field拒否
 - Desktop設定画面の更新一覧と要求操作
 
-同一digestの破損通常fileをBrokerがAudit付きで原子的に修復する経路は実装したが、Rust／local TLS fixtureの範囲であり、製品Broker・installed product上の修復実証ではない。Windows installed productでの実配布元download、製品BrokerからのDNS／TLS失敗注入、保存後tamper検査からinstall／rollbackまでの経路、owner固定公開鍵の本番provisioningは未成立で、正式releaseの`release_blocker`として保持する。DNS API試験はWindows localの制御loopback fixtureを使用し、installed productや実配布元での挙動を証明しない。Linux／macOS pathは現状`ToSocketAddrs`を使う。この期限付き取消resolverとの機能差は非Windows技術工程R15で扱う`post_v1_scope`であり、Windows 1.0の完了主張へ含めない。metadata署名検査やlocal TLS fixtureの成功だけで実配布元の安全性、installed productでの更新成功、release readinessを主張しない。system proxy必須環境は未対応の`known_limitation`であり、直接HTTPS接続が許可されない環境ではdownloadは失敗する。
+同一digestの破損通常fileをBrokerがAudit付きで原子的に修復する経路と、署名済みpackageの未起動version staging consumerを実装したが、Rust test／local TLS fixtureおよびnative dialog testの範囲であり、正式installed product経路の実証ではない。Windows installed productでの実配布元download、製品BrokerからのDNS／TLS失敗注入、crash後の残存stage Recovery、active version切替から起動・rollbackまでの経路、owner固定公開鍵の本番provisioningは未成立で、正式releaseの`release_blocker`として保持する。DNS API試験はWindows localの制御loopback fixtureを使用し、installed productや実配布元での挙動を証明しない。Linux／macOS pathは現状`ToSocketAddrs`を使う。この期限付き取消resolverとの機能差は非Windows技術工程R15で扱う`post_v1_scope`であり、Windows 1.0の完了主張へ含めない。metadata署名検査やlocal TLS fixtureの成功だけで実配布元の安全性、installed productでの更新成功、release readinessを主張しない。system proxy必須環境は未対応の`known_limitation`であり、直接HTTPS接続が許可されない環境ではdownloadは失敗する。

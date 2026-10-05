@@ -33,6 +33,8 @@
 
 2026-10-06 P11 capability-reader追試: 非選別の逐次Rust suiteは465件中454 passed／2 failed／9 ignored。失敗は`adapters::minidora::tests::ContentLength付きJSONだけを期限内に取得する`と上記Update TLS fixtureで、どちらも現行reader差分外。MINIDORA fixture単独再実行は1 passed、Update TLS fixture単独再実行はOS error 10054／`ConnectionReset`で再失敗した。`FQ-TEST-LOOPBACK`の既存対象を更新し、P11 blockerへ追加しない。
 
+2026-10-06 P11 Broker version-staging consumer回帰: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`はRust lib test 469件中456 passed／3 failed／10 ignored。A2A loopbackと`failed_replacement_keeps_the_existing_corrupt_package_unchanged`は各単独再実行でPASS。`local_tls_server_repairs_only_after_verified_package_bytes`は単独でもOS error 10054／`ConnectionReset`で失敗し、root cause未確定。すべて既存`FQ-TEST-LOOPBACK`のlocalhost fixture問題で、今回のversion staging差分との因果は観測されていない。現行P11 blockerへ追加せず、最終統合後の全Rust試験で再確認する。
+
 ## 3. Final QA段階
 
 | 段階 | 対象 | 開始条件 |

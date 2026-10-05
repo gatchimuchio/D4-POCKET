@@ -962,6 +962,9 @@ pub struct Broker {
     pub(super) desktop_export_root: Option<(std::path::PathBuf, cap_std::fs::Dir)>,
     desktop_package_layout_verified: bool,
     desktop_install_path_verified: bool,
+    pub(super) desktop_product_identity: Option<(String, String)>,
+    #[cfg(test)]
+    pub(super) desktop_product_install_local_app_data: Option<PathBuf>,
     desktop_agent_workspace_protected_paths: Vec<PathBuf>,
     desktop_loopback_bind_verified: bool,
     desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
@@ -1002,6 +1005,9 @@ impl Broker {
             desktop_export_root: None,
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
+            desktop_product_identity: None,
+            #[cfg(test)]
+            desktop_product_install_local_app_data: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -1076,6 +1082,9 @@ impl Broker {
             desktop_export_root: None,
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
+            desktop_product_identity: None,
+            #[cfg(test)]
+            desktop_product_install_local_app_data: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -1096,7 +1105,13 @@ impl Broker {
 
         let mut started = BTreeMap::<
             String,
-            (String, Option<(String, super::execution_history::AgentTaskHistoryAuditRecord)>),
+            (
+                String,
+                Option<(
+                    String,
+                    super::execution_history::AgentTaskHistoryAuditRecord,
+                )>,
+            ),
         >::new();
         let mut terminal = BTreeSet::<String>::new();
         for event in self.audit_log.events() {
@@ -1120,10 +1135,7 @@ impl Broker {
             // Taskの意味識別子はreasonに保存される。旧形式のように意味識別子を
             // operationへ直接記録したeventも、互換性維持のため受理する。
             if event.operation == TASK_START || event.reason == TASK_START {
-                started.insert(
-                    event.request_id.clone(),
-                    (event.event_hash.clone(), None),
-                );
+                started.insert(event.request_id.clone(), (event.event_hash.clone(), None));
             } else if [
                 TASK_COMPLETE,
                 TASK_FAILED,
@@ -1144,14 +1156,13 @@ impl Broker {
             if let Some((start_audit_event_id, mut record)) = structured_start {
                 record.stage = "terminal".into();
                 record.status = "suspended".into();
-                record.updated_at = self
-                    .current_epoch_seconds()
-                    .max(record.created_at);
+                record.updated_at = self.current_epoch_seconds().max(record.created_at);
                 record.result_hash = None;
                 record.failure_class = Some("中断回復".into());
                 record.start_audit_event_id = Some(start_audit_event_id);
-                let (reason, digest) = super::execution_history::encode_agent_task_audit(&record)
-                    .map_err(|error| BrokerStoreError::MalformedAuditState(error.into()))?;
+                let (reason, digest) =
+                    super::execution_history::encode_agent_task_audit(&record)
+                        .map_err(|error| BrokerStoreError::MalformedAuditState(error.into()))?;
                 self.append_audit(
                     &task_id,
                     TASK_RECOVERY,
@@ -1186,6 +1197,33 @@ impl Broker {
         self.desktop_package_layout_verified = package_layout_verified;
         self.desktop_install_path_verified = installed_path_verified;
         self.desktop_loopback_bind_verified = loopback_bind_verified;
+    }
+
+    pub(crate) fn set_desktop_product_identity(
+        &mut self,
+        app_id: String,
+        audit_store_id: String,
+    ) -> Result<(), &'static str> {
+        let valid_generated_id = |value: &str, prefix: &str| {
+            value.strip_prefix(prefix).is_some_and(|suffix| {
+                suffix.len() == 32
+                    && suffix
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+        };
+        if !valid_generated_id(&app_id, "d4-pocket-app-")
+            || !valid_generated_id(&audit_store_id, "audit-store-")
+        {
+            return Err("埋込み製品identityが不正");
+        }
+        self.desktop_product_identity = Some((app_id, audit_store_id));
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_desktop_product_install_local_app_data(&mut self, path: PathBuf) {
+        self.desktop_product_install_local_app_data = Some(path);
     }
 
     pub(crate) fn set_desktop_export_root(
@@ -1651,6 +1689,7 @@ impl Broker {
                 true,
                 OwnerConfirmationSource::OwnerCredential,
                 None,
+                None,
             ),
             Err(_) => self.reject_with_payload_hash(
                 "malformed-owner-request",
@@ -1671,13 +1710,14 @@ impl Broker {
     /// Owner権限は要求本文やmetadataから作らず、このprocess内呼出しだけが供給する。
     #[cfg(test)]
     pub(crate) fn desktop_owner_operation_json(&mut self, input: &str) -> BrokerResponse {
-        self.desktop_owner_operation_json_with_update_confirmation(input, None)
+        self.desktop_owner_operation_json_with_update_confirmation(input, None, None)
     }
 
     pub(crate) fn desktop_owner_operation_json_with_update_confirmation(
         &mut self,
         input: &str,
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+        apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     ) -> BrokerResponse {
         let envelope = match BrokerRequestEnvelope::from_json_str(input) {
             Ok(envelope) => envelope,
@@ -1727,6 +1767,7 @@ impl Broker {
                     | BrokerOperation::回帰Case登録
                     | BrokerOperation::資格情報失効
                     | BrokerOperation::更新download要求
+                    | BrokerOperation::更新適用要求
             )
         );
         if !operation_is_allowlisted
@@ -1747,6 +1788,7 @@ impl Broker {
             true,
             OwnerConfirmationSource::DesktopNativeConfirmation,
             download_confirmation,
+            apply_confirmation,
         )
     }
 
@@ -1764,6 +1806,7 @@ impl Broker {
                 OwnerConfirmationSource::NotOwner
             },
             None,
+            None,
         )
     }
 
@@ -1773,6 +1816,7 @@ impl Broker {
         owner: bool,
         export_confirmation: OwnerConfirmationSource,
         download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+        apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     ) -> BrokerResponse {
         self.端末期限処理();
         let request_id = envelope
@@ -2259,6 +2303,7 @@ impl Broker {
                 &payload_hash,
                 export_confirmation,
                 download_confirmation.as_ref(),
+                apply_confirmation.as_ref(),
             ),
             operation @ (BrokerOperation::通知一覧
             | BrokerOperation::通知既読
@@ -5578,6 +5623,7 @@ mod tests {
             true,
             OwnerConfirmationSource::DesktopNativeConfirmation,
             None,
+            None,
         );
         assert_eq!(response.status, BrokerStatus::Rejected);
         assert_eq!(
@@ -5602,6 +5648,7 @@ mod tests {
             request,
             true,
             OwnerConfirmationSource::DesktopNativeConfirmation,
+            None,
             None,
         );
         assert_eq!(response.status, BrokerStatus::Rejected);
@@ -5879,8 +5926,8 @@ mod tests {
                 )
                 .expect("Task開始metadataを保存");
         }
-        let broker = Broker::new_persistent("task-history-restart", &root)
-            .expect("中断Taskを再開せず隔離");
+        let broker =
+            Broker::new_persistent("task-history-restart", &root).expect("中断Taskを再開せず隔離");
         let page = super::super::execution_history::agent_task_page(
             &broker.audit_log,
             "runtime-a",
@@ -7979,8 +8026,7 @@ mod tests {
                 "status": "missing"
             }
         });
-        let mut normal_request =
-            BrokerRequestEnvelope::health("a2a-normal", "a2a-normal-nonce");
+        let mut normal_request = BrokerRequestEnvelope::health("a2a-normal", "a2a-normal-nonce");
         normal_request.session_id = Some("session-1".to_string());
         normal_request.operation = Some(BrokerOperation::A2A接続);
         normal_request.payload = Some(payload.clone());

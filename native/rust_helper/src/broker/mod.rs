@@ -23,9 +23,8 @@ pub(crate) mod json_input;
 pub(crate) mod mcp_center;
 pub(crate) mod notification_center;
 pub(crate) mod observation_center;
-pub(crate) mod profile_center;
-#[cfg(test)]
 pub(crate) mod product_install;
+pub(crate) mod profile_center;
 pub mod protocol;
 pub(crate) mod runtime_lifecycle;
 pub(crate) mod runtime_registry;

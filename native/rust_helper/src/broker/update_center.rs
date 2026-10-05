@@ -13,9 +13,14 @@ use super::protocol::{
 use super::store::{BrokerPersistentStore, BrokerStoreError};
 use crate::audit_hash::sha256_tagged;
 use crate::update_verification::{verify_signed_update_signature, SignedUpdateCandidate};
+#[cfg(windows)]
+use cap_fs_ext::OsMetadataExt as _;
+use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::fs::OpenOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
@@ -46,6 +51,14 @@ pub(crate) struct UpdateDownloadConfirmation {
     pub(crate) summary: String,
     pub(crate) display_host: String,
     pub(crate) payload_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UpdateApplyConfirmation {
+    pub(crate) download: UpdateDownloadConfirmation,
+    pub(crate) app_id: String,
+    pub(crate) audit_store_id: String,
+    pub(crate) version_directory: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -482,6 +495,7 @@ pub(super) fn dispatch(
     payload_hash: &str,
     owner_confirmation: OwnerConfirmationSource,
     download_confirmation: Option<&UpdateDownloadConfirmation>,
+    apply_confirmation: Option<&UpdateApplyConfirmation>,
 ) -> BrokerResponse {
     poll_download_completion(broker);
     match operation.as_str() {
@@ -496,6 +510,7 @@ pub(super) fn dispatch(
             payload_hash,
             owner_confirmation,
             download_confirmation,
+            None,
         ),
         OP_APPLY => execution_request(
             broker,
@@ -505,6 +520,7 @@ pub(super) fn dispatch(
             payload_hash,
             owner_confirmation,
             None,
+            apply_confirmation,
         ),
         OP_DEFER => defer(broker, payload, request_id, payload_hash),
         OP_ROLLBACK => execution_request(
@@ -514,6 +530,7 @@ pub(super) fn dispatch(
             request_id,
             payload_hash,
             owner_confirmation,
+            None,
             None,
         ),
         _ => broker.reject_with_payload_hash(
@@ -819,6 +836,7 @@ fn execution_request(
     hash: &str,
     owner_confirmation: OwnerConfirmationSource,
     download_confirmation: Option<&UpdateDownloadConfirmation>,
+    apply_confirmation: Option<&UpdateApplyConfirmation>,
 ) -> BrokerResponse {
     let request: UpdateIDRequest = match serde_json::from_value::<UpdateIDRequest>(payload.clone())
     {
@@ -1131,6 +1149,17 @@ fn execution_request(
             shutdown_requested: broker.shutdown_requested,
         };
     }
+    if operation == OP_APPLY {
+        return apply_verified_package(
+            broker,
+            &request,
+            &current_record,
+            request_id,
+            hash,
+            owner_confirmation,
+            apply_confirmation,
+        );
+    }
     suspended(
         broker,
         operation,
@@ -1139,6 +1168,410 @@ fn execution_request(
         hash,
         "外部download、install、process、rollback実行経路は未接続のためsuspended",
     )
+}
+
+fn apply_verified_package(
+    broker: &mut Broker,
+    request: &UpdateIDRequest,
+    record: &UpdateRecord,
+    request_id: &str,
+    payload_hash: &str,
+    owner_confirmation: OwnerConfirmationSource,
+    confirmation: Option<&UpdateApplyConfirmation>,
+) -> BrokerResponse {
+    if owner_confirmation != OwnerConfirmationSource::DesktopNativeConfirmation {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "desktop_native_owner_confirmation_required",
+            "更新package導入にはRust Desktop起動器のnative Owner確認が必要",
+            payload_hash,
+        );
+    }
+    let Some(confirmation) = confirmation else {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "update_apply_confirmation_missing",
+            "固定導入先とpackage identityを示したnative確認記録がない",
+            payload_hash,
+        );
+    };
+    let Some((app_id, audit_store_id)) = broker.desktop_product_identity.clone() else {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "update_install_product_identity_missing",
+            "製品App／Audit Store identityを検証できないため導入しない",
+            payload_hash,
+        );
+    };
+    let Some(package_sha256) = record.candidate.package_sha256.as_deref() else {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "update_package_binding_required",
+            "署名済みpackage digestがない",
+            payload_hash,
+        );
+    };
+    let Some(package_bytes) = record.candidate.package_size_bytes else {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "update_package_binding_required",
+            "署名済みpackage byte長がない",
+            payload_hash,
+        );
+    };
+    let download = &confirmation.download;
+    if download.update_id != record.candidate.update_id
+        || download.candidate_hash != record.candidate_hash
+        || download.package_sha256 != package_sha256
+        || download.package_size_bytes != package_bytes
+        || download.offered_version != record.candidate.offered_version
+        || download.channel != record.candidate.channel
+        || download.summary != record.candidate.summary
+        || download.payload_hash != payload_hash
+        || confirmation.app_id != app_id
+        || confirmation.audit_store_id != audit_store_id
+    {
+        return reject(
+            broker,
+            request_id,
+            OP_APPLY,
+            "update_apply_confirmation_stale",
+            "native Owner確認後に候補、製品identity、または操作payloadが変化した",
+            payload_hash,
+        );
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (request, record);
+        return suspended(
+            broker,
+            OP_APPLY,
+            request_id,
+            json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "復旧ID": "recover-update-install-platform", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+            payload_hash,
+            "固定install rootのWindows Known Folder経路がないためsuspended",
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        #[cfg(test)]
+        let install_plan = broker
+            .desktop_product_install_local_app_data
+            .as_deref()
+            .map(|local_app_data| {
+                super::product_install::plan_product_install(
+                    local_app_data,
+                    &app_id,
+                    &record.candidate.offered_version,
+                    package_sha256,
+                )
+            });
+        #[cfg(not(test))]
+        let install_plan: Option<
+            Result<
+                super::product_install::ProductInstallPlan,
+                super::product_install::ProductInstallPlanError,
+            >,
+        > = None;
+        let plan_result = match install_plan {
+            Some(plan) => plan,
+            None => super::product_install::plan_current_user_product_install(
+                &app_id,
+                &record.candidate.offered_version,
+                package_sha256,
+            ),
+        };
+        let plan = match plan_result {
+            Ok(plan) => plan,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    "product_install_plan_invalid",
+                    "Brokerが固定導入先を導出できない",
+                    payload_hash,
+                )
+            }
+        };
+        if plan.version_directory != confirmation.version_directory {
+            return reject(
+                broker,
+                request_id,
+                OP_APPLY,
+                "update_apply_destination_stale",
+                "native Owner確認に表示した固定導入先が現在のKnown Folder計画と異なる",
+                payload_hash,
+            );
+        }
+        let Some(stage_name) = plan
+            .version_directory
+            .file_name()
+            .and_then(|name| name.to_str())
+        else {
+            return reject(
+                broker,
+                request_id,
+                OP_APPLY,
+                "product_install_stage_invalid",
+                "content-addressed version directory名が不正",
+                payload_hash,
+            );
+        };
+        if !broker.state_store.persistence_ready() {
+            return suspended(
+                broker,
+                OP_APPLY,
+                request_id,
+                json!({"版": VERSION, "更新ID": request.update_id, "候補hash": request.candidate_hash, "状態": "suspended", "復旧ID": "recover-update-install-audit", "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE}),
+                payload_hash,
+                "永続Auditが利用できないためpackageを導入しない",
+            );
+        }
+        let package_directory = match broker.state_store.open_update_package_directory() {
+            Ok(Some(directory)) => directory,
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    "update_package_store_unavailable",
+                    "Broker固定download package directoryを開けない",
+                    payload_hash,
+                )
+            }
+        };
+        let package_name = format!("{package_sha256}.pkg");
+        let mut options = OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        let mut package = match package_directory.open_with(&package_name, &options) {
+            Ok(package) => package,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    "update_package_missing",
+                    "署名済みdigest名のdownload packageがない",
+                    payload_hash,
+                )
+            }
+        };
+        let package_metadata = match package.metadata() {
+            Ok(metadata)
+                if metadata.is_file()
+                    && metadata.file_attributes() & 0x400 == 0
+                    && metadata.len() == package_bytes =>
+            {
+                metadata
+            }
+            _ => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    "update_package_file_invalid",
+                    "download packageの通常file属性または署名済みbyte長が一致しない",
+                    payload_hash,
+                )
+            }
+        };
+        let intent_reason = format!(
+            "Capability=product.install.version_stage Permission=現在の署名済み候補・App ID・version・package digestの固定導入先一回限定 Approval=内容を表示したRust Desktop native Owner確認 AuditEvent=展開前意図を永続化 RecoveryAction=未起動version directoryは自動実行せず、再起動後にpackage digestとstage全体を再検証してから復旧判断。candidate={} version={} package_sha256={} bytes={}",
+            record.candidate.update_id,
+            record.candidate.offered_version,
+            package_sha256,
+            package_bytes
+        );
+        let intent = match broker.append_audit(
+            request_id,
+            OP_APPLY,
+            "queued",
+            &intent_reason,
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        ) {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_APPLY,
+                    "update_apply_audit_failed",
+                    "導入開始前Auditを確定できない",
+                )
+            }
+        };
+        #[cfg(test)]
+        let injected_versions_directory = broker
+            .desktop_product_install_local_app_data
+            .as_deref()
+            .map(|local_app_data| {
+                super::product_install::open_product_versions_directory(local_app_data, &app_id)
+            });
+        #[cfg(not(test))]
+        let injected_versions_directory: Option<
+            Result<(PathBuf, cap_std::fs::Dir), super::product_install::ProductInstallPlanError>,
+        > = None;
+        let versions_result = match injected_versions_directory {
+            Some(result) => result,
+            None => super::product_install::open_current_user_product_versions_directory(&app_id),
+        };
+        let (versions_path, versions_directory) = match versions_result {
+            Ok(result) => result,
+            Err(_) => {
+                if broker
+                    .append_audit(
+                    &format!("{request_id}:failed"),
+                    OP_APPLY,
+                    "failed",
+                    "Capability=product.install.version_stage Permission=現在候補の導入先のみ Approval=Rust Desktop native Owner確認 AuditEvent=導入rootを開けない結果を記録 RecoveryAction=package内容は変更せずKnown FolderとAuditを再確認",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    payload_hash,
+                    )
+                    .is_err()
+                {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        OP_APPLY,
+                        "update_apply_audit_failed",
+                        "導入rootを開けない結果のAuditを確定できない",
+                    );
+                }
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    "product_install_root_unavailable",
+                    "Known Folder配下の固定導入先をcapabilityで開けない",
+                    payload_hash,
+                );
+            }
+        };
+        if plan.version_directory.parent() != Some(versions_path.as_path()) {
+            if broker
+                .append_audit(
+                    &format!("{request_id}:failed"),
+                    OP_APPLY,
+                    "failed",
+                    "Capability=product.install.version_stage Permission=現在候補の導入先のみ Approval=Rust Desktop native Owner確認 AuditEvent=directory capability不一致を記録 RecoveryAction=package内容は変更せず導入先を再確認",
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    payload_hash,
+                )
+                .is_err()
+            {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_APPLY,
+                    "update_apply_audit_failed",
+                    "導入先不一致のAuditを確定できない",
+                );
+            }
+            return reject(
+                broker,
+                request_id,
+                OP_APPLY,
+                "product_install_root_mismatch",
+                "導入先pathとBroker directory capabilityが一致しない",
+                payload_hash,
+            );
+        }
+        let extraction = crate::product_package::extract_verified_package_into_directory(
+            &mut package,
+            package_metadata.len(),
+            Some(package_sha256),
+            &versions_directory,
+            stage_name,
+            crate::product_package::ProductPackageExpectation {
+                product_version: Some(&record.candidate.offered_version),
+                app_id: &app_id,
+                audit_store_id: &audit_store_id,
+            },
+        );
+        let info = match extraction {
+            Ok(info) => info,
+            Err(error) => {
+                if broker
+                    .append_audit(
+                        &format!("{request_id}:failed"),
+                        OP_APPLY,
+                        "failed",
+                        &format!("Capability=product.install.version_stage Permission=確認済み候補に一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=展開失敗を記録 RecoveryAction=readerがidentity検査済みの自身のstageのみ除去。再試行前に同じ署名packageを再検証。failure_code={}", error.0),
+                        EVIDENCE_SOURCE_INTERNAL_STATE,
+                        payload_hash,
+                    )
+                    .is_err()
+                {
+                    return broker.audit_store_failed_response(
+                        request_id,
+                        OP_APPLY,
+                        "update_apply_audit_failed",
+                        "導入失敗をAuditへ確定できない",
+                    );
+                }
+                return reject(
+                    broker,
+                    request_id,
+                    OP_APPLY,
+                    error.0,
+                    "署名済みpackageの構造・identity・file hash検証に失敗",
+                    payload_hash,
+                );
+            }
+        };
+        let completion = broker.append_audit(
+            &format!("{request_id}:complete"),
+            OP_APPLY,
+            "completed",
+            &format!("Capability=product.install.version_stage Permission=署名済みApp identityとcontent-addressed version directory一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=完全展開・package／file digest一致を記録 RecoveryAction=このversionはまだ起動・有効化しない。次工程のcurrent trust・起動・rollback審査を要求。file_count={} total_bytes={} package_sha256={}", info.file_count, info.total_file_bytes, package_sha256),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        );
+        let completion = match completion {
+            Ok(event) => event,
+            Err(_) => {
+                return broker.audit_store_failed_response(
+                    request_id,
+                    OP_APPLY,
+                    "update_apply_audit_failed",
+                    "展開後のAuditを確定できない。version directoryは自動起動しない",
+                )
+            }
+        };
+        return BrokerResponse {
+            request_id: request_id.to_string(),
+            operation: OP_APPLY.to_string(),
+            status: BrokerStatus::Accepted,
+            evidence_source: EVIDENCE_SOURCE_INTERNAL_STATE.to_string(),
+            audit_event_id: completion.event_id,
+            error: None,
+            health: None,
+            body: Some(json!({
+                "版": VERSION,
+                "更新ID": request.update_id,
+                "候補hash": request.candidate_hash,
+                "導入状態": "version_staged",
+                "有効化": "suspended",
+                "file数": info.file_count,
+                "total_bytes": info.total_file_bytes,
+                "復旧ID": "recover-update-install-activation",
+                "証拠種別": EVIDENCE_SOURCE_INTERNAL_STATE,
+                "開始Audit ID": intent.event_id,
+            })),
+            shutdown_requested: broker.shutdown_requested,
+        };
+    }
 }
 
 fn verify_candidate(
@@ -1531,6 +1964,7 @@ mod tests {
         rand::SystemRandom,
         signature::{Ed25519KeyPair, KeyPair},
     };
+    use sha2::{Digest, Sha256};
     use std::io::Write;
 
     fn trust_and_candidate() -> (UpdateTrust, UpdateCandidateDocument) {
@@ -1575,6 +2009,117 @@ mod tests {
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 ),
                 package_size_bytes: Some(1024),
+                signed_bytes_hex: hex::encode(signed),
+                signature_hex: hex::encode(signature.as_ref()),
+                signer_fingerprint: fingerprint,
+                rollback_available: true,
+            },
+        )
+    }
+
+    const INSTALL_APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
+    const INSTALL_AUDIT_ID: &str = "audit-store-22222222222222222222222222222222";
+
+    fn install_test_package() -> Vec<u8> {
+        let product_manifest = serde_json::to_vec(&json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "export-install-test",
+            "manifest": {
+                "app_identity": {"app_id": INSTALL_APP_ID},
+                "audit_store": {
+                    "store_id": INSTALL_AUDIT_ID,
+                    "chain_status": "new",
+                    "inherited": false
+                },
+                "inheritance_policy": {
+                    "authority": "none",
+                    "permission": "none",
+                    "approval": "none",
+                    "credential": "none",
+                    "audit_chain": "none"
+                }
+            }
+        }))
+        .unwrap();
+        let files: Vec<(&str, &[u8])> = vec![
+            ("app/data/app.so", b"a"),
+            ("app/data/icudtl.dat", b"b"),
+            ("app/flutter_windows.dll", b"c"),
+            ("app/gui_shell_desktop.exe", b"d"),
+            ("broker/gui_shell_rust_helper.exe", b"e"),
+            ("gui_shell_desktop_launcher.exe", b"f"),
+            ("product_manifest.json", &product_manifest),
+        ];
+        let entries: Vec<_> = files
+            .iter()
+            .map(|(path, bytes)| {
+                json!({
+                    "path": path,
+                    "byte_length": bytes.len(),
+                    "sha256": hex::encode(Sha256::digest(bytes)),
+                })
+            })
+            .collect();
+        let manifest = serde_json::to_vec(&json!({
+            "version": 1,
+            "product": "D4 Pocket",
+            "product_version": "1.1.0",
+            "app_id": INSTALL_APP_ID,
+            "audit_store_id": INSTALL_AUDIT_ID,
+            "files": entries,
+        }))
+        .unwrap();
+        let mut package = b"D4PKG01\n".to_vec();
+        package.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
+        package.extend_from_slice(&manifest);
+        for (_, bytes) in files {
+            package.extend_from_slice(bytes);
+        }
+        package
+    }
+
+    fn trust_and_candidate_for_package(package: &[u8]) -> (UpdateTrust, UpdateCandidateDocument) {
+        let key = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
+        let pair = Ed25519KeyPair::from_pkcs8(key.as_ref()).unwrap();
+        let der = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ]
+        .into_iter()
+        .chain(pair.public_key().as_ref().iter().copied())
+        .collect::<Vec<_>>();
+        let digest = hex::encode(Sha256::digest(package));
+        let signed = serde_json::to_vec(&SignedManifest {
+            version: CANDIDATE_VERSION,
+            update_id: "update-apply",
+            current_version: "1.0.0",
+            offered_version: "1.1.0",
+            channel: "stable",
+            summary: "安全更新",
+            package_sha256: &digest,
+            package_size_bytes: package.len() as u64,
+            rollback_available: true,
+        })
+        .unwrap();
+        let fingerprint = sha256_tagged(pair.public_key().as_ref());
+        let signature = pair.sign(&signed);
+        (
+            UpdateTrust {
+                version: TRUST_VERSION,
+                algorithm: "Ed25519".into(),
+                public_key_der_hex: hex::encode(der),
+                public_key_fingerprint: fingerprint.clone(),
+                package_sources: Vec::new(),
+            },
+            UpdateCandidateDocument {
+                version: CANDIDATE_VERSION,
+                update_id: "update-apply".into(),
+                current_version: "1.0.0".into(),
+                offered_version: "1.1.0".into(),
+                channel: "stable".into(),
+                summary: "安全更新".into(),
+                package_sha256: Some(digest),
+                package_size_bytes: Some(package.len() as u64),
                 signed_bytes_hex: hex::encode(signed),
                 signature_hex: hex::encode(signature.as_ref()),
                 signer_fingerprint: fingerprint,
@@ -1912,7 +2457,7 @@ mod tests {
     }
 
     #[test]
-    fn execution_requests_remain_suspended_and_audited() {
+    fn rollback_remains_suspended_and_apply_rejects_without_native_owner_confirmation() {
         let (trust, candidate) = trust_and_candidate();
         let candidate_value = serde_json::to_value(&candidate).unwrap();
         let candidate_hash =
@@ -1928,25 +2473,203 @@ mod tests {
             .status,
             BrokerStatus::Accepted
         );
-        for (operation, expected_operation) in [
-            (BrokerOperation::更新適用要求, OP_APPLY),
-            (BrokerOperation::更新rollback要求, OP_ROLLBACK),
-        ] {
-            let response = call(
+        let apply = call(
+            &mut broker,
+            BrokerOperation::更新適用要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(apply.status, BrokerStatus::Rejected);
+        assert_eq!(
+            apply.error.as_ref().map(|error| error.code.as_str()),
+            Some("desktop_native_owner_confirmation_required")
+        );
+        let rollback = call(
+            &mut broker,
+            BrokerOperation::更新rollback要求,
+            json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
+        );
+        assert_eq!(rollback.status, BrokerStatus::Suspended);
+        assert_eq!(
+            rollback.error.as_ref().map(|error| error.code.as_str()),
+            Some("update_execution_suspended")
+        );
+        let event = broker.audit_events().last().unwrap();
+        assert_eq!(event.operation, OP_ROLLBACK);
+        assert_eq!(event.decision, "suspended");
+        assert_eq!(rollback.audit_event_id, event.event_id);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("d4p-update-apply-{}-{unique}", std::process::id()));
+        let store_root = root.join("broker-store");
+        let install_root = root.join("local-app-data");
+        std::fs::create_dir_all(&install_root).unwrap();
+        let install_root = std::fs::canonicalize(&install_root).unwrap();
+        let package = install_test_package();
+        let digest = hex::encode(Sha256::digest(&package));
+        let (trust, candidate) = trust_and_candidate_for_package(&package);
+        let candidate_value = serde_json::to_value(&candidate).unwrap();
+        let candidate_hash =
+            crate::broker::protocol::canonical_payload_hash(Some(&candidate_value));
+        let mut broker = Broker::new_persistent("session-1", &store_root).unwrap();
+        broker.update_trust = Some(trust);
+        broker
+            .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
+            .unwrap();
+        broker.set_desktop_product_install_local_app_data(install_root.clone());
+        assert_eq!(
+            call(
                 &mut broker,
-                operation,
-                json!({"版": 1, "更新ID": "update-1", "候補hash": candidate_hash}),
-            );
-            assert_eq!(response.status, BrokerStatus::Suspended);
-            assert_eq!(
-                response.error.as_ref().map(|error| error.code.as_str()),
-                Some("update_execution_suspended")
-            );
-            let event = broker.audit_events().last().unwrap();
-            assert_eq!(event.operation, expected_operation);
-            assert_eq!(event.decision, "suspended");
-            assert_eq!(response.audit_event_id, event.event_id);
-        }
+                BrokerOperation::更新確認,
+                json!({"版": 1, "候補": [candidate]})
+            )
+            .status,
+            BrokerStatus::Accepted
+        );
+        let package_directory = broker
+            .state_store
+            .open_update_package_directory()
+            .unwrap()
+            .unwrap();
+        drop(package_directory);
+        std::fs::write(
+            store_root
+                .join("update_packages")
+                .join(format!("{digest}.pkg")),
+            &package,
+        )
+        .unwrap();
+        let payload = json!({
+            "版": 1,
+            "更新ID": "update-apply",
+            "候補hash": candidate_hash,
+        });
+        let payload_hash = crate::broker::protocol::canonical_payload_hash(Some(&payload));
+        let target = super::super::product_install::plan_product_install(
+            &install_root,
+            INSTALL_APP_ID,
+            "1.1.0",
+            &digest,
+        )
+        .unwrap()
+        .version_directory;
+        let confirmation = UpdateApplyConfirmation {
+            download: UpdateDownloadConfirmation {
+                update_id: "update-apply".into(),
+                candidate_hash: payload["候補hash"].as_str().unwrap().into(),
+                source_url: String::new(),
+                package_sha256: digest.clone(),
+                package_size_bytes: package.len() as u64,
+                offered_version: "1.1.0".into(),
+                channel: "stable".into(),
+                summary: "安全更新".into(),
+                display_host: String::new(),
+                payload_hash: payload_hash.clone(),
+            },
+            app_id: INSTALL_APP_ID.into(),
+            audit_store_id: INSTALL_AUDIT_ID.into(),
+            version_directory: target.clone(),
+        };
+        let envelope = |request_id: &str| {
+            json!({
+                "request_id": request_id,
+                "session_id": "session-1",
+                "operation": OP_APPLY,
+                "payload_hash": payload_hash,
+                "nonce": format!("{request_id}-nonce"),
+                "issued_at": BrokerRequestEnvelope::current_issued_at(),
+                "metadata": {"client": "desktop_flutter"},
+                "payload": payload,
+            })
+            .to_string()
+        };
+        let normal_ipc = call(&mut broker, BrokerOperation::更新適用要求, payload.clone());
+        assert_eq!(normal_ipc.status, BrokerStatus::Rejected);
+        assert_eq!(
+            normal_ipc.error.unwrap().code,
+            "desktop_native_owner_confirmation_required"
+        );
+        let mut stale_confirmation = confirmation.clone();
+        stale_confirmation.version_directory = install_root.join("attacker-controlled");
+        let stale = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-apply-stale"),
+            None,
+            Some(stale_confirmation),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.unwrap().code, "update_apply_destination_stale");
+        assert!(!target.exists());
+
+        let mut stale_identity = confirmation.clone();
+        stale_identity.app_id = "d4-pocket-app-33333333333333333333333333333333".into();
+        let stale = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-apply-identity-stale"),
+            None,
+            Some(stale_identity),
+        );
+        assert_eq!(stale.status, BrokerStatus::Rejected);
+        assert_eq!(stale.error.unwrap().code, "update_apply_confirmation_stale");
+        assert!(!target.exists());
+
+        let package_path = store_root
+            .join("update_packages")
+            .join(format!("{digest}.pkg"));
+        let mut tampered_package = package.clone();
+        *tampered_package.last_mut().unwrap() ^= 1;
+        std::fs::write(&package_path, tampered_package).unwrap();
+        let tampered = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-apply-tampered"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(tampered.status, BrokerStatus::Rejected);
+        assert!(!target.exists());
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-apply-tampered:failed" && event.decision == "failed"
+        }));
+        std::fs::write(&package_path, &package).unwrap();
+
+        let applied = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-apply"),
+            None,
+            Some(confirmation.clone()),
+        );
+        assert_eq!(applied.status, BrokerStatus::Accepted);
+        assert_eq!(applied.body.as_ref().unwrap()["導入状態"], "version_staged");
+        assert_eq!(applied.body.as_ref().unwrap()["有効化"], "suspended");
+        assert_eq!(
+            std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
+            b"d"
+        );
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
+        assert!(broker
+            .audit_events()
+            .iter()
+            .any(|event| { event.operation == OP_APPLY && event.decision == "completed" }));
+
+        let repeated = broker.desktop_owner_operation_json_with_update_confirmation(
+            &envelope("desktop-update-apply-replay"),
+            None,
+            Some(confirmation),
+        );
+        assert_eq!(repeated.status, BrokerStatus::Rejected);
+        assert_eq!(repeated.error.unwrap().code, "package_destination_exists");
+        assert_eq!(
+            std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
+            b"d"
+        );
+        drop(broker);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -2076,6 +2799,7 @@ mod tests {
         let busy = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-busy"),
             Some(confirmation.clone()),
+            None,
         );
         assert_eq!(busy.status, BrokerStatus::Rejected);
         assert_eq!(busy.error.unwrap().code, "update_download_busy");
@@ -2088,6 +2812,7 @@ mod tests {
         let stale = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-stale"),
             Some(stale_confirmation),
+            None,
         );
         assert_eq!(stale.status, BrokerStatus::Rejected);
         assert_eq!(
@@ -2097,6 +2822,7 @@ mod tests {
         let queued = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-accepted"),
             Some(confirmation),
+            None,
         );
         assert_eq!(queued.status, BrokerStatus::Accepted);
         assert_eq!(

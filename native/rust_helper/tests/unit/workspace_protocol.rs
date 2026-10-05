@@ -43,6 +43,7 @@ fn native_request(b: &mut Broker, op: &str, payload: Value) -> BrokerResponse {
         true,
         OwnerConfirmationSource::DesktopNativeConfirmation,
         None,
+        None,
     )
 }
 fn registration(b: &mut Broker) -> Value {

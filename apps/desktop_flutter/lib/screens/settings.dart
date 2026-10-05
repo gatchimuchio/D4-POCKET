@@ -752,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。install・process起動・rollbackはsuspendedです。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。Start Menu切替・process起動・rollbackはsuspendedです。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -851,7 +851,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 updateId: updateId,
                 candidateHash: candidateHash,
               ),
-              '適用要求を記録しました（実行はsuspended）。',
+              '署名済みpackageを未起動versionとして固定導入先へ展開しました。Start Menu切替・process起動・rollbackはsuspendedです。',
             ),
             child: const Text('適用要求'),
           ),

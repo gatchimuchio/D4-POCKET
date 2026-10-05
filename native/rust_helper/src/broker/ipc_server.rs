@@ -38,6 +38,8 @@ pub struct BrokerServerConfig {
     pub(crate) desktop_package_layout_verified: bool,
     /// Rust Desktop起動器が正式installed rootを独立に検証済みの場合のみtrue。
     pub(crate) desktop_install_path_verified: bool,
+    /// Product Build時に埋込み、要求payloadから受け取らないApp／Audit Store identity。
+    pub(crate) desktop_product_identity: Option<(String, String)>,
 }
 
 impl BrokerServerConfig {
@@ -57,6 +59,7 @@ impl BrokerServerConfig {
             desktop_protected_store_dir: None,
             desktop_package_layout_verified: false,
             desktop_install_path_verified: false,
+            desktop_product_identity: None,
         }
     }
 }
@@ -97,6 +100,7 @@ impl BrokerServerError {
 pub(crate) struct DesktopOwnerOperationRequest {
     pub request_json: String,
     pub download_confirmation: Option<super::update_center::UpdateDownloadConfirmation>,
+    pub apply_confirmation: Option<super::update_center::UpdateApplyConfirmation>,
     pub reply: SyncSender<BrokerResponse>,
 }
 
@@ -146,6 +150,11 @@ fn run_loopback_server_inner(
     let session_secret = random_hex(32)?;
     let mut broker = Broker::new_persistent(&session_id, &config.store_dir)
         .map_err(|error| BrokerServerError::new(error.message()))?;
+    if let Some((app_id, audit_store_id)) = config.desktop_product_identity.clone() {
+        broker
+            .set_desktop_product_identity(app_id, audit_store_id)
+            .map_err(BrokerServerError::new)?;
+    }
     let mut desktop_agent_workspace_protected_paths =
         vec![config.store_dir.clone(), config.session_file.clone()];
     desktop_agent_workspace_protected_paths
@@ -409,6 +418,7 @@ fn run_loopback_server_inner(
                 let response = broker.desktop_owner_operation_json_with_update_confirmation(
                     &request.request_json,
                     request.download_confirmation,
+                    request.apply_confirmation,
                 );
                 let _ = request.reply.send(response);
             }
