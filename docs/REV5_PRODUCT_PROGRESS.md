@@ -1,6 +1,6 @@
 # D4 Pocket / GUI-Shell rev5 Product-First 進捗
 
-更新日: 2026-10-05
+更新日: 2026-10-06
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
 現行phase: `P11 Windows Productization` (`OPEN`)。`P10 Module Selection / Pruning`は2026-10-05にrev5 Product Build受入れを閉鎖。`P9 Standalone Export`、`P8 GUI-Shell Compose`、`P7 A2A / Host / Adapter`、`P6 Credential / MCP`、`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
@@ -222,6 +222,16 @@ Windows Computer Useはこの2個目の同名Flutter windowをtargetable window�
 実行した試験は、Desktop projectで`flutter test --no-pub --no-test-assets --dart-define=GUI_SHELL_MODULE_SETUP_DOCTOR=false --dart-define=GUI_SHELL_MODULE_HISTORY=false --dart-define=GUI_SHELL_MODULE_EVALUATION_LAB=false --dart-define=GUI_SHELL_MODULE_HOST_CAPABILITIES=false --dart-define=GUI_SHELL_MODULE_NOTIFICATIONS=false --dart-define=GUI_SHELL_MODULE_OBSERVABILITY=false --dart-define=GUI_SHELL_MODULE_TRACE_INSPECTOR=false --dart-define=GUI_SHELL_MODULE_HOST_OPERATIONS=false test/module_pruning_test.dart`（2件合格）、`python -X utf8 tooling/build_module_pruned_windows.py --receipt examples/contracts/gui_shell_export_receipt.valid.json --plan-only`、Schema検査（158 Schema／155正常例／205負例）、Conformance（234 checks）。最初のasset付きFlutter試験は、OneDrive上の`build/unit_test_assets`をFlutterが削除できず、試験本体開始前に失敗した。assetを要しない対象試験を`--no-test-assets`で再実行して合格した。
 
 P9 portable bundleのWindows再起動時、Computer Use helperは同名製品windowを対象可能な窓として返さなかった。process path／parentは対象bundleを識別できたが、視覚的な画面確認は主張しない。P10の機能受入れはcompile-time define、製品build記録、Widget試験の範囲で閉じる。AOT／binaryの意味上の除去、Rust／第三者依存の除去、サイズ、cold startup、実行時resource、最終統合製品上の再確認は`docs/FINAL_QA_QUEUE.md`と既存release blockerへ送る。`binary_pruning_verified=false`は維持する。現行phaseは直ちにP11 Windows Productizationとする。
+
+### P11 Windows製品化 — OPEN
+
+#### Package format／reader基盤 — 実装・局所検証済み（製品経路未接続）
+
+- `D4PKG01`固定無圧縮format、JSON Schema、Developer専用portable Export packager、Rust package readerを追加した。
+- Rust readerは上限付きpackage／manifest、case-insensitive path順序・一意性、Windows path traversal／予約名／reparse point拒否、required payload、各file byte length／SHA-256、trailing byte、同梱Product ManifestのApp ID／Audit Store ID／新規Audit／Authority非継承を検証し、未存在stage directoryだけへ展開する。
+- Python packagerも同梱Product Manifestのidentity／Authority条件を照合する。Builder／readerとも配布元署名を検証せず、trust・Permission・Approvalを生成しない。
+- 個別証拠: `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib product_package -- --test-threads=1` 4件合格。`python -X utf8 tooling/schema_check/check_schemas.py`はSchema 159件／正常例156件／負例206件で合格。`python -X utf8 tooling/conformance_tests/run_conformance_skeleton.py`は235 checksで合格。
+- まだInstaller／Uninstaller／first run／installed product root／Start Menu登録／Update apply／Rollback／Repair／version displayへ接続していない。この基盤だけでP11受入れ、Windows Feature Complete、正式配布可を主張しない。次はnative setup／stable launch経路を実装し、package readerをその経路へ接続する。
 
 ## 3. 後続製品工程
 

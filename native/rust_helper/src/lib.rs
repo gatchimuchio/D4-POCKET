@@ -17,6 +17,7 @@ pub mod ipc;
 pub mod network;
 pub mod process;
 pub mod update_verification;
+pub mod product_package;
 pub(crate) mod mcp;
 pub(crate) mod a2a;
 

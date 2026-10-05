@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/d4_pocket_product_package_manifest.schema.json",
+  "title": "D4 Pocket製品package目録",
+  "description": "Brokerが外側署名・package digestを検査した後、Installerが展開前に再検査する固定順file inventory。Authorityを含まない。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "product", "product_version", "app_id", "audit_store_id", "files"],
+  "properties": {
+    "version": { "const": 1 },
+    "product": { "const": "D4 Pocket" },
+    "product_version": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$" },
+    "app_id": { "type": "string", "pattern": "^d4-pocket-app-[a-f0-9]{32}$" },
+    "audit_store_id": { "type": "string", "pattern": "^audit-store-[a-f0-9]{32}$" },
+    "files": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 20000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "byte_length", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?:app|broker)/[A-Za-z0-9._/-]+$|^(?:gui_shell_desktop_launcher\\.exe|product_manifest\\.json)$" },
+          "byte_length": { "type": "integer", "minimum": 0, "maximum": 4294967296 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

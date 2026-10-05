@@ -236,6 +236,10 @@
       "責任": "Windows Desktop起動器の固定配置、Rust Broker lifecycle、normal endpoint、ユーザー保存・cleanup、未成立の配布工程境界"
     },
     {
+      "path": "docs/specs/windows-product-package.md",
+      "責任": "D4PKG01製品packageの固定形式、境界、package目録とRust readerの検証範囲、Installer／Update未接続の明示"
+    },
+    {
       "path": "specs/gui_shell_module_catalog.json",
       "責任": "書出し対象Desktop画面Module、必須境界、依存、source surfaceの機械可読一覧"
     },
@@ -246,6 +250,10 @@
     {
       "path": "specs/gui_shell_module_comparison_evidence.schema.json",
       "責任": "Developer専用Windows all-enabled baseline／画面選択AOT比較のcommand、toolchain、artifact、Flutter AOT surface library有無、size-analysis hash証拠。report node一致の証拠範囲を超えて製品、権限、安全Core、起動、資源を主張しない"
+    },
+    {
+      "path": "specs/d4_pocket_product_package_manifest.schema.json",
+      "責任": "Brokerが外側署名とpackage全体hashを検査した後、Installerが展開対象file、製品版、独立App／Audit identity、各file hashと許可rootを再検査する固定package目録。Permission／Approval／Authorityを含まない"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

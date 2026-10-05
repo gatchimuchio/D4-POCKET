@@ -99,6 +99,7 @@ from tooling.export_windows_product import (
     validate_export_inputs,
 )
 import tooling.export_windows_product as windows_export
+import tooling.package_windows_product as windows_product_package
 
 REQUIRED_SCHEMA_NAMES = {
     "workspace_diff",
@@ -9584,6 +9585,111 @@ def test_gui_shell_module_comparison_is_same_commit_and_non_authoritative() -> l
     return errors
 
 
+def test_windows_product_package_writer_is_bounded_and_hash_bound() -> list[str]:
+    errors: list[str] = []
+    app_id = "d4-pocket-app-11111111111111111111111111111111"
+    audit_store_id = "audit-store-22222222222222222222222222222222"
+    payloads = {
+        "app/data/app.so": b"app-so",
+        "app/data/icudtl.dat": b"icu-data",
+        "app/flutter_windows.dll": b"flutter",
+        "app/gui_shell_desktop.exe": b"desktop",
+        "broker/gui_shell_rust_helper.exe": b"broker",
+        "gui_shell_desktop_launcher.exe": b"launcher",
+        "product_manifest.json": json.dumps({
+            "version": 1,
+            "product": "D4 Pocket",
+            "export_id": "export-test",
+            "manifest": {
+                "app_identity": {"app_id": app_id},
+                "audit_store": {"store_id": audit_store_id, "chain_status": "new", "inherited": False},
+                "inheritance_policy": {
+                    "authority": "none", "permission": "none", "approval": "none",
+                    "credential": "none", "audit_chain": "none",
+                },
+            },
+        }, separators=(",", ":")).encode("utf-8"),
+    }
+    with tempfile.TemporaryDirectory(prefix="d4p-product-package-") as temporary:
+        root = Path(temporary)
+        source = root / "bundle"
+        source.mkdir()
+        for relative, payload in payloads.items():
+            target = source / Path(relative)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(payload)
+        output = root / "D4Pocket.pkg"
+        record = windows_product_package.write_product_package(
+            source,
+            output,
+            product_version="1.2.3",
+            app_id=app_id,
+            audit_store_id=audit_store_id,
+        )
+        package = output.read_bytes()
+        if package[:8] != windows_product_package.MAGIC:
+            errors.append("D4PKG01 magicが固定されていない")
+        if len(package) < 12:
+            return errors + ["D4PKG01 headerが不完全"]
+        manifest_length = int.from_bytes(package[8:12], "little")
+        manifest_end = 12 + manifest_length
+        try:
+            manifest = json.loads(package[12:manifest_end].decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return errors + ["D4PKG01 manifestがUTF-8 JSONではない"]
+        schema_errors = validate_instance(
+            manifest, load_schema("d4_pocket_product_package_manifest.schema.json")
+        )
+        if schema_errors:
+            errors.append("D4PKG01 manifestが正本Schemaに適合しない")
+        payload_offset = manifest_end
+        for entry in manifest.get("files", []):
+            byte_length = entry.get("byte_length")
+            content = package[payload_offset : payload_offset + byte_length]
+            if len(content) != byte_length or hashlib.sha256(content).hexdigest() != entry.get("sha256"):
+                errors.append("D4PKG01 file inventoryのbyte長／SHA-256が一致しない")
+                break
+            payload_offset += byte_length
+        if payload_offset != len(package):
+            errors.append("D4PKG01 file payloadに欠落またはtrailing byteがある")
+        if record["package_sha256"] != hashlib.sha256(package).hexdigest():
+            errors.append("D4PKG01 receipt SHA-256が生成packageと一致しない")
+        if record["file_count"] != len(payloads):
+            errors.append("D4PKG01 receipt file countが一致しない")
+        try:
+            (source / "product_manifest.json").write_text(
+                json.dumps({
+                    "version": 1,
+                    "product": "D4 Pocket",
+                    "export_id": "export-test",
+                    "manifest": {"app_identity": {"app_id": "d4-pocket-app-33333333333333333333333333333333"}},
+                }),
+                encoding="utf-8",
+            )
+            windows_product_package.write_product_package(
+                source,
+                root / "mismatched.pkg",
+                product_version="1.2.3",
+                app_id=app_id,
+                audit_store_id=audit_store_id,
+            )
+            errors.append("Product Manifestとpackage identityの不一致を拒否しない")
+        except ValueError:
+            pass
+        try:
+            windows_product_package.write_product_package(
+                source,
+                source / "inside.pkg",
+                product_version="1.2.3",
+                app_id=app_id,
+                audit_store_id=audit_store_id,
+            )
+            errors.append("source bundle内へのpackage再帰書込みを拒否しない")
+        except ValueError:
+            pass
+    return errors
+
+
 def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() -> list[str]:
     evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
     schema = load_schema("gui_shell_windows_export_build.schema.json")
@@ -10643,6 +10749,7 @@ def main() -> int:
         test_gui_shell_export_is_new_identity_and_non_inheriting,
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
         test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative,
+        test_windows_product_package_writer_is_bounded_and_hash_bound,
         test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
