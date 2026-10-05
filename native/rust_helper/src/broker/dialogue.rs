@@ -146,11 +146,17 @@ struct AgentAdapterMetadata {
     adapter_id: String,
     agent_id: String,
     provider: String,
+    #[serde(default)]
+    provider_id: Option<String>,
     version: String,
     model: String,
     status: String,
     capabilities: Vec<AgentCapabilityMetadata>,
     workspace_requirements: AgentWorkspaceMetadata,
+    #[serde(default)]
+    provider_health: Option<AgentSupportMetadata>,
+    #[serde(rename = "automatic_fallback", default)]
+    _automatic_fallback: Option<bool>,
     tool_support: AgentSupportMetadata,
     mcp_support: AgentSupportMetadata,
     session_support: AgentSupportMetadata,
@@ -191,6 +197,8 @@ struct AgentWorkspaceMetadata {
 #[serde(deny_unknown_fields)]
 struct AgentAuthenticationMetadata {
     method: String,
+    #[serde(default)]
+    status: Option<String>,
     secret_value_present: bool,
 }
 
@@ -228,6 +236,10 @@ impl AgentAdapterMetadata {
         if !agent_text_valid(&metadata.adapter_id)
             || !agent_text_valid(&metadata.agent_id)
             || !agent_text_valid(&metadata.provider)
+            || metadata
+                .provider_id
+                .as_deref()
+                .is_some_and(|provider_id| !agent_text_valid(provider_id))
             || !agent_text_valid(&metadata.version)
             || !agent_text_valid(&metadata.model)
             || !["ready", "degraded", "unavailable", "unsupported"]
@@ -246,6 +258,10 @@ impl AgentAdapterMetadata {
                 != metadata.capabilities.len()
             || !["required", "optional"].contains(&metadata.workspace_requirements.mode.as_str())
             || metadata.workspace_requirements.boundary_policy != "deny_outside_workspace"
+            || metadata
+                .provider_health
+                .as_ref()
+                .is_some_and(|health| !agent_support_valid(health))
             || metadata.workspace_requirements.secret_paths.len() > 64
             || metadata
                 .workspace_requirements
@@ -263,10 +279,14 @@ impl AgentAdapterMetadata {
                 "api_key_reference",
                 "oauth_reference",
                 "local_credential_reference",
+                "codex_cli_managed",
                 "unsupported",
                 "unknown",
             ]
             .contains(&metadata.authentication.method.as_str())
+            || metadata.authentication.status.as_deref().is_some_and(|status| {
+                !["supported", "unsupported", "unknown"].contains(&status)
+            })
             || metadata.authentication.secret_value_present
             || metadata.host_requirements.platforms.is_empty()
             || metadata.host_requirements.platforms.len() > 8
@@ -2649,6 +2669,18 @@ mod tests {
         .expect("正常Agent Adapter fixture");
         let parsed = AgentAdapterMetadata::read(&valid).expect("正常Agent Adapter metadata");
         assert!(!parsed.task_execution_supported(), "宣言の欠落は未対応扱い");
+
+        let mut provider_model = valid.clone();
+        provider_model["provider_id"] = json!("openai_codex_cli");
+        provider_model["provider_health"] = json!({
+            "status": "unknown",
+            "reason": "CLI interfaceのみ確認済み"
+        });
+        provider_model["automatic_fallback"] = json!(false);
+        provider_model["authentication"]["method"] = json!("codex_cli_managed");
+        provider_model["authentication"]["status"] = json!("unknown");
+        AgentAdapterMetadata::read(&provider_model)
+            .expect("提供元・模型・健全性・自動代替・認証情報を読む");
 
         let mut task_unknown = valid.clone();
         task_unknown["capabilities"]

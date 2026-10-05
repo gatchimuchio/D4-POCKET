@@ -64,6 +64,7 @@ struct AgentCliRuntimeWorkspaceRegistration {
     workspace_id: String,
     workspace_root: String,
     secret_paths: Vec<String>,
+    provider_model_selection: crate::adapters::ProviderModelSelection,
 }
 
 #[derive(Deserialize)]
@@ -1210,6 +1211,7 @@ impl Broker {
             || request.cli_path.chars().any(char::is_control)
             || request.workspace_root.chars().any(char::is_control)
             || !secret_paths_valid
+            || !request.provider_model_selection.is_valid()
             || !Path::new(&request.cli_path).is_absolute()
             || !Path::new(&request.workspace_root).is_absolute()
         {
@@ -1363,6 +1365,7 @@ impl Broker {
             &request.adapter_id,
             Path::new(&request.cli_path),
             Path::new(&request.workspace_root),
+            &request.provider_model_selection,
         )
         .map_err(|error| crate::adapters::cli_registration_error_reason(&error))?;
         let metadata = root
@@ -5400,7 +5403,14 @@ mod tests {
             "cli_path": root.join("codex.exe"),
             "workspace_id": "workspace-test",
             "workspace_root": root.join("workspace"),
-            "secret_paths": [".env"]
+            "secret_paths": [".env"],
+            "provider_model_selection": {
+                "version": 1,
+                "provider_id": "openai_codex_cli",
+                "model_id": "model-test-01",
+                "authentication_source": "codex_cli_managed",
+                "automatic_fallback": false
+            }
         }));
         request.refresh_payload_hash();
         request

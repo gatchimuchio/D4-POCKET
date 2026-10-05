@@ -107,6 +107,8 @@ enum DesktopOwnerOperationSummary {
         workspace_id: String,
         workspace_root: String,
         secret_paths: Vec<String>,
+        provider_id: String,
+        model_id: String,
         payload_hash: String,
     },
     RegressionCaseDelete {
@@ -212,6 +214,7 @@ struct AgentCliRuntimeWorkspaceRegistrationRequest {
     workspace_id: String,
     workspace_root: String,
     secret_paths: Vec<String>,
+    provider_model_selection: crate::adapters::ProviderModelSelection,
 }
 
 #[derive(Deserialize)]
@@ -1205,6 +1208,7 @@ fn owner_operation_candidate(
                     .collect::<std::collections::BTreeSet<_>>()
                     .len()
                     != request.secret_paths.len()
+                || !request.provider_model_selection.is_valid()
             {
                 return None;
             }
@@ -1216,6 +1220,8 @@ fn owner_operation_candidate(
                 workspace_id: request.workspace_id,
                 workspace_root: request.workspace_root,
                 secret_paths: request.secret_paths,
+                provider_id: request.provider_model_selection.provider_id,
+                model_id: request.provider_model_selection.model_id,
                 payload_hash,
             }
         }
@@ -1680,13 +1686,17 @@ fn owner_confirmation_text_for_identity(
             workspace_id,
             workspace_root,
             secret_paths,
+            provider_id,
+            model_id,
             payload_hash,
         } => format!(
-            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\n{}\n\npayload hash:\n{}",
+            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\n提供元・模型: {} / {}\n認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を受け取らない）\n提供元接続・模型利用可否: 不明（登録時はCLI接続面のみ確認）\n自動代替実行: 無効\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\n{}\n\npayload hash:\n{}",
             owner_confirmation_value(adapter_id),
             owner_confirmation_value(runtime_id),
             owner_confirmation_value(cli_path),
             owner_confirmation_value(interface_scope),
+            owner_confirmation_value(provider_id),
+            owner_confirmation_value(model_id),
             owner_confirmation_value(workspace_id),
             owner_confirmation_value(workspace_root),
             if secret_paths.is_empty() {
@@ -2473,6 +2483,8 @@ mod tests {
                 workspace_id,
                 workspace_root,
                 secret_paths,
+                provider_id,
+                model_id,
                 payload_hash,
             } => json!({
                 "summary": {
@@ -2484,6 +2496,8 @@ mod tests {
                     "workspace_id": workspace_id,
                     "workspace_root": workspace_root,
                     "secret_paths": secret_paths,
+                    "provider_id": provider_id,
+                    "model_id": model_id,
                     "payload_hash": payload_hash
                 },
                 "confirm": confirm
@@ -2939,6 +2953,8 @@ mod tests {
                 workspace_id: String,
                 workspace_root: String,
                 secret_paths: Vec<String>,
+                provider_id: String,
+                model_id: String,
                 payload_hash: String,
             },
         }
@@ -3043,6 +3059,8 @@ mod tests {
                 workspace_id,
                 workspace_root,
                 secret_paths,
+                provider_id,
+                model_id,
                 payload_hash,
             } => DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
                 adapter_id,
@@ -3052,6 +3070,8 @@ mod tests {
                 workspace_id,
                 workspace_root,
                 secret_paths,
+                provider_id,
+                model_id,
                 payload_hash,
             },
         };
@@ -4204,7 +4224,14 @@ mod tests {
             "cli_path": executable.to_string_lossy(),
             "workspace_id": WORKSPACE_ID,
             "workspace_root": workspace_root.to_string_lossy(),
-            "secret_paths": [".env"]
+            "secret_paths": [".env"],
+            "provider_model_selection": {
+                "version": 1,
+                "provider_id": "openai_codex_cli",
+                "model_id": "model-test-01",
+                "authentication_source": "codex_cli_managed",
+                "automatic_fallback": false
+            }
         });
         let validate_registration_summary =
             |summary: &DesktopOwnerOperationSummary, expected_payload_hash: &str| {
@@ -4216,22 +4243,31 @@ mod tests {
                     workspace_id,
                     workspace_root: confirmed_workspace_root,
                     secret_paths,
+                    provider_id,
+                    model_id,
                     payload_hash,
                 } = summary
                 else {
                     panic!("Agent CLI登録はscope固定のnative Owner確認を使う")
                 };
                 assert_eq!(adapter_id, "codex-cli");
-                assert_eq!(interface_scope, "--version と exec --help");
+                assert_eq!(
+                    interface_scope,
+                    "--version と exec --help（--model対応）"
+                );
                 assert_eq!(runtime_id, RUNTIME_ID);
                 assert_eq!(cli_path, executable.to_str().unwrap());
                 assert_eq!(workspace_id, WORKSPACE_ID);
                 assert_eq!(confirmed_workspace_root, workspace_root.to_str().unwrap());
                 assert_eq!(secret_paths.len(), 1);
                 assert_eq!(secret_paths[0], ".env");
+                assert_eq!(provider_id, "openai_codex_cli");
+                assert_eq!(model_id, "model-test-01");
                 assert_eq!(payload_hash, expected_payload_hash);
                 let confirmation_text = owner_confirmation_text(summary);
                 assert!(confirmation_text.contains(AGENT_CLI_REGISTRATION_NOTICE));
+                assert!(confirmation_text.contains("model-test-01"));
+                assert!(confirmation_text.contains("自動代替実行: 無効"));
                 assert!(confirmation_text.contains(".env"));
                 assert!(!confirmation_text.contains("synthetic-secret-content-never-returned"));
             };
@@ -4737,12 +4773,14 @@ mod tests {
     fn agent_cli_runtime_workspace_confirmation_matches_build_scope() {
         let summary = DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
             adapter_id: "codex-cli".into(),
-            interface_scope: "--version と exec --help".into(),
+            interface_scope: "--version と exec --help（--model対応）".into(),
             runtime_id: "codex-r2-synthetic".into(),
             cli_path: r"C:\Tools\Codex\codex.exe".into(),
             workspace_id: "workspace-r2-synthetic".into(),
             workspace_root: r"C:\d4-r2-synthetic-workspace".into(),
             secret_paths: vec![".env".into(), "secrets".into()],
+            provider_id: "openai_codex_cli".into(),
+            model_id: "model-test-01".into(),
             payload_hash: format!("sha256:{}", "a".repeat(64)),
         };
         let text = owner_confirmation_text(&summary);
@@ -4752,7 +4790,9 @@ mod tests {
         assert!(text.contains(".env"));
         assert!(text.contains("secrets"));
         assert!(text.contains("Adapter ID: codex-cli"));
-        assert!(text.contains("--version と exec --help"));
+        assert!(text.contains("--version と exec --help（--model対応）"));
+        assert!(text.contains("openai_codex_cli / model-test-01"));
+        assert!(text.contains("自動代替実行: 無効"));
         assert!(text.contains(AGENT_CLI_REGISTRATION_NOTICE));
         #[cfg(feature = "r2-e2e")]
         {

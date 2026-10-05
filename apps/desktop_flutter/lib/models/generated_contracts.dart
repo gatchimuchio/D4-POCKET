@@ -345,6 +345,9 @@ class AgentAdapterRecord {
     this.workspaceBoundary = 'unknown',
     this.processSpawnStatus = 'unknown',
     this.authenticationMethod = 'unknown',
+    this.authenticationStatus = 'unknown',
+    this.providerHealthStatus = 'unknown',
+    this.automaticFallback,
   });
 
   final String adapterId;
@@ -359,6 +362,9 @@ class AgentAdapterRecord {
   final String workspaceBoundary;
   final String processSpawnStatus;
   final String authenticationMethod;
+  final String authenticationStatus;
+  final String providerHealthStatus;
+  final bool? automaticFallback;
 
   factory AgentAdapterRecord.fromJson(Map<String, Object?> json) {
     final workspace =
@@ -369,6 +375,9 @@ class AgentAdapterRecord {
         Map<String, Object?>.from(host['process_spawn'] as Map? ?? {});
     final authentication =
         Map<String, Object?>.from(json['authentication'] as Map? ?? {});
+    final providerHealth =
+        Map<String, Object?>.from(json['provider_health'] as Map? ?? {});
+    final automaticFallback = json['automatic_fallback'];
     return AgentAdapterRecord(
       adapterId: json['adapter_id'] as String? ?? '',
       agentId: json['agent_id'] as String? ?? '',
@@ -383,6 +392,9 @@ class AgentAdapterRecord {
       workspaceBoundary: workspace['boundary_policy'] as String? ?? 'unknown',
       processSpawnStatus: processSpawn['status'] as String? ?? 'unknown',
       authenticationMethod: authentication['method'] as String? ?? 'unknown',
+      authenticationStatus: authentication['status'] as String? ?? 'unknown',
+      providerHealthStatus: providerHealth['status'] as String? ?? 'unknown',
+      automaticFallback: automaticFallback is bool ? automaticFallback : null,
     );
   }
 }

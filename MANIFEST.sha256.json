@@ -92,7 +92,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "f18ce3c8b18b1fbe63a75814825c2081235ca7f10e8bebe40f98355883bd0bfd"
+      "sha256": "6b9ecf344f28a659aeb212611915c9864ff30696a0de57d748ea6c8f17c6b054"
     },
     {
       "path": "AUDIT.md",
@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "a565f0384f4a0c82bed8b4225d0c4afde1e404fef9729e94369df6523941be8c"
+      "sha256": "0ffed7d8e39ddb62dae4b33c929a7e9be53efdfdc06faa39c279b6277d0ef654"
     },
     {
       "path": "SECURITY.md",
@@ -204,11 +204,11 @@
     },
     {
       "path": "apps/desktop_flutter/lib/models/generated_contracts.dart",
-      "sha256": "166cf16cceb720c7369d682ceccb4ebe2b578c47e2f6aa03abc48d67540abb20"
+      "sha256": "9faa18cd381224e70e7e4695100b2f13c0fe0921ce6f0b4b43e5385ebbbe7f67"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/agent_center.dart",
-      "sha256": "8beef9297b33430e0d56c6630cb71ce3451894d2bd91aa55eebd8b56198cda45"
+      "sha256": "9ccace7c3a42e8a54f73ce5409c01e1bc7d8ab976439050608b239afb8f64212"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/approval_center.dart",
@@ -644,7 +644,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
-      "sha256": "f2ab4171dd5a3fa270d36ec1c4e72b1def02c01645fd12fdfe6f99ae1b8ecde2"
+      "sha256": "34e46daec3d7f01a03bde0aea40b7ebb30dfd6a71c123e5ff5003a87571138a4"
     },
     {
       "path": "apps/desktop_flutter/test/windows_tray_client_test.dart",
@@ -1168,7 +1168,7 @@
     },
     {
       "path": "docs/FINAL_QA_QUEUE.md",
-      "sha256": "8782ced74cbb02f287f2b99e4dde3e1bde88b8a2defc7def10d6280f7ef39217"
+      "sha256": "b6324b5dc008704b2e62327e899bd53b8a42e913beb12491031d6073683f6a32"
     },
     {
       "path": "docs/FIRST_RUN.md",
@@ -1224,7 +1224,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "96878db822d488bfa7dd774adc192ac5a29ac9b6e81205d1b8929d0fd24fa030"
+      "sha256": "545c0933c58e0cc95c14fbc6294a481b05bd9a8e5ef5ab89c536fc60be4e5d80"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1592,7 +1592,7 @@
     },
     {
       "path": "examples/contracts/agent_cli_runtime_workspace_registration.valid.json",
-      "sha256": "89a91517b1bcfcf395b66b721df821460248a1627ffc297ffabe6c4d5cb3f5c3"
+      "sha256": "77611548b330b86ea73dcaf3a536ca919781233d7fe783a6850b993f151ca285"
     },
     {
       "path": "examples/contracts/agent_comparison.valid.json",
@@ -1924,7 +1924,7 @@
     },
     {
       "path": "examples/contracts/invalid/agent_cli_runtime_workspace_registration_authority.invalid.json",
-      "sha256": "1fb3f612fd2cad948fbd2a08fb278e612cf91205f2061b8daa74316c59d25228"
+      "sha256": "e187d0a5146464b9ddeeca71f68e22baf1061c1fdc1e847b8edc489c248f90c8"
     },
     {
       "path": "examples/contracts/invalid/agent_comparison_authority.invalid.json",
@@ -3060,7 +3060,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/codex_cli.rs",
-      "sha256": "3d7fe1fe2265f1864329d477ad1c9b91213ad0e71294e07796ab18dfffdb2910"
+      "sha256": "1e24c390b23dea869fc593ac73140eb5ee8ffbd06deb914915b69974948baa46"
     },
     {
       "path": "native/rust_helper/src/adapters/mcp_stdio.rs",
@@ -3072,7 +3072,7 @@
     },
     {
       "path": "native/rust_helper/src/adapters/mod.rs",
-      "sha256": "41e339a70852f4cce5fad37c20bbe87e764e337a55c0de35c45aa48746948b3c"
+      "sha256": "fb88b793136008c9b4d65f88d1c5d74bf79011f71e11c24800c4da4100039ce3"
     },
     {
       "path": "native/rust_helper/src/adapters/process_tree.rs",
@@ -3160,7 +3160,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/dialogue.rs",
-      "sha256": "d435eafeaccc08ba693a9d5a4c9499c64ef26da7a3188f7e3ed3930a15d64ef8"
+      "sha256": "6e603d517c77eb019be23472223401376c8722cc37bd887df69ba6c3eab95a00"
     },
     {
       "path": "native/rust_helper/src/broker/evaluation_control.rs",
@@ -3220,7 +3220,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "705b03a56d36ff840f06f3b7711088aade5bf6c56afaaa95966941d4d52e784d"
+      "sha256": "03f424e8ccdf2d074e761e0c34852f606a2cdce24072c626939661c9dc2f5b37"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3272,7 +3272,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "64678a54b6f9dbfa8c1ac75aa506236f1a4886351a3d126eecc69e8b91580250"
+      "sha256": "63d18a7040deeb7348a3d6ae02f723981af1ca6a9cc3a212b93c62e6f97323a2"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3348,7 +3348,7 @@
     },
     {
       "path": "native/rust_helper/tests/fixtures/fake_codex_cli.rs",
-      "sha256": "e77793d3fd2ab0cf2a506520ce7593371da1d1d6c4c60463e1c937c1ccd080a0"
+      "sha256": "3522fb50b582ece4d80ecaf25038795fd978863c960fd7b87c684b5d8860205f"
     },
     {
       "path": "native/rust_helper/tests/protected_data.rs",
@@ -3896,11 +3896,11 @@
     },
     {
       "path": "specs/agent_adapter.schema.json",
-      "sha256": "d9041fa89aae83987d4cc99c7ee0d11c36007dc18b6bf01af65963ef81af1dfa"
+      "sha256": "80b60c542de63c57392680f2cbfc8bc47140fa95260caa570a729485d874ed9d"
     },
     {
       "path": "specs/agent_cli_runtime_workspace_registration.schema.json",
-      "sha256": "be0ce22c17479427bbd92ad3d928152f271fad78f2a7328e68fe0d543c4846ce"
+      "sha256": "e389c712403f7ea4dba95418ffa6186d5258ff87d629be91b4dc15822f11d706"
     },
     {
       "path": "specs/agent_comparison.schema.json",
@@ -4472,7 +4472,7 @@
     },
     {
       "path": "tooling/agent_adapter_probe.py",
-      "sha256": "6a44662d537bfe730d1fab8ea8379accdf788484de3374dadafde4a0531e04be"
+      "sha256": "f7049313b6348a3893dbabb865c6363230e96c07db953cd0b58e0622fd4e30da"
     },
     {
       "path": "tooling/audit_checkpoint_verifier.py",
@@ -4508,7 +4508,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "2bbb64645fbd27ef2d6b252c81c39a6c8f1d4e1518b68ac9b0681167c0f44b00"
+      "sha256": "8b1b99cfa88c6b3a8cdc0080c4228e5dfdc35a7a026d928bdbdb71e2a602ce8b"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4592,7 +4592,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "59cf8e7c1e3534fefd17afaca8b66f0ea159b77b39a93c7e0a16682868425eff"
+      "sha256": "0a661bfb9e0cb5fd3f9c83cdf345a2ba4f99f3389d7b31d1026b994776ca370b"
     },
     {
       "path": "tooling/shell_snapshot.py",

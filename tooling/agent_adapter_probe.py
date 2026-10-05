@@ -79,6 +79,7 @@ def build_adapter_record(
         "adapter_id": "codex-cli",
         "agent_id": "codex",
         "provider": "OpenAI",
+        "provider_id": "openai_codex_cli",
         "version": version if version_ok else "unknown",
         "model": "unknown",
         "status": status,
@@ -88,10 +89,20 @@ def build_adapter_record(
                 "support": _support("unknown", "help interfaceだけを確認し、実taskは実行していない"),
             },
             {
+                "capability_id": "provider_selection",
+                "support": _support("supported", "登録可能なProvider経路はOpenAI via Codex CLIだけである"),
+            },
+            {
+                "capability_id": "model_selection",
+                "support": _support("supported", "CLI --model interfaceの存在を検査する。Model利用可否は未確認"),
+            },
+            {
                 "capability_id": "session_control",
                 "support": _support("unknown", "exec helpにresume/fork表記はあるが、セッション操作の実動作は確認していない"),
             },
         ],
+        "provider_health": _support("unknown", "CLI interfaceだけを確認しProvider接続・Model利用可否は検査していない"),
+        "automatic_fallback": False,
         "workspace_requirements": {
             "mode": "required",
             "boundary_policy": "deny_outside_workspace",
@@ -104,7 +115,8 @@ def build_adapter_record(
         "usage_metrics_support": _support("unknown", "実taskのmetricsを取得していない"),
         "cost_metrics_support": _support("unknown", "cost情報を取得していない"),
         "authentication": {
-            "method": "unknown",
+            "method": "codex_cli_managed",
+            "status": "unknown",
             "secret_value_present": False,
         },
         "host_requirements": {
@@ -123,7 +135,7 @@ def probe_codex_cli() -> dict[str, object]:
         return build_adapter_record(None, "unknown", False, False)
     version_code, version_output = _run_read_only(executable, ["--version"])
     help_code, help_output = _run_read_only(executable, ["exec", "--help"])
-    help_ok = help_code == 0 and "codex exec" in help_output
+    help_ok = help_code == 0 and "codex exec" in help_output and "--model" in help_output
     return build_adapter_record(
         executable,
         _version_text(version_output),

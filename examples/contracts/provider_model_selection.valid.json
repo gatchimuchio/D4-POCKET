@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "provider_id": "openai_codex_cli",
+  "model_id": "model-fixture-v1",
+  "authentication_source": "codex_cli_managed",
+  "automatic_fallback": false
+}

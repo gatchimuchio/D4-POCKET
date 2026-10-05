@@ -8,7 +8,7 @@ use std::time::Duration;
 
 const VERSION_OUTPUT: &str = "codex-cli";
 const EXEC_HELP_OUTPUT: &str =
-    "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config --skip-git-repo-check";
+    "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config --skip-git-repo-check --model MODEL";
 
 const TASK_PERMISSION_PROFILE: [&str; 5] = [
     "default_permissions=\"d4p-agent-task\"",
@@ -38,6 +38,14 @@ fn main() {
     let Some(workspace) = argument_after(&arguments, "--cd").map(PathBuf::from) else {
         process::exit(42);
     };
+    let model_id = argument_after(&arguments, "--model");
+    let model_flag_count = arguments
+        .iter()
+        .filter(|argument| argument.as_str() == "--model")
+        .count();
+    if model_flag_count > 1 || model_id.is_some_and(|value| !valid_model_id(value)) {
+        process::exit(51);
+    }
     let (Some(temp), Some(tmp)) = (env::var_os("TEMP"), env::var_os("TMP")) else {
         process::exit(43);
     };
@@ -75,8 +83,12 @@ fn main() {
     }
 
     println!(r#"{{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}}"#);
+    let task_result = model_id.map_or_else(
+        || "fixture-task-completed".to_owned(),
+        |model| format!("fixture-task-completed:{model}"),
+    );
     println!(
-        r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"fixture-task-completed"}}}}"#
+        r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"{task_result}"}}}}"#
     );
     println!(r#"{{"type":"turn.completed"}}"#);
 }
@@ -99,7 +111,7 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
     if !arguments.iter().any(|argument| argument == "exec")
         || !arguments.last().is_some_and(|argument| argument == "-")
         || !contains_pair(arguments, "--json", "--ephemeral")
-        || !contains_pair(arguments, "--ignore-user-config", "--color")
+        || !contains_in_order(arguments, &["--ignore-user-config", "--color"])
         || !contains_pair(arguments, "--color", "never")
         || !arguments
             .iter()
@@ -146,6 +158,27 @@ fn contains_pair(arguments: &[String], first: &str, second: &str) -> bool {
     arguments
         .windows(2)
         .any(|pair| pair[0] == first && pair[1] == second)
+}
+
+fn contains_in_order(arguments: &[String], expected: &[&str]) -> bool {
+    let mut next = 0;
+    for argument in arguments {
+        if argument == expected[next] {
+            next += 1;
+            if next == expected.len() {
+                return true;
+            }
+        }
+    }
+    expected.is_empty()
+}
+
+fn valid_model_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().enumerate().all(|(index, byte)| {
+            byte.is_ascii_alphanumeric() || (index > 0 && b"._:/-".contains(&byte))
+        })
 }
 
 fn argument_after<'a>(arguments: &'a [String], flag: &str) -> Option<&'a str> {

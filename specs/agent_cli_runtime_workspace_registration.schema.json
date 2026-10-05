@@ -3,7 +3,7 @@
   "$id": "https://example.invalid/gui-shell/schemas/agent_cli_runtime_workspace_registration.schema.json",
   "title": "Agent CLI実行系・作業領域の登録要求",
   "type": "object",
-  "required": ["version", "adapter_id", "runtime_id", "cli_path", "workspace_id", "workspace_root", "secret_paths"],
+  "required": ["version", "adapter_id", "runtime_id", "cli_path", "workspace_id", "workspace_root", "secret_paths", "provider_model_selection"],
   "additionalProperties": false,
   "properties": {
     "version": {"const": 1},
@@ -50,6 +50,7 @@
         "maxLength": 256,
         "description": "Workspace rootからの相対秘密path。秘密本文やCredential値ではない。"
       }
-    }
+    },
+    "provider_model_selection": {"$ref": "provider_model_selection.schema.json"}
   }
 }

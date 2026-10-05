@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/gui-shell/schemas/provider_model_selection.schema.json",
+  "title": "Provider・Model選択",
+  "description": "実物Codex CLI経路で選ぶProviderとModel。資格情報・権限・Capabilityを含まず、認証はCodex CLI管理領域へ委譲し、自動fallbackは行わない。",
+  "type": "object",
+  "required": ["version", "provider_id", "model_id", "authentication_source", "automatic_fallback"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "provider_id": {"const": "openai_codex_cli"},
+    "model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$(?![\\s\\S])",
+      "description": "Codex CLIへ--modelで渡す選択値。存在・契約・利用可能性は登録時に推測しない。"
+    },
+    "authentication_source": {"const": "codex_cli_managed"},
+    "automatic_fallback": {"const": false}
+  }
+}

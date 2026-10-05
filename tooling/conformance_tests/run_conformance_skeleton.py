@@ -183,6 +183,7 @@ REQUIRED_SCHEMA_NAMES = {
     "agent_task_scratch_recovery",
     "agent_task_request",
     "agent_cli_runtime_workspace_registration",
+    "provider_model_selection",
     "agent_task_workspace_permission_request",
     "agent_task_workspace_permission",
     "agent_tool_call",
@@ -271,6 +272,7 @@ BROKER_REQUIRED_SCHEMAS = {
     "ipc_request.schema.json",
     "ipc_response.schema.json",
     "agent_cli_runtime_workspace_registration.schema.json",
+    "provider_model_selection.schema.json",
     "broker_error.schema.json",
     "broker_endpoint.schema.json",
     "broker_session.schema.json",
@@ -8081,6 +8083,79 @@ def test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free() -> 
     return errors
 
 
+def test_provider_model_selection_is_registered_and_non_authoritative() -> list[str]:
+    schema = load_schema("provider_model_selection.schema.json")
+    valid = load_contract_fixture("provider_model_selection.valid.json")
+    invalid = load_contract_fixture(
+        "invalid/provider_model_selection_unknown_provider.invalid.json"
+    )
+    errors: list[str] = []
+    if validate_instance(valid, schema):
+        errors.append("Provider／Model選択の正常例が契約に適合しない")
+    if validate_instance(invalid, schema) == []:
+        errors.append("未登録ProviderをProvider／Model選択が受け入れた")
+    for changed in (
+        {**valid, "automatic_fallback": True},
+        {**valid, "model_id": "--dangerous"},
+        {**valid, "model_id": "model\n"},
+        {**valid, "model_id": "模型"},
+        {**valid, "credential_value": "secret"},
+        {**valid, "capabilities": ["task_execution"]},
+    ):
+        if validate_instance(changed, schema) == []:
+            errors.append("Provider／Model選択が禁止値または権限類似fieldを受け入れた")
+    registration = load_schema("agent_cli_runtime_workspace_registration.schema.json")
+    if "provider_model_selection" not in registration.get("required", []):
+        errors.append("Agent CLI登録がProvider／Model選択を必須にしていない")
+    if registration.get("properties", {}).get("provider_model_selection", {}).get(
+        "$ref"
+    ) != "provider_model_selection.schema.json":
+        errors.append("Agent CLI登録がProvider／Model選択Schemaを参照しない")
+    adapter = (ROOT / "native/rust_helper/src/adapters/codex_cli.rs").read_text(
+        encoding="utf-8"
+    )
+    fake_cli = (ROOT / "native/rust_helper/tests/fixtures/fake_codex_cli.rs").read_text(
+        encoding="utf-8"
+    )
+    agent_center = (ROOT / "apps/desktop_flutter/lib/screens/agent_center.dart").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        '"--model", model_id',
+        '"provider_id": "openai_codex_cli"',
+        '"provider_health": {"status": "unknown"',
+        '"automatic_fallback": false',
+        '"method": "codex_cli_managed"',
+    ):
+        if required not in adapter:
+            errors.append(f"Codex Adapterが選択Model／状態契約を反映しない: {required}")
+    for required in (
+        "fn 選択Modelが偽CodexCLIのTask実行へ届く()",
+        '"model-fixture-v1"',
+        '"fixture-task-completed:model-fixture-v1"',
+    ):
+        if required not in adapter:
+            errors.append(f"Provider／Modelの偽CLI正常経路試験がない: {required}")
+    for required in (
+        'argument_after(&arguments, "--model")',
+        "fixture-task-completed:{model}",
+        "--model MODEL",
+    ):
+        if required not in fake_cli:
+            errors.append(f"偽Codex CLIがModel指定を検証しない: {required}")
+    for required in (
+        "'provider_model_selection': {",
+        "'model_id': modelId",
+        "'authentication_source': 'codex_cli_managed'",
+        "'automatic_fallback': false",
+        "提供元接続・模型利用可否: 不明（CLI接続面のみ確認）",
+        "自動代替実行: 無効",
+    ):
+        if required not in agent_center:
+            errors.append(f"Agent CenterがProvider／Model状態を表示・送信しない: {required}")
+    return errors
+
+
 def test_agent_task_owner_confirmation_wait_uses_native_operation_timeout() -> list[str]:
     broker_client = (ROOT / "apps/desktop_flutter/lib/services/broker_client.dart").read_text(
         encoding="utf-8"
@@ -8642,6 +8717,15 @@ def test_agent_adapter_probe_is_read_only_and_fail_closed() -> list[str]:
         return ["interface確認済みAgentをBroker dispatch停止中のdegradedとして表現しなかった"]
     if adapter["authentication"]["secret_value_present"] is not False:
         return ["Agent CLI probeがsecret実値の存在を許可した"]
+    if (
+        adapter.get("provider_id") != "openai_codex_cli"
+        or adapter.get("provider_health", {}).get("status") != "unknown"
+        or adapter.get("automatic_fallback") is not False
+        or adapter["authentication"].get("method") != "codex_cli_managed"
+    ):
+        return ["Agent CLI probeがProvider／Model選択とunknown／fallback状態を正確に投影しない"]
+    if validate_instance(adapter, schema):
+        return ["Provider／Model状態を含むAgent CLI probeがAgent Adapter Schemaに適合しない"]
     unavailable = build_adapter_record(None, "unknown", False, False)
     if unavailable["status"] != "unavailable" or unavailable["evidence_source"] != "CONFIG":
         return ["未導入Agent CLIを利用可能として扱った"]
@@ -10444,6 +10528,7 @@ def main() -> int:
         test_agent_task_request_cannot_carry_authority_or_dialogue_approval,
         test_agent_broker_operations_are_declared_in_ipc_contracts,
         test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free,
+        test_provider_model_selection_is_registered_and_non_authoritative,
         test_agent_task_owner_confirmation_wait_uses_native_operation_timeout,
         test_agent_task_id_operations_are_content_free_and_declared,
         test_agent_task_workspace_permission_is_owner_scoped_and_one_use,

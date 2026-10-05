@@ -150,6 +150,7 @@ REQUIRED = {
     "agent_task_id_request.schema.json",
     "agent_task_request.schema.json",
     "agent_cli_runtime_workspace_registration.schema.json",
+    "provider_model_selection.schema.json",
     "agent_task_workspace_permission_request.schema.json",
     "agent_task_workspace_permission.schema.json",
     "agent_task_owner_approval.schema.json",

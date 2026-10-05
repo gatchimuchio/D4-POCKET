@@ -1551,6 +1551,10 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
                     title: 'Broker内登録: ${registration.runtimeId}',
                     rows: [
                       '作業領域ID: ${registration.workspaceId}',
+                      '提供元・模型識別子: OpenAI（Codex CLI経由） / ${registration.modelId}',
+                      '利用者設定の認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を保持しない）',
+                      '提供元接続・模型利用可否: 不明（CLI接続面のみ確認）',
+                      '自動代替実行: 無効',
                       'Task実行: ${registration.taskExecutionStatus}',
                       'Permission／Approval／Credential: 生成なし',
                     ],
@@ -1928,6 +1932,7 @@ class _CodexRegistrationInput {
     required this.workspaceId,
     required this.workspaceRoot,
     required this.secretPaths,
+    required this.modelId,
     this.taskExecutionStatus = 'unknown',
   });
 
@@ -1936,6 +1941,7 @@ class _CodexRegistrationInput {
   final String workspaceId;
   final String workspaceRoot;
   final List<String> secretPaths;
+  final String modelId;
   final String taskExecutionStatus;
 
   _CodexRegistrationInput withTaskExecutionStatus(String status) =>
@@ -1945,6 +1951,7 @@ class _CodexRegistrationInput {
         workspaceId: workspaceId,
         workspaceRoot: workspaceRoot,
         secretPaths: secretPaths,
+        modelId: modelId,
         taskExecutionStatus: status,
       );
 
@@ -1956,6 +1963,13 @@ class _CodexRegistrationInput {
         'workspace_id': workspaceId,
         'workspace_root': workspaceRoot,
         'secret_paths': secretPaths,
+        'provider_model_selection': {
+          'version': 1,
+          'provider_id': 'openai_codex_cli',
+          'model_id': modelId,
+          'authentication_source': 'codex_cli_managed',
+          'automatic_fallback': false,
+        },
       };
 }
 
@@ -1974,6 +1988,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   final _workspaceId = TextEditingController(text: 'workspace-local');
   final _workspaceRoot = TextEditingController();
   final _secretPaths = TextEditingController();
+  final _modelId = TextEditingController();
 
   @override
   void dispose() {
@@ -1982,11 +1997,35 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
     _workspaceId.dispose();
     _workspaceRoot.dispose();
     _secretPaths.dispose();
+    _modelId.dispose();
     super.dispose();
   }
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? '入力してください' : null;
+
+  String? _modelIdValidator(String? value) {
+    final candidate = value?.trim() ?? '';
+    if (candidate.isEmpty) return '模型識別子を入力してください';
+    final units = candidate.codeUnits;
+    bool isAsciiAlphanumeric(int unit) =>
+        (unit >= 48 && unit <= 57) ||
+        (unit >= 65 && unit <= 90) ||
+        (unit >= 97 && unit <= 122);
+    bool isAllowed(int unit) =>
+        isAsciiAlphanumeric(unit) ||
+        unit == 46 ||
+        unit == 95 ||
+        unit == 58 ||
+        unit == 47 ||
+        unit == 45;
+    if (units.length > 128 ||
+        !isAsciiAlphanumeric(units.first) ||
+        units.skip(1).any((unit) => !isAllowed(unit))) {
+      return '模型識別子はASCII英数字で始まる1〜128文字の英数字・._:/-にしてください';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -2000,9 +2039,24 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    '入力値はRust Brokerへ送られ、Owner確認画面に登録範囲として表示されます。CLIは --version と exec --help のみ検査します。Credential値は入力しないでください。',
+                    '利用できる提供元はCodex CLI経由のOpenAIのみです。模型識別子はCodex CLIへそのまま渡します。登録時は --version と exec --help（--model対応）のみ確認し、提供元接続・模型利用可否は検査しません。認証は利用者がCodex CLIへ設定したものを使い、D4 Pocketは秘密値を受け取りません。自動代替実行は行いません。',
                   ),
                   const SizedBox(height: 12),
+                  const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('提供元'),
+                    subtitle: Text('OpenAI（Codex CLI経由・現在の実装経路）'),
+                    trailing: Icon(Icons.lock_outline),
+                  ),
+                  TextFormField(
+                    controller: _modelId,
+                    decoration: const InputDecoration(
+                      labelText: '模型識別子',
+                      hintText: 'Codex CLIの設定と同じ識別子を入力',
+                      helperText: '登録時に実在性・利用権限は確認しません。',
+                    ),
+                    validator: _modelIdValidator,
+                  ),
                   TextFormField(
                     controller: _runtimeId,
                     decoration:
@@ -2064,6 +2118,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                 workspaceId: _workspaceId.text.trim(),
                 workspaceRoot: _workspaceRoot.text.trim(),
                 secretPaths: secrets,
+                modelId: _modelId.text.trim(),
               ));
             },
             child: const Text('native Owner確認へ進む'),
@@ -2160,6 +2215,13 @@ class _AgentAdapterPanel extends StatelessWidget {
 
   final AgentAdapterRecord adapter;
 
+  String _statusLabel(String status) => switch (status) {
+        'supported' => '対応',
+        'unsupported' => '未対応',
+        'unknown' => '不明',
+        _ => '不明',
+      };
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -2169,7 +2231,7 @@ class _AgentAdapterPanel extends StatelessWidget {
         children: [
           Text('${adapter.agentId} (${adapter.adapterId})'),
           SectionList(
-            title: 'プロバイダー / モデル',
+            title: '提供元・模型',
             rows: ['${adapter.provider} / ${adapter.model}'],
           ),
           SectionList(title: '状態', rows: [adapter.status]),
@@ -2191,6 +2253,14 @@ class _AgentAdapterPanel extends StatelessWidget {
               '作業領域: ${adapter.workspaceBoundary}',
               'プロセス起動: ${adapter.processSpawnStatus}',
               '認証方式: ${adapter.authenticationMethod}',
+              '認証状態: ${adapter.authenticationStatus}',
+            ],
+          ),
+          SectionList(
+            title: '提供元・模型の状態',
+            rows: [
+              '提供元接続・模型利用可否: ${_statusLabel(adapter.providerHealthStatus)}',
+              '自動代替実行: ${adapter.automaticFallback == false ? '無効' : adapter.automaticFallback == true ? '有効' : '不明'}',
             ],
           ),
         ],

@@ -6,5 +6,12 @@
   "workspace_id": "r2-synthetic-workspace",
   "workspace_root": "C:\\d4-r2-synthetic-workspace",
   "secret_paths": [],
+  "provider_model_selection": {
+    "version": 1,
+    "provider_id": "openai_codex_cli",
+    "model_id": "model-fixture-v1",
+    "authentication_source": "codex_cli_managed",
+    "automatic_fallback": false
+  },
   "permission": "workspace.write"
 }

@@ -41,6 +41,39 @@ void main() {
     );
   }
 
+  test('Agent Adapter Provider状態を観測値として保持する', () {
+    final adapter = AgentAdapterRecord.fromJson({
+      'adapter_id': 'codex-cli',
+      'agent_id': 'codex',
+      'provider': 'OpenAI',
+      'provider_id': 'openai_codex_cli',
+      'version': '0.160.0',
+      'model': 'model-test-01',
+      'status': 'degraded',
+      'capabilities': [
+        {
+          'capability_id': 'model_selection',
+          'support': {'status': 'supported'},
+        },
+      ],
+      'provider_health': {'status': 'unknown'},
+      'automatic_fallback': false,
+      'authentication': {
+        'method': 'codex_cli_managed',
+        'status': 'unknown',
+        'secret_value_present': false,
+      },
+      'evidence_source': 'LIVE_RUNTIME',
+      'evidence_reason': 'CLI interface確認のみ',
+    });
+
+    expect(adapter.providerHealthStatus, 'unknown');
+    expect(adapter.automaticFallback, isFalse);
+    expect(adapter.authenticationMethod, 'codex_cli_managed');
+    expect(adapter.authenticationStatus, 'unknown');
+    expect(adapter.model, 'model-test-01');
+  });
+
   testWidgets('履歴の遷移先がナビゲーションに存在し離脱できる', (tester) async {
     await tester.pumpWidget(const GuiShellDesktopApp());
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
@@ -686,11 +719,18 @@ void main() {
     await tester.tap(find.text('登録を開始'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'codex-r2-synthetic');
-    await tester.enterText(fields.at(1), r'C:\Tools\Codex\codex.exe');
-    await tester.enterText(fields.at(2), 'workspace-r2-synthetic');
-    await tester.enterText(fields.at(3), r'C:\d4-r2-synthetic-workspace');
-    await tester.enterText(fields.at(4), '.env\nsecrets');
+    await tester.enterText(fields.at(0), '--dangerous');
+    await tester.enterText(fields.at(1), 'codex-r2-synthetic');
+    await tester.enterText(fields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(fields.at(3), 'workspace-r2-synthetic');
+    await tester.enterText(fields.at(4), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(fields.at(5), '.env\nsecrets');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+    expect(transport.operations, isNot(contains('AgentCLI実行系作業領域登録')));
+    expect(find.textContaining('模型識別子はASCII英数字で始まる'), findsOneWidget);
+
+    await tester.enterText(fields.at(0), 'model-test-01');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
     await tester.pump();
@@ -706,8 +746,19 @@ void main() {
     expect(registration['adapter_id'], 'codex-cli');
     expect(registration['workspace_root'], r'C:\d4-r2-synthetic-workspace');
     expect(registration['secret_paths'], ['.env', 'secrets']);
+    expect(registration['provider_model_selection'], {
+      'version': 1,
+      'provider_id': 'openai_codex_cli',
+      'model_id': 'model-test-01',
+      'authentication_source': 'codex_cli_managed',
+      'automatic_fallback': false,
+    });
     expect(registration.containsKey('permission'), isFalse);
     expect(registration.containsKey('approval_id'), isFalse);
+    expect(find.textContaining('OpenAI（Codex CLI経由） / model-test-01'),
+        findsOneWidget);
+    expect(find.textContaining('提供元接続・模型利用可否: 不明（CLI接続面のみ確認）'), findsOneWidget);
+    expect(find.text('自動代替実行: 無効'), findsOneWidget);
     expect(find.text('Task実行: unsupported'), findsOneWidget);
     expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
   });
@@ -749,11 +800,12 @@ void main() {
       await tester.tap(find.text('登録を開始'));
       await tester.pumpAndSettle();
       final fields = find.byType(TextFormField);
-      await tester.enterText(fields.at(0), runtime);
-      await tester.enterText(fields.at(1), r'C:\Tools\Codex\codex.exe');
-      await tester.enterText(fields.at(2), workspace);
-      await tester.enterText(fields.at(3), root);
-      await tester.enterText(fields.at(4), '.env');
+      await tester.enterText(fields.at(0), 'model-test-01');
+      await tester.enterText(fields.at(1), runtime);
+      await tester.enterText(fields.at(2), r'C:\Tools\Codex\codex.exe');
+      await tester.enterText(fields.at(3), workspace);
+      await tester.enterText(fields.at(4), root);
+      await tester.enterText(fields.at(5), '.env');
       await tester.tap(find.text('native Owner確認へ進む'));
       await tester.pumpAndSettle();
     }
@@ -781,6 +833,12 @@ void main() {
         {'codex-agent-a', 'codex-agent-b'});
     expect(requests.map((request) => request['workspace_id']).toSet(),
         {'workspace-agent-a', 'workspace-agent-b'});
+    expect(
+      requests.every((request) =>
+          (request['provider_model_selection'] as Map)['model_id'] ==
+          'model-test-01'),
+      isTrue,
+    );
     expect(requests, hasLength(2));
     expect(
         requests.every((request) =>
@@ -1563,13 +1621,14 @@ void main() {
     await tester.tap(find.text('登録を開始'));
     await tester.pumpAndSettle();
     final registrationFields = find.byType(TextFormField);
-    await tester.enterText(registrationFields.at(0), 'codex-r2-synthetic');
+    await tester.enterText(registrationFields.at(0), 'model-test-01');
+    await tester.enterText(registrationFields.at(1), 'codex-r2-synthetic');
     await tester.enterText(
-        registrationFields.at(1), r'C:\Tools\Codex\codex.exe');
-    await tester.enterText(registrationFields.at(2), 'workspace-r2-synthetic');
+        registrationFields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(registrationFields.at(3), 'workspace-r2-synthetic');
     await tester.enterText(
-        registrationFields.at(3), r'C:\d4-r2-synthetic-workspace');
-    await tester.enterText(registrationFields.at(4), '.env');
+        registrationFields.at(4), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(registrationFields.at(5), '.env');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
 
@@ -1736,13 +1795,14 @@ void main() {
     await tester.tap(find.text('登録を開始'));
     await tester.pumpAndSettle();
     final registrationFields = find.byType(TextFormField);
-    await tester.enterText(registrationFields.at(0), 'codex-r2-synthetic');
+    await tester.enterText(registrationFields.at(0), 'model-test-01');
+    await tester.enterText(registrationFields.at(1), 'codex-r2-synthetic');
     await tester.enterText(
-        registrationFields.at(1), r'C:\Tools\Codex\codex.exe');
-    await tester.enterText(registrationFields.at(2), 'workspace-r2-synthetic');
+        registrationFields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(registrationFields.at(3), 'workspace-r2-synthetic');
     await tester.enterText(
-        registrationFields.at(3), r'C:\d4-r2-synthetic-workspace');
-    await tester.enterText(registrationFields.at(4), '.env');
+        registrationFields.at(4), r'C:\d4-r2-synthetic-workspace');
+    await tester.enterText(registrationFields.at(5), '.env');
     await tester.tap(find.text('native Owner確認へ進む'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('登録Workspaceで対話Sessionを開始'));

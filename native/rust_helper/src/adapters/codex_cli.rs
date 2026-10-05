@@ -110,6 +110,7 @@ pub struct CodexCliAdapter {
     workspace_identity: crate::broker::workspace_root::DirectoryIdentity,
     workspace_write_interface: bool,
     version: String,
+    model_id: Option<String>,
     #[cfg(any(test, feature = "r2-e2e"))]
     test_responses_api: Option<CodexCliTestResponses>,
 }
@@ -117,6 +118,25 @@ pub struct CodexCliAdapter {
 impl CodexCliAdapter {
     /// ownerの起動設定からだけ呼び出す。PATH探索やIPC由来の任意pathは行わない。
     pub fn new(executable: &Path, workspace: &Path) -> Result<Self, String> {
+        Self::new_configured(executable, workspace, None)
+    }
+
+    pub fn new_with_model(
+        executable: &Path,
+        workspace: &Path,
+        model_id: &str,
+    ) -> Result<Self, String> {
+        if !valid_model_id(model_id) {
+            return Err("Codex Model IDが不正".into());
+        }
+        Self::new_configured(executable, workspace, Some(model_id.to_owned()))
+    }
+
+    fn new_configured(
+        executable: &Path,
+        workspace: &Path,
+        model_id: Option<String>,
+    ) -> Result<Self, String> {
         let executable = canonical_executable(executable)?;
         let workspace = canonical_workspace(workspace)?;
         let workspace_guard = crate::broker::workspace_root::pin_workspace_path(&workspace)
@@ -155,6 +175,7 @@ impl CodexCliAdapter {
                 .nth(1)
                 .unwrap_or("unknown")
                 .to_string(),
+            model_id,
             #[cfg(any(test, feature = "r2-e2e"))]
             test_responses_api,
         })
@@ -181,6 +202,7 @@ impl CodexCliAdapter {
             },
             workspace_write_interface: true,
             version: "test".into(),
+            model_id: None,
             #[cfg(test)]
             test_responses_api: None,
         }
@@ -233,13 +255,18 @@ impl 実行系Adapter for CodexCliAdapter {
             "adapter_id": "codex-cli",
             "agent_id": "codex",
             "provider": "OpenAI",
+            "provider_id": "openai_codex_cli",
             "version": self.version,
-            "model": "unknown",
+            "model": self.model_id.as_deref().unwrap_or("unknown"),
             "status": "degraded",
             "capabilities": [
                 task_execution_capability,
+                {"capability_id": "provider_selection", "support": {"status": "supported", "reason": "登録済みOpenAI via Codex CLI経路だけを選択可能"}},
+                {"capability_id": "model_selection", "support": {"status": "supported", "reason": "選択ModelをCodex CLI --modelへ渡す。Modelの実在性・利用可否は未確認"}},
                 {"capability_id": "session_control", "support": {"status": "unknown", "reason": "help interfaceの表記だけで実動作を確認していない"}}
             ],
+            "provider_health": {"status": "unknown", "reason": "登録時はCLI interfaceのみ検査し、Provider接続・Model利用可否を確認していない"},
+            "automatic_fallback": false,
             "workspace_requirements": {
                 "mode": "required",
                 "boundary_policy": "deny_outside_workspace",
@@ -251,7 +278,7 @@ impl 実行系Adapter for CodexCliAdapter {
             "cancellation_support": {"status": "unknown", "reason": "取消経路の実動作を確認していない"},
             "usage_metrics_support": {"status": "unknown", "reason": "実taskのmetricsを取得していない"},
             "cost_metrics_support": {"status": "unknown", "reason": "cost情報を取得していない"},
-            "authentication": {"method": "unknown", "secret_value_present": false},
+            "authentication": {"method": "codex_cli_managed", "status": "unknown", "secret_value_present": false},
             "host_requirements": {
                 "platforms": [host_platform()],
                 "network_scope": "unknown",
@@ -292,6 +319,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &scratch,
             &context.secret_paths,
             instruction,
+            self.model_id.as_deref(),
             cancel,
             deadline,
             self.test_responses_api.as_ref(),
@@ -304,6 +332,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &scratch,
             &context.secret_paths,
             instruction,
+            self.model_id.as_deref(),
             cancel,
             deadline,
         );
@@ -326,6 +355,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &self.workspace,
             self.workspace_identity,
             &要求.入力,
+            self.model_id.as_deref(),
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -337,6 +367,7 @@ impl 実行系Adapter for CodexCliAdapter {
             &self.workspace,
             self.workspace_identity,
             &要求.入力,
+            self.model_id.as_deref(),
             CodexSandbox::ReadOnly,
             None,
             &[],
@@ -531,6 +562,7 @@ fn exec_interface_present(output: &[u8]) -> bool {
         "--ephemeral",
         "--ignore-user-config",
         "--skip-git-repo-check",
+        "--model",
     ]
     .iter()
     .all(|required| help.contains(required))
@@ -538,6 +570,14 @@ fn exec_interface_present(output: &[u8]) -> bool {
 
 fn workspace_write_interface_present(output: &[u8]) -> bool {
     exec_interface_present(output) && String::from_utf8_lossy(output).contains("workspace-write")
+}
+
+fn valid_model_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().enumerate().all(|(index, byte)| {
+            byte.is_ascii_alphanumeric() || (index > 0 && b"._:/-".contains(&byte))
+        })
 }
 
 #[derive(Clone, Copy)]
@@ -695,6 +735,7 @@ fn spawn_codex_task(
     workspace: &Path,
     expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
     input: &str,
+    model_id: Option<&str>,
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
@@ -702,21 +743,23 @@ fn spawn_codex_task(
 ) -> Result<process_tree::SupervisedChild, 対話失敗> {
     let workspace_guard = pin_registered_workspace(workspace, expected_workspace)?;
     #[cfg(any(test, feature = "r2-e2e"))]
-    let task_command = build_codex_command(
+    let task_command = build_codex_command_with_model(
         executable,
         workspace,
         sandbox,
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
+        model_id,
         test_responses_api,
     )?;
     #[cfg(not(any(test, feature = "r2-e2e")))]
-    let task_command = build_codex_command(
+    let task_command = build_codex_command_with_model(
         executable,
         workspace,
         sandbox,
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
+        model_id,
     )?;
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // Scratch作成後のWorkspace変化をもう一度確認し、CLI起動直前の秘密別名を拒否する。
@@ -734,6 +777,7 @@ fn spawn_codex_task(
     Ok(child)
 }
 
+#[cfg(test)]
 fn build_codex_command(
     executable: &Path,
     workspace: &Path,
@@ -742,6 +786,30 @@ fn build_codex_command(
     secret_paths: &[String],
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
+    build_codex_command_with_model(
+        executable,
+        workspace,
+        sandbox,
+        scratch,
+        secret_paths,
+        None,
+        #[cfg(any(test, feature = "r2-e2e"))]
+        test_responses_api,
+    )
+}
+
+fn build_codex_command_with_model(
+    executable: &Path,
+    workspace: &Path,
+    sandbox: CodexSandbox,
+    scratch: Option<&Path>,
+    secret_paths: &[String],
+    model_id: Option<&str>,
+    #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
+) -> Result<Command, 対話失敗> {
+    if model_id.is_some_and(|model| !valid_model_id(model)) {
+        return Err(対話失敗::要求不正);
+    }
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
     #[cfg(any(test, feature = "r2-e2e"))]
@@ -802,6 +870,9 @@ fn build_codex_command(
         return Err(対話失敗::要求不正);
     }
     task_command.args(["exec", "--json", "--ephemeral", "--ignore-user-config"]);
+    if let Some(model_id) = model_id {
+        task_command.args(["--model", model_id]);
+    }
     if let CodexSandbox::ReadOnly = sandbox {
         task_command.args(["--sandbox", "read-only"]);
     }
@@ -896,6 +967,7 @@ fn run_agent_task(
     scratch: &WorkspaceTaskScratch,
     secret_paths: &[String],
     instruction: &str,
+    model_id: Option<&str>,
     cancel: &AtomicBool,
     deadline: Instant,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
@@ -912,6 +984,7 @@ fn run_agent_task(
         workspace,
         expected_workspace,
         instruction,
+        model_id,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -923,6 +996,7 @@ fn run_agent_task(
         workspace,
         expected_workspace,
         instruction,
+        model_id,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -1337,6 +1411,53 @@ mod tests {
             None,
         )
         .is_err());
+    }
+
+    #[test]
+    fn 選択ModelをCodex実物interface引数へ固定しfallbackしない() {
+        let command = build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            Some("model-fixture-v1"),
+            None,
+        )
+        .expect("選択Modelを使う固定CLI command");
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--model", "model-fixture-v1"]));
+        assert_eq!(args.iter().filter(|arg| arg.as_str() == "--model").count(), 1);
+        assert!(build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            Some("--dangerous"),
+            None,
+        )
+        .is_err());
+
+        let mut adapter = CodexCliAdapter::for_test(
+            PathBuf::from(r"C:\codex.exe"),
+            PathBuf::from(r"C:\workspace"),
+        );
+        adapter.model_id = Some("model-fixture-v1".into());
+        let metadata = adapter.agent_metadata().expect("提供元・模型情報を取得");
+        assert_eq!(metadata["provider"], "OpenAI");
+        assert_eq!(metadata["model"], "model-fixture-v1");
+        assert_eq!(metadata["provider_id"], "openai_codex_cli");
+        assert_eq!(metadata["provider_health"]["status"], "unknown");
+        assert_eq!(metadata["automatic_fallback"], false);
+        assert_eq!(metadata["authentication"]["method"], "codex_cli_managed");
+        assert_eq!(metadata["authentication"]["status"], "unknown");
+        assert_eq!(metadata["authentication"]["secret_value_present"], false);
     }
 
     #[test]
@@ -2258,6 +2379,7 @@ exit 0
                 &workspace,
                 identity,
                 "synthetic fixture task",
+                None,
                 CodexSandbox::WorkspaceWrite,
                 Some(&scratch),
                 &secrets,
@@ -2282,11 +2404,11 @@ exit 0
 
     #[test]
     fn read_onlyは維持しworkspace_writeはTaskだけに要求する() {
-        let help = b"Usage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
+        let help = b"Usage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only]\n--model MODEL\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
         assert!(exec_interface_present(help));
         assert!(!workspace_write_interface_present(help));
         let without_non_git_flag =
-            b"Usage: codex exec [OPTIONS] [PROMPT]\n--json\n--ephemeral\n--ignore-user-config";
+            b"Usage: codex exec [OPTIONS] [PROMPT]\n--json\n--model MODEL\n--ephemeral\n--ignore-user-config";
         assert!(!exec_interface_present(without_non_git_flag));
         let adapter = CodexCliAdapter {
             executable: PathBuf::from(r"C:\codex.exe"),
@@ -2297,6 +2419,7 @@ exit 0
             },
             workspace_write_interface: false,
             version: "test".into(),
+            model_id: None,
             test_responses_api: None,
         };
         assert!(!adapter.AgentTask実行対応());
@@ -2304,7 +2427,7 @@ exit 0
             adapter.AgentTask実行("test", &AtomicBool::new(false), Instant::now(), None),
             Err(対話失敗::AgentTask非対応)
         );
-        let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
+        let help = "codex execの能力検査用fixture\nUsage: codex exec [OPTIONS] [PROMPT]\n--sandbox [read-only, workspace-write]\n--model MODEL\n--cd DIR\n--json\n--ephemeral\n--ignore-user-config\n--skip-git-repo-check";
         assert!(exec_interface_present(help.as_bytes()));
         assert!(workspace_write_interface_present(help.as_bytes()));
     }
@@ -2448,6 +2571,39 @@ exit 0
         assert!(!scratch_path.exists());
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
         std::fs::remove_dir_all(root).expect("試験rootを削除");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 選択Modelが偽CodexCLIのTask実行へ届く() {
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let fixture_directory = root.path().join("fixture");
+        let workspace = root.path().join("workspace");
+        fs::create_dir(&fixture_directory).expect("偽CLI用領域");
+        fs::create_dir(&workspace).expect("登録作業領域");
+        let executable = codex_cli_fixture::compile_fake_codex_cli(&fixture_directory);
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("登録Workspace identity")
+            .identity;
+        let adapter = CodexCliAdapter::new_with_model(
+            &executable,
+            &workspace,
+            "model-fixture-v1",
+        )
+        .expect("偽CLIがModel指定interfaceを公開する");
+        let context = scratch_context(identity);
+        let completed = adapter.AgentTask実行(
+            "Provider / Model選択のfixture Task",
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(5),
+            Some(context.clone()),
+        );
+        assert_eq!(
+            completed,
+            Ok("fixture-task-completed:model-fixture-v1".into())
+        );
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }
 
     #[cfg(windows)]
