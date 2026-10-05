@@ -233,11 +233,11 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "責任": "Windows Desktop起動器の固定配置、Rust Broker lifecycle、normal endpoint、ユーザー保存・cleanup、未成立の配布工程境界"
+      "責任": "Windows Desktop起動器のportable／固定installed root入口、Broker lifecycle、active version Bootstrapper読取、ユーザー保存・cleanup、未成立の配布工程境界"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "責任": "D4PKG01製品packageの固定形式、境界、package目録とRust readerの検証範囲、Installer／Update未接続の明示"
+      "責任": "D4PKG01製品package、有効版記録、固定root Bootstrapperの境界とreader検証範囲、Installer／Update writer未接続の明示"
     },
     {
       "path": "specs/gui_shell_module_catalog.json",
@@ -254,6 +254,10 @@
     {
       "path": "specs/d4_pocket_product_package_manifest.schema.json",
       "責任": "Brokerが外側署名とpackage全体hashを検査した後、Installerが展開対象file、製品版、独立App／Audit identity、各file hashと許可rootを再検査する固定package目録。Permission／Approval／Authorityを含まない"
+    },
+    {
+      "path": "specs/d4_pocket_active_version.schema.json",
+      "責任": "Brokerが承認済み有効版切替で記録する製品／identity／version／package・起動器・Product Manifest hash。Bootstrapperの固定版選択用で任意path・Authorityを含まない"
     },
     {
       "path": "tooling/compare_module_builds_windows.py",

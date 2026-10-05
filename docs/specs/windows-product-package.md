@@ -52,3 +52,13 @@ P11の導入先は、管理者権限を要求しない現在利用者単位と�
 `App ID`、製品版、package SHA-256は検証済みpackage／現在のBroker trustから得る。Flutter、Setup UI、update候補は導入先pathを指定しない。異なるApp ID、製品版、package digestは別のversion directoryになる。導入先が同一volumeであることを要求し、既存version directoryを上書きしない。
 
 Windows Broker consumerはKnown Folder APIの現在利用者`LocalAppData`から固定`versions` directoryをcapabilityで開き、同一volumeと非reparse directory identityを検証して、署名済みpackageのversion directoryを新規作成する。展開前intent Auditが失敗した場合はinstall directoryを作成しない。package全体と内包fileの検証が成功した場合だけ`version_staged`を返し、永続Auditへ完了記録する。Audit storeは既存のidentity別`%LOCALAPPDATA%/D4Pocket/apps/<App ID>/stores/<Audit Store ID>`に残し、製品payloadの削除・更新と混同しない。Machine-wide registry、elevation、利用者指定の任意install pathはこのP11基本経路に含めない。なお、固定path／fixture上のconsumer接続はinstalled productの起動、別user profile隔離、process cleanup、起動失敗Recovery、Rollbackを意味しない。
+
+## 7. 有効版記録と固定root Bootstrapper
+
+固定導入rootの`gui_shell_desktop_launcher.exe`は、portable bundleの隣接package起動器と同じbinaryを使い、実行fileがWindows Known Folder由来の`LocalAppData/Programs/D4 Pocket/<App ID>/`直下にある場合だけBootstrapper経路へ入る。compile-time App IDがないgeneric起動器やroot外のportable bundleは従来の固定sibling配置を使う。固定root判定に失敗した場合はinstalled modeへ推測で移行しない。
+
+Bootstrapperはroot直下の`active_version.json`を最大4 KiB、`versions` directoryと選択版をno-follow capabilityで読み、同一volume／file identity／非reparse条件を確認する。記録は`specs/d4_pocket_active_version.schema.json`に従い、version、product、App ID、Audit Store ID、製品版、package hash、version-local launcher hash、Product Manifest hashだけを含む。実行pathは受け取らない。有効版directory名は製品版とpackage hashから固定導出し、起動前にlauncherとProduct Manifestのhashを照合し、通常package layoutも再検証する。
+
+この記録は起動対象の選択情報であり、配布元trust、Permission、Approval、Capabilityを作らない。Bootstrapperは受信引数を転送せず、環境をOS用allowlistへ絞り、`LOCALAPPDATA`はKnown Folder API由来値へ固定してからversion-local launcherを起動する。起動後のBroker lifecycle／Auditはversion-local launcherの現行契約に従う。記録欠損・identity不一致・JSON重複／未知field・version path不正・hash不一致・reparse・required payload欠損は、UIやBrokerを起動せず固定codeで失敗する。
+
+現行実装はこの有効版記録を読むBootstrapper分岐と拒否試験までである。Brokerによる記録生成、固定rootへの初回Bootstrapper配置、有効版切替、Start Menu、Rollbackは未接続であり、今回のreaderとfixture試験をinstalled productの起動成立へ昇格しない。記録生成と切替はstage操作と別のnative Owner確認・Broker Permission・durable Auditを持つ次のP11操作として接続する。

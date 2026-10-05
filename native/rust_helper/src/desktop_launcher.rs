@@ -2501,6 +2501,33 @@ fn launch_frontend(
     wait_for_frontend(&mut frontend, broker)
 }
 
+fn launch_active_product_version(
+    launcher: &Path,
+    local_app_data: &Path,
+) -> Result<(), DesktopLaunchError> {
+    let mut command = Command::new(launcher);
+    let inherited = filtered_frontend_environment(std::env::vars_os())
+        .into_iter()
+        .filter(|(name, _)| !name.eq_ignore_ascii_case(OsStr::new("LOCALAPPDATA")));
+    command
+        .env_clear()
+        .envs(inherited)
+        .env("LOCALAPPDATA", local_app_data)
+        .current_dir(launcher.parent().ok_or_else(|| {
+            DesktopLaunchError::new(
+                "ACTIVE_VERSION_LAUNCHER_INVALID",
+                "D4 Pocketの有効版を起動できません。導入状態を確認してください。",
+            )
+        })?);
+    command.spawn().map_err(|_| {
+        DesktopLaunchError::new(
+            "ACTIVE_VERSION_START_FAILED",
+            "D4 Pocketの有効版を起動できません。導入状態を確認してください。",
+        )
+    })?;
+    Ok(())
+}
+
 fn filtered_frontend_environment(
     inherited: impl IntoIterator<Item = (OsString, OsString)>,
 ) -> Vec<(OsString, OsString)> {
@@ -2537,6 +2564,35 @@ pub fn run() -> Result<(), DesktopLaunchError> {
     let launcher_exe = std::env::current_exe().map_err(|_| {
         DesktopLaunchError::new("LAUNCHER_PATH_INVALID", "起動元を確認できません。")
     })?;
+    let product_identity = compiled_product_runtime_identity()?;
+    if let Some(identity) = product_identity.as_ref() {
+        let local_app_data = crate::broker::product_install::current_user_local_app_data()
+            .map_err(|_| {
+                DesktopLaunchError::new(
+                    "USER_DATA_ROOT_UNAVAILABLE",
+                    "Windowsのユーザー保存先を確認できません。",
+                )
+            })?;
+        if crate::product_bootstrapper::is_fixed_installed_entrypoint(
+            &launcher_exe,
+            &local_app_data,
+            &identity.app_id,
+        ) {
+            let active_launcher = crate::product_bootstrapper::resolve_active_version_launcher(
+                &local_app_data,
+                &identity.app_id,
+                &identity.audit_store_id,
+            )
+            .map_err(|error| {
+                DesktopLaunchError::new(
+                    error.0,
+                    "D4 Pocketの有効版を確認できません。導入状態を確認してください。",
+                )
+            })?;
+            resolve_package_layout(&active_launcher)?;
+            return launch_active_product_version(&active_launcher, &local_app_data);
+        }
+    }
     let layout = resolve_package_layout(&launcher_exe)?;
     let local_app_data = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
@@ -2546,7 +2602,6 @@ pub fn run() -> Result<(), DesktopLaunchError> {
                 "Windowsのユーザー保存先を確認できません。",
             )
         })?;
-    let product_identity = compiled_product_runtime_identity()?;
     let runtime_dir = runtime_directory_with_identity(&local_app_data, product_identity.as_ref())?;
     let _instance_lock = acquire_instance_lock(&runtime_dir)?;
     // package構成の検証はinstalled rootの由来確認とは別の証拠である。

@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "4f206850fcfaf8463f6c0ffe0613507cbc3bcc50112a0b7fb1bb7ee3b993eab1"
+      "sha256": "28900ca6ab219858f97493ec34d11bb6eca1e6f1adbfa7070520b7e87958bd67"
     },
     {
       "path": "SECURITY.md",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "bd497f90dec3c69a4ec377a00402e81a3afad1acd36f8a74210a5c32fbdebaad"
+      "sha256": "d307c50c7f442f41c97d245230a4944c580efd5b79a7a085c78f6540c5a4a894"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1512,11 +1512,11 @@
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "13c12f4e365c173ef815e4769e76d0c021ab9fe73ecf5133a6cd545fdd023a6d"
+      "sha256": "4a0b147cc7adf862b78bc6b351ecc3218e6d79d7bc17a8858c26f59cf5ba7515"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "88f7404cc24e6fe95ad1e42735571ffea27e71acaca83fe92c3616b0fecc3c00"
+      "sha256": "670be0b67dd4e4931be634191f9fb051421338279f7d8e53cebbb3697148d834"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3300,7 +3300,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "a59105ed36330831fca0937e402c8c4524c8770a9ec904ea90d0296fd62fe842"
+      "sha256": "7afe5f65702f6d2414ef4c583529a3d11a956bf9aa74cb1c0ae151fd4eb7aa67"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3360,7 +3360,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "fde28902cc127edd106ab3f5c0fda4233864f04979140c74876655aa8b84e0bd"
+      "sha256": "279fea66c7f176f817c505ce9c7454d42c2cd0ba8b1934ae93c2ca948636bb8d"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3380,7 +3380,7 @@
     },
     {
       "path": "native/rust_helper/src/lib.rs",
-      "sha256": "36dcfa164011f90b6d085cbacb3dbc82fbdf974e3f4ad63b32280ec5a2863cb3"
+      "sha256": "07d50b010f08726c410eb6a0c6f10cc7a8e247428c3288a314b95143c35037d1"
     },
     {
       "path": "native/rust_helper/src/main.rs",
@@ -4620,7 +4620,7 @@
     },
     {
       "path": "tooling/conformance_tests/run_conformance_skeleton.py",
-      "sha256": "13863410636d53121eeca6bd4db91624e2b5c11dc0fc6fed659a6489cef73851"
+      "sha256": "a27c87699ed8f7d29ca0af703924981522ca7306a826bb8a95c29dd1bbeda049"
     },
     {
       "path": "tooling/conformance_tests/test_long_run_validation.py",
@@ -4708,7 +4708,7 @@
     },
     {
       "path": "tooling/schema_check/check_schemas.py",
-      "sha256": "29981f6f64107748fc258940870220a0701e01296c0917322ac3506367ae5ebf"
+      "sha256": "4e88a3b9f212ee662dd3bcf03930fc2b46c199b609c8a288345a7ed4eda4c628"
     },
     {
       "path": "tooling/shell_snapshot.py",
@@ -4744,7 +4744,7 @@
     },
     {
       "path": "\u898f\u5b9a/\u6b63\u672c\u7d22\u5f15.json",
-      "sha256": "c23d9671a8e4b71f674fa7b530abef28c85312c77e190acd9666483fe2288fb8"
+      "sha256": "774c8154295be687224066768c9bd450900e16da2dd7271250dab0389f062757"
     }
   ]
 }

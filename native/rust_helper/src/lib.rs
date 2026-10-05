@@ -3,6 +3,8 @@
 #[cfg(windows)]
 pub mod desktop_launcher;
 #[cfg(windows)]
+pub(crate) mod product_bootstrapper;
+#[cfg(windows)]
 pub mod protected_store;
 
 pub mod audit_hash;

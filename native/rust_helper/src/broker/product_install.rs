@@ -78,18 +78,121 @@ pub(crate) fn open_product_versions_directory(
     Ok((versions_path, current))
 }
 
+/// 既存の固定製品rootだけをno-followで開く。起動時に導入directoryを作らない。
+pub(crate) fn open_existing_product_root(
+    local_app_data: &Path,
+    app_id: &str,
+) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
+    validate_install_inputs(local_app_data, app_id)?;
+    let metadata = std::fs::symlink_metadata(local_app_data)
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err(ProductInstallPlanError(
+            "product_install_local_app_data_invalid",
+        ));
+    }
+    let local_app_data = std::fs::canonicalize(local_app_data)
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    let root = Dir::open_ambient_dir(&local_app_data, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    let root_metadata = root
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_local_app_data_unavailable"))?;
+    if !root_metadata.is_dir() || is_cap_reparse_point(&root_metadata) {
+        return Err(ProductInstallPlanError(
+            "product_install_local_app_data_invalid",
+        ));
+    }
+    let root_device = CapMetadataExt::dev(&root_metadata);
+    let mut current = root;
+    for component in [INSTALL_DIRECTORY, PRODUCT_DIRECTORY, app_id] {
+        current = open_existing_child_directory(&current, component, root_device)?;
+    }
+    let product_root = local_app_data
+        .join(INSTALL_DIRECTORY)
+        .join(PRODUCT_DIRECTORY)
+        .join(app_id);
+    Ok((product_root, current))
+}
+
+/// 固定導入root pathを導出する。directoryを作成せず、任意pathを受け取らない。
+pub(crate) fn product_install_root(
+    local_app_data: &Path,
+    app_id: &str,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    validate_install_inputs(local_app_data, app_id)?;
+    Ok(local_app_data
+        .join(INSTALL_DIRECTORY)
+        .join(PRODUCT_DIRECTORY)
+        .join(app_id))
+}
+
+fn validate_install_inputs(
+    local_app_data: &Path,
+    app_id: &str,
+) -> Result<(), ProductInstallPlanError> {
+    if !local_app_data.is_absolute()
+        || local_app_data
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(ProductInstallPlanError(
+            "product_install_local_app_data_invalid",
+        ));
+    }
+    if !valid_identity(app_id) {
+        return Err(ProductInstallPlanError(
+            "product_install_app_identity_invalid",
+        ));
+    }
+    Ok(())
+}
+
 /// 製品経路ではOS Known Folder API以外からLocalAppDataを受け取らない。
 #[cfg(windows)]
 pub(crate) fn open_current_user_product_versions_directory(
     app_id: &str,
 ) -> Result<(PathBuf, Dir), ProductInstallPlanError> {
-    let local_app_data = winsafe::SHGetKnownFolderPath(
+    let local_app_data = current_user_local_app_data()?;
+    open_product_versions_directory(Path::new(&local_app_data), app_id)
+}
+
+#[cfg(windows)]
+pub(crate) fn current_user_local_app_data() -> Result<PathBuf, ProductInstallPlanError> {
+    winsafe::SHGetKnownFolderPath(
         &winsafe::co::KNOWNFOLDERID::LocalAppData,
         winsafe::co::KF::DEFAULT,
         None,
     )
-    .map_err(|_| ProductInstallPlanError("product_install_known_folder_unavailable"))?;
-    open_product_versions_directory(Path::new(&local_app_data), app_id)
+    .map(PathBuf::from)
+    .map_err(|_| ProductInstallPlanError("product_install_known_folder_unavailable"))
+}
+
+fn open_existing_child_directory(
+    parent: &Dir,
+    name: &str,
+    root_device: u64,
+) -> Result<Dir, ProductInstallPlanError> {
+    let before_open = parent
+        .symlink_metadata(name)
+        .map_err(|_| ProductInstallPlanError("product_install_directory_unavailable"))?;
+    if !before_open.is_dir() || is_cap_reparse_point(&before_open) {
+        return Err(ProductInstallPlanError("product_install_directory_invalid"));
+    }
+    let opened = parent
+        .open_dir_nofollow(name)
+        .map_err(|_| ProductInstallPlanError("product_install_directory_invalid"))?;
+    let after_open = opened
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_install_directory_invalid"))?;
+    if !after_open.is_dir()
+        || is_cap_reparse_point(&after_open)
+        || !same_cap_file(&before_open, &after_open)
+        || CapMetadataExt::dev(&after_open) != root_device
+    {
+        return Err(ProductInstallPlanError("product_install_directory_invalid"));
+    }
+    Ok(opened)
 }
 
 fn open_or_create_child_directory(
@@ -175,18 +278,8 @@ pub(crate) fn plan_current_user_product_install(
     product_version: &str,
     package_sha256: &str,
 ) -> Result<ProductInstallPlan, ProductInstallPlanError> {
-    let local_app_data = winsafe::SHGetKnownFolderPath(
-        &winsafe::co::KNOWNFOLDERID::LocalAppData,
-        winsafe::co::KF::DEFAULT,
-        None,
-    )
-    .map_err(|_| ProductInstallPlanError("product_install_known_folder_unavailable"))?;
-    plan_product_install(
-        Path::new(&local_app_data),
-        app_id,
-        product_version,
-        package_sha256,
-    )
+    let local_app_data = current_user_local_app_data()?;
+    plan_product_install(&local_app_data, app_id, product_version, package_sha256)
 }
 
 /// OSが返した現在利用者のLocalAppDataと製品Manifest identityから、導入先を固定導出する。
@@ -197,20 +290,7 @@ pub(crate) fn plan_product_install(
     product_version: &str,
     package_sha256: &str,
 ) -> Result<ProductInstallPlan, ProductInstallPlanError> {
-    if !local_app_data.is_absolute()
-        || local_app_data
-            .components()
-            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
-    {
-        return Err(ProductInstallPlanError(
-            "product_install_local_app_data_invalid",
-        ));
-    }
-    if !valid_identity(app_id) {
-        return Err(ProductInstallPlanError(
-            "product_install_app_identity_invalid",
-        ));
-    }
+    let root = product_install_root(local_app_data, app_id)?;
     if !valid_product_version(product_version) {
         return Err(ProductInstallPlanError("product_install_version_invalid"));
     }
@@ -220,10 +300,6 @@ pub(crate) fn plan_product_install(
         ));
     }
 
-    let root = local_app_data
-        .join(INSTALL_DIRECTORY)
-        .join(PRODUCT_DIRECTORY)
-        .join(app_id);
     let version_directory = root
         .join(VERSIONS_DIRECTORY)
         .join(format!("{product_version}-{package_sha256}"));
@@ -263,7 +339,9 @@ fn valid_product_version(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{open_product_versions_directory, plan_product_install};
+    use super::{
+        open_existing_product_root, open_product_versions_directory, plan_product_install,
+    };
     use std::path::Path;
 
     const APP_ID: &str = "d4-pocket-app-11111111111111111111111111111111";
@@ -317,6 +395,37 @@ mod tests {
             .join(APP_ID)
             .join("versions")
             .is_dir());
+        drop(capability);
+        std::fs::remove_dir_all(local_app_data).unwrap();
+    }
+
+    #[test]
+    fn existing_product_root_opens_without_creating_missing_installation() {
+        let local_app_data = std::env::temp_dir().join(format!(
+            "d4p-product-root-readonly-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&local_app_data).unwrap();
+        assert_eq!(
+            open_existing_product_root(&local_app_data, APP_ID)
+                .unwrap_err()
+                .0,
+            "product_install_directory_unavailable"
+        );
+        assert!(!local_app_data.join("Programs").exists());
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        std::fs::create_dir_all(&product_root).unwrap();
+        let (opened_path, capability) =
+            open_existing_product_root(&local_app_data, APP_ID).unwrap();
+        assert_eq!(opened_path, std::fs::canonicalize(product_root).unwrap());
+        assert!(capability.dir_metadata().unwrap().is_dir());
         drop(capability);
         std::fs::remove_dir_all(local_app_data).unwrap();
     }

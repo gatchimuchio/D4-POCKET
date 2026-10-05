@@ -9691,6 +9691,31 @@ def test_windows_product_package_writer_is_bounded_and_hash_bound() -> list[str]
     return errors
 
 
+def test_d4_pocket_active_version_record_is_fixed_and_path_free() -> list[str]:
+    schema = load_schema("d4_pocket_active_version.schema.json")
+    valid = load_contract_fixture("d4_pocket_active_version.valid.json")
+    errors: list[str] = []
+    if validate_instance(valid, schema):
+        errors.append("Bootstrapper有効版記録の正常例が正本Schemaに適合しない")
+    invalid = load_contract_fixture(
+        "invalid/d4_pocket_active_version_arbitrary_path.invalid.json"
+    )
+    if not validate_instance(invalid, schema):
+        errors.append("有効版記録から任意executable pathを受け入れた")
+    for field, value in (
+        ("product_version", "../outside"),
+        ("product_version", "release"),
+        ("package_sha256", "A" * 64),
+        ("launcher_sha256", "../payload"),
+        ("audit_store_id", "audit-store-invalid"),
+    ):
+        mutated = copy.deepcopy(valid)
+        mutated[field] = value
+        if not validate_instance(mutated, schema):
+            errors.append(f"有効版記録の不正field {field} を拒否しない")
+    return errors
+
+
 def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() -> list[str]:
     evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
     schema = load_schema("gui_shell_windows_export_build.schema.json")
@@ -10764,6 +10789,7 @@ def main() -> int:
         test_gui_shell_module_build_is_untrusted_ui_only_selection,
         test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative,
         test_windows_product_package_writer_is_bounded_and_hash_bound,
+        test_d4_pocket_active_version_record_is_fixed_and_path_free,
         test_gui_shell_module_comparison_is_same_commit_and_non_authoritative,
         test_l3_bounded_reference_extension_uses_existing_contracts,
         test_l3_bounded_reference_extension_governed_path_accepts_declared_mapping,
