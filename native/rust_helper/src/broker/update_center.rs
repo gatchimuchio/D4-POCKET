@@ -75,6 +75,7 @@ pub(crate) struct UpdateActivationConfirmation {
     pub(crate) app_id: String,
     pub(crate) audit_store_id: String,
     pub(crate) version_directory: PathBuf,
+    pub(crate) start_menu_shortcut_path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -1748,6 +1749,49 @@ fn activate_verified_staged_package(
                 )
             }
         };
+        #[cfg(test)]
+        let start_menu_directory = broker
+            .desktop_product_start_menu_directory
+            .clone()
+            .or_else(|| super::product_install::current_user_start_menu_directory().ok());
+        #[cfg(not(test))]
+        let start_menu_directory = super::product_install::current_user_start_menu_directory().ok();
+        let Some(start_menu_directory) = start_menu_directory else {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "product_start_menu_known_folder_unavailable",
+                "Windows Known Folderから現在利用者のStart Menuを導出できない",
+                payload_hash,
+            );
+        };
+        let planned_start_menu_shortcut = match super::product_install::plan_start_menu_shortcut(
+            &start_menu_directory,
+            &app_id,
+        ) {
+            Ok(path) => path,
+            Err(_) => {
+                return reject(
+                    broker,
+                    request_id,
+                    OP_ACTIVATE,
+                    "product_start_menu_plan_invalid",
+                    "BrokerがStart Menu shortcutの固定配置を導出できない",
+                    payload_hash,
+                )
+            }
+        };
+        if planned_start_menu_shortcut != confirmation.start_menu_shortcut_path {
+            return reject(
+                broker,
+                request_id,
+                OP_ACTIVATE,
+                "update_activation_start_menu_stale",
+                "native Owner確認に表示したStart Menu shortcut先が現在のKnown Folder計画と異なる",
+                payload_hash,
+            );
+        }
         if plan.version_directory != confirmation.version_directory {
             return reject(
                 broker,
@@ -1883,7 +1927,7 @@ fn activate_verified_staged_package(
         }
 
         let intent_reason = format!(
-            "Capability=product.install.activate_version Permission=現在の署名候補・App ID・version・package digestから固定導出した有効版record一回限定 Approval=切替対象を表示した独立Rust Desktop native Owner確認 AuditEvent=切替前意図を永続化 RecoveryAction=stageとpackageの全byte／inventoryを読取専用再検証し、失敗時はactive recordを変更しない。process起動・Start Menu変更・rollbackは行わない。candidate={} version={} package_sha256={} bytes={}",
+            "Capability=product.install.activate_version Permission=現在の署名候補・App ID・version・package digestとStart Menu Known Folderから固定導出した有効版record／shortcut一回限定 Approval=切替対象とshortcut先を表示した独立Rust Desktop native Owner確認 AuditEvent=切替前意図を永続化 RecoveryAction=stageとpackageをread-only検証し、失敗時は既存stage／active record／shortcutを自動削除しない。process起動・rollbackは行わない。candidate={} version={} package_sha256={} bytes={}",
             record.candidate.update_id,
             record.candidate.offered_version,
             package_sha256,
@@ -1957,11 +2001,38 @@ fn activate_verified_staged_package(
                 "固定root Bootstrapperまたは有効版recordを安全に公開できず切替を拒否",
             );
         }
+        let registered_shortcut =
+            match super::product_install::register_start_menu_shortcut(
+                &local_app_data,
+                &start_menu_directory,
+                &app_id,
+                &root_path,
+            ) {
+                Ok(path) => path,
+                Err(error) => {
+                    return activation_failed(
+                        broker,
+                        request_id,
+                        payload_hash,
+                        error.0,
+                        "有効版record公開後のStart Menu shortcut登録が未完了。既存状態を維持し、Owner確認付きで再試行する",
+                    )
+                }
+            };
+        if registered_shortcut != confirmation.start_menu_shortcut_path {
+            return activation_failed(
+                broker,
+                request_id,
+                payload_hash,
+                "product_start_menu_published_path_mismatch",
+                "Start Menu shortcut公開先が確認済み固定pathと一致しない",
+            );
+        }
         let completion = broker.append_audit(
             &format!("{request_id}:complete"),
             OP_ACTIVATE,
             "completed",
-            &format!("Capability=product.install.activate_version Permission=現在の署名候補と完全検証済み固定stageだけを有効版recordへ設定 Approval=独立したRust Desktop native Owner確認 AuditEvent=固定root Bootstrapper配置状態と有効版recordのatomic公開を記録 RecoveryAction=有効版recordは次回起動時にBootstrapperがidentity・version・package／launcher／manifest hashを再照合する。process起動・Start Menu変更・rollbackはしない。version={} package_sha256={} file_count={} total_bytes={} intent_audit_id={}", info.product_version, package_sha256, info.file_count, info.total_file_bytes, intent.event_id),
+            &format!("Capability=product.install.activate_version Permission=現在の署名候補と完全検証済み固定stageだけを有効版recordへ設定し固定Start Menu shortcutを登録 Approval=独立したRust Desktop native Owner確認 AuditEvent=固定root Bootstrapper配置、有効版recordのatomic公開、Start Menu shortcutの登録完了を記録 RecoveryAction=次回の固定root起動時にBootstrapperがidentity・version・package／launcher／manifest hashを再照合する。Shortcutは固定root Bootstrapperを指す。processは起動せずrollbackもしない。version={} package_sha256={} file_count={} total_bytes={} Start_Menu=registered intent_audit_id={}", info.product_version, package_sha256, info.file_count, info.total_file_bytes, intent.event_id),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         );
@@ -1990,7 +2061,7 @@ fn activate_verified_staged_package(
                 "候補hash": request.candidate_hash,
                 "有効化": "active_version_recorded",
                 "起動": "not_started",
-                "Start Menu": "unchanged",
+                "Start Menu": "registered",
                 "file数": info.file_count,
                 "total_bytes": info.total_file_bytes,
                 "開始Audit ID": intent.event_id,
@@ -2972,8 +3043,11 @@ mod tests {
             std::env::temp_dir().join(format!("d4p-update-apply-{}-{unique}", std::process::id()));
         let store_root = root.join("broker-store");
         let install_root = root.join("local-app-data");
+        let start_menu_root = root.join("start-menu");
         std::fs::create_dir_all(&install_root).unwrap();
+        std::fs::create_dir_all(&start_menu_root).unwrap();
         let install_root = std::fs::canonicalize(&install_root).unwrap();
+        let start_menu_root = std::fs::canonicalize(&start_menu_root).unwrap();
         let package = install_test_package();
         let digest = hex::encode(Sha256::digest(&package));
         let (trust, candidate) = trust_and_candidate_for_package(&package);
@@ -2986,6 +3060,7 @@ mod tests {
             .set_desktop_product_identity(INSTALL_APP_ID.into(), INSTALL_AUDIT_ID.into())
             .unwrap();
         broker.set_desktop_product_install_local_app_data(install_root.clone());
+        broker.set_desktop_product_start_menu_directory(start_menu_root.clone());
         assert_eq!(
             call(
                 &mut broker,
@@ -3064,6 +3139,11 @@ mod tests {
             app_id: INSTALL_APP_ID.into(),
             audit_store_id: INSTALL_AUDIT_ID.into(),
             version_directory: target.clone(),
+            start_menu_shortcut_path: super::super::product_install::plan_start_menu_shortcut(
+                &start_menu_root,
+                INSTALL_APP_ID,
+            )
+            .unwrap(),
         };
         let activation_envelope = |request_id: &str| {
             json!({
@@ -3211,6 +3291,27 @@ mod tests {
             .join("active_version.json")
             .exists());
 
+        let mut stale_start_menu_confirmation = activation_confirmation.clone();
+        stale_start_menu_confirmation.start_menu_shortcut_path =
+            start_menu_root.join("attacker-controlled.lnk");
+        let stale_start_menu = broker.desktop_owner_operation_json_with_update_confirmations(
+            &activation_envelope("desktop-update-activation-start-menu-stale"),
+            None,
+            None,
+            Some(stale_start_menu_confirmation),
+        );
+        assert_eq!(stale_start_menu.status, BrokerStatus::Rejected);
+        assert_eq!(
+            stale_start_menu.error.unwrap().code,
+            "update_activation_start_menu_stale"
+        );
+        assert!(!install_root
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(INSTALL_APP_ID)
+            .join("active_version.json")
+            .exists());
+
         let staged_executable = target.join("app/gui_shell_desktop.exe");
         std::fs::write(&staged_executable, b"x").unwrap();
         let changed_stage = broker.desktop_owner_operation_json_with_update_confirmations(
@@ -3244,7 +3345,8 @@ mod tests {
             "active_version_recorded"
         );
         assert_eq!(activated.body.as_ref().unwrap()["起動"], "not_started");
-        assert_eq!(activated.body.as_ref().unwrap()["Start Menu"], "unchanged");
+        assert_eq!(activated.body.as_ref().unwrap()["Start Menu"], "registered");
+        assert!(activation_confirmation.start_menu_shortcut_path.is_file());
         assert!(product_root
             .join("gui_shell_desktop_launcher.exe")
             .is_file());
@@ -3263,6 +3365,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(active_record["product_version"], "1.1.0");
+        let shortcut_bytes =
+            std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap();
         assert!(broker.audit_events().iter().any(|event| {
             event.request_id == "desktop-update-activation"
                 && event.operation == OP_ACTIVATE
@@ -3278,9 +3382,13 @@ mod tests {
             &activation_envelope("desktop-update-activation-replay"),
             None,
             None,
-            Some(activation_confirmation),
+            Some(activation_confirmation.clone()),
         );
         assert_eq!(activated_again.status, BrokerStatus::Accepted);
+        assert_eq!(
+            std::fs::read(&activation_confirmation.start_menu_shortcut_path).unwrap(),
+            shortcut_bytes
+        );
         assert_eq!(
             crate::product_bootstrapper::resolve_active_version_launcher(
                 &install_root,

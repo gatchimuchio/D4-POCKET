@@ -539,6 +539,9 @@ fn current_update_activation_confirmation(
         candidate_hash: request.candidate_hash.clone(),
     };
     let apply = current_update_apply_confirmation(&apply_request, payload_hash, endpoint)?;
+    let start_menu_shortcut_path =
+        crate::broker::product_install::plan_current_user_start_menu_shortcut(&apply.app_id)
+            .ok()?;
     Some(crate::broker::update_center::UpdateActivationConfirmation {
         update_id: apply.download.update_id,
         candidate_hash: apply.download.candidate_hash,
@@ -551,6 +554,7 @@ fn current_update_activation_confirmation(
         app_id: apply.app_id,
         audit_store_id: apply.audit_store_id,
         version_directory: apply.version_directory,
+        start_menu_shortcut_path,
     })
 }
 
@@ -2188,7 +2192,7 @@ fn owner_confirmation_text_for_identity(
             confirmation,
             payload_hash,
         } => format!(
-            "署名済みD4 Pocketの未起動版を有効版へ切り替えますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定rootを再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。processは起動せず、Start Menu・現在実行中process・旧versionを変更／削除せず、rollbackもしません。切替後の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
+            "署名済みD4 Pocketの未起動版を有効版へ切り替え、Start Menuへ登録しますか？\n\n更新ID: {}\n提供版: {}\nchannel: {}\n署名済みpackage SHA-256: {}\n署名済みbyte長: {}\nApp ID: {}\nAudit Store ID: {}\n固定version directory: {}\nStart Menu shortcut登録先: {}\n内容概要: {}\n\nこの操作はRust Desktop起動器が現在のBroker候補とKnown Folderから表示内容を作成し、Brokerが実行直前にtrust・署名・package全体・stage内file／directory inventory・製品identity・固定root・Start Menu先を再検証します。有効版recordを固定root内でatomicに置換し、初回だけ検証済みstageからroot Bootstrapperをcreate-onlyで配置します。Start Menu shortcutは固定root Bootstrapperを指します。processは起動せず、現在実行中process・旧versionを変更／削除せず、rollbackもしません。切替後の起動は次回の固定root Bootstrapper起動時です。操作intentと結果をdurable Auditへ記録します。\n\npayload hash:\n{}",
             owner_confirmation_value(&confirmation.update_id),
             owner_confirmation_value(&confirmation.offered_version),
             owner_confirmation_value(&confirmation.channel),
@@ -2197,6 +2201,7 @@ fn owner_confirmation_text_for_identity(
             owner_confirmation_value(&confirmation.app_id),
             owner_confirmation_value(&confirmation.audit_store_id),
             owner_confirmation_value(&confirmation.version_directory.display().to_string()),
+            owner_confirmation_value(&confirmation.start_menu_shortcut_path.display().to_string()),
             owner_confirmation_value(&confirmation.summary),
             payload_hash
         ),
@@ -2992,6 +2997,7 @@ mod tests {
                     "app_id": confirmation.app_id,
                     "audit_store_id": confirmation.audit_store_id,
                     "version_directory": confirmation.version_directory,
+                    "start_menu_shortcut_path": confirmation.start_menu_shortcut_path,
                 },
                 "confirm": confirm
             }),
@@ -3548,6 +3554,7 @@ mod tests {
                 app_id: String,
                 audit_store_id: String,
                 version_directory: PathBuf,
+                start_menu_shortcut_path: PathBuf,
             },
         }
         #[derive(Deserialize)]
@@ -3733,6 +3740,7 @@ mod tests {
                 app_id,
                 audit_store_id,
                 version_directory,
+                start_menu_shortcut_path,
             } => DesktopOwnerOperationSummary::UpdateActivation {
                 confirmation: crate::broker::update_center::UpdateActivationConfirmation {
                     update_id,
@@ -3746,6 +3754,7 @@ mod tests {
                     app_id,
                     audit_store_id,
                     version_directory,
+                    start_menu_shortcut_path,
                 },
                 payload_hash,
             },
@@ -6937,6 +6946,9 @@ mod tests {
                 version_directory: PathBuf::from(
                     r"C:\Users\test\AppData\Local\Programs\D4 Pocket\d4-pocket-app-11111111111111111111111111111111\versions\1.2.3-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 ),
+                start_menu_shortcut_path: PathBuf::from(
+                    r"C:\Users\test\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\D4 Pocket\D4 Pocket.lnk",
+                ),
             },
             payload_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                 .into(),
@@ -6977,6 +6989,8 @@ mod tests {
             "atomic",
             "次回の固定root Bootstrapper起動時",
             "Start Menu",
+            "Start Menu shortcut登録先:",
+            "Start Menu shortcutは固定root Bootstrapperを指します",
             "process",
             "payload hash:",
         ] {

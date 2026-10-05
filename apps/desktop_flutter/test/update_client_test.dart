@@ -50,7 +50,7 @@ class _UpdateTransport implements BrokerTransport {
           '版': 1,
           '有効化': 'active_version_recorded',
           '起動': 'not_started',
-          'Start Menu': 'unchanged',
+          'Start Menu': 'registered',
           '証拠種別': 'INTERNAL_STATE',
         },
       };
@@ -153,6 +153,7 @@ void main() {
     );
     expect(activation['有効化'], 'active_version_recorded');
     expect(activation['起動'], 'not_started');
+    expect(activation['Start Menu'], 'registered');
     await client.defer(
       updateId: 'update-1',
       candidateHash: 'sha256:${'a' * 64}',

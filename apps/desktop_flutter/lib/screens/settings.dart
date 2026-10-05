@@ -752,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('更新センター', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(
-                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証してrecordを更新します。切替だけではprocessを起動せず、Start Menuとrollbackは変更しません。',
+                '信頼設定=${body['署名信頼設定'] ?? 'unknown'}。downloadは直接HTTPS接続のみ（system proxy・自動retryなし）で、Rust Desktopの確認が必要です。適用要求は署名済みpackageを固定version directoryへ未起動状態で展開します。有効版切替は別のRust Desktop確認後にpackageとstage全体を再検証し、有効版recordと固定root Bootstrapperを指すStart Menu shortcutを登録します。切替だけではprocessを起動せず、旧版削除やrollbackもしません。',
               ),
               if (downloadJob != null) ...[
                 const SizedBox(height: 4),
@@ -866,7 +866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         updateId: updateId,
                         candidateHash: candidateHash,
                       ),
-                      '有効版recordを切り替えました。次回の固定root起動時に選択版を使用します。process・Start Menu・rollbackは変更していません。',
+                      '有効版recordを切り替え、固定root Bootstrapperを指すStart Menu shortcutを登録しました。次回の固定root起動時に選択版を使用します。process起動・旧版削除・rollbackは行っていません。',
                     )
                 : null,
             child: const Text('有効版へ切替'),

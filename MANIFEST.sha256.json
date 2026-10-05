@@ -164,7 +164,7 @@
     },
     {
       "path": "ROADMAP.md",
-      "sha256": "9b50c1438e8fdedbe6cacbaa46685104db0943feefb2b4a0581be49da451d9a5"
+      "sha256": "b2e5abededddb2c01efd2698ca46d1005f211025ded785404acdd0c1677a8d0f"
     },
     {
       "path": "SECURITY.md",
@@ -288,7 +288,7 @@
     },
     {
       "path": "apps/desktop_flutter/lib/screens/settings.dart",
-      "sha256": "a9b2a5d929fe80a67432e227875bfc8225b955a15ae803f4396d36e72e3ad84a"
+      "sha256": "bd72ab00c52f53a6e9b1ba6e7e66ac26ea1873301bbb689dbc1b5937bb3b3935"
     },
     {
       "path": "apps/desktop_flutter/lib/screens/setup_doctor.dart",
@@ -656,7 +656,7 @@
     },
     {
       "path": "apps/desktop_flutter/test/update_client_test.dart",
-      "sha256": "ae61db6760278f4f2f3fb5b5a0a5ef631080f6b0145b74c12f13878cad2cd0aa"
+      "sha256": "88271a87f61cba4df22f2e8c71707e692cdee234965765ebc41f87856748ba09"
     },
     {
       "path": "apps/desktop_flutter/test/widget_test.dart",
@@ -1240,7 +1240,7 @@
     },
     {
       "path": "docs/REV5_PRODUCT_PROGRESS.md",
-      "sha256": "e29a882b6472907d580d55e4420271827b94a1f7ed3672805230093a67a2e5ab"
+      "sha256": "438deb679bc519f95a93a472598f21b3a030613ff95ca8d906c8ba2b85ffb83b"
     },
     {
       "path": "docs/SETUP_DOCTOR.md",
@@ -1508,15 +1508,15 @@
     },
     {
       "path": "docs/specs/update-center.md",
-      "sha256": "d9a062dcff6d558944730d1a00767830a0a09125aa1c1999f333f1e4146a24c1"
+      "sha256": "718971007ce32aac37cdf2397f06f8a43fa09e392fecbe800c199ffdc692a07b"
     },
     {
       "path": "docs/specs/windows-desktop-launcher.md",
-      "sha256": "9931d45c00013a7eae8c71debaa0e86a77c96f91dd64b443513b23141e2fbfb4"
+      "sha256": "8272a5ce5eac7779889b79d815dab1fa2e3b609847a2ce431fa483730480ef23"
     },
     {
       "path": "docs/specs/windows-product-package.md",
-      "sha256": "7c8c98398427b755e52396a4fc46cc3ec85159a5bd0c0e98eb7fbda8129bdaa2"
+      "sha256": "6c8ea0234120d1d946b019feb4775f37585c75eb6ebfce996db92da4bf4d62f9"
     },
     {
       "path": "docs/specs/windows-protection.md",
@@ -3308,7 +3308,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/product_install.rs",
-      "sha256": "c1a40173bca560009ff0b3549366564dea27d90b3932fc62b27cffc4eed43ca0"
+      "sha256": "1e1c8f5c0dd1d6a685e02947bdf9c9594e4950d3ff288736f84a75492171d86b"
     },
     {
       "path": "native/rust_helper/src/broker/profile_center.rs",
@@ -3316,7 +3316,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/protocol.rs",
-      "sha256": "2be88109bf69fb4f638eb6ebc1abdb901765c1ab1d0caf85a85300c86819682e"
+      "sha256": "3a0d5911ea8f7609ff4c161ead38a7e06e3fb60b78c0e944de4490b8ca776ec7"
     },
     {
       "path": "native/rust_helper/src/broker/regression_case.rs",
@@ -3340,7 +3340,7 @@
     },
     {
       "path": "native/rust_helper/src/broker/update_center.rs",
-      "sha256": "4ba783131141a6e34199098197f7b898bdd5c66dfca2be44c81f2b401601e066"
+      "sha256": "8eec024e2f23c8ee80c4eef6a6f437450175c1ae386037f97e382322af60de18"
     },
     {
       "path": "native/rust_helper/src/broker/update_download.rs",
@@ -3368,7 +3368,7 @@
     },
     {
       "path": "native/rust_helper/src/desktop_launcher.rs",
-      "sha256": "0a62064a1f74c28e1679c5dbebe56d2a2ecfccd9d3225c4a60f2b89213bb67e7"
+      "sha256": "861a0dbccefe095ca45287fe19b305514698234b81bf78baa7599ae0e12b3f04"
     },
     {
       "path": "native/rust_helper/src/diagnostics.rs",
@@ -3940,7 +3940,7 @@
     },
     {
       "path": "release_blockers.registry.json",
-      "sha256": "80fda31c875461544c7c9b095860f92b0e59ef9ca3ad0e411668f2bacea9d9da"
+      "sha256": "a5831d5b1aa78ccdad01b951c2be1658713c5b6747e93d03856baf4038ec6165"
     },
     {
       "path": "requirements-dev.txt",

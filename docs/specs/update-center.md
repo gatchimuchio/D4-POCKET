@@ -1,6 +1,6 @@
 # 更新センター
 
-状態: C12 download、署名済みpackageの未起動version staging、および別Owner確認によるactive version record切替をBroker／native Owner経路へ接続。process起動／Start Menu／rollbackは未接続。
+状態: C12 download、署名済みpackageの未起動version staging、および別Owner確認によるactive version record／Start Menu shortcut切替をBroker／native Owner経路へ接続。process起動／rollbackは未接続。
 
 更新センターは、更新候補の表示、Broker所有信頼設定によるEd25519署名検査、更新適用の要求、延期、rollback要求を扱う。更新候補自身の公開鍵、MCP metadata、Profile、履歴、UI stateは信頼源ではない。
 
@@ -38,13 +38,13 @@ downloadはBrokerのserial IPC loop外の単一worker上で非同期HTTP client�
 
 Brokerは永続Auditを利用できる場合に限り、展開前の`queued`を確定する。その後、Windows既知フォルダーの`LocalAppData/Programs/D4 Pocket/<App ID>/versions`をCapabilityとして作成／開く。配布物はBroker固定保存領域からリンクを追跡せずに開いた同一ファイルハンドルを使い、全体のdigest／byte長と各収録ファイルのhashを照合しながら、digest名で決まる版別directoryへ展開する。既存directoryを上書きしない。初回は未存在destinationへ作成し、再要求時は既存fileが署名packageのbyte prefixと一致する場合だけ未完byteを追記する。完全展開後にfile／directory inventory全体を照合し、余分なentry、reparse point、相違する既存byteがあればfail-closedで拒否する。失敗した新規stageだけをidentity照合後に除去し、再開対象stageは失敗時も保持する。成功時は`version_staged`／`有効化=suspended`とし、開始／完了Audit ID、ファイル数、byte数、および再開有無だけを返す。秘密値、ファイル本文、導入pathはFlutterへの応答へ返さない。Flutterは成功時に未起動版の展開完了と、Start Menu切替／process起動／rollbackが保留であることを表示する。
 
-この処理は有効版を選ばず、Start Menu、registry、process、旧版、rollbackへ作用しない。process crash／電源断で展開途中のdirectoryが残っても自動起動しない。再適用は新たなnative Owner確認後にだけ行い、署名packageと一致する既存byte prefixを継続し、完全stageなら全内容を再照合する。不一致・余分なentryは保持して拒否する。これはBroker fixture上の部分stage Recovery／再試行であり、実installed productのcrash／電源断後LIVE_RUNTIME証拠ではない。Installer／Uninstaller、有効版切替、Start Menu、installed productの起動・初回設定、Rollback、実配布元downloadと連結した製品経路はP11未完了である。Broker consumerはRust test fixture、Win32 Owner dialogは別のUI試験であり、正式installed productの証拠ではない。
+この処理は有効版を選ばず、Start Menu、registry、process、旧版、rollbackへ作用しない。process crash／電源断で展開途中のdirectoryが残っても自動起動しない。再適用は新たなnative Owner確認後にだけ行い、署名packageと一致する既存byte prefixを継続し、完全stageなら全内容を再照合する。不一致・余分なentryは保持して拒否する。これはBroker fixture上の部分stage Recovery／再試行であり、実installed productのcrash／電源断後LIVE_RUNTIME証拠ではない。Installer／Uninstaller、installed product経路での有効版切替・Start Menu登録・起動・初回設定、Rollback、実配布元downloadと連結した製品経路はP11未完了である。Broker consumerはRust test fixture、Win32 Owner dialogは別のUI試験であり、正式installed productの証拠ではない。
 
 ### 有効版recordの独立切替
 
-`更新有効版切替要求`は`更新適用要求`と別operation・別native Owner確認である。Brokerは現在の候補署名／trust、package digest／byte長、製品identity、Known Folder由来の固定導入先、永続Auditを再検証し、既存stageを署名packageとread-onlyで全byte／inventory照合する。完全一致時だけ、固定root Bootstrapperの初回配置（未配置の場合）と`active_version.json`の一時file同期後の同一root内renameを行う。stage操作の確認を切替許可として再利用しない。
+`更新有効版切替要求`は`更新適用要求`と別operation・別native Owner確認である。Brokerは現在の候補署名／trust、package digest／byte長、製品identity、Known Folder由来の固定導入先、Start Menu先、永続Auditを再検証し、既存stageを署名packageとread-onlyで全byte／inventory照合する。完全一致時だけ、固定root Bootstrapperの初回配置（未配置の場合）と`active_version.json`の一時file同期後の同一root内renameを行い、そのBootstrapperを指す現在利用者向けStart Menu shortcutをcreate-onlyで登録する。同じtargetのshortcutは冪等に再利用し、別targetとの競合は上書きせず拒否する。stage操作の確認を切替許可として再利用しない。
 
-応答は`active_version_recorded`であり、process起動、Start Menu変更、旧版削除、rollbackは行わない。次回の固定root Bootstrapper起動が選択版を再検証して起動する契約への接続である。現在の証拠はBroker Rust fixtureとBootstrapper reader試験までに限られ、installed product上の次回起動、Installer／Uninstaller、Start Menu、Rollback、実配布元download連結は未成立であり、P11を閉じない。
+応答は`active_version_recorded`と`Start Menu=registered`であり、process起動、旧版削除、rollbackは行わない。次回の固定root Bootstrapper起動が選択版を再検証して起動する契約への接続である。現在の証拠はBroker Rust fixtureでのactive record／shortcut登録、同一target再試行、競合非上書きとBootstrapper reader試験までに限られる。installed product上の次回起動、Installer／Uninstaller、実配布元download連結、Rollbackは未成立であり、P11を閉じない。
 
 Flutterは一覧表示と要求送信だけを担当し、filesystem、process、network、credential、privileged IPCを直接扱わない。
 

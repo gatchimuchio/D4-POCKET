@@ -1,17 +1,29 @@
 //! Windows製品の導入先をBroker所有の固定規則から導出する。
 //!
-//! 固定path計画とBroker専用のversions directory capability取得を行う。
-//! package展開、shortcut登録、Permission／Approval／Auditは行わず、実作用はBroker consumerが統治する。
+//! 固定path計画、Broker専用のversions directory capability取得、Start Menu shortcut登録を行う。
+//! package展開、Permission／Approval／Auditは行わず、実作用はBroker consumerが統治する。
 
 #[cfg(windows)]
 use cap_fs_ext::OsMetadataExt as _;
 use cap_fs_ext::{DirExt, MetadataExt as CapMetadataExt};
+#[cfg(windows)]
+use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt as _};
 use cap_std::fs::Dir;
+#[cfg(windows)]
+use cap_std::fs::OpenOptions;
 use std::path::{Component, Path, PathBuf};
 
 const INSTALL_DIRECTORY: &str = "Programs";
 const PRODUCT_DIRECTORY: &str = "D4 Pocket";
 const VERSIONS_DIRECTORY: &str = "versions";
+#[cfg(windows)]
+const START_MENU_PROGRAMS_DIRECTORY: &str = "Programs";
+#[cfg(windows)]
+const START_MENU_PRODUCT_DIRECTORY: &str = "D4 Pocket";
+#[cfg(windows)]
+const START_MENU_SHORTCUT_FILE: &str = "D4 Pocket.lnk";
+#[cfg(windows)]
+const MAX_START_MENU_SHORTCUT_BYTES: u64 = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProductInstallPlan {
@@ -180,6 +192,366 @@ pub(crate) fn current_user_local_app_data() -> Result<PathBuf, ProductInstallPla
     )
     .map(PathBuf::from)
     .map_err(|_| ProductInstallPlanError("product_install_known_folder_unavailable"))
+}
+
+/// Windows Known Folder APIから現在利用者のStart Menu rootを取得する。
+#[cfg(windows)]
+pub(crate) fn current_user_start_menu_directory() -> Result<PathBuf, ProductInstallPlanError> {
+    winsafe::SHGetKnownFolderPath(
+        &winsafe::co::KNOWNFOLDERID::StartMenu,
+        winsafe::co::KF::DEFAULT,
+        None,
+    )
+    .map(PathBuf::from)
+    .map_err(|_| ProductInstallPlanError("product_start_menu_known_folder_unavailable"))
+}
+
+/// 現在利用者向けStart Menu shortcutの固定配置pathを計画する。
+#[cfg(windows)]
+pub(crate) fn plan_current_user_start_menu_shortcut(
+    app_id: &str,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    let start_menu = current_user_start_menu_directory()?;
+    plan_start_menu_shortcut(&start_menu, app_id)
+}
+
+#[cfg(windows)]
+pub(crate) fn plan_start_menu_shortcut(
+    start_menu_directory: &Path,
+    app_id: &str,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    if !start_menu_directory.is_absolute()
+        || start_menu_directory
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu_metadata = std::fs::symlink_metadata(start_menu_directory)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    if !start_menu_metadata.is_dir()
+        || start_menu_metadata.file_type().is_symlink()
+        || is_reparse_point(&start_menu_metadata)
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu_directory = std::fs::canonicalize(start_menu_directory)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    if !valid_identity(app_id) {
+        return Err(ProductInstallPlanError(
+            "product_install_app_identity_invalid",
+        ));
+    }
+    Ok(start_menu_directory
+        .join(START_MENU_PROGRAMS_DIRECTORY)
+        .join(START_MENU_PRODUCT_DIRECTORY)
+        .join(START_MENU_SHORTCUT_FILE))
+}
+
+/// 現在利用者の固定製品rootを指すStart Menu shortcutをcreate-onlyで登録する。
+/// 既存entryが同じrootを指す場合だけ再利用し、別targetは上書きしない。
+#[cfg(windows)]
+pub(crate) fn register_start_menu_shortcut(
+    local_app_data: &Path,
+    start_menu_directory: &Path,
+    app_id: &str,
+    product_root: &Path,
+) -> Result<PathBuf, ProductInstallPlanError> {
+    let expected_root = product_install_root(local_app_data, app_id)?;
+    let expected_root = std::fs::canonicalize(expected_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    let product_root_metadata = std::fs::symlink_metadata(product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    if !product_root_metadata.is_dir()
+        || product_root_metadata.file_type().is_symlink()
+        || is_reparse_point(&product_root_metadata)
+    {
+        return Err(ProductInstallPlanError("product_install_root_invalid"));
+    }
+    let product_root = std::fs::canonicalize(product_root)
+        .map_err(|_| ProductInstallPlanError("product_install_root_unavailable"))?;
+    if !windows_path_equal(&expected_root, &product_root) {
+        return Err(ProductInstallPlanError("product_install_root_mismatch"));
+    }
+
+    let launcher_path = product_root.join("gui_shell_desktop_launcher.exe");
+    let launcher_metadata = std::fs::symlink_metadata(&launcher_path)
+        .map_err(|_| ProductInstallPlanError("installed_bootstrapper_unavailable"))?;
+    if !launcher_metadata.is_file()
+        || launcher_metadata.file_type().is_symlink()
+        || is_reparse_point(&launcher_metadata)
+        || launcher_metadata.len() == 0
+    {
+        return Err(ProductInstallPlanError("installed_bootstrapper_invalid"));
+    }
+    let launcher_path = std::fs::canonicalize(&launcher_path)
+        .map_err(|_| ProductInstallPlanError("installed_bootstrapper_invalid"))?;
+    if !launcher_path.starts_with(&product_root) {
+        return Err(ProductInstallPlanError("installed_bootstrapper_invalid"));
+    }
+
+    if !start_menu_directory.is_absolute()
+        || start_menu_directory
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let supplied_start_menu_metadata = std::fs::symlink_metadata(start_menu_directory)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    if !supplied_start_menu_metadata.is_dir()
+        || supplied_start_menu_metadata.file_type().is_symlink()
+        || is_reparse_point(&supplied_start_menu_metadata)
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu_path = std::fs::canonicalize(start_menu_directory)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    let start_menu_metadata = std::fs::symlink_metadata(&start_menu_path)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    if !start_menu_metadata.is_dir()
+        || start_menu_metadata.file_type().is_symlink()
+        || is_reparse_point(&start_menu_metadata)
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu = Dir::open_ambient_dir(&start_menu_path, cap_std::ambient_authority())
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_unavailable"))?;
+    let start_menu_metadata = start_menu
+        .dir_metadata()
+        .map_err(|_| ProductInstallPlanError("product_start_menu_directory_invalid"))?;
+    if !start_menu_metadata.is_dir() || is_cap_reparse_point(&start_menu_metadata) {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_directory_invalid",
+        ));
+    }
+    let start_menu_device = CapMetadataExt::dev(&start_menu_metadata);
+    let programs = open_or_create_child_directory(
+        &start_menu,
+        START_MENU_PROGRAMS_DIRECTORY,
+        start_menu_device,
+    )?;
+    let product =
+        open_or_create_child_directory(&programs, START_MENU_PRODUCT_DIRECTORY, start_menu_device)?;
+    let shortcut_path = start_menu_path
+        .join(START_MENU_PROGRAMS_DIRECTORY)
+        .join(START_MENU_PRODUCT_DIRECTORY)
+        .join(START_MENU_SHORTCUT_FILE);
+
+    match product.symlink_metadata(START_MENU_SHORTCUT_FILE) {
+        Ok(_) => {
+            verify_existing_start_menu_shortcut(&product, &shortcut_path, &launcher_path)?;
+            return Ok(shortcut_path);
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => {
+            return Err(ProductInstallPlanError(
+                "product_start_menu_shortcut_unavailable",
+            ))
+        }
+    }
+
+    let mut suffix = [0u8; 16];
+    getrandom::getrandom(&mut suffix)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_nonce_failed"))?;
+    let temporary_name = format!("D4Pocket.{}.lnk.tmp", hex::encode(suffix));
+    let temporary_path = start_menu_path
+        .join(START_MENU_PROGRAMS_DIRECTORY)
+        .join(START_MENU_PRODUCT_DIRECTORY)
+        .join(&temporary_name);
+    let mut options = OpenOptions::new();
+    options
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No);
+    let reservation = product
+        .open_with(&temporary_name, &options)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_temporary_create_failed"))?;
+    drop(reservation);
+
+    if let Err(error) = save_shell_link(&temporary_path, &launcher_path) {
+        let _ = product.remove_file(&temporary_name);
+        return Err(error);
+    }
+    let temporary_metadata = product
+        .symlink_metadata(&temporary_name)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_temporary_invalid"))?;
+    if !temporary_metadata.is_file()
+        || is_cap_reparse_point(&temporary_metadata)
+        || temporary_metadata.len() == 0
+        || temporary_metadata.len() > MAX_START_MENU_SHORTCUT_BYTES
+    {
+        let _ = product.remove_file(&temporary_name);
+        return Err(ProductInstallPlanError(
+            "product_start_menu_temporary_invalid",
+        ));
+    }
+
+    match product.hard_link(&temporary_name, &product, START_MENU_SHORTCUT_FILE) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let _ = product.remove_file(&temporary_name);
+            verify_existing_start_menu_shortcut(&product, &shortcut_path, &launcher_path)?;
+            return Ok(shortcut_path);
+        }
+        Err(_) => {
+            let _ = product.remove_file(&temporary_name);
+            return Err(ProductInstallPlanError(
+                "product_start_menu_shortcut_publish_failed",
+            ));
+        }
+    }
+    product
+        .remove_file(&temporary_name)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_temporary_cleanup_failed"))?;
+    verify_existing_start_menu_shortcut(&product, &shortcut_path, &launcher_path)?;
+    Ok(shortcut_path)
+}
+
+#[cfg(windows)]
+fn verify_existing_start_menu_shortcut(
+    product_directory: &Dir,
+    shortcut_path: &Path,
+    expected_launcher: &Path,
+) -> Result<(), ProductInstallPlanError> {
+    let metadata = product_directory
+        .symlink_metadata(START_MENU_SHORTCUT_FILE)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_shortcut_unavailable"))?;
+    if !metadata.is_file()
+        || is_cap_reparse_point(&metadata)
+        || metadata.len() == 0
+        || metadata.len() > MAX_START_MENU_SHORTCUT_BYTES
+    {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_shortcut_conflict",
+        ));
+    }
+    let existing_target = load_shell_link_target(shortcut_path)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_shortcut_conflict"))?;
+    let existing_target = std::fs::canonicalize(existing_target)
+        .map_err(|_| ProductInstallPlanError("product_start_menu_shortcut_conflict"))?;
+    if !windows_path_equal(&existing_target, expected_launcher) {
+        return Err(ProductInstallPlanError(
+            "product_start_menu_shortcut_conflict",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn save_shell_link(
+    shortcut_path: &Path,
+    target_path: &Path,
+) -> Result<(), ProductInstallPlanError> {
+    let shortcut_path = shell_link_compatible_path(shortcut_path)?;
+    let target_path = shell_link_compatible_path(target_path)?;
+    run_shell_link_com(move || {
+        use winsafe::prelude::*;
+
+        let shell_link = winsafe::CoCreateInstance::<winsafe::IShellLink>(
+            &winsafe::co::CLSID::ShellLink,
+            None::<&winsafe::IUnknown>,
+            winsafe::co::CLSCTX::INPROC_SERVER,
+        )
+        .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_create_failed"))?;
+        shell_link
+            .SetPath(&target_path)
+            .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_target_failed"))?;
+        shell_link.SetDescription("D4 Pocket").map_err(|_| {
+            ProductInstallPlanError("product_start_menu_shell_link_description_failed")
+        })?;
+        let persist_file = shell_link
+            .QueryInterface::<winsafe::IPersistFile>()
+            .map_err(|_| ProductInstallPlanError("product_start_menu_persist_interface_failed"))?;
+        persist_file
+            .Save(Some(&shortcut_path), false)
+            .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_save_failed"))
+    })
+}
+
+#[cfg(windows)]
+fn load_shell_link_target(shortcut_path: &Path) -> Result<PathBuf, ProductInstallPlanError> {
+    let shortcut_path = shell_link_compatible_path(shortcut_path)?;
+    run_shell_link_com(move || {
+        use winsafe::prelude::*;
+
+        let shell_link = winsafe::CoCreateInstance::<winsafe::IShellLink>(
+            &winsafe::co::CLSID::ShellLink,
+            None::<&winsafe::IUnknown>,
+            winsafe::co::CLSCTX::INPROC_SERVER,
+        )
+        .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_load_failed"))?;
+        let persist_file = shell_link
+            .QueryInterface::<winsafe::IPersistFile>()
+            .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_load_failed"))?;
+        persist_file
+            .Load(&shortcut_path, winsafe::co::STGM::READ)
+            .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_load_failed"))?;
+        shell_link
+            .GetPath(None, winsafe::co::SLGP::RAWPATH)
+            .map(PathBuf::from)
+            .map_err(|_| ProductInstallPlanError("product_start_menu_shell_link_load_failed"))
+    })
+}
+
+#[cfg(windows)]
+fn shell_link_compatible_path(path: &Path) -> Result<String, ProductInstallPlanError> {
+    let value = path.to_str().ok_or(ProductInstallPlanError(
+        "product_start_menu_path_not_unicode",
+    ))?;
+    let normalized = if let Some(extended) = value.strip_prefix("\\\\?\\") {
+        if let Some(unc) = extended.strip_prefix("UNC\\") {
+            format!("\\\\{unc}")
+        } else if extended.as_bytes().get(1) == Some(&b':')
+            && extended.as_bytes().get(2) == Some(&b'\\')
+        {
+            extended.to_owned()
+        } else {
+            return Err(ProductInstallPlanError(
+                "product_start_menu_path_not_shell_compatible",
+            ));
+        }
+    } else {
+        value.to_owned()
+    };
+    Ok(normalized)
+}
+
+#[cfg(windows)]
+fn run_shell_link_com<T, F>(operation: F) -> Result<T, ProductInstallPlanError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, ProductInstallPlanError> + Send + 'static,
+{
+    std::thread::Builder::new()
+        .name("D4 Pocket Start Menu COM".to_owned())
+        .spawn(move || {
+            let _com = winsafe::CoInitializeEx(
+                winsafe::co::COINIT::APARTMENTTHREADED | winsafe::co::COINIT::DISABLE_OLE1DDE,
+            )
+            .map_err(|_| ProductInstallPlanError("product_start_menu_com_initialize_failed"))?;
+            operation()
+        })
+        .map_err(|_| ProductInstallPlanError("product_start_menu_com_thread_failed"))?
+        .join()
+        .map_err(|_| ProductInstallPlanError("product_start_menu_com_thread_failed"))?
+}
+
+#[cfg(windows)]
+fn windows_path_equal(left: &Path, right: &Path) -> bool {
+    left.to_string_lossy()
+        .replace('/', "\\")
+        .eq_ignore_ascii_case(&right.to_string_lossy().replace('/', "\\"))
 }
 
 fn open_existing_child_directory(
@@ -529,6 +901,102 @@ mod tests {
             .0,
             "product_install_package_hash_invalid"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn start_menu_shortcut_targets_fixed_bootstrapper_and_is_idempotent() {
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-start-menu-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let local_app_data = scratch.join("Local");
+        let start_menu = scratch.join("StartMenu");
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        std::fs::create_dir_all(&product_root).unwrap();
+        std::fs::create_dir_all(&start_menu).unwrap();
+        let launcher = product_root.join("gui_shell_desktop_launcher.exe");
+        std::fs::write(&launcher, b"fixture bootstrapper").unwrap();
+
+        let registered = super::register_start_menu_shortcut(
+            &local_app_data,
+            &start_menu,
+            APP_ID,
+            &product_root,
+        )
+        .unwrap();
+        assert_eq!(
+            registered,
+            super::plan_start_menu_shortcut(&start_menu, APP_ID).unwrap()
+        );
+        assert_eq!(
+            std::fs::canonicalize(super::load_shell_link_target(&registered).unwrap()).unwrap(),
+            std::fs::canonicalize(&launcher).unwrap()
+        );
+        let first_bytes = std::fs::read(&registered).unwrap();
+
+        assert_eq!(
+            super::register_start_menu_shortcut(
+                &local_app_data,
+                &start_menu,
+                APP_ID,
+                &product_root,
+            )
+            .unwrap(),
+            registered
+        );
+        assert_eq!(std::fs::read(&registered).unwrap(), first_bytes);
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn start_menu_conflict_is_rejected_without_overwriting_existing_shortcut() {
+        let scratch = std::env::temp_dir().join(format!(
+            "d4p-start-menu-conflict-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let local_app_data = scratch.join("Local");
+        let start_menu = scratch.join("StartMenu");
+        let product_root = local_app_data
+            .join("Programs")
+            .join("D4 Pocket")
+            .join(APP_ID);
+        let programs = start_menu.join("Programs").join("D4 Pocket");
+        std::fs::create_dir_all(&product_root).unwrap();
+        std::fs::create_dir_all(&programs).unwrap();
+        let launcher = product_root.join("gui_shell_desktop_launcher.exe");
+        let other_target = scratch.join("unrelated.exe");
+        std::fs::write(&launcher, b"fixture bootstrapper").unwrap();
+        std::fs::write(&other_target, b"unrelated target").unwrap();
+        let shortcut = programs.join("D4 Pocket.lnk");
+        super::save_shell_link(&shortcut, &other_target).unwrap();
+        let original_bytes = std::fs::read(&shortcut).unwrap();
+
+        assert_eq!(
+            super::register_start_menu_shortcut(
+                &local_app_data,
+                &start_menu,
+                APP_ID,
+                &product_root,
+            )
+            .unwrap_err()
+            .0,
+            "product_start_menu_shortcut_conflict"
+        );
+        assert_eq!(std::fs::read(&shortcut).unwrap(), original_bytes);
+        std::fs::remove_dir_all(scratch).unwrap();
     }
 
     #[cfg(windows)]

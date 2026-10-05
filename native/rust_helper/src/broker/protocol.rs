@@ -968,6 +968,8 @@ pub struct Broker {
     pub(super) desktop_product_identity: Option<(String, String)>,
     #[cfg(test)]
     pub(super) desktop_product_install_local_app_data: Option<PathBuf>,
+    #[cfg(test)]
+    pub(super) desktop_product_start_menu_directory: Option<PathBuf>,
     desktop_agent_workspace_protected_paths: Vec<PathBuf>,
     desktop_loopback_bind_verified: bool,
     desktop_first_run_configuration: Option<(Value, Vec<u8>)>,
@@ -1011,6 +1013,8 @@ impl Broker {
             desktop_product_identity: None,
             #[cfg(test)]
             desktop_product_install_local_app_data: None,
+            #[cfg(test)]
+            desktop_product_start_menu_directory: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -1088,6 +1092,8 @@ impl Broker {
             desktop_product_identity: None,
             #[cfg(test)]
             desktop_product_install_local_app_data: None,
+            #[cfg(test)]
+            desktop_product_start_menu_directory: None,
             desktop_agent_workspace_protected_paths: Vec::new(),
             desktop_loopback_bind_verified: false,
             desktop_first_run_configuration: None,
@@ -1227,6 +1233,11 @@ impl Broker {
     #[cfg(test)]
     pub(crate) fn set_desktop_product_install_local_app_data(&mut self, path: PathBuf) {
         self.desktop_product_install_local_app_data = Some(path);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_desktop_product_start_menu_directory(&mut self, path: PathBuf) {
+        self.desktop_product_start_menu_directory = Some(path);
     }
 
     pub(crate) fn set_desktop_export_root(
