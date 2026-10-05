@@ -94,6 +94,7 @@ from tooling.export_windows_product import (
     _resolve_output_directory,
     _safe_extract_source,
     _validate_cargo_target_path,
+    product_version_from_source,
     scan_credential_artifacts,
     validate_build_evidence,
     validate_export_inputs,
@@ -9694,6 +9695,19 @@ def test_gui_shell_windows_export_build_is_hash_bound_and_non_authoritative() ->
     evidence = load_contract_fixture("gui_shell_windows_export_build.valid.json")
     schema = load_schema("gui_shell_windows_export_build.schema.json")
     errors: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="d4p-product-version-") as temporary:
+        source_root = Path(temporary)
+        pubspec = source_root / "apps" / "desktop_flutter" / "pubspec.yaml"
+        pubspec.parent.mkdir(parents=True)
+        pubspec.write_text("name: product\nversion: 2.4.1+17\n", encoding="utf-8")
+        if product_version_from_source(source_root) != "2.4.1+17":
+            errors.append("Product buildがsourceのpubspec版を固定できない")
+        pubspec.write_text("name: product\nversion: invalid\n", encoding="utf-8")
+        try:
+            product_version_from_source(source_root)
+            errors.append("不正なsource製品版を拒否しない")
+        except ValueError:
+            pass
     if validate_instance(evidence, schema):
         errors.append("Windows Export buildの正常証拠がSchemaに適合しない")
     scan_record = evidence.get("credential_artifact_scan", {})

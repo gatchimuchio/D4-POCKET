@@ -224,6 +224,17 @@ def _schema(name: str) -> dict[str, Any]:
     return value
 
 
+def product_version_from_source(source_root: Path) -> str:
+    pubspec_path = source_root / "apps" / "desktop_flutter" / "pubspec.yaml"
+    pubspec = _read_regular_file(pubspec_path, 256 * 1024, "Flutter pubspec.yaml").decode(
+        "utf-8"
+    )
+    match = re.search(r"(?m)^version:\s*([0-9][A-Za-z0-9.+_-]{0,63})\s*$", pubspec)
+    if match is None:
+        raise ValueError("Flutter pubspec.yamlから製品版を決定できない")
+    return match.group(1)
+
+
 def validate_export_inputs(
     receipt_raw: bytes, manifest_raw: bytes
 ) -> tuple[dict[str, Any], dict[str, Any], Any, str, str]:
@@ -663,6 +674,10 @@ def build_portable_bundle(
                 ],
             ]
             flutter_project = source_root / "apps" / "desktop_flutter"
+            product_version = product_version_from_source(source_root)
+            flutter_arguments.append(
+                f"--dart-define=GUI_SHELL_PRODUCT_VERSION={product_version}"
+            )
             subprocess.run(
                 [flutter, *flutter_arguments],
                 cwd=flutter_project,

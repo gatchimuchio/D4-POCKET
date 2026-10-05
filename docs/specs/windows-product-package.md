@@ -1,18 +1,26 @@
 # Windows製品Package
 
-状態: P11 Windows Productizationの基盤contract。Installer／Update production pathの成立を意味しない。
+状態: P11 Windows Productizationのpackage format／reader contract。Installer、installed product、Update／Rollback、正式配布の成立を意味しない。
 
 ## 1. 責任境界
 
-`D4PKG01`はWindows製品payloadを固定順に格納する無圧縮package形式である。package全体の配布元署名・digest検証はRust Brokerの責任であり、この形式reader、package作成tool、Product Manifest自身は配布元trustを生成しない。
+`D4PKG01`はWindows製品payloadを固定順に格納する無圧縮package形式である。これを導入・更新へ接続するときの配布元署名・digest検証はRust Brokerが担う。この形式reader、package作成tool、Product Manifest自身は配布元trustを生成しない。
 
 Developer専用の`tooling/package_windows_product.py`は、commit／build receiptに結合されたportable Export bundleを梱包する。通常利用者へPython、Rust、Flutter、Git、terminalを要求する経路ではない。
 
 Rust `product_package` readerは、期待するApp ID／Audit Store ID／製品版を呼出し元から固定で受け、packageの構造、path、file数、size、各file hash、同梱`product_manifest.json`の新規identityとAuthority非継承を検査する。展開先は未存在の新規stage directoryに限定する。検査失敗時はreaderが作成したstageだけを除去する。
 
-このmoduleはBrokerの署名検証、Owner確認、Permission、Approval、Audit、filesystem installation、process起動またはrollbackを実施しない。現時点ではInstaller／Updateから未接続であり、P11の製品経路受入れは未成立である。
+package reader自体はBrokerの署名検証、Owner確認、Permission、Approval、Audit、製品配置を実施しない。package内SHA-256は自己整合性検査であり、配布元の真正性を証明しない。今後の導入・更新consumerはBrokerのtrust、native Owner確認、Permission／Approval、durable Audit、Recovery経路へ接続しなければならない。これらが未接続のpackageを正式配布用として扱ってはならない。
 
-## 2. 固定形式
+## 2. 導入・更新consumerの必須境界
+
+現行package readerは製品root、Start Menu、registry、processへ作用しない。standalone Setupからこれらを直接変更する経路は設けない。導入・削除・更新を実装するときは、既存Brokerを唯一の権限依存作用主体とし、操作ごとにCapability、現在条件に束縛したPermissionとnative Owner Approval、durable AuditEvent、失敗時RecoveryActionを接続する。Flutter／manifest／Setup UI／package metadataは権限を生成しない。
+
+## 3. 製品版表示
+
+portable Exportは、現行`apps/desktop_flutter/pubspec.yaml`の製品版をbuild時にFlutterへ渡す。Settings表示とpackage metadataの製品版は同じsource値を使う。通常の開発buildでは`開発版`と表示する。この表示はbuild identityの投影であり、package署名、installed root、更新・rollbackの証拠ではない。
+
+## 4. 固定形式
 
 ```text
 8 bytes   D4PKG01\n
@@ -25,6 +33,6 @@ manifestのfile一覧はASCII Windows-safe relative pathのcase-insensitive昇�
 
 許可rootは`app/`、`broker/`、`gui_shell_desktop_launcher.exe`、`product_manifest.json`。必須のDesktop／Flutter／Broker／launcher／Product Manifest fileを欠くpackageは拒否する。
 
-## 3. 適合確認
+## 5. 適合確認
 
-packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。これらは`FIXTURE`／unit evidenceであり、installed product、update、rollback、署名検証、通常Release成立の証拠ではない。
+packagerのPython ConformanceとRust readerのunit testは、形式・hash・path containment・製品identity・Authority非継承を検査する。product version表示のWidget／build argument testはversion source結合だけを検査する。これらはinstalled別user profile、署名検証、package配布元trust、Installer、Update／Rollback、正式Releaseの証拠ではない。

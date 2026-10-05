@@ -12,6 +12,11 @@ import '../services/update_client.dart';
 import 'mcp_connection_center.dart';
 import 'shared.dart';
 
+const guiShellProductVersion = String.fromEnvironment(
+  'GUI_SHELL_PRODUCT_VERSION',
+  defaultValue: '開発版',
+);
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.client});
 
@@ -120,6 +125,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ShellPage(
       title: '設定',
       children: [
+        const BorderedPanel(
+          child: Text('D4 Pocket 製品版: $guiShellProductVersion'),
+        ),
         BorderedPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

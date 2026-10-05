@@ -25,6 +25,7 @@ void main() {
       await tester.pumpAndSettle();
       final initialLayoutError = tester.takeException();
       expect(initialLayoutError, isNull, reason: '初期表示');
+      expect(find.text('D4 Pocket 製品版: 1.2.3'), findsOneWidget);
 
       await _enter(tester, 'compose-runtime-ids', 'runtime.local');
       await _enter(tester, 'compose-agent-ids', 'agent.codex');

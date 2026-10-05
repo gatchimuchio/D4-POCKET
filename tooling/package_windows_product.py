@@ -26,6 +26,7 @@ from tooling.export_windows_product import (
     _require_clean_source,
     _schema,
     _sha256_file,
+    product_version_from_source,
     validate_build_evidence,
 )
 from tooling.schema_check.check_schemas import validate_instance
@@ -249,10 +250,7 @@ def build_export_package(source_root: Path, output_path: Path) -> dict[str, Any]
     validate_build_evidence(evidence, source_root)
     if _require_clean_source() != evidence["source_commit"]:
         raise ValueError("product package作成sourceがExport build receiptのcommitと一致しない")
-    pubspec = (ROOT / "apps" / "desktop_flutter" / "pubspec.yaml").read_text(encoding="utf-8")
-    match = re.search(r"(?m)^version:\s*([0-9][A-Za-z0-9.+_-]{0,63})\s*$", pubspec)
-    if match is None:
-        raise ValueError("Flutter pubspec.yamlから製品版を決定できない")
+    product_version = product_version_from_source(ROOT)
     manifest = json.loads((source_root / "product_manifest.json").read_text(encoding="utf-8"))
     identity = manifest.get("manifest", {})
     app_id = identity.get("app_identity", {}).get("app_id")
@@ -262,7 +260,7 @@ def build_export_package(source_root: Path, output_path: Path) -> dict[str, Any]
     return write_product_package(
         source_root,
         output_path,
-        product_version=match.group(1),
+        product_version=product_version,
         app_id=app_id,
         audit_store_id=audit_store_id,
     )
