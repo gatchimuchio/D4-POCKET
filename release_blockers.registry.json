@@ -3009,24 +3009,26 @@
       "release_tracks": ["windows_v1"],
       "blocks_release": true,
       "blocks_windows_technical_complete": true,
-      "reason": "C12のnative Owner確認付きpackage downloadに加え、2026-10-06にBroker test経路から署名済みpackageをKnown Folder由来の固定per-user version directoryへ未起動状態でstageするconsumerを実装した。native Owner確認、現在candidate／App ID／Audit Store ID／destination再照合、durable intent／completion Audit、既存stage非上書きはfixtureで確認した。ただしInstaller／Uninstaller、active version切替、Start Menu、process起動、crash後partial stage Recovery、Rollback、製品Broker／installed productの実証は未成立。Windows DNS ClientとTLS配布元経路はhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
-      "required_action": "test identityによるInstaller／Uninstaller、active version／Start Menu切替、same-volume transaction、partial stageの失敗／crash Recovery、RollbackをContract・negative test・隔離Windows実測へ接続する。実配布元のdownload／tamper／repairからinstalled productの起動・Rollbackまでを検証し、source／artifact identityへ証拠を結合する。production identityはTechnical Complete後の別blockerで扱う。",
+      "reason": "C12のnative Owner確認付きpackage downloadに加え、2026-10-06にBroker test経路から署名済みpackageをKnown Folder由来の固定per-user version directoryへ未起動状態でstageするconsumerを実装した。native Owner確認、現在candidate／App ID／Audit Store ID／destination再照合、durable intent／completion Audit、同じ署名packageとのhash一致を条件とした途中stage再開はfixtureで確認した。ただしInstaller／Uninstaller、active version切替、Start Menu、process起動、installed productでの実crash／電源断後Recovery、Rollbackの実証は未成立。Windows DNS ClientとTLS配布元経路はhelper／loopback fixtureの範囲に限られる。正式package identity／signing identityは別のOwner Finalization blockerとして分離する。",
+      "required_action": "試験用識別子によるインストール／アンインストール、現行版／スタートメニュー切替、同一ボリューム内更新処理、正式導入製品の強制終了／電源断後の再起動復旧、旧版復帰を契約・否定試験・隔離Windows実測へ接続する。実配布元からの取得／改変検出／修復と、正式導入製品の起動／旧版復帰を検証し、ソースと生成物の識別情報へ証拠を結合する。正式発行者・署名識別情報はWindows技術完了後の別blockerで扱う。",
       "broker_signed_version_staging_consumer": {
         "date": "2026-10-06",
         "evidence_sources": ["FIXTURE", "LIVE_RUNTIME"],
         "validation": {
           "focused_broker_consumer": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib native_owner_apply_stages_exact_signed_package_without_activation_or_overwrite -- --test-threads=1: 1 passed。",
           "fixed_versions_capability": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib broker::product_install::tests -- --test-threads=1: 4 passed。",
+          "partial_stage_resume": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib product_package::tests -- --test-threads=1: 8 passed。さらにnative_owner_apply_stages_exact_signed_package_without_activation_or_overwrite: 1 passed。途中file prefix／完全stageの再要求はfixtureで成功し、相違prefix／余分entryは保持して拒否。実installed process crash／電源断は未実施。",
           "native_owner_dialog": "cargo test --locked --manifest-path native/rust_helper/Cargo.toml --lib update_apply_native_confirmation_limits_approval_to_staging -- --ignored --test-threads=1: 1 passed;実Win32 dialogを自動操作。",
-          "full_rust_suite": "逐次lib suite 469件中456 passed／3 failed／10 ignored。A2A loopbackとfailed_replacement fixtureは単独再実行PASS、local_tls_server_repairs_only_after_verified_package_bytesは単独でもWSA 10054 ConnectionReset。原因未確定としてFQ-TEST-LOOPBACKへ送付。"
+          "full_rust_suite": "逐次lib suite 469件中456 passed／3 failed／10 ignored。A2A loopbackとfailed_replacement fixtureは単独再実行PASS、local_tls_server_repairs_only_after_verified_package_bytesは単独でもWSA 10054 ConnectionReset。原因未確定としてFQ-TEST-LOOPBACKへ送付。",
+          "latest_all_target_validation": "2026-10-06 `cargo test --locked --manifest-path native/rust_helper/Cargo.toml --all-targets -- --test-threads=1`: lib 460 passed／0 failed／10 ignored、他targetを含め計506 passed／0 failed／11 ignored。既存loopback試験も今回実行は全PASS。先行する接続失敗の履歴は削除せず保持。"
         },
         "observations": {
           "owner_and_candidate_binding": "通常IPC／native確認context欠落／stale candidate／identity mismatchを拒否。native Owner確認の対象に製品版、channel、package digest／byte長、App ID、Audit Store ID、固定destinationを表示。",
-          "package_and_filesystem": "Broker固定storeからno-followで開いた同一package handleをouter digest／byte lengthとinner file hashesで検査し、directory capability直下へ展開。tampered packageはstageを残さず拒否し、既存stageは上書きしない。",
+          "package_and_filesystem": "Broker固定storeからno-followで開いた同一package handleをouter digest／byte lengthとinner file hashesで検査し、directory capability直下へ展開。新規stageでtampered packageを拒否し、既存stageでは署名packageと一致するfile prefixだけを再利用。相違byte／余分entryは保持して拒否し、上書き・削除しない。",
           "audit_and_activation": "展開前queuedと成功completedをdurable Auditへ記録し、成功応答はversion_staged／activation suspended。process／Start Menu／old version／rollbackへ作用しない。",
           "native_ui": "別Win32 dialog childにおける実MessageBox表示・No／Yes選択を検証。これはbroker consumer統合のLIVE_RUNTIMEではなく、UI提示部分だけのLIVE_RUNTIME。"
         },
-        "scope_limit": "Broker consumerの統合試験はRust Broker test fixture。Win32 native Owner dialogだけはLIVE_RUNTIME。正式installed product、実配布元、別user profile、partial-stage crash Recovery、active version切替、process launch、Start Menu、Rollback、release readinessを証明しない。release blockerを維持する。"
+        "scope_limit": "Broker consumerとpartial-stage再開の統合試験はRust Broker test fixture。Win32 native Owner dialogだけはLIVE_RUNTIME。正式installed product、実配布元、別user profile、実process crash／電源断後のRecovery、active version切替、process launch、Start Menu、Rollback、release readinessを証明しない。release blockerを維持する。"
       },
       "update_candidate_package_binding": {
         "date": "2026-09-30",

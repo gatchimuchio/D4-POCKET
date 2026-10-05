@@ -132,6 +132,48 @@ pub(crate) fn extract_verified_package_into_directory<R: Read>(
     stage_name: &str,
     expected: ProductPackageExpectation<'_>,
 ) -> Result<ProductPackageInfo, ProductPackageError> {
+    extract_verified_package_into_directory_mode(
+        input,
+        package_bytes,
+        expected_package_sha256,
+        parent,
+        stage_name,
+        expected,
+        false,
+    )
+    .map(|(info, _)| info)
+}
+
+/// 既存stageがある場合は署名packageと一致するprefix fileだけを再利用して展開を続ける。
+/// 不一致fileやpackage外entryは上書き・削除せず、fail-closedで保持する。
+pub(crate) fn resume_verified_package_into_directory<R: Read>(
+    input: R,
+    package_bytes: u64,
+    expected_package_sha256: Option<&str>,
+    parent: &Dir,
+    stage_name: &str,
+    expected: ProductPackageExpectation<'_>,
+) -> Result<(ProductPackageInfo, bool), ProductPackageError> {
+    extract_verified_package_into_directory_mode(
+        input,
+        package_bytes,
+        expected_package_sha256,
+        parent,
+        stage_name,
+        expected,
+        true,
+    )
+}
+
+fn extract_verified_package_into_directory_mode<R: Read>(
+    input: R,
+    package_bytes: u64,
+    expected_package_sha256: Option<&str>,
+    parent: &Dir,
+    stage_name: &str,
+    expected: ProductPackageExpectation<'_>,
+    resume_existing: bool,
+) -> Result<(ProductPackageInfo, bool), ProductPackageError> {
     if !(12..=MAX_PACKAGE_BYTES).contains(&package_bytes) {
         return Err(err("package_size_invalid"));
     }
@@ -145,50 +187,91 @@ pub(crate) fn extract_verified_package_into_directory<R: Read>(
     if !parent_metadata.is_dir() || is_cap_reparse_point(&parent_metadata) {
         return Err(err("package_parent_invalid"));
     }
-    match parent.symlink_metadata(stage_name) {
+    let (stage, created_stage, stage_entry_metadata) = match parent.symlink_metadata(stage_name) {
+        Ok(existing_metadata) if resume_existing => {
+            if !existing_metadata.is_dir() || is_cap_reparse_point(&existing_metadata) {
+                return Err(err("package_stage_invalid"));
+            }
+            let stage = parent
+                .open_dir_nofollow(stage_name)
+                .map_err(|_| err("package_stage_invalid"))?;
+            let opened_metadata = stage
+                .dir_metadata()
+                .map_err(|_| err("package_stage_invalid"))?;
+            if !opened_metadata.is_dir()
+                || is_cap_reparse_point(&opened_metadata)
+                || !same_cap_file(&existing_metadata, &opened_metadata)
+            {
+                return Err(err("package_stage_changed"));
+            }
+            (stage, false, existing_metadata)
+        }
         Ok(_) => return Err(err("package_destination_exists")),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            parent
+                .create_dir(stage_name)
+                .map_err(|_| err("package_stage_create_failed"))?;
+            let created_metadata = parent
+                .symlink_metadata(stage_name)
+                .map_err(|_| err("package_stage_invalid"))?;
+            if !created_metadata.is_dir() || is_cap_reparse_point(&created_metadata) {
+                return Err(err("package_stage_invalid"));
+            }
+            let stage = parent
+                .open_dir_nofollow(stage_name)
+                .map_err(|_| err("package_stage_invalid"))?;
+            let opened_metadata = stage
+                .dir_metadata()
+                .map_err(|_| err("package_stage_invalid"))?;
+            if !same_cap_file(&created_metadata, &opened_metadata) {
+                return Err(err("package_stage_changed"));
+            }
+            (stage, true, created_metadata)
+        }
         Err(_) => return Err(err("package_destination_invalid")),
-    }
-    parent
-        .create_dir(stage_name)
-        .map_err(|_| err("package_stage_create_failed"))?;
-    let created_metadata = parent
-        .symlink_metadata(stage_name)
-        .map_err(|_| err("package_stage_invalid"))?;
-    if !created_metadata.is_dir() || is_cap_reparse_point(&created_metadata) {
-        return Err(err("package_stage_invalid"));
-    }
-    let stage = match parent.open_dir_nofollow(stage_name) {
-        Ok(stage) => stage,
-        Err(_) => return Err(err("package_stage_invalid")),
     };
     let stage_metadata = match stage.dir_metadata() {
         Ok(metadata) => metadata,
         Err(_) => {
-            let _ = stage.remove_open_dir_all();
+            if created_stage {
+                let _ = stage.remove_open_dir_all();
+            }
             return Err(err("package_stage_invalid"));
         }
     };
-    if !same_cap_file(&created_metadata, &stage_metadata) {
+    if !same_cap_file(&stage_entry_metadata, &stage_metadata) {
+        if created_stage {
+            let _ = stage.remove_open_dir_all();
+        }
         return Err(err("package_stage_changed"));
     }
     if !stage_metadata.is_dir() || is_cap_reparse_point(&stage_metadata) {
-        let _ = stage.remove_open_dir_all();
+        if created_stage {
+            let _ = stage.remove_open_dir_all();
+        }
         return Err(err("package_stage_invalid"));
     }
 
     let mut input = PackageHashReader::new(input);
-    let result = extract_inner(&mut input, &stage, &expected, package_bytes).and_then(|info| {
+    let result = extract_inner(
+        &mut input,
+        &stage,
+        &expected,
+        package_bytes,
+        resume_existing,
+    )
+    .and_then(|info| {
         if expected_package_sha256.is_some_and(|expected| input.finish() != expected) {
             return Err(err("package_outer_hash_mismatch"));
         }
         Ok(info)
     });
     if result.is_err() {
-        let _ = stage.remove_open_dir_all();
+        if created_stage {
+            let _ = stage.remove_open_dir_all();
+        }
     }
-    result
+    result.map(|info| (info, !created_stage))
 }
 
 struct PackageHashReader<R> {
@@ -222,6 +305,7 @@ fn extract_inner<R: Read>(
     destination: &Dir,
     expected: &ProductPackageExpectation<'_>,
     package_bytes: u64,
+    resume_existing: bool,
 ) -> Result<ProductPackageInfo, ProductPackageError> {
     let mut magic = [0u8; 8];
     input
@@ -258,21 +342,59 @@ fn extract_inner<R: Read>(
     }
 
     let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
+    let mut existing_buffer = vec![0u8; COPY_BUFFER_BYTES];
     let mut product_manifest_validated = false;
     for entry in &manifest.files {
         if entry.path == "product_manifest.json" && entry.byte_length > MAX_PRODUCT_MANIFEST_BYTES {
             return Err(err("package_product_manifest_size_invalid"));
         }
         let (parent, file_name) = open_package_parent(destination, &entry.path)?;
-        let mut options = OpenOptions::new();
-        options
-            .write(true)
-            .create_new(true)
-            .follow(FollowSymlinks::No);
-        let mut output = parent
-            .open_with(file_name, &options)
-            .map_err(|_| err("package_file_create_failed"))?;
+        let (mut output, existing_prefix_bytes) = if resume_existing {
+            let mut options = OpenOptions::new();
+            options.read(true).write(true).follow(FollowSymlinks::No);
+            match parent.open_with(file_name, &options) {
+                Ok(file) => {
+                    let metadata = file
+                        .metadata()
+                        .map_err(|_| err("package_stage_existing_file_invalid"))?;
+                    if !metadata.is_file()
+                        || is_cap_reparse_point(&metadata)
+                        || metadata.len() > entry.byte_length
+                    {
+                        return Err(err("package_stage_existing_file_invalid"));
+                    }
+                    (file, metadata.len())
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    let mut options = OpenOptions::new();
+                    options
+                        .write(true)
+                        .create_new(true)
+                        .follow(FollowSymlinks::No);
+                    (
+                        parent
+                            .open_with(file_name, &options)
+                            .map_err(|_| err("package_file_create_failed"))?,
+                        0,
+                    )
+                }
+                Err(_) => return Err(err("package_stage_existing_file_invalid")),
+            }
+        } else {
+            let mut options = OpenOptions::new();
+            options
+                .write(true)
+                .create_new(true)
+                .follow(FollowSymlinks::No);
+            (
+                parent
+                    .open_with(file_name, &options)
+                    .map_err(|_| err("package_file_create_failed"))?,
+                0,
+            )
+        };
         let mut remaining = entry.byte_length;
+        let mut consumed = 0u64;
         let mut digest = Sha256::new();
         let mut captured_manifest = (entry.path == "product_manifest.json")
             .then(|| Vec::with_capacity(entry.byte_length as usize));
@@ -285,14 +407,31 @@ fn extract_inner<R: Read>(
             if count == 0 {
                 return Err(err("package_file_truncated"));
             }
-            output
-                .write_all(&buffer[..count])
-                .map_err(|_| err("package_file_write_failed"))?;
+            let prefix_count = usize::try_from(
+                existing_prefix_bytes
+                    .saturating_sub(consumed)
+                    .min(count as u64),
+            )
+            .map_err(|_| err("package_length_invalid"))?;
+            if prefix_count > 0 {
+                output
+                    .read_exact(&mut existing_buffer[..prefix_count])
+                    .map_err(|_| err("package_stage_existing_file_invalid"))?;
+                if existing_buffer[..prefix_count] != buffer[..prefix_count] {
+                    return Err(err("package_stage_existing_file_mismatch"));
+                }
+            }
+            if prefix_count < count {
+                output
+                    .write_all(&buffer[prefix_count..count])
+                    .map_err(|_| err("package_file_write_failed"))?;
+            }
             digest.update(&buffer[..count]);
             if let Some(captured) = captured_manifest.as_mut() {
                 captured.extend_from_slice(&buffer[..count]);
             }
             remaining -= count as u64;
+            consumed += count as u64;
         }
         output
             .sync_all()
@@ -307,6 +446,9 @@ fn extract_inner<R: Read>(
     }
     if !product_manifest_validated {
         return Err(err("package_required_file_missing"));
+    }
+    if resume_existing {
+        validate_stage_tree(destination, &manifest.files)?;
     }
     let mut trailing = [0u8; 1];
     if input
@@ -323,6 +465,82 @@ fn extract_inner<R: Read>(
         file_count: manifest.files.len(),
         total_file_bytes,
     })
+}
+
+fn validate_stage_tree(
+    root: &Dir,
+    package_files: &[PackageFile],
+) -> Result<(), ProductPackageError> {
+    let mut expected_files = BTreeSet::new();
+    let mut expected_directories = BTreeSet::new();
+    for file in package_files {
+        expected_files.insert(file.path.clone());
+        let mut prefix = String::new();
+        let parents: Vec<&str> = file.path.split('/').collect();
+        for component in parents.iter().take(parents.len().saturating_sub(1)) {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(component);
+            expected_directories.insert(prefix.clone());
+        }
+    }
+    let mut found_files = BTreeSet::new();
+    let mut found_directories = BTreeSet::new();
+    collect_stage_tree(root, "", &mut found_files, &mut found_directories)?;
+    if found_files != expected_files || found_directories != expected_directories {
+        return Err(err("package_stage_unexpected_entry"));
+    }
+    Ok(())
+}
+
+fn collect_stage_tree(
+    directory: &Dir,
+    prefix: &str,
+    files: &mut BTreeSet<String>,
+    directories: &mut BTreeSet<String>,
+) -> Result<(), ProductPackageError> {
+    let mut pending = vec![(
+        directory
+            .try_clone()
+            .map_err(|_| err("package_stage_unreadable"))?,
+        prefix.to_owned(),
+    )];
+    while let Some((current, current_prefix)) = pending.pop() {
+        for entry in current
+            .read_dir(".")
+            .map_err(|_| err("package_stage_unreadable"))?
+        {
+            let entry = entry.map_err(|_| err("package_stage_unreadable"))?;
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| err("package_stage_entry_invalid"))?;
+            let relative = if current_prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{current_prefix}/{name}")
+            };
+            let metadata = current
+                .symlink_metadata(&name)
+                .map_err(|_| err("package_stage_entry_invalid"))?;
+            if is_cap_reparse_point(&metadata) {
+                return Err(err("package_stage_reparse_point"));
+            }
+            if metadata.is_dir() {
+                directories.insert(relative.clone());
+                let child = current
+                    .open_dir_nofollow(&name)
+                    .map_err(|_| err("package_stage_entry_invalid"))?;
+                pending.push((child, relative));
+            } else if metadata.is_file() {
+                files.insert(relative);
+            } else {
+                return Err(err("package_stage_entry_invalid"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_product_manifest(
@@ -817,6 +1035,107 @@ mod tests {
             "package_path_reparse_or_conflict"
         );
         assert!(!path.parent().unwrap().join("stage-conflict").exists());
+        drop(directory);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn capability_resume_completes_only_matching_partial_files_and_rejects_extras() {
+        let path = write_temp(&package_with(files_for_test()), "stage-resume");
+        let directory = cap_std::fs::Dir::open_ambient_dir(
+            path.parent().unwrap(),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        let mut files = files_for_test();
+        files[0] = ("app/data/app.so", b"signed-prefix-and-suffix");
+        let bytes = package_with(files);
+        let digest = hex::encode(Sha256::digest(&bytes));
+        fs::create_dir_all(path.parent().unwrap().join("stage/app/data")).unwrap();
+        fs::write(
+            path.parent().unwrap().join("stage/app/data/app.so"),
+            b"signed-prefix",
+        )
+        .unwrap();
+
+        let (info, resumed) = resume_verified_package_into_directory(
+            std::io::Cursor::new(bytes.clone()),
+            bytes.len() as u64,
+            Some(&digest),
+            &directory,
+            "stage",
+            expectation(Some("1.2.3")),
+        )
+        .unwrap();
+        assert!(resumed);
+        assert_eq!(info.file_count, files_for_test().len());
+        assert_eq!(
+            fs::read(path.parent().unwrap().join("stage/app/data/app.so")).unwrap(),
+            b"signed-prefix-and-suffix"
+        );
+
+        let (recovered, resumed) = resume_verified_package_into_directory(
+            std::io::Cursor::new(bytes.clone()),
+            bytes.len() as u64,
+            Some(&digest),
+            &directory,
+            "stage",
+            expectation(Some("1.2.3")),
+        )
+        .unwrap();
+        assert!(resumed);
+        assert_eq!(recovered, info);
+
+        drop(directory);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+
+        let path = write_temp(&package_with(files_for_test()), "stage-resume-mismatch");
+        let directory = cap_std::fs::Dir::open_ambient_dir(
+            path.parent().unwrap(),
+            cap_std::ambient_authority(),
+        )
+        .unwrap();
+        fs::create_dir_all(path.parent().unwrap().join("stage/app/data")).unwrap();
+        fs::write(path.parent().unwrap().join("stage/app/data/app.so"), b"x").unwrap();
+        let bytes = package_with(files_for_test());
+        let digest = hex::encode(Sha256::digest(&bytes));
+        assert_eq!(
+            resume_verified_package_into_directory(
+                std::io::Cursor::new(bytes.clone()),
+                bytes.len() as u64,
+                Some(&digest),
+                &directory,
+                "stage",
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_stage_existing_file_mismatch"
+        );
+        assert_eq!(
+            fs::read(path.parent().unwrap().join("stage/app/data/app.so")).unwrap(),
+            b"x"
+        );
+
+        fs::write(path.parent().unwrap().join("stage/app/data/app.so"), b"a").unwrap();
+        fs::write(path.parent().unwrap().join("stage/unexpected.bin"), b"keep").unwrap();
+        assert_eq!(
+            resume_verified_package_into_directory(
+                std::io::Cursor::new(bytes.clone()),
+                bytes.len() as u64,
+                Some(&digest),
+                &directory,
+                "stage",
+                expectation(Some("1.2.3")),
+            )
+            .unwrap_err()
+            .0,
+            "package_stage_unexpected_entry"
+        );
+        assert_eq!(
+            fs::read(path.parent().unwrap().join("stage/unexpected.bin")).unwrap(),
+            b"keep"
+        );
         drop(directory);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

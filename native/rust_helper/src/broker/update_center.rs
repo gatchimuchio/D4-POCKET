@@ -1487,7 +1487,7 @@ fn apply_verified_package(
                 payload_hash,
             );
         }
-        let extraction = crate::product_package::extract_verified_package_into_directory(
+        let extraction = crate::product_package::resume_verified_package_into_directory(
             &mut package,
             package_metadata.len(),
             Some(package_sha256),
@@ -1499,15 +1499,15 @@ fn apply_verified_package(
                 audit_store_id: &audit_store_id,
             },
         );
-        let info = match extraction {
-            Ok(info) => info,
+        let (info, resumed) = match extraction {
+            Ok(result) => result,
             Err(error) => {
                 if broker
                     .append_audit(
                         &format!("{request_id}:failed"),
                         OP_APPLY,
                         "failed",
-                        &format!("Capability=product.install.version_stage Permission=確認済み候補に一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=展開失敗を記録 RecoveryAction=readerがidentity検査済みの自身のstageのみ除去。再試行前に同じ署名packageを再検証。failure_code={}", error.0),
+                        &format!("Capability=product.install.version_stage Permission=確認済み候補に一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=展開失敗を記録 RecoveryAction=新規stageだけをreaderがcleanupし、再開stageは内容不一致時も保持する。再試行前に同じ署名packageと既存file prefixを再検証。failure_code={}", error.0),
                         EVIDENCE_SOURCE_INTERNAL_STATE,
                         payload_hash,
                     )
@@ -1534,7 +1534,7 @@ fn apply_verified_package(
             &format!("{request_id}:complete"),
             OP_APPLY,
             "completed",
-            &format!("Capability=product.install.version_stage Permission=署名済みApp identityとcontent-addressed version directory一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=完全展開・package／file digest一致を記録 RecoveryAction=このversionはまだ起動・有効化しない。次工程のcurrent trust・起動・rollback審査を要求。file_count={} total_bytes={} package_sha256={}", info.file_count, info.total_file_bytes, package_sha256),
+            &format!("Capability=product.install.version_stage Permission=署名済みApp identityとcontent-addressed version directory一回限定 Approval=Rust Desktop native Owner確認 AuditEvent=完全展開・package／file digest一致を記録 RecoveryAction=既存stageはpackage prefix hashと全entryを再照合してのみ再開し、不一致・余分なentryを変更しない。versionは起動・有効化しない。resumed={resumed} file_count={} total_bytes={} package_sha256={}", info.file_count, info.total_file_bytes, package_sha256),
             EVIDENCE_SOURCE_INTERNAL_STATE,
             payload_hash,
         );
@@ -1563,6 +1563,7 @@ fn apply_verified_package(
                 "候補hash": request.candidate_hash,
                 "導入状態": "version_staged",
                 "有効化": "suspended",
+                "再開": resumed,
                 "file数": info.file_count,
                 "total_bytes": info.total_file_bytes,
                 "復旧ID": "recover-update-install-activation",
@@ -2635,6 +2636,8 @@ mod tests {
             event.request_id == "desktop-update-apply-tampered:failed" && event.decision == "failed"
         }));
         std::fs::write(&package_path, &package).unwrap();
+        std::fs::create_dir_all(target.join("app/data")).unwrap();
+        std::fs::write(target.join("app/data/app.so"), b"").unwrap();
 
         let applied = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-apply"),
@@ -2644,6 +2647,7 @@ mod tests {
         assert_eq!(applied.status, BrokerStatus::Accepted);
         assert_eq!(applied.body.as_ref().unwrap()["導入状態"], "version_staged");
         assert_eq!(applied.body.as_ref().unwrap()["有効化"], "suspended");
+        assert_eq!(applied.body.as_ref().unwrap()["再開"], true);
         assert_eq!(
             std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
             b"d"
@@ -2652,18 +2656,24 @@ mod tests {
             .audit_events()
             .iter()
             .any(|event| { event.operation == OP_APPLY && event.decision == "queued" }));
-        assert!(broker
-            .audit_events()
-            .iter()
-            .any(|event| { event.operation == OP_APPLY && event.decision == "completed" }));
+        assert!(broker.audit_events().iter().any(|event| {
+            event.request_id == "desktop-update-apply:complete"
+                && event.operation == OP_APPLY
+                && event.decision == "completed"
+                && event.reason.contains("resumed=true")
+        }));
 
         let repeated = broker.desktop_owner_operation_json_with_update_confirmation(
             &envelope("desktop-update-apply-replay"),
             None,
             Some(confirmation),
         );
-        assert_eq!(repeated.status, BrokerStatus::Rejected);
-        assert_eq!(repeated.error.unwrap().code, "package_destination_exists");
+        assert_eq!(repeated.status, BrokerStatus::Accepted);
+        assert_eq!(
+            repeated.body.as_ref().unwrap()["導入状態"],
+            "version_staged"
+        );
+        assert_eq!(repeated.body.as_ref().unwrap()["再開"], true);
         assert_eq!(
             std::fs::read(target.join("app").join("gui_shell_desktop.exe")).unwrap(),
             b"d"

@@ -12,6 +12,8 @@ P7ではA2A loopback、Host registry／表示面、local・remote／degraded区�
 
 本書の以下の過去日付付き記録は、記録当時の証拠・計画を保持する。rev5の現在状態と作業順を判断するときは上記の現行正本を優先し、過去の「現行」表記を現在状態として再利用しない。
 
+P11追補（2026-10-06）: 署名済みpackageの未起動version stagingを、Broker fixture上で既存stage再開まで接続した。再適用では既存fileが同一packageのbyte prefixと一致する部分だけ再利用し、完了後にfile／directory inventoryを全照合する。相違byte、package外entry、reparse pointは保持して拒否し、再試行ごとにnative Owner確認とdurable Auditを要求する。部分stage／完全stageのfixture試験はPASS。これは実installed product process crash／電源断後のLIVE_RUNTIME Recoveryではない。Installer、Uninstaller、active version／Start Menu切替、起動、Rollback、installed path検証を含むP11はOPENのまま。
+
 ## rev3作業履歴（現行工程の正本ではない）
 
 R2追補（2026-10-04、run50 Audit projection不一致）: 修正前source 1dc2014c6a71b5dd1cf094a2f313608ab06b9160由来のinstalled r2-e2e run50でnative Owner Permission／Task Approval後にTaskを開始し、同じfile-backed Auditを持つBroker restart後もTask開始Audit broker-audit-59に対応するRecovery Auditが0件だった。productionは意味markerをreasonへ記録し、Recoveryはoperationのみ検索していた。active process descendantsがLauncher停止前に消失していたためprocess cleanupも未検証。根因修正とproduction形式・旧形式・冪等性testを追加し、focused testはPASS。run50はidentity_kind=gui_shell／isolated=false／formal_runtime_proof=false、MxC TEMP write失敗であり、R2 Recovery／provenance合格ではない。修正後fresh installed crash LIVE_RUNTIME再試験までtask_execution=unsupportedを維持する。詳細はdocs/REV3_PROGRESS.md。
