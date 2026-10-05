@@ -42,6 +42,54 @@ class _McpTransport implements BrokerTransport {
       '公開範囲': 'metadata_only',
       '証拠種別': 'INTERNAL_STATE',
     },
+    {
+      '版': 1,
+      '資格情報ID': '11111111111111111111111111111111',
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1002,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'c').join()}',
+      '作成監査ID': 'audit-provider-created',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+    {
+      '版': 1,
+      '資格情報ID': '22222222222222222222222222222222',
+      '用途': 'provider_api_key',
+      '接続対象': 'other-provider',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1003,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'd').join()}',
+      '作成監査ID': 'audit-provider-wrong-target',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    },
+    {
+      '版': 1,
+      '資格情報ID': '33333333333333333333333333333333',
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '失効',
+      '作成時刻UnixMillis': 1004,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': 2000,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'e').join()}',
+      '作成監査ID': 'audit-provider-revoked',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    },
   ];
   String listedEvidence = 'INTERNAL_STATE';
   String executionState = 'ready';
@@ -294,6 +342,20 @@ void main() {
       'environment_variable': 'MCP_API_KEY',
     });
     expect(transport.payloads.toString(), isNot(contains('secret-marker')));
+  });
+
+  test('Provider一覧は用途・接続先・種類・有効状態が一致するmetadataだけ返す', () async {
+    final transport = _McpTransport();
+    final credentials =
+        await McpConnectionClient(transport).listProviderCredentials();
+
+    expect(credentials.map((entry) => entry.credentialId), [
+      '11111111111111111111111111111111',
+    ]);
+    expect(transport.operations, ['資格情報一覧']);
+    expect(transport.payloads.single, {'版': 1});
+    expect(transport.payloads.toString(),
+        isNot(contains('synthetic-provider-key')));
   });
 
   test('MCP clientはCredential IDと登録metadataをBrokerへ送りreceiptを検査する', () async {

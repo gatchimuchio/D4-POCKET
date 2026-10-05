@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/gui-shell/schemas/provider_model_selection.schema.json",
   "title": "Provider・Model選択",
-  "description": "実物Codex CLI経路で選ぶProviderとModel。資格情報・権限・Capabilityを含まず、認証はCodex CLI管理領域へ委譲し、自動fallbackは行わない。",
+  "description": "実物Codex CLI経路で選ぶProviderとModel。認証方式はCodex CLI委譲またはBroker保管庫参照のどちらかに固定し、資格情報の実値・権限・Capabilityは含めず、自動fallbackは行わない。",
   "type": "object",
   "required": ["version", "provider_id", "model_id", "authentication_source", "automatic_fallback"],
   "additionalProperties": false,
@@ -16,7 +16,22 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$(?![\\s\\S])",
       "description": "Codex CLIへ--modelで渡す選択値。存在・契約・利用可能性は登録時に推測しない。"
     },
-    "authentication_source": {"const": "codex_cli_managed"},
+    "authentication_source": {"enum": ["codex_cli_managed", "broker_credential_vault"]},
+    "credential_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$(?![\\s\\S])",
+      "description": "Broker DPAPI保管庫にあるprovider_api_key資格情報のmetadata参照。実値ではなく、Brokerが登録時・使用時に用途、対象、状態を再検証する。"
+    },
     "automatic_fallback": {"const": false}
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"authentication_source": {"const": "codex_cli_managed"}}},
+      "then": {"not": {"required": ["credential_id"]}}
+    },
+    {
+      "if": {"properties": {"authentication_source": {"const": "broker_credential_vault"}}},
+      "then": {"required": ["credential_id"]}
+    }
+  ]
 }

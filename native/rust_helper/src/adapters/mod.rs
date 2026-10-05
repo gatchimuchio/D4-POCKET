@@ -12,6 +12,8 @@ pub(crate) struct ProviderModelSelection {
     pub(crate) provider_id: String,
     pub(crate) model_id: String,
     authentication_source: String,
+    #[serde(default)]
+    credential_id: Option<String>,
     automatic_fallback: bool,
 }
 
@@ -19,7 +21,6 @@ impl ProviderModelSelection {
     pub(crate) fn is_valid(&self) -> bool {
         self.version == 1
             && self.provider_id == "openai_codex_cli"
-            && self.authentication_source == "codex_cli_managed"
             && !self.automatic_fallback
             && !self.model_id.is_empty()
             && self.model_id.len() <= 128
@@ -27,7 +28,30 @@ impl ProviderModelSelection {
                 byte.is_ascii_alphanumeric()
                     || (index > 0 && b"._:/-".contains(&byte))
             })
+            && match self.authentication_source.as_str() {
+                "codex_cli_managed" => self.credential_id.is_none(),
+                "broker_credential_vault" => self
+                    .credential_id
+                    .as_deref()
+                    .is_some_and(valid_credential_id),
+                _ => false,
+            }
     }
+
+    pub(crate) fn credential_id(&self) -> Option<&str> {
+        self.credential_id.as_deref()
+    }
+
+    pub(crate) fn authentication_source(&self) -> &str {
+        &self.authentication_source
+    }
+}
+
+fn valid_credential_id(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 pub(crate) fn supports_cli_adapter(adapter_id: &str) -> bool {
@@ -52,11 +76,14 @@ pub(crate) fn create_cli_adapter(
     }
     match adapter_id {
         "codex-cli" if provider_model_selection.provider_id == "openai_codex_cli" => {
-            Ok(std::sync::Arc::new(codex_cli::CodexCliAdapter::new_with_model(
-                executable,
-                workspace,
-                &provider_model_selection.model_id,
-            )?) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>)
+            Ok(std::sync::Arc::new(
+                codex_cli::CodexCliAdapter::new_with_provider_authentication(
+                    executable,
+                    workspace,
+                    &provider_model_selection.model_id,
+                    provider_model_selection.credential_id(),
+                )?,
+            ) as std::sync::Arc<dyn crate::broker::dialogue::実行系Adapter>)
         }
         _ => Err("未対応のCLI Adapter ID".to_owned()),
     }
@@ -116,6 +143,7 @@ mod cli_adapter_registry_tests {
                 provider_id: "openai_codex_cli".into(),
                 model_id: "fixture-model".into(),
                 authentication_source: "codex_cli_managed".into(),
+                credential_id: None,
                 automatic_fallback: false,
             },
         );

@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 const VERSION_OUTPUT: &str = "codex-cli";
+const PROVIDER_CREDENTIAL_CANARY: &str = "synthetic-provider-key-fixture-only";
 const EXEC_HELP_OUTPUT: &str =
     "codex exec --sandbox workspace-write --cd DIR --json --ephemeral --ignore-user-config --skip-git-repo-check --model MODEL";
 
@@ -60,6 +61,27 @@ fn main() {
     let mut instruction = String::new();
     if io::stdin().read_to_string(&mut instruction).is_err() || instruction.trim().is_empty() {
         process::exit(46);
+    }
+    if instruction.trim() == "FIXTURE_PROVIDER_CREDENTIAL" {
+        let received_key = env::var("OPENAI_API_KEY").ok();
+        let shell_excludes_key = arguments.windows(2).any(|pair| {
+            pair[0] == "-c"
+                && pair[1]
+                    == "shell_environment_policy.exclude=[\"OPENAI_API_KEY\",\"CODEX_API_KEY\",\"CODEX_ACCESS_TOKEN\"]"
+        });
+        let key_is_not_in_arguments = arguments
+            .iter()
+            .all(|argument| !argument.contains(PROVIDER_CREDENTIAL_CANARY));
+        if received_key.as_deref() != Some(PROVIDER_CREDENTIAL_CANARY)
+            || !shell_excludes_key
+            || !key_is_not_in_arguments
+        {
+            process::exit(52);
+        }
+        println!(r#"{{"type":"thread.started","thread_id":"01a0cd58-c4fc-7221-8d25-dc52d12ba3fd"}}"#);
+        println!(r#"{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"fixture-provider-credential-bound"}}}}"#);
+        println!(r#"{{"type":"turn.completed"}}"#);
+        return;
     }
     if let Some(heartbeat_path) = instruction.strip_prefix("FIXTURE_TIMEOUT_WITH_DESCENDANT ") {
         let executable = env::current_exe().unwrap_or_else(|_| process::exit(48));
@@ -131,8 +153,22 @@ fn valid_task_arguments(arguments: &[String]) -> bool {
         .filter(|pair| pair[0] == "-c")
         .map(|pair| pair[1].as_str())
         .collect::<Vec<_>>();
-    if configs.len() != TASK_PERMISSION_PROFILE.len() + 1
-        || configs[..TASK_PERMISSION_PROFILE.len()] != TASK_PERMISSION_PROFILE
+    let has_provider_key = env::var_os("OPENAI_API_KEY").is_some();
+    let provider_settings = [
+        "shell_environment_policy.ignore_default_excludes=false",
+        "shell_environment_policy.exclude=[\"OPENAI_API_KEY\",\"CODEX_API_KEY\",\"CODEX_ACCESS_TOKEN\"]",
+    ];
+    let provider_offset = if has_provider_key {
+        provider_settings.len()
+    } else {
+        0
+    };
+    if (has_provider_key
+        && (configs.len() < provider_settings.len()
+            || configs[..provider_settings.len()] != provider_settings))
+        || configs.len() != TASK_PERMISSION_PROFILE.len() + 1 + provider_offset
+        || configs[provider_offset..provider_offset + TASK_PERMISSION_PROFILE.len()]
+            != TASK_PERMISSION_PROFILE
     {
         return false;
     }

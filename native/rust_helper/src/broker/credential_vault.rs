@@ -15,6 +15,7 @@ const VERSION: u64 = 1;
 const RECORD_PREFIX: &str = "資格情報記録:";
 const REVOCATION_PREFIX: &str = "資格情報失効記録:";
 const MCP_USE_PREFIX: &str = "MCP資格情報使用:";
+const PROVIDER_USE_PREFIX: &str = "提供元資格情報使用:";
 const MAX_TEXT_BYTES: usize = 256;
 const MAX_SECRET_BYTES: usize = 65_536;
 
@@ -113,6 +114,21 @@ struct McpCredentialUseRecord {
     used_at: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderCredentialUseRecord {
+    version: u64,
+    credential_id: String,
+    provider_id: String,
+    runtime_id: String,
+    used_at: i64,
+}
+
+pub(super) enum ProviderCredentialUseFailure {
+    Denied,
+    Audit,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CredentialRevocationRecord {
@@ -129,6 +145,100 @@ struct CredentialLedger {
 }
 
 impl Broker {
+    pub(super) fn 提供元資格情報参照確認(&self, credential_id: &str) -> bool {
+        credential_ledger(&self.audit_log).is_ok_and(|ledger| {
+            ledger.entries.iter().any(|entry| {
+                entry.public.credential_id == credential_id
+                    && entry.public.purpose == "provider_api_key"
+                    && entry.public.target == "openai_codex_cli"
+                    && entry.public.kind == "api_key"
+                    && entry.public.status == "有効"
+                    && entry.public.revoked_at.is_none()
+            })
+        })
+    }
+
+    pub(super) fn 提供元資格情報使用処理(
+        &mut self,
+        request_id: &str,
+        runtime_id: &str,
+        provider_id: &str,
+        credential_id: &str,
+        payload_hash: &str,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, ProviderCredentialUseFailure> {
+        const OPERATION: &str = "提供元資格情報使用";
+        if !self.state_store.persistence_ready()
+            || !hex_identifier(credential_id)
+            || provider_id != "openai_codex_cli"
+            || !safe_text(runtime_id, MAX_TEXT_BYTES)
+        {
+            return Err(ProviderCredentialUseFailure::Denied);
+        }
+        let ledger = credential_ledger(&self.audit_log)
+            .map_err(|_| ProviderCredentialUseFailure::Audit)?;
+        let entry = ledger
+            .entries
+            .into_iter()
+            .find(|entry| {
+                entry.public.credential_id == credential_id
+                    && entry.public.purpose == "provider_api_key"
+                    && entry.public.target == provider_id
+                    && entry.public.kind == "api_key"
+                    && entry.public.status == "有効"
+                    && entry.public.revoked_at.is_none()
+            })
+            .ok_or(ProviderCredentialUseFailure::Denied)?;
+        if self.protected_store.is_none() {
+            return Err(ProviderCredentialUseFailure::Denied);
+        }
+        self.append_audit(
+            request_id,
+            OPERATION,
+            "received",
+            "Broker承認済みProvider実行から資格情報使用を要求。ID・提供元・Runtime参照のみを記録し、秘密値は記録しない",
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .map_err(|_| ProviderCredentialUseFailure::Audit)?;
+
+        let secret = self
+            .protected_store
+            .as_ref()
+            .expect("ProtectedStore登録確認済み")
+            .read(
+                crate::protected_store::Purpose::Credential,
+                &entry.storage_id,
+                &entry.public.ciphertext_hash,
+            )
+            .map_err(|_| ProviderCredentialUseFailure::Denied)?;
+        let secret = zeroize::Zeroizing::new(secret.as_bytes().to_vec());
+        if secret.is_empty()
+            || std::str::from_utf8(&secret).is_err()
+            || secret.iter().any(u8::is_ascii_control)
+        {
+            return Err(ProviderCredentialUseFailure::Denied);
+        }
+
+        let record = ProviderCredentialUseRecord {
+            version: VERSION,
+            credential_id: credential_id.to_owned(),
+            provider_id: provider_id.to_owned(),
+            runtime_id: runtime_id.to_owned(),
+            used_at: self.current_epoch_millis(),
+        };
+        let encoded = serde_json::to_string(&record).map_err(|_| ProviderCredentialUseFailure::Audit)?;
+        self.append_audit(
+            request_id,
+            OPERATION,
+            "accepted",
+            &format!("{PROVIDER_USE_PREFIX}{encoded}"),
+            EVIDENCE_SOURCE_INTERNAL_STATE,
+            payload_hash,
+        )
+        .map_err(|_| ProviderCredentialUseFailure::Audit)?;
+        Ok(secret)
+    }
+
     pub(super) fn 資格情報MCP使用処理(
         &mut self,
         request_id: &str,
@@ -930,6 +1040,29 @@ fn credential_ledger(log: &BrokerAuditLog) -> Result<CredentialLedger, ()> {
                     .and_modify(|used_at: &mut i64| *used_at = (*used_at).max(record.used_at))
                     .or_insert(record.used_at);
             }
+            ("提供元資格情報使用", "accepted") => {
+                let encoded = event.reason.strip_prefix(PROVIDER_USE_PREFIX).ok_or(())?;
+                let record: ProviderCredentialUseRecord =
+                    serde_json::from_str(encoded).map_err(|_| ())?;
+                let entry = by_id.get(&record.credential_id).ok_or(())?;
+                if record.version != VERSION
+                    || !hex_identifier(&record.credential_id)
+                    || record.provider_id != "openai_codex_cli"
+                    || !safe_text(&record.runtime_id, MAX_TEXT_BYTES)
+                    || record.used_at <= 0
+                    || entry.public.purpose != "provider_api_key"
+                    || entry.public.target != record.provider_id
+                    || entry.public.kind != "api_key"
+                    || entry.public.status != "有効"
+                    || entry.public.revoked_at.is_some()
+                {
+                    return Err(());
+                }
+                last_use
+                    .entry(record.credential_id)
+                    .and_modify(|used_at: &mut i64| *used_at = (*used_at).max(record.used_at))
+                    .or_insert(record.used_at);
+            }
             _ => {}
         }
     }
@@ -984,6 +1117,21 @@ mod tests {
             "資格情報ID": id,
             "用途": "mcp_transport",
             "接続対象": target,
+            "種類": "api_key",
+            "保管方式": "windows_dpapi",
+            "登録者種別": "owner",
+            "登録経路": "owner_control",
+            "秘密値": secret,
+        })
+    }
+
+    fn provider_fixture_payload(id: &str, secret: &str) -> Value {
+        json!({
+            "版": 1,
+            "操作": "追加",
+            "資格情報ID": id,
+            "用途": "provider_api_key",
+            "接続対象": "openai_codex_cli",
             "種類": "api_key",
             "保管方式": "windows_dpapi",
             "登録者種別": "owner",
@@ -1148,6 +1296,91 @@ mod tests {
         assert!(body["資格情報一覧"][0]["最終使用時刻UnixMillis"]
             .as_i64()
             .is_some());
+        drop(broker);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn provider_credential_use_is_bound_to_codex_and_audited_without_secret() {
+        let (mut broker, root) = broker_with_vault("provider-use");
+        let id = "9".repeat(32);
+        let secret_marker = "synthetic-provider-key-never-project";
+        let added = call(
+            &mut broker,
+            BrokerOperation::資格情報登録,
+            provider_fixture_payload(&id, secret_marker),
+            true,
+        );
+        assert_eq!(added.status, BrokerStatus::Accepted, "{added:?}");
+        assert!(broker.提供元資格情報参照確認(&id));
+        assert!(!broker.提供元資格情報参照確認(&"8".repeat(32)));
+
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "provider-use-wrong-target",
+                "codex-runtime-fixture",
+                "another-provider",
+                &id,
+                &canonical_payload_hash(None),
+            ),
+            Err(ProviderCredentialUseFailure::Denied)
+        ));
+        let secret = match broker.提供元資格情報使用処理(
+                "provider-use-approved-fixture",
+                "codex-runtime-fixture",
+                "openai_codex_cli",
+                &id,
+                &canonical_payload_hash(None),
+            ) {
+            Ok(secret) => secret,
+            Err(_) => panic!("一致する提供元だけがBroker内で短命復号"),
+        };
+        assert_eq!(secret.as_slice(), secret_marker.as_bytes());
+        drop(secret);
+
+        let listed = call(
+            &mut broker,
+            BrokerOperation::資格情報一覧,
+            json!({"版": 1}),
+            false,
+        );
+        assert_eq!(listed.status, BrokerStatus::Accepted, "{listed:?}");
+        let public = listed.body.expect("Provider資格情報metadata");
+        assert_eq!(
+            public["資格情報一覧"][0]["最終使用時刻UnixMillis"]
+                .as_i64()
+                .is_some(),
+            true
+        );
+        let audit = serde_json::to_string(&broker.audit_events()).expect("使用Audit");
+        assert!(audit.contains("提供元資格情報使用"));
+        assert!(audit.contains(&id));
+        assert!(!audit.contains(secret_marker));
+        assert!(!public.to_string().contains(secret_marker));
+
+        let revoked = native_owner_call(
+            &mut broker,
+            json!({
+                "版": 1,
+                "資格情報ID": id,
+                "用途": "provider_api_key",
+                "接続対象": "openai_codex_cli",
+                "暗号文hash": added.body.as_ref().unwrap()["暗号文hash"],
+                "作成監査ID": added.body.as_ref().unwrap()["作成監査ID"],
+            }),
+        );
+        assert_eq!(revoked.status, BrokerStatus::Accepted, "{revoked:?}");
+        assert!(!broker.提供元資格情報参照確認(&id));
+        assert!(matches!(
+            broker.提供元資格情報使用処理(
+                "provider-use-after-revoke",
+                "codex-runtime-fixture",
+                "openai_codex_cli",
+                &id,
+                &canonical_payload_hash(None),
+            ),
+            Err(ProviderCredentialUseFailure::Denied)
+        ));
         drop(broker);
         std::fs::remove_dir_all(root).expect("cleanup");
     }

@@ -178,6 +178,18 @@ class McpConnectionClient {
     if (!_validIdentifier(targetServerId)) {
       throw const BrokerClientException('MCP Server識別子の形式が不正です');
     }
+    return List.unmodifiable((await _listCredentials()).where((entry) =>
+        entry.purpose == 'mcp_transport' && entry.target == targetServerId));
+  }
+
+  Future<List<McpCredentialSummary>> listProviderCredentials() async =>
+      List.unmodifiable((await _listCredentials()).where((entry) =>
+          entry.purpose == 'provider_api_key' &&
+          entry.target == 'openai_codex_cli' &&
+          entry.kind == 'api_key' &&
+          entry.status == '有効'));
+
+  Future<List<McpCredentialSummary>> _listCredentials() async {
     final response = await _transport.request(
       '資格情報一覧',
       payload: const {'版': 1},
@@ -270,8 +282,7 @@ class McpConnectionClient {
         ciphertextHash: ciphertextHash,
         createdAuditId: createdAuditId,
       );
-    }).where((entry) =>
-        entry.purpose == 'mcp_transport' && entry.target == targetServerId);
+    }).toList(growable: false);
     return List.unmodifiable(entries);
   }
 

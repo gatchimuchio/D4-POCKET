@@ -6984,13 +6984,20 @@ def test_codex_cli_adapter_is_broker_governed_and_bounded() -> list[str]:
         "--dangerously-bypass-approvals-and-sandbox",
         "--worktree",
         "--add-dir",
-        "OPENAI_API_KEY",
-        "CODEX_API_KEY",
         "command_envelope",
     ]
     for token in forbidden:
         if token in adapter:
             errors.append(f"Codex Adapterに禁止された実行境界tokenがある: {token}")
+    for required in (
+        '.env("OPENAI_API_KEY", credential)',
+        '"shell_environment_policy.ignore_default_excludes=false"',
+        '"shell_environment_policy.exclude=[\\"OPENAI_API_KEY\\",\\"CODEX_API_KEY\\",\\"CODEX_ACCESS_TOKEN\\"]"',
+        '"CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY"',
+        '"local_credential_reference"',
+    ):
+        if required not in adapter:
+            errors.append(f"Codex Provider credentialの短命bindingまたは子process除外がない: {required}")
     if "codex_runtimes" not in broker or "CodexCliAdapter" not in broker:
         errors.append("Codex AdapterがBrokerの明示登録経路へ接続されていない")
     return errors
@@ -8134,14 +8141,28 @@ def test_agent_cli_runtime_registration_is_owner_scoped_and_authority_free() -> 
 def test_provider_model_selection_is_registered_and_non_authoritative() -> list[str]:
     schema = load_schema("provider_model_selection.schema.json")
     valid = load_contract_fixture("provider_model_selection.valid.json")
+    vault_valid = load_contract_fixture("provider_model_selection_vault.valid.json")
     invalid = load_contract_fixture(
         "invalid/provider_model_selection_unknown_provider.invalid.json"
+    )
+    invalid_missing_credential = load_contract_fixture(
+        "invalid/provider_model_selection_vault_missing_id.invalid.json"
+    )
+    invalid_credential_id = load_contract_fixture(
+        "invalid/provider_model_selection_vault_malformed_id.invalid.json"
     )
     errors: list[str] = []
     if validate_instance(valid, schema):
         errors.append("Provider／Model選択の正常例が契約に適合しない")
-    if validate_instance(invalid, schema) == []:
-        errors.append("未登録ProviderをProvider／Model選択が受け入れた")
+    if validate_instance(vault_valid, schema):
+        errors.append("Broker資格情報参照を使うProvider／Model選択例が契約に適合しない")
+    for negative, label in (
+        (invalid, "未登録Provider"),
+        (invalid_missing_credential, "Credential ID欠落"),
+        (invalid_credential_id, "不正Credential ID"),
+    ):
+        if validate_instance(negative, schema) == []:
+            errors.append(f"Provider／Model選択が{label}を受け入れた")
     for changed in (
         {**valid, "automatic_fallback": True},
         {**valid, "model_id": "--dangerous"},
@@ -8173,7 +8194,7 @@ def test_provider_model_selection_is_registered_and_non_authoritative() -> list[
         '"provider_id": "openai_codex_cli"',
         '"provider_health": {"status": "unknown"',
         '"automatic_fallback": false',
-        '"method": "codex_cli_managed"',
+        '"method": if self.provider_credential_id.is_some() { "local_credential_reference" } else { "codex_cli_managed" }',
     ):
         if required not in adapter:
             errors.append(f"Codex Adapterが選択Model／状態契約を反映しない: {required}")
@@ -8194,7 +8215,9 @@ def test_provider_model_selection_is_registered_and_non_authoritative() -> list[
     for required in (
         "'provider_model_selection': {",
         "'model_id': modelId",
-        "'authentication_source': 'codex_cli_managed'",
+        "'authentication_source': authenticationSource",
+        "if (credentialId != null) 'credential_id': credentialId",
+        "listProviderCredentials()",
         "'automatic_fallback': false",
         "提供元接続・模型利用可否: 不明（CLI接続面のみ確認）",
         "自動代替実行: 無効",

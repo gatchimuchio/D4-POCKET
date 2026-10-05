@@ -763,6 +763,104 @@ void main() {
     expect(find.text('登録Workspaceで対話Sessionを開始'), findsOneWidget);
   });
 
+  testWidgets('Provider保管庫modeはmetadataのCredential IDだけ登録要求へ渡す',
+      (WidgetTester tester) async {
+    const credentialId = '11111111111111111111111111111111';
+    const syntheticSecret = 'synthetic-provider-key-never-project';
+    final credentialMetadata = {
+      '版': 1,
+      '資格情報ID': credentialId,
+      '用途': 'provider_api_key',
+      '接続対象': 'openai_codex_cli',
+      '種類': 'api_key',
+      '保管方式': 'windows_dpapi',
+      '状態': '有効',
+      '作成時刻UnixMillis': 1000,
+      '最終使用時刻UnixMillis': null,
+      '失効時刻UnixMillis': null,
+      '暗号文hash': 'sha256:${List<String>.filled(64, 'a').join()}',
+      '作成監査ID': 'audit-provider-credential-created',
+      '公開範囲': 'metadata_only',
+      '証拠種別': 'INTERNAL_STATE',
+    };
+    final transport = _FakeBrokerTransport([
+      _brokerHealthResponse(),
+      _brokerHostCapabilityResponse(),
+      _brokerHostListResponse(),
+      _brokerAdapterListResponse(),
+      _brokerAgentAdapterListResponse(),
+      _brokerDialogueSessionListResponse(),
+      _brokerAcceptedBody('normalize_payload', {'quarantined': false}),
+      _brokerAcceptedBody('content_projection', {'redacted_payload': {}}),
+      _brokerAcceptedBody('approval_edit', {'ok': false}),
+      _brokerCommandSuspendedResponse(),
+      {
+        'request_id': 'test-資格情報一覧',
+        'operation': '資格情報一覧',
+        'status': 'accepted',
+        'evidence_source': 'INTERNAL_STATE',
+        'audit_event_id': 'audit-provider-credential-list',
+        'error': null,
+        'body': {
+          '版': 1,
+          '資格情報一覧': [credentialMetadata],
+          '件数': 1,
+          '公開範囲': 'metadata_only',
+          '証拠種別': 'INTERNAL_STATE',
+        },
+        'shutdown_requested': false,
+      },
+      _brokerAcceptedBody('AgentCLI実行系作業領域登録', {
+        'runtime_id': 'codex-provider-vault-fixture',
+        'workspace_id': 'workspace-provider-vault-fixture',
+        'registration_lifetime': 'broker_process',
+        'task_execution': 'unsupported',
+        'permission_generated': false,
+        'approval_generated': false,
+        'credential_value_accepted': false,
+      }),
+    ]);
+    final client = await ShellCoreClient.product(transport: transport);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: AgentCenter(client: client)),
+    ));
+
+    await tester.tap(find.text('登録を開始'));
+    await tester.pumpAndSettle();
+    final vaultMode = find.text('D4 Pocket資格情報保管庫');
+    await tester.ensureVisible(vaultMode);
+    await tester.tap(vaultMode);
+    await tester.pumpAndSettle();
+
+    final credentialPicker = find.byType(DropdownButtonFormField<String>);
+    await tester.ensureVisible(credentialPicker);
+    await tester.tap(credentialPicker);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(credentialId).last);
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'model-test-01');
+    await tester.enterText(fields.at(1), 'codex-provider-vault-fixture');
+    await tester.enterText(fields.at(2), r'C:\Tools\Codex\codex.exe');
+    await tester.enterText(fields.at(3), 'workspace-provider-vault-fixture');
+    await tester.enterText(fields.at(4), r'C:\d4-provider-vault-workspace');
+    await tester.tap(find.text('native Owner確認へ進む'));
+    await tester.pumpAndSettle();
+
+    final listRequest = transport.requests
+        .singleWhere((request) => request['operation'] == '資格情報一覧');
+    expect(listRequest['payload'], {'版': 1});
+    final registrationRequest = transport.requests
+        .singleWhere((request) => request['operation'] == 'AgentCLI実行系作業領域登録');
+    final selection = (registrationRequest['payload']!
+        as Map)['provider_model_selection'] as Map;
+    expect(selection['authentication_source'], 'broker_credential_vault');
+    expect(selection['credential_id'], credentialId);
+    expect(jsonEncode(registrationRequest), isNot(contains(syntheticSecret)));
+    expect(transport.requests.toString(), isNot(contains(syntheticSecret)));
+  });
+
   testWidgets('Agent CenterはCompare用に異なるRuntimeとWorkspaceを複数登録状態として保持する',
       (WidgetTester tester) async {
     Map<String, Object?> registrationResponse(

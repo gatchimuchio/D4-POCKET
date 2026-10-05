@@ -41,6 +41,7 @@ const TASK_FILESYSTEM_OVERRIDE_PREFIX: &str =
 struct CodexCliTestResponses {
     port: u16,
     codex_home: PathBuf,
+    requires_openai_auth: bool,
 }
 
 #[cfg(all(feature = "r2-e2e", not(test)))]
@@ -83,7 +84,11 @@ fn loopback_responses_from_environment() -> Result<Option<CodexCliTestResponses>
             {
                 return Err("R2 loopback試験CODEX_HOMEに既存fileがある".into());
             }
-            Ok(Some(CodexCliTestResponses { port, codex_home }))
+            Ok(Some(CodexCliTestResponses {
+                port,
+                codex_home,
+                requires_openai_auth: false,
+            }))
         }
         _ => Err("R2 loopback試験設定が揃っていない".into()),
     }
@@ -102,6 +107,9 @@ const SAFE_ENVIRONMENT: &[&str] = &[
     "PROGRAMDATA",
     "SystemDrive",
     "CODEX_HOME",
+    // Windows隔離機構がサービス選択に使う非秘密の経路識別値。
+    // 呼出元のOS識別はサービス側でも独立に確認される。
+    "CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY",
 ];
 
 pub struct CodexCliAdapter {
@@ -111,6 +119,7 @@ pub struct CodexCliAdapter {
     workspace_write_interface: bool,
     version: String,
     model_id: Option<String>,
+    provider_credential_id: Option<String>,
     #[cfg(any(test, feature = "r2-e2e"))]
     test_responses_api: Option<CodexCliTestResponses>,
 }
@@ -118,7 +127,7 @@ pub struct CodexCliAdapter {
 impl CodexCliAdapter {
     /// ownerの起動設定からだけ呼び出す。PATH探索やIPC由来の任意pathは行わない。
     pub fn new(executable: &Path, workspace: &Path) -> Result<Self, String> {
-        Self::new_configured(executable, workspace, None)
+        Self::new_configured(executable, workspace, None, None)
     }
 
     pub fn new_with_model(
@@ -129,13 +138,33 @@ impl CodexCliAdapter {
         if !valid_model_id(model_id) {
             return Err("Codex Model IDが不正".into());
         }
-        Self::new_configured(executable, workspace, Some(model_id.to_owned()))
+        Self::new_configured(executable, workspace, Some(model_id.to_owned()), None)
+    }
+
+    pub(crate) fn new_with_provider_authentication(
+        executable: &Path,
+        workspace: &Path,
+        model_id: &str,
+        provider_credential_id: Option<&str>,
+    ) -> Result<Self, String> {
+        if !valid_model_id(model_id)
+            || provider_credential_id.is_some_and(|id| !valid_credential_id(id))
+        {
+            return Err("Codex Provider／Model認証参照が不正".into());
+        }
+        Self::new_configured(
+            executable,
+            workspace,
+            Some(model_id.to_owned()),
+            provider_credential_id.map(str::to_owned),
+        )
     }
 
     fn new_configured(
         executable: &Path,
         workspace: &Path,
         model_id: Option<String>,
+        provider_credential_id: Option<String>,
     ) -> Result<Self, String> {
         let executable = canonical_executable(executable)?;
         let workspace = canonical_workspace(workspace)?;
@@ -176,6 +205,7 @@ impl CodexCliAdapter {
                 .unwrap_or("unknown")
                 .to_string(),
             model_id,
+            provider_credential_id,
             #[cfg(any(test, feature = "r2-e2e"))]
             test_responses_api,
         })
@@ -183,12 +213,26 @@ impl CodexCliAdapter {
 
     #[cfg(test)]
     pub(crate) fn use_test_loopback_responses_api(&mut self, port: u16, codex_home: PathBuf) {
+        self.use_test_loopback_responses_api_with_auth(port, codex_home, false);
+    }
+
+    #[cfg(test)]
+    fn use_test_loopback_responses_api_with_auth(
+        &mut self,
+        port: u16,
+        codex_home: PathBuf,
+        requires_openai_auth: bool,
+    ) {
         assert_ne!(port, 0, "loopback test server port must be assigned");
         assert!(
             codex_home.is_absolute(),
             "isolated CODEX_HOME must be absolute"
         );
-        self.test_responses_api = Some(CodexCliTestResponses { port, codex_home });
+        self.test_responses_api = Some(CodexCliTestResponses {
+            port,
+            codex_home,
+            requires_openai_auth,
+        });
     }
 
     #[cfg(test)]
@@ -203,15 +247,177 @@ impl CodexCliAdapter {
             workspace_write_interface: true,
             version: "test".into(),
             model_id: None,
+            provider_credential_id: None,
             #[cfg(test)]
             test_responses_api: None,
         }
+    }
+
+    fn execute_agent_task(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<String, 対話失敗> {
+        if !self.AgentTask実行対応() {
+            return Err(対話失敗::AgentTask非対応);
+        }
+        let context = context.ok_or(対話失敗::AgentTask非対応)?;
+        validate_task_secret_paths(
+            &self.workspace,
+            self.workspace_identity,
+            &context.secret_paths,
+        )?;
+        let mut scratch =
+            WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
+        #[cfg(any(test, feature = "r2-e2e"))]
+        let result = run_agent_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &scratch,
+            &context.secret_paths,
+            instruction,
+            self.model_id.as_deref(),
+            credential.as_deref().map(Vec::as_slice),
+            cancel,
+            deadline,
+            self.test_responses_api.as_ref(),
+        );
+        #[cfg(not(any(test, feature = "r2-e2e")))]
+        let result = run_agent_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &scratch,
+            &context.secret_paths,
+            instruction,
+            self.model_id.as_deref(),
+            credential.as_deref().map(Vec::as_slice),
+            cancel,
+            deadline,
+        );
+        match scratch.cleanup() {
+            Ok(()) => result,
+            Err(error) => Err(error),
+        }
+    }
+
+    fn respond_with_credential(
+        &self,
+        request: &対話要求,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        raw_received: &mut Vec<Vec<u8>>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<実行結果, 対話失敗> {
+        #[cfg(any(test, feature = "r2-e2e"))]
+        let mut child = spawn_codex_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &request.入力,
+            self.model_id.as_deref(),
+            credential.as_deref().map(Vec::as_slice),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            None,
+        )?;
+        #[cfg(not(any(test, feature = "r2-e2e")))]
+        let mut child = spawn_codex_task(
+            &self.executable,
+            &self.workspace,
+            self.workspace_identity,
+            &request.入力,
+            self.model_id.as_deref(),
+            credential.as_deref().map(Vec::as_slice),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+        )?;
+        let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
+        let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
+        let stdout_reader = thread::spawn(move || bounded_read(stdout));
+        let stderr_reader = thread::spawn(move || bounded_read(stderr));
+
+        let status = loop {
+            if cancel.load(Ordering::SeqCst) {
+                if child.terminate_tree().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(対話失敗::取消);
+            }
+            if Instant::now() >= deadline {
+                if child.terminate_tree().is_err() {
+                    return Err(対話失敗::通信失敗);
+                }
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(対話失敗::期限超過);
+            }
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    if child.stop_descendants().is_err() {
+                        return Err(対話失敗::通信失敗);
+                    }
+                    break status;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(10)),
+                Err(_) => {
+                    if child.terminate_tree().is_err() {
+                        return Err(対話失敗::通信失敗);
+                    }
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(対話失敗::通信失敗);
+                }
+            }
+        };
+
+        let stdout = stdout_reader
+            .join()
+            .map_err(|_| 対話失敗::通信失敗)?
+            .map_err(|_| 対話失敗::応答不正)?;
+        let _stderr = stderr_reader
+            .join()
+            .map_err(|_| 対話失敗::通信失敗)?
+            .map_err(|_| 対話失敗::応答不正)?;
+        if !status.success() {
+            return Err(対話失敗::通信失敗);
+        }
+
+        let (body, thread_id) = parse_jsonl(&stdout)?;
+        let trace_id = trace_id(&request.要求ID);
+        let trace_hash = sha256_tagged(&stdout);
+        raw_received.push(stdout.clone());
+        Ok(実行結果 {
+            対話セッションID: request.対話セッションID.clone(),
+            本文: body,
+            参照: Vec::new(),
+            能力: Vec::new(),
+            経路: format!("codex-cli:{thread_id}"),
+            追跡ID: trace_id,
+            追跡hash: trace_hash,
+            保留: false,
+            生応答: stdout,
+        })
     }
 }
 
 impl 実行系Adapter for CodexCliAdapter {
     fn 接続対象(&self) -> String {
         "codex-cli://broker-governed-read-only".into()
+    }
+
+    fn provider_credential_binding(&self) -> Option<(String, String)> {
+        self.provider_credential_id
+            .as_ref()
+            .map(|id| ("openai_codex_cli".into(), id.clone()))
     }
 
     fn 作業領域実体識別子(
@@ -278,7 +484,11 @@ impl 実行系Adapter for CodexCliAdapter {
             "cancellation_support": {"status": "unknown", "reason": "取消経路の実動作を確認していない"},
             "usage_metrics_support": {"status": "unknown", "reason": "実taskのmetricsを取得していない"},
             "cost_metrics_support": {"status": "unknown", "reason": "cost情報を取得していない"},
-            "authentication": {"method": "codex_cli_managed", "status": "unknown", "secret_value_present": false},
+            "authentication": {
+                "method": if self.provider_credential_id.is_some() { "local_credential_reference" } else { "codex_cli_managed" },
+                "status": "unknown",
+                "secret_value_present": false
+            },
             "host_requirements": {
                 "platforms": [host_platform()],
                 "network_scope": "unknown",
@@ -300,46 +510,18 @@ impl 実行系Adapter for CodexCliAdapter {
         deadline: Instant,
         context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
     ) -> Result<String, 対話失敗> {
-        if !self.AgentTask実行対応() {
-            return Err(対話失敗::AgentTask非対応);
-        }
-        let context = context.ok_or(対話失敗::AgentTask非対応)?;
-        validate_task_secret_paths(
-            &self.workspace,
-            self.workspace_identity,
-            &context.secret_paths,
-        )?;
-        let mut scratch =
-            WorkspaceTaskScratch::create(&self.workspace, self.workspace_identity, &context)?;
-        #[cfg(any(test, feature = "r2-e2e"))]
-        let result = run_agent_task(
-            &self.executable,
-            &self.workspace,
-            self.workspace_identity,
-            &scratch,
-            &context.secret_paths,
-            instruction,
-            self.model_id.as_deref(),
-            cancel,
-            deadline,
-            self.test_responses_api.as_ref(),
-        );
-        #[cfg(not(any(test, feature = "r2-e2e")))]
-        let result = run_agent_task(
-            &self.executable,
-            &self.workspace,
-            self.workspace_identity,
-            &scratch,
-            &context.secret_paths,
-            instruction,
-            self.model_id.as_deref(),
-            cancel,
-            deadline,
-        );
-        match scratch.cleanup() {
-            Ok(()) => result,
-            Err(error) => Err(error),
-        }
+        self.execute_agent_task(instruction, cancel, deadline, context, None)
+    }
+
+    fn AgentTask実行資格情報付き(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<String, 対話失敗> {
+        self.execute_agent_task(instruction, cancel, deadline, context, credential)
     }
 
     fn 応答(
@@ -349,97 +531,18 @@ impl 実行系Adapter for CodexCliAdapter {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗> {
-        #[cfg(any(test, feature = "r2-e2e"))]
-        let mut child = spawn_codex_task(
-            &self.executable,
-            &self.workspace,
-            self.workspace_identity,
-            &要求.入力,
-            self.model_id.as_deref(),
-            CodexSandbox::ReadOnly,
-            None,
-            &[],
-            None,
-        )?;
-        #[cfg(not(any(test, feature = "r2-e2e")))]
-        let mut child = spawn_codex_task(
-            &self.executable,
-            &self.workspace,
-            self.workspace_identity,
-            &要求.入力,
-            self.model_id.as_deref(),
-            CodexSandbox::ReadOnly,
-            None,
-            &[],
-        )?;
-        let stdout = child.child.stdout.take().ok_or(対話失敗::通信失敗)?;
-        let stderr = child.child.stderr.take().ok_or(対話失敗::通信失敗)?;
-        let stdout_reader = thread::spawn(move || bounded_read(stdout));
-        let stderr_reader = thread::spawn(move || bounded_read(stderr));
+        self.respond_with_credential(要求, 取消, 期限, 生受信, None)
+    }
 
-        let status = loop {
-            if 取消.load(Ordering::SeqCst) {
-                if child.terminate_tree().is_err() {
-                    return Err(対話失敗::通信失敗);
-                }
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
-                return Err(対話失敗::取消);
-            }
-            if Instant::now() >= 期限 {
-                if child.terminate_tree().is_err() {
-                    return Err(対話失敗::通信失敗);
-                }
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
-                return Err(対話失敗::期限超過);
-            }
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    if child.stop_descendants().is_err() {
-                        return Err(対話失敗::通信失敗);
-                    }
-                    break status;
-                }
-                Ok(None) => thread::sleep(Duration::from_millis(10)),
-                Err(_) => {
-                    if child.terminate_tree().is_err() {
-                        return Err(対話失敗::通信失敗);
-                    }
-                    let _ = stdout_reader.join();
-                    let _ = stderr_reader.join();
-                    return Err(対話失敗::通信失敗);
-                }
-            }
-        };
-
-        let stdout = stdout_reader
-            .join()
-            .map_err(|_| 対話失敗::通信失敗)?
-            .map_err(|_| 対話失敗::応答不正)?;
-        let _stderr = stderr_reader
-            .join()
-            .map_err(|_| 対話失敗::通信失敗)?
-            .map_err(|_| 対話失敗::応答不正)?;
-        if !status.success() {
-            return Err(対話失敗::通信失敗);
-        }
-
-        let (本文, thread_id) = parse_jsonl(&stdout)?;
-        let trace_id = trace_id(&要求.要求ID);
-        let trace_hash = sha256_tagged(&stdout);
-        生受信.push(stdout.clone());
-        Ok(実行結果 {
-            対話セッションID: 要求.対話セッションID.clone(),
-            本文,
-            参照: Vec::new(),
-            能力: Vec::new(),
-            経路: format!("codex-cli:{thread_id}"),
-            追跡ID: trace_id,
-            追跡hash: trace_hash,
-            保留: false,
-            生応答: stdout,
-        })
+    fn 応答資格情報付き(
+        &self,
+        request: &対話要求,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        raw_received: &mut Vec<Vec<u8>>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<実行結果, 対話失敗> {
+        self.respond_with_credential(request, cancel, deadline, raw_received, credential)
     }
 }
 
@@ -578,6 +681,13 @@ fn valid_model_id(value: &str) -> bool {
         && value.bytes().enumerate().all(|(index, byte)| {
             byte.is_ascii_alphanumeric() || (index > 0 && b"._:/-".contains(&byte))
         })
+}
+
+fn valid_credential_id(value: &str) -> bool {
+    value.len() == 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Clone, Copy)]
@@ -736,6 +846,7 @@ fn spawn_codex_task(
     expected_workspace: crate::broker::workspace_root::DirectoryIdentity,
     input: &str,
     model_id: Option<&str>,
+    provider_credential: Option<&[u8]>,
     sandbox: CodexSandbox,
     scratch: Option<&WorkspaceTaskScratch>,
     secret_paths: &[String],
@@ -750,6 +861,7 @@ fn spawn_codex_task(
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
         model_id,
+        provider_credential,
         test_responses_api,
     )?;
     #[cfg(not(any(test, feature = "r2-e2e")))]
@@ -760,6 +872,7 @@ fn spawn_codex_task(
         scratch.map(WorkspaceTaskScratch::path),
         secret_paths,
         model_id,
+        provider_credential,
     )?;
     if matches!(sandbox, CodexSandbox::WorkspaceWrite) {
         // Scratch作成後のWorkspace変化をもう一度確認し、CLI起動直前の秘密別名を拒否する。
@@ -793,6 +906,7 @@ fn build_codex_command(
         scratch,
         secret_paths,
         None,
+        None,
         #[cfg(any(test, feature = "r2-e2e"))]
         test_responses_api,
     )
@@ -805,6 +919,7 @@ fn build_codex_command_with_model(
     scratch: Option<&Path>,
     secret_paths: &[String],
     model_id: Option<&str>,
+    provider_credential: Option<&[u8]>,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
 ) -> Result<Command, 対話失敗> {
     if model_id.is_some_and(|model| !valid_model_id(model)) {
@@ -812,6 +927,18 @@ fn build_codex_command_with_model(
     }
     let workspace_path = workspace.to_str().ok_or(対話失敗::要求不正)?;
     let mut task_command = command(executable, workspace);
+    if let Some(credential) = provider_credential {
+        let credential = std::str::from_utf8(credential).map_err(|_| 対話失敗::権限拒否)?;
+        if credential.is_empty() || credential.bytes().any(|byte| byte.is_ascii_control()) {
+            return Err(対話失敗::権限拒否);
+        }
+        task_command
+            .arg("-c")
+            .arg("shell_environment_policy.ignore_default_excludes=false")
+            .arg("-c")
+            .arg("shell_environment_policy.exclude=[\"OPENAI_API_KEY\",\"CODEX_API_KEY\",\"CODEX_ACCESS_TOKEN\"]")
+            .env("OPENAI_API_KEY", credential);
+    }
     #[cfg(any(test, feature = "r2-e2e"))]
     if let Some(test_api) = test_responses_api {
         let base_url = format!("http://127.0.0.1:{}/v1", test_api.port);
@@ -822,14 +949,17 @@ fn build_codex_command_with_model(
             "model_providers.d4p_loopback_probe.name=\"D4 Pocket loopback probe\"".to_owned(),
             format!("model_providers.d4p_loopback_probe.base_url=\"{base_url}\""),
             "model_providers.d4p_loopback_probe.wire_api=\"responses\"".to_owned(),
-            "model_providers.d4p_loopback_probe.requires_openai_auth=false".to_owned(),
+            format!(
+                "model_providers.d4p_loopback_probe.requires_openai_auth={}",
+                test_api.requires_openai_auth
+            ),
             "model_providers.d4p_loopback_probe.supports_websockets=false".to_owned(),
             "model_providers.d4p_loopback_probe.request_max_retries=0".to_owned(),
             "model_providers.d4p_loopback_probe.stream_max_retries=2".to_owned(),
             // 任意の外部Apps／Plugins catalog取得を止め、偽API以外を試験対象から除く。
             "features.apps=false".to_owned(),
             "features.plugins=false".to_owned(),
-            // 認証なしloopback試験ではmachine analyticsの送信も無効化する。
+            // loopback試験ではmachine analyticsの送信も無効化する。
             "analytics.enabled=false".to_owned(),
             "approval_policy=\"never\"".to_owned(),
         ];
@@ -968,6 +1098,7 @@ fn run_agent_task(
     secret_paths: &[String],
     instruction: &str,
     model_id: Option<&str>,
+    provider_credential: Option<&[u8]>,
     cancel: &AtomicBool,
     deadline: Instant,
     #[cfg(any(test, feature = "r2-e2e"))] test_responses_api: Option<&CodexCliTestResponses>,
@@ -985,6 +1116,7 @@ fn run_agent_task(
         expected_workspace,
         instruction,
         model_id,
+        provider_credential,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -997,6 +1129,7 @@ fn run_agent_task(
         expected_workspace,
         instruction,
         model_id,
+        provider_credential,
         CodexSandbox::WorkspaceWrite,
         Some(scratch),
         secret_paths,
@@ -1423,6 +1556,7 @@ mod tests {
             &[],
             Some("model-fixture-v1"),
             None,
+            None,
         )
         .expect("選択Modelを使う固定CLI command");
         let args: Vec<_> = command
@@ -1441,6 +1575,7 @@ mod tests {
             &[],
             Some("--dangerous"),
             None,
+            None,
         )
         .is_err());
 
@@ -1458,6 +1593,54 @@ mod tests {
         assert_eq!(metadata["authentication"]["method"], "codex_cli_managed");
         assert_eq!(metadata["authentication"]["status"], "unknown");
         assert_eq!(metadata["authentication"]["secret_value_present"], false);
+    }
+
+    #[test]
+    fn Broker資格情報はCodex親processだけへ渡しtool環境から除外する() {
+        let canary = "synthetic-provider-key-never-in-argv";
+        let command = build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            Some("o3"),
+            Some(canary.as_bytes()),
+            None,
+        )
+        .expect("Broker資格情報付きの固定CLI command");
+        let key_is_environment_only = command
+            .get_envs()
+            .any(|(name, value)| {
+                name == "OPENAI_API_KEY" && value == Some(std::ffi::OsStr::new(canary))
+            });
+        assert!(key_is_environment_only, "合成keyはCodex親processのAPI key環境値に限る");
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        let excludes_provider_keys = args.windows(2).any(|pair| {
+            pair == [
+                "-c",
+                "shell_environment_policy.exclude=[\"OPENAI_API_KEY\",\"CODEX_API_KEY\",\"CODEX_ACCESS_TOKEN\"]",
+            ]
+        });
+        assert!(excludes_provider_keys, "Codex tool shellから全Provider key sourceを除外する");
+        assert!(
+            args.iter().all(|argument| !argument.contains(canary)),
+            "秘密値をCLI argumentへ載せない"
+        );
+        assert!(build_codex_command_with_model(
+            Path::new(r"C:\codex.exe"),
+            Path::new(r"C:\workspace"),
+            CodexSandbox::ReadOnly,
+            None,
+            &[],
+            Some("o3"),
+            Some(b"invalid\nkey"),
+            None,
+        )
+        .is_err());
     }
 
     #[test]
@@ -2380,6 +2563,7 @@ exit 0
                 identity,
                 "synthetic fixture task",
                 None,
+                None,
                 CodexSandbox::WorkspaceWrite,
                 Some(&scratch),
                 &secrets,
@@ -2420,6 +2604,7 @@ exit 0
             workspace_write_interface: false,
             version: "test".into(),
             model_id: None,
+            provider_credential_id: None,
             test_responses_api: None,
         };
         assert!(!adapter.AgentTask実行対応());
@@ -2602,6 +2787,108 @@ exit 0
             completed,
             Ok("fixture-task-completed:model-fixture-v1".into())
         );
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 合成Credential付きProvider結合を偽CodexCLIまで通し秘密値を返さない_fixture() {
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let fixture_directory = root.path().join("fixture");
+        let workspace = root.path().join("workspace");
+        fs::create_dir(&fixture_directory).expect("偽CLI用領域");
+        fs::create_dir(&workspace).expect("登録作業領域");
+        let executable = codex_cli_fixture::compile_fake_codex_cli(&fixture_directory);
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("登録Workspace identity")
+            .identity;
+        let adapter = CodexCliAdapter::new_with_provider_authentication(
+            &executable,
+            &workspace,
+            "o3",
+            Some("11111111111111111111111111111111"),
+        )
+        .expect("Provider Credential参照を固定した偽CLI Adapter");
+        let context = scratch_context(identity);
+        let synthetic_key = "synthetic-provider-key-fixture-only";
+        let completed = adapter.AgentTask実行資格情報付き(
+            "FIXTURE_PROVIDER_CREDENTIAL",
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(5),
+            Some(context.clone()),
+            Some(zeroize::Zeroizing::new(synthetic_key.as_bytes().to_vec())),
+        );
+
+        assert_eq!(
+            completed,
+            Ok("fixture-provider-credential-bound".into()),
+            "偽Codex CLIが親process環境の合成keyとkey除外configを受け取る"
+        );
+        assert!(!format!("{completed:?}").contains(synthetic_key));
+        codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
+        assert!(!context.journal.has_pending_workspace("workspace-fixture"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "GUI_SHELL_CODEX_PROVIDER_AUTH_TEST_EXEの実Codex CLIと合成API keyだけで認証・tool子process除外を確認するときに実行する"]
+    fn Provider資格情報は実CodexCLIへ届きtool子processから除外される_LIVE_RUNTIME() {
+        let executable = std::env::var_os("GUI_SHELL_CODEX_PROVIDER_AUTH_TEST_EXE")
+            .map(PathBuf::from)
+            .expect("GUI_SHELL_CODEX_PROVIDER_AUTH_TEST_EXEにCodex CLI absolute pathを指定する");
+        assert!(executable.is_absolute());
+        assert!(executable.is_file());
+
+        let root = codex_cli_fixture::FixtureTempDirectory::create();
+        let workspace = root.path().join("workspace");
+        let codex_home = root.path().join("codex-home");
+        fs::create_dir(&workspace).expect("合成Workspace");
+        fs::create_dir(&codex_home).expect("既存認証を持たない専用CODEX_HOME");
+        let synthetic_key = "synthetic-d4-pocket-provider-key-never-production";
+        let server = crate::broker::dialogue::broker_codex_loopback_support::
+            CodexLoopbackResponses::start_requiring_authorization(
+                &workspace,
+                &format!("Bearer {synthetic_key}"),
+                synthetic_key,
+            )
+            .expect("認証方式照合付きの試験用API");
+        server.use_provider_auth_probe_command(concat!(
+            "$ErrorActionPreference='Stop'; ",
+            "if($env:OPENAI_API_KEY){Write-Output $env:OPENAI_API_KEY}else{Write-Output 'D4P_PROVIDER_KEY_ABSENT'}; ",
+            "Set-Content -LiteralPath (Join-Path (Get-Location) 'broker-real-codex-marker.txt') ",
+            "-Value 'synthetic-provider-auth-probe' -NoNewline -ErrorAction Stop"
+        ).to_owned());
+
+        let mut adapter = CodexCliAdapter::new_with_provider_authentication(
+            &executable,
+            &workspace,
+            "o3",
+            Some("11111111111111111111111111111111"),
+        )
+        .expect("実Codex CLIの固定interface");
+        adapter.use_test_loopback_responses_api_with_auth(
+            server.port(),
+            codex_home,
+            true,
+        );
+        let identity = crate::broker::workspace_root::pin_workspace_path(&workspace)
+            .expect("合成Workspace identity")
+            .identity;
+        let context = scratch_context(identity);
+        let result = adapter.AgentTask実行資格情報付き(
+            "合成keyを使い、tool childがそのkeyを継承しないことだけを確認する",
+            &AtomicBool::new(false),
+            Instant::now() + Duration::from_secs(90),
+            Some(context.clone()),
+            Some(zeroize::Zeroizing::new(synthetic_key.as_bytes().to_vec())),
+        );
+
+        assert!(server.authorized_requests() >= 1, "Codex CLIがBearer認証を送る");
+        assert_eq!(server.authorization_rejections(), 0);
+        assert_eq!(result, Ok("合成試験Taskが完了しました".into()));
+        assert_eq!(server.credential_canary_observations(), 0);
+        assert!(workspace.join("broker-real-codex-marker.txt").is_file());
         codex_cli_fixture::assert_no_workspace_task_scratch(&workspace);
         assert!(!context.journal.has_pending_workspace("workspace-fixture"));
     }

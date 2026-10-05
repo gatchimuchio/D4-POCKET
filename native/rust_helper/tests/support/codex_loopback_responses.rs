@@ -43,9 +43,16 @@ struct State {
     blocked_unhandled_local_requests: AtomicUsize,
     command: Mutex<String>,
     workspace: String,
+    expected_authorization_hash: Option<String>,
+    credential_canary_hash: Option<String>,
+    credential_canary_length: usize,
+    authorized_requests: AtomicUsize,
+    authorization_rejections: AtomicUsize,
+    credential_canary_observations: AtomicUsize,
+    finalize_after_one_tool: AtomicBool,
 }
 
-pub(super) struct CodexLoopbackResponses {
+pub(crate) struct CodexLoopbackResponses {
     port: u16,
     state: Arc<State>,
     worker: Option<JoinHandle<()>>,
@@ -53,11 +60,27 @@ pub(super) struct CodexLoopbackResponses {
 }
 
 impl CodexLoopbackResponses {
-    pub(super) fn start(workspace: &Path) -> std::io::Result<Self> {
+    pub(crate) fn start(workspace: &Path) -> std::io::Result<Self> {
         Self::start_on(workspace, 0)
     }
 
-    pub(super) fn start_on(workspace: &Path, port: u16) -> std::io::Result<Self> {
+    pub(crate) fn start_on(workspace: &Path, port: u16) -> std::io::Result<Self> {
+        Self::start_with_probe(workspace, port, None)
+    }
+
+    pub(crate) fn start_requiring_authorization(
+        workspace: &Path,
+        authorization_header: &str,
+        secret_canary: &str,
+    ) -> std::io::Result<Self> {
+        Self::start_with_probe(workspace, 0, Some((authorization_header, secret_canary)))
+    }
+
+    fn start_with_probe(
+        workspace: &Path,
+        port: u16,
+        authentication: Option<(&str, &str)>,
+    ) -> std::io::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", port))?;
         listener.set_nonblocking(true)?;
         let port = listener.local_addr()?.port();
@@ -96,6 +119,15 @@ impl CodexLoopbackResponses {
             blocked_unhandled_local_requests: AtomicUsize::new(0),
             command: Mutex::new(synthetic_workspace_probe()),
             workspace: workspace_text,
+            expected_authorization_hash: authentication
+                .map(|(bearer, _)| crate::audit_hash::sha256_tagged(bearer.as_bytes())),
+            credential_canary_hash: authentication
+                .map(|(_, canary)| crate::audit_hash::sha256_tagged(canary.as_bytes())),
+            credential_canary_length: authentication.map_or(0, |(_, canary)| canary.len()),
+            authorized_requests: AtomicUsize::new(0),
+            authorization_rejections: AtomicUsize::new(0),
+            credential_canary_observations: AtomicUsize::new(0),
+            finalize_after_one_tool: AtomicBool::new(false),
         });
         let worker_state = Arc::clone(&state);
         let request_workers = Arc::new(Mutex::new(Vec::<JoinHandle<()>>::new()));
@@ -135,11 +167,18 @@ impl CodexLoopbackResponses {
         })
     }
 
-    pub(super) fn port(&self) -> u16 {
+    pub(crate) fn use_provider_auth_probe_command(&self, command: String) {
+        self.set_command(command);
+        self.state
+            .finalize_after_one_tool
+            .store(true, Ordering::SeqCst);
+    }
+
+    pub(crate) fn port(&self) -> u16 {
         self.port
     }
 
-    pub(super) fn set_command(&self, command: String) {
+    pub(crate) fn set_command(&self, command: String) {
         *self
             .state
             .command
@@ -177,11 +216,11 @@ impl CodexLoopbackResponses {
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
     }
 
-    pub(super) fn accepted_connections(&self) -> usize {
+    pub(crate) fn accepted_connections(&self) -> usize {
         self.state.accepted_connections.load(Ordering::SeqCst)
     }
 
-    pub(super) fn incomplete_request_summary(&self) -> String {
+    pub(crate) fn incomplete_request_summary(&self) -> String {
         format!(
             "blocking_mode_failures={}, reader_clone_failures={}, request_line_failures={}, request_line_error_code={}, empty_request_lines={}, header_read_failures={}",
             self.state.blocking_mode_failures.load(Ordering::SeqCst),
@@ -193,7 +232,7 @@ impl CodexLoopbackResponses {
         )
     }
 
-    pub(super) fn incomplete_request_count(&self) -> usize {
+    pub(crate) fn incomplete_request_count(&self) -> usize {
         self.state.blocking_mode_failures.load(Ordering::SeqCst)
             + self.state.reader_clone_failures.load(Ordering::SeqCst)
             + self.state.request_line_failures.load(Ordering::SeqCst)
@@ -201,19 +240,33 @@ impl CodexLoopbackResponses {
             + self.state.header_read_failures.load(Ordering::SeqCst)
     }
 
-    pub(super) fn post_requests(&self) -> usize {
+    pub(crate) fn post_requests(&self) -> usize {
         self.state.post_requests.load(Ordering::SeqCst)
     }
 
-    pub(super) fn response_post_attempts(&self) -> usize {
+    pub(crate) fn authorized_requests(&self) -> usize {
+        self.state.authorized_requests.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn authorization_rejections(&self) -> usize {
+        self.state.authorization_rejections.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn credential_canary_observations(&self) -> usize {
+        self.state
+            .credential_canary_observations
+            .load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn response_post_attempts(&self) -> usize {
         self.state.response_post_attempts.load(Ordering::SeqCst)
     }
 
-    pub(super) fn invalid_post_bodies(&self) -> usize {
+    pub(crate) fn invalid_post_bodies(&self) -> usize {
         self.state.invalid_post_bodies.load(Ordering::SeqCst)
     }
 
-    pub(super) fn response_write_summary(&self) -> String {
+    pub(crate) fn response_write_summary(&self) -> String {
         format!(
             "failures={}, body_bytes={}",
             self.state.response_write_failures.load(Ordering::SeqCst),
@@ -221,33 +274,33 @@ impl CodexLoopbackResponses {
         )
     }
 
-    pub(super) fn response_write_failures(&self) -> usize {
+    pub(crate) fn response_write_failures(&self) -> usize {
         self.state.response_write_failures.load(Ordering::SeqCst)
     }
 
-    pub(super) fn model_list_requests(&self) -> usize {
+    pub(crate) fn model_list_requests(&self) -> usize {
         self.state.model_list_requests.load(Ordering::SeqCst)
     }
 
-    pub(super) fn tool_was_offered(&self) -> bool {
+    pub(crate) fn tool_was_offered(&self) -> bool {
         self.state.tool_offered.load(Ordering::SeqCst)
     }
 
-    pub(super) fn tool_call_was_sent(&self) -> bool {
+    pub(crate) fn tool_call_was_sent(&self) -> bool {
         self.state.tool_call_sent.load(Ordering::SeqCst)
     }
 
-    pub(super) fn tool_result_was_received(&self) -> bool {
+    pub(crate) fn tool_result_was_received(&self) -> bool {
         self.state.tool_result_received.load(Ordering::SeqCst)
     }
 
-    pub(super) fn repeated_tool_call_rejections(&self) -> usize {
+    pub(crate) fn repeated_tool_call_rejections(&self) -> usize {
         self.state
             .repeated_tool_call_rejections
             .load(Ordering::SeqCst)
     }
 
-    pub(super) fn tool_output_summary(&self) -> String {
+    pub(crate) fn tool_output_summary(&self) -> String {
         format!(
             "items={}, missing_call_id={}, id_mismatch={}",
             self.state.tool_output_items_seen.load(Ordering::SeqCst),
@@ -258,7 +311,7 @@ impl CodexLoopbackResponses {
         )
     }
 
-    pub(super) fn tool_output_diagnostics(&self) -> Vec<Value> {
+    pub(crate) fn tool_output_diagnostics(&self) -> Vec<Value> {
         self.state
             .tool_output_diagnostics
             .lock()
@@ -266,7 +319,7 @@ impl CodexLoopbackResponses {
             .clone()
     }
 
-    pub(super) fn request_shape_summary(&self) -> String {
+    pub(crate) fn request_shape_summary(&self) -> String {
         format!(
             "{:?}",
             *self
@@ -277,7 +330,7 @@ impl CodexLoopbackResponses {
         )
     }
 
-    pub(super) fn blocked_external_requests(&self) -> usize {
+    pub(crate) fn blocked_external_requests(&self) -> usize {
         self.state.blocked_connect_requests.load(Ordering::SeqCst)
             + self.state.blocked_non_local_requests.load(Ordering::SeqCst)
             + self
@@ -286,7 +339,7 @@ impl CodexLoopbackResponses {
                 .load(Ordering::SeqCst)
     }
 
-    pub(super) fn blocked_external_summary(&self) -> String {
+    pub(crate) fn blocked_external_summary(&self) -> String {
         format!(
             "CONNECT={}, openai={}, chatgpt={}, other={}, non_local={}, unhandled_local={}",
             self.state.blocked_connect_requests.load(Ordering::SeqCst),
@@ -772,6 +825,7 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
     let mut content_length = 0usize;
     let mut chunked = false;
     let mut host = String::new();
+    let mut authorization_hash = None;
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line) {
@@ -792,6 +846,10 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                         chunked = value.to_ascii_lowercase().contains("chunked");
                     } else if name.eq_ignore_ascii_case("host") {
                         host = value.trim().to_ascii_lowercase();
+                    } else if name.eq_ignore_ascii_case("authorization") {
+                        authorization_hash = Some(crate::audit_hash::sha256_tagged(
+                            value.trim().as_bytes(),
+                        ));
                     }
                 }
             }
@@ -815,6 +873,15 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
     if !local_host || !local_target {
         block_external(&mut stream, state, BlockedRequest::NonLocal);
         return;
+    }
+    if let Some(expected) = state.expected_authorization_hash.as_deref() {
+        if authorization_hash.as_deref() == Some(expected) {
+            state.authorized_requests.fetch_add(1, Ordering::SeqCst);
+        } else {
+            state.authorization_rejections.fetch_add(1, Ordering::SeqCst);
+            let _ = respond(&mut stream, 401, "application/json", b"{}");
+            return;
+        }
     }
     let path = target.split('?').next().unwrap_or(target);
     if method.eq_ignore_ascii_case("GET")
@@ -845,6 +912,19 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
             return;
         }
     };
+
+    if let (Some(expected), Some(canary_length)) = (
+        state.credential_canary_hash.as_deref(),
+        (state.credential_canary_length > 0).then_some(state.credential_canary_length),
+    ) {
+        if body.windows(canary_length).any(|window| {
+            crate::audit_hash::sha256_tagged(window) == expected
+        }) {
+            state
+                .credential_canary_observations
+                .fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     let request: Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
@@ -978,7 +1058,10 @@ fn handle_request(mut stream: TcpStream, port: u16, state: &State) {
                 .iter()
                 .any(|tool| tool.get("name").and_then(Value::as_str) == Some("exec_command"))
         });
-    if tool_result_exists && state.tool_result_received.load(Ordering::SeqCst) {
+    if (tool_result_exists && state.tool_result_received.load(Ordering::SeqCst))
+        || (state.finalize_after_one_tool.load(Ordering::SeqCst)
+            && state.tool_result_received.load(Ordering::SeqCst))
+    {
         *state
             .active_tool_call_id
             .lock()

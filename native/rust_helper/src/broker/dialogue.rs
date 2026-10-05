@@ -103,6 +103,10 @@ impl AgentTaskWorkspaceIdentity {
 
 pub trait 実行系Adapter: Send + Sync {
     fn 接続対象(&self) -> String;
+    /// Broker登録時に固定された提供元資格情報への参照。metadataからは取得しない。
+    fn provider_credential_binding(&self) -> Option<(String, String)> {
+        None
+    }
     /// Agent Taskの対象WorkspaceとAdapterが固定した実体rootを照合する。
     /// 未提供はTask操作の拒否条件とし、metadata宣言で代替しない。
     fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
@@ -127,6 +131,19 @@ pub trait 実行系Adapter: Send + Sync {
     ) -> Result<String, 対話失敗> {
         Err(対話失敗::AgentTask非対応)
     }
+    fn AgentTask実行資格情報付き(
+        &self,
+        instruction: &str,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        context: Option<super::agent_task_scratch::AgentTaskScratchContext>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<String, 対話失敗> {
+        if credential.is_some() {
+            return Err(対話失敗::権限拒否);
+        }
+        self.AgentTask実行(instruction, cancel, deadline, context)
+    }
     /// OS資源観測のためにBrokerだけが読むloopback接続先。権限や操作対象を生成しない。
     fn 観測対象(&self) -> Option<SocketAddr> {
         None
@@ -138,6 +155,19 @@ pub trait 実行系Adapter: Send + Sync {
         期限: Instant,
         生受信: &mut Vec<Vec<u8>>,
     ) -> Result<実行結果, 対話失敗>;
+    fn 応答資格情報付き(
+        &self,
+        request: &対話要求,
+        cancel: &AtomicBool,
+        deadline: Instant,
+        raw_received: &mut Vec<Vec<u8>>,
+        credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<実行結果, 対話失敗> {
+        if credential.is_some() {
+            return Err(対話失敗::権限拒否);
+        }
+        self.応答(request, cancel, deadline, raw_received)
+    }
 }
 
 #[derive(Deserialize)]
@@ -750,6 +780,8 @@ impl Drop for 対話制御 {
 }
 
 type 監査器<'a> = dyn FnMut(&str, &str, &str) -> Result<String, 対話失敗> + 'a;
+type 提供元資格情報取得器<'a> =
+    dyn FnMut(&str, &str, &str, &str) -> Result<zeroize::Zeroizing<Vec<u8>>, 対話失敗> + 'a;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1179,6 +1211,32 @@ impl 対話制御 {
         scratch_journal: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
         監査: &mut 監査器<'_>,
     ) -> Result<Value, 対話失敗> {
+        let mut 資格情報なし = |_: &str, _: &str, _: &str, _: &str| {
+            Err(対話失敗::権限拒否)
+        };
+        self.操作_作業領域結合済み_scratch_提供元資格情報付き(
+            操作,
+            値,
+            owner,
+            現在,
+            作業領域結合,
+            scratch_journal,
+            &mut 資格情報なし,
+            監査,
+        )
+    }
+
+    pub(crate) fn 操作_作業領域結合済み_scratch_提供元資格情報付き(
+        &mut self,
+        操作: &str,
+        値: &Value,
+        owner: bool,
+        現在: i64,
+        作業領域結合: Option<&super::workspace::DialogueWorkspaceBinding>,
+        scratch_journal: Option<super::agent_task_scratch::AgentTaskScratchJournal>,
+        資格情報取得: &mut 提供元資格情報取得器<'_>,
+        監査: &mut 監査器<'_>,
+    ) -> Result<Value, 対話失敗> {
         if matches!(操作, "対話承認" | "対話承認待ち") && !owner {
             return Err(対話失敗::権限拒否);
         }
@@ -1527,6 +1585,17 @@ impl 対話制御 {
                 ) {
                     return Err(対話失敗::権限拒否);
                 }
+                let provider_credential = adapter
+                    .provider_credential_binding()
+                    .map(|(provider_id, credential_id)| {
+                        資格情報取得(
+                            &request.agent_runtime_id,
+                            &provider_id,
+                            &credential_id,
+                            &instruction_hash,
+                        )
+                    })
+                    .transpose()?;
                 let grant = self
                     .agent_task_permissions
                     .get(&request.session_id)
@@ -1620,11 +1689,12 @@ impl 対話制御 {
                             Err(対話失敗::取消)
                         } else {
                             AgentTask結果hash化(
-                                adapter.AgentTask実行(
+                                adapter.AgentTask実行資格情報付き(
                                     &instruction,
                                     &worker_cancel,
                                     deadline,
                                     Some(execution_context),
+                                    provider_credential,
                                 ),
                                 &worker_cancel,
                                 deadline,
@@ -2062,8 +2132,19 @@ impl 対話制御 {
                 let adapter = Arc::clone(
                     self.実行系
                         .get(&work.要求.実行系ID)
-                        .ok_or(対話失敗::実行系不在)?,
+                    .ok_or(対話失敗::実行系不在)?,
                 );
+                let provider_credential = adapter
+                    .provider_credential_binding()
+                    .map(|(provider_id, credential_id)| {
+                        資格情報取得(
+                            &work.要求.実行系ID,
+                            &provider_id,
+                            &credential_id,
+                            &work.要求hash,
+                        )
+                    })
+                    .transpose()?;
                 let 理由 = if work.評価隔離 {
                     format!(
                         "対話送信承認 Capability=対話送信 Permission={} Approval={} 表示範囲={} 評価隔離=true RecoveryAction=接続再確認",
@@ -2098,7 +2179,13 @@ impl 対話制御 {
                         let 結果 = if 取消.load(Ordering::SeqCst) {
                             Err(対話失敗::取消)
                         } else {
-                            adapter.応答(&要求, &取消, 期限, &mut 生受信)
+                            adapter.応答資格情報付き(
+                                &要求,
+                                &取消,
+                                期限,
+                                &mut 生受信,
+                                provider_credential,
+                            )
                         };
                         let _ = 送信.send(受信結果 {
                             結果,
@@ -2657,7 +2744,7 @@ mod broker_codex_fixture_support;
 
 #[cfg(all(test, windows))]
 #[path = "../../tests/support/codex_loopback_responses.rs"]
-mod broker_codex_loopback_support;
+pub(crate) mod broker_codex_loopback_support;
 
 #[cfg(test)]
 mod tests {
@@ -2820,6 +2907,8 @@ mod tests {
 
     struct 試験Adapter {
         回数: Arc<AtomicUsize>,
+        provider_credential_id: Option<String>,
+        provider_credential_forward_count: Option<Arc<AtomicUsize>>,
         失敗: bool,
         別session: bool,
         遅延: bool,
@@ -2828,6 +2917,11 @@ mod tests {
     impl 実行系Adapter for 試験Adapter {
         fn 接続対象(&self) -> String {
             "試験専用".into()
+        }
+        fn provider_credential_binding(&self) -> Option<(String, String)> {
+            self.provider_credential_id
+                .as_ref()
+                .map(|id| ("openai_codex_cli".into(), id.clone()))
         }
         fn 作業領域実体識別子(&self) -> Option<AgentTaskWorkspaceIdentity> {
             Some(AgentTaskWorkspaceIdentity::new(1, 1))
@@ -2878,6 +2972,25 @@ mod tests {
                 return Err(対話失敗::通信失敗);
             }
             Ok("TASK_PRIVATE_OUTPUT_SENTINEL".into())
+        }
+        fn AgentTask実行資格情報付き(
+            &self,
+            instruction: &str,
+            cancel: &AtomicBool,
+            deadline: Instant,
+            context: Option<crate::broker::agent_task_scratch::AgentTaskScratchContext>,
+            credential: Option<zeroize::Zeroizing<Vec<u8>>>,
+        ) -> Result<String, 対話失敗> {
+            match (&self.provider_credential_id, credential) {
+                (Some(_), Some(_)) => {
+                    if let Some(counter) = &self.provider_credential_forward_count {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                    }
+                }
+                (Some(_), None) | (None, Some(_)) => return Err(対話失敗::権限拒否),
+                (None, None) => {}
+            }
+            self.AgentTask実行(instruction, cancel, deadline, context)
         }
         fn 応答(
             &self,
@@ -3061,6 +3174,8 @@ mod tests {
             "left",
             Arc::new(試験Adapter {
                 回数: n.clone(),
+                provider_credential_id: None,
+                provider_credential_forward_count: None,
                 失敗,
                 別session,
                 遅延,
@@ -3170,6 +3285,122 @@ mod tests {
         .unwrap();
         AgentTask操作(c, "AgentTaskOwnerApprovalGrant", request, true).unwrap();
     }
+
+    #[test]
+    fn Provider資格情報の解決は現行WorkspacePermissionとTaskApproval後だけ行う() {
+        let (mut c, calls) = 準備(false, false, false);
+        let credential_forward_count = Arc::new(AtomicUsize::new(0));
+        c.実行系.remove("left");
+        c.登録(
+            "left",
+            Arc::new(試験Adapter {
+                回数: calls.clone(),
+                provider_credential_id: Some("a".repeat(32)),
+                provider_credential_forward_count: Some(credential_forward_count.clone()),
+                失敗: false,
+                別session: false,
+                遅延: false,
+                Agentmetadata有効: true,
+            }),
+        )
+        .expect("Provider結合付きの試験Adapterを登録");
+        let session_id = 開始(&mut c, "left");
+        let instruction = "承認後だけProvider資格情報を使うfixture";
+        let request = AgentTask要求(&session_id, instruction);
+        let binding = super::super::workspace::DialogueWorkspaceBinding::for_test(
+            "left",
+            "fixture-workspace-left",
+        );
+        let scratch_journal =
+            super::super::agent_task_scratch::AgentTaskScratchJournal::in_memory();
+        let resolver_calls = Arc::new(AtomicUsize::new(0));
+        let resolver_call_count = resolver_calls.clone();
+        let synthetic_key = "synthetic-provider-key-never-audit";
+        let mut resolve_credential =
+            move |runtime_id: &str, provider_id: &str, credential_id: &str, use_hash: &str| {
+                assert_eq!(runtime_id, "left");
+                assert_eq!(provider_id, "openai_codex_cli");
+                assert_eq!(credential_id, "a".repeat(32));
+                assert!(use_hash.starts_with("sha256:"));
+                resolver_call_count.fetch_add(1, Ordering::SeqCst);
+                Ok(zeroize::Zeroizing::new(synthetic_key.as_bytes().to_vec()))
+            };
+        let mut audit_reasons = Vec::new();
+        let mut audit = |reason: &str, _: &str, _: &str| {
+            audit_reasons.push(reason.to_owned());
+            Ok("fixture-provider-audit".to_owned())
+        };
+
+        assert_eq!(
+            c.操作_作業領域結合済み_scratch_提供元資格情報付き(
+                "AgentTask実行",
+                &request,
+                false,
+                100,
+                Some(&binding),
+                Some(scratch_journal.clone()),
+                &mut resolve_credential,
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "Permission／Approval未発行ではCredential resolverへ進まない"
+        );
+        assert_eq!(resolver_calls.load(Ordering::SeqCst), 0);
+
+        AgentTask権限とApprovalを発行(&mut c, &session_id, instruction);
+        let changed_instruction = AgentTask要求(&session_id, "承認本文を差し替える");
+        assert_eq!(
+            c.操作_作業領域結合済み_scratch_提供元資格情報付き(
+                "AgentTask実行",
+                &changed_instruction,
+                false,
+                100,
+                Some(&binding),
+                Some(scratch_journal.clone()),
+                &mut resolve_credential,
+                &mut audit,
+            ),
+            Err(対話失敗::権限拒否),
+            "別本文hashではCredential resolverへ進まない"
+        );
+        assert_eq!(resolver_calls.load(Ordering::SeqCst), 0);
+
+        let started = c
+            .操作_作業領域結合済み_scratch_提供元資格情報付き(
+                "AgentTask実行",
+                &request,
+                false,
+                100,
+                Some(&binding),
+                Some(scratch_journal),
+                &mut resolve_credential,
+                &mut audit,
+            )
+            .expect("有効Permission／Approval後に資格情報を解決してTaskを開始");
+        assert_eq!(resolver_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(started["status"], "running");
+        let task_id = started["task_id"]
+            .as_str()
+            .expect("Task識別子")
+            .to_owned();
+        let mut state = Value::Null;
+        for _ in 0..50 {
+            state = AgentTask操作(&mut c, "AgentTask状態", json!({"task_id": task_id}), false)
+                .expect("Task状態");
+            if state["status"] != "running" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        drop(audit);
+        assert_eq!(state["status"], "completed");
+        assert_eq!(credential_forward_count.load(Ordering::SeqCst), 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(audit_reasons
+            .iter()
+            .all(|reason| !reason.contains(synthetic_key)));
+    }
+
     fn 開始(c: &mut 対話制御, id: &str) -> String {
         操作(c, "対話開始", json!({"実行系ID":id}), false).unwrap()["対話セッションID"]
             .as_str()
@@ -4770,18 +5001,31 @@ mod tests {
         assert!(audit_events
             .iter()
             .any(|event| event.0.contains("Owner Approval発行")));
-        assert!(audit_events
-            .iter()
-            .any(|event| event.0.contains("一回消費")));
+        // 直結fixtureの監査callbackには表示用operation名ではなく、
+        // Task状態を示す構造化履歴markerが渡る。
+        let has_task_audit = |task_id: &str, stage: &str, status: &str| {
+            audit_events.iter().any(|event| {
+                event.1 == task_id
+                    && event
+                        .0
+                        .strip_prefix(super::super::execution_history::AGENT_TASK_HISTORY_PREFIX)
+                        .and_then(|body| serde_json::from_str::<Value>(body).ok())
+                        .map(|record| {
+                            record["stage"] == stage
+                                && record["status"] == status
+                                && record["task_id"] == task_id
+                        })
+                        .unwrap_or(false)
+            })
+        };
+        assert!(has_task_audit(task_id, "start", "running"));
+        assert!(has_task_audit(&cancel_task_id, "start", "running"));
+        assert!(has_task_audit(&deadline_task_id, "start", "running"));
+        assert!(has_task_audit(&cancel_task_id, "terminal", "cancelled"));
+        assert!(has_task_audit(&deadline_task_id, "terminal", "failed"));
         assert!(audit_events
             .iter()
             .any(|event| event.0.contains("取消要求") && event.1 == cancel_task_id));
-        assert!(audit_events
-            .iter()
-            .any(|event| { event.0.contains("失敗・取消") && event.1 == cancel_task_id }));
-        assert!(audit_events
-            .iter()
-            .any(|event| { event.0.contains("失敗・取消") && event.1 == deadline_task_id }));
         let audit_text = serde_json::to_string(&audit_events).unwrap();
         assert!(!audit_text.contains(instruction));
         assert!(!audit_text.contains(&cancel_instruction));
@@ -5211,6 +5455,8 @@ mod tests {
             "runtime-only",
             Arc::new(試験Adapter {
                 回数: Arc::new(AtomicUsize::new(0)),
+                provider_credential_id: None,
+                provider_credential_forward_count: None,
                 失敗: false,
                 別session: false,
                 遅延: false,
@@ -6291,6 +6537,8 @@ mod tests {
                 "right",
                 Arc::new(試験Adapter {
                     回数: Arc::new(AtomicUsize::new(0)),
+                    provider_credential_id: None,
+                    provider_credential_forward_count: None,
                     失敗: right,
                     別session: false,
                     遅延: false,

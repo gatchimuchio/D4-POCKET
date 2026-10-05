@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "provider_id": "openai_codex_cli",
+  "model_id": "model-fixture-v1",
+  "authentication_source": "broker_credential_vault",
+  "credential_id": "1111111111111111111111111111111Z",
+  "automatic_fallback": false
+}

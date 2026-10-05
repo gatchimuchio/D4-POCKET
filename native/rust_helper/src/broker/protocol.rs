@@ -1269,6 +1269,30 @@ impl Broker {
                 payload_hash,
             );
         }
+        let provider_credential_available = match request.provider_model_selection.credential_id() {
+            None => true,
+            Some(credential_id) => {
+                #[cfg(windows)]
+                {
+                    self.提供元資格情報参照確認(credential_id)
+                }
+                #[cfg(not(windows))]
+                {
+                    let _ = credential_id;
+                    false
+                }
+            }
+        };
+        if !provider_credential_available {
+            return self.reject_with_payload_hash(
+                request_id,
+                operation,
+                "provider_credential_not_available",
+                "指定Providerに結び付く有効なBroker資格情報を確認できません",
+                true,
+                payload_hash,
+            );
+        }
         if !self.desktop_install_path_verified
             || self.desktop_agent_workspace_protected_paths.is_empty()
         {
@@ -4251,28 +4275,61 @@ impl Broker {
         };
         let mut 対話 = std::mem::take(&mut self.対話);
         let now = self.current_epoch_seconds();
-        let result = 対話.操作_作業領域結合済み_scratch(
+        let scratch_journal = self.agent_task_scratch.clone();
+        let broker = std::cell::RefCell::new(&mut *self);
+        let mut audit = |reason: &str, id: &str, hash: &str| {
+            let event = broker
+                .borrow_mut()
+                .append_audit(
+                    id,
+                    operation.as_str(),
+                    "recorded",
+                    reason,
+                    EVIDENCE_SOURCE_INTERNAL_STATE,
+                    hash,
+                )
+                .map_err(|_| 対話失敗::監査失敗)?;
+            last_event = event.event_id.clone();
+            Ok(event.event_id)
+        };
+        let mut provider_credential =
+            |runtime_id: &str, provider_id: &str, credential_id: &str, use_hash: &str| {
+                #[cfg(windows)]
+                {
+                    match broker.borrow_mut().提供元資格情報使用処理(
+                        request_id,
+                        runtime_id,
+                        provider_id,
+                        credential_id,
+                        use_hash,
+                    ) {
+                        Ok(secret) => Ok(secret),
+                        Err(super::credential_vault::ProviderCredentialUseFailure::Audit) => {
+                            Err(対話失敗::監査失敗)
+                        }
+                        Err(super::credential_vault::ProviderCredentialUseFailure::Denied) => {
+                            Err(対話失敗::権限拒否)
+                        }
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    let _ = (runtime_id, provider_id, credential_id, use_hash);
+                    Err(対話失敗::権限拒否)
+                }
+            };
+        let result = 対話.操作_作業領域結合済み_scratch_提供元資格情報付き(
             operation.as_str(),
             payload,
             owner,
             now,
             workspace_binding.as_ref(),
-            self.agent_task_scratch.clone(),
-            &mut |reason, id, hash| {
-                let event = self
-                    .append_audit(
-                        id,
-                        operation.as_str(),
-                        "recorded",
-                        reason,
-                        EVIDENCE_SOURCE_INTERNAL_STATE,
-                        hash,
-                    )
-                    .map_err(|_| 対話失敗::監査失敗)?;
-                last_event = event.event_id.clone();
-                Ok(event.event_id)
-            },
+            scratch_journal,
+            &mut provider_credential,
+            &mut audit,
         );
+        drop(audit);
+        drop(broker);
         self.対話 = 対話;
         match result {
             Ok(body) => BrokerResponse {

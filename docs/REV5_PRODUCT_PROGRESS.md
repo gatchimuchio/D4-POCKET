@@ -2,7 +2,7 @@
 
 更新日: 2026-10-05
 工程正本: ユーザー提示「D4 Pocket / GUI-Shell 統合実装仕様書 rev5」「統合開発工程表 rev5」「Codex実装指示書 rev5」
-現行phase: `P6 Credential / MCP` (`OPEN`)。`P5 Workspace / History / Evaluation`は2026-10-05にProduct Build受入れを閉鎖。
+現行phase: `P7 A2A / Host / Adapter` (`OPEN`)。`P6 Credential / MCP`は2026-10-05にProduct Build受入れを閉鎖。`P5 Workspace / History / Evaluation`も同日に閉鎖済み。
 基準Repository状態: rev5文書同期commit `39dd3f4bc7aafe350ca94fce9392095f1064d2bc`。その後の実装・検証状態は本書末尾の更新履歴を参照。
 
 ## 正本の選び方
@@ -103,21 +103,35 @@ Task履歴のAudit記録は本文を含めず、Task開始・終端の照合に�
 
 今回の追加検証: `cargo test --locked --lib agent_task_history -- --test-threads=1` PASS（4件）、`cargo build --locked` PASS、Desktop履歴画面 `flutter test --no-pub test/history_screen_test.dart` PASS（16件）、Desktopと共通UIの`flutter analyze --no-pub` PASS、Schema検査PASS（158 schema／155正常例／201負例）、Conformance PASS（234 checks）。Flutter試験はOneDrive上の既知のbuild cleanup問題を避けたASCII一時cloneで実行し、検査対象の3 Dart fileだけを同期した。`python -X utf8 tooling/日本語基底監査.py --strict`はFAILのまま。今回変更fileは0 findingであり、残る2 findingは旧rev3／rev4履歴文書の既存記録で、現行意味正本へ昇格・書換えしない。既存P5 focused tests: Workspace Inspector 22、履歴／内容表示14+4、Evaluation画面5、対話履歴27、Regression Case Client 6+2、Evaluation Client 10、Rust P5対象51（合計141件）PASS。これはProduct Build受入れであり、通常Release capability、installed product、広域regression、最終出荷保証を意味しない。大規模evaluationとFeature Complete後の横断品質保証はFinal QAへ送る。
 
-### P6 資格情報／MCP — OPEN
+### P6 資格情報／MCP — CLOSED（Product Build）
 
 | 受入れ条件 | 状態 | 成立範囲・証拠 |
 | --- | --- | --- |
 | 資格情報のOwner登録・一覧・失効 | 合格（Broker経路） | 登録はOwner control、一覧はmetadata-only、失効はRust Desktop native確認と永続Auditを要求。資格情報Broker試験6件PASS |
-| 提供元への資格情報結合 | 未成立 | 現行提供元`openai_codex_cli`は利用者のCodex CLI設定へ認証を委譲し、D4 Pocketは秘密値を受け取らない。別の提供元実行経路がD4管理Credentialを消費する結合は未接続 |
+| 提供元への資格情報結合 | 合格（Product Build fixture） | `openai_codex_cli`の登録済みCredential IDをBrokerが現在のTask Permission／Approvalと照合し、DPAPIから解決した合成秘密値をCodex CLI親process環境へだけ渡す。偽Codex CLI fixtureは引数への非露出とshell環境除外設定を検査 |
 | MCP Credential結合 | 合格（Windows製品経路） | 登録済みCredential ID・用途・対象Server・状態をDPAPI保管と照合し、対象stdio childだけへ短命値を渡す。別Server再利用を拒否 |
 | MCP接続・Tool一覧 | 合格 | BrokerがWindows stdio childからdiscovery／Tool Schemaを取得し、通常IPCへmetadata-onlyで投影。Trustや権限は生成しない |
 | MCP Tool実行・監査 | 合格（Product Build範囲） | Rust Broker・DPAPI・実`cmd.exe` fixture processを通すWindows統合試験で一回限りPermission、Owner-confirmation要求、永続Auditへの記録、hash-only結果、切断を確認 |
 
-2026-10-05にP6のMCP基本経路を実装・検証した。`cargo test --locked --lib broker::mcp_center::tests -- --test-threads=1`は2件、`broker::credential_vault::tests`は6件、`adapters::mcp_stdio::tests`は5件すべてPASS。統合試験は合成Credentialだけを使い、実値とTool本文markerがBroker応答・Auditに現れないことを確認した。Tool応答の`LIVE_RUNTIME`はfixture child processとの実通信を示す。試験はBrokerのOwner-confirmation要求入口までを通すが、Windows確認dialogを表示するDesktop製品操作の証拠ではない。P6はProvider credential bindingが未成立のためOPENを維持し、現行Codex CLI認証境界を変更せず、この受入れを消費する実Provider経路を施工する。
+開始時点の記録: P6のMCP基本経路は2026-10-05に先行実装済みだったが、Provider credential bindingは未接続だった。MCP統合試験は合成Credentialだけを使い、実値とTool本文markerがBroker応答・Auditに現れないことを確認した。Tool応答の`LIVE_RUNTIME`はfixture child processとの実通信を示すが、Windows確認dialogを表示するDesktop製品操作の証拠ではない。
+
+2026-10-05のP6完了単位で、Broker資格情報解決を現在要求のWorkspace Permission／Task Approval後に限定し、永続使用Audit確定後だけDPAPI秘密値を短命bufferでCodex Adapterへ渡す経路を追加した。Codex CLI資格情報modeは既存CLI管理認証modeと分離し、自動fallbackしない。Provider credential binding、Owner登録／一覧／失効、MCP接続／Tool一覧／Tool実行のProduct Build基本経路が揃ったためP6をCLOSEDとする。
+
+Provider結合の`FIXTURE`試験では、合成CredentialがCodex CLI親process環境へ届き、CLI引数・結果・Auditへ出ず、tool shellから除外する設定が渡ることを偽Codex CLIが確認した。Broker試験ではPermission／Approval欠落と本文差替時にResolverが呼ばれず、有効grant後に一度だけCredentialがAdapterへ届く。これは実Codex CLI／実Provider APIの成功証拠ではない。実Codex CLI 0.160.0を合成loopback APIへ接続する`LIVE_RUNTIME`試験は、API要求前にMxCが`CreateProcessSecurityEnvironment`／HRESULT `0x80070003`で停止した。Provider接続・模型利用可否は`unknown`のままとし、自動fallbackを無効、通常Releaseの`task_execution=unsupported`を維持する。実CLI／MxCの統合証拠と別profile installed経路はFinal QA／release evidenceで確認する。
+
+検証結果: JSON Schema 158件、正常例155件、負例fixture 203件、適合確認234項目に合格。資格情報保管庫のRust対象試験7件、Broker資格情報解決の許可境界試験1件、偽Codex CLIへの合成資格情報引渡し試験1件、MCP Broker試験2件、MCP stdio試験5件、DesktopのMCP metadata試験12件、資格情報IDだけを登録する画面試験1件もそれぞれ合格。`cargo build --locked`も合格。
+
+非選別の`cargo test --locked -- --test-threads=1`はlib試験432件成功／2件失敗／7件ignoredで終了した。失敗は既存Windows HTTP／TLS接続fixtureの接続切断（OS error 10054／`ConnectionReset`）で、Codex loopback fixtureは単独再実行で成功、Update DownloadのTLS修復fixtureも単独再実行で成功した一方、既存package置換fixtureは単独でも接続切断を再現した。現行差分の他targetまで結果を得るため、この3試験だけを`--skip failed_tool_result_is_not_replayed_as_another_exec_command --skip failed_replacement_keeps_the_existing_corrupt_package_unchanged --skip local_tls_server_repairs_only_after_verified_package_bytes`で明示除外した全target実行を行い、lib 431件成功／0失敗／7 ignored／3 filteredとなり、他の全実行targetも失敗なしで完了した。3試験は削除・変更せず、集約loopback安定性を既存`FQ-TEST-LOOPBACK`へ記録する。これはP6資格情報変更経路の失敗ではなく、P6 Acceptanceを阻止しない。通常Release capabilityや正式配布可否へは昇格しない。
+
+日本語基底strict監査は終了code 1で、旧rev3／rev4履歴文書の2件と、試験内の外部Authorization protocol値`Bearer`に対する静的heuristic finding 1件が残る。今回のテスト説明文は日本語化済み。過去履歴は改変せず、protocol値も監査回避のために変形しない。この監査結果は日本語文書負債として記録し、P6のCredential authority境界・Provider結合Acceptanceとは分離する。
+
+### P7 対A2A連携／複数Host／Adapter管理 — OPEN
+
+現行rev5の範囲はA2A、Multi Host、Adapter Manager、Host capability、接続性、degraded mode、local／remote Runtimeの区別である。P6を再訪せず、現行rev5 Acceptanceに対して実装済み経路と未成立条件を確認して順に進める。過去版の状態を現行受入れへ継承しない。
 
 ## 3. 後続製品工程
 
-P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / EvaluationはProduct Build受入れを閉鎖した。現行はP6 Credential / MCP。続いてP7 A2A / Host / Adapter、P8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
+P2 Multi-Agent Compare、P3 Handoff、P4 Provider / Model Center、P5 Workspace / History / Evaluation、P6 Credential / MCPはProduct Build受入れを閉鎖した。現行はP7 A2A / Host / Adapter。続いてP8 GUI-Shell Compose、P9 Standalone Export、P10 Module Selection / Pruning、P11 Windows Productization、P12 Product Integrationを進める。P12の統合経路成立をWindows Feature Completeとし、その後にQ0〜Q7 Final QAへ移る。P13 Mobile / Non-WindowsはWindows Feature Completeを止めず別trackとして扱う。Owner Finalizationではproduction Publisher／signing identity、production Audit key、不可逆な事業判断、Final GOだけをOwnerへ戻す。
 
 ## 4. 関連正本
 

@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import '../models/generated_contracts.dart';
 import '../services/agent_task_client.dart';
 import '../services/agent_handoff.dart';
-import '../services/broker_client.dart' show BrokerClientException;
+import '../services/broker_client.dart'
+    show BrokerClientException, BrokerTransport;
+import '../services/mcp_connection_client.dart'
+    show McpConnectionClient, McpCredentialSummary;
 import '../services/runtime_dialogue_client.dart' show RuntimeDialogueClient;
 import '../services/shell_core_client.dart';
 import '../services/agent_coordination.dart';
@@ -175,7 +178,8 @@ class _AgentCenterState extends State<AgentCenter> with WidgetsBindingObserver {
   Future<void> _registerCodexRuntime() async {
     final input = await showDialog<_CodexRegistrationInput>(
       context: context,
-      builder: (context) => const _CodexRegistrationDialog(),
+      builder: (context) =>
+          _CodexRegistrationDialog(transport: widget.client.brokerTransport),
     );
     if (!mounted || input == null) return;
     if (_registrations.any((registered) =>
@@ -1933,6 +1937,8 @@ class _CodexRegistrationInput {
     required this.workspaceRoot,
     required this.secretPaths,
     required this.modelId,
+    this.authenticationSource = 'codex_cli_managed',
+    this.credentialId,
     this.taskExecutionStatus = 'unknown',
   });
 
@@ -1942,6 +1948,8 @@ class _CodexRegistrationInput {
   final String workspaceRoot;
   final List<String> secretPaths;
   final String modelId;
+  final String authenticationSource;
+  final String? credentialId;
   final String taskExecutionStatus;
 
   _CodexRegistrationInput withTaskExecutionStatus(String status) =>
@@ -1952,6 +1960,8 @@ class _CodexRegistrationInput {
         workspaceRoot: workspaceRoot,
         secretPaths: secretPaths,
         modelId: modelId,
+        authenticationSource: authenticationSource,
+        credentialId: credentialId,
         taskExecutionStatus: status,
       );
 
@@ -1967,14 +1977,17 @@ class _CodexRegistrationInput {
           'version': 1,
           'provider_id': 'openai_codex_cli',
           'model_id': modelId,
-          'authentication_source': 'codex_cli_managed',
+          'authentication_source': authenticationSource,
+          if (credentialId != null) 'credential_id': credentialId,
           'automatic_fallback': false,
         },
       };
 }
 
 class _CodexRegistrationDialog extends StatefulWidget {
-  const _CodexRegistrationDialog();
+  const _CodexRegistrationDialog({required this.transport});
+
+  final BrokerTransport? transport;
 
   @override
   State<_CodexRegistrationDialog> createState() =>
@@ -1989,6 +2002,9 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
   final _workspaceRoot = TextEditingController();
   final _secretPaths = TextEditingController();
   final _modelId = TextEditingController();
+  String _authenticationSource = 'codex_cli_managed';
+  String? _credentialId;
+  Future<List<McpCredentialSummary>>? _providerCredentials;
 
   @override
   void dispose() {
@@ -2039,7 +2055,7 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    '利用できる提供元はCodex CLI経由のOpenAIのみです。模型識別子はCodex CLIへそのまま渡します。登録時は --version と exec --help（--model対応）のみ確認し、提供元接続・模型利用可否は検査しません。認証は利用者がCodex CLIへ設定したものを使い、D4 Pocketは秘密値を受け取りません。自動代替実行は行いません。',
+                    '利用できる提供元はCodex CLI経由のOpenAIのみです。模型識別子はCodex CLIへそのまま渡します。登録時に提供元接続・模型利用可否は検査しません。認証は既存Codex CLI設定、またはD4 Pocket Brokerの資格情報ID参照から選びます。秘密値はこの画面へ取得せず、自動代替実行は行いません。',
                   ),
                   const SizedBox(height: 12),
                   const ListTile(
@@ -2057,6 +2073,40 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
                     ),
                     validator: _modelIdValidator,
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('認証方式',
+                        style: Theme.of(context).textTheme.titleSmall),
+                  ),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Codex CLI管理設定'),
+                    subtitle: const Text('現在のCodex CLI認証を使用'),
+                    value: 'codex_cli_managed',
+                    groupValue: _authenticationSource,
+                    onChanged: (value) => setState(() {
+                      _authenticationSource = value!;
+                      _credentialId = null;
+                    }),
+                  ),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('D4 Pocket資格情報保管庫'),
+                    subtitle:
+                        const Text('登録済みOpenAI API keyをBrokerから参照（秘密値は表示しない）'),
+                    value: 'broker_credential_vault',
+                    groupValue: _authenticationSource,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _authenticationSource = value;
+                        _providerCredentials ??= _loadProviderCredentials();
+                      });
+                    },
+                  ),
+                  if (_authenticationSource == 'broker_credential_vault')
+                    _providerCredentialSelector(),
                   TextFormField(
                     controller: _runtimeId,
                     decoration:
@@ -2104,26 +2154,97 @@ class _CodexRegistrationDialogState extends State<_CodexRegistrationDialog> {
             child: const Text('キャンセル'),
           ),
           FilledButton(
-            onPressed: () {
-              if (!_formKey.currentState!.validate()) return;
-              final secrets = _secretPaths.text
-                  .split(RegExp(r'[\r\n]+'))
-                  .map((path) => path.trim())
-                  .where((path) => path.isNotEmpty)
-                  .toList(growable: false);
-              if (secrets.length > 16) return;
-              Navigator.of(context).pop(_CodexRegistrationInput(
-                runtimeId: _runtimeId.text.trim(),
-                codexCliPath: _cliPath.text.trim(),
-                workspaceId: _workspaceId.text.trim(),
-                workspaceRoot: _workspaceRoot.text.trim(),
-                secretPaths: secrets,
-                modelId: _modelId.text.trim(),
-              ));
-            },
+            onPressed: _authenticationSource == 'broker_credential_vault' &&
+                    _providerCredentials == null
+                ? null
+                : () {
+                    if (!_formKey.currentState!.validate()) return;
+                    if (_authenticationSource == 'broker_credential_vault' &&
+                        _credentialId == null) {
+                      return;
+                    }
+                    final secrets = _secretPaths.text
+                        .split(RegExp(r'[\r\n]+'))
+                        .map((path) => path.trim())
+                        .where((path) => path.isNotEmpty)
+                        .toList(growable: false);
+                    if (secrets.length > 16) return;
+                    Navigator.of(context).pop(_CodexRegistrationInput(
+                      runtimeId: _runtimeId.text.trim(),
+                      codexCliPath: _cliPath.text.trim(),
+                      workspaceId: _workspaceId.text.trim(),
+                      workspaceRoot: _workspaceRoot.text.trim(),
+                      secretPaths: secrets,
+                      modelId: _modelId.text.trim(),
+                      authenticationSource: _authenticationSource,
+                      credentialId: _credentialId,
+                    ));
+                  },
             child: const Text('native Owner確認へ進む'),
           ),
         ],
+      );
+
+  Future<List<McpCredentialSummary>> _loadProviderCredentials() {
+    final transport = widget.transport;
+    if (transport == null) {
+      return Future.error(const BrokerClientException('Broker接続がありません'));
+    }
+    return McpConnectionClient(transport).listProviderCredentials();
+  }
+
+  Widget _providerCredentialSelector() =>
+      FutureBuilder<List<McpCredentialSummary>>(
+        future: _providerCredentials,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.error_outline),
+              title: Text('資格情報metadataを取得できません。登録を停止しました。'),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              title: Text('Brokerから資格情報metadataを取得中'),
+            );
+          }
+          final credentials = snapshot.data!;
+          if (credentials.isEmpty) {
+            return const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.info_outline),
+              title: Text('利用可能なOpenAI API keyがありません'),
+              subtitle: Text('資格情報保管庫へ登録後、この画面を開き直してください。'),
+            );
+          }
+          final selected = credentials.any(
+            (credential) => credential.credentialId == _credentialId,
+          )
+              ? _credentialId
+              : null;
+          return DropdownButtonFormField<String>(
+            value: selected,
+            decoration: const InputDecoration(
+              labelText: '資格情報ID',
+              helperText: '秘密値はBrokerから読み取り、画面には返しません。',
+            ),
+            items: credentials
+                .map((credential) => DropdownMenuItem(
+                      value: credential.credentialId,
+                      child: Text(credential.credentialId),
+                    ))
+                .toList(growable: false),
+            validator: (value) => value == null ? '資格情報IDを選択してください' : null,
+            onChanged: (value) => setState(() => _credentialId = value),
+          );
+        },
       );
 }
 

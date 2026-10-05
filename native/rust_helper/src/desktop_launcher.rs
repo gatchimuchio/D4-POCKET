@@ -109,6 +109,8 @@ enum DesktopOwnerOperationSummary {
         secret_paths: Vec<String>,
         provider_id: String,
         model_id: String,
+        authentication_source: String,
+        credential_id: Option<String>,
         payload_hash: String,
     },
     RegressionCaseDelete {
@@ -1220,8 +1222,16 @@ fn owner_operation_candidate(
                 workspace_id: request.workspace_id,
                 workspace_root: request.workspace_root,
                 secret_paths: request.secret_paths,
-                provider_id: request.provider_model_selection.provider_id,
-                model_id: request.provider_model_selection.model_id,
+                provider_id: request.provider_model_selection.provider_id.clone(),
+                model_id: request.provider_model_selection.model_id.clone(),
+                authentication_source: request
+                    .provider_model_selection
+                    .authentication_source()
+                    .to_owned(),
+                credential_id: request
+                    .provider_model_selection
+                    .credential_id()
+                    .map(str::to_owned),
                 payload_hash,
             }
         }
@@ -1688,15 +1698,28 @@ fn owner_confirmation_text_for_identity(
             secret_paths,
             provider_id,
             model_id,
+            authentication_source,
+            credential_id,
             payload_hash,
         } => format!(
-            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\n提供元・模型: {} / {}\n認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を受け取らない）\n提供元接続・模型利用可否: 不明（登録時はCLI接続面のみ確認）\n自動代替実行: 無効\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\n{}\n\npayload hash:\n{}",
+            "Agent CLI実行系と作業領域を、このDesktop起動中だけBrokerへ登録しますか？\n\nAdapter ID: {}\nRuntime ID: {}\nCLI実行file: {}\nCLI検査範囲: {}\n提供元・模型: {} / {}\n{}\n提供元接続・模型利用可否: 不明（登録時はCLI接続面のみ確認）\n自動代替実行: 無効\nWorkspace ID: {}\nWorkspace root: {}\n秘密path除外（本文は受け取りません）:\n{}\n\n{}\n\npayload hash:\n{}",
             owner_confirmation_value(adapter_id),
             owner_confirmation_value(runtime_id),
             owner_confirmation_value(cli_path),
             owner_confirmation_value(interface_scope),
             owner_confirmation_value(provider_id),
             owner_confirmation_value(model_id),
+            if authentication_source == "broker_credential_vault" {
+                format!(
+                    "認証: Broker資格情報保管庫のProvider API keyを、Approval済み実行だけに使用\n資格情報ID: {}（metadata参照のみ。秘密値をFlutter／この確認要求へ含めない）",
+                    credential_id
+                        .as_deref()
+                        .map(owner_confirmation_value)
+                        .unwrap_or_else(|| "不正・未指定".into())
+                )
+            } else {
+                "認証: Codex CLI管理設定を使用（D4 Pocketは秘密値を受け取らない）".into()
+            },
             owner_confirmation_value(workspace_id),
             owner_confirmation_value(workspace_root),
             if secret_paths.is_empty() {
@@ -2483,10 +2506,12 @@ mod tests {
                 workspace_id,
                 workspace_root,
                 secret_paths,
-                provider_id,
-                model_id,
-                payload_hash,
-            } => json!({
+                    provider_id,
+                    model_id,
+                    authentication_source,
+                    credential_id,
+                    payload_hash,
+                } => json!({
                 "summary": {
                     "kind": "agent_cli_runtime_workspace_registration",
                     "adapter_id": adapter_id,
@@ -2498,6 +2523,8 @@ mod tests {
                     "secret_paths": secret_paths,
                     "provider_id": provider_id,
                     "model_id": model_id,
+                    "authentication_source": authentication_source,
+                    "credential_id": credential_id,
                     "payload_hash": payload_hash
                 },
                 "confirm": confirm
@@ -2955,6 +2982,8 @@ mod tests {
                 secret_paths: Vec<String>,
                 provider_id: String,
                 model_id: String,
+                authentication_source: String,
+                credential_id: Option<String>,
                 payload_hash: String,
             },
         }
@@ -3061,6 +3090,8 @@ mod tests {
                 secret_paths,
                 provider_id,
                 model_id,
+                authentication_source,
+                credential_id,
                 payload_hash,
             } => DesktopOwnerOperationSummary::AgentCliRuntimeWorkspaceRegistration {
                 adapter_id,
@@ -3072,6 +3103,8 @@ mod tests {
                 secret_paths,
                 provider_id,
                 model_id,
+                authentication_source,
+                credential_id,
                 payload_hash,
             },
         };
@@ -4245,6 +4278,8 @@ mod tests {
                     secret_paths,
                     provider_id,
                     model_id,
+                    authentication_source,
+                    credential_id,
                     payload_hash,
                 } = summary
                 else {
@@ -4263,6 +4298,8 @@ mod tests {
                 assert_eq!(secret_paths[0], ".env");
                 assert_eq!(provider_id, "openai_codex_cli");
                 assert_eq!(model_id, "model-test-01");
+                assert_eq!(authentication_source, "codex_cli_managed");
+                assert_eq!(credential_id, &None);
                 assert_eq!(payload_hash, expected_payload_hash);
                 let confirmation_text = owner_confirmation_text(summary);
                 assert!(confirmation_text.contains(AGENT_CLI_REGISTRATION_NOTICE));
@@ -4781,6 +4818,8 @@ mod tests {
             secret_paths: vec![".env".into(), "secrets".into()],
             provider_id: "openai_codex_cli".into(),
             model_id: "model-test-01".into(),
+            authentication_source: "codex_cli_managed".into(),
+            credential_id: None,
             payload_hash: format!("sha256:{}", "a".repeat(64)),
         };
         let text = owner_confirmation_text(&summary);
